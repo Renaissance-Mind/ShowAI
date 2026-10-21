@@ -3,6 +3,7 @@ import { clearWidgetSelection } from "./widget-selection";
 import { ImageContent } from "./ImageContent";
 import { richTextStyle } from "./model.mjs";
 import { mathHtml } from "../blocks/markdown-math.mjs";
+import { installNoteBubbles } from "../blocks/note-bubble";
 import {
   useEffect,
   useState,
@@ -362,6 +363,7 @@ export function MathView({
 }: NodeViewProps) {
   const t = useTranslator(messages);
   const display = node.type.name === "mathBlock" || node.attrs.display;
+  installNoteBubbles();
   return (
     <NodeViewWrapper
       as={display ? "div" : "span"}

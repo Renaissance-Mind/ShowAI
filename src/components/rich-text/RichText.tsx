@@ -13,6 +13,7 @@ import {
   richTextStyle,
 } from "./model.mjs";
 import "../blocks/katex.css";
+import { installNoteBubbles } from "../blocks/note-bubble";
 
 export type RichTextHost = Pick<
   RichTextEditorProps,
@@ -36,6 +37,8 @@ export function RichText({
   host,
 }: BlockProps & { host?: RichTextHost }) {
   const t = useTranslator(messages);
+  // Annotated text and formulas show their notes in reading and editing.
+  installNoteBubbles();
   validateRichTextData(data);
   const content = useMemo(
     () => richTextDocument(data),

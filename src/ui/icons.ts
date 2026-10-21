@@ -98,6 +98,7 @@ export {
   MapIcon,
   Maximize2,
   MessageSquareQuote,
+  MessageSquareText,
   Minus,
   Monitor,
   Moon,

@@ -11,6 +11,7 @@ import "./layer-diagram.css";
 import { blockLabel } from "./shared";
 import { useTranslator } from "../../i18n/react";
 import messages from "../../i18n/messages/layerDiagram";
+import { NoteText } from "./NoteText";
 
 type Module = { id: string; name: string; path?: string; detail?: string };
 type Layer = {
@@ -114,7 +115,11 @@ export function LayerDiagramBlock({ data }: BlockProps) {
     >
       <div className="ly-top">
         <div>
-          {model.title && <h3 className="ly-title">{model.title}</h3>}
+          {model.title && (
+            <h3 className="ly-title">
+              <NoteText text={model.title} />
+            </h3>
+          )}
           {model.caption && (
             <p className="ly-caption">
               <RichText source={model.caption} inline />

@@ -84,6 +84,8 @@ Code blocks use Lowlight's common language grammars, including JavaScript, TypeS
 
 Text marks are `bold`, `italic`, `underline`, `strike`, `code`, `highlight`, and `link`. A link has `attrs.href` with an HTTP(S), `mailto:`, `tel:`, or anchor URL; a highlight can use `attrs.color` and `attrs.mode` (`lower` or `full`). `textStyle` carries supported text styling such as color. JavaScript URLs and arbitrary HTML are rejected.
 
+`annotation` attaches a hover note: `{ "type": "annotation", "attrs": { "note": "…" } }`, 1–1000 characters. Readers see the note in a bubble when they hover, focus or tap the text, which shows a dotted underline. Markdown input writes it as `[visible text]{note}`. Formulas carry their notes in LaTeX: `\note{x_t}{noisy latent at step t}` annotates one part of a formula, and `[$formula$]{note}` imports as a note on the whole formula. Notes may contain `$…$` math. The same `[visible text]{note}` syntax works in documentation built-ins' inline markup, component titles and descriptions, and chart labels and series names.
+
 ```json
 {
   "type": "text",

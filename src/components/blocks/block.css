@@ -385,7 +385,7 @@
   background: none;
   text-decoration: underline;
 }
-.sb-chart-legend > button > span,
+.sb-chart-legend > button > span:not([data-showai-note]),
 .sb-dot {
   display: inline-block;
   width: 6px;

@@ -1,5 +1,11 @@
 import { Marked } from "marked";
 import { mathExtensions } from "../blocks/markdown-math.mjs";
+import {
+  NOTE_MAX,
+  annotateLatex,
+  invalidNoteMark,
+  noteMarkdownExtension,
+} from "../blocks/note-markup.mjs";
 
 // ==text== is the common Markdown highlight syntax (Obsidian, Typora, many AI
 // outputs). Its content must not start or end with a space, so `a == b` stays text.
@@ -19,7 +25,12 @@ const highlightExtension = {
   },
 };
 const markdownImport = new Marked({
-  extensions: [...mathExtensions, highlightExtension],
+  // [visible text]{note} attaches a hover note; see note-markup.mjs.
+  extensions: [
+    ...mathExtensions,
+    ...(noteMarkdownExtension ? [noteMarkdownExtension] : []),
+    highlightExtension,
+  ],
 });
 
 export const richTextFormats = [
@@ -31,6 +42,7 @@ export const richTextFormats = [
   "code",
   "link",
   "textStyle",
+  "annotation",
 ];
 export const richTextAlignments = ["left", "center", "right", "justify"];
 // Editors label these by value from their own message catalog.
@@ -80,6 +92,11 @@ export function markdownToRichText(
         return t.type === "codespan"
           ? textNode(t.text, [...marks, { type: mark }])
           : inline(t.tokens, [...marks, { type: mark }]);
+      if (t.type === "annotation")
+        return inline(t.tokens, [
+          ...marks,
+          { type: "annotation", attrs: { note: t.note } },
+        ]);
       if (t.type === "link")
         return inline(t.tokens, [
           ...marks,
@@ -89,13 +106,21 @@ export function markdownToRichText(
           },
         ]);
       if (t.type === "br") return [{ type: "hardBreak" }];
-      if (t.type === "mathInline" || t.type === "mathBlock")
+      if (t.type === "mathInline" || t.type === "mathBlock") {
+        // Formulas carry no marks; an annotated formula keeps its note in LaTeX.
+        const note = [...marks]
+          .reverse()
+          .find((mark) => mark.type === "annotation");
         return [
           {
             type: "mathInline",
-            attrs: { latex: t.text, display: !!t.display },
+            attrs: {
+              latex: note ? annotateLatex(t.text, note.attrs.note) : t.text,
+              display: !!t.display,
+            },
           },
         ];
+      }
       if (t.type === "image")
         return [
           {
@@ -333,6 +358,8 @@ export function validateRichTextData(data) {
         !/^(https?:\/\/|mailto:|tel:|#)/i.test(mark.attrs?.href ?? "")
       )
         throw Error("无效的文字链接。");
+      if (invalidNoteMark(mark))
+        throw Error(`注释需要 1–${NOTE_MAX} 个字符的 note。`);
     }
     if (
       node.type === "image" &&

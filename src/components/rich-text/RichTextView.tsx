@@ -6,6 +6,8 @@ import { richTextStyle } from "./model.mjs";
 import { createElement, type CSSProperties, type ReactNode } from "react";
 import type { JSONContent } from "@tiptap/core";
 import { mathHtml } from "../blocks/markdown-math.mjs";
+import { noteProps } from "../blocks/NoteText";
+import { installNoteBubbles } from "../blocks/note-bubble";
 import { safeUrl } from "../blocks/helpers";
 import { StepperReader, stepTitle } from "./Stepper";
 import { translator } from "../../i18n";
@@ -58,6 +60,13 @@ function markedText(node: JSONContent): ReactNode {
           >
             {content}
           </mark>
+        );
+        break;
+      case "annotation":
+        content = (
+          <span {...props} {...noteProps(String(mark.attrs?.note ?? ""))}>
+            {content}
+          </span>
         );
         break;
       case "textStyle":
@@ -161,6 +170,7 @@ export function RichTextNode({
       return markedText(node);
     case "mathInline":
     case "mathBlock":
+      installNoteBubbles();
       return createElement(node.type === "mathBlock" ? "div" : "span", {
         ...props,
         className:

@@ -44,6 +44,9 @@ import themeContent from "../design/content.css?raw";
 import contract from "../components/blocks/primitive-contract.mjs?raw";
 import nativeInkContract from "../surface/native-ink.mjs?raw";
 import portableInkContract from "../surface/portable-ink.mjs?raw";
+import compiledInk from "../surface/ink-kernel/compiled-ink.mjs?raw";
+import inkKernelWasm from "../surface/ink-kernel/ink-kernel-wasm.mjs?raw";
+import nativeBoardScene from "../surface/native-board-scene.mjs?raw";
 import nativeInkPreview from "../surface/NativeInkPreview.tsx?raw";
 import nativeInkCss from "../surface/native-ink.css?raw";
 import capacity from "../portable/capacity.mjs?raw";
@@ -78,6 +81,10 @@ import resourceEditor from "../components/blocks/ResourceEditor.tsx?raw";
 import researchContract from "../components/blocks/research-contract.mjs?raw";
 import researchCss from "../components/blocks/research-media.css?raw";
 import math from "../components/blocks/markdown-math.mjs?raw";
+import noteMarkup from "../components/blocks/note-markup.mjs?raw";
+import noteBubble from "../components/blocks/note-bubble.ts?raw";
+import noteCss from "../components/blocks/note.css?raw";
+import noteText from "../components/blocks/NoteText.tsx?raw";
 import katexCss from "../components/blocks/katex.css?raw";
 import shared from "../components/blocks/shared.tsx?raw";
 import helpers from "../components/blocks/helpers.ts?raw";
@@ -115,6 +122,7 @@ import i18n_primitives from "../i18n/messages/primitives.ts?raw";
 import i18n_references from "../i18n/messages/references.ts?raw";
 import i18n_resourceEditor from "../i18n/messages/resourceEditor.ts?raw";
 import i18n_richText from "../i18n/messages/richText.ts?raw";
+import i18n_richTextNotes from "../i18n/messages/richTextNotes.ts?raw";
 import i18n_search from "../i18n/messages/search.ts?raw";
 import i18n_analysis from "../i18n/messages/analysis.ts?raw";
 import i18n_scene3d from "../i18n/messages/scene3d.ts?raw";
@@ -209,6 +217,9 @@ const sources: Record<string, string> = {
   "primitive-contract.mjs": contract,
   "native-ink.mjs": nativeInkContract,
   "portable-ink.mjs": portableInkContract,
+  "ink-kernel/compiled-ink.mjs": compiledInk,
+  "ink-kernel/ink-kernel-wasm.mjs": inkKernelWasm,
+  "native-board-scene.mjs": nativeBoardScene,
   "NativeInkPreview.tsx": nativeInkPreview,
   "native-ink.css": nativeInkCss,
   "capacity.mjs": capacity,
@@ -243,6 +254,10 @@ const sources: Record<string, string> = {
   "research-contract.mjs": researchContract,
   "research-media.css": researchCss,
   "markdown-math.mjs": math,
+  "note-markup.mjs": noteMarkup,
+  "note-bubble.ts": noteBubble,
+  "note.css": noteCss,
+  "NoteText.tsx": noteText,
   "katex.css": katexCss,
   "shared.tsx": shared,
   "helpers.ts": helpers,
@@ -280,6 +295,7 @@ const sources: Record<string, string> = {
   "i18n/messages/references.ts": i18n_references,
   "i18n/messages/resourceEditor.ts": i18n_resourceEditor,
   "i18n/messages/richText.ts": i18n_richText,
+  "i18n/messages/richTextNotes.ts": i18n_richTextNotes,
   "i18n/messages/search.ts": i18n_search,
   "i18n/messages/analysis.ts": i18n_analysis,
   "i18n/messages/scene3d.ts": i18n_scene3d,

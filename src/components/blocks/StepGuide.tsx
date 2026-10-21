@@ -18,6 +18,7 @@ import { blockLabel } from "./shared";
 import type { Translator } from "../../i18n";
 import { useTranslator } from "../../i18n/react";
 import messages from "../../i18n/messages/stepGuide";
+import { NoteText } from "./NoteText";
 
 type Variant = { label: string; code: string; lang?: string };
 type Segment = { start: number; minutes: number; kind: "active" | "wait" };
@@ -614,7 +615,11 @@ export function StepGuideBlock({ data }: BlockProps) {
     >
       {(guide.title || guide.description) && (
         <div className="sg-head">
-          {guide.title && <h3 className="sg-heading">{guide.title}</h3>}
+          {guide.title && (
+            <h3 className="sg-heading">
+              <NoteText text={guide.title} />
+            </h3>
+          )}
           {guide.description && (
             <p className="sg-sub">
               <Inline source={guide.description} />

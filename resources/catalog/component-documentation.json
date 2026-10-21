@@ -15,7 +15,7 @@
       "inputs": [
         {
           "path": "content",
-          "meaning": "doc JSON 内容树；文字 marks 保存 bold/italic/underline/strike/code/highlight/link/textStyle。旧 Markdown/plain 字符串兼容导入。"
+          "meaning": "doc JSON 内容树；文字 marks 保存 bold/italic/underline/strike/code/highlight/link/textStyle/annotation（悬停注释，attrs.note）。旧 Markdown/plain 字符串兼容导入。"
         },
         {
           "path": "format",
@@ -72,6 +72,14 @@
           "exampleIndex": 1
         },
         {
+          "title": "悬停注释",
+          "steps": [
+            "Markdown 写 [可见文字]{注释}：文字带虚线下划线，读者悬停、聚焦或轻点时显示注释。公式内写 \\note{变量}{注释}，可注释多个变量；[$公式$]{注释} 注释整个公式。",
+            "注释可含 $…$，花括号成对，1–1000 字符。内容树中为 annotation mark，公式注释保存在 latex；选中菜单的“注释”按钮可增改删。"
+          ],
+          "exampleIndex": 1
+        },
+        {
           "title": "替换为自己的内容",
           "steps": [
             "根据上述输入关系填入任务提供的内容，保留稳定标识与合法取值。",
@@ -86,8 +94,13 @@
           "persistence": "none"
         },
         {
+          "action": "悬停、聚焦或轻点带注释的内容",
+          "effect": "显示注释气泡；移开、Esc 或轻点别处关闭。",
+          "persistence": "none"
+        },
+        {
           "action": "选中文字",
-          "effect": "统一菜单设置字体、字号、粗体、强调、下划线、删除线、高亮颜色与下半部/整块模式、文字颜色、行内代码、链接和段落对齐。",
+          "effect": "统一菜单设置字体、字号、粗体、强调、下划线、删除线、高亮颜色与下半部/整块模式、文字颜色、行内代码、链接、注释和段落对齐。",
           "persistence": "content"
         },
         {
@@ -1026,11 +1039,11 @@
       "inputs": [
         {
           "path": "title",
-          "meaning": "组件标题；只修改本实例的文字。"
+          "meaning": "组件标题；只修改本实例的文字。 可写 [文字]{注释}，悬停时显示注释。"
         },
         {
           "path": "description",
-          "meaning": "说明文字，用于解释数据口径或阅读目标。"
+          "meaning": "说明文字，用于解释数据口径或阅读目标。 可写 [文字]{注释}，悬停时显示注释。"
         },
         {
           "path": "type",
@@ -1038,11 +1051,11 @@
         },
         {
           "path": "labels",
-          "meaning": "横轴标签数组；序列中的第 i 个数值对应 labels[i]。"
+          "meaning": "横轴标签数组；序列中的第 i 个数值对应 labels[i]。标签可写 [文字]{注释}，读者悬停横轴标签或原始数据表时显示注释；超过 12 个字符的标签被截短，悬停显示全文。"
         },
         {
           "path": "series",
-          "meaning": "每条序列包含 name、values，可选 color；values 应与 labels 等长且全为有限数值。"
+          "meaning": "每条序列包含 name、values，可选 color；values 应与 labels 等长且全为有限数值。name 可写 [文字]{注释}，悬停图例与数据表表头时显示。"
         },
         {
           "path": "unit",
@@ -9218,7 +9231,7 @@
         },
         {
           "path": "steps[].detail",
-          "meaning": "可选：当前步骤的说明；支持 **粗体**、`代码` 与 [链接](https://…)，换行分段。"
+          "meaning": "可选：当前步骤的说明；支持 **粗体**、`代码`、[链接](https://…) 与悬停注释 [文字]{注释}，换行分段。"
         }
       ],
       "recipes": [
@@ -9363,7 +9376,7 @@
         },
         {
           "path": "layers[].modules[].detail",
-          "meaning": "可选：模块职责；支持 **粗体**、`代码` 与 [链接](https://…)，换行分段。"
+          "meaning": "可选：模块职责；支持 **粗体**、`代码`、[链接](https://…) 与悬停注释 [文字]{注释}，换行分段。"
         },
         {
           "path": "initial",
@@ -9495,7 +9508,7 @@
         },
         {
           "path": "steps[].body",
-          "meaning": "说明，按换行分段。行内标记：**粗体**、`代码`、[文字](https://…)。"
+          "meaning": "说明，按换行分段。行内标记：**粗体**、`代码`、[文字](https://…)、悬停注释 [文字]{注释}。"
         },
         {
           "path": "steps[].code",
@@ -9801,7 +9814,7 @@
         },
         {
           "path": "nodes[].detail",
-          "meaning": "可选：更多说明；支持 **粗体**、`代码`、[链接](https://…)，空行分段，每行以 - 开头的段落成为列表。"
+          "meaning": "可选：更多说明；支持 **粗体**、`代码`、[链接](https://…) 与悬停注释 [文字]{注释}，空行分段，每行以 - 开头的段落成为列表。"
         },
         {
           "path": "nodes[].example",
@@ -9955,7 +9968,7 @@
         },
         {
           "path": "cards[].body",
-          "meaning": "一句话说明，支持 **粗体** 和 `代码`；没有 href 的卡片也可以写 [链接](https://…)。"
+          "meaning": "一句话说明，支持 **粗体**、`代码` 和悬停注释 [文字]{注释}；没有 href 的卡片也可以写 [链接](https://…)。"
         },
         {
           "path": "cards[].icon",

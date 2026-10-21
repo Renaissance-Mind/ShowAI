@@ -25,6 +25,8 @@ function markdownText(node: JSONContent): string {
     else if (mark.type === "strike") value = `~~${value}~~`;
     else if (mark.type === "code")
       value = `\`${value.replaceAll("`", "\\`")}\``;
+    else if (mark.type === "annotation")
+      value = `[${value}]{${mark.attrs?.note ?? ""}}`;
   }
   return value;
 }

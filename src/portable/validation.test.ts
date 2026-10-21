@@ -66,7 +66,11 @@ describe("portable artifact boundaries", () => {
     }
     for (const [name, type] of Object.entries(schema.marks)) {
       const mark = type.create(
-        name === "link" ? { href: "https://example.com" } : undefined,
+        name === "link"
+          ? { href: "https://example.com" }
+          : name === "annotation"
+            ? { note: "悬停时显示的注释" }
+            : undefined,
       );
       const text = schema.text("Marked text", [mark]).toJSON();
       expect(

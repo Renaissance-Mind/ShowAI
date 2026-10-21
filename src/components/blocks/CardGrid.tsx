@@ -12,6 +12,7 @@ import "./card-grid.css";
 import { blockLabel } from "./shared";
 import { useTranslator } from "../../i18n/react";
 import messages from "../../i18n/messages/cardGrid";
+import { NoteText } from "./NoteText";
 
 type Card = CardGridData["cards"][number];
 
@@ -41,7 +42,11 @@ function CardContent({
       {card.icon}
     </span>
   );
-  const tag = card.tag && <span className="cg-tag">{card.tag}</span>;
+  const tag = card.tag && (
+    <span className="cg-tag">
+      <NoteText text={card.tag} focusable={!linked} />
+    </span>
+  );
   if (tile)
     return (
       <>
@@ -52,7 +57,9 @@ function CardContent({
           </span>
         )}
         <span className="cg-title">
-          <span>{card.title}</span>
+          <span>
+            <NoteText text={card.title} focusable={!linked} />
+          </span>
           {linked && <Arrow />}
         </span>
         {body}
@@ -63,7 +70,9 @@ function CardContent({
       {icon}
       <span className="cg-text">
         <span className="cg-title">
-          <span>{card.title}</span>
+          <span>
+            <NoteText text={card.title} focusable={!linked} />
+          </span>
           {tag}
         </span>
         {body}
@@ -85,7 +94,11 @@ export function CardGridBlock({ data }: BlockProps) {
       data-columns={columns}
       style={{ "--cg-columns": columns } as CSSProperties}
     >
-      {model.title && <h3 className="cg-heading">{model.title}</h3>}
+      {model.title && (
+        <h3 className="cg-heading">
+          <NoteText text={model.title} />
+        </h3>
+      )}
       <ul className="cg-grid">
         {model.cards.map((card, index) => {
           const tone = CARD_TONES.includes(card.tone!) ? card.tone : "brand";

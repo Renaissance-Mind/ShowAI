@@ -23,6 +23,7 @@ import "./structure-browser.css";
 import { blockLabel } from "./shared";
 import { useTranslator } from "../../i18n/react";
 import messages from "../../i18n/messages/structureBrowser";
+import { NoteText } from "./NoteText";
 
 type Structure = {
   title?: string;
@@ -334,7 +335,11 @@ export function StructureBrowserBlock({ data }: BlockProps) {
       className="sb-block stb-block"
       aria-label={blockLabel(model.title, t("title"))}
     >
-      {model.title && <h3 className="stb-heading">{model.title}</h3>}
+      {model.title && (
+        <h3 className="stb-heading">
+          <NoteText text={model.title} />
+        </h3>
+      )}
       <div className="stb-frame">
         <div className="stb-nav">
           <div

@@ -24,6 +24,10 @@ import { validateEventTimelineData } from "../components/blocks/event-timeline-c
 import { validatePlaygroundData } from "../components/blocks/playground-contract.mjs";
 import { validateDatabaseData } from "../components/blocks/database-contract.mjs";
 import { validateResearchData } from "../components/blocks/research-contract.mjs";
+import {
+  NOTE_MAX,
+  invalidNoteMark,
+} from "../components/blocks/note-markup.mjs";
 // Shared by the browser importer and the dependency-free artifact command.
 import { validateRemoteComponents } from "./remote.mjs";
 import {
@@ -80,6 +84,7 @@ const markTypes = new Set([
   "link",
   "highlight",
   "textStyle",
+  "annotation",
 ]);
 const nodeAttributes = new Set([
   "id",
@@ -126,6 +131,7 @@ const markAttributes = new Set([
   "fontFamily",
   "fontSize",
   "mode",
+  "note",
 ]);
 
 function object(value, path) {
@@ -626,6 +632,10 @@ function validateNode(value, path, counter, depth = 0, parentType = null) {
         throw new Error("Highlight mode must be lower or full.");
       if (mark.type === "link" && !isSafeUrl(mark.attrs?.href))
         throw new Error("Links require a safe href.");
+      if (invalidNoteMark(mark))
+        throw new Error(
+          `Annotations require a note of 1–${NOTE_MAX} characters.`,
+        );
     }
   }
   if (node.content !== undefined) {

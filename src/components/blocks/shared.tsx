@@ -3,6 +3,8 @@ import { useContext, useLayoutEffect, type ReactNode } from "react";
 import { BlockActions, BlockActionHost } from "./action-host";
 import { useTranslator } from "../../i18n/react";
 import messages from "../../i18n/messages/blocks";
+import { NoteText } from "./NoteText";
+import { plainNotes } from "./note-markup.mjs";
 
 // Default titles that built-in components save into documents; a caption that
 // still matches one of them is hidden.
@@ -24,7 +26,7 @@ export function blockLabel(title: unknown, fallback: string): string {
   return typeof title === "string" &&
     title.trim() &&
     !genericTitles.has(title.trim())
-    ? title
+    ? plainNotes(title)
     : fallback;
 }
 
@@ -69,9 +71,15 @@ export function BlockHeader({
     >
       {hasCaption && (
         <div className="sb-heading">
-          {visibleTitle && <div className="sb-title">{visibleTitle}</div>}
+          {visibleTitle && (
+            <div className="sb-title">
+              <NoteText text={visibleTitle} />
+            </div>
+          )}
           {description?.trim() && (
-            <p className="sb-description">{description}</p>
+            <p className="sb-description">
+              <NoteText text={description} />
+            </p>
           )}
         </div>
       )}

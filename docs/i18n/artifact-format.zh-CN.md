@@ -73,6 +73,8 @@ v3 用可递归嵌套的原生 Page 与 Board 保存内容。Page 按阅读顺�
 
 文本 marks 包括 bold、italic、underline、strike、code、highlight、link 与支持的 textStyle。链接允许 HTTP(S)、mailto、tel 或锚点；highlight 可指定 color 和 lower/full 模式。拒绝 JavaScript URL 与任意 HTML。
 
+`annotation` 为文字附加悬停注释：`{ "type": "annotation", "attrs": { "note": "…" } }`，1–1000 个字符。带注释的文字显示虚线下划线，读者悬停、键盘聚焦或轻点时在气泡中看到注释。Markdown 输入写作 `[可见文字]{注释}`。公式的注释写在 LaTeX 里：`\note{x_t}{第 t 步的带噪潜变量}` 注释公式中的一部分，`[$公式$]{注释}` 导入后成为整个公式的注释。注释中可用 `$…$` 写公式。同一 `[可见文字]{注释}` 写法也用于文档类内置组件的行内标记、组件标题与说明，以及图表标签和序列名。
+
 ## 内置组件
 
 ```json

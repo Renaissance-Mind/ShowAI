@@ -20,6 +20,20 @@ import type { BlockProps, ChartSeries } from "./types";
 import { getLocale } from "../../i18n";
 import { useTranslator } from "../../i18n/react";
 import messages from "../../i18n/messages/chart";
+import { NoteSvgText, NoteText, noteProps } from "./NoteText";
+import { plainNotes, textNotes } from "./note-markup.mjs";
+
+/** Axis label: [label]{note} keeps its note; a shortened label shows the full text on hover. */
+function AxisLabel({ label }: { label: string }) {
+  const plain = plainNotes(label);
+  if (plain.length <= 12) return <NoteSvgText text={label} />;
+  const notes = textNotes(label).map((item) => item.note);
+  return (
+    <tspan {...noteProps([plain, ...notes].join("\n"), false)}>
+      {plain.slice(0, 10) + "…"}
+    </tspan>
+  );
+}
 
 const WIDTH = 760,
   HEIGHT = 272,
@@ -125,13 +139,13 @@ export function ChartBlock({ data, onChange, readOnly }: BlockProps) {
           { id: "label", name: t("csvLabel"), type: "text" },
           ...series.map((item, index) => ({
             id: `s${index}`,
-            name: item.name,
+            name: plainNotes(item.name),
             type: "number" as const,
           })),
         ],
         labels.map((label, index) => ({
           id: String(index),
-          label,
+          label: plainNotes(label),
           ...Object.fromEntries(
             series.map((item, seriesIndex) => [
               `s${seriesIndex}`,
@@ -140,7 +154,7 @@ export function ChartBlock({ data, onChange, readOnly }: BlockProps) {
           ),
         })),
       ),
-      `${text(data.title) || t("fileName")}.csv`,
+      `${plainNotes(text(data.title)) || t("fileName")}.csv`,
       "text/csv;charset=utf-8",
     );
   return (
@@ -265,7 +279,7 @@ export function ChartBlock({ data, onChange, readOnly }: BlockProps) {
                 }
               >
                 <span style={{ backgroundColor: item.color }} />
-                {item.name}
+                <NoteText text={item.name} focusable={false} />
               </button>
             ))}
             {text(data.unit) && (
@@ -279,7 +293,7 @@ export function ChartBlock({ data, onChange, readOnly }: BlockProps) {
               viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
               role="img"
               aria-label={t("summary", {
-                title: text(data.title) || t("chart"),
+                title: plainNotes(text(data.title)) || t("chart"),
                 points: labels.length,
                 series: series.length,
               })}
@@ -354,7 +368,7 @@ export function ChartBlock({ data, onChange, readOnly }: BlockProps) {
                       textAnchor="middle"
                       className="sb-chart-label"
                     >
-                      {label.length > 12 ? label.slice(0, 10) + "…" : label}
+                      <AxisLabel label={label} />
                     </text>
                   ),
               )}
@@ -393,7 +407,8 @@ export function ChartBlock({ data, onChange, readOnly }: BlockProps) {
                           }
                         >
                           <title>
-                            {label} · {item.name}: {item.values[index] ?? 0}
+                            {plainNotes(label)} · {plainNotes(item.name)}:{" "}
+                            {item.values[index] ?? 0}
                             {text(data.unit)}
                           </title>
                         </rect>
@@ -429,7 +444,8 @@ export function ChartBlock({ data, onChange, readOnly }: BlockProps) {
                               strokeWidth={2}
                             >
                               <title>
-                                {label} · {item.name}: {item.values[index] ?? 0}
+                                {plainNotes(label)} · {plainNotes(item.name)}:{" "}
+                                {item.values[index] ?? 0}
                                 {text(data.unit)}
                               </title>
                             </circle>
@@ -455,14 +471,14 @@ export function ChartBlock({ data, onChange, readOnly }: BlockProps) {
                   left: `${Math.min(78, Math.max(8, (x(hover) / WIDTH) * 100))}%`,
                 }}
               >
-                <strong>{labels[hover]}</strong>
+                <strong>{plainNotes(labels[hover])}</strong>
                 {visible.map((item, index) => (
                   <div key={`${item.name}-${index}`}>
                     <span
                       className="sb-dot"
                       style={{ background: item.color }}
                     />
-                    {item.name}
+                    {plainNotes(item.name)}
                     <b>
                       {prettyNumber(item.values[hover] ?? 0)}
                       {text(data.unit)}
@@ -482,14 +498,18 @@ export function ChartBlock({ data, onChange, readOnly }: BlockProps) {
                   <tr>
                     <th>{t("label")}</th>
                     {series.map((item, index) => (
-                      <th key={index}>{item.name}</th>
+                      <th key={index}>
+                        <NoteText text={item.name} />
+                      </th>
                     ))}
                   </tr>
                 </thead>
                 <tbody>
                   {labels.map((label, index) => (
                     <tr key={index}>
-                      <td>{label}</td>
+                      <td>
+                        <NoteText text={label} />
+                      </td>
                       {series.map((item, seriesIndex) => (
                         <td key={seriesIndex}>{item.values[index] ?? "—"}</td>
                       ))}

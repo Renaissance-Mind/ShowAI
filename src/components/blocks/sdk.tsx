@@ -1,4 +1,6 @@
 export { RichText } from "../rich-text/RichText";
+// Hover notes: [label]{note} in text fields, noteProps for custom anchors.
+export { NoteText, NoteSvgText, noteProps } from "./NoteText";
 import "./block.css";
 import "./theme.css";
 export { GestureBoundary } from "./GestureBoundary";

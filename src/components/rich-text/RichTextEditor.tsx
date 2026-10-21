@@ -6,6 +6,7 @@ import { CAPACITY, formatBytes } from "../../portable/capacity.mjs";
 import { translator } from "../../i18n";
 import { useTranslator } from "../../i18n/react";
 import messages from "../../i18n/messages/richText";
+import noteMessages from "../../i18n/messages/richTextNotes";
 import ExpandableSearch from "../ExpandableSearch";
 import { RichTextEnvironment } from "./environment";
 import type { CatalogComponent } from "../../core/component-categories";
@@ -69,6 +70,7 @@ import {
   ListOrdered,
   ArrowRight,
   MessageSquareQuote,
+  MessageSquareText,
   Minus,
   PanelTop,
   Plus,
@@ -85,6 +87,11 @@ import {
 import { TableControls } from "./TableControls";
 import { FormatControls } from "./FormatControls";
 import { createExtensions } from "./extensions";
+import {
+  NOTE_MAX,
+  annotateLatex,
+  outerLatexNote,
+} from "../blocks/note-markup.mjs";
 import "./editor.css";
 
 const initialSelections = new WeakSet<Editor>();
@@ -133,7 +140,15 @@ interface HoverBlock {
   top: number;
   index: number;
 }
-type DialogState = { type: "image" | "link"; value: string; alt: string };
+type DialogState = {
+  type: "image" | "link" | "note";
+  value: string;
+  alt: string;
+  /** Formula node that receives the note through \note in its LaTeX. */
+  math?: { pos: number; body: string };
+  /** The selection already carried a note when the dialog opened. */
+  hadNote?: boolean;
+};
 
 function ToolButton({
   label,
@@ -202,6 +217,7 @@ export default function RichTextEditor({
   retentionKey,
 }: RichTextEditorProps) {
   const t = useTranslator(messages);
+  const tn = useTranslator(noteMessages);
   const latestOnChange = useRef(onChange);
   const selectionMenuId = useId();
   latestOnChange.current = onChange;
@@ -708,16 +724,44 @@ export default function RichTextEditor({
   }
 
   const openDialog = useCallback(
-    (type: "image" | "link") => {
+    (type: "image" | "link" | "note") => {
       if (!editor) return;
+      const { selection } = editor.state;
       selectionBeforeDialog.current = {
-        from: editor.state.selection.from,
-        to: editor.state.selection.to,
+        from: selection.from,
+        to: selection.to,
       };
+      const formula =
+        type === "note" &&
+        selection instanceof NodeSelection &&
+        ["mathInline", "mathBlock"].includes(selection.node.type.name)
+          ? selection.node
+          : null;
+      const outer = formula
+        ? outerLatexNote(String(formula.attrs.latex ?? ""))
+        : null;
       setDialog({
         type,
-        value: type === "link" ? (editor.getAttributes("link").href ?? "") : "",
+        value:
+          type === "link"
+            ? (editor.getAttributes("link").href ?? "")
+            : type === "note"
+              ? formula
+                ? (outer?.note ?? "")
+                : (editor.getAttributes("annotation").note ?? "")
+              : "",
         alt: "",
+        hadNote:
+          type === "note" &&
+          (formula ? Boolean(outer) : editor.isActive("annotation")),
+        ...(formula
+          ? {
+              math: {
+                pos: selection.from,
+                body: outer?.body ?? String(formula.attrs.latex ?? ""),
+              },
+            }
+          : {}),
       });
       setDialogError("");
       setInsertMenu(false);
@@ -725,6 +769,47 @@ export default function RichTextEditor({
     },
     [editor],
   );
+
+  /** Add, change or remove the hover note of the selected text or formula. */
+  function applyNote(state: DialogState, value: string) {
+    if (!editor) return false;
+    if (value.length > NOTE_MAX) {
+      setDialogError(tn("dialog.noteTooLong", { max: NOTE_MAX }));
+      return false;
+    }
+    if (state.math) {
+      const { pos, body } = state.math;
+      const node = editor.state.doc.nodeAt(pos);
+      if (!node || !["mathInline", "mathBlock"].includes(node.type.name)) {
+        setDialogError(tn("dialog.noteTargetMissing"));
+        return false;
+      }
+      editor
+        .chain()
+        .focus()
+        .command(({ tr }) => {
+          tr.setNodeMarkup(pos, undefined, {
+            ...node.attrs,
+            latex: value ? annotateLatex(body, value) : body,
+          });
+          return true;
+        })
+        .run();
+      return true;
+    }
+    if (selectionBeforeDialog.current)
+      editor.commands.setTextSelection(selectionBeforeDialog.current);
+    if (editor.state.selection.empty && !editor.isActive("annotation")) {
+      setDialogError(tn("dialog.noteNeedsSelection"));
+      return false;
+    }
+    const chain = editor.chain().focus();
+    if (editor.state.selection.empty) chain.extendMarkRange("annotation");
+    if (value) chain.setMark("annotation", { note: value });
+    else chain.unsetMark("annotation");
+    chain.run();
+    return true;
+  }
 
   async function insertImageFiles(
     files: File[],
@@ -1185,7 +1270,11 @@ export default function RichTextEditor({
         ).length
       : 0;
   const formatButtons = (!minimal || bubble) && (
-    <FormatControls editor={editor} onLink={() => openDialog("link")} />
+    <FormatControls
+      editor={editor}
+      onLink={() => openDialog("link")}
+      onNote={() => openDialog("note")}
+    />
   );
 
   return (
@@ -1941,6 +2030,11 @@ export default function RichTextEditor({
                   setDialogError(t("dialog.invalidLinkUrl"));
                   return;
                 }
+                if (dialog.type === "note") {
+                  if (!applyNote(dialog, value)) return;
+                  setDialog(null);
+                  return;
+                }
                 if (selectionBeforeDialog.current)
                   editor.commands.setTextSelection(
                     selectionBeforeDialog.current,
@@ -1985,6 +2079,8 @@ export default function RichTextEditor({
                 <div className="editor-modal-symbol">
                   {dialog.type === "image" ? (
                     <ImagePlus size={21} />
+                  ) : dialog.type === "note" ? (
+                    <MessageSquareText size={21} />
                   ) : (
                     <Link2 size={21} />
                   )}
@@ -1992,7 +2088,11 @@ export default function RichTextEditor({
                 <h3 id="editor-dialog-title">
                   {dialog.type === "image"
                     ? t("insert.image")
-                    : t("dialog.addLink")}
+                    : dialog.type === "note"
+                      ? tn(
+                          dialog.hadNote ? "dialog.editNote" : "dialog.addNote",
+                        )
+                      : t("dialog.addLink")}
                 </h3>
                 <button
                   type="button"
@@ -2013,23 +2113,55 @@ export default function RichTextEditor({
                   <span>{t("dialog.imageFormats")}</span>
                 </button>
               )}
-              <label className="editor-field">
-                <span>
-                  {dialog.type === "image"
-                    ? t("dialog.imageUrl")
-                    : t("dialog.linkUrl")}
-                </span>
-                <input
-                  autoFocus
-                  type="text"
-                  placeholder="https://"
-                  value={dialog.value}
-                  onChange={(event) => {
-                    setDialog({ ...dialog, value: event.target.value });
-                    setDialogError("");
-                  }}
-                />
-              </label>
+              {dialog.type === "note" && (
+                <label className="editor-field">
+                  <span>
+                    {dialog.math
+                      ? tn("dialog.noteFormula")
+                      : tn("dialog.noteText")}
+                  </span>
+                  <textarea
+                    autoFocus
+                    rows={4}
+                    maxLength={NOTE_MAX}
+                    placeholder={tn("dialog.notePlaceholder")}
+                    value={dialog.value}
+                    onChange={(event) => {
+                      setDialog({ ...dialog, value: event.target.value });
+                      setDialogError("");
+                    }}
+                    onKeyDown={(event) => {
+                      if (
+                        event.key === "Enter" &&
+                        (event.metaKey || event.ctrlKey)
+                      ) {
+                        event.preventDefault();
+                        event.currentTarget.form?.requestSubmit();
+                      }
+                    }}
+                  />
+                  <small>{tn("dialog.noteHint")}</small>
+                </label>
+              )}
+              {dialog.type !== "note" && (
+                <label className="editor-field">
+                  <span>
+                    {dialog.type === "image"
+                      ? t("dialog.imageUrl")
+                      : t("dialog.linkUrl")}
+                  </span>
+                  <input
+                    autoFocus
+                    type="text"
+                    placeholder="https://"
+                    value={dialog.value}
+                    onChange={(event) => {
+                      setDialog({ ...dialog, value: event.target.value });
+                      setDialogError("");
+                    }}
+                  />
+                </label>
+              )}
               {dialog.type === "image" && (
                 <label className="editor-field">
                   <span>
@@ -2067,6 +2199,17 @@ export default function RichTextEditor({
                     {t("dialog.removeLink")}
                   </button>
                 )}
+                {dialog.type === "note" && dialog.hadNote && (
+                  <button
+                    type="button"
+                    className="editor-text-action"
+                    onClick={() => {
+                      if (applyNote(dialog, "")) setDialog(null);
+                    }}
+                  >
+                    {tn("dialog.removeNote")}
+                  </button>
+                )}
                 <button
                   type="button"
                   className="editor-secondary"
@@ -2077,7 +2220,10 @@ export default function RichTextEditor({
                 <button
                   type="submit"
                   className="editor-primary"
-                  disabled={dialog.type === "image" && !dialog.value.trim()}
+                  disabled={
+                    (dialog.type === "image" || dialog.type === "note") &&
+                    !dialog.value.trim()
+                  }
                 >
                   <Check size={15} />
                   {dialog.type === "image"

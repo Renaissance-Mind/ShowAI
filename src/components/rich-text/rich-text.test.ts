@@ -152,6 +152,57 @@ describe("shared rich-text component", () => {
         .content?.[0].content?.[0].text,
     ).toBe("**原样**");
   });
+  it("imports [text]{note} as hover notes on text and formulas", () => {
+    const doc = markdownToRichText(
+      "[侧网络]{只更新这一支} 预测 [$\\epsilon_\\theta$]{去噪网络的噪声估计}，[x] {y} 保持原样。",
+    );
+    getSchema(createExtensions()).nodeFromJSON(doc).check();
+    expect(() =>
+      validateDocument({ ...blankDocument(), content: doc }),
+    ).not.toThrow();
+    const nodes = doc.content?.[0].content ?? [];
+    expect(nodes[0]).toEqual({
+      type: "text",
+      text: "侧网络",
+      marks: [{ type: "annotation", attrs: { note: "只更新这一支" } }],
+    });
+    expect(nodes.find((node) => node.type === "mathInline")).toEqual({
+      type: "mathInline",
+      attrs: {
+        latex: "\\note{\\epsilon_\\theta}{去噪网络的噪声估计}",
+        display: false,
+      },
+    });
+    expect(nodes.map((node) => node.text ?? "").join("")).toContain(
+      "[x] {y} 保持原样",
+    );
+    const html = renderToStaticMarkup(
+      createElement(RichText, {
+        data: { content: doc, format: "richtext" },
+        readOnly: true,
+      }),
+    );
+    expect(html).toContain(
+      '<span class="showai-note" data-showai-note="只更新这一支" tabindex="0">侧网络</span>',
+    );
+    expect(html).toContain('data-showai-note="去噪网络的噪声估计"');
+    expect(() =>
+      validateRichTextData({
+        format: "richtext",
+        content: {
+          type: "doc",
+          content: [
+            {
+              type: "paragraph",
+              content: [
+                { type: "text", text: "a", marks: [{ type: "annotation" }] },
+              ],
+            },
+          ],
+        },
+      }),
+    ).toThrow(/note/);
+  });
   it("imports ==highlight== and every heading level as valid page content", () => {
     const doc = markdownToRichText(
       "#### 四级标题\n\n读 ==重点 **加粗**== 时，a == b 与 `==代码==` 保持原样。",

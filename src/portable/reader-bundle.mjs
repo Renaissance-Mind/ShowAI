@@ -132,20 +132,26 @@ export function readerKinds(documents) {
 const MATH_TEXT = /\$|\\\(|\\\[/;
 // Markdown gives code a language only through fences.
 const CODE_TEXT = /```|~~~/;
+// [text]{note} in any text field or \note{part}{note} in a formula.
+const NOTE_TEXT = /\]\{|\\note(?![A-Za-z])/;
 /**
  * Optional reader capabilities a page does not need. KaTeX (code and fonts) is
  * a third of a page reader, so it stays out unless the page has formulas or
  * Markdown-like text that may still become one. Syntax grammars likewise stay
- * out unless the page has code blocks or Markdown code fences.
+ * out unless the page has code blocks or Markdown code fences, and the hover
+ * note controller unless some text or formula carries a note.
  */
 export function readerOmissions(documents) {
   let math = false;
   let code = false;
+  let notes = false;
   const visit = (value) => {
-    if ((math && code) || value === null || value === undefined) return;
+    if ((math && code && notes) || value === null || value === undefined)
+      return;
     if (typeof value === "string") {
       if (MATH_TEXT.test(value)) math = true;
       if (CODE_TEXT.test(value)) code = true;
+      if (NOTE_TEXT.test(value)) notes = true;
       return;
     }
     if (Array.isArray(value)) {
@@ -155,6 +161,7 @@ export function readerOmissions(documents) {
     if (typeof value === "object") {
       if (value.type === "mathInline" || value.type === "mathBlock")
         math = true;
+      if (value.type === "annotation") notes = true;
       if (
         value.type === "codeBlock" ||
         (value.type === "widget" && value.attrs?.kind === "code")
@@ -164,7 +171,11 @@ export function readerOmissions(documents) {
     }
   };
   for (const document of documents) visit(document.content);
-  return [...(code ? [] : ["code"]), ...(math ? [] : ["math"])];
+  return [
+    ...(code ? [] : ["code"]),
+    ...(math ? [] : ["math"]),
+    ...(notes ? [] : ["notes"]),
+  ];
 }
 const removeRanges = (source, ranges) => {
   for (const { start, end } of [...ranges].sort((a, b) => b.start - a.start))
@@ -223,6 +234,7 @@ async function compileReader(archivePath, archive, kinds, omits = []) {
   const selected = new Set(kinds);
   const omitMath = omits.includes("math");
   const omitCode = omits.includes("code");
+  const omitNotes = omits.includes("notes");
   const catalogKinds = (name) =>
     JSON.parse(archive.files[`resources/catalog/${name}.json`]).map(
       (item) => item.kind,
@@ -342,11 +354,46 @@ async function compileReader(archivePath, archive, kinds, omits = []) {
               'export const highlightCode = (code) => ({ type: "root", children: [{ type: "text", value: code }] });',
             loader: "js",
           };
+        // Never reached without notes; anchors simply show no bubble if they are.
+        if (omitNotes && args.path === "src/components/blocks/note-bubble.ts")
+          return {
+            contents:
+              "export const installNoteBubbles = () => {}; export const noteHtml = (note) => note;",
+            loader: "js",
+          };
+        if (omitNotes && args.path === "src/components/blocks/note.css")
+          return { contents: "", loader: "css" };
+        if (omitNotes && args.path === "src/components/blocks/NoteText.tsx")
+          return {
+            contents:
+              'export const noteProps = () => ({}); export const NoteText = ({ text }) => String(text ?? ""); export const NoteSvgText = NoteText;',
+            loader: "js",
+          };
+        // Without "]{" or \note anywhere on the page, parsing finds nothing.
+        if (omitNotes && args.path === "src/components/blocks/note-markup.mjs")
+          return {
+            contents: [
+              "export const NOTE_MAX = 1000;",
+              "export const matchNote = () => null;",
+              "export const findNote = () => null;",
+              'export const noteSegments = (source) => [{ type: "text", text: String(source ?? "") }];',
+              'export const plainNotes = (source) => String(source ?? "");',
+              "export const textNotes = () => [];",
+              'export const prepareNoteLatex = (latex) => ({ latex: String(latex ?? ""), notes: [] });',
+              "export const attachLatexNotes = (html) => html;",
+              "export const annotateLatex = (latex) => latex;",
+              "export const outerLatexNote = () => null;",
+              "export const noteMarkdownExtension = null;",
+              "export const invalidNoteMark = () => false;",
+            ].join("\n"),
+            loader: "js",
+          };
         // Readers never edit: rich text renders through its static view, so
         // the lazily loaded ProseMirror editor would only add weight.
         if (args.path === "src/components/rich-text/RichTextEditor.tsx")
           return {
-            contents: "export default function RichTextEditor() { return null; }",
+            contents:
+              "export default function RichTextEditor() { return null; }",
             loader: "tsx",
           };
         let source = archive.files[args.path];

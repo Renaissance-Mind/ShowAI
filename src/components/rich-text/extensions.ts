@@ -308,6 +308,27 @@ const TextStyle = Mark.create({
     0,
   ],
 });
+// [visible text]{note}: hovering, focusing or tapping the text shows the note.
+const Annotation = Mark.create({
+  name: "annotation",
+  inclusive: false,
+  addAttributes: () => ({
+    note: {
+      default: "",
+      parseHTML: (element: HTMLElement) =>
+        element.getAttribute("data-showai-note") ?? "",
+      renderHTML: (attrs: { note?: string }) => ({
+        "data-showai-note": attrs.note ?? "",
+      }),
+    },
+  }),
+  parseHTML: () => [{ tag: "span[data-showai-note]" }],
+  renderHTML: ({ HTMLAttributes }) => [
+    "span",
+    mergeAttributes({ class: "showai-note" }, HTMLAttributes),
+    0,
+  ],
+});
 const mathNode = (inline: boolean) =>
   Node.create({
     name: inline ? "mathInline" : "mathBlock",
@@ -340,6 +361,7 @@ export function createExtensions(
     ContentAttributes,
     RichTextNode,
     TextStyle,
+    Annotation,
     mathNode(true),
     mathNode(false),
     StableBlockIds.configure({ readOnly: options.readOnly ?? false }),

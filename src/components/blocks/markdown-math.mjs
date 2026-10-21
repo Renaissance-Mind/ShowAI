@@ -1,5 +1,6 @@
 import { Marked } from "marked";
 import katex from "katex";
+import { attachLatexNotes, prepareNoteLatex } from "./note-markup.mjs";
 
 // A private lexer keeps math from changing other consumers of marked (and code spans).
 function formula(source, display, delimiter) {
@@ -37,16 +38,22 @@ function formula(source, display, delimiter) {
   };
 }
 
+/** KaTeX HTML; `\note{part}{text}` marks parts that show a hover note. */
 export function mathHtml(source, display = false) {
-  return katex.renderToString(source, {
+  const { latex, notes } = prepareNoteLatex(source);
+  const html = katex.renderToString(latex, {
     displayMode: display,
     throwOnError: false,
-    trust: false,
+    // Only the placeholders written by prepareNoteLatex need \htmlData.
+    trust: notes.length
+      ? (context) => context.command === "\\htmlData"
+      : false,
     strict: false,
     output: "htmlAndMathml",
     maxExpand: 1000,
     maxSize: 20,
   });
+  return attachLatexNotes(html, notes);
 }
 
 /** Block and inline math, shared by lexers that add their own syntax. */
