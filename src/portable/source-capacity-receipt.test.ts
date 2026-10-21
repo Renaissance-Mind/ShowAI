@@ -249,6 +249,9 @@ it("fresh wrappers preserve complete unknown metadata, resource JSON counts, val
   expect(parseArtifactWithValidatedDocument(artifact, body)).toEqual(
     parseArtifact(artifact),
   );
+  const consume = (value: unknown) =>
+    parseArtifactConsumingForSourceSnapshot(cloneSourceValue(value));
+  expect(consume(artifact)).toEqual(parseArtifact(artifact));
   for (const patch of [
     { version: 99 },
     { presentation: "invalid" },
@@ -260,6 +263,7 @@ it("fresh wrappers preserve complete unknown metadata, resource JSON counts, val
       parseArtifactWithValidatedDocument({ ...artifact, ...patch }, body),
     ).toThrow();
     expect(() => parseArtifact({ ...artifact, ...patch })).toThrow();
+    expect(() => consume({ ...artifact, ...patch })).toThrow();
   }
   let deep: any = 0;
   for (let i = 0; i < 64; i++) deep = { child: deep };
@@ -269,6 +273,7 @@ it("fresh wrappers preserve complete unknown metadata, resource JSON counts, val
       body,
     ),
   ).toThrow(/deeply/);
+  expect(() => consume({ ...artifact, futureWrapper: deep })).toThrow(/deeply/);
   const detached = cloneSourceValue(body);
   expect(() =>
     parseArtifactWithValidatedDocument(
@@ -304,6 +309,31 @@ it("consuming factory owns its actual parsed graph without changing the public c
     parseArtifactWithValidatedDocument({ ...result }, result.document),
   ).toEqual(parseArtifact(result));
 });
+it("actual consuming measurements cannot be asserted through JSON fields or hide invalid content", () => {
+  const input = {
+    format: "showai",
+    version: 1,
+    document: source(),
+    inputCapacity: {
+      document: {},
+      sizes: { structureBytes: 0, jsonBytes: 0, resourceBytes: 0 },
+    },
+  };
+  expect(
+    parseArtifactConsumingForSourceSnapshot(cloneSourceValue(input)),
+  ).toEqual(parseArtifact(input));
+  const oversized = {
+    ...input,
+    document: { ...source(), future: "x".repeat(CAPACITY.pageStructureBytes) },
+  };
+  expect(() => parseArtifactConsumingForSourceSnapshot(oversized)).toThrow(
+    /Page structure/,
+  );
+  const badDate = { ...input, document: { ...source(), updatedAt: "invalid" } };
+  expect(() => parseArtifactConsumingForSourceSnapshot(badDate)).toThrow(
+    /ISO date/,
+  );
+});
 it("honors the actual 256MiB wrapper boundary and falls back rather than rejecting a safe conservative date bound", () => {
   const body = owned(),
     artifact = {
@@ -317,11 +347,24 @@ it("honors the actual 256MiB wrapper boundary and falls back rather than rejecti
   expect(parseArtifactWithValidatedDocument(artifact, body).document).toBe(
     body,
   );
+  expect(
+    parseArtifactConsumingForSourceSnapshot({
+      ...artifact,
+      document: cloneSourceValue(body),
+    }).document,
+  ).toEqual(body);
   expect(() =>
     parseArtifactWithValidatedDocument(
       { ...artifact, futurePadding: artifact.futurePadding + "x" },
       body,
     ),
+  ).toThrow(/Artifact JSON/);
+  expect(() =>
+    parseArtifactConsumingForSourceSnapshot({
+      ...artifact,
+      document: cloneSourceValue(body),
+      futurePadding: artifact.futurePadding + "x",
+    }),
   ).toThrow(/Artifact JSON/);
   const shorter = freezeOwnedSource({ ...body, updatedAt: "2026-10-21" });
   expect(inheritSourceSnapshotTimestampCapacity(body, shorter)).toBe(true);
@@ -421,4 +464,69 @@ it("registers a real FileStore CAS result and rejects altered or retired actual 
   } finally {
     await rm(directory, { recursive: true, force: true });
   }
+});
+
+it("captures wrapper accessors before measuring its independent document", () => {
+  const document = source();
+  const expected = structuredClone(document);
+  const input = { format: "showai", version: 1, document };
+  Object.defineProperty(input, "unknownWrapper", {
+    enumerable: true,
+    get() {
+      (document as any).future = "x".repeat(CAPACITY.pageStructureBytes);
+      return { actual: true };
+    },
+  });
+  const result = parseArtifactConsumingForSourceSnapshot(input).document;
+  expect(result).toEqual(
+    parseArtifact({ format: "showai", version: 1, document: expected })
+      .document,
+  );
+  expect(measureContent(result).structureBytes).toBeLessThan(
+    CAPACITY.pageStructureBytes,
+  );
+  expect(hasSourceSnapshotCapacity(result)).toBe(true);
+  expect(() => parseArtifact(input)).toThrow(/limit|large|exceed/i);
+});
+
+it("observers cannot mutate measured aliases or obtain authority from a generic frozen getter graph", () => {
+  for (const stage of [
+    "input.capacity",
+    "json",
+    "capacity",
+    "capacityPreimage",
+    "canonicalCapacity",
+  ]) {
+    const document = source(),
+      expected = structuredClone(document);
+    const result = parseArtifactConsumingForSourceSnapshot(
+      { format: "showai", version: 1, document },
+      (name: string) => {
+        if (name === stage)
+          (document as any).future = "x".repeat(CAPACITY.pageStructureBytes);
+      },
+    ).document;
+    expect(result).toEqual(
+      parseArtifact({ format: "showai", version: 1, document: expected })
+        .document,
+    );
+    expect(hasSourceSnapshotCapacity(result)).toBe(true);
+  }
+  let actual = source();
+  const getter = Object.defineProperty({}, "document", {
+    enumerable: true,
+    get: () => actual,
+  });
+  freezeOwnedSource(getter);
+  actual = {
+    ...source(),
+    future: "x".repeat(CAPACITY.pageStructureBytes),
+  } as ShowDocument;
+  expect(() =>
+    parseArtifactConsumingForSourceSnapshot({
+      format: "showai",
+      version: 1,
+      document: (getter as any).document,
+    }),
+  ).toThrow(/limit|large|exceed/i);
 });

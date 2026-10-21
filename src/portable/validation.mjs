@@ -1,4 +1,4 @@
-import {freezeOwnedJSON,isOwnedJSON} from "./owned-json.mjs";
+import {freezeOwnedJSON,isOwnedJSON,captureOwnedJSON} from "./owned-json.mjs";
 import {shareNativeSource} from "../surface/native-source-delta.mjs";
 import { validateInkArchiveGroup } from "../surface/ink-archive-group.mjs";
 import { isResource } from "../surface/containers.mjs";
@@ -845,11 +845,12 @@ function validationStage(observer, name, operation) {
   const now = () => globalThis.performance?.now?.() ?? Date.now(), start = now();
   try { return operation(); } finally { observer(name, now() - start); }
 }
-function validateDocumentValue(value, independent, observer) {
+function validateDocumentValue(value, independent, observer, inputCapacity) {
   validationStage(observer, "json", () => validateJson(value, "document"));
-  const sizes = validationStage(observer, "capacity", () => assertContent(value));
+  const sizes = validationStage(observer, "capacity", () => inputCapacity?.document === value
+    ? assertContentSizes(inputCapacity.sizes) : assertContent(value));
   const source = object(value, "document");
-  const document = independent ? structuredClone(source) : source;
+  const document = independent ? structuredClone(source) : capacityPreimage(source);
   const capacityBefore = validationStage(observer, "capacityPreimage", () => capacityPreimage(document));
   let templateContext;
   if (document.templateContext !== undefined) {
@@ -1089,19 +1090,31 @@ function captureOwnedArtifact(artifact) {
   const proof = documentCapacity.get(artifact.document);
   if (!proof)
     throw new Error("Canonical document capacity receipt is missing.");
-  const document = freezeOwnedJSON(artifact.document);
+  const document = captureOwnedJSON(artifact.document);
   rememberOwnedCapacity(document, proof.upper, proof.maximumDepth);
   return { ...artifact, document };
 }
 /** Internal source factory. Public parseArtifact keeps its mutable independent
  * capture semantics; only this synchronous validation+ownership step mints proof. */
 export function parseArtifactForSourceSnapshot(input) {
-  return captureOwnedArtifact(parseArtifactDocument(input, validateDocument));
+  return parseArtifactConsumingForSourceSnapshot(input);
 }
 export function parseArtifactConsumingForSourceSnapshot(input, observer) {
+  // This closed synchronous factory owns the actual normalization graph. One
+  // real document traversal supplies both its page gate and the enclosing
+  // artifact byte gate; wrapper fields retain their own complete traversal.
+  // Capture before any measurement or observer can run. Neither a wrapper
+  // accessor nor a reentrant observer can mutate the measured private graph.
+  const captured = typeof input === "string" ? input : captureOwnedJSON(input);
+  const measured = validationStage(observer, "input.capacity", () =>
+    measureSourceArtifactInput(captured),
+  );
   return captureOwnedArtifact(
-    parseArtifactDocument(input, (value) =>
-      validateDocumentValue(value, false, observer),
+    parseArtifactDocument(
+      captured,
+      (value) => validateDocumentValue(value, false, observer, measured),
+      undefined,
+      measured,
     ),
   );
 }
@@ -1113,7 +1126,7 @@ export function shareSourceSnapshotDocument(base, canonical) {
     throw new Error("Source capacity sharing requires actual owned graphs.");
   const result = shareNativeSource(base, canonical);
   if (!receipt) return result;
-  const held = freezeOwnedJSON(result);
+  const held = captureOwnedJSON(result);
   rememberOwnedCapacity(held, receipt.sizes, receipt.maximumDepth);
   return held;
 }
@@ -1173,8 +1186,35 @@ function artifactCapacityBytes(artifact, heldDocument) {
   return measureContent(artifact).jsonBytes;
 }
 
-function parseArtifactDocument(input, documentParser, heldDocument) {
-  const inputBytes = typeof input === "string" ? utf8Bytes(input) : artifactCapacityBytes(input,heldDocument);
+function measureSourceArtifactInput(input) {
+  if (typeof input === "string") return null;
+  const artifact = object(input, "artifact"),
+    document = artifact.document;
+  const sizes = measureContent(document),
+    depth = contentMeasurementDepth(sizes);
+  // Keep the full official traversal for an unprovable embedding. The ordinary
+  // mutable parser never receives a captured measurement from a caller.
+  if (depth === null || depth + 1 > 64) return null;
+  const wrapper = measureContent({ ...artifact, document: null });
+  return {
+    input,
+    document,
+    sizes,
+    jsonBytes: wrapper.jsonBytes - 4 + sizes.jsonBytes,
+  };
+}
+function parseArtifactDocument(
+  input,
+  documentParser,
+  heldDocument,
+  inputCapacity,
+) {
+  const inputBytes =
+    typeof input === "string"
+      ? utf8Bytes(input)
+      : inputCapacity?.input === input
+        ? inputCapacity.jsonBytes
+        : artifactCapacityBytes(input, heldDocument);
   assertBytes("Artifact JSON", inputBytes, CAPACITY.artifactBytes);
   const artifact = object(
     typeof input === "string" ? JSON.parse(input) : input,
