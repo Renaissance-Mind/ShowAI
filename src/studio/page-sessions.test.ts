@@ -321,6 +321,52 @@ describe("workspace sessions against the real loopback workbench", () => {
     const retained=await invoke<{id:string}[]>("drafts:list",{kind:"page",projectId:project,resourceId:first.document.id});
     expect(retained.length).toBeGreaterThan(0);
   });
+  it("saves a reviewed merge through the workbench page:mergeSave action",async()=>{
+    const view=await warm();
+    view.edit({title:"Local title waiting for save"});
+    await invoke("pages:save",{
+      projectId:project,pageId:first.document.id,
+      document:{...first.document,title:"Remote title already saved"},
+      baseHash:first.hash,baseRevision:first.revision,
+    });
+    await view.refresh();
+    const {status,draft,mergeBase}=view.getSnapshot();
+    expect(status).toBe("conflict");
+    const preview=await invoke<{conflicts:unknown[];currentRevision:string;currentHash:string}>("page:mergePreview",{
+      projectId:project,pageId:first.document.id,baseRevision:mergeBase,document:draft,
+    });
+    expect(preview.conflicts.length).toBeGreaterThan(0);
+    view.prepareResolution({...draft!,title:"Reviewed merged title"},preview.currentRevision,preview.currentHash);
+    expect(view.getSnapshot().reviewingConflict).toBe(true);
+    calls.length=0;
+    expect(await view.retry()).toBe(true);
+    expect(calls).toContain("page:mergeSave");
+    const saved=await invoke<LoadedPage>("pages:get",{projectId:project,pageId:first.document.id});
+    expect(saved.document.title).toBe("Reviewed merged title");
+    expect(saved.revision).not.toBe(preview.currentRevision);
+    expect(view.getSnapshot()).toMatchObject({status:"saved",reviewingConflict:false});
+  });
+  it("saves a reviewed external conflict resolution through the workbench workspace:resolve action",async()=>{
+    const view=await warm();
+    await writeFile(first.path,serializeArtifact({...first.document,title:"External file edit"}));
+    view.edit({title:"Local edit beside the external file"});
+    expect(await view.flush()).toBe(false);
+    const {status,draft,conflictId}=view.getSnapshot();
+    expect(status).toBe("conflict");
+    expect(conflictId).toBeDefined();
+    const detail=await invoke<{external:string|null}>("workspace:conflict",{id:conflictId});
+    expect(detail.external).toContain("External file edit");
+    view.prepareExternalResolution({...draft!,title:"Reviewed external resolution"},conflictId!);
+    expect(view.getSnapshot().reviewingConflict).toBe(true);
+    calls.length=0;
+    expect(await view.retry()).toBe(true);
+    expect(calls).toContain("workspace:resolve");
+    const saved=await invoke<LoadedPage>("pages:get",{projectId:project,pageId:first.document.id});
+    expect(saved.document.title).toBe("Reviewed external resolution");
+    expect(saved.workspaceConflicts).toBeUndefined();
+    expect(await invoke("workspace:conflicts",{projectId:project})).toEqual([]);
+    expect(view.getSnapshot()).toMatchObject({status:"saved",reviewingConflict:false,conflictId:undefined});
+  });
   it("keeps every open tab resident, including duplicate pages beyond the history budget", async () => {
     await warm();
     calls.length = 0;

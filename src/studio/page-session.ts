@@ -492,7 +492,7 @@ export function createPageSession(options: PageSessionOptions): PageSession {
               ? existingDraft
               : await persist(source, sequence, projectRef.current);
           const response = resolution.current?.externalConflictId
-            ? await options.invoke<LoadedPage>("history:resolve", {
+            ? await options.invoke<LoadedPage>("workspace:resolve", {
                 projectId: projectRef.current,
                 id: resolution.current.externalConflictId,
                 resolution: "merge",
@@ -503,7 +503,7 @@ export function createPageSession(options: PageSessionOptions): PageSession {
                 },
               })
             : resolution.current
-              ? await options.invoke<LoadedPage>("history:mergeSave", {
+              ? await options.invoke<LoadedPage>("page:mergeSave", {
                   projectId: projectRef.current,
                   pageId: source.id,
                   document: source,
