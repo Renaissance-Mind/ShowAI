@@ -1,12 +1,12 @@
 import { expect, it } from "vitest";
 import { blankDocument } from "../core/catalog";
-import { mergePageContent } from "../core/page-merge-model";
+import { canCommitPageMerge, mergePageContent } from "../core/page-merge-model";
 import { normalizeDocument } from "../core/diff";
 import { createResource, createSurface } from "./containers.mjs";
 import { addNode } from "./editing";
 import { createPortableInk } from "./portable-ink.mjs";
 import { canonicalInkJSON } from "./ink-operations.mjs";
-import { resolveInkWireFields, stampInkDocument, validateInkWireState } from "./ink-wire.mjs";
+import { inkWireResolutionPlan, inkWireResolutionCandidates, inkWireConflicts, resolveInkWireFields, stampInkDocument, validateInkWireState } from "./ink-wire.mjs";
 import type { ShowDocument } from "../types";
 
 const frame = { x: 10, y: 20, width: 40, height: 30 };
@@ -150,4 +150,28 @@ it("placement cycles stay explicit and do not invent a stream of legacy edits on
   expect(ink(merged.document).attrs!.ink.samples).toEqual(ink(base).attrs!.ink.samples);
   const again = mergePageContent(base, merged.document, right);
   expect(Object.keys(state(again.document).clock).filter(actor => actor.startsWith("legacy-"))).toEqual([]);
+});
+
+it("retained deletion conflicts can explicitly restore the edited source with a new real author event", () => {
+  const base = source(), removed = edit(base, "ipad", page => { page.content.content = []; page.layout = {}; });
+  const moved = edit(base, "browser", page => { page.layout!.stroke.y = 900; });
+  const unresolved = mergePageContent(base, removed, moved).document;
+  const candidates = inkWireResolutionCandidates(unresolved), keep = candidates[0].candidates.find(candidate => candidate.value === true)!;
+  const resolved = resolveInkWireFields(unresolved, [{ boardId: base.content.attrs!.id, strokeId: "stroke", field: "alive", hash: keep.hash }], { actor: "ipad", sequence: 2 });
+  expect(resolved.layout!.stroke.y).toBe(900);
+  expect(ink(resolved).attrs!.ink.samples).toEqual(ink(base).attrs!.ink.samples);
+  expect(inkWireConflicts(resolved)).toEqual([]);
+  expect(mergePageContent(unresolved, resolved, removed).conflicts).toEqual([]);
+});
+
+it("classifies only fully retained ink variants as safe in-place merges", () => {
+  const base = source(), left = edit(base, "ipad", page => { ink(page).attrs!.color = "#ff0000"; });
+  const right = edit(base, "browser", page => { ink(page).attrs!.color = "#0000ff"; });
+  const merged = mergePageContent(base, left, right);
+  expect(canCommitPageMerge(merged)).toBe(true);
+  expect(merged.conflicts).toMatchObject([{ domain: "ink", retained: true, ink: { field: "color" } }]);
+  expect(canCommitPageMerge({ conflicts: [{ kind: "text", path: "/text" }] })).toBe(false);
+  expect(canCommitPageMerge({ conflicts: [{ kind: "value", path: "/ink", domain: "ink", retained: false }] })).toBe(false);
+  const group = inkWireResolutionCandidates(merged.document)[0], chosen = group.candidates[0];
+  expect(inkWireResolutionPlan(merged.document, [{ ...group, hash: chosen.hash }])).toEqual({ boardId: group.boardId, changes: [{ kind: "edit", strokeId: "stroke", patch: { color: chosen.value } }] });
 });

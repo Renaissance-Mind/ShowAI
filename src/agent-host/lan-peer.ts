@@ -33,7 +33,7 @@ import {
   lockDocumentComponents,
   importCompiledComponents,
 } from "../core/catalog";
-import { mergePageContent } from "../core/page-merge-model";
+import { canCommitPageMerge, mergePageContent } from "../core/page-merge-model";
 import { mergeValues } from "../core/catalog-merge";
 import { canonicalJson, documentHash } from "../core/diff";
 import { changeContext } from "../core/history-context";
@@ -713,7 +713,7 @@ export class LanPeerServer {
               local,
               current.document,
             );
-            if (merged.conflicts.length)
+            if (!canCommitPageMerge(merged))
               throw new CoreError(
                 "CONFLICT",
                 "Both devices edited the same content. Keep the iPad draft and resolve it before syncing.",

@@ -10,6 +10,7 @@ import { CoreError, type PageRecord } from "./model";
 import type { ShowDocument } from "../types";
 import type { SyncConfiguration } from "../sync/protocol";
 import { previewPageMerge } from "./page-merge";
+import { canCommitPageMerge } from "./page-merge-model";
 import { retainSyncConflicts } from "../sync/conflict-retention";
 import { serializeArtifact } from "../portable/validation.mjs";
 
@@ -68,7 +69,7 @@ export async function preserveRemoteSave(
     preview = baseDocument
       ? previewPageMerge(baseDocument, document, current.document)
       : null;
-  if (preview && !preview.conflicts.length)
+  if (preview && canCommitPageMerge(preview))
     return store.savePage(
       projectId,
       current.document.id,

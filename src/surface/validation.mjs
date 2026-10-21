@@ -2,6 +2,7 @@ import { objectCapabilities, bindingParent } from "./geometry.mjs";
 import { validateNativeInk } from "./native-ink.mjs";
 import { isPortableInk } from "./portable-ink.mjs";
 import { validateInkWireState } from "./ink-wire.mjs";
+import { validateInkFragments, validateInkInput } from "./ink-input-contract.mjs";
 import { labelCapable, MAX_LABEL_LENGTH } from "./drawing-label.mjs";
 import { isResource, fillResource, surfaceKind } from "./containers.mjs";
 import { fillSurfaceLayout, visitNodes } from "./document.mjs";
@@ -194,6 +195,8 @@ function validateResource(document) {
       owner = node;
     }
     if (node.type === "drawing") {
+      validateInkFragments(node.attrs.ink, node.attrs.inkFragments);
+      validateInkInput(node.attrs.inkInput, node.attrs.ink, node.attrs.inkFragments);
       if (node.attrs.ink !== undefined) {
         validateNativeInk(node.attrs.ink);
         if (

@@ -13,6 +13,7 @@ import type {
 import { CoreError } from "../core/model";
 import { canonicalJson } from "../core/diff";
 import { previewPageMerge } from "../core/page-merge";
+import { canCommitPageMerge } from "../core/page-merge-model";
 import { mergeFolders } from "../core/folder-merge";
 import type { FolderMetadata } from "../core/model";
 import { parseArtifact, serializeArtifact } from "../portable/validation.mjs";
@@ -355,7 +356,7 @@ export function mergeProjectFiles(
         parseArtifact(JSON.parse(b.toString())).document,
         parseArtifact(JSON.parse(c.toString())).document,
       );
-      if (!preview.conflicts.length) {
+      if (canCommitPageMerge(preview)) {
         merged.set(path, Buffer.from(serializeArtifact(preview.document)));
         continue;
       }

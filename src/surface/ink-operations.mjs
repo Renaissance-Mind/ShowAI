@@ -1,9 +1,10 @@
 import { isInkNode, validatePortableInk } from "./portable-ink.mjs";
+import { validateInkFragments, validateInkInput } from "./ink-input-contract.mjs";
 
 export const INK_OPERATION_FORMAT = "showai-ink-operation-v1";
 export const INK_CHECKPOINT_FORMAT = "showai-ink-checkpoint-v1";
-const attributes = ["ink", "color", "strokeWidth", "pressure"];
-const fields = [...attributes, "node", "layout"];
+const attributes = ["ink", "inkFragments", "color", "strokeWidth", "pressure"];
+const fields = [...attributes, "node", "layout", "placement"];
 const own = (object, key) => Object.hasOwn(object, key);
 const compare = (a, b) => a < b ? -1 : a > b ? 1 : 0;
 const finite = n => typeof n === "number" && Number.isFinite(n);
@@ -66,9 +67,15 @@ function layout(value) {
       value.height !== undefined && (!finite(value.height) || value.height <= 0) ||
       value.rotation !== undefined && !finite(value.rotation)) invalid("invalid stroke layout");
 }
+export function validateInkOperationField(name, value) {
+  if (![...fields, "alive"].includes(name)) invalid("unsupported field");
+  return field(name, value);
+}
 function field(name, value) {
   if (attributes.includes(name) && value === null) return;
   if (name === "ink") validatePortableInk(value);
+  else if (name === "inkFragments") { if (!Array.isArray(value) || value.length > 1024) invalid("invalid ink fragments"); value.forEach(validatePortableInk); }
+  else if (name === "placement" && (!value || !id(value.parentId) || ![value.after, value.before].every(anchor => anchor === null || id(anchor)))) invalid("invalid stroke placement");
   else if (name === "node" && (!value?.attrs || !id(value.attrs.id) || attributes.some(key => own(value.attrs, key)))) invalid("node metadata must exclude mutable ink attributes");
   else if (name === "layout") layout(value);
   else if (name === "color" && (!id(value) || value.length > 128)) invalid("invalid color");
@@ -92,7 +99,10 @@ export function validateInkOperation(value) {
     if (change.kind === "create") {
       if (change.node?.attrs?.id !== change.strokeId || !isInkNode(change.node)) invalid("creation requires an ink node with the same stable id");
       if (change.node.attrs.ink) validatePortableInk(change.node.attrs.ink);
+      validateInkFragments(change.node.attrs.ink, change.node.attrs.inkFragments);
+      validateInkInput(change.node.attrs.inkInput, change.node.attrs.ink, change.node.attrs.inkFragments);
       layout(change.layout);
+      if (change.placement) field("placement", change.placement);
     } else if (change.kind === "edit") {
       if (!change.patch || !Object.keys(change.patch).length || Object.keys(change.patch).some(key => !fields.includes(key))) invalid("unsupported edit field");
       Object.entries(change.patch).forEach(([key, value]) => field(key, value));
@@ -134,8 +144,8 @@ export function validateInkCheckpoint(state) {
   const known = state.known, operationIds = Object.keys(known);
   for (const operationId of operationIds) {
     const item = known[operationId], match = /^([a-zA-Z0-9][a-zA-Z0-9_-]{0,95}):([1-9][0-9]*)$/.exec(operationId);
-    if (!match || !/^[a-f0-9]{64}$/.test(item.hash) || !Number.isSafeInteger(item.level) || item.level < 1 || !item.clock || item.clock[match[1]] !== Number(match[2])) invalid("checkpoint causal identity");
-    for (const [actor, sequence] of Object.entries(item.clock)) if (!Number.isSafeInteger(sequence) || sequence < 1 || !own(known, `${actor}:${sequence}`)) invalid("checkpoint causal coverage");
+    if (!match || !(item.anchor === true && item.hash === null || /^[a-f0-9]{64}$/.test(item.hash)) || !Number.isSafeInteger(item.level) || item.level < 1 || !item.clock || item.clock[match[1]] !== Number(match[2])) invalid("checkpoint causal identity");
+    for (const [actor, sequence] of Object.entries(item.clock)) if (!/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,95}$/.test(actor) || !Number.isSafeInteger(sequence) || sequence < 1) invalid("checkpoint causal coverage");
   }
   if (new Set(state.frontier).size !== state.frontier.length || state.frontier.some(operationId => !own(known, operationId))) invalid("checkpoint frontier");
   for (const operationId of operationIds) if (!state.frontier.some(head => observed(known[head].clock, operationId))) invalid("checkpoint omits a causal head");
@@ -144,7 +154,7 @@ export function validateInkCheckpoint(state) {
   for (const stroke of state.strokes) {
     if (!id(stroke.id) || seen.has(stroke.id) || !own(known, stroke.creationId) || !Array.isArray(stroke.creationOrder) || stroke.creationOrder.length !== 3 || stroke.creationOrder[0] !== known[stroke.creationId].level || stroke.creationOrder[1] !== stroke.creationId || !Number.isSafeInteger(stroke.creationOrder[2]) || stroke.creationOrder[2] < 0) invalid("checkpoint stroke identity");
     seen.add(stroke.id);
-    if ([...attributes, "node", "layout", "alive"].some(key => !stroke.registers?.[key]?.length)) invalid("checkpoint missing register");
+    if (!stroke.registers?.alive?.length || !stroke.registers.alive.some(entry => entry.value === false) && [...attributes.filter(key => key !== "inkFragments"), "node", "layout"].some(key => !stroke.registers?.[key]?.length)) invalid("checkpoint missing register");
     for (const [key, entries] of Object.entries(stroke.registers)) {
       if (![...fields, "alive"].includes(key) || !Array.isArray(entries) || !entries.length || new Set(entries.map(entry => entry.operationId)).size !== entries.length) invalid("checkpoint register");
       for (const entry of entries) {
@@ -169,18 +179,24 @@ export class InkOperationReplica {
     this.known = new Map(Object.entries(state.known));
     this.strokes = new Map(state.strokes.map(stroke => [stroke.id, stroke]));
     this.frontier = new Set(state.frontier); this.version = 0; this.nextToken = 0; this.prepared = null;
+    this.clock = Object.create(null);
+    for (const item of this.known.values()) for (const [actor, sequence] of Object.entries(item.clock)) this.clock[actor] = Math.max(this.clock[actor] ?? 0, sequence);
   }
   /** Prepare is copy-on-write for touched strokes/registers only. Existing sample
    * payloads and causal maps remain owned and are not cloned or revalidated. */
   prepare(operations) {
     if (this.prepared) invalid("a replica already has a prepared transaction");
-    const pending = new Map(), known = new Map(), strokes = new Map(), touched = new Map();
+    const pending = new Map(), known = new Map(), strokes = new Map(), touched = new Map(), undo = {};
     const getKnown = key => known.get(key) ?? this.known.get(key), getStroke = key => strokes.get(key) ?? this.strokes.get(key);
     const frontier = new Set(this.frontier);
     for (const operation of operations) {
     validateInkOperation(operation);
     if (operation.pageId !== this.pageId || operation.boardId !== this.boardId) invalid("cross-Board replay");
     const hash = inkOperationDigest(operation), existing = getKnown(operation.id), queued = pending.get(operation.id);
+    if (existing?.anchor) {
+      if (existing.hash === hash) { known.set(operation.id, { ...existing, anchor: false }); continue; }
+      invalid(`operation is represented by a compact causal anchor; import its projection: ${operation.id}`);
+    }
     if (existing && existing.hash !== hash || queued && queued.hash !== hash) invalid(`operation id collision: ${operation.id}`);
     if (!existing) pending.set(operation.id, { operation, hash });
     }
@@ -190,8 +206,10 @@ export class InkOperationReplica {
     for (const { operation, hash } of ready) {
       const clock = Object.create(null);
       for (const parent of operation.parents) for (const [actor, sequence] of Object.entries(getKnown(parent).clock)) clock[actor] = Math.max(clock[actor] ?? 0, sequence);
+      if ((clock[operation.actor] ?? 0) >= operation.sequence) invalid("operation sequence does not follow its observed actor clock");
       clock[operation.actor] = operation.sequence;
       const level = 1 + Math.max(0, ...operation.parents.map(parent => getKnown(parent).level));
+      const inverses = [];
       const write = (stroke, key, value) => {
         const entries = (stroke.registers[key] ?? []).filter(entry => !observed(clock, entry.operationId));
         stroke.registers[key] = [...entries, { operationId: operation.id, value: clone(value) }].sort((a, b) => compare(a.operationId, b.operationId));
@@ -205,37 +223,128 @@ export class InkOperationReplica {
           strokes.set(change.strokeId, stroke);
           write(stroke, "node", inkNodeMetadata(change.node)); write(stroke, "layout", change.layout); write(stroke, "alive", true);
           attributes.forEach(key => write(stroke, key, change.node.attrs[key] ?? null));
+          if (change.placement) write(stroke, "placement", change.placement);
+          inverses.push({ kind: "delete", strokeId: change.strokeId });
         } else {
           if (!stroke || !observed(clock, stroke.creationId)) invalid(`edit does not observe stroke creation: ${change.strokeId}`);
           if (!strokes.has(change.strokeId)) { stroke = { ...stroke, registers: { ...stroke.registers } }; strokes.set(change.strokeId, stroke); }
-          if (change.kind === "edit") Object.entries(change.patch).forEach(([key, value]) => write(stroke, key, value));
-          else if (change.kind === "delete") write(stroke, "alive", false);
+          if (change.kind === "edit") {
+            const patch = { ...change.patch }, inverse = {};
+            if (own(patch, "ink") && !own(patch, "inkFragments")) patch.inkFragments = stroke.registers.inkFragments?.[0]?.value ?? null;
+            if (own(patch, "inkFragments") && !own(patch, "ink")) patch.ink = stroke.registers.ink?.[0]?.value ?? null;
+            for (const [key, value] of Object.entries(patch)) {
+              if (stroke.registers[key]?.length) inverse[key] = clone(stroke.registers[key][0].value);
+              else if (attributes.includes(key)) inverse[key] = null;
+              write(stroke, key, value);
+            }
+            if (Object.keys(inverse).length) inverses.push({ kind: "edit", strokeId: change.strokeId, patch: inverse });
+          }
+          else if (change.kind === "delete") {
+            if (!stroke.registers.alive.some(entry => entry.value === false)) inverses.push({ kind: "restore", strokeId: change.strokeId });
+            write(stroke, "alive", false);
+          }
           else {
             if (!(stroke.registers.alive ?? []).some(entry => entry.value === false && observed(clock, entry.operationId))) invalid("restore must explicitly observe a deletion");
             write(stroke, "alive", true);
+            inverses.push({ kind: "delete", strokeId: change.strokeId });
           }
         }
       }
       known.set(operation.id, { hash, clock, level });
+      undo[operation.id] = { changes: inverses };
       operation.parents.forEach(parent => frontier.delete(parent));
       frontier.add(operation.id); pending.delete(operation.id);
     }
     }
     const token = String(++this.nextToken), records = [];
+    for (const stroke of strokes.values()) {
+      if (!stroke.registers.alive.some(entry => entry.value === false) && (!stroke.registers.node?.length || !stroke.registers.layout?.length)) invalid("restoring sparse ink requires its editable source");
+      const primary = stroke.registers.ink?.[0]?.value, fragments = stroke.registers.inkFragments?.[0]?.value;
+      if (primary && fragments) validateInkFragments(primary, fragments);
+    }
     for (const [key, value] of known) records.push({ kind: "known", key, field: "", value });
     for (const [key, stroke] of strokes) {
       if (!this.strokes.has(key)) records.push({ kind: "stroke", key, field: "", value: { id: stroke.id, creationId: stroke.creationId, creationOrder: stroke.creationOrder } });
       for (const field of touched.get(key) ?? []) records.push({ kind: "register", key, field, value: stroke.registers[field] });
     }
-    this.prepared = { token, known, strokes, frontier };
-    return { token, records: clone(records), frontier: [...frontier].sort(compare), appendedIds: [...known.keys()] };
+    const clock = { ...this.clock };
+    for (const item of known.values()) for (const [actor, sequence] of Object.entries(item.clock)) clock[actor] = Math.max(clock[actor] ?? 0, sequence);
+    this.prepared = { token, known, strokes, frontier, clock };
+    return { token, records: clone(records), frontier: [...frontier].sort(compare), clock, undo, appendedIds: [...known.keys()] };
+  }
+  /** Import actual compact causal heads, never a fabricated after-all operation.
+   * Foreign anchors have a context and optional source hash, not an op body. */
+  prepareImport(checkpoint) {
+    if (this.prepared) invalid("a replica already has a prepared transaction");
+    validateInkCheckpoint(checkpoint);
+    if (checkpoint.pageId !== this.pageId || checkpoint.boardId !== this.boardId) invalid("cross-Board checkpoint import");
+    const known = new Map(), strokes = new Map(), records = [];
+    const getKnown = key => known.get(key) ?? this.known.get(key);
+    const dominates = (one, two) => Object.entries(two).every(([actor, sequence]) => (one[actor] ?? 0) >= sequence);
+    for (const [key, incoming] of Object.entries(checkpoint.known)) {
+      const previous = this.known.get(key); let next = incoming;
+      if (previous) {
+        if (previous.sourceHash && incoming.sourceHash && previous.sourceHash !== incoming.sourceHash) invalid(`source event collision: ${key}`);
+        if (previous.hash && incoming.hash && previous.hash !== incoming.hash) invalid(`operation id collision: ${key}`);
+        if (previous.partial && dominates(incoming.clock, previous.clock)) next = { ...incoming, ...(previous.hash ? { hash: previous.hash, anchor: false } : {}) };
+        else if (incoming.partial && dominates(previous.clock, incoming.clock)) next = previous;
+        else {
+          if (canonicalInkJSON(previous.clock) !== canonicalInkJSON(incoming.clock)) invalid(`operation context collision: ${key}`);
+          next = previous.hash ? previous : incoming.hash ? incoming : previous;
+        }
+      }
+      if (!previous || canonicalInkJSON(previous) !== canonicalInkJSON(next)) { known.set(key, clone(next)); records.push({ kind: "known", key, field: "", value: next }); }
+    }
+    for (const incoming of checkpoint.strokes) {
+      const previous = this.strokes.get(incoming.id);
+      if (previous && (previous.creationId !== incoming.creationId || canonicalInkJSON(previous.creationOrder) !== canonicalInkJSON(incoming.creationOrder))) invalid(`stroke creation identity collision: ${incoming.id}`);
+      const next = previous ? { ...previous, registers: { ...previous.registers } } : { ...incoming, registers: {} };
+      if (!previous) records.push({ kind: "stroke", key: next.id, field: "", value: { id: next.id, creationId: next.creationId, creationOrder: next.creationOrder } });
+      for (const [field, heads] of Object.entries(incoming.registers)) {
+        const entries = new Map((previous?.registers[field] ?? []).map(entry => [entry.operationId, entry]));
+        for (const entry of heads) {
+          if (entries.has(entry.operationId) && canonicalInkJSON(entries.get(entry.operationId).value) !== canonicalInkJSON(entry.value)) invalid(`field value collision: ${incoming.id}/${field}`);
+          entries.set(entry.operationId, entry);
+        }
+        const merged = [...entries.values()].filter(entry => ![...entries.values()].some(other => entry !== other && observed(getKnown(other.operationId).clock, entry.operationId))).sort((a, b) => compare(a.operationId, b.operationId));
+        if (canonicalInkJSON(previous?.registers[field] ?? []) !== canonicalInkJSON(merged)) {
+          next.registers[field] = clone(merged); records.push({ kind: "register", key: next.id, field, value: merged });
+        }
+      }
+      if (!previous || Object.keys(next.registers).some(field => next.registers[field] !== previous.registers[field])) strokes.set(next.id, next);
+    }
+    const candidateHeads = [...new Set([...this.frontier, ...checkpoint.frontier])];
+    const frontier = new Set(candidateHeads.filter(head => !candidateHeads.some(other => head !== other && observed(getKnown(other).clock, head))));
+    const clock = { ...this.clock };
+    for (const item of known.values()) for (const [actor, sequence] of Object.entries(item.clock)) clock[actor] = Math.max(clock[actor] ?? 0, sequence);
+    const token = String(++this.nextToken); this.prepared = { token, known, strokes, frontier, clock };
+    return { token, records: clone(records), frontier: [...frontier].sort(compare), clock, appendedIds: [] };
+  }
+  actorSequence(actor) { return this.clock[actor] ?? 0; }
+  compensationPlan(operation, inverse) {
+    if (operation.pageId !== this.pageId || operation.boardId !== this.boardId || this.known.get(operation.id)?.hash !== inkOperationDigest(operation)) invalid("undo source identity differs from retained history");
+    const changes = [], skipped = [];
+    for (const change of inverse.changes) {
+      const stroke = this.strokes.get(change.strokeId), active = field => stroke?.registers[field]?.length === 1 && stroke.registers[field][0].operationId === operation.id;
+      const original = operation.changes.find(item => item.strokeId === change.strokeId);
+      if (original?.kind === "create") {
+        if (stroke && Object.values(stroke.registers).every(entries => entries.every(entry => entry.operationId === operation.id))) changes.push(change);
+        else skipped.push({ strokeId: change.strokeId, field: "create" });
+      } else if (change.kind === "edit") {
+        const patch = {};
+        for (const [field, value] of Object.entries(change.patch)) { if (active(field)) patch[field] = value; else skipped.push({ strokeId: change.strokeId, field }); }
+        if (Object.keys(patch).length) changes.push({ ...change, patch });
+      } else if (active("alive")) changes.push(change);
+      else skipped.push({ strokeId: change.strokeId, field: "alive" });
+    }
+    return { pageId: this.pageId, boardId: this.boardId, changes: clone(changes), parents: [...this.frontier].sort(compare), skipped };
   }
   commit(token) {
     if (!this.prepared || this.prepared.token !== token) invalid("unknown prepared replica transaction");
-    const { known, strokes, frontier } = this.prepared;
+    const { known, strokes, frontier, clock } = this.prepared;
     for (const [key, value] of known) this.known.set(key, value);
     for (const [key, value] of strokes) this.strokes.set(key, value);
-    this.frontier = frontier; this.prepared = null; this.version++;
+    this.frontier = frontier; this.clock = clock; this.prepared = null; this.version++;
     return { frontier: [...frontier].sort(compare), version: this.version };
   }
   abort(token) {
@@ -277,6 +386,20 @@ export function inkCheckpointFromRecords({ pageId, boardId, frontier, records })
   }
   state.strokes = [...strokes.values()].sort(strokeOrder); return state;
 }
+/** Offline/audit replay. Import records are the exact validated post-merge delta
+ * durably committed at that point, not a newly authored after-all operation. */
+export function replayInkJournalEvents(scope, events) {
+  let replica = new InkOperationReplica(scope);
+  for (const event of events) {
+    if (event.kind === "operation") replica.append([event.operation]);
+    else if (event.kind === "import") {
+      const records = new Map(inkCheckpointRecords(replica.checkpoint()).map(record => [canonicalInkJSON([record.kind, record.key, record.field]), record]));
+      for (const record of event.delta.records) records.set(canonicalInkJSON([record.kind, record.key, record.field]), record);
+      replica = new InkOperationReplica({ checkpoint: inkCheckpointFromRecords({ ...scope, frontier: event.delta.frontier, records: [...records.values()] }) });
+    } else invalid("unsupported journal event");
+  }
+  return replica.checkpoint();
+}
 
 export function checkpointInkOperations(operations, checkpoint) {
   if (!operations.length && !checkpoint) invalid("a scope is required for an empty operation set");
@@ -288,8 +411,9 @@ export function materializeInkOperations(operations, checkpoint) {
   const replica = new InkOperationReplica({ ...operations[0], checkpoint }); replica.append(operations); return replica.materialize();
 }
 function materializeState(state, getKnown) {
-  const conflicts = [];
-  const strokes = state.strokes.map(stroke => {
+  const conflicts = [], tombstones = [];
+  const strokes = state.strokes.flatMap(stroke => {
+    if (!stroke.registers.node?.length || !stroke.registers.layout?.length) { if (stroke.registers.alive.some(entry => entry.value === false)) { tombstones.push(stroke.id); return []; } invalid("visible ink is missing its source node"); }
     const node = clone(stroke.registers.node[0].value), heads = {}, local = [];
     let frame;
     for (const [key, entries] of Object.entries(stroke.registers)) {
@@ -316,9 +440,9 @@ function materializeState(state, getKnown) {
     }
     // Any concurrent deletion hides the stroke; source data and delete/edit
     // conflicts survive. A snapshot consumer must explicitly resolve conflicts.
-    return { id: stroke.id, node, layout: frame, deleted: stroke.registers.alive.some(entry => entry.value === false), heads, conflicts: local };
+    return [{ id: stroke.id, node, layout: frame, ...(stroke.registers.placement ? { placement: clone(stroke.registers.placement[0].value) } : {}), deleted: stroke.registers.alive.some(entry => entry.value === false), heads, conflicts: local }];
   });
-  return { pageId: state.pageId, boardId: state.boardId, frontier: state.frontier, strokes, conflicts };
+  return { pageId: state.pageId, boardId: state.boardId, frontier: state.frontier, strokes, tombstones, conflicts };
 }
 
 /** Selective undo never writes over a later or concurrent remote register head.

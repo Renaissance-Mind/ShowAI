@@ -165,3 +165,20 @@ describe("portable causal ink operations", () => {
     expect(() => validateInkOperation(bad)).toThrow("finite JSON");
   });
 });
+
+it("keeps a long logical stroke's fragments in one atomic editable register pair", () => {
+  const primary = createPortableInk(Array.from({ length: 20000 }, (_, index) => ({ x: index / 1000, y: 2 })), 2, [40, 30]);
+  const rest = createPortableInk([{ x: 20, y: 2 }, { x: 25, y: 8 }], 2, [40, 30]);
+  const logical = { ...node("long"), attrs: { ...node("long").attrs, ink: primary, inkFragments: [rest] } };
+  const seed = bootstrapInkOperation({ actor: "seed", pageId: "page", boardId: "board", nodes: [logical], layout: { long: frame } })!;
+  const replica = new InkOperationReplica({ pageId: "page", boardId: "board" }); replica.append([seed]);
+  const changed = structuredClone(rest); changed.samples[1][1] = 10;
+  const update = operation("ipad", [{ kind: "edit", strokeId: "long", patch: { inkFragments: [changed] } }]);
+  const staged = replica.prepare([update]);
+  expect(staged.records.filter(record => record.kind === "register").map(record => record.field)).toEqual(["inkFragments", "ink"]);
+  replica.commit(staged.token);
+  expect(replica.materialize().strokes).toHaveLength(1);
+  expect(replica.materialize().strokes[0].node.attrs!.inkFragments[0].samples[1][1]).toBe(10);
+  const mismatch = structuredClone(rest); mismatch.opacity = 0.5;
+  expect(() => replica.prepare([operation("bad", [{ kind: "edit", strokeId: "long", patch: { inkFragments: [mismatch] } }], [update.id])])).toThrow("opacity");
+});

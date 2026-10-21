@@ -1,9 +1,9 @@
-import { canonicalInkJSON, inkNodeMetadata, inkOperationDigest } from "./ink-operations.mjs";
+import { canonicalInkJSON, inkNodeMetadata, inkOperationDigest, materializeInkOperations, validateInkCheckpoint, validateInkOperationField } from "./ink-operations.mjs";
 import { isInkNode } from "./portable-ink.mjs";
 
 export const INK_WIRE_FORMAT = "showai-ink-state-v1";
 export class InkWireError extends Error { constructor(message) { super(`Ink causal state: ${message}`); this.name = "InkWireError"; this.code = "INK_CAUSAL_CONFLICT"; } }
-const fields = ["node", "ink", "color", "strokeWidth", "pressure", "layout", "placement", "alive"];
+const fields = ["node", "ink", "inkFragments", "color", "strokeWidth", "pressure", "layout", "placement", "alive"];
 const own = (value, key) => Object.hasOwn(value, key);
 const clone = value => JSON.parse(canonicalInkJSON(value));
 const hash = value => inkOperationDigest(value ?? null);
@@ -31,6 +31,9 @@ export function validateInkWireState(value) {
   if (value?.format !== INK_WIRE_FORMAT || !Number.isSafeInteger(value.level) || value.level < 0 || !value.strokes || !value.contexts || Object.keys(value.strokes).length > 100000) fail("unsupported format or excessive state");
   clock(value.clock);
   for (const [dot, context] of Object.entries(value.contexts)) { dotParts(dot); clock(context); if (!seen(context, dot) || Object.entries(context).some(([actor, sequence]) => (value.clock[actor] ?? 0) < sequence)) fail("context exceeds its causal clock"); }
+  for (const [dot, level] of Object.entries(value.levels ?? {})) if (!own(value.contexts, dot) || !Number.isSafeInteger(level) || level < 1) fail("invalid event level");
+  for (const [dot, digest] of Object.entries(value.digests ?? {})) if (!own(value.contexts, dot) || !/^[a-f0-9]{64}$/.test(digest)) fail("invalid event digest");
+  for (const [dot, digest] of Object.entries(value.eventDigests ?? {})) if (!own(value.contexts, dot) || !/^[a-f0-9]{64}$/.test(digest)) fail("invalid snapshot edit digest");
   for (const [id, stroke] of Object.entries(value.strokes)) {
     if (!id || ["__proto__", "prototype", "constructor"].includes(id) || !Array.isArray(stroke.born) || stroke.born.length !== 3 || !Number.isSafeInteger(stroke.born[0]) || stroke.born[0] < 1 || !Number.isSafeInteger(stroke.born[2]) || stroke.born[2] < 0) fail("invalid stroke identity");
     dotParts(stroke.born[1]);
@@ -45,10 +48,13 @@ export function validateInkWireState(value) {
         if (field === "alive" && ![aliveHash, deletedHash].includes(head[1])) fail("invalid liveness digest");
       }
     }
-    if (!isDeleted(stroke) && fields.some(field => !stroke.fields[field]?.length)) fail("visible stroke is missing field heads");
+    if (!isDeleted(stroke) && fields.filter(field => field !== "inkFragments").some(field => !stroke.fields[field]?.length)) fail("visible stroke is missing field heads");
     for (const [field, values] of Object.entries(stroke.variants ?? {})) {
       if (!fields.includes(field) || !values || Array.isArray(values)) fail("invalid conflict variants");
-      for (const [digest, variant] of Object.entries(values)) if (hash(variant) !== digest || !stroke.fields[field]?.some(([, candidate]) => digest === candidate)) fail("variant digest differs from its head");
+      for (const [digest, variant] of Object.entries(values)) {
+        if (hash(variant) !== digest || !stroke.fields[field]?.some(([, candidate]) => digest === candidate)) fail("variant digest differs from its head");
+        if (field !== "alive") validateInkOperationField(field, variant);
+      }
     }
   }
   return value;
@@ -87,18 +93,25 @@ function fieldValue(record, field) {
   if (field === "layout" || field === "placement") return record[field];
   return record.node.attrs[field] ?? null;
 }
-function empty() { return { format: INK_WIRE_FORMAT, clock: {}, level: 0, contexts: {}, strokes: {} }; }
+function empty() { return { format: INK_WIRE_FORMAT, clock: {}, level: 0, contexts: {}, levels: {}, digests: {}, eventDigests: {}, strokes: {} }; }
 function bootstrap(record) {
-  if (record?.board.attrs.inkState) return clone(validateInkWireState(record.board.attrs.inkState));
+  if (record?.board.attrs.inkState) {
+    const current = clone(validateInkWireState(record.board.attrs.inkState));
+    for (const stroke of Object.values(current.strokes)) if (!isDeleted(stroke) && !stroke.fields.inkFragments) stroke.fields.inkFragments = stroke.fields.ink.map(([dot]) => [dot, hash(null)]);
+    return current;
+  }
   const state = empty(); if (!record?.records.size) return state;
   const dot = `snapshot-${hash([...record.records].map(([id, value]) => [id, fields.map(field => fieldValue(value, field))])).slice(0, 48)}:1`;
-  const [actor] = dotParts(dot); state.clock[actor] = 1; state.contexts[dot] = { [actor]: 1 }; state.level = 1;
+  const [actor] = dotParts(dot); state.clock[actor] = 1; state.contexts[dot] = { [actor]: 1 }; state.level = 1; state.levels[dot] = 1;
   for (const [id, value] of record.records) state.strokes[id] = { born: [1, dot, value.index], fields: Object.fromEntries(fields.map(field => [field, [[dot, hash(fieldValue(value, field))]]])) };
   return state;
 }
 function prune(state) {
   const referenced = new Set(Object.values(state.strokes).flatMap(stroke => Object.values(stroke.fields).flat().map(([dot]) => dot)));
   state.contexts = Object.fromEntries([...referenced].sort(compare).map(dot => [dot, state.contexts[dot]]));
+  state.levels = Object.fromEntries([...referenced].filter(dot => state.levels?.[dot]).sort(compare).map(dot => [dot, state.levels[dot]]));
+  state.digests = Object.fromEntries([...referenced].filter(dot => state.digests?.[dot]).sort(compare).map(dot => [dot, state.digests[dot]]));
+  state.eventDigests = Object.fromEntries([...referenced].filter(dot => state.eventDigests?.[dot]).sort(compare).map(dot => [dot, state.eventDigests[dot]]));
   return state;
 }
 function compactDeleted(stroke) { stroke.fields = { alive: stroke.fields.alive }; delete stroke.variants; delete stroke.unplaced; }
@@ -132,12 +145,13 @@ function reconcile(record, baseline, identity, conflicts) {
     if (!current) { if (stroke && (!isDeleted(stroke) || forced.get(id)?.includes("alive"))) changed.push({ id, values: { alive: false }, current }); continue; }
     if (!stroke) { changed.push({ id, values: Object.fromEntries(fields.map(field => [field, fieldValue(current, field)])), current }); continue; }
     if (isDeleted(stroke) && !identity) {
-      conflicts.push({ strokeId: id, field: "alive", reason: "An unstamped snapshot cannot restore deleted ink." }); continue;
+      conflicts.push({ strokeId: id, field: "alive", retained: false, reason: "An unstamped snapshot cannot restore deleted ink." }); continue;
     }
     const placementMatches = stroke.fields.placement?.some(([, digest]) => digest === hash(fieldValue(current, "placement")));
-    if (stroke.unplaced && !identity && !placementMatches) conflicts.push({ strokeId: id, field: "placement", reason: "Ink placement still requires structural resolution." });
+    if (stroke.unplaced && !identity && !placementMatches) conflicts.push({ strokeId: id, field: "placement", retained: false, reason: "Ink placement still requires structural resolution." });
     if (placementMatches) delete stroke.unplaced;
     const values = Object.fromEntries(fields.filter(field => !(field === "placement" && stroke.unplaced && !identity) && (authored.get(id)?.includes(field) || forced.get(id)?.includes(field) || !stroke.fields[field]?.some(([, digest]) => digest === hash(fieldValue(current, field))))).map(field => [field, fieldValue(current, field)]));
+    if (own(values, "ink") || own(values, "inkFragments")) { values.ink = fieldValue(current, "ink"); values.inkFragments = fieldValue(current, "inkFragments"); }
     if (Object.keys(values).length) changed.push({ id, values, current });
   }
   if (!changed.length) return prune(state);
@@ -148,7 +162,10 @@ function reconcile(record, baseline, identity, conflicts) {
   // Unknown legacy writers have no stable device ID. Bound their fallback
   // provenance rather than silently discard causal history to save bytes.
   if (!identity && Object.keys(state.clock).filter(key => key.startsWith("legacy-")).length >= 128) fail("legacy edits require a current client with a stable writer identity");
-  state.clock[actor] = sequence; state.contexts[dot] = { ...state.clock }; state.level++;
+  state.clock[actor] = sequence; state.contexts[dot] = { ...state.clock }; state.level++; state.levels ??= {}; state.levels[dot] = state.level;
+  state.eventDigests ??= {};
+  state.eventDigests[dot] = identity?.format === "showai-ink-operation-v1" ? hash(identity) : hash({ format: "showai-ink-snapshot-edit-v1", dot, context: state.contexts[dot], changes: changed.map(({ id, values }) => [id, values]) });
+  if (identity?.format === "showai-ink-operation-v1") { state.digests ??= {}; state.digests[dot] = hash(identity); }
   for (const { id, values, current } of changed) {
     const stroke = state.strokes[id] ?? { born: [state.level, dot, current.index], fields: {} };
     for (const [field, value] of Object.entries(values)) { stroke.fields[field] = [[dot, hash(value)]]; if (stroke.variants) delete stroke.variants[field]; }
@@ -176,6 +193,45 @@ export function inkWireClockForActor(document, actor) {
 export function hasInkWireContent(document) {
   return [...boards(document).values()].some(record => record.records.size || record.board.attrs.inkState);
 }
+/** Persistent conflict UI can derive badges/candidates from the saved page,
+ * rather than depending on a transient sync receipt. */
+export function inkWireConflicts(document) {
+  const conflicts = [];
+  for (const [boardId, record] of boards(document)) {
+    const state = record.board.attrs.inkState; if (!state) continue; validateInkWireState(state);
+    for (const [strokeId, stroke] of Object.entries(state.strokes)) {
+      const retained = Object.entries(stroke.fields).every(([field, heads]) => heads.every(([, digest]) => valueLookup(strokeId, field, digest, [{ record, state }]).found));
+      for (const [field, heads] of Object.entries(stroke.fields)) if (new Set(heads.map(([, digest]) => digest)).size > 1) conflicts.push({ boardId, strokeId, field, retained, reason: "Concurrent ink field edits require resolution." });
+      for (const [dot, digest] of stroke.fields.alive) if (digest === deletedHash) {
+        for (const [field, heads] of Object.entries(stroke.fields)) if (field !== "alive" && heads.some(([other]) => !seen(state.contexts[dot], other) && !seen(state.contexts[other], dot))) conflicts.push({ boardId, strokeId, field: `delete/${field}`, retained, reason: "An ink deletion overlaps a concurrent edit." });
+      }
+      if (stroke.unplaced) conflicts.push({ boardId, strokeId, field: "placement", retained: false, reason: "Ink placement still requires structural resolution." });
+    }
+  }
+  return conflicts;
+}
+
+/** Read-only candidate values for retained-conflict inspectors. Geometry is kept
+ * as editable source; callers should summarize it rather than stringify samples. */
+export function inkWireResolutionCandidates(document) {
+  const result = [], conflicts = inkWireConflicts(document);
+  for (const conflict of conflicts) {
+    if (!conflict.retained) continue;
+    const record = boards(document).get(conflict.boardId), state = record.board.attrs.inkState;
+    const field = conflict.field.startsWith("delete/") ? "alive" : conflict.field;
+    if (result.some(item => item.boardId === conflict.boardId && item.strokeId === conflict.strokeId && item.field === field)) continue;
+    const stroke = state.strokes[conflict.strokeId], candidates = new Map();
+    for (const [dot, digest] of stroke.fields[field] ?? []) {
+      const resolved = valueLookup(conflict.strokeId, field, digest, [{record, state}]);
+      if (!resolved.found) continue;
+      if (!candidates.has(digest)) candidates.set(digest, { hash: digest, value: clone(resolved.value), dots: [] });
+      candidates.get(digest).dots.push(dot);
+    }
+    if (field === "alive" && conflict.field.startsWith("delete/")) candidates.set(aliveHash, { hash: aliveHash, value: true, dots: [] });
+    result.push({ boardId: conflict.boardId, strokeId: conflict.strokeId, field, candidates: [...candidates.values()] });
+  }
+  return result;
+}
 
 function mergeHeads(one, two, contexts) {
   const candidates = new Map();
@@ -198,6 +254,11 @@ function valueLookup(id, field, digest, sources) {
 function joinBoard(id, base, left, right, conflicts) {
   const baseline = bootstrap(base), one = reconcile(left, base, undefined, conflicts), two = reconcile(right, base, undefined, conflicts);
   const state = empty(); state.clock = joinClock(one.clock, two.clock); state.level = Math.max(one.level, two.level);
+  for (const [dot, level] of Object.entries({ ...one.levels, ...two.levels })) state.levels[dot] = Math.max(one.levels?.[dot] ?? level, two.levels?.[dot] ?? level);
+  for (const property of ["digests", "eventDigests"]) {
+    for (const [dot, value] of Object.entries(two[property] ?? {})) if (one[property]?.[dot] !== undefined && !equal(one[property][dot], value)) fail("one edit dot names different source events");
+    state[property] = { ...one[property], ...two[property] };
+  }
   state.contexts = { ...one.contexts };
   for (const [dot, context] of Object.entries(two.contexts)) {
     if (state.contexts[dot] && !equal(state.contexts[dot], context)) fail("one dot names conflicting causal contexts");
@@ -206,7 +267,7 @@ function joinBoard(id, base, left, right, conflicts) {
   const sources = [{ record: left, state: one }, { record: right, state: two }, { record: base, state: baseline }], visible = [];
   for (const strokeId of new Set([...Object.keys(one.strokes), ...Object.keys(two.strokes)])) {
     const a = one.strokes[strokeId], b = two.strokes[strokeId];
-    if (a && b && !equal(a.born, b.born)) conflicts.push({ boardId: id, strokeId, field: "creation", reason: "Different creations reused a stable ink ID." });
+    if (a && b && !equal(a.born, b.born)) conflicts.push({ boardId: id, strokeId, field: "creation", retained: false, reason: "Different creations reused a stable ink ID." });
     const stroke = { born: [...[a?.born, b?.born].filter(Boolean).sort(birthOrder)[0]], fields: {}, ...(a?.unplaced || b?.unplaced ? { unplaced: true } : {}) };
     for (const field of fields) {
       const heads = mergeHeads(a?.fields[field], b?.fields[field], state.contexts);
@@ -215,14 +276,14 @@ function joinBoard(id, base, left, right, conflicts) {
     const local = [], selected = {};
     for (const [field, heads] of Object.entries(stroke.fields)) {
       const hashes = new Set(heads.map(([, digest]) => digest));
-      if (hashes.size > 1) local.push({ boardId: id, strokeId, field, reason: "Concurrent ink field edits require resolution." });
+      if (hashes.size > 1) local.push({ boardId: id, strokeId, field, retained: true, reason: "Concurrent ink field edits require resolution." });
       if (field !== "alive") {
         const resolved = valueLookup(strokeId, field, heads[0][1], sources);
         if (resolved.found) selected[field] = clone(resolved.value);
       }
     }
     for (const [dot, digest] of stroke.fields.alive) if (digest === deletedHash) {
-      for (const [field, heads] of Object.entries(stroke.fields)) if (field !== "alive" && heads.some(([other]) => !seen(state.contexts[dot], other) && !seen(state.contexts[other], dot))) local.push({ boardId: id, strokeId, field: `delete/${field}`, reason: "An ink deletion overlaps a concurrent edit." });
+      for (const [field, heads] of Object.entries(stroke.fields)) if (field !== "alive" && heads.some(([other]) => !seen(state.contexts[dot], other) && !seen(state.contexts[other], dot))) local.push({ boardId: id, strokeId, field: `delete/${field}`, retained: true, reason: "An ink deletion overlaps a concurrent edit." });
     }
     const deleted = isDeleted(stroke);
     if (deleted && !local.length) compactDeleted(stroke);
@@ -233,16 +294,16 @@ function joinBoard(id, base, left, right, conflicts) {
         for (const [, digest] of heads) {
           const resolved = valueLookup(strokeId, field, digest, sources);
           if (resolved.found && (deleted || digest !== hash(selected[field]))) values[digest] = clone(resolved.value);
-          else if (!resolved.found) local.push({ boardId: id, strokeId, field, reason: "A referenced ink value is unavailable; source copies are retained." });
+          else if (!resolved.found) local.push({ boardId: id, strokeId, field, retained: false, reason: "A referenced ink value is unavailable; source copies are retained." });
         }
         if (Object.keys(values).length) variants[field] = values;
       }
       if (Object.keys(variants).length) stroke.variants = variants;
       if (!deleted) {
-        if (!selected.node || !selected.layout || !selected.placement) local.push({ boardId: id, strokeId, field: "node", reason: "Visible ink is missing its canonical source value." });
+        if (!selected.node || !selected.layout || !selected.placement) local.push({ boardId: id, strokeId, field: "node", retained: false, reason: "Visible ink is missing its canonical source value." });
         else {
           const node = selected.node;
-          for (const field of ["ink", "color", "strokeWidth", "pressure"]) { if (selected[field] === null) delete node.attrs[field]; else if (selected[field] !== undefined) node.attrs[field] = selected[field]; }
+          for (const field of ["ink", "inkFragments", "color", "strokeWidth", "pressure"]) { if (selected[field] === null) delete node.attrs[field]; else if (selected[field] !== undefined) node.attrs[field] = selected[field]; }
           visible.push({ id: strokeId, node, layout: selected.layout, placement: selected.placement, born: stroke.born });
         }
       }
@@ -285,12 +346,12 @@ export function finishInkPageMerge(document, prepared) {
   const visit = node => { if (node.attrs?.id) nodes.set(node.attrs.id, node); node.content?.forEach(visit); }; visit(result.content);
   for (const plan of prepared.plans) {
     const board = nodes.get(plan.id);
-    if (!board || board.attrs?.kind !== "board") { if (plan.visible.length) conflicts.push({ boardId: plan.id, field: "placement", reason: "The target Board was removed." }); continue; }
+    if (!board || board.attrs?.kind !== "board") { if (plan.visible.length) conflicts.push({ boardId: plan.id, field: "placement", retained: false, reason: "The target Board was removed." }); continue; }
     board.attrs.inkState = plan.state;
     const groups = new Map();
     for (const stroke of plan.visible) {
       let parent = nodes.get(stroke.placement.parentId);
-      if (!parent) { conflicts.push({ boardId: plan.id, strokeId: stroke.id, field: "placement", reason: "The ink parent was removed." }); plan.state.strokes[stroke.id].unplaced = true; parent = board; }
+      if (!parent) { conflicts.push({ boardId: plan.id, strokeId: stroke.id, field: "placement", retained: false, reason: "The ink parent was removed." }); plan.state.strokes[stroke.id].unplaced = true; parent = board; }
       const group = groups.get(parent) ?? []; group.push(stroke); groups.set(parent, group);
       result.layout ??= {}; result.layout[stroke.id] = stroke.layout;
     }
@@ -308,7 +369,7 @@ export function finishInkPageMerge(document, prepared) {
       }
       const byId = new Map([...existing.map(node => [node.attrs.id, node]), ...ink.map(stroke => [stroke.id, stroke.node])]);
       if (ordered.length !== ids.size) {
-        conflicts.push({ boardId: plan.id, field: "placement", reason: "Concurrent ink placement and object ordering form a cycle." });
+        conflicts.push({ boardId: plan.id, field: "placement", retained: false, reason: "Concurrent ink placement and object ordering form a cycle." });
         for (const stroke of ink) plan.state.strokes[stroke.id].unplaced = true;
         parent.content = [...existing, ...ink.map(stroke => stroke.node)];
       }
@@ -321,7 +382,7 @@ export function finishInkPageMerge(document, prepared) {
 
 /** Explicit resolution is an authored edit with a real persisted identity. The
  * selected value may equal the visible value; its new causal dot still matters. */
-export function resolveInkWireFields(document, choices, identity) {
+function prepareResolution(document, choices) {
   const next = clone(document), forced = [];
   const locate = id => {
     const visit = (node, parent) => node.attrs?.id === id ? { node, parent } : node.content?.map(child => visit(child, node)).find(Boolean);
@@ -336,7 +397,8 @@ export function resolveInkWireFields(document, choices, identity) {
   };
   for (const choice of choices) {
     const record = boards(next).get(choice.boardId), state = record?.board.attrs.inkState, stroke = state?.strokes[choice.strokeId];
-    if (!stroke?.fields[choice.field]?.some(([, digest]) => digest === choice.hash)) fail("resolution does not name a current candidate");
+    const retainedRestore = choice.field === "alive" && choice.hash === aliveHash && inkWireConflicts(next).some(item => item.boardId === choice.boardId && item.strokeId === choice.strokeId && item.field.startsWith("delete/") && item.retained);
+    if (!retainedRestore && !stroke?.fields[choice.field]?.some(([, digest]) => digest === choice.hash)) fail("resolution does not name a current candidate");
     const resolved = valueLookup(choice.strokeId, choice.field, choice.hash, [{ record, state }]);
     if (!resolved.found) fail("resolution source is unavailable");
     let found = locate(choice.strokeId);
@@ -354,7 +416,7 @@ export function resolveInkWireFields(document, choices, identity) {
             values[field] = clone(value.value);
           }
           const node = values.node;
-          for (const field of ["ink", "color", "strokeWidth", "pressure"]) { if (values[field] !== null) node.attrs[field] = values[field]; }
+          for (const field of ["ink", "inkFragments", "color", "strokeWidth", "pressure"]) { if (values[field] !== null) node.attrs[field] = values[field]; }
           insert(node, values.placement); next.layout ??= {}; next.layout[choice.strokeId] = values.layout;
         }
         forced.push({ kind: "restore", strokeId: choice.strokeId });
@@ -366,12 +428,108 @@ export function resolveInkWireFields(document, choices, identity) {
     if (choice.field === "layout") next.layout[choice.strokeId] = value;
     else if (choice.field === "placement") { found.parent.content = found.parent.content.filter(child => child !== found.node); insert(found.node, value); }
     else if (choice.field === "node") {
-      const attributes = Object.fromEntries(["ink", "color", "strokeWidth", "pressure"].filter(key => own(found.node.attrs, key)).map(key => [key, found.node.attrs[key]]));
+      const attributes = Object.fromEntries(["ink", "inkFragments", "color", "strokeWidth", "pressure"].filter(key => own(found.node.attrs, key)).map(key => [key, found.node.attrs[key]]));
       const node = { ...value, attrs: { ...value.attrs, ...attributes } };
       found.parent.content = found.parent.content.map(child => child === found.node ? node : child);
     } else if (value === null) delete found.node.attrs[choice.field];
     else found.node.attrs[choice.field] = value;
-    forced.push({ kind: "edit", strokeId: choice.strokeId, patch: { [choice.field]: value } });
+    const patch = { [choice.field]: value };
+    if (["ink", "inkFragments"].includes(choice.field)) {
+      const counterpart = choice.field === "ink" ? "inkFragments" : "ink";
+      const dot = stroke.fields[choice.field].find(([, digest]) => digest === choice.hash)[0];
+      const companion = stroke.fields[counterpart]?.find(([source]) => source === dot);
+      const source = companion && valueLookup(choice.strokeId, counterpart, companion[1], [{ record, state }]);
+      if (!source?.found) fail("logical ink fragments have no matching source event");
+      patch[counterpart] = clone(source.value);
+      if (source.value === null) delete found.node.attrs[counterpart]; else found.node.attrs[counterpart] = clone(source.value);
+    }
+    forced.push({ kind: "edit", strokeId: choice.strokeId, patch });
   }
-  return stampInkDocument(next, document, { ...identity, changes: forced });
+  return { document: next, changes: forced };
+}
+export function resolveInkWireFields(document, choices, identity) {
+  const prepared = prepareResolution(document, choices);
+  return stampInkDocument(prepared.document, document, { ...identity, changes: prepared.changes });
+}
+/** Validated author intent only. The native journal supplies the real actor,
+ * sequence and observed parents atomically; this function allocates no identity. */
+export function inkWireResolutionPlan(document, choices) {
+  if (!Array.isArray(choices) || !choices.length || new Set(choices.map(choice => choice.boardId)).size !== 1) fail("one native resolution plan requires one Board");
+  const prepared = prepareResolution(document, choices), changes = new Map();
+  for (const change of prepared.changes) {
+    const previous = changes.get(change.strokeId);
+    if (previous && (previous.kind !== "edit" || change.kind !== "edit")) fail("resolve liveness before choosing its other fields");
+    changes.set(change.strokeId, previous ? { ...change, patch: { ...previous.patch, ...change.patch } } : change);
+  }
+  return { boardId: choices[0].boardId, changes: [...changes.values()] };
+}
+
+/** Foreign checkpoints are sparse causal anchors, not synthesized operations.
+ * The initial legacy snapshot uses the same deterministic wire bootstrap as all hosts. */
+export function inkCheckpointFromDocument(document, boardId) {
+  const record = boards(document).get(boardId); if (!record) fail("Board is missing");
+  const state = bootstrap(record), known = {}, strokes = [];
+  if (!metadataMatches(record, state)) fail("unstamped source must be reconciled against its actual baseline before journal import");
+  const births = new Map(Object.values(state.strokes).map(stroke => [stroke.born[1], stroke.born[0]]));
+  for (const [dot, context] of Object.entries(state.contexts)) known[dot] = { anchor: true, hash: state.digests?.[dot] ?? null, ...(state.eventDigests?.[dot] ? { sourceHash: state.eventDigests[dot] } : {}), clock: clone(context), level: births.get(dot) ?? state.levels?.[dot] ?? Math.max(1, state.level) };
+  for (const [actor, sequence] of Object.entries(state.clock)) {
+    const dot = `${actor}:${sequence}`;
+    known[dot] ??= { anchor: true, partial: true, hash: null, clock: { [actor]: sequence }, level: Math.max(1, state.level) };
+  }
+  for (const [id, stroke] of Object.entries(state.strokes)) {
+    const [actor, sequence] = dotParts(stroke.born[1]);
+    known[stroke.born[1]] ??= { anchor: true, partial: true, hash: null, clock: { [actor]: sequence }, level: stroke.born[0] };
+    if (known[stroke.born[1]].partial) known[stroke.born[1]].level = stroke.born[0];
+    const registers = {};
+    for (const [field, heads] of Object.entries(stroke.fields)) registers[field] = heads.map(([operationId, digest]) => {
+      const resolved = valueLookup(id, field, digest, [{ record, state }]);
+      if (!resolved.found) fail("incoming field source is unavailable");
+      return { operationId, value: clone(resolved.value) };
+    });
+    strokes.push({ id, creationId: stroke.born[1], creationOrder: stroke.born, registers });
+  }
+  const candidates = [...new Set(Object.values(state.strokes).flatMap(stroke => Object.values(stroke.fields).flat().map(([dot]) => dot)))];
+  const frontier = candidates.filter(dot => !candidates.some(other => dot !== other && seen(known[other].clock, dot))).sort(compare);
+  return validateInkCheckpoint({ format: "showai-ink-checkpoint-v1", pageId: document.id, boardId, frontier, known, strokes });
+}
+
+/** Native coalesced saves export the retained replica's original dots, not the
+ * identity of whichever stroke happened to trigger the final checkpoint. */
+export function inkWireDocumentFromCheckpoint(document, boardId, checkpoint) {
+  validateInkCheckpoint(checkpoint);
+  if (checkpoint.pageId !== document.id || checkpoint.boardId !== boardId) fail("checkpoint projection scope differs");
+  const next = clone(document), record = boards(next).get(boardId); if (!record) fail("Board is missing");
+  const state = empty(), materialized = materializeInkOperations([], checkpoint), byId = new Map(materialized.strokes.map(stroke => [stroke.id, stroke])), visible = [];
+  for (const item of Object.values(checkpoint.known)) { state.clock = joinClock(state.clock, item.clock); state.level = Math.max(state.level, item.level); }
+  for (const source of checkpoint.strokes) {
+    const stroke = { born: source.creationOrder, fields: {} }, current = byId.get(source.id), registers = { ...source.registers };
+    if (!registers.placement && current && !current.deleted) {
+      const placement = record.records.get(source.id)?.placement ?? { parentId: boardId, after: record.board.content?.filter(node => !isInkNode(node)).at(-1)?.attrs?.id ?? null, before: null };
+      registers.placement = [{ operationId: source.creationId, value: placement }];
+    }
+    const variants = {};
+    for (const [field, heads] of Object.entries(registers)) {
+      if (!fields.includes(field)) continue;
+      stroke.fields[field] = heads.map(entry => {
+        const descriptor = checkpoint.known[entry.operationId]; state.contexts[entry.operationId] = descriptor.clock; state.levels[entry.operationId] = descriptor.level;
+        if (descriptor.hash) state.digests[entry.operationId] = descriptor.hash;
+        if (descriptor.sourceHash || descriptor.hash) state.eventDigests[entry.operationId] = descriptor.sourceHash ?? descriptor.hash;
+        return [entry.operationId, hash(entry.value)];
+      });
+      if (field !== "alive") {
+        const values = {};
+        for (const entry of heads) if (current?.deleted || !current || hash(entry.value) !== hash(field === "placement" ? current.placement ?? registers.placement?.[0]?.value : fieldValue({ node: current.node, layout: current.layout }, field))) values[hash(entry.value)] = clone(entry.value);
+        if (Object.keys(values).length) variants[field] = values;
+      }
+    }
+    const hasConflict = materialized.conflicts.some(conflict => conflict.strokeId === source.id);
+    if (isDeleted(stroke) && !hasConflict) compactDeleted(stroke);
+    else if (Object.keys(variants).length) stroke.variants = variants;
+    state.strokes[source.id] = stroke;
+    if (current && !current.deleted) visible.push({ id: source.id, node: current.node, layout: current.layout, placement: current.placement ?? registers.placement[0].value, born: source.creationOrder });
+  }
+  const removedIds = new Set(record.records.keys());
+  const strip = node => { if (node.content) node.content = node.content.filter(child => !removedIds.has(child.attrs?.id)).map(strip); return node; };
+  next.content = strip(next.content); next.layout = Object.fromEntries(Object.entries(next.layout ?? {}).filter(([id]) => !removedIds.has(id)));
+  return finishInkPageMerge(next, { plans: [{ id: boardId, state: prune(state), visible }], conflicts: [] }).document;
 }

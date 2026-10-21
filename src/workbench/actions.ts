@@ -1,3 +1,5 @@
+import { prepareSavedInkResolution } from "../core/ink-wire-writer";
+import type { InkWireChoice } from "../surface/ink-wire.mjs";
 import { validatePageIcon } from "../lib/page-icon.mjs";
 import { translator } from "../i18n";
 import commonMessages from "../i18n/messages/common";
@@ -171,6 +173,7 @@ export const workbenchActions = new Set([
   "pages:create",
   "pages:insertTemplate",
   "pages:save",
+  "pages:prepareInkResolution",
   "pages:duplicate",
   "pages:remove",
   "pages:rename",
@@ -1005,6 +1008,12 @@ export function createWorkbench(
             text(args, "baseRevision", true),
           ),
         );
+      }
+      case "pages:prepareInkResolution": {
+        const id = projectId(args), current = await store.readPage(id, pageId(args));
+        if (!Array.isArray(args.choices) || !args.choices.length || args.choices.length > 128 || args.choices.some(choice => !choice || typeof choice !== "object" || Array.isArray(choice) || ["boardId", "strokeId", "field", "hash"].some(key => typeof choice[key] !== "string" || !choice[key]))) throw new CoreError("INVALID_DATA", "Invalid ink conflict choices.");
+        const document = await prepareSavedInkResolution(store.root, current.document, args.choices as InkWireChoice[]);
+        return { baseline: current.document, document };
       }
       case "pages:save": {
         const id = projectId(args);

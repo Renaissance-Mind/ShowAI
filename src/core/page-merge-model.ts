@@ -26,6 +26,10 @@ export interface PageMergeConflict {
   path: string;
   kind: "value" | "text" | "structure";
   reason?: string;
+  /** Fully retained ink variants may travel in the canonical page in-place. */
+  domain?: "ink";
+  retained?: boolean;
+  ink?: { boardId?: string; strokeId?: string; field: string };
   base?: unknown;
   ours?: unknown;
   theirs?: unknown;
@@ -365,7 +369,9 @@ export function mergePageContent(
       document = projected.document;
       conflicts.push(...projected.conflicts.map(conflict => ({
         path: `/ink/${conflict.boardId ?? "board"}/${conflict.strokeId ?? ""}/${conflict.field}`,
-        kind: "value" as const, reason: conflict.reason,
+        kind: "value" as const, reason: conflict.reason, domain: "ink" as const,
+        retained: conflict.retained,
+        ink: { boardId: conflict.boardId, strokeId: conflict.strokeId, field: conflict.field },
       })));
     }
     document = validateDocument(document);
@@ -388,6 +394,10 @@ export function mergePageContent(
     document = structuredClone(originalInputs.ours);
   }
   return { document, conflicts };
+}
+
+export function canCommitPageMerge(result: Pick<PageMergeResult, "conflicts">): boolean {
+  return result.conflicts.every(conflict => conflict.domain === "ink" && conflict.retained === true);
 }
 
 export function describeMergeConflict(

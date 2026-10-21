@@ -5,15 +5,17 @@ export const INK_OPERATION_FORMAT: "showai-ink-operation-v1";
 export const INK_CHECKPOINT_FORMAT: "showai-ink-checkpoint-v1";
 export type InkEditPatch = {
   ink?: PortableInk | null;
+  inkFragments?: PortableInk[] | null;
   color?: string | null;
   strokeWidth?: number | null;
   pressure?: boolean | null;
   /** Node structure/metadata excluding ink, color, strokeWidth and pressure. */
   node?: JSONContent;
   layout?: NodeLayout;
+  placement?: { parentId: string; after: string | null; before: string | null };
 };
 export type InkOperationChange =
-  | { kind: "create"; strokeId: string; node: JSONContent; layout: NodeLayout }
+  | { kind: "create"; strokeId: string; node: JSONContent; layout: NodeLayout; placement?: InkEditPatch["placement"] }
   | { kind: "edit"; strokeId: string; patch: InkEditPatch }
   | { kind: "delete" | "restore"; strokeId: string };
 export interface InkOperationIdentity { actor: string; sequence: number }
@@ -36,7 +38,7 @@ export interface InkOperationCheckpoint {
   pageId: string;
   boardId: string;
   frontier: string[];
-  known: Record<string, { hash: string; clock: Record<string, number>; level: number }>;
+  known: Record<string, { hash: string | null; clock: Record<string, number>; level: number; anchor?: boolean; partial?: boolean; sourceHash?: string }>;
   strokes: {
     id: string;
     creationId: string;
@@ -52,11 +54,13 @@ export interface InkMaterialization {
     id: string;
     node: JSONContent;
     layout: NodeLayout;
+    placement?: InkEditPatch["placement"];
     deleted: boolean;
     heads: Record<string, string[]>;
     conflicts: InkOperationConflict[];
   }[];
   conflicts: InkOperationConflict[];
+  tombstones: string[];
 }
 export interface InkReplicaRecord {
   kind: "known" | "stroke" | "register";
@@ -69,6 +73,8 @@ export interface InkReplicaPrepared {
   records: InkReplicaRecord[];
   frontier: string[];
   appendedIds: string[];
+  clock: Record<string, number>;
+  undo?: Record<string, { changes: InkOperationChange[] }>;
 }
 export class InkOperationReplica {
   constructor(value: { pageId?: string; boardId?: string; checkpoint?: InkOperationCheckpoint });
@@ -76,6 +82,9 @@ export class InkOperationReplica {
   readonly boardId: string;
   readonly frontier: Set<string>;
   prepare(operations: InkOperation[]): InkReplicaPrepared;
+  prepareImport(checkpoint: InkOperationCheckpoint): InkReplicaPrepared;
+  actorSequence(actor: string): number;
+  compensationPlan(operation: InkOperation, inverse: { changes: InkOperationChange[] }): { pageId: string; boardId: string; changes: InkOperationChange[]; parents: string[]; skipped: { strokeId: string; field: string }[] };
   commit(token: string): { frontier: string[]; version: number };
   abort(token: string): void;
   append(operations: InkOperation[]): InkReplicaPrepared;
@@ -84,6 +93,8 @@ export class InkOperationReplica {
 }
 export function inkCheckpointRecords(checkpoint: InkOperationCheckpoint): InkReplicaRecord[];
 export function inkCheckpointFromRecords(value: { pageId: string; boardId: string; frontier: string[]; records: InkReplicaRecord[] }): InkOperationCheckpoint;
+export type InkJournalEvent = { ordinal: number } & ({ kind: "operation"; operation: InkOperation } | { kind: "import"; delta: { records: InkReplicaRecord[]; frontier: string[]; clock: Record<string, number> } });
+export function replayInkJournalEvents(scope: { pageId: string; boardId: string }, events: InkJournalEvent[]): InkOperationCheckpoint;
 export function canonicalInkJSON(value: unknown): string;
 export function inkOperationDigest(value: unknown): string;
 export function inkNodeMetadata(node: JSONContent): JSONContent;
@@ -105,3 +116,5 @@ export function inkCompensationPlan(operations: InkOperation[], operationId: str
   pageId: string; boardId: string; changes: InkOperationChange[]; parents: string[];
   skipped: { strokeId: string; field: string }[];
 };
+
+export function validateInkOperationField(name: string, value: unknown): void;

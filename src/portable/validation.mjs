@@ -507,6 +507,8 @@ function validateNode(value, path, counter, depth = 0, parentType = null) {
             "points",
             "bindings",
             "ink",
+            "inkFragments",
+            "inkInput",
             "label",
             "labelSize",
           ])

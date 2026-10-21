@@ -9,6 +9,7 @@ import {
   materializeInkOperations, validateInkOperation,
   type InkOperation, type InkOperationChange, type InkOperationCheckpoint,
   type InkReplicaPrepared, type InkReplicaRecord,
+  type InkJournalEvent,
 } from "../surface/ink-operations.mjs";
 
 export const INK_JOURNAL_SCHEMA_SQL = `
@@ -28,13 +29,19 @@ CREATE TABLE IF NOT EXISTS ink_replica_records(
  PRIMARY KEY(page_id,board_id,kind,record_key,field));
 CREATE TABLE IF NOT EXISTS ink_replica_state(
  page_id TEXT NOT NULL,board_id TEXT NOT NULL,ordinal INTEGER NOT NULL,
- payload TEXT NOT NULL,sha256 TEXT NOT NULL,PRIMARY KEY(page_id,board_id));`;
+ payload TEXT NOT NULL,sha256 TEXT NOT NULL,PRIMARY KEY(page_id,board_id));
+CREATE TABLE IF NOT EXISTS ink_operation_undo(
+ page_id TEXT NOT NULL,board_id TEXT NOT NULL,operation_id TEXT NOT NULL,
+ payload TEXT NOT NULL,sha256 TEXT NOT NULL,PRIMARY KEY(page_id,board_id,operation_id));
+CREATE TABLE IF NOT EXISTS ink_checkpoint_imports(
+ ordinal INTEGER PRIMARY KEY,page_id TEXT NOT NULL,board_id TEXT NOT NULL,
+ payload TEXT NOT NULL,sha256 TEXT NOT NULL);`;
 type Scope = { pageId: string; boardId: string };
 type OperationRow = { ordinal: number; operation_id: string; actor: string; sequence: number; sha256: string; payload: string };
 type SnapshotRow = { ordinal: number; sha256: string; payload: string };
 type RecordRow = { kind: InkReplicaRecord["kind"]; record_key: string; field: string; payload: string; sha256: string };
-type Cached = { replica: InkOperationReplica; ordinal: number; dirty: InkReplicaRecord[] };
-type Plan = { cached: Cached; token: string; ordinal: number };
+type Cached = { replica: InkOperationReplica; ordinal: number; dirty: InkReplicaRecord[]; generation?: string };
+type Plan = { cached: Cached; token: string; ordinal: number; generation?: string };
 const digest = (text: string) => createHash("sha256").update(text).digest("hex");
 const scopeKey = (scope: Scope) => canonicalInkJSON([scope.pageId, scope.boardId]);
 
@@ -67,7 +74,7 @@ export class InkOperationJournal {
     let durable = false;
     try {
       const result = action(plans); this.db.exec("COMMIT"); durable = true;
-      for (const plan of plans) { plan.cached.replica.commit(plan.token); plan.cached.ordinal = plan.ordinal; plan.cached.dirty = []; }
+      for (const plan of plans) { plan.cached.replica.commit(plan.token); plan.cached.ordinal = plan.ordinal; plan.cached.generation = plan.generation; plan.cached.dirty = []; }
       return result;
     } catch (error) {
       if (!durable) { this.db.exec("ROLLBACK"); for (const plan of plans) plan.cached.replica.abort(plan.token); }
@@ -108,7 +115,7 @@ export class InkOperationJournal {
     }
     if (checkpoint && (checkpoint.pageId !== scope.pageId || checkpoint.boardId !== scope.boardId)) throw new Error("Ink checkpoint scope mismatch.");
     const rows = this.tail(scope, ordinal);
-    return { checkpoint, operations: rows.map(row => row.operation), ordinal: rows.at(-1)?.ordinal ?? ordinal, legacySelected };
+    return { checkpoint, operations: rows.map(row => row.operation), ordinal: rows.at(-1)?.ordinal ?? ordinal, legacySelected, generation: indexed?.sha256 };
   }
   read(scope: Scope) {
     const state = this.readState(scope);
@@ -121,12 +128,14 @@ export class InkOperationJournal {
   }
   private cached(scope: Scope): Cached {
     const key = scopeKey(scope); let cached = this.replicas.get(key);
+    const generation = this.db.prepare("SELECT sha256 FROM ink_replica_state WHERE page_id=? AND board_id=?").get(scope.pageId, scope.boardId)?.sha256 as string | undefined;
+    if (cached && generation !== cached.generation) { this.replicas.delete(key); cached = undefined; }
     if (!cached) {
       const state = this.state(scope);
       const replica = new InkOperationReplica({ ...scope, checkpoint: state.checkpoint });
       const dirty = state.legacySelected && state.checkpoint ? inkCheckpointRecords(state.checkpoint) : [];
       const applied = replica.append(state.operations);
-      cached = { replica, ordinal: state.ordinal, dirty: [...dirty, ...applied.records] }; this.replicas.set(key, cached);
+      cached = { replica, ordinal: state.ordinal, dirty: [...dirty, ...applied.records], generation: state.generation }; this.replicas.set(key, cached);
     } else {
       const rows = this.tail(scope, cached.ordinal);
       if (rows.length) { const applied = cached.replica.append(rows.map(row => row.operation)); cached.dirty.push(...applied.records); cached.ordinal = rows.at(-1)!.ordinal; }
@@ -140,6 +149,10 @@ export class InkOperationJournal {
     catch (error) { this.db.exec("ROLLBACK"); throw error; }
   }
   append(operations: InkOperation[]) { return this.transaction(plans => this.appendInside(operations, plans)); }
+  private nextOrdinal() {
+    const previous = this.db.prepare("SELECT MAX(value) AS value FROM (SELECT MAX(ordinal) AS value FROM ink_operations UNION ALL SELECT MAX(ordinal) AS value FROM ink_checkpoint_imports)").get()!.value;
+    return Number(previous ?? 0) + 1;
+  }
   private appendInside(operations: InkOperation[], plans: Plan[]) {
     const groups = new Map<string, { scope: Scope; operations: InkOperation[] }>();
     for (const operation of operations) {
@@ -159,22 +172,36 @@ export class InkOperationJournal {
       }
       if (!fresh.length) continue;
       const prepared = cached.replica.prepare(fresh);
-      const plan = { cached, token: prepared.token, ordinal: cached.ordinal }; plans.push(plan);
-      const insert = this.db.prepare("INSERT INTO ink_operations(page_id,board_id,operation_id,actor,sequence,sha256,payload) VALUES(?,?,?,?,?,?,?)");
+      const plan: Plan = { cached, token: prepared.token, ordinal: cached.ordinal }; plans.push(plan);
+      const insert = this.db.prepare("INSERT INTO ink_operations(ordinal,page_id,board_id,operation_id,actor,sequence,sha256,payload) VALUES(?,?,?,?,?,?,?,?)");
       for (const operation of fresh) {
         const payload = queued.get(operation.id)!;
-        plan.ordinal = Number(insert.run(scope.pageId, scope.boardId, operation.id, operation.actor, operation.sequence, digest(payload), payload).lastInsertRowid); appended++;
+        plan.ordinal = this.nextOrdinal(); insert.run(plan.ordinal, scope.pageId, scope.boardId, operation.id, operation.actor, operation.sequence, digest(payload), payload); appended++;
+        const inverse = prepared.undo?.[operation.id];
+        if (inverse) { const bytes = canonicalInkJSON(inverse); this.db.prepare("INSERT OR IGNORE INTO ink_operation_undo VALUES(?,?,?,?,?)").run(scope.pageId, scope.boardId, operation.id, bytes, digest(bytes)); }
       }
-      this.writeIndex(scope, [...cached.dirty, ...prepared.records], prepared, plan.ordinal);
+      plan.generation = this.writeIndex(scope, [...cached.dirty, ...prepared.records], prepared, plan.ordinal);
     }
     return { appended };
   }
   appendLocal(input: Scope & { parents: string[]; changes: InkOperationChange[] }) {
     return this.transaction(plans => {
+      const cached = this.cached(input);
       const previous = this.db.prepare("SELECT MAX(sequence) AS sequence FROM ink_operations WHERE page_id=? AND board_id=? AND actor=?").get(input.pageId, input.boardId, this.actor)?.sequence;
-      const sequence = Number(previous ?? 0) + 1;
+      const sequence = Math.max(Number(previous ?? 0), cached.replica.actorSequence(this.actor)) + 1;
       const operation = createInkOperation({ ...input, actor: this.actor, sequence, parents: [...input.parents, ...(sequence > 1 ? [`${this.actor}:${sequence - 1}`] : [])] });
       this.appendInside([operation], plans); return operation;
+    });
+  }
+  importCheckpoint(scope: Scope, checkpoint: InkOperationCheckpoint) {
+    return this.transaction(plans => {
+      const cached = this.cached(scope), prepared = cached.replica.prepareImport(checkpoint), ordinal = this.nextOrdinal();
+      if (!prepared.records.length) { cached.replica.abort(prepared.token); return { ordinal: cached.ordinal, changedRecords: 0 }; }
+      const plan: Plan = { cached, token: prepared.token, ordinal }; plans.push(plan);
+      const payload = canonicalInkJSON({ format: "showai-ink-checkpoint-import-v1", records: prepared.records, frontier: prepared.frontier, clock: prepared.clock });
+      this.db.prepare("INSERT INTO ink_checkpoint_imports VALUES(?,?,?,?,?)").run(ordinal, scope.pageId, scope.boardId, payload, digest(payload));
+      plan.generation = this.writeIndex(scope, [...cached.dirty, ...prepared.records], prepared, ordinal);
+      return { ordinal, changedRecords: prepared.records.length };
     });
   }
   /** A separate persisted wire actor stamps CAS-checked snapshot editors. It
@@ -193,19 +220,39 @@ export class InkOperationJournal {
   private writeIndex(scope: Scope, records: InkReplicaRecord[], prepared: InkReplicaPrepared, ordinal: number) {
     const statement = this.db.prepare("INSERT INTO ink_replica_records VALUES(?,?,?,?,?,?,?) ON CONFLICT(page_id,board_id,kind,record_key,field) DO UPDATE SET payload=excluded.payload,sha256=excluded.sha256");
     for (const record of records) { const payload = canonicalInkJSON(record.value); statement.run(scope.pageId, scope.boardId, record.kind, record.key, record.field, payload, digest(payload)); }
-    const payload = canonicalInkJSON({ format: "showai-ink-index-v1", frontier: prepared.frontier });
+    const payload = canonicalInkJSON({ format: "showai-ink-index-v1", frontier: prepared.frontier, clock: prepared.clock, generation: randomUUID() });
     this.db.prepare("INSERT INTO ink_replica_state VALUES(?,?,?,?,?) ON CONFLICT(page_id,board_id) DO UPDATE SET ordinal=excluded.ordinal,payload=excluded.payload,sha256=excluded.sha256").run(scope.pageId, scope.boardId, ordinal, payload, digest(payload));
+    return digest(payload);
   }
   /** Explicit export snapshot. Hot appends already checkpoint only touched rows;
    * they never serialize or rewrite every stored stroke. */
   checkpoint(scope: Scope) {
     this.transaction(plans => {
       const cached = this.cached(scope), prepared = cached.replica.prepare([]);
-      plans.push({ cached, token: prepared.token, ordinal: cached.ordinal });
-      this.writeIndex(scope, cached.dirty, prepared, cached.ordinal);
+      const plan: Plan = { cached, token: prepared.token, ordinal: cached.ordinal }; plans.push(plan);
+      plan.generation = this.writeIndex(scope, cached.dirty, prepared, cached.ordinal);
     });
     // Reconstruction/export is outside the SQLite writer lock.
     return this.readState(scope).checkpoint ?? null;
   }
   operations(scope: Scope): InkOperation[] { return this.tail(scope, 0).map(row => row.operation); }
+  operation(scope: Scope, operationId: string) {
+    const row = this.db.prepare("SELECT ordinal,operation_id,actor,sequence,sha256,payload FROM ink_operations WHERE page_id=? AND board_id=? AND operation_id=?").get(scope.pageId, scope.boardId, operationId) as OperationRow | undefined;
+    return row ? this.decode(row) : null;
+  }
+  undoRecord(scope: Scope, operationId: string) {
+    const row = this.db.prepare("SELECT payload,sha256 FROM ink_operation_undo WHERE page_id=? AND board_id=? AND operation_id=?").get(scope.pageId, scope.boardId, operationId) as { payload: string; sha256: string } | undefined;
+    if (!row) return null;
+    if (digest(row.payload) !== row.sha256) throw new Error("Ink undo checksum mismatch.");
+    return JSON.parse(row.payload) as { changes: InkOperationChange[] };
+  }
+  events(scope: Scope): InkJournalEvent[] {
+    const operations = this.db.prepare("SELECT ordinal,operation_id,actor,sequence,sha256,payload FROM ink_operations WHERE page_id=? AND board_id=?").all(scope.pageId, scope.boardId) as OperationRow[];
+    const imports = this.db.prepare("SELECT ordinal,sha256,payload FROM ink_checkpoint_imports WHERE page_id=? AND board_id=?").all(scope.pageId, scope.boardId) as SnapshotRow[];
+    return [...operations.map(row => ({ ordinal: row.ordinal, kind: "operation" as const, operation: this.decode(row) })), ...imports.map(row => {
+      if (digest(row.payload) !== row.sha256) throw new Error("Ink import checksum mismatch.");
+      const delta = JSON.parse(row.payload); if (delta.format !== "showai-ink-checkpoint-import-v1") throw new Error("Invalid ink checkpoint import event.");
+      return { ordinal: row.ordinal, kind: "import" as const, delta };
+    })].sort((a, b) => a.ordinal - b.ordinal);
+  }
 }
