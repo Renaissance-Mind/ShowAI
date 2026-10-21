@@ -840,12 +840,17 @@ export function validateDocument(value) {
   return validateDocumentValue(value, true);
 }
 
-function validateDocumentValue(value, independent) {
-  validateJson(value, "document");
-  const sizes = assertContent(value);
+function validationStage(observer, name, operation) {
+  if (!observer) return operation();
+  const now = () => globalThis.performance?.now?.() ?? Date.now(), start = now();
+  try { return operation(); } finally { observer(name, now() - start); }
+}
+function validateDocumentValue(value, independent, observer) {
+  validationStage(observer, "json", () => validateJson(value, "document"));
+  const sizes = validationStage(observer, "capacity", () => assertContent(value));
   const source = object(value, "document");
   const document = independent ? structuredClone(source) : source;
-  const capacityBefore = capacityPreimage(document);
+  const capacityBefore = validationStage(observer, "capacityPreimage", () => capacityPreimage(document));
   let templateContext;
   if (document.templateContext !== undefined) {
     const context = object(
@@ -900,7 +905,7 @@ function validateDocumentValue(value, independent) {
     throw new Error("Page content must be a doc or surface node.");
   const surface = document.content.type === "surface";
   const resource = isResource(document);
-  if (surface) assignSurfaceIds(document);
+  if (surface) validationStage(observer, "surfaceIds", () => assignSurfaceIds(document));
   else if (
     document.layout !== undefined ||
     document.views !== undefined ||
@@ -908,8 +913,8 @@ function validateDocumentValue(value, independent) {
   )
     throw new Error("Layout and views require a surface root.");
   const validation = {count: 0, surface, resource, capacityMayGrow: false};
-  validateNode(document.content, "document.content", validation);
-  if (surface) validateSurface(document);
+  validationStage(observer, "nodes", () => validateNode(document.content, "document.content", validation));
+  if (surface) validationStage(observer, "surface", () => validateSurface(document));
   const canvasIds = new Set(
     (document.content.content ?? [])
       .filter((node) => node.attrs?.canvas != null)
@@ -989,7 +994,7 @@ function validateDocumentValue(value, independent) {
     comments,
     ...(templateContext ? { templateContext } : {}),
   };
-  canonicalCapacity(capacityBefore, canonical, sizes, validation.capacityMayGrow);
+  validationStage(observer, "canonicalCapacity", () => canonicalCapacity(capacityBefore, canonical, sizes, validation.capacityMayGrow));
   return canonical;
 }
 
@@ -1093,10 +1098,10 @@ function captureOwnedArtifact(artifact) {
 export function parseArtifactForSourceSnapshot(input) {
   return captureOwnedArtifact(parseArtifactDocument(input, validateDocument));
 }
-export function parseArtifactConsumingForSourceSnapshot(input) {
+export function parseArtifactConsumingForSourceSnapshot(input, observer) {
   return captureOwnedArtifact(
     parseArtifactDocument(input, (value) =>
-      validateDocumentValue(value, false),
+      validateDocumentValue(value, false, observer),
     ),
   );
 }

@@ -113,23 +113,23 @@ export function normalizeSourceDocument(document:ShowDocument):ShowDocument{
  const canonical=parseArtifact({format:"showai",version:artifactVersion(normalized),document:normalized}).document;
  canonicalCapacityBodies.add(canonical);return canonical;
 }
-function normalizeOwnedSourceDocument(document:ShowDocument):ShowDocument{
+function normalizeOwnedSourceDocument(document:ShowDocument,observer?:SourceRuntimeObserver):ShowDocument{
  // Only the actual recursive owner may reuse readable child branches. Reconcile
  // writes an independent root/maps and path-copies structural repairs; the
  // consuming parser still runs every JSON, model, ink and capacity check.
  // Arbitrary caller objects retain the independent defensive capture below.
- if(normalizationReadableBodies.has(document)&&isOwnedSource(document))return normalizeParsedSourceDocument(document);
+ if(normalizationReadableBodies.has(document)&&isOwnedSource(document))return normalizeParsedSourceDocument(document,observer);
  const normalized=reconcileSurface(document);
  const canonical=parseArtifactForSourceSnapshot({format:"showai",version:artifactVersion(normalized),document:normalized}).document;
  canonicalCapacityBodies.add(canonical);return canonical;
 }
-function normalizeParsedSourceDocument(document:ShowDocument):ShowDocument{
+function normalizeParsedSourceDocument(document:ShowDocument,observer?:SourceRuntimeObserver):ShowDocument{
  // Retain the original result root for history's pre-normalization semantics.
  // This is either our exclusive JSON.parse graph or an actual recursively owned
  // readable graph. The independent mutable root/maps own every normalization
  // write; shared frozen leaves are read-only throughout complete validation.
- const normalized=reconcileSurface({...document},{clone:false});
- const canonical=parseArtifactConsumingForSourceSnapshot({format:"showai",version:artifactVersion(normalized),document:normalized}).document;
+ const normalized=measured(observer,"reconcile",()=>reconcileSurface({...document},{clone:false}));
+ const canonical=parseArtifactConsumingForSourceSnapshot({format:"showai",version:artifactVersion(normalized),document:normalized},observer).document;
  canonicalCapacityBodies.add(canonical);return canonical;
 }
 /** The actual immutable base already satisfies all three official limits.
@@ -351,7 +351,7 @@ export class SourceRuntimeOwner {
    let base:ShowDocument;
    if(origin&&this.validatedBodies.has(current.document)&&!diffNativeSource(origin.packet.document,packet.baseDocument).length)base=current.document;
    else{
-    base=entry.canonicalBase??measured(observer,"unchanged.normalizeBase",()=>freezeOwnedSource(normalizeOwnedSourceDocument(packet.baseDocument)));
+    base=entry.canonicalBase??measured(observer,"unchanged.normalizeBase",()=>freezeOwnedSource(normalizeOwnedSourceDocument(packet.baseDocument,observer && ((stage,time)=>observer("unchanged.base."+stage,time)))));
     if(!entry.canonicalBase){entry.canonicalBase=base;if(this.publications.get(scopeKey(current.ref.scope)+"\u0000"+request.publicationId)===entry)this.account(base,1)}
    }
    unchanged=measured(observer,"unchanged.compareBase",()=>nativeDocumentBodiesEqual(base,current.document));
@@ -360,7 +360,7 @@ export class SourceRuntimeOwner {
   // A raw/draft ref is not itself capacity proof. Equality above proves all
   // model fields except storage time; validate that actual scalar/body too.
   if(!this.validatedBodies.has(current.document))measured(observer,"unchanged.currentCapacity",()=>assertContent(current.document));
-  const canonical=entry.canonical??measured(observer,"unchanged.normalizeIncoming",()=>freezeOwnedSource(normalizeOwnedSourceDocument(packet.document)));
+  const canonical=entry.canonical??measured(observer,"unchanged.normalizeIncoming",()=>freezeOwnedSource(normalizeOwnedSourceDocument(packet.document,observer && ((stage,time)=>observer("unchanged.incoming."+stage,time)))));
   if(!entry.canonical){entry.canonical=canonical;if(this.publications.get(scopeKey(current.ref.scope)+"\u0000"+request.publicationId)===entry)this.account(canonical,1)}
   const prepared=this.prepareNativeOrigin(current,request.publicationId,entry,canonical,request.sourceVersion,observer);
   // The only pre-normalized argument is the fresh private formal factory

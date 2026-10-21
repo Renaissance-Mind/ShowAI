@@ -30,7 +30,7 @@ export function injectArtifactIntoHtml(
 ): string;
 /** Internal closed source factories; canonical document is recursively owned before escape. */
 export function parseArtifactForSourceSnapshot(input:unknown):ShowArtifact;
-export function parseArtifactConsumingForSourceSnapshot(input:unknown):ShowArtifact;
+export function parseArtifactConsumingForSourceSnapshot(input:unknown,observer?:(stage:string,milliseconds:number)=>void):ShowArtifact;
 export function shareSourceSnapshotDocument<T extends ShowDocument>(base:T,canonical:T):T;
 export function inheritSourceSnapshotTimestampCapacity(base:ShowDocument,body:ShowDocument):boolean;
 /** Actual saved backend result only; always measures complete final body. */
