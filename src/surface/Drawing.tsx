@@ -114,6 +114,7 @@ export function Drawing({
   const shape = isPortableInk(node.attrs!.ink) ? (
     <PortableInkPaths
       ink={node.attrs!.ink}
+      fragments={node.attrs!.inkFragments}
       color={color}
       width={strokeWidth}
       pressure={node.attrs!.pressure}

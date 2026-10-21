@@ -11,8 +11,8 @@ import {
 import { polygonContains } from "./lasso.mjs";
 import {
   isPortableInk,
-  portableInkHit,
-  portableInkBounds,
+  portableNodeHit,
+  portableNodeBounds,
 } from "./portable-ink.mjs";
 
 /** A lasso selects enclosed paint and any contour touched by its trace. */
@@ -102,11 +102,7 @@ export function shapeIntersectsPolygon(node, frame, polygon, tolerance = 0) {
 export function drawingBounds(node) {
   if (node.type !== "drawing") return null;
   if (isPortableInk(node.attrs.ink))
-    return portableInkBounds(
-      node.attrs.ink,
-      node.attrs.strokeWidth,
-      node.attrs.pressure,
-    );
+    return portableNodeBounds(node);
   if (node.attrs.ink)
     return {
       x: 0,
@@ -325,14 +321,12 @@ export function shapeHit(node, frame, point) {
   p.x -= frame.x;
   p.y -= frame.y;
   if (isPortableInk(node.attrs.ink)) {
-    const result = portableInkHit(
-      node.attrs.ink,
+    const result = portableNodeHit(
+      node,
       {
         x: (p.x * node.attrs.extent[0]) / frame.width,
         y: (p.y * node.attrs.extent[1]) / height,
       },
-      node.attrs.strokeWidth,
-      node.attrs.pressure,
     );
     return {
       ...result,

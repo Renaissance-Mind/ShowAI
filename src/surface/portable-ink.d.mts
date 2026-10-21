@@ -25,6 +25,9 @@ export function portableInkSamples(
 export function portableNodeSamples(node: {
   attrs: Record<string, any>;
 }): number[][];
+export function portableNodeFragments(node: {attrs: Record<string, any>}): PortableInk[];
+export function portableNodeBounds(node: {attrs: Record<string, any>}): {x:number;y:number;width:number;height:number};
+export function portableNodeHit(node: {attrs: Record<string, any>}, point:{x:number;y:number}): {inside:boolean;distance:number;solid:boolean;area:number};
 export function inkFramePose(
   frame: {
     x: number;

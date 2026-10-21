@@ -21,6 +21,35 @@ export function portableNodeSamples(node) {
   );
 }
 
+/** One logical stroke can exceed the bounded v1 fragment capacity. Keeping
+ * fragments on the same node preserves selection, transforms and undo. */
+export function portableNodeFragments(node) {
+  if (!isPortableInk(node?.attrs?.ink)) throw new Error("Expected portable ink node");
+  const extra = node.attrs.inkFragments ?? [];
+  if (!Array.isArray(extra) || extra.some((ink) => !isPortableInk(ink)))
+    throw new Error("Invalid logical ink fragments");
+  return [node.attrs.ink, ...extra];
+}
+
+export function portableNodeBounds(node) {
+  let left = Infinity, top = Infinity, right = -Infinity, bottom = -Infinity;
+  for (const ink of portableNodeFragments(node)) {
+    const box = portableInkBounds(ink, node.attrs.strokeWidth, node.attrs.pressure);
+    left = Math.min(left, box.x); top = Math.min(top, box.y);
+    right = Math.max(right, box.x + box.width); bottom = Math.max(bottom, box.y + box.height);
+  }
+  return { x: left, y: top, width: right - left, height: bottom - top };
+}
+
+export function portableNodeHit(node, point) {
+  let inside = false, distance = Infinity, solid = false;
+  for (const ink of portableNodeFragments(node)) {
+    const hit = portableInkHit(ink, point, node.attrs.strokeWidth, node.attrs.pressure);
+    inside ||= hit.inside; solid ||= hit.solid; distance = Math.min(distance, hit.distance);
+  }
+  return { inside, distance, solid, area: node.attrs.ink.extent[0] * node.attrs.ink.extent[1] };
+}
+
 export function inkFramePose(frame, extent) {
   const a = ((frame.rotation ?? 0) * Math.PI) / 180,
     c = Math.cos(a),
