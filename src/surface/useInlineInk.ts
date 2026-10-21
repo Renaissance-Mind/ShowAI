@@ -6,6 +6,7 @@ import { inkNodes } from "./inline-ink";
 import { inkUIRegions } from "./ink-ui-regions";
 import type { InkCommand } from "./inline-ink";
 import type { Camera } from "./model";
+import { useNativeBoard, type NativeBoardOptions } from "./useNativeBoard";
 
 /** WebKit's SVG screen matrix omits ancestor CSS scales. Read the CSS basis
  * and locate its transformed border box, including rotated/nested objects. */
@@ -68,6 +69,12 @@ export function useInlineInk({
   onTool,
   onShapeGesture,
   onClearSelection,
+  selection,
+  onSelection,
+  onLayout,
+  onDrawing,
+  onActivate,
+  fillColor,
 }: {
   root: RefObject<HTMLDivElement | null>;
   world: RefObject<HTMLDivElement | null>;
@@ -87,7 +94,16 @@ export function useInlineInk({
   onTool: (tool: string) => void;
   onClearSelection: () => void;
   onShapeGesture: (value: NonNullable<InkCommand["shapeGesture"]>) => void;
+  selection?: NativeBoardOptions["selection"];
+  onSelection?: NativeBoardOptions["onSelection"];
+  onLayout?: NativeBoardOptions["onLayout"];
+  onDrawing?: NativeBoardOptions["onDrawing"];
+  onActivate?: NativeBoardOptions["onActivate"];
+  fillColor?: string;
 }) {
+  useNativeBoard({root,world,camera:viewCamera,document:source,boardId,tool,color,width,pressure,ruler,enabled,
+    onCamera,onTool,onClearSelection,selection,onSelection,onLayout,onDrawing,onActivate,fillColor});
+  const legacyEnabled=enabled&&(typeof window==="undefined"||window.showai?.inlineInk?.nativeScene!==true);
   const current = useRef({
     source,
     color,
@@ -120,7 +136,7 @@ export function useInlineInk({
   };
   useEffect(() => {
     const bridge = window.showai?.inlineInk;
-    if (!bridge || !enabled || !source) return;
+    if (!bridge || !legacyEnabled || !source) return;
     return bridge.onCommand((value) => {
       if (value.pageId !== source.id || value.boardId !== boardId) return;
       if (value.clearSelection) current.current.onClearSelection();
@@ -143,7 +159,7 @@ export function useInlineInk({
               : value.tool,
         );
     });
-  }, [enabled, source?.id, boardId]);
+  }, [legacyEnabled, source?.id, boardId]);
   useEffect(() => {
     invalidate.current?.();
   }, [source, color, width, pressure, ruler, tool]);
@@ -151,7 +167,7 @@ export function useInlineInk({
     const bridge = window.showai?.inlineInk;
     if (
       !bridge ||
-      !enabled ||
+      !legacyEnabled ||
       !source ||
       !inking ||
       !root.current ||
@@ -442,5 +458,5 @@ export function useInlineInk({
         }
       });
     };
-  }, [enabled, source?.id, boardId, inking, root, world, viewCamera]);
+  }, [legacyEnabled, source?.id, boardId, inking, root, world, viewCamera]);
 }

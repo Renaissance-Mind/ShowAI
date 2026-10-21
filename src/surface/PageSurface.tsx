@@ -323,6 +323,12 @@ export default function PageSurface({
     enabled: enabled && !locked && !!onDraw && !printing,
     onCamera: (value, final) => controls.current.navigateTo(value, final),
     onClearSelection: () => board.select(null),
+    selection: () => [...board.ids],
+    onSelection: ids => board.selectIds(ids),
+    onLayout: frames => onTransform?.(frames, "native-board"),
+    onDrawing: (node, frame) => onDraw?.(node, frame),
+    onActivate: id => onExpand?.(id),
+    fillColor: drawFillColor,
     onShapeGesture: (value) => {
       const point = {
         clientX: value.x,

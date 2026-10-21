@@ -1007,6 +1007,11 @@ body:has([data-showai-development]) .surface-toolbar {
 .surface-grid {
   display: none;
 }
+/* Native Board retains object data/layout in the editor while a single native
+   scene owns their presentation and camera for every input tool. */
+.page-surface[data-native-board-active="true"] > .surface-scroll > :is(.surface-world, .surface-grid) {
+  visibility: hidden;
+}
 .page-surface.has-board-grid > .surface-scroll > .surface-grid {
   display: block;
   position: absolute;

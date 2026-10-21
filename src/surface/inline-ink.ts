@@ -17,13 +17,23 @@ export interface InkUpdate {
   /** The source actually seen by the author, before this delta was produced. */
   baseNodes?: JSONContent[];
   baseLayout?: Record<string, NodeLayout>;
+  /** Canonical native replica projection, including real causal wire heads. */
+  document?: ShowDocument;
+  baseDocument?: ShowDocument;
+  operationIds?: string[];
 }
 export interface InkFrame {
   token: string;
   pageId: string;
   boardId: string;
   document?: ShowDocument;
-  tool: "pen" | "highlighter" | "eraser";
+  tool: string;
+  nativeScene?: boolean;
+  objects?: import("./board-native-projection").NativeObjectProjection[];
+  selection?: string[];
+  fillColor?: string;
+  grid?: boolean;
+  background?: string;
   color: string;
   width: number;
   pressure?: boolean;
@@ -47,6 +57,10 @@ export interface InkCommand {
   tool?: string;
   error?: string;
   clearSelection?: boolean;
+  selection?: string[];
+  layouts?: Record<string,NodeLayout>;
+  primitive?: {id:string;tool:string;start:{x:number;y:number};end:{x:number;y:number}};
+  activate?: string;
   shapeGesture?: {
     id: string;
     phase: "began" | "changed" | "ended" | "cancelled";
@@ -55,6 +69,8 @@ export interface InkCommand {
   };
 }
 export interface InlineInkBridge {
+  /** One native camera/scene for all Board tools, including selection. */
+  nativeScene?: boolean;
   setDocument?(pageId: string, document: ShowDocument): void;
   bind(
     pageId: string,
