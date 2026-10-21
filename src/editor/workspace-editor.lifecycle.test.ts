@@ -57,7 +57,9 @@ it("moves a real retained Editor between hosts, preserves undo/selection and Act
     await a
       .getByRole("button", { name: "Inspect Editor A", exact: true })
       .click();
-    const before = JSON.parse(await a.locator("output").innerText());
+    const before = JSON.parse(
+      await a.locator("[data-editor-report]").innerText(),
+    );
     for (let index = 0; index < 4; index++) {
       await a
         .getByRole("button", { name: "Switch Page host A", exact: true })
@@ -67,7 +69,9 @@ it("moves a real retained Editor between hosts, preserves undo/selection and Act
       await a
         .getByRole("button", { name: "Inspect Editor A", exact: true })
         .click();
-      expect(JSON.parse(await a.locator("output").innerText())).toEqual(before);
+      expect(
+        JSON.parse(await a.locator("[data-editor-report]").innerText()),
+      ).toEqual(before);
       expect(await b.locator(".tiptap").innerText()).toContain(
         "Saved B Page content",
       );
@@ -85,6 +89,26 @@ it("moves a real retained Editor between hosts, preserves undo/selection and Act
       process.platform === "darwin" ? "Meta+z" : "Control+z",
     );
     expect(await text.innerText()).not.toContain("!");
+    await a
+      .getByRole("button", { name: "Switch Page host A", exact: true })
+      .click();
+    // Move away from the previous paragraph click so PM interprets this as a
+    // new single click rather than its retained double/triple-click sequence.
+    await text
+      .locator("p")
+      .first()
+      .click({ position: { x: 4, y: 4 } });
+    expect(await a.locator("[data-interaction-host]").innerText()).toBe(
+      "click:expanded",
+    );
+    await page.keyboard.press("F8");
+    expect(await a.locator("[data-interaction-host]").innerText()).toBe(
+      "key:expanded",
+    );
+    await page.keyboard.insertText("new host edit");
+    expect(await a.locator("[data-publication-host]").innerText()).toBe(
+      "expanded",
+    );
     // Activity must preserve connected node views, including their own component
     // state and an iframe draft, rather than recreating the editor's view.
     await a
