@@ -14,6 +14,7 @@ export class CompiledInkKernel {
     this.instance = new WebAssembly.Instance(module(), { env: {
       sin: Math.sin, cos: Math.cos, hypot: Math.hypot,
       memcpy(destination, source, length) { new Uint8Array(exports.memory.buffer).copyWithin(destination, source, source + length); return destination; },
+      memset(destination, value, length) { new Uint8Array(exports.memory.buffer).fill(value, destination, destination + length); return destination; },
     } });
     exports = this.instance.exports;
     this.api = exports;
