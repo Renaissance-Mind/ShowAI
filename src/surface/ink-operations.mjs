@@ -209,8 +209,10 @@ export class InkOperationReplica {
       if ((clock[operation.actor] ?? 0) >= operation.sequence) invalid("operation sequence does not follow its observed actor clock");
       clock[operation.actor] = operation.sequence;
       const level = 1 + Math.max(0, ...operation.parents.map(parent => getKnown(parent).level));
-      const inverses = [];
+      const inverses = [], beforeHeads = Object.create(null);
       const write = (stroke, key, value) => {
+        const prior = beforeHeads[stroke.id] ??= Object.create(null);
+        if (!own(prior, key)) prior[key] = (stroke.registers[key] ?? []).map(entry => ({ operationId: entry.operationId, valueHash: inkOperationDigest(entry.value) }));
         const entries = (stroke.registers[key] ?? []).filter(entry => !observed(clock, entry.operationId));
         stroke.registers[key] = [...entries, { operationId: operation.id, value: clone(value) }].sort((a, b) => compare(a.operationId, b.operationId));
         const keys = touched.get(stroke.id) ?? new Set(); keys.add(key); touched.set(stroke.id, keys);
@@ -251,7 +253,7 @@ export class InkOperationReplica {
         }
       }
       known.set(operation.id, { hash, clock, level });
-      undo[operation.id] = { changes: inverses };
+      undo[operation.id] = { changes: inverses, beforeHeads };
       operation.parents.forEach(parent => frontier.delete(parent));
       frontier.add(operation.id); pending.delete(operation.id);
     }
@@ -338,6 +340,95 @@ export class InkOperationReplica {
       else skipped.push({ strokeId: change.strokeId, field: "alive" });
     }
     return { pageId: this.pageId, boardId: this.boardId, changes: clone(changes), parents: [...this.frontier].sort(compare), skipped };
+  }
+  /** One logical action may own several sequential writes. Follow actual
+   * prior register ownership, rather than writing intermediate inverse events
+   * which would hide the older source heads from selective compensation. */
+  compensationGroupPlan(sources) {
+    if (!Array.isArray(sources) || !sources.length) invalid("empty compensation group");
+    const group = new Map(), affected = new Map(), changes = [], sourcePhase = [], skipped = [];
+    for (const source of sources) {
+      const operation = validateInkOperation(source.operation), inverse = source.undo;
+      if (operation.pageId !== this.pageId || operation.boardId !== this.boardId || this.known.get(operation.id)?.hash !== inkOperationDigest(operation)) invalid("group undo source identity differs from retained history");
+      if (!inverse || !Array.isArray(inverse.changes)) invalid("group undo record is unavailable");
+      if (group.has(operation.id) && canonicalInkJSON(group.get(operation.id)) !== canonicalInkJSON(source)) invalid("group undo source collision");
+      group.set(operation.id, source);
+      for (const change of operation.changes) {
+        const fields = affected.get(change.strokeId) ?? new Set();
+        for (const undo of inverse.changes.filter(item => item.strokeId === change.strokeId)) {
+          if (undo.kind === "edit") Object.keys(undo.patch).forEach(field => fields.add(field));
+          else if (["delete", "restore"].includes(undo.kind)) fields.add("alive");
+        }
+        affected.set(change.strokeId, fields);
+      }
+    }
+    const inverseValue = (source, strokeId, field) => {
+      const value = source.undo.changes.find(change => change.strokeId === strokeId);
+      if (field === "alive" && value?.kind === "delete") return { found: true, value: false };
+      if (field === "alive" && value?.kind === "restore") return { found: true, value: true };
+      if (value?.kind === "edit" && own(value.patch, field)) return { found: true, value: value.patch[field] };
+      return { found: false };
+    };
+    const forwardValue = (source, strokeId, field) => {
+      const value = source.operation.changes.find(change => change.strokeId === strokeId);
+      if (field === "alive" && value?.kind === "delete") return { found: true, value: false };
+      if (field === "alive" && value?.kind === "restore") return { found: true, value: true };
+      if (value?.kind === "edit" && own(value.patch, field)) return { found: true, value: value.patch[field] };
+      return { found: false };
+    };
+    for (const [strokeId, wanted] of affected) {
+      const stroke = this.strokes.get(strokeId);
+      const skip = (field, reason) => { if (!skipped.some(item => item.strokeId === strokeId && item.field === field)) skipped.push({ strokeId, field, reason }); };
+      if (!stroke) { skip("stroke", "source-unavailable"); continue; }
+      const created = group.get(stroke.creationId)?.operation.changes.some(change => change.strokeId === strokeId && change.kind === "create");
+      if (created) {
+        if (Object.values(stroke.registers).every(heads => heads.every(head => group.has(head.operationId)))) {
+          if (!stroke.registers.alive.some(head => head.value === false)) changes.push({ kind: "delete", strokeId });
+        } else skip("create", "foreign-or-conflicting-current-head");
+        continue;
+      }
+      const patch = {}, resolved = new Map();
+      for (const field of wanted) {
+        const current = stroke.registers[field];
+        if (current?.length !== 1 || !group.has(current[0].operationId)) { skip(field, "foreign-or-conflicting-current-head"); continue; }
+        let cursor = current[0].operationId, result, blocked = false;
+        const visited = new Set();
+        while (group.has(cursor)) {
+          if (visited.has(cursor)) invalid("group undo prior-head cycle"); visited.add(cursor);
+          const source = group.get(cursor), inverse = inverseValue(source, strokeId, field);
+          if (!inverse.found) { skip(field, "inverse-unavailable"); blocked = true; break; }
+          const prior = source.undo.beforeHeads?.[strokeId]?.[field];
+          if (prior === undefined) {
+            if (group.size === 1) { result = inverse.value; break; }
+            skip(field, "prior-heads-unavailable"); blocked = true; break;
+          }
+          if (!Array.isArray(prior) || prior.length !== 1) { skip(field, "conflicting-prior-heads"); blocked = true; break; }
+          const head = prior[0], known = this.known.get(head.operationId);
+          if (!known || !observed(this.known.get(cursor).clock, head.operationId)) { skip(field, "prior-source-unavailable"); blocked = true; break; }
+          if (head.valueHash !== inkOperationDigest(inverse.value)) invalid("group undo prior-head value hash differs");
+          result = inverse.value;
+          if (!group.has(head.operationId)) break;
+          const forward = forwardValue(group.get(head.operationId), strokeId, field);
+          if (!forward.found) { skip(field, "prior-group-field-unavailable"); blocked = true; break; }
+          if (inkOperationDigest(forward.value) !== head.valueHash) invalid("group undo prior-head source identity differs");
+          cursor = head.operationId;
+        }
+        if (!blocked && result !== undefined && canonicalInkJSON(result) !== canonicalInkJSON(current[0].value)) resolved.set(field, clone(result));
+      }
+      if (["ink", "inkFragments"].some(field => wanted.has(field)) && skipped.some(item => item.strokeId === strokeId && ["ink", "inkFragments"].includes(item.field))) {
+        resolved.delete("ink"); resolved.delete("inkFragments");
+        for (const field of ["ink", "inkFragments"]) if (wanted.has(field)) skip(field, "logical-geometry-conflict");
+      }
+      for (const [field, value] of resolved) if (field !== "alive") patch[field] = value;
+      // The existing raw format permits one change per stroke per operation.
+      // A liveness+source inverse therefore needs two real contiguous events,
+      // committed together by the journal transaction before any publication.
+      if (resolved.has("alive")) {
+        changes.push({ kind: resolved.get("alive") ? "restore" : "delete", strokeId });
+        if (Object.keys(patch).length) sourcePhase.push({ kind: "edit", strokeId, patch });
+      } else if (Object.keys(patch).length) changes.push({ kind: "edit", strokeId, patch });
+    }
+    return { pageId: this.pageId, boardId: this.boardId, changes, phases: sourcePhase.length ? [changes, sourcePhase] : [changes], parents: [...this.frontier].sort(compare), skipped };
   }
   commit(token) {
     if (!this.prepared || this.prepared.token !== token) invalid("unknown prepared replica transaction");

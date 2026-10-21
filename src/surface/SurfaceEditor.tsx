@@ -31,7 +31,7 @@ import { mergePageContent, canCommitPageMerge } from "../core/page-merge-model";
 import InkConflictInspector from "./InkConflictInspector";
 import {nativeContentHistoryStages} from "./native-content-history";
 
-interface NativeInkHistoryAction {boardId:string;operationIds:string[];intentId?:string;strokeIds?:string[]}
+import {appendNativeInkHistoryGroups,nativeInkHistoryGroups,type NativeInkHistoryAction,type NativeInkHistoryGroup} from "./native-ink-history";
 
 const contentKey = (document: ShowDocument) =>
   JSON.stringify([
@@ -248,17 +248,16 @@ function SurfaceEditor({
             for(const adopted of value.adoptActions??[]){
               for(const [snapshot,action]of inkActions.current){
                 if(action.intentId!==adopted.intentId)continue;
-                inkActions.current.set(snapshot,{...action,boardId:adopted.boardId,
-                  operationIds:[...new Set([...action.operationIds,...adopted.operationIds])]});
+                inkActions.current.set(snapshot,appendNativeInkHistoryGroups(action,[adopted]));
               }
             }
             for(const corrected of value.correctionActions??[]){
               for(const [snapshot,action]of inkActions.current){
                 if(!action.strokeIds?.includes(corrected.strokeId))continue;
-                inkActions.current.set(snapshot,{...action,operationIds:[...new Set([...action.operationIds,...corrected.operationIds])]});
+                inkActions.current.set(snapshot,appendNativeInkHistoryGroups(action,[{boardId:corrected.boardId??value.boardId,operationIds:corrected.operationIds}]));
               }
             }
-            const nativeAction=value.operationIds?.length?{boardId:value.boardId,operationIds:value.operationIds,strokeIds:value.historyStrokeIds}:undefined;
+            const nativeAction=value.operationIds?.length?appendNativeInkHistoryGroups({strokeIds:value.historyStrokeIds},[{boardId:value.boardId,operationIds:value.operationIds}]):undefined;
             if(value.nativeContentActions?.length){
               if(nativeAction)throw new InkEditConflict("Native ink must reach its history boundary before object editing");
               const plan=nativeContentHistoryStages(current.current,value.baseDocument,value.document,value.nativeContentActions);
@@ -318,17 +317,20 @@ function SurfaceEditor({
       if (!next) return;
       const before=current.current, action=inkActions.current.get(next);
       let restored:ContainerDocument;
-      if(action?.operationIds.length&&action.boardId&&window.showai?.inlineInk?.nativeScene){
+      const groups=action?nativeInkHistoryGroups(action):[];
+      if(groups.length&&window.showai?.inlineInk?.nativeScene){
         const generic={...current.current,icon:next.icon,content:next.content,layout:next.layout,surfaceViews:next.surfaceViews};
-        const result=await window.showai.invoke<{document:ShowDocument;operationIds:string[]}>("native:board.compensate",{
-          projectId:inlineInkProjectId,pageId:before.id,boardId:action.boardId,operationIds:action.operationIds,
+        const result=await window.showai.invoke<{document:ShowDocument;groups?:NativeInkHistoryGroup[];boardId?:string;operationIds?:string[]}>("native:board.compensate",{
+          projectId:inlineInkProjectId,pageId:before.id,groups,
+          ...(groups.length===1?groups[0]:{}),
           baseDocument:before,document:generic,
         });
         const merged=mergePageContent(before,current.current,result.document);
         if(!canCommitPageMerge(merged))throw new InkEditConflict("Undo encountered concurrent Board edits");
         restored=merged.document as ContainerDocument;
         authorBaseline.current=result.document;
-        inkActions.current.set(before,{boardId:action.boardId,operationIds:result.operationIds});
+        const inverseGroups=result.groups??(groups.length===1&&result.operationIds?[{boardId:groups[0].boardId,operationIds:result.operationIds}]:[]);
+        inkActions.current.set(before,appendNativeInkHistoryGroups({strokeIds:action?.strokeIds},inverseGroups));
       }else restored = {
         ...current.current,icon:next.icon,content:next.content,layout:next.layout,surfaceViews:next.surfaceViews,
       };

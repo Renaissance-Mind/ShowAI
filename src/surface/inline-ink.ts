@@ -28,7 +28,7 @@ export interface InkUpdate {
   nativeContentGroup?: string;
   nativeContentActions?: import("./native-content-history").NativeContentHistoryAction[];
   adoptActions?: {intentId:string;boardId:string;operationIds:string[]}[];
-  correctionActions?: {strokeId:string;operationIds:string[]}[];
+  correctionActions?: {boardId?:string;strokeId:string;operationIds:string[]}[];
 }
 export interface InkFrame {
   token: string;
