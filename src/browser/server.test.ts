@@ -735,6 +735,9 @@ test("loopback API rejects missing tokens, foreign origins, rebinding, invalid p
   );
   expect((await fetch(server.url + "assets/outside.json")).status).toBe(404);
   const html = await fetch(server.url);
+  const scriptPolicy = html.headers.get("content-security-policy")!.split(";").find(directive => directive.trim().startsWith("script-src "))!.trim().split(/\s+/);
+  expect(scriptPolicy).toContain("'wasm-unsafe-eval'");
+  expect(scriptPolicy).not.toContain("'unsafe-eval'");
   expect(html.headers.get("content-security-policy")).toContain(
     "frame-ancestors 'none'",
   );

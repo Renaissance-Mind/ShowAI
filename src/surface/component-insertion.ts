@@ -65,11 +65,17 @@ export function insertComponent(
   const parent = parentId
     ? findSurfaceNode(document, parentId)?.node
     : document.content;
-  if (!parent || !["surface", "region"].includes(parent.type ?? ""))
+  if (!parent || !["surface", "region", "step"].includes(parent.type ?? ""))
     throw new Error("Component destination must be a container.");
+  // A stepper's step holds content blocks in flow; it has no layout frames.
+  const inStep = parent.type === "step";
   const definition = builtinComponent(kind);
   if (!definition && kind !== "custom")
     throw new Error(`Unknown component: ${kind}.`);
+  if (inStep && definition?.insertion)
+    throw new Error(
+      `A step holds content blocks; insert ${kind} into a Page or Board instead.`,
+    );
   let node: JSONContent, frame: NodeLayout;
   if (kind === "text") {
     node = createRichTextNode(data);
@@ -153,7 +159,7 @@ export function insertComponent(
     node,
     ...siblings.slice(index),
   ];
-  document.layout[node.attrs!.id] = frame;
+  if (!inStep) document.layout[node.attrs!.id] = frame;
   return {
     document: reconcileSurface(document),
     nodeId: node.attrs!.id as string,

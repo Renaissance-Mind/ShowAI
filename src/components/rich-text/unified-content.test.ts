@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { getSchema } from "@tiptap/core";
+import {EditorState} from "@tiptap/pm/state";
 import { renderToStaticMarkup } from "react-dom/server";
 import { createElement } from "react";
 import { createExtensions } from "./extensions";
@@ -50,6 +51,22 @@ const fixtures = {
   divider: { color: "#123456" },
 };
 describe("unified content compatibility", () => {
+  it("preserves object names when real editor transactions change widget data and image metadata", () => {
+    const schema=getSchema(createExtensions());
+    const input={type:"doc",content:[
+      {type:"widget",attrs:{id:"counter",name:"计数器",kind:"custom-counter",data:{value:0}}},
+      {type:"image",attrs:{id:"picture",name:"示意图",src:"data:image/png;base64,YQ==",alt:"source",caption:"说明"}},
+    ]};
+    const original=schema.nodeFromJSON(input);original.check();
+    const state=EditorState.create({doc:original});
+    const widget=original.child(0),image=original.child(1);
+    const updated=state.apply(state.tr
+      .setNodeMarkup(0,undefined,{...widget.attrs,data:{value:1}})
+      .setNodeMarkup(widget.nodeSize,undefined,{...image.attrs,caption:"新的说明"})).doc.toJSON();
+    expect(updated.content[0].attrs).toMatchObject({id:"counter",name:"计数器",data:{value:1}});
+    expect(updated.content[1].attrs).toMatchObject({id:"picture",name:"示意图",caption:"新的说明"});
+    expect(input.content[0].attrs.data).toEqual({value:0});
+  });
   it.each(Object.entries(fixtures))(
     "keeps %s identity and data through migration, editor schema and portable export",
     (kind, data) => {

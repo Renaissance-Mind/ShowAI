@@ -18,6 +18,7 @@ import { DropCursorCleanup } from "./drop-cursor-cleanup";
 import {
   CalloutView,
   ToggleView,
+  StepperView,
   WidgetView,
   MathView,
   ImageView,
@@ -42,6 +43,8 @@ export const blockIdNodeTypes = [
   "tableHeader",
   "callout",
   "toggle",
+  "stepper",
+  "step",
   "widget",
   "mathInline",
   "mathBlock",
@@ -208,6 +211,40 @@ export const ToggleNode = Node.create({
   addNodeView: () => ReactNodeViewRenderer(ToggleView),
 });
 
+/** Ordered steps shown one at a time; which step is open is reading state, never saved. */
+export const StepperNode = Node.create({
+  name: "stepper",
+  group: "block",
+  content: "step+",
+  defining: true,
+  draggable: true,
+  isolating: true,
+  parseHTML: () => [{ tag: "section[data-stepper]" }],
+  renderHTML: ({ HTMLAttributes }) => [
+    "section",
+    mergeAttributes(HTMLAttributes, { "data-stepper": "" }),
+    0,
+  ],
+  addNodeView: () => ReactNodeViewRenderer(StepperView),
+});
+
+/** One step: a short title and any blocks, including other components. */
+export const StepNode = Node.create({
+  name: "step",
+  content: "block+",
+  defining: true,
+  isolating: true,
+  addAttributes: () => ({
+    title: { default: "" },
+  }),
+  parseHTML: () => [{ tag: "section[data-step]" }],
+  renderHTML: ({ HTMLAttributes }) => [
+    "section",
+    mergeAttributes(HTMLAttributes, { "data-step": "" }),
+    0,
+  ],
+});
+
 export const RichTextNode = Node.create({
   name: "richText",
   priority: 50,
@@ -271,6 +308,27 @@ const TextStyle = Mark.create({
     0,
   ],
 });
+// [visible text]{note}: hovering, focusing or tapping the text shows the note.
+const Annotation = Mark.create({
+  name: "annotation",
+  inclusive: false,
+  addAttributes: () => ({
+    note: {
+      default: "",
+      parseHTML: (element: HTMLElement) =>
+        element.getAttribute("data-showai-note") ?? "",
+      renderHTML: (attrs: { note?: string }) => ({
+        "data-showai-note": attrs.note ?? "",
+      }),
+    },
+  }),
+  parseHTML: () => [{ tag: "span[data-showai-note]" }],
+  renderHTML: ({ HTMLAttributes }) => [
+    "span",
+    mergeAttributes({ class: "showai-note" }, HTMLAttributes),
+    0,
+  ],
+});
 const mathNode = (inline: boolean) =>
   Node.create({
     name: inline ? "mathInline" : "mathBlock",
@@ -303,6 +361,7 @@ export function createExtensions(
     ContentAttributes,
     RichTextNode,
     TextStyle,
+    Annotation,
     mathNode(true),
     mathNode(false),
     StableBlockIds.configure({ readOnly: options.readOnly ?? false }),
@@ -340,6 +399,8 @@ export function createExtensions(
     TextAlign.configure({ types: ["heading", "paragraph"] }),
     CalloutNode,
     ToggleNode,
+    StepperNode,
+    StepNode,
     WidgetNode,
   ];
 }
@@ -388,12 +449,22 @@ const ContentAttributes = Extension.create({
     });
     return [
       {
+        types: blockIdNodeTypes,
+        attributes: { name: { ...attribute("name"), default:"",
+          parseHTML:(element:HTMLElement)=>{
+            const value=attribute("name").parseHTML(element);
+            return typeof value === "string" ? value:"";
+          },
+        } },
+      },
+      {
         types: [
           "image",
           "codeBlock",
           "table",
           "callout",
           "toggle",
+          "stepper",
           "horizontalRule",
         ],
         attributes: { componentStyle: attribute("componentStyle") },

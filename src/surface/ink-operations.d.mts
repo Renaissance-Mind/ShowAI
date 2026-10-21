@@ -68,13 +68,17 @@ export interface InkReplicaRecord {
   field: string;
   value: unknown;
 }
+export interface InkUndoRecord {
+  changes: InkOperationChange[];
+  beforeHeads?: Record<string, Record<string, { operationId: string; valueHash: string }[]>>;
+}
 export interface InkReplicaPrepared {
   token: string;
   records: InkReplicaRecord[];
   frontier: string[];
   appendedIds: string[];
   clock: Record<string, number>;
-  undo?: Record<string, { changes: InkOperationChange[] }>;
+  undo?: Record<string, InkUndoRecord>;
 }
 export class InkOperationReplica {
   constructor(value: { pageId?: string; boardId?: string; checkpoint?: InkOperationCheckpoint });
@@ -84,6 +88,7 @@ export class InkOperationReplica {
   prepare(operations: InkOperation[]): InkReplicaPrepared;
   prepareImport(checkpoint: InkOperationCheckpoint): InkReplicaPrepared;
   actorSequence(actor: string): number;
+  compensationGroupPlan(sources: {operation: InkOperation; undo: InkUndoRecord}[]): {pageId: string; boardId: string; changes: InkOperationChange[]; phases: InkOperationChange[][]; parents: string[]; skipped: {strokeId: string; field: string; reason: string}[]};
   compensationPlan(operation: InkOperation, inverse: { changes: InkOperationChange[] }): { pageId: string; boardId: string; changes: InkOperationChange[]; parents: string[]; skipped: { strokeId: string; field: string }[] };
   commit(token: string): { frontier: string[]; version: number };
   abort(token: string): void;

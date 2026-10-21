@@ -28,6 +28,17 @@ describe("inline markup", () => {
       },
     ]);
     expect(plainInline("**a** `b` [c](#d)")).toBe("a b c");
+    expect(parseInline("**[x]{横轴}** 与 [y](#y)")).toEqual([
+      {
+        type: "strong",
+        children: [
+          { type: "note", note: "横轴", children: [{ type: "text", text: "x" }] },
+        ],
+      },
+      { type: "text", text: " 与 " },
+      { type: "link", href: "#y", children: [{ type: "text", text: "y" }] },
+    ]);
+    expect(plainInline("[**a**]{b} `c`")).toBe("a c");
   });
 
   it("accepts web, mail, anchor and relative links only", () => {

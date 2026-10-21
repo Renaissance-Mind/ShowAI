@@ -1,3 +1,7 @@
+import {
+  inkArchiveGroup,
+  flattenInkArchiveChild,
+} from "./ink-archive-group.mjs";
 import type { JSONContent } from "@tiptap/core";
 import type { ShowDocument } from "../types";
 import type { NodeLayout } from "./types";
@@ -485,7 +489,15 @@ export function ungroupRegion<T extends ShowDocument>(
     frame?.mode !== "free"
   )
     return null;
-  const children = region.node.content ?? [];
+  const archive = inkArchiveGroup(region.node);
+  const children = (region.node.content ?? []).map((child) => {
+    if (!archive) return child;
+    const local = document.layout![child.attrs!.id];
+    if (!local) throw new Error("Archive child has no frame");
+    const flattened = flattenInkArchiveChild(child, local, archive, frame);
+    document.layout![child.attrs!.id] = flattened.frame;
+    return flattened.node;
+  });
   const position = region.parent.content!.indexOf(region.node);
   region.parent.content!.splice(position, 1, ...children);
   const ids: string[] = [];
@@ -496,8 +508,8 @@ export function ungroupRegion<T extends ShowDocument>(
     ids.push(id);
     document.layout![id] = {
       ...local,
-      x: local.x + frame.x + contentOffset.x,
-      y: local.y + frame.y + contentOffset.y,
+      x: archive ? local.x : local.x + frame.x + contentOffset.x,
+      y: archive ? local.y : local.y + frame.y + contentOffset.y,
     };
   }
   return { document: reconcileSurface(document), ids };

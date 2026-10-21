@@ -19,6 +19,7 @@ import "./command-reference.css";
 import { blockLabel } from "./shared";
 import { useTranslator } from "../../i18n/react";
 import messages from "../../i18n/messages/commandReference";
+import { NoteText } from "./NoteText";
 
 type Param = { name: string; meaning: string };
 type Command = {
@@ -270,7 +271,11 @@ export function CommandReferenceBlock({ data }: BlockProps) {
     >
       {(reference.title || reference.description) && (
         <div className="cr-head">
-          {reference.title && <h3 className="cr-heading">{reference.title}</h3>}
+          {reference.title && (
+            <h3 className="cr-heading">
+              <NoteText text={reference.title} />
+            </h3>
+          )}
           {reference.description && (
             <p className="cr-sub">
               <Inline source={reference.description} />

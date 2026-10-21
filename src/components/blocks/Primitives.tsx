@@ -46,6 +46,9 @@ export const CalloutBlock = (props: BlockProps) => (
 export const ToggleBlock = (props: BlockProps) => (
   <ContentBlock {...props} kind="toggle" />
 );
+export const StepperBlock = (props: BlockProps) => (
+  <ContentBlock {...props} kind="stepper" />
+);
 export const DividerBlock = (props: BlockProps) => (
   <ContentBlock {...props} kind="divider" />
 );

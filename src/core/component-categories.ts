@@ -19,6 +19,7 @@ const builtinCategories: Record<string, ComponentCategory> = {
   text: "text",
   callout: "text",
   toggle: "text",
+  stepper: "text",
   divider: "text",
   code: "text",
   bookmark: "text",

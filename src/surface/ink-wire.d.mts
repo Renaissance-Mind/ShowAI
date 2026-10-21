@@ -1,5 +1,5 @@
 import type { ShowDocument } from "../types";
-import type { InkOperationIdentity, InkOperationChange, InkOperationCheckpoint } from "./ink-operations.mjs";
+import type { InkOperationIdentity, InkOperationChange, InkOperationCheckpoint, InkOperation } from "./ink-operations.mjs";
 export const INK_WIRE_FORMAT: "showai-ink-state-v1";
 export class InkWireError extends Error { readonly code: "INK_CAUSAL_CONFLICT" }
 export interface InkWireConflict { boardId?: string; strokeId?: string; field: string; reason: string; retained: boolean }
@@ -18,6 +18,7 @@ export interface PreparedInkPageMerge {
   plans: unknown[]; conflicts: InkWireConflict[];
 }
 export function validateInkWireState(value: unknown): InkWireState;
+export function inkWireDraftCommitMetadataMatches(draft:ShowDocument,committed:ShowDocument):boolean;
 export function stampInkDocument(document: ShowDocument, baseline: ShowDocument | undefined, identity: InkOperationIdentity & { changes?: InkOperationChange[] }): ShowDocument;
 export function inkWireClockForActor(document: ShowDocument, actor: string): number;
 export function hasInkWireContent(document: ShowDocument): boolean;
@@ -31,3 +32,6 @@ export function inkWireDocumentFromCheckpoint(document: ShowDocument, boardId: s
 export interface InkWireChoice { boardId: string; strokeId: string; field: string; hash: string }
 export function inkWireResolutionCandidates(document: ShowDocument): {boardId: string; strokeId: string; field: string; candidates: {hash: string; value: unknown; dots: string[]}[]}[];
 export function inkWireResolutionPlan(document: ShowDocument, choices: InkWireChoice[]): {boardId: string; changes: InkOperationChange[]};
+export function inkWireEditPlans(baseline: ShowDocument, next: ShowDocument): {boardId: string; parents: string[]; changes: InkOperationChange[]}[];
+export function inkWireImportCheckpoints(baseline: ShowDocument, next: ShowDocument): {boardId: string; checkpoint: InkOperationCheckpoint}[];
+export function inkWireAuthorReceipt(authorBaseline: ShowDocument, rawDraft: ShowDocument, actualOperations: InkOperation[], actualJournalCheckpoint: InkOperationCheckpoint): ShowDocument;

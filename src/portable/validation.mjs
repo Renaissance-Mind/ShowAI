@@ -1,8 +1,12 @@
+import { validateInkArchiveGroup } from "../surface/ink-archive-group.mjs";
 import { isResource } from "../surface/containers.mjs";
 import { validatePageIcon } from "../lib/page-icon.mjs";
 import { artifactVersion, assignSurfaceIds } from "../surface/document.mjs";
 import { validateSurface } from "../surface/validation.mjs";
-import { validatePrimitiveData } from "../components/blocks/primitive-contract.mjs";
+import {
+  MAX_STEPS,
+  validatePrimitiveData,
+} from "../components/blocks/primitive-contract.mjs";
 import { validateMindmapData } from "../components/blocks/mindmap-contract.mjs";
 import { validateFlowchartData } from "../components/blocks/flowchart-contract.mjs";
 import {
@@ -21,6 +25,10 @@ import { validateEventTimelineData } from "../components/blocks/event-timeline-c
 import { validatePlaygroundData } from "../components/blocks/playground-contract.mjs";
 import { validateDatabaseData } from "../components/blocks/database-contract.mjs";
 import { validateResearchData } from "../components/blocks/research-contract.mjs";
+import {
+  NOTE_MAX,
+  invalidNoteMark,
+} from "../components/blocks/note-markup.mjs";
 // Shared by the browser importer and the dependency-free artifact command.
 import { validateRemoteComponents } from "./remote.mjs";
 import {
@@ -64,6 +72,8 @@ const nodeTypes = new Set([
   "tableHeader",
   "callout",
   "toggle",
+  "stepper",
+  "step",
   "widget",
 ]);
 const markTypes = new Set([
@@ -75,6 +85,7 @@ const markTypes = new Set([
   "link",
   "highlight",
   "textStyle",
+  "annotation",
 ]);
 const nodeAttributes = new Set([
   "id",
@@ -121,6 +132,7 @@ const markAttributes = new Set([
   "fontFamily",
   "fontSize",
   "mode",
+  "note",
 ]);
 
 function object(value, path) {
@@ -336,9 +348,16 @@ function validateWidgetData(kind, data, path) {
     return;
   }
   if (
-    ["text", "image", "table", "callout", "toggle", "divider", "code"].includes(
-      kind,
-    )
+    [
+      "text",
+      "image",
+      "table",
+      "callout",
+      "toggle",
+      "stepper",
+      "divider",
+      "code",
+    ].includes(kind)
   ) {
     validatePrimitiveData(kind, data);
     if ((kind === "text" && typeof data.content === "object") || data.document)
@@ -514,9 +533,12 @@ function validateNode(value, path, counter, depth = 0, parentType = null) {
           ])
         : node.type === "surface"
           ? new Set([...nodeAttributes, "widthMode", "inkState", "outline"])
-          : nodeAttributes,
+          : node.type === "region"
+            ? new Set([...nodeAttributes, "inkArchiveGroup"])
+            : nodeAttributes,
       node.type === "surface",
     );
+  validateInkArchiveGroup(node);
   if (
     node.attrs?.frameless !== undefined &&
     (node.type !== "surface" ||
@@ -614,6 +636,10 @@ function validateNode(value, path, counter, depth = 0, parentType = null) {
         throw new Error("Highlight mode must be lower or full.");
       if (mark.type === "link" && !isSafeUrl(mark.attrs?.href))
         throw new Error("Links require a safe href.");
+      if (invalidNoteMark(mark))
+        throw new Error(
+          `Annotations require a note of 1–${NOTE_MAX} characters.`,
+        );
     }
   }
   if (node.content !== undefined) {
@@ -656,6 +682,7 @@ function validateNode(value, path, counter, depth = 0, parentType = null) {
     "table",
     "callout",
     "toggle",
+    "stepper",
     "widget",
   ];
   const allowed = {
@@ -679,6 +706,8 @@ function validateNode(value, path, counter, depth = 0, parentType = null) {
     blockquote: blockTypes,
     callout: blockTypes,
     toggle: blockTypes,
+    stepper: ["step"],
+    step: blockTypes,
     bulletList: ["listItem"],
     orderedList: ["listItem"],
     listItem: blockTypes,
@@ -691,11 +720,15 @@ function validateNode(value, path, counter, depth = 0, parentType = null) {
   }[node.type];
   if (allowed && children.some((child) => !allowed.includes(child.type)))
     throw new Error(`${path} contains an invalid child block.`);
+  if (node.type === "stepper" && children.length > MAX_STEPS)
+    throw new Error(`${path} must contain at most ${MAX_STEPS} steps.`);
   if (
     [
       "blockquote",
       "callout",
       "toggle",
+      "stepper",
+      "step",
       "bulletList",
       "orderedList",
       "listItem",

@@ -17,6 +17,7 @@ import "./sequence-diagram.css";
 import { blockLabel } from "./shared";
 import { useTranslator } from "../../i18n/react";
 import messages from "../../i18n/messages/sequenceDiagram";
+import { NoteText } from "./NoteText";
 
 type Kind = "call" | "reply" | "note";
 type Actor = {
@@ -596,7 +597,11 @@ export function SequenceDiagramBlock({ data }: BlockProps) {
       {(model.title || model.description || !narrow) && (
         <div className="sq-top">
           <div>
-            {model.title && <h3 className="sq-title">{model.title}</h3>}
+            {model.title && (
+              <h3 className="sq-title">
+                <NoteText text={model.title} />
+              </h3>
+            )}
             {model.description && (
               <p className="sq-description">{model.description}</p>
             )}

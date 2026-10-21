@@ -1,4 +1,6 @@
+import { rebaseHistorySnapshots } from "./history-rebase";
 import { applyInkUpdate, InkEditConflict } from "./inline-ink";
+import type {NativeAuthorMutation} from "./inline-ink";
 import { SurfaceGeometryStore } from "./geometry-store";
 import type { EditorControls } from "./EditorControls";
 import { insertComponentAtText } from "./component-insertion";
@@ -27,8 +29,9 @@ import { toPageEditor, fromPageEditor } from "./page-content";
 import { PageModuleContext, pageEditorNodes } from "./PageEditorNodes";
 import { mergePageContent, canCommitPageMerge } from "../core/page-merge-model";
 import InkConflictInspector from "./InkConflictInspector";
+import {nativeContentHistoryStages} from "./native-content-history";
 
-interface NativeInkHistoryAction {boardId:string;operationIds:string[]}
+import {appendNativeInkHistoryGroups,nativeInkHistoryGroups,type NativeInkHistoryAction,type NativeInkHistoryGroup} from "./native-ink-history";
 
 const contentKey = (document: ShowDocument) =>
   JSON.stringify([
@@ -61,6 +64,7 @@ function SurfaceEditor({
   inspectorHost,
   inlineInkProjectId,
   onInkSave,
+  onOpenEmbeddedSurface,
 }: {
   document: ShowDocument;
   onChange: (document: ShowDocument) => void;
@@ -74,6 +78,7 @@ function SurfaceEditor({
   inspectorHost?: HTMLElement | null;
   inlineInkProjectId?: string;
   onInkSave?: () => Promise<boolean>;
+  onOpenEmbeddedSurface?: (id:string) => void;
 }) {
   const document = useMemo(
     () => (isResource(input) ? input : upgradeResource(input)),
@@ -84,6 +89,8 @@ function SurfaceEditor({
     retainedState?.document?.id === document.id ? retainedState : undefined;
   if (retainedState && !retainedState.runtime) retainedState.runtime = {};
   const current = useRef<ContainerDocument>(restored?.document ?? document);
+  const authorBaseline=useRef<ShowDocument>(document);
+  const lastAuthorMutation=useRef<string|undefined>(undefined);
   const geometrySettlement = useRef({ generation: 0, first: 0, second: 0 });
   useEffect(
     () => () => {
@@ -137,25 +144,14 @@ function SurfaceEditor({
         refresh((value) => value + 1);
         return;
       }
+      authorBaseline.current=document;
       geometrySettlement.current.generation++;
       if (before.id !== document.id) {
         history.current = { past: [], future: [], group: "", at: 0 };
         inkActions.current.clear();
+        lastAuthorMutation.current=undefined;
       } else {
-        const rebase = (snapshot: ContainerDocument) => {
-          const next=mergePageContent(before, document, snapshot, "history").document as ContainerDocument;
-          const action=inkActions.current.get(snapshot);
-          if(action){inkActions.current.delete(snapshot);inkActions.current.set(next,action)}
-          return next;
-        };
-        history.current.past = history.current.past
-          .map(rebase)
-          .filter((snapshot) => contentKey(snapshot) !== contentKey(document));
-        history.current.future = history.current.future
-          .map(rebase)
-          .filter((snapshot) => contentKey(snapshot) !== contentKey(document));
-        history.current.group = "";
-        history.current.at = 0;
+        rebaseHistorySnapshots(history.current,inkActions.current,before,document);
       }
     }
     current.current = document;
@@ -186,7 +182,7 @@ function SurfaceEditor({
     });
   }, [geometry]);
   const commit = useCallback(
-    (value: ShowDocument, group = "", nativeAction?:NativeInkHistoryAction) => {
+    (value: ShowDocument, group = "", nativeAction?:NativeInkHistoryAction, recordHistory=true, authoring=true) => {
       if (latestReadOnly.current) return;
       const next = (
         isReconciledSurface(value) ? value : reconcileSurface(value)
@@ -202,17 +198,29 @@ function SurfaceEditor({
         return;
       const stack = history.current,
         now = Date.now();
-      if (!group || group !== stack.group || now - stack.at > 800) {
+      if (recordHistory&&(!group || group !== stack.group || now - stack.at > 800)) {
         stack.past.push(before);
         if(nativeAction)inkActions.current.set(before,nativeAction);
         if (stack.past.length > 80) { const expired=stack.past.shift();if(expired)inkActions.current.delete(expired); }
       }
-      for(const discarded of stack.future)inkActions.current.delete(discarded);
-      stack.future = [];
-      stack.group = group;
-      stack.at = now;
+      if(recordHistory){
+        for(const discarded of stack.future)inkActions.current.delete(discarded);
+        stack.future = [];stack.group=group;stack.at=now;
+      }
+      else rebaseHistorySnapshots(stack,inkActions.current,before,next);
+      let author:NativeAuthorMutation|undefined;
+      if(authoring&&recordHistory&&!nativeAction&&window.showai?.inlineInk?.nativeScene){
+        const owner=stack.past.at(-1);
+        if(owner){
+          const action=inkActions.current.get(owner)??{boardId:"",operationIds:[]};
+          action.intentId??=crypto.randomUUID();inkActions.current.set(owner,action);
+          const mutationId=crypto.randomUUID();
+          author={intentId:action.intentId,mutationId,authorMutationId:lastAuthorMutation.current,authorBaseline:authorBaseline.current,before};
+          lastAuthorMutation.current=mutationId;
+        }
+      }
       current.current = next;
-      window.showai?.inlineInk?.setDocument?.(next.id, next);
+      window.showai?.inlineInk?.setDocument?.(next.id, next,author);
       latestChange.current(next);
       refresh((value) => value + 1);
       settleGeometry();
@@ -236,7 +244,31 @@ function SurfaceEditor({
               throw new InkEditConflict("Native Board projection has no matching writer baseline");
             const merged=mergePageContent(value.baseDocument,current.current,value.document);
             if(!canCommitPageMerge(merged))throw new InkEditConflict("Concurrent Board edits require resolution");
-            commit(merged.document,"",value.operationIds?.length?{boardId:value.boardId,operationIds:value.operationIds}:undefined);
+            authorBaseline.current=value.document;
+            for(const adopted of value.adoptActions??[]){
+              for(const [snapshot,action]of inkActions.current){
+                if(action.intentId!==adopted.intentId)continue;
+                inkActions.current.set(snapshot,appendNativeInkHistoryGroups(action,[adopted]));
+              }
+            }
+            for(const corrected of value.correctionActions??[]){
+              for(const [snapshot,action]of inkActions.current){
+                if(!action.strokeIds?.includes(corrected.strokeId))continue;
+                inkActions.current.set(snapshot,appendNativeInkHistoryGroups(action,[{boardId:corrected.boardId??value.boardId,operationIds:corrected.operationIds}]));
+              }
+            }
+            const nativeAction=value.operationIds?.length?appendNativeInkHistoryGroups({strokeIds:value.historyStrokeIds},[{boardId:value.boardId,operationIds:value.operationIds}]):undefined;
+            if(value.nativeContentActions?.length){
+              if(nativeAction)throw new InkEditConflict("Native ink must reach its history boundary before object editing");
+              const plan=nativeContentHistoryStages(current.current,value.baseDocument,value.document,value.nativeContentActions);
+              if(plan.stages.length){
+                if(contentKey(current.current)!==contentKey(plan.sourceOnly))
+                  rebaseHistorySnapshots(history.current,inkActions.current,current.current,plan.sourceOnly as ContainerDocument);
+                current.current=plan.sourceOnly as ContainerDocument;
+                for(const stage of plan.stages)commit(stage.document,`native-content:${stage.groupId}`,undefined,true,false);
+              }else commit(merged.document,"",undefined,false,false);
+            }else commit(merged.document,value.nativeContentAction ? `native-content:${value.nativeContentGroup??""}` : "",
+              nativeAction,!!nativeAction||value.nativeContentAction===true,false);
           }else commit(applyInkUpdate(current.current, value));
         } catch (error) {
           if (!(error instanceof InkEditConflict)) throw error;
@@ -285,14 +317,20 @@ function SurfaceEditor({
       if (!next) return;
       const before=current.current, action=inkActions.current.get(next);
       let restored:ContainerDocument;
-      if(action&&window.showai?.inlineInk?.nativeScene){
-        const result=await window.showai.invoke<{document:ShowDocument;operationIds:string[]}>("native:board.compensate",{
-          projectId:inlineInkProjectId,pageId:before.id,boardId:action.boardId,operationIds:action.operationIds,
+      const groups=action?nativeInkHistoryGroups(action):[];
+      if(groups.length&&window.showai?.inlineInk?.nativeScene){
+        const generic={...current.current,icon:next.icon,content:next.content,layout:next.layout,surfaceViews:next.surfaceViews};
+        const result=await window.showai.invoke<{document:ShowDocument;groups?:NativeInkHistoryGroup[];boardId?:string;operationIds?:string[]}>("native:board.compensate",{
+          projectId:inlineInkProjectId,pageId:before.id,groups,
+          ...(groups.length===1?groups[0]:{}),
+          baseDocument:before,document:generic,
         });
         const merged=mergePageContent(before,current.current,result.document);
         if(!canCommitPageMerge(merged))throw new InkEditConflict("Undo encountered concurrent Board edits");
         restored=merged.document as ContainerDocument;
-        inkActions.current.set(before,{boardId:action.boardId,operationIds:result.operationIds});
+        authorBaseline.current=result.document;
+        const inverseGroups=result.groups??(groups.length===1&&result.operationIds?[{boardId:groups[0].boardId,operationIds:result.operationIds}]:[]);
+        inkActions.current.set(before,appendNativeInkHistoryGroups({strokeIds:action?.strokeIds},inverseGroups));
       }else restored = {
         ...current.current,icon:next.icon,content:next.content,layout:next.layout,surfaceViews:next.surfaceViews,
       };
@@ -489,6 +527,7 @@ function SurfaceEditor({
       }}
     >
       <ContainerRuntime
+        onOpenEmbeddedSurface={onOpenEmbeddedSurface}
         document={current.current}
         geometry={geometry}
         pageWidthModes

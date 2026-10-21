@@ -1,3 +1,7 @@
+import {
+  inkArchiveGroup,
+  inkArchiveGroupLayout,
+} from "./ink-archive-group.mjs";
 import { useConnectionGeometry } from "./useConnectionGeometry";
 import { objectCapabilities } from "./geometry.mjs";
 import { Drawing } from "./Drawing";
@@ -157,7 +161,32 @@ const ContentNode = memo(
     else if (node.type === "region") {
       const mode = frame?.mode ?? "flow",
         children = node.content ?? [];
-      if (mode === "flow") {
+      if (inkArchiveGroup(node)) {
+        const local = inkArchiveGroupLayout(inkArchiveGroup(node)!, frame!);
+        body = (
+          <div
+            className="surface-layout-free ink-archive-local-space"
+            style={{
+              width: local.width,
+              height: local.height,
+              transform: `scale(${local.scaleX},${local.scaleY})`,
+              transformOrigin: "0 0",
+            }}
+          >
+            {children.map((child) => (
+              <ContentNode
+                key={child.attrs!.id}
+                node={child}
+                document={document}
+                positioned
+                spatial={spatial}
+                renderContent={renderContent}
+                renderSurface={renderSurface}
+              />
+            ))}
+          </div>
+        );
+      } else if (mode === "flow") {
         const groups: (JSONContent[] | JSONContent)[] = [];
         for (const child of children) {
           if (
@@ -270,6 +299,7 @@ const ContentNode = memo(
         name={nodeName(node)}
         positioned={positioned}
         region={node.type === "region"}
+        archiveGroup={!!inkArchiveGroup(node)}
         container={node.type === "surface"}
         drawing={node.type === "drawing" || nativeInk}
         component={node.type === "widget"}

@@ -41,6 +41,7 @@ export function ContentNodeActions({
     "codeBlock",
     "callout",
     "toggle",
+    "stepper",
     "horizontalRule",
   ].includes(type);
   const style = node.attrs.componentStyle ?? {};

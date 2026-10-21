@@ -2,6 +2,7 @@ import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import type { Editor } from "@tiptap/core";
 import { useTranslator } from "../../i18n/react";
 import messages from "../../i18n/messages/richText";
+import noteMessages from "../../i18n/messages/richTextNotes";
 import {
   AlignCenter,
   AlignLeft,
@@ -13,6 +14,7 @@ import {
   Highlighter,
   Italic,
   Link2,
+  MessageSquareText,
   Strikethrough,
   Type,
   Underline,
@@ -44,11 +46,15 @@ const highlightColors = [
 export function FormatControls({
   editor,
   onLink,
+  onNote,
 }: {
   editor: Editor;
   onLink: () => void;
+  /** Opens the hover-note editor for the selected text or formula. */
+  onNote?: () => void;
 }) {
   const t = useTranslator(messages);
+  const tn = useTranslator(noteMessages);
   const [colorsOpen, setColorsOpen] = useState(false);
   const root = useRef<HTMLDivElement>(null);
   const colorButton = useRef<HTMLButtonElement>(null);
@@ -319,6 +325,18 @@ export function FormatControls({
           editor.isActive("link"),
           onLink,
         )}
+        {onNote &&
+          action(
+            tn("format.note"),
+            <MessageSquareText size={16} />,
+            editor.isActive("annotation") ||
+              /^\s*\\note\b/.test(
+                String(
+                  editor.state.selection.$from.nodeAfter?.attrs.latex ?? "",
+                ),
+              ),
+            onNote,
+          )}
       </div>
       {colorsOpen && (
         <div

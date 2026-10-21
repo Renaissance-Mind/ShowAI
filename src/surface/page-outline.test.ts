@@ -1,3 +1,4 @@
+import { insertComponent } from "./component-insertion";
 import { afterEach, describe, expect, it } from "vitest";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -85,6 +86,22 @@ describe("native Page outline contract", () => {
       "heading:next",
     ]);
     expect(tree.targets.has("heading:intro")).toBe(false);
+  });
+  it("keeps independently navigated stepper content outside the Page outline", () => {
+    const inserted = insertComponent(outlineDocument(), null, "stepper", {
+      steps: [{ title: "Step", content: "## Inside the step" }],
+    });
+    const page = validateDocument(inserted.document).content;
+    expect(
+      flattenOutline(buildPageOutline(page).items).map((item) => item.title),
+    ).toEqual(["Same title", "Subsection", "Same title"]);
+    page.attrs!.outline.source = {
+      mode: "manual",
+      entries: [{ id: "stepper-link", nodeId: inserted.nodeId }],
+    };
+    expect(buildPageOutline(page).targets.get("stepper-link")).toBe(
+      inserted.nodeId,
+    );
   });
   it("preserves disabled configuration and rejects Board/native attribute misuse and malformed trees", () => {
     const doc = outlineDocument();

@@ -706,7 +706,8 @@
   font-size: 9px;
   margin-left: 5px;
 }
-.editor-field input {
+.editor-field input,
+.editor-field textarea {
   display: block;
   width: 100%;
   background: var(--paper, #fff);
@@ -714,6 +715,20 @@
   border-radius: 5px;
   padding: 10px 11px;
   font-size: 12px;
+}
+.editor-field textarea {
+  min-height: 92px;
+  resize: vertical;
+  line-height: 1.6;
+  font: inherit;
+  font-size: 13px;
+}
+.editor-field > small {
+  display: block;
+  margin-top: 7px;
+  font-size: 11px;
+  line-height: 1.6;
+  color: var(--muted);
 }
 .editor-field-error {
   font-size: 11px;

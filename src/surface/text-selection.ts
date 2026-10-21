@@ -32,7 +32,7 @@ export function paintedTextSelection(target: Element) {
   return null;
 }
 const textBoundarySelector =
-  ".document-widget,.portable-widget,.page-document-module,.rich-text-component,[data-surface-id],pre,table,.document-callout,.document-toggle";
+  ".document-widget,.portable-widget,.page-document-module,.rich-text-component,[data-surface-id],pre,table,.document-callout,.document-toggle,.document-stepper";
 export function registerSelectionEditor(editor: Editor) {
   editors.set(editor.view.dom, editor);
   return () => {

@@ -1,6 +1,8 @@
-// Inline markup shared by documentation-style built-ins: **bold**, `code` and
-// [label](href). Parsing is pure so contracts, the CLI and the portable reader
-// agree on what counts as a link; rendering never uses raw HTML.
+// Inline markup shared by documentation-style built-ins: **bold**, `code`,
+// [label](href) and hover notes [label]{note}. Parsing is pure so contracts,
+// the CLI and the portable reader agree on what counts as a link or a note;
+// rendering never uses raw HTML.
+import { findNote, plainNotes } from "./note-markup.mjs";
 
 const INLINE = /\*\*(.+?)\*\*|`([^`]+)`|\[([^\]]+)\]\(([^)\s]+)\)/g;
 
@@ -30,7 +32,22 @@ export function parseInline(source) {
   const pattern = new RegExp(INLINE.source, "g");
   let position = 0;
   let match;
-  while ((match = pattern.exec(source))) {
+  for (;;) {
+    pattern.lastIndex = position;
+    match = pattern.exec(source);
+    const note = findNote(source, position);
+    if (note && (!match || note.index <= match.index)) {
+      if (note.index > position)
+        out.push({ type: "text", text: source.slice(position, note.index) });
+      out.push({
+        type: "note",
+        note: note.note,
+        children: parseInline(note.label),
+      });
+      position = note.end;
+      continue;
+    }
+    if (!match) break;
     if (match.index > position)
       out.push({ type: "text", text: source.slice(position, match.index) });
     if (match[1] !== undefined)
@@ -49,9 +66,12 @@ export function parseInline(source) {
   return out;
 }
 
-/** Inline markup reduced to its visible text. */
+/** Inline markup reduced to its visible text; notes keep only their label. */
 export const plainInline = (source) =>
-  source.replace(INLINE, (_, bold, code, label) => bold ?? code ?? label);
+  plainNotes(source).replace(
+    INLINE,
+    (_, bold, code, label) => bold ?? code ?? label,
+  );
 
 /** Unsafe link targets in the markup, in order of appearance. */
 export function unsafeInlineLinks(source) {

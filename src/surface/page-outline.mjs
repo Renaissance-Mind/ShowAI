@@ -23,7 +23,7 @@ export function pageOutlineNodes(page) {
   const nodes = new Map();
   function visit(node) {
     if (node.attrs?.id) nodes.set(node.attrs.id, node);
-    if (node.type === "surface" || node.type === "widget") return;
+    if (["surface", "widget", "stepper"].includes(node.type)) return;
     node.content?.forEach(visit);
   }
   page.content?.forEach(visit);

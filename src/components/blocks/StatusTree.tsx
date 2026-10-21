@@ -6,6 +6,7 @@ import { blockLabel } from "./shared";
 import type { MessageKey } from "../../i18n";
 import { useTranslator } from "../../i18n/react";
 import messages from "../../i18n/messages/analysis";
+import { NoteText } from "./NoteText";
 
 type Tone = "done" | "failed" | "active" | "todo" | "paused";
 type Status = { id: string; label: string; tone: Tone; color?: string };
@@ -179,7 +180,11 @@ export function StatusTreeBlock({ data }: BlockProps) {
       aria-label={blockLabel(model.title, t("tree.title"))}
     >
       <div className="an-head">
-        {model.title && <h3 className="an-title">{model.title}</h3>}
+        {model.title && (
+          <h3 className="an-title">
+            <NoteText text={model.title} />
+          </h3>
+        )}
         {model.description && <p className="an-sub">{model.description}</p>}
         <div
           className="an-tools"

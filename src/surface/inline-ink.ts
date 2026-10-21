@@ -21,6 +21,14 @@ export interface InkUpdate {
   document?: ShowDocument;
   baseDocument?: ShowDocument;
   operationIds?: string[];
+  historyStrokeIds?: string[];
+  correctionOnly?: boolean;
+  /** A durable native object edit shares the ordinary document undo history. */
+  nativeContentAction?: boolean;
+  nativeContentGroup?: string;
+  nativeContentActions?: import("./native-content-history").NativeContentHistoryAction[];
+  adoptActions?: {intentId:string;boardId:string;operationIds:string[]}[];
+  correctionActions?: {boardId?:string;strokeId:string;operationIds:string[]}[];
 }
 export interface InkFrame {
   token: string;
@@ -68,10 +76,13 @@ export interface InkCommand {
     y: number;
   };
 }
+export interface NativeAuthorMutation {
+  intentId?:string|null;mutationId?:string;authorMutationId?:string;authorBaseline?:ShowDocument;before?:ShowDocument;
+}
 export interface InlineInkBridge {
   /** One native camera/scene for all Board tools, including selection. */
   nativeScene?: boolean;
-  setDocument?(pageId: string, document: ShowDocument): void;
+  setDocument?(pageId: string, document: ShowDocument,author?:NativeAuthorMutation): void;
   bind(
     pageId: string,
     projectId: string,

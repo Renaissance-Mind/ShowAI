@@ -15,7 +15,7 @@
       "inputs": [
         {
           "path": "content",
-          "meaning": "doc JSON 内容树；文字 marks 保存 bold/italic/underline/strike/code/highlight/link/textStyle。旧 Markdown/plain 字符串兼容导入。"
+          "meaning": "doc JSON 内容树；文字 marks 保存 bold/italic/underline/strike/code/highlight/link/textStyle/annotation（悬停注释，attrs.note）。旧 Markdown/plain 字符串兼容导入。"
         },
         {
           "path": "format",
@@ -72,6 +72,14 @@
           "exampleIndex": 1
         },
         {
+          "title": "悬停注释",
+          "steps": [
+            "Markdown 写 [可见文字]{注释}：文字带虚线下划线，读者悬停、聚焦或轻点时显示注释。公式内写 \\note{变量}{注释}，可注释多个变量；[$公式$]{注释} 注释整个公式。",
+            "注释可含 $…$，花括号成对，1–1000 字符。内容树中为 annotation mark，公式注释保存在 latex；选中菜单的“注释”按钮可增改删。"
+          ],
+          "exampleIndex": 1
+        },
+        {
           "title": "替换为自己的内容",
           "steps": [
             "根据上述输入关系填入任务提供的内容，保留稳定标识与合法取值。",
@@ -86,8 +94,13 @@
           "persistence": "none"
         },
         {
+          "action": "悬停、聚焦或轻点带注释的内容",
+          "effect": "显示注释气泡；移开、Esc 或轻点别处关闭。",
+          "persistence": "none"
+        },
+        {
           "action": "选中文字",
-          "effect": "统一菜单设置字体、字号、粗体、强调、下划线、删除线、高亮颜色与下半部/整块模式、文字颜色、行内代码、链接和段落对齐。",
+          "effect": "统一菜单设置字体、字号、粗体、强调、下划线、删除线、高亮颜色与下半部/整块模式、文字颜色、行内代码、链接、注释和段落对齐。",
           "persistence": "content"
         },
         {
@@ -657,6 +670,131 @@
       ]
     }
   },
+  "stepper": {
+    "version": 1,
+    "reuse": {
+      "kind": "general",
+      "boundaries": [
+        "适合按顺序展开的过程：读者一次看一步，并在步骤之间来回对照；内容需要同时看到时用普通段落、分栏或表格。",
+        "外壳只负责步骤切换；每一步的画面由放进去的内容决定，可以是文字、图片、表格或其他组件。"
+      ]
+    },
+    "usage": {
+      "purpose": "按顺序逐步展示内容：步骤条显示编号与标题，一次显示一步，每一步可放任意内容，包括其他组件。",
+      "structure": [
+        "页面中保存为原生 stepper 节点，子节点只能是 step；step 的 attrs.title 是步骤标题，内容是任意块。",
+        "阅读时显示当前一步，步骤条、上一步/下一步与左右方向键切换；当前步骤只属于这次阅读。打印与导出依次展开全部步骤并显示标题。",
+        "编辑时切换到要修改的步骤，在步骤条下方修改标题、添加、删除或调整顺序；光标移入其他步骤时自动切换。"
+      ],
+      "inputs": [
+        {
+          "path": "document",
+          "meaning": "正式编辑格式：{type:\"doc\",content:[{type:\"stepper\",content:[{type:\"step\",attrs:{title},content:[...]}]}]}。每个 step 的内容是任意块，可包含 widget 组件。"
+        },
+        {
+          "path": "steps",
+          "meaning": "按顺序排列的步骤，1–12 个；用于从文字创建。"
+        },
+        {
+          "path": "steps[].title",
+          "meaning": "步骤条上的短标题；为空时显示“第 n 步”。"
+        },
+        {
+          "path": "steps[].content",
+          "meaning": "这一步的正文，支持与 Markdown 组件相同的语法。需要放入其他组件时，在页面中向对应 step 插入块。"
+        },
+        {
+          "path": "color",
+          "meaning": "文字颜色；使用可读的 CSS 颜色。"
+        },
+        {
+          "path": "backgroundColor",
+          "meaning": "组件背景颜色。"
+        },
+        {
+          "path": "fontSize",
+          "meaning": "字号，单位 px；范围以 schema 为准。"
+        },
+        {
+          "path": "align",
+          "meaning": "组件内容的默认对齐方式。"
+        },
+        {
+          "path": "padding",
+          "meaning": "内容内边距，单位 px。"
+        },
+        {
+          "path": "radius",
+          "meaning": "外框圆角，单位 px。"
+        }
+      ],
+      "recipes": [
+        {
+          "title": "在页面中逐步展示一个过程",
+          "steps": [
+            "按发生顺序拆成 2–8 步，每步一个短标题，标题说清这一步是什么事件或阶段。",
+            "每一步只放读者在这一步需要看的内容：一句说明，加一张图或一个组件；变化本身用具体的值或画面表达。",
+            "在页面中先插入 stepper，再用 block.insert 把段落、图片或 widget 组件放进对应 step（parentId 为该 step 的 id）。"
+          ],
+          "exampleIndex": 0
+        }
+      ],
+      "interactions": [
+        {
+          "action": "点击步骤、上一步/下一步，或在步骤条上按左右方向键",
+          "effect": "切换当前显示的步骤。",
+          "persistence": "view"
+        },
+        {
+          "action": "编辑时修改标题、添加、删除或调整步骤顺序",
+          "effect": "修改页面内容，保存后形成正式版本。",
+          "persistence": "content"
+        }
+      ],
+      "constraints": [
+        "stepper 只包含 step，最多 12 个；每个 step 至少包含一个块。",
+        "当前显示的步骤不写入内容。"
+      ],
+      "editing": {
+        "data": [
+          "替换公开字段中的内容、数值、初始配置与受支持样式；遵守 schema 和字段关系。"
+        ],
+        "implementation": [
+          "新增图形、输入结构或交互行为时读取开发说明，创建新版本并在真实 Page 验证。"
+        ]
+      }
+    },
+    "development": {
+      "entryPoints": [
+        {
+          "path": "src/components/rich-text/Stepper.tsx",
+          "purpose": "步骤条与阅读视图，编辑器与阅读器共用。"
+        },
+        {
+          "path": "src/components/rich-text/NodeViews.tsx",
+          "purpose": "StepperView：编辑器中的步骤切换与步骤增删、排序。"
+        },
+        {
+          "path": "index.tsx",
+          "purpose": "通过 source 视图获得的可编辑 SDK 包装入口；用 showai:components 组合已有能力。"
+        }
+      ],
+      "architecture": [
+        "stepper 与 step 是原生内容节点，与 toggle 同层；编辑器用样式隐藏非当前步骤，不移除节点，阅读器在一次渲染中保留全部步骤。",
+        "当前步骤是阅读状态，不进入内容哈希。"
+      ],
+      "extensionPoints": [
+        "步骤数上限与编辑器隐藏规则（stepper.css）同步修改。"
+      ],
+      "invariants": [
+        "保留原始输入与稳定 ID，明确区分源数据、派生值和阅读状态。",
+        "保持只读模式不写入源内容，沿用宿主的菜单与交互边界。"
+      ],
+      "verification": [
+        "在真实 Page 中放入含组件的步骤，核对切换、编辑保存、只读阅读、打印与离线导出。"
+      ]
+    }
+  },
   "divider": {
     "version": 1,
     "reuse": {
@@ -901,11 +1039,11 @@
       "inputs": [
         {
           "path": "title",
-          "meaning": "组件标题；只修改本实例的文字。"
+          "meaning": "组件标题；只修改本实例的文字。 可写 [文字]{注释}，悬停时显示注释。"
         },
         {
           "path": "description",
-          "meaning": "说明文字，用于解释数据口径或阅读目标。"
+          "meaning": "说明文字，用于解释数据口径或阅读目标。 可写 [文字]{注释}，悬停时显示注释。"
         },
         {
           "path": "type",
@@ -913,11 +1051,11 @@
         },
         {
           "path": "labels",
-          "meaning": "横轴标签数组；序列中的第 i 个数值对应 labels[i]。"
+          "meaning": "横轴标签数组；序列中的第 i 个数值对应 labels[i]。标签可写 [文字]{注释}，读者悬停横轴标签或原始数据表时显示注释；超过 12 个字符的标签被截短，悬停显示全文。"
         },
         {
           "path": "series",
-          "meaning": "每条序列包含 name、values，可选 color；values 应与 labels 等长且全为有限数值。"
+          "meaning": "每条序列包含 name、values，可选 color；values 应与 labels 等长且全为有限数值。name 可写 [文字]{注释}，悬停图例与数据表表头时显示。"
         },
         {
           "path": "unit",
@@ -9093,7 +9231,7 @@
         },
         {
           "path": "steps[].detail",
-          "meaning": "可选：当前步骤的说明；支持 **粗体**、`代码` 与 [链接](https://…)，换行分段。"
+          "meaning": "可选：当前步骤的说明；支持 **粗体**、`代码`、[链接](https://…) 与悬停注释 [文字]{注释}，换行分段。"
         }
       ],
       "recipes": [
@@ -9238,7 +9376,7 @@
         },
         {
           "path": "layers[].modules[].detail",
-          "meaning": "可选：模块职责；支持 **粗体**、`代码` 与 [链接](https://…)，换行分段。"
+          "meaning": "可选：模块职责；支持 **粗体**、`代码`、[链接](https://…) 与悬停注释 [文字]{注释}，换行分段。"
         },
         {
           "path": "initial",
@@ -9370,7 +9508,7 @@
         },
         {
           "path": "steps[].body",
-          "meaning": "说明，按换行分段。行内标记：**粗体**、`代码`、[文字](https://…)。"
+          "meaning": "说明，按换行分段。行内标记：**粗体**、`代码`、[文字](https://…)、悬停注释 [文字]{注释}。"
         },
         {
           "path": "steps[].code",
@@ -9676,7 +9814,7 @@
         },
         {
           "path": "nodes[].detail",
-          "meaning": "可选：更多说明；支持 **粗体**、`代码`、[链接](https://…)，空行分段，每行以 - 开头的段落成为列表。"
+          "meaning": "可选：更多说明；支持 **粗体**、`代码`、[链接](https://…) 与悬停注释 [文字]{注释}，空行分段，每行以 - 开头的段落成为列表。"
         },
         {
           "path": "nodes[].example",
@@ -9830,7 +9968,7 @@
         },
         {
           "path": "cards[].body",
-          "meaning": "一句话说明，支持 **粗体** 和 `代码`；没有 href 的卡片也可以写 [链接](https://…)。"
+          "meaning": "一句话说明，支持 **粗体**、`代码` 和悬停注释 [文字]{注释}；没有 href 的卡片也可以写 [链接](https://…)。"
         },
         {
           "path": "cards[].icon",

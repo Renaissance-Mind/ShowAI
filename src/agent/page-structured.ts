@@ -25,6 +25,8 @@ function markdownText(node: JSONContent): string {
     else if (mark.type === "strike") value = `~~${value}~~`;
     else if (mark.type === "code")
       value = `\`${value.replaceAll("`", "\\`")}\``;
+    else if (mark.type === "annotation")
+      value = `[${value}]{${mark.attrs?.note ?? ""}}`;
   }
   return value;
 }
@@ -43,7 +45,13 @@ export function structuredContent(document: ShowDocument) {
           ? String(attrs.data?.props?.title ?? attrs.data?.title ?? kind)
           : node.type === "drawing"
             ? String(attrs.label ?? attrs.name ?? "")
-            : text(node);
+            : node.type === "step"
+              ? String(attrs.title ?? "")
+              : node.type === "stepper"
+                ? (node.content ?? [])
+                    .map((step) => String(step.attrs?.title ?? ""))
+                    .join(" → ")
+                : text(node);
     if (attrs.id)
       outline.push({
         id: attrs.id,
@@ -141,6 +149,17 @@ export function structuredContent(document: ShowDocument) {
       lines.push(`${"#".repeat(Math.min(6, depth + 2))} ${title}`, "");
     if (node.type === "toggle")
       lines.push(`### ${attrs.title ?? "折叠内容"}`, "");
+    if (node.type === "stepper") {
+      // Steps read in order; each title carries its id for later inserts.
+      (node.content ?? []).forEach((step, index) => {
+        lines.push(
+          `### ${index + 1}. ${step.attrs?.title || `第 ${index + 1} 步`} [${step.attrs?.id ?? ""}]`,
+          "",
+        );
+        visit(step, depth + 1);
+      });
+      return;
+    }
     if (node.type === "listItem" || node.type === "taskItem") {
       lines.push(
         `${node.type === "taskItem" ? `- [${attrs.checked ? "x" : " "}]` : "-"} ${markdownText(node)}`,

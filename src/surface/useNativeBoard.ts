@@ -63,7 +63,7 @@ export function useNativeBoard(options:NativeBoardOptions){
       dirty=false;const v=current.current,source=v.document;
       if(!alive||!source||!surface.getClientRects().length||document.visibilityState==="hidden")return;
       const size=surface.clientWidth+":"+surface.clientHeight;
-      if(poseDocument!==source||poseSize!==size){poses=measureNativeBoard(surface,world);poseDocument=source;poseSize=size}
+      if(poseDocument!==source||poseSize!==size){poses=measureNativeBoard(surface,world,source);poseDocument=source;poseSize=size}
       const holes=inkUIRegions(document.querySelectorAll<HTMLElement>("[data-surface-ui],.surface-toolbar,.studio-context-menu,.studio-modal-shade,.container-inspector,.studio-sidebar-shell:not([data-sidebar-mode=hidden]) .studio-sidebar,.studio-mobile-sidebar-edge,.studio-mobile-sidebar-scrim,.studio-mobile-navigation-tools"));
       const style=getComputedStyle(surface);
       const packet={token,pageId:source.id,boardId:v.boardId,nativeScene:true,tool:v.tool??"select",color:v.color,fillColor:v.fillColor??"none",width:v.width,pressure:v.pressure,ruler:v.ruler,
