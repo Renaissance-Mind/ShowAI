@@ -383,8 +383,9 @@ try {
   result.checks.push(
     "new content defaults to Page; an embedded Board owns its viewport and contains an editable Page",
   );
-  await object(nestedPageId)
-    .getByRole("button", { name: "展开 Page", exact: true })
+  assert.ok((await object(nestedPageId).getAttribute("class")).split(/\s+/).includes("is-selected"));
+  await scene(boardId)
+    .getByRole("button", { name: "展开选中容器", exact: true })
     .click();
   assert.equal(await page.locator(".container-workspace-bar").count(), 1);
   assert.equal(
