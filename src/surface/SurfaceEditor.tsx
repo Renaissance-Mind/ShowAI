@@ -30,6 +30,7 @@ import { PageModuleContext, pageEditorNodes } from "./PageEditorNodes";
 import { mergePageContent, canCommitPageMerge } from "../core/page-merge-model";
 import InkConflictInspector from "./InkConflictInspector";
 import {nativeContentHistoryStages} from "./native-content-history";
+import {nativeDocumentContentKey} from "./native-document-content";
 
 import {appendNativeInkHistoryGroups,nativeInkHistoryGroups,type NativeInkHistoryAction,type NativeInkHistoryGroup} from "./native-ink-history";
 
@@ -196,6 +197,11 @@ function SurfaceEditor({
           next.icon === before.icon)
       )
         return;
+      if(!recordHistory && nativeDocumentContentKey(next)===nativeDocumentContentKey(before)){
+        current.current=next;
+        window.showai?.inlineInk?.setDocument?.(next.id,next);
+        return;
+      }
       const stack = history.current,
         now = Date.now();
       if (recordHistory&&(!group || group !== stack.group || now - stack.at > 800)) {
