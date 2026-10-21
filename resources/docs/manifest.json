@@ -145,65 +145,139 @@
     }
    ],
    "pages": {
-    "c207d0b8-8aa9-5290-95a5-2a6c4484456c": {
-     "title": "CLI 与 MCP 参考",
-     "icon": "⌨️",
-     "file": "zh-CN/pages/c207d0b8-8aa9-5290-95a5-2a6c4484456c.json",
-     "sha256": "f5f9679105b2cf95321bc5289ad846f270f0bcb2794b1939222992239e4ab987",
+    "2e9af66b-0a83-58f6-b3f5-a480f0f6abab": {
+     "title": "ShowAI 文档",
+     "icon": "📚",
+     "file": "zh-CN/pages/2e9af66b-0a83-58f6-b3f5-a480f0f6abab.json",
+     "sha256": "ac80a513b6db1fb4614b60fe9f9fb5fa9ac00b644e80433637d9d422a6f1f43c",
      "components": [
       "zh-CN/components/doc-hero@1.0.0-7c2bbe84b003.json",
-      "zh-CN/components/doc-commands@1.0.0-f2cb922c18c3.json",
-      "zh-CN/components/doc-compare@1.0.0-3a5b6ff02c26.json",
-      "zh-CN/components/doc-cards@1.0.0-96ea3af150bd.json"
-     ]
-    },
-    "1b6dc3fc-a168-5ede-8cd2-fb3e22566de4": {
-     "title": "开发自定义组件",
-     "icon": "🧪",
-     "file": "zh-CN/pages/1b6dc3fc-a168-5ede-8cd2-fb3e22566de4.json",
-     "sha256": "03027ff1589f240487e043fe0544500b6cd632c11ba4f2616c94578c378e652c",
-     "components": [
-      "zh-CN/components/doc-hero@1.0.0-7c2bbe84b003.json",
-      "zh-CN/components/doc-tree@1.0.0-74d9519ab11b.json",
+      "zh-CN/components/doc-cards@1.0.0-96ea3af150bd.json",
       "zh-CN/components/doc-steps@1.0.0-660edad476b2.json",
-      "zh-CN/components/doc-diagram@1.0.0-9ceb1b83b733.json",
-      "zh-CN/components/doc-cards@1.0.0-96ea3af150bd.json"
+      "zh-CN/components/doc-diagram@1.0.0-9ceb1b83b733.json"
      ]
     },
-    "d25297b7-5bfa-5283-ae6a-da5f8e524904": {
-     "title": "页面文件格式",
-     "icon": "📄",
-     "file": "zh-CN/pages/d25297b7-5bfa-5283-ae6a-da5f8e524904.json",
-     "sha256": "d1e5f7408ce438dc85d99ccec59d8d85082d97c9896923571454cfd2b204bc70",
+    "0b49bb7a-052c-5fe7-a05f-f647bb862a91": {
+     "title": "快速上手",
+     "icon": "🚀",
+     "file": "zh-CN/pages/0b49bb7a-052c-5fe7-a05f-f647bb862a91.json",
+     "sha256": "0210b32f0bf871aa98fdb90ae9d38dcfb094cc1e59cac9c6ec8d51266f9da7c6",
      "components": [
       "zh-CN/components/doc-hero@1.0.0-7c2bbe84b003.json",
-      "zh-CN/components/doc-tree@1.0.0-74d9519ab11b.json",
-      "zh-CN/components/doc-cards@1.0.0-96ea3af150bd.json"
-     ]
-    },
-    "428dd837-61c9-5984-b3a5-0f577b6db22a": {
-     "title": "架构",
-     "icon": "🏗️",
-     "file": "zh-CN/pages/428dd837-61c9-5984-b3a5-0f577b6db22a.json",
-     "sha256": "cdd7342ef8309af5722625bf5dd99aa89ef71bb7c781cb679d4602ad8e2c0031",
-     "components": [
-      "zh-CN/components/doc-hero@1.0.0-7c2bbe84b003.json",
-      "zh-CN/components/doc-diagram@1.0.0-9ceb1b83b733.json",
-      "zh-CN/components/doc-layers@1.0.0-b59acf80b60a.json",
+      "zh-CN/components/doc-steps@1.0.0-660edad476b2.json",
       "zh-CN/components/doc-sequence@1.0.0-54ea7e21b2eb.json",
       "zh-CN/components/doc-cards@1.0.0-96ea3af150bd.json"
+     ]
+    },
+    "5130253b-e1ae-5e03-bf87-ec58d245de28": {
+     "title": "Page 与 Board",
+     "icon": "🧩",
+     "file": "zh-CN/pages/5130253b-e1ae-5e03-bf87-ec58d245de28.json",
+     "sha256": "76db2b6958285abe1af7451b320da5ab4d6153e12e9b7959a6f2b53e9c328893",
+     "components": [
+      "zh-CN/components/doc-hero@1.0.0-7c2bbe84b003.json",
+      "zh-CN/components/doc-steps@1.0.0-660edad476b2.json",
+      "zh-CN/components/doc-compare@1.0.0-3a5b6ff02c26.json",
+      "zh-CN/components/doc-diagram@1.0.0-9ceb1b83b733.json",
+      "zh-CN/components/doc-commands@1.0.0-f2cb922c18c3.json",
+      "zh-CN/components/doc-cards@1.0.0-96ea3af150bd.json"
+     ]
+    },
+    "35f9cd9f-42bc-56f3-a792-3961178925bb": {
+     "title": "安装与运行",
+     "icon": "💻",
+     "file": "zh-CN/pages/35f9cd9f-42bc-56f3-a792-3961178925bb.json",
+     "sha256": "7429544add82ca7b328125d7f093bd1580e1f54026f19059c22ef1aa57f8bc42",
+     "components": [
+      "zh-CN/components/doc-hero@1.0.0-7c2bbe84b003.json",
+      "zh-CN/components/doc-steps@1.0.0-660edad476b2.json",
+      "zh-CN/components/doc-compare@1.0.0-3a5b6ff02c26.json",
+      "zh-CN/components/doc-tree@1.0.0-74d9519ab11b.json",
+      "zh-CN/components/doc-cards@1.0.0-96ea3af150bd.json"
+     ]
+    },
+    "e8c001a7-4e9f-5515-a2e4-8ed6085ef46d": {
+     "title": "在 Agent 中使用",
+     "icon": "🤝",
+     "file": "zh-CN/pages/e8c001a7-4e9f-5515-a2e4-8ed6085ef46d.json",
+     "sha256": "0367ad20da0ebe1815199a46141cfc6c9fc2ae5c48b1a9d2a3718fb633030ff5",
+     "components": [
+      "zh-CN/components/doc-hero@1.0.0-7c2bbe84b003.json",
+      "zh-CN/components/doc-compare@1.0.0-3a5b6ff02c26.json",
+      "zh-CN/components/doc-steps@1.0.0-660edad476b2.json",
+      "zh-CN/components/doc-sequence@1.0.0-54ea7e21b2eb.json",
+      "zh-CN/components/doc-cards@1.0.0-96ea3af150bd.json"
+     ]
+    },
+    "963599de-ed81-58ea-be92-5b68937966f8": {
+     "title": "连接 Agent 时的常见问题",
+     "icon": "🔍",
+     "file": "zh-CN/pages/963599de-ed81-58ea-be92-5b68937966f8.json",
+     "sha256": "404b95ad90ae71b1aa48a52f764e8f960c58c8e30487b625fdcf6924cf48d592",
+     "components": [
+      "zh-CN/components/doc-hero@1.0.0-7c2bbe84b003.json",
+      "zh-CN/components/doc-steps@1.0.0-660edad476b2.json",
+      "zh-CN/components/doc-cards@1.0.0-96ea3af150bd.json"
+     ]
+    },
+    "cf5d1ce9-369c-55de-923f-8da2ce92c74d": {
+     "title": "网页版 ChatGPT（邀请制）",
+     "icon": "💬",
+     "file": "zh-CN/pages/cf5d1ce9-369c-55de-923f-8da2ce92c74d.json",
+     "sha256": "416f642de97f56e9950d5faf9b389030a4fda4ba516c22f37d36db77f86ba31b",
+     "components": [
+      "zh-CN/components/doc-hero@1.0.0-7c2bbe84b003.json",
+      "zh-CN/components/doc-steps@1.0.0-660edad476b2.json"
+     ]
+    },
+    "833d5f6c-651d-5abe-a8a4-542d6fe0be37": {
+     "title": "内置 Agent",
+     "icon": "🤖",
+     "file": "zh-CN/pages/833d5f6c-651d-5abe-a8a4-542d6fe0be37.json",
+     "sha256": "6fe811cd6af7b91ae92deec0fb4f3c39a5149274864c5dd12313d4429db4f4a1",
+     "components": [
+      "zh-CN/components/doc-hero@1.0.0-7c2bbe84b003.json",
+      "zh-CN/components/doc-steps@1.0.0-660edad476b2.json",
+      "zh-CN/components/doc-compare@1.0.0-3a5b6ff02c26.json",
+      "zh-CN/components/doc-diagram@1.0.0-9ceb1b83b733.json",
+      "zh-CN/components/doc-cards@1.0.0-96ea3af150bd.json"
+     ]
+    },
+    "6e51cbfe-9394-571a-aa5a-5ff2fa96610e": {
+     "title": "技能与工作流程",
+     "icon": "🧠",
+     "file": "zh-CN/pages/6e51cbfe-9394-571a-aa5a-5ff2fa96610e.json",
+     "sha256": "5016dc17668ed08457d57f0b43ee1ac1a52a21a36b5a6ee8b0f59771fd5423a1",
+     "components": [
+      "zh-CN/components/doc-hero@1.0.0-7c2bbe84b003.json",
+      "zh-CN/components/doc-cards@1.0.0-96ea3af150bd.json",
+      "zh-CN/components/doc-compare@1.0.0-3a5b6ff02c26.json"
      ]
     },
     "c907d80d-f305-5558-bcbf-29ffd17d0f5d": {
      "title": "服务器运维",
      "icon": "🛠️",
      "file": "zh-CN/pages/c907d80d-f305-5558-bcbf-29ffd17d0f5d.json",
-     "sha256": "026dcef63444065ad9141c8e28dd745dd2128b67f23c72dbbc13802b8237b65e",
+     "sha256": "f4e519ddd3625e6d6d9479974ebf2e7fbb80e4ee4466a20b95c99e4151e88f54",
      "components": [
       "zh-CN/components/doc-hero@1.0.0-7c2bbe84b003.json",
       "zh-CN/components/doc-steps@1.0.0-660edad476b2.json",
       "zh-CN/components/doc-sequence@1.0.0-54ea7e21b2eb.json",
       "zh-CN/components/doc-commands@1.0.0-f2cb922c18c3.json",
+      "zh-CN/components/doc-cards@1.0.0-96ea3af150bd.json"
+     ]
+    },
+    "e30c72da-65cb-5628-8d35-370c8ac92363": {
+     "title": "组件与模板",
+     "icon": "🧱",
+     "file": "zh-CN/pages/e30c72da-65cb-5628-8d35-370c8ac92363.json",
+     "sha256": "48f2cfa4920d689e4262db874b003c14879d52fc3123afc2f58fd07e58fdff61",
+     "components": [
+      "zh-CN/components/doc-hero@1.0.0-7c2bbe84b003.json",
+      "zh-CN/components/doc-compare@1.0.0-3a5b6ff02c26.json",
+      "zh-CN/components/doc-steps@1.0.0-660edad476b2.json",
+      "zh-CN/components/doc-diagram@1.0.0-9ceb1b83b733.json",
+      "zh-CN/components/doc-sequence@1.0.0-54ea7e21b2eb.json",
       "zh-CN/components/doc-cards@1.0.0-96ea3af150bd.json"
      ]
     },
@@ -211,7 +285,7 @@
      "title": "ShowAI Cloud",
      "icon": "☁️",
      "file": "zh-CN/pages/56c95573-459b-54ae-9b0d-92c23b55fb88.json",
-     "sha256": "94a16521fa480692fe2d2cc7c7a85b4ce9079a107aed6f3a4a3dea4b0eff4855",
+     "sha256": "eaa59149bf32f816f1e8e5c941e93c641d2c8655b0070a3047ded4cfd209d70c",
      "components": [
       "zh-CN/components/doc-hero@1.0.0-7c2bbe84b003.json",
       "zh-CN/components/doc-steps@1.0.0-660edad476b2.json",
@@ -220,16 +294,42 @@
       "zh-CN/components/doc-cards@1.0.0-96ea3af150bd.json"
      ]
     },
-    "c51ee747-5e00-5bda-8c27-7465ace0566a": {
-     "title": "项目服务器与团队协作",
-     "icon": "👥",
-     "file": "zh-CN/pages/c51ee747-5e00-5bda-8c27-7465ace0566a.json",
-     "sha256": "29c0b7bbb05fd7f3e4625ab35d32a0d19a67dba1abcd29211f26c78a0da12940",
+    "c38eeda4-c709-5cae-bc63-2e4223ae0873": {
+     "title": "核心概念",
+     "icon": "🧭",
+     "file": "zh-CN/pages/c38eeda4-c709-5cae-bc63-2e4223ae0873.json",
+     "sha256": "391a5d45d2f0a40230ec3d910c672fbdbee5228071e8ed4c9e15ec4945d26b83",
      "components": [
       "zh-CN/components/doc-hero@1.0.0-7c2bbe84b003.json",
       "zh-CN/components/doc-diagram@1.0.0-9ceb1b83b733.json",
-      "zh-CN/components/doc-steps@1.0.0-660edad476b2.json",
+      "zh-CN/components/doc-tree@1.0.0-74d9519ab11b.json",
       "zh-CN/components/doc-compare@1.0.0-3a5b6ff02c26.json",
+      "zh-CN/components/doc-cards@1.0.0-96ea3af150bd.json"
+     ]
+    },
+    "6bd63230-60fc-561b-a445-2aea7c48e79e": {
+     "title": "图表、导图与图形",
+     "icon": "📊",
+     "file": "zh-CN/pages/6bd63230-60fc-561b-a445-2aea7c48e79e.json",
+     "sha256": "5806be1eb337c9289cfca853cd51088f24a3b96487803cf38ad0ae800ec88cf1",
+     "components": [
+      "zh-CN/components/doc-hero@1.0.0-7c2bbe84b003.json",
+      "zh-CN/components/doc-commands@1.0.0-f2cb922c18c3.json",
+      "zh-CN/components/doc-compare@1.0.0-3a5b6ff02c26.json",
+      "zh-CN/components/doc-cards@1.0.0-96ea3af150bd.json"
+     ]
+    },
+    "038265ef-4dcc-5b17-9003-83c716c14876": {
+     "title": "导出与分享",
+     "icon": "📤",
+     "file": "zh-CN/pages/038265ef-4dcc-5b17-9003-83c716c14876.json",
+     "sha256": "a852782d9a37ebd1e7d83a79fee544fffbce1f709e78074c002880b7c3ee0d58",
+     "components": [
+      "zh-CN/components/doc-hero@1.0.0-7c2bbe84b003.json",
+      "zh-CN/components/doc-compare@1.0.0-3a5b6ff02c26.json",
+      "zh-CN/components/doc-steps@1.0.0-660edad476b2.json",
+      "zh-CN/components/doc-tree@1.0.0-74d9519ab11b.json",
+      "zh-CN/components/doc-commands@1.0.0-f2cb922c18c3.json",
       "zh-CN/components/doc-sequence@1.0.0-54ea7e21b2eb.json",
       "zh-CN/components/doc-cards@1.0.0-96ea3af150bd.json"
      ]
@@ -238,7 +338,7 @@
      "title": "内容库与版本",
      "icon": "🗂️",
      "file": "zh-CN/pages/bd1ef961-f5d1-50a1-aded-0895dc63ebc7.json",
-     "sha256": "54cbddfcf2b92a36a38d44e3721aa20f8bb3a5b73185718f9e61062937d63fea",
+     "sha256": "c1f1d9a279b735ad9941205993e05b365b2e301464bfd3bffd36e622a4672338",
      "components": [
       "zh-CN/components/doc-hero@1.0.0-7c2bbe84b003.json",
       "zh-CN/components/doc-tree@1.0.0-74d9519ab11b.json",
@@ -248,167 +348,67 @@
       "zh-CN/components/doc-cards@1.0.0-96ea3af150bd.json"
      ]
     },
-    "6e51cbfe-9394-571a-aa5a-5ff2fa96610e": {
-     "title": "技能与工作流程",
-     "icon": "🧠",
-     "file": "zh-CN/pages/6e51cbfe-9394-571a-aa5a-5ff2fa96610e.json",
-     "sha256": "324d4539f552de25983bf94260f81decd3f5ef8b2fb3384b380246c60c29b670",
+    "c51ee747-5e00-5bda-8c27-7465ace0566a": {
+     "title": "项目服务器与团队协作",
+     "icon": "👥",
+     "file": "zh-CN/pages/c51ee747-5e00-5bda-8c27-7465ace0566a.json",
+     "sha256": "9c56f9e95be1541eec0634d6066e784acf3607166294de4125345d9eff1a70f2",
      "components": [
       "zh-CN/components/doc-hero@1.0.0-7c2bbe84b003.json",
-      "zh-CN/components/doc-cards@1.0.0-96ea3af150bd.json",
-      "zh-CN/components/doc-compare@1.0.0-3a5b6ff02c26.json"
-     ]
-    },
-    "833d5f6c-651d-5abe-a8a4-542d6fe0be37": {
-     "title": "内置 Agent",
-     "icon": "🤖",
-     "file": "zh-CN/pages/833d5f6c-651d-5abe-a8a4-542d6fe0be37.json",
-     "sha256": "4c700e2fe99d9f685eb2973d3f2426ca861a72fc11b247c03135652fcdf803b8",
-     "components": [
-      "zh-CN/components/doc-hero@1.0.0-7c2bbe84b003.json",
+      "zh-CN/components/doc-diagram@1.0.0-9ceb1b83b733.json",
       "zh-CN/components/doc-steps@1.0.0-660edad476b2.json",
       "zh-CN/components/doc-compare@1.0.0-3a5b6ff02c26.json",
+      "zh-CN/components/doc-sequence@1.0.0-54ea7e21b2eb.json",
+      "zh-CN/components/doc-cards@1.0.0-96ea3af150bd.json"
+     ]
+    },
+    "428dd837-61c9-5984-b3a5-0f577b6db22a": {
+     "title": "架构",
+     "icon": "🏗️",
+     "file": "zh-CN/pages/428dd837-61c9-5984-b3a5-0f577b6db22a.json",
+     "sha256": "644c00b51f1ed8faa04376157d37c77dfd0a96d3bd2ee0df40865a85d3c0b91f",
+     "components": [
+      "zh-CN/components/doc-hero@1.0.0-7c2bbe84b003.json",
+      "zh-CN/components/doc-diagram@1.0.0-9ceb1b83b733.json",
+      "zh-CN/components/doc-layers@1.0.0-b59acf80b60a.json",
+      "zh-CN/components/doc-sequence@1.0.0-54ea7e21b2eb.json",
+      "zh-CN/components/doc-cards@1.0.0-96ea3af150bd.json"
+     ]
+    },
+    "d25297b7-5bfa-5283-ae6a-da5f8e524904": {
+     "title": "页面文件格式",
+     "icon": "📄",
+     "file": "zh-CN/pages/d25297b7-5bfa-5283-ae6a-da5f8e524904.json",
+     "sha256": "48b473d3fafc873e3269e99184439684e0413af26b62b1f4376ae05dbb6af56f",
+     "components": [
+      "zh-CN/components/doc-hero@1.0.0-7c2bbe84b003.json",
+      "zh-CN/components/doc-tree@1.0.0-74d9519ab11b.json",
+      "zh-CN/components/doc-cards@1.0.0-96ea3af150bd.json"
+     ]
+    },
+    "1b6dc3fc-a168-5ede-8cd2-fb3e22566de4": {
+     "title": "开发自定义组件",
+     "icon": "🧪",
+     "file": "zh-CN/pages/1b6dc3fc-a168-5ede-8cd2-fb3e22566de4.json",
+     "sha256": "a6acf31f7b5eed21e1d183859920fb810dd1778580d53e225da9481d3122273e",
+     "components": [
+      "zh-CN/components/doc-hero@1.0.0-7c2bbe84b003.json",
+      "zh-CN/components/doc-tree@1.0.0-74d9519ab11b.json",
+      "zh-CN/components/doc-steps@1.0.0-660edad476b2.json",
       "zh-CN/components/doc-diagram@1.0.0-9ceb1b83b733.json",
       "zh-CN/components/doc-cards@1.0.0-96ea3af150bd.json"
      ]
     },
-    "cf5d1ce9-369c-55de-923f-8da2ce92c74d": {
-     "title": "网页版 ChatGPT（邀请制）",
-     "icon": "💬",
-     "file": "zh-CN/pages/cf5d1ce9-369c-55de-923f-8da2ce92c74d.json",
-     "sha256": "3df09e34394f6c22e3fbca5a73dff5568c287a9fc5cda314c899e6eebc1461df",
-     "components": [
-      "zh-CN/components/doc-hero@1.0.0-7c2bbe84b003.json",
-      "zh-CN/components/doc-steps@1.0.0-660edad476b2.json"
-     ]
-    },
-    "963599de-ed81-58ea-be92-5b68937966f8": {
-     "title": "连接 Agent 时的常见问题",
-     "icon": "🔍",
-     "file": "zh-CN/pages/963599de-ed81-58ea-be92-5b68937966f8.json",
-     "sha256": "c06fa98446eab964d5a684d46f2f1ac0ad8088ded11194a249318245e09c9e3b",
-     "components": [
-      "zh-CN/components/doc-hero@1.0.0-7c2bbe84b003.json",
-      "zh-CN/components/doc-steps@1.0.0-660edad476b2.json",
-      "zh-CN/components/doc-cards@1.0.0-96ea3af150bd.json"
-     ]
-    },
-    "e8c001a7-4e9f-5515-a2e4-8ed6085ef46d": {
-     "title": "在 Agent 中使用",
-     "icon": "🤝",
-     "file": "zh-CN/pages/e8c001a7-4e9f-5515-a2e4-8ed6085ef46d.json",
-     "sha256": "3d454720121f1c46284cbb0345a461c06a2d718f23feae458420eb9c9ef1fbe9",
-     "components": [
-      "zh-CN/components/doc-hero@1.0.0-7c2bbe84b003.json",
-      "zh-CN/components/doc-compare@1.0.0-3a5b6ff02c26.json",
-      "zh-CN/components/doc-steps@1.0.0-660edad476b2.json",
-      "zh-CN/components/doc-sequence@1.0.0-54ea7e21b2eb.json",
-      "zh-CN/components/doc-cards@1.0.0-96ea3af150bd.json"
-     ]
-    },
-    "038265ef-4dcc-5b17-9003-83c716c14876": {
-     "title": "导出与分享",
-     "icon": "📤",
-     "file": "zh-CN/pages/038265ef-4dcc-5b17-9003-83c716c14876.json",
-     "sha256": "85109b533d8a10085404a68209c9d805370f192639c0a8463ad4915a3d0842c4",
-     "components": [
-      "zh-CN/components/doc-hero@1.0.0-7c2bbe84b003.json",
-      "zh-CN/components/doc-compare@1.0.0-3a5b6ff02c26.json",
-      "zh-CN/components/doc-steps@1.0.0-660edad476b2.json",
-      "zh-CN/components/doc-tree@1.0.0-74d9519ab11b.json",
-      "zh-CN/components/doc-commands@1.0.0-f2cb922c18c3.json",
-      "zh-CN/components/doc-sequence@1.0.0-54ea7e21b2eb.json",
-      "zh-CN/components/doc-cards@1.0.0-96ea3af150bd.json"
-     ]
-    },
-    "6bd63230-60fc-561b-a445-2aea7c48e79e": {
-     "title": "图表、导图与图形",
-     "icon": "📊",
-     "file": "zh-CN/pages/6bd63230-60fc-561b-a445-2aea7c48e79e.json",
-     "sha256": "4212ddf4625e264238f98c1261ed6d940ca52c57e8eb09f5ff461240690f0843",
+    "c207d0b8-8aa9-5290-95a5-2a6c4484456c": {
+     "title": "CLI 与 MCP 参考",
+     "icon": "⌨️",
+     "file": "zh-CN/pages/c207d0b8-8aa9-5290-95a5-2a6c4484456c.json",
+     "sha256": "ec4ecb6b2b100cee1f2b28ce758d1299d1dbbc14c60c448d0a380b5b098a56d4",
      "components": [
       "zh-CN/components/doc-hero@1.0.0-7c2bbe84b003.json",
       "zh-CN/components/doc-commands@1.0.0-f2cb922c18c3.json",
       "zh-CN/components/doc-compare@1.0.0-3a5b6ff02c26.json",
       "zh-CN/components/doc-cards@1.0.0-96ea3af150bd.json"
-     ]
-    },
-    "e30c72da-65cb-5628-8d35-370c8ac92363": {
-     "title": "组件与模板",
-     "icon": "🧱",
-     "file": "zh-CN/pages/e30c72da-65cb-5628-8d35-370c8ac92363.json",
-     "sha256": "49c80a1e5aa66780524d8ff949d419dea5644dadca4cd5b22441cbd078c5eb6c",
-     "components": [
-      "zh-CN/components/doc-hero@1.0.0-7c2bbe84b003.json",
-      "zh-CN/components/doc-compare@1.0.0-3a5b6ff02c26.json",
-      "zh-CN/components/doc-steps@1.0.0-660edad476b2.json",
-      "zh-CN/components/doc-diagram@1.0.0-9ceb1b83b733.json",
-      "zh-CN/components/doc-sequence@1.0.0-54ea7e21b2eb.json",
-      "zh-CN/components/doc-cards@1.0.0-96ea3af150bd.json"
-     ]
-    },
-    "35f9cd9f-42bc-56f3-a792-3961178925bb": {
-     "title": "安装与运行",
-     "icon": "💻",
-     "file": "zh-CN/pages/35f9cd9f-42bc-56f3-a792-3961178925bb.json",
-     "sha256": "6ca909c88e316c2f63e95d65cbce7cd4bbf827bd50f9cf5fd0562ecc4a3ce0ac",
-     "components": [
-      "zh-CN/components/doc-hero@1.0.0-7c2bbe84b003.json",
-      "zh-CN/components/doc-steps@1.0.0-660edad476b2.json",
-      "zh-CN/components/doc-compare@1.0.0-3a5b6ff02c26.json",
-      "zh-CN/components/doc-tree@1.0.0-74d9519ab11b.json",
-      "zh-CN/components/doc-cards@1.0.0-96ea3af150bd.json"
-     ]
-    },
-    "c38eeda4-c709-5cae-bc63-2e4223ae0873": {
-     "title": "核心概念",
-     "icon": "🧭",
-     "file": "zh-CN/pages/c38eeda4-c709-5cae-bc63-2e4223ae0873.json",
-     "sha256": "62f61f645e8b8f921b58e2291cb2ee83b35cd45252d0ea0843fb2b758469d90a",
-     "components": [
-      "zh-CN/components/doc-hero@1.0.0-7c2bbe84b003.json",
-      "zh-CN/components/doc-diagram@1.0.0-9ceb1b83b733.json",
-      "zh-CN/components/doc-tree@1.0.0-74d9519ab11b.json",
-      "zh-CN/components/doc-compare@1.0.0-3a5b6ff02c26.json",
-      "zh-CN/components/doc-cards@1.0.0-96ea3af150bd.json"
-     ]
-    },
-    "5130253b-e1ae-5e03-bf87-ec58d245de28": {
-     "title": "Page 与 Board",
-     "icon": "🧩",
-     "file": "zh-CN/pages/5130253b-e1ae-5e03-bf87-ec58d245de28.json",
-     "sha256": "7d51d1e67a4406f1ad9665339be74afe38701eedc6d81b91bb4cf9408553cc71",
-     "components": [
-      "zh-CN/components/doc-hero@1.0.0-7c2bbe84b003.json",
-      "zh-CN/components/doc-steps@1.0.0-660edad476b2.json",
-      "zh-CN/components/doc-compare@1.0.0-3a5b6ff02c26.json",
-      "zh-CN/components/doc-diagram@1.0.0-9ceb1b83b733.json",
-      "zh-CN/components/doc-commands@1.0.0-f2cb922c18c3.json",
-      "zh-CN/components/doc-cards@1.0.0-96ea3af150bd.json"
-     ]
-    },
-    "0b49bb7a-052c-5fe7-a05f-f647bb862a91": {
-     "title": "快速上手",
-     "icon": "🚀",
-     "file": "zh-CN/pages/0b49bb7a-052c-5fe7-a05f-f647bb862a91.json",
-     "sha256": "1d4973742c83b1577e93834064b5ec9f9f923c1f905e0a769952b3325c4298f3",
-     "components": [
-      "zh-CN/components/doc-hero@1.0.0-7c2bbe84b003.json",
-      "zh-CN/components/doc-steps@1.0.0-660edad476b2.json",
-      "zh-CN/components/doc-sequence@1.0.0-54ea7e21b2eb.json",
-      "zh-CN/components/doc-cards@1.0.0-96ea3af150bd.json"
-     ]
-    },
-    "2e9af66b-0a83-58f6-b3f5-a480f0f6abab": {
-     "title": "ShowAI 文档",
-     "icon": "📚",
-     "file": "zh-CN/pages/2e9af66b-0a83-58f6-b3f5-a480f0f6abab.json",
-     "sha256": "4bb23ab67fde87fb6b079890e415d231a98e370ba1bdbde6636d7fc653517d5d",
-     "components": [
-      "zh-CN/components/doc-hero@1.0.0-7c2bbe84b003.json",
-      "zh-CN/components/doc-cards@1.0.0-96ea3af150bd.json",
-      "zh-CN/components/doc-steps@1.0.0-660edad476b2.json",
-      "zh-CN/components/doc-diagram@1.0.0-9ceb1b83b733.json"
      ]
     }
    }
@@ -531,65 +531,139 @@
     }
    ],
    "pages": {
-    "c207d0b8-8aa9-5290-95a5-2a6c4484456c": {
-     "title": "CLI & MCP Reference",
-     "icon": "⌨️",
-     "file": "en/pages/c207d0b8-8aa9-5290-95a5-2a6c4484456c.json",
-     "sha256": "a6f0e03427f9a7dd5e557a8ea0aa39a1c3d9fcc93b5b91c0456b34e0aab4076e",
+    "2e9af66b-0a83-58f6-b3f5-a480f0f6abab": {
+     "title": "ShowAI Documentation",
+     "icon": "📚",
+     "file": "en/pages/2e9af66b-0a83-58f6-b3f5-a480f0f6abab.json",
+     "sha256": "e53b9814c977bb1cf11561f35926a35d8afd9fe122b35dfc13eac90e1a429fb7",
      "components": [
       "en/components/doc-hero@1.0.0-6aa1b6a2a0e9.json",
-      "en/components/doc-commands@1.0.0-9832e342e037.json",
-      "en/components/doc-compare@1.0.0-6450bf2fc82c.json",
-      "en/components/doc-cards@1.0.0-25e52118b12f.json"
-     ]
-    },
-    "1b6dc3fc-a168-5ede-8cd2-fb3e22566de4": {
-     "title": "Develop Custom Components",
-     "icon": "🧪",
-     "file": "en/pages/1b6dc3fc-a168-5ede-8cd2-fb3e22566de4.json",
-     "sha256": "ab6645752d2c9fe4852f5a93f087e0e5e11bd32db0040efdfd9729168a631084",
-     "components": [
-      "en/components/doc-hero@1.0.0-6aa1b6a2a0e9.json",
-      "en/components/doc-tree@1.0.0-5ff06117c9a5.json",
+      "en/components/doc-cards@1.0.0-25e52118b12f.json",
       "en/components/doc-steps@1.0.0-0c4f6546ba7a.json",
-      "en/components/doc-diagram@1.0.0-6aac721ab95e.json",
-      "en/components/doc-cards@1.0.0-25e52118b12f.json"
+      "en/components/doc-diagram@1.0.0-6aac721ab95e.json"
      ]
     },
-    "d25297b7-5bfa-5283-ae6a-da5f8e524904": {
-     "title": "Page File Format",
-     "icon": "📄",
-     "file": "en/pages/d25297b7-5bfa-5283-ae6a-da5f8e524904.json",
-     "sha256": "999fe29278f9603dc2249c54ee01e81efe5b98dea694f213c0f1ea02451607ec",
+    "0b49bb7a-052c-5fe7-a05f-f647bb862a91": {
+     "title": "Quick Start",
+     "icon": "🚀",
+     "file": "en/pages/0b49bb7a-052c-5fe7-a05f-f647bb862a91.json",
+     "sha256": "fe1da64d840792166cf5432cedd59c1edb0c5c7659de9a9aed45ea588784de93",
      "components": [
       "en/components/doc-hero@1.0.0-6aa1b6a2a0e9.json",
-      "en/components/doc-tree@1.0.0-5ff06117c9a5.json",
-      "en/components/doc-cards@1.0.0-25e52118b12f.json"
-     ]
-    },
-    "428dd837-61c9-5984-b3a5-0f577b6db22a": {
-     "title": "Architecture",
-     "icon": "🏗️",
-     "file": "en/pages/428dd837-61c9-5984-b3a5-0f577b6db22a.json",
-     "sha256": "cc94bba364b139e4ed696b6e4d16cc93e89033334afd3d2953cc2ccd170380b5",
-     "components": [
-      "en/components/doc-hero@1.0.0-6aa1b6a2a0e9.json",
-      "en/components/doc-diagram@1.0.0-6aac721ab95e.json",
-      "en/components/doc-layers@1.0.0-539f88e3d299.json",
+      "en/components/doc-steps@1.0.0-0c4f6546ba7a.json",
       "en/components/doc-sequence@1.0.0-a540b813aa99.json",
       "en/components/doc-cards@1.0.0-25e52118b12f.json"
+     ]
+    },
+    "5130253b-e1ae-5e03-bf87-ec58d245de28": {
+     "title": "Pages & Boards",
+     "icon": "🧩",
+     "file": "en/pages/5130253b-e1ae-5e03-bf87-ec58d245de28.json",
+     "sha256": "27a93b508a1065e4dbe59c071913cd94f2ce5e344e46003de5cbedb5b22b7b73",
+     "components": [
+      "en/components/doc-hero@1.0.0-6aa1b6a2a0e9.json",
+      "en/components/doc-steps@1.0.0-0c4f6546ba7a.json",
+      "en/components/doc-compare@1.0.0-6450bf2fc82c.json",
+      "en/components/doc-diagram@1.0.0-6aac721ab95e.json",
+      "en/components/doc-commands@1.0.0-9832e342e037.json",
+      "en/components/doc-cards@1.0.0-25e52118b12f.json"
+     ]
+    },
+    "35f9cd9f-42bc-56f3-a792-3961178925bb": {
+     "title": "Installation & Setup",
+     "icon": "💻",
+     "file": "en/pages/35f9cd9f-42bc-56f3-a792-3961178925bb.json",
+     "sha256": "0d724e2e1ad17642892f612c71d0307b3e991f22a64be55371aa6933c0c9dd32",
+     "components": [
+      "en/components/doc-hero@1.0.0-6aa1b6a2a0e9.json",
+      "en/components/doc-steps@1.0.0-0c4f6546ba7a.json",
+      "en/components/doc-compare@1.0.0-6450bf2fc82c.json",
+      "en/components/doc-tree@1.0.0-5ff06117c9a5.json",
+      "en/components/doc-cards@1.0.0-25e52118b12f.json"
+     ]
+    },
+    "e8c001a7-4e9f-5515-a2e4-8ed6085ef46d": {
+     "title": "Use with an Agent",
+     "icon": "🤝",
+     "file": "en/pages/e8c001a7-4e9f-5515-a2e4-8ed6085ef46d.json",
+     "sha256": "f0b47f866a96fd44b7a0a461224817d45e485f7821a07a613cf1e195318ca668",
+     "components": [
+      "en/components/doc-hero@1.0.0-6aa1b6a2a0e9.json",
+      "en/components/doc-compare@1.0.0-6450bf2fc82c.json",
+      "en/components/doc-steps@1.0.0-0c4f6546ba7a.json",
+      "en/components/doc-sequence@1.0.0-a540b813aa99.json",
+      "en/components/doc-cards@1.0.0-25e52118b12f.json"
+     ]
+    },
+    "963599de-ed81-58ea-be92-5b68937966f8": {
+     "title": "Connecting an agent: common problems",
+     "icon": "🔍",
+     "file": "en/pages/963599de-ed81-58ea-be92-5b68937966f8.json",
+     "sha256": "0bd58806bf46c26c665289f3c643ef61f4e66cffcaf6d23e0ac2cd452f8ad004",
+     "components": [
+      "en/components/doc-hero@1.0.0-6aa1b6a2a0e9.json",
+      "en/components/doc-steps@1.0.0-0c4f6546ba7a.json",
+      "en/components/doc-cards@1.0.0-25e52118b12f.json"
+     ]
+    },
+    "cf5d1ce9-369c-55de-923f-8da2ce92c74d": {
+     "title": "ChatGPT on the web (invite only)",
+     "icon": "💬",
+     "file": "en/pages/cf5d1ce9-369c-55de-923f-8da2ce92c74d.json",
+     "sha256": "82a94ba6a52d8fed7e63fbab8bd722a42aeedb6e55f58aff06e0cab87d1b9004",
+     "components": [
+      "en/components/doc-hero@1.0.0-6aa1b6a2a0e9.json",
+      "en/components/doc-steps@1.0.0-0c4f6546ba7a.json"
+     ]
+    },
+    "833d5f6c-651d-5abe-a8a4-542d6fe0be37": {
+     "title": "Built-in Agent",
+     "icon": "🤖",
+     "file": "en/pages/833d5f6c-651d-5abe-a8a4-542d6fe0be37.json",
+     "sha256": "344df9063c52bed204a21ac33a2f4d0ff1e70fbbb673c2477bdf7e4ab7491207",
+     "components": [
+      "en/components/doc-hero@1.0.0-6aa1b6a2a0e9.json",
+      "en/components/doc-steps@1.0.0-0c4f6546ba7a.json",
+      "en/components/doc-compare@1.0.0-6450bf2fc82c.json",
+      "en/components/doc-diagram@1.0.0-6aac721ab95e.json",
+      "en/components/doc-cards@1.0.0-25e52118b12f.json"
+     ]
+    },
+    "6e51cbfe-9394-571a-aa5a-5ff2fa96610e": {
+     "title": "Skills & Workflows",
+     "icon": "🧠",
+     "file": "en/pages/6e51cbfe-9394-571a-aa5a-5ff2fa96610e.json",
+     "sha256": "f9007b1401df05570d8add7d824424b868067bff4c03b1f350b67cf7dd4ece11",
+     "components": [
+      "en/components/doc-hero@1.0.0-6aa1b6a2a0e9.json",
+      "en/components/doc-cards@1.0.0-25e52118b12f.json",
+      "en/components/doc-compare@1.0.0-6450bf2fc82c.json"
      ]
     },
     "c907d80d-f305-5558-bcbf-29ffd17d0f5d": {
      "title": "Server Operations",
      "icon": "🛠️",
      "file": "en/pages/c907d80d-f305-5558-bcbf-29ffd17d0f5d.json",
-     "sha256": "5fd2ad799b9b191a2b9e351353a6060a027484ce3a82a8b3ac6144a9c31b9a10",
+     "sha256": "8d1a1d4fe747574a723c2f39da87b7699e4b221b59238f82d470fc989d98523e",
      "components": [
       "en/components/doc-hero@1.0.0-6aa1b6a2a0e9.json",
       "en/components/doc-steps@1.0.0-0c4f6546ba7a.json",
       "en/components/doc-sequence@1.0.0-a540b813aa99.json",
       "en/components/doc-commands@1.0.0-9832e342e037.json",
+      "en/components/doc-cards@1.0.0-25e52118b12f.json"
+     ]
+    },
+    "e30c72da-65cb-5628-8d35-370c8ac92363": {
+     "title": "Components & Templates",
+     "icon": "🧱",
+     "file": "en/pages/e30c72da-65cb-5628-8d35-370c8ac92363.json",
+     "sha256": "9b96b99e2e21dc758adff171f7146ae16665f480ac713f9a13430d98cb822445",
+     "components": [
+      "en/components/doc-hero@1.0.0-6aa1b6a2a0e9.json",
+      "en/components/doc-compare@1.0.0-6450bf2fc82c.json",
+      "en/components/doc-steps@1.0.0-0c4f6546ba7a.json",
+      "en/components/doc-diagram@1.0.0-6aac721ab95e.json",
+      "en/components/doc-sequence@1.0.0-a540b813aa99.json",
       "en/components/doc-cards@1.0.0-25e52118b12f.json"
      ]
     },
@@ -597,7 +671,7 @@
      "title": "ShowAI Cloud",
      "icon": "☁️",
      "file": "en/pages/56c95573-459b-54ae-9b0d-92c23b55fb88.json",
-     "sha256": "b966806e2ff0b8b288383a63fa274842e8800d97c528a33c89ea7ff89fbbca60",
+     "sha256": "69a15b53fc283bc4b098f76d244e9ec9c138a4bb262e94f652bb1324088b9493",
      "components": [
       "en/components/doc-hero@1.0.0-6aa1b6a2a0e9.json",
       "en/components/doc-steps@1.0.0-0c4f6546ba7a.json",
@@ -606,16 +680,42 @@
       "en/components/doc-cards@1.0.0-25e52118b12f.json"
      ]
     },
-    "c51ee747-5e00-5bda-8c27-7465ace0566a": {
-     "title": "Project Server & Team Collaboration",
-     "icon": "👥",
-     "file": "en/pages/c51ee747-5e00-5bda-8c27-7465ace0566a.json",
-     "sha256": "8449d94cac2c7a2a59c38da95fc422dd0863fcde327e74895f31a2f21f2938eb",
+    "c38eeda4-c709-5cae-bc63-2e4223ae0873": {
+     "title": "Core Concepts",
+     "icon": "🧭",
+     "file": "en/pages/c38eeda4-c709-5cae-bc63-2e4223ae0873.json",
+     "sha256": "2134ad9b72a5dc8ea3d8c45fde978163bc8a1a684656fa9c556d7690c02ab61f",
      "components": [
       "en/components/doc-hero@1.0.0-6aa1b6a2a0e9.json",
       "en/components/doc-diagram@1.0.0-6aac721ab95e.json",
-      "en/components/doc-steps@1.0.0-0c4f6546ba7a.json",
+      "en/components/doc-tree@1.0.0-5ff06117c9a5.json",
       "en/components/doc-compare@1.0.0-6450bf2fc82c.json",
+      "en/components/doc-cards@1.0.0-25e52118b12f.json"
+     ]
+    },
+    "6bd63230-60fc-561b-a445-2aea7c48e79e": {
+     "title": "Charts, Mind Maps & Diagrams",
+     "icon": "📊",
+     "file": "en/pages/6bd63230-60fc-561b-a445-2aea7c48e79e.json",
+     "sha256": "4b23db9ad13cb5fdffd12fde4ca3d7724c5cb570e1ee2c43f08fd384a6ac42be",
+     "components": [
+      "en/components/doc-hero@1.0.0-6aa1b6a2a0e9.json",
+      "en/components/doc-commands@1.0.0-9832e342e037.json",
+      "en/components/doc-compare@1.0.0-6450bf2fc82c.json",
+      "en/components/doc-cards@1.0.0-25e52118b12f.json"
+     ]
+    },
+    "038265ef-4dcc-5b17-9003-83c716c14876": {
+     "title": "Export & Share",
+     "icon": "📤",
+     "file": "en/pages/038265ef-4dcc-5b17-9003-83c716c14876.json",
+     "sha256": "c676e392d4650cfcdfa16b65d8acf7e3fd8c9fe055b7c58faad5f019a43fa353",
+     "components": [
+      "en/components/doc-hero@1.0.0-6aa1b6a2a0e9.json",
+      "en/components/doc-compare@1.0.0-6450bf2fc82c.json",
+      "en/components/doc-steps@1.0.0-0c4f6546ba7a.json",
+      "en/components/doc-tree@1.0.0-5ff06117c9a5.json",
+      "en/components/doc-commands@1.0.0-9832e342e037.json",
       "en/components/doc-sequence@1.0.0-a540b813aa99.json",
       "en/components/doc-cards@1.0.0-25e52118b12f.json"
      ]
@@ -624,7 +724,7 @@
      "title": "Content Library & Versions",
      "icon": "🗂️",
      "file": "en/pages/bd1ef961-f5d1-50a1-aded-0895dc63ebc7.json",
-     "sha256": "e70fe45265b39234969d7a5c633bd00af819a380890df9834ed7a5916440e1d9",
+     "sha256": "6cb9301182fff40d787c511a33d15c0856cc2510a9cf99dfea3e296d82ed3694",
      "components": [
       "en/components/doc-hero@1.0.0-6aa1b6a2a0e9.json",
       "en/components/doc-tree@1.0.0-5ff06117c9a5.json",
@@ -634,167 +734,67 @@
       "en/components/doc-cards@1.0.0-25e52118b12f.json"
      ]
     },
-    "6e51cbfe-9394-571a-aa5a-5ff2fa96610e": {
-     "title": "Skills & Workflows",
-     "icon": "🧠",
-     "file": "en/pages/6e51cbfe-9394-571a-aa5a-5ff2fa96610e.json",
-     "sha256": "e43765fc6ea8531eae14affd5d80405f98631681b00755ee7fb3b736ce694208",
+    "c51ee747-5e00-5bda-8c27-7465ace0566a": {
+     "title": "Project Server & Team Collaboration",
+     "icon": "👥",
+     "file": "en/pages/c51ee747-5e00-5bda-8c27-7465ace0566a.json",
+     "sha256": "121d00e47b3d2289fb32dbce4247b04d794d2f4ecf1177c686b01c2b0ac74e11",
      "components": [
       "en/components/doc-hero@1.0.0-6aa1b6a2a0e9.json",
-      "en/components/doc-cards@1.0.0-25e52118b12f.json",
-      "en/components/doc-compare@1.0.0-6450bf2fc82c.json"
-     ]
-    },
-    "833d5f6c-651d-5abe-a8a4-542d6fe0be37": {
-     "title": "Built-in Agent",
-     "icon": "🤖",
-     "file": "en/pages/833d5f6c-651d-5abe-a8a4-542d6fe0be37.json",
-     "sha256": "a3508bbf037f549eb6b9979507c91430f729b011702ce2b71fc60fda184c3b61",
-     "components": [
-      "en/components/doc-hero@1.0.0-6aa1b6a2a0e9.json",
+      "en/components/doc-diagram@1.0.0-6aac721ab95e.json",
       "en/components/doc-steps@1.0.0-0c4f6546ba7a.json",
       "en/components/doc-compare@1.0.0-6450bf2fc82c.json",
+      "en/components/doc-sequence@1.0.0-a540b813aa99.json",
+      "en/components/doc-cards@1.0.0-25e52118b12f.json"
+     ]
+    },
+    "428dd837-61c9-5984-b3a5-0f577b6db22a": {
+     "title": "Architecture",
+     "icon": "🏗️",
+     "file": "en/pages/428dd837-61c9-5984-b3a5-0f577b6db22a.json",
+     "sha256": "dc96284ddc9eac99227e0ee9f294192656786410d7a9bdb6d4cd5b02f52f4cc2",
+     "components": [
+      "en/components/doc-hero@1.0.0-6aa1b6a2a0e9.json",
+      "en/components/doc-diagram@1.0.0-6aac721ab95e.json",
+      "en/components/doc-layers@1.0.0-539f88e3d299.json",
+      "en/components/doc-sequence@1.0.0-a540b813aa99.json",
+      "en/components/doc-cards@1.0.0-25e52118b12f.json"
+     ]
+    },
+    "d25297b7-5bfa-5283-ae6a-da5f8e524904": {
+     "title": "Page File Format",
+     "icon": "📄",
+     "file": "en/pages/d25297b7-5bfa-5283-ae6a-da5f8e524904.json",
+     "sha256": "e503a2dad2534ae7a4918f6c600bdc8e43d9167be76f3b51841f6945aeba86bb",
+     "components": [
+      "en/components/doc-hero@1.0.0-6aa1b6a2a0e9.json",
+      "en/components/doc-tree@1.0.0-5ff06117c9a5.json",
+      "en/components/doc-cards@1.0.0-25e52118b12f.json"
+     ]
+    },
+    "1b6dc3fc-a168-5ede-8cd2-fb3e22566de4": {
+     "title": "Develop Custom Components",
+     "icon": "🧪",
+     "file": "en/pages/1b6dc3fc-a168-5ede-8cd2-fb3e22566de4.json",
+     "sha256": "71ff91da9b57c76861c52cee9b4a679de54473a5a53b71813d661cdae54abbb9",
+     "components": [
+      "en/components/doc-hero@1.0.0-6aa1b6a2a0e9.json",
+      "en/components/doc-tree@1.0.0-5ff06117c9a5.json",
+      "en/components/doc-steps@1.0.0-0c4f6546ba7a.json",
       "en/components/doc-diagram@1.0.0-6aac721ab95e.json",
       "en/components/doc-cards@1.0.0-25e52118b12f.json"
      ]
     },
-    "cf5d1ce9-369c-55de-923f-8da2ce92c74d": {
-     "title": "ChatGPT on the web (invite only)",
-     "icon": "💬",
-     "file": "en/pages/cf5d1ce9-369c-55de-923f-8da2ce92c74d.json",
-     "sha256": "f70fb5e324036592a10654db652ee2f117e2f0076c0f02b9964f6fcdaba67df8",
-     "components": [
-      "en/components/doc-hero@1.0.0-6aa1b6a2a0e9.json",
-      "en/components/doc-steps@1.0.0-0c4f6546ba7a.json"
-     ]
-    },
-    "963599de-ed81-58ea-be92-5b68937966f8": {
-     "title": "Connecting an agent: common problems",
-     "icon": "🔍",
-     "file": "en/pages/963599de-ed81-58ea-be92-5b68937966f8.json",
-     "sha256": "9af60dd2e974de6e991ad8e6bbf83915e74e2e1c4b2da62dd1c9ff1330668a39",
-     "components": [
-      "en/components/doc-hero@1.0.0-6aa1b6a2a0e9.json",
-      "en/components/doc-steps@1.0.0-0c4f6546ba7a.json",
-      "en/components/doc-cards@1.0.0-25e52118b12f.json"
-     ]
-    },
-    "e8c001a7-4e9f-5515-a2e4-8ed6085ef46d": {
-     "title": "Use with an Agent",
-     "icon": "🤝",
-     "file": "en/pages/e8c001a7-4e9f-5515-a2e4-8ed6085ef46d.json",
-     "sha256": "b699460804833bd1486aa65574c91e63f55789c36e8ed938743c881216fe6ece",
-     "components": [
-      "en/components/doc-hero@1.0.0-6aa1b6a2a0e9.json",
-      "en/components/doc-compare@1.0.0-6450bf2fc82c.json",
-      "en/components/doc-steps@1.0.0-0c4f6546ba7a.json",
-      "en/components/doc-sequence@1.0.0-a540b813aa99.json",
-      "en/components/doc-cards@1.0.0-25e52118b12f.json"
-     ]
-    },
-    "038265ef-4dcc-5b17-9003-83c716c14876": {
-     "title": "Export & Share",
-     "icon": "📤",
-     "file": "en/pages/038265ef-4dcc-5b17-9003-83c716c14876.json",
-     "sha256": "dc244e194ccfa685da5bb411bd9bfe04f1bd762c08aa449e47555176efc43580",
-     "components": [
-      "en/components/doc-hero@1.0.0-6aa1b6a2a0e9.json",
-      "en/components/doc-compare@1.0.0-6450bf2fc82c.json",
-      "en/components/doc-steps@1.0.0-0c4f6546ba7a.json",
-      "en/components/doc-tree@1.0.0-5ff06117c9a5.json",
-      "en/components/doc-commands@1.0.0-9832e342e037.json",
-      "en/components/doc-sequence@1.0.0-a540b813aa99.json",
-      "en/components/doc-cards@1.0.0-25e52118b12f.json"
-     ]
-    },
-    "6bd63230-60fc-561b-a445-2aea7c48e79e": {
-     "title": "Charts, Mind Maps & Diagrams",
-     "icon": "📊",
-     "file": "en/pages/6bd63230-60fc-561b-a445-2aea7c48e79e.json",
-     "sha256": "ed95624ab3fbdc4d7969a157373c1e06b163bbf86428e59e17b466e53c9fe455",
+    "c207d0b8-8aa9-5290-95a5-2a6c4484456c": {
+     "title": "CLI & MCP Reference",
+     "icon": "⌨️",
+     "file": "en/pages/c207d0b8-8aa9-5290-95a5-2a6c4484456c.json",
+     "sha256": "d6d63e6222bbe62eeef1a3911dc4804d8afbdfbc5af958fd68e93290c043d913",
      "components": [
       "en/components/doc-hero@1.0.0-6aa1b6a2a0e9.json",
       "en/components/doc-commands@1.0.0-9832e342e037.json",
       "en/components/doc-compare@1.0.0-6450bf2fc82c.json",
       "en/components/doc-cards@1.0.0-25e52118b12f.json"
-     ]
-    },
-    "e30c72da-65cb-5628-8d35-370c8ac92363": {
-     "title": "Components & Templates",
-     "icon": "🧱",
-     "file": "en/pages/e30c72da-65cb-5628-8d35-370c8ac92363.json",
-     "sha256": "8901f7e9f3c6e17a8abd080212e062ce1aaa2dc760578dc3429da1f414b68baf",
-     "components": [
-      "en/components/doc-hero@1.0.0-6aa1b6a2a0e9.json",
-      "en/components/doc-compare@1.0.0-6450bf2fc82c.json",
-      "en/components/doc-steps@1.0.0-0c4f6546ba7a.json",
-      "en/components/doc-diagram@1.0.0-6aac721ab95e.json",
-      "en/components/doc-sequence@1.0.0-a540b813aa99.json",
-      "en/components/doc-cards@1.0.0-25e52118b12f.json"
-     ]
-    },
-    "35f9cd9f-42bc-56f3-a792-3961178925bb": {
-     "title": "Installation & Setup",
-     "icon": "💻",
-     "file": "en/pages/35f9cd9f-42bc-56f3-a792-3961178925bb.json",
-     "sha256": "886eca10f79d3eaa1c39c04d3b21e6620a0aefbfc62821ce3c4cb14eb9d4dde5",
-     "components": [
-      "en/components/doc-hero@1.0.0-6aa1b6a2a0e9.json",
-      "en/components/doc-steps@1.0.0-0c4f6546ba7a.json",
-      "en/components/doc-compare@1.0.0-6450bf2fc82c.json",
-      "en/components/doc-tree@1.0.0-5ff06117c9a5.json",
-      "en/components/doc-cards@1.0.0-25e52118b12f.json"
-     ]
-    },
-    "c38eeda4-c709-5cae-bc63-2e4223ae0873": {
-     "title": "Core Concepts",
-     "icon": "🧭",
-     "file": "en/pages/c38eeda4-c709-5cae-bc63-2e4223ae0873.json",
-     "sha256": "9b133873428de984864c7af21eda524e23cfd7b6c8991bd577e5902c6e488f5a",
-     "components": [
-      "en/components/doc-hero@1.0.0-6aa1b6a2a0e9.json",
-      "en/components/doc-diagram@1.0.0-6aac721ab95e.json",
-      "en/components/doc-tree@1.0.0-5ff06117c9a5.json",
-      "en/components/doc-compare@1.0.0-6450bf2fc82c.json",
-      "en/components/doc-cards@1.0.0-25e52118b12f.json"
-     ]
-    },
-    "5130253b-e1ae-5e03-bf87-ec58d245de28": {
-     "title": "Pages & Boards",
-     "icon": "🧩",
-     "file": "en/pages/5130253b-e1ae-5e03-bf87-ec58d245de28.json",
-     "sha256": "6c5b65bdd6f350c4d38aba06f655ad39e37deea14941072dbeb79bd315df6d10",
-     "components": [
-      "en/components/doc-hero@1.0.0-6aa1b6a2a0e9.json",
-      "en/components/doc-steps@1.0.0-0c4f6546ba7a.json",
-      "en/components/doc-compare@1.0.0-6450bf2fc82c.json",
-      "en/components/doc-diagram@1.0.0-6aac721ab95e.json",
-      "en/components/doc-commands@1.0.0-9832e342e037.json",
-      "en/components/doc-cards@1.0.0-25e52118b12f.json"
-     ]
-    },
-    "0b49bb7a-052c-5fe7-a05f-f647bb862a91": {
-     "title": "Quick Start",
-     "icon": "🚀",
-     "file": "en/pages/0b49bb7a-052c-5fe7-a05f-f647bb862a91.json",
-     "sha256": "3161403d0a45026d0d518583fcf8b72f80c524da82960bba604f7f3acca4382e",
-     "components": [
-      "en/components/doc-hero@1.0.0-6aa1b6a2a0e9.json",
-      "en/components/doc-steps@1.0.0-0c4f6546ba7a.json",
-      "en/components/doc-sequence@1.0.0-a540b813aa99.json",
-      "en/components/doc-cards@1.0.0-25e52118b12f.json"
-     ]
-    },
-    "2e9af66b-0a83-58f6-b3f5-a480f0f6abab": {
-     "title": "ShowAI Documentation",
-     "icon": "📚",
-     "file": "en/pages/2e9af66b-0a83-58f6-b3f5-a480f0f6abab.json",
-     "sha256": "7939cba3a6de16867d9be3110399078f9a1551f40074c55e343ed68e75bcae93",
-     "components": [
-      "en/components/doc-hero@1.0.0-6aa1b6a2a0e9.json",
-      "en/components/doc-cards@1.0.0-25e52118b12f.json",
-      "en/components/doc-steps@1.0.0-0c4f6546ba7a.json",
-      "en/components/doc-diagram@1.0.0-6aac721ab95e.json"
      ]
     }
    }

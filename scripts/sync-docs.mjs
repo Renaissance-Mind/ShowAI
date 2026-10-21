@@ -33,9 +33,9 @@ export function componentFile(key) {
 }
 
 /**
- * The documentation tree of one language: the website's docs pages (docs-site.json) in the order and
- * folders of its "ShowAI 文档" project. Other pages of that project, such as the launch article, are
- * website content and stay out.
+ * The documentation tree of one language: every published page of the website's "ShowAI 文档"
+ * project, in its folders and order. docs-site.json names the project, the slugs that links use, and
+ * the pages that only the website shows (appExclude, such as the launch article).
  */
 function localeDocs(locale, seed, catalog, site, files) {
   const project = seed.projects?.[site.projectId];
@@ -43,19 +43,20 @@ function localeDocs(locale, seed, catalog, site, files) {
     throw new Error(
       `The ${locale} seed has no documentation project ${site.projectId}.`,
     );
-  const wanted = new Set(Object.values(site.pages));
+  const excluded = new Set(site.appExclude ?? []);
   const pages = new Map();
   for (const [key, record] of Object.entries(seed.pages ?? {})) {
     const [projectId, pageId] = key.split("/");
     if (
       projectId !== site.projectId ||
-      !wanted.has(pageId) ||
+      excluded.has(pageId) ||
       record.document?.archived
     )
       continue;
     pages.set(pageId, record);
   }
-  const missing = [...wanted].filter((id) => !pages.has(id));
+  // Every slug must open a page the App ships, or links to it would leave the App.
+  const missing = Object.values(site.pages).filter((id) => !pages.has(id));
   if (missing.length)
     throw new Error(
       `The ${locale} seed is missing documentation pages: ${missing.join(", ")}`,
@@ -67,7 +68,9 @@ function localeDocs(locale, seed, catalog, site, files) {
     return index < 0 ? Number.MAX_SAFE_INTEGER : index;
   };
   const children = (parentId) => {
-    const parent = folders.find((folder) => folder.id === parentId);
+    const parent = parentId
+      ? folders.find((folder) => folder.id === parentId)
+      : project;
     const order =
       parent?.sortBy === "manual" && parent.manualOrder
         ? parent.manualOrder

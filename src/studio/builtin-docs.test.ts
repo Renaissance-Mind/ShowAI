@@ -25,13 +25,14 @@ const shape = (entries: DocsEntry[]): unknown =>
   );
 
 describe("built-in documentation", () => {
-  it("lists every documentation page of the website once, in the same tree for each language", () => {
-    const slugPages = Object.values(manifest.slugs).sort();
+  it("lists every documentation page once, in the same tree for each language, with every link target", () => {
     for (const locale of LOCALES) {
       const ids = pageIds(builtinDocs(locale).tree);
       expect(new Set(ids).size).toBe(ids.length);
-      expect([...ids].sort()).toEqual(slugPages);
-      expect(Object.keys(builtinDocs(locale).pages).sort()).toEqual(slugPages);
+      expect([...ids].sort()).toEqual(
+        Object.keys(builtinDocs(locale).pages).sort(),
+      );
+      for (const id of Object.values(manifest.slugs)) expect(ids).toContain(id);
     }
     expect(shape(builtinDocs("en").tree)).toEqual(
       shape(builtinDocs("zh-CN").tree),

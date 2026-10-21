@@ -44,12 +44,13 @@ function website(title = (text) => text) {
     },
     sidebar: {
       entryOrder: {
-        [projectId]: ["intro", "home", "use", "export", "install"],
+        [projectId]: ["intro", "home", "faq", "use", "export", "install"],
       },
     },
     pages: {
       [`${projectId}/intro`]: page("intro", title("介绍")),
       [`${projectId}/home`]: page("home", title("文档"), null, [key]),
+      [`${projectId}/faq`]: page("faq", title("常见问题")),
       [`${projectId}/install`]: page("install", title("安装"), "use"),
       [`${projectId}/export`]: page("export", title("导出"), "use", [key]),
       ["other/page"]: page("page", "其他项目"),
@@ -74,6 +75,7 @@ const input = () => {
     site: {
       projectId,
       pages: { "": "home", install: "install", export: "export" },
+      appExclude: ["intro"],
     },
   };
 };
@@ -83,6 +85,8 @@ test("the App receives the website's documentation pages in their folders and or
   const manifest = JSON.parse(files.get("manifest.json"));
   assert.deepEqual(manifest.locales["zh-CN"].tree, [
     { type: "page", id: "home" },
+    // A page without a slug is still documentation; slugs only name link targets.
+    { type: "page", id: "faq" },
     {
       type: "folder",
       id: "use",
@@ -99,7 +103,7 @@ test("the App receives the website's documentation pages in their folders and or
     `zh-CN/components/${componentFile(key)}`,
   ]);
   assert.equal(componentFile(key), `doc-hero@1.0.0-${hex.slice(0, 12)}.json`);
-  // The launch article and pages of other projects are website content.
+  // The launch article (appExclude) and pages of other projects are website content.
   assert.ok(!files.has("zh-CN/pages/intro.json"));
   assert.ok(!files.has("zh-CN/pages/page.json"));
   assert.equal(
