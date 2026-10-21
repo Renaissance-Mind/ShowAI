@@ -3392,6 +3392,7 @@ export default function Studio() {
               onSelect={(id) => void workspace.select(id).catch(report)}
               onClose={(id) => void workspace.close(id).catch(report)}
               onAdd={() => void workspace.add().catch(report)}
+              onMove={workspace.move}
             />
           }
         >

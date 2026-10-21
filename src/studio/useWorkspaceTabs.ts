@@ -4,6 +4,7 @@ import {
   closeWorkspaceTab,
   createWorkspace,
   currentEntry,
+  moveWorkspaceTab,
   parseWorkspaceTabs,
   sameLocation,
   setWorkspaceAssistantOpen,
@@ -180,6 +181,10 @@ export function useWorkspaceTabs({
     select,
     add,
     open,
+    move: (id: string, targetId: string, placement: "before" | "after") => {
+      if (pending.current || closing.current || !ready) return;
+      publish(moveWorkspaceTab(current.current, id, targetId, placement));
+    },
     close,
     step,
     rememberScroll,

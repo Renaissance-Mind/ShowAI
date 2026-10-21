@@ -62,6 +62,47 @@
   font-size: 13px;
   font-weight: 450;
   text-align: left;
+  user-select: none;
+}
+.studio-tab > [role="tab"][data-reorderable] {
+  cursor: grab;
+  touch-action: none;
+}
+.studio-tab[data-dragging] {
+  opacity: 0.45;
+}
+.studio-tab-drag-preview {
+  position: fixed;
+  z-index: 10000;
+  max-width: 220px;
+  padding: 8px 12px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--paper);
+  color: var(--text);
+  box-shadow: 0 4px 16px #0002;
+  font-size: 13px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  pointer-events: none;
+}
+.studio-tab[data-drop]::after {
+  content: "";
+  position: absolute;
+  top: 4px;
+  bottom: 4px;
+  width: 3px;
+  border-radius: 2px;
+  background: var(--accent);
+  pointer-events: none;
+  z-index: 1;
+}
+.studio-tab[data-drop="before"]::after {
+  left: 0;
+}
+.studio-tab[data-drop="after"]::after {
+  right: 0;
 }
 .studio-tab > [role="tab"] > span:last-child {
   overflow: hidden;

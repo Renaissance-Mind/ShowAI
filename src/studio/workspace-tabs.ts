@@ -124,6 +124,23 @@ export function closeWorkspaceTab(state: WorkspaceTabsState, id: string) {
   };
 }
 
+/** Move an existing tab without changing its identity, history or selection. */
+export function moveWorkspaceTab(
+  state: WorkspaceTabsState,
+  id: string,
+  targetId: string,
+  placement: "before" | "after",
+): WorkspaceTabsState {
+  if (id === targetId) return state;
+  const source = state.tabs.find((tab) => tab.id === id);
+  if (!source || !state.tabs.some((tab) => tab.id === targetId)) return state;
+  const tabs = state.tabs.filter((tab) => tab.id !== id);
+  const index = tabs.findIndex((tab) => tab.id === targetId);
+  tabs.splice(index + (placement === "after" ? 1 : 0), 0, source);
+  if (tabs.every((tab, index) => tab === state.tabs[index])) return state;
+  return { ...state, tabs };
+}
+
 /** Session data is window-local and scoped to the content library. */
 export function parseWorkspaceTabs(
   bytes: string | null,

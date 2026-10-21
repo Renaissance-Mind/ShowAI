@@ -4,6 +4,7 @@ import {
   closeWorkspaceTab,
   createWorkspace,
   currentEntry,
+  moveWorkspaceTab,
   parseWorkspaceTabs,
   recentEntry,
   setWorkspaceAssistantOpen,
@@ -21,6 +22,60 @@ const page = (id: string, projectId = "project-a"): WorkspaceEntry => ({
 });
 
 describe("workspace tabs", () => {
+  it("moves tabs in either direction while preserving selection, history and Agent state", () => {
+    const first = createWorkspace(page("page-a"));
+    const visited = visitWorkspace(first, page("page-b"));
+    const state = addWorkspaceTab(
+      addWorkspaceTab(
+        setWorkspaceAssistantOpen(visited, first.activeId, true),
+        page("page-c"),
+      ),
+      page("page-d"),
+    );
+    const [a, b, c] = state.tabs;
+    const right = moveWorkspaceTab(state, a.id, c.id, "after");
+    expect(right.tabs).toEqual([b, c, a]);
+    expect(right.activeId).toBe(c.id);
+    expect(right.tabs[2]).toBe(a);
+    expect(a.assistantOpen).toBe(true);
+    expect(a.entries.map((entry) => entry.location.pageId)).toEqual([
+      "page-a",
+      "page-b",
+    ]);
+    const left = moveWorkspaceTab(right, c.id, b.id, "before");
+    expect(left.tabs).toEqual([c, b, a]);
+    expect(left.activeId).toBe(c.id);
+    expect(parseWorkspaceTabs(JSON.stringify({ version: 1, ...left }))).toEqual(
+      left,
+    );
+    expect(state.tabs).toEqual([a, b, c]);
+  });
+
+  it("ignores missing, identical and already adjacent reorder targets", () => {
+    const state = addWorkspaceTab(
+      createWorkspace(page("page-a")),
+      page("page-b"),
+    );
+    const [a, b] = state.tabs;
+    expect(moveWorkspaceTab(state, "missing", b.id, "after")).toBe(state);
+    expect(moveWorkspaceTab(state, a.id, "missing", "before")).toBe(state);
+    expect(moveWorkspaceTab(state, a.id, a.id, "before")).toBe(state);
+    expect(moveWorkspaceTab(state, a.id, b.id, "before")).toBe(state);
+    expect(moveWorkspaceTab(state, b.id, a.id, "after")).toBe(state);
+  });
+
+  it("closes the active tab using its new neighbors after reordering", () => {
+    const state = addWorkspaceTab(
+      addWorkspaceTab(createWorkspace(page("page-a")), page("page-b")),
+      page("page-c"),
+    );
+    const [a, b, c] = state.tabs;
+    const moved = moveWorkspaceTab(state, c.id, a.id, "before");
+    const closed = closeWorkspaceTab(moved, c.id);
+    expect(closed.tabs).toEqual([a, b]);
+    expect(closed.activeId).toBe(a.id);
+  });
+
   it("keeps the Agent panel open state per tab and restores it with the window session", () => {
     const initial = createWorkspace(page("page-a"));
     const opened = setWorkspaceAssistantOpen(initial, initial.activeId, true);
