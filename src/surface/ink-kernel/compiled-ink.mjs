@@ -60,10 +60,13 @@ export class CompiledInkKernel {
     return { x: values[0], y: values[1], width: values[2], height: values[3] };
   }
   prepare(ink, width = ink.width, pressure = ink.brush !== 'monoline', start = 0, length = ink.samples.length - start) {
-    this.reset(); const samples = this.samples(ink.samples), style = this.style(ink, width, pressure), countsOffset = this.allocate(12);
-    this.check(this.api.sa_ink_geometry_counts(samples, ink.samples.length, start, length, countsOffset));
+    if (!Array.isArray(ink.samples) || ink.samples.length < 1 || ink.samples.length > 20000 || !Number.isInteger(start) || !Number.isInteger(length) || start < 0 || length < 0 || start + length > ink.samples.length) throw new Error('Invalid incremental ink range');
+    const first = Math.max(0, start - 1), last = Math.max(start + length, Math.min(ink.samples.length, start + 1));
+    const changed = ink.samples.slice(first, last), localStart = start - first;
+    this.reset(); const samples = this.samples(changed), style = this.style(ink, width, pressure), countsOffset = this.allocate(12);
+    this.check(this.api.sa_ink_geometry_counts(samples, changed.length, localStart, length, countsOffset));
     const counts = this.readCounts(countsOffset), pointOffset = this.allocate(counts.points * 16), contourOffset = this.allocate(counts.contours * 8), vertexOffset = this.allocate(counts.vertices * 8), boundsOffset = this.allocate(32);
-    this.check(this.api.sa_ink_build(samples, ink.samples.length, start, length, style, pointOffset, counts.points, contourOffset, counts.contours, vertexOffset, counts.vertices, boundsOffset));
+    this.check(this.api.sa_ink_build(samples, changed.length, localStart, length, style, pointOffset, counts.points, contourOffset, counts.contours, vertexOffset, counts.vertices, boundsOffset));
     const points = new Float64Array(this.api.memory.buffer, pointOffset, counts.points * 2).slice();
     const contours = new Uint32Array(this.api.memory.buffer, contourOffset, counts.contours * 2).slice();
     const vertices = new Float32Array(this.api.memory.buffer, vertexOffset, counts.vertices * 2).slice();
