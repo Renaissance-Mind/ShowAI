@@ -48,6 +48,7 @@ import compiledInk from "../surface/ink-kernel/compiled-ink.mjs?raw";
 import inkKernelWasm from "../surface/ink-kernel/ink-kernel-wasm.mjs?raw";
 import nativeBoardScene from "../surface/native-board-scene.mjs?raw";
 import nativeInkPreview from "../surface/NativeInkPreview.tsx?raw";
+import objectContext from "../surface/object-context.ts?raw";
 import nativeInkCss from "../surface/native-ink.css?raw";
 import capacity from "../portable/capacity.mjs?raw";
 import sdk from "../components/blocks/sdk.tsx?raw";
@@ -170,6 +171,21 @@ import src_doc_diagrams_contract_mjs from "../components/blocks/doc-diagrams-con
 import src_sequence_diagram_css from "../components/blocks/sequence-diagram.css?raw";
 import src_SequenceDiagram_tsx from "../components/blocks/SequenceDiagram.tsx?raw";
 
+// Component frames have no source runtime, so a captured value only has to be
+// an independent frozen JSON copy; the SDK gets this stand-in instead of the
+// host's ownership registry.
+const frameSourceRuntime = `export function ownSourceValue(value) {
+  const copy = JSON.parse(JSON.stringify(value));
+  const freeze = (item) => {
+    if (item && typeof item === "object" && !Object.isFrozen(item)) {
+      for (const key of Object.keys(item)) freeze(item[key]);
+      Object.freeze(item);
+    }
+    return item;
+  };
+  return freeze(copy);
+}
+`;
 const sources: Record<string, string> = {
   ...g2BuiltinSources,
   ...diagramBuiltinSources,
@@ -221,6 +237,8 @@ const sources: Record<string, string> = {
   "ink-kernel/ink-kernel-wasm.mjs": inkKernelWasm,
   "native-board-scene.mjs": nativeBoardScene,
   "NativeInkPreview.tsx": nativeInkPreview,
+  "object-context.ts": objectContext,
+  "surface/source-runtime.ts": frameSourceRuntime,
   "native-ink.css": nativeInkCss,
   "capacity.mjs": capacity,
   "sdk.tsx": sdk,
@@ -372,6 +390,10 @@ export const builtinSources: Record<string, string> = Object.fromEntries(
       .replaceAll(
         '"../../surface/text-selection-model"',
         '"../surface/text-selection-model"',
+      )
+      .replaceAll(
+        '"../../surface/source-runtime"',
+        '"../surface/source-runtime"',
       )
       .replaceAll(
         '"../components/rich-text/text-range-edit"',

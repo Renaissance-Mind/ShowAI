@@ -1,6 +1,6 @@
 import "./native-ink.css";
 import {useContext} from "react";
-import {ObjectContext} from "./SurfaceObject";
+import {ObjectContext} from "./object-context";
 import { useTranslator } from "../i18n/react";
 import messages from "../i18n/messages/nativeInk";
 export function NativeInkPreview({

@@ -6,14 +6,12 @@ import {
 } from "./drawing-geometry.mjs";
 import type { JSONContent } from "@tiptap/core";
 import { resizeFrame, frameHeight, frameBounds } from "./geometry.mjs";
-import type { SurfaceGeometryStore } from "./geometry-store";
-import type { BoardInteraction, BoardGesture } from "./useBoardInteraction";
+import type { BoardGesture } from "./useBoardInteraction";
 import { BlockActionHost } from "../components/blocks/action-host";
 import type { MessageKey } from "../i18n";
 import { useTranslator } from "../i18n/react";
 import messages from "../i18n/messages/surface";
 import {
-  createContext,
   useContext,
   useEffect,
   useRef,
@@ -32,43 +30,8 @@ import {
 import type { NodeLayout } from "./types";
 import { isBoardShape } from "./board-input.mjs";
 
-export interface ObjectActions {
-  componentActionsHost?: HTMLElement | null;
-  /** This exact Board has an accepted native scene owning paint and selection. */
-  nativeScene?: boolean;
-  scale: number;
-  geometry?: SurfaceGeometryStore;
-  selected: string | null;
-  board?: BoardInteraction;
-  connect?: (
-    id: string,
-    endpoint: "start" | "end",
-    point: { x: number; y: number },
-  ) => void;
-  select: (id: string | null, additive?: boolean) => void;
-  /** Mark the object an arrow endpoint at this client point would bind to; null clears. */
-  highlightTarget?: (x: number | null, y?: number, exclude?: string) => void;
-  inspect?: (id: string | null) => void;
-  expand?: (id: string) => void;
-  remove?: (id: string) => void;
-  move?: (id: string, frame: NodeLayout) => void;
-  /** The shape or arrow whose label is open for editing. */
-  labelEditing?: string | null;
-  editLabel?: (id: string | null) => void;
-  /** Commit a label; minHeight grows a shape whose text no longer fits. */
-  setLabel?: (id: string, label: string, minHeight?: number) => void;
-  readOnly: boolean;
-  revealAll: boolean;
-  revealed: Set<string>;
-}
-export const ObjectContext = createContext<ObjectActions>({
-  scale: 1,
-  selected: null,
-  select: () => {},
-  readOnly: true,
-  revealAll: false,
-  revealed: new Set(),
-});
+import { ObjectContext } from "./object-context";
+export { ObjectContext, type ObjectActions } from "./object-context";
 
 export function SurfaceObject({
   id,
