@@ -42,6 +42,9 @@ import themeContent from "../design/content.css?raw";
 import contract from "../components/blocks/primitive-contract.mjs?raw";
 import nativeInkContract from "../surface/native-ink.mjs?raw";
 import portableInkContract from "../surface/portable-ink.mjs?raw";
+import compiledInkKernel from "../surface/ink-kernel/compiled-ink.mjs?raw";
+import inkKernelWasm from "../surface/ink-kernel/ink-kernel-wasm.mjs?raw";
+import nativeBoardScene from "../surface/native-board-scene.mjs?raw";
 import nativeInkPreview from "../surface/NativeInkPreview.tsx?raw";
 import nativeInkCss from "../surface/native-ink.css?raw";
 import capacity from "../portable/capacity.mjs?raw";
@@ -205,6 +208,9 @@ const sources: Record<string, string> = {
   "primitive-contract.mjs": contract,
   "native-ink.mjs": nativeInkContract,
   "portable-ink.mjs": portableInkContract,
+  "ink-kernel/compiled-ink.mjs": compiledInkKernel,
+  "ink-kernel/ink-kernel-wasm.mjs": inkKernelWasm,
+  "native-board-scene.mjs": nativeBoardScene,
   "NativeInkPreview.tsx": nativeInkPreview,
   "native-ink.css": nativeInkCss,
   "capacity.mjs": capacity,
