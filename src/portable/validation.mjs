@@ -774,6 +774,12 @@ function validateNode(value, path, counter, depth = 0, parentType = null) {
     throw new Error(`${path} cannot contain formatted code.`);
 }
 
+/** The same timestamp rule is used for full documents and the source owner's
+ * sole-field storage acknowledgment proof. This does not validate a document. */
+export function isDocumentTimestamp(value) {
+  return typeof value === "string" && Number.isFinite(Date.parse(value));
+}
+
 export function validateDocument(value) {
   validateJson(value, "document");
   assertContent(value);
@@ -866,8 +872,7 @@ export function validateDocument(value) {
   for (const key of ["createdAt", "updatedAt"])
     if (
       document[key] !== undefined &&
-      (typeof document[key] !== "string" ||
-        !Number.isFinite(Date.parse(document[key])))
+      !isDocumentTimestamp(document[key])
     )
       throw new Error(`document.${key} must be an ISO date string.`);
   if (document.parentId != null)
@@ -995,7 +1000,7 @@ function validateSelection(selection, document) {
   return { blockIds: [...blocks] };
 }
 
-export function parseArtifact(input) {
+function parseArtifactDocument(input, documentParser) {
   assertBytes(
     "Artifact JSON",
     typeof input === "string"
@@ -1016,7 +1021,7 @@ export function parseArtifact(input) {
     !["spatial", "reading"].includes(artifact.presentation)
   )
     throw new Error("Unknown page presentation.");
-  const document = validateDocument(artifact.document);
+  const document = documentParser(artifact.document);
   if (artifact.version !== artifactVersion(document))
     throw new Error("Artifact version does not match its page model.");
   return {
@@ -1038,6 +1043,21 @@ export function parseArtifact(input) {
           remoteComponents: validateRemoteComponents(artifact.remoteComponents),
         }),
   };
+}
+
+export function parseArtifact(input) {
+  return parseArtifactDocument(input, validateDocument);
+}
+
+/** Trusted backend adapter only. The source registry must first return its
+ * actual held body after an exact complete-body comparison. Public imports
+ * always use parseArtifact and cannot supply a skip-validation flag. */
+export function parseArtifactWithValidatedDocument(input, heldDocument) {
+  return parseArtifactDocument(input, document => {
+    if (document !== heldDocument)
+      throw new Error("Artifact document is not the actual registered body.");
+    return heldDocument;
+  });
 }
 
 export function serializeArtifact(

@@ -6,6 +6,9 @@ export const MAX_ARTIFACT_BYTES: number;
 export const ARTIFACT_DATA_ID: string;
 export function isSafeUrl(value: unknown, image?: boolean): boolean;
 export function validateDocument(value: unknown): ShowDocument;
+export function isDocumentTimestamp(value: unknown): boolean;
+/** Internal trusted adapter: held body must come from the actual source registry. */
+export function parseArtifactWithValidatedDocument(input: unknown, heldDocument: ShowDocument): ShowArtifact;
 export function parseArtifact(input: unknown): ShowArtifact;
 export function serializeArtifact(
   document: ShowDocument,

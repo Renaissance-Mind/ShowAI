@@ -1,3 +1,4 @@
+import {CAPACITY} from "../portable/capacity.mjs";
 import {createHash} from "node:crypto";
 import {installInkDigestProvider} from "./ink-operations.mjs";
 import {stampInkDocument} from "./ink-wire.mjs";
@@ -147,4 +148,33 @@ it("checks normalized proof, scope and epoch, keeps its lease under pressure, an
  expect(()=>owner.execute({kind:"normalize",ref:draft.next,proof:"normalized"} as any)).toThrow(/ISO/);
  owner.execute({kind:"release",leaseId:"normalized-reader"});owner.execute({kind:"release",leaseId:"draft"});owner.execute({kind:"seed",scope:seed.next.scope,document});
  expect(()=>owner.execute({kind:"normalize",ref:stable.next})).toThrow(/expired/);
+});
+it("matches only exact actual registered validated bodies, including proven timestamp-only drafts",()=>{
+ const {owner,seed}=setup(),body=resolve(owner,seed.next),copy=cloneSourceValue(body);
+ expect(owner.normalizedDocumentMatching({ref:seed.next,document:copy})).toBe(body);
+ for(const patch of [{title:"Different"},{updatedAt:"2026-10-22T01:00:00Z"},{futureRoot:{value:true}}])expect(owner.normalizedDocumentMatching({ref:seed.next,document:{...copy,...patch}} as any)).toBeNull();
+ const timestamp=delta(owner.execute({kind:"draft",base:seed.next,transactionId:"actual-storage-time",edits:[{op:"set",path:["updatedAt"],value:"2026-10-22T01:00:00.000Z"}],leaseId:"timestamp"}));
+ expect(timestamp.next.kind).toBe("draft");expect(()=>owner.normalizedDocumentMatching({ref:{...timestamp.next,kind:"normalized"},document:resolve(owner,timestamp.next)})).toThrow();expect(owner.normalizedDocumentMatching({ref:timestamp.next,document:cloneSourceValue(resolve(owner,timestamp.next))})).toBe(resolve(owner,timestamp.next));
+ const invalid=delta(owner.execute({kind:"draft",base:seed.next,transactionId:"invalid-storage-time",edits:[{op:"set",path:["updatedAt"],value:"invalid"}],leaseId:"invalid-time"}));
+ expect(owner.normalizedDocumentMatching({ref:invalid.next,document:resolve(owner,invalid.next)})).toBeNull();expect(()=>owner.execute({kind:"normalize",ref:invalid.next})).toThrow(/ISO/);
+ const edited=delta(owner.execute({kind:"draft",base:timestamp.next,transactionId:"ordinary-edit",edits:[{op:"set",path:["title"],value:"Ordinary draft"}],leaseId:"edited"}));expect(owner.normalizedDocumentMatching({ref:edited.next,document:resolve(owner,edited.next)})).toBeNull();
+ const following=delta(owner.execute({kind:"draft",base:edited.next,transactionId:"timestamp-after-unvalidated-edit",edits:[{op:"set",path:["updatedAt"],value:"2026-10-22T02:00:00Z"}],leaseId:"following"}));expect(owner.normalizedDocumentMatching({ref:following.next,document:resolve(owner,following.next)})).toBeNull();
+ for(const change of [{epoch:"forged"},{kind:"draft"},{scope:{...seed.next.scope,projectId:"forged"}}])expect(()=>owner.normalizedDocumentMatching({ref:{...seed.next,...change} as SourceSnapshotRef,document:body})).toThrow();
+ expect(()=>owner.execute({kind:"normalizedSourceDocumentMatching",ref:seed.next,document:body} as any)).toThrow(/Unknown/);
+});
+it("reports private merged worker phases without changing its exact source result",()=>{
+ const {owner,document,seed}=setup(),next=cloneSourceValue(document);next.title="Actual native merge";const packet={document:next,baseDocument:document};
+ const stages:{stage:string;duration:number}[]=[];
+ const observed=owner.registerActualMergedPublication({current:seed.next,publicationId:"timed-native",packet,result:{document:next,conflicts:[]},leaseId:"observed"},(stage,duration)=>stages.push({stage,duration}));
+ expect(stages.map(item=>item.stage)).toEqual(["rememberPublication","normalize","register.share","register.freeze","register.candidates","register.account","register.retain","register.diff","history","bodyCompare"]);
+ expect(stages.every(item=>Number.isFinite(item.duration)&&item.duration>=0)).toBe(true);
+ const plain=owner.registerActualMergedPublication({current:seed.next,publicationId:"timed-native",packet,result:{document:next,conflicts:[]},leaseId:"plain"});expect(resolve(owner,observed.next)).toEqual(resolve(owner,plain.next));expect(observed.edits).toEqual(plain.edits);
+});
+
+it("retains an oversized timestamp draft without promoting its optional validation proof",()=>{
+ const {owner,seed}=setup(),timestamp=" ".repeat(CAPACITY.pageStructureBytes)+"2026-10-22";
+ expect(Number.isFinite(Date.parse(timestamp))).toBe(true);
+ const draft=delta(owner.execute({kind:"draft",base:seed.next,transactionId:"oversized-valid-date",edits:[{op:"set",path:["updatedAt"],value:timestamp}],leaseId:"recoverable-oversize"}));
+ const body=resolve(owner,draft.next);expect(body.updatedAt).toBe(timestamp);expect(draft.next.kind).toBe("draft");expect(owner.normalizedDocumentMatching({ref:draft.next,document:body})).toBeNull();
+ expect(()=>owner.execute({kind:"normalize",ref:draft.next})).toThrow(/Page structure/);
 });
