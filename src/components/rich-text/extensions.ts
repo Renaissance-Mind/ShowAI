@@ -449,6 +449,15 @@ const ContentAttributes = Extension.create({
     });
     return [
       {
+        types: blockIdNodeTypes,
+        attributes: { name: { ...attribute("name"), default:"",
+          parseHTML:(element:HTMLElement)=>{
+            const value=attribute("name").parseHTML(element);
+            return typeof value === "string" ? value:"";
+          },
+        } },
+      },
+      {
         types: [
           "image",
           "codeBlock",
