@@ -124,10 +124,10 @@ try {
     .first()
     .waitFor();
   const api = (action, args = {}) =>
-    page.evaluate(({ action, args }) => window.showai.invoke(action, args), {
-      action,
-      args,
-    });
+    page.evaluate(async ({ action, args }) => {
+      try{return await window.showai.invoke(action,args)}
+      catch(reason){throw new Error(JSON.stringify({action,code:reason?.code,message:reason?.message}))}
+    }, {action,args});
   const project = await api("projects:create", { name: "Page / Board 验收" });
   const created = await api("pages:create", {
     projectId: project.id,
@@ -252,7 +252,7 @@ try {
     ) {
       const text = container
         .locator(
-          ":scope > .container-page-column > .surface-layout-flow > .document-editor > .editor-canvas > div > .tiptap",
+          ":scope > .container-page-column > .page-continuous-content > .rich-text-component > .document-editor > .editor-canvas > div > .tiptap",
         )
         .last();
       await text.click();
