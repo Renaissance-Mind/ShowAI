@@ -1,3 +1,4 @@
+import {measureNativeSync} from "./native-perf";
 import { useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import type { ShowDocument } from "../types";
@@ -20,7 +21,7 @@ export default function InkConflictInspector({ document, projectId, host, before
   onResolve: (document: ShowDocument) => void;
   readOnly?: boolean;
 }) {
-  const t = useTranslator(messages), groups = useMemo(() => inkWireResolutionCandidates(document), [document]);
+  const t = useTranslator(messages), groups = useMemo(() => host ? measureNativeSync("surface.conflictInspector",()=>inkWireResolutionCandidates(document)) : [], [document,host]);
   const [busy, setBusy] = useState(false), [error, setError] = useState("");
   if (!groups.length || !host) return null;
   const resolve = async (group: typeof groups[number], hash: string) => {

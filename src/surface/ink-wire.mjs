@@ -231,10 +231,17 @@ export function inkWireConflicts(document) {
   for (const [boardId, record] of boards(document)) {
     const state = record.board.attrs.inkState; if (!state) continue; validateInkWireState(state);
     for (const [strokeId, stroke] of Object.entries(state.strokes)) {
-      const retained = Object.entries(stroke.fields).every(([field, heads]) => heads.every(([, digest]) => valueLookup(strokeId, field, digest, [{ record, state }]).found));
-      for (const [field, heads] of Object.entries(stroke.fields)) if (new Set(heads.map(([, digest]) => digest)).size > 1) conflicts.push({ boardId, strokeId, field, retained, reason: "Concurrent ink field edits require resolution." });
+      const local = [];
+      // Current hashes/contexts already say whether there is a conflict. Only
+      // genuine competing values need their editable source values verified;
+      // uncontested geometry must not be rehashed merely to hide an empty badge.
+      for (const [field, heads] of Object.entries(stroke.fields)) if (new Set(heads.map(([, digest]) => digest)).size > 1) local.push({ field, reason: "Concurrent ink field edits require resolution." });
       for (const [dot, digest] of stroke.fields.alive) if (digest === deletedHash) {
-        for (const [field, heads] of Object.entries(stroke.fields)) if (field !== "alive" && heads.some(([other]) => !seen(state.contexts[dot], other) && !seen(state.contexts[other], dot))) conflicts.push({ boardId, strokeId, field: `delete/${field}`, retained, reason: "An ink deletion overlaps a concurrent edit." });
+        for (const [field, heads] of Object.entries(stroke.fields)) if (field !== "alive" && heads.some(([other]) => !seen(state.contexts[dot], other) && !seen(state.contexts[other], dot))) local.push({ field: `delete/${field}`, reason: "An ink deletion overlaps a concurrent edit." });
+      }
+      if (local.length) {
+        const retained = Object.entries(stroke.fields).every(([field, heads]) => heads.every(([, digest]) => valueLookup(strokeId, field, digest, [{ record, state }]).found));
+        for (const conflict of local) conflicts.push({ boardId, strokeId, field: conflict.field, retained, reason: conflict.reason });
       }
       if (stroke.unplaced) conflicts.push({ boardId, strokeId, field: "placement", retained: false, reason: "Ink placement still requires structural resolution." });
     }
