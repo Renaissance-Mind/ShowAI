@@ -49,11 +49,7 @@ function capturePlain(
   const charge = (bytes) => {
     if (!exclusive) {
       budget.bytes += bytes;
-      assertBytes(
-        "Source JSON capture",
-        budget.bytes,
-        CAPACITY.publicationTransferBytes,
-      );
+      assertBytes("Source JSON capture", budget.bytes, budget.maximum);
     }
   };
   if (
@@ -69,15 +65,13 @@ function capturePlain(
     throw new TypeError(
       "Invalid native source delta: non-JSON value (expected finite plain data)",
     );
-  if (plainOwned.has(value)) {
-    charge(plainBytes.get(value));
-    return value;
-  }
+  // Reusing a sealed branch allocates no defensive copy. Its actual encoded
+  // bytes remain subject to the complete document/artifact gates afterwards.
+  if (plainOwned.has(value)) return value;
   if (depth > 64 || (!exclusive && active.has(value)))
     throw new TypeError("Expected acyclic JSON data within depth 64");
   if (!exclusive && captured.has(value)) {
     const result = captured.get(value);
-    charge(plainBytes.get(result));
     return result;
   }
   const array = Array.isArray(value),
@@ -144,20 +138,28 @@ function capturePlain(
   if (!exclusive) captured.set(value, result);
   return result;
 }
-export function captureOwnedJSON(value) {
+export function captureOwnedJSON(
+  value,
+  maximumNewCopyBytes = CAPACITY.publicationTransferBytes,
+) {
+  if (
+    !Number.isSafeInteger(maximumNewCopyBytes) ||
+    maximumNewCopyBytes < 0 ||
+    maximumNewCopyBytes > CAPACITY.publicationTransferBytes
+  )
+    throw new TypeError("Invalid source defensive capture budget");
   return capturePlain(value, false, new WeakSet(), new WeakMap(), 0, {
     bytes: 0,
+    maximum: maximumNewCopyBytes,
   });
 }
 /** Parse, compare against actual sealed data, and seal before anything escapes.
  * The base may suggest reuse but every field is compared; no identity shortcut
  * grants ownership to mutable caller objects or accessor graphs. */
 export function parseOwnedJSON(raw, base) {
-  assertBytes(
-    "Source JSON capture",
-    utf8Bytes(raw),
-    CAPACITY.publicationTransferBytes,
-  );
+  // This exclusive parse creates no extra defensive whole-graph copy. An
+  // internal merged request can contain three independently legal documents;
+  // the public artifact/P limits must not become a new whole-request limit.
   const candidate = base === undefined ? undefined : captureOwnedJSON(base);
   return capturePlain(
     JSON.parse(raw),

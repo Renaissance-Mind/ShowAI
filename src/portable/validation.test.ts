@@ -204,7 +204,7 @@ describe("portable artifact boundaries", () => {
           Array.from({ length: 12001 }, () => ({ type: "paragraph" })),
         ),
       ),
-    ).toThrow("too many");
+    ).toThrow("Document exceeds 12000 nodes.");
 
     expect(() =>
       validateDocument(

@@ -187,9 +187,13 @@ function validateJson(value, path, depth = 0) {
     return;
   }
   if (Array.isArray(value)) {
-    if (value.length > MAX_NODES)
-      throw new Error(`${path} contains too many items.`);
-    value.forEach((item, i) => validateJson(item, `${path}[${i}]`, depth + 1));
+    // Model nodes have their own shared total counter below. Geometry samples,
+    // pressure knots and forward-compatible JSON data are not document nodes;
+    // their real bytes/depth and typed schema budgets still apply in full.
+    for (let i = 0; i < value.length; i++) {
+      if (!Object.hasOwn(value, i)) throw new Error(`${path} must contain dense JSON arrays.`);
+      validateJson(value[i], `${path}[${i}]`, depth + 1);
+    }
     return;
   }
   object(value, path);
