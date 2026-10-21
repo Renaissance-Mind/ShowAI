@@ -4,7 +4,8 @@ import {createResource} from "./containers.mjs";
 import {blankDocument} from "../core/catalog";
 import {addNode} from "./editing";
 import {createPortableInk} from "./portable-ink.mjs";
-import {stampInkDocument,inkWireConflicts} from "./ink-wire.mjs";
+import {stampInkDocument,inkWireConflicts,inkCheckpointFromDocument,inkWireDocumentFromCheckpoint} from "./ink-wire.mjs";
+import {InkOperationReplica,createInkOperation} from "./ink-operations.mjs";
 import {mergePageContent} from "../core/page-merge-model";
 import {findSurfaceNode,isReconciledSurface,reconcileSurface} from "./document.mjs";
 import {mergeNativeDocumentReceipt,nativeDocumentBodiesEqual} from "./native-document-content";
@@ -134,4 +135,83 @@ it("encodes only changed values regardless of unrelated editable sample count",(
   expect(result.baseDocument).toBe(baseline.baseDocument);return JSON.stringify(edits).length;
  });
  expect(sizes[0]).toBe(sizes[1]);expect(sizes[0]).toBeLessThan(200);
+});
+it("encodes exact middle array insertion/deletion with one splice while retaining append/tail edits",()=>{
+ const a={id:"a",unknown:{keep:true}},b={id:"b",unknown:{keep:null}},c={id:"c",unknown:{keep:"é"}};
+ for(const [before,next,expected] of [
+  [[a,b,c],[a,c],{op:"splice",path:["nodes"],index:1,deleteCount:1,items:[]}],
+  [[a,c],[a,b,c],{op:"splice",path:["nodes"],index:1,deleteCount:0,items:[b]}],
+  [[a,b,c],[b,c],{op:"splice",path:["nodes"],index:0,deleteCount:1,items:[]}],
+ ] as [unknown[],unknown[],NativeSourceEdit][]){
+  const baseline=freeze({nodes:before}),target={nodes:next};expect(diffNativeSource(baseline,target)).toEqual([expected]);
+  expect(applyNativeSourceDelta(baseline,[expected])).toEqual(target);
+ }
+ expect(applyNativeSourceDelta([1,2,3],[{op:"splice",path:[],index:1,deleteCount:1,items:[4,5]}])).toEqual([1,4,5,3]);
+ expect(diffNativeSource([a,b],[a,b,c])).toEqual([{op:"set",path:[2],value:c}]);
+ expect(diffNativeSource([a,b,c],[a,b])).toEqual([{op:"resize",path:[],length:2}]);
+});
+it("splice validates dense ranges atomically and isolates large inserted JSON without argument spreading",()=>{
+ const original=freeze({items:[{id:"a"},{id:"b"}],keep:{value:1}}),badItems=Array(2);badItems[1]="hole";
+ const invalid=[{index:-1,deleteCount:0,items:[]},{index:3,deleteCount:0,items:[]},{index:1.5,deleteCount:0,items:[]},
+  {index:1,deleteCount:2,items:[]},{index:1,deleteCount:-1,items:[]},{index:1,deleteCount:.5,items:[]},
+  {index:1,deleteCount:0,items:null},{index:1,deleteCount:0,items:[],unexpected:true},{index:1,deleteCount:0,items:badItems},{index:1,deleteCount:0,items:[undefined]}];
+ for(const fields of invalid){
+  const edit={op:"splice",path:["items"],...fields} as NativeSourceEdit;
+  expect(()=>applyNativeSourceDelta(original,[{op:"set",path:["keep","value"],value:9},edit])).toThrow(/Invalid native source delta/);
+  expect(original.keep.value).toBe(1);expect(original.items).toEqual([{id:"a"},{id:"b"}]);
+ }
+ expect(()=>applyNativeSourceDelta(original,[{op:"splice",path:["keep"],index:0,deleteCount:0,items:[]}])).toThrow(/existing array/);
+ const items=Array.from({length:200000},(_,index)=>index),result=applyNativeSourceDelta(original,[{op:"splice",path:["items"],index:1,deleteCount:0,items}]) as any;
+ items[0]=-1;expect(result.items).toHaveLength(200002);expect(result.items[1]).toBe(0);expect(result.items.at(-1)).toEqual({id:"b"});expect(result.keep).toBe(original.keep);
+ const inserted={nested:["é","é"]},small=applyNativeSourceDelta(original,[{op:"splice",path:["items"],index:1,deleteCount:1,items:[inserted]}]) as any;
+ inserted.nested[0]="mutated";expect(small.items[1].nested).toEqual(["é","é"]);
+});
+it("splice handles literal Unicode and prototype object keys without changing prototypes",()=>{
+ const before=JSON.parse('{"__proto__":{"é":[1,2,3],"é":[4,5]}}'),next=JSON.parse('{"__proto__":{"é":[1,3],"é":[4,5]}}');
+ const edits=diffNativeSource(before,next);expect(edits).toEqual([{op:"splice",path:["__proto__","é"],index:1,deleteCount:1,items:[]}]);
+ const result=applyNativeSourceDelta(freeze(before),edits);expect(result).toEqual(next);expect(Object.getPrototypeOf(result)).toBe(Object.prototype);expect(({} as any).é).toBeUndefined();
+});
+it("retains unique old UI node references after deletion/reordering, never ID-only equality",()=>{
+ const previous=[{attrs:{id:"a"},unknown:{keep:1}},{attrs:{id:"b"},unknown:{keep:2}},{attrs:{id:"c"},unknown:{keep:3}}];
+ const moved=shareNativeSource(previous,structuredClone([previous[2],previous[0],previous[1]]));
+ expect(moved).not.toBe(previous);expect(moved.map(node=>node.attrs.id)).toEqual(["c","a","b"]);
+ expect(moved[0]).toBe(previous[2]);expect(moved[1]).toBe(previous[0]);expect(moved[2]).toBe(previous[1]);
+ const deleted=shareNativeSource(previous,structuredClone([previous[1],previous[2]]));expect(deleted[0]).toBe(previous[1]);expect(deleted[1]).toBe(previous[2]);
+ const changed=structuredClone([previous[1],previous[2]]);changed[0].unknown.keep=99;
+ const next=shareNativeSource(previous,changed);expect(next[0]).not.toBe(previous[1]);expect(next[0].unknown.keep).toBe(99);expect(next[1]).toBe(previous[2]);
+ const ids=[{id:"first",causal:{heads:["a:1"]}},{id:"last",causal:{heads:["b:1"]}}],future=structuredClone([ids[1]]);future[0].causal.heads.push("foreign:1");
+ expect(shareNativeSource(ids,future)[0]).not.toBe(ids[1]);
+});
+it("uses index fallback for duplicate/missing identities and never searches another parent array",()=>{
+ const old=[{id:"a",value:1},{id:"b",value:2},{id:"c",value:3}],duplicate=structuredClone([{id:"b",value:2},{id:"b",value:2}]);
+ const next=shareNativeSource(old,duplicate);expect(next[0]).not.toBe(old[1]);expect(next[1]).toBe(old[1]);expect(next[0]).not.toBe(next[1]);
+ const duplicateOld=[{id:"b",value:2},{id:"b",value:2}],unique=shareNativeSource(duplicateOld,structuredClone([{id:"b",value:2}]));expect(unique[0]).toBe(duplicateOld[0]);
+ const noID=[{value:1},{value:2}],moved=shareNativeSource(noID,structuredClone([noID[1]]));expect(moved[0]).not.toBe(noID[1]);
+ const parents={one:[old[0]],two:[] as typeof old},target={one:[],two:structuredClone([old[0]])};
+ expect(shareNativeSource(parents,target).two[0]).not.toBe(old[0]);
+});
+
+it("does not let a new unique ID borrow mutable data from a surviving old node",()=>{
+ const previous=[{id:"a",data:{value:1}},{id:"b",data:{value:2}}],normalized=structuredClone([{id:"c",data:{value:1}},previous[0]]);
+ const next=shareNativeSource(previous,normalized);expect(next[0]).toBe(normalized[0]);expect(next[1]).toBe(previous[0]);
+ expect(next[0].data).not.toBe(next[1].data);next[0].data.value=99;expect(next[1].data.value).toBe(1);
+ const composed=[{id:"é",data:{value:1}}],decomposed=structuredClone([{id:"é",data:{value:1}}]);
+ expect(shareNativeSource(composed,decomposed)[0]).toBe(decomposed[0]);
+});
+
+it("replays actual first/middle/last causal deletes compactly while preserving surviving UI ink identities",()=>{
+ const initial=source();let draft=structuredClone(initial);
+ for(let index=1;index<=6;index++)draft=addNode(draft,{type:"drawing",attrs:{...structuredClone(node(initial).attrs),id:`stroke-${index}`,ink:createPortableInk([{x:index,y:index,pressure:.5},{x:70+index,y:30+index,pressure:.8}],2,[100,60])}},
+  {x:index*100,y:0,width:100,height:60},draft.content.attrs!.id) as ShowDocument;
+ const baseline=stampInkDocument(draft,initial,{actor:"actual-setup",sequence:1}),boardId=baseline.content.attrs!.id as string;
+ const checkpoint=inkCheckpointFromDocument(baseline,boardId),before=JSON.parse(JSON.stringify({document:baseline,baseDocument:baseline})),oldUI=reconcileSurface(before.document);
+ for(const id of ["stroke","stroke-3","stroke-6"]){
+  const replica=new InkOperationReplica({checkpoint}),operation=createInkOperation({actor:"actual-eraser",sequence:1,pageId:baseline.id,boardId,parents:[...replica.frontier],changes:[{kind:"delete",strokeId:id}]});
+  replica.append([operation]);
+  const after=JSON.parse(JSON.stringify({document:inkWireDocumentFromCheckpoint(baseline,boardId,replica.checkpoint()),baseDocument:baseline}));
+  const edits=diffNativeSource(freeze(before),after);expect(applyNativeSourceDelta(before,edits)).toEqual(after);expect(JSON.stringify(edits).length).toBeLessThan(6000);
+  const ui=reconcileSurface(after.document,{shareWith:oldUI});expect(findSurfaceNode(ui,id)).toBeUndefined();
+  for(const remaining of ["stroke",...Array.from({length:6},(_,index)=>`stroke-${index+1}`)].filter(value=>value!==id))
+    expect(findSurfaceNode(ui,remaining)!.node).toBe(findSurfaceNode(oldUI,remaining)!.node);
+ }
 });
