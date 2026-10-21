@@ -3,8 +3,10 @@ import { execFileSync } from 'node:child_process';
 import { mkdtempSync, rmSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
+import { buildSync } from 'esbuild';
+import { runInNewContext } from 'node:vm';
 import { CompiledInkKernel, inkKernelProvenance } from './compiled-ink.mjs';
-import { createPortableInk, portableInkGeometry, portableInkBounds, portableInkSamples, portableInkHit, validatePortableInk } from '../portable-ink.mjs';
+import { createPortableInk, portableInkGeometry, portableInkBounds, portableInkSamples, portableInkHit, validatePortableInk } from './reference-ink-v1.mjs';
 
 const brushes: Record<string, number> = { pen: 0, marker: 1, pencil: 2, monoline: 3 };
 const commands: Record<string, number> = { M: 0, L: 1, Q: 2, C: 3, Z: 4 };
@@ -48,6 +50,13 @@ const fixtures = () => {
   return result;
 };
 describe('compiled shared ink v1', () => {
+  it('keeps validation usable in JavaScriptCore without WebAssembly or base64 globals',()=>{
+    const bundle=buildSync({entryPoints:['src/surface/portable-ink.mjs'],bundle:true,write:false,format:'iife',globalName:'InkValidation'}).outputFiles[0].text;
+    const context:{WebAssembly:undefined;atob:undefined;InkValidation?:any}={WebAssembly:undefined,atob:undefined};
+    runInNewContext(bundle,context);
+    const ink=createPortableInk([{x:0,y:0},{x:20,y:20}],3,[30,30]);
+    expect(context.InkValidation.validatePortableInk(ink)).toBe(ink);
+  });
   it('pins the generated Wasm to the authoritative C++ source', async () => {
     const { createHash } = await import('node:crypto');
     for (const [name, hash] of Object.entries(inkKernelProvenance.sourceHashes)) expect(createHash('sha256').update(readFileSync(resolve('src/surface/ink-kernel', name))).digest('hex')).toBe(hash);

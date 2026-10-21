@@ -21,6 +21,7 @@ export class CompiledInkKernel {
   samples(samples:number[][]):number;
   style(ink:PortableInk,width:number,pressure:boolean):number;
   resolveSamples(ink:PortableInk,width?:number,pressure?:boolean):number[][];
+  bounds(ink:PortableInk,width?:number,pressure?:boolean):{x:number;y:number;width:number;height:number};
   prepare(ink:PortableInk,width?:number,pressure?:boolean,start?:number,length?:number):PreparedInkGeometry;
   flattenMask(commands:PortableInk['mask'],affine:PortableInk['transform']):InkContourBuffers;
   hit(geometry:PreparedInkGeometry,point:{x:number;y:number}):{inside:boolean;distance:number;solid:true};

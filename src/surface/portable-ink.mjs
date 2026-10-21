@@ -1,3 +1,6 @@
+import { CompiledInkKernel } from "./ink-kernel/compiled-ink.mjs";
+let compiledKernel;
+const geometryKernel = () => compiledKernel ??= new CompiledInkKernel();
 /** Portable brush v1. This module has no DOM, platform or storage dependencies. */
 export const PORTABLE_INK_FORMAT = "showai-ink-v1";
 export const isEditableDrawing = (node) =>
@@ -8,17 +11,7 @@ export function portableInkSamples(
   width = ink.width,
   pressure = ink.brush !== "monoline",
 ) {
-  return ink.samples.map((p) => {
-    const q = [...p],
-      nib = pressure
-        ? ink.brush === "monoline"
-          ? ink.width * (0.2 + 0.8 * Math.min(1, p[6]))
-          : p[3]
-        : ink.width;
-    q[3] = (nib * width) / ink.width;
-    q[4] = (nib * (p[3] > 0 ? p[4] / p[3] : 1) * width) / ink.width;
-    return q;
-  });
+  return geometryKernel().resolveSamples(ink, width, pressure);
 }
 export function portableNodeSamples(node) {
   return portableInkSamples(
@@ -101,6 +94,7 @@ export function portableInkColor(color, dark = false) {
     : color;
 }
 const caches = new WeakMap();
+const preparedGeometry = new WeakMap();
 const finite = (x, min, max) =>
   typeof x === "number" && Number.isFinite(x) && x >= min && x <= max;
 export const isPortableInk = (ink) => ink?.format === PORTABLE_INK_FORMAT;
@@ -262,61 +256,14 @@ export function validatePortableInk(ink) {
     throw new Error("Invalid original ink archive.");
   return ink;
 }
-const n = (x) => String(Math.round(x * 10000) / 10000);
-const map = (m, p) => ({
-  x: m[0] * p.x + m[2] * p.y + m[4],
-  y: m[1] * p.x + m[3] * p.y + m[5],
-});
 export function portableInkBounds(
   ink,
   strokeWidth = ink.width,
   pressure = ink.brush !== "monoline",
 ) {
-  let left = Infinity,
-    top = Infinity,
-    right = -Infinity,
-    bottom = -Infinity;
-  for (const sample of portableInkSamples(ink, strokeWidth, pressure))
-    for (const point of ellipse(sample, 1)) {
-      const p = map(ink.transform, point);
-      left = Math.min(left, p.x);
-      top = Math.min(top, p.y);
-      right = Math.max(right, p.x);
-      bottom = Math.max(bottom, p.y);
-    }
-  return {
-    x: left,
-    y: top,
-    width: Math.max(1, right - left),
-    height: Math.max(1, bottom - top),
-  };
+  return geometryKernel().bounds(ink, strokeWidth, pressure);
 }
-function ellipse(p, width) {
-  const a = p[7],
-    c = Math.cos(a),
-    s = Math.sin(a),
-    rx = (p[3] * width) / 2,
-    ry = (p[4] * width) / 2;
-  return Array.from({ length: 16 }, (_, i) => {
-    const t = (i * Math.PI) / 8,
-      x = rx * Math.cos(t),
-      y = ry * Math.sin(t);
-    return { x: p[0] + x * c - y * s, y: p[1] + x * s + y * c };
-  });
-}
-function support(p, width, nx, ny) {
-  const a = p[7],
-    c = Math.cos(a),
-    s = Math.sin(a),
-    x = nx * c + ny * s,
-    y = -nx * s + ny * c,
-    rx = (p[3] * width) / 2,
-    ry = (p[4] * width) / 2;
-  const d = Math.hypot(rx * x, ry * y) || 1,
-    ex = (rx * rx * x) / d,
-    ey = (ry * ry * y) / d;
-  return { x: ex * c - ey * s, y: ex * s + ey * c };
-}
+
 /** One filled contour prevents translucent marker segments darkening at joins. */
 export function portableInkGeometry(
   ink,
@@ -327,117 +274,13 @@ export function portableInkGeometry(
   if (!widths) caches.set(ink, (widths = new Map()));
   const key = strokeWidth + ":" + pressure;
   if (widths.has(key)) return widths.get(key);
-  const width = 1,
-    polygons = [],
-    samples = portableInkSamples(ink, strokeWidth, pressure);
-  for (let i = 0; i < samples.length; i++) {
-    const p = samples[i];
-    polygons.push(ellipse(p, width));
-    if (!i) continue;
-    const q = samples[i - 1],
-      dx = p[0] - q[0],
-      dy = p[1] - q[1],
-      l = Math.hypot(dx, dy);
-    if (!l) continue;
-    const a = support(q, width, -dy / l, dx / l),
-      b = support(p, width, -dy / l, dx / l);
-    polygons.push([
-      { x: q[0] + a.x, y: q[1] + a.y },
-      { x: q[0] - a.x, y: q[1] - a.y },
-      { x: p[0] - b.x, y: p[1] - b.y },
-      { x: p[0] + b.x, y: p[1] + b.y },
-    ]);
-  }
-  const world = polygons.map((poly) => poly.map((p) => map(ink.transform, p)));
-  const result = {
-    polygons: world,
-    path: world
-      .map(
-        (poly) =>
-          "M " + poly.map((p) => n(p.x) + " " + n(p.y)).join(" L ") + " Z",
-      )
-      .join(" "),
-    mask: ink.mask
-      ?.map((c) => c[0] + " " + c.slice(1).map(n).join(" "))
-      .join(" "),
-  };
+  const { polygons, path, mask, prepared } = geometryKernel().geometry(ink, strokeWidth, pressure);
+  const result = { polygons, path, mask };
+  preparedGeometry.set(result, prepared);
   // Do not accumulate every width visited by a slider.
   widths.clear();
   widths.set(key, result);
   return result;
-}
-function contains(poly, p) {
-  let inside = false;
-  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
-    const a = poly[i],
-      b = poly[j];
-    if (
-      a.y > p.y !== b.y > p.y &&
-      p.x < ((b.x - a.x) * (p.y - a.y)) / (b.y - a.y) + a.x
-    )
-      inside = !inside;
-  }
-  return inside;
-}
-function maskContours(ink) {
-  const contours = [];
-  let points = [],
-    last = { x: 0, y: 0 };
-  for (const c of ink.mask ?? []) {
-    if (c[0] === "M") {
-      if (points.length) contours.push(points);
-      points = [];
-      last = { x: c[1], y: c[2] };
-      points.push(map(ink.transform, last));
-    } else if (c[0] === "L") {
-      last = { x: c[1], y: c[2] };
-      points.push(map(ink.transform, last));
-    } else if (c[0] === "Q" || c[0] === "C") {
-      const a = last,
-        cubic = c[0] === "C",
-        end = { x: c[c.length - 2], y: c[c.length - 1] };
-      for (let i = 1; i <= 32; i++) {
-        const t = i / 32,
-          u = 1 - t;
-        const p = cubic
-          ? {
-              x:
-                u * u * u * a.x +
-                3 * u * u * t * c[1] +
-                3 * u * t * t * c[3] +
-                t * t * t * end.x,
-              y:
-                u * u * u * a.y +
-                3 * u * u * t * c[2] +
-                3 * u * t * t * c[4] +
-                t * t * t * end.y,
-            }
-          : {
-              x: u * u * a.x + 2 * u * t * c[1] + t * t * end.x,
-              y: u * u * a.y + 2 * u * t * c[2] + t * t * end.y,
-            };
-        points.push(map(ink.transform, p));
-      }
-      last = end;
-    } else if (c[0] === "Z" && points.length) {
-      contours.push(points);
-      points = [];
-    }
-  }
-  if (points.length) contours.push(points);
-  return contours;
-}
-function maskContains(contours, p) {
-  let winding = 0;
-  for (const poly of contours)
-    for (let i = 0; i < poly.length; i++) {
-      const a = poly[i],
-        b = poly[(i + 1) % poly.length],
-        cross = (b.x - a.x) * (p.y - a.y) - (p.x - a.x) * (b.y - a.y);
-      if (a.y <= p.y && b.y > p.y && cross > 0) winding++;
-      else if (a.y > p.y && b.y <= p.y && cross < 0) winding--;
-    }
-  return winding !== 0;
 }
 export function portableInkHit(
   ink,
@@ -445,40 +288,12 @@ export function portableInkHit(
   strokeWidth = ink.width,
   pressure = ink.brush !== "monoline",
 ) {
-  if (ink.mask !== undefined && !maskContains(maskContours(ink), point))
-    return {
-      inside: false,
-      distance: Infinity,
-      solid: true,
-      area: ink.extent[0] * ink.extent[1],
-    };
-  let distance = Infinity,
-    inside = false;
-  for (const poly of portableInkGeometry(ink, strokeWidth, pressure).polygons) {
-    inside ||= contains(poly, point);
-    for (let i = 0; i < poly.length; i++) {
-      const a = poly[i],
-        b = poly[(i + 1) % poly.length],
-        dx = b.x - a.x,
-        dy = b.y - a.y;
-      const t = Math.max(
-        0,
-        Math.min(
-          1,
-          ((point.x - a.x) * dx + (point.y - a.y) * dy) /
-            (dx * dx + dy * dy || 1),
-        ),
-      );
-      distance = Math.min(
-        distance,
-        Math.hypot(point.x - a.x - t * dx, point.y - a.y - t * dy),
-      );
-    }
-  }
+  const geometry = portableInkGeometry(ink, strokeWidth, pressure);
+  const kernel = geometryKernel();
+  kernel.reset();
+  const mask = ink.mask === undefined ? null : kernel.flattenMask(ink.mask, ink.transform);
   return {
-    inside,
-    distance: inside ? 0 : distance,
-    solid: true,
+    ...kernel.hit({ ...preparedGeometry.get(geometry), mask }, point),
     area: ink.extent[0] * ink.extent[1],
   };
 }

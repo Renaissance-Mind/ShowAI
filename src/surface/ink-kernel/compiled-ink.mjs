@@ -53,6 +53,12 @@ export class CompiledInkKernel {
     const values = new Float64Array(this.api.memory.buffer, output, ink.samples.length * 9);
     return ink.samples.map((_, i) => Array.from(values.subarray(i * 9, i * 9 + 9)));
   }
+  bounds(ink, width = ink.width, pressure = ink.brush !== 'monoline') {
+    this.reset(); const samples = this.samples(ink.samples), style = this.style(ink, width, pressure), output = this.allocate(32);
+    this.check(this.api.sa_ink_bounds(samples, ink.samples.length, style, output));
+    const values = new Float64Array(this.api.memory.buffer, output, 4);
+    return { x: values[0], y: values[1], width: values[2], height: values[3] };
+  }
   prepare(ink, width = ink.width, pressure = ink.brush !== 'monoline', start = 0, length = ink.samples.length - start) {
     this.reset(); const samples = this.samples(ink.samples), style = this.style(ink, width, pressure), countsOffset = this.allocate(12);
     this.check(this.api.sa_ink_geometry_counts(samples, ink.samples.length, start, length, countsOffset));
