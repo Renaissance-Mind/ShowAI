@@ -123,6 +123,37 @@ function metadataMatches(record, state) {
   }
   return [...record.records.keys()].every(id => own(state.strokes, id));
 }
+
+/** A page save may enrich an editor draft with persisted causal identities.
+ * Unchanged fields must retain every candidate and tombstone; pending editable
+ * field changes may legitimately supersede their older annotation. */
+export function inkWireDraftCommitMetadataMatches(draft, committed) {
+  if(draft?.id!==committed?.id)return false;
+  const beforeBoards=boards(draft),afterBoards=boards(committed);
+  for(const [id,record]of afterBoards){
+    const state=bootstrap(record);
+    if(!metadataMatches(record,state))return false;
+    const before=beforeBoards.get(id);
+    if(!before?.board.attrs.inkState)continue;
+    const original=bootstrap(before);
+    if(Object.entries(original.clock).some(([actor,sequence])=>(state.clock[actor]??0)<sequence))return false;
+    for(const [strokeID,stroke]of Object.entries(original.strokes)){
+      const current=before.records.get(strokeID),saved=state.strokes[strokeID];
+      if(!saved)return false;
+      const deleting=!current && !isDeleted(stroke);
+      for(const [field,heads]of Object.entries(stroke.fields)){
+        if(field!=="alive" && (!current || deleting))continue;
+        const intended=hash(fieldValue(current,field));
+        // A stale head on a locally edited field is expected until the real
+        // writer stamps it. It must not make unrelated conflicts disposable.
+        if(!heads.some(([,digest])=>digest===intended))continue;
+        const retained=new Set((saved.fields[field]??[]).map(([,digest])=>digest));
+        if(heads.some(([,digest])=>!retained.has(digest)))return false;
+      }
+    }
+  }
+  return [...beforeBoards.keys()].every(id=>afterBoards.has(id));
+}
 function reconcile(record, baseline, identity, conflicts) {
   const before = bootstrap(baseline), supplied = record?.board.attrs.inkState;
   const suppliedValid = supplied ? validateInkWireState(supplied) : null;

@@ -16,10 +16,12 @@ import { documentHash, canonicalJson } from "./diff";
 import type { ShowDocument } from "./model";
 import type { ChangeActor } from "./history-model";
 import { visitNodes } from "../surface/document.mjs";
+import {inkWireDraftCommitMetadataMatches} from "../surface/ink-wire.mjs";
 
 function committedDraftHash(document: ShowDocument): string {
   const normalized = structuredClone(document);
   visitNodes(normalized.content, (node) => {
+    if(node.type==="surface" && node.attrs?.kind==="board")delete node.attrs.inkState;
     const data = node.attrs?.data;
     // Catalog resolution adds a lookup scope; locking an exact revision removes it.
     // The immutable fingerprint, version and all content props still participate.
@@ -570,6 +572,7 @@ export class EditorDrafts {
         const committed = JSON.parse(bytes.toString("utf8"))
           .document as ShowDocument;
         if (
+          !inkWireDraftCommitMetadataMatches(content as ShowDocument,committed) ||
           committedDraftHash(committed) !==
           committedDraftHash(content as ShowDocument)
         )

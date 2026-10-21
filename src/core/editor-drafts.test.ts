@@ -8,6 +8,11 @@ import { EditorDrafts } from "./editor-drafts";
 import { ContentLibrary as GitLibrary } from "./content-library";
 import { FileStore } from "./store";
 import type { EditorDraftInput } from "./editor-drafts";
+import {blankDocument} from "./catalog";
+import {createResource} from "../surface/containers.mjs";
+import {addNode} from "../surface/editing";
+import {createPortableInk} from "../surface/portable-ink.mjs";
+import type {ShowDocument} from "./model";
 describe("persistent local editor drafts", () => {
   let root: string,
     library: GitLibrary,
@@ -34,6 +39,26 @@ describe("persistent local editor drafts", () => {
   });
   afterEach(async () => {
     await rm(root, { recursive: true, force: true });
+  });
+
+  it("completes an actual saved ink draft after server causal enrichment, including an unstamped style edit",async()=>{
+    let document=createResource(blankDocument(),"board") as ShowDocument;
+    document={...document,id:input.resourceId};
+    document=addNode(document,{type:"drawing",attrs:{id:"portable-stroke",tool:"pen",name:"Ink",color:"#112233",strokeWidth:2,extent:[40,30],
+      points:[{x:1,y:2},{x:20,y:12}],ink:createPortableInk([{x:1,y:2,pressure:0.5},{x:20,y:12,pressure:0.8}],2,[40,30])}},
+      {x:10,y:20,width:40,height:30},document.content.attrs!.id) as ShowDocument;
+    const store=new FileStore(root),current=await store.readPage(input.projectId!,input.resourceId);
+    const draft=await drafts.save({...input,content:document});
+    const saved=await store.savePage(input.projectId!,input.resourceId,document,current.hash,current.revision);
+    expect(saved.document.content.attrs!.inkState).toBeDefined();
+    expect(document.content.attrs!.inkState).toBeUndefined();
+    expect(await drafts.completePage(draft.id,draft.generation,saved.revision!)).toBe(true);
+    const edited=structuredClone(saved.document);
+    edited.content.content!.find(n=>n.attrs?.id==="portable-stroke")!.attrs!.strokeWidth=6;
+    const pending=await drafts.save({...input,sequence:2,baseRevision:saved.revision,content:edited});
+    const committed=await store.savePage(input.projectId!,input.resourceId,edited,saved.hash,saved.revision);
+    expect(await drafts.completePage(pending.id,pending.generation,committed.revision!)).toBe(true);
+    expect(await drafts.list()).toEqual([]);
   });
 
   it("keeps large local page drafts compact and reads the prior per-node representation", async () => {

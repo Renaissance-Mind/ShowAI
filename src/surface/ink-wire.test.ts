@@ -6,7 +6,7 @@ import { createResource, createSurface } from "./containers.mjs";
 import { addNode } from "./editing";
 import { createPortableInk } from "./portable-ink.mjs";
 import { canonicalInkJSON } from "./ink-operations.mjs";
-import { inkWireResolutionPlan, inkWireResolutionCandidates, inkWireConflicts, resolveInkWireFields, stampInkDocument, validateInkWireState } from "./ink-wire.mjs";
+import { inkWireDraftCommitMetadataMatches, inkWireResolutionPlan, inkWireResolutionCandidates, inkWireConflicts, resolveInkWireFields, stampInkDocument, validateInkWireState } from "./ink-wire.mjs";
 import type { ShowDocument } from "../types";
 
 const frame = { x: 10, y: 20, width: 40, height: 30 };
@@ -22,6 +22,20 @@ function ink(page: ShowDocument, id = "stroke") {
 }
 function edit(base: ShowDocument, actor: string, change: (page: ShowDocument) => void, sequence = 1) { const next = structuredClone(base); change(next); return stampInkDocument(next, base, { actor, sequence }); }
 const state = (page: ShowDocument) => page.content.attrs!.inkState;
+
+it("commit metadata enrichment cannot discard an unchanged conflict candidate or tombstone",()=>{
+  const base=source(),left=edit(base,"left",page=>{ink(page).attrs!.color="#ff0000"}),right=edit(base,"right",page=>{ink(page).attrs!.color="#0000ff"});
+  const draft=mergePageContent(base,left,right).document;
+  const candidates=inkWireResolutionCandidates(draft),choice=candidates.find(c=>c.field==="color")!;
+  const visible=ink(draft).attrs!.color,candidate=choice.candidates.find(c=>c.value===visible)!;
+  const resolved=resolveInkWireFields(draft,[{boardId:choice.boardId,strokeId:choice.strokeId,field:choice.field,hash:candidate.hash}],{actor:"resolver",sequence:1});
+  expect(ink(resolved).attrs!.color).toBe(visible);
+  expect(inkWireDraftCommitMetadataMatches(draft,resolved)).toBe(false);
+  expect(inkWireDraftCommitMetadataMatches(resolved,resolved)).toBe(true);
+  const deleted=edit(base,"deleter",page=>{page.content.content=[];page.layout={}}),lost=structuredClone(deleted);
+  delete lost.content.attrs!.inkState;
+  expect(inkWireDraftCommitMetadataMatches(deleted,lost)).toBe(false);
+});
 
 it("stores causal references without duplicating unconflicted sample arrays and survives actual normalization", () => {
   const page = source(), normalized = normalizeDocument(page);
