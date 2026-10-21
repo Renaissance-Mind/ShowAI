@@ -142,7 +142,16 @@ function onlySharedTimestampChanged(before:ShowDocument,after:ShowDocument):bool
  const keys=Object.keys(before);
  return keys.length===Object.keys(after).length&&keys.every(key=>Object.hasOwn(after,key)&&(key==="updatedAt"||(before as unknown as Record<string,unknown>)[key]===(after as unknown as Record<string,unknown>)[key]));
 }
-interface Snapshot {ref:SourceSnapshotRef;document:ShowDocument;candidates:SourceSnapshotDelta["inkCandidates"];conflicts:PageMergeConflict[]}
+/** A private factory record, never a public request/asserted normalized flag.
+ * The input ref must still resolve to its actual complete immutable body. */
+export interface NativePublicationOrigin {
+ format:"showai-native-publication-origin-v1";publicationId:string;scope:SourceScope;
+ boardId:string;token:string;sourceVersion:number;
+}
+type NativePublicationPacket={document:ShowDocument;baseDocument:ShowDocument;pageId?:string;[key:string]:unknown};
+interface PublicationEntry {packet:NativePublicationPacket;canonical?:ShowDocument}
+interface PublicationOriginRecord {identity:NativePublicationOrigin;packet:NativePublicationPacket}
+interface Snapshot {ref:SourceSnapshotRef;document:ShowDocument;candidates:SourceSnapshotDelta["inkCandidates"];conflicts:PageMergeConflict[];nativeOrigin?:PublicationOriginRecord}
 /** Same synchronous service runs in Native JSC, a browser worker or Node.
  * No transport/client is allowed to construct a registered reference itself. */
 export class SourceRuntimeOwner {
@@ -152,7 +161,7 @@ export class SourceRuntimeOwner {
  private validatedBodies=new WeakSet<ShowDocument>();
  private leases=new Map<string,Set<string>>();
  private transactions=new Map<string,{base:SourceSnapshotRef;edits:NativeSourceEdit[];next:SourceSnapshotRef;leaseId?:string}>();
- private publications=new Map<string,unknown>();
+ private publications=new Map<string,PublicationEntry>();
  private references=new Map<object,number>();
  private residentBytes=0;
  private account(value:object,direction:1|-1){
@@ -164,7 +173,9 @@ export class SourceRuntimeOwner {
   this.residentBytes+=direction*metric.bytes;
   for(const child of metric.children)this.account(child,direction);
  }
- private forget(id:string){const entry=this.snapshots.get(id);if(entry){this.snapshots.delete(id);this.account(entry.document,-1)}}
+ private forget(id:string){const entry=this.snapshots.get(id);if(entry){this.snapshots.delete(id);this.account(entry.document,-1);if(entry.nativeOrigin)this.account(entry.nativeOrigin,-1)}}
+ private forgetPublication(key:string){const entry=this.publications.get(key);if(entry){this.publications.delete(key);this.account(entry.packet,-1);if(entry.canonical)this.account(entry.canonical,-1)}}
+ private prunePublications(){while(this.publications.size>8||this.publications.size&&this.residentBytes>this.limits.bytes)this.forgetPublication(this.publications.keys().next().value!)}
  constructor(options:{ownerId?:string;epoch?:string;maximumUnleased?:number;maximumPinned?:number;maximumResidentBytes?:number}={}){
   this.ownerId=options.ownerId??crypto.randomUUID();this.epoch=options.epoch??crypto.randomUUID();this.limits={unleased:options.maximumUnleased??64,pinned:options.maximumPinned??256,bytes:options.maximumResidentBytes??96*1024*1024};
  }
@@ -192,7 +203,7 @@ export class SourceRuntimeOwner {
    if(transaction.leaseId&&this.leases.has(transaction.leaseId))continue;
    this.transactions.delete(key);this.account(transaction.edits,-1);
   }
-  while(this.publications.size>8){const key=this.publications.keys().next().value!,value=this.publications.get(key);this.publications.delete(key);if(value&&typeof value==="object")this.account(value,-1)}
+  this.prunePublications();
  }
  private retain(leaseId:string,refs:SourceSnapshotRef[]){
   if(!leaseId)fail("Source lease requires an identity");
@@ -224,17 +235,59 @@ export class SourceRuntimeOwner {
   }else timestampProof=timestampOnly;
   const ref=freezeOwnedSource({format:"showai-source-snapshot-v1" as const,ownerId:this.ownerId,epoch:this.epoch,snapshotId:`snapshot-${++this.nextId}`,scope:{...targetScope},kind});
   const candidates=measured(observer,"register.candidates",()=>timestampProof&&base?base.candidates:kind==="normalized"?inkWireResolutionCandidates(body):[]);
-  this.snapshots.set(ref.snapshotId,{ref,document:body,candidates,conflicts});measured(observer,"register.account",()=>this.account(body,1));
+  const nativeOrigin=base?.nativeOrigin&&this.validatedBodies.has(body)&&isDocumentTimestamp(body.updatedAt)&&nativeDocumentBodiesEqual(base.document,body)?base.nativeOrigin:undefined;
+  this.snapshots.set(ref.snapshotId,{ref,document:body,candidates,conflicts,...(nativeOrigin?{nativeOrigin}:{})});measured(observer,"register.account",()=>{this.account(body,1);if(nativeOrigin)this.account(nativeOrigin,1)});
   try{measured(observer,"register.retain",()=>{if(leaseId)this.retain(leaseId,[ref]);else this.prune(new Set([ref.snapshotId]));});}
   catch(error){this.forget(ref.snapshotId);throw error}
   const edits=base?measured(observer,"register.diff",()=>preparedEdits??diffOwnedSource(base.document,body)):undefined;
   return {format:"showai-owned-source-v1",base:base?.ref??null,next:ref,...(base?{edits:edits!}:{full:body}),conflicts,inkCandidates:candidates};
  }
- private rememberPublication(current:Snapshot,publicationId:string,packet:{document:ShowDocument;baseDocument:ShowDocument;pageId?:string;[key:string]:unknown},parsedPacket?:()=>typeof packet){
+ private rememberPublication(current:Snapshot,publicationId:string,packet:NativePublicationPacket,parsedPacket?:()=>typeof packet):PublicationEntry{
   if(!publicationId||packet.document?.id!==current.ref.scope.pageId||packet.baseDocument?.id!==current.ref.scope.pageId||packet.pageId&&packet.pageId!==current.ref.scope.pageId)fail("Native publication has no matching actual source scope");
   const key=scopeKey(current.ref.scope)+"\u0000"+publicationId,known=this.publications.get(key);
-  if(known&&diffNativeSource(known,packet).length)fail("Native publication identity names a different complete packet");
-  if(!known){const previous=[...this.publications.values()].at(-1),copy=parsedPacket?parsedPacket():cloneSourceValue(packet),value=freezeOwnedSource(previous?shareNativeSource(previous,copy):copy);this.publications.set(key,value);this.account(value,1)}
+  if(known&&diffNativeSource(known.packet,packet).length)fail("Native publication identity names a different complete packet");
+  if(known)return known;
+  // A live pinned origin outlives the eight-entry replay cache. It still binds
+  // its immutable complete P even if another actual call reuses that identity.
+  for(const snapshot of this.snapshots.values())if(snapshot.nativeOrigin?.identity.publicationId===publicationId&&scopeKey(snapshot.ref.scope)===scopeKey(current.ref.scope)){
+   if(diffNativeSource(snapshot.nativeOrigin.packet,packet).length)fail("Native publication identity names a different complete packet");
+  }
+  const previous=[...this.publications.values()].at(-1)?.packet,copy=parsedPacket?parsedPacket():cloneSourceValue(packet),value=freezeOwnedSource(previous?shareNativeSource(previous,copy):copy);
+  const entry={packet:value};this.publications.set(key,entry);this.account(value,1);this.prunePublications();return entry;
+ }
+ private prepareNativeOrigin(current:Snapshot,publicationId:string,entry:PublicationEntry,merged:ShowDocument,sourceVersion:number,observer?:SourceRuntimeObserver):{record:PublicationOriginRecord;canonical?:ShowDocument}{
+  const packet=entry.packet;
+  if(!Number.isSafeInteger(sourceVersion)||sourceVersion<0||typeof packet.boardId!=="string"||!packet.boardId||typeof packet.token!=="string"||!packet.token)fail("Actual Native publication requires its captured version/Board/token");
+  const board=(node:ShowDocument["content"]):boolean=>node.type==="surface"&&node.attrs?.id===packet.boardId&&node.attrs?.kind==="board"||!!node.content?.some(board);
+  if(!board(packet.document.content))fail("Actual Native publication Board is absent from its captured source");
+  const identity:NativePublicationOrigin={format:"showai-native-publication-origin-v1",publicationId,scope:{...current.ref.scope},boardId:packet.boardId as string,token:packet.token as string,sourceVersion};
+  for(const snapshot of this.snapshots.values())if(snapshot.nativeOrigin?.identity.publicationId===publicationId&&scopeKey(snapshot.ref.scope)===scopeKey(current.ref.scope)){
+   if(diffNativeSource(snapshot.nativeOrigin.identity,identity).length)fail("Native publication identity names a different captured source version");
+  }
+  // The ordinary path will normalize exactly P, including its timestamp.
+  // A real merged/canonical difference requires running
+  // the SAME full factory on captured P, including capacity and causal fields.
+  const equivalent=measured(observer,"origin.compare",()=>!diffNativeSource(packet.document,merged).length);
+  let canonical:ShowDocument|undefined;
+  if(!equivalent||!isDocumentTimestamp(packet.document.updatedAt)){
+   canonical=entry.canonical??measured(observer,"origin.normalize",()=>freezeOwnedSource(normalizeSourceDocument(packet.document)));
+   if(!entry.canonical){entry.canonical=canonical;if(this.publications.get(scopeKey(current.ref.scope)+"\u0000"+publicationId)===entry)this.account(canonical,1)}
+  }
+  return{record:freezeOwnedSource({identity,packet}),canonical};
+ }
+ private bindNativeOrigin(prepared:{record:PublicationOriginRecord;canonical?:ShowDocument},result:SourceSnapshotDelta,observer?:SourceRuntimeObserver){
+  const actual=this.get(result.next),record=prepared.record;
+  if(actual.nativeOrigin){this.account(actual.nativeOrigin,-1);delete actual.nativeOrigin}
+  if(prepared.canonical&&!measured(observer,"origin.bodyCompare",()=>nativeDocumentBodiesEqual(prepared.canonical!,actual.document)))return;
+  actual.nativeOrigin=record;this.account(record,1);this.prune(new Set([result.next.snapshotId]));
+ }
+ /** Trusted host adapter only. An actual ref attached to another document is
+  * rejected; no caller boolean, kind or claimed publication can mint proof.
+  * This proves canonical captured-P semantics, never a persisted disk anchor;
+  * the host must separately check its real save baseline/CAS. */
+ nativePublicationDocumentMatching(request:{ref:SourceSnapshotRef;document:ShowDocument}):NativePublicationOrigin|null{
+  const actual=this.get(request.ref);
+  return actual.nativeOrigin&&this.validatedBodies.has(actual.document)&&!diffNativeSource(actual.document,request.document).length?actual.nativeOrigin.identity:null;
  }
  private finishPublication(current:Snapshot,publicationId:string,packet:{document:ShowDocument;baseDocument:ShowDocument;[key:string]:unknown},merged:{document:ShowDocument;conflicts:PageMergeConflict[]},leaseId?:string,observer?:SourceRuntimeObserver,parsedDocument?:()=>ShowDocument):SourceSnapshotDelta{
   if(!canCommitPageMerge(merged))throw new SourceRuntimeError("SOURCE_MERGE_CONFLICT","Native publication requires explicit conflict resolution");
@@ -258,17 +311,23 @@ export class SourceRuntimeOwner {
  }
  /** Only an actual backend author/adoption+merge route can call this adapter.
   * A public request never accepts a client-asserted merged result. */
- registerActualMergedPublication(request:{current:SourceSnapshotRef;publicationId:string;packet:{document:ShowDocument;baseDocument:ShowDocument;[key:string]:unknown};result:{document:ShowDocument;conflicts:PageMergeConflict[]};leaseId?:string},observer?:SourceRuntimeObserver):SourceSnapshotDelta{
-  const current=this.get(request.current);measured(observer,"rememberPublication",()=>this.rememberPublication(current,request.publicationId,request.packet));
-  return this.finishPublication(current,request.publicationId,request.packet,request.result,request.leaseId,observer);
+ registerActualMergedPublication(request:{current:SourceSnapshotRef;publicationId:string;sourceVersion?:number;packet:NativePublicationPacket;result:{document:ShowDocument;conflicts:PageMergeConflict[]};leaseId?:string},observer?:SourceRuntimeObserver):SourceSnapshotDelta{
+  const current=this.get(request.current),entry=measured(observer,"rememberPublication",()=>this.rememberPublication(current,request.publicationId,request.packet));
+  const origin=request.sourceVersion===undefined?undefined:this.prepareNativeOrigin(current,request.publicationId,entry,request.result.document,request.sourceVersion,observer);
+  const result=this.finishPublication(current,request.publicationId,request.packet,request.result,request.leaseId,observer);
+  if(origin)this.bindNativeOrigin(origin,result,observer);
+  return result;
  }
  /** The only consuming entry creates its own independent object graph here.
   * General object callers cannot opt out of defensive capture or validation. */
  registerActualMergedJSON(raw:string,observer?:SourceRuntimeObserver):SourceSnapshotDelta{
   const request=measured(observer,"parse",()=>JSON.parse(raw)) as Parameters<SourceRuntimeOwner["registerActualMergedPublication"]>[0];
   const current=this.get(request.current);
-  measured(observer,"rememberPublication",()=>this.rememberPublication(current,request.publicationId,request.packet,()=>request.packet));
-  return this.finishPublication(current,request.publicationId,request.packet,request.result,request.leaseId,observer,()=>request.result.document);
+  const entry=measured(observer,"rememberPublication",()=>this.rememberPublication(current,request.publicationId,request.packet,()=>request.packet));
+  const origin=request.sourceVersion===undefined?undefined:this.prepareNativeOrigin(current,request.publicationId,entry,request.result.document,request.sourceVersion,observer);
+  const result=this.finishPublication(current,request.publicationId,request.packet,request.result,request.leaseId,observer,()=>request.result.document);
+  if(origin)this.bindNativeOrigin(origin,result,observer);
+  return result;
  }
  /** Trusted adapter only: a ref or kind flag alone never proves a different
   * Swift/JSON body. The exact comparator includes every root field, timestamp,
@@ -351,7 +410,7 @@ export class SourceRuntimeOwner {
    case "dispose":{
     const key=scopeKey(scope(request.scope));for(const [id,value]of this.snapshots)if(scopeKey(value.ref.scope)===key){this.forget(id);for(const [leaseId,lease]of this.leases){lease.delete(id);if(!lease.size)this.leases.delete(leaseId)}}
     for(const key of this.transactions.keys())if(key.startsWith(scopeKey(request.scope)+"\u0000")){const value=this.transactions.get(key)!;this.transactions.delete(key);this.account(value.edits,-1);}
-    for(const key of this.publications.keys())if(key.startsWith(scopeKey(request.scope)+"\u0000")){const packet=this.publications.get(key);this.publications.delete(key);if(packet&&typeof packet==="object")this.account(packet,-1)}
+    for(const key of this.publications.keys())if(key.startsWith(scopeKey(request.scope)+"\u0000"))this.forgetPublication(key);
     return{retained:0};
    }
    default:return fail("Unknown source runtime request");
@@ -383,4 +442,9 @@ export function normalizeActualProjection(raw:string):string{
 /** Private validation-entry adapter; deliberately absent from execute(). */
 export function normalizedSourceDocumentMatching(request:{ref:SourceSnapshotRef;document:ShowDocument}):ShowDocument|null{
  service??=new SourceRuntimeOwner();return service.normalizedDocumentMatching(request);
+}
+
+/** Private actual-factory provenance lookup, deliberately absent from execute. */
+export function nativePublicationDocumentMatching(request:{ref:SourceSnapshotRef;document:ShowDocument}):NativePublicationOrigin|null{
+ service??=new SourceRuntimeOwner();return service.nativePublicationDocumentMatching(request);
 }
