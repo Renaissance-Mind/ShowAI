@@ -9,18 +9,36 @@ import {
 } from "./document.mjs";
 import { translator } from "../i18n";
 import messages from "../i18n/messages/surface";
-import { ownSourceValue } from "./source-runtime";
+import { isOwnedSource, ownSourceValue } from "./source-runtime";
 
 /** Text/widget transactions already carry schema-assigned IDs. Structural
  * commands retain explicit reconciliation; typing only copies its edited path. */
 export interface NodeEditOptions {
+  /** false skips normalization only while block structure stays unchanged. */
   normalize?: boolean;
   /** Mutable attribute record only; existing nested values/children stay
    * read-only. Replace a nested value with its own draft to edit it. */
   attributesOnly?: boolean;
 }
-function finishEdit(source: ShowDocument, options: NodeEditOptions) {
-  return options.normalize === false
+/** Layout/view references follow block identities and hierarchy, not text,
+ * inline marks or widget data. Only proven owned branches can skip comparison.
+ * A structural edit still crosses the same COW reconciliation boundary used by
+ * the structural commands; ordinary typing does not normalize the page. */
+function sameStructure(before: JSONContent, after: JSONContent): boolean {
+  if (before === after && isOwnedSource(before)) return true;
+  if (before.type !== after.type || before.attrs?.id !== after.attrs?.id)
+    return false;
+  if (before.type === "surface" && before.attrs?.kind !== after.attrs?.kind)
+    return false;
+  if (before.content === after.content && isOwnedSource(before.content))
+    return true;
+  const previous = (before.content ?? []).filter((node) => node.type !== "text");
+  const next = (after.content ?? []).filter((node) => node.type !== "text");
+  return previous.length === next.length &&
+    previous.every((node, index) => sameStructure(node, next[index]));
+}
+function finishEdit(before: ShowDocument, source: ShowDocument, options: NodeEditOptions) {
+  return options.normalize === false && sameStructure(before.content, source.content)
     ? source
     : reconcileSurface(source, { clone: false });
 }
@@ -74,7 +92,7 @@ export function editNode(
   };
   const content = walk(source.content);
   if (!changed) return source;
-  return finishEdit({ ...source, content }, options);
+  return finishEdit(source, { ...source, content }, options);
 }
 
 export function replaceChildren(
@@ -111,7 +129,7 @@ export function replaceChildren(
     return { ...node, content: next };
   };
   const content = walk(source.content);
-  return changed ? finishEdit({ ...source, content }, options) : source;
+  return changed ? finishEdit(source, { ...source, content }, options) : source;
 }
 
 export function addNode(
