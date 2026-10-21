@@ -1,0 +1,9 @@
+{
+  "type": "object",
+  "properties": {
+    "numbering": { "type": "boolean" },
+    "indent": { "type": "integer", "minimum": 8, "maximum": 32 }
+  },
+  "required": ["numbering", "indent"],
+  "additionalProperties": false
+}

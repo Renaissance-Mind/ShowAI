@@ -73,3 +73,10 @@ export default function Explorer({ data, onContext, context }) {
 机制组件保持稳定对象与状态身份，变化、继承和固定条件使用可解释的编码；比较组件保持共同维度、缺项和来源。空态、筛选无结果、输入更新后的失效选择、恢复操作和静态展开属于同一阅读任务。避免仅添加通用缩放或折叠后就声称支持机制理解或条件比较。
 
 嵌入组件中的阅读面板要在实际宿主里检查可见性和焦点恢复。自动增高的 iframe 与宿主视口高度不同；固定定位或弹窗可能落在当前屏幕外。详情较长时优先使用组件内的视图切换，并在返回时恢复选择与焦点。只检查顶层页面中的组件，不能证明嵌入后同样可用。
+
+
+## Page 原生目录组件
+
+目录组件声明 manifest.role="page-outline"、pageOutlineProtocol=1、category="outline"，通过 Page 的 attrs.outline.renderer 关联精确版本。React 入口接收 props 和 outline（protocol、pageId、items 树、activeItemId、expandedItemIds、container 的 placement/width/height、theme、locale），以及 navigate(itemId)、setBranchExpanded(itemId,expanded)、collapse()。组件负责呈现、分支和可访问性，Page 宿主负责位置、整体收起和目标校验。只读页面仍提供导航动作。作者 props 遵循包自己的 schema；阅读状态使用上述协议，普通 onChange 不参与。
+
+创建或修改后，在 Page 中实际关联并验证导航、当前章节、窗口宽度变化和收起展开；完整契约见 docs/page-surface.md，两个独立示例位于 examples/page-outline-index 和 examples/page-outline-path。

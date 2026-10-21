@@ -14,6 +14,53 @@ An embedded Board has a fixed-height viewport. A Page inside a Board normally ha
 
 The content breadcrumb tracks expansion. Moving, wrapping and deleting containers uses the same resource, save system and undo history at every level.
 
+## Native Page outline
+
+Enable an optional outline from **Page actions → Outline settings**. A Page without an enabled outline has no navigation rail or reserved space. The built-in reading index follows native headings, excludes nested container contents and supports depth, title overrides and hidden headings. Manual outlines organize groups and links to Page content using the entry editor's ordering and indent controls. Adjusting the outline does not move content.
+
+Standard and wide Pages use their measured outer gutter when it can fit the outline; otherwise the outline floats. Full-width Pages use a floating outline. Readers can collapse, expand or pin it; narrow Pages use a drawer that closes after navigation. Reader choices are retained separately for each Page view and never change the stored document. Independent HTML keeps navigation, the selected renderer and author width preferences; printing projects a simple semantic outline.
+
+Store author configuration in the Page surface's `attrs.outline`:
+
+```json
+{
+  "version": 1,
+  "enabled": true,
+  "source": { "mode": "headings", "maxLevel": 3 },
+  "initialState": "auto",
+  "placement": "auto",
+  "width": 220
+}
+```
+
+`initialState` accepts `auto`, `expanded` or `collapsed`; `placement` accepts `auto`, `floating` or `docked`; width is 180–480px. Set `enabled:false` to retain configuration while hiding the outline, or remove the attribute to remove configuration. Headings can have `source.overrides: {"HEADING_ID": {"title":"Alias", "hidden":false}}`. Manual sources use `{mode:"manual",entries:[{id,title?,nodeId?,children?}]}`. Groups require a title; unavailable targets remain editable and are omitted from reader navigation. Only targets within the owning Page can navigate.
+
+### Custom outline components
+
+A directory renderer is a versioned component with `role:"page-outline"`, `pageOutlineProtocol:1` and category `outline` in its manifest. It uses the same source, schema, immutable revisions, compiler and sandbox as content packages and appears in the **Page outlines** catalog category. Attach it through outline settings or set `attrs.outline.renderer` to `{componentId,version,integrity,props}`. The exact reference travels with template copies and offline exports. The built-in index is used when renderer is omitted; an unavailable renderer displays a recovery message and the basic native index.
+
+The React entry receives:
+
+```ts
+{
+  props, // author parameters, validated by the package schema
+  outline: {
+    protocol: 1, pageId,
+    items: [{ id, title, level, navigable, children }],
+    activeItemId, expandedItemIds,
+    container: { placement, width, height },
+    theme, locale
+  },
+  navigate(itemId),
+  setBranchExpanded(itemId, expanded),
+  collapse()
+}
+```
+
+Layouts can implement their own lists, trees or visual navigation. Render within the provided container, retain keyboard and touch access, and expose current and expanded states. The host validates item IDs and performs navigation; read-only Pages retain these actions. Author parameters are separate from the generated tree and personal branch state. The host always supplies the overall collapse control. Component actions work in sandboxed readers and conversation inline readers.
+
+`examples/page-outline-index` and `examples/page-outline-path` are complete independently importable implementations. For example, import with `showai catalog import --project PROJECT --input examples/page-outline-index --json`, then select it in Page outline settings. Agents can use `block.attrs.set` on the Page ID to configure the native feature with the current base hash/revision.
+
 ## Interaction
 
 | Action                            | Behavior                                                    |

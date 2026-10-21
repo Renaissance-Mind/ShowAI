@@ -1,0 +1,15 @@
+{
+  "id": "page-outline-index",
+  "name": "阅读索引",
+  "version": "1.0.0",
+  "description": "使用层级编号的 Page 目录组件，支持分支展开与当前章节定位。",
+  "category": "outline",
+  "role": "page-outline",
+  "pageOutlineProtocol": 1,
+  "entry": "index.tsx",
+  "scenarios": ["报告目录", "长页面导航"],
+  "defaultData": { "numbering": true, "indent": 16 },
+  "examples": [
+    { "name": "默认目录", "data": { "numbering": true, "indent": 16 } }
+  ]
+}

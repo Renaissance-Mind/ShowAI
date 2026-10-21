@@ -1,0 +1,13 @@
+{
+  "id": "page-outline-path",
+  "name": "章节路径",
+  "version": "1.0.0",
+  "description": "以分组和连接线呈现章节的 Page 目录组件。",
+  "category": "outline",
+  "role": "page-outline",
+  "pageOutlineProtocol": 1,
+  "entry": "index.tsx",
+  "scenarios": ["分组章节", "树状导航"],
+  "defaultData": { "gap": 12 },
+  "examples": [{ "name": "章节路径", "data": { "gap": 12 } }]
+}

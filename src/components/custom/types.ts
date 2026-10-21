@@ -110,9 +110,18 @@ export interface ComponentExample {
 
 /** User packages contain manifest.json, props.schema.json and a local React entry. */
 export type ComponentCategory =
-  "text" | "image" | "table" | "data" | "flow" | "surface" | "other";
+  | "text"
+  | "image"
+  | "table"
+  | "data"
+  | "flow"
+  | "surface"
+  | "outline"
+  | "other";
 
 export interface ComponentManifest {
+  role?: "page-outline";
+  pageOutlineProtocol?: 1;
   /** Versioned use/development contract. Older packages remain explicitly undocumented. */
   documentation?: import("./documentation").ComponentDocumentation;
   id: string;
@@ -225,3 +234,9 @@ export interface CustomComponentProps<
   onChange?: (data: T) => void;
   readOnly: boolean;
 }
+
+export type {
+  PageOutlineComponentProps,
+  PageOutlineItem,
+  PageOutlineData,
+} from "../../surface/page-outline.mjs";

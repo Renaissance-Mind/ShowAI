@@ -6,6 +6,7 @@ import * as JsxRuntime from "react/jsx-runtime";
 import * as JsxDevRuntime from "react/jsx-dev-runtime";
 import { useEffect, useRef, useState } from "react";
 import type { CompiledComponent } from "./types";
+import type { PageOutlineComponentProps } from "../../surface/page-outline.mjs";
 import { useTranslator } from "../../i18n/react";
 import messages from "../../i18n/messages/customComponents";
 import {
@@ -14,7 +15,10 @@ import {
 } from "./component-context.mjs";
 
 interface MountedComponent {
-  update(data: Record<string, unknown>): void;
+  update(
+    data: Record<string, unknown>,
+    outline?: PageOutlineComponentProps,
+  ): void;
   destroy(): void;
 }
 interface InlineModule {
@@ -25,6 +29,7 @@ interface InlineModule {
       onError: (message: string) => void;
       onContext?: (snapshot: ComponentContextSnapshot) => boolean;
       context?: ComponentContextSnapshot;
+      outline?: PageOutlineComponentProps;
     },
   ): MountedComponent;
 }
@@ -41,10 +46,14 @@ export function InlineComponent({
   component,
   data,
   host,
+  outline,
+  onError,
 }: {
   component: CompiledComponent;
   data: Record<string, unknown>;
   host: HTMLElement;
+  outline?: PageOutlineComponentProps;
+  onError?: (message: string) => void;
 }) {
   const container = useRef<HTMLDivElement>(null);
   const mounted = useRef<MountedComponent | null>(null);
@@ -52,6 +61,9 @@ export function InlineComponent({
   const [error, setError] = useState("");
   const t = useTranslator(messages);
   currentData.current = data;
+  const currentOutline = useRef(outline);
+  currentOutline.current = outline;
+  useEffect(() => onError?.(error), [error, onError]);
   useEffect(() => {
     if (
       !container.current ||
@@ -125,6 +137,7 @@ export function InlineComponent({
     globals[callbackKey] = (module: InlineModule) => {
       mounted.current = module.mount(root, {
         data: currentData.current,
+        outline: currentOutline.current,
         onError: setError,
         ...(conversation
           ? { onContext, context: handedOver.get(blockId!) }
@@ -151,7 +164,7 @@ export function InlineComponent({
       queueMicrotask(() => instance?.destroy());
     };
   }, [component.integrity, host]);
-  useEffect(() => mounted.current?.update(data), [data]);
+  useEffect(() => mounted.current?.update(data, outline), [data, outline]);
   return (
     <section aria-label={component.name} style={{ margin: "18px 0" }}>
       <div ref={container} />

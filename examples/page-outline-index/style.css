@@ -1,0 +1,55 @@
+.reading-index {
+  font:
+    12px/1.7 system-ui,
+    sans-serif;
+  color: var(--text);
+  padding: 4px 9px;
+}
+.reading-index ol {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.reading-index ol ol {
+  margin-left: var(--index-indent);
+}
+.index-row {
+  display: flex;
+  gap: 3px;
+  align-items: baseline;
+}
+.index-row button {
+  background: none;
+  border: 0;
+  color: var(--muted);
+  padding: 7px 3px;
+  font: inherit;
+  cursor: pointer;
+}
+.index-row .index-link {
+  flex: 1;
+  text-align: left;
+  overflow-wrap: anywhere;
+  border-radius: 5px;
+}
+.index-link span {
+  font-variant-numeric: tabular-nums;
+  margin-right: 7px;
+  font-size: 10px;
+}
+.index-row button:hover {
+  background: var(--hover);
+}
+.index-link[aria-current="location"] {
+  color: var(--accent);
+  background: var(--hover);
+  font-weight: 600;
+}
+.index-row button:focus-visible {
+  outline: 2px solid var(--accent);
+}
+@media (pointer: coarse) {
+  .index-row button {
+    min-height: 44px;
+  }
+}

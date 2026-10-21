@@ -130,6 +130,17 @@ export function collectCustomComponentRefs(
         ...(scope ? { scope } : {}),
       });
     }
+    const renderer =
+      node.type === "surface" && node.attrs?.kind === "page"
+        ? node.attrs?.outline?.renderer
+        : undefined;
+    if (renderer) {
+      const ref = readCustomBlockData(renderer);
+      refs.set(
+        `${componentKey(ref.componentId, ref.version)}:${ref.integrity}`,
+        ref,
+      );
+    }
     node.content?.forEach(visit);
   };
   visit(document.content);

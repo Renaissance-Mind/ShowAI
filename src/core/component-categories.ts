@@ -11,6 +11,7 @@ export const componentCategories = [
   { id: "data", label: "数据" },
   { id: "flow", label: "流程" },
   { id: "surface", label: "页面与白板" },
+  { id: "outline", label: "页面目录" },
   { id: "other", label: "其他" },
 ] as const satisfies readonly { id: ComponentCategory; label: string }[];
 
@@ -64,6 +65,7 @@ export type ComponentGroup = (typeof componentCategories)[number] & {
 };
 
 export function componentCategory(item: CatalogComponent): ComponentCategory {
+  if (!("kind" in item) && item.role === "page-outline") return "outline";
   if ("kind" in item)
     return item.kind.startsWith("g2-")
       ? "data"

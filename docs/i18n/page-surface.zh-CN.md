@@ -22,6 +22,53 @@ Page 的正文、文本模块与流式内容区域共用一个文档编辑器，
 
 工作区顶部的内容层级显示当前展开路径。「返回上层」恢复父级视图。通过外框手柄移动整个模块，通过文字或内部控件编辑内容。所有层级**共享一个资源文件、保存机制和编辑撤销记录**；跨容器移动、删除、绘画和包裹都可以撤销。
 
+## Page 原生目录
+
+通过「页面操作 → 目录设置」为当前 Page 启用目录。未启用时，页面没有目录入口和占位。默认阅读索引跟随原生标题，支持收录深度、显示名覆盖与隐藏条目，并以嵌套容器为作用域边界。手动目录可以创建分组、选择正文目标、调整顺序与缩进；修改目录顺序不会移动正文。
+
+标准和加宽页面会测量正文旁的实际留白，空间足够时使用页边目录，否则使用浮动目录。全宽页面使用浮动目录。读者可以收起、展开或固定目录；窄屏使用抽屉，定位章节后自动收起。个人阅读状态按页面视图独立保留，不修改页面内容。独立 HTML 包含导航、目录组件和页面宽度设置；打印使用简明的语义目录。
+
+配置保存在对应 Page surface 的 `attrs.outline`：
+
+```json
+{
+  "version": 1,
+  "enabled": true,
+  "source": { "mode": "headings", "maxLevel": 3 },
+  "initialState": "auto",
+  "placement": "auto",
+  "width": 220
+}
+```
+
+`initialState` 支持 `auto`、`expanded`、`collapsed`；`placement` 支持 `auto`、`floating`、`docked`；宽度范围为 180–480px。`enabled:false` 关闭目录并保留配置，删除属性则移除配置。标题覆盖使用 `source.overrides: {"标题ID": {"title":"显示名", "hidden":false}}`。手动来源使用 `{mode:"manual",entries:[{id,title?,nodeId?,children?}]}`；无跳转目标的分组需有名称。失效引用可在设置中修复，阅读导航会跳过失效目标。
+
+### 自定义目录组件
+
+目录组件在 manifest 中声明 `role:"page-outline"`、`pageOutlineProtocol:1` 和 `category:"outline"`，复用现有组件的源码、参数 schema、精确版本、编译及沙箱机制。组件库提供「页面目录」分类。通过目录设置选择组件，或把 `{componentId,version,integrity,props}` 写入 `attrs.outline.renderer`；模板复制和离线导出会携带确定版本。省略 renderer 使用内置阅读索引；组件不可用时，显示恢复提示和基础目录。
+
+React 入口接收以下数据与操作：
+
+```ts
+{
+  props, // 作者保存的参数，按组件自己的 schema 校验
+  outline: {
+    protocol: 1, pageId,
+    items: [{ id, title, level, navigable, children }],
+    activeItemId, expandedItemIds,
+    container: { placement, width, height },
+    theme, locale
+  },
+  navigate(itemId),
+  setBranchExpanded(itemId, expanded),
+  collapse()
+}
+```
+
+组件可以自行设计列表、树或图形导航，在给定空间中绘制，保持键盘、触屏、当前章节与分支展开状态可达。宿主校验条目身份并执行导航；只读页面也保留这些操作。作者参数、生成的目录树和个人分支状态分别管理。整体收起控件由宿主提供。动作协议同时支持独立沙箱阅读器和对话内联阅读器。
+
+`examples/page-outline-index` 与 `examples/page-outline-path` 是两份完整的可导入实现。例如执行 `showai catalog import --project PROJECT --input examples/page-outline-index --json`，再到 Page 目录设置中选用。Agent 可通过当前 hash / revision 下的 `block.attrs.set` 修改 Page 目录属性。
+
 ## 交互
 
 | 操作                              | 行为                                     |
