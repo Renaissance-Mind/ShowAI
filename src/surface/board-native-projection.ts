@@ -41,7 +41,7 @@ export function measureNativeBoard(surface:HTMLElement,world:HTMLElement,source?
     const svg=[...element.querySelectorAll<SVGSVGElement>("svg[data-native-ink],svg.board-drawing")]
       .find(candidate=>candidate.closest("[data-surface-id]")===element);
     const box=svg?.viewBox.baseVal;
-    const id=element.dataset.surfaceId!,node=nodes.get(id),extent=node?.attrs?.extent??node?.attrs?.nativeInk?.extent??node?.attrs?.data?.nativeInk?.extent;
+    const id=element.dataset.surfaceId!,node=nodes.get(id),extent=node?.attrs?.inkArchiveGroup?.extent??node?.attrs?.extent??node?.attrs?.nativeInk?.extent??node?.attrs?.data?.nativeInk?.extent;
     const size=Array.isArray(extent)&&extent.length===2?extent:box&&box.width>0&&box.height>0?[box.width,box.height]:[width,height];
     const frame=source?.layout?.[id];
     const authoritative=frame?.height&&element.parentElement===world;

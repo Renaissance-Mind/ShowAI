@@ -1,8 +1,15 @@
+import {
+  validateInkArchiveGroup,
+  inkArchiveGroup,
+} from "./ink-archive-group.mjs";
 import { objectCapabilities, bindingParent } from "./geometry.mjs";
 import { validateNativeInk } from "./native-ink.mjs";
 import { isPortableInk } from "./portable-ink.mjs";
 import { validateInkWireState } from "./ink-wire.mjs";
-import { validateInkFragments, validateInkInput } from "./ink-input-contract.mjs";
+import {
+  validateInkFragments,
+  validateInkInput,
+} from "./ink-input-contract.mjs";
 import { labelCapable, MAX_LABEL_LENGTH } from "./drawing-label.mjs";
 import { isResource, fillResource, surfaceKind } from "./containers.mjs";
 import { fillSurfaceLayout, visitNodes } from "./document.mjs";
@@ -171,11 +178,13 @@ function validateResource(document) {
     owners.set(id, owner);
     if (node.attrs?.canvas != null)
       throw new Error("Positions belong in layout.");
+    validateInkArchiveGroup(node);
     if (node.type === "surface") {
       if (!["page", "board"].includes(node.attrs.kind))
         throw new Error("Surface kind must be page or board.");
       if (node.attrs.inkState !== undefined) {
-        if (node.attrs.kind !== "board") throw new Error("Causal ink metadata requires a Board.");
+        if (node.attrs.kind !== "board")
+          throw new Error("Causal ink metadata requires a Board.");
         validateInkWireState(node.attrs.inkState);
       }
       if (
@@ -196,7 +205,11 @@ function validateResource(document) {
     }
     if (node.type === "drawing") {
       validateInkFragments(node.attrs.ink, node.attrs.inkFragments);
-      validateInkInput(node.attrs.inkInput, node.attrs.ink, node.attrs.inkFragments);
+      validateInkInput(
+        node.attrs.inkInput,
+        node.attrs.ink,
+        node.attrs.inkFragments,
+      );
       if (node.attrs.ink !== undefined) {
         validateNativeInk(node.attrs.ink);
         if (
@@ -332,6 +345,13 @@ function validateResource(document) {
       throw new Error(`Layout requires a direct container child: ${id}.`);
     object(frame, `layout.${id}`);
     if (
+      inkArchiveGroup(node) &&
+      (frame.mode !== "free" ||
+        !(frame.height > 0) ||
+        frame.contentSize !== undefined)
+    )
+      throw new Error("inkArchiveGroup requires a fixed free-layout frame.");
+    if (
       Object.keys(frame).some(
         (key) =>
           ![
@@ -382,10 +402,13 @@ function validateResource(document) {
     finite(
       frame.width,
       node.type === "drawing" ||
+        inkArchiveGroup(node) ||
         (node.attrs?.nativeInk ?? node.attrs?.data?.nativeInk)
         ? 1
         : 120,
-      node.attrs?.ink || (node.attrs?.nativeInk ?? node.attrs?.data?.nativeInk)
+      inkArchiveGroup(node) ||
+        node.attrs?.ink ||
+        (node.attrs?.nativeInk ?? node.attrs?.data?.nativeInk)
         ? 1000000
         : 10000,
       `layout.${id}.width`,
@@ -394,6 +417,7 @@ function validateResource(document) {
       finite(
         frame.height,
         node.type === "drawing" ||
+          inkArchiveGroup(node) ||
           (node.attrs?.nativeInk ?? node.attrs?.data?.nativeInk)
           ? 1
           : 40,

@@ -1,3 +1,4 @@
+import { inkArchiveGroup } from "./ink-archive-group.mjs";
 // ShowAI native geometry. Parent-local coordinates; no editor/DOM dependency.
 export const radians = (degrees = 0) => (degrees * Math.PI) / 180;
 export function rotatePoint(point, center, degrees = 0) {
@@ -99,7 +100,8 @@ export const surfaceToScreen = (point, origin, camera) => ({
   y: origin.y + camera.y + point.y * camera.scale,
 });
 export function objectCapabilities(node) {
-  const drawing = node.type === "drawing";
+  const drawing = node.type === "drawing",
+    archiveGroup = !!inkArchiveGroup(node);
   const nativeInk =
     !!node.attrs?.nativeInk ||
     (node.type === "widget" &&
@@ -107,15 +109,16 @@ export function objectCapabilities(node) {
       !!node.attrs?.data?.nativeInk);
   return {
     rotate:
-      (drawing || nativeInk || node.type === "image") &&
+      (drawing || nativeInk || archiveGroup || node.type === "image") &&
       !(drawing && node.attrs?.tool === "arrow"),
     resizeHeight:
+      archiveGroup ||
       drawing ||
       nativeInk ||
       node.type === "image" ||
       (node.type === "surface" && node.attrs?.kind === "board"),
     bindTarget: !(drawing && node.attrs?.tool === "arrow"),
-    minWidth: drawing || nativeInk ? 1 : 120,
+    minWidth: drawing || nativeInk || archiveGroup ? 1 : 120,
     minHeight: node.type === "surface" ? 180 : 1,
   };
 }

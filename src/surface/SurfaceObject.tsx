@@ -74,6 +74,7 @@ export function SurfaceObject({
   frame,
   positioned,
   region = false,
+  archiveGroup = false,
   container = false,
   drawing = false,
   drawingNode,
@@ -88,6 +89,7 @@ export function SurfaceObject({
   frame?: NodeLayout;
   positioned: boolean;
   region?: boolean;
+  archiveGroup?: boolean;
   container?: boolean;
   drawing?: boolean;
   drawingNode?: JSONContent;
@@ -257,7 +259,7 @@ export function SurfaceObject({
       ? {
           ...drag.start,
           width: Math.max(
-            drawing ? 1 : 120,
+            drawing || archiveGroup ? 1 : 120,
             Math.min(10000, drag.start.width + dx),
           ),
           ...(fixedHeight
@@ -393,7 +395,7 @@ export function SurfaceObject({
     <section
       ref={element}
       style={style}
-      className={`surface-object${region ? " is-region" : ""}${container ? " is-container" : ""}${drawing ? " is-drawing" : ""}${moving ? " is-moving" : ""}${locked ? " is-locked" : ""}${(board?.ids.has(id) ?? actions.selected === id) ? " is-selected" : ""}`}
+      className={`surface-object${region ? " is-region" : ""}${archiveGroup ? " is-ink-archive-group" : ""}${container ? " is-container" : ""}${drawing ? " is-drawing" : ""}${moving ? " is-moving" : ""}${locked ? " is-locked" : ""}${(board?.ids.has(id) ?? actions.selected === id) ? " is-selected" : ""}`}
       data-surface-id={id}
       data-board-drawing={(drawing && positioned && !!board) || undefined}
       data-board-shape={isBoardShape(drawingNode) || undefined}
@@ -482,7 +484,7 @@ export function SurfaceObject({
             ↻
           </button>
         )}
-      {((!actions.readOnly && chrome && !board) ||
+      {((!actions.readOnly && chrome && !board && !archiveGroup) ||
         (actions.readOnly && container && mount)) && (
         <div className="surface-object-header" data-surface-ui>
           {actions.readOnly ? (
@@ -620,7 +622,7 @@ export function SurfaceObject({
                 drawingNode ? geometryFrame(drawingNode, measured) : measured,
                 { x: step[0] * amount, y: step[1] * amount },
                 direction,
-                { width: drawing ? 1 : 120, height: container ? 180 : 1 },
+                { width: drawing || archiveGroup ? 1 : 120, height: container ? 180 : 1 },
               );
               if (!fixedHeight) {
                 next.height = frame.height;

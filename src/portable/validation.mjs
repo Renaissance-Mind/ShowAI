@@ -1,3 +1,4 @@
+import { validateInkArchiveGroup } from "../surface/ink-archive-group.mjs";
 import { isResource } from "../surface/containers.mjs";
 import { validatePageIcon } from "../lib/page-icon.mjs";
 import { artifactVersion, assignSurfaceIds } from "../surface/document.mjs";
@@ -532,9 +533,12 @@ function validateNode(value, path, counter, depth = 0, parentType = null) {
           ])
         : node.type === "surface"
           ? new Set([...nodeAttributes, "widthMode", "inkState"])
-          : nodeAttributes,
+          : node.type === "region"
+            ? new Set([...nodeAttributes, "inkArchiveGroup"])
+            : nodeAttributes,
       node.type === "surface",
     );
+  validateInkArchiveGroup(node);
   if (
     node.attrs?.frameless !== undefined &&
     (node.type !== "surface" ||
