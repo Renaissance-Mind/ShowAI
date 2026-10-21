@@ -395,6 +395,8 @@ export function createPageSession(options: PageSessionOptions): PageSession {
         }
         const editingSource = current.current;
         const source = structuredClone(editingSource);
+        if (typeof window !== "undefined")
+          window.showai?.inlineInk?.copyDocumentMetadata?.(editingSource, source);
         const sequence = revision.current;
         const operation = operations.current.get(sequence) ?? {
           id: crypto.randomUUID(),

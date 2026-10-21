@@ -83,6 +83,8 @@ export interface InlineInkBridge {
   /** One native camera/scene for all Board tools, including selection. */
   nativeScene?: boolean;
   setDocument?(pageId: string, document: ShowDocument,author?:NativeAuthorMutation): void;
+  /** Carry ephemeral native provenance across the real immutable save snapshot. */
+  copyDocumentMetadata?(source: ShowDocument, snapshot: ShowDocument): void;
   bind(
     pageId: string,
     projectId: string,
