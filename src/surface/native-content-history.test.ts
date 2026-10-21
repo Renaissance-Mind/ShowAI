@@ -40,3 +40,15 @@ it("history receipts cannot cross page identities",()=>{
   const base=fixture(),other={...base,id:"unrelated"};
   expect(()=>nativeContentHistoryStages(base,base,base,[{groupId:"label",beforeDocument:other,document:other}])).toThrow(/baseline/);
 });
+
+import {mergePageContent} from "../core/page-merge-model";
+it("reuses only the exact captured triplet while preserving foreign fields through actual history rollback",()=>{
+ const base=fixture(),current=changed(base,"remote","Web foreign"),owned=changed(base,"local","mine"),incoming=structuredClone(owned);incoming.layout!.remote.y=140;
+ const result=mergePageContent(base,current,incoming),actions=[{groupId:"label",beforeDocument:base,document:owned}];
+ const actual=nativeContentHistoryStages(current,base,incoming,actions,{baseline:base,current,incoming,result});
+ expect(actual).toEqual(nativeContentHistoryStages(current,base,incoming,actions));
+ expect(label(actual.sourceOnly,"local")).toBe("local");expect(label(actual.sourceOnly,"remote")).toBe("Web foreign");expect(actual.sourceOnly.layout!.remote.y).toBe(140);
+ const oldCurrent=structuredClone(base),stale=mergePageContent(base,oldCurrent,incoming);
+ const guarded=nativeContentHistoryStages(current,base,incoming,actions,{baseline:base,current:oldCurrent,incoming,result:stale});
+ expect(label(guarded.sourceOnly,"remote")).toBe("Web foreign");
+});

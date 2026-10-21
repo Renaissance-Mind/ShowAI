@@ -1,5 +1,6 @@
 import type { JSONContent } from "@tiptap/core";
 import type { ShowDocument } from "../types";
+import type { PageMergeResult } from "../core/page-merge-model";
 import type { NodeLayout } from "./types";
 import { findSurfaceNode } from "./document.mjs";
 import { isInkNode } from "./portable-ink.mjs";
@@ -85,6 +86,8 @@ export interface InlineInkBridge {
   setDocument?(pageId: string, document: ShowDocument,author?:NativeAuthorMutation): void;
   /** Carry ephemeral native provenance across the real immutable save snapshot. */
   copyDocumentMetadata?(source: ShowDocument, snapshot: ShowDocument): void;
+  hasProjectionReceipt?(incoming: ShowDocument): boolean;
+  mergeProjection?(incoming: ShowDocument, current: ShowDocument): Promise<PageMergeResult | null>;
   bind(
     pageId: string,
     projectId: string,

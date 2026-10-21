@@ -1,5 +1,5 @@
 import type {ShowDocument} from "../types";
-import {mergePageContent,canCommitPageMerge} from "../core/page-merge-model";
+import {mergePageContent,canCommitPageMerge,type PageMergeResult} from "../core/page-merge-model";
 import {InkEditConflict} from "./inline-ink";
 
 export interface NativeContentHistoryAction {
@@ -12,8 +12,11 @@ export interface NativeContentHistoryAction {
  * Roll back only the accepted local edits against that latest source, retaining
  * foreign changes in every undo snapshot. No intermediate source is published. */
 export function nativeContentHistoryStages(current:ShowDocument,baseline:ShowDocument,
-  incoming:ShowDocument,actions:NativeContentHistoryAction[]) {
-  const merged=mergePageContent(baseline,current,incoming);
+  incoming:ShowDocument,actions:NativeContentHistoryAction[],prepared?:{
+    baseline:ShowDocument;current:ShowDocument;incoming:ShowDocument;result:PageMergeResult;
+  }) {
+  const merged=prepared?.baseline===baseline&&prepared.current===current&&prepared.incoming===incoming
+    ?prepared.result:mergePageContent(baseline,current,incoming);
   if(!canCommitPageMerge(merged))throw new InkEditConflict("Concurrent Board edits require resolution");
   let before=merged.document;
   const stages:{groupId:string;before:ShowDocument;document:ShowDocument}[]=[];

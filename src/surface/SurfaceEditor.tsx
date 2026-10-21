@@ -30,7 +30,7 @@ import { PageModuleContext, pageEditorNodes } from "./PageEditorNodes";
 import { mergePageContent, canCommitPageMerge } from "../core/page-merge-model";
 import InkConflictInspector from "./InkConflictInspector";
 import {nativeContentHistoryStages} from "./native-content-history";
-import {nativeDocumentContentKey} from "./native-document-content";
+import {nativeDocumentContentKey,nativeDocumentBodiesEqual,mergeNativeDocumentReceipt,mergeNativeProjectionReceipt} from "./native-document-content";
 
 import {appendNativeInkHistoryGroups,nativeInkHistoryGroups,type NativeInkHistoryAction,type NativeInkHistoryGroup} from "./native-ink-history";
 
@@ -238,17 +238,34 @@ function SurfaceEditor({
   useEffect(() => {
     const bridge = window.showai?.inlineInk;
     if (!bridge || !inlineInkProjectId || readOnly) return;
+    let bound=true;
     const unbind = bridge.bind(
       document.id,
       inlineInkProjectId,
       async (value, applied) => {
-        if (latestReadOnly.current || current.current.id !== value.pageId)
+        if (!bound || latestReadOnly.current || current.current.id !== value.pageId)
           return false;
         try {
           if(value.document){
             if(!value.baseDocument||value.document.id!==value.pageId||value.baseDocument.id!==value.pageId)
               throw new InkEditConflict("Native Board projection has no matching writer baseline");
-            const merged=mergePageContent(value.baseDocument,current.current,value.document);
+            let merged:ReturnType<typeof mergeNativeDocumentReceipt>;
+            while(true){
+              if(!bound||latestReadOnly.current||current.current.id!==value.pageId)return false;
+              if(nativeDocumentBodiesEqual(value.baseDocument,current.current)){
+                merged={document:value.document,conflicts:[]};break;
+              }
+              if(bridge.hasProjectionReceipt?.(value.document)&&bridge.mergeProjection){
+                const projected=await mergeNativeProjectionReceipt(value.baseDocument,value.document,()=>current.current,
+                  (incoming,latest)=>bridge.mergeProjection!(incoming,latest),
+                  ()=>bound&&!latestReadOnly.current&&current.current.id===value.pageId,
+                  (observed,snapshot)=>bridge.copyDocumentMetadata?.(observed,snapshot));
+                if(!projected)return false;
+                if(current.current!==projected.current||!nativeDocumentBodiesEqual(projected.basis,current.current))continue;
+                merged=projected.result;break;
+              }
+              merged=mergeNativeDocumentReceipt(value.baseDocument,current.current,value.document);break;
+            }
             if(!canCommitPageMerge(merged))throw new InkEditConflict("Concurrent Board edits require resolution");
             authorBaseline.current=value.document;
             for(const adopted of value.adoptActions??[]){
@@ -266,7 +283,7 @@ function SurfaceEditor({
             const nativeAction=value.operationIds?.length?appendNativeInkHistoryGroups({strokeIds:value.historyStrokeIds},[{boardId:value.boardId,operationIds:value.operationIds}]):undefined;
             if(value.nativeContentActions?.length){
               if(nativeAction)throw new InkEditConflict("Native ink must reach its history boundary before object editing");
-              const plan=nativeContentHistoryStages(current.current,value.baseDocument,value.document,value.nativeContentActions);
+              const plan=nativeContentHistoryStages(current.current,value.baseDocument,value.document,value.nativeContentActions,{baseline:value.baseDocument,current:current.current,incoming:value.document,result:merged});
               if(plan.stages.length){
                 if(contentKey(current.current)!==contentKey(plan.sourceOnly))
                   rebaseHistorySnapshots(history.current,inkActions.current,current.current,plan.sourceOnly as ContainerDocument);
@@ -277,6 +294,7 @@ function SurfaceEditor({
               nativeAction,!!nativeAction||value.nativeContentAction===true,false);
           }else commit(applyInkUpdate(current.current, value));
         } catch (error) {
+          if(!bound||latestReadOnly.current||current.current.id!==value.pageId)return false;
           if (!(error instanceof InkEditConflict)) throw error;
           const record = await window.showai!.invoke<{
             document: ShowDocument;
@@ -310,7 +328,7 @@ function SurfaceEditor({
       },
     );
     bridge.setDocument?.(document.id, current.current);
-    return unbind;
+    return ()=>{bound=false;unbind()};
   }, [document.id, inlineInkProjectId, readOnly, commit]);
   const travel = useCallback(
     async (redo = false) => {
