@@ -478,8 +478,11 @@ export default function PageSurface({
     if (
       !onTransform ||
       locked ||
+      // An embedded Board is an interactive, contenteditable=false NodeView
+      // inside the outer Page editor. That boundary stops text ownership.
+      target.closest("[contenteditable]")?.getAttribute("contenteditable") === "true" ||
       target.closest(
-        'input,textarea,select,iframe,video,audio,[contenteditable=true],[data-editor-keyboard-scope],[data-surface-gesture="own"],.react-flow',
+        'input,textarea,select,iframe,video,audio,[data-editor-keyboard-scope],[data-surface-gesture="own"],.react-flow',
       )
     )
       return false;

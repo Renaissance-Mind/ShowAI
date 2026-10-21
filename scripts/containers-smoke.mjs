@@ -539,8 +539,15 @@ try {
     /展开后继续编辑/,
   );
   await page.getByRole("button", { name: "返回上层", exact: true }).click();
-  await object(nestedPageId)
-    .getByRole("button", { name: "设置 Page", exact: true })
+  // Board object headers are replaced by selection controls. Open the actual
+  // object's context menu; its enclosing Page editor must not claim this
+  // contenteditable=false embedded Board as its own editable text.
+  await scene(nestedPageId)
+    .locator(":scope > .container-page-column > .container-page-heading")
+    .click({ button: "right" });
+  await page
+    .getByRole("menu", { name: "对象操作", exact: true })
+    .getByRole("menuitem", { name: "对象设置", exact: true })
     .click();
   await page.getByLabel("所属容器", { exact: true }).selectOption(rootId);
   saved = await poll(
