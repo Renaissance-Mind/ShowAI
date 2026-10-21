@@ -1,11 +1,11 @@
 ---
 name: show-document
-description: 通过 ShowAI MCP 制作、续改、展示和导出可交互报告、讲解页面、白板图示与小型网站。完整作品请求（包括只给题目）使用；按理解意图、收集材料、呈现逻辑、设计稿四个阶段读取模板指南，再按设计稿制作。
+description: 通过 ShowAI MCP 制作、续改、展示和导出要保存的可交互报告、讲解页面、白板图示与小型网站。用户要整理成文档、需要保存、续改或分享，或要求一份完整讲解（包括只给题目）时使用；按理解意图、收集材料、呈现逻辑、设计稿四个阶段读取模板指南，再按设计稿制作。只在对话里看一眼的可视化用 show-visual。
 ---
 
 # 创作与展示
 
-先读取下面的系统基线；它适用于每个呈现任务。用户要求成品时持续完成四个阶段、制作、评审与交付。只要求对话讨论时直接回答；只要求规划或设计稿时交付相应记录并按用途保存，不自动实现。
+先读取下面的系统基线；它适用于每个呈现任务。用户要求成品时持续完成四个阶段、制作、评审与交付。只要求对话讨论时直接回答；只想在对话里看到一两个图表、示意或模拟时用 [show-visual](../show-visual/SKILL.md)；只要求规划或设计稿时交付相应记录并按用途保存，不自动实现。
 
 <!-- showai-system-baseline:start -->
 
@@ -40,6 +40,10 @@ description: 通过 ShowAI MCP 制作、续改、展示和导出可交互报告�
 
 调用 template_context({projectId,templates?,knownSystemHash?}) 取得系统基线、所选模板 README、固定引用和带 signature 的组件索引；保留 context.templates，组件较多时按 componentPage 分页。进入某阶段时才读 template_guide({projectId,stage,templates:context.templates})，一次一个阶段。四阶段为 intent、material、logic、design。knownSystemHash 对应系统基线正文，knownHash 对应已持有的 context 或某阶段指南响应；都只用于本轮确实读到的同一内容。
 
+## 从对话展示升级
+
+用户在 [show-visual](../show-visual/SKILL.md) 展示之后要求保存时，先按 use-showai 确定项目。只保存那几个组件：把展示时的 {kind,data} 原样作为 `page_create` 的 blocks 或 `component.insert` 写入，自定义组件沿用 show_component 返回的 version 与 integrity，可补一段说明文字，不必重走四个阶段。要把多次展示整理成一份有结构的文档：从理解意图开始走四个阶段，已有展示的数据作为材料，组件按设计稿取舍。
+
 ## 四个阶段
 
 每个阶段形成一份记录，下一阶段只依据这份记录工作。简单任务可以把记录合并写在对话里，但不跳过判断。
@@ -65,4 +69,4 @@ description: 通过 ShowAI MCP 制作、续改、展示和导出可交互报告�
 
 制作完成后按 [review-presentation](../review-presentation/SKILL.md) 对照读者简报与设计稿检查：首屏、每幕的真实内容与交互、窄屏与静态、数字与来源；为最终规划填入 blockIds 并用 `check_plan.py <最终规划> --page <页面源 JSON>` 校验引用。源检查用 response:"source"；派生值与计算读默认 structured 视图与 response:"full"；图像检查可用 response:"receipt"。实际宿主交互遵循官方操控规则；没有执行的路径明确标注。
 
-正式保存后用 page_present，按 [对话展示](references/conversation-display.md) 展示本轮真实 delivery。容量按需读 [容量](references/capacity.md)，局部展示与临时状态读 [页面阅读](references/page-reading.md)。只有用户明确独立交付时用 render_document；连接、保存或显示失败不自动改变内容归属。
+正式保存后用 page_present，按 [宿主显示](../use-showai/references/host-display.md) 展示本轮真实 delivery。容量按需读 [容量](references/capacity.md)，局部展示与临时状态读 [页面阅读](references/page-reading.md)。只有用户要一份完整独立文件且不入库时用 render_document；连接、保存或显示失败不自动改变内容归属，也不改用 show_component 了事。

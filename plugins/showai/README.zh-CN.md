@@ -2,7 +2,7 @@
 
 **语言：** [English](README.md) | 简体中文 · [文档目录](../../docs/i18n/index.zh-CN.md)
 
-ShowAI 让 Agent 用界面回答——可以交互、可以归档、在使用中不断进化。它由两部分组成：本插件为 Agent 提供 ShowAI 的工具（stdio MCP launcher）和八个 Skill；ShowAI App 保存页面，并提供插件连接的运行时。兼容性以运行时报告的实际能力为准。
+ShowAI 让 Agent 用界面回答——可以交互、可以归档、在使用中不断进化。它由两部分组成：本插件为 Agent 提供 ShowAI 的工具（stdio MCP launcher）和九个 Skill；ShowAI App 保存页面，并提供插件连接的运行时。兼容性以运行时报告的实际能力为准。
 
 ## 安装
 
@@ -43,16 +43,17 @@ npm run plugin:dsh
 
 ## Skill 与任务分工
 
-| Skill                                                      | 用途                             |
-| ---------------------------------------------------------- | -------------------------------- |
-| [use-showai](skills/use-showai/SKILL.md)                   | 连接身份、发现、查找、阅读与分工 |
-| [plan-presentation](skills/plan-presentation/SKILL.md)     | 读者意图、材料与呈现逻辑         |
-| [design-presentation](skills/design-presentation/SKILL.md) | 逐幕设计稿、布局与交互           |
-| [show-document](skills/show-document/SKILL.md)             | 制作、续改、保存、展示与导出     |
-| [review-presentation](skills/review-presentation/SKILL.md) | 检查理解、修订与复核             |
-| [create-component](skills/create-component/SKILL.md)       | 可复用 React 表达能力            |
-| [create-template](skills/create-template/SKILL.md)         | 可复用模板文件夹与方法           |
-| [collaborate-canvas](skills/collaborate-canvas/SKILL.md)   | 画布协作、多端配对与保存状态     |
+| Skill                                                      | 用途                                |
+| ---------------------------------------------------------- | ----------------------------------- |
+| [use-showai](skills/use-showai/SKILL.md)                   | 连接身份、发现、查找、阅读与分工    |
+| [show-visual](skills/show-visual/SKILL.md)                 | 在对话中直接展示 1–5 个组件，不保存 |
+| [plan-presentation](skills/plan-presentation/SKILL.md)     | 读者意图、材料与呈现逻辑            |
+| [design-presentation](skills/design-presentation/SKILL.md) | 逐幕设计稿、布局与交互              |
+| [show-document](skills/show-document/SKILL.md)             | 制作、续改、保存、展示与导出        |
+| [review-presentation](skills/review-presentation/SKILL.md) | 检查理解、修订与复核                |
+| [create-component](skills/create-component/SKILL.md)       | 可复用 React 表达能力               |
+| [create-template](skills/create-template/SKILL.md)         | 可复用模板文件夹与方法              |
+| [collaborate-canvas](skills/collaborate-canvas/SKILL.md)   | 画布协作、多端配对与保存状态        |
 
 Agent 文档操作使用 MCP，先读取 guide() 并发现能力与项目。正式成果先保存到项目再 page_present；明确独立交付使用 render_document。详细方法由同源 Skill 维护，本页用于安装与接入。
 
@@ -60,12 +61,13 @@ Agent 文档操作使用 MCP，先读取 guide() 并发现能力与项目。正�
 
 launcher 只解析目标库登记的运行时，要求 showai-mcp-v1 与所需工作流协议。失败明确报错，不自动切换库。启动前在宿主配置：
 
-| 配置                    | 用途                     |
-| ----------------------- | ------------------------ |
-| SHOWAI_HOME             | 内容库，默认 ~/.showai   |
-| SHOWAI_PROJECT_ID       | 可选项目绑定             |
-| SHOWAI_TEMPLATES        | 启动模板，需同时绑定项目 |
-| SHOWAI_PRESENTATION_DIR | 宿主可访问的展示目录     |
+| 配置                    | 用途                                                                                                      |
+| ----------------------- | --------------------------------------------------------------------------------------------------------- |
+| SHOWAI_HOME             | 内容库，默认 ~/.showai                                                                                    |
+| SHOWAI_PROJECT_ID       | 可选项目绑定                                                                                              |
+| SHOWAI_TEMPLATES        | 启动模板，需同时绑定项目                                                                                  |
+| SHOWAI_PRESENTATION_DIR | 宿主可访问的展示目录                                                                                      |
+| SHOWAI_HOST_DISPLAY     | show_component 进入该宿主对话的方式：mcp-app、codex-visualize、fragment-file、model-html、image 或 native |
 
 参见[运行时说明](skills/use-showai/references/runtime.md)。更新插件不自动升级应用或正在运行的 MCP。内置 Agent 由 AgentHost 提供项目绑定连接，任务私有插件移除外部 library launcher。
 
@@ -73,7 +75,7 @@ launcher 只解析目标库登记的运行时，要求 showai-mcp-v1 与所需�
 
 page_present 返回完整离线 HTML/source 与聊天预览。预览容纳时使用本地阅读器，超预算可用固定发布阅读器在线回退；delivery.compact/online 使用发布阅读器。SHOWAI_READER_CDN=off 保持阅读器离线。
 
-宿主可以显示 MCP Apps、使用返回的 Codex 本机可视化路径，或交付完整 HTML/source。显示能力取决于宿主。路径与 HTTP 预览是快照，项目中源页面持续可编辑。详见[对话展示](skills/show-document/references/conversation-display.md)。
+宿主可以显示 MCP Apps、使用返回的 Codex 本机可视化路径，或交付完整 HTML/source。显示能力取决于宿主。路径与 HTTP 预览是快照，项目中源页面持续可编辑。详见[对话展示](skills/use-showai/references/host-display.md)。
 
 ## 网页 ChatGPT 与远程包
 

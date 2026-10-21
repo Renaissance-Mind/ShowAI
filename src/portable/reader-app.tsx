@@ -181,14 +181,18 @@ function ArtifactReader({
   return (
     <div
       ref={appRef}
-      className={`portable-app${artifact.selection ? " portable-partial" : ""}`}
+      className={`portable-app${artifact.selection ? " portable-partial" : ""}${artifact.selection?.chrome === "none" ? " portable-component" : ""}`}
     >
       {draftPreview && (
         <div className="portable-draft-note" role="status">
           {t("draftNote")}
         </div>
       )}
-      <div className="portable-options" ref={menuRef}>
+      <div
+        className="portable-options"
+        ref={menuRef}
+        hidden={artifact.selection?.chrome === "none"}
+      >
         <button
           ref={menuButtonRef}
           className="portable-options-trigger"

@@ -2,11 +2,12 @@
 
 **语言：** [English](../skills.md) | 简体中文 · [文档目录](index.zh-CN.md)
 
-ShowAI 插件提供八个 Skill，覆盖连接阅读、理解规划、表达设计、页面制作、呈现评审、模板和组件。运行时提供存储、原生容器、目录、编译与渲染；Plugin 分发技能、指南与连接配置。CLI 用于启动、诊断与脚本，Agent 的文档操作统一使用 MCP。
+ShowAI 插件提供九个 Skill，覆盖连接阅读、理解规划、表达设计、页面制作、呈现评审、模板和组件。运行时提供存储、原生容器、目录、编译与渲染；Plugin 分发技能、指南与连接配置。CLI 用于启动、诊断与脚本，Agent 的文档操作统一使用 MCP。
 
 | Skill                                                                           | 何时使用                             | 产物                                       |
 | ------------------------------------------------------------------------------- | ------------------------------------ | ------------------------------------------ |
 | [use-showai](../../plugins/showai/skills/use-showai/SKILL.md)                   | 基础用法、连接、查找、阅读与能力发现 | 可靠答案、项目和页面身份、当前目录         |
+| [show-visual](../../plugins/showai/skills/show-visual/SKILL.md)                 | 在对话中直接展示可视化               | 展示 1–5 个组件，不保存                    |
 | [plan-presentation](../../plugins/showai/skills/plan-presentation/SKILL.md)     | 先规划怎么讲清楚、复杂内容组织       | 任务简报、证据范围、多级理解路径与通过条件 |
 | [design-presentation](../../plugins/showai/skills/design-presentation/SKILL.md) | 视觉、布局、图形与交互分镜           | 设计稿、主要状态、静态方式与资源选择       |
 | [show-document](../../plugins/showai/skills/show-document/SKILL.md)             | 制作、续改、展示、导出或应用模板     | 可继续编辑的 Page 与实际交付               |
@@ -43,6 +44,6 @@ ShowAI 插件提供八个 Skill，覆盖连接阅读、理解规划、表达设�
 
 源数据核对、静态截图、实际操作与读者试读分别提供不同证据。遵循宿主规定的界面操控方式。内容、来源、主线、可读性、交互和恢复都按任务检查；静态版本保留重要状态、条件和来源。没有实际检查的范围应明确说明。
 
-完整 Page 保存后，page_present 返回全页 HTML/source 及可选的局部聊天预览。聊天容量不足时选择可独立理解的节点，并保留全页交付。显示契约见[对话展示](../../plugins/showai/skills/show-document/references/conversation-display.md)。
+完整 Page 保存后，page_present 返回全页 HTML/source 及可选的局部聊天预览。聊天容量不足时选择可独立理解的节点，并保留全页交付。显示契约见[对话展示](../../plugins/showai/skills/use-showai/references/host-display.md)。
 
 插件安装、宿主能力刷新和会话获得新说明分别核验。安装插件不自动升级运行时；更新后检查实际 Skill 列表、MCP 能力和模板目录。

@@ -1,6 +1,6 @@
 {
   "name": "showai",
-  "version": "0.20.3",
+  "version": "0.21.0",
   "description": "Four-stage presentation workflow (intent, material, logic, design), template method folders with optional component libraries, and unified MCP presentation for local and web agents.",
   "author": {
     "name": "ShowAI"

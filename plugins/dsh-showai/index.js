@@ -39,7 +39,7 @@ import { join } from "node:path";
 /** Same-origin route the browser asks for; the Host answers it and redirects a load. */
 export const PREVIEW_ROUTE = "/showai-page-preview";
 /** Wire tools whose settled result carries a ShowAI presentation delivery. */
-const PRESENTATION_TOOL = /^mcp__[A-Za-z0-9_-]+__(?:page_present|render_document)$/;
+const PRESENTATION_TOOL = /^mcp__[A-Za-z0-9_-]+__(?:page_present|render_document|show_component)$/;
 /** Preview files kept in the cache; older ones are dropped after each write. */
 const MAX_PREVIEWS = 40;
 /** A preview above this size is not cached (the fallback surface opens the file instead). */

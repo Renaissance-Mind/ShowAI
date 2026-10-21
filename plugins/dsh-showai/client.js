@@ -25,7 +25,7 @@ window.__ModuleLoader__.load({
     /** Same-origin Host route; the Host answers the probe and redirects the load. */
     const ROUTE = "/showai-page-preview";
     /** Wire tools this view takes over. */
-    const TOOLS = ["mcp__showai__page_present", "mcp__showai__render_document"];
+    const TOOLS = ["mcp__showai__page_present", "mcp__showai__render_document", "mcp__showai__show_component"];
     /** Frame heights: the inline seat, and the expanded seat. */
     const COLLAPSED_HEIGHT = 420;
     const TAIL_HEIGHT = 460;
@@ -403,7 +403,7 @@ window.__ModuleLoader__.load({
      * Wire tools whose settled result carries a ShowAI presentation delivery.
      * Kept in sync with the Host half so a Turn record and the cache agree.
      */
-    const PRESENTATION_TOOL = /^mcp__[A-Za-z0-9_-]+__(?:page_present|render_document)$/;
+    const PRESENTATION_TOOL = /^mcp__[A-Za-z0-9_-]+__(?:page_present|render_document|show_component)$/;
 
     /**
      * Read the delivery record out of one settled Tool result message.

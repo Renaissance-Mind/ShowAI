@@ -2,7 +2,7 @@
 
 **语言：** [English](../codex.md) | 简体中文 · [文档目录](index.zh-CN.md)
 
-连接 ShowAI 后，Claude Code 与 Codex 可以用界面而不是一段文字来回答，把它保存为 ShowAI 项目中的页面，之后还能在你的修改上继续。插件为 Agent 提供 ShowAI 的工具和八个 Skill；ShowAI App 负责保存页面，并提供插件连接的运行时。**先安装 App，插件随 App 提供。**
+连接 ShowAI 后，Claude Code 与 Codex 可以用界面而不是一段文字来回答，把它保存为 ShowAI 项目中的页面，之后还能在你的修改上继续。插件为 Agent 提供 ShowAI 的工具和九个 Skill；ShowAI App 负责保存页面，并提供插件连接的运行时。**先安装 App，插件随 App 提供。**
 
 ## 从 App 安装插件
 

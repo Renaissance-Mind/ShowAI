@@ -135,7 +135,7 @@ claude plugin marketplace add ./
 claude plugin install showai@renaissance-mind
 ```
 
-先启动一次 App，或执行 `npm run runtime:register`，插件才能在内容库中找到运行时。八个 Skill 与接入细节见[插件说明](../../plugins/showai/README.zh-CN.md)，启动器与打包见[本地浏览器版](local-browser.zh-CN.md)，脚本用法见 [CLI 参考](agent-usage.zh-CN.md)。
+先启动一次 App，或执行 `npm run runtime:register`，插件才能在内容库中找到运行时。九个 Skill 与接入细节见[插件说明](../../plugins/showai/README.zh-CN.md)，启动器与打包见[本地浏览器版](local-browser.zh-CN.md)，脚本用法见 [CLI 参考](agent-usage.zh-CN.md)。
 
 ## 📚 文档
 

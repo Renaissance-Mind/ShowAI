@@ -3,7 +3,7 @@ name: create-component
 description: 通过 ShowAI MCP 创建或改造可复用 React 组件。先查目录和评估组合，维护可查询的参数契约，再补齐确实缺少的图形、表达或交互能力。
 ---
 
-沿用已核实MCP连接、项目和页面；缺少时读 [use-showai](../use-showai/SKILL.md)。正式资源保存到目标项目；用户明确独立交付时可把相同源码对象交给render_document，不自动创建个人项目。
+沿用已核实MCP连接、项目和页面；缺少时读 [use-showai](../use-showai/SKILL.md)。正式资源保存到目标项目；开发中想先在对话里看效果时，把源码对象作为 `show_component` 的 componentSources 预览；用户明确要独立文件时交给render_document。两者都不自动创建个人项目。
 
 用[设计稿](../design-presentation/references/design-draft.md)明确图形关系、状态与通过条件。组件负责稳定的数据表达和交互，实例保存本次事实；通用、专题和内容专用的复用边界分别判断。usage 的 purpose/structure/constraints 说明理解任务、视觉编码、空态、窄屏与静态方式，interactions 说明操作和保存边界；继续使用当前 documentation schema，不添加未经支持的参数。跨组件联动先核实实际接口，只有具体复用需求成立时才提炼共享能力。多个页面或组件要读写同一份数据时用项目的 [共享数据](../use-showai/references/shared-data.md)，组件不自建同步接口，只需按 [组件设计](references/component-authoring.md) 的要求处理 data 与条目 id。
 

@@ -1054,7 +1054,12 @@ function validateSelection(selection, document) {
     throw new Error(
       "Artifact selection must reference unique existing block ids.",
     );
-  return { blockIds: [...blocks] };
+  if (selection.chrome !== undefined && selection.chrome !== "none")
+    throw new Error('Artifact selection chrome must be "none".');
+  return {
+    blockIds: [...blocks],
+    ...(selection.chrome ? { chrome: selection.chrome } : {}),
+  };
 }
 
 function parseArtifactDocument(input, documentParser) {

@@ -112,7 +112,8 @@ const rules: Partial<Record<GuideTopic, string[]>> = {
   integration: [
     "Agent document operations use MCP. CLI remains a host setup, service launch, diagnostics and scripting interface, not an alternative authoring workflow.",
     "Confirm capabilities and connection identity. A library connection requires explicit projectId; bound connections reject another projectId; remote projects are restricted by OAuth and current membership.",
-    "Formal documents are saved in the selected project before page_present. Only explicitly standalone deliverables use render_document. Never change library or persistence mode because a connection or export failed.",
+    "Route by what the user wants to keep. A visualization to see now uses show_component: one to five components, no project, nothing saved. Documents to keep, edit or share are saved in the selected project before page_present; saving a shown component reuses the same {kind,data}. render_document is for a complete standalone document. Never change library or persistence mode because a connection or export failed.",
+    "show_component delivery follows the plugin's SHOWAI_HOST_DISPLAY (mcp-app, codex-visualize, model-html, image, native). Without a declaration it attaches the MCP Apps view; choose image, compact or fragment-file explicitly when the host's actual display is different.",
   ],
   workspace: [
     "For read-only lookup use projects_list or the bound project_context; do not create projects. For new formal content on a library connection, project_resolve takes an absolute trusted host sourceDirectory. It may create the directory mapping. Use project_create only when the user wants a separately named project.",

@@ -47,8 +47,9 @@ export interface ShowArtifact {
   version: 1 | 2 | 3;
   document: ShowDocument;
   presentation?: "spatial" | "reading";
-  /** This artifact contains a projection of the source page, not the whole page. */
-  selection?: { blockIds: string[] };
+  /** This artifact contains a projection of the source page, not the whole page.
+   * chrome "none" shows the blocks as conversation components without reader options. */
+  selection?: { blockIds: string[]; chrome?: "none" };
   components?: CompiledComponent[];
   /** Exact published packages required by an intentionally network-dependent export. */
   remoteComponents?: PublishedComponentLocator[];

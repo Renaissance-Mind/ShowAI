@@ -199,7 +199,7 @@ test("remote guide delivers the full shared Skill workflow anonymously and retai
   );
   expect(entry.protocol).toBe("showai-remote-skills-v1");
   expect(entry.markdown).toContain("根据任务继续");
-  expect(entry.skills).toHaveLength(8);
+  expect(entry.skills).toHaveLength(9);
   expect(entry.connection).toMatchObject({
     mcpUrl: http.url + "/mcp",
     tools: tools.tools.map((tool) => tool.name).sort(),

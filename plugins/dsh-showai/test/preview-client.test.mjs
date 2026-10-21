@@ -70,7 +70,7 @@ async function loadClient({ uiConversation } = {}) {
   if (uiConversation !== undefined) {
     assert.deepEqual(
       registrations.map((entry) => entry.spec.name).sort(),
-      ["conversation.chat.turnTail", "tool.call.toolview", "tool.call.toolview"],
+      ["conversation.chat.turnTail", "tool.call.toolview", "tool.call.toolview", "tool.call.toolview"],
     );
     return {
       card: registrations.find((entry) => entry.spec.name === "tool.call.toolview").component,
@@ -79,7 +79,7 @@ async function loadClient({ uiConversation } = {}) {
   }
   assert.deepEqual(
     registrations.map((entry) => entry.spec.key),
-    ["mcp__showai__page_present", "mcp__showai__render_document"],
+    ["mcp__showai__page_present", "mcp__showai__render_document", "mcp__showai__show_component"],
   );
   return registrations[0].component;
 }

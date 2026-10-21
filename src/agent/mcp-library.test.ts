@@ -236,8 +236,11 @@ test("catalog discovery returns all compact entries, with optional pagination be
           "reuse",
           "documentationStatus",
           "version",
+          // Only components that do not fit a conversation as-is are flagged.
+          ...(item.conversation ? ["conversation"] : []),
         ].sort(),
       );
+      expect([undefined, "limited", "unsuitable"]).toContain(item.conversation);
     }
     const first = await call(client, name, { ...args, limit: 50 });
     const second = await call(client, name, {

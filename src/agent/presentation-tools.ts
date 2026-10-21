@@ -12,9 +12,25 @@ import {
   describePublicResource,
   presentationSchema,
   renderPresentation,
+  renderComponents,
+  showComponentSchema,
+  compactPresentation,
+  SHOW_COMPONENT_LIMIT,
+  SHOW_DELIVERIES,
 } from "./presentation";
-import { mcpReaderHtml, readerResourceUri } from "./mcp-ui";
+import {
+  mcpReaderHtml,
+  mcpComponentHtml,
+  readerResourceUri,
+  componentResourceUri,
+} from "./mcp-ui";
 import { errorResult } from "./service";
+import { randomUUID } from "node:crypto";
+import { mkdir, mkdtemp, readdir, rm, stat, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { dirname, join } from "node:path";
+import { renderReading } from "./reading-renderer";
+import type { ReadingOptions } from "./page-reading";
 
 export type Presentation = Awaited<ReturnType<typeof renderPresentation>>;
 export interface PresentationDelivery {
@@ -31,6 +47,71 @@ export const readerToolMeta = {
   "openai/toolInvocation/invoking": "正在生成 ShowAI 页面",
   "openai/toolInvocation/invoked": "ShowAI 页面已就绪",
 };
+const componentToolMeta = {
+  ui: { resourceUri: componentResourceUri },
+  "openai/outputTemplate": componentResourceUri,
+  "openai/toolInvocation/invoking": "正在生成 ShowAI 组件",
+  "openai/toolInvocation/invoked": "ShowAI 组件已就绪",
+};
+
+/** What the installing plugin declares about its host; harness names prove nothing. */
+export const HOST_DISPLAYS = {
+  "mcp-app": "mcp-app",
+  "codex-visualize": "fragment-file",
+  "fragment-file": "fragment-file",
+  "model-html": "compact",
+  image: "image",
+  native: "mcp-app",
+} as const;
+export type HostDisplay = keyof typeof HOST_DISPLAYS;
+export function hostDisplay(value = process.env.SHOWAI_HOST_DISPLAY) {
+  if (!value) return undefined;
+  if (!(value in HOST_DISPLAYS))
+    throw new Error(
+      `SHOWAI_HOST_DISPLAY must be one of ${Object.keys(HOST_DISPLAYS).join(", ")}.`,
+    );
+  return value as HostDisplay;
+}
+/** A model copies compact text into its reply; larger fragments are not passed this way. */
+const COMPACT_BYTES = 32 * 1024;
+/** Fragment files are conversation previews, not deliverables; only recent ones are kept. */
+const KEPT_FRAGMENTS = 20;
+
+async function keepRecentFragments(directory: string) {
+  const entries = await readdir(directory, { withFileTypes: true }).catch(
+    (error: NodeJS.ErrnoException) => {
+      if (error.code === "ENOENT") return [];
+      throw error;
+    },
+  );
+  const previews = await Promise.all(
+    entries
+      .filter((entry) => entry.isDirectory())
+      .map(async (entry) => ({
+        path: join(directory, entry.name),
+        time: (await stat(join(directory, entry.name))).mtimeMs,
+      })),
+  );
+  previews.sort((a, b) => b.time - a.time);
+  for (const old of previews.slice(KEPT_FRAGMENTS))
+    await rm(old.path, { recursive: true, force: true });
+}
+
+async function captureComponents(html: string, theme: "light" | "dark") {
+  const directory = await mkdtemp(join(tmpdir(), "showai-show-image-"));
+  try {
+    const path = join(directory, "component.html");
+    await writeFile(path, html, "utf8");
+    return await renderReading(path, {
+      // A short viewport lets the full-page capture end where the components end.
+      viewport: { width: 760, height: 240 },
+      theme,
+      actions: [],
+    } as unknown as ReadingOptions);
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+}
 /** Legacy service receipts include CLI navigation hints. They are not Agent commands. */
 export function mcpData(data: unknown): unknown {
   if (!data || typeof data !== "object" || Array.isArray(data)) return data;
@@ -92,8 +173,17 @@ export function registerPresentationTools(
     privateProjects?: boolean;
     projectAccess?: "library" | "project";
     boundProjectId?: string;
+    /** Read-only access to saved components; undefined on public connections. */
+    componentLibrary?: {
+      root: string;
+      resolveProject(projectId?: string): Promise<string | undefined>;
+    };
+    /** Parent directory for fragment-file previews of show_component. */
+    previewDirectory?: string;
+    hostDisplay?: HostDisplay;
   },
 ) {
+  const declaredDisplay = options.hostDisplay ?? hostDisplay();
   const safe = (handler: () => Promise<unknown>) =>
     handler().then(mcpSuccess, mcpFailure);
   const readOnly = {
@@ -124,6 +214,38 @@ export function registerPresentationTools(
               },
               "openai/widgetDescription":
                 "Interactive ShowAI page. Read, explore and compare the supplied content.",
+              "openai/widgetCSP": {
+                connect_domains: [],
+                resource_domains: domains,
+              },
+            },
+          },
+        ],
+      };
+    },
+  );
+  server.registerResource(
+    "showai-component",
+    componentResourceUri,
+    { mimeType: "text/html;profile=mcp-app" },
+    async () => {
+      const domains = cdnReaderOrigins(await cdnReaderUrls());
+      return {
+        contents: [
+          {
+            uri: componentResourceUri,
+            mimeType: "text/html;profile=mcp-app",
+            text: mcpComponentHtml,
+            _meta: {
+              ui: {
+                prefersBorder: false,
+                csp: { connectDomains: [], resourceDomains: domains },
+                ...(options.widgetDomain
+                  ? { domain: options.widgetDomain }
+                  : {}),
+              },
+              "openai/widgetDescription":
+                "Interactive ShowAI components shown in the conversation. Explore them; nothing is saved.",
               "openai/widgetCSP": {
                 connect_domains: [],
                 resource_domains: domains,
@@ -228,8 +350,17 @@ export function registerPresentationTools(
           requiresProject: false,
           requiresSynchronization: false,
           outputs: ["mcp-app", "inline", "html", "source"],
+          levels: ["show", "document"],
+          show: {
+            tool: "show_component",
+            maxComponents: SHOW_COMPONENT_LIMIT,
+            deliveries: SHOW_DELIVERIES,
+            savesContent: false,
+            projectComponents: !!options.componentLibrary,
+          },
+          declaredHostDisplay: declaredDisplay ?? "undeclared",
           hostDisplay:
-            "The harness determines whether inline or MCP Apps can be displayed. Always preserve a usable file or project receipt.",
+            "The harness determines whether inline or MCP Apps can be displayed. show_component follows the plugin's declared host display; documents always preserve a usable file or project receipt.",
         },
         projects: {
           available: options.privateProjects ?? true,
@@ -246,8 +377,8 @@ export function registerPresentationTools(
           htmlDisplayRequired: false,
         },
         workflow:
-          "Use MCP for all Agent document operations. Formal content: resolve project, read/create, edit, save, then page_present. Only explicitly standalone content uses render_document. Do not switch connection, library or persistence mode after a failure.",
-        next: `For explicitly standalone presentation: public_catalog_list → public_catalog_describe → render_document. ${options.privateProjects === false ? "This connection has no private project entry; use a project connection when persistence is requested." : `For project work: ${options.transport === "http" ? "projects_list" : "project_context"} → page_read/create/apply/save. Display is optional; check synchronization separately.`}`,
+          "Use MCP for all Agent document operations. Route each request: discussion is answered in text; a visualization the user only wants to see now uses show_component (1–5 components, nothing saved); a document to keep, edit or share resolves a project, reads/creates, edits, saves, then page_present. render_document is for a complete standalone document that is not saved. When the user later asks to keep a shown component, save the same {kind,data} in a Page. Do not switch connection, library or persistence mode after a failure.",
+        next: `For a conversation visualization: public_catalog_describe (or catalog_describe) view=guide for the chosen component → show_component. For a complete standalone document: public_catalog_list → public_catalog_describe → render_document. ${options.privateProjects === false ? "This connection has no private project entry; use a project connection when persistence is requested." : `For project work: ${options.transport === "http" ? "projects_list" : "project_context"} → page_read/create/apply/save. Display is optional; check synchronization separately.`}`,
       }),
   );
   server.registerTool(
@@ -299,7 +430,7 @@ export function registerPresentationTools(
     "render_document",
     {
       description:
-        "Render explicitly standalone ShowAI content using public components/templates or supplied custom sources. Formal work uses page_create/save then page_present. Anonymous, independent of shared projects. Does not save into a personal project. Hosts without inline still receive usable HTML/source delivery. Read the relevant component schema first.",
+        "Render a complete standalone ShowAI document (several sections, a template, or an offline file) using public components/templates or supplied custom sources, without saving it. Showing one to five components in the conversation uses show_component; work to keep uses page_create/save then page_present. Anonymous, independent of shared projects. Hosts without inline still receive usable HTML/source delivery. Read the relevant component schema first.",
       inputSchema: presentationSchema,
       annotations: readOnly,
       _meta: { securitySchemes: noAuth, ...readerToolMeta },
@@ -333,6 +464,133 @@ export function registerPresentationTools(
               inline: presentation.inline,
               inlineError: presentation.inlineError,
               ...(delivery ? { delivery } : {}),
+            },
+          },
+        };
+      } catch (error) {
+        return mcpFailure(error);
+      }
+    },
+  );
+  server.registerTool(
+    "show_component",
+    {
+      description: `Show 1–${SHOW_COMPONENT_LIMIT} components directly in the conversation, without a project or Page. Use it for a visualization the user wants to see now; nothing is saved. Read the chosen component's guide first; kind/data are exactly page_apply component.insert data, so a shown component can later be saved unchanged with page_create blocks or component.insert.`,
+      inputSchema: showComponentSchema,
+      annotations: readOnly,
+      _meta: { securitySchemes: noAuth, ...componentToolMeta },
+    },
+    async (input) => {
+      try {
+        if (input.projectId && !options.componentLibrary)
+          throw new Error(
+            "This connection cannot read saved project components. Show built-in components, pass componentSources, or save a Page in an authorized project.",
+          );
+        const library = options.componentLibrary && {
+          root: options.componentLibrary.root,
+          projectId: await options.componentLibrary.resolveProject(
+            input.projectId,
+          ),
+        };
+        const shown = await renderComponents(input, library);
+        const warnings = [...shown.warnings];
+        let mode: Exclude<(typeof SHOW_DELIVERIES)[number], "auto"> =
+          input.delivery && input.delivery !== "auto"
+            ? input.delivery
+            : declaredDisplay
+              ? HOST_DISPLAYS[declaredDisplay]
+              : "mcp-app";
+        if (!declaredDisplay && (!input.delivery || input.delivery === "auto"))
+          warnings.push(
+            "The plugin declared no host display. The MCP Apps view is attached; if this host shows nothing, call again with delivery image, compact or fragment-file according to the host's actual display.",
+          );
+        if (shown.inlineError && mode !== "image") {
+          warnings.push(shown.inlineError);
+          mode = "image";
+        }
+        let delivery: Record<string, unknown> = { mode };
+        if (mode === "compact") {
+          const compact = await compactPresentation(shown.html);
+          if (compact && Buffer.byteLength(compact) <= COMPACT_BYTES)
+            delivery = {
+              mode,
+              compact,
+              note: "Pass this text unchanged to the host's model-written HTML visualization tool. It loads the ShowAI reader from public CDNs.",
+            };
+          else {
+            warnings.push(
+              compact
+                ? `The compact fragment is ${Buffer.byteLength(compact)} bytes, above ${COMPACT_BYTES}; an image is returned instead.`
+                : "No CDN reader is configured for a compact fragment; an image is returned instead.",
+            );
+            mode = "image";
+          }
+        }
+        if (mode === "fragment-file") {
+          const directory = options.previewDirectory
+            ? join(options.previewDirectory, "show-components")
+            : undefined;
+          if (!directory)
+            throw new Error(
+              "fragment-file needs a host-owned presentation directory. Configure SHOWAI_PRESENTATION_DIR or use another delivery.",
+            );
+          const path = join(directory, randomUUID(), "component.inline.html");
+          await mkdir(dirname(path), { recursive: true });
+          await writeFile(path, shown.inline!, "utf8");
+          await keepRecentFragments(directory);
+          // Same field as page_present, so file-reading host adapters handle both.
+          delivery = {
+            mode,
+            inline: path,
+            note: `A conversation preview, not a deliverable. Only the latest ${KEPT_FRAGMENTS} fragments are kept.`,
+          };
+        }
+        let image: { data: string; mimeType: "image/png" } | undefined;
+        if (mode === "image") {
+          const capture = await captureComponents(
+            shown.html,
+            input.theme ?? "light",
+          );
+          image = {
+            data: capture.png.toString("base64"),
+            mimeType: "image/png",
+          };
+          delivery = {
+            mode,
+            width: capture.width,
+            height: capture.height,
+            note: "A static image. Interactive views need an MCP Apps, Codex or model-written HTML host.",
+          };
+        }
+        const result = mcpSuccess({
+          ...(shown.title ? { title: shown.title } : {}),
+          components: shown.components,
+          delivery,
+          bytes: {
+            inline: shown.inline ? Buffer.byteLength(shown.inline) : null,
+          },
+          display: {
+            resourceAttached: true,
+            inlineAvailable: !!shown.inline,
+            imageAttached: !!image,
+          },
+          persistence: {
+            savedToProject: false,
+            files: mode === "fragment-file" ? "preview-directory" : "none",
+          },
+          ...(warnings.length ? { warnings } : {}),
+          next: "To keep it, save the same blocks with page_create({projectId,blocks}) or page_apply component.insert in an authorized project, then page_present.",
+        });
+        return {
+          ...result,
+          content: [
+            ...result.content,
+            ...(image ? [{ type: "image" as const, ...image }] : []),
+          ],
+          _meta: {
+            showai: {
+              inline: shown.inline,
+              inlineError: shown.inlineError,
             },
           },
         };

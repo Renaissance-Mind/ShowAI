@@ -173,6 +173,10 @@ html {
 .portable-partial .surface-reading-heading:empty {
   display: none;
 }
+/* Conversation components sit directly in the host's message column. */
+.portable-component .portable-document {
+  padding: 4px 0;
+}
 /* Reader typography is independent of the editing application. */
 .portable-content {
   overflow-wrap: anywhere;

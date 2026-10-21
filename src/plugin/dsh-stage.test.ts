@@ -59,6 +59,7 @@ test("stages the bundle with Skills, the launcher and a literal MCP row", async 
       ELECTRON_RUN_AS_NODE: "1",
       NOTE: 'quote " and: colon',
       SHOWAI_HOME: join(root, "library"),
+      SHOWAI_HOST_DISPLAY: "fragment-file",
     },
     // The MCP child keeps a stable working directory: staging replaces the
     // bundle directory, which would invalidate a cwd inside it.

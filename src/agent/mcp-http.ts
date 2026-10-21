@@ -72,6 +72,7 @@ const publicTools = new Set([
   "public_catalog_list",
   "public_catalog_describe",
   "render_document",
+  "show_component",
   "presentation_source",
 ]);
 const oauth = (write: boolean) => [
@@ -994,7 +995,7 @@ export async function createMcpHttpApp(options: McpHttpOptions) {
           }
           return json(result, value.status);
         }
-        if (name === "render_document") {
+        if (name === "render_document" || name === "show_component") {
           if (renderCount >= 2)
             return toolError(
               new Error("Two presentations are rendering. Retry shortly."),

@@ -66,7 +66,7 @@ const guides: Record<
       "render input is {document?,templateId?,title?,componentSources?}; supply document or templateId. componentSources use the editable manifest/schema/source/files/assets contract from guide component. Rendering returns HTML, inline and source plus savedToProject=false/synchronized=false.",
       "For persistent work use the selected local project or OAuth-authorized remote project. Remote tools require projectId from projects_list and never accept local filesystem paths. CLI and project-bound stdio use the actual local project.",
       "Remote writes pull before operating and push afterward. Inspect isError, ok and synchronization.state/error/remoteHead. A retained local result with failed sync must not be reported as published. Cross-device conflicts retain both versions and may return a new page ID; same-device conflicts require explicit resolution.",
-      "Display is optional: MCP Apps uses render_document/page_present; other inline hosts use their actual rendering contract. Text-only hosts can write shared projects and return a receipt; the user sees synchronized results in ShowAI.",
+      "Display is optional: MCP Apps uses show_component/render_document/page_present; other inline hosts use their actual rendering contract. show_component shows one to five components in the conversation without saving them. Text-only hosts can write shared projects and return a receipt; the user sees synchronized results in ShowAI.",
       "Local CLI, stdio and HTTP reuse content operations. Authentication and host rendering are adapters. Only claim a named harness has been tested when it actually has.",
     ],
     commands: [

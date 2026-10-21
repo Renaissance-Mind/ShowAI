@@ -1,3 +1,5 @@
+import conversationFit from "../../resources/catalog/inline-readiness.json";
+import type { InlineReadiness } from "../components/custom/types";
 import { resolveDocumentDatasets } from "./dataset-resolution";
 import { FileStore } from "./store";
 import { hasBinding } from "../datasets/binding.mjs";
@@ -142,10 +144,16 @@ export type {
   PackageMergePreview,
 } from "../components/custom/types";
 
+/** Agent discovery adds conversation fit; the reader bundle never needs it. */
 export function listBuiltinComponents({
   includeLegacy = false,
 }: { includeLegacy?: boolean } = {}): BuiltinComponentMetadata[] {
-  return builtinComponentCatalog({ includeLegacy });
+  return builtinComponentCatalog({ includeLegacy }).map((item) => {
+    const conversation = (
+      conversationFit as Record<string, InlineReadiness | undefined>
+    )[item.kind];
+    return conversation ? { ...item, conversation } : item;
+  });
 }
 export function describeBuiltinComponent(
   kind: string,

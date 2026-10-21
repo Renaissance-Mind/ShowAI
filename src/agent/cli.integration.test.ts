@@ -164,6 +164,254 @@ test("public CLI and stdio render customized content without creating a personal
   }
 }, 60_000);
 
+test("show_component shows conversation components without a project and saves the same blocks later", async () => {
+  const isolated = await mkdtemp(join(tmpdir(), "showai-show-component-"));
+  const library = join(isolated, "library");
+  const hostDirectory = join(isolated, "host");
+  const chart = {
+    kind: "chart",
+    data: {
+      title: "p95 延迟",
+      type: "line",
+      unit: "ms",
+      labels: ["周一", "周二", "周三"],
+      series: [{ name: "API", values: [182, 240, 196] }],
+    },
+  };
+  const connect = async (args: string[], env: Record<string, string> = {}) => {
+    const client = new Client({
+      name: "show-component-test",
+      version: "1.0.0",
+    });
+    await client.connect(
+      new StdioClientTransport({
+        command: process.execPath,
+        args: [cli, "mcp", ...args, "--home", library],
+        env: {
+          ...(Object.fromEntries(
+            Object.entries(environment()).filter(
+              (entry): entry is [string, string] =>
+                typeof entry[1] === "string",
+            ),
+          ) as Record<string, string>),
+          ...env,
+        },
+      }),
+    );
+    return client;
+  };
+  type Shown = {
+    data: {
+      delivery: { mode: string; inline?: string; compact?: string };
+      persistence: { savedToProject: boolean; files: string };
+      components: { kind: string }[];
+      warnings?: string[];
+    };
+  };
+  try {
+    const publicClient = await connect(["--public"]);
+    try {
+      const tools = await publicClient.listTools();
+      const show = tools.tools.find((item) => item.name === "show_component");
+      expect(show?._meta?.ui).toEqual({
+        resourceUri: "ui://showai/component-v1.html",
+      });
+      const resource = await publicClient.readResource({
+        uri: "ui://showai/component-v1.html",
+      });
+      expect(
+        String((resource.contents[0] as { text?: string }).text),
+      ).toContain("ShowAI 组件");
+      const shown = await publicClient.callTool({
+        name: "show_component",
+        arguments: { ...chart, title: "延迟" },
+      });
+      expect(shown.isError).not.toBe(true);
+      const receipt = (shown.structuredContent as Shown).data;
+      expect(receipt.delivery.mode).toBe("mcp-app");
+      expect(receipt.persistence).toEqual({
+        savedToProject: false,
+        files: "none",
+      });
+      expect(receipt.components).toEqual([{ kind: "chart" }]);
+      expect(receipt.warnings?.[0]).toContain("declared no host display");
+      expect(
+        (shown._meta as { showai: { inline: string } }).showai.inline,
+      ).toContain("data-showai-inline-root");
+      const image = await publicClient.callTool({
+        name: "show_component",
+        arguments: { ...chart, delivery: "image", theme: "dark" },
+      });
+      expect(image.isError).not.toBe(true);
+      expect((image.structuredContent as Shown).data.delivery.mode).toBe(
+        "image",
+      );
+      const png = (image.content as { type: string; data?: string }[]).find(
+        (item) => item.type === "image",
+      );
+      expect(Buffer.from(png!.data!, "base64").subarray(1, 4).toString()).toBe(
+        "PNG",
+      );
+      // Compact text needs a CDN reader; without one the host gets an image.
+      const compact = (
+        (
+          await publicClient.callTool({
+            name: "show_component",
+            arguments: { ...chart, delivery: "compact" },
+          })
+        ).structuredContent as Shown
+      ).data;
+      if (compact.delivery.mode === "compact")
+        expect(compact.delivery.compact).toContain("data-showai");
+      else expect(compact.warnings?.join(" ")).toContain("image");
+      const tooMany = await publicClient.callTool({
+        name: "show_component",
+        arguments: { blocks: Array(6).fill(chart) },
+      });
+      expect(tooMany.isError).toBe(true);
+      const document = await publicClient.callTool({
+        name: "show_component",
+        arguments: { kind: "page", data: {} },
+      });
+      expect(document.isError).toBe(true);
+      expect(JSON.stringify(document.content)).toContain("page_present");
+    } finally {
+      await publicClient.close();
+    }
+    expect(
+      await access(library).then(
+        () => true,
+        () => false,
+      ),
+    ).toBe(false);
+
+    const project = await run(["projects", "create", "--name", "Show"], {
+      home: library,
+    });
+    // The plugin launcher passes SHOWAI_PRESENTATION_DIR as this option.
+    const codex = await connect(["--presentation-directory", hostDirectory], {
+      SHOWAI_HOST_DISPLAY: "codex-visualize",
+    });
+    try {
+      const capabilities = await codex.callTool({
+        name: "showai_capabilities",
+        arguments: {},
+      });
+      const presentation = (
+        capabilities.structuredContent as {
+          data: {
+            presentation: {
+              declaredHostDisplay: string;
+              show: { maxComponents: number };
+            };
+          };
+        }
+      ).data.presentation;
+      expect(presentation.declaredHostDisplay).toBe("codex-visualize");
+      expect(presentation.show.maxComponents).toBe(5);
+      const shown = await codex.callTool({
+        name: "show_component",
+        arguments: {
+          blocks: [
+            chart,
+            {
+              kind: "metrics",
+              data: { items: [{ label: "峰值", value: 240, unit: "ms" }] },
+            },
+          ],
+        },
+      });
+      expect(shown.isError).not.toBe(true);
+      const receipt = (shown.structuredContent as Shown).data;
+      expect(receipt.delivery.mode).toBe("fragment-file");
+      expect(receipt.delivery.inline).toContain(
+        join(hostDirectory, "show-components"),
+      );
+      expect(await readFile(receipt.delivery.inline!, "utf8")).toContain(
+        "data-showai-inline-root",
+      );
+      expect(receipt.persistence.files).toBe("preview-directory");
+      expect(receipt.warnings).toBeUndefined();
+      const pages = await codex.callTool({
+        name: "pages_list",
+        arguments: { projectId: project.id },
+      });
+      expect(
+        (pages.structuredContent as { data: unknown[] }).data,
+      ).toHaveLength(0);
+      // Keeping a shown component reuses the same blocks unchanged.
+      const saved = await codex.callTool({
+        name: "page_create",
+        arguments: { projectId: project.id, title: "延迟", blocks: [chart] },
+      });
+      expect(saved.isError).not.toBe(true);
+      const page = (
+        saved.structuredContent as {
+          data: {
+            document: {
+              content: {
+                content: { attrs: { kind: string; data: unknown } }[];
+              };
+            };
+          };
+        }
+      ).data.document;
+      expect(page.content.content[0].attrs).toMatchObject(chart);
+      // Saved project components are read from the library, never written.
+      const component = await run(
+        [
+          "catalog",
+          "import",
+          "--project",
+          project.id,
+          "--input",
+          join(repository, "resources/catalog/value-slider"),
+        ],
+        { home: library },
+      );
+      const custom = {
+        kind: "custom",
+        data: {
+          componentId: component.id,
+          version: component.version,
+          props: { label: "阈值", value: 0.4, min: 0, max: 1 },
+        },
+      };
+      const anonymous = await codex.callTool({
+        name: "show_component",
+        arguments: custom,
+      });
+      expect(anonymous.isError).toBe(true);
+      const projectComponent = await codex.callTool({
+        name: "show_component",
+        arguments: { ...custom, projectId: project.id, delivery: "mcp-app" },
+      });
+      expect(projectComponent.isError).not.toBe(true);
+      expect(
+        (projectComponent.structuredContent as Shown).data.components,
+      ).toEqual([
+        expect.objectContaining({
+          kind: "custom",
+          componentId: component.id,
+          version: component.version,
+          integrity: expect.stringMatching(/^sha256-/),
+        }),
+      ]);
+      const after = await codex.callTool({
+        name: "pages_list",
+        arguments: { projectId: project.id },
+      });
+      expect(
+        (after.structuredContent as { data: unknown[] }).data,
+      ).toHaveLength(1);
+    } finally {
+      await codex.close();
+    }
+  } finally {
+    await rm(isolated, { recursive: true, force: true });
+  }
+}, 90_000);
+
 // Content history and checkpoint restore were replaced by current-state
 // storage; importing and activating an old library remains supported.
 test("CLI prepares and activates an old library and the bound MCP reads it within project scope", async () => {

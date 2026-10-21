@@ -70,7 +70,7 @@ SDK 子进程使用**独立环境**，不继承用户的 API Key、Codex 登录�
 
 ## 项目绑定与展示
 
-内置 Agent 的宿主显式提供项目 MCP。其私有插件副本保留八个 Skill，移除外部插件的 library MCP 启动配置，避免同时接入整个内容库。连接失败时不改用创作 CLI 或另一个项目。
+内置 Agent 的宿主显式提供项目 MCP。其私有插件副本保留九个 Skill，移除外部插件的 library MCP 启动配置，避免同时接入整个内容库。连接失败时不改用创作 CLI 或另一个项目。
 
 **保存页面后**使用 `page_present` 返回完整 HTML/source 和可选 inline 预览。当前内置聊天按文字与文件链接交付；它不因生成 inline 就具备对话 HTML 显示能力。文件路径由运行时分配，读取和保存沿用当前项目身份、hash/revision。
 

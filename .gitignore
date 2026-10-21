@@ -80,7 +80,8 @@ plugins/showai/scripts/cli.mjs
 !/plugins/showai/skills/create-template/references/template-creation.md
 !/plugins/showai/skills/show-document/SKILL.md
 !/plugins/showai/skills/show-document/references/board-authoring.md
-!/plugins/showai/skills/show-document/references/conversation-display.md
+!/plugins/showai/skills/use-showai/references/host-display.md
+!/plugins/showai/skills/show-visual/SKILL.md
 !/plugins/showai/skills/show-document/references/capacity.md
 !/plugins/showai/skills/show-document/references/page-reading.md
 !/plugins/showai/skills/use-showai/SKILL.md

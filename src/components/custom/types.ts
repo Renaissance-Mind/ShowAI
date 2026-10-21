@@ -184,6 +184,13 @@ export interface BuiltinComponentMetadata {
   defaultData: Record<string, unknown>;
   propsSchema: JsonSchema;
   examples: ComponentExample[];
+  /** How the component fits a conversation column, measured at chat widths. */
+  conversation?: InlineReadiness;
+}
+
+export interface InlineReadiness {
+  status: "ready" | "limited" | "unsuitable";
+  note?: string;
 }
 
 export interface CustomComponentRef {

@@ -135,7 +135,7 @@ claude plugin marketplace add ./
 claude plugin install showai@renaissance-mind
 ```
 
-Start the app once, or run `npm run runtime:register`, so the plugin can find the runtime in your content library. See the [plugin documentation](plugins/showai/README.md) for the eight Skills and connection details, [Local browser edition](docs/local-browser.md) for launchers and packaging, and the [CLI reference](docs/agent-usage.md) for scripting.
+Start the app once, or run `npm run runtime:register`, so the plugin can find the runtime in your content library. See the [plugin documentation](plugins/showai/README.md) for the nine Skills and connection details, [Local browser edition](docs/local-browser.md) for launchers and packaging, and the [CLI reference](docs/agent-usage.md) for scripting.
 
 ## 📚 Documentation
 

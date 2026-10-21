@@ -116,7 +116,12 @@ export async function stageDshBundle({
   const server = {
     command: runtime.command,
     args: [join(target, "mcp/launch.mjs")],
-    env: { ...runtime.env, SHOWAI_HOME: home },
+    // The preview view reads the fragment file show_component writes.
+    env: {
+      ...runtime.env,
+      SHOWAI_HOME: home,
+      SHOWAI_HOST_DISPLAY: "fragment-file",
+    },
     // Staging replaces the bundle directory as a whole, so a live MCP child
     // must not keep its working directory there: its cwd would vanish and every
     // later call would fail with uv_cwd ENOENT. The library home is stable.

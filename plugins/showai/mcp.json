@@ -5,7 +5,8 @@
       "type": "stdio",
       "command": "node",
       "args": ["./mcp/launch.mjs"],
-      "cwd": "./"
+      "cwd": "./",
+      "env": { "SHOWAI_HOST_DISPLAY": "codex-visualize" }
     }
   }
 }

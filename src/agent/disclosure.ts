@@ -76,6 +76,8 @@ export interface CatalogSummary {
   effects?: string[];
   reuse?: "general" | "domain" | "content-specific" | "unclassified";
   documentationStatus?: "available" | "missing";
+  /** Built-in components only: fit for show_component in a conversation column. */
+  conversation?: import("../components/custom/types").InlineReadiness;
   workflow?: {
     format: 1;
     stages: string[];
@@ -206,6 +208,14 @@ export function summarizeCatalog(
           documentationStatus: item.documentation
             ? ("available" as const)
             : ("missing" as const),
+          ...(scope === "builtin" &&
+          item.conversation &&
+          typeof item.conversation === "object"
+            ? {
+                conversation:
+                  item.conversation as import("../components/custom/types").InlineReadiness,
+              }
+            : {}),
           effects: Array.isArray(item.effects)
             ? item.effects.filter(
                 (value): value is string => typeof value === "string",
@@ -262,6 +272,7 @@ export function catalogEntry(item: CatalogSummary) {
     scenarios,
     reuse,
     documentationStatus,
+    conversation,
     workflow,
   } = item;
   return {
@@ -273,6 +284,10 @@ export function catalogEntry(item: CatalogSummary) {
     scenarios,
     scope,
     ...(reuse ? { reuse, documentationStatus } : {}),
+    // The compact index flags only components that do not fit a conversation as-is.
+    ...(conversation && conversation.status !== "ready"
+      ? { conversation: conversation.status }
+      : {}),
     ...(workflow ? { workflow } : {}),
     ...(version ? { version } : {}),
     ...(integrity ? { integrity } : {}),

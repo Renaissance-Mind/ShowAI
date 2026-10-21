@@ -2,7 +2,7 @@
 
 **Language:** English | [简体中文](README.zh-CN.md) · [Documentation](../../docs/README.md)
 
-ShowAI lets your agent answer with interfaces — interactive, archived, and evolving as you use them. It has two parts: this plugin gives the agent ShowAI's tools (a stdio MCP launcher) and eight Skills, and the ShowAI app keeps the pages and provides the runtime the plugin talks to. Compatibility is determined by the runtime's reported capabilities.
+ShowAI lets your agent answer with interfaces — interactive, archived, and evolving as you use them. It has two parts: this plugin gives the agent ShowAI's tools (a stdio MCP launcher) and nine Skills, and the ShowAI app keeps the pages and provides the runtime the plugin talks to. Compatibility is determined by the runtime's reported capabilities.
 
 ## Install
 
@@ -46,6 +46,7 @@ Then, once, in DeepSeek Harness: **Plugins → Add plugin**, paste the bundle pa
 | Skill                                                      | Purpose                                             |
 | ---------------------------------------------------------- | --------------------------------------------------- |
 | [use-showai](skills/use-showai/SKILL.md)                   | Connection identity, discovery, reading and routing |
+| [show-visual](skills/show-visual/SKILL.md)                 | Show 1–5 components in the conversation, unsaved    |
 | [plan-presentation](skills/plan-presentation/SKILL.md)     | Reader intent, material and presentation logic      |
 | [design-presentation](skills/design-presentation/SKILL.md) | Scene-by-scene design draft, layout and interaction |
 | [show-document](skills/show-document/SKILL.md)             | Create, continue, save, present and export Pages    |
@@ -60,12 +61,13 @@ Agent document operations use MCP. Begin with guide() and capability/project dis
 
 The launcher resolves only the selected library's registered runtime and requires showai-mcp-v1 plus the relevant workflow capabilities. It reports incompatibility instead of switching libraries. Configure these in the host before startup:
 
-| Setting                 | Purpose                                        |
-| ----------------------- | ---------------------------------------------- |
-| SHOWAI_HOME             | Library root; default ~/.showai                |
-| SHOWAI_PROJECT_ID       | Optional project binding                       |
-| SHOWAI_TEMPLATES        | Startup templates, requiring SHOWAI_PROJECT_ID |
-| SHOWAI_PRESENTATION_DIR | Presentation directory accessible to the host  |
+| Setting                 | Purpose                                                                                                                   |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| SHOWAI_HOME             | Library root; default ~/.showai                                                                                           |
+| SHOWAI_PROJECT_ID       | Optional project binding                                                                                                  |
+| SHOWAI_TEMPLATES        | Startup templates, requiring SHOWAI_PROJECT_ID                                                                            |
+| SHOWAI_PRESENTATION_DIR | Presentation directory accessible to the host                                                                             |
+| SHOWAI_HOST_DISPLAY     | How show_component reaches this host's conversation: mcp-app, codex-visualize, fragment-file, model-html, image or native |
 
 See [runtime setup](skills/use-showai/references/runtime.md). Updating the plugin does not upgrade the application or an already running MCP server. The embedded ShowAI Agent receives project-bound MCP from AgentHost and omits the external library launcher from its private package.
 
@@ -73,7 +75,7 @@ See [runtime setup](skills/use-showai/references/runtime.md). Updating the plugi
 
 page_present returns complete offline HTML/source plus a conversation preview. The preview uses a local reader when it fits; a published reader can supply an online fallback. delivery.compact and delivery.online use the pinned published reader. SHOWAI_READER_CDN=off keeps reader delivery offline.
 
-The host displays MCP Apps, uses the actual local Codex visualization path or offers the full HTML/source. Display support depends on the host. Runtime-owned paths and HTTP preview URLs are snapshots, while the saved project remains editable. See [conversation display](skills/show-document/references/conversation-display.md).
+The host displays MCP Apps, uses the actual local Codex visualization path or offers the full HTML/source. Display support depends on the host. Runtime-owned paths and HTTP preview URLs are snapshots, while the saved project remains editable. See [conversation display](skills/use-showai/references/host-display.md).
 
 ## ChatGPT web and remote packages
 

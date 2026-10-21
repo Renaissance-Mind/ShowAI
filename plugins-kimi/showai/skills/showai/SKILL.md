@@ -1,6 +1,6 @@
 ---
 name: showai
-description: 在 Kimi Work 中通过 ShowAI MCP 创建、修改、阅读和展示项目页面。正式内容先保存，再适配当前宿主的 Widget 或文件展示能力。
+description: 在 Kimi Work 中通过 ShowAI MCP 在对话里直接展示组件，或创建、修改、阅读和展示项目页面。只看一眼的可视化不建项目；正式内容先保存，再适配当前宿主的 Widget 或文件展示能力。
 ---
 
 # 在 Kimi Work 使用 ShowAI
@@ -11,7 +11,11 @@ Agent使用已连接的ShowAI MCP工具操作文档。宿主负责本机或远�
 
 纯阅读用pages_list、library_search和page_read，长页先outline再按blockIds读取。不要因为只读查询创建项目。修改前读取完整Page，保留hash、revision和稳定节点ID，page_apply/page_save同时传baseHash/baseRevision。保存冲突必须比较并处理，不能只更新基线覆盖。
 
-页面创建、组件和模板操作分别查询guide的authoring、containers、component、templates等主题。component_save的source对象包含manifest、schema、source及可选files/assets，参数以当前schema为准；模板用template_save/template_apply。正式内容保存在选定项目。只有用户明确要求独立结果时才调用render_document，并说明未保存个人项目。
+页面创建、组件和模板操作分别查询guide的authoring、containers、component、templates等主题。component_save的source对象包含manifest、schema、source及可选files/assets，参数以当前schema为准；模板用template_save/template_apply。正式内容保存在选定项目。只有用户明确要求独立文件时才调用render_document，并说明未保存个人项目。
+
+## 对话展示
+
+用户只想在对话里看一眼图表、示意、模拟或对比，没有提保存、文档、分享或续改已有页面时，不建项目：读所选组件的guide后调用show_component({kind,data})，或用blocks一次展示最多5个组件，delivery选fragment-file。把返回的delivery.inline文件原样写入Widget的workspace/index.html并执行显示动作；不要用compact或CDN阅读器。组件索引标为conversation:"limited"且说明需要联网的组件（G2图表、外部图形套件、PDF）在本宿主无法离线显示，改选其他组件或用delivery:"image"。正文只写画面要点，并说明没有保存。用户随后要保存时，按下文确定项目，把同一份{kind,data}原样作为page_create的blocks写入，再page_present。
 
 保存后调用page_present。blockIds只选择inline预览，完整HTML/source仍保留全页。远程操作另核对synchronization状态；展示或本机保存成功不证明远端已同步。
 

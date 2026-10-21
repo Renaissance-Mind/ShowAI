@@ -22,7 +22,7 @@ ShowAI 是可进化的人机交互界面：Agent 的回答不再只是一段文�
 | 文档                                      | 内容                                 |
 | ----------------------------------------- | ------------------------------------ |
 | [组件与模板](catalog-lifecycle.zh-CN.md)  | 作用域、不可变版本、组合与发布       |
-| [Skills 与工作流程](skills.zh-CN.md)      | 八个 Skill 与任务分工                |
+| [Skills 与工作流程](skills.zh-CN.md)      | 九个 Skill 与任务分工                |
 | [模板文件夹](template-bundles.zh-CN.md)   | 元信息、四阶段指南与组件库           |
 | [组件参数](component-parameters.zh-CN.md) | 生成式参数参考、省略行为与关系校验   |
 | [G2 数据图表](g2-components.zh-CN.md)     | 43 种图表、数据源与字段映射          |

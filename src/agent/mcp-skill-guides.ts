@@ -14,7 +14,7 @@ const context = {
     "This is the remote HTTP connection. Apply the remote branches of the shared skills. Never ask this client to configure a local launcher, read a local content library, run ShowAI CLI commands, or pass local filesystem paths to remote tools.",
     "Use only tools actually exposed by this connection and their current input schemas. Some shared references document local-only operations; explain unavailable capabilities rather than inventing tools or changing connections.",
     "Follow references through guide({skill,file}); no local file access or installed skills are needed. Read only the current task/stage and reuse the exact content already read this turn.",
-    "User requests control persistence: save formal work to an authorized project, use render_document only for explicitly standalone output. Do not change scope after connection or save failures.",
+    "User requests control persistence: a visualization to see now uses show_component (nothing saved); work to keep is saved to an authorized project; render_document is only for a complete standalone document. Do not change scope after connection or save failures.",
     "Scripts are supplied as reference text, never automatically executed. If the host cannot execute a planning check, follow the skill's manual-check fallback and state what was checked.",
   ],
 };
@@ -22,7 +22,7 @@ const context = {
 export const remoteSkillInstructions =
   'Start every ShowAI task by calling guide() for the shared Skill entrypoint and task routes, even when no plugin Skills are installed. Then read guide({skill:"NAME"}) and referenced files as needed. Read-only lookup stays read-only; complete page requests continue through creation, review, saving and presentation. This is the authorized remote connection; do not use local paths or CLI. Private project IDs come from projects_list; create a project only when requested. ' +
   "The host may defer tool definitions. The guide response lists this connection's actual tools and MCP URL. If a required tool is listed but not currently loaded, use the host's tool discovery scoped to this selected connection before claiming it is unavailable. Do not switch to another similarly named ShowAI connection. Tool availability and OAuth scope are separate; report the actual discovery or authorization error. " +
-  "The eight workflows cover connection/lookup/reading/recovery (use-showai), page creation/editing/partial presentation/export (show-document), understanding plans (plan-presentation), visual/interaction design (design-presentation), review (review-presentation), reusable components (create-component), reusable templates (create-template), and collaborative canvas/paired-device workflows (collaborate-canvas). Read guide topic presentation and current template stage when directed. OAuth is required for private projects; public catalogs and guides need no login. Read the current page/hash/revision before editing. Check saving, synchronization and presentation separately. Unavailable historical snapshots or local library switching must be reported, not simulated. Login codes and credentials are entered by the user in the authorization UI, never requested in chat.";
+  "The nine workflows cover connection/lookup/reading/recovery (use-showai), components shown in the conversation without saving (show-visual), page creation/editing/partial presentation/export (show-document), understanding plans (plan-presentation), visual/interaction design (design-presentation), review (review-presentation), reusable components (create-component), reusable templates (create-template), and collaborative canvas/paired-device workflows (collaborate-canvas). Read guide topic presentation and current template stage when directed. OAuth is required for private projects; public catalogs and guides need no login. Read the current page/hash/revision before editing. Check saving, synchronization and presentation separately. Unavailable historical snapshots or local library switching must be reported, not simulated. Login codes and credentials are entered by the user in the authorization UI, never requested in chat.";
 
 function metadata(name: string) {
   const source = mcpSkillSources[`${name}/SKILL.md`];
@@ -136,7 +136,11 @@ export function mcpSkillGuide(
               skill: "use-showai",
             },
             {
-              task: "Complete page/report/site creation, continuation, partial display or export; includes a bare topic asking for a finished work",
+              task: "Show one to five components (chart, diagram, mechanism, simulation, comparison, UI mockup) in the conversation without a project or saving",
+              skill: "show-visual",
+            },
+            {
+              task: "Complete page/report/site creation to keep, continuation, partial display or export; includes a bare topic asking for a finished work or saving a component shown earlier",
               skill: "show-document",
             },
             {

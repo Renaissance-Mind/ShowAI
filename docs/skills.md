@@ -2,11 +2,12 @@
 
 **Language:** English | [简体中文](i18n/skills.zh-CN.md) · [Documentation](README.md)
 
-The ShowAI plugin provides eight Skills. The runtime owns storage, native containers, catalog, compilation and rendering; the plugin supplies methods, references and connection configuration. Agent document operations use MCP. CLI supports startup, diagnostics and scripts.
+The ShowAI plugin provides nine Skills. The runtime owns storage, native containers, catalog, compilation and rendering; the plugin supplies methods, references and connection configuration. Agent document operations use MCP. CLI supports startup, diagnostics and scripts.
 
 | Skill                                                                        | Task                                                      | Result                                                         |
 | ---------------------------------------------------------------------------- | --------------------------------------------------------- | -------------------------------------------------------------- |
 | [use-showai](../plugins/showai/skills/use-showai/SKILL.md)                   | Connect, find, read and discover capabilities             | Connection, content identities and available resources         |
+| [show-visual](../plugins/showai/skills/show-visual/SKILL.md)                 | Show a visualization in the conversation                  | One to five components displayed, nothing saved                |
 | [plan-presentation](../plugins/showai/skills/plan-presentation/SKILL.md)     | Organize difficult material                               | Reader goals, evidence scope and understanding path            |
 | [design-presentation](../plugins/showai/skills/design-presentation/SKILL.md) | Design expression and interaction                         | Objects, relationships, layout, states and static alternatives |
 | [show-document](../plugins/showai/skills/show-document/SKILL.md)             | Create, revise, present, export or apply a template       | Saved editable Page and delivery                               |
@@ -39,6 +40,6 @@ Components own their schema and versioned usage/development documentation. Query
 
 Source inspection, screenshots, interaction checks and reader trials establish different evidence. Check factual support, reading order, important states, narrow layouts and static/export behavior as relevant; report untested scope.
 
-`page_present` captures one saved revision and returns full HTML/source. `blockIds` selects the conversation preview while retaining the complete delivery. Use meaningful excerpts if the inline budget is exceeded. See [Conversation display](../plugins/showai/skills/show-document/references/conversation-display.md).
+`page_present` captures one saved revision and returns full HTML/source. `blockIds` selects the conversation preview while retaining the complete delivery. Use meaningful excerpts if the inline budget is exceeded. See [Conversation display](../plugins/showai/skills/use-showai/references/host-display.md).
 
 Local plugin installation, host capability refresh and current-conversation guidance loading are separate checks. Remote ChatGPT users receive the same workflows through `guide` without installing local Skills. Updating either route does not automatically upgrade the other runtime.

@@ -1084,6 +1084,24 @@ export function createMcpServer(options: {
       projectAccess: options.projectAccess ?? "project",
       boundProjectId:
         options.projectAccess === "library" ? undefined : projectId,
+      previewDirectory:
+        options.presentationDirectory ??
+        join(service.store.root, "local", "agent-previews"),
+      componentLibrary: {
+        root: service.store.root,
+        async resolveProject(selected) {
+          if (options.projectAccess !== "library") {
+            if (selected !== undefined && selected !== projectId)
+              throw new Error(
+                "This MCP connection is bound to another project.",
+              );
+            return projectId;
+          }
+          if (selected === undefined) return undefined;
+          await service.store.readProject(selected);
+          return selected;
+        },
+      },
       storePresentation: async (value) =>
         (
           await writePresentation(
@@ -1129,7 +1147,7 @@ export async function startPublicMcp(root: string) {
     { name: "showai", version: packageMetadata.version },
     {
       instructions:
-        "Create presentations without a personal project or synchronization. Discover public resources, customize their document/source, then render_document. Use the returned inline/HTML files or MCP Apps resource only when your harness supports that display. No project data is available on this connection.",
+        "Create presentations without a personal project or synchronization. To show one to five components in the conversation, read the chosen public component's guide, then show_component. For a complete standalone document, discover public resources, customize their document/source, then render_document. Use the returned inline/HTML files or MCP Apps resource only when your harness supports that display. No project data is available on this connection.",
     },
   );
   server.registerTool(
@@ -1158,6 +1176,7 @@ export async function startPublicMcp(root: string) {
   registerPresentationTools(server, {
     transport: "stdio",
     privateProjects: false,
+    previewDirectory: join(root, "local", "agent-previews"),
     storePresentation: async (value) =>
       (
         await writePresentation(

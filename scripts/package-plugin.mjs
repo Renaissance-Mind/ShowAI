@@ -103,6 +103,8 @@ await writeFile(
         showai: {
           command: "node",
           args: ["${CLAUDE_PLUGIN_ROOT}/mcp/launch.mjs"],
+          // Claude hosts show components through model-written HTML.
+          env: { SHOWAI_HOST_DISPLAY: "model-html" },
         },
       },
     },

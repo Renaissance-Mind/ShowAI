@@ -17,15 +17,16 @@ import source14 from "../../plugins/showai/skills/review-presentation/references
 import source15 from "../../plugins/showai/skills/review-presentation/SKILL.md?raw";
 import source16 from "../../plugins/showai/skills/show-document/references/board-authoring.md?raw";
 import source17 from "../../plugins/showai/skills/show-document/references/capacity.md?raw";
-import source18 from "../../plugins/showai/skills/show-document/references/conversation-display.md?raw";
-import source19 from "../../plugins/showai/skills/show-document/references/page-reading.md?raw";
-import source20 from "../../plugins/showai/skills/show-document/SKILL.md?raw";
-import source21 from "../../plugins/showai/skills/use-showai/references/integration.md?raw";
-import source22 from "../../plugins/showai/skills/use-showai/references/runtime.md?raw";
-import source23 from "../../plugins/showai/skills/use-showai/references/shared-data.md?raw";
-import source24 from "../../plugins/showai/skills/use-showai/SKILL.md?raw";
+import source18 from "../../plugins/showai/skills/show-document/references/page-reading.md?raw";
+import source19 from "../../plugins/showai/skills/show-document/SKILL.md?raw";
+import source20 from "../../plugins/showai/skills/show-visual/SKILL.md?raw";
+import source21 from "../../plugins/showai/skills/use-showai/references/host-display.md?raw";
+import source22 from "../../plugins/showai/skills/use-showai/references/integration.md?raw";
+import source23 from "../../plugins/showai/skills/use-showai/references/runtime.md?raw";
+import source24 from "../../plugins/showai/skills/use-showai/references/shared-data.md?raw";
+import source25 from "../../plugins/showai/skills/use-showai/SKILL.md?raw";
 
-export const mcpSkillNames = ["collaborate-canvas","create-component","create-template","design-presentation","plan-presentation","review-presentation","show-document","use-showai"] as const;
+export const mcpSkillNames = ["collaborate-canvas","create-component","create-template","design-presentation","plan-presentation","review-presentation","show-document","show-visual","use-showai"] as const;
 export const mcpSkillSources: Record<string, string> = {
   "collaborate-canvas/SKILL.md": source0,
   "create-component/references/component-authoring.md": source1,
@@ -45,11 +46,12 @@ export const mcpSkillSources: Record<string, string> = {
   "review-presentation/SKILL.md": source15,
   "show-document/references/board-authoring.md": source16,
   "show-document/references/capacity.md": source17,
-  "show-document/references/conversation-display.md": source18,
-  "show-document/references/page-reading.md": source19,
-  "show-document/SKILL.md": source20,
-  "use-showai/references/integration.md": source21,
-  "use-showai/references/runtime.md": source22,
-  "use-showai/references/shared-data.md": source23,
-  "use-showai/SKILL.md": source24,
+  "show-document/references/page-reading.md": source18,
+  "show-document/SKILL.md": source19,
+  "show-visual/SKILL.md": source20,
+  "use-showai/references/host-display.md": source21,
+  "use-showai/references/integration.md": source22,
+  "use-showai/references/runtime.md": source23,
+  "use-showai/references/shared-data.md": source24,
+  "use-showai/SKILL.md": source25,
 };

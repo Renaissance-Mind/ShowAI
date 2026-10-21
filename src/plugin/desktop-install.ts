@@ -429,10 +429,24 @@ export class DesktopPluginInstaller {
       ...claudeManifest,
       version,
     });
+    // Each host declares how show_component reaches its conversation.
     await json(join(source, "mcp.json"), {
-      mcpServers: { showai: { type: "stdio", ...server } },
+      mcpServers: {
+        showai: {
+          type: "stdio",
+          ...server,
+          env: { ...server.env, SHOWAI_HOST_DISPLAY: "codex-visualize" },
+        },
+      },
     });
-    await json(join(source, ".mcp.json"), { mcpServers: { showai: server } });
+    await json(join(source, ".mcp.json"), {
+      mcpServers: {
+        showai: {
+          ...server,
+          env: { ...server.env, SHOWAI_HOST_DISPLAY: "model-html" },
+        },
+      },
+    });
     await mkdir(join(marketplace, ".agents/plugins"), { recursive: true });
     await mkdir(join(marketplace, ".claude-plugin"), { recursive: true });
     await json(join(marketplace, ".agents/plugins/marketplace.json"), {

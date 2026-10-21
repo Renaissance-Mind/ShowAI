@@ -10,6 +10,7 @@ import {
   type TemplateStage,
 } from "../portable/template-bundle.mjs";
 import { templateGuide } from "./template-workflow";
+import { blocksDocument } from "./page-authoring";
 import { catalogPage, type CatalogView } from "./disclosure";
 import { FileStore } from "../core/store";
 import { buildPageHtml } from "./exporter";
@@ -250,6 +251,33 @@ export async function renderPresentation(raw: PresentationInput) {
   if (!input.templateId && (input.templateVersion || input.templateIntegrity))
     throw new Error("Template version/integrity require templateId.");
   if (input.title) document = { ...document, title: input.title };
+  const rendered = await renderDocumentArtifacts(document, {
+    componentSources: input.componentSources as unknown as
+      ComponentSource[] | undefined,
+    blockIds: input.blockIds,
+  });
+  const preview = await inlinePresentation(rendered.inlineHtml);
+  const online = await onlinePresentation(rendered.html);
+  const compact = await compactPresentation(rendered.inlineHtml);
+  return {
+    title: rendered.title,
+    document: rendered.document,
+    html: rendered.html,
+    ...preview,
+    ...(online ? { online } : {}),
+    ...(compact ? { compact } : {}),
+    source: rendered.source,
+    persistence: { savedToProject: false, synchronized: false },
+    bytes: {
+      html: Buffer.byteLength(rendered.html),
+      inline: preview.inline ? Buffer.byteLength(preview.inline) : null,
+      online: online ? Buffer.byteLength(online) : null,
+      compact: compact ? Buffer.byteLength(compact) : null,
+    },
+  };
+}
+
+function assertKnownKinds(document: ShowDocument) {
   const knownKinds = new Set([
     "custom",
     ...listBuiltinComponents({ includeLegacy: true }).map((item) => item.kind),
@@ -262,22 +290,46 @@ export async function renderPresentation(raw: PresentationInput) {
     node.content?.forEach(validateKinds);
   };
   validateKinds(document.content);
-  const home = await mkdtemp(join(tmpdir(), "showai-render-"));
+}
+
+/** Supplied sources compile in a temporary workspace. Saved library
+ * components are read in place; the library is never written. */
+interface ComponentOrigin {
+  componentSources?: ComponentSource[];
+  library?: { root: string; projectId?: string };
+}
+
+async function renderDocumentArtifacts(
+  input: ShowDocument,
+  options: ComponentOrigin & {
+    blockIds?: string[];
+    /** A conversation component preview: the whole document is shown without reader chrome. */
+    component?: boolean;
+  },
+) {
+  let document = input;
+  assertKnownKinds(document);
+  const library = options.componentSources?.length
+    ? undefined
+    : options.library;
+  const home = library
+    ? library.root
+    : await mkdtemp(join(tmpdir(), "showai-render-"));
   try {
-    const store = new FileStore(home);
-    const project = await store.createProject({ name: "Presentation" });
-    for (const source of input.componentSources ?? [])
-      await saveComponent(
-        home,
-        source as unknown as ComponentSource,
-        project.id,
-      );
+    let projectId = library?.projectId;
+    if (!library) {
+      projectId = (
+        await new FileStore(home).createProject({ name: "Presentation" })
+      ).id;
+      for (const source of options.componentSources ?? [])
+        await saveComponent(home, source, projectId);
+    }
     const components = await resolveDocumentComponents(
       home,
       document,
-      project.id,
+      projectId,
     );
-    document = await lockDocumentComponents(home, document, project.id);
+    document = await lockDocumentComponents(home, document, projectId);
     const validateCustomProps = (node: ShowDocument["content"]) => {
       if (node.type === "widget" && node.attrs?.kind === "custom") {
         const reference = node.attrs.data;
@@ -296,57 +348,175 @@ export async function renderPresentation(raw: PresentationInput) {
       node.content?.forEach(validateCustomProps);
     };
     validateCustomProps(document.content);
-    const html = await buildPageHtml(
-      document,
-      undefined,
-      components,
-      [],
-      "reading",
-    );
-    const selected = input.blockIds
-      ? selectDocumentBlocks(document, input.blockIds)
+    const html = options.component
+      ? undefined
+      : await buildPageHtml(document, undefined, components, [], "reading");
+    const selected = options.blockIds
+      ? selectDocumentBlocks(document, options.blockIds)
       : undefined;
-    const inlineHtml = selected
-      ? await buildPageHtml(
-          selected,
-          undefined,
-          await resolveDocumentComponents(home, selected, project.id),
-          [],
-          "reading",
-          { blockIds: input.blockIds! },
-        )
-      : html;
-    const preview = await inlinePresentation(inlineHtml);
-    const online = await onlinePresentation(html);
-    const compact = await compactPresentation(inlineHtml);
+    const inlineHtml = options.component
+      ? await buildPageHtml(document, undefined, components, [], "reading", {
+          blockIds: (document.content.content ?? []).map(
+            (node) => node.attrs?.id as string,
+          ),
+          chrome: "none",
+        })
+      : selected
+        ? await buildPageHtml(
+            selected,
+            undefined,
+            await resolveDocumentComponents(home, selected, projectId),
+            [],
+            "reading",
+            { blockIds: options.blockIds! },
+          )
+        : html!;
     return {
       title: document.title,
       document,
-      html,
-      ...preview,
-      ...(online ? { online } : {}),
-      ...(compact ? { compact } : {}),
+      components,
+      // A component preview is its own whole document.
+      html: html ?? inlineHtml,
+      inlineHtml,
       source: JSON.stringify(
         {
           ...JSON.parse(serializeArtifact(document, components, [], "reading")),
-          ...(input.componentSources?.length
-            ? { componentSources: input.componentSources }
+          ...(options.componentSources?.length
+            ? { componentSources: options.componentSources }
             : {}),
         },
         null,
         2,
       ),
-      persistence: { savedToProject: false, synchronized: false },
-      bytes: {
-        html: Buffer.byteLength(html),
-        inline: preview.inline ? Buffer.byteLength(preview.inline) : null,
-        online: online ? Buffer.byteLength(online) : null,
-        compact: compact ? Buffer.byteLength(compact) : null,
-      },
     };
   } finally {
-    await rm(home, { recursive: true, force: true });
+    if (!library) await rm(home, { recursive: true, force: true });
   }
+}
+
+export const SHOW_COMPONENT_LIMIT = 5;
+export const SHOW_DELIVERIES = [
+  "auto",
+  "mcp-app",
+  "fragment-file",
+  "compact",
+  "image",
+] as const;
+const showBlock = z.object({ kind: z.string().min(1), data: object });
+export const showComponentSchema = {
+  kind: z
+    .string()
+    .min(1)
+    .optional()
+    .describe(
+      "One component: a built-in kind such as chart, flowchart or scene-3d, or custom. Use blocks for several.",
+    ),
+  data: object
+    .optional()
+    .describe(
+      "The component's parameters, exactly as page_apply component.insert data. Custom components use {componentId,version,props}.",
+    ),
+  blocks: z
+    .array(showBlock)
+    .min(1)
+    .max(SHOW_COMPONENT_LIMIT)
+    .optional()
+    .describe(
+      `Up to ${SHOW_COMPONENT_LIMIT} components shown together in order, each {kind,data}. Use instead of kind/data. More content belongs in a saved Page.`,
+    ),
+  projectId: z
+    .string()
+    .min(1)
+    .optional()
+    .describe(
+      "Only to resolve custom components saved in that project. Nothing is saved there.",
+    ),
+  componentSources: z
+    .array(object)
+    .max(SHOW_COMPONENT_LIMIT)
+    .optional()
+    .describe(
+      "Unsaved component packages (manifest, schema, source, files, assets), compiled in an isolated temporary workspace for preview.",
+    ),
+  title: z
+    .string()
+    .max(300)
+    .optional()
+    .describe(
+      "Accessible name and host card title. It is not drawn above the component.",
+    ),
+  delivery: z
+    .enum(SHOW_DELIVERIES)
+    .optional()
+    .describe(
+      "auto follows the plugin's declared host display. mcp-app attaches the MCP Apps component view and writes no file; fragment-file writes the inline fragment for hosts that reference a file (Codex visualize); compact returns a few-KB fragment text for hosts where the model writes HTML; image returns a PNG.",
+    ),
+  theme: z
+    .enum(["light", "dark"])
+    .optional()
+    .describe("Image delivery only. Other deliveries follow the host theme."),
+};
+export type ShowComponentInput = z.infer<
+  z.ZodObject<typeof showComponentSchema>
+>;
+
+/** Shows components in a conversation. The document is built exactly like
+ * page_create blocks, so the same {kind,data} can later be saved unchanged. */
+export async function renderComponents(
+  raw: ShowComponentInput,
+  library?: { root: string; projectId?: string },
+) {
+  const input = z.object(showComponentSchema).parse(raw);
+  if (input.blocks && (input.kind || input.data))
+    throw new Error("Provide kind/data for one component or blocks, not both.");
+  const blocks =
+    input.blocks ??
+    (input.kind && input.data
+      ? [{ kind: input.kind, data: input.data }]
+      : undefined);
+  if (!blocks)
+    throw new Error(
+      `Provide kind and data for one component, or blocks for up to ${SHOW_COMPONENT_LIMIT}.`,
+    );
+  if (blocks.some((block) => block.kind === "page" || block.kind === "board"))
+    throw new Error(
+      "Page and Board are documents, not conversation components. Save a Page and use page_present.",
+    );
+  const rendered = await renderDocumentArtifacts(
+    blocksDocument(blocks, input.title ?? ""),
+    {
+      component: true,
+      componentSources: input.componentSources as unknown as
+        ComponentSource[] | undefined,
+      library,
+    },
+  );
+  const preview = await inlinePresentation(rendered.inlineHtml);
+  const builtins = listBuiltinComponents({ includeLegacy: true });
+  const warnings = blocks.flatMap((block) => {
+    const fit = builtins.find((item) => item.kind === block.kind)?.conversation;
+    return fit && fit.status !== "ready"
+      ? [
+          `${block.kind} is ${fit.status} in a conversation column${fit.note ? `: ${fit.note}` : "."}`,
+        ]
+      : [];
+  });
+  return {
+    warnings,
+    title: input.title,
+    document: rendered.document,
+    // The exact versions to keep when the same blocks are saved in a Page.
+    components: (rendered.document.content.content ?? []).map((node) => {
+      const kind = String(node.attrs?.kind);
+      if (kind !== "custom") return { kind };
+      const { componentId, version, integrity } = node.attrs?.data ?? {};
+      return { kind, componentId, version, integrity };
+    }),
+    html: rendered.html,
+    ...preview,
+    source: rendered.source,
+    persistence: { savedToProject: false, synchronized: false },
+  };
 }
 
 /**

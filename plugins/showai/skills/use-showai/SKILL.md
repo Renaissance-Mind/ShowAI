@@ -1,11 +1,24 @@
 ---
 name: use-showai
-description: 通过 ShowAI MCP 连接、查找与阅读内容，处理用户粘贴或对话附带的 ShowAI 引用与组件状态，管理项目、文件夹、侧栏、页面迁移与草稿，让多个页面的组件共用并同时修改一份共享数据，查询组件模板及引用，处理保存冲突。先核实连接和项目归属；页面创作、组件开发、模板创建分别进入专门技能。
+description: 通过 ShowAI MCP 连接、查找与阅读内容，处理用户粘贴或对话附带的 ShowAI 引用与组件状态，管理项目、文件夹、侧栏、页面迁移与草稿，让多个页面的组件共用并同时修改一份共享数据，查询组件模板及引用，处理保存冲突。先按用户要的结果选择讨论、对话展示或文档路径，保存前核实连接和项目归属；对话中直接展示组件、页面创作、组件开发、模板创建分别进入专门技能。
 ---
 
 # 使用 ShowAI
 
 Agent 通过 MCP 操作 ShowAI。App、网页、CLI 和 MCP 共用内容核心；CLI 保留服务启动、诊断与脚本用途，不作为 Agent 的另一套文档创作流程。用户只问用法时正常解释，不因本技能自动创建页面。
+
+## 选择路径
+
+先按用户要的结果选择路径，再做后面的连接与归属核对。
+
+| 请求                 | 典型说法                                                                         | 路径                                                                                                     |
+| -------------------- | -------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| 讨论或解释           | “解释一下”“这两个怎么选”                                                         | 直接回答；文字、Markdown 表格或 Mermaid 足够时不调用 ShowAI                                              |
+| 在对话里看一眼       | “画出来看看”“演示一下这个机制”“模拟参数变大会怎样”“做个对比图”“给我看个界面原型” | [show-visual](../show-visual/SKILL.md)：`show_component` 展示 1–5 个组件，不建项目、不保存，无需项目归属 |
+| 整理成文档或需要留存 | “整理成文档/报告”“做一份讲解页”“存到 ShowAI”“发给别人看”“继续改刚才那页”         | 核对连接与项目归属后进入 [show-document](../show-document/SKILL.md)                                      |
+| 先展示、后保存       | 展示之后用户说“存下来”“把刚才几张图整理成文档”                                   | 只存这几个组件时，把同一份 {kind,data} 原样写入 Page；多次展示合成一份文档时走四个阶段，已有展示作为材料 |
+
+判断依据是结果是否需要留存、继续编辑或交给别人，不是内容复杂度或组件数量。没有留存信号、也不是续改已有 Page 时，可视化按对话展示处理。展示不写入任何内容库，内容归属只在保存时确定。文档路径的连接或保存失败不改用展示，展示失败也不自动建项目。
 
 ## 核对连接和归属
 
@@ -25,7 +38,7 @@ Agent 通过 MCP 操作 ShowAI。App、网页、CLI 和 MCP 共用内容核心�
 
 源 Page 包含结构化内容树、稳定节点 ID、布局与组件数据。Page 按顺序阅读，Board 表达空间关系，两者可以嵌套。组件负责把数据渲染成图形与交互；模板提供复用结构。页面引用精确组件版本与指纹。
 
-内容库与代码目录不同。本机默认库是 `~/.showai`，以实际连接为准。HTML 是阅读交付物；HTML 所在目录不证明有无源 Page。正式文档默认在已选项目中保存为一份 Page，再按需要展示。只有用户明确要独立文件、独立展示或不入库时才用 `render_document`；其中 `savedToProject=false` 必须如实说明。
+内容库与代码目录不同。本机默认库是 `~/.showai`，以实际连接为准。HTML 是阅读交付物；HTML 所在目录不证明有无源 Page。正式文档默认在已选项目中保存为一份 Page，再按需要展示。对话中看一眼的组件用 `show_component`；需要一份完整独立文件但不入库时才用 `render_document`。两者都返回 `savedToProject=false`，必须如实说明。
 
 ## 模板阶段与会话
 
@@ -49,6 +62,7 @@ Agent 通过 MCP 操作 ShowAI。App、网页、CLI 和 MCP 共用内容核心�
 | 阅读数据、长页局部                   | 默认 structured；先 `detail:"outline"` 获取节点 ID，再用 `blockIds` 取局部；纯源读取用 `rendered:false`                                                                                                                                                                                    |
 | 理解 Board、从裁切图定位 Page 或对象 | `board_read` 默认图像包 → 同一 snapshotId 的 tile/region/element/source；Page 完整源用 `page_read` 的 snapshotId/blockIds；见 [Board 与 Page 阅读](../show-document/references/page-reading.md)                                                                                            |
 | 查看布局或操作效果                   | `page_read` 的 image / html；读取 [阅读视图](../show-document/references/page-reading.md)，遵循宿主实际 UI 操控规则                                                                                                                                                                        |
+| 在对话中直接展示 1–5 个组件          | [show-visual](../show-visual/SKILL.md)，不建项目、不保存                                                                                                                                                                                                                                   |
 | 创建、修改、展示、导出或应用模板     | [show-document](../show-document/SKILL.md)                                                                                                                                                                                                                                                 |
 | 查询组件或模板                       | `catalog_list({kind:"component"或"template",projectId})` 读取相应目录元信息；模板先用 template_context 与 template_guide，组件再按需取 guide/schema；公开目录用 public_catalog_list/describe                                                                                               |
 | 创建可复用组件                       | [create-component](../create-component/SKILL.md)                                                                                                                                                                                                                                           |
@@ -82,7 +96,7 @@ Agent 通过 MCP 操作 ShowAI。App、网页、CLI 和 MCP 共用内容核心�
 
 组件状态（宿主模型上下文的 `showai.components`，或内置 Agent 消息附带的组件状态）是读者在组件里当前的探索结果，例如滑块参数：含 blockId、componentId、name、label 与 model。它属于同一消息所指的页面：内置 Agent 消息的目标页面，或对话预览上下文中 `showai.reference`、`showai.readerState` 给出的 projectId 与 pageId；无法确定页面时询问用户。它没有保存到页面，用于理解“按这个参数”“为什么这里变平”这类问题；用户要求保留时，读取当前页面与该组件的 [参数契约](../create-component/references/parameter-contract.md)，只把契约中的参数按 [show-document](../show-document/SKILL.md) 的组件修改方式写入 data；派生值与 label 不保存。
 
-对话预览还会自动附带控件的最新取值 `showai.readerState`，见 [对话展示](../show-document/references/conversation-display.md)。组件状态是读者主动交出的那一刻，控件取值可能更新；两者不一致时说明差异，按用户这次的意图选择。
+对话预览还会自动附带控件的最新取值 `showai.readerState`，见 [宿主显示](references/host-display.md)。组件状态是读者主动交出的那一刻，控件取值可能更新；两者不一致时说明差异，按用户这次的意图选择。
 
 ## 编辑与验证
 
@@ -90,6 +104,6 @@ Agent 通过 MCP 操作 ShowAI。App、网页、CLI 和 MCP 共用内容核心�
 
 绑定共享数据的块（`page_read` 的 bindings 中列出）有自己的冲突处理，见 [共享数据](references/shared-data.md#并发与冲突)。同设备 CONFLICT / saveFailed 表示保存失败，回执带 recovery、currentHash/currentRevision 与 nextStep。`page_apply` 失败时，用 `page_diff({projectId,pageId,sinceHash:原baseHash})` 查看期间的改动并重新 `page_read` 完整当前源；改动不涉及本次节点时在当前版本上重做这些操作，以新的 baseHash/baseRevision 保存；涉及时把这些操作应用到原基线源得到整页尝试稿，再走下面的整页合并。`page_save` 的整页尝试稿用 `page_merge_preview({projectId,pageId,baseRevision:原baseRevision,document:尝试稿})`，它返回合并候选 document 与 conflicts；逐项处理 conflicts，重叠且无法从用户意图判断时询问用户，再用 `page_merge_save({projectId,pageId,baseRevision,currentRevision:冲突回执的currentRevision,document:处理后的候选})` 提交。放弃本次修改时告诉用户哪些修改没有保存。不能只换成新版本参数原样覆盖。本机外部文件改动用 `workspace_conflicts` 列出、`workspace_conflict` 读取，向用户说明差异，由用户决定 discard（放弃外部改动）、import（采用校验后的外部页面）或 merge（提交合并结果），再用 `workspace_resolve` 执行；外部快照仍会保留。细节查 `guide({topic:"recovery"})`。跨设备同步合并失败可能返回带来源的可见副本，后续沿用实际 document.id。阅读探索与临时预览不自动保存正文。
 
-正式内容保存后核对结果；需要展示时调用 `page_present`，沿 [对话展示](../show-document/references/conversation-display.md) 使用真实 delivery。工具成功不等于已经显示。远程同步另看 synchronization.state/error/remoteHead；本机保存不证明远端已收到。
+正式内容保存后核对结果；需要展示时调用 `page_present`，沿 [宿主显示](references/host-display.md) 使用真实 delivery。工具成功不等于已经显示。远程同步另看 synchronization.state/error/remoteHead；本机保存不证明远端已收到。
 
 页面内容历史、历史预览和版本恢复已移除。`page_diff` 只把当前页面与运行时保留的读取或草稿基线比较，sinceHash 取之前 `page_read` 返回的 hash 或 revision，或用户引用中的 revision；基线不可用时返回 MISSING_BASELINE，此时说明无法比较并重新读取，不能提供更早的历史。页面同步只传当前内容、组件依赖与资源；阅读和导出按需生成 HTML。保存冲突保留尝试稿，以实际返回的基线和当前内容明确处理。

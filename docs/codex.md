@@ -2,7 +2,7 @@
 
 **Language:** English | [简体中文](i18n/codex.zh-CN.md) · [Documentation](README.md)
 
-With ShowAI connected, Claude Code and Codex can answer with an interface instead of a block of text, save it as a page in your ShowAI project, and continue from your edits later. The plugin gives the agent ShowAI's tools and eight Skills; the ShowAI app keeps the pages and provides the runtime the plugin talks to. Install the app first — the plugin comes with it.
+With ShowAI connected, Claude Code and Codex can answer with an interface instead of a block of text, save it as a page in your ShowAI project, and continue from your edits later. The plugin gives the agent ShowAI's tools and nine Skills; the ShowAI app keeps the pages and provides the runtime the plugin talks to. Install the app first — the plugin comes with it.
 
 ## Install the plugin from the app
 
