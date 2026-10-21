@@ -13,7 +13,8 @@ export function scopeReaderCss(css) {
 // Page hides its content height behind an inner scrollbar, so let the active
 // root Page grow naturally. Keep spatial Boards and embedded fixed frames
 // bounded. Applying this at export time also adapts archived readers. Pages
-// with native outlines wrap the root Page in .page-outline-shell.
+// with native outlines wrap the root Page in .page-outline-shell; a visible
+// outline keeps the Page as its own scroll container so it can track position.
 export const INLINE_READER_OVERRIDES = `.portable-document { max-width: none; padding: 24px 0 12px; }
 .portable-page-heading,
 .container-page-heading:empty,
@@ -21,18 +22,18 @@ export const INLINE_READER_OVERRIDES = `.portable-document { max-width: none; pa
 .portable-options { display: none; }
 .portable-app { min-height: 0; }
 .portable-app:has(> .container-workspace > .container-main > .container-page.is-root),
-.portable-app:has(> .container-workspace > .container-main > .page-outline-shell > .container-page.is-root),
+.portable-app:has(> .container-workspace > .container-main > .page-outline-shell:not([data-outline-docked]) > .container-page.is-root),
 .portable-app > .container-workspace:has(> .container-main > .container-page.is-root),
-.portable-app > .container-workspace:has(> .container-main > .page-outline-shell > .container-page.is-root),
-.portable-app > .container-workspace > .container-main > .page-outline-shell:has(> .container-page.is-root) {
+.portable-app > .container-workspace:has(> .container-main > .page-outline-shell:not([data-outline-docked]) > .container-page.is-root),
+.portable-app > .container-workspace > .container-main > .page-outline-shell:not([data-outline-docked]):has(> .container-page.is-root) {
   height: auto;
 }
 .portable-app > .container-workspace > .container-main:has(> .container-page.is-root),
-.portable-app > .container-workspace > .container-main:has(> .page-outline-shell > .container-page.is-root) {
+.portable-app > .container-workspace > .container-main:has(> .page-outline-shell:not([data-outline-docked]) > .container-page.is-root) {
   flex: none;
 }
 .portable-app > .container-workspace > .container-main > .container-page.is-root,
-.portable-app > .container-workspace > .container-main > .page-outline-shell > .container-page.is-root {
+.portable-app > .container-workspace > .container-main > .page-outline-shell:not([data-outline-docked]) > .container-page.is-root {
   height: auto;
   overflow: visible;
   overscroll-behavior: auto;
