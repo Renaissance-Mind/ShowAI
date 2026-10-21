@@ -389,9 +389,11 @@ try {
   assert.ok(expandBounds);
   await page.mouse.move(expandBounds.x+expandBounds.width/2,expandBounds.y+expandBounds.height/2);
   await page.mouse.down();
+  assert.ok((await object(nestedPageId).getAttribute("class")).split(/\s+/).includes("is-selected"),"Pressing an embedded toolbar must retain its selected child");
   await page.mouse.move(expandBounds.x+expandBounds.width/2+100,expandBounds.y+expandBounds.height/2-70,{steps:8});
   await page.mouse.up();
   assert.equal(await page.locator(".container-workspace-bar").count(),0,"A real toolbar drag must not activate its starting button");
+  assert.ok((await object(nestedPageId).getAttribute("class")).split(/\s+/).includes("is-selected"),"Dragging an embedded toolbar must retain its selected child");
   await expandSelected.click();
   await page.locator(".container-workspace-bar").waitFor();
   assert.equal(await page.locator(".container-workspace-bar").count(), 1);

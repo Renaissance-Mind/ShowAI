@@ -409,8 +409,14 @@ export function SurfaceObject({
       tabIndex={-1}
       onPointerDown={(event) => {
         // A secondary click keeps a multi-selection for its context menu,
-        // which selects an unselected object itself.
-        if (event.defaultPrevented || event.button !== 0) return;
+        // which selects an unselected object itself. An embedded surface's UI
+        // owns its interaction without selecting the outer container object.
+        if (
+          event.defaultPrevented ||
+          event.button !== 0 ||
+          (event.target as Element).closest("[data-surface-ui]")
+        )
+          return;
         if (
           isTextPointerTarget(
             event.target as Element,
