@@ -6,7 +6,7 @@ import {createElement} from "react";
 import {renderToStaticMarkup} from "react-dom/server";
 import {startBrowserServer} from "../browser/server";
 import type {LoadedPage} from "../studio/page-session";
-import InkConflictInspector from "./InkConflictInspector";
+import InkConflictInspector,{acceptPreparedInkResolution} from "./InkConflictInspector";
 import {addNode} from "./editing";
 import {createPortableInk} from "./portable-ink.mjs";
 import {inkWireConflicts,inkWireResolutionCandidates,stampInkDocument} from "./ink-wire.mjs";
@@ -34,7 +34,26 @@ it("renders ordinary inline choices then resolves through the real workbench rou
   const render=(document:ShowDocument)=>renderToStaticMarkup(createElement(InkConflictInspector,{document,projectId:project.id,getDocument:()=>document,onResolve:()=>{}}));
   const inline=render(current.document);expect(inline).toContain("surface-inspector ink-conflict-inspector");expect(inline).toContain("#ff0000");expect(inline).toContain("#0000ff");
   const group=inkWireResolutionCandidates(current.document)[0],chosen=group.candidates.find(candidate=>candidate.value==="#0000ff")!;
-  const prepared=await invoke<{baseline:ShowDocument;document:ShowDocument}>("pages:prepareInkResolution",{projectId:project.id,pageId:page.document.id,choices:[{boardId:group.boardId,strokeId:group.strokeId,field:group.field,hash:chosen.hash}]});
+  const prepare=()=>invoke<{baseline:ShowDocument;document:ShowDocument}>("pages:prepareInkResolution",{projectId:project.id,pageId:page.document.id,choices:[{boardId:group.boardId,strokeId:group.strokeId,field:group.field,hash:chosen.hash}]});
+  for(const change of [
+   (draft:ShowDocument)=>{draft.title="New title during real preparation"},
+   (draft:ShowDocument)=>{draft.comments=[{id:"during-prepare",text:"New comment",createdAt:draft.createdAt,resolved:false}]},
+   (draft:ShowDocument)=>{draft.createdAt="2026-01-01T00:00:00Z"},
+   (draft:ShowDocument)=>{(draft as any).futureMetadata={mustKeep:["unknown",null]}},
+  ]){
+   const draft=structuredClone(current.document),pending=prepare();let applied=false;
+   change(draft);const edited=structuredClone(draft);
+   await expect(acceptPreparedInkResolution(pending,()=>draft,()=>{applied=true},"Actual preparation became stale")).rejects.toThrow("Actual preparation became stale");
+   expect(applied).toBe(false);expect(draft).toEqual(edited);
+  }
+  const acknowledged=structuredClone(current.document),pendingTimestamp=prepare();let accepted:ShowDocument|undefined;
+  acknowledged.updatedAt="2026-10-21T20:50:00Z";
+  await acceptPreparedInkResolution(pendingTimestamp,()=>acknowledged,next=>{accepted=next},"Must permit storage timestamp only");
+  expect(accepted?.content.content![0].attrs!.color).toBe("#0000ff");
+  let preparedDocument:ShowDocument|undefined;
+  const prepared=await prepare();
+  await acceptPreparedInkResolution(Promise.resolve(prepared),()=>current.document,next=>{preparedDocument=next},"Normal source must match");
+  expect(preparedDocument).toBe(prepared.document);
   expect(prepared.baseline).toEqual(current.document);
   const head=prepared.document.content.attrs!.inkState.strokes.stroke.fields.color;
   expect(head).toHaveLength(1);expect(head[0][0]).toMatch(/^wire-device-/);

@@ -5,10 +5,17 @@ import type { ShowDocument } from "../types";
 import { desktop, errorMessage } from "../studio/bridge";
 import { useTranslator } from "../i18n/react";
 import messages from "../i18n/messages/inkConflicts";
-import { canonicalInkJSON } from "./ink-operations.mjs";
+import { nativeDocumentBodiesEqual } from "./native-document-content";
 import { inkWireResolutionCandidates } from "./ink-wire.mjs";
 
-const content = (document: ShowDocument) => canonicalInkJSON({ id: document.id, content: document.content, layout: document.layout ?? {}, surfaceViews: document.surfaceViews ?? {}, icon: document.icon ?? null });
+/** The prepare request may race any editor field, including metadata outside
+ * the canvas. Only the storage acknowledgement timestamp is non-authoring. */
+export async function acceptPreparedInkResolution(preparation:Promise<{baseline:ShowDocument;document:ShowDocument}>,
+  getDocument:()=>ShowDocument,onResolve:(document:ShowDocument)=>void,staleMessage:string){
+  const prepared=await preparation;
+  if(!nativeDocumentBodiesEqual(prepared.baseline,getDocument()))throw new Error(staleMessage);
+  onResolve(prepared.document);
+}
 
 /** One badge within the existing inspector; all choices become real persisted
  * author events before the owning PageSession performs its normal CAS save. */
@@ -29,9 +36,7 @@ export default function InkConflictInspector({ document, projectId, host, before
     setBusy(true); setError("");
     try {
       if (beforeResolve && !await beforeResolve()) throw new Error(t("saved"));
-      const prepared = await desktop.invoke<{ baseline: ShowDocument; document: ShowDocument }>("pages:prepareInkResolution", { projectId, pageId: document.id, choices: [{ boardId: group.boardId, strokeId: group.strokeId, field: group.field, hash }] });
-      if (content(prepared.baseline) !== content(getDocument())) throw new Error(t("stale"));
-      onResolve(prepared.document);
+      await acceptPreparedInkResolution(desktop.invoke<{ baseline: ShowDocument; document: ShowDocument }>("pages:prepareInkResolution", { projectId, pageId: document.id, choices: [{ boardId: group.boardId, strokeId: group.strokeId, field: group.field, hash }] }),getDocument,onResolve,t("stale"));
     } catch (failure) { setError(errorMessage(failure)); }
     finally { setBusy(false); }
   };
