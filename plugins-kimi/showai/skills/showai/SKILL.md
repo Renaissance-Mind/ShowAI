@@ -15,7 +15,7 @@ Agent使用已连接的ShowAI MCP工具操作文档。宿主负责本机或远�
 
 ## 对话展示
 
-用户只想在对话里看一眼图表、示意、模拟或对比，没有提保存、文档、分享或续改已有页面时，不建项目：读所选组件的guide后调用show_component({kind,data})，或用blocks一次展示最多5个组件，delivery选fragment-file。把返回的delivery.inline文件原样写入Widget的workspace/index.html并执行显示动作；不要用compact或CDN阅读器。组件索引标为conversation:"limited"且说明需要联网的组件（G2图表、外部图形套件、PDF）在本宿主无法离线显示，改选其他组件或用delivery:"image"。正文只写画面要点，并说明没有保存。用户随后要保存时，按下文确定项目，把同一份{kind,data}原样作为page_create的blocks写入，再page_present。
+用户只想在对话里看一眼图表、示意、模拟或对比，没有提保存、文档、分享或续改已有页面时，不建项目：读所选组件的guide后调用show_component({kind,data})，或用blocks一次展示最多5个组件，delivery选fragment-file。把返回的delivery.inline文件原样写入Widget的workspace/index.html并执行显示动作；不要用compact或CDN阅读器。组件索引标为conversation:"limited"且说明需要联网的组件（如少数G2图表、外部图形套件、PDF）在本宿主无法离线显示，改选其他组件或用delivery:"image"。正文只写画面要点，并说明没有保存。用户随后要保存时，按下文确定项目，把同一份{kind,data}原样作为page_create的blocks写入，再page_present。
 
 保存后调用page_present。blockIds只选择inline预览，完整HTML/source仍保留全页。远程操作另核对synchronization状态；展示或本机保存成功不证明远端已同步。
 
