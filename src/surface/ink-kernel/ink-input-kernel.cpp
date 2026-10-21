@@ -175,6 +175,29 @@ static void rebuild(State *s,uint32_t dirty,bool finishing){
     ++s->generation;
 }
 static uint32_t sampleCount(const State *s){return !total(s)?0:s->curves?curves(s)[s->curves-1].sample_offset+curves(s)[s->curves-1].steps:1;}
+// Private test-TU work accounting; no production storage, exports or ABI.
+#ifdef SHOWAI_INK_INPUT_EXPORT_WORK
+struct StrokeExportWork {
+  uint64_t lookup_comparisons = 0, curve_advances = 0, segments = 0;
+};
+static StrokeExportWork strokeExportWork;
+#endif
+static uint32_t strokeCurveForSegment(const State *s, uint32_t start) {
+  uint32_t lo = 0, hi = s->curves;
+  // Match the old forward seek exactly: an interval at a shared endpoint
+  // belongs to the NEXT fitted curve, hence upper_bound(last_raw<=start).
+  while (lo < hi) {
+#ifdef SHOWAI_INK_INPUT_EXPORT_WORK
+    ++strokeExportWork.lookup_comparisons;
+#endif
+    uint32_t middle = lo + (hi - lo) / 2;
+    if (curves(s)[middle].last_raw <= start)
+      lo = middle + 1;
+    else
+      hi = middle;
+  }
+  return lo;
+}
 static bool exportOverlap(const void *a, uint64_t an, const void *b,
                           uint64_t bn) {
   if (!an || !bn)
@@ -251,9 +274,9 @@ SAInkStatus sa_input_copy_stroke_segments(const void *p, uint32_t start,
     return SA_INK_INVALID;
   if (capacity < count)
     return SA_INK_CAPACITY;
-  uint32_t curveIndex = 0;
-  while (curveIndex < s->curves && curves(s)[curveIndex].last_raw <= start)
-    ++curveIndex;
+  if (!count)
+    return SA_INK_OK;
+  uint32_t curveIndex = strokeCurveForSegment(s,start);
   for (uint32_t i = 0; i < count; i++) {
     uint32_t index = start + i;
     SAInkInputStrokeSegment result{};
@@ -267,8 +290,12 @@ SAInkStatus sa_input_copy_stroke_segments(const void *p, uint32_t start,
           filtered(s)[0].values[3] * .5;
     } else {
       while (curveIndex + 1 < s->curves &&
-             curves(s)[curveIndex].last_raw <= index)
+             curves(s)[curveIndex].last_raw <= index) {
         ++curveIndex;
+#ifdef SHOWAI_INK_INPUT_EXPORT_WORK
+        ++strokeExportWork.curve_advances;
+#endif
+      }
       const auto &c = curves(s)[curveIndex];
       double span = c.last_raw - c.first_raw,
              lo = double(index - c.first_raw) / span,
@@ -285,6 +312,9 @@ SAInkStatus sa_input_copy_stroke_segments(const void *p, uint32_t start,
       result.geometry.radius[1] = filtered(s)[index + 1].values[3] * .5;
     }
     out[i] = result;
+#ifdef SHOWAI_INK_INPUT_EXPORT_WORK
+    ++strokeExportWork.segments;
+#endif
   }
   return SA_INK_OK;
 }
