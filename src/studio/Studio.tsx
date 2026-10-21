@@ -1214,10 +1214,7 @@ export default function Studio() {
       );
     }
     if (disposition !== "current")
-      return workspace.open(
-        libraryEntry(target),
-        disposition === "foreground-tab",
-      );
+      return workspace.open(libraryEntry(target));
     return target.kind === "page"
       ? openPage(target.id, target.projectId)
       : openProject(
@@ -1260,7 +1257,6 @@ export default function Studio() {
           icon: meta.icon,
           scrollTop: 0,
         },
-        disposition === "foreground-tab",
       );
     workspace.rememberScroll();
     routingRef.current = true;
@@ -2632,7 +2628,8 @@ export default function Studio() {
       event.preventDefault();
       if (!(await openTarget(target, disposition)))
         throw new Error(t("resolveDraftFirst"));
-      if (disposition === "foreground-tab") setRevealNode(result.blockId);
+      if (disposition === "tab" || disposition === "foreground-tab")
+        setRevealNode(result.blockId);
       return;
     }
     const scope = result.projectId
