@@ -11,14 +11,15 @@ const clang = process.env.SHOWAI_INK_CLANG || 'clang++';
 const linker = process.env.SHOWAI_INK_WASM_LD || 'wasm-ld';
 const temporary = await mkdtemp(join(tmpdir(), 'showai-ink-wasm-'));
 const hash = bytes => createHash('sha256').update(bytes).digest('hex');
-const sources = ['include/showai_ink.h', 'showai_ink.cpp', 'include/ink-input-kernel.h', 'ink-input-kernel.cpp', 'include/analytic-path.h', 'analytic-path.cpp', 'include/module.modulemap'];
+const sources = ['include/showai_ink.h', 'showai_ink.cpp', 'include/ink-input-kernel.h', 'ink-input-kernel.cpp', 'include/analytic-path.h', 'analytic-path.cpp', 'include/ink-stroke-kernel.h', 'ink-stroke-kernel.cpp', 'include/module.modulemap'];
 const compilerFlags = ['--target=wasm32-unknown-unknown', '-mbulk-memory', '-std=c++17', '-O3', '-ffp-contract=off', '-fno-exceptions', '-fno-rtti', '-fno-builtin', '-nostdlib'];
 try {
-  const object = join(temporary, 'ink.o'), inputObject = join(temporary, 'input.o'), analyticObject = join(temporary, 'analytic.o'), wasm = join(temporary, 'ink.wasm');
+  const object = join(temporary, 'ink.o'), inputObject = join(temporary, 'input.o'), analyticObject = join(temporary, 'analytic.o'), strokeObject = join(temporary, 'stroke.o'), wasm = join(temporary, 'ink.wasm');
   execFileSync(clang, [...compilerFlags, '-c', join(source, 'showai_ink.cpp'), '-o', object], { stdio: 'inherit' });
   execFileSync(clang, [...compilerFlags, '-c', join(source, 'ink-input-kernel.cpp'), '-o', inputObject], { stdio: 'inherit' });
   execFileSync(clang, [...compilerFlags, '-c', join(source, 'analytic-path.cpp'), '-o', analyticObject], { stdio: 'inherit' });
-  execFileSync(linker, ['--no-entry', '--export-all', '--allow-undefined', '--stack-first', '-z', 'stack-size=131072', '--initial-memory=262144', '--max-memory=268435456', object, inputObject, analyticObject, '-o', wasm], { stdio: 'inherit' });
+  execFileSync(clang, [...compilerFlags, '-c', join(source, 'ink-stroke-kernel.cpp'), '-o', strokeObject], { stdio: 'inherit' });
+  execFileSync(linker, ['--no-entry', '--export-all', '--allow-undefined', '--stack-first', '-z', 'stack-size=131072', '--initial-memory=262144', '--max-memory=268435456', object, inputObject, analyticObject, strokeObject, '-o', wasm], { stdio: 'inherit' });
   const bytes = await readFile(wasm);
   const module = new WebAssembly.Module(bytes);
   const imports = WebAssembly.Module.imports(module);
