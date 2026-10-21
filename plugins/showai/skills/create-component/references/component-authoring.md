@@ -34,7 +34,7 @@ Archify、Diagram Design 和 Fireworks 技术图带有固定上游提交的完�
 - `onContext({model, private?, label?})`：`model` 是模型可见的 JSON（不超过 8 KiB），随读者下一条消息进入对话；`private` 只返回给同一组件实例，用于恢复滑块位置、视图等，Agent 看不到；`label` 是输入框标签上的短文字（不超过 80 字）。整份快照不超过 16 KiB，只接受有限的 JSON 值，格式错误或超限时抛出错误。调用必须紧随读者的操作（例如点击「交给对话」），否则返回 false；成功返回 true。
 - `context`：这个实例仍在对话输入框中等待发送的快照（含 `private`），组件挂载时据此恢复状态；没有时为 undefined。它只在挂载时提供，之后由组件自己维护状态。
 
-宿主行为：工作台把 `model` 作为可删的组件状态标签放进内置 Agent 输入框，第一次交出时打开对话面板，再次交出更新同一标签，读者移除标签后它不随消息发送；MCP Apps 预览经 `ui/update-model-context` 交给宿主，与引用、控件取值合为一份上下文。任何宿主都不会写入页面 props、不会自动发送消息，也不会启动 Agent。导出 HTML、组件预览、缩略图和不接受模型上下文的宿主不提供 `onContext`，此时不显示交给对话的控件。
+宿主行为：工作台把 `model` 作为可删的组件状态标签放进内置 Agent 输入框，第一次交出时打开对话面板，再次交出更新同一标签，读者移除标签后它不随消息发送；MCP Apps 预览经 `ui/update-model-context` 交给宿主，与引用、控件取值合为一份上下文。任何宿主都不会写入页面 props、不会自动发送消息，也不会启动 Agent。导出 HTML、组件目录中的预览、缩略图、没有页面身份的 show_component 视图和不接受模型上下文的宿主不提供 `onContext`，此时不显示交给对话的控件。
 
 ```jsx
 export default function Explorer({ data, onContext, context }) {
@@ -45,7 +45,12 @@ export default function Explorer({ data, onContext, context }) {
       type="button"
       onClick={() =>
         onContext({
-          model: { gamma, omega: data.omega, regime, changedFromSaved: gamma !== data.gamma },
+          model: {
+            gamma,
+            omega: data.omega,
+            regime,
+            changedFromSaved: gamma !== data.gamma,
+          },
           private: { gamma },
           label: `γ=${gamma} · ${regime}`,
         })
@@ -80,7 +85,6 @@ export default function Explorer({ data, onContext, context }) {
 机制组件保持稳定对象与状态身份，变化、继承和固定条件使用可解释的编码；比较组件保持共同维度、缺项和来源。空态、筛选无结果、输入更新后的失效选择、恢复操作和静态展开属于同一阅读任务。避免仅添加通用缩放或折叠后就声称支持机制理解或条件比较。
 
 嵌入组件中的阅读面板要在实际宿主里检查可见性和焦点恢复。自动增高的 iframe 与宿主视口高度不同；固定定位或弹窗可能落在当前屏幕外。详情较长时优先使用组件内的视图切换，并在返回时恢复选择与焦点。只检查顶层页面中的组件，不能证明嵌入后同样可用。
-
 
 ## Page 原生目录组件
 

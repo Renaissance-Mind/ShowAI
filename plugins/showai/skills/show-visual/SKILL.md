@@ -9,14 +9,14 @@ description: 在对话中直接展示 1–5 个 ShowAI 组件（图表、示意�
 
 ## 先判断
 
-- **值不值得画。** 文字、Markdown 表格或 Mermaid 已经讲清时直接回答，不调用 ShowAI。画面要让读者看出文字说不清的关系、变化、空间结构，或能亲手调整参数。
+- **值不值得画。** 文字、Markdown 表格或 Mermaid 已经讲清时直接回答，不调用 ShowAI。画面要让读者看出文字说不清的关系、变化、空间结构，或能亲手调整参数。用户明确要某种图时直接画。
 - **是不是展示。** 请求提到保存、文档、报告、项目、分享、发给别人，或是在续改一份已有 Page 时，进入 [show-document](../show-document/SKILL.md)。其余可视化请求按对话展示处理。
 - **这张图回答什么。** 先写一句“读者看完能知道什么”，据此选组件、取数据；这是展示路径里唯一的意图记录。
 
 ## 制作
 
 1. **选组件。** 内置组件不需要项目：用 `public_catalog_list({kind:"component"})` 取得索引（任何连接都有）；已持有 `project_context` 的 componentCatalog 时直接沿用，它还含该项目的自定义组件。按 description、scenarios 和 signature 选一个主组件。需要并排对照或“图加一段说明”时最多放 5 个；内容再多就应整理成文档。索引条目带 `conversation: "limited"` 表示放进对话有已知限制（详情见该组件 summary 的 conversation.note，show_component 也会在 warnings 里说明），`"unsuitable"` 表示不适合放进对话，改选其他组件或整理成文档。
-   目录里没有合适的组件时，说明限制后用文字或表格回答；确实需要新表达时按 [create-component](../create-component/SKILL.md) 写组件，用 `componentSources` 预览，用户要复用时再保存。
+   目录里没有合适的组件时，先告诉用户：可以用文字或表格回答，或临时写一个组件。选择写组件时按 [create-component](../create-component/SKILL.md) 编写，用 `componentSources` 预览，格式与 `component_save` 的 source 相同（manifest、schema、source，可选 files、assets）；用户要复用时再保存。
 2. **读 guide。** 内置组件用 `public_catalog_describe({id,view:"guide"})`；项目自定义组件用 `catalog_describe({projectId,id,view:"guide"})`。按 schema 填真实数据，不补造数字；本轮已读过同一版本时不重复读。
 3. **调用。** `show_component({kind,data})`，多个组件用 `blocks:[{kind,data},…]`。data 与 `page_apply` 的 `component.insert` 完全相同。自定义组件写 `{kind:"custom",data:{componentId,version,integrity?,props}}`，integrity 取自目录条目；它保存在某个项目里时再传 `projectId`，只用于查找组件，不写入项目。开发中的组件包用 `componentSources` 预览。
 4. **回复。** 按返回的 delivery 交付（见下）。正文只写画面帮读者看出的一两点，不复述数据，不介绍工具或文件。
@@ -30,7 +30,9 @@ description: 在对话中直接展示 1–5 个 ShowAI 组件（图表、示意�
 - `compact`：把 `delivery.compact` 原样交给宿主中由模型写 HTML 的可视化工具（如 Claude 的 show_widget），按该工具自己的说明调用；片段从公共 CDN 加载阅读器。
 - `image`：结果附带 PNG，用于没有交互显示的宿主。
 
-工具成功不等于已经显示。warnings 说明宿主未声明显示能力或片段超出预算时，按宿主实际能力换一种 delivery 重试；各宿主规则见 [宿主显示](../use-showai/references/host-display.md)。读者在组件里调整的取值会以 `showai.readerState` 进入上下文，用于“按这个继续”之类的追问。
+工具成功不等于已经显示。warnings 说明宿主未声明显示能力或片段超出预算时，按宿主实际能力换一种 delivery 重试；各宿主规则见 [宿主显示](../use-showai/references/host-display.md)。读者在组件视图里调整的控件取值，在接受模型上下文的 MCP Apps 宿主中会以 `showai.readerState` 进入上下文；其他宿主没有这项，以用户的描述为准。展示没有页面身份，组件的“交给对话”和“引用到对话”不可用。
+
+`model-html` 宿主的 compact 被改成图片时，仍需要交互就减少数据或组件后重试 compact，或建议存成 Page 后用 page_present 交付完整文件。
 
 ## 之后要保存
 
