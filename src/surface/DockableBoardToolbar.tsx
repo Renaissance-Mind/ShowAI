@@ -80,7 +80,6 @@ export function DockableBoardToolbar({
     snapOrigin: { pointer: Point; gap: number } | null;
     active: boolean;
     origin: ToolbarDock;
-    pressed: HTMLElement | null;
   } | null>(null);
   const position = useRef<Point | null>(null),
     frame = useRef(0),
@@ -226,6 +225,10 @@ export function DockableBoardToolbar({
     event.preventDefault();
     event.stopPropagation();
     if (!current.active) {
+      // Until actual movement, the browser owns the pressed control's native
+      // focus/click. Taking capture on pointerdown retargets that click and
+      // breaks buttons inside an embedded editor's NodeView.
+      event.currentTarget.setPointerCapture(event.pointerId);
       current.active = true;
       position.current = toolbarCenter(
         dock,
@@ -310,8 +313,6 @@ export function DockableBoardToolbar({
     const current = drag.current;
     if (current?.id !== event.pointerId) return;
     if (!cancel) advance(event);
-    const pressed = !cancel && !current.active ? current.pressed : null;
-    event.preventDefault();
     if (current.active) {
       if (!cancel && (!mobile || current.snapped)) {
         current.pointer = pointer(event);
@@ -319,17 +320,13 @@ export function DockableBoardToolbar({
       } else restore(current.origin);
       setDragging(false);
     }
-    suppressClick.current = true;
+    suppressClick.current = current.active;
     drag.current = null;
     position.current = null;
     cancelAnimationFrame(frame.current);
     frame.current = 0;
     if (event.currentTarget.hasPointerCapture(event.pointerId))
       event.currentTarget.releasePointerCapture(event.pointerId);
-    if (pressed?.isConnected) {
-      if (event.pointerType === "mouse") pressed.focus({ preventScroll: true });
-      pressed.click();
-    }
   };
   const center =
     dragging && position.current
@@ -381,13 +378,8 @@ export function DockableBoardToolbar({
             across = horizontal(edge)
               ? (event.clientY - rect.top) / rect.height
               : (event.clientX - rect.left) / rect.width;
-          // The strip owns the contact from its start. Activate the pressed
-          // control only on a tap, after deciding that it was not a drag.
-          const pressed = (event.target as Element).closest<HTMLElement>(
-            "button,summary",
-          );
-          event.preventDefault();
-          event.currentTarget.setPointerCapture(event.pointerId);
+          // Record drag intent without cancelling a button's native tap.
+          // Capture begins only when advance observes real pointer movement.
           drag.current = {
             id: event.pointerId,
             start: { x: event.clientX, y: event.clientY },
@@ -417,7 +409,6 @@ export function DockableBoardToolbar({
                 },
             active: false,
             origin: dock,
-            pressed,
           };
         }}
         onPointerMove={advance}
