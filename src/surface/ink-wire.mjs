@@ -468,8 +468,12 @@ export function inkWireResolutionPlan(document, choices) {
  * The initial legacy snapshot uses the same deterministic wire bootstrap as all hosts. */
 export function inkCheckpointFromDocument(document, boardId) {
   const record = boards(document).get(boardId); if (!record) fail("Board is missing");
-  const state = bootstrap(record), known = {}, strokes = [];
+  const state = bootstrap(record);
   if (!metadataMatches(record, state)) fail("unstamped source must be reconciled against its actual baseline before journal import");
+  return checkpointFromWireState(document.id, boardId, state, (id, field, digest) => valueLookup(id, field, digest, [{ record, state }]));
+}
+function checkpointFromWireState(pageId, boardId, state, lookup) {
+  const known = {}, strokes = [];
   const births = new Map(Object.values(state.strokes).map(stroke => [stroke.born[1], stroke.born[0]]));
   for (const [dot, context] of Object.entries(state.contexts)) known[dot] = { anchor: true, hash: state.digests?.[dot] ?? null, ...(state.eventDigests?.[dot] ? { sourceHash: state.eventDigests[dot] } : {}), clock: clone(context), level: births.get(dot) ?? state.levels?.[dot] ?? Math.max(1, state.level) };
   for (const [actor, sequence] of Object.entries(state.clock)) {
@@ -482,7 +486,7 @@ export function inkCheckpointFromDocument(document, boardId) {
     if (known[stroke.born[1]].partial) known[stroke.born[1]].level = stroke.born[0];
     const registers = {};
     for (const [field, heads] of Object.entries(stroke.fields)) registers[field] = heads.map(([operationId, digest]) => {
-      const resolved = valueLookup(id, field, digest, [{ record, state }]);
+      const resolved = lookup(id, field, digest);
       if (!resolved.found) fail("incoming field source is unavailable");
       return { operationId, value: clone(resolved.value) };
     });
@@ -490,7 +494,7 @@ export function inkCheckpointFromDocument(document, boardId) {
   }
   const candidates = [...new Set(Object.values(state.strokes).flatMap(stroke => Object.values(stroke.fields).flat().map(([dot]) => dot)))];
   const frontier = candidates.filter(dot => !candidates.some(other => dot !== other && seen(known[other].clock, dot))).sort(compare);
-  return validateInkCheckpoint({ format: "showai-ink-checkpoint-v1", pageId: document.id, boardId, frontier, known, strokes });
+  return validateInkCheckpoint({ format: "showai-ink-checkpoint-v1", pageId, boardId, frontier, known, strokes });
 }
 
 /** Native coalesced saves export the retained replica's original dots, not the
@@ -532,4 +536,67 @@ export function inkWireDocumentFromCheckpoint(document, boardId, checkpoint) {
   const strip = node => { if (node.content) node.content = node.content.filter(child => !removedIds.has(child.attrs?.id)).map(strip); return node; };
   next.content = strip(next.content); next.layout = Object.fromEntries(Object.entries(next.layout ?? {}).filter(([id]) => !removedIds.has(id)));
   return finishInkPageMerge(next, { plans: [{ id: boardId, state: prune(state), visible }], conflicts: [] }).document;
+}
+
+/** Convert an ordinary canonical editor draft into author intent against the
+ * exact document that editor observed. Imported/stamped heads pass through;
+ * no clock from the currently retained journal is falsely attributed to it.
+ * A sparse tombstone restore has two ordered plans: source hydration, liveness.
+ * The durable adapter allocates each real operation ID and local predecessor. */
+export function inkWireEditPlans(baseline, next) {
+  if (!baseline || baseline.id !== next?.id) fail("edit plan requires the same author page baseline");
+  const beforeBoards = boards(baseline), afterBoards = boards(next), plans = [];
+  for (const boardId of new Set([...beforeBoards.keys(), ...afterBoards.keys()])) {
+    const before = beforeBoards.get(boardId), after = afterBoards.get(boardId), state = bootstrap(before);
+    if (before && !metadataMatches(before, state)) fail("edit author baseline is unstamped");
+    const supplied = after?.board.attrs.inkState ? bootstrap(after) : null;
+    const heads = [...new Set(Object.values(state.strokes).flatMap(stroke => Object.values(stroke.fields).flat().map(([dot]) => dot)))];
+    const parents = heads.filter(dot => !heads.some(other => dot !== other && seen(state.contexts[other], dot))).sort(compare);
+    const changes = [], restores = [];
+    const stamped = (id, field, value) => {
+      if (!supplied) return false;
+      const incoming = supplied.strokes[id]?.fields[field], original = state.strokes[id]?.fields[field];
+      return !!incoming?.some(([dot, digest]) => digest === hash(value) && !original?.some(([oldDot, oldDigest]) => oldDot === dot && oldDigest === digest));
+    };
+    for (const id of new Set([...Object.keys(state.strokes), ...(before?.records.keys() ?? []), ...(after?.records.keys() ?? [])])) {
+      const old = before?.records.get(id), current = after?.records.get(id), previous = state.strokes[id];
+      if (!current) {
+        if (old && !stamped(id, "alive", false)) changes.push({ kind: "delete", strokeId: id });
+        continue;
+      }
+      if (!previous) {
+        if (!stamped(id, "alive", true)) changes.push({ kind: "create", strokeId: id, node: clone(current.node), layout: clone(current.layout), placement: clone(current.placement) });
+        continue;
+      }
+      const restoring = isDeleted(previous), patch = {};
+      for (const field of fields.filter(field => field !== "alive")) {
+        const value = fieldValue(current, field);
+        if ((restoring || !equal(fieldValue(old, field), value)) && !stamped(id, field, value)) patch[field] = clone(value);
+      }
+      if (own(patch, "ink") || own(patch, "inkFragments")) {
+        patch.ink = clone(fieldValue(current, "ink")); patch.inkFragments = clone(fieldValue(current, "inkFragments"));
+      }
+      if (Object.keys(patch).length) changes.push({ kind: "edit", strokeId: id, patch });
+      if (restoring && !stamped(id, "alive", true)) restores.push({ kind: "restore", strokeId: id });
+    }
+    if (changes.length) plans.push({ boardId, parents, changes });
+    if (restores.length) plans.push({ boardId, parents, changes: restores });
+  }
+  return plans;
+}
+
+/** Import only real source heads from a draft which may also contain ordinary
+ * unstamped edits. Missing canonical source cannot be guessed from its hash.
+ * The authoring adapter imports these anchors before appending editPlans. */
+export function inkWireImportCheckpoints(baseline, next) {
+  if (!baseline || baseline.id !== next?.id) fail("draft import requires the same author page baseline");
+  const beforeBoards = boards(baseline), afterBoards = boards(next), result = [];
+  for (const boardId of new Set([...beforeBoards.keys(), ...afterBoards.keys()])) {
+    const before = beforeBoards.get(boardId), after = afterBoards.get(boardId), original = bootstrap(before);
+    if (before && !metadataMatches(before, original)) fail("edit author baseline is unstamped");
+    const state = after?.board.attrs.inkState ? bootstrap(after) : original;
+    const sources = [{ record: after, state }, { record: before, state: original }];
+    result.push({ boardId, checkpoint: checkpointFromWireState(next.id, boardId, state, (id, field, digest) => valueLookup(id, field, digest, sources)) });
+  }
+  return result;
 }

@@ -31,3 +31,5 @@ export function inkWireDocumentFromCheckpoint(document: ShowDocument, boardId: s
 export interface InkWireChoice { boardId: string; strokeId: string; field: string; hash: string }
 export function inkWireResolutionCandidates(document: ShowDocument): {boardId: string; strokeId: string; field: string; candidates: {hash: string; value: unknown; dots: string[]}[]}[];
 export function inkWireResolutionPlan(document: ShowDocument, choices: InkWireChoice[]): {boardId: string; changes: InkOperationChange[]};
+export function inkWireEditPlans(baseline: ShowDocument, next: ShowDocument): {boardId: string; parents: string[]; changes: InkOperationChange[]}[];
+export function inkWireImportCheckpoints(baseline: ShowDocument, next: ShowDocument): {boardId: string; checkpoint: InkOperationCheckpoint}[];
