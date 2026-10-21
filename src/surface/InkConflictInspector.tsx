@@ -3,14 +3,10 @@ import { createPortal } from "react-dom";
 import type { ShowDocument } from "../types";
 import { desktop, errorMessage } from "../studio/bridge";
 import { useTranslator } from "../i18n/react";
-import { defineMessages } from "../i18n";
+import messages from "../i18n/messages/inkConflicts";
 import { canonicalInkJSON } from "./ink-operations.mjs";
 import { inkWireResolutionCandidates } from "./ink-wire.mjs";
 
-const messages = defineMessages("inkConflicts", {
-  "zh-CN": { title: "笔迹冲突（{count}）", choose: "选择要保留的修改", source: "笔迹 {id}", keep: "保留笔迹", remove: "删除笔迹", variant: "版本 {index}", chooseVariant: "采用{value}", saved: "先保存当前页面后再处理冲突。", stale: "页面已变化，请等待同步完成后重新选择。", geometry: "笔迹形状", layout: "位置与大小", node: "笔迹属性", ink: "笔迹形状", inkFragments: "笔迹形状", color: "颜色", strokeWidth: "粗细", pressure: "压感", placement: "层级与顺序", alive: "保留或删除" },
-  en: { title: "Ink conflicts ({count})", choose: "Choose the edit to keep", source: "Stroke {id}", keep: "Keep stroke", remove: "Delete stroke", variant: "Version {index}", chooseVariant: "Use {value}", saved: "Save the current page before resolving conflicts.", stale: "The page changed. Wait for sync, then choose again.", geometry: "Stroke geometry", layout: "Position and size", node: "Stroke attributes", ink: "Stroke geometry", inkFragments: "Stroke geometry", color: "Color", strokeWidth: "Width", pressure: "Pressure", placement: "Layer and order", alive: "Keep or delete" },
-});
 const content = (document: ShowDocument) => canonicalInkJSON({ id: document.id, content: document.content, layout: document.layout ?? {}, surfaceViews: document.surfaceViews ?? {}, icon: document.icon ?? null });
 
 /** One badge within the existing inspector; all choices become real persisted

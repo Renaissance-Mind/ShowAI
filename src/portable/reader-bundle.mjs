@@ -138,15 +138,17 @@ const NOTE_TEXT = /\]\{|\\note(?![A-Za-z])/;
  * Optional reader capabilities a page does not need. KaTeX (code and fonts) is
  * a third of a page reader, so it stays out unless the page has formulas or
  * Markdown-like text that may still become one. Syntax grammars likewise stay
- * out unless the page has code blocks or Markdown code fences, and the hover
- * note controller unless some text or formula carries a note.
+ * out unless the page has code blocks or Markdown code fences, the hover
+ * note controller unless some text or formula carries a note, and the compiled
+ * ink kernel unless the page holds strokes or drawings.
  */
 export function readerOmissions(documents) {
   let math = false;
   let code = false;
   let notes = false;
+  let ink = false;
   const visit = (value) => {
-    if ((math && code && notes) || value === null || value === undefined)
+    if ((math && code && notes && ink) || value === null || value === undefined)
       return;
     if (typeof value === "string") {
       if (MATH_TEXT.test(value)) math = true;
@@ -163,6 +165,13 @@ export function readerOmissions(documents) {
         math = true;
       if (value.type === "annotation") notes = true;
       if (
+        value.type === "drawing" ||
+        Object.hasOwn(value, "nativeInk") ||
+        Object.hasOwn(value, "inkState") ||
+        Object.hasOwn(value, "ink")
+      )
+        ink = true;
+      if (
         value.type === "codeBlock" ||
         (value.type === "widget" && value.attrs?.kind === "code")
       )
@@ -175,6 +184,7 @@ export function readerOmissions(documents) {
     ...(code ? [] : ["code"]),
     ...(math ? [] : ["math"]),
     ...(notes ? [] : ["notes"]),
+    ...(ink ? [] : ["ink"]),
   ];
 }
 const removeRanges = (source, ranges) => {
@@ -235,6 +245,7 @@ async function compileReader(archivePath, archive, kinds, omits = []) {
   const omitMath = omits.includes("math");
   const omitCode = omits.includes("code");
   const omitNotes = omits.includes("notes");
+  const omitInk = omits.includes("ink");
   const catalogKinds = (name) =>
     JSON.parse(archive.files[`resources/catalog/${name}.json`]).map(
       (item) => item.kind,
@@ -387,6 +398,32 @@ async function compileReader(archivePath, archive, kinds, omits = []) {
               "export const invalidNoteMark = () => false;",
             ].join("\n"),
             loader: "js",
+          };
+        // Ink geometry is computed only for strokes and drawings; without any,
+        // the compiled kernel and its WebAssembly would only add weight.
+        if (omitInk && args.path === "src/surface/ink-kernel/compiled-ink.mjs")
+          return {
+            contents: [
+              "export const inkKernelProvenance = null;",
+              "export class CompiledInkKernel {",
+              '  constructor() { throw new Error("This reader was built for a page without ink."); }',
+              "}",
+            ].join("\n"),
+            loader: "js",
+          };
+        // Readers never draw: inline ink runs only with an edit handler, so the
+        // hook and the native board bridge behind it would only add weight.
+        if (args.path === "src/surface/useInlineInk.ts")
+          return {
+            contents: "export function useInlineInk() {}",
+            loader: "ts",
+          };
+        // The icon picker opens only in editable pages.
+        if (args.path === "src/studio/PageIconDialog.tsx")
+          return {
+            contents:
+              "export default function PageIconDialog() { return null; }",
+            loader: "tsx",
           };
         // Readers never edit: rich text renders through its static view, so
         // the lazily loaded ProseMirror editor would only add weight.
