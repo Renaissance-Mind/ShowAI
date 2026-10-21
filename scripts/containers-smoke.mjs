@@ -387,6 +387,7 @@ try {
   await scene(boardId)
     .getByRole("button", { name: "展开选中容器", exact: true })
     .click();
+  await page.locator(".container-workspace-bar").waitFor();
   assert.equal(await page.locator(".container-workspace-bar").count(), 1);
   assert.equal(
     await page
