@@ -62,6 +62,7 @@ function SurfaceEditor({
   inspectorHost,
   inlineInkProjectId,
   onInkSave,
+  onOpenEmbeddedSurface,
 }: {
   document: ShowDocument;
   onChange: (document: ShowDocument) => void;
@@ -75,6 +76,7 @@ function SurfaceEditor({
   inspectorHost?: HTMLElement | null;
   inlineInkProjectId?: string;
   onInkSave?: () => Promise<boolean>;
+  onOpenEmbeddedSurface?: (id:string) => void;
 }) {
   const document = useMemo(
     () => (isResource(input) ? input : upgradeResource(input)),
@@ -524,6 +526,7 @@ function SurfaceEditor({
       }}
     >
       <ContainerRuntime
+        onOpenEmbeddedSurface={onOpenEmbeddedSurface}
         document={current.current}
         geometry={geometry}
         pageWidthModes

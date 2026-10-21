@@ -134,8 +134,10 @@ export function ContainerRuntime({
   onControlsChange,
   retainedState,
   inspectorHost,
+  onOpenEmbeddedSurface,
 }: {
   document: ContainerDocument;
+  onOpenEmbeddedSurface?: (id:string) => void;
   geometry?: SurfaceGeometryStore;
   onChange?: (next: ShowDocument, group?: string) => void;
   renderContent: ContentRenderer;
@@ -232,12 +234,13 @@ export function ContainerRuntime({
   const rootId = document.content.attrs!.id;
   const focusSurface = useCallback(
     (id: string) => {
+      if(id!==rootId && onOpenEmbeddedSurface){onOpenEmbeddedSurface(id);return;}
       expand(id === rootId ? null : id);
       activate(id);
       select(null);
       inspect(null);
     },
-    [rootId],
+    [rootId,onOpenEmbeddedSurface],
   );
   const surfaceId = root.attrs!.id;
   const setSurfaceIcon = useCallback(
