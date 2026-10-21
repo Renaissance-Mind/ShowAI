@@ -356,12 +356,16 @@ export default function PageSurface({
         rootRef.current
           ?.querySelector<HTMLElement>(".board-color-picker > summary")
           ?.click();
-      } else if (
-        value === "eraser" ||
-        value === "pen" ||
-        value === "highlighter"
-      )
-        onToolChange?.(value);
+      } else if (value === "select") {
+        onToolChange?.(null);
+      } else {
+        switch (value) {
+          case "pen": case "highlighter": case "eraser":
+          case "rectangle": case "ellipse": case "arrow": case "region":
+          case "pan": case "lasso": case "text":
+            onToolChange?.(value);
+        }
+      }
     },
   });
   const board = useBoardInteraction({
