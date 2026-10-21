@@ -638,6 +638,40 @@ describe("native connections and structural commands", () => {
 });
 
 describe("content-sized object geometry", () => {
+  it("returns the actual source identity only when this materialization changes no geometry", () => {
+    const document=reconcileConnections(fixture()),store=new SurfaceGeometryStore(),bytes=JSON.stringify(document);
+    expect(store.materialize(document)).toBe(document);
+    store.measure("page",200,540); // a different rendered width is not applicable
+    expect(store.materialize(document)).toBe(document);expect(JSON.stringify(document)).toBe(bytes);
+    document.layout.page={...document.layout.page,heightMode:"auto"};
+    store.measure("page",300,540);
+    const saved=store.materialize(document);
+    expect(saved).not.toBe(document);expect(saved.layout).not.toBe(document.layout);
+    expect(saved.layout.page.contentSize).toEqual({width:300,height:540});
+    expect(document.layout.page.contentSize).toBeUndefined();
+    expect(findSurfaceNode(saved,"image")!.node).toBe(findSurfaceNode(document,"image")!.node);
+    expect(store.materialize(saved)).toBe(saved);
+    store.measure("page",300,600);
+    expect(store.materialize(saved).layout.page.contentSize!.height).toBe(600);
+    expect(saved.layout.page.contentSize!.height).toBe(540);
+  });
+  it("observes in-place node insertion and changed arrow dependencies before returning identity", () => {
+    const document=reconcileConnections(fixture()),store=new SurfaceGeometryStore();
+    expect(store.materialize(document)).toBe(document);
+    // Populate the separate render cache before an external same-root edit.
+    store.resolveArrow(arrow(document),document.layout.arrow,document);
+    document.content.content!.push(createSurface("page","New Page","new-page"));
+    document.layout["new-page"]={x:0,y:0,width:300,height:200,heightMode:"auto"};
+    store.measure("new-page",300,510);
+    const before=JSON.stringify(document),materialized=store.materialize(document);
+    expect(materialized).not.toBe(document);expect(materialized.layout["new-page"].contentSize!.height).toBe(510);
+    expect(JSON.stringify(document)).toBe(before);
+    document.layout.image={...document.layout.image,x:900};
+    const changed=store.materialize(document);
+    expect(changed).not.toBe(document);expect(ends(changed)[1].x).toBe(900);
+    expect(ends(document)[1].x).toBe(600);
+  });
+
   it("notifies only the measured target's connections and batches gesture changes", () => {
     const store = new SurfaceGeometryStore();
     let a = 0,

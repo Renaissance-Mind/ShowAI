@@ -172,6 +172,9 @@ function SurfaceEditor({
         if (settlement.generation !== generation) return;
         const before = current.current,
           measured = measureNativeSync("surface.settle.materialize",()=>geometry.materialize(before));
+        // materialize guarantees COW after observing this current tree. This
+        // only proves the geometry operation made no additional source edit.
+        if (before === measured) return;
         if (measureNativeSync("surface.settle.key",()=>contentKey(before) === contentKey(measured))) return;
         const settled = measureNativeSync("surface.settle.reconcile",()=>reconcileSurface(
           { ...measured, surfaceViews: { ...measured.surfaceViews } },

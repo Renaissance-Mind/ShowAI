@@ -115,7 +115,9 @@ export class SurfaceGeometryStore {
   }
   materialize<T extends ShowDocument>(document: T): T {
     let layout = document.layout;
-    const index = this.entries(document);
+    // Authoring observes the current tree, including any externally edited
+    // nodes on this same root reference; the render cache is not evidence.
+    const index = indexSurfaceTree(document.content);
     for (const [id, measurement] of this.measurements) {
       const frame = layout?.[id],
         node = index.get(id)?.node;
@@ -135,6 +137,6 @@ export class SurfaceGeometryStore {
       if (layout === document.layout) layout = { ...layout };
       layout![id] = { ...frame, contentSize: measurement };
     }
-    return reconcileConnections({ ...document, layout });
+    return reconcileConnections(layout === document.layout ? document : { ...document, layout });
   }
 }
