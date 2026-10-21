@@ -29,6 +29,7 @@ import { toPageEditor, fromPageEditor } from "./page-content";
 import { PageModuleContext, pageEditorNodes } from "./PageEditorNodes";
 import { mergePageContent, canCommitPageMerge } from "../core/page-merge-model";
 import InkConflictInspector from "./InkConflictInspector";
+import {nativeContentHistoryStages} from "./native-content-history";
 
 interface NativeInkHistoryAction {boardId:string;operationIds:string[];intentId?:string;strokeIds?:string[]}
 
@@ -258,7 +259,16 @@ function SurfaceEditor({
               }
             }
             const nativeAction=value.operationIds?.length?{boardId:value.boardId,operationIds:value.operationIds,strokeIds:value.historyStrokeIds}:undefined;
-            commit(merged.document,value.nativeContentAction ? `native-content:${value.nativeContentGroup??""}` : "",
+            if(value.nativeContentActions?.length){
+              if(nativeAction)throw new InkEditConflict("Native ink must reach its history boundary before object editing");
+              const plan=nativeContentHistoryStages(current.current,value.baseDocument,value.document,value.nativeContentActions);
+              if(plan.stages.length){
+                if(contentKey(current.current)!==contentKey(plan.sourceOnly))
+                  rebaseHistorySnapshots(history.current,inkActions.current,current.current,plan.sourceOnly as ContainerDocument);
+                current.current=plan.sourceOnly as ContainerDocument;
+                for(const stage of plan.stages)commit(stage.document,`native-content:${stage.groupId}`,undefined,true,false);
+              }else commit(merged.document,"",undefined,false,false);
+            }else commit(merged.document,value.nativeContentAction ? `native-content:${value.nativeContentGroup??""}` : "",
               nativeAction,!!nativeAction||value.nativeContentAction===true,false);
           }else commit(applyInkUpdate(current.current, value));
         } catch (error) {
