@@ -7,6 +7,7 @@ import {mergePageContent,canCommitPageMerge,type PageMergeConflict} from "../cor
 import {inkWireResolutionCandidates} from "./ink-wire.mjs";
 import {nativeContentHistoryStages,type NativeContentHistoryAction} from "./native-content-history";
 import {nativeDocumentBodiesEqual} from "./native-document-content";
+import {appendPortableInkFromSource} from "./portable-ink-append.mjs";
 import {applyNativeSourceDelta,diffNativeSource,shareNativeSource,type NativeSourceEdit} from "./native-source-delta.mjs";
 
 export interface SourceScope {homeId:string;projectId:string;pageId:string}
@@ -29,6 +30,7 @@ export type SourceRuntimeRequest =
  | ({kind:"publication";current:SourceSnapshotRef;publicationId:string;packet:{document:ShowDocument;baseDocument:ShowDocument;pageId?:string;[key:string]:unknown}}&Lease)
  | ({kind:"merge";base:SourceSnapshotRef;current:SourceSnapshotRef;incoming:SourceSnapshotRef;mode?:"history"}&Lease)
  | ({kind:"history";base:SourceSnapshotRef;current:SourceSnapshotRef;entries:SourceSnapshotRef[]}&Lease)
+ | {kind:"historyAppendInk";source:SourceSnapshotRef;boardId:string;strokeId:string;entries:SourceSnapshotRef[];leaseId:string}
  | {kind:"delta";base:SourceSnapshotRef;next:SourceSnapshotRef}
  | {kind:"resolve";ref:SourceSnapshotRef}
  | {kind:"serialize";ref:SourceSnapshotRef}
@@ -36,7 +38,11 @@ export type SourceRuntimeRequest =
  | {kind:"release";leaseId:string}
  | {kind:"dispose";scope:SourceScope};
 export interface SourceHistoryResult {rebasedHistory:{delta:SourceSnapshotDelta;unchanged:boolean}[]}
-export type SourceRuntimeResponse=SourceHistoryResult|SourceSnapshotDelta|{ref:SourceSnapshotRef;document:ShowDocument}|{ref:SourceSnapshotRef;json:string}|{retained:number};
+export interface SourceInkHistoryResult {
+ format:"showai-owned-ink-history-v1";source:SourceSnapshotRef;boardId:string;strokeId:string;
+ entries:{base:SourceSnapshotRef;next:SourceSnapshotRef;unchanged:boolean}[];
+}
+export type SourceRuntimeResponse=SourceInkHistoryResult|SourceHistoryResult|SourceSnapshotDelta|{ref:SourceSnapshotRef;document:ShowDocument}|{ref:SourceSnapshotRef;json:string}|{retained:number};
 export type SourceRuntimeObserver=(stage:string,durationMilliseconds:number)=>void;
 function measured<T>(observer:SourceRuntimeObserver|undefined,stage:string,operation:()=>T):T{
  if(!observer)return operation();
@@ -432,6 +438,39 @@ export class SourceRuntimeOwner {
     this.rememberPublication(current,request.publicationId,packet);
     const merged=nativeDocumentBodiesEqual(packet.baseDocument,current.document)?{document:packet.document,conflicts:[]}:mergePageContent(packet.baseDocument,current.document,packet.document);
     return this.finishPublication(current,request.publicationId,packet,merged,request.leaseId);
+   }
+   case "historyAppendInk":{
+    const source=this.get(request.source),entries=request.entries.map(ref=>this.get(ref));
+    if(!request.leaseId)fail("Ink history requires an explicit output lease");
+    if(entries.some(entry=>scopeKey(entry.ref.scope)!==scopeKey(source.ref.scope)))fail("Ink history crosses its actual home/project/page");
+    // Validate the actual sealed source even for an empty history. A caller's
+    // stroke ID or an existing target node never grants source authority.
+    appendPortableInkFromSource(source.document,source.document,request.boardId,request.strokeId);
+    const projected=new Map<Snapshot,ShowDocument>();
+    for(const entry of entries)if(!projected.has(entry))projected.set(entry,appendPortableInkFromSource(entry.document,source.document,request.boardId,request.strokeId));
+    const refs=[source.ref,...entries.map(entry=>entry.ref)];
+    const pinned=new Set([...this.leases.values()].flatMap(ids=>[...ids]));
+    for(const ref of refs)pinned.add(ref.snapshotId);
+    const changed=[...projected].filter(([entry,body])=>body!==entry.document).length;
+    const sameScopePins=[...pinned].filter(id=>{const value=this.snapshots.get(id);return value&&scopeKey(value.ref.scope)===scopeKey(source.ref.scope)}).length;
+    if(sameScopePins+changed>this.limits.pinned)fail("Live page source retention exceeds its explicit per-scope budget");
+    let temporary:string;
+    do{temporary=`ink-history-internal-${crypto.randomUUID()}`}while(this.leases.has(temporary)||temporary===request.leaseId);
+    const created:SourceSnapshotRef[]=[],results=new Map<Snapshot,SourceSnapshotRef>();
+    this.retain(temporary,refs);
+    try{
+     for(const [entry,body]of projected){
+      if(body===entry.document){results.set(entry,entry.ref);continue}
+      // No full per-entry ink delta is materialized or returned. This exact
+      // COW body remains a draft until the ordinary actual save validator.
+      const next=this.register(source.ref.scope,body,"draft",null,undefined).next;
+      created.push(next);results.set(entry,next);this.retain(temporary,[...refs,...created]);
+     }
+     this.retain(request.leaseId,[...refs,...created]);
+     return{format:"showai-owned-ink-history-v1",source:source.ref,boardId:request.boardId,strokeId:request.strokeId,
+      entries:entries.map(entry=>({base:entry.ref,next:results.get(entry)!,unchanged:projected.get(entry)===entry.document}))};
+    }catch(error){for(const ref of created)this.forget(ref.snapshotId);throw error}
+    finally{this.leases.delete(temporary);this.prune()}
    }
    case "history":{
     const base=this.get(request.base),current=this.get(request.current),entries=request.entries.map(ref=>this.get(ref));

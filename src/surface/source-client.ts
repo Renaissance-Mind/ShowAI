@@ -1,5 +1,6 @@
 import type {ShowDocument} from "../types";
-import {SourceRuntimeOwner,SourceRuntimeError,diffOwnedSource,cloneSourceValue,ownSourceValue,freezeOwnedSource,isOwnedSource,type SourceRuntimeRequest,type SourceRuntimeResponse,type SourceScope,type SourceSnapshotRef,type SourceSnapshotDelta} from "./source-runtime";
+import {SourceRuntimeOwner,SourceRuntimeError,diffOwnedSource,cloneSourceValue,ownSourceValue,freezeOwnedSource,isOwnedSource,sameSourceRef,type SourceRuntimeRequest,type SourceRuntimeResponse,type SourceScope,type SourceSnapshotRef,type SourceSnapshotDelta} from "./source-runtime";
+import {appendPortableInkFromSource} from "./portable-ink-append.mjs";
 import {applyNativeSourceDelta,type NativeSourceEdit} from "./native-source-delta.mjs";
 import {nativeDocumentBodiesEqual} from "./native-document-content";
 
@@ -235,6 +236,45 @@ export class OwnedSourceSession {
   });
   }catch(error){await this.abandonOutputLease(leaseId);throw error}
  }
+ /** Project one actually sealed stroke into captured later history edges.
+  * The worker sends only owner refs; the UI uses the same COW operation and
+  * binds its result only to this call's checked actual transport response. */
+ async appendInkHistory(sourceDocument:ShowDocument,boardId:string,strokeId:string,documents:ShowDocument[],leaseName:string):Promise<{documents:ShowDocument[];release:()=>Promise<void>}>{
+  if(this.disposed)throw new SourceRuntimeError("SOURCE_DISPOSED","Source page is retired");
+  const source=await this.reference(sourceDocument),refs:SourceSnapshotRef[]=[];
+  for(const document of documents)refs.push(await this.reference(document));
+  const leaseId=`${this.clientId}:${leaseName}:ink-${crypto.randomUUID()}`;
+  this.pendingLeases.add(leaseId);
+  try{
+   const response=await this.transport.request({kind:"historyAppendInk",source,boardId,strokeId,entries:refs,leaseId});
+   if(this.disposed)throw new SourceRuntimeError("SOURCE_DISPOSED","Source page was retired during ink history projection");
+   const actualScope=await this.scopePromise;
+   if(!("format" in response)||response.format!=="showai-owned-ink-history-v1"||!sameSourceRef(response.source,source)||response.boardId!==boardId||response.strokeId!==strokeId||response.entries.length!==documents.length)
+    throw new SourceRuntimeError("SOURCE_PROTOCOL","Source worker did not return this captured ink history");
+   // Validate the entire descriptor before issuing any UI proof. No public
+   // adoption method accepts a caller-authored descriptor or copied owner ID.
+   response.entries.forEach((entry,index)=>{
+    this.checkedScope(entry.next,actualScope);
+    if(!sameSourceRef(entry.base,refs[index])||entry.next.format!=="showai-source-snapshot-v1"||entry.next.ownerId!==source.ownerId||entry.next.epoch!==source.epoch||typeof entry.next.snapshotId!=="string"||!entry.next.snapshotId||typeof entry.unchanged!=="boolean"||
+     (entry.unchanged?!sameSourceRef(entry.next,entry.base):entry.next.kind!=="draft"||sameSourceRef(entry.next,entry.base)))
+     throw new SourceRuntimeError("SOURCE_PROTOCOL","Ink history response differs from its captured ordered baselines");
+   });
+   const projected=documents.map(document=>appendPortableInkFromSource(document,sourceDocument,boardId,strokeId));
+   projected.forEach((document,index)=>{
+    if((document===documents[index])!==response.entries[index].unchanged)throw new SourceRuntimeError("SOURCE_PROTOCOL","Ink history owner and UI projection disagree");
+   });
+   freezeOwnedSource(response);
+   projected.forEach((document,index)=>{if(document!==documents[index])this.remember(freezeOwnedSource(document),Promise.resolve(response.entries[index].next))});
+   let released=false;
+   return{documents:projected,release:async()=>{
+    if(released)return;
+    // Publishing a projected result queues its current pin. Do not release
+    // the response's only ownership while that actual pin is still pending.
+    for(const entry of response.entries){const pin=this.pendingPins.get(key(entry.next));if(pin)await this.waitRegistration(pin)}
+    await this.transport.request({kind:"release",leaseId});this.pendingLeases.delete(leaseId);released=true;
+   }};
+  }catch(error){await this.abandonOutputLease(leaseId);throw error}
+ }
  async preparePublication(request:{publicationScope:unknown;pubId:string}):Promise<PreparedSourcePublication>{
   if(!this.transport.publication)throw new SourceRuntimeError("SOURCE_TRANSPORT","This source transport has no Native publication authority");
   this.publicationRequests.set(request.pubId,request);while(this.publicationRequests.size>8)this.publicationRequests.delete(this.publicationRequests.keys().next().value!);
@@ -334,7 +374,7 @@ export function createSourceTransport(invoke:<T>(action:string,args?:Record<stri
  if(native)return{
   sourceClientId,
   scope:async(projectId,pageId)=>{actualScope=await invoke("native:source.scope",{projectId,pageId,sourceClientId});return actualScope!},
-  request:async request=>{const ref="ref" in request?request.ref:"base" in request?request.base:"current" in request?request.current:null;const scope="scope" in request?request.scope:ref?.scope??("refs" in request?request.refs[0]?.scope:undefined)??actualScope;return await invoke("native:source.request",{projectId:scope?.projectId,pageId:scope?.pageId,sourceClientId,request});},
+  request:async request=>{const ref="ref" in request?request.ref:"base" in request?request.base:"current" in request?request.current:"source" in request?request.source:null;const scope="scope" in request?request.scope:ref?.scope??("refs" in request?request.refs[0]?.scope:undefined)??actualScope;return await invoke("native:source.request",{projectId:scope?.projectId,pageId:scope?.pageId,sourceClientId,request});},
   publication:args=>invoke("native:source.publication",{...args,sourceClientId}),
   acknowledge:async(deliveryId,ref)=>{await invoke("native:source.acknowledge",{projectId:ref.scope.projectId,pageId:ref.scope.pageId,sourceClientId,deliveryId})},
   close:async()=>{if(actualScope)await invoke("native:source.request",{projectId:actualScope.projectId,pageId:actualScope.pageId,sourceClientId,request:{kind:"dispose",scope:actualScope}})},
