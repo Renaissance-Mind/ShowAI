@@ -65,16 +65,20 @@ it("capture rejects non-JSON and cyclic graphs and preserves literal safe keys i
   expect(held.__proto__).not.toBe(original.__proto__);
   expect(() => parseOwnedJSON('{"number":1e999}')).toThrow(/non-JSON/);
 });
-it("bounds defensive capture before allocating or reading the rest of an oversized aliased graph", () => {
-  const oneMiB = captureOwnedJSON({ text: "x".repeat(1024 * 1024) });
+it("bounds only defensive new copies without rejecting already held graph reuse", () => {
+  const text = "x".repeat(128),
+    held = captureOwnedJSON({ text });
+  expect(captureOwnedJSON(Array(13).fill(held), 1024)).toHaveLength(13);
   let laterReads = 0;
   const input = {
-    many: Array(513).fill(oneMiB),
+    many: Array.from({ length: 13 }, () => ({ text })),
     get later() {
       laterReads++;
       return 1;
     },
   };
-  expect(() => captureOwnedJSON(input)).toThrow(/Source JSON capture/);
+  expect(() => captureOwnedJSON(input, 1024)).toThrow(/Source JSON capture/);
   expect(laterReads).toBe(0);
+  expect(captureOwnedJSON(held, 0)).toBe(held);
+  expect(() => captureOwnedJSON({}, Infinity)).toThrow(/capture budget/);
 });
