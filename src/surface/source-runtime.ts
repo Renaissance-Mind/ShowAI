@@ -149,7 +149,7 @@ export interface NativePublicationOrigin {
  boardId:string;token:string;sourceVersion:number;
 }
 type NativePublicationPacket={document:ShowDocument;baseDocument:ShowDocument;pageId?:string;[key:string]:unknown};
-interface PublicationEntry {packet:NativePublicationPacket;canonical?:ShowDocument}
+interface PublicationEntry {packet:NativePublicationPacket;canonical?:ShowDocument;canonicalBase?:ShowDocument}
 interface PublicationOriginRecord {identity:NativePublicationOrigin;packet:NativePublicationPacket}
 interface Snapshot {ref:SourceSnapshotRef;document:ShowDocument;candidates:SourceSnapshotDelta["inkCandidates"];conflicts:PageMergeConflict[];nativeOrigin?:PublicationOriginRecord}
 /** Same synchronous service runs in Native JSC, a browser worker or Node.
@@ -174,7 +174,7 @@ export class SourceRuntimeOwner {
   for(const child of metric.children)this.account(child,direction);
  }
  private forget(id:string){const entry=this.snapshots.get(id);if(entry){this.snapshots.delete(id);this.account(entry.document,-1);if(entry.nativeOrigin)this.account(entry.nativeOrigin,-1)}}
- private forgetPublication(key:string){const entry=this.publications.get(key);if(entry){this.publications.delete(key);this.account(entry.packet,-1);if(entry.canonical)this.account(entry.canonical,-1)}}
+ private forgetPublication(key:string){const entry=this.publications.get(key);if(entry){this.publications.delete(key);this.account(entry.packet,-1);if(entry.canonical)this.account(entry.canonical,-1);if(entry.canonicalBase)this.account(entry.canonicalBase,-1)}}
  private prunePublications(){while(this.publications.size>8||this.publications.size&&this.residentBytes>this.limits.bytes)this.forgetPublication(this.publications.keys().next().value!)}
  constructor(options:{ownerId?:string;epoch?:string;maximumUnleased?:number;maximumPinned?:number;maximumResidentBytes?:number}={}){
   this.ownerId=options.ownerId??crypto.randomUUID();this.epoch=options.epoch??crypto.randomUUID();this.limits={unleased:options.maximumUnleased??64,pinned:options.maximumPinned??256,bytes:options.maximumResidentBytes??96*1024*1024};
@@ -289,11 +289,11 @@ export class SourceRuntimeOwner {
   const actual=this.get(request.ref);
   return actual.nativeOrigin&&this.validatedBodies.has(actual.document)&&!diffNativeSource(actual.document,request.document).length?actual.nativeOrigin.identity:null;
  }
- private finishPublication(current:Snapshot,publicationId:string,packet:{document:ShowDocument;baseDocument:ShowDocument;[key:string]:unknown},merged:{document:ShowDocument;conflicts:PageMergeConflict[]},leaseId?:string,observer?:SourceRuntimeObserver,parsedDocument?:()=>ShowDocument):SourceSnapshotDelta{
+ private finishPublication(current:Snapshot,publicationId:string,packet:{document:ShowDocument;baseDocument:ShowDocument;[key:string]:unknown},merged:{document:ShowDocument;conflicts:PageMergeConflict[]},leaseId?:string,observer?:SourceRuntimeObserver,parsedDocument?:()=>ShowDocument,actualCanonicalResult?:ShowDocument):SourceSnapshotDelta{
   if(!canCommitPageMerge(merged))throw new SourceRuntimeError("SOURCE_MERGE_CONFLICT","Native publication requires explicit conflict resolution");
   const actions=packet.nativeContentActions as NativeContentHistoryAction[]|undefined;
   if(actions?.length&&!leaseId)fail("Native history publication requires an explicit response lease");
-  const normalized=measured(observer,"normalize",()=>parsedDocument?normalizeParsedSourceDocument(parsedDocument()):normalizeSourceDocument(merged.document));
+  const normalized=actualCanonicalResult??measured(observer,"normalize",()=>parsedDocument?normalizeParsedSourceDocument(parsedDocument()):normalizeSourceDocument(merged.document));
   const result=this.register(current.ref.scope,normalized,"normalized",current,leaseId,merged.conflicts,undefined,observer);
   measured(observer,"history",()=>{if(actions?.length){
    const plan=nativeContentHistoryStages(current.document,packet.baseDocument,packet.document,actions,{baseline:packet.baseDocument,current:current.document,incoming:packet.document,result:merged});
@@ -328,6 +328,51 @@ export class SourceRuntimeOwner {
   const result=this.finishPublication(current,request.publicationId,request.packet,request.result,request.leaseId,observer,()=>request.result.document);
   if(origin)this.bindNativeOrigin(origin,result,observer);
   return result;
+ }
+ /** Private actual-Native producer only. A canonical current UI baseline is
+  * not a foreign edit of the raw captured writer baseline. Do not reconstruct
+  * unchanged rich leaves through a three-way merge merely to add Native ink.
+  * Native content/history actions deliberately keep their existing full route. */
+ private unchangedNativePublication(current:Snapshot,request:{publicationId:string;sourceVersion:number;packet:NativePublicationPacket;leaseId?:string},entry:PublicationEntry,observer?:SourceRuntimeObserver):SourceSnapshotDelta|null{
+  const packet=entry.packet;
+  if(packet.nativeContentAction===true||(Array.isArray(packet.nativeContentActions)&&packet.nativeContentActions.length))return null;
+  if(!isDocumentTimestamp(current.document.updatedAt))return null;
+  let unchanged=false;
+  const origin=current.nativeOrigin;
+  if(origin&&this.validatedBodies.has(current.document)&&origin.identity.publicationId===request.publicationId&&scopeKey(origin.identity.scope)===scopeKey(current.ref.scope)){
+   // Same actually proved P after a failed save/ACK; timestamp-only COW has
+   // already retained its official model/capacity proof, not a caller token.
+   unchanged=!diffNativeSource(origin.packet,packet).length;
+  }
+  if(!unchanged){
+   let base:ShowDocument;
+   if(origin&&this.validatedBodies.has(current.document)&&!diffNativeSource(origin.packet.document,packet.baseDocument).length)base=current.document;
+   else{
+    base=entry.canonicalBase??measured(observer,"unchanged.normalizeBase",()=>freezeOwnedSource(normalizeSourceDocument(packet.baseDocument)));
+    if(!entry.canonicalBase){entry.canonicalBase=base;if(this.publications.get(scopeKey(current.ref.scope)+"\u0000"+request.publicationId)===entry)this.account(base,1)}
+   }
+   unchanged=measured(observer,"unchanged.compareBase",()=>nativeDocumentBodiesEqual(base,current.document));
+  }
+  if(!unchanged)return null;
+  // A raw/draft ref is not itself capacity proof. Equality above proves all
+  // model fields except storage time; validate that actual scalar/body too.
+  if(!this.validatedBodies.has(current.document))measured(observer,"unchanged.currentCapacity",()=>assertContent(current.document));
+  const canonical=entry.canonical??measured(observer,"unchanged.normalizeIncoming",()=>freezeOwnedSource(normalizeSourceDocument(packet.document)));
+  if(!entry.canonical){entry.canonical=canonical;if(this.publications.get(scopeKey(current.ref.scope)+"\u0000"+request.publicationId)===entry)this.account(canonical,1)}
+  const prepared=this.prepareNativeOrigin(current,request.publicationId,entry,canonical,request.sourceVersion,observer);
+  // The only pre-normalized argument is the fresh private formal factory
+  // object above; no public request or general object caller can provide it.
+  const result=this.finishPublication(current,request.publicationId,packet,{document:canonical,conflicts:[]},request.leaseId,observer,undefined,canonical);
+  this.bindNativeOrigin(prepared,result,observer);return result;
+ }
+ registerActualNativePublicationIfUnchanged(request:{current:SourceSnapshotRef;publicationId:string;sourceVersion:number;packet:NativePublicationPacket;leaseId?:string},observer?:SourceRuntimeObserver):SourceSnapshotDelta|null{
+  const current=this.get(request.current),entry=measured(observer,"rememberPublication",()=>this.rememberPublication(current,request.publicationId,request.packet));
+  return this.unchangedNativePublication(current,request,entry,observer);
+ }
+ registerActualNativeJSONIfUnchanged(raw:string,observer?:SourceRuntimeObserver):SourceSnapshotDelta|null{
+  const request=measured(observer,"parse",()=>JSON.parse(raw)) as Parameters<SourceRuntimeOwner["registerActualNativePublicationIfUnchanged"]>[0];
+  const current=this.get(request.current),entry=measured(observer,"rememberPublication",()=>this.rememberPublication(current,request.publicationId,request.packet,()=>request.packet));
+  return this.unchangedNativePublication(current,request,entry,observer);
  }
  /** Trusted adapter only: a ref or kind flag alone never proves a different
   * Swift/JSON body. The exact comparator includes every root field, timestamp,
@@ -447,4 +492,9 @@ export function normalizedSourceDocumentMatching(request:{ref:SourceSnapshotRef;
 /** Private actual-factory provenance lookup, deliberately absent from execute. */
 export function nativePublicationDocumentMatching(request:{ref:SourceSnapshotRef;document:ShowDocument}):NativePublicationOrigin|null{
  service??=new SourceRuntimeOwner();return service.nativePublicationDocumentMatching(request);
+}
+
+/** Private captured-publication factory; never accepted by execute(). */
+export function registerActualNativePublicationIfUnchanged(raw:string,observer?:SourceRuntimeObserver):string{
+ service??=new SourceRuntimeOwner();return JSON.stringify(service.registerActualNativeJSONIfUnchanged(raw,observer));
 }
