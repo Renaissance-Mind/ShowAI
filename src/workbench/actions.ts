@@ -83,6 +83,7 @@ import type {
 } from "../components/custom/types";
 import type { ComponentManifest, JsonSchema } from "../components/custom/types";
 import type { DesktopInfo } from "../desktop/bridge";
+import { resolveDocumentDatasets } from "../core/dataset-resolution";
 import {
   datasetActions,
   datasetMutationActions,
@@ -1413,7 +1414,11 @@ export function createWorkbench(
         if (selection.canceled || !selection.filePath) return null;
         await assertExportDestination(store.root, id, selection.filePath);
         if (format === "json") {
-          const source = serializeArtifact(record.document, record.components);
+          // Like HTML exports, the file carries the shared data its blocks show.
+          const document = (
+            await resolveDocumentDatasets(store, id, record.document)
+          ).document;
+          const source = serializeArtifact(document, record.components);
           await writeFile(selection.filePath, source, "utf8");
           return {
             format,

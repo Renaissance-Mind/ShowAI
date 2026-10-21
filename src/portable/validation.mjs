@@ -25,7 +25,8 @@ import { validateEventTimelineData } from "../components/blocks/event-timeline-c
 import { validatePlaygroundData } from "../components/blocks/playground-contract.mjs";
 import { validateDatabaseData } from "../components/blocks/database-contract.mjs";
 import { validateResearchData } from "../components/blocks/research-contract.mjs";
-import { BINDING_KEY, compileBinding } from "../datasets/binding.mjs";
+// Kept local so readers do not carry the binding engine; stores check bindings fully.
+const BINDING_KEY = "$binding";
 import {
   NOTE_MAX,
   invalidNoteMark,
@@ -283,11 +284,9 @@ function validateWidgetData(kind, data, path) {
   if (Object.hasOwn(data, BINDING_KEY)) {
     // The block stores a dataset binding and its own values; the component
     // props are resolved from the dataset and checked where they are rendered.
-    try {
-      compileBinding(data[BINDING_KEY]);
-    } catch (error) {
-      throw new Error(`${path}.${BINDING_KEY}: ${error.message}`);
-    }
+    const binding = data[BINDING_KEY];
+    object(binding, `${path}.${BINDING_KEY}`);
+    string(binding.dataset, `${path}.${BINDING_KEY}.dataset`, 128);
     if (kind === "custom") {
       object(data.props, `${path}.props`);
       assertContent(

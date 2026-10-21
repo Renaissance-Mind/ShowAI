@@ -45,6 +45,7 @@ import {
   type DatasetSnapshot,
 } from "./client";
 import { DatasetDialog, type DatasetDialogRequest } from "./DatasetDialog";
+import { BoundWidgetHost } from "./widget-host";
 import "./datasets.css";
 
 let shared: DatasetClient | undefined;
@@ -118,7 +119,7 @@ export function DatasetScope({
   }, [value, readOnly]);
   return (
     <ScopeContext.Provider value={value}>
-      {children}
+      <BoundWidgetHost.Provider value={host}>{children}</BoundWidgetHost.Provider>
       {dialog &&
         value &&
         createPortal(
@@ -587,3 +588,5 @@ export function SharedDataAction({
 export function sharesData(kind: string) {
   return !contentKinds.has(kind);
 }
+
+const host = { Bound: BoundWidget, Action: SharedDataAction };

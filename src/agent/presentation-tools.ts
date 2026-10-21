@@ -169,6 +169,23 @@ export function registerPresentationTools(
           },
         },
         capacities: { unit: "bytes", ...CAPACITY },
+        datasets: {
+          protocol: "showai-datasets-v1",
+          available: options.privateProjects !== false,
+          guide: "datasets",
+          tools: [
+            "dataset_list",
+            "dataset_read",
+            "dataset_create",
+            "dataset_apply",
+            "dataset_delete",
+          ],
+          pageOperations: [
+            "component.binding.set",
+            "component.binding.remove",
+            "component.props.set",
+          ],
+        },
         management: {
           protocol: "showai-workspace-management-v1",
           folders: options.privateProjects !== false,

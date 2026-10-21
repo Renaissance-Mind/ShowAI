@@ -23,8 +23,7 @@ import {
 import { downloadFile } from "./helpers";
 import type { BlockProps } from "./types";
 import "./block.css";
-import { hasBinding } from "../../datasets/binding.mjs";
-import { BoundWidget, SharedDataAction } from "../../datasets/react";
+import { BoundWidgetHost, hasBinding } from "../../datasets/widget-host";
 import { translator } from "../../i18n";
 import { useTranslator } from "../../i18n/react";
 import messages from "../../i18n/messages/widget";
@@ -100,18 +99,28 @@ class BlockBoundary extends Component<
 
 /** A block bound to a shared dataset resolves its props there first. */
 export const Widget = memo(function Widget(props: BlockProps & { kind: string }) {
-  return (
-    <>
-      <SharedDataAction {...props} />
-      {hasBinding(props.data) ? (
-        <BoundWidget
-          {...props}
-          render={(resolved) => <WidgetBody {...resolved} />}
-        />
-      ) : (
+  const host = useContext(BoundWidgetHost);
+  if (!hasBinding(props.data))
+    return (
+      <>
+        {host && <host.Action {...props} />}
         <WidgetBody {...props} />
-      )}
+      </>
+    );
+  return host ? (
+    <>
+      <host.Action {...props} />
+      <host.Bound
+        {...props}
+        render={(resolved) => <WidgetBody {...resolved} />}
+      />
     </>
+  ) : (
+    <UnavailableBlock
+      kind={props.kind}
+      data={props.data}
+      error={widgetMessages("sharedDataUnavailable")}
+    />
   );
 });
 

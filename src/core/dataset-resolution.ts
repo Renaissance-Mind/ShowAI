@@ -5,6 +5,7 @@ import {
   type BindingIssue,
 } from "../datasets/binding.mjs";
 import { visitNodes } from "../surface/document.mjs";
+import { formatPath } from "../datasets/operations.mjs";
 import { DatasetBaselines, DatasetStore, type DatasetRecord } from "./datasets";
 import { CoreError } from "./model";
 import type { FileStore } from "./store";
@@ -23,6 +24,8 @@ export interface BindingRead {
   props?: Record<string, unknown>;
   /** Items of collection mappings, by target prop. */
   mapped?: Record<string, number>;
+  /** Source record path of each mapped item (when props are included). */
+  sources?: Record<string, string>;
   issues: BindingIssue[];
   error?: string;
 }
@@ -100,6 +103,13 @@ export async function resolveDocumentDatasets(
       for (const item of resolved.projected.values())
         mapped[item.into] = (mapped[item.into] ?? 0) + 1;
       if (Object.keys(mapped).length) read.mapped = mapped;
+      if (options.includeProps && resolved.projected.size)
+        read.sources = Object.fromEntries(
+          [...resolved.projected.values()].map((item) => [
+            item.id,
+            item.source ? formatPath(item.source) : "",
+          ]),
+        );
       replacements.set(
         blockId,
         snapshotBinding(kind, node.attrs!.data, record.dataset.value),

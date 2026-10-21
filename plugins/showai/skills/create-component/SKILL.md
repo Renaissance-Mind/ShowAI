@@ -5,7 +5,7 @@ description: 通过 ShowAI MCP 创建或改造可复用 React 组件。先查目
 
 沿用已核实MCP连接、项目和页面；缺少时读 [use-showai](../use-showai/SKILL.md)。正式资源保存到目标项目；用户明确独立交付时可把相同源码对象交给render_document，不自动创建个人项目。
 
-用[设计稿](../design-presentation/references/design-draft.md)明确图形关系、状态与通过条件。组件负责稳定的数据表达和交互，实例保存本次事实；通用、专题和内容专用的复用边界分别判断。usage 的 purpose/structure/constraints 说明理解任务、视觉编码、空态、窄屏与静态方式，interactions 说明操作和保存边界；继续使用当前 documentation schema，不添加未经支持的参数。跨组件联动先核实实际接口，只有具体复用需求成立时才提炼共享能力。
+用[设计稿](../design-presentation/references/design-draft.md)明确图形关系、状态与通过条件。组件负责稳定的数据表达和交互，实例保存本次事实；通用、专题和内容专用的复用边界分别判断。usage 的 purpose/structure/constraints 说明理解任务、视觉编码、空态、窄屏与静态方式，interactions 说明操作和保存边界；继续使用当前 documentation schema，不添加未经支持的参数。跨组件联动先核实实际接口，只有具体复用需求成立时才提炼共享能力。多个页面或组件要读写同一份数据时用项目的 [共享数据](../use-showai/references/shared-data.md)，组件不自建同步接口，只需按 [组件设计](references/component-authoring.md) 的要求处理 data 与条目 id。
 
 先明确内容输入、读者操作及可见结果。先取得或复用project_context的componentCatalog；目录变化时用catalog_list更新。catalog_describe先取guide，再用view=parameters按字段/子树读取类型、含义、遗漏行为、真实例子与关系约束；schema/examples按需读取；调整数据或组合即可达到目标时复用。需要新实现时读取 [组件设计](references/component-authoring.md)及guide({topic:"component"})。读取详情或源码时沿用目录或页面引用中的scope、version、integrity，准确区分同名组件；实现开发先取development，再只取选中组件所需的source文件；修改已有组件时读取它的全部源码文件与资源，因为component_save需要完整的manifest、schema、source和files/assets。
 

@@ -16,6 +16,7 @@ import {
   surfaceViews,
 } from "../surface/containers.mjs";
 import { createHash } from "node:crypto";
+import { compileBinding, readBinding } from "../datasets/binding.mjs";
 import { validateDocument } from "../portable/validation.mjs";
 import { CoreError } from "./model";
 import {
@@ -34,6 +35,21 @@ import type {
 
 export { canonicalJson } from "./canonical";
 import { canonicalJson } from "./canonical";
+
+/** Blocks bound to shared data must carry a complete, valid binding when saved. */
+function assertBindings(document: ShowDocument) {
+  visitNodes(document.content, (node) => {
+    if (node.type !== "widget" || !readBinding(node.attrs?.data)) return;
+    try {
+      compileBinding(readBinding(node.attrs!.data));
+    } catch (error) {
+      throw new CoreError(
+        "INVALID_DATA",
+        `Block ${node.attrs?.id ?? ""} $binding: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+  });
+}
 
 /** Only document bookkeeping dates are excluded; dates in user data remain meaningful. */
 export function documentHash(document: ShowDocument): string {
@@ -62,6 +78,7 @@ export function normalizeDocument(
       error instanceof Error ? error.message : "Invalid page document.",
     );
   }
+  if (!options.validated) assertBindings(document);
   const used = new Set<string>();
   const oldIds = new Map<string, string[]>();
   const signature = (node: JSONContent) => {

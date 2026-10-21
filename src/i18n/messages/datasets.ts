@@ -72,7 +72,7 @@ export default defineMessages("datasets", {
     detachHint: "组件改为保存当前显示内容的副本，之后的修改不再同步。",
     deleteDataset: "删除这份共享数据",
     deleteBlocked: "仍有页面使用它，先在这些页面解除共享后才能删除。",
-    deleteConfirm: "删除共享数据「{name}」？此操作会写入历史，可以从历史恢复。",
+    deleteConfirm: "删除共享数据「{name}」？删除后不能在应用中撤销。",
     deleted: "共享数据已删除。",
     issues: "映射提示",
     close: "关闭",
@@ -158,7 +158,7 @@ export default defineMessages("datasets", {
     deleteBlocked:
       "Pages still use it. Stop sharing on those pages before deleting it.",
     deleteConfirm:
-      "Delete shared data “{name}”? The deletion is recorded in history and can be restored from there.",
+      "Delete shared data “{name}”? This can't be undone in the app.",
     deleted: "Shared data deleted.",
     issues: "Mapping notes",
     close: "Close",

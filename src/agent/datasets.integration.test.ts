@@ -295,6 +295,7 @@ test("two pages share one dataset; both write, merge and conflict at the field",
   expect(sourceRead.bindings[0]).toMatchObject({
     datasetId,
     mapped: { rows: 2 },
+    sources: { "task:t1": "objectives[id=o1].keyResults[id=k1].tasks[id=t1]" },
   });
   expect(rows.map((row: { id: string }) => row.id)).toEqual([
     "m1",
@@ -463,6 +464,39 @@ test("two pages share one dataset; both write, merge and conflict at the field",
     "2026-10-26",
   );
 
+  // An incomplete binding is rejected when the page is saved.
+  scheduleRead = await ok("page_read", {
+    pageId: schedule.document.id,
+    rendered: false,
+  });
+  const invalid = await call("page_apply", {
+    pageId: schedule.document.id,
+    baseHash: scheduleRead.hash,
+    baseRevision: scheduleRead.revision,
+    operations: [
+      {
+        type: "block.attrs.set",
+        blockId: database.attrs.id,
+        attrs: {
+          data: {
+            ...stored,
+            $binding: {
+              dataset: datasetId,
+              collections: [{ key: "x", into: "rows", from: "objectives" }],
+            },
+          },
+        },
+      },
+    ],
+  });
+  expect(invalid.ok).toBe(false);
+  expect(invalid.error.message).toMatch(/\[\*\]/);
+
+  const capabilities = await ok("showai_capabilities");
+  expect(capabilities.datasets).toMatchObject({
+    protocol: "showai-datasets-v1",
+    available: true,
+  });
   const guide = await ok("guide", { topic: "datasets" });
   expect(guide.tools).toContain("dataset_apply");
 }, 240_000);
