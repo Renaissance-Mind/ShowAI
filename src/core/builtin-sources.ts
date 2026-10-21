@@ -44,7 +44,10 @@ import themeContent from "../design/content.css?raw";
 import contract from "../components/blocks/primitive-contract.mjs?raw";
 import nativeInkContract from "../surface/native-ink.mjs?raw";
 import portableInkContract from "../surface/portable-ink.mjs?raw";
+import portableInkV2 from "../surface/portable-ink-v2.mjs?raw";
+import cubicInk from "../surface/cubic-ink.mjs?raw";
 import compiledInk from "../surface/ink-kernel/compiled-ink.mjs?raw";
+import inkStrokeKernel from "../surface/ink-kernel/ink-stroke-kernel.mjs?raw";
 import inkKernelWasm from "../surface/ink-kernel/ink-kernel-wasm.mjs?raw";
 import nativeBoardScene from "../surface/native-board-scene.mjs?raw";
 import nativeInkPreview from "../surface/NativeInkPreview.tsx?raw";
@@ -233,7 +236,10 @@ const sources: Record<string, string> = {
   "primitive-contract.mjs": contract,
   "native-ink.mjs": nativeInkContract,
   "portable-ink.mjs": portableInkContract,
+  "portable-ink-v2.mjs": portableInkV2,
+  "cubic-ink.mjs": cubicInk,
   "ink-kernel/compiled-ink.mjs": compiledInk,
+  "ink-kernel/ink-stroke-kernel.mjs": inkStrokeKernel,
   "ink-kernel/ink-kernel-wasm.mjs": inkKernelWasm,
   "native-board-scene.mjs": nativeBoardScene,
   "NativeInkPreview.tsx": nativeInkPreview,
