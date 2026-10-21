@@ -118,6 +118,12 @@ function field(name, value) {
   else if (name === "strokeWidth" && (!finite(value) || value < 0.5 || value > 40)) invalid("invalid stroke width");
   else if (name === "pressure" && typeof value !== "boolean") invalid("invalid pressure flag");
 }
+function validateStrokeSourceVersions(stroke){
+  if(stroke.registers.ink?.some(entry=>entry.value?.format==="showai-ink-v2")){
+    if(stroke.registers.inkFragments?.some(entry=>entry.value!==null))invalid("cubic ink cannot retain inkFragments");
+    if(stroke.registers.node?.some(entry=>Object.hasOwn(entry.value?.attrs??{},"inkInput")))invalid("cubic capture must be inside its atomic ink field");
+  }
+}
 
 export function validateInkOperation(value) {
   canonicalInkJSON(value);
@@ -201,6 +207,7 @@ export function validateInkCheckpoint(state) {
       }
       if (entries.some(entry => entries.some(other => entry !== other && observed(known[other.operationId].clock, entry.operationId)))) invalid("checkpoint register heads must be concurrent");
     }
+    validateStrokeSourceVersions(stroke);
   }
   return state;
 }
@@ -299,6 +306,7 @@ export class InkOperationReplica {
     }
     const token = String(++this.nextToken), records = [];
     for (const stroke of strokes.values()) {
+      validateStrokeSourceVersions(stroke);
       if (!stroke.registers.alive.some(entry => entry.value === false) && (!stroke.registers.node?.length || !stroke.registers.layout?.length)) invalid("restoring sparse ink requires its editable source");
       const primary = stroke.registers.ink?.[0]?.value, fragments = stroke.registers.inkFragments?.[0]?.value;
       if (primary && fragments) validateInkFragments(primary, fragments);

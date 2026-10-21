@@ -3,15 +3,18 @@ const finite = (n, min, max) => typeof n === "number" && Number.isFinite(n) && n
 const reject = message => { throw new Error(`Invalid logical ink source: ${message}`); };
 export function validateInkFragments(primary, fragments) {
   if (fragments === undefined) return;
+  if(primary?.format==="showai-ink-v2")reject("cubic ink cannot have inkFragments");
   validatePortableInk(primary);
   if (!Array.isArray(fragments) || fragments.length > 1024) reject("fragment list");
   for (const fragment of fragments) {
     validatePortableInk(fragment);
+    if(fragment.format!==primary.format)reject("fragment format must match its logical stroke");
     for (const field of ["brushVersion", "brush", "width", "opacity", "extent", "transform"])
       if (JSON.stringify(fragment[field]) !== JSON.stringify(primary[field])) reject(`fragment ${field} must match its logical stroke`);
   }
 }
 export function validateInkInput(input, primary, fragments = []) {
+  if(primary?.format==="showai-ink-v2"){if(input!==undefined)reject("cubic ink capture belongs inside ink, not attrs.inkInput");return;}
   if (input === undefined) return;
   if (!input || input.format !== "showai-input-v1" || typeof input.sourceID !== "string" || !input.sourceID || input.sourceID.length > 256 || input.composite !== "single-opacity-coverage" || input.fragmentCount !== 1 + fragments.length || input.compositeOpacity !== primary?.opacity) reject("source identity, fragment count or opacity");
   if (Object.keys(input).some(key => !["format", "sourceID", "configuration", "raw", "curves", "fragmentCount", "compositeOpacity", "composite"].includes(key))) reject("unknown source field");

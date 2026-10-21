@@ -88,6 +88,19 @@ export class CompiledInkInput {
       const v = new Uint32Array(this.api.memory.buffer, at, 2); return { start: v[0], count: v[1] };
     });
   }
+  filtered(start = 0, count = this.snapshot().actualCount - start) {
+    this.resetScratch(); const at = this.kernel.allocate(count * 72); this.kernel.check(this.api.sa_input_copy_filtered(this.state, start, count, at, count));
+    const values = new Float64Array(this.api.memory.buffer, at, count * 9);
+    return Array.from({ length: count }, (_, i) => Array.from(values.subarray(i * 9, i * 9 + 9)));
+  }
+  strokeSegmentCount() {
+    this.resetScratch(); const at = this.kernel.allocate(4); this.kernel.check(this.api.sa_input_stroke_segment_count(this.state, at)); return new DataView(this.api.memory.buffer).getUint32(at, true);
+  }
+  strokeSegments(start = 0, count = this.strokeSegmentCount() - start) {
+    this.resetScratch(); const at = this.kernel.allocate(count * 104); this.kernel.check(this.api.sa_input_copy_stroke_segments(this.state, start, count, at, count));
+    const view = new DataView(this.api.memory.buffer);
+    return Array.from({ length: count }, (_, i) => {const p=at+i*104,degree=view.getUint32(p+80,true);return {points:Array.from({length:degree+1},(_,j)=>[view.getFloat64(p+j*16,true),view.getFloat64(p+j*16+8,true)]),radius:[view.getFloat64(p+64,true),view.getFloat64(p+72,true)],firstRaw:view.getUint32(p+88,true),lastRaw:view.getUint32(p+92,true),containsPredictions:!!(view.getUint32(p+96,true)&1)};});
+  }
   durableSource(sourceID, { origin = { x: 0, y: 0 }, opacity = 1 } = {}) {
     if (!this.snapshot().finished || typeof sourceID !== 'string' || !sourceID) throw new Error('A finished source stroke identity is required');
     if (![origin.x, origin.y, opacity].every(Number.isFinite) || opacity < 0 || opacity > 1) throw new RangeError('Ink source origin/opacity');

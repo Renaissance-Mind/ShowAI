@@ -1,7 +1,22 @@
 import { CompiledInkKernel } from "./ink-kernel/compiled-ink.mjs";
-export { nativeBoardScenePatch, resolveNativeBoardScene } from "./native-board-scene.mjs";
+import { CUBIC_INK_FORMAT, validateCubicInk } from "./portable-ink-v2.mjs";
+import {
+  cubicInkGeometry,
+  cubicInkQueryGeometry,
+  cubicInkHit,
+  cubicInkBounds,
+} from "./cubic-ink.mjs";
+export {
+  CUBIC_INK_FORMAT,
+  DEFAULT_OUTLINE_TOLERANCE,
+} from "./portable-ink-v2.mjs";
+export { cubicInkFromInput } from "./cubic-ink.mjs";
+export {
+  nativeBoardScenePatch,
+  resolveNativeBoardScene,
+} from "./native-board-scene.mjs";
 let compiledKernel;
-const geometryKernel = () => compiledKernel ??= new CompiledInkKernel();
+const geometryKernel = () => (compiledKernel ??= new CompiledInkKernel());
 /** Portable brush v1. This module has no DOM, platform or storage dependencies. */
 export const PORTABLE_INK_FORMAT = "showai-ink-v1";
 export const isEditableDrawing = (node) =>
@@ -12,6 +27,10 @@ export function portableInkSamples(
   width = ink.width,
   pressure = ink.brush !== "monoline",
 ) {
+  if (ink?.format === CUBIC_INK_FORMAT)
+    throw new Error(
+      "Cubic ink has center/radius elements, not editable v1 samples",
+    );
   return geometryKernel().resolveSamples(ink, width, pressure);
 }
 export function portableNodeSamples(node) {
@@ -25,30 +44,59 @@ export function portableNodeSamples(node) {
 /** One logical stroke can exceed the bounded v1 fragment capacity. Keeping
  * fragments on the same node preserves selection, transforms and undo. */
 export function portableNodeFragments(node) {
-  if (!isPortableInk(node?.attrs?.ink)) throw new Error("Expected portable ink node");
+  if (!isPortableInk(node?.attrs?.ink))
+    throw new Error("Expected portable ink node");
   const extra = node.attrs.inkFragments ?? [];
+  if (
+    node.attrs.ink.format === CUBIC_INK_FORMAT &&
+    Object.hasOwn(node.attrs, "inkFragments")
+  )
+    throw new Error("Cubic ink cannot have v1 inkFragments");
   if (!Array.isArray(extra) || extra.some((ink) => !isPortableInk(ink)))
     throw new Error("Invalid logical ink fragments");
   return [node.attrs.ink, ...extra];
 }
 
 export function portableNodeBounds(node) {
-  let left = Infinity, top = Infinity, right = -Infinity, bottom = -Infinity;
+  let left = Infinity,
+    top = Infinity,
+    right = -Infinity,
+    bottom = -Infinity;
   for (const ink of portableNodeFragments(node)) {
-    const box = portableInkBounds(ink, node.attrs.strokeWidth, node.attrs.pressure);
-    left = Math.min(left, box.x); top = Math.min(top, box.y);
-    right = Math.max(right, box.x + box.width); bottom = Math.max(bottom, box.y + box.height);
+    const box = portableInkBounds(
+      ink,
+      node.attrs.strokeWidth,
+      node.attrs.pressure,
+    );
+    left = Math.min(left, box.x);
+    top = Math.min(top, box.y);
+    right = Math.max(right, box.x + box.width);
+    bottom = Math.max(bottom, box.y + box.height);
   }
   return { x: left, y: top, width: right - left, height: bottom - top };
 }
 
 export function portableNodeHit(node, point) {
-  let inside = false, distance = Infinity, solid = false;
+  let inside = false,
+    distance = Infinity,
+    solid = false;
   for (const ink of portableNodeFragments(node)) {
-    const hit = portableInkHit(ink, point, node.attrs.strokeWidth, node.attrs.pressure);
-    inside ||= hit.inside; solid ||= hit.solid; distance = Math.min(distance, hit.distance);
+    const hit = portableInkHit(
+      ink,
+      point,
+      node.attrs.strokeWidth,
+      node.attrs.pressure,
+    );
+    inside ||= hit.inside;
+    solid ||= hit.solid;
+    distance = Math.min(distance, hit.distance);
   }
-  return { inside, distance, solid, area: node.attrs.ink.extent[0] * node.attrs.ink.extent[1] };
+  return {
+    inside,
+    distance,
+    solid,
+    area: node.attrs.ink.extent[0] * node.attrs.ink.extent[1],
+  };
 }
 
 export function inkFramePose(frame, extent) {
@@ -98,23 +146,48 @@ export function inkModelPoses(document, boardId, previous = {}) {
 export function inkScenePatch(document, boardId, previous) {
   const collect = (doc) => {
     const found = new Map();
-    const find = node => node.attrs?.id === boardId ? node : node.content?.map(find).find(Boolean);
-    const walk = node => {
+    const find = (node) =>
+      node.attrs?.id === boardId ? node : node.content?.map(find).find(Boolean);
+    const walk = (node) => {
       if (node.type === "surface") return null;
-      const id=node.attrs?.id;
-      if (isInkNode(node)) {found.set(id,node);return {type:"ink-ref",attrs:{id}};}
-      const content=node.content?.map(walk).filter(Boolean) ?? [];
-      return content.length ? {type:node.type,attrs:{id},content} : null;
+      const id = node.attrs?.id;
+      if (isInkNode(node)) {
+        found.set(id, node);
+        return { type: "ink-ref", attrs: { id } };
+      }
+      const content = node.content?.map(walk).filter(Boolean) ?? [];
+      return content.length
+        ? { type: node.type, attrs: { id }, content }
+        : null;
     };
-    const board=doc && find(doc.content);
+    const board = doc && find(doc.content);
     if (doc && !board) throw new Error("Ink Board no longer exists");
-    const content=board?.content?.map(walk).filter(Boolean) ?? [];
-    return {found,content};
+    const content = board?.content?.map(walk).filter(Boolean) ?? [];
+    return { found, content };
   };
-  const current=collect(document), old=collect(previous);
+  const current = collect(document),
+    old = collect(previous);
   return {
-    document:{id:document.id,content:{type:"surface",attrs:{id:boardId,kind:"board"},content:current.content},layout:Object.fromEntries([...current.found.keys()].map(id=>[id,document.layout?.[id]]).filter(([,frame])=>frame))},
-    nodes:[...current.found].filter(([id,node])=>old.found.get(id)!==node && JSON.stringify(old.found.get(id))!==JSON.stringify(node)).map(([,node])=>node),
+    document: {
+      id: document.id,
+      content: {
+        type: "surface",
+        attrs: { id: boardId, kind: "board" },
+        content: current.content,
+      },
+      layout: Object.fromEntries(
+        [...current.found.keys()]
+          .map((id) => [id, document.layout?.[id]])
+          .filter(([, frame]) => frame),
+      ),
+    },
+    nodes: [...current.found]
+      .filter(
+        ([id, node]) =>
+          old.found.get(id) !== node &&
+          JSON.stringify(old.found.get(id)) !== JSON.stringify(node),
+      )
+      .map(([, node]) => node),
   };
 }
 export function portableInkColor(color, dark = false) {
@@ -127,7 +200,8 @@ const caches = new WeakMap();
 const preparedGeometry = new WeakMap();
 const finite = (x, min, max) =>
   typeof x === "number" && Number.isFinite(x) && x >= min && x <= max;
-export const isPortableInk = (ink) => ink?.format === PORTABLE_INK_FORMAT;
+export const isPortableInk = (ink) =>
+  ink?.format === PORTABLE_INK_FORMAT || ink?.format === CUBIC_INK_FORMAT;
 export function createPortableInk(
   points,
   width,
@@ -188,6 +262,7 @@ export function portableNodeInk(node) {
   );
 }
 export function validatePortableInk(ink) {
+  if (ink?.format === CUBIC_INK_FORMAT) return validateCubicInk(ink);
   if (!isPortableInk(ink) || ink.brushVersion !== 1 || ink.strokeCount !== 1)
     throw new Error("Unsupported portable ink brush/version.");
   if (
@@ -291,6 +366,14 @@ export function portableInkBounds(
   strokeWidth = ink.width,
   pressure = ink.brush !== "monoline",
 ) {
+  if (ink?.format === CUBIC_INK_FORMAT) {
+    const box = cubicInkBounds(ink, strokeWidth, pressure);
+    return {
+      ...box,
+      width: Math.max(1, box.width),
+      height: Math.max(1, box.height),
+    };
+  }
   return geometryKernel().bounds(ink, strokeWidth, pressure);
 }
 
@@ -300,11 +383,24 @@ export function portableInkGeometry(
   strokeWidth = ink.width,
   pressure = ink.brush !== "monoline",
 ) {
+  if (ink?.format === CUBIC_INK_FORMAT) {
+    const geometry = cubicInkGeometry(ink, strokeWidth, pressure);
+    return {
+      path: geometry.path,
+      get polygons() {
+        return cubicInkQueryGeometry(ink, strokeWidth, pressure).polygons;
+      },
+    };
+  }
   let widths = caches.get(ink);
   if (!widths) caches.set(ink, (widths = new Map()));
   const key = strokeWidth + ":" + pressure;
   if (widths.has(key)) return widths.get(key);
-  const { polygons, path, mask, prepared } = geometryKernel().geometry(ink, strokeWidth, pressure);
+  const { polygons, path, mask, prepared } = geometryKernel().geometry(
+    ink,
+    strokeWidth,
+    pressure,
+  );
   const result = { polygons, path, mask };
   preparedGeometry.set(result, prepared);
   // Do not accumulate every width visited by a slider.
@@ -318,10 +414,13 @@ export function portableInkHit(
   strokeWidth = ink.width,
   pressure = ink.brush !== "monoline",
 ) {
+  if (ink?.format === CUBIC_INK_FORMAT)
+    return cubicInkHit(ink, point, strokeWidth, pressure);
   const geometry = portableInkGeometry(ink, strokeWidth, pressure);
   const kernel = geometryKernel();
   kernel.reset();
-  const mask = ink.mask === undefined ? null : kernel.flattenMask(ink.mask, ink.transform);
+  const mask =
+    ink.mask === undefined ? null : kernel.flattenMask(ink.mask, ink.transform);
   return {
     ...kernel.hit({ ...preparedGeometry.get(geometry), mask }, point),
     area: ink.extent[0] * ink.extent[1],

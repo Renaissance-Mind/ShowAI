@@ -175,10 +175,35 @@ static void rebuild(State *s,uint32_t dirty,bool finishing){
     ++s->generation;
 }
 static uint32_t sampleCount(const State *s){return !total(s)?0:s->curves?curves(s)[s->curves-1].sample_offset+curves(s)[s->curves-1].steps:1;}
+static bool exportOverlap(const void *a, uint64_t an, const void *b,
+                          uint64_t bn) {
+  if (!an || !bn)
+    return false;
+  uintptr_t x = (uintptr_t)a, y = (uintptr_t)b;
+  return an > UINTPTR_MAX - x || bn > UINTPTR_MAX - y ||
+         (x < y + bn && y < x + an);
+}
+static bool exportOutput(const State *s, void *out, uint64_t bytes) {
+  return !bytes ||
+         (out && (uintptr_t)out % 8 == 0 &&
+          bytes <= UINTPTR_MAX - (uintptr_t)out &&
+          !exportOverlap(s, sa_input_state_bytes(s->capacity), out, bytes));
+}
+static XY curveDerivative(const SAInkInputCurve &c, double t) {
+  double u = 1 - t;
+  return {3 * (u * u * (c.points[2] - c.points[0]) +
+               2 * u * t * (c.points[4] - c.points[2]) +
+               t * t * (c.points[6] - c.points[4])),
+          3 * (u * u * (c.points[3] - c.points[1]) +
+               2 * u * t * (c.points[5] - c.points[3]) +
+               t * t * (c.points[7] - c.points[5]))};
+}
+
 }
 
 extern "C" {
 uint32_t sa_input_sizeof_point(){return sizeof(SAInkInputPoint);}uint32_t sa_input_sizeof_config(){return sizeof(SAInkInputConfig);}uint32_t sa_input_sizeof_curve(){return sizeof(SAInkInputCurve);}uint32_t sa_input_sizeof_snapshot(){return sizeof(SAInkInputSnapshot);}
+uint32_t sa_input_sizeof_stroke_segment(){return sizeof(SAInkInputStrokeSegment);}
 uint32_t sa_input_state_bytes(uint32_t capacity){if(!capacity||capacity>SA_INK_INPUT_MAX_RAW)return 0;return aligned(sizeof(State))+(capacity+SA_INK_INPUT_MAX_PREDICTED)*(sizeof(SAInkInputPoint)+sizeof(XY)+sizeof(SAInkSample)+sizeof(SAInkInputCurve));}
 SAInkStatus sa_input_initialize(void *p,uint32_t bytes,uint32_t capacity,const SAInkInputConfig *config){if(!p||((uintptr_t)p&7)||!config||!valid(*config))return SA_INK_INVALID;uint32_t needed=sa_input_state_bytes(capacity);if(!needed||bytes<needed)return SA_INK_CAPACITY;State *s=(State*)p;*s={};s->magic=MAGIC;s->capacity=capacity;s->config=*config;return SA_INK_OK;}
 SAInkStatus sa_input_relocate(const void *p,void *q,uint32_t bytes,uint32_t capacity){auto *s=(const State*)p;if(!valid(s)||!q||p==q||capacity<s->actual||capacity<s->capacity)return SA_INK_INVALID;SAInkStatus status=sa_input_initialize(q,bytes,capacity,&s->config);if(status!=SA_INK_OK)return status;auto *d=(State*)q;*d=*s;d->capacity=capacity;for(uint32_t i=0;i<s->actual;i++)raw(d)[i]=raw(s)[i];for(uint32_t i=0;i<s->predicted;i++)raw(d)[capacity+i]=raw(s)[s->capacity+i];for(uint32_t i=0;i<total(s);i++){jitter(d)[i]=jitter((State*)s)[i];filtered(d)[i]=filtered(s)[i];}for(uint32_t i=0;i<s->curves;i++)curves(d)[i]=curves(s)[i];return SA_INK_OK;}
@@ -192,6 +217,77 @@ SAInkStatus sa_input_correct(void *p,const SAInkInputPoint *replacement){auto *s
 SAInkStatus sa_input_finish(void *p){auto *s=(State*)p;if(!valid(s)||!s->actual)return SA_INK_INVALID;uint32_t dirty=affected(s);s->predicted=0;s->finished=1;rebuild(s,dirty,true);return SA_INK_OK;}
 SAInkStatus sa_input_snapshot(const void *p,SAInkInputSnapshot *out){auto *s=(const State*)p;if(!valid(s)||!out)return SA_INK_INVALID;uint32_t count=sampleCount(s);*out={s->actual,s->predicted,s->curves,s->finalized,s->changed,count,count<2?count:1+(count-2)/(SA_INK_INPUT_FRAGMENT_SAMPLES-1),s->finished,s->filtered_work,s->fit_work,s->generation,0};return SA_INK_OK;}
 SAInkStatus sa_input_copy_raw(const void *p,uint32_t start,uint32_t count,SAInkInputPoint *out,uint32_t capacity){auto *s=(const State*)p;if(!valid(s)||start>s->actual||count>s->actual-start||(count&&!out))return SA_INK_INVALID;if(capacity<count)return SA_INK_CAPACITY;for(uint32_t i=0;i<count;i++)out[i]=point(s,start+i);return SA_INK_OK;}
+SAInkStatus sa_input_copy_filtered(const void *p, uint32_t start,
+                                   uint32_t count, SAInkSample *out,
+                                   uint32_t capacity) {
+  auto *s = (const State *)p;
+  if (!valid(s) || start > s->actual || count > s->actual - start ||
+      !exportOutput(s, out, uint64_t(count) * sizeof(*out)))
+    return SA_INK_INVALID;
+  if (capacity < count)
+    return SA_INK_CAPACITY;
+  for (uint32_t i = 0; i < count; i++)
+    out[i] = filtered(s)[start + i];
+  return SA_INK_OK;
+}
+SAInkStatus sa_input_stroke_segment_count(const void *p, uint32_t *out) {
+  auto *s = (const State *)p;
+  if (!valid(s) || !out || (uintptr_t)out % 4 ||
+      exportOverlap(s, sa_input_state_bytes(s->capacity), out, sizeof(*out)))
+    return SA_INK_INVALID;
+  *out = total(s) > 1 ? total(s) - 1 : total(s);
+  return SA_INK_OK;
+}
+SAInkStatus sa_input_copy_stroke_segments(const void *p, uint32_t start,
+                                          uint32_t count,
+                                          SAInkInputStrokeSegment *out,
+                                          uint32_t capacity) {
+  auto *s = (const State *)p;
+  if (!valid(s))
+    return SA_INK_INVALID;
+  uint32_t n = total(s), size = n > 1 ? n - 1 : n;
+  if (start > size || count > size - start ||
+      !exportOutput(s, out, uint64_t(count) * sizeof(*out)))
+    return SA_INK_INVALID;
+  if (capacity < count)
+    return SA_INK_CAPACITY;
+  uint32_t curveIndex = 0;
+  while (curveIndex < s->curves && curves(s)[curveIndex].last_raw <= start)
+    ++curveIndex;
+  for (uint32_t i = 0; i < count; i++) {
+    uint32_t index = start + i;
+    SAInkInputStrokeSegment result{};
+    result.first_raw = index;
+    result.last_raw = n > 1 ? index + 1 : index;
+    result.flags = result.last_raw >= s->actual ? 1 : 0;
+    if (n == 1) {
+      result.geometry.controls[0] = filtered(s)[0].values[0];
+      result.geometry.controls[1] = filtered(s)[0].values[1];
+      result.geometry.radius[0] = result.geometry.radius[1] =
+          filtered(s)[0].values[3] * .5;
+    } else {
+      while (curveIndex + 1 < s->curves &&
+             curves(s)[curveIndex].last_raw <= index)
+        ++curveIndex;
+      const auto &c = curves(s)[curveIndex];
+      double span = c.last_raw - c.first_raw,
+             lo = double(index - c.first_raw) / span,
+             hi = double(index + 1 - c.first_raw) / span, dt = hi - lo;
+      XY a = evaluate(c, lo), b = evaluate(c, hi), da = curveDerivative(c, lo),
+         db = curveDerivative(c, hi);
+      XY controls[4] = {a, add(a, mul(da, dt / 3)), sub(b, mul(db, dt / 3)), b};
+      result.geometry.degree = 3;
+      for (uint32_t k = 0; k < 4; k++) {
+        result.geometry.controls[2 * k] = controls[k].x;
+        result.geometry.controls[2 * k + 1] = controls[k].y;
+      }
+      result.geometry.radius[0] = filtered(s)[index].values[3] * .5;
+      result.geometry.radius[1] = filtered(s)[index + 1].values[3] * .5;
+    }
+    out[i] = result;
+  }
+  return SA_INK_OK;
+}
 SAInkStatus sa_input_copy_curves(const void *p,uint32_t start,uint32_t count,SAInkInputCurve *out,uint32_t capacity){auto *s=(const State*)p;if(!valid(s)||start>s->curves||count>s->curves-start||(count&&!out))return SA_INK_INVALID;if(capacity<count)return SA_INK_CAPACITY;for(uint32_t i=0;i<count;i++)out[i]=curves(s)[start+i];return SA_INK_OK;}
 SAInkStatus sa_input_copy_samples(const void *p,uint32_t start,uint32_t count,SAInkSample *out,uint32_t capacity){auto *s=(const State*)p;if(!valid(s)||start>sampleCount(s)||count>sampleCount(s)-start||(count&&!out))return SA_INK_INVALID;if(capacity<count)return SA_INK_CAPACITY;
     uint32_t curve=0;if(start&&s->curves){uint32_t lo=0,hi=s->curves;while(lo<hi){uint32_t m=lo+(hi-lo)/2;if(curves(s)[m].sample_offset+curves(s)[m].steps<=start)lo=m+1;else hi=m;}curve=lo;}

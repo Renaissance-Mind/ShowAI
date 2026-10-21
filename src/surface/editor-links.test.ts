@@ -133,3 +133,14 @@ test('actual traversal work is bounded by model structure rather than unrelated 
  }
  expect(visits[1]).toBe(visits[0]);expect(opaque).toEqual([4,4]);expect(visits[1]).toBeLessThan(150);
 });
+
+import {inkInputConfiguration} from './ink-kernel/compiled-ink-input.mjs';
+const cubicSource=()=>({format:'showai-ink-v2',geometryVersion:1,brushVersion:1,brush:'pen',strokeCount:1,width:2,opacity:1,extent:[40,30],transform:[1,0,0,1,0,0],outlineTolerance:.0025,segments:[{points:[[1,2],[10,20],[20,4]],radius:[1,1]}],capture:{format:'showai-input-capture-v1',sourceID:'identity-not-a-link',configuration:inkInputConfiguration({width:2}),raw:[[1,2,0,.5,0,1.5,1,0,0,0],[20,4,.01,.5,0,1.5,2,0,0,0]]}});
+test('only typed drawing cubic ink is opaque; capture identities and source geometry remain unchanged',()=>{
+ const source=createResource(blankDocument(),'board') as ShowDocument,ink=cubicSource();source.content.content=[{type:'drawing',attrs:{id:'v2',tool:'pen',color:'#111111',strokeWidth:2,extent:[40,30],points:[{x:1,y:2},{x:20,y:4}],ink}},{type:'richText',attrs:{id:'rich'},content:[{type:'paragraph',content:[unsafe()]}]}];
+ const result=repairEditorLinks(source,{visitedValues:0,opaqueFields:0});expect(result.repairs).toHaveLength(1);expect(result.document.content.content![0].attrs!.ink).toBe(ink);expect(ink.capture.sourceID).toBe('identity-not-a-link');expect(()=>validateDocument(result.document)).not.toThrow();
+});
+test('coincidentally named cubic formats, unknown fields and malformed typed values retain actual link scanning',()=>{
+ for(const change of [(i:any)=>{i.extra=unsafe()},(i:any)=>{i.segments[0].points[0][0]=unsafe()},(i:any)=>{i.capture.raw[0][0]=unsafe()},(i:any)=>{i.capture.predicted=[unsafe()]}]){const source=blankDocument(),ink=cubicSource();change(ink);source.content.content=[{type:'drawing',attrs:{id:'v2',ink}}];expect(repairEditorLinks(source).repairs.length).toBeGreaterThan(0);}
+ const source=blankDocument(),ink={...cubicSource(),extra:unsafe()};source.content.content=[{type:'widget',attrs:{id:'widget',kind:'custom',data:{ink,nested:{type:'drawing',attrs:{ink}}}}}];expect(repairEditorLinks(source).repairs).toHaveLength(2);
+});

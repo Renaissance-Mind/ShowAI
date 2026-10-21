@@ -22,6 +22,10 @@ typedef struct {
   uint32_t geometry_version, max_depth, max_leaves, max_commands;
 } SAInkStrokeOptions;
 typedef struct {
+  double source_width, width;
+  uint32_t pressure, reserved;
+} SAInkStrokeStyle;
+typedef struct {
   uint32_t commands, contours, envelope_curves, fallback_leaves;
   uint32_t sampled_checks, leaves, maximum_depth, fallback_contours;
   double sampled_envelope_error, fallback_center_bound, arc_error_bound;
@@ -30,6 +34,7 @@ typedef struct {
 uint32_t sa_stroke_geometry_version(void);
 uint32_t sa_stroke_sizeof_segment(void);
 uint32_t sa_stroke_sizeof_options(void);
+uint32_t sa_stroke_sizeof_style(void);
 uint32_t sa_stroke_sizeof_result(void);
 /* Version1 defines round pen/marker circular sweep only; no other cap/join flag
  * is accepted. Each element contributes the union of its moving disks. All
@@ -63,6 +68,41 @@ SAInkStatus sa_stroke_path_counts(const SAInkStrokeSegment *, uint32_t,
 SAInkStatus sa_stroke_path_build(const SAInkStrokeSegment *, uint32_t,
                                  const SAInkStrokeOptions *, SAInkPathCommand *,
                                  uint32_t capacity, SAInkStrokeResult *);
+/* Pure style resolution, no source mutation: pressure=1 scales authored radii
+ * by width/source_width; pressure=0 sets BOTH radii to width/2. Controls stay
+ * unchanged. Entire input validates before writes. An exactly in-place array is
+ * permitted, partial overlap and style/output alias are rejected atomically. */
+SAInkStatus sa_stroke_resolve_segments(const SAInkStrokeSegment *, uint32_t,
+                                       const SAInkStrokeStyle *,
+                                       SAInkStrokeSegment *, uint32_t capacity);
+typedef struct {
+  uint32_t points, contours;
+  SAInkBounds bounds;
+} SAInkStrokePathMeasure;
+uint32_t sa_stroke_sizeof_path_measure(void);
+SAInkStatus sa_stroke_path_bounds(const SAInkPathCommand *, uint32_t,
+                                  const double affine[6], SAInkBounds *);
+/* Derived query geometry only; never serialize it as source. Bounds use actual
+ * transformed Bezier extrema. Flattening uses a Bernstein chord bound and query
+ * distance differs from the actual output Bezier boundary by <=tolerance.
+ * Inside uses the shared analytic nonzero winding, not flattened polygons.
+ * max_points bounds total work/output; max subdivision depth is24. Failure is
+ * atomic. Paths accept finite M/L/Q/C/Z, zero reserved, and explicit M after Z.
+ */
+SAInkStatus sa_stroke_path_measure(const SAInkPathCommand *, uint32_t,
+                                   const double affine[6], double tolerance,
+                                   uint32_t max_points,
+                                   SAInkStrokePathMeasure *);
+SAInkStatus sa_stroke_path_flatten(const SAInkPathCommand *, uint32_t,
+                                   const double affine[6], double tolerance,
+                                   uint32_t max_points, SAInkPoint *,
+                                   uint32_t point_capacity, SAInkContour *,
+                                   uint32_t contour_capacity,
+                                   SAInkStrokePathMeasure *);
+SAInkStatus sa_stroke_path_query(const SAInkPathCommand *, uint32_t,
+                                 const double affine[6], double x, double y,
+                                 double tolerance, uint32_t max_points,
+                                 SAInkHit *);
 #ifdef __cplusplus
 }
 #endif
