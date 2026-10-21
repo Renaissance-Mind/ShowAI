@@ -113,11 +113,11 @@ export class SourceRuntimeOwner {
   if(!snapshot||!sameSourceRef(ref,snapshot.ref))fail("Source snapshot has expired or its scope/proof differs");
   return snapshot!;
  }
- private prune(){
+ private prune(protectedIds:ReadonlySet<string>=new Set()){
   const pinned=new Set([...this.leases.values()].flatMap(set=>[...set])),perScope=new Map<string,number>();
   for(const id of pinned){const entry=this.snapshots.get(id);if(entry){const key=scopeKey(entry.ref.scope);perScope.set(key,(perScope.get(key)??0)+1)}}
   if([...perScope.values()].some(count=>count>this.limits.pinned))fail("Live page source retention exceeds its explicit per-scope budget");
-  const unleased=[...this.snapshots.keys()].filter(id=>!pinned.has(id));
+  const unleased=[...this.snapshots.keys()].filter(id=>!pinned.has(id)&&!protectedIds.has(id));
   let remaining=unleased.length;
   for(const id of unleased){if(remaining<=this.limits.unleased&&this.residentBytes<=this.limits.bytes)break;this.forget(id);remaining--}
   // Explicit pins always win over cache pressure. Callers can persist/retire an
@@ -138,7 +138,8 @@ export class SourceRuntimeOwner {
   const ref=freezeOwnedSource({format:"showai-source-snapshot-v1" as const,ownerId:this.ownerId,epoch:this.epoch,snapshotId:`snapshot-${++this.nextId}`,scope:{...targetScope},kind});
   const candidates=kind==="normalized"?inkWireResolutionCandidates(body):[];
   this.snapshots.set(ref.snapshotId,{ref,document:body,candidates,conflicts});this.account(body,1);
-  if(leaseId)this.retain(leaseId,[ref]);else this.prune();
+  try{if(leaseId)this.retain(leaseId,[ref]);else this.prune(new Set([ref.snapshotId]));}
+  catch(error){this.forget(ref.snapshotId);throw error}
   return {format:"showai-owned-source-v1",base:base?.ref??null,next:ref,...(base?{edits:preparedEdits??diffNativeSource(base.document,body)}:{full:body}),conflicts,inkCandidates:candidates};
  }
  /** Trusted host adapter only: actual backend normalization/CAS has already
@@ -195,7 +196,7 @@ export class SourceRuntimeOwner {
    case "retain":return this.retain(request.leaseId,request.refs);
    case "release":this.leases.delete(request.leaseId);this.prune();return{retained:0};
    case "dispose":{
-    const key=scopeKey(scope(request.scope));for(const [id,value]of this.snapshots)if(scopeKey(value.ref.scope)===key){this.forget(id);for(const lease of this.leases.values())lease.delete(id)}
+    const key=scopeKey(scope(request.scope));for(const [id,value]of this.snapshots)if(scopeKey(value.ref.scope)===key){this.forget(id);for(const [leaseId,lease]of this.leases){lease.delete(id);if(!lease.size)this.leases.delete(leaseId)}}
     for(const key of this.transactions.keys())if(key.startsWith(scopeKey(request.scope)+"\u0000"))this.transactions.delete(key);
     for(const key of this.publications.keys())if(key.startsWith(scopeKey(request.scope)+"\u0000")){const packet=this.publications.get(key);this.publications.delete(key);if(packet&&typeof packet==="object")this.account(packet,-1)}
     return{retained:0};

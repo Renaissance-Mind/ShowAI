@@ -65,3 +65,17 @@ it("registers actual saved metadata as a distinct exact body and keeps its priva
  expect(resolve(owner,seed.next).createdAt).not.toBe(body.createdAt);
  expect(()=>owner.execute({kind:"registerActualSavedSnapshot",document:body} as any)).toThrow(/Unknown source runtime request/);
 });
+
+it("never returns an already evicted new snapshot under byte pressure and rolls back rejected pins",()=>{
+ const tiny=new SourceRuntimeOwner({maximumResidentBytes:1,maximumUnleased:0}),document=source();
+ const admitted=delta(tiny.execute({kind:"seed",scope:actualScope(document),document}));
+ expect(resolve(tiny,admitted.next).id).toBe(document.id);
+ const {owner,seed}=setup({maximumPinned:1});
+ expect(()=>owner.execute({kind:"draft",base:seed.next,transactionId:"rejected-budget",edits:[{op:"set",path:["title"],value:"pending"}],leaseId:"pending"})).toThrow(/retention/);
+ expect(resolve(owner,seed.next).id).toBe(seed.next.scope.pageId);
+ expect(()=>resolve(owner,{...seed.next,snapshotId:"snapshot-2",kind:"draft"})).toThrow(/expired/);
+ owner.execute({kind:"release",leaseId:"current"});
+ const next=delta(owner.execute({kind:"seed",scope:seed.next.scope,document:sourceWithId(seed.next.scope.pageId),leaseId:"next"}));
+ expect(resolve(owner,next.next).id).toBe(seed.next.scope.pageId);
+});
+function sourceWithId(id:string){return{...source(),id}}
