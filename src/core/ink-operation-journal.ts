@@ -177,6 +177,19 @@ export class InkOperationJournal {
       this.appendInside([operation], plans); return operation;
     });
   }
+  /** A separate persisted wire actor stamps CAS-checked snapshot editors. It
+   * cannot collide with the device actor's actual journal operation sequence. */
+  reserveWireIdentity(pageId: string, minimumSequence = 0) {
+    if (!Number.isSafeInteger(minimumSequence) || minimumSequence < 0) throw new Error("Invalid wire sequence baseline.");
+    return this.transaction(() => {
+      const key = `wire-sequence:${digest(pageId)}`;
+      const previous = Number(this.db.prepare("SELECT value FROM ink_journal_metadata WHERE key=?").get(key)?.value ?? 0);
+      const sequence = Math.max(previous, minimumSequence) + 1;
+      if (!Number.isSafeInteger(sequence)) throw new Error("Ink wire sequence is exhausted.");
+      this.db.prepare("INSERT INTO ink_journal_metadata VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value").run(key, String(sequence));
+      return { actor: `wire-${this.actor}`, sequence };
+    });
+  }
   private writeIndex(scope: Scope, records: InkReplicaRecord[], prepared: InkReplicaPrepared, ordinal: number) {
     const statement = this.db.prepare("INSERT INTO ink_replica_records VALUES(?,?,?,?,?,?,?) ON CONFLICT(page_id,board_id,kind,record_key,field) DO UPDATE SET payload=excluded.payload,sha256=excluded.sha256");
     for (const record of records) { const payload = canonicalInkJSON(record.value); statement.run(scope.pageId, scope.boardId, record.kind, record.key, record.field, payload, digest(payload)); }

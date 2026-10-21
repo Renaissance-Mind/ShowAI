@@ -1,6 +1,7 @@
 import { objectCapabilities, bindingParent } from "./geometry.mjs";
 import { validateNativeInk } from "./native-ink.mjs";
 import { isPortableInk } from "./portable-ink.mjs";
+import { validateInkWireState } from "./ink-wire.mjs";
 import { labelCapable, MAX_LABEL_LENGTH } from "./drawing-label.mjs";
 import { isResource, fillResource, surfaceKind } from "./containers.mjs";
 import { fillSurfaceLayout, visitNodes } from "./document.mjs";
@@ -172,6 +173,10 @@ function validateResource(document) {
     if (node.type === "surface") {
       if (!["page", "board"].includes(node.attrs.kind))
         throw new Error("Surface kind must be page or board.");
+      if (node.attrs.inkState !== undefined) {
+        if (node.attrs.kind !== "board") throw new Error("Causal ink metadata requires a Board.");
+        validateInkWireState(node.attrs.inkState);
+      }
       if (
         node.attrs.widthMode !== undefined &&
         (node.attrs.kind !== "page" ||

@@ -101,3 +101,7 @@ export function materializeInkOperations(operations: InkOperation[], checkpoint?
 export function compensateInkOperation(operations: InkOperation[], operationId: string, identity: InkOperationIdentity): {
   operation: InkOperation | null; skipped: { strokeId: string; field: string }[];
 };
+export function inkCompensationPlan(operations: InkOperation[], operationId: string): {
+  pageId: string; boardId: string; changes: InkOperationChange[]; parents: string[];
+  skipped: { strokeId: string; field: string }[];
+};

@@ -9,6 +9,7 @@ import {
 import { validateDocument } from "../portable/validation.mjs";
 import type { ShowDocument } from "./model";
 import type { MergeConflict } from "../components/custom/types";
+import { finishInkPageMerge, InkWireError, prepareInkPageMerge } from "../surface/ink-wire.mjs";
 
 interface FlatNode {
   parent: string | null;
@@ -165,6 +166,7 @@ export function mergePageContent(
 ): PageMergeResult {
   if (base.id !== ours.id || ours.id !== theirs.id)
     throw new Error("Page merge inputs must identify the same page.");
+  const originalInputs = { base, ours, theirs };
   if (Object.hasOwn(choices, "/structure"))
     return {
       document: structuredClone(
@@ -172,6 +174,13 @@ export function mergePageContent(
       ),
       conflicts: [],
     };
+  let inkPrepared;
+  try { inkPrepared = mode === "merge" ? prepareInkPageMerge(base, ours, theirs) : null; }
+  catch (error) {
+    if (!(error instanceof InkWireError)) throw error;
+    return { document: structuredClone(ours), conflicts: [{ path: "/ink", kind: "value", reason: error.message }] };
+  }
+  if (inkPrepared) { base = inkPrepared.base; ours = inkPrepared.ours; theirs = inkPrepared.theirs; }
   const b = flatten(base),
     o = flatten(ours),
     t = flatten(theirs);
@@ -351,15 +360,23 @@ export function mergePageContent(
     };
     if (visited.size !== Object.keys(nodes).length)
       throw new Error("Merged page contains detached nodes.");
+    if (inkPrepared) {
+      const projected = finishInkPageMerge(document, inkPrepared);
+      document = projected.document;
+      conflicts.push(...projected.conflicts.map(conflict => ({
+        path: `/ink/${conflict.boardId ?? "board"}/${conflict.strokeId ?? ""}/${conflict.field}`,
+        kind: "value" as const, reason: conflict.reason,
+      })));
+    }
     document = validateDocument(document);
   } catch (error) {
     // A structurally invalid merge remains a visible conflict and an intact local draft.
     conflicts.push({
       path: "/structure",
       kind: "structure",
-      base: base.content,
-      ours: ours.content,
-      theirs: theirs.content,
+      base: originalInputs.base.content,
+      ours: originalInputs.ours.content,
+      theirs: originalInputs.theirs.content,
     });
     if (
       !(error instanceof Error) ||
@@ -368,7 +385,7 @@ export function mergePageContent(
     )
       throw error;
     conflicts[conflicts.length - 1].reason = error.message;
-    document = structuredClone(ours);
+    document = structuredClone(originalInputs.ours);
   }
   return { document, conflicts };
 }

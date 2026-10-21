@@ -323,7 +323,7 @@ function materializeState(state, getKnown) {
 
 /** Selective undo never writes over a later or concurrent remote register head.
  * New concurrent arrivals can still produce explicit conflicts, never silent loss. */
-export function compensateInkOperation(operations, operationId, identity) {
+export function inkCompensationPlan(operations, operationId) {
   const target = operations.find(operation => operation.id === operationId);
   if (!target) invalid("undo target is missing from retained journal");
   const state = checkpointInkOperations(operations), current = new Map(state.strokes.map(stroke => [stroke.id, stroke]));
@@ -347,6 +347,10 @@ export function compensateInkOperation(operations, operationId, identity) {
     } else if (active("alive")) changes.push({ kind: change.kind === "delete" ? "restore" : "delete", strokeId: change.strokeId });
     else skipped.push({ strokeId: change.strokeId, field: "alive" });
   }
-  const parents = [...new Set([...state.frontier, ...(identity.sequence > 1 ? [`${identity.actor}:${identity.sequence - 1}`] : [])])];
-  return { operation: changes.length ? createInkOperation({ ...identity, pageId: state.pageId, boardId: state.boardId, parents, changes }) : null, skipped };
+  return { pageId: state.pageId, boardId: state.boardId, changes, parents: state.frontier, skipped };
+}
+export function compensateInkOperation(operations, operationId, identity) {
+  const plan = inkCompensationPlan(operations, operationId);
+  const parents = [...new Set([...plan.parents, ...(identity.sequence > 1 ? [`${identity.actor}:${identity.sequence - 1}`] : [])])];
+  return { operation: plan.changes.length ? createInkOperation({ ...identity, pageId: plan.pageId, boardId: plan.boardId, parents, changes: plan.changes }) : null, skipped: plan.skipped };
 }

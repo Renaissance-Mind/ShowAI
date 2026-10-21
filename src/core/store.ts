@@ -30,6 +30,7 @@ import { CoreError } from "./model";
 import { atomicRename } from "./atomic-rename";
 import { libraryMutations, legacyMutations } from "./history-context";
 import { pageWriteCapture } from "./page-write-capture";
+import { stampSavedInk } from "./ink-wire-writer";
 import { withLibraryLock } from "./library-lock";
 const projectionReads = new AsyncLocalStorage<string>();
 import { pageSummaries } from "./page-summaries";
@@ -1533,7 +1534,7 @@ export class FileStore {
         "INVALID_DATA",
         "A whiteboard cannot be overwritten with a legacy document. Import the legacy source as a separate page.",
       );
-    const document = normalizeDocument(
+    let document = normalizeDocument(
       {
         ...input,
         id: pageId,
@@ -1542,6 +1543,7 @@ export class FileStore {
       },
       current.document,
     );
+    document = await stampSavedInk(this.root, document, current.document);
     const hash = documentHash(document);
     if (hash === current.hash) return current;
     const record = { document, hash, path: this.pagePath(projectId, pageId) };
