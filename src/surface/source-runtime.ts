@@ -49,6 +49,10 @@ const scopeKey=(scope:SourceScope)=>JSON.stringify([scope.homeId,scope.projectId
 function scope(value:SourceScope){if(!value||[value.homeId,value.projectId,value.pageId].some(part=>typeof part!=="string"||!part))fail("Source scope requires its actual home, project and page");return value}
 export const sameSourceRef=(one:SourceSnapshotRef|null|undefined,two:SourceSnapshotRef|null|undefined)=>!!one&&!!two&&one.ownerId===two.ownerId&&one.epoch===two.epoch&&one.snapshotId===two.snapshotId&&one.kind===two.kind&&scopeKey(one.scope)===scopeKey(two.scope);
 const canonicalCapacityBodies=new WeakSet<ShowDocument>();
+// Only this owner's independent JSON captures/registered bodies may enter the
+// COW consuming normalizer. The exported generic freeze helper is not a grant
+// of input authority to an arbitrary object caller (including accessor graphs).
+const normalizationReadableBodies=new WeakSet<ShowDocument>();
 /** Same actual recursive ownership factory is used by private validation. */
 export function freezeOwnedSource<T>(value:T):T{return freezeOwnedJSON(value)}
 export const isOwnedSource=(value:unknown):boolean=>isOwnedJSON(value);
@@ -110,13 +114,20 @@ export function normalizeSourceDocument(document:ShowDocument):ShowDocument{
  canonicalCapacityBodies.add(canonical);return canonical;
 }
 function normalizeOwnedSourceDocument(document:ShowDocument):ShowDocument{
+ // Only the actual recursive owner may reuse readable child branches. Reconcile
+ // writes an independent root/maps and path-copies structural repairs; the
+ // consuming parser still runs every JSON, model, ink and capacity check.
+ // Arbitrary caller objects retain the independent defensive capture below.
+ if(normalizationReadableBodies.has(document)&&isOwnedSource(document))return normalizeParsedSourceDocument(document);
  const normalized=reconcileSurface(document);
  const canonical=parseArtifactForSourceSnapshot({format:"showai",version:artifactVersion(normalized),document:normalized}).document;
  canonicalCapacityBodies.add(canonical);return canonical;
 }
 function normalizeParsedSourceDocument(document:ShowDocument):ShowDocument{
- // Retain the original result root for history's pre-normalization semantics;
- // reconcile's no-clone route owns its maps and copies changed model nodes.
+ // Retain the original result root for history's pre-normalization semantics.
+ // This is either our exclusive JSON.parse graph or an actual recursively owned
+ // readable graph. The independent mutable root/maps own every normalization
+ // write; shared frozen leaves are read-only throughout complete validation.
  const normalized=reconcileSurface({...document},{clone:false});
  const canonical=parseArtifactConsumingForSourceSnapshot({format:"showai",version:artifactVersion(normalized),document:normalized}).document;
  canonicalCapacityBodies.add(canonical);return canonical;
@@ -206,6 +217,7 @@ export class SourceRuntimeOwner {
   scope(targetScope);if(document.id!==targetScope.pageId)fail("Source body belongs to another page");
   const shared=measured(observer,"register.share",()=>base&&!preparedEdits?shareSourceSnapshotDocument(base.document,document):document);
   const body=measured(observer,"register.freeze",()=>freezeOwnedSource(shared));
+  normalizationReadableBodies.add(body);
   let timestampProof=false;
   const timestampOnly=!!base&&this.validatedBodies.has(base.document)&&isDocumentTimestamp(body.updatedAt)&&(preparedEdits?preparedEdits.every(edit=>edit.op==="set"&&edit.path.length===1&&edit.path[0]==="updatedAt"):onlySharedTimestampChanged(base.document,body));
   if(!this.validatedBodies.has(body)){
@@ -243,6 +255,7 @@ export class SourceRuntimeOwner {
    if(diffNativeSource(snapshot.nativeOrigin.packet,packet).length)fail("Native publication identity names a different complete packet");
   }
   const previous=[...this.publications.values()].at(-1)?.packet,copy=parsedPacket?parsedPacket():cloneSourceValue(packet),value=freezeOwnedSource(previous?shareNativeSource(previous,copy):copy);
+  normalizationReadableBodies.add(value.document);normalizationReadableBodies.add(value.baseDocument);
   const entry={packet:value};this.publications.set(key,entry);this.account(value,1);this.prunePublications();return entry;
  }
  private prepareNativeOrigin(current:Snapshot,publicationId:string,entry:PublicationEntry,merged:ShowDocument,sourceVersion:number,observer?:SourceRuntimeObserver):{record:PublicationOriginRecord;canonical?:ShowDocument}{
