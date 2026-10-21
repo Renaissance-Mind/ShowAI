@@ -232,6 +232,8 @@ export async function createMcpHttpApp(options: McpHttpOptions) {
         storePresentation: (value) => storePresentation(value, true),
         widgetDomain: options.widgetDomain,
         privateProjects: servers.length > 0,
+        // Hosted connections serve MCP Apps clients and have no local files.
+        hostDisplay: "mcp-app",
       },
       decorateTool(name: string, tool: RegisteredTool) {
         if (localOnly.has(name)) {
