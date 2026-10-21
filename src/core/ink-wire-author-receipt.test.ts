@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { blankDocument } from "./catalog";
 import { InkOperationJournal } from "./ink-operation-journal";
 import { InkOperationReplica, canonicalInkJSON, inkOperationDigest } from "../surface/ink-operations.mjs";
-import { inkCheckpointFromDocument, inkWireAuthorReceipt, inkWireEditPlans, inkWireImportCheckpoints, stampInkDocument } from "../surface/ink-wire.mjs";
+import { inkCheckpointFromDocument, inkWireAuthorReceipt, inkWireEditPlans, inkWireImportCheckpoints, inkWireDocumentFromCheckpoint, stampInkDocument } from "../surface/ink-wire.mjs";
 import { createResource } from "../surface/containers.mjs";
 import { addNode } from "../surface/editing";
 import { createPortableInk } from "../surface/portable-ink.mjs";
@@ -90,4 +90,16 @@ it("returns only the latest author branch rather than accumulating history times
   expect(journal.operations(scope)).toHaveLength(31);
   expect(canonicalInkJSON(receipt).length).toBeLessThan(firstBytes+500);
   expect(receipt.content.attrs!.inkState.strokes["native-C"]).toBeUndefined();
+});
+
+it("imports a field not covered by the author branch even when its dot is inherited in that branch's global clock", async()=>{
+  const base=source(),scope=scopeOf(base),journal=await open();journal.importCheckpoint(scope,inkCheckpointFromDocument(base,scope.boardId));
+  const native=journal.appendLocal({...scope,parents:["seed:1"],changes:[{kind:"edit",strokeId:"base",patch:{color:"#ff0000"}}]});
+  const raw=structuredClone(base);raw.content.content![0].attrs!.strokeWidth=10;
+  const authored=journal.appendLocal({pageId:base.id,...inkWireEditPlans(base,raw)[0]});
+  const receipt=inkWireAuthorReceipt(base,raw,[authored],journal.read(scope).checkpoint!);
+  expect(receipt.content.attrs!.inkState.contexts[authored.id][native.actor]).toBe(authored.sequence);
+  const projected=inkWireDocumentFromCheckpoint(raw,scope.boardId,journal.read(scope).checkpoint!);
+  expect(projected.content.content![0].attrs!.color).toBe("#ff0000");
+  expect(inkWireEditPlans(receipt,projected)).toEqual([]);
 });

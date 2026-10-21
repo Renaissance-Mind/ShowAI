@@ -101,3 +101,26 @@ it("does not silently order an ordinary draft after an unseen same-field remote 
   const current = journal.read(scope).materialization!;
   expect(current.conflicts).toMatchObject([{ field: "strokeWidth", candidates: expect.arrayContaining([{ operationId: "browser:1", value: 30 }, expect.objectContaining({ value: 20 })]) }]);
 });
+
+it("authors generic history restoration of a superseded field instead of treating its old dot as a new import", async () => {
+  const base = source(), changed = structuredClone(base); changed.content.content![0].attrs!.color = "#ff0000";
+  const current = stampInkDocument(changed, base, { actor: "ipad", sequence: 1 });
+  const plans = inkWireEditPlans(current, base);
+  expect(plans[0].changes).toEqual([{ kind: "edit", strokeId: "stroke", patch: { color: "#111111" } }]);
+  const journal = await open(), scope = scopeOf(base); journal.importCheckpoint(scope, inkCheckpointFromDocument(current, scope.boardId));
+  for (const incoming of inkWireImportCheckpoints(current, base)) journal.importCheckpoint({ pageId: base.id, boardId: incoming.boardId }, incoming.checkpoint);
+  for (const plan of plans) journal.appendLocal({ pageId: base.id, ...plan });
+  expect(journal.read(scope).materialization!.strokes[0].node.attrs!.color).toBe("#111111");
+});
+it("restores historical source after a compact tombstone but imports a genuinely newer restoration without fabricating edits", async () => {
+  const base = source(), erased = structuredClone(base); erased.content.content = []; erased.layout = {};
+  const removed = stampInkDocument(erased, base, { actor: "ipad", sequence: 1 });
+  const plans = inkWireEditPlans(removed, base);
+  expect(plans).toHaveLength(2); expect(plans[0].changes[0].kind).toBe("edit"); expect(plans[1].changes).toEqual([{ kind: "restore", strokeId: "stroke" }]);
+  const journal = await open(), scope = scopeOf(base); journal.importCheckpoint(scope, inkCheckpointFromDocument(base, scope.boardId));
+  journal.appendLocal({ ...scope, parents: ["seed:1"], changes: [{ kind: "delete", strokeId: "stroke" }] });
+  const deleted = inkWireDocumentFromCheckpoint(erased, scope.boardId, journal.read(scope).checkpoint!);
+  journal.appendLocal({ ...scope, parents: journal.read(scope).checkpoint!.frontier, changes: [{ kind: "restore", strokeId: "stroke" }] });
+  const restored = inkWireDocumentFromCheckpoint(base, scope.boardId, journal.read(scope).checkpoint!);
+  expect(inkWireEditPlans(deleted, restored)).toEqual([]);
+});

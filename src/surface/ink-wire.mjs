@@ -555,8 +555,14 @@ export function inkWireEditPlans(baseline, next) {
     const changes = [], restores = [];
     const stamped = (id, field, value) => {
       if (!supplied) return false;
-      const incoming = supplied.strokes[id]?.fields[field], original = state.strokes[id]?.fields[field];
-      return !!incoming?.some(([dot, digest]) => digest === hash(value) && !original?.some(([oldDot, oldDigest]) => oldDot === dot && oldDigest === digest));
+      const previous = state.strokes[id], source = supplied.strokes[id], incoming = source?.fields[field];
+      // Global clock coverage can include an unseen native predecessor. Only
+      // heads of this field prove its older value was already superseded.
+      // A compact deletion supplies the coverage of discarded source fields.
+      const covered = previous?.fields[field] ?? (isDeleted(previous) ? previous.fields.alive : undefined);
+      if (field === "alive" && value === true && isDeleted(source)) return false;
+      const freshRestore = isDeleted(previous) && !isDeleted(source) && source?.fields.alive.some(([dot, digest]) => digest === aliveHash && !previous.fields.alive.some(([old]) => seen(state.contexts[old], dot)));
+      return !!incoming?.some(([dot, digest]) => digest === hash(value) && (field !== "alive" && freshRestore || !covered?.some(([old]) => seen(state.contexts[old], dot))));
     };
     for (const id of new Set([...Object.keys(state.strokes), ...(before?.records.keys() ?? []), ...(after?.records.keys() ?? [])])) {
       const old = before?.records.get(id), current = after?.records.get(id), previous = state.strokes[id];
