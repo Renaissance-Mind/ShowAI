@@ -65,13 +65,13 @@ dataset_create({projectId, name:"全景 OKR", fromBlock:{pageId, blockId, baseHa
 - 两种写法遇到同一字段的新修改都返回 CONFLICT 并且什么都不写，见下文。`page_apply` 返回的 CONFLICT 带 `details.datasetId` 与 `details.conflicts` 时是共享数据冲突：重新 `page_read` 后逐项决定，不走 `page_diff` 和整页合并；没有这些字段时是页面本身的保存冲突。
 - `page_save` 不能把共享参数写进绑定块；要改这些参数用上面两种方式。
 - 解除绑定：`{type:"component.binding.remove", blockId, keep:"snapshot"}` 把当前显示的参数存为块的副本。
-- 删除：先用 `dataset_read` 的 `references` 查看本项目里使用它的页面，向用户确认（删除不能在应用中撤销）。`dataset_delete({projectId, datasetId, baseHash})` 只删除没有块使用的共享数据，已移到其他项目、仍指向它的页面也算在内；仍有使用时返回 `details.references` 而不删除，由用户决定是否先在这些块上解除绑定。
+- 删除：先用 `dataset_read` 的 `references` 查看本项目里使用它的页面，向用户确认（删除不能在应用中撤销）。`dataset_delete({projectId, datasetId, baseHash})` 只删除没有块使用的共享数据，已移到其他项目、仍指向它的页面也算在内；仍有使用时返回 `details.references`（每项带 projectId、pageId、blockIds）而不删除，由用户决定是否先在这些块上解除绑定：读取对应项目的页面后用 `component.binding.remove`。
 
 ## 并发与冲突
 
-每次写入都带着它开始时的值。不同记录、同一记录的不同字段可以同时修改，自动合并；两处把同一字段改成不同的值才是冲突：写入返回 CONFLICT、什么都不写，`details.conflicts` 给出每个字段的 `path`、`base`、`mine`、`theirs`。重新读取，逐项决定后用新的 baseHash 写入；不要用旧读取的整份值覆盖。没有 id 的列表只能整体替换，几处同时改它会冲突，所以多人编辑的列表条目要有稳定 id。顺序调整按最后一次为准，不丢内容。
+每次写入都带着它开始时的值。不同记录、同一记录的不同字段可以同时修改，自动合并；两处把同一字段改成不同的值才是冲突：写入返回 CONFLICT、什么都不写，`details.conflicts` 给出每个字段的 `path`、`base`、`mine`、`theirs`。重新读取，把每个字段的 `base`、`mine`、`theirs` 告诉用户，由用户决定保留哪个（意图明确时按用户这次的要求），再用新的 baseHash 写入；不要用旧读取的整份值覆盖。没有 id 的列表只能整体替换，几处同时改它会冲突，所以多人编辑的列表条目要有稳定 id。顺序调整按最后一次为准，不丢内容。
 
-用户说应用里出现冲突提示时，先用 `page_read` 看该块是否在 `bindings` 中：是共享数据就按本节处理；不是则属于页面保存冲突，按 use-showai 的编辑与验证处理。工作台里的共享数据冲突留在出现冲突的那个窗口：组件上方列出「此处的修改」和「另一处的修改」，由使用者选择保留哪一个。这些未决的值保存在该窗口的本地草稿里（不在 `drafts_list` 的草稿中），Agent 用 `dataset_read` 只能看到已保存的值，看不到另一个值，也清除不了这个提示，需要请用户说出想保留的内容。用户问起时解释含义，读取已保存的值告诉用户；用户希望保留另一个值时，可以在确认后用 `dataset_apply` 写入，但仍需用户在该窗口选择一次来关闭提示。
+用户说应用里出现冲突提示时，先用 `page_read` 看该块是否在 `bindings` 中：是共享数据就按本节处理；不是则属于页面保存冲突，按 use-showai 的编辑与验证处理。工作台里的共享数据冲突留在出现冲突的那个窗口：组件上方列出「此处的修改」和「另一处的修改」，由使用者选择保留哪一个。「此处的修改」是这个窗口尚未保存的值，保存在该窗口的本地草稿里（不在 `drafts_list` 的草稿中）；「另一处的修改」是已经保存的值。Agent 用 `dataset_read` 只能看到已保存的值，看不到窗口里未保存的那个值，也清除不了这个提示，需要请用户说出想保留的内容。用户问起时解释含义，读取已保存的值告诉用户；用户希望保留的值由 Agent 写入时，在确认后用 `dataset_apply` 写入，再请用户在该窗口点「采用另一处的」关闭提示（此时另一处就是刚写入的值）。
 
 ## 把复制改成共享
 
