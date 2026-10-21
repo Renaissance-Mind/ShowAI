@@ -96,6 +96,15 @@ SAInkStatus sa_analytic_implicit_evaluate(uint32_t mode, float sign,
 SAInkStatus sa_analytic_path_winding(const SAInkPathCommand *, uint32_t,
                                      const double affine[6], double x, double y,
                                      uint32_t fill, SAAnalyticHit *);
+/* Query-only extended command budget (1..4,000,000). Does not enlarge the
+ * existing build/mesh or 100,000-command winding contracts. Exact same parser,
+ * analytic roots, winding and boundary semantics; caller-owned atomic output,
+ * non-overlapping valid aligned buffers. No hidden allocation. */
+SAInkStatus sa_analytic_path_winding_extended(const SAInkPathCommand *,
+                                              uint32_t, const double affine[6],
+                                              double x, double y, uint32_t fill,
+                                              uint32_t max_commands,
+                                              SAAnalyticHit *);
 SAInkStatus sa_analytic_patch_winding(const SAAnalyticPatch *,
                                       const SAAnalyticVertex *,
                                       uint32_t vertex_count, double x, double y,

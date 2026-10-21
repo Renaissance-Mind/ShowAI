@@ -10,6 +10,11 @@ export interface InkStrokeOptions {
   maxLeaves?: number;
   maxCommands?: number;
 }
+export interface InkStrokeStyle {
+  sourceWidth: number;
+  width: number;
+  pressure: boolean;
+}
 export interface InkStrokeResult {
   commands: number;
   contours: number;
@@ -31,9 +36,35 @@ export class CompiledInkStroke {
   counts(
     segments: InkStrokeSegment[],
     options?: InkStrokeOptions,
+    style?: InkStrokeStyle,
   ): InkStrokeResult;
   build(
     segments: InkStrokeSegment[],
     options?: InkStrokeOptions,
+    style?: InkStrokeStyle,
   ): { commands: InkStrokeCommand[]; result: InkStrokeResult };
+  resolve(
+    segments: InkStrokeSegment[],
+    style: InkStrokeStyle,
+  ): InkStrokeSegment[];
+  pathGeometry(
+    commands: InkStrokeCommand[],
+    affine?: number[],
+    tolerance?: number,
+    maxPoints?: number,
+  ): {
+    bounds: { x: number; y: number; width: number; height: number };
+    polygons: { x: number; y: number }[][];
+  };
+  pathBounds(
+    commands: InkStrokeCommand[],
+    affine?: number[],
+  ): { x: number; y: number; width: number; height: number };
+  pathHit(
+    commands: InkStrokeCommand[],
+    point: { x: number; y: number },
+    affine?: number[],
+    tolerance?: number,
+    maxPoints?: number,
+  ): { inside: boolean; distance: number; solid: true };
 }

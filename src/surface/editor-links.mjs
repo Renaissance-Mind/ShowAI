@@ -1,4 +1,5 @@
 import { isSafeUrl } from "../portable/validation.mjs";
+import { validateCubicInk } from "./portable-ink-v2.mjs";
 import { richTextDocument } from "../components/rich-text/model.mjs";
 
 // These are closed payload envelopes in the canonical model, not arbitrary
@@ -20,10 +21,15 @@ const portable = value => only(value,portableKeys) && value.format === "showai-i
   Array.isArray(value.transform) && value.transform.length === 6;
 const native = value => portable(value) || only(value,nativeKeys) && value.format === "showai-pencilkit-v1" &&
   typeof value.drawing === "string" && typeof value.preview === "string" && (value.extent === undefined || extent(value.extent));
+function cubic(value) {
+  if(value?.format !== "showai-ink-v2")return false;
+  // An input boundary: unknown or malformed fields retain the ordinary link walk.
+  try { validateCubicInk(value); return true; } catch { return false; }
+}
 function opaqueField(context,key,value) {
   const node=context?.node;
   if(context?.kind === "attrs" && node?.type === "drawing") {
-    if(key === "ink") return native(value);
+    if(key === "ink") return native(value) || cubic(value);
     if(key === "inkFragments") return Array.isArray(value) && value.every(portable);
     if(key === "inkInput") return only(value,inputKeys) && value.format === "showai-input-v1" && typeof value.sourceID === "string" &&
       only(value.configuration,configurationKeys) && value.configuration.version === 1 && Array.isArray(value.raw) && Array.isArray(value.curves);

@@ -532,7 +532,52 @@ extern "C" {
 uint32_t sa_stroke_geometry_version() { return SA_INK_STROKE_GEOMETRY_VERSION; }
 uint32_t sa_stroke_sizeof_segment() { return sizeof(SAInkStrokeSegment); }
 uint32_t sa_stroke_sizeof_options() { return sizeof(SAInkStrokeOptions); }
+uint32_t sa_stroke_sizeof_style() { return sizeof(SAInkStrokeStyle); }
 uint32_t sa_stroke_sizeof_result() { return sizeof(SAInkStrokeResult); }
+SAInkStatus sa_stroke_resolve_segments(const SAInkStrokeSegment *input,
+                                       uint32_t count,
+                                       const SAInkStrokeStyle *style,
+                                       SAInkStrokeSegment *out,
+                                       uint32_t capacity) {
+  uint64_t bytes = uint64_t(count) * sizeof(*input);
+  if (!span(style, sizeof(*style)) || !aligned(style) || !span(input, bytes) ||
+      (count && !aligned(input)) || count > 100000 ||
+      !finite(style->source_width) || style->source_width < .5 ||
+      style->source_width > 40 || !finite(style->width) || style->width < .5 ||
+      style->width > 40 || style->pressure > 1 || style->reserved ||
+      !span(out, bytes) || (count && !aligned(out)) ||
+      (input != out && overlap(input, bytes, out, bytes)) ||
+      overlap(style, sizeof(*style), out, bytes))
+    return SA_INK_INVALID;
+  if (capacity < count)
+    return SA_INK_CAPACITY;
+  double ratio = style->width / style->source_width;
+  for (uint32_t i = 0; i < count; i++) {
+    const auto &s = input[i];
+    if (s.degree > 3 || s.reserved)
+      return SA_INK_INVALID;
+    for (uint32_t k = 0; k < 8; k++)
+      if (!finite(s.controls[k]) || abs(s.controls[k]) > 1e6 ||
+          (k > 2 * s.degree + 1 && s.controls[k] != 0))
+        return SA_INK_INVALID;
+    for (uint32_t k = 0; k < 2; k++) {
+      if (!finite(s.radius[k]) || s.radius[k] < 0 || s.radius[k] > 1e4)
+        return SA_INK_INVALID;
+      double r = style->pressure ? s.radius[k] * ratio : style->width * .5;
+      if (!finite(r) || r > 1e4)
+        return SA_INK_RANGE;
+    }
+    if (!s.degree && s.radius[0] != s.radius[1])
+      return SA_INK_INVALID;
+  }
+  for (uint32_t i = 0; i < count; i++) {
+    SAInkStrokeSegment s = input[i];
+    s.radius[0] = style->pressure ? s.radius[0] * ratio : style->width * .5;
+    s.radius[1] = style->pressure ? s.radius[1] * ratio : style->width * .5;
+    out[i] = s;
+  }
+  return SA_INK_OK;
+}
 SAInkStatus sa_stroke_path_counts(const SAInkStrokeSegment *s, uint32_t n,
                                   const SAInkStrokeOptions *o,
                                   SAInkStrokeResult *out) {
@@ -572,5 +617,269 @@ SAInkStatus sa_stroke_path_build(const SAInkStrokeSegment *s, uint32_t n,
   if (status == SA_INK_OK)
     *out = result;
   return status;
+}
+}
+
+// Path queries consume the SAME generated Bezier contours. This is a detached,
+// bounded measurement/selection representation, never persisted rendering data.
+#include "include/analytic-path.h"
+namespace {
+struct PathWalk {
+  double tolerance;
+  uint32_t budget;
+  SAInkStrokePathMeasure result{};
+  SAInkPoint *points = nullptr;
+  SAInkContour *contours = nullptr;
+  bool query = false, bounds_only = false;
+  V probe{};
+  double distance = __builtin_inf();
+  V first{}, last{};
+  uint32_t contour_start = 0;
+  bool open = false, has_bounds = false;
+  SAInkStatus status = SA_INK_OK;
+};
+static V mapped(const double *m, V p) {
+  return {m[0] * p.x + m[2] * p.y + m[4], m[1] * p.x + m[3] * p.y + m[5]};
+}
+static double segmentDistance(V p, V a, V b) {
+  V d = sub(b, a);
+  double s = dot(d, d);
+  double t = s ? max(0, min(1, dot(sub(p, a), d) / s)) : 0;
+  return norm(sub(p, add(a, mul(d, t))));
+}
+static void include(PathWalk &w, V p) {
+  if (!w.has_bounds) {
+    w.result.bounds = {p.x, p.y, 0, 0};
+    w.has_bounds = true;
+    return;
+  }
+  auto &b = w.result.bounds;
+  double right = max(b.x + b.width, p.x), bottom = max(b.y + b.height, p.y);
+  b.x = min(b.x, p.x);
+  b.y = min(b.y, p.y);
+  b.width = right - b.x;
+  b.height = bottom - b.y;
+}
+static void extremum(PathWalk &w, const Curve &c, double t) {
+  if (t > 0 && t < 1)
+    include(w, value(c, t));
+}
+static void curveBounds(PathWalk &w, const Curve &c) {
+  include(w, c.p[0]);
+  include(w, c.p[c.degree]);
+  for (uint32_t axis = 0; axis < 2; axis++) {
+    double v[4];
+    for (uint32_t i = 0; i <= c.degree; i++)
+      v[i] = axis ? c.p[i].y : c.p[i].x;
+    if (c.degree == 2) {
+      double a = v[0] - 2 * v[1] + v[2];
+      if (a)
+        extremum(w, c, (v[0] - v[1]) / a);
+    }
+    if (c.degree == 3) {
+      double a = -v[0] + 3 * v[1] - 3 * v[2] + v[3],
+             b = 2 * (v[0] - 2 * v[1] + v[2]), d = v[1] - v[0],
+             scale = max(abs(a), max(abs(b), abs(d)));
+      if (!scale)
+        continue;
+      a /= scale;
+      b /= scale;
+      d /= scale;
+      if (!a) {
+        if (b)
+          extremum(w, c, -d / b);
+      } else {
+        double disc = b * b - 4 * a * d;
+        if (disc >= 0) {
+          double root = __builtin_sqrt(disc),
+                 q = -(b + (b < 0 ? -root : root)) * .5;
+          extremum(w, c, q / a);
+          if (q)
+            extremum(w, c, d / q);
+        }
+      }
+    }
+  }
+}
+static void pathPoint(PathWalk &w, V p) {
+  if (w.status != SA_INK_OK)
+    return;
+  if (w.result.points >= w.budget) {
+    w.status = SA_INK_CAPACITY;
+    return;
+  }
+  if (w.query && w.result.points > w.contour_start)
+    w.distance = min(w.distance, segmentDistance(w.probe, w.last, p));
+  if (w.points)
+    w.points[w.result.points] = {p.x, p.y};
+  ++w.result.points;
+  w.last = p;
+}
+static void finishContour(PathWalk &w) {
+  if (!w.open || w.status != SA_INK_OK)
+    return;
+  if (w.query)
+    w.distance = min(w.distance, segmentDistance(w.probe, w.last, w.first));
+  if (w.contours)
+    w.contours[w.result.contours] = {w.contour_start,
+                                     w.result.points - w.contour_start};
+  ++w.result.contours;
+  w.open = false;
+}
+static void flatCurve(PathWalk &w, const Curve &c, uint32_t depth) {
+  if (w.status != SA_INK_OK)
+    return;
+  if (chordBound(c) <= w.tolerance) {
+    pathPoint(w, c.p[c.degree]);
+    return;
+  }
+  if (depth >= 24) {
+    w.status = SA_INK_CAPACITY;
+    return;
+  }
+  Curve a, b;
+  split(c, a, b);
+  flatCurve(w, a, depth + 1);
+  flatCurve(w, b, depth + 1);
+}
+static SAInkStatus pathWalk(const SAInkPathCommand *commands, uint32_t n,
+                            const double *m, PathWalk &w) {
+  if (!span(commands, uint64_t(n) * sizeof(*commands)) ||
+      (n && !aligned(commands)) || n > 4000000 || !span(m, 48) || !aligned(m) ||
+      !finite(w.tolerance) || w.tolerance < 1e-9 || w.tolerance > 1000 ||
+      !w.budget || w.budget > 4000000)
+    return SA_INK_INVALID;
+  for (uint32_t i = 0; i < 6; i++)
+    if (!finite(m[i]))
+      return SA_INK_INVALID;
+  for (uint32_t i = 0; i < n; i++) {
+    const auto &c = commands[i];
+    if (c.reserved || c.operation > SA_INK_CLOSE)
+      return SA_INK_INVALID;
+    for (uint32_t k = 0; k < 6; k++)
+      if (!finite(c.values[k]))
+        return SA_INK_INVALID;
+    if (c.operation == SA_INK_MOVE) {
+      finishContour(w);
+      V p = mapped(m, {c.values[0], c.values[1]});
+      if (!finite(p.x) || !finite(p.y))
+        return SA_INK_RANGE;
+      w.contour_start = w.result.points;
+      w.first = p;
+      w.open = true;
+      pathPoint(w, p);
+      include(w, p);
+    } else {
+      if (!w.open)
+        return SA_INK_INVALID;
+      if (c.operation == SA_INK_CLOSE) {
+        finishContour(w);
+        continue;
+      }
+      Curve curve{};
+      curve.p[0] = w.last;
+      curve.degree = c.operation;
+      for (uint32_t k = 0; k < curve.degree; k++) {
+        curve.p[k + 1] = mapped(m, {c.values[k * 2], c.values[k * 2 + 1]});
+        if (!finite(curve.p[k + 1].x) || !finite(curve.p[k + 1].y))
+          return SA_INK_RANGE;
+      }
+      curveBounds(w, curve);
+      if (w.bounds_only)
+        pathPoint(w, curve.p[curve.degree]);
+      else
+        flatCurve(w, curve, 0);
+    }
+    if (w.status != SA_INK_OK)
+      return w.status;
+  }
+  finishContour(w);
+  return w.status;
+}
+} // namespace
+extern "C" {
+uint32_t sa_stroke_sizeof_path_measure() {
+  return sizeof(SAInkStrokePathMeasure);
+}
+SAInkStatus sa_stroke_path_bounds(const SAInkPathCommand *c, uint32_t n,
+                                  const double *m, SAInkBounds *out) {
+  if (!span(out, sizeof(*out)) || !aligned(out) ||
+      overlap(out, sizeof(*out), c, uint64_t(n) * sizeof(*c)) ||
+      overlap(out, sizeof(*out), m, 48))
+    return SA_INK_INVALID;
+  PathWalk w{1, 4000000};
+  w.bounds_only = true;
+  auto status = pathWalk(c, n, m, w);
+  if (status == SA_INK_OK)
+    *out = w.result.bounds;
+  return status;
+}
+SAInkStatus sa_stroke_path_measure(const SAInkPathCommand *c, uint32_t n,
+                                   const double *m, double tolerance,
+                                   uint32_t budget,
+                                   SAInkStrokePathMeasure *out) {
+  if (!span(out, sizeof(*out)) || !aligned(out) ||
+      overlap(out, sizeof(*out), c, uint64_t(n) * sizeof(*c)) ||
+      overlap(out, sizeof(*out), m, 48))
+    return SA_INK_INVALID;
+  PathWalk w{tolerance, budget};
+  auto status = pathWalk(c, n, m, w);
+  if (status == SA_INK_OK)
+    *out = w.result;
+  return status;
+}
+SAInkStatus sa_stroke_path_flatten(const SAInkPathCommand *c, uint32_t n,
+                                   const double *m, double tolerance,
+                                   uint32_t budget, SAInkPoint *p, uint32_t pn,
+                                   SAInkContour *contours, uint32_t cn,
+                                   SAInkStrokePathMeasure *out) {
+  SAInkStrokePathMeasure required;
+  auto status = sa_stroke_path_measure(c, n, m, tolerance, budget, &required);
+  if (status != SA_INK_OK)
+    return status;
+  if (pn < required.points || cn < required.contours)
+    return SA_INK_CAPACITY;
+  uint64_t pb = uint64_t(required.points) * sizeof(*p),
+           cb = uint64_t(required.contours) * sizeof(*contours),
+           input = uint64_t(n) * sizeof(*c);
+  if (!span(out, sizeof(*out)) || !aligned(out) || !span(p, pb) ||
+      (pb && !aligned(p)) || !span(contours, cb) ||
+      (cb && (uintptr_t)contours % 4) || overlap(p, pb, contours, cb) ||
+      overlap(p, pb, c, input) || overlap(p, pb, m, 48) ||
+      overlap(contours, cb, c, input) || overlap(contours, cb, m, 48) ||
+      overlap(out, sizeof(*out), p, pb) ||
+      overlap(out, sizeof(*out), contours, cb) ||
+      overlap(out, sizeof(*out), c, input) || overlap(out, sizeof(*out), m, 48))
+    return SA_INK_INVALID;
+  PathWalk w{tolerance, budget};
+  w.points = p;
+  w.contours = contours;
+  status = pathWalk(c, n, m, w);
+  if (status == SA_INK_OK)
+    *out = w.result;
+  return status;
+}
+SAInkStatus sa_stroke_path_query(const SAInkPathCommand *c, uint32_t n,
+                                 const double *m, double x, double y,
+                                 double tolerance, uint32_t budget,
+                                 SAInkHit *out) {
+  if (!span(out, sizeof(*out)) || !aligned(out) || !finite(x) || !finite(y) ||
+      overlap(out, sizeof(*out), c, uint64_t(n) * sizeof(*c)) ||
+      overlap(out, sizeof(*out), m, 48))
+    return SA_INK_INVALID;
+  PathWalk w{tolerance, budget};
+  w.query = true;
+  w.probe = {x, y};
+  auto status = pathWalk(c, n, m, w);
+  if (status != SA_INK_OK)
+    return status;
+  SAAnalyticHit hit{};
+  status = sa_analytic_path_winding_extended(c, n, m, x, y, SA_ANALYTIC_NONZERO,
+                                             4000000, &hit);
+  if (status != SA_INK_OK)
+    return status;
+  *out = {hit.inside || hit.boundary, 0,
+          (hit.inside || hit.boundary) ? 0 : w.distance};
+  return SA_INK_OK;
 }
 }

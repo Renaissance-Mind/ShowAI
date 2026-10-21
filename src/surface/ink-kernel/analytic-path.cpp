@@ -765,8 +765,8 @@ struct Sink {
 // One parser drives sizing/build and the independent full path oracle.
 static SAInkStatus walk(const SAInkPathCommand *commands, uint32_t count,
                         const double *m, Sink *s, double x, double y, int *w,
-                        bool *boundary) {
-  if ((count && !commands) || count > 100000 || !affine_valid(m))
+                        bool *boundary, uint32_t command_limit = 100000) {
+  if ((count && !commands) || count > command_limit || !affine_valid(m))
     return SA_INK_INVALID;
   if (affine_orientation(m) == 0) {
     s = nullptr;
@@ -1044,6 +1044,28 @@ SAInkStatus sa_analytic_path_winding(const SAInkPathCommand *c, uint32_t n,
   auto status = walk(c, n, m, nullptr, x, y, &w, &boundary);
   if (status == SA_INK_OK)
     hit(w, boundary, fill, out);
+  return status;
+}
+SAInkStatus sa_analytic_path_winding_extended(const SAInkPathCommand *c,
+                                              uint32_t n, const double *m,
+                                              double x, double y, uint32_t fill,
+                                              uint32_t max_commands,
+                                              SAAnalyticHit *out) {
+  auto span = [](const void *p, uint64_t bytes) {
+    return !bytes || (p && bytes <= UINTPTR_MAX - (uintptr_t)p);
+  };
+  const uint64_t bytes = uint64_t(n) * sizeof(*c);
+  if (!max_commands || max_commands > 4000000 || n > max_commands ||
+      !span(c, bytes) || (n && (uintptr_t)c % 8) || !span(m, 48) ||
+      (uintptr_t)m % 8 || !span(out, sizeof(*out)) || (uintptr_t)out % 4 ||
+      !fin(x) || !fin(y) || fill > 1 || overlap(out, sizeof(*out), c, bytes) ||
+      overlap(out, sizeof(*out), m, 48))
+    return SA_INK_INVALID;
+  int winding = 0;
+  bool boundary = false;
+  auto status = walk(c, n, m, nullptr, x, y, &winding, &boundary, max_commands);
+  if (status == SA_INK_OK)
+    hit(winding, boundary, fill, out);
   return status;
 }
 SAInkStatus sa_analytic_patch_winding(const SAAnalyticPatch *p,

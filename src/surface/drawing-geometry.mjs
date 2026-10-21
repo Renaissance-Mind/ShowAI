@@ -13,11 +13,13 @@ import {
   isPortableInk,
   portableNodeHit,
   portableNodeBounds,
+  portableInkGeometry,
 } from "./portable-ink.mjs";
 
 /** A lasso selects enclosed paint and any contour touched by its trace. */
 export function shapeIntersectsPolygon(node, frame, polygon, tolerance = 0) {
   if (polygon.length < 2) return false;
+  if(node.type==="drawing"&&node.attrs?.ink?.format==="showai-ink-v2")return cubicIntersectsPolygon(node,frame,polygon,tolerance);
   const center = {
     x: frame.x + frame.width / 2,
     y: frame.y + frameHeight(frame) / 2,
@@ -96,6 +98,15 @@ export function shapeIntersectsPolygon(node, frame, polygon, tolerance = 0) {
         ),
       ),
   );
+}
+function cubicIntersectsPolygon(node,frame,polygon,tolerance){
+  const center={x:frame.x+frame.width/2,y:frame.y+frameHeight(frame)/2},[w,h]=node.attrs.extent;
+  const contours=portableInkGeometry(node.attrs.ink,node.attrs.strokeWidth,node.attrs.pressure).polygons.map(points=>points.map(p=>rotatePoint({x:frame.x+p.x*frame.width/w,y:frame.y+p.y*frameHeight(frame)/h},center,frame.rotation)));
+  if(polygon.length>=3&&contours.some(points=>points.some(p=>polygonContains(polygon,p))))return true;
+  if(polygon.some(p=>{const hit=shapeHit(node,frame,p);return hit.inside||hit.distance<=tolerance;}))return true;
+  const cross=(a,b,c)=>(b.x-a.x)*(c.y-a.y)-(b.y-a.y)*(c.x-a.x);
+  const intersects=(a,b,c,d)=>{const u=cross(a,b,c),v=cross(a,b,d),p=cross(c,d,a),q=cross(c,d,b);return (((u>0&&v<0)||(u<0&&v>0))&&((p>0&&q<0)||(p<0&&q>0)))||Math.min(segmentDistance(a,c,d),segmentDistance(b,c,d),segmentDistance(c,a,b),segmentDistance(d,a,b))<=tolerance;};
+  return contours.some(points=>points.some((b,i)=>polygon.some((d,j)=>intersects(points[(i+points.length-1)%points.length],b,polygon[(j+polygon.length-1)%polygon.length],d))));
 }
 
 /** Geometry is the painted centerline, independent of SVG viewport padding. */
@@ -373,6 +384,7 @@ export function shapeIntersects(node, frame, rect, wrap = false) {
   if (!intersectsFrame(geometryFrame(node, frame), rect)) return false;
   if (node.attrs?.ink && !isPortableInk(node.attrs.ink)) return true;
   if (node.type !== "drawing") return true;
+  if(node.attrs?.ink?.format==="showai-ink-v2")return cubicIntersectsPolygon(node,frame,[{x:rect.x,y:rect.y},{x:rect.x+rect.width,y:rect.y},{x:rect.x+rect.width,y:rect.y+rect.height},{x:rect.x,y:rect.y+rect.height}],0);
   if (
     node.attrs.fillColor &&
     node.attrs.fillColor !== "none" &&

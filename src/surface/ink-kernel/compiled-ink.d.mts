@@ -1,4 +1,4 @@
-import type { PortableInk } from '../portable-ink.mjs';
+import type { PortableInkV1 as PortableInk } from '../portable-ink.mjs';
 export interface InkKernelProvenance { abiVersion: number; sourceHashes: Record<string,string>; wasmSha256: string; bytes: number; compiler: string; flags: string[]; imports: {module:string;name:string;kind:string}[] }
 export const inkKernelProvenance: InkKernelProvenance;
 export interface InkContourBuffers { points: Float64Array; contours: Uint32Array }

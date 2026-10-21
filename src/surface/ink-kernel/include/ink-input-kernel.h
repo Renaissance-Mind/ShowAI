@@ -1,6 +1,7 @@
 #ifndef SHOWAI_INK_INPUT_KERNEL_H
 #define SHOWAI_INK_INPUT_KERNEL_H
 #include "showai_ink.h"
+#include "ink-stroke-kernel.h"
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -33,11 +34,22 @@ typedef struct {
     uint32_t first_changed_curve,sample_count,fragment_count,finished;
     uint32_t filtered_points,fit_evaluations,generation,reserved;
 } SAInkInputSnapshot;
+/* Additive export, never changes the version1 state/config/curve/sample layout.
+ * Each element restricts an original fitted cubic to ONE actual/raw pressure
+ * interval, using the original polynomial for bit-identical shared endpoints.
+ * flags bit0 marks an ephemeral predicted endpoint. Only a finished state may
+ * be persisted; its elements have flags=0. reserved is always0.
+ */
+typedef struct {
+    SAInkStrokeSegment geometry;
+    uint32_t first_raw,last_raw,flags,reserved;
+} SAInkInputStrokeSegment;
 
 uint32_t sa_input_sizeof_point(void);
 uint32_t sa_input_sizeof_config(void);
 uint32_t sa_input_sizeof_curve(void);
 uint32_t sa_input_sizeof_snapshot(void);
+uint32_t sa_input_sizeof_stroke_segment(void);
 uint32_t sa_input_state_bytes(uint32_t raw_capacity);
 SAInkStatus sa_input_initialize(void *state,uint32_t bytes,uint32_t raw_capacity,const SAInkInputConfig *config);
 /* Growth is explicit and infrequent; source remains usable and unchanged. */
@@ -54,6 +66,14 @@ SAInkStatus sa_input_snapshot(const void *state,SAInkInputSnapshot *snapshot);
 SAInkStatus sa_input_copy_raw(const void *state,uint32_t start,uint32_t count,SAInkInputPoint *output,uint32_t capacity);
 SAInkStatus sa_input_copy_curves(const void *state,uint32_t start,uint32_t count,SAInkInputCurve *output,uint32_t capacity);
 SAInkStatus sa_input_copy_samples(const void *state,uint32_t start,uint32_t count,SAInkSample *output,uint32_t capacity);
+/* Actual-index filtered records, NOT flattened rendering samples. Predictions
+ * may influence the live tail filter but are never copied as actual records. */
+SAInkStatus sa_input_copy_filtered(const void *state,uint32_t start,uint32_t count,SAInkSample *output,uint32_t capacity);
+/* Count/copy the complete live curve domain, including flagged predictions.
+ * Empty state ->0; a point ->one degree0 disk. Durable adapters MUST finish
+ * first and reject flagged elements; no prediction can become persisted ink. */
+SAInkStatus sa_input_stroke_segment_count(const void *state,uint32_t *count);
+SAInkStatus sa_input_copy_stroke_segments(const void *state,uint32_t start,uint32_t count,SAInkInputStrokeSegment *output,uint32_t capacity);
 /* Fragments overlap one endpoint and belong to ONE logical opacity composite.
  * The host must preserve that group; independently alpha-compositing fragments
  * is not an equivalent export. Predictions must be cleared with finish first. */

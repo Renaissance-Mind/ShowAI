@@ -28,6 +28,7 @@ beforeAll(() => {
     "-fno-exceptions",
     "-fno-rtti",
     "src/surface/ink-kernel/ink-stroke-kernel.cpp",
+    "src/surface/ink-kernel/analytic-path.cpp",
     "src/surface/ink-kernel/stroke-native-parity.cpp",
     "-o",
     executable,
@@ -743,4 +744,45 @@ it("rejects invalid batches, budgets and aliasing atomically in the real native 
     kernel.build(cases[0], { cap: "square" } as InkStrokeOptions),
   ).toThrow();
   expect(kernel.build(cases[1])).toEqual(good);
+});
+
+it("resolves authored radius styles with byte-identical native and WASM semantics", () => {
+  const segments: InkStrokeSegment[] = [
+    { points: [[1, 2]], radius: [1, 1] },
+    {
+      points: [
+        [2, 3],
+        [4, 8],
+        [9, 2],
+      ],
+      radius: [0.5, 2],
+    },
+  ];
+  for (const pressure of [false, true]) {
+    const bytes = Buffer.alloc(28 + segments.length * 88);
+    bytes.writeUInt32LE(segments.length);
+    bytes.writeDoubleLE(4, 4);
+    bytes.writeDoubleLE(8, 12);
+    bytes.writeUInt32LE(pressure ? 1 : 0, 20);
+    segments.forEach((s, i) => {
+      const at = 28 + i * 88;
+      s.points.flat().forEach((v, j) => bytes.writeDoubleLE(v, at + j * 8));
+      s.radius.forEach((v, j) => bytes.writeDoubleLE(v, at + 64 + j * 8));
+      bytes.writeUInt32LE(s.points.length - 1, at + 80);
+    });
+    const actual = execFileSync(executable, ["--style"], { input: bytes }),
+      resolved = kernel.resolve(segments, {
+        sourceWidth: 4,
+        width: 8,
+        pressure,
+      }),
+      expected = Buffer.alloc(4 + segments.length * 88);
+    resolved.forEach((s, i) => {
+      const at = 4 + i * 88;
+      s.points.flat().forEach((v, j) => expected.writeDoubleLE(v, at + j * 8));
+      s.radius.forEach((v, j) => expected.writeDoubleLE(v, at + 64 + j * 8));
+      expected.writeUInt32LE(s.points.length - 1, at + 80);
+    });
+    expect(actual).toEqual(expected);
+  }
 });

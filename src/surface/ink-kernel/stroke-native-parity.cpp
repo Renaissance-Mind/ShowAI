@@ -81,7 +81,25 @@ static int contract() {
     return 10;
   return 0;
 }
-int main(int argc, char **) {
+int main(int argc, char **argv) {
+  if (argc > 1 && std::strcmp(argv[1], "--style") == 0) {
+    uint32_t n;
+    if (std::fread(&n, 4, 1, stdin) != 1 || n > 100000)
+      return 1;
+    SAInkStrokeStyle style;
+    if (std::fread(&style, sizeof(style), 1, stdin) != 1)
+      return 2;
+    std::vector<SAInkStrokeSegment> input(n), output(n);
+    if (n &&
+        std::fread(input.data(), sizeof(SAInkStrokeSegment), n, stdin) != n)
+      return 3;
+    uint32_t status =
+        sa_stroke_resolve_segments(input.data(), n, &style, output.data(), n);
+    std::fwrite(&status, 4, 1, stdout);
+    if (status == SA_INK_OK && n)
+      std::fwrite(output.data(), sizeof(SAInkStrokeSegment), n, stdout);
+    return 0;
+  }
   if (argc > 1)
     return contract();
   uint32_t count;
