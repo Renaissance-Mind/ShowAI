@@ -135,7 +135,7 @@ export function retainSyncConflicts(input: {
         : note(
             pageId,
             title,
-            `${bytes ? "此文件的合并失败，原始内容已完整保留。" : "此来源删除了文件；另一来源的修改也已保留。"}\n原文件：${conflict.path}\n来源：${label(source)}\n来源版本：${source.revision ?? "未知"}\n记录：${root}record.json\n${bytes ? `原始内容：${preservedPath}` : ""}`, // i18n-exempt: retained conflict note saved into the project
+            `${conflict.fields?.length ? `共享数据中的以下字段在两处被改成了不同的值，当前保留另一来源的值；其余修改已合并：${conflict.fields.join("、")}\n` : ""}${bytes ? "此文件的合并失败，原始内容已完整保留。" : "此来源删除了文件；另一来源的修改也已保留。"}\n原文件：${conflict.path}\n来源：${label(source)}\n来源版本：${source.revision ?? "未知"}\n记录：${root}record.json\n${bytes ? `原始内容：${preservedPath}` : ""}`, // i18n-exempt: retained conflict note saved into the project
           );
       const path = `${prefix}pages/${pageId}.json`;
       files.set(path, Buffer.from(serializeArtifact(document)));
@@ -154,7 +154,8 @@ export function retainSyncConflicts(input: {
         hash: bytes && hash(bytes),
       });
     }
-    if (!originalPageId) {
+    // A field-merged dataset keeps its merge; the inputs above preserve both versions.
+    if (!originalPageId && !conflict.fields) {
       const remote = input.remoteFiles.get(conflict.path);
       if (remote) files.set(conflict.path, remote);
       else files.delete(conflict.path);

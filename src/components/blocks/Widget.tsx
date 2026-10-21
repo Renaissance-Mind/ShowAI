@@ -23,6 +23,8 @@ import {
 import { downloadFile } from "./helpers";
 import type { BlockProps } from "./types";
 import "./block.css";
+import { hasBinding } from "../../datasets/binding.mjs";
+import { BoundWidget, SharedDataAction } from "../../datasets/react";
 import { translator } from "../../i18n";
 import { useTranslator } from "../../i18n/react";
 import messages from "../../i18n/messages/widget";
@@ -96,7 +98,24 @@ class BlockBoundary extends Component<
   }
 }
 
-export const Widget = memo(function Widget({
+/** A block bound to a shared dataset resolves its props there first. */
+export const Widget = memo(function Widget(props: BlockProps & { kind: string }) {
+  return (
+    <>
+      <SharedDataAction {...props} />
+      {hasBinding(props.data) ? (
+        <BoundWidget
+          {...props}
+          render={(resolved) => <WidgetBody {...resolved} />}
+        />
+      ) : (
+        <WidgetBody {...props} />
+      )}
+    </>
+  );
+});
+
+const WidgetBody = memo(function WidgetBody({
   kind,
   data,
   onChange,

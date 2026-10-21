@@ -3,6 +3,7 @@ export const CAPACITY: Readonly<{
   resourceBytes: number;
   pageResourceBytes: number;
   componentPropsBytes: number;
+  datasetBytes: number;
   componentSourceBytes: number;
   componentAssetBytes: number;
   componentFiles: number;

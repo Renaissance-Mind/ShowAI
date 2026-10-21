@@ -431,6 +431,28 @@ export class FileStore {
     return names;
   }
 
+  /** File access for project datasets (core/datasets.ts) under this store's path, lock and history rules. */
+  datasetFiles() {
+    return {
+      root: this.root,
+      directory: (projectId: string) =>
+        join(this.projectPath(projectId), "datasets"),
+      readProject: (projectId: string) => this.readProject(projectId),
+      readJson: (path: string) => this.readJson(path),
+      write: (path: string, source: string) => this.atomicWrite(path, source),
+      remove: async (path: string) => {
+        await this.safePath(path);
+        const managed = logicalPath(this.root, path);
+        if (managed)
+          await writeLibraryFiles(this.root, new Map([[managed, null]]));
+        else await rm(path, { force: true });
+      },
+      names: (path: string) => this.contentNames(path, "json"),
+      lock: <T>(key: string, action: () => Promise<T>) =>
+        this.withLock(key, action),
+    };
+  }
+
   async readProject(projectId: string): Promise<ProjectMetadata> {
     return validateProjectMetadata(
       await this.readJson(join(this.projectPath(projectId), "project.json")),

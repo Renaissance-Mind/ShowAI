@@ -3,6 +3,7 @@ import { defineMessages } from "../index";
 // Basic blocks: image, table, callout, toggle and code.
 export default defineMessages("primitives", {
   "zh-CN": {
+    sharedData: "共享数据…",
     imageFrame: "图片",
     appearance: "外观",
     color: "文字颜色",
@@ -38,6 +39,7 @@ export default defineMessages("primitives", {
     codeContent: "代码内容",
   },
   en: {
+    sharedData: "Shared data…",
     imageFrame: "Image",
     appearance: "Appearance",
     color: "Text color",

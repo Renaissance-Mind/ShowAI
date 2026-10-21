@@ -1,6 +1,6 @@
 ---
 name: use-showai
-description: 通过 ShowAI MCP 连接、查找与阅读内容，处理用户粘贴或对话附带的 ShowAI 引用与组件状态，管理项目、文件夹、侧栏、页面迁移与草稿，查询组件模板及引用，处理保存冲突。先核实连接和项目归属；页面创作、组件开发、模板创建分别进入专门技能。
+description: 通过 ShowAI MCP 连接、查找与阅读内容，处理用户粘贴或对话附带的 ShowAI 引用与组件状态，管理项目、文件夹、侧栏、页面迁移与草稿，让多个页面的组件共用并同时修改一份共享数据，查询组件模板及引用，处理保存冲突。先核实连接和项目归属；页面创作、组件开发、模板创建分别进入专门技能。
 ---
 
 # 使用 ShowAI
@@ -43,6 +43,7 @@ Agent 通过 MCP 操作 ShowAI。App、网页、CLI 和 MCP 共用内容核心�
 | 创建、整理或恢复项目与文件夹         | `projects_list({includeArchived?})` / `folders_list({projectId,includeArchived?})` → `project_update` / `folder_create` / `folder_update`；真实文件夹不能由同名 Page 替代，见[内容组织接口](references/runtime.md#内容组织接口) |
 | 移动页面、调整层级、分组和排序       | `entry_move` / `directory_sort`；库或远程连接用 `sidebar_read` / `sidebar_group_create` / `sidebar_group_update` / `sidebar_project_move`。先核实目标身份与权限，见[内容组织接口](references/runtime.md#内容组织接口)           |
 | 查组件或模板被哪些内容引用           | `catalog_references({projectId,kind,id,version?,integrity?})`，返回当前项目中的逻辑路径和节点 ID；正向依赖仍用 `catalog_describe({view:"dependencies"})`                                                                        |
+| 多个页面或组件共用、同时修改一份数据 | 读 [共享数据](references/shared-data.md) 与 `guide({topic:"datasets"})`；`dataset_create`（含 fromBlock）、`page_apply` 的 `component.binding.set`、`dataset_read` / `dataset_apply`。不要用脚本在页面之间复制数据              |
 | 找回或管理尚未保存的草稿             | `drafts_list` → `draft_read`；保留编辑用 `draft_save`，明确放弃用 `draft_remove`，保存一致内容后用 `draft_complete`。代次冲突保留新稿，见[草稿接口](references/runtime.md#草稿接口)                                             |
 | 用户粘贴或附带 ShowAI 引用、组件状态 | 按下文「处理用户引用」核对版本、按 ID 读取，再进入对应任务                                                                                                                                                                      |
 | 阅读数据、长页局部                   | 默认 structured；先 `detail:"outline"` 获取节点 ID，再用 `blockIds` 取局部；纯源读取用 `rendered:false`                                                                                                                         |
@@ -64,12 +65,12 @@ Agent 通过 MCP 操作 ShowAI。App、网页、CLI 和 MCP 共用内容核心�
 
 用户在 ShowAI 中选中内容后「复制引用」，或在对话预览里右键「引用到对话」，会交给你一份引用：一行标题、一条 `showai://` 链接和一行 `"type":"showai.reference"` 的 JSON；对话宿主中它位于模型上下文的 `showai.reference`。它表示用户在某个已保存版本里指向的内容，字段为 kind、projectId、pageId、title、hash、revision、blockIds 或 Board 的 nodeIds 与 surfaceId、至多 20 条文字标签，以及可选的位置参考 position。以 JSON 为准；链接 `showai://project/项目/page/页面?blocks=ID,…` 供人在 ShowAI 中打开并高亮这些内容。同样的规则也在 `guide({topic:"reading"})` 中。
 
-| 用户选的范围                 | kind      | 定位字段                    |
-| ---------------------------- | --------- | --------------------------- |
-| 选中的文字、某一块或几个块   | selection | blockIds（按页面顺序）      |
-| Board 上的一个或多个对象     | board     | nodeIds、surfaceId          |
-| 整个 Board                   | board     | surfaceId，没有 nodeIds     |
-| 整页                         | page      | 只有 projectId 与 pageId    |
+| 用户选的范围               | kind      | 定位字段                 |
+| -------------------------- | --------- | ------------------------ |
+| 选中的文字、某一块或几个块 | selection | blockIds（按页面顺序）   |
+| Board 上的一个或多个对象   | board     | nodeIds、surfaceId       |
+| 整个 Board                 | board     | surfaceId，没有 nodeIds  |
+| 整页                       | page      | 只有 projectId 与 pageId |
 
 标签按文字段落或选中文字的行生成，每条至多 160 字，可能截断，不与 ID 一一对应；判断“第二段”等位置时读取这些 ID 后确认。
 

@@ -1,3 +1,4 @@
+import { datasetWriteTools } from "./mcp-datasets";
 import {
   CAPACITY,
   CapacityError,
@@ -45,6 +46,7 @@ import {
 
 const writeTools = new Set([
   ...organizationWriteTools,
+  ...datasetWriteTools,
   "project_create",
   "page_create",
   "page_save",

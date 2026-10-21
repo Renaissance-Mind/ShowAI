@@ -35,7 +35,7 @@ export interface ChangeContext {
 }
 
 export interface HistoryResource {
-  kind: "page" | "project" | "component" | "template" | "library";
+  kind: "page" | "project" | "component" | "template" | "dataset" | "library";
   id: string;
   projectId?: string;
   path: string;
@@ -81,6 +81,9 @@ export function resourceForPath(path: string): HistoryResource {
     };
   const page = path.match(/^projects\/([^/]+)\/pages\/([^/]+)\.json$/);
   if (page) return { kind: "page", projectId: page[1], id: page[2], path };
+  const dataset = path.match(/^projects\/([^/]+)\/datasets\/([^/]+)\.json$/);
+  if (dataset)
+    return { kind: "dataset", projectId: dataset[1], id: dataset[2], path };
   const project = path.match(/^projects\/([^/]+)\/project\.json$/);
   if (project)
     return { kind: "project", projectId: project[1], id: project[1], path };

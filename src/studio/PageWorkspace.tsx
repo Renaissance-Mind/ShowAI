@@ -17,6 +17,7 @@ import SurfaceEditor from "../surface/SurfaceEditor";
 import type { EditorControls } from "../surface/EditorControls";
 import type { PageSessions, PageViewSession } from "./page-sessions";
 import PageHeading from "./PageHeading";
+import { DatasetScope } from "../datasets/react";
 
 function PageContent({
   view,
@@ -50,30 +51,36 @@ function PageContent({
   const locked = !!readOnly || !!state.record?.readOnly;
   return (
     <CustomComponentsProvider components={state.record?.components ?? []}>
-      <SurfaceEditor
-        key={`${state.draft.id}:${state.renderVersion}`}
-        document={state.draft}
+      <DatasetScope
+        projectId={state.projectId}
+        pageId={state.draft.id}
         readOnly={locked}
-        onChange={view.session.edit}
-        header={
-          state.draft.content.attrs?.kind === "board" ? undefined : (
-            <PageHeading
-              title={state.draft.title}
-              icon={state.draft.icon}
-              readOnly={locked}
-              onTitleChange={(title) => view.session.edit({ title })}
-              onEditIcon={onEditIcon}
-            />
-          )
-        }
-        revealId={revealId}
-        onControlsChange={onControlsChange}
-        onActiveSurfaceChange={onActiveSurfaceChange}
-        onRevealHandled={onRevealHandled}
-        retainedState={view.surface}
-        inlineInkProjectId={state.projectId ?? undefined}
-        onInkSave={view.session.flush}
-      />
+      >
+        <SurfaceEditor
+          key={`${state.draft.id}:${state.renderVersion}`}
+          document={state.draft}
+          readOnly={locked}
+          onChange={view.session.edit}
+          header={
+            state.draft.content.attrs?.kind === "board" ? undefined : (
+              <PageHeading
+                title={state.draft.title}
+                icon={state.draft.icon}
+                readOnly={locked}
+                onTitleChange={(title) => view.session.edit({ title })}
+                onEditIcon={onEditIcon}
+              />
+            )
+          }
+          revealId={revealId}
+          onControlsChange={onControlsChange}
+          onActiveSurfaceChange={onActiveSurfaceChange}
+          onRevealHandled={onRevealHandled}
+          retainedState={view.surface}
+          inlineInkProjectId={state.projectId ?? undefined}
+          onInkSave={view.session.flush}
+        />
+      </DatasetScope>
     </CustomComponentsProvider>
   );
 }

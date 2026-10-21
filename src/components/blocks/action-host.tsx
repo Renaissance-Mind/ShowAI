@@ -8,6 +8,20 @@ export const BlockActionHost = createContext<{
   closeSettings?: () => void;
 } | null>(null);
 
+/**
+ * Items a host maps into a component from elsewhere (e.g. shared dataset
+ * records), by item id: their source and the fields that cannot change here.
+ */
+export interface BlockItemSource {
+  label?: string;
+  readOnly: readonly string[];
+  removable: boolean;
+}
+export const BlockItemSources = createContext<ReadonlyMap<
+  string,
+  BlockItemSource
+> | null>(null);
+
 export function BlockActions({ children }: { children: ReactNode }) {
   const host = useContext(BlockActionHost);
   if (!host) return children;

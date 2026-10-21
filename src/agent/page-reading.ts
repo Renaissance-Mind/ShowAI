@@ -1,3 +1,7 @@
+import {
+  resolveDocumentDatasets,
+  type BindingRead,
+} from "../core/dataset-resolution";
 import { structuredContent, type OutlineItem } from "./page-structured";
 export { structuredContent } from "./page-structured";
 
@@ -123,6 +127,8 @@ export interface ReadIdentity {
   blockIds?: string[];
   view: (typeof READ_VIEWS)[number];
   componentRefs: { id: string; version: string; integrity?: string }[];
+  /** Blocks whose props come from a project dataset, with the resolved props. */
+  bindings?: BindingRead[];
 }
 export interface StructuredRead extends ReadIdentity {
   view: "structured";
@@ -235,6 +241,12 @@ export async function readPageView(
   const document = options.blockIds
     ? selectDocumentBlocks(record.document, options.blockIds)
     : record.document;
+  // Bound blocks read and render their shared data; `document` stays the stored source.
+  const shared = await resolveDocumentDatasets(store, projectId, document, {
+    includeProps: true,
+    remember: true,
+  });
+  const resolved = shared.document;
   const sourceOnly =
     options.view === "structured" &&
     (options.detail === "outline" ||
@@ -247,7 +259,7 @@ export async function readPageView(
     );
   const components = sourceOnly
     ? []
-    : await resolveDocumentComponents(store.root, document, projectId);
+    : await resolveDocumentComponents(store.root, resolved, projectId);
   const identity: ReadIdentity = {
     ...(captured
       ? {
@@ -266,6 +278,7 @@ export async function readPageView(
     hash: record.hash,
     ...(record.revision ? { revision: record.revision } : {}),
     view: options.view,
+    ...(shared.bindings.length ? { bindings: shared.bindings } : {}),
     partial: !!options.blockIds,
     ...(options.blockIds ? { blockIds: options.blockIds } : {}),
     componentRefs: sourceOnly
@@ -281,7 +294,7 @@ export async function readPageView(
         })),
   };
   const { out: _out, overwrite: _overwrite, ...state } = options;
-  const content = structuredContent(document);
+  const content = structuredContent(resolved);
   if (options.view === "structured" && options.detail === "outline") {
     const outlineMarkdown = `# ${identity.title}\n\n${content.outline.map((node) => `${"  ".repeat(node.depth)}- ${node.title || node.type} [${node.id}]`).join("\n")}`;
     const result =
@@ -326,7 +339,7 @@ export async function readPageView(
   if (render) {
     const html = previewHtml(
       await buildPageHtml(
-        document,
+        resolved,
         undefined,
         components,
         [],

@@ -3,6 +3,7 @@ import {
   type DragEvent,
   type KeyboardEvent,
   type ReactNode,
+  useContext,
   useEffect,
   useMemo,
   useRef,
@@ -22,6 +23,7 @@ import {
   timeLanes,
 } from "./database-contract.mjs";
 import { text } from "./helpers";
+import { BlockItemSources } from "./action-host";
 import { EmptyState } from "./shared";
 import { useLocale, useTranslator } from "../../i18n/react";
 import messages from "../../i18n/messages/database";
@@ -191,6 +193,10 @@ export function DatabaseCalendar({
   const t = useTranslator(messages);
   const locale = useLocale();
   const format = useFormatters(locale);
+  // Rows mapped from shared data move only when their date is writable here.
+  const sources = useContext(BlockItemSources);
+  const movable = (id: string) =>
+    !sources?.get(id)?.readOnly.includes(settings.dateColumn?.id ?? "");
   const today = localDay();
   const [mode, setMode] = useState<Mode>(settings.mode);
   const [anchor, setAnchor] = useState(settings.initialDay ?? today);
@@ -366,7 +372,7 @@ export function DatabaseCalendar({
         style={toneStyle(tone)}
         aria-pressed={entry.row.id === selectedId}
         title={[time, title].filter(Boolean).join(" ")}
-        draggable={Boolean(editable && onMove)}
+        draggable={Boolean(editable && onMove && movable(entry.row.id))}
         onDragStart={() => setDragging(entry)}
         onDragEnd={() => setDragging(null)}
         onClick={() =>
@@ -858,19 +864,21 @@ export function DatabaseCalendar({
                 ` – ${format.full(selected.end)}`}
               {timeText(selected) && ` · ${timeText(selected)}`}
             </span>
-            {editable && onRemove && (
-              <button
-                type="button"
-                className="sb-icon-button sb-danger"
-                aria-label={t("deleteRecord")}
-                onClick={() => {
-                  onRemove(selected.row.id);
-                  setSelectedId(null);
-                }}
-              >
-                <Trash2 size={13} />
-              </button>
-            )}
+            {editable &&
+              onRemove &&
+              sources?.get(selected.row.id)?.removable !== false && (
+                <button
+                  type="button"
+                  className="sb-icon-button sb-danger"
+                  aria-label={t("deleteRecord")}
+                  onClick={() => {
+                    onRemove(selected.row.id);
+                    setSelectedId(null);
+                  }}
+                >
+                  <Trash2 size={13} />
+                </button>
+              )}
             <button
               type="button"
               className="sb-icon-button"

@@ -27,6 +27,8 @@ export interface DesktopChange {
   home: string;
   projectIds?: string[];
   pageIds?: string[];
+  /** Changed shared datasets as "projectId/datasetId"; "projectId/*" for the whole folder. */
+  datasets?: string[];
   catalog?: boolean;
   projects?: boolean;
   sidebar?: boolean;

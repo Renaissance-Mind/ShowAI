@@ -1,3 +1,6 @@
+import { resolveDocumentDatasets } from "./dataset-resolution";
+import { FileStore } from "./store";
+import { hasBinding } from "../datasets/binding.mjs";
 import { instantiateTemplate } from "./template-instance";
 export { instantiateTemplate } from "./template-instance";
 import {
@@ -1064,9 +1067,21 @@ async function saveTemplateImpl(
   assertVersion(version);
   if (version === "0.0.0-legacy")
     throw new Error("Legacy flat templates are read-only. Save a new version.");
+  // A template carries the data its blocks show, not references to this project's datasets.
+  const source = input.document
+    ? project
+      ? (
+          await resolveDocumentDatasets(
+            new FileStore(home),
+            project,
+            input.document,
+          )
+        ).document
+      : input.document
+    : blankDocument();
   const document = await lockDocumentComponents(
     home,
-    documentCopy(input.document ?? blankDocument()),
+    documentCopy(source),
     project,
   );
   delete document.templateContext;
@@ -2744,7 +2759,9 @@ export async function resolveDocumentComponents(
       if (!schemas.has(reference))
         throw new Error("A custom component reference was not resolved.");
       const component = schemas.get(reference)!;
-      assertProps(component.schema, data.props, component.documentation);
+      // A bound block keeps only its local props; the resolved props are checked when rendered.
+      if (!hasBinding(node.attrs.data))
+        assertProps(component.schema, data.props, component.documentation);
     }
     node.content?.forEach(visit);
   };
@@ -2899,7 +2916,8 @@ export async function lockDocumentComponents(
         selected.set(key, pending);
       }
       const component = await pending;
-      assertProps(component.schema, data.props, component.documentation);
+      if (!hasBinding(data))
+        assertProps(component.schema, data.props, component.documentation);
       const { scope: _scope, ...properties } = data;
       node.attrs.data = {
         ...properties,

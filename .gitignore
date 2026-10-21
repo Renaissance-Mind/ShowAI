@@ -86,6 +86,7 @@ plugins/showai/scripts/cli.mjs
 !/plugins/showai/skills/use-showai/SKILL.md
 !/plugins/showai/skills/use-showai/references/integration.md
 !/plugins/showai/skills/use-showai/references/runtime.md
+!/plugins/showai/skills/use-showai/references/shared-data.md
 !/resources/catalog/task-gantt/README.md
 !/resources/catalog/value-slider/README.md
 

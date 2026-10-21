@@ -1,3 +1,5 @@
+import { mergeDatasetVersions, validateDataset } from "../core/datasets";
+import { formatPath } from "../datasets/operations.mjs";
 import { Buffer } from "node:buffer";
 import { createHash } from "node:crypto";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
@@ -324,6 +326,8 @@ export interface FileConflict {
   base: string | null;
   local: string | null;
   remote: string | null;
+  /** The merged file keeps both sides' other changes; these fields kept the remote value. */
+  fields?: string[];
 }
 export function mergeProjectFiles(
   base: Map<string, Buffer>,
@@ -360,6 +364,27 @@ export function mergeProjectFiles(
         merged.set(path, Buffer.from(serializeArtifact(preview.document)));
         continue;
       }
+    }
+    if (a && b && c && /^projects\/[^/]+\/datasets\/[^/]+\.json$/.test(path)) {
+      const id = path.split("/").at(-1)!.slice(0, -5);
+      const result = mergeDatasetVersions(
+        validateDataset(JSON.parse(a.toString()), id),
+        validateDataset(JSON.parse(b.toString()), id),
+        validateDataset(JSON.parse(c.toString()), id),
+      );
+      merged.set(
+        path,
+        Buffer.from(`${JSON.stringify(result.dataset, null, 2)}\n`),
+      );
+      if (result.conflicts.length)
+        conflicts.push({
+          path,
+          base: a.toString("base64"),
+          local: b.toString("base64"),
+          remote: c.toString("base64"),
+          fields: result.conflicts.map((item) => formatPath(item.path)),
+        });
+      continue;
     }
     if (a && b && c && /\/project\.json$/.test(path)) {
       const original = JSON.parse(a.toString()) as Record<string, unknown>,

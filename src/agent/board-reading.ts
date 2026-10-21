@@ -1,3 +1,4 @@
+import { resolveDocumentDatasets } from "../core/dataset-resolution";
 import { createHash, randomUUID } from "node:crypto";
 import { mkdir, readdir, rm, stat } from "node:fs/promises";
 import { join } from "node:path";
@@ -396,9 +397,13 @@ async function createSnapshot(
           `Capture state ${nodeId} must identify a ${kind} inside this Board.`,
         );
     }
+  // Bound blocks render their shared data; the captured source stays unchanged.
+  const rendered = (
+    await resolveDocumentDatasets(store, projectId, scoped.document)
+  ).document;
   const components = await resolveDocumentComponents(
     store.root,
-    scoped.document,
+    rendered,
     projectId,
   );
   const id = randomUUID(),
@@ -417,7 +422,7 @@ async function createSnapshot(
   let complete = false;
   try {
     const inputHtml = await buildPageHtml(
-      scoped.document,
+      rendered,
       undefined,
       components,
       [],

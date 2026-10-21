@@ -7,7 +7,8 @@ export function changedResources(
   paths: Iterable<string>,
 ): DesktopChange {
   const projectIds = new Set<string>(),
-    pageIds = new Set<string>();
+    pageIds = new Set<string>(),
+    datasets = new Set<string>();
   let allPages = false;
   let catalog = false,
     projects = false,
@@ -26,6 +27,12 @@ export function changedResources(
     const page = local.match(/^projects\/[^/]+\/pages\/([^/.]+)(?:\.json$|\/)/);
     if (page) pageIds.add(page[1]);
     else if (/^projects\/[^/]+\/pages(?:\/|$)/.test(local)) allPages = true;
+    const dataset = local.match(
+      /^projects\/([^/]+)\/datasets\/([^/.]+)\.json$/,
+    );
+    if (dataset) datasets.add(`${dataset[1]}/${dataset[2]}`);
+    else if (/^projects\/([^/]+)\/datasets\/?$/.test(local))
+      datasets.add(`${project![1]}/*`);
     if (/(?:^|\/)packages\//.test(local)) catalog = true;
     if (local === "sidebar.json") sidebar = true;
     if (!project && !catalog && !sidebar) unknown = true;
@@ -35,6 +42,7 @@ export function changedResources(
     home,
     projectIds: [...projectIds],
     pageIds: [...pageIds],
+    ...(datasets.size ? { datasets: [...datasets] } : {}),
     catalog,
     allPages,
     projects,

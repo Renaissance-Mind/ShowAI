@@ -2,19 +2,34 @@ import { useState } from "react";
 import type { Editor } from "@tiptap/core";
 import { useTranslator } from "../../i18n/react";
 import messages from "../../i18n/messages/primitives";
+import { Database } from "../../ui/icons";
 import {
   codeLanguages,
   normalizeCodeLanguage,
   supportsCodeLanguage,
 } from "./code-highlighting";
 
+/** The workbench's shared data dialog; it is not part of this package, so it answers an event. */
+const SHARED_DATA_EVENT = "showai:shared-data";
+function sharedDataAvailable() {
+  if (typeof window === "undefined") return false;
+  const probe = new CustomEvent(SHARED_DATA_EVENT, {
+    cancelable: true,
+    detail: null,
+  });
+  window.dispatchEvent(probe);
+  return probe.defaultPrevented;
+}
+
 /** Component-specific fields join the existing block menu and its lifecycle. */
 export function ContentNodeActions({
   editor,
   position,
+  onDone,
 }: {
   editor: Editor;
   position: number;
+  onDone?: () => void;
 }) {
   const t = useTranslator(messages);
   const [copyStatus, setCopyStatus] = useState("");
@@ -51,6 +66,42 @@ export function ContentNodeActions({
     else next[key] = value;
     update("componentStyle", next);
   };
+  if (
+    type === "widget" &&
+    node.attrs.kind !== "text" &&
+    sharedDataAvailable()
+  ) {
+    const id = node.attrs.id;
+    // Applies by block id: the document may change while the dialog is open.
+    const apply = (data: Record<string, unknown>) => {
+      let at = -1;
+      editor.state.doc.descendants((child, offset) => {
+        if (at < 0 && child.attrs?.id === id) at = offset;
+        return at < 0;
+      });
+      if (at >= 0)
+        editor.view.dispatch(
+          editor.state.tr.setNodeAttribute(at, "data", data),
+        );
+    };
+    return (
+      <button
+        type="button"
+        onClick={() => {
+          window.dispatchEvent(
+            new CustomEvent(SHARED_DATA_EVENT, {
+              cancelable: true,
+              detail: { kind: node.attrs.kind, data: node.attrs.data, apply },
+            }),
+          );
+          onDone?.();
+        }}
+      >
+        <Database size={15} />
+        {t("sharedData")}
+      </button>
+    );
+  }
   return (
     <div className="content-node-fields">
       {type === "image" && (

@@ -47,6 +47,7 @@ import { pageWriteCapture, type PageWrite } from "../core/page-write-capture";
 import { savePageWrites } from "../agent-host/page-undo";
 import { WorkspaceService } from "./workspace-service";
 import { registerOrganizationTools } from "./mcp-organization";
+import { registerDatasetTools } from "./mcp-datasets";
 import { recordConnections } from "./mcp-connections";
 
 const scopeSchema = z.enum([
@@ -180,6 +181,14 @@ export function createMcpServer(options: {
     openWorldHint: false,
   };
 
+  registerDatasetTools(
+    register,
+    service,
+    projectId,
+    call,
+    { readOnly, write },
+    changeSchema,
+  );
   registerOrganizationTools(
     register,
     new WorkspaceService(service.store.root, projectId, {
@@ -492,24 +501,34 @@ export function createMcpServer(options: {
     "page_apply",
     {
       description:
-        'Apply stable-block-id operations with a current baseHash. Query guide authoring for the operation shapes. Add components with {type:"component.insert",kind,data,parentId?,afterId?} rather than block.insert of a nested node, change existing component data with {type:"component.props.set",blockId,props} rather than block.replace, and keep each call shallow and short.',
+        'Apply stable-block-id operations with a current baseHash. Query guide authoring for the operation shapes. Add components with {type:"component.insert",kind,data,parentId?,afterId?} rather than block.insert of a nested node, change existing component data with {type:"component.props.set",blockId,props} rather than block.replace, and keep each call shallow and short. On a block bound to a dataset, component.props.set writes the dataset (guide datasets); component.binding.set/remove bind or detach a block.',
       inputSchema: {
         ...changeSchema,
         pageId: z.string(),
         baseHash: z.string().min(1),
         baseRevision: z.string().optional(),
         operations: z.array(jsonObject).max(1000),
+        datasetBases: z.record(z.string(), z.string()).optional(),
         response: z.enum(["full", "source", "receipt"]).default("full"),
       },
       annotations: write,
     },
-    ({ pageId, baseHash, baseRevision, operations, response, ...metadata }) =>
+    ({
+      pageId,
+      baseHash,
+      baseRevision,
+      operations,
+      datasetBases,
+      response,
+      ...metadata
+    }) =>
       call(
         () =>
           service.applyPage(projectId, pageId, {
             baseHash,
             baseRevision,
             operations: operations as PageOperation[],
+            datasetBases,
           }),
         metadata,
       ).then((result) => compactMcpResult(result, response)),

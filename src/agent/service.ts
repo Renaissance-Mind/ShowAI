@@ -8,7 +8,7 @@ import { EditorDrafts } from "../core/editor-drafts";
 import { placeTemplate } from "../surface/document.mjs";
 import { upgradeResource } from "../surface/containers.mjs";
 import { FileStore } from "../core/store";
-import { applyOperations, canonicalJson } from "../core/diff";
+import { canonicalJson } from "../core/diff";
 import { createHash } from "node:crypto";
 import { mutateLibrary } from "../core/library-runtime";
 import {
@@ -74,6 +74,7 @@ import {
 import { pageOf, shellToken, summarizeCatalog } from "./disclosure";
 
 import { getGuide } from "./guides";
+import { DatasetService } from "./dataset-service";
 import {
   readPageView,
   type PageReadOptions,
@@ -147,12 +148,64 @@ function rebindImportedComponents(
 
 export class AgentService extends CatalogService {
   declare readonly store: FileStore;
+  readonly datasets: DatasetService;
   constructor(options: { root?: string; projectId?: string } = {}) {
     super(new FileStore(options.root), options.projectId);
+    this.datasets = new DatasetService(this.store);
   }
 
   guide(topic?: string) {
     return getGuide(topic);
+  }
+
+  datasetList(projectId: string) {
+    return this.datasets.list(this.requireProject(projectId));
+  }
+  datasetRead(
+    projectId: string,
+    datasetId: string,
+    options: { path?: unknown } = {},
+  ) {
+    return this.datasets.read(
+      this.requireProject(projectId),
+      datasetId,
+      options,
+    );
+  }
+  datasetReferences(projectId: string, datasetId: string) {
+    return this.datasets.references(this.requireProject(projectId), datasetId);
+  }
+  datasetCreate(
+    projectId: string,
+    input: Parameters<DatasetService["create"]>[1],
+  ) {
+    return this.mutation("Create dataset", [projectId, input], () =>
+      this.datasets.create(this.requireProject(projectId), input),
+    );
+  }
+  datasetApply(
+    projectId: string,
+    datasetId: string,
+    input: Parameters<DatasetService["apply"]>[2],
+  ) {
+    return this.mutation(
+      "Apply dataset changes",
+      [projectId, datasetId, input],
+      () =>
+        this.datasets.apply(this.requireProject(projectId), datasetId, input),
+    );
+  }
+  datasetDelete(projectId: string, datasetId: string, baseHash: string) {
+    return this.mutation(
+      "Delete dataset",
+      [projectId, datasetId, baseHash],
+      () =>
+        this.datasets.remove(
+          this.requireProject(projectId),
+          datasetId,
+          baseHash,
+        ),
+    );
   }
 
   private requireSharedWrite(operation: string) {
@@ -647,6 +700,7 @@ export class AgentService extends CatalogService {
       rebindImportedComponents(document, imported),
       project,
     );
+    this.datasets.assertBoundBlocks(document);
     if (
       current.hash !== baseHash ||
       (baseRevision && current.revision !== baseRevision)
@@ -699,9 +753,15 @@ export class AgentService extends CatalogService {
             "CONFLICT",
             "页面已有新修改，当前内容和尝试的操作已保留。请重新读取并明确处理。",
           );
+        const routed = await this.datasets.applyPageOperations(
+          project,
+          baselineDocument,
+          input.operations,
+          input.datasetBases,
+        );
         const document = await lockDocumentComponents(
           this.store.root,
-          applyOperations(baselineDocument, input.operations),
+          routed.document,
           project,
         );
         const preserved = await preserveRemoteSave(
@@ -712,7 +772,10 @@ export class AgentService extends CatalogService {
           input.baseHash,
           input.baseRevision,
         );
-        if (preserved) return preserved;
+        if (preserved) {
+          await routed.commit();
+          return preserved;
+        }
       }
       throw new CoreError(
         "CONFLICT",
@@ -720,18 +783,28 @@ export class AgentService extends CatalogService {
         { currentHash: current.hash, currentRevision: current.revision },
       );
     }
+    const routed = await this.datasets.applyPageOperations(
+      project,
+      current.document,
+      input.operations,
+      input.datasetBases,
+    );
     const document = await lockDocumentComponents(
       this.store.root,
-      applyOperations(current.document, input.operations),
+      routed.document,
       project,
     );
-    return this.store.savePage(
+    this.datasets.assertBoundBlocks(document);
+    const saved = await this.store.savePage(
       project,
       pageId,
       document,
       input.baseHash,
       input.baseRevision,
     );
+    // The same library transaction commits the page and its dataset writes.
+    await routed.commit();
+    return saved;
   }
   async diffPage(projectId: string, pageId: string, sinceHash: string) {
     return this.store.diffPage(
@@ -1117,6 +1190,9 @@ export function errorResult(error: unknown) {
       : {}),
     ...(error instanceof CoreError && error.currentHash
       ? { currentHash: error.currentHash }
+      : {}),
+    ...(error instanceof CoreError && error.details
+      ? { details: error.details }
       : {}),
   };
 }

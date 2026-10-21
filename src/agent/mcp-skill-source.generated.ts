@@ -22,7 +22,8 @@ import source19 from "../../plugins/showai/skills/show-document/references/page-
 import source20 from "../../plugins/showai/skills/show-document/SKILL.md?raw";
 import source21 from "../../plugins/showai/skills/use-showai/references/integration.md?raw";
 import source22 from "../../plugins/showai/skills/use-showai/references/runtime.md?raw";
-import source23 from "../../plugins/showai/skills/use-showai/SKILL.md?raw";
+import source23 from "../../plugins/showai/skills/use-showai/references/shared-data.md?raw";
+import source24 from "../../plugins/showai/skills/use-showai/SKILL.md?raw";
 
 export const mcpSkillNames = ["collaborate-canvas","create-component","create-template","design-presentation","plan-presentation","review-presentation","show-document","use-showai"] as const;
 export const mcpSkillSources: Record<string, string> = {
@@ -49,5 +50,6 @@ export const mcpSkillSources: Record<string, string> = {
   "show-document/SKILL.md": source20,
   "use-showai/references/integration.md": source21,
   "use-showai/references/runtime.md": source22,
-  "use-showai/SKILL.md": source23,
+  "use-showai/references/shared-data.md": source23,
+  "use-showai/SKILL.md": source24,
 };

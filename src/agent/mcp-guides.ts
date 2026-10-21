@@ -41,6 +41,15 @@ const tools: Record<GuideTopic, string[]> = {
   ],
   reading: ["board_read", "page_read"],
   document: ["page_read", "page_apply", "page_save"],
+  datasets: [
+    "dataset_list",
+    "dataset_read",
+    "dataset_create",
+    "dataset_apply",
+    "dataset_delete",
+    "page_read",
+    "page_apply",
+  ],
   containers: [
     "catalog_describe",
     "board_read",

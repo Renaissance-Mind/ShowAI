@@ -1,6 +1,6 @@
-import { BlockSettings } from "./action-host";
+import { BlockItemSources, BlockSettings } from "./action-host";
 import ExpandableSearch from "../ExpandableSearch";
-import { useMemo, useState } from "react";
+import { useContext, useMemo, useState } from "react";
 import {
   ArrowDown,
   ArrowUp,
@@ -211,6 +211,12 @@ export function DatabaseBlock({ data, onChange, readOnly }: BlockProps) {
   const [page, setPage] = useState(0);
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const editable = Boolean(onChange && !readOnly);
+  // Rows mapped from shared data keep their source fields and stay in the source.
+  const sources = useContext(BlockItemSources);
+  const cellEditable = (row: DatabaseRow, column: DatabaseColumn) =>
+    editable && !sources?.get(row.id)?.readOnly.includes(column.id);
+  const removable = (row: DatabaseRow) =>
+    sources?.get(row.id)?.removable ?? true;
   const selectColumns = columns.filter((column) => column.type === "select");
   const groupColumn =
     columns.find(
@@ -272,8 +278,10 @@ export function DatabaseBlock({ data, onChange, readOnly }: BlockProps) {
     setFilter({ column: "", value: "" });
     return row.id;
   };
-  const removeRow = (id: string) =>
+  const removeRow = (id: string) => {
+    if (sources?.get(id)?.removable === false) return;
     onChange?.({ ...data, rows: rows.filter((row) => row.id !== id) });
+  };
   const toggleSort = (column: string) => {
     setSort((current) =>
       current?.column === column
@@ -317,29 +325,33 @@ export function DatabaseBlock({ data, onChange, readOnly }: BlockProps) {
       ...data,
       title: draftTitle,
       columns: cleaned,
-      rows: rows.map((row) => ({
-        id: row.id,
-        ...Object.fromEntries(
-          cleaned.map((column) => {
-            const previous = row[column.id];
-            const value =
-              column.type === "checkbox"
-                ? previous === true || previous === "true"
-                : column.type === "number"
-                  ? previous === "" ||
-                    previous === undefined ||
-                    previous === null
-                    ? ""
-                    : Number.isFinite(Number(previous))
-                      ? Number(previous)
-                      : ""
-                  : column.type === "date"
-                    ? normalizeDate(text(previous))
-                    : text(previous);
-            return [column.id, value];
-          }),
-        ),
-      })),
+      rows: rows.map((row) =>
+        sources?.has(row.id)
+          ? row
+          : {
+              id: row.id,
+              ...Object.fromEntries(
+                cleaned.map((column) => {
+                  const previous = row[column.id];
+                  const value =
+                    column.type === "checkbox"
+                      ? previous === true || previous === "true"
+                      : column.type === "number"
+                        ? previous === "" ||
+                          previous === undefined ||
+                          previous === null
+                          ? ""
+                          : Number.isFinite(Number(previous))
+                            ? Number(previous)
+                            : ""
+                        : column.type === "date"
+                          ? normalizeDate(text(previous))
+                          : text(previous);
+                  return [column.id, value];
+                }),
+              ),
+            },
+      ),
     };
     // Calendar settings must keep pointing at columns of the right type.
     const calendarConfig = pruneCalendarConfig(
@@ -683,7 +695,7 @@ export function DatabaseBlock({ data, onChange, readOnly }: BlockProps) {
             <Cell
               row={row}
               column={column}
-              editable={editable}
+              editable={cellEditable(row, column)}
               update={(value) => updateRow(row.id, column.id, value)}
             />
           )}
@@ -739,13 +751,13 @@ export function DatabaseBlock({ data, onChange, readOnly }: BlockProps) {
                 {shownRows
                   .slice(activePage * pageSize, (activePage + 1) * pageSize)
                   .map((row) => (
-                    <tr key={row.id}>
+                    <tr key={row.id} title={sources?.get(row.id)?.label}>
                       {columns.map((column) => (
                         <td key={column.id}>
                           <Cell
                             row={row}
                             column={column}
-                            editable={editable}
+                            editable={cellEditable(row, column)}
                             update={(value) =>
                               updateRow(row.id, column.id, value)
                             }
@@ -754,16 +766,18 @@ export function DatabaseBlock({ data, onChange, readOnly }: BlockProps) {
                       ))}
                       {editable && (
                         <td className="sb-row-action">
-                          <button
-                            type="button"
-                            className="sb-icon-button sb-danger"
-                            aria-label={t("deleteNamedRecord", {
-                              name: text(row[columns[0]?.id]),
-                            })}
-                            onClick={() => removeRow(row.id)}
-                          >
-                            <Trash2 size={13} />
-                          </button>
+                          {removable(row) && (
+                            <button
+                              type="button"
+                              className="sb-icon-button sb-danger"
+                              aria-label={t("deleteNamedRecord", {
+                                name: text(row[columns[0]?.id]),
+                              })}
+                              onClick={() => removeRow(row.id)}
+                            >
+                              <Trash2 size={13} />
+                            </button>
+                          )}
                         </td>
                       )}
                     </tr>
@@ -841,7 +855,7 @@ export function DatabaseBlock({ data, onChange, readOnly }: BlockProps) {
                             <Cell
                               row={row}
                               column={column}
-                              editable={editable}
+                              editable={cellEditable(row, column)}
                               update={(value) =>
                                 updateRow(row.id, column.id, value)
                               }
@@ -868,14 +882,16 @@ export function DatabaseBlock({ data, onChange, readOnly }: BlockProps) {
                               ))}
                             </select>
                           )}
-                          <button
-                            type="button"
-                            className="sb-icon-button sb-danger"
-                            aria-label={t("deleteRecord")}
-                            onClick={() => removeRow(row.id)}
-                          >
-                            <Trash2 size={13} />
-                          </button>
+                          {removable(row) && (
+                            <button
+                              type="button"
+                              className="sb-icon-button sb-danger"
+                              aria-label={t("deleteRecord")}
+                              onClick={() => removeRow(row.id)}
+                            >
+                              <Trash2 size={13} />
+                            </button>
+                          )}
                         </div>
                       )}
                     </div>

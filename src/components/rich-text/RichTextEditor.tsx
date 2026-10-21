@@ -1680,7 +1680,11 @@ export default function RichTextEditor({
                         <div className="menu-rule" />
                       </>
                     )}
-                  <ContentNodeActions editor={editor} position={hover.pos} />
+                  <ContentNodeActions
+                    editor={editor}
+                    position={hover.pos}
+                    onDone={() => setBlockMenu(false)}
+                  />
                   {onDetachBlock && (
                     <button
                       onClick={() => {

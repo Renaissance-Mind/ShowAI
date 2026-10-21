@@ -36,6 +36,7 @@ import messages from "../../i18n/messages/customComponents";
 import common from "../../i18n/messages/common";
 import { AssistantContext } from "../assistant-context";
 import { componentContextIssue } from "./component-context.mjs";
+import { BindingBasisContext } from "../../datasets/basis";
 import "./custom.css";
 
 const ComponentsContext = createContext<ReadonlyMap<string, CompiledComponent>>(
@@ -197,6 +198,15 @@ function SandboxComponent({
     readOnly: !!readOnly || !onChange,
   });
   latest.current = { data, parsed, onChange, readOnly, assistant };
+  // A bound block asks which props each change started from. The frame posts
+  // showai:valid after applying each props message, in order.
+  const basisContext = useContext(BindingBasisContext);
+  const basisReporter = useRef(basisContext);
+  basisReporter.current = basisContext;
+  const reportBasis = (props: Record<string, unknown>) =>
+    basisReporter.current?.(props);
+  const frameProps = useRef(initial.current.props);
+  const unconfirmed = useRef<Record<string, unknown>[]>([]);
   /** The page block this instance renders, for state handed to the conversation. */
   const blockId = () => {
     const owner = iframe.current?.closest<HTMLElement>(
@@ -280,6 +290,8 @@ function SandboxComponent({
 
   const sendProps = () => {
     const current = latest.current;
+    unconfirmed.current.push(current.parsed.props);
+    if (unconfirmed.current.length > 64) unconfirmed.current.shift();
     iframe.current?.contentWindow?.postMessage(
       {
         channel,
@@ -318,6 +330,8 @@ function SandboxComponent({
       )
         return;
       if (event.data.type === "showai:ready") {
+        frameProps.current = initial.current.props;
+        unconfirmed.current = [];
         sendProps();
         // State still waiting in the conversation input returns to its component.
         const id = blockId();
@@ -368,7 +382,10 @@ function SandboxComponent({
         setError(
           String(event.data.message || t("cannotDisplay")).slice(0, 500),
         );
-      if (event.data.type === "showai:valid") setError("");
+      if (event.data.type === "showai:valid") {
+        setError("");
+        frameProps.current = unconfirmed.current.shift() ?? frameProps.current;
+      }
       if (
         ["showai:viewport-lock-get", "showai:viewport-lock-set"].includes(
           event.data.type,
@@ -448,6 +465,7 @@ function SandboxComponent({
         } else if (JSON.stringify(current.parsed.props) !== draftBase.current) {
           setDraftError(t("dataChanged"));
         } else if (!current.readOnly && current.onChange) {
+          reportBasis(current.parsed.props);
           current.onChange({ ...current.data, props: pending.props });
           closeEditor();
         }
@@ -470,6 +488,8 @@ function SandboxComponent({
           );
           return;
         }
+        reportBasis(frameProps.current);
+        frameProps.current = event.data.props;
         current.onChange({ ...current.data, props: event.data.props });
       }
     };

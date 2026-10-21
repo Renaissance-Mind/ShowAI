@@ -1,3 +1,4 @@
+import { resolveDocumentDatasets } from "../core/dataset-resolution";
 import { CAPACITY, assertBytes } from "../portable/capacity.mjs";
 import {
   access,
@@ -294,7 +295,10 @@ export async function exportPage(
       (await store.readPage(options.projectId, options.pageId, {
         checkpoint: false,
       }));
-    const fullDocument = record.document;
+    // Shared data is resolved into the exported copy; the reader has no library.
+    const fullDocument = (
+      await resolveDocumentDatasets(store, options.projectId, record.document)
+    ).document;
     const sourceDocument = selection
       ? selectDocumentBlocks(fullDocument, selection.blockIds)
       : fullDocument;
@@ -386,9 +390,20 @@ export async function exportPage(
       store.readPage(options.projectId, page.id, { checkpoint: false }),
     ),
   );
-  let documents = records
-    .map((record) => record.document)
-    .filter((document) => options.pageId || !document.archived);
+  let documents = (
+    await Promise.all(
+      records.map(
+        async (record) =>
+          (
+            await resolveDocumentDatasets(
+              store,
+              options.projectId,
+              record.document,
+            )
+          ).document,
+      ),
+    )
+  ).filter((document) => options.pageId || !document.archived);
   if (!documents.length)
     throw new Error("This project has no active pages to export.");
   for (const document of documents) assertOfflineImages(document);

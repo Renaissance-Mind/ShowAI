@@ -110,17 +110,31 @@ export async function mutateLibrary<T>(
     error.recovery = { action: "read-compare-save" };
     throw error;
   }
-  if (
-    result.entry &&
+  // A saved page or dataset record, possibly inside a dataset apply result.
+  const savedRecord = (value: unknown) =>
+    !!value &&
+    typeof value === "object" &&
+    ("document" in value || "dataset" in value) &&
+    "path" in value;
+  const record =
+    !savedRecord(result.value) &&
     result.value &&
     typeof result.value === "object" &&
-    "document" in result.value &&
-    "path" in result.value &&
-    typeof result.value.path === "string"
+    "record" in result.value &&
+    savedRecord((result.value as { record: unknown }).record)
+      ? (result.value as { record: unknown }).record
+      : result.value;
+  if (
+    result.entry &&
+    record &&
+    typeof record === "object" &&
+    ("document" in record || "dataset" in record) &&
+    "path" in record &&
+    typeof record.path === "string"
   ) {
-    const path = logicalPath(home, result.value.path);
+    const path = logicalPath(home, record.path);
     if (path)
-      Object.assign(result.value, {
+      Object.assign(record, {
         revision: await library.resourceRevision(path, result.entry.revision),
         ...(result.entry.workspaceConflicts?.length
           ? { workspaceConflicts: result.entry.workspaceConflicts }

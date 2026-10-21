@@ -171,6 +171,18 @@ export type PageOperation =
       props: Record<string, unknown>;
     }
   | { type: "block.text.set"; blockId: string; text: string }
+  /** Bind a component block to a project dataset; see the datasets guide. */
+  | {
+      type: "component.binding.set";
+      blockId: string;
+      binding: Record<string, unknown>;
+    }
+  /** Detach a bound block; "snapshot" (default) keeps the shown props in the block. */
+  | {
+      type: "component.binding.remove";
+      blockId: string;
+      keep?: "snapshot" | "local";
+    }
   /** Native shapes and bound arrows from nodes and edges, laid out when unpositioned. */
   | ({ type: "diagram.insert" } & DiagramInsertInput)
   /** Lay out existing connected objects along their arrows, as the editor's arrange command does. */
@@ -180,6 +192,11 @@ export interface ApplyPageInput {
   baseRevision?: string;
   baseHash: string;
   operations: PageOperation[];
+  /**
+   * Dataset hashes ("projectId/datasetId" or datasetId → hash) the writer read
+   * for bound blocks; defaults to this session's last read of each dataset.
+   */
+  datasetBases?: Record<string, string>;
 }
 
 export interface FieldChange {
@@ -236,6 +253,8 @@ export class CoreError extends Error {
   readonly currentHash?: string;
   readonly currentRevision?: string;
   readonly conflictId?: string;
+  /** Structured facts for the caller, e.g. the conflicting fields of a dataset write. */
+  details?: Record<string, unknown>;
   saveFailed?: boolean;
   recovery?: {
     action: "read-compare-save";

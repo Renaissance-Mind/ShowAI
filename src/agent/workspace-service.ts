@@ -1,3 +1,4 @@
+import { retargetBindings } from "../datasets/binding.mjs";
 import { createHash } from "node:crypto";
 import { FileStore, assertId } from "../core/store";
 import {
@@ -102,6 +103,8 @@ export class WorkspaceService {
         await this.store.arrangeEntry(
           { ...input, projectId: source },
           async (document) => {
+            // Shared data stays in its project; bindings name it explicitly.
+            document = retargetBindings(document, source, destination);
             const locked = await lockDocumentComponents(
               this.store.root,
               document,

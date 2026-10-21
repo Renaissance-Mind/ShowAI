@@ -465,6 +465,24 @@ export default function Studio() {
     receive();
     return () => window.removeEventListener("showai:invitation", receive);
   });
+  useEffect(() => {
+    // The shared data dialog lists the pages using it; opening one reveals the block.
+    const open = (event: Event) => {
+      const detail = (
+        event as CustomEvent<{
+          projectId?: string;
+          pageId?: string;
+          blockId?: string;
+        }>
+      ).detail;
+      if (!detail?.pageId) return;
+      void openPage(detail.pageId, detail.projectId).then((opened) => {
+        if (opened && detail.blockId) setRevealNode(detail.blockId);
+      });
+    };
+    window.addEventListener("showai:open-page", open);
+    return () => window.removeEventListener("showai:open-page", open);
+  });
   const [templates, setTemplates] = useState<TemplateMetadata[]>([]);
   const [showTemplateVersions, setShowTemplateVersions] = useState(false);
   const [templateType, setTemplateType] = useState<TemplateType>("all");

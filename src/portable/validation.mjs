@@ -25,6 +25,7 @@ import { validateEventTimelineData } from "../components/blocks/event-timeline-c
 import { validatePlaygroundData } from "../components/blocks/playground-contract.mjs";
 import { validateDatabaseData } from "../components/blocks/database-contract.mjs";
 import { validateResearchData } from "../components/blocks/research-contract.mjs";
+import { BINDING_KEY, compileBinding } from "../datasets/binding.mjs";
 import {
   NOTE_MAX,
   invalidNoteMark,
@@ -279,6 +280,26 @@ function validateAttrs(attrs, path, permitted, surfaceIcon = false) {
 }
 
 function validateWidgetData(kind, data, path) {
+  if (Object.hasOwn(data, BINDING_KEY)) {
+    // The block stores a dataset binding and its own values; the component
+    // props are resolved from the dataset and checked where they are rendered.
+    try {
+      compileBinding(data[BINDING_KEY]);
+    } catch (error) {
+      throw new Error(`${path}.${BINDING_KEY}: ${error.message}`);
+    }
+    if (kind === "custom") {
+      object(data.props, `${path}.props`);
+      assertContent(
+        data.props,
+        "Component instance data",
+        CAPACITY.componentPropsBytes,
+      );
+    }
+    if (data[BINDING_KEY].props) return;
+    const { [BINDING_KEY]: _binding, ...local } = data;
+    data = local;
+  }
   if (Object.hasOwn(diagramTemplates, kind)) {
     validateDiagramData(kind, data);
     return;

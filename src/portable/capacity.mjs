@@ -5,6 +5,8 @@ export const CAPACITY = Object.freeze({
   resourceBytes: 64 * MiB,
   pageResourceBytes: 128 * MiB,
   componentPropsBytes: 8 * MiB,
+  // A shared dataset becomes component props, so it shares their budget.
+  datasetBytes: 8 * MiB,
   componentSourceBytes: 16 * MiB,
   componentAssetBytes: 128 * MiB,
   componentFiles: 200,

@@ -1,3 +1,4 @@
+import { retargetBindings } from "../datasets/binding.mjs";
 import { prepareSavedInkResolution } from "../core/ink-wire-writer";
 import type { InkWireChoice } from "../surface/ink-wire.mjs";
 import { validatePageIcon } from "../lib/page-icon.mjs";
@@ -82,6 +83,11 @@ import type {
 } from "../components/custom/types";
 import type { ComponentManifest, JsonSchema } from "../components/custom/types";
 import type { DesktopInfo } from "../desktop/bridge";
+import {
+  datasetActions,
+  datasetMutationActions,
+  handleDatasetAction,
+} from "./dataset-actions";
 
 const t = translator(workbenchMessages);
 const tc = translator(commonMessages);
@@ -205,6 +211,7 @@ export const workbenchActions = new Set([
   "media:reveal",
   "app:openPageWindow",
   "app:openWindow",
+  ...datasetActions,
 ]);
 export function text(
   args: Record<string, unknown>,
@@ -445,6 +452,8 @@ export function createWorkbench(
     action: string,
     args: Record<string, unknown>,
   ): Promise<unknown> {
+    if (datasetActions.has(action))
+      return handleDatasetAction(store, action, args);
     if (action.startsWith("sync:")) {
       const sync = syncManager(store.root);
       sync.start();
@@ -791,6 +800,8 @@ export function createWorkbench(
             baseRevision: text(args, "baseRevision", true),
           },
           async (document) => {
+            // Shared data stays in its project; bindings name it explicitly.
+            document = retargetBindings(document, source, destination);
             const locked = await lockDocumentComponents(
               store.root,
               document,
@@ -1524,6 +1535,7 @@ export function createWorkbench(
     "catalog:fork",
     "catalog:mergeSave",
     "catalog:verifyPublish",
+    ...datasetMutationActions,
   ]);
   const dialogActions = new Set([
     "components:import",

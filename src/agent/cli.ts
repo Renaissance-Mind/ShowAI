@@ -74,8 +74,15 @@ Start with one project:
   projects bind PROJECT --harness HOST --session SESSION_ID
   pages list --project PROJECT
 
+Shared datasets (one value that blocks on several pages read and write; see guide datasets):
+  datasets list --project PROJECT
+  datasets read DATASET --project PROJECT [--path 'objectives[id=o1]']
+  datasets create --project PROJECT --name NAME --input VALUE_OR_FROM_BLOCK.json
+  datasets apply DATASET --project PROJECT --input operations.json --base-hash HASH
+  datasets delete DATASET --project PROJECT --base-hash HASH
+
 Discover only what you need:
-  guide [workspace|reading|authoring|containers|document|catalog|component|templates|versions|recovery|sync|export|publish]
+  guide [workspace|reading|authoring|containers|document|datasets|catalog|component|templates|versions|recovery|sync|export|publish]
   template import DIRECTORY --project PROJECT
   template export ID --project PROJECT --out NEW_DIRECTORY
   template context --project PROJECT [--templates ID[@VERSION],ID]
@@ -860,6 +867,12 @@ async function runCliCommand(argv: string[]): Promise<unknown> {
           baseHash: option(args, "base-hash", true)!,
           baseRevision: option(args, "base-revision"),
           operations: operations as PageOperation[],
+          ...(input &&
+          typeof input === "object" &&
+          !Array.isArray(input) &&
+          "datasetBases" in input
+            ? { datasetBases: input.datasetBases as Record<string, string> }
+            : {}),
         });
       }
       if (action === "diff") {
@@ -871,6 +884,61 @@ async function runCliCommand(argv: string[]): Promise<unknown> {
         );
       }
       break;
+    case "datasets": {
+      if (action === "list") {
+        requireCount(args, 2);
+        return service.datasetList(await project());
+      }
+      if (action === "read") {
+        requireCount(args, 3);
+        return service.datasetRead(await project(), id, {
+          path: option(args, "path"),
+        });
+      }
+      if (action === "create") {
+        requireCount(args, 2);
+        const input = option(args, "input")
+          ? await readJson(option(args, "input")!)
+          : {};
+        if (!input || typeof input !== "object" || Array.isArray(input))
+          throw new Error(
+            "--input must contain { value } or { fromBlock: { pageId, blockId, baseHash, local? } }.",
+          );
+        return service.datasetCreate(await project(), {
+          ...(input as Record<string, unknown>),
+          name: option(args, "name", true)!,
+          ...(option(args, "description")
+            ? { description: option(args, "description") }
+            : {}),
+        } as Parameters<AgentService["datasetCreate"]>[1]);
+      }
+      if (action === "apply") {
+        requireCount(args, 3);
+        const input = await readJson(option(args, "input", true)!);
+        const body = Array.isArray(input) ? { operations: input } : input;
+        if (
+          !body ||
+          typeof body !== "object" ||
+          !Array.isArray((body as { operations?: unknown }).operations)
+        )
+          throw new Error(
+            "Expected a JSON array of dataset operations, or { operations: [...], name?, description? }.",
+          );
+        return service.datasetApply(await project(), id, {
+          ...(body as { operations: unknown[] }),
+          baseHash: option(args, "base-hash", true)!,
+        });
+      }
+      if (action === "delete") {
+        requireCount(args, 3);
+        return service.datasetDelete(
+          await project(),
+          id,
+          option(args, "base-hash", true)!,
+        );
+      }
+      break;
+    }
     case "export": {
       requireCount(args, 1);
       const format = option(args, "format", true);
@@ -1341,6 +1409,8 @@ export async function runCli(argv: string[]): Promise<unknown> {
     (command === "projects" &&
       ["current", "create", "bind"].includes(action)) ||
     (command === "pages" && ["create", "save", "apply"].includes(action)) ||
+    (command === "datasets" &&
+      ["create", "apply", "delete"].includes(action)) ||
     (command === "template" &&
       ["apply", "instantiate", "save", "import"].includes(action)) ||
     (command === "catalog" &&

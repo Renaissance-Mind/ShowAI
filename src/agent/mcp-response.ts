@@ -56,6 +56,9 @@ export function compactMcpResult(
     selected.title ??= document.title;
     if (profile === "source") selected.document = document;
   }
+  // Bound blocks keep only their binding in the source; their props live in a dataset.
+  if (profile === "source" && Array.isArray(record.bindings))
+    selected.bindings = record.bindings;
   selected.response = profile;
   return {
     ...result,
