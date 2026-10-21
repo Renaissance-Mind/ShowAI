@@ -1,7 +1,9 @@
 // Real CLI, filesystem, local browser bridge and exported readers. No mocked services.
 import assert from "node:assert/strict";
 import { execFile, spawn } from "node:child_process";
-import { mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { once } from "node:events";
+import { createHash } from "node:crypto";
 import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { promisify } from "node:util";
@@ -86,7 +88,7 @@ const result = {
   checks: [],
   errors: [],
 };
-let browser, page, application;
+let browser, page, application, fixturePath;
 try {
   browser = await chromium.launch({
     executablePath: process.env.SHOWAI_BROWSER_EXECUTABLE,
@@ -172,6 +174,7 @@ try {
   });
   const pageId = created.document.id,
     rootId = created.document.content.attrs.id;
+  fixturePath = created.path;
   const read = () => api("pages:get", { projectId: project.id, pageId });
   const find = (node, id) =>
     node.attrs?.id === id
@@ -746,6 +749,7 @@ try {
     );
   }
   assert.deepEqual(result.errors, []);
+  result.finalSourceHash = (await read()).hash;
   result.passed = true;
 } catch (error) {
   result.error = error.stack ?? String(error);
@@ -759,6 +763,19 @@ try {
   await browser?.close();
   await application?.close();
   server?.kill("SIGTERM");
+  if (server?.pid && server.exitCode === null && server.signalCode === null)
+    await once(server, "exit");
+  if (fixturePath) {
+    const bytes = await readFile(fixturePath);
+    await writeFile(join(output, "final-page.json"), bytes);
+    result.finalArtifactSHA256 = createHash("sha256").update(bytes).digest("hex");
+  }
+  result.keptTestFixtures = process.env.SHOWAI_KEEP_TEST_FIXTURES === "1";
+  if (!result.keptTestFixtures)
+    await Promise.all([
+      rm(env.SHOWAI_HOME, { recursive: true, force: true }),
+      rm(env.SHOWAI_USER_DATA, { recursive: true, force: true }),
+    ]);
   await writeFile(join(output, "result.json"), JSON.stringify(result, null, 2));
   console.log(JSON.stringify(result, null, 2));
 }
