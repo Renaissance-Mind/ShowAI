@@ -1,4 +1,4 @@
-import {freezeOwnedJSON,isOwnedJSON,ownedJSONMetrics} from "../portable/owned-json.mjs";
+import {freezeOwnedJSON,isOwnedJSON,ownedJSONMetrics,captureOwnedJSON,parseOwnedJSON} from "../portable/owned-json.mjs";
 import type {ShowDocument} from "../types";
 import {assertContent,CapacityError,nonResourceReplacementDoesNotGrow} from "../portable/capacity.mjs";
 import {reconcileSurface,artifactVersion} from "./document.mjs";
@@ -254,7 +254,7 @@ export class SourceRuntimeOwner {
   for(const snapshot of this.snapshots.values())if(snapshot.nativeOrigin?.identity.publicationId===publicationId&&scopeKey(snapshot.ref.scope)===scopeKey(current.ref.scope)){
    if(diffNativeSource(snapshot.nativeOrigin.packet,packet).length)fail("Native publication identity names a different complete packet");
   }
-  const previous=[...this.publications.values()].at(-1)?.packet,copy=parsedPacket?parsedPacket():cloneSourceValue(packet),value=freezeOwnedSource(previous?shareNativeSource(previous,copy):copy);
+  const previous=[...this.publications.values()].at(-1)?.packet,copy=parsedPacket?parsedPacket():captureOwnedJSON(packet),value=captureOwnedJSON(parsedPacket?copy:previous?shareNativeSource(previous,copy):copy);
   normalizationReadableBodies.add(value.document);normalizationReadableBodies.add(value.baseDocument);
   const entry={packet:value};this.publications.set(key,entry);this.account(value,1);this.prunePublications();return entry;
  }
@@ -324,7 +324,7 @@ export class SourceRuntimeOwner {
  /** The only consuming entry creates its own independent object graph here.
   * General object callers cannot opt out of defensive capture or validation. */
  registerActualMergedJSON(raw:string,observer?:SourceRuntimeObserver):SourceSnapshotDelta{
-  const request=measured(observer,"parse",()=>JSON.parse(raw)) as Parameters<SourceRuntimeOwner["registerActualMergedPublication"]>[0];
+  const request=measured(observer,"parse",()=>parseOwnedJSON(raw,{packet:[...this.publications.values()].at(-1)?.packet??null})) as Parameters<SourceRuntimeOwner["registerActualMergedPublication"]>[0];
   const current=this.get(request.current);
   const entry=measured(observer,"rememberPublication",()=>this.rememberPublication(current,request.publicationId,request.packet,()=>request.packet));
   const origin=request.sourceVersion===undefined?undefined:this.prepareNativeOrigin(current,request.publicationId,entry,request.result.document,request.sourceVersion,observer);
@@ -373,7 +373,7 @@ export class SourceRuntimeOwner {
   return this.unchangedNativePublication(current,request,entry,observer);
  }
  registerActualNativeJSONIfUnchanged(raw:string,observer?:SourceRuntimeObserver):SourceSnapshotDelta|null{
-  const request=measured(observer,"parse",()=>JSON.parse(raw)) as Parameters<SourceRuntimeOwner["registerActualNativePublicationIfUnchanged"]>[0];
+  const request=measured(observer,"parse",()=>parseOwnedJSON(raw,{packet:[...this.publications.values()].at(-1)?.packet??null})) as Parameters<SourceRuntimeOwner["registerActualNativePublicationIfUnchanged"]>[0];
   const current=this.get(request.current),entry=measured(observer,"rememberPublication",()=>this.rememberPublication(current,request.publicationId,request.packet,()=>request.packet));
   return this.unchangedNativePublication(current,request,entry,observer);
  }
@@ -468,13 +468,13 @@ export class SourceRuntimeOwner {
 let service:SourceRuntimeOwner|undefined;
 /** iOS validation-entry can re-export this directly; the registry is the same
  * real worker instance used by every resolve/save call, never a Web-side map. */
-export function sourceRuntime(raw:string):string{service??=new SourceRuntimeOwner();return JSON.stringify(service.execute(JSON.parse(raw) as SourceRuntimeRequest));}
+export function sourceRuntime(raw:string):string{service??=new SourceRuntimeOwner();return JSON.stringify(service.execute(parseOwnedJSON(raw) as SourceRuntimeRequest));}
 
 /** Only a backend adapter may expose this in its private validation VM. Public
  * sourceRuntime requests have no saved/validated flag that bypasses validation. */
 export function registerActualSavedSnapshot(raw:string):string{
  service??=new SourceRuntimeOwner();
- return JSON.stringify(service.registerActualSavedSnapshot(JSON.parse(raw)));
+ return JSON.stringify(service.registerActualSavedSnapshot(parseOwnedJSON(raw) as Parameters<SourceRuntimeOwner["registerActualSavedSnapshot"]>[0]));
 }
 
 export function registerActualMergedPublication(raw:string,observer?:SourceRuntimeObserver):string{
@@ -484,7 +484,7 @@ export function registerActualMergedPublication(raw:string,observer?:SourceRunti
 
 export function normalizeActualProjection(raw:string):string{
  service??=new SourceRuntimeOwner();
- return JSON.stringify(service.normalizeActualProjection(JSON.parse(raw)));
+ return JSON.stringify(service.normalizeActualProjection(parseOwnedJSON(raw) as Parameters<SourceRuntimeOwner["normalizeActualProjection"]>[0]));
 }
 
 /** Private validation-entry adapter; deliberately absent from execute(). */
