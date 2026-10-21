@@ -6,21 +6,21 @@
 
 宿主名称不能证明显示能力。各宿主的插件在 MCP 启动配置里声明 `SHOWAI_HOST_DISPLAY`，`showai_capabilities.presentation.declaredHostDisplay` 回显实际值；`show_component` 的 `delivery:"auto"` 按它选择：
 
-| 声明              | 宿主                                                             | show_component 交付                                                                           |
-| ----------------- | ---------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
-| `mcp-app`         | 支持 MCP Apps 的对话客户端（含托管 HTTP 连接）                   | 附带 `ui://showai/component-v1.html` 组件视图，不写文件                                       |
-| `codex-visualize` | Codex                                                            | `fragment-file`：片段写入宿主的展示目录，最终回复使用下面的 Codex 引用                        |
-| `fragment-file`   | 读取本机片段文件的其他宿主（DeepSeek Harness 预览、Kimi Widget） | 同上，宿主按自己的方式显示 delivery.inline 指向的文件                                         |
-| `model-html`      | 由模型在回复中写出 HTML 的宿主（如 Claude Code 的 show_widget）  | `compact`：返回几 KB 片段文本，原样交给该工具；超过 32 KB 或没有 CDN 阅读器时改为图片         |
-| `image`           | 没有交互显示的客户端                                             | PNG 图片附件                                                                                  |
-| `native`          | ShowAI 内置 Agent                                                | 同 mcp-app，由 App 直接渲染                                                                   |
-| 未声明            | 未知                                                             | 附带组件视图并返回 warning；宿主实际没有显示时，显式选择 image、compact 或 fragment-file 重试 |
+| 声明              | 宿主                                                             | show_component 交付                                                                                         |
+| ----------------- | ---------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| `mcp-app`         | 支持 MCP Apps 的对话客户端（含托管 HTTP 连接）                   | 附带 `ui://showai/component-v1.html` 组件视图，不写文件                                                     |
+| `codex-visualize` | Codex                                                            | `fragment-file`：片段写入宿主的展示目录，最终回复使用下面的 Codex 引用                                      |
+| `fragment-file`   | 读取本机片段文件的其他宿主（DeepSeek Harness 预览、Kimi Widget） | 同上，宿主按自己的方式显示 delivery.inline 指向的文件                                                       |
+| `model-html`      | 由模型在回复中写出 HTML 的宿主（如 Claude Code 的 show_widget）  | `compact`：返回几 KB 片段文本，原样交给该工具；超过 32 KB 或没有 CDN 阅读器时由 show_component 自动改为图片 |
+| `image`           | 没有交互显示的客户端                                             | PNG 图片附件                                                                                                |
+| `native`          | ShowAI 内置 Agent                                                | 同 mcp-app，由 App 直接渲染                                                                                 |
+| 未声明            | 未知                                                             | 附带组件视图并返回 warning；宿主实际没有显示时，显式选择 image、compact 或 fragment-file 重试               |
 
 组件视图与页面阅读器使用同一套 MCP Apps 消息、主题与 `showai.readerState` 回传，但不显示页面标题和“⋯”菜单，背景透明。fragment-file 只在本连接的展示目录下的 show-components 中保留最近 20 份，是对话预览而非交付文件。
 
 ## 宿主适配
 
-所有宿主遵循同一规则：能放下本地阅读器就离线交付，放不下才在线加载阅读器。同一宿主有多种方式时，优先能交付文件的方式（MCP Apps、inline 路径引用、发布 delivery.html），最后才是由模型写出 HTML。
+本节用于 page_present 与 render_document 的页面交付；show_component 按上一节的声明自动选择。所有宿主遵循同一规则：能放下本地阅读器就离线交付，放不下才在线加载阅读器。同一宿主有多种方式时，优先能交付文件的方式（MCP Apps、inline 路径引用、发布 delivery.html），最后才是由模型写出 HTML。
 
 | 实际能力                                                    | 使用结果                                                                                                                                                                                                                              |
 | ----------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
