@@ -18,7 +18,7 @@
 - 概念与关系：flowchart（journeys 逐步走一条路线，stages 按阶段改变节点状态）、mindmap、layer-diagram 分层架构、sequence-diagram 参与者之间按顺序的往返；项目目录有专题图形组件时按其 guide 使用。
 - 操作与参考：step-guide 编号步骤、分平台代码、读者逐步勾选与计时；command-reference 可搜索的命令与参数；structure-browser 目录或字段结构与说明；card-grid 入口与选项卡片。
 - 时间与计划：roadmap 按日期阅读泳道、负责人、依赖和里程碑（只读）；event-timeline 事件、阶段与指标曲线同轴回放；database 的 calendar 视图展示带日期的记录、打卡热力与连续天数；roadmap 只负责阅读，需要持续编辑的排期用 database 等可编辑数据。
-- 逐步展示的过程与机制：stepper 是逐步切换的外壳，步骤条一次显示一步，每一步放这一步需要的画面——一句说明加一张图、一个表格或其他组件；变化用具体的值或画面表达，不靠外壳排版。先插入 stepper，再把内容插入对应 step。step-walkthrough 只为已有页面保留，新内容不再使用；只需按阶段给节点着色时用 flowchart stages；读者要照着执行的操作步骤用 step-guide。
+- 逐步展示的过程与机制：stepper 是逐步切换的外壳，步骤条一次显示一步，每一步放这一步需要的画面——一句说明加一张图、一个表格或其他组件；变化用具体的值或画面表达，不靠外壳排版。先插入 stepper（steps 里写各步标题与一句说明），再用结构化读取找到各 step 的 id，以 component.insert 或 block.insert 的 parentId 指向该 step，把表格、图片或组件放进这一步。step-walkthrough 只为已有页面保留，新内容不再使用；只需按阶段给节点着色时用 flowchart stages；读者要照着执行的操作步骤用 step-guide。
 - 对照与证据：waterfall 从期初到期末的逐项增减；table、database、comparison-matrix、chart 与适配数据类型的 G2 图表；references 和 bookmark。
 - 补充说明：text、toggle；关键条件进入主线。
 - 参数探索：playground 用声明式公式、预设、目标差距、分项构成和加权排名，只做它公开的有限运算；专题模型按各自假设使用。
