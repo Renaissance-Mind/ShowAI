@@ -18,6 +18,7 @@ export interface PreparedInkPageMerge {
   plans: unknown[]; conflicts: InkWireConflict[];
 }
 export function validateInkWireState(value: unknown): InkWireState;
+export function inkWireDraftCommitMetadataMatches(draft:ShowDocument,committed:ShowDocument):boolean;
 export function stampInkDocument(document: ShowDocument, baseline: ShowDocument | undefined, identity: InkOperationIdentity & { changes?: InkOperationChange[] }): ShowDocument;
 export function inkWireClockForActor(document: ShowDocument, actor: string): number;
 export function hasInkWireContent(document: ShowDocument): boolean;
