@@ -384,9 +384,15 @@ try {
     "new content defaults to Page; an embedded Board owns its viewport and contains an editable Page",
   );
   assert.ok((await object(nestedPageId).getAttribute("class")).split(/\s+/).includes("is-selected"));
-  await scene(boardId)
-    .getByRole("button", { name: "展开选中容器", exact: true })
-    .click();
+  const expandSelected=scene(boardId).getByRole("button",{name:"展开选中容器",exact:true});
+  const expandBounds=await expandSelected.boundingBox();
+  assert.ok(expandBounds);
+  await page.mouse.move(expandBounds.x+expandBounds.width/2,expandBounds.y+expandBounds.height/2);
+  await page.mouse.down();
+  await page.mouse.move(expandBounds.x+expandBounds.width/2+100,expandBounds.y+expandBounds.height/2-70,{steps:8});
+  await page.mouse.up();
+  assert.equal(await page.locator(".container-workspace-bar").count(),0,"A real toolbar drag must not activate its starting button");
+  await expandSelected.click();
   await page.locator(".container-workspace-bar").waitFor();
   assert.equal(await page.locator(".container-workspace-bar").count(), 1);
   assert.equal(
