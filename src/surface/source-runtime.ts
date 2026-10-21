@@ -243,7 +243,12 @@ export class SourceRuntimeOwner {
     this.transactions.set(key,{base:base.ref,edits,next:result.next,leaseId:request.leaseId});this.account(edits,1);this.prune(new Set([result.next.snapshotId]));return result;
    }
    case "normalize":{
-    const current=this.get(request.ref);return this.register(current.ref.scope,normalizeSourceDocument(current.document),"normalized",current,request.leaseId);
+    const current=this.get(request.ref);
+    if(current.ref.kind==="normalized"){
+     if(request.leaseId)this.retain(request.leaseId,[current.ref]);
+     return{format:"showai-owned-source-v1",base:current.ref,next:current.ref,edits:[],conflicts:current.conflicts,inkCandidates:current.candidates};
+    }
+    return this.register(current.ref.scope,normalizeSourceDocument(current.document),"normalized",current,request.leaseId);
    }
    case "merge":{
     const base=this.get(request.base),current=this.get(request.current),incoming=this.get(request.incoming);

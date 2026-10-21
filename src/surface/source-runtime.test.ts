@@ -1,5 +1,10 @@
+import {createHash} from "node:crypto";
+import {installInkDigestProvider} from "./ink-operations.mjs";
+import {stampInkDocument} from "./ink-wire.mjs";
+import {createPortableInk} from "./portable-ink.mjs";
+import {addNode} from "./editing";
 import {expect,it} from "vitest";
-import {SourceRuntimeOwner,cloneSourceValue,ownSourceValue,isOwnedSource,type SourceSnapshotDelta,type SourceSnapshotRef} from "./source-runtime";
+import {SourceRuntimeOwner,cloneSourceValue,ownSourceValue,isOwnedSource,type SourceSnapshotDelta,type SourceSnapshotRef,normalizeSourceDocument} from "./source-runtime";
 import {blankDocument} from "../core/catalog";
 import {createResource} from "./containers.mjs";
 import type {ShowDocument} from "../types";
@@ -112,4 +117,34 @@ it("rebases generic history over complete foreign root changes in the real owner
  const changed=delta(owner.execute({kind:"draft",base:remote.next,transactionId:"remote-same-field",edits:[{op:"set",path:["title"],value:"Foreign title"}],leaseId:"remote"}));
  const same=owner.execute({kind:"history",base:local.next,current:changed.next,entries:[seed.next],leaseId:"history"});
  if(!("rebasedHistory" in same))throw new Error("Missing actual history response");expect(resolve(owner,same.rebasedHistory[0].delta.next).title).toBe("Foreign title");expect(same.rebasedHistory[0].unchanged).toBe(true);
+});
+
+it("reuses the actual normalized snapshot, retained ink conflicts and lease without registering or hashing it again",()=>{
+ let document=source();const boardId=document.content.attrs!.id;
+ document=addNode(document,{type:"drawing",attrs:{id:"actual-stroke",tool:"pen",color:"#111111",strokeWidth:2,extent:[40,30],points:[{x:1,y:2},{x:20,y:12}],ink:createPortableInk([{x:1,y:2,pressure:.5},{x:20,y:12,pressure:.8}],2,[40,30])}},{x:10,y:20,width:40,height:30},boardId) as ShowDocument;
+ const base=stampInkDocument(document,undefined,{actor:"actual-seed",sequence:1}),left=cloneSourceValue(base),right=cloneSourceValue(base);
+ left.content.content![0].attrs!.color="#ff0000";right.content.content![0].attrs!.color="#0000ff";
+ const owner=new SourceRuntimeOwner(),scope=actualScope(document),seed=(document:ShowDocument,leaseId:string)=>delta(owner.execute({kind:"seed",scope,document,proof:"normalized",leaseId}));
+ const b=seed(base,"base"),l=seed(stampInkDocument(left,base,{actor:"actual-left",sequence:1}),"left"),r=seed(stampInkDocument(right,base,{actor:"actual-right",sequence:1}),"right");
+ const merged=delta(owner.execute({kind:"merge",base:b.next,current:l.next,incoming:r.next,leaseId:"merged"})),body=resolve(owner,merged.next),expected=normalizeSourceDocument(body);
+ expect(merged.conflicts).toMatchObject([{domain:"ink",retained:true}]);expect(merged.inkCandidates.length).toBeGreaterThan(0);
+ let hashes=0;installInkDigestProvider(input=>{hashes++;return createHash("sha256").update(input,"utf8").digest("hex")});hashes=0;
+ try{
+  const normalized=delta(owner.execute({kind:"normalize",ref:merged.next,leaseId:"saved-view"}));
+  expect(normalized.base).toBe(merged.next);expect(normalized.next).toBe(merged.next);expect(normalized.edits).toEqual([]);expect(normalized.conflicts).toBe(merged.conflicts);expect(normalized.inkCandidates).toBe(merged.inkCandidates);expect(hashes).toBe(0);
+  expect(resolve(owner,normalized.next)).toEqual(expected);
+  const next=seed(base,"new");expect(Number(next.next.snapshotId.split("-")[1])).toBe(Number(merged.next.snapshotId.split("-")[1])+1);
+ }finally{installInkDigestProvider(null)}
+});
+it("checks normalized proof, scope and epoch, keeps its lease under pressure, and still rejects invalid drafts",()=>{
+ const {owner,seed,document}=setup({maximumResidentBytes:1,maximumUnleased:0});
+ const stable=delta(owner.execute({kind:"normalize",ref:seed.next,leaseId:"normalized-reader"}));expect(stable.next).toEqual(seed.next);
+ owner.execute({kind:"release",leaseId:"current"});for(let index=0;index<4;index++)owner.execute({kind:"seed",scope:seed.next.scope,document:{...document,title:`Cache pressure ${index}`}});
+ expect(resolve(owner,stable.next)).toEqual(resolve(owner,seed.next));
+ for(const change of [{epoch:"forged"},{scope:{...seed.next.scope,projectId:"forged"}},{scope:{...seed.next.scope,homeId:"forged"}}])expect(()=>owner.execute({kind:"normalize",ref:{...stable.next,...change}})).toThrow();
+ const draft=delta(owner.execute({kind:"draft",base:stable.next,transactionId:"invalid-created-at",edits:[{op:"set",path:["createdAt"],value:"invalid"}],leaseId:"draft"}));
+ expect(()=>owner.execute({kind:"normalize",ref:{...draft.next,kind:"normalized"}})).toThrow(/proof|scope|expired/);
+ expect(()=>owner.execute({kind:"normalize",ref:draft.next,proof:"normalized"} as any)).toThrow(/ISO/);
+ owner.execute({kind:"release",leaseId:"normalized-reader"});owner.execute({kind:"release",leaseId:"draft"});owner.execute({kind:"seed",scope:seed.next.scope,document});
+ expect(()=>owner.execute({kind:"normalize",ref:stable.next})).toThrow(/expired/);
 });
