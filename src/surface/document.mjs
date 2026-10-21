@@ -43,13 +43,18 @@ export function assignSurfaceIds(document, { repairLegacy = false } = {}) {
       let id = stableId(`${document.id}:${path}`);
       while (used.has(id)) id += "-copy";
       used.add(id);
-      node.attrs = { ...node.attrs, id };
+      node = { ...node, attrs: { ...node.attrs, id } };
     }
     if (node.attrs?.id) seen.add(node.attrs.id);
-    if (Array.isArray(node.content))
-      node.content.forEach((child, index) => walk(child, `${path}/${index}`));
+    if (Array.isArray(node.content)) {
+      const content = node.content.map((child, index) => walk(child, `${path}/${index}`));
+      if (content.some((child, index) => child !== node.content[index]))
+        node = { ...node, content };
+    }
+    return node;
   };
-  walk(document.content, "");
+  const content = walk(document.content, "");
+  if (content !== document.content) document.content = content;
   return document;
 }
 
@@ -172,9 +177,14 @@ export function reconcileSurface(source, options = {}) {
   return document;
 }
 function reconcileSurfaceDocument(source, { clone = true } = {}) {
-  const document = fillSurfaceLayout(
-    assignSurfaceIds(clone ? structuredClone(source) : source),
-  );
+  // clone:false retains its mutable-command-root contract. Frozen readable
+  // roots first get their own draft; maps and missing-ID paths are always COW.
+  const draft = clone ? structuredClone(source) : Object.isFrozen(source) ? { ...source } : source;
+  if (!clone) {
+    if (draft.layout) draft.layout = { ...draft.layout };
+    if (draft.surfaceViews) draft.surfaceViews = { ...draft.surfaceViews };
+  }
+  const document = fillSurfaceLayout(assignSurfaceIds(draft));
   if (isResource(document)) return reconcileResource(document);
   if (!isSurface(document)) return document;
   const ids = new Set(),
@@ -200,6 +210,7 @@ function reconcileSurfaceDocument(source, { clone = true } = {}) {
     }))
     .filter((view) => view.targets.length);
   document.views = {
+    ...document.views,
     initial: saved.some((view) => view.id === document.views.initial)
       ? document.views.initial
       : null,

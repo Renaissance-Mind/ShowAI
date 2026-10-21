@@ -1,5 +1,6 @@
 import type { JSONContent } from "@tiptap/core";
 import type { ShowDocument } from "../types";
+import { ownSourceValue } from "./source-runtime";
 import { remapSurfaceIds, visitNodes } from "./document.mjs";
 import { createSurface } from "./containers.mjs";
 import { translator } from "../i18n";
@@ -23,7 +24,10 @@ export function toPageEditor(
   ) {
     let module = moduleJSON.get(node);
     if (!module) {
-      module = { type: "pageModule", attrs: { id: node.attrs!.id, node } };
+      module = ownSourceValue({
+        type: "pageModule",
+        attrs: { id: node.attrs!.id, node },
+      });
       moduleJSON.set(node, module);
     }
     return module;
@@ -62,14 +66,30 @@ export function toPageEditor(
   };
 }
 
-export function fromPageEditor(
+/** Plain module round-trip never writes the editor's readable source. */
+export function fromPageEditor(node: JSONContent): JSONContent {
+  return decodePageEditor(node);
+}
+
+/** Duplicated modules allocate layout/view entries on this command's own draft. */
+export function fromPageEditorDraft<T extends ShowDocument>(
+  node: JSONContent,
+  source: T,
+) {
+  // decode replaces each map only if a duplicated module contributes entries.
+  const document: T = { ...source };
+  const content = decodePageEditor(node, document);
+  return { content, document };
+}
+
+function decodePageEditor(
   node: JSONContent,
   source?: ShowDocument,
 ): JSONContent {
   if (node.type === "pageModule") {
     const originalNode = node.attrs!.node as JSONContent;
     if (originalNode.attrs?.id === node.attrs!.id) {
-      moduleJSON.set(originalNode, node);
+      moduleJSON.set(originalNode, ownSourceValue(node));
       return originalNode;
     }
     const original = structuredClone(node.attrs!.node) as JSONContent;
@@ -106,7 +126,7 @@ export function fromPageEditor(
     original.attrs = { ...original.attrs, id: node.attrs!.id };
     return original;
   }
-  const content = node.content?.map((child) => fromPageEditor(child, source));
+  const content = node.content?.map((child) => decodePageEditor(child, source));
   if (
     !content ||
     content.every((child, index) => child === node.content![index])

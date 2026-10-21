@@ -1,3 +1,4 @@
+import { ownSourceValue } from "../../surface/source-runtime";
 import { isTextPointerTarget } from "../../surface/text-selection";
 import { clearWidgetSelection } from "./widget-selection";
 import { ImageContent } from "./ImageContent";
@@ -96,7 +97,7 @@ export function WidgetView({
         kind: node.attrs.kind,
         data: node.attrs.data,
         onChange: (data) => {
-          if (editor.isEditable) updateAttributes({ data });
+          if (editor.isEditable) updateAttributes({ data: ownSourceValue(data) });
         },
         readOnly: !editable,
       })}

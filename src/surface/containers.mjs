@@ -274,6 +274,7 @@ export function reconcileResource(document) {
       }))
       .filter((view) => view.targets.length);
     document.surfaceViews[id] = {
+      ...before,
       initial: saved.some((view) => view.id === before.initial)
         ? before.initial
         : null,

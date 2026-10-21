@@ -1,5 +1,6 @@
 import type { JSONContent } from "@tiptap/core";
 import type { Node } from "@tiptap/pm/model";
+import { ownSourceValue } from "../surface/source-runtime";
 
 const serialized = new WeakMap<Node, JSONContent>();
 
@@ -15,8 +16,11 @@ export function editorNodeJSON(node: Node): JSONContent {
   }
   if (node.marks.length) json.marks = node.marks.map((mark) => mark.toJSON());
   if (node.isText) json.text = node.text;
-  serialized.set(node, json);
-  return json;
+  // PM attrs may include mutable widget data: never freeze or publish their
+  // aliases. Cached child JSON is already owned and remains shared.
+  const snapshot = ownSourceValue(json);
+  serialized.set(node, snapshot);
+  return snapshot;
 }
 
 function sameNode(node: Node, json: JSONContent): boolean {

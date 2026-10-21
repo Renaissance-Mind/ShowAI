@@ -1,3 +1,4 @@
+import { cloneSourceValue, ownSourceValue } from "../../surface/source-runtime";
 import { RichTextEnvironment } from "../rich-text/environment";
 import { AssistantContext } from "../assistant-context";
 import {
@@ -102,6 +103,12 @@ export const Widget = memo(function Widget({
   readOnly,
   host,
 }: BlockProps & { kind: string }) {
+  // Components own a mutable working copy, including read-only renderers that
+  // internally prepare their data. Published callbacks capture before returning.
+  const draft = useMemo(() => cloneSourceValue(data), [data]);
+  const publish = onChange && !readOnly
+    ? (value: typeof data) => onChange(ownSourceValue(value))
+    : undefined;
   const registerComponent = useContext(RegisterComponentContext);
   const assistant = useContext(AssistantContext);
   const environment = useMemo(
@@ -125,7 +132,7 @@ export const Widget = memo(function Widget({
   if (!definition) return <UnavailableBlock kind={kind} data={data} />;
   if (definition.validate) {
     try {
-      definition.validate(data);
+      definition.validate(draft);
     } catch (error) {
       return (
         <UnavailableBlock
@@ -160,8 +167,8 @@ export const Widget = memo(function Widget({
       >
         <RichTextEnvironment.Provider value={environment}>
           <Renderer
-            data={data}
-            onChange={readOnly ? undefined : onChange}
+            data={draft}
+            onChange={publish}
             readOnly={readOnly}
             host={host}
           />

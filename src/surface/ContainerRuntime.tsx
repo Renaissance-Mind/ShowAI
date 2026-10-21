@@ -62,11 +62,17 @@ import {
 } from "./SurfaceContent";
 import PageSurface, { type SurfaceHandle } from "./PageSurface";
 import { ObjectContext, type ObjectActions } from "./SurfaceObject";
-import { addNode, editNode, moveNode, removeNode } from "./editing";
+import {
+  addNode,
+  editNode as editSurfaceNode,
+  moveNode,
+  removeNode,
+} from "./editing";
+import { ownSourceValue } from "./source-runtime";
+
 import {
   findSurfaceNode,
   nodePaths,
-  reconcileSurface,
   visitNodes,
 } from "./document.mjs";
 import {
@@ -82,6 +88,19 @@ import { PageWidthSwitch } from "./PageWidthSwitch";
 import { BoardTools } from "./BoardTools";
 import { useTranslator } from "../i18n/react";
 import messages from "../i18n/messages/surface";
+
+// Attribute commands replace nested values explicitly, retaining source ink and
+// children. Structural commands below perform their own reconciliation.
+function editNode(
+  source: ShowDocument,
+  id: string,
+  update: (node: JSONContent) => void,
+) {
+  return ownSourceValue(editSurfaceNode(source, id, update, {
+    normalize: false,
+    attributesOnly: true,
+  }));
+}
 
 /** Text placed on a Board starts as a note-sized box rather than a page column. */
 const boardTextWidth = 320;
@@ -170,7 +189,7 @@ export function ContainerRuntime({
   const ot = useTranslator(outlineMessages);
   const [outlineSettingsId, setOutlineSettingsId] = useState<string | null>(null);
   const document = useMemo(
-    () => reconcileConnections({ ...sourceDocument }),
+    () => ownSourceValue(reconcileConnections({ ...sourceDocument })),
     [sourceDocument],
   );
   const localGeometry = useMemo(
@@ -365,13 +384,7 @@ export function ContainerRuntime({
     document,
     current,
     commit: (next, group) => {
-      const measured = reconcileSurface(
-        {
-          ...geometry.materialize(next),
-          surfaceViews: { ...next.surfaceViews },
-        },
-        { clone: false },
-      );
+      const measured = ownSourceValue(geometry.materialize(next));
       current.current = measured as ContainerDocument;
       onChange?.(measured, group);
     },
@@ -1522,7 +1535,7 @@ function ContainerView({
                         end: { ...bindings.end, anchor: anchors.end },
                       };
                     }) as ContainerDocument;
-                  runtime.commit(reconcileConnections(next));
+                  runtime.commit(reconcileConnections({ ...next }));
                 }
           }
           onAddComponent={

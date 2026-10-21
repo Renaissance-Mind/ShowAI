@@ -9,6 +9,21 @@ import {
 } from "./document.mjs";
 import { translator } from "../i18n";
 import messages from "../i18n/messages/surface";
+import { ownSourceValue } from "./source-runtime";
+
+/** Text/widget transactions already carry schema-assigned IDs. Structural
+ * commands retain explicit reconciliation; typing only copies its edited path. */
+export interface NodeEditOptions {
+  normalize?: boolean;
+  /** Mutable attribute record only; existing nested values/children stay
+   * read-only. Replace a nested value with its own draft to edit it. */
+  attributesOnly?: boolean;
+}
+function finishEdit(source: ShowDocument, options: NodeEditOptions) {
+  return options.normalize === false
+    ? source
+    : reconcileSurface(source, { clone: false });
+}
 
 const t = translator(messages);
 
@@ -39,14 +54,17 @@ export function editNode(
   source: ShowDocument,
   id: string,
   update: (node: JSONContent) => void,
+  options: NodeEditOptions = {},
 ) {
   let changed = false;
   const walk = (node: JSONContent): JSONContent => {
     if (node.attrs?.id === id) {
-      const copy = structuredClone(node);
+      const copy = options.attributesOnly
+        ? { ...node, attrs: { ...node.attrs } }
+        : structuredClone(node);
       update(copy);
       changed = true;
-      return copy;
+      return ownSourceValue(copy);
     }
     if (!node.content) return node;
     const children = node.content.map(walk);
@@ -56,14 +74,7 @@ export function editNode(
   };
   const content = walk(source.content);
   if (!changed) return source;
-  return reconcileSurface(
-    {
-      ...source,
-      content,
-      ...(source.layout ? { layout: { ...source.layout } } : {}),
-    },
-    { clone: false },
-  );
+  return finishEdit({ ...source, content }, options);
 }
 
 export function replaceChildren(
@@ -71,6 +82,7 @@ export function replaceChildren(
   parentId: string,
   ids: string[],
   replacement: JSONContent[],
+  options: NodeEditOptions = {},
 ) {
   const selected = new Set(ids);
   let changed = false;
@@ -87,7 +99,7 @@ export function replaceChildren(
     const index = start < 0 ? content.length : start;
     const next = [
       ...content.slice(0, index),
-      ...replacement,
+      ...ownSourceValue(replacement),
       ...content.slice(index).filter((child) => !selected.has(child.attrs?.id)),
     ];
     if (
@@ -99,16 +111,7 @@ export function replaceChildren(
     return { ...node, content: next };
   };
   const content = walk(source.content);
-  return changed
-    ? reconcileSurface(
-        {
-          ...source,
-          content,
-          ...(source.layout ? { layout: { ...source.layout } } : {}),
-        },
-        { clone: false },
-      )
-    : source;
+  return changed ? finishEdit({ ...source, content }, options) : source;
 }
 
 export function addNode(

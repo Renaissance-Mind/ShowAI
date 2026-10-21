@@ -137,6 +137,8 @@ export class SurfaceGeometryStore {
       if (layout === document.layout) layout = { ...layout };
       layout![id] = { ...frame, contentSize: measurement };
     }
-    return reconcileConnections(layout === document.layout ? document : { ...document, layout });
+    // Connection reconciliation may replace root fields even with no new measurements.
+    const next = reconcileConnections({ ...document, ...(layout ? { layout } : {}) });
+    return next.content === document.content && next.layout === document.layout ? document : next;
   }
 }
