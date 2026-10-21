@@ -114,13 +114,12 @@ export function diffOwnedSource(before:unknown,next:unknown):NativeSourceEdit[]{
   for(const key of Object.keys(b).sort())if(Object.hasOwn(a,key))visit(a[key],b[key],[...path,key]);else edits.push({op:"set",path:[...path,key],value:cloneSourceValue(b[key])});
  };visit(before,next,[]);return edits;
 }
-/** Full canonical validation belongs on an owner worker. Keep its normalized
- * graph rather than validateDocument's selected-field return value: unknown
- * source fields are part of the user's exact source body. */
+/** The owner stores the actual validated canonical result, including known
+ * defaults. The validator preserves legal unknown root/comment fields; a proof
+ * must describe exactly the document returned by ordinary artifact parsing. */
 export function normalizeSourceDocument(document:ShowDocument):ShowDocument{
  const normalized=reconcileSurface(document);
- parseArtifact({format:"showai",version:artifactVersion(normalized),document:normalized});
- return normalized;
+ return parseArtifact({format:"showai",version:artifactVersion(normalized),document:normalized}).document;
 }
 interface Snapshot {ref:SourceSnapshotRef;document:ShowDocument;candidates:SourceSnapshotDelta["inkCandidates"];conflicts:PageMergeConflict[]}
 /** Same synchronous service runs in Native JSC, a browser worker or Node.
