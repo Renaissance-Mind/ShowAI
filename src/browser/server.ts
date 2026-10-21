@@ -541,7 +541,7 @@ export async function startBrowserServer(options: BrowserServerOptions) {
         );
         response.setHeader(
           "Content-Security-Policy",
-          `default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https: http:; media-src 'self' data: https: http:; font-src 'self' data:; connect-src 'self'; frame-src 'self' about: data: blob:; frame-ancestors ${preview ? "'self'" : "'none'"}; object-src 'none'; base-uri 'none'; form-action 'none'; worker-src 'none'`,
+          `default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https: http:; media-src 'self' data: https: http:; font-src 'self' data:; connect-src 'self'; frame-src 'self' about: data: blob:; frame-ancestors ${preview ? "'self'" : "'none'"}; object-src 'none'; base-uri 'none'; form-action 'none'; worker-src 'self'`,
         );
         response.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
         response.end(request.method === "HEAD" ? undefined : html);

@@ -738,6 +738,8 @@ test("loopback API rejects missing tokens, foreign origins, rebinding, invalid p
   const scriptPolicy = html.headers.get("content-security-policy")!.split(";").find(directive => directive.trim().startsWith("script-src "))!.trim().split(/\s+/);
   expect(scriptPolicy).toContain("'wasm-unsafe-eval'");
   expect(scriptPolicy).not.toContain("'unsafe-eval'");
+  const workerPolicy=html.headers.get("content-security-policy")!.split(";").find(directive=>directive.trim().startsWith("worker-src "))!.trim().split(/\s+/);
+  expect(workerPolicy).toEqual(["worker-src","'self'"]);
   expect(html.headers.get("content-security-policy")).toContain(
     "frame-ancestors 'none'",
   );
