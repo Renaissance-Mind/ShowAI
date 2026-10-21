@@ -65,3 +65,71 @@ test("nested rich text links retain every word and safe marks while unsafe targe
   expect(() => validateDocument(result.document)).not.toThrow();
   expect(repairEditorLinks(result.document).document).toBe(result.document);
 });
+
+import {createResource} from './containers.mjs';
+import {addNode} from './editing';
+import {createPortableInk} from './portable-ink.mjs';
+import {stampInkDocument} from './ink-wire.mjs';
+import type {ShowDocument} from '../types';
+import fixture from './native-ink-fixture.json';
+const unsafe=()=>({type:'text',text:'Kept visible text',marks:[{type:'bold'},{type:'link',attrs:{href:'javascript:alert(1)'}}]});
+function inkBoard(count=32){
+ const points=Array.from({length:count},(_,i)=>({x:i%30,y:i%20,pressure:.5})),ink=createPortableInk(points,2,[40,30]);
+ // These are real version1 fields produced by historical native upcasts.
+ ink.seed=42;ink.createdAt=123;ink.sourceDrawing=fixture.node.attrs.data.nativeInk.drawing;
+ const configuration={version:1,mode:0,width:2,creationZoom:1,fitTolerance:.2,flattenTolerance:.1,positionWindow:.01,jitterWindow:.01,forceBackward:0,forceForward:0,forceTime:0,minimumFraction:.1,maximumFraction:1,curveBlend:.5,estimateTimeout:.01};
+ const input={format:'showai-input-v1',sourceID:'source',configuration,raw:points.map((point,i)=>[point.x,point.y,i/120,.5,0,1.5,0,0,0,0]),curves:[{points:[1,2,5,3,15,8,20,10],firstRaw:0,lastRaw:count-1,steps:10}],fragmentCount:2,compositeOpacity:1,composite:'single-opacity-coverage'};
+ let document=createResource(blankDocument(),'board') as ShowDocument;
+ document=addNode(document,{type:'drawing',attrs:{id:'long',tool:'pen',color:'#111111',strokeWidth:2,extent:[40,30],points:[{x:0,y:0},{x:20,y:10}],ink,inkFragments:[ink],inkInput:input}},
+  {x:10,y:20,width:40,height:30},document.content.attrs!.id) as ShowDocument;
+ return stampInkDocument(document,undefined,{actor:'seed',sequence:1});
+}
+test('closed typed stroke data stays identical while real malformed rich-text links are repaired',()=>{
+ const source=inkBoard(),attrs=source.content.content![0].attrs!,state=source.content.attrs!.inkState;
+ source.content.content!.push({type:'richText',attrs:{id:'rich'},content:[{type:'paragraph',content:[unsafe()]}]});source.layout!.rich={x:0,y:80,width:400,height:100};source.surfaceViews![source.content.attrs!.id].readingOrder.push('rich');
+ const result=repairEditorLinks(source),next=result.document.content.content![0].attrs!;
+ expect(result.repairs).toHaveLength(1);expect(next).toBe(attrs);expect(next.ink).toBe(attrs.ink);expect(next.ink.samples).toBe(attrs.ink.samples);expect(next.inkFragments).toBe(attrs.inkFragments);expect(next.inkInput).toBe(attrs.inkInput);expect(result.document.content.attrs!.inkState).toBe(state);
+ expect(result.document.content.content![1].content![0].content![0].marks).toEqual([{type:'bold'}]);expect(()=>validateDocument(result.document)).not.toThrow();
+});
+test('actual public legacy archives and version1 archive groups retain original opaque bytes',()=>{
+ const source=createResource(blankDocument(),'board') as ShowDocument;
+ const legacy=structuredClone(fixture.node),nativeInk=legacy.attrs.data.nativeInk;
+ const portable=createPortableInk([{x:1,y:2},{x:20,y:10}],2,[40,30]);
+ const group={type:'region',attrs:{id:'group',inkArchiveGroup:{version:1,extent:[40,30],sourceDrawing:nativeInk.drawing}},content:[{type:'drawing',attrs:{id:'child',tool:'pen',color:'#111111',strokeWidth:2,extent:[40,30],points:[{x:1,y:2},{x:20,y:10}],ink:portable}}]};
+ source.content.content=[legacy,group,{type:'image',attrs:{id:'inline-native',nativeInk}},{type:'richText',attrs:{id:'link'},content:[{type:'paragraph',content:[unsafe()]}]}];
+ const result=repairEditorLinks(source);
+ expect(result.repairs).toHaveLength(1);expect(result.document.content.content![0]).toBe(legacy);expect(result.document.content.content![1]).toBe(group);expect(result.document.content.content![2].attrs!.nativeInk).toBe(nativeInk);
+ expect(group.attrs.inkArchiveGroup.sourceDrawing).toBe(nativeInk.drawing);
+});
+test('unknown formats and additional payload keys retain the original link traversal',()=>{
+ for(const change of [(ink:Record<string,any>)=>{ink.format='showai-ink-future'},(ink:Record<string,any>)=>{ink.extra={content:[unsafe()]}}]){
+  const source=inkBoard(),ink=source.content.content![0].attrs!.ink;change(ink);ink.samples[0][0]={content:[unsafe()]};
+  const result=repairEditorLinks(source),next=result.document.content.content![0].attrs!.ink;
+  expect(result.repairs.length).toBeGreaterThan(0);expect(next.samples[0][0].content[0].marks).toEqual([{type:'bold'}]);
+ }
+});
+test('arbitrary widget data is not a drawing model even when its keys and format imitate one',()=>{
+ const source=blankDocument(),ink=createPortableInk([{x:1,y:2},{x:20,y:10}],2,[40,30]);
+ const custom={...ink,samples:[unsafe()]};
+ source.content.content=[{type:'widget',attrs:{id:'custom',kind:'custom-component',data:{ink:custom,template:'original-template',source:{id:'original-source'},nested:{type:'drawing',attrs:{ink:custom}}}}}];
+ const result=repairEditorLinks(source),data=result.document.content.content![0].attrs!.data;
+ expect(result.repairs).toHaveLength(2);expect(data.ink.samples[0].marks).toEqual([{type:'bold'}]);expect(data.nested.attrs.ink.samples[0].marks).toEqual([{type:'bold'}]);expect(data.template).toBe('original-template');expect(data.source).toBe(source.content.content![0].attrs!.data.source);
+});
+test('nested Pages and string-backed widget rich text still repair every real link',()=>{
+ const source=createResource(blankDocument(),'board') as ShowDocument;
+ source.content.content=[{type:'surface',attrs:{id:'page',kind:'page'},content:[{type:'richText',attrs:{id:'rich'},content:[{type:'paragraph',content:[unsafe()]}]},{type:'widget',attrs:{id:'widget',kind:'text',data:{format:'richtext',content:'[Widget words](javascript:alert(1))'}}}]}];
+ const result=repairEditorLinks(source),children=result.document.content.content![0].content!;
+ expect(result.repairs).toHaveLength(2);expect(children[0].content![0].content![0].marks).toEqual([{type:'bold'}]);expect(children[1].attrs!.data.content.content[0].content[0].text).toBe('Widget words');expect(children[1].attrs!.data.content.content[0].content[0].marks).toBeUndefined();
+});
+test('opaque link repair does not validate or admit malformed numeric ink',()=>{
+ const source=inkBoard(),ink=source.content.content![0].attrs!.ink;ink.samples[0][0]='invalid coordinate';
+ const result=repairEditorLinks(source);expect(result.document).toBe(source);expect(result.repairs).toEqual([]);expect(()=>validateDocument(result.document)).toThrow(/sample/);
+});
+test('actual traversal work is bounded by model structure rather than unrelated dense samples',()=>{
+ const visits:number[]=[],opaque:number[]=[];
+ for(const count of [32,20000]){
+  const source=inkBoard(count),diagnostics={visitedValues:0,opaqueFields:0},result=repairEditorLinks(source,diagnostics);
+  expect(result.document).toBe(source);expect(result.repairs).toEqual([]);visits.push(diagnostics.visitedValues);opaque.push(diagnostics.opaqueFields);
+ }
+ expect(visits[1]).toBe(visits[0]);expect(opaque).toEqual([4,4]);expect(visits[1]).toBeLessThan(150);
+});
