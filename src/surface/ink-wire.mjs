@@ -1,4 +1,4 @@
-import { canonicalInkJSON, inkNodeMetadata, inkOperationDigest, materializeInkOperations, validateInkCheckpoint, validateInkOperationField } from "./ink-operations.mjs";
+import { canonicalInkJSON, inkNodeMetadata, inkOperationDigest, materializeInkOperations, validateInkCheckpoint, validateInkOperationField, validateInkOperation, InkOperationReplica } from "./ink-operations.mjs";
 import { isInkNode } from "./portable-ink.mjs";
 
 export const INK_WIRE_FORMAT = "showai-ink-state-v1";
@@ -594,9 +594,103 @@ export function inkWireImportCheckpoints(baseline, next) {
   for (const boardId of new Set([...beforeBoards.keys(), ...afterBoards.keys()])) {
     const before = beforeBoards.get(boardId), after = afterBoards.get(boardId), original = bootstrap(before);
     if (before && !metadataMatches(before, original)) fail("edit author baseline is unstamped");
-    const state = after?.board.attrs.inkState ? bootstrap(after) : original;
-    const sources = [{ record: after, state }, { record: before, state: original }];
+    const supplied = after?.board.attrs.inkState ? bootstrap(after) : null;
+    const state = supplied ? mergeImportWireStates(original, supplied) : original;
+    const sources = [{ record: after, state: supplied ?? state }, { record: before, state: original }, { record: after, state }];
     result.push({ boardId, checkpoint: checkpointFromWireState(next.id, boardId, state, (id, field, digest) => valueLookup(id, field, digest, sources)) });
   }
+  return result;
+}
+
+// A raw coalesced draft may retain an older wire envelope than the latest author
+// receipt. Join only its real causal heads; canonical mutations are never
+// reconciled through synthetic legacy events at this boundary.
+function mergeImportWireStates(one, two) {
+  const state = empty(); state.clock = joinClock(one.clock, two.clock); state.level = Math.max(one.level, two.level);
+  for (const property of ["digests", "eventDigests"]) {
+    for (const [dot, value] of Object.entries(two[property] ?? {})) if (one[property]?.[dot] !== undefined && !equal(one[property][dot], value)) fail("one edit dot names different source events");
+    state[property] = { ...one[property], ...two[property] };
+  }
+  state.contexts = { ...one.contexts };
+  for (const [dot, context] of Object.entries(two.contexts)) {
+    if (state.contexts[dot] && !equal(state.contexts[dot], context)) fail("one dot names conflicting causal contexts");
+    state.contexts[dot] = context;
+  }
+  for (const [dot, level] of Object.entries({ ...one.levels, ...two.levels })) state.levels[dot] = Math.max(one.levels?.[dot] ?? level, two.levels?.[dot] ?? level);
+  for (const id of new Set([...Object.keys(one.strokes), ...Object.keys(two.strokes)])) {
+    const a = one.strokes[id], b = two.strokes[id];
+    if (a && b && !equal(a.born, b.born)) fail("different creations reused a stable ink ID");
+    const stroke = { born: clone(a?.born ?? b.born), fields: {} }, variants = {};
+    for (const field of fields) {
+      const heads = mergeHeads(a?.fields[field], b?.fields[field], state.contexts);
+      if (!heads.length) continue;
+      stroke.fields[field] = heads;
+      for (const [digest, value] of Object.entries({ ...a?.variants?.[field], ...b?.variants?.[field] })) if (heads.some(([, hash]) => hash === digest)) (variants[field] ??= {})[digest] = value;
+    }
+    if (Object.keys(variants).length) stroke.variants = variants;
+    if (a?.unplaced || b?.unplaced) stroke.unplaced = true;
+    state.strokes[id] = stroke;
+  }
+  return validateInkWireState(state);
+}
+
+/** Return the latest editor-visible author branch using exact committed source
+ * operations. Causal parents may cover unseen native edits, but their stroke
+ * registers are never imported into this receipt or attributed to the UI. */
+export function inkWireAuthorReceipt(authorBaseline, rawDraft, actualOperations, actualJournalCheckpoint) {
+  const journal = validateInkCheckpoint(actualJournalCheckpoint), { pageId, boardId } = journal;
+  if (authorBaseline?.id !== pageId || rawDraft?.id !== pageId || !Array.isArray(actualOperations)) fail("author receipt scope differs");
+  const incoming = inkWireImportCheckpoints(authorBaseline, rawDraft).find(item => item.boardId === boardId);
+  if (!incoming) fail("author receipt Board is missing");
+  const partial = incoming.checkpoint, author = boards(rawDraft).get(boardId);
+  if (!author) fail("author receipt target Board was removed");
+  const targets = new Set(actualOperations.map(operation => operation.id)), touched = new Map(), parents = new Set(partial.frontier);
+  const cover = (id, field) => { const keys = touched.get(id) ?? new Set(); keys.add(field); touched.set(id, keys); };
+  for (const operation of actualOperations) {
+    validateInkOperation(operation);
+    if (operation.pageId !== pageId || operation.boardId !== boardId) fail("author operation scope differs");
+    const descriptor = journal.known[operation.id];
+    if (!descriptor || descriptor.hash !== inkOperationDigest(operation)) fail("author operation is not the committed source");
+    const expected = {};
+    for (const parent of operation.parents) {
+      const source = journal.known[parent]; if (!source) fail("committed author dependency is unavailable");
+      for (const [actor, sequence] of Object.entries(source.clock)) expected[actor] = Math.max(expected[actor] ?? 0, sequence);
+      if (!targets.has(parent)) {
+        const previous = partial.known[parent];
+        if (previous?.hash && source.hash && previous.hash !== source.hash) fail("author dependency identity differs");
+        partial.known[parent] = { ...clone(source), anchor: true }; parents.add(parent);
+      }
+    }
+    expected[operation.actor] = operation.sequence;
+    if (!equal(expected, descriptor.clock)) fail("committed author context differs from original parents");
+    for (const change of operation.changes) {
+      const current = author.records.get(change.strokeId);
+      if (change.kind === "create") {
+        if (!current || !equal(change.node, current.node) || !equal(change.layout, current.layout) || change.placement && !equal(change.placement, current.placement)) fail("author create does not match its visible source");
+        fields.forEach(field => cover(change.strokeId, field));
+      } else if (change.kind === "delete") {
+        if (current) fail("author deletion still has visible source"); cover(change.strokeId, "delete");
+      } else if (change.kind === "restore") {
+        if (!current) fail("author restore has no visible source"); cover(change.strokeId, "restore");
+      } else {
+        if (!current) fail("author edit target is not in its draft");
+        for (const [field, value] of Object.entries(change.patch)) {
+          if (!equal(value, fieldValue(current, field))) fail("author field does not match its visible source");
+          cover(change.strokeId, field);
+        }
+      }
+    }
+  }
+  for (const plan of inkWireEditPlans(authorBaseline, rawDraft).filter(plan => plan.boardId === boardId)) for (const change of plan.changes) {
+    const covered = touched.get(change.strokeId);
+    if (change.kind === "edit") { if (Object.keys(change.patch).some(field => !covered?.has(field))) fail("author receipt omits a changed field"); }
+    else if (change.kind === "create") { if (!fields.every(field => covered?.has(field))) fail("author receipt omits its created source"); }
+    else if (!covered?.has(change.kind)) fail("author receipt omits liveness intent");
+  }
+  partial.frontier = [...parents].filter(dot => ![...parents].some(other => dot !== other && seen(partial.known[other].clock, dot))).sort(compare);
+  const replica = new InkOperationReplica({ checkpoint: partial }); replica.append(actualOperations);
+  const result = inkWireDocumentFromCheckpoint(rawDraft, boardId, replica.checkpoint());
+  // Projection is scoped to this Board. Raw non-ink content and other Boards
+  // remain the editor's current draft, without a full-journal value overlay.
   return result;
 }
