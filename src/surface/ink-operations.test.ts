@@ -5,6 +5,7 @@ import {
   bootstrapInkOperation, canonicalInkJSON, checkpointInkOperations,
   compensateInkOperation, createInkOperation, inkOperationDigest,
   materializeInkOperations, validateInkCheckpoint, validateInkOperation,
+  InkOperationReplica,
   type InkOperation, type InkOperationChange,
 } from "./ink-operations.mjs";
 
@@ -19,6 +20,17 @@ const edit = (actor: string, patch: Extract<InkOperationChange, { kind: "edit" }
 function permutations<T>(items: T[]): T[][] { return items.length <= 1 ? [items] : items.flatMap((item, i) => permutations(items.filter((_, j) => i !== j)).map(rest => [item, ...rest])); }
 
 describe("portable causal ink operations", () => {
+  it("prepares only touched registers, publishes after commit, and aborts without changing state", () => {
+    const replica = new InkOperationReplica({ pageId: "page", boardId: "board" }); replica.append([initial()]);
+    const before = replica.checkpoint(), prepared = replica.prepare([edit("ipad", { color: "#ff0000" })]);
+    expect(replica.checkpoint()).toEqual(before);
+    expect(prepared.records.map(record => [record.kind, record.field])).toEqual([["known", ""], ["register", "color"]]);
+    expect(canonicalInkJSON(prepared)).not.toContain('"samples"');
+    replica.abort(prepared.token); expect(replica.checkpoint()).toEqual(before);
+    const next = replica.prepare([edit("ipad", { color: "#0000ff" })]); replica.commit(next.token);
+    expect(replica.materialize(["stroke"]).strokes[0].node.attrs!.color).toBe("#0000ff");
+    expect(() => replica.commit(next.token)).toThrow("unknown prepared");
+  });
   it("uses SHA-256 and canonical JSON matching host bytes, including Unicode and numeric boundaries", () => {
     for (const value of ["", "abc", "中文🤔", "\ud800", "x".repeat(100000), { z: 1e-8, a: [1.002e-7, 0, -0, "e\u0301", "é"] }]) {
       const text = typeof value === "string" ? value : canonicalInkJSON(value);

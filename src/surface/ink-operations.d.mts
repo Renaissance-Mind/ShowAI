@@ -58,6 +58,32 @@ export interface InkMaterialization {
   }[];
   conflicts: InkOperationConflict[];
 }
+export interface InkReplicaRecord {
+  kind: "known" | "stroke" | "register";
+  key: string;
+  field: string;
+  value: unknown;
+}
+export interface InkReplicaPrepared {
+  token: string;
+  records: InkReplicaRecord[];
+  frontier: string[];
+  appendedIds: string[];
+}
+export class InkOperationReplica {
+  constructor(value: { pageId?: string; boardId?: string; checkpoint?: InkOperationCheckpoint });
+  readonly pageId: string;
+  readonly boardId: string;
+  readonly frontier: Set<string>;
+  prepare(operations: InkOperation[]): InkReplicaPrepared;
+  commit(token: string): { frontier: string[]; version: number };
+  abort(token: string): void;
+  append(operations: InkOperation[]): InkReplicaPrepared;
+  checkpoint(): InkOperationCheckpoint;
+  materialize(ids?: string[]): InkMaterialization;
+}
+export function inkCheckpointRecords(checkpoint: InkOperationCheckpoint): InkReplicaRecord[];
+export function inkCheckpointFromRecords(value: { pageId: string; boardId: string; frontier: string[]; records: InkReplicaRecord[] }): InkOperationCheckpoint;
 export function canonicalInkJSON(value: unknown): string;
 export function inkOperationDigest(value: unknown): string;
 export function inkNodeMetadata(node: JSONContent): JSONContent;

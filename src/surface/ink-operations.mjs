@@ -144,7 +144,7 @@ export function validateInkCheckpoint(state) {
   for (const stroke of state.strokes) {
     if (!id(stroke.id) || seen.has(stroke.id) || !own(known, stroke.creationId) || !Array.isArray(stroke.creationOrder) || stroke.creationOrder.length !== 3 || stroke.creationOrder[0] !== known[stroke.creationId].level || stroke.creationOrder[1] !== stroke.creationId || !Number.isSafeInteger(stroke.creationOrder[2]) || stroke.creationOrder[2] < 0) invalid("checkpoint stroke identity");
     seen.add(stroke.id);
-    if (!stroke.registers?.node?.length || !stroke.registers.layout?.length || !stroke.registers.alive?.length) invalid("checkpoint missing register");
+    if ([...attributes, "node", "layout", "alive"].some(key => !stroke.registers?.[key]?.length)) invalid("checkpoint missing register");
     for (const [key, entries] of Object.entries(stroke.registers)) {
       if (![...fields, "alive"].includes(key) || !Array.isArray(entries) || !entries.length || new Set(entries.map(entry => entry.operationId)).size !== entries.length) invalid("checkpoint register");
       for (const entry of entries) {
@@ -162,33 +162,43 @@ export function validateInkCheckpoint(state) {
 /** Incremental replay: checkpoints retain causal metadata and current register heads,
  * not the historical sample payloads. Old operations remain in the durable journal
  * for selective undo and later peer reconciliation; this is not peer-safe GC. */
-export function checkpointInkOperations(operations, checkpoint) {
-  if (!operations.length && !checkpoint) invalid("a scope is required for an empty operation set");
-  const state = checkpoint ? clone(checkpoint) : emptyInkCheckpoint(operations[0]);
-  validateInkCheckpoint(state);
-  const known = new Map(Object.entries(state.known)), pending = new Map(), strokes = new Map(state.strokes.map(stroke => [stroke.id, stroke]));
-  const frontier = new Set(state.frontier);
-  for (const operation of operations) {
+export class InkOperationReplica {
+  constructor({ pageId, boardId, checkpoint }) {
+    const state = checkpoint ? clone(validateInkCheckpoint(checkpoint)) : emptyInkCheckpoint({ pageId, boardId });
+    this.pageId = state.pageId; this.boardId = state.boardId;
+    this.known = new Map(Object.entries(state.known));
+    this.strokes = new Map(state.strokes.map(stroke => [stroke.id, stroke]));
+    this.frontier = new Set(state.frontier); this.version = 0; this.nextToken = 0; this.prepared = null;
+  }
+  /** Prepare is copy-on-write for touched strokes/registers only. Existing sample
+   * payloads and causal maps remain owned and are not cloned or revalidated. */
+  prepare(operations) {
+    if (this.prepared) invalid("a replica already has a prepared transaction");
+    const pending = new Map(), known = new Map(), strokes = new Map(), touched = new Map();
+    const getKnown = key => known.get(key) ?? this.known.get(key), getStroke = key => strokes.get(key) ?? this.strokes.get(key);
+    const frontier = new Set(this.frontier);
+    for (const operation of operations) {
     validateInkOperation(operation);
-    if (operation.pageId !== state.pageId || operation.boardId !== state.boardId) invalid("cross-Board replay");
-    const hash = inkOperationDigest(operation), existing = known.get(operation.id), queued = pending.get(operation.id);
+    if (operation.pageId !== this.pageId || operation.boardId !== this.boardId) invalid("cross-Board replay");
+    const hash = inkOperationDigest(operation), existing = getKnown(operation.id), queued = pending.get(operation.id);
     if (existing && existing.hash !== hash || queued && queued.hash !== hash) invalid(`operation id collision: ${operation.id}`);
     if (!existing) pending.set(operation.id, { operation, hash });
-  }
-  while (pending.size) {
-    const ready = [...pending.values()].filter(({ operation }) => operation.parents.every(parent => known.has(parent))).sort((a, b) => compare(a.operation.id, b.operation.id));
+    }
+    while (pending.size) {
+    const ready = [...pending.values()].filter(({ operation }) => operation.parents.every(parent => getKnown(parent))).sort((a, b) => compare(a.operation.id, b.operation.id));
     if (!ready.length) invalid(`missing causal dependency or cycle: ${[...pending.keys()].sort(compare).join(", ")}`);
     for (const { operation, hash } of ready) {
       const clock = Object.create(null);
-      for (const parent of operation.parents) for (const [actor, sequence] of Object.entries(known.get(parent).clock)) clock[actor] = Math.max(clock[actor] ?? 0, sequence);
+      for (const parent of operation.parents) for (const [actor, sequence] of Object.entries(getKnown(parent).clock)) clock[actor] = Math.max(clock[actor] ?? 0, sequence);
       clock[operation.actor] = operation.sequence;
-      const level = 1 + Math.max(0, ...operation.parents.map(parent => known.get(parent).level));
+      const level = 1 + Math.max(0, ...operation.parents.map(parent => getKnown(parent).level));
       const write = (stroke, key, value) => {
         const entries = (stroke.registers[key] ?? []).filter(entry => !observed(clock, entry.operationId));
         stroke.registers[key] = [...entries, { operationId: operation.id, value: clone(value) }].sort((a, b) => compare(a.operationId, b.operationId));
+        const keys = touched.get(stroke.id) ?? new Set(); keys.add(key); touched.set(stroke.id, keys);
       };
       for (const [index, change] of operation.changes.entries()) {
-        let stroke = strokes.get(change.strokeId);
+        let stroke = getStroke(change.strokeId);
         if (change.kind === "create") {
           if (stroke) invalid(`stroke id was already created (including tombstones): ${change.strokeId}`);
           stroke = { id: change.strokeId, creationId: operation.id, creationOrder: [level, operation.id, index], registers: {} };
@@ -197,6 +207,7 @@ export function checkpointInkOperations(operations, checkpoint) {
           attributes.forEach(key => write(stroke, key, change.node.attrs[key] ?? null));
         } else {
           if (!stroke || !observed(clock, stroke.creationId)) invalid(`edit does not observe stroke creation: ${change.strokeId}`);
+          if (!strokes.has(change.strokeId)) { stroke = { ...stroke, registers: { ...stroke.registers } }; strokes.set(change.strokeId, stroke); }
           if (change.kind === "edit") Object.entries(change.patch).forEach(([key, value]) => write(stroke, key, value));
           else if (change.kind === "delete") write(stroke, "alive", false);
           else {
@@ -209,15 +220,75 @@ export function checkpointInkOperations(operations, checkpoint) {
       operation.parents.forEach(parent => frontier.delete(parent));
       frontier.add(operation.id); pending.delete(operation.id);
     }
+    }
+    const token = String(++this.nextToken), records = [];
+    for (const [key, value] of known) records.push({ kind: "known", key, field: "", value });
+    for (const [key, stroke] of strokes) {
+      if (!this.strokes.has(key)) records.push({ kind: "stroke", key, field: "", value: { id: stroke.id, creationId: stroke.creationId, creationOrder: stroke.creationOrder } });
+      for (const field of touched.get(key) ?? []) records.push({ kind: "register", key, field, value: stroke.registers[field] });
+    }
+    this.prepared = { token, known, strokes, frontier };
+    return { token, records: clone(records), frontier: [...frontier].sort(compare), appendedIds: [...known.keys()] };
   }
-  state.known = Object.fromEntries([...known].sort(([a], [b]) => compare(a, b)));
-  state.frontier = [...frontier].sort(compare);
-  state.strokes = [...strokes.values()].sort((a, b) => a.creationOrder[0] - b.creationOrder[0] || compare(a.creationOrder[1], b.creationOrder[1]) || a.creationOrder[2] - b.creationOrder[2]);
-  return state;
+  commit(token) {
+    if (!this.prepared || this.prepared.token !== token) invalid("unknown prepared replica transaction");
+    const { known, strokes, frontier } = this.prepared;
+    for (const [key, value] of known) this.known.set(key, value);
+    for (const [key, value] of strokes) this.strokes.set(key, value);
+    this.frontier = frontier; this.prepared = null; this.version++;
+    return { frontier: [...frontier].sort(compare), version: this.version };
+  }
+  abort(token) {
+    if (!this.prepared || this.prepared.token !== token) invalid("unknown prepared replica transaction");
+    this.prepared = null;
+  }
+  append(operations) { const prepared = this.prepare(operations); this.commit(prepared.token); return prepared; }
+  checkpoint() {
+    return clone({ format: INK_CHECKPOINT_FORMAT, pageId: this.pageId, boardId: this.boardId,
+      frontier: [...this.frontier].sort(compare), known: Object.fromEntries([...this.known].sort(([a], [b]) => compare(a, b))),
+      strokes: [...this.strokes.values()].sort(strokeOrder) });
+  }
+  /** Explicit reads may materialize the whole Board; append does not. */
+  materialize(ids) {
+    const strokes = (ids ? ids.map(id => this.strokes.get(id)).filter(Boolean) : [...this.strokes.values()]).sort(strokeOrder);
+    return materializeState({ pageId: this.pageId, boardId: this.boardId, frontier: [...this.frontier].sort(compare), strokes }, id => this.known.get(id));
+  }
+}
+const strokeOrder = (a, b) => a.creationOrder[0] - b.creationOrder[0] || compare(a.creationOrder[1], b.creationOrder[1]) || a.creationOrder[2] - b.creationOrder[2];
+
+export function inkCheckpointRecords(checkpoint) {
+  const records = Object.entries(checkpoint.known).map(([key, value]) => ({ kind: "known", key, field: "", value }));
+  for (const stroke of checkpoint.strokes) {
+    records.push({ kind: "stroke", key: stroke.id, field: "", value: { id: stroke.id, creationId: stroke.creationId, creationOrder: stroke.creationOrder } });
+    for (const [field, value] of Object.entries(stroke.registers)) records.push({ kind: "register", key: stroke.id, field, value });
+  }
+  return records;
+}
+export function inkCheckpointFromRecords({ pageId, boardId, frontier, records }) {
+  const state = emptyInkCheckpoint({ pageId, boardId }), strokes = new Map();
+  state.frontier = [...frontier];
+  for (const record of records) {
+    if (record.kind === "known") Object.defineProperty(state.known, record.key, { value: record.value, enumerable: true, writable: true, configurable: true });
+    else if (record.kind === "stroke") strokes.set(record.key, { ...record.value, registers: {} });
+  }
+  for (const record of records) if (record.kind === "register") {
+    const stroke = strokes.get(record.key); if (!stroke) invalid("indexed register has no stroke identity");
+    Object.defineProperty(stroke.registers, record.field, { value: record.value, enumerable: true, writable: true, configurable: true });
+  }
+  state.strokes = [...strokes.values()].sort(strokeOrder); return state;
+}
+
+export function checkpointInkOperations(operations, checkpoint) {
+  if (!operations.length && !checkpoint) invalid("a scope is required for an empty operation set");
+  const replica = new InkOperationReplica({ ...operations[0], checkpoint }); replica.append(operations); return replica.checkpoint();
 }
 
 export function materializeInkOperations(operations, checkpoint) {
-  const state = checkpointInkOperations(operations, checkpoint), conflicts = [];
+  if (!operations.length && !checkpoint) invalid("a scope is required for an empty operation set");
+  const replica = new InkOperationReplica({ ...operations[0], checkpoint }); replica.append(operations); return replica.materialize();
+}
+function materializeState(state, getKnown) {
+  const conflicts = [];
   const strokes = state.strokes.map(stroke => {
     const node = clone(stroke.registers.node[0].value), heads = {}, local = [];
     let frame;
@@ -236,7 +307,7 @@ export function materializeInkOperations(operations, checkpoint) {
     for (const deletion of stroke.registers.alive.filter(entry => entry.value === false)) {
       for (const [key, entries] of Object.entries(stroke.registers)) {
         if (key === "alive") continue;
-        const concurrent = entries.filter(entry => !observed(state.known[deletion.operationId].clock, entry.operationId) && !observed(state.known[entry.operationId].clock, deletion.operationId));
+        const concurrent = entries.filter(entry => !observed(getKnown(deletion.operationId).clock, entry.operationId) && !observed(getKnown(entry.operationId).clock, deletion.operationId));
         if (concurrent.length) {
           const conflict = { strokeId: stroke.id, field: `delete/${key}`, candidates: clone([deletion, ...concurrent]) };
           local.push(conflict); conflicts.push(conflict);

@@ -1,5 +1,5 @@
 import { afterEach, beforeAll, expect, it } from "vitest";
-import { mkdtemp, mkdir, rm } from "node:fs/promises";
+import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { DatabaseSync } from "node:sqlite";
@@ -7,7 +7,7 @@ import { spawn } from "node:child_process";
 import { pathToFileURL } from "node:url";
 import { build } from "esbuild";
 import { InkOperationJournal } from "./ink-operation-journal";
-import { bootstrapInkOperation, createInkOperation, materializeInkOperations } from "../surface/ink-operations.mjs";
+import { bootstrapInkOperation, canonicalInkJSON, createInkOperation, materializeInkOperations } from "../surface/ink-operations.mjs";
 import { createPortableInk } from "../surface/portable-ink.mjs";
 
 const roots: string[] = [], journals: InkOperationJournal[] = [];
@@ -117,13 +117,56 @@ it("reports committed source corruption explicitly instead of skipping a stroke"
   const journal = await open(await temporary()); journal.append([seed()]);
   const db = new DatabaseSync(journal.path);
   db.prepare("UPDATE ink_operations SET payload=? WHERE operation_id=?").run("{}", "seed:1"); db.close();
-  expect(() => journal.read(scope)).toThrow("checksum mismatch");
+  // The independent current-register index still preserves editable geometry.
+  expect(journal.read(scope).materialization!.strokes[0].node.attrs!.ink).toEqual(node.attrs.ink);
   expect(() => journal.operations(scope)).toThrow("checksum mismatch");
 });
 it("reports corrupted checkpoint data while retaining original source operations", async () => {
   const journal = await open(await temporary()); journal.append([seed()]); journal.checkpoint(scope);
   const db = new DatabaseSync(journal.path);
-  db.prepare("UPDATE ink_checkpoints SET payload='{}'").run(); db.close();
-  expect(() => journal.read(scope)).toThrow("checkpoint checksum mismatch");
+  db.prepare("UPDATE ink_replica_state SET payload='{}'").run(); db.close();
+  expect(() => journal.read(scope)).toThrow("state checksum mismatch");
   expect(journal.operations(scope)).toEqual([seed()]);
+});
+
+it("SQL rollback discards the prepared replica delta and leaves actor sequence reusable", async () => {
+  const journal = await open(await temporary()); journal.append([seed()]);
+  const db = new DatabaseSync(journal.path);
+  db.exec("CREATE TRIGGER reject_index BEFORE INSERT ON ink_replica_records WHEN NEW.kind='register' AND NEW.field='color' BEGIN SELECT RAISE(ABORT,'rejected index write'); END;");
+  expect(() => journal.appendLocal({ ...scope, parents: ["seed:1"], changes: [{ kind: "edit", strokeId: "stroke", patch: { color: "#ff0000" } }] })).toThrow("rejected index write");
+  expect(journal.operations(scope)).toHaveLength(1);
+  db.exec("DROP TRIGGER reject_index"); db.close();
+  const next = journal.appendLocal({ ...scope, parents: ["seed:1"], changes: [{ kind: "edit", strokeId: "stroke", patch: { color: "#0000ff" } }] });
+  expect(next.sequence).toBe(1);
+  expect(journal.read(scope).materialization!.strokes[0].node.attrs!.color).toBe("#0000ff");
+});
+
+it("dense-board sustained append writes and latency scale with the new stroke, not old geometry", async () => {
+  const sampleNode = (id: string) => ({ ...node, attrs: { ...node.attrs, id, ink: createPortableInk(Array.from({ length: 64 }, (_, i) => ({ x: i / 2, y: 5 + i % 12, pressure: 0.8 })), 2, [50, 30]) } });
+  const measurements = [];
+  for (const initialCount of [1, 512]) {
+    const root = await temporary(), original = await open(root);
+    const nodes = Array.from({ length: initialCount }, (_, i) => sampleNode(`old-${i}`));
+    original.append([bootstrapInkOperation({ ...scope, actor: "seed", nodes, layout: Object.fromEntries(nodes.map(node => [node.attrs.id, frame])) })!]);
+    close(original);
+    const journal = await open(root), warming = performance.now(); journal.warm(scope); const warmMs = performance.now() - warming;
+    const db = new DatabaseSync(journal.path);
+    db.exec("CREATE TABLE write_probe(bytes INTEGER);CREATE TRIGGER probe_insert AFTER INSERT ON ink_replica_records BEGIN INSERT INTO write_probe VALUES(length(CAST(NEW.payload AS BLOB)));END;CREATE TRIGGER probe_update AFTER UPDATE ON ink_replica_records BEGIN INSERT INTO write_probe VALUES(length(CAST(NEW.payload AS BLOB)));END;");
+    const times: number[] = [], bytes: number[] = [], sourceBytes: number[] = [];
+    for (let index = 0; index < 48; ++index) {
+      const strokeId = `new-${index}`, current = sampleNode(strokeId), before = performance.now();
+      const operation = journal.appendLocal({ ...scope, parents: ["seed:1"], changes: [{ kind: "create", strokeId, node: current, layout: frame }] });
+      times.push(performance.now() - before);
+      bytes.push(Number(db.prepare("SELECT SUM(bytes) AS bytes FROM write_probe").get()!.bytes));
+      sourceBytes.push(Buffer.byteLength(canonicalInkJSON(operation)));
+      db.exec("DELETE FROM write_probe");
+    }
+    db.close();
+    const sorted = [...times].sort((a, b) => a - b);
+    measurements.push({ initialCount, appended: 48, warmMs, medianMs: sorted[24], p95Ms: sorted[45], maxMs: sorted.at(-1)!, maxIndexBytes: Math.max(...bytes), maxSourceBytes: Math.max(...sourceBytes) });
+  }
+  expect(measurements[1].maxIndexBytes).toBeLessThan(measurements[0].maxIndexBytes * 1.05);
+  expect(measurements[1].maxIndexBytes).toBeLessThan(measurements[1].maxSourceBytes * 2);
+  expect(measurements[1].p95Ms).toBeLessThan(80);
+  if (process.env.SHOWAI_INK_BENCHMARK_RECEIPT) await writeFile(process.env.SHOWAI_INK_BENCHMARK_RECEIPT, JSON.stringify(measurements, null, 2));
 });
