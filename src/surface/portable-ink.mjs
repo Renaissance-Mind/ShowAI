@@ -1,4 +1,5 @@
 import { CompiledInkKernel } from "./ink-kernel/compiled-ink.mjs";
+export { nativeBoardScenePatch, resolveNativeBoardScene } from "./native-board-scene.mjs";
 let compiledKernel;
 const geometryKernel = () => compiledKernel ??= new CompiledInkKernel();
 /** Portable brush v1. This module has no DOM, platform or storage dependencies. */

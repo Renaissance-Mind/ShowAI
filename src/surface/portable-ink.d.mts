@@ -14,6 +14,7 @@ export interface PortableInk {
   createdAt?: number;
 }
 export const PORTABLE_INK_FORMAT: "showai-ink-v1";
+export { nativeBoardScenePatch, resolveNativeBoardScene } from "./native-board-scene.mjs";
 export function isEditableDrawing(
   node: { type?: string; attrs?: Record<string, any> } | undefined,
 ): boolean;
