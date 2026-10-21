@@ -38,19 +38,25 @@ uint32_t sa_stroke_sizeof_style(void);
 uint32_t sa_stroke_sizeof_result(void);
 /* Version1 defines round pen/marker circular sweep only; no other cap/join flag
  * is accepted. Each element contributes the union of its moving disks. All
- * contours have positive orientation and are ONE nonzero-fill opacity
- * composite; alpha-blending individual contours is incorrect. Elements may be
- * disconnected. Connected elements naturally have round union joins. A closed
- * source must explicitly supply its closing element; no implicit center-line
- * edge is added. Zero elements mean empty coverage. A point contributes a disk
- * (zero radius contributes empty area). Version1 does not change portable ink
- * v1 semantics.
- * Preparing an affected subrange is legal; combine its coverage with retained
- * subranges before applying opacity. This kernel has no camera-dependent work.
+ * successful output consists of certified nonnegative-winding pieces and is ONE
+ * nonzero-fill opacity composite; alpha-blending individual contours is
+ * incorrect. Elements may be disconnected. Connected elements naturally have
+ * round union joins. A closed source must explicitly supply its closing
+ * element; no implicit center-line edge is added. Zero elements mean empty
+ * coverage. A point contributes a disk (zero radius contributes empty area).
+ * Version1 does not change portable ink v1 semantics. Preparing an affected
+ * subrange is legal; combine its coverage with retained subranges before
+ * applying opacity. This kernel has no camera-dependent work.
  *
- * Regular intervals use the actual circular envelope and analytic derivatives,
- * approximated by endpoint Hermite cubics. Adaptive quarter/mid/three-quarter
- * checks are SAMPLED errors, not certified global bounds. Unsafe speed/radius
+ * Regular intervals use paired endpoint-Hermite approximations of the actual
+ * circular envelopes. Both fitted-strip Jacobians are certified nonnegative
+ * over their complete parameter interval, including zero-width endpoints.
+ * Cap/hull boundary fans have the same complete-interval sign check. Connected
+ * source knots use positive disk/halfplane gap coverage, never a negative join
+ * correction. These orientation proofs do NOT certify positional accuracy:
+ * adaptive quarter/mid/three-quarter checks are SAMPLED errors, not global
+ * bounds. An unresolved output-sign/precision proof is an explicit error, not
+ * an unsafe emitted contour. Unsafe speed/radius
  * or folded intervals use a linear sweep fallback; its center deviation has a
  * Bernstein convex-hull bound. Circular arcs use Hermite cubics with a separate
  * conservative angular interpolation bound. Statistics are diagnostic, never
@@ -61,6 +67,9 @@ uint32_t sa_stroke_sizeof_result(void);
  * capacity, alias or exhausted depth/work budget leaves ALL outputs untouched.
  * Input/output buffers must not overlap; arithmetic pointer overflow rejects.
  * Every nonempty POD buffer must be 8-byte aligned on both native and Wasm.
+ * The actual thread must support gradual binary64 underflow. A host FTZ/DAZ
+ * execution mode is detected and returns RANGE without changing outputs;
+ * an interval proof cannot be asserted in a different arithmetic model.
  */
 SAInkStatus sa_stroke_path_counts(const SAInkStrokeSegment *, uint32_t,
                                   const SAInkStrokeOptions *,

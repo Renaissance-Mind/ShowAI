@@ -51,12 +51,12 @@ static int contract() {
           &result) != SA_INK_INVALID ||
       !unchanged())
     return 5;
-  alignas(8) unsigned char alias[4096]{};
+  alignas(8) unsigned char alias[16384]{};
   std::memcpy(alias, &s, sizeof(s));
-  unsigned char original[4096];
+  unsigned char original[sizeof(alias)];
   std::memcpy(original, alias, sizeof(alias));
   if (sa_stroke_path_build(reinterpret_cast<SAInkStrokeSegment *>(alias), 1, &o,
-                           reinterpret_cast<SAInkPathCommand *>(alias), 64,
+                           reinterpret_cast<SAInkPathCommand *>(alias), 256,
                            &result) != SA_INK_INVALID ||
       std::memcmp(alias, original, sizeof(alias)) || !unchanged())
     return 6;

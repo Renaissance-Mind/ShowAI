@@ -45,5 +45,24 @@ int main() {
   budget = 64;
   require(!progressPositive(&zero, 0, 0, budget),
           "zero polynomial is not positive");
+  require(gradualBinary64(), "normal host binary64 underflow mode");
+#if defined(__aarch64__) || defined(__arm64__)
+  uint64_t saved;
+  __asm__ volatile("mrs %0, fpcr" : "=r"(saved));
+  uint64_t flush = saved | (uint64_t(1) << 24);
+  __asm__ volatile("msr fpcr, %0" ::"r"(flush) : "memory");
+  SAInkStrokeSegment source{};
+  source.radius[0] = source.radius[1] = 1;
+  SAInkStrokeOptions options{.0025, 1, 20, 100000, 1000000};
+  SAInkStrokeResult output{};
+  output.commands = 0x5a5a5a5a;
+  auto before = output;
+  auto status = sa_stroke_path_counts(&source, 1, &options, &output);
+  __asm__ volatile("msr fpcr, %0" ::"r"(saved) : "memory");
+  require(status == SA_INK_RANGE &&
+              !__builtin_memcmp(&before, &output, sizeof(output)),
+          "FTZ rejects proofs atomically and preserves caller output");
+  require(gradualBinary64(), "host FPCR restored");
+#endif
   std::puts("STROKE_PROGRESS_INTERVAL_CONTRACT_OK");
 }

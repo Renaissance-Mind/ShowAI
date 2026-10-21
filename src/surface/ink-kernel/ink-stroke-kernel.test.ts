@@ -419,9 +419,12 @@ it("prepares long regular cubics as continuous curve outlines instead of nib pol
     },
     result = kernel.build([segment]);
   expect(result.result.fallbackLeaves).toBe(0);
-  expect(result.result.contours).toBe(1);
+  expect(result.result.contours).toBeLessThanOrEqual(3);
   expect(result.result.envelopeCurves).toBeLessThanOrEqual(8);
-  expect(result.result.commands).toBeLessThan(25);
+  expect(result.result.commands).toBeLessThan(48);
+  expect(analytic.build(result.commands).vertices.length / 15).toBeLessThan(
+    120,
+  );
   expect(result.commands.some((c) => c[0] === "C")).toBe(true);
   expect(result.result.sampledEnvelopeError).toBeLessThanOrEqual(0.01);
   expect(result.result.arcErrorBound).toBeLessThanOrEqual(0.005);
@@ -465,8 +468,12 @@ it("keeps all actual input pressure knots when preparing real coalesced input cu
   const result = kernel.build(segments);
   expect(native(segments).equals(wasmBytes(segments))).toBe(true);
   expect(result.result.fallbackLeaves).toBe(0);
-  expect(result.result.contours).toBe(1);
-  expect(result.result.commands).toBeLessThan(180);
+  expect(result.result.contours).toBeLessThanOrEqual(segments.length * 3);
+  // Actual37-sample portable-v1 footprint is590triangles; positive derived
+  // strip/cap pieces must retain a real geometry advantage at this workload.
+  expect(analytic.build(result.commands).vertices.length / 15).toBeLessThan(
+    590,
+  );
   oracle(segments, grid(-5, -6, 120, 22, 13));
 });
 function split(points: P[], t: number) {
@@ -500,6 +507,7 @@ it("measures dense envelope probes against actual output without claiming a glob
   let start: P = [0, 0];
   for (const c of prepared.commands) {
     if (c[0] === "M") start = [c[1], c[2]];
+    else if (c[0] === "L") start = [c[1], c[2]];
     else if (c[0] === "C") {
       paths.push({
         points: [start, [c[1], c[2]], [c[3], c[4]], [c[5], c[6]]],
@@ -635,8 +643,8 @@ it("certifies nonuniform straight motion without treating tangential acceleratio
   const input = structuredClone(segments),
     prepared = oracle(segments, grid(-2, -2, 6, 4, 31), 0.0025);
   expect(prepared.result.fallbackLeaves).toBe(0);
-  expect(prepared.result.contours).toBe(1);
-  expect(prepared.result.commands).toBeLessThan(24);
+  expect(prepared.result.contours).toBeLessThanOrEqual(3);
+  expect(prepared.result.commands).toBeLessThan(48);
   expect(segments).toEqual(input);
   expect(
     native(segments, { tolerance: 0.0025 }).equals(
@@ -648,6 +656,151 @@ it("executes the real native interval normal/subnormal/overflow and strict-posit
   expect(execFileSync(progressExecutable, { encoding: "utf8" })).toContain(
     "STROKE_PROGRESS_INTERVAL_CONTRACT_OK",
   );
+});
+it("preserves nonnegative coverage of an actual fitted negative-pocket regression and a second genuine disk block", () => {
+  // Exact dyadic/Sturm verification of the former8-command output gives -1
+  // at this off-boundary point, despite true-source regularity. Position
+  // sampling alone therefore cannot authorize signed block composition.
+  const segments: InkStrokeSegment[] = [
+    {
+      points: [
+        [0, 0],
+        [0.00003367778537142461, -0.012859080612437065],
+        [0.009293639021512949, 0.013488575661669581],
+        [0.009327316806884374, 0],
+      ],
+      radius: [9.85587254061633e-7, 9.85587254061633e-7],
+    },
+  ];
+  const point: P = [0.0014658802756783362, -0.0035283613106323656],
+    disk: InkStrokeSegment = { points: [point], radius: [5e-7, 5e-7] },
+    options = { tolerance: 0.0025 };
+  const input = structuredClone(segments),
+    A = kernel.build(segments, options),
+    B = kernel.build([disk], options),
+    whole = kernel.build([...segments, disk], options);
+  const wa = analytic.pathWinding(A.commands, point),
+    wb = analytic.pathWinding(B.commands, point),
+    w = analytic.pathWinding(whole.commands, point);
+  expect(wa.boundary).toBe(false);
+  expect(wa.winding).toBeGreaterThanOrEqual(0);
+  expect(wb.winding).toBe(1);
+  expect(w.winding).toBeGreaterThan(0);
+  expect(w.inside).toBe(true);
+  const reflected = analytic.pathWinding(
+      A.commands,
+      [-point[0], point[1]],
+      [-1, 0, 0, 1, 0, 0],
+    ),
+    reflectedDisk = analytic.pathWinding(
+      B.commands,
+      [-point[0], point[1]],
+      [-1, 0, 0, 1, 0, 0],
+    );
+  expect(reflected.winding).toBe(-wa.winding);
+  expect(reflectedDisk.winding).toBe(-1);
+  expect(reflected.winding + reflectedDisk.winding).toBeLessThan(0);
+  expect(segments).toEqual(input);
+  expect(
+    native([...segments, disk], options).equals(
+      wasmBytes([...segments, disk], options),
+    ),
+  ).toBe(true);
+});
+it("covers zero-radius endpoints, empty radius profiles, reversals and varying-width joins using only positive output", () => {
+  const cases: InkStrokeSegment[][] = [
+    [
+      {
+        points: [
+          [0, 0],
+          [2, 0],
+        ],
+        radius: [0, 0.1],
+      },
+      {
+        points: [
+          [2, 0],
+          [3, 1],
+        ],
+        radius: [0.1, 0],
+      },
+    ],
+    [
+      {
+        points: [
+          [0, 0],
+          [2, 0],
+        ],
+        radius: [0, 0],
+      },
+    ],
+    [
+      {
+        points: [
+          [0, 0],
+          [2, 0],
+        ],
+        radius: [0.25, 0.4],
+      },
+      {
+        points: [
+          [2, 0],
+          [1, 0],
+        ],
+        radius: [0.4, 0.1],
+      },
+    ],
+    [
+      {
+        points: [
+          [0, 0],
+          [2, 0],
+        ],
+        radius: [0.5, 0.4],
+      },
+      {
+        points: [
+          [2, 0],
+          [2.5, 1.5],
+        ],
+        radius: [0.4, 0.6],
+      },
+    ],
+  ];
+  for (const segments of cases) {
+    const out = oracle(segments, grid(-1, -1, 5, 4, 31), 0.0025);
+    const points = grid(-1, -1, 5, 4, 31),
+      hits = analytic.meshWinding(analytic.build(out.commands), points);
+    expect(hits.every((hit) => hit.winding >= 0)).toBe(true);
+    expect(
+      native(segments, { tolerance: 0.0025 }).equals(
+        wasmBytes(segments, { tolerance: 0.0025 }),
+      ),
+    ).toBe(true);
+  }
+  expect(kernel.build(cases[1]).commands).toEqual([]);
+});
+it("applies command budgets to the final certified band rather than its unmerged planning pieces", () => {
+  const segments: InkStrokeSegment[] = [
+    {
+      points: [
+        [0, 0],
+        [30, 12],
+        [65, 12],
+        [100, 0],
+      ],
+      radius: [2, 4],
+    },
+  ];
+  const prepared = kernel.build(segments),
+    options = { maxCommands: prepared.commands.length };
+  expect(kernel.build(segments, options).commands).toEqual(prepared.commands);
+  expect(native(segments, options).equals(wasmBytes(segments, options))).toBe(
+    true,
+  );
+  expect(() =>
+    kernel.build(segments, { maxCommands: prepared.commands.length - 1 }),
+  ).toThrow();
 });
 it("proves both curved envelopes below the real curvature fold and keeps actual folds on the fallback", () => {
   const points: P[] = [
