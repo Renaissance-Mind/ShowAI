@@ -9,6 +9,8 @@ export class InkEditConflict extends Error {
   readonly code = "INK_EDIT_CONFLICT";
 }
 export interface InkUpdate {
+  /** Immutable native publication identity; retries must not repeat history. */
+  publicationId?: string;
   pageId: string;
   boardId: string;
   nodes: JSONContent[];

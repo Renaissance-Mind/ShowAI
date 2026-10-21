@@ -18,7 +18,7 @@ export function upgradeDocument(
 ): WhiteboardPage;
 export function reconcileSurface<T extends ShowDocument>(
   document: T,
-  options?: { clone?: boolean },
+  options?: { clone?: boolean; shareWith?: T },
 ): T;
 export function findSurfaceNode(
   document: ShowDocument,

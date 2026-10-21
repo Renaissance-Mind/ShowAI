@@ -186,13 +186,15 @@ function SurfaceEditor({
   const commit = useCallback(
     (value: ShowDocument, group = "", nativeAction?:NativeInkHistoryAction, recordHistory=true, authoring=true) => {
       if (latestReadOnly.current) return;
-      const next = measureNativeSync("surface.commit.reconcile",()=>
-        isReconciledSurface(value) ? value : reconcileSurface(value)
-      ) as ContainerDocument;
       const before = current.current;
+      const next = measureNativeSync("surface.commit.reconcile",()=>
+        !authoring ? reconcileSurface(value,{shareWith:before}) :
+          isReconciledSurface(value) ? value : reconcileSurface(value)
+      ) as ContainerDocument;
+      if(!authoring)window.showai?.inlineInk?.copyDocumentMetadata?.(value,next);
       if (
         next === before ||
-        (next.content === before.content &&
+        (authoring && next.content === before.content &&
           next.layout === before.layout &&
           next.surfaceViews === before.surfaceViews &&
           next.icon === before.icon)
@@ -242,12 +244,17 @@ function SurfaceEditor({
     const bridge = window.showai?.inlineInk;
     if (!bridge || !inlineInkProjectId || readOnly) return;
     let bound=true;
+    const appliedPublications=new Set<string>();
     const unbind = bridge.bind(
       document.id,
       inlineInkProjectId,
       async (value, applied) => {
         if (!bound || latestReadOnly.current || current.current.id !== value.pageId)
           return false;
+        if(value.publicationId&&appliedPublications.has(value.publicationId)){
+          applied?.();
+          return (await inkSave.current?.()) ?? true;
+        }
         try {
           if(value.document){
             if(!value.baseDocument||value.document.id!==value.pageId||value.baseDocument.id!==value.pageId)
@@ -288,9 +295,10 @@ function SurfaceEditor({
               if(nativeAction)throw new InkEditConflict("Native ink must reach its history boundary before object editing");
               const plan=nativeContentHistoryStages(current.current,value.baseDocument,value.document,value.nativeContentActions,{baseline:value.baseDocument,current:current.current,incoming:value.document,result:merged});
               if(plan.stages.length){
-                if(contentKey(current.current)!==contentKey(plan.sourceOnly))
-                  measureNativeSync("surface.receipt.historyRebase",()=>rebaseHistorySnapshots(history.current,inkActions.current,current.current,plan.sourceOnly as ContainerDocument));
-                current.current=plan.sourceOnly as ContainerDocument;
+                const sourceOnly=reconcileSurface(plan.sourceOnly,{shareWith:current.current}) as ContainerDocument;
+                if(contentKey(current.current)!==contentKey(sourceOnly))
+                  measureNativeSync("surface.receipt.historyRebase",()=>rebaseHistorySnapshots(history.current,inkActions.current,current.current,sourceOnly));
+                current.current=sourceOnly;
                 for(const stage of plan.stages)commit(stage.document,`native-content:${stage.groupId}`,undefined,true,false);
               }else commit(merged.document,"",undefined,false,false);
             }else commit(merged.document,value.nativeContentAction ? `native-content:${value.nativeContentGroup??""}` : "",
@@ -325,6 +333,10 @@ function SurfaceEditor({
             },
           });
           throw error;
+        }
+        if(value.publicationId){
+          appliedPublications.add(value.publicationId);
+          if(appliedPublications.size>64)appliedPublications.delete(appliedPublications.values().next().value!);
         }
         applied?.();
         return (await inkSave.current?.()) ?? true;

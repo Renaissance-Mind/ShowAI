@@ -1,3 +1,4 @@
+import { shareNativeSource } from "./native-source-delta.mjs";
 import { remapPageOutline } from "./page-outline.mjs";
 import {
   isResource,
@@ -163,7 +164,10 @@ const reconciledDocuments = new WeakSet();
 export const isReconciledSurface = (document) =>
   reconciledDocuments.has(document);
 export function reconcileSurface(source, options = {}) {
-  const document = reconcileSurfaceDocument(source, options);
+  if (options.shareWith && options.clone === false)
+    throw new TypeError("Structural sharing requires an independent normalization clone");
+  const normalized = reconcileSurfaceDocument(source, options);
+  const document = options.shareWith ? shareNativeSource(options.shareWith, normalized) : normalized;
   reconciledDocuments.add(document);
   return document;
 }

@@ -1,3 +1,4 @@
+import {shareNativeSource} from "../surface/native-source-delta.mjs";
 import {measureNativeSync} from "../surface/native-perf";
 import { coalescedTask } from "../lib/coalesced-task";
 import type { JSONContent } from "@tiptap/core";
@@ -488,8 +489,11 @@ export function createPageSession(options: PageSessionOptions): PageSession {
                       surfaceViews: editingSource.surfaceViews,
                     }
                   : saved.document;
-              current.current = installed;
-              setDraft(installed);
+              const shared=shareNativeSource(current.current!,installed);
+              if(typeof window!=="undefined" && (saved.reuseDocument || shared===editingSource))
+                window.showai?.inlineInk?.copyDocumentMetadata?.(source,shared);
+              current.current = shared;
+              setDraft(shared);
             }
             return saved;
           });

@@ -6,6 +6,10 @@ import { startBrowserServer } from "../browser/server";
 import { withLibraryLock } from "../core/library-lock";
 import { serializeArtifact } from "../portable/validation.mjs";
 import { PageSessions } from "./page-sessions";
+import {createResource} from "../surface/containers.mjs";
+import {addNode} from "../surface/editing";
+import {createPortableInk} from "../surface/portable-ink.mjs";
+import {findSurfaceNode,reconcileSurface} from "../surface/document.mjs";
 import type { LoadedPage } from "./page-session";
 import type { ContainerDocument } from "../types";
 import type { JSONContent } from "@tiptap/core";
@@ -367,6 +371,41 @@ describe("workspace sessions against the real loopback workbench", () => {
     expect(sessions.getSnapshot().views.map((view) => view.tabId)).toEqual([
       "a",
     ]);
+  });
+  it("shares untouched UI nodes after the real writer stamps canonical ink metadata", async () => {
+    await sessions.open(project,first.document.id,"a");
+    const view=sessions.getSnapshot().active!;
+    let page:import("../types").ShowDocument=createResource(first.document,"board");
+    page=addNode(page,{type:"drawing",attrs:{id:"new-ink",tool:"pen",color:"#111111",strokeWidth:2,extent:[100,60],points:[{x:0,y:0},{x:80,y:40}],ink:createPortableInk([{x:0,y:0,pressure:.5},{x:80,y:40,pressure:.8}],2,[100,60])}},
+      {x:0,y:0,width:100,height:60},page.content.attrs!.id);
+    page=addNode(page,{type:"drawing",attrs:{id:"unchanged-shape",tool:"rectangle",color:"#111111",strokeWidth:2,extent:[100,60],points:[{x:0,y:0},{x:100,y:60}]}},
+      {x:200,y:0,width:100,height:60},page.content.attrs!.id);
+    const ui=reconcileSurface(page),unchanged=findSurfaceNode(ui,"unchanged-shape")!.node;
+    view.edit({content:ui.content,layout:ui.layout,surfaceViews:ui.surfaceViews});
+    expect(await view.flush()).toBe(true);
+    const installed=view.getSnapshot().draft!;
+    expect(installed.content.attrs!.inkState).toBeDefined();
+    expect(findSurfaceNode(installed,"unchanged-shape")!.node).toBe(unchanged);
+    expect(installed.layout!["unchanged-shape"]).toBe(ui.layout!["unchanged-shape"]);
+    const saved=await invoke<LoadedPage>("pages:get",{projectId:project,pageId:first.document.id});
+    expect(installed).toEqual(saved.document);
+  });
+  it("keeps N+1 UI source when an actual pending save acknowledges N", async () => {
+    const view=await warm(),entered=deferred(),release=deferred();
+    const held=withLibraryLock(home,async()=>{entered.release();await release.promise});
+    await entered.promise;
+    try{
+      view.edit({title:"Native packet N"});
+      const pending=view.flush();
+      // Let the real save capture its immutable source while the writer is locked.
+      while(view.getSnapshot().status!=="saving")await new Promise(resolve=>setTimeout(resolve,1));
+      view.edit({title:"Native packet N+1"});
+      release.release();await held;expect(await pending).toBe(true);
+      expect(view.getSnapshot().draft!.title).toBe("Native packet N+1");
+      expect(await view.flush()).toBe(true);
+      const saved=await invoke<LoadedPage>("pages:get",{projectId:project,pageId:first.document.id});
+      expect(saved.document.title).toBe("Native packet N+1");
+    }finally{release.release();await held}
   });
   it("retains locally and switches while the actual database writer is busy", async () => {
     const a = await warm();
