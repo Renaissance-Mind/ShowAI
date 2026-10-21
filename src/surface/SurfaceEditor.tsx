@@ -33,7 +33,7 @@ import InkConflictInspector from "./InkConflictInspector";
 import {nativeContentHistoryStages} from "./native-content-history";
 import {nativeDocumentContentKey,nativeDocumentBodiesEqual,mergeNativeDocumentReceipt,mergeNativeProjectionReceipt} from "./native-document-content";
 
-import {appendNativeInkHistoryGroups,nativeInkHistoryGroups,type NativeInkHistoryAction,type NativeInkHistoryGroup} from "./native-ink-history";
+import {appendNativeInkHistoryGroups,nativeInkHistoryGroups,unregisteredNativeInkHistoryAction,type NativeInkHistoryAction,type NativeInkHistoryGroup} from "./native-ink-history";
 
 const contentKey = (document: ShowDocument) =>
   JSON.stringify([
@@ -192,13 +192,17 @@ function SurfaceEditor({
           isReconciledSurface(value) ? value : reconcileSurface(value)
       ) as ContainerDocument;
       if(!authoring)window.showai?.inlineInk?.copyDocumentMetadata?.(value,next);
-      if (
+      if(nativeAction){
+        nativeAction=unregisteredNativeInkHistoryAction(nativeAction,inkActions.current.values());
+        recordHistory=!!nativeAction;
+      }
+      if (!nativeAction && (
         next === before ||
         (authoring && next.content === before.content &&
           next.layout === before.layout &&
           next.surfaceViews === before.surfaceViews &&
           next.icon === before.icon)
-      )
+      ))
         return;
       if(!recordHistory && measureNativeSync("surface.commit.key",()=>nativeDocumentContentKey(next)===nativeDocumentContentKey(before))){
         current.current=next;
@@ -207,9 +211,12 @@ function SurfaceEditor({
       }
       const stack = history.current,
         now = Date.now();
-      if (recordHistory&&(!group || group !== stack.group || now - stack.at > 800)) {
-        stack.past.push(before);
-        if(nativeAction)inkActions.current.set(before,nativeAction);
+      if (recordHistory&&(nativeAction || !group || group !== stack.group || now - stack.at > 800)) {
+        // A semantic-only receipt still owns a distinct history edge; using
+        // current itself would overwrite a second edge with that same body.
+        const snapshot=nativeAction&&next===before?{...before}:before;
+        stack.past.push(snapshot);
+        if(nativeAction)inkActions.current.set(snapshot,nativeAction);
         if (stack.past.length > 80) { const expired=stack.past.shift();if(expired)inkActions.current.delete(expired); }
       }
       if(recordHistory){
@@ -227,6 +234,11 @@ function SurfaceEditor({
           author={intentId:action.intentId,mutationId,authorMutationId:lastAuthorMutation.current,authorBaseline:authorBaseline.current,before};
           lastAuthorMutation.current=mutationId;
         }
+      }
+      if(next===before){
+        window.showai?.inlineInk?.setDocument?.(next.id,next);
+        refresh(value=>value+1);
+        return;
       }
       measureNativeSync("surface.commit.publish",()=>{
         current.current = next;

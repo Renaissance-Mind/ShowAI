@@ -85,3 +85,27 @@ it('atomically plans liveness and source restoration in two real events and redo
  expect(redo.plan.phases).toEqual([[{kind:'delete',strokeId:'stroke'}],[{kind:'edit',strokeId:'stroke',patch:{strokeWidth:10}}]]);
  expect(j.read(scope).materialization!.strokes[0]).toMatchObject({deleted:true,node:{attrs:{strokeWidth:10}}});
 });
+
+import {appendNativeInkHistoryGroups,nativeInkHistoryGroups,unregisteredNativeInkHistoryAction,type NativeInkHistoryAction} from '../surface/native-ink-history';
+it('keeps both durable actions undoable when the save echo already contains the second source body',async()=>{
+ const j=await open();
+ const create=(id:string)=>j.appendLocal({...scope,parents:replica(j).materialize().frontier,changes:[{kind:'create',strokeId:id,node:{...node,attrs:{...node.attrs,id}},layout:frame}]});
+ const first=create('first'),second=create('second');
+ // Both source values have already reached UI before the second actual action
+ // receipt. History ownership comes from actual scoped IDs, never JSON deltas.
+ const arrivedSource=j.read(scope).materialization!,registered:NativeInkHistoryAction[]=[];
+ expect(arrivedSource.strokes.filter(s=>!s.deleted).map(s=>s.id)).toEqual(['first','second']);
+ for(const operation of [first,second]){
+  const action=unregisteredNativeInkHistoryAction(appendNativeInkHistoryGroups({},[{boardId:scope.boardId,operationIds:[operation.id]}]),registered)!;
+  expect(action).toBeDefined();registered.push(action);
+ }
+ expect(unregisteredNativeInkHistoryAction(registered[1],registered)).toBeUndefined();
+ expect(nativeInkHistoryGroups(registered[0])[0].operationIds).toEqual([first.id]);
+ expect(nativeInkHistoryGroups(registered[1])[0].operationIds).toEqual([second.id]);
+ const undoSecond=compensate(j,[source(j,second)]);
+ expect(j.read(scope).materialization!.strokes.filter(s=>!s.deleted).map(s=>s.id)).toEqual(['first']);
+ const undoFirst=compensate(j,[source(j,first)]);
+ expect(j.read(scope).materialization!.strokes.filter(s=>!s.deleted)).toEqual([]);
+ compensate(j,[source(j,undoFirst.operation!)]);compensate(j,[source(j,undoSecond.operation!)]);
+ expect(j.read(scope).materialization!.strokes.filter(s=>!s.deleted).map(s=>s.id)).toEqual(['first','second']);
+});
