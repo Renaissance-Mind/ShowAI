@@ -4,7 +4,7 @@ export function inkInputConfiguration(options = {}) {
   const width = options.width ?? 3, creationZoom = options.creationZoom ?? 1, mode = options.mode ?? 1;
   const screen = Math.min(18, Math.max(2.6, width * creationZoom));
   return { width, creationZoom, fitTolerance: (mode === 2 ? 0.05 : 0.5) / (1 + 1.5 * (screen - 2.6) / 15.4) / creationZoom,
-    flattenTolerance: 0.1 / creationZoom, positionWindow: 0.01, jitterWindow: 0.015,
+    flattenTolerance: 0.1 / creationZoom, positionWindow: mode === 2 ? 0.04 : 0.01, jitterWindow: mode === 2 ? 0.04 : 0.015,
     forceBackward: mode === 2 ? 0.75 * width : 0, forceForward: mode === 2 ? 0.5 * width : 0,
     forceTime: mode === 2 ? 0.04 : 0, minimumFraction: 0.25, maximumFraction: 1, curveBlend: 1,
     estimateTimeout: 0.2, ...options, mode, version: 1 };
