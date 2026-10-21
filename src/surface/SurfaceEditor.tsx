@@ -191,7 +191,7 @@ function SurfaceEditor({
     });
   }, [geometry]);
   const commit = useCallback(
-    (value: ShowDocument, group = "", nativeAction?:NativeInkHistoryAction, recordHistory=true) => {
+    (value: ShowDocument, group = "", nativeAction?:NativeInkHistoryAction, recordHistory=true, authoring=true) => {
       if (latestReadOnly.current) return;
       const next = (
         isReconciledSurface(value) ? value : reconcileSurface(value)
@@ -217,7 +217,7 @@ function SurfaceEditor({
         stack.future = [];stack.group=group;stack.at=now;
       }
       let author:NativeAuthorMutation|undefined;
-      if(recordHistory&&!nativeAction&&window.showai?.inlineInk?.nativeScene){
+      if(authoring&&recordHistory&&!nativeAction&&window.showai?.inlineInk?.nativeScene){
         const owner=stack.past.at(-1);
         if(owner){
           const action=inkActions.current.get(owner)??{boardId:"",operationIds:[]};
@@ -267,7 +267,8 @@ function SurfaceEditor({
               }
             }
             const nativeAction=value.operationIds?.length?{boardId:value.boardId,operationIds:value.operationIds,strokeIds:value.historyStrokeIds}:undefined;
-            commit(merged.document,"",nativeAction,!!nativeAction);
+            commit(merged.document,value.nativeContentAction ? `native-content:${value.nativeContentGroup??""}` : "",
+              nativeAction,!!nativeAction||value.nativeContentAction===true,false);
           }else commit(applyInkUpdate(current.current, value));
         } catch (error) {
           if (!(error instanceof InkEditConflict)) throw error;

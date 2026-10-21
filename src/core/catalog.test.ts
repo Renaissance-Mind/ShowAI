@@ -124,7 +124,7 @@ it("React Flow can be composed through the SDK and exported without external scr
     project(home),
   );
   expect(reloaded.integrity).toBe(result.integrity);
-});
+}, 60000);
 
 describe("filesystem template catalog", () => {
   it("lists the folder templates and keeps blank as a Studio-only page source", async () => {

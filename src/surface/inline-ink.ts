@@ -23,6 +23,9 @@ export interface InkUpdate {
   operationIds?: string[];
   historyStrokeIds?: string[];
   correctionOnly?: boolean;
+  /** A durable native object edit shares the ordinary document undo history. */
+  nativeContentAction?: boolean;
+  nativeContentGroup?: string;
   adoptActions?: {intentId:string;boardId:string;operationIds:string[]}[];
   correctionActions?: {strokeId:string;operationIds:string[]}[];
 }

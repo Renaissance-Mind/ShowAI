@@ -431,16 +431,40 @@ export default function RichTextEditor({
       setBubble(null);
     }
   }, [editor, readOnly]);
+  // React node views (toggle, callout, stepper) render synchronously while a
+  // transaction is applied; the page re-renders inside that flush with the
+  // previous echo of its content. Syncing then would revert the transaction.
+  const latestContent = useRef(content);
+  latestContent.current = content;
+  const dispatching = useRef(false);
+  useEffect(() => {
+    if (!editor) return;
+    const begin = () => {
+      dispatching.current = true;
+    };
+    const end = () => {
+      dispatching.current = false;
+    };
+    editor.on("beforeTransaction", begin);
+    editor.on("transaction", end);
+    return () => {
+      editor.off("beforeTransaction", begin);
+      editor.off("transaction", end);
+    };
+  }, [editor]);
   useLayoutEffect(() => {
     if (!editor) return;
     let timer: ReturnType<typeof setTimeout> | undefined;
     const apply = () => {
       if (editor.isDestroyed) return;
-      if (editor.view.composing) {
-        timer = setTimeout(apply, 25);
+      if (editor.view.composing || dispatching.current) {
+        timer = setTimeout(apply, dispatching.current ? 0 : 25);
         return;
       }
-      const transaction = externalContentTransaction(editor.state, content);
+      const transaction = externalContentTransaction(
+        editor.state,
+        latestContent.current,
+      );
       if (!transaction) return;
       const widgetId =
         editor.state.selection instanceof NodeSelection &&
