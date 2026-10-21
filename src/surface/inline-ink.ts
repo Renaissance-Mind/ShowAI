@@ -11,6 +11,7 @@ export class InkEditConflict extends Error {
 export interface InkUpdate {
   /** Immutable native publication identity; retries must not repeat history. */
   publicationId?: string;
+  sourceSnapshot?: import("./source-runtime").SourceSnapshotDelta;
   pageId: string;
   boardId: string;
   nodes: JSONContent[];
@@ -85,6 +86,11 @@ export interface NativeAuthorMutation {
 export interface InlineInkBridge {
   /** One native camera/scene for all Board tools, including selection. */
   nativeScene?: boolean;
+  registerSourceModel?(model:{
+    snapshotFor:(document:ShowDocument)=>Promise<{ref:import("./source-runtime").SourceSnapshotRef;sourceClientId:string}|null>;
+    preparePublication:(document:ShowDocument,request:{publicationScope:unknown;pubId:string})=>Promise<import("./source-client").PreparedSourcePublication|null>;
+    completePublication:(document:ShowDocument,pubId:string)=>Promise<void>;
+  }):()=>void;
   setDocument?(pageId: string, document: ShowDocument,author?:NativeAuthorMutation): void;
   /** Carry ephemeral native provenance across the real immutable save snapshot. */
   copyDocumentMetadata?(source: ShowDocument, snapshot: ShowDocument): void;

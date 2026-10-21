@@ -1,5 +1,7 @@
 export interface NativeInkHistoryGroup {boardId:string;operationIds:string[]}
 export interface NativeInkHistoryAction {
+  /** Raw ink only: compensation keeps every current generic source field. */
+  kind?:"native-ink";
   groups?:NativeInkHistoryGroup[];
   /** Old sessions may still contain a single Board action. */
   boardId?:string;operationIds?:string[];

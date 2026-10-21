@@ -1,3 +1,4 @@
+import {sourceSessionFor,diffOwnedSource,type OwnedSourceSession} from "./source-client";
 import {measureNativeSync} from "./native-perf";
 import { rebaseHistorySnapshots } from "./history-rebase";
 import { applyInkUpdate, InkEditConflict } from "./inline-ink";
@@ -26,7 +27,7 @@ import {
   isReconciledSurface,
 } from "./document.mjs";
 import type { ContentRenderProps } from "./SurfaceContent";
-import { toPageEditor, fromPageEditor } from "./page-content";
+import { toPageEditor, fromPageEditor, fromPageEditorDraft } from "./page-content";
 import { PageModuleContext, pageEditorNodes } from "./PageEditorNodes";
 import { mergePageContent, canCommitPageMerge } from "../core/page-merge-model";
 import InkConflictInspector from "./InkConflictInspector";
@@ -53,6 +54,7 @@ export interface SurfaceEditorState {
     inkActions?: Map<ContainerDocument,NativeInkHistoryAction>;
   };
 }
+const retainedHistoryLeases=new WeakMap<SurfaceEditorState,string>();
 function SurfaceEditor({
   document: input,
   onChange,
@@ -82,8 +84,12 @@ function SurfaceEditor({
   onInkSave?: () => Promise<boolean>;
   onOpenEmbeddedSurface?: (id:string) => void;
 }) {
-  const document = useMemo(
-    () => (isResource(input) ? input : upgradeResource(input)),
+  const document = useMemo<ContainerDocument>(
+    () => {
+      if(isResource(input))return input;
+      const upgraded=upgradeResource(input),owner=sourceSessionFor(input);
+      return (owner?owner.replace(upgraded):upgraded) as ContainerDocument;
+    },
     [input],
   );
   const geometry = useMemo(() => new SurfaceGeometryStore(), [document.id]);
@@ -128,38 +134,68 @@ function SurfaceEditor({
   latestChange.current = onChange;
   const latestReadOnly = useRef(readOnly);
   latestReadOnly.current = readOnly;
+  const historyLease=useRef((()=>{if(retainedState){let name=retainedHistoryLeases.get(retainedState);if(!name){name=`surface-history-${crypto.randomUUID()}`;retainedHistoryLeases.set(retainedState,name)}return name;}return `surface-history-${crypto.randomUUID()}`})());
+  const historyTail=useRef<Promise<void>>(Promise.resolve());
+  const historyFailure=useRef<unknown>(undefined);
+  const historyReplacements=useRef(new WeakMap<ContainerDocument,ContainerDocument>());
+  const pinHistory=useCallback((session:OwnedSourceSession|undefined=sourceSessionFor(current.current))=>{
+    if(!session)return;
+    const captured=[...new Set([...history.current.past,...history.current.future])];
+    const work=session.retainHistory(captured,historyLease.current);
+    void work.catch(error=>{historyFailure.current=error});
+  },[]);
+  const rebaseHistory=useCallback((before:ContainerDocument,incoming:ContainerDocument)=>{
+    const session=sourceSessionFor(incoming);
+    if(!session||sourceSessionFor(before)!==session){rebaseHistorySnapshots(history.current,inkActions.current,before,incoming);return;}
+    if(diffOwnedSource(before,incoming).every(edit=>edit.path.length===1&&edit.path[0]==="updatedAt"))return;
+    const entries=[...new Set([...history.current.past,...history.current.future])].filter(entry=>inkActions.current.get(entry)?.kind!=="native-ink");
+    if(!entries.length)return;
+    const name=`${historyLease.current}:rebase-${crypto.randomUUID()}`;
+    const inputs=session.retainHistory([before,incoming,...entries],`${name}:inputs`);
+    const work=historyTail.current.then(async()=>{
+      await inputs;
+      const resolve=(entry:ContainerDocument)=>{let next=historyReplacements.current.get(entry);while(next){entry=next;next=historyReplacements.current.get(entry)}return entry;};
+      const present=entries.map(resolve).filter(entry=>history.current.past.includes(entry)||history.current.future.includes(entry));
+      const projections=await session.rebaseHistory(before,incoming,present,name);
+      if(session.disposed||current.current.id!==incoming.id)return;
+      const replacement=new Map<ContainerDocument,ContainerDocument|null>();
+      for(const value of projections){
+        const old=value.before as ContainerDocument,action=inkActions.current.get(old);
+        if(!history.current.past.includes(old)&&!history.current.future.includes(old))continue;
+        const next=value.unchanged&&!action?null:value.document as ContainerDocument;
+        replacement.set(old,next);if(next)historyReplacements.current.set(old,next);inkActions.current.delete(old);if(next&&action)inkActions.current.set(next,action);
+      }
+      const apply=(values:ContainerDocument[])=>values.flatMap(value=>replacement.has(value)?replacement.get(value)?[replacement.get(value)!]:[]:[value]);
+      history.current.past=apply(history.current.past);history.current.future=apply(history.current.future);history.current.group="";history.current.at=0;
+      await session.retainHistory([...new Set([...history.current.past,...history.current.future])],historyLease.current);
+      await session.releaseLease(name);await session.releaseLease(`${name}:inputs`);
+    });
+    historyTail.current=work;void work.catch(error=>{historyFailure.current=error});
+  },[]);
+  useEffect(()=>()=>{
+    if(retainedState)return;
+    const owner=sourceSessionFor(current.current);if(!owner||owner.disposed)return;
+    void historyTail.current.then(()=>owner.releaseLease(historyLease.current)).catch(error=>{console.error("Source history retirement failed",error)});
+  },[retainedState]);
   const widgetChanges = useRef(
     new Map<string, (data: Record<string, unknown>) => void>(),
   );
   useLayoutEffect(() => {
     const before = current.current;
     if (before === document) return;
-    if (
-      before.content !== document.content ||
-      before.layout !== document.layout ||
-      before.surfaceViews !== document.surfaceViews ||
-      before.icon !== document.icon
-    ) {
-      if (measureNativeSync("surface.propEcho.key",()=>contentKey(before) === contentKey(document))) {
-        current.current = document;
-        window.showai?.inlineInk?.setDocument?.(document.id, document);
-        refresh((value) => value + 1);
-        return;
-      }
-      authorBaseline.current=document;
-      geometrySettlement.current.generation++;
-      if (before.id !== document.id) {
-        history.current = { past: [], future: [], group: "", at: 0 };
-        inkActions.current.clear();
-        lastAuthorMutation.current=undefined;
-      } else {
-        measureNativeSync("surface.propEcho.rebase",()=>rebaseHistorySnapshots(history.current,inkActions.current,before,document));
-      }
+    const owned=sourceSessionFor(document);
+    if(!owned&&measureNativeSync("surface.propEcho.key",()=>nativeDocumentBodiesEqual(before,document))){
+      current.current=document;window.showai?.inlineInk?.setDocument?.(document.id,document);refresh(value=>value+1);return;
     }
+    authorBaseline.current=document;
+    geometrySettlement.current.generation++;
+    if(before.id!==document.id||owned&&sourceSessionFor(before)!==owned){
+      history.current={past:[],future:[],group:"",at:0};inkActions.current.clear();lastAuthorMutation.current=undefined;
+    }else rebaseHistory(before,document);
     current.current = document;
     window.showai?.inlineInk?.setDocument?.(document.id, document);
     refresh((value) => value + 1);
-  }, [document]);
+  }, [document,rebaseHistory]);
   const settleGeometry = useCallback(() => {
     // Let content layout and ResizeObserver settle, then complete this same undo transaction.
     // Opening/reading a document never schedules this authoring-only step.
@@ -175,8 +211,9 @@ function SurfaceEditor({
         // materialize guarantees COW after observing this current tree. This
         // only proves the geometry operation made no additional source edit.
         if (before === measured) return;
-        if (measureNativeSync("surface.settle.key",()=>contentKey(before) === contentKey(measured))) return;
-        const settled = measureNativeSync("surface.settle.reconcile",()=>reconcileSurface(
+        const owner=sourceSessionFor(before);
+        if (!owner&&measureNativeSync("surface.settle.key",()=>contentKey(before) === contentKey(measured))) return;
+        const settled = owner?owner.replace(measured) as ContainerDocument:measureNativeSync("surface.settle.reconcile",()=>reconcileSurface(
           { ...measured, surfaceViews: { ...measured.surfaceViews } },
           { clone: false },
         )) as ContainerDocument;
@@ -187,27 +224,21 @@ function SurfaceEditor({
     });
   }, [geometry]);
   const commit = useCallback(
-    (value: ShowDocument, group = "", nativeAction?:NativeInkHistoryAction, recordHistory=true, authoring=true) => {
+    (value: ShowDocument, group = "", nativeAction?:NativeInkHistoryAction, recordHistory=true, authoring=true, publish=true) => {
       if (latestReadOnly.current) return;
       const before = current.current;
-      const next = measureNativeSync("surface.commit.reconcile",()=>
+      const owner=sourceSessionFor(before);
+      const next = (owner?(authoring?owner.replace(value):sourceSessionFor(value)===owner?value:owner.replace(value)):measureNativeSync("surface.commit.reconcile",()=>
         !authoring ? reconcileSurface(value,{shareWith:before}) :
           isReconciledSurface(value) ? value : reconcileSurface(value)
-      ) as ContainerDocument;
+      )) as ContainerDocument;
       if(!authoring)window.showai?.inlineInk?.copyDocumentMetadata?.(value,next);
       if(nativeAction){
         nativeAction=unregisteredNativeInkHistoryAction(nativeAction,inkActions.current.values());
         recordHistory=!!nativeAction;
       }
-      if (!nativeAction && (
-        next === before ||
-        (authoring && next.content === before.content &&
-          next.layout === before.layout &&
-          next.surfaceViews === before.surfaceViews &&
-          next.icon === before.icon)
-      ))
-        return;
-      if(!recordHistory && measureNativeSync("surface.commit.key",()=>nativeDocumentContentKey(next)===nativeDocumentContentKey(before))){
+      if (!nativeAction && next===before)return;
+      if(!owner&&!recordHistory && measureNativeSync("surface.commit.key",()=>nativeDocumentContentKey(next)===nativeDocumentContentKey(before))){
         current.current=next;
         window.showai?.inlineInk?.setDocument?.(next.id,next);
         return;
@@ -217,7 +248,7 @@ function SurfaceEditor({
       if (recordHistory&&(nativeAction || !group || group !== stack.group || now - stack.at > 800)) {
         // A semantic-only receipt still owns a distinct history edge; using
         // current itself would overwrite a second edge with that same body.
-        const snapshot=nativeAction&&next===before?{...before}:before;
+        const snapshot=nativeAction&&next===before?(owner?owner.snapshot(before) as ContainerDocument:{...before}):before;
         stack.past.push(snapshot);
         if(nativeAction)inkActions.current.set(snapshot,nativeAction);
         if (stack.past.length > 80) { const expired=stack.past.shift();if(expired)inkActions.current.delete(expired); }
@@ -226,7 +257,8 @@ function SurfaceEditor({
         for(const discarded of stack.future)inkActions.current.delete(discarded);
         stack.future = [];stack.group=group;stack.at=now;
       }
-      else measureNativeSync("surface.commit.rebase",()=>rebaseHistorySnapshots(stack,inkActions.current,before,next));
+      else rebaseHistory(before,next);
+      pinHistory(owner);
       let author:NativeAuthorMutation|undefined;
       if(authoring&&recordHistory&&!nativeAction&&window.showai?.inlineInk?.nativeScene){
         const owner=stack.past.at(-1);
@@ -238,6 +270,7 @@ function SurfaceEditor({
           lastAuthorMutation.current=mutationId;
         }
       }
+      if(!publish){current.current=next;return;}
       if(next===before){
         window.showai?.inlineInk?.setDocument?.(next.id,next);
         refresh(value=>value+1);
@@ -251,7 +284,7 @@ function SurfaceEditor({
         settleGeometry();
       });
     },
-    [settleGeometry],
+    [settleGeometry,rebaseHistory,pinHistory],
   );
   const inkSave = useRef(onInkSave);
   inkSave.current = onInkSave;
@@ -271,7 +304,31 @@ function SurfaceEditor({
           return (await inkSave.current?.()) ?? true;
         }
         try {
-          if(value.document){
+          if(value.sourceSnapshot&&value.document&&sourceSessionFor(value.document)){
+            const session=sourceSessionFor(value.document)!;
+            let snapshot=value.sourceSnapshot,target=value.document;
+            let published=session.apply(snapshot);
+            while(!published){
+              if(!bound||latestReadOnly.current||current.current.id!==value.pageId)return false;
+              const retried=await session.retryPublication(snapshot);snapshot=retried.sourceSnapshot;target=retried.document;
+              published=session.apply(snapshot);
+            }
+            target=published;bridge.copyDocumentMetadata?.(value.document,target);
+            authorBaseline.current=target;
+            for(const adopted of value.adoptActions??[])for(const [before,action]of inkActions.current){if(action.intentId===adopted.intentId)inkActions.current.set(before,appendNativeInkHistoryGroups(action,[adopted]));}
+            for(const corrected of value.correctionActions??[])for(const [before,action]of inkActions.current){if(action.strokeIds?.includes(corrected.strokeId))inkActions.current.set(before,appendNativeInkHistoryGroups(action,[{boardId:corrected.boardId??value.boardId,operationIds:corrected.operationIds}]));}
+            const nativeAction=value.operationIds?.length?appendNativeInkHistoryGroups({strokeIds:value.historyStrokeIds,...(!value.nativeContentAction&&!value.nativeContentActions?.length?{kind:"native-ink" as const}:{})},[{boardId:value.boardId,operationIds:value.operationIds}]):undefined;
+            if(snapshot.history?.stages.length){
+              if(nativeAction)throw new InkEditConflict("Native ink must reach its history boundary before object editing");
+              const before=current.current,sourceOnly=session.apply(snapshot.history.sourceOnly,{publish:false,baseDocument:session.baseline(snapshot)}) as ContainerDocument|null;
+              if(!sourceOnly)throw new InkEditConflict("Native history source lost its captured owned baseline");
+              rebaseHistory(before,sourceOnly);current.current=sourceOnly;
+              let prior:ShowDocument=sourceOnly;
+              for(const stage of snapshot.history.stages){const body=session.apply(stage.delta,{publish:false,baseDocument:prior});if(!body)throw new InkEditConflict("Native history stage lost its owned baseline");commit(body,`native-content:${stage.groupId}`,undefined,true,false,false);prior=body;}
+              // Worker final normalization is independent from history stages.
+              current.current=target as ContainerDocument;bridge.setDocument?.(target.id,target);latestChange.current(target);refresh(value=>value+1);
+            }else commit(target,value.nativeContentAction?`native-content:${value.nativeContentGroup??""}`:"",nativeAction,!!nativeAction||value.nativeContentAction===true,false);
+          }else if(value.document){
             if(!value.baseDocument||value.document.id!==value.pageId||value.baseDocument.id!==value.pageId)
               throw new InkEditConflict("Native Board projection has no matching writer baseline");
             let merged:ReturnType<typeof mergeNativeDocumentReceipt>;
@@ -305,7 +362,7 @@ function SurfaceEditor({
                 inkActions.current.set(snapshot,appendNativeInkHistoryGroups(action,[{boardId:corrected.boardId??value.boardId,operationIds:corrected.operationIds}]));
               }
             }
-            const nativeAction=value.operationIds?.length?appendNativeInkHistoryGroups({strokeIds:value.historyStrokeIds},[{boardId:value.boardId,operationIds:value.operationIds}]):undefined;
+            const nativeAction=value.operationIds?.length?appendNativeInkHistoryGroups({strokeIds:value.historyStrokeIds,...(!value.nativeContentAction&&!value.nativeContentActions?.length?{kind:"native-ink" as const}:{})},[{boardId:value.boardId,operationIds:value.operationIds}]):undefined;
             if(value.nativeContentActions?.length){
               if(nativeAction)throw new InkEditConflict("Native ink must reach its history boundary before object editing");
               const plan=nativeContentHistoryStages(current.current,value.baseDocument,value.document,value.nativeContentActions,{baseline:value.baseDocument,current:current.current,incoming:value.document,result:merged});
@@ -349,6 +406,7 @@ function SurfaceEditor({
           });
           throw error;
         }
+        const owner=sourceSessionFor(current.current);if(owner)await owner.retainHistory([...new Set([...history.current.past,...history.current.future])],historyLease.current);
         if(value.publicationId){
           appliedPublications.add(value.publicationId);
           if(appliedPublications.size>64)appliedPublications.delete(appliedPublications.values().next().value!);
@@ -359,48 +417,56 @@ function SurfaceEditor({
     );
     bridge.setDocument?.(document.id, current.current);
     return ()=>{bound=false;unbind()};
-  }, [document.id, inlineInkProjectId, readOnly, commit]);
+  }, [document.id, inlineInkProjectId, readOnly, commit,rebaseHistory]);
   const travel = useCallback(
     async (redo = false) => {
       await window.showai?.inlineInk?.flush();
       geometrySettlement.current.generation++;
+      await historyTail.current;if(historyFailure.current)throw historyFailure.current;
       const stack = history.current,
         source = redo ? stack.future : stack.past,
-        target = redo ? stack.past : stack.future,
         next = source.at(-1);
       if (!next) return;
       const before=current.current, action=inkActions.current.get(next);
-      let restored:ContainerDocument;
+      let restored:ContainerDocument,inverseBefore=before;
       const groups=action?nativeInkHistoryGroups(action):[];
-      if(groups.length&&window.showai?.inlineInk?.nativeScene){
-        const generic={...current.current,icon:next.icon,content:next.content,layout:next.layout,surfaceViews:next.surfaceViews};
-        const result=await window.showai.invoke<{document:ShowDocument;groups?:NativeInkHistoryGroup[];boardId?:string;operationIds?:string[]}>("native:board.compensate",{
-          projectId:inlineInkProjectId,pageId:before.id,groups,
+      if((groups.length||action?.intentId)&&window.showai?.inlineInk?.nativeScene){
+        const generic=action?.kind==="native-ink"?before:next;
+        const session=sourceSessionFor(before);
+        const result=await window.showai.invoke<{document:ShowDocument;sourceSnapshot?:import("./source-runtime").SourceSnapshotDelta;sourceSnapshotDeliveryId?:string;groups?:NativeInkHistoryGroup[];boardId?:string;operationIds?:string[]}>("native:board.compensate",{
+          projectId:inlineInkProjectId,pageId:before.id,groups,kind:action?.kind,intentId:action?.intentId,
           ...(groups.length===1?groups[0]:{}),
-          baseDocument:before,document:generic,
+          baseDocument:before,document:generic,...(session?{sourceCurrentRef:await session.reference(before),sourceClientId:session.clientId}:{}),
         });
-        const merged=mergePageContent(before,current.current,result.document);
-        if(!canCommitPageMerge(merged))throw new InkEditConflict("Undo encountered concurrent Board edits");
-        restored=merged.document as ContainerDocument;
-        authorBaseline.current=result.document;
+        if(session&&result.sourceSnapshot)restored=await session.acceptProjection(result.sourceSnapshot,before,result.sourceSnapshotDeliveryId) as ContainerDocument;
+        else if(session){
+          const incoming=session.captureExternal(result.document,`${historyLease.current}:undo-result`),merged=await session.merge(before,current.current,incoming);
+          if(session.document!==current.current){await merged.release();throw new InkEditConflict("Undo source changed while merging");}
+          const applied=session.apply(merged.delta);await merged.release();if(!applied)throw new InkEditConflict("Undo source no longer matches its captured baseline");restored=applied as ContainerDocument;
+        }else{
+          const merged=mergePageContent(before,current.current,result.document);
+          if(!canCommitPageMerge(merged))throw new InkEditConflict("Undo encountered concurrent Board edits");restored=merged.document as ContainerDocument;
+        }
+        authorBaseline.current=(session&&result.sourceSnapshot?session.registeredBody(result.sourceSnapshot.next):result.document)??restored;
         const inverseGroups=result.groups??(groups.length===1&&result.operationIds?[{boardId:groups[0].boardId,operationIds:result.operationIds}]:[]);
-        inkActions.current.set(before,appendNativeInkHistoryGroups({strokeIds:action?.strokeIds},inverseGroups));
-      }else restored = {
-        ...current.current,icon:next.icon,content:next.content,layout:next.layout,surfaceViews:next.surfaceViews,
-      };
-      const latest=(redo?stack.future:stack.past)===source&&source.at(-1)===next;
-      const index=source.lastIndexOf(next);
-      if(index>=0)source.splice(index,1);
-      if(latest)target.push(before);else inkActions.current.delete(before);
-      inkActions.current.delete(next);
+        const inverseOwner=sourceSessionFor(current.current);inverseBefore=(inverseOwner?inverseOwner.snapshot(current.current):{...current.current}) as ContainerDocument;
+        inkActions.current.set(inverseBefore,appendNativeInkHistoryGroups({strokeIds:action?.strokeIds,kind:action?.kind},inverseGroups));
+      }else {
+        const session=sourceSessionFor(before);restored=(session?session.replace(next):next) as ContainerDocument;
+      }
+      let consumed=next,successor=historyReplacements.current.get(consumed);while(successor){consumed=successor;successor=historyReplacements.current.get(consumed)}
+      const activeSource=redo?stack.future:stack.past,activeTarget=redo?stack.past:stack.future,index=activeSource.lastIndexOf(consumed);
+      if(index>=0)activeSource.splice(index,1);
+      activeTarget.push(inverseBefore);inkActions.current.delete(consumed);if(consumed!==next)inkActions.current.delete(next);
       stack.group = "";
+      pinHistory(sourceSessionFor(restored));
       current.current = restored;
       window.showai?.inlineInk?.setDocument?.(restored.id, restored);
       latestChange.current(restored);
       refresh((value) => value + 1);
       settleGeometry();
     },
-    [settleGeometry,inlineInkProjectId],
+    [settleGeometry,inlineInkProjectId,pinHistory],
   );
   const undo = useCallback(() => travel(), [travel]);
   const redo = useCallback(() => travel(true), [travel]);
@@ -425,7 +491,7 @@ function SurfaceEditor({
           commit(
             editNode(current.current, parentId, (node) => {
               node.attrs = { ...node.attrs, data };
-            }),
+            },{normalize:false,attributesOnly:true}),
             `widget:${parentId}`,
           );
         };
@@ -499,19 +565,14 @@ function SurfaceEditor({
           onContentChange: (value, options) => {
             let source = current.current;
             if (renderModule) {
-              source = {
-                ...source,
-                layout: { ...source.layout },
-                surfaceViews: { ...source.surfaceViews },
-              };
-              value = fromPageEditor(value, source);
+              const converted=fromPageEditorDraft(value,source);source=converted.document;value=converted.content;
             }
             const group =
               options?.historyGroup ??
               (options?.separateHistory ? "" : `text:${parentId}`);
             if (kind === "children")
               commit(
-                replaceChildren(source, parentId, ids, value.content ?? []),
+                replaceChildren(source, parentId, ids, value.content ?? [],{normalize:false}),
                 group,
               );
             else
@@ -534,7 +595,7 @@ function SurfaceEditor({
                         : child,
                     );
                   }
-                }),
+                },{normalize:false}),
                 group,
               );
           },

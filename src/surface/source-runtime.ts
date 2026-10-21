@@ -77,6 +77,36 @@ export function ownSourceValue<T>(value:T):T{
   ancestors.delete(value);return freezeOwnedSource(copy);
  };return capture(value) as T;
 }
+const equalOwned=(one:unknown,two:unknown):boolean=>{
+ if(one===two&&(isOwnedSource(one)||one===null||typeof one!=="object"))return true;
+ if(!one||!two||typeof one!=="object"||typeof two!=="object"||Array.isArray(one)!==Array.isArray(two))return false;
+ if(Array.isArray(one)&&Array.isArray(two))return one.length===two.length&&one.every((value,index)=>equalOwned(value,two[index]));
+ const keys=Object.keys(one);return keys.length===Object.keys(two).length&&keys.every(key=>Object.hasOwn(two,key)&&equalOwned((one as Record<string,unknown>)[key],(two as Record<string,unknown>)[key]));
+};
+/** Unlike generic mutable-source diff, both inputs are actual owned snapshots.
+ * Identity shortcuts are restricted to this module's recursively frozen data. */
+export function diffOwnedSource(before:unknown,next:unknown):NativeSourceEdit[]{
+ if(!isOwnedSource(before)||!isOwnedSource(next))throw new SourceRuntimeError("SOURCE_NOT_OWNED","Draft diff requires actual immutable owned graphs");
+ const edits:NativeSourceEdit[]=[];
+ const visit=(one:unknown,two:unknown,path:(string|number)[])=>{
+  if(one===two&&(isOwnedSource(one)||one===null||typeof one!=="object"))return;
+  if(!one||!two||typeof one!=="object"||typeof two!=="object"||Array.isArray(one)!==Array.isArray(two)){
+   if(one!==two)edits.push({op:"set",path,value:cloneSourceValue(two)});return;
+  }
+  if(Array.isArray(one)&&Array.isArray(two)){
+   if(one.length!==two.length){let prefix=0,suffix=0,limit=Math.min(one.length,two.length);
+    while(prefix<limit&&equalOwned(one[prefix],two[prefix]))prefix++;
+    while(suffix<limit-prefix&&equalOwned(one.at(-1-suffix),two.at(-1-suffix)))suffix++;
+    if(suffix){edits.push({op:"splice",path,index:prefix,deleteCount:one.length-prefix-suffix,items:cloneSourceValue(two.slice(prefix,two.length-suffix))});return}
+   }
+   for(let index=0;index<two.length;index++)if(index<one.length)visit(one[index],two[index],[...path,index]);else edits.push({op:"set",path:[...path,index],value:cloneSourceValue(two[index])});
+   if(two.length<one.length)edits.push({op:"resize",path,length:two.length});return;
+  }
+  const a=one as Record<string,unknown>,b=two as Record<string,unknown>;
+  for(const key of Object.keys(a).sort())if(!Object.hasOwn(b,key))edits.push({op:"remove",path:[...path,key]});
+  for(const key of Object.keys(b).sort())if(Object.hasOwn(a,key))visit(a[key],b[key],[...path,key]);else edits.push({op:"set",path:[...path,key],value:cloneSourceValue(b[key])});
+ };visit(before,next,[]);return edits;
+}
 /** Full canonical validation belongs on an owner worker. Keep its normalized
  * graph rather than validateDocument's selected-field return value: unknown
  * source fields are part of the user's exact source body. */
@@ -93,7 +123,7 @@ export class SourceRuntimeOwner {
  private nextId=0;
  private snapshots=new Map<string,Snapshot>();
  private leases=new Map<string,Set<string>>();
- private transactions=new Map<string,{base:SourceSnapshotRef;edits:NativeSourceEdit[];next:SourceSnapshotRef}>();
+ private transactions=new Map<string,{base:SourceSnapshotRef;edits:NativeSourceEdit[];next:SourceSnapshotRef;leaseId?:string}>();
  private publications=new Map<string,unknown>();
  private references=new Map<object,number>();
  private residentBytes=0;
@@ -126,7 +156,14 @@ export class SourceRuntimeOwner {
   for(const id of unleased){if(remaining<=this.limits.unleased&&this.residentBytes<=this.limits.bytes)break;this.forget(id);remaining--}
   // Explicit pins always win over cache pressure. Callers can persist/retire an
   // inactive scope; no author/history state is silently evicted to hit bytes.
-  while(this.transactions.size>512)this.transactions.delete(this.transactions.keys().next().value!);
+  for(const [key,transaction]of this.transactions){
+   if(this.transactions.size<=512&&this.residentBytes<=this.limits.bytes)break;
+   // An unanswered exact draft keeps its original transaction under its live
+   // response lease. Completed replay cache cannot silently consume unlimited
+   // point payload memory outside the same source residency budget.
+   if(transaction.leaseId&&this.leases.has(transaction.leaseId))continue;
+   this.transactions.delete(key);this.account(transaction.edits,-1);
+  }
   while(this.publications.size>8){const key=this.publications.keys().next().value!,value=this.publications.get(key);this.publications.delete(key);if(value&&typeof value==="object")this.account(value,-1)}
  }
  private retain(leaseId:string,refs:SourceSnapshotRef[]){
@@ -144,7 +181,7 @@ export class SourceRuntimeOwner {
   this.snapshots.set(ref.snapshotId,{ref,document:body,candidates,conflicts});this.account(body,1);
   try{if(leaseId)this.retain(leaseId,[ref]);else this.prune(new Set([ref.snapshotId]));}
   catch(error){this.forget(ref.snapshotId);throw error}
-  return {format:"showai-owned-source-v1",base:base?.ref??null,next:ref,...(base?{edits:preparedEdits??diffNativeSource(base.document,body)}:{full:body}),conflicts,inkCandidates:candidates};
+  return {format:"showai-owned-source-v1",base:base?.ref??null,next:ref,...(base?{edits:preparedEdits??diffOwnedSource(base.document,body)}:{full:body}),conflicts,inkCandidates:candidates};
  }
  private rememberPublication(current:Snapshot,publicationId:string,packet:{document:ShowDocument;baseDocument:ShowDocument;pageId?:string;[key:string]:unknown}){
   if(!publicationId||packet.document?.id!==current.ref.scope.pageId||packet.baseDocument?.id!==current.ref.scope.pageId||packet.pageId&&packet.pageId!==current.ref.scope.pageId)fail("Native publication has no matching actual source scope");
@@ -201,8 +238,9 @@ export class SourceRuntimeOwner {
     const base=this.get(request.base);if(!request.transactionId)fail("Source draft requires an actual transaction identity");
     const key=scopeKey(base.ref.scope)+"\u0000"+request.transactionId,known=this.transactions.get(key);
     if(known){if(!sameSourceRef(known.base,base.ref)||diffNativeSource(known.edits,request.edits).length)fail("Source transaction identity names different edits");const next=this.get(known.next);return{format:"showai-owned-source-v1",base:base.ref,next:next.ref,edits:cloneSourceValue(known.edits),conflicts:[],inkCandidates:next.candidates};}
-    const target=applyNativeSourceDelta(base.document,request.edits),result=this.register(base.ref.scope,target,"draft",base,request.leaseId,[],freezeOwnedSource(cloneSourceValue(request.edits)));
-    this.transactions.set(key,{base:base.ref,edits:freezeOwnedSource(cloneSourceValue(request.edits)),next:result.next});return result;
+    const edits=freezeOwnedSource(cloneSourceValue(request.edits)),target=applyNativeSourceDelta(base.document,edits),result=this.register(base.ref.scope,target,"draft",base,request.leaseId,[],edits);
+    if(request.leaseId)this.retain(request.leaseId,[base.ref,result.next]);
+    this.transactions.set(key,{base:base.ref,edits,next:result.next,leaseId:request.leaseId});this.account(edits,1);this.prune(new Set([result.next.snapshotId]));return result;
    }
    case "normalize":{
     const current=this.get(request.ref);return this.register(current.ref.scope,normalizeSourceDocument(current.document),"normalized",current,request.leaseId);
@@ -236,7 +274,7 @@ export class SourceRuntimeOwner {
    case "delta":{
     const base=this.get(request.base),next=this.get(request.next);
     if(scopeKey(base.ref.scope)!==scopeKey(next.ref.scope))fail("Source delta crosses its actual home/project/page");
-    return{format:"showai-owned-source-v1",base:base.ref,next:next.ref,edits:diffNativeSource(base.document,next.document),conflicts:next.conflicts,inkCandidates:next.candidates};
+    return{format:"showai-owned-source-v1",base:base.ref,next:next.ref,edits:diffOwnedSource(base.document,next.document),conflicts:next.conflicts,inkCandidates:next.candidates};
    }
    case "resolve":{const value=this.get(request.ref);return{ref:value.ref,document:value.document};}
    case "serialize":{const value=this.get(request.ref);return{ref:value.ref,json:JSON.stringify(value.document)};}
@@ -244,7 +282,7 @@ export class SourceRuntimeOwner {
    case "release":this.leases.delete(request.leaseId);this.prune();return{retained:0};
    case "dispose":{
     const key=scopeKey(scope(request.scope));for(const [id,value]of this.snapshots)if(scopeKey(value.ref.scope)===key){this.forget(id);for(const [leaseId,lease]of this.leases){lease.delete(id);if(!lease.size)this.leases.delete(leaseId)}}
-    for(const key of this.transactions.keys())if(key.startsWith(scopeKey(request.scope)+"\u0000"))this.transactions.delete(key);
+    for(const key of this.transactions.keys())if(key.startsWith(scopeKey(request.scope)+"\u0000")){const value=this.transactions.get(key)!;this.transactions.delete(key);this.account(value.edits,-1);}
     for(const key of this.publications.keys())if(key.startsWith(scopeKey(request.scope)+"\u0000")){const packet=this.publications.get(key);this.publications.delete(key);if(packet&&typeof packet==="object")this.account(packet,-1)}
     return{retained:0};
    }
