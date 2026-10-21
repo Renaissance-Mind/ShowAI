@@ -104,6 +104,8 @@ export type InkJournalEvent = { ordinal: number } & ({ kind: "operation"; operat
 export function replayInkJournalEvents(scope: { pageId: string; boardId: string }, events: InkJournalEvent[]): InkOperationCheckpoint;
 export function canonicalInkJSON(value: unknown): string;
 export function inkOperationDigest(value: unknown): string;
+/** SHA-256 of UTF-8 input, replacing isolated surrogates and preserving normalization. */
+export function installInkDigestProvider(provider: ((source:string)=>string)|null): void;
 export function inkNodeMetadata(node: JSONContent): JSONContent;
 export function validateInkCheckpoint(value: unknown): InkOperationCheckpoint;
 export function emptyInkCheckpoint(scope: { pageId: string; boardId: string }): InkOperationCheckpoint;

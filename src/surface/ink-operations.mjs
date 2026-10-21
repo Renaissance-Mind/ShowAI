@@ -22,9 +22,45 @@ export function canonicalInkJSON(value) {
   return invalid("only finite JSON values are supported");
 }
 
-/** Synchronous SHA-256 for the same pure kernel in browsers and JavaScriptCore. */
+let inkDigestProvider = null;
+const checkedDigest = value => {
+  if (typeof value !== "string" || !/^[a-f0-9]{64}$/.test(value)) invalid("SHA-256 provider must return 64 lowercase hexadecimal characters synchronously");
+  return value;
+};
+/** Install a trusted synchronous platform SHA-256 implementation. Input is the
+ * exact existing source string; encode UTF-8 with isolated UTF-16 surrogates
+ * replaced by U+FFFD, preserving NUL and Unicode normalization form. No provider
+ * error is caught or silently retried with another implementation. Installation
+ * publishes only after all known vectors pass; a failed replacement leaves the
+ * previous provider active. Passing null restores the portable implementation. */
+export function installInkDigestProvider(provider) {
+  if (provider === null) { inkDigestProvider = null; return; }
+  if (typeof provider !== "function") invalid("SHA-256 provider must be a function or null");
+  const vectors = [
+    ["", "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"],
+    ["abc", "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"],
+    ["\0", "6e340b9cffb37a989ca544e6bb780a2c78901d3fb33738768511a30617afa01d"],
+    ["中文🤔", "431406ad071587234a33f8c00aa72eb2e54e28dad036f7f4061ffbff82f966ee"],
+    ["\ud800", "83d544ccc223c057d2bf80d3f2a32982c32c3c0db8e2674820da5064783fb097"],
+    ["\udc00", "83d544ccc223c057d2bf80d3f2a32982c32c3c0db8e2674820da5064783fb097"],
+    ["é", "4a99557e4033c3539de2eb65472017cad5f9557f7a0625a09f1c3f6e2ba69c4c"],
+    ["e\u0301", "bf12767b0f2a56b2190075bae8169f656e3ce8d6357d4aff184bc6c7ea48f9f6"],
+    ["a".repeat(63), "7d3e74a05d7db15bce4ad9ec0658ea98e3f06eeecf16b4c6fff2da457ddc2f34"],
+    ["a".repeat(64), "ffe054fe7ae0cb6dc65c3af9b61d5209f439851db43d0ba5997337df154668eb"],
+    ["a".repeat(65), "635361c48bb9eab14198e76ea8ab7f1a41685d6ad62aa9146d301d4f17eb0ae0"],
+    ['{"a":[0,1e-8,1e+21],"z":"é"}', "0cd3dcf34ffcc62e2f24861f9f37733172d3b3b5c353018bdab1f9b8aa2ed77d"],
+  ];
+  for (const [source, expected] of vectors) if (checkedDigest(provider(source)) !== expected) invalid("SHA-256 provider failed its UTF-8 known-vector self-test");
+  inkDigestProvider = provider;
+}
+
+/** Synchronous SHA-256 shared by every lexical kernel and wire call site. */
 export function inkOperationDigest(value) {
-  const source = typeof value === "string" ? value : canonicalInkJSON(value), bytes = [];
+  const source = typeof value === "string" ? value : canonicalInkJSON(value);
+  return inkDigestProvider ? checkedDigest(inkDigestProvider(source)) : portableInkDigest(source);
+}
+function portableInkDigest(source) {
+  const bytes = [];
   for (const ch of source) {
     const code = ch.codePointAt(0), c = code >= 0xd800 && code <= 0xdfff ? 0xfffd : code;
     if (c < 0x80) bytes.push(c);
