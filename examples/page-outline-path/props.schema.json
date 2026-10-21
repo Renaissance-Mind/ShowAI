@@ -1,0 +1,6 @@
+{
+  "type": "object",
+  "properties": { "gap": { "type": "integer", "minimum": 4, "maximum": 24 } },
+  "required": ["gap"],
+  "additionalProperties": false
+}

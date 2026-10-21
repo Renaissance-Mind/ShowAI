@@ -1,3 +1,7 @@
+import {
+  remapPageOutline,
+  pageOutlineNodes,
+} from "../surface/page-outline.mjs";
 import { reconcileSurface, visitNodes } from "../surface/document.mjs";
 import { validateDocument } from "./validation.mjs";
 
@@ -49,5 +53,12 @@ export function selectDocumentBlocks(source, blockIds) {
         views.initial = null;
     else document.views.initial = null;
   }
+  visitNodes(document.content, (node) => {
+    if (node.attrs?.outline)
+      node.attrs.outline = remapPageOutline(
+        node.attrs.outline,
+        new Map([...pageOutlineNodes(node).keys()].map((id) => [id, id])),
+      );
+  });
   return validateDocument(document);
 }

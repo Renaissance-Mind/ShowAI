@@ -49,11 +49,13 @@ export function ComponentSlashMenu({
       ?.querySelector('[aria-selected="true"]')
       ?.scrollIntoView({ block: "nearest" });
   }, [selected]);
-  const items = catalog.items.filter((item) =>
-    `${item.name} ${item.description} ${componentDisplayName(item)} ${componentDisplayDescription(item)} ${"kind" in item ? item.kind : item.id}`
-      .toLowerCase()
-      .includes(query.toLowerCase()),
-  );
+  const items = catalog.items
+    .filter((item) => "kind" in item || item.role !== "page-outline")
+    .filter((item) =>
+      `${item.name} ${item.description} ${componentDisplayName(item)} ${componentDisplayDescription(item)} ${"kind" in item ? item.kind : item.id}`
+        .toLowerCase()
+        .includes(query.toLowerCase()),
+    );
   const insert = async (index: number) => {
     const item = items[index];
     if (!item || busy) return;

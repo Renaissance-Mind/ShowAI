@@ -4601,6 +4601,7 @@ export default function Studio() {
               ) : undefined
             }
             canInsert={
+              dialog.custom?.role !== "page-outline" &&
               !!page.draft &&
               page.projectId === selectedProject &&
               (dialog.custom?.scope !== "project" ||

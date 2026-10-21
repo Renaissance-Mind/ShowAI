@@ -1,3 +1,7 @@
+import { PageOutline, PageOutlinePrint } from "./PageOutline";
+import { OutlineSettings } from "./OutlineSettings";
+import type { OutlineViewState } from "./page-outline.mjs";
+import outlineMessages from "../i18n/messages/pageOutline";
 import {isEditableDrawing} from "./portable-ink.mjs";
 import { TextSelectionScope } from "./TextSelectionScope";
 import { SurfaceGeometryStore } from "./geometry-store";
@@ -98,6 +102,8 @@ interface Runtime {
   activate: (id: string) => void;
   render: ContentRenderer;
   scrolls: Map<string, number>;
+  outlines: Map<string, OutlineViewState>;
+  outlineSettings: (id: string) => void;
   revealRequest: string | null;
   requestReveal: (id: string | null) => void;
   openComponents: (
@@ -112,6 +118,7 @@ export interface ContainerViewState {
   expanded?: string | null;
   active?: string;
   scrolls?: Map<string, number>;
+  outlines?: Map<string, OutlineViewState>;
 }
 export function ContainerRuntime({
   document: sourceDocument,
@@ -160,6 +167,8 @@ export function ContainerRuntime({
   inspectorHost?: HTMLElement | null;
 }) {
   const t = useTranslator(messages);
+  const ot = useTranslator(outlineMessages);
+  const [outlineSettingsId, setOutlineSettingsId] = useState<string | null>(null);
   const document = useMemo(
     () => reconcileConnections({ ...sourceDocument }),
     [sourceDocument],
@@ -209,6 +218,9 @@ export function ContainerRuntime({
     };
   }, []);
   const scrolls = useRef(retainedState?.scrolls ?? new Map<string, number>());
+  const outlines = useRef(
+    retainedState?.outlines ?? new Map<string, OutlineViewState>(),
+  );
   const viewState = useRef({ selected, expanded, active });
   viewState.current = { selected, expanded, active };
   useLayoutEffect(
@@ -216,6 +228,7 @@ export function ContainerRuntime({
       if (retainedState)
         Object.assign(retainedState, viewState.current, {
           scrolls: scrolls.current,
+          outlines: outlines.current,
         });
     },
     [retainedState],
@@ -295,6 +308,7 @@ export function ContainerRuntime({
             wrap,
             pageWidthMode: root.attrs?.widthMode ?? "standard",
             setPageWidthMode,
+            outlineSettings: () => setOutlineSettingsId(surfaceId),
           }
         : null,
     [
@@ -372,6 +386,8 @@ export function ContainerRuntime({
     activate,
     render: renderContent,
     scrolls: scrolls.current,
+    outlines: outlines.current,
+    outlineSettings: setOutlineSettingsId,
     revealRequest,
     requestReveal,
     openComponents: (parentId, point, position) =>
@@ -395,6 +411,34 @@ export function ContainerRuntime({
         }
       >
         <Context.Provider value={runtime}>
+          {outlineSettingsId &&
+            !runtime.readOnly &&
+            findSurfaceNode(document, outlineSettingsId)?.node.attrs?.kind ===
+              "page" && (
+              <OutlineSettings
+                page={findSurfaceNode(document, outlineSettingsId)!.node}
+                onClose={() => setOutlineSettingsId(null)}
+                onSave={(config, baseline) => {
+                  const target = findSurfaceNode(
+                    current.current,
+                    outlineSettingsId,
+                  )?.node;
+                  if (
+                    !target ||
+                    target.attrs?.kind !== "page" ||
+                    JSON.stringify(target.attrs.outline) !== baseline
+                  )
+                    throw new Error(ot("errorChanged"));
+                  runtime.commit(
+                    editNode(current.current, outlineSettingsId, (node) => {
+                      node.attrs = { ...node.attrs };
+                      if (config) node.attrs.outline = config;
+                      else delete node.attrs.outline;
+                    }),
+                  );
+                }}
+              />
+            )}
           {iconTarget && !runtime.readOnly && (
             <PageIconDialog
               value={
@@ -954,6 +998,7 @@ function ContainerView({
     readOnly = runtime.readOnly;
   const viewport = useRef<SurfaceHandle>(null),
     page = useRef<HTMLDivElement>(null);
+  const pageShell = useRef<HTMLDivElement>(null);
   const [tool, setTool] = useState<BoardTool | null>(null);
   const [styles, setStyles] = useState<Record<string, DrawingStyle>>({
     pen: { color: "#252629", fillColor: "none", strokeWidth: 2.5 },
@@ -980,6 +1025,8 @@ function ContainerView({
   const enabled = root || runtime.active === id;
   const viewScope = useContext(EditorViewScope);
   const persistKey = `showai.page-scroll.v3:${runtime.document.id}:${id}:${root ? "expanded" : "embedded"}${viewScope ? `:${viewScope}` : ""}`;
+  if (!runtime.outlines.has(persistKey)) runtime.outlines.set(persistKey, {});
+  const outlineView = runtime.outlines.get(persistKey)!;
   useLayoutEffect(() => {
     const element = page.current;
     if (!element) return;
@@ -1085,40 +1132,58 @@ function ContainerView({
   if (kind === "page" || reading)
     return (
       <ObjectContext.Provider value={actions}>
-        <div
-          ref={page}
-          className={`container-page${root ? " is-root" : ""}${reading ? " is-reading-projection" : ""}`}
-          data-container-root={id}
-          data-frameless={node.attrs?.frameless || undefined}
-          data-width-mode={
-            runtime.pageWidthModes && kind === "page"
-              ? (node.attrs?.widthMode ?? "standard")
-              : undefined
-          }
-          data-input-surface={id}
-          aria-label={`Page ${nodeName(node)}`}
-          onScroll={(event) => {
-            if (!runtime.printing && !matchMedia("print").matches)
-              runtime.scrolls.set(persistKey, event.currentTarget.scrollTop);
-          }}
-          onPointerDownCapture={(event) => {
-            if (
-              (event.target as Element).closest("[data-container-root]") ===
-              event.currentTarget
-            )
-              runtime.activate(id);
-          }}
-        >
-          <div className="container-page-column">
-            {heading && <div className="container-page-heading">{heading}</div>}
-            <SurfaceContent
-              document={runtime.document}
-              container={node}
-              spatial={!reading}
-              renderContent={runtime.render}
-              renderSurface={renderSurface}
-            />
+        <div className="page-outline-shell" ref={pageShell}>
+          <div
+            ref={page}
+            className={`container-page${root ? " is-root" : ""}${reading ? " is-reading-projection" : ""}`}
+            data-container-root={id}
+            data-frameless={node.attrs?.frameless || undefined}
+            data-width-mode={
+              (runtime.pageWidthModes || node.attrs?.outline?.enabled) &&
+              kind === "page"
+                ? (node.attrs?.widthMode ?? "standard")
+                : undefined
+            }
+            data-input-surface={id}
+            aria-label={`Page ${nodeName(node)}`}
+            onScroll={(event) => {
+              if (!runtime.printing && !matchMedia("print").matches)
+                runtime.scrolls.set(persistKey, event.currentTarget.scrollTop);
+            }}
+            onPointerDownCapture={(event) => {
+              if (
+                (event.target as Element).closest("[data-container-root]") ===
+                event.currentTarget
+              )
+                runtime.activate(id);
+            }}
+          >
+            <div className="container-page-column">
+              {heading && (
+                <div className="container-page-heading">{heading}</div>
+              )}
+              {kind === "page" && <PageOutlinePrint page={node} />}
+              <SurfaceContent
+                document={runtime.document}
+                container={node}
+                spatial={!reading}
+                renderContent={runtime.render}
+                renderSurface={renderSurface}
+              />
+            </div>
           </div>
+          {kind === "page" && !runtime.printing && (
+            <PageOutline
+              page={node}
+              documentId={runtime.document.id}
+              scroll={page}
+              shell={pageShell}
+              view={outlineView}
+              onSettings={
+                readOnly ? undefined : () => runtime.outlineSettings(id)
+              }
+            />
+          )}
         </div>
       </ObjectContext.Provider>
     );

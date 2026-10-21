@@ -42,6 +42,7 @@ const ComponentsContext = createContext<ReadonlyMap<string, CompiledComponent>>(
   new Map(),
 );
 const InlineHostContext = createContext<HTMLElement | null>(null);
+export const useInlineComponentHost = () => useContext(InlineHostContext);
 
 export function CustomComponentsProvider({
   components,

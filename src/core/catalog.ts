@@ -1292,6 +1292,12 @@ function record(value: unknown, label: string): Record<string, unknown> {
 }
 function manifestFrom(value: unknown): ComponentManifest {
   const item = record(value, "Component manifest");
+  if (item.role !== undefined || item.pageOutlineProtocol !== undefined) {
+    if (item.role !== "page-outline" || item.pageOutlineProtocol !== 1)
+      throw new Error(
+        "Page outline components require role page-outline and pageOutlineProtocol 1.",
+      );
+  }
   if (item.reader !== undefined && item.reader !== "readData")
     throw new Error("Component reader must name the readData export.");
   if (
@@ -1299,7 +1305,7 @@ function manifestFrom(value: unknown): ComponentManifest {
     !componentCategories.some(({ id }) => id === item.category)
   )
     throw new Error(
-      "Component category must be text, image, table, data, flow or other.",
+      "Component category must be text, image, table, data, flow, surface, outline or other.",
     );
   for (const key of ["id", "name", "version", "description", "entry"])
     if (typeof item[key] !== "string" || (item[key] as string).length > 4000)
@@ -1355,6 +1361,9 @@ function manifestFrom(value: unknown): ComponentManifest {
       ? { category: item.category as ComponentManifest["category"] }
       : {}),
     entry,
+    ...(item.role
+      ? { role: "page-outline" as const, pageOutlineProtocol: 1 as const }
+      : {}),
     ...(item.reader ? { reader: "readData" as const } : {}),
     scenarios: item.scenarios as string[],
     ...(item.documentation !== undefined
@@ -1499,14 +1508,14 @@ function compiledIntegrity(
 function runtimeSource(entry: string, reader = false): string {
   return `import React, {useState,useEffect} from 'react';import{createRoot}from'react-dom/client';import * as UserModule from ${JSON.stringify(entry)};import validate from 'showai:validator';const UserComponent=UserModule.default;
 const config=JSON.parse(document.getElementById('showai-component-data')?.textContent||'{}');const channel=config.channel;
-const send=(type,extra={})=>parent.postMessage({channel,type,...extra},'*');let update;
+const send=(type,extra={})=>parent.postMessage({channel,type,...extra},'*');let update,outlineUpdate;
 const validationMessage=()=>(validate.errors||[]).map(error=>(error.instancePath||error.params?.missingProperty||'data')+' '+error.message).join('; ');
 function check(props){if(validate(props))return true;send('showai:error',{message:validationMessage()});return false;}
 function reading(props){try{const read=UserModule['read'+'Data'];if(${reader}&&typeof read!=='function')throw new Error('Declared readData export is missing');const computed=typeof read==='function'?read(props):undefined;if(computed&&typeof computed.then==='function')throw new Error('readData must be synchronous');const visit=(value,depth=0)=>{if(depth>40)throw new Error('readData is nested too deeply');if(value===null||typeof value==='string'||typeof value==='boolean'||typeof value==='number'&&Number.isFinite(value))return;if(Array.isArray(value)){value.forEach(child=>visit(child,depth+1));return;}if(value&&typeof value==='object'&&Object.getPrototypeOf(value)===Object.prototype){Object.values(value).forEach(child=>visit(child,depth+1));return;}throw new Error('readData must contain only finite JSON values');};if(typeof read==='function')visit(computed);const encoded=JSON.stringify(computed);if(encoded&&new TextEncoder().encode(encoded).byteLength>65536)throw new Error('readData exceeds 64 KiB');window.__SHOWAI_COMPONENT_READING__={ready:true,status:typeof read==='function'?'computed':'raw',props,data:encoded===undefined?undefined:JSON.parse(encoded)};}catch(error){window.__SHOWAI_COMPONENT_READING__={ready:true,status:'error',props,error:String(error.message||error)};}}
 const contextIssue=${componentContextIssue.toString()};let restore;
 const handOver=snapshot=>{const issue=contextIssue(snapshot);if(issue)throw new Error('onContext: '+issue);if(navigator.userActivation&&!navigator.userActivation.isActive)return false;send('showai:context',{snapshot:JSON.parse(JSON.stringify(snapshot))});return true;};
-function App(){const[state,setState]=useState({data:config.props||{},readOnly:config.readOnly!==false});const[conversation,setConversation]=useState({available:config.context===true,key:0,value:undefined});useEffect(()=>reading(state.data),[state.data]);update=(data,readOnly,available)=>{setConversation(c=>c.available===available?c:{...c,available});if(check(data)){setState({data,readOnly});send('showai:valid')}};restore=value=>setConversation(c=>c.key?c:{...c,key:1,value});return React.createElement(UserComponent,{key:conversation.key,...state,onChange:state.readOnly?undefined:(data)=>{if(check(data)){setState(s=>({...s,data}));send('showai:change',{props:data});}},onContext:conversation.available?handOver:undefined,context:conversation.value});}
-window.addEventListener('message',event=>{if(event.source!==parent||event.data?.channel!==channel)return;if(event.data?.type==='showai:validate'){const valid=validate(event.data.props);send('showai:validation',{requestId:event.data.requestId,valid,message:valid?'':validationMessage()});return;}if(event.data?.type==='showai:props')update?.(event.data.props,event.data.readOnly!==false,event.data.context===true);if(event.data?.type==='showai:context-restore'&&event.data.snapshot&&!contextIssue(event.data.snapshot))restore?.(event.data.snapshot);});
+function App(){const[outline,setOutline]=useState(config.outline);outlineUpdate=setOutline;const[state,setState]=useState({data:config.props||{},readOnly:config.readOnly!==false});const[conversation,setConversation]=useState({available:config.context===true,key:0,value:undefined});useEffect(()=>reading(state.data),[state.data]);update=(data,readOnly,available)=>{setConversation(c=>c.available===available?c:{...c,available});if(check(data)){setState({data,readOnly});send('showai:valid')}};restore=value=>setConversation(c=>c.key?c:{...c,key:1,value});return React.createElement(UserComponent,{key:conversation.key,...state,...(outline?{props:state.data,outline,navigate:itemId=>send('showai:outline-action',{action:'navigate',itemId}),setBranchExpanded:(itemId,expanded)=>send('showai:outline-action',{action:'branch',itemId,expanded}),collapse:()=>send('showai:outline-action',{action:'collapse'})}:{}),onChange:state.readOnly?undefined:(data)=>{if(check(data)){setState(s=>({...s,data}));send('showai:change',{props:data});}},onContext:conversation.available?handOver:undefined,context:conversation.value});}
+window.addEventListener('message',event=>{if(event.source!==parent||event.data?.channel!==channel)return;if(event.data?.type==='showai:validate'){const valid=validate(event.data.props);send('showai:validation',{requestId:event.data.requestId,valid,message:valid?'':validationMessage()});return;}if(event.data?.type==='showai:outline')outlineUpdate?.(event.data.outline);if(event.data?.type==='showai:props')update?.(event.data.props,event.data.readOnly!==false,event.data.context===true);if(event.data?.type==='showai:context-restore'&&event.data.snapshot&&!contextIssue(event.data.snapshot))restore?.(event.data.snapshot);});
 window.addEventListener('error',event=>send('showai:error',{message:event.message}));window.addEventListener('unhandledrejection',event=>send('showai:error',{message:String(event.reason?.message||event.reason)}));
 createRoot(document.getElementById('component-root')).render(React.createElement(App));
 new ResizeObserver(()=>send('showai:height',{height:Math.ceil(document.getElementById('component-root').getBoundingClientRect().height)+2})).observe(document.getElementById('component-root'));send('showai:ready');`;
@@ -1515,7 +1524,7 @@ new ResizeObserver(()=>send('showai:height',{height:Math.ceil(document.getElemen
 function inlineRuntimeSource(entry: string): string {
   return `import React from 'react';import{createRoot}from'react-dom/client';import UserComponent from ${JSON.stringify(entry)};import validate from 'showai:validator';
 export function mount(target,initial){const root=createRoot(target,{onUncaughtError:error=>initial.onError(String(error?.message||error))});
-const render=data=>{if(!validate(data)){initial.onError((validate.errors||[]).map(error=>(error.instancePath||'data')+' '+error.message).join('; '));return;}initial.onError('');root.render(React.createElement(UserComponent,{data,readOnly:true,onChange:undefined,onContext:initial.onContext,context:initial.context}));};render(initial.data);return{update:render,destroy:()=>root.unmount()};}`;
+const render=(data,outline=initial.outline)=>{if(!validate(data)){initial.onError((validate.errors||[]).map(error=>(error.instancePath||'data')+' '+error.message).join('; '));return;}initial.onError('');root.render(React.createElement(UserComponent,{data,...(outline?{props:data,...outline}:{}),readOnly:true,onChange:undefined,onContext:initial.onContext,context:initial.context}));};render(initial.data);return{update:render,destroy:()=>root.unmount()};}`;
 }
 
 function componentValidatorSource(
@@ -2681,23 +2690,6 @@ export async function resolveDocumentComponents(
     return withLibrarySnapshot(home, () =>
       resolveDocumentComponents(home, document, projectId),
     );
-  const refs = collectCustomComponentRefs(document);
-  const components = await Promise.all(
-    refs.map(async (ref) => {
-      const component = await getComponent(
-        home,
-        ref.componentId,
-        ref.version,
-        projectId,
-        { integrity: ref.integrity, scope: ref.scope },
-      );
-      if (ref.integrity && component.integrity !== ref.integrity)
-        throw new Error(
-          `Component integrity mismatch: ${ref.componentId}@${ref.version}.`,
-        );
-      return component;
-    }),
-  );
   const key = (ref: {
     componentId: string;
     version: string;
@@ -2710,8 +2702,40 @@ export async function resolveDocumentComponents(
       ref.integrity,
       ref.integrity ? undefined : ref.scope,
     ]);
+  const refs = collectCustomComponentRefs(document);
+  const required = new Set<string>();
+  const requireContent = (node: ShowDocument["content"]) => {
+    if (node.type === "widget" && node.attrs?.kind === "custom")
+      required.add(key(readCustomBlockData(node.attrs.data)));
+    node.content?.forEach(requireContent);
+  };
+  requireContent(document.content);
+  const resolved = await Promise.all(
+    refs.map(async (ref) => {
+      const component = await getComponent(
+        home,
+        ref.componentId,
+        ref.version,
+        projectId,
+        { integrity: ref.integrity, scope: ref.scope },
+      ).catch((error) => {
+        if (required.has(key(ref))) throw error;
+        return undefined;
+      });
+      // A failed navigation package must not prevent reading the Page's content.
+      if (!component) return undefined;
+      if (ref.integrity && component.integrity !== ref.integrity)
+        throw new Error(
+          `Component integrity mismatch: ${ref.componentId}@${ref.version}.`,
+        );
+      return component;
+    }),
+  );
   const schemas = new Map(
-    refs.map((ref, index) => [key(ref), components[index]]),
+    refs.map((ref, index) => [key(ref), resolved[index]]),
+  );
+  const components = resolved.filter(
+    (component): component is CompiledComponent => !!component,
   );
   const visit = (node: typeof document.content) => {
     if (node.type === "widget" && node.attrs?.kind === "custom") {
@@ -2883,6 +2907,22 @@ export async function lockDocumentComponents(
         version: component.version,
         integrity: component.integrity,
       };
+    }
+    if (node.attrs?.outline?.enabled && node.attrs.outline.renderer) {
+      const ref = readCustomBlockData(node.attrs.outline.renderer);
+      const component = await getComponent(
+        home,
+        ref.componentId,
+        ref.version,
+        projectId,
+        { integrity: ref.integrity, scope: ref.scope },
+      );
+      if (
+        component.role !== "page-outline" ||
+        component.pageOutlineProtocol !== 1
+      )
+        throw new Error("Page outline renderer does not implement protocol 1.");
+      assertProps(component.schema, ref.props, component.documentation);
     }
     await Promise.all((node.content ?? []).map(visit));
   };

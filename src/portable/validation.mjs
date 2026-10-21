@@ -532,7 +532,7 @@ function validateNode(value, path, counter, depth = 0, parentType = null) {
             "labelSize",
           ])
         : node.type === "surface"
-          ? new Set([...nodeAttributes, "widthMode", "inkState"])
+          ? new Set([...nodeAttributes, "widthMode", "inkState", "outline"])
           : node.type === "region"
             ? new Set([...nodeAttributes, "inkArchiveGroup"])
             : nodeAttributes,

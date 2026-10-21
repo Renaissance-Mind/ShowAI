@@ -1,0 +1,58 @@
+.chapter-path {
+  padding: 4px 9px;
+  font:
+    12px/1.7 system-ui,
+    sans-serif;
+  color: var(--text);
+}
+.chapter-path ol {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.chapter-path > ol > li {
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  padding: 7px;
+  margin-bottom: var(--path-gap);
+}
+.chapter-path ol ol {
+  border-left: 1px solid var(--line);
+  margin-left: 11px;
+  padding-left: 6px;
+}
+.path-row {
+  display: flex;
+  align-items: baseline;
+  gap: 3px;
+}
+.path-row button {
+  font: inherit;
+  border: 0;
+  background: none;
+  color: var(--muted);
+  padding: 6px 3px;
+  cursor: pointer;
+}
+.path-row .path-link {
+  flex: 1;
+  text-align: left;
+  overflow-wrap: anywhere;
+  border-radius: 4px;
+}
+.chapter-path > ol > li > .path-row .path-link {
+  color: var(--text);
+  font-weight: 600;
+}
+.path-link[aria-current="location"] {
+  color: var(--accent) !important;
+  background: var(--hover);
+}
+.path-row button:focus-visible {
+  outline: 2px solid var(--accent);
+}
+@media (pointer: coarse) {
+  .path-row button {
+    min-height: 44px;
+  }
+}

@@ -6,6 +6,7 @@ import {
   Undo2,
   Redo2,
   Columns3,
+  ListTree,
 } from "../ui/icons";
 import type { PageWidthMode } from "./types";
 import { PageWidthSwitch } from "./PageWidthSwitch";
@@ -16,8 +17,10 @@ import {
 import { translator } from "../i18n";
 import { useTranslator } from "../i18n/react";
 import messages from "../i18n/messages/surface";
+import outlineMessages from "../i18n/messages/pageOutline";
 
 const translate = translator(messages);
+const outlineTranslate = translator(outlineMessages);
 
 export interface EditorControls {
   documentId: string;
@@ -33,6 +36,7 @@ export interface EditorControls {
   wrap: (kind: "page" | "board") => void;
   pageWidthMode: PageWidthMode;
   setPageWidthMode: (mode: PageWidthMode) => void;
+  outlineSettings: () => void;
 }
 
 export function EditorHistoryButtons({
@@ -108,6 +112,11 @@ export function containerMenuItems(
       : []),
     ...(controls.kind === "page"
       ? [
+          {
+            label: outlineTranslate("settings"),
+            icon: <ListTree size={15} />,
+            onSelect: controls.outlineSettings,
+          },
           {
             label: t("pageWidth"),
             icon: <Columns3 size={15} />,

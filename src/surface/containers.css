@@ -224,7 +224,7 @@
 .surface-object.is-container:not([style*="height:"]) > .surface-object-content {
   height: auto;
 }
-.surface-object.is-container > .surface-object-content > .container-page {
+.surface-object.is-container > .surface-object-content > .page-outline-shell > .container-page {
   min-height: 120px;
 }
 .surface-object.is-container .container-page-column {
@@ -232,6 +232,7 @@
 }
 .surface-object.is-container
   > .surface-object-content
+  > .page-outline-shell
   > .container-page[data-frameless="true"] {
   min-height: 0;
 }
@@ -516,6 +517,7 @@
   .container-board
     .surface-object.is-container
     > .surface-object-content
+    > .page-outline-shell
     > .container-page {
     height: 100% !important;
     overflow: hidden !important;

@@ -1,3 +1,4 @@
+import { remapPageOutline } from "./page-outline.mjs";
 import {
   isResource,
   fillResource,
@@ -252,6 +253,7 @@ export function remapSurfaceIds(source, nextId = () => crypto.randomUUID()) {
     node.attrs = { ...node.attrs, id };
   });
   visitNodes(document.content, (node) => {
+    if (node.attrs?.outline) node.attrs.outline = remapPageOutline(node.attrs.outline, mapping, nextId);
     if (!node.attrs?.bindings) return;
     const bindings = {};
     for (const key of ["start", "end"]) {

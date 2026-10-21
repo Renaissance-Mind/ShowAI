@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useAppearanceTheme } from "../design/useAppearanceTheme";
 import {
   Blocks,
+  ListTree,
   PanelsTopLeft,
   ChartNoAxesCombined,
   Code2,
@@ -36,6 +37,7 @@ const categoryIcons = {
   flow: Workflow,
   surface: PanelsTopLeft,
   other: Blocks,
+  outline: ListTree,
 };
 export function ComponentNavigation({
   groups,

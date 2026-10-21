@@ -11,6 +11,7 @@ import {
   validateInkInput,
 } from "./ink-input-contract.mjs";
 import { labelCapable, MAX_LABEL_LENGTH } from "./drawing-label.mjs";
+import { validatePageOutline } from "./page-outline.mjs";
 import { isResource, fillResource, surfaceKind } from "./containers.mjs";
 import { fillSurfaceLayout, visitNodes } from "./document.mjs";
 const reserved = new Set(["__proto__", "constructor", "prototype"]);
@@ -176,6 +177,7 @@ function validateResource(document) {
     nodes.set(id, node);
     parents.set(id, parent);
     owners.set(id, owner);
+    if (node.attrs?.outline !== undefined) validatePageOutline(node.attrs.outline, node);
     if (node.attrs?.canvas != null)
       throw new Error("Positions belong in layout.");
     validateInkArchiveGroup(node);
