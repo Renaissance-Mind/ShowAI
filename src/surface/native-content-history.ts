@@ -1,5 +1,6 @@
 import type {ShowDocument} from "../types";
 import {mergePageContent,canCommitPageMerge,type PageMergeResult} from "../core/page-merge-model";
+import {nativeDocumentContentKey} from "./native-document-content";
 import {InkEditConflict} from "./inline-ink";
 
 export interface NativeContentHistoryAction {
@@ -27,6 +28,6 @@ export function nativeContentHistoryStages(current:ShowDocument,baseline:ShowDoc
     before=mergePageContent(action.document,before,action.beforeDocument,"history").document;
     stages.push({groupId:action.groupId,before,document});
   }
-  const key=(value:ShowDocument)=>JSON.stringify([value.content,value.layout,value.surfaceViews,value.icon]);
+  const key=nativeDocumentContentKey;
   return {sourceOnly:before,stages:stages.reverse().filter(stage=>key(stage.before)!==key(stage.document))};
 }

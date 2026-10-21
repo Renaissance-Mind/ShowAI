@@ -79,3 +79,37 @@ it("never returns an already evicted new snapshot under byte pressure and rolls 
  expect(resolve(owner,next.next).id).toBe(seed.next.scope.pageId);
 });
 function sourceWithId(id:string){return{...source(),id}}
+it("accepts only the private actual merge adapter and prepares exact generic history snapshots in its worker",()=>{
+ const {owner,document,seed}=setup();
+ const incoming=cloneSourceValue(document);incoming.title="Actual native title";
+ const packet={pageId:document.id,document:incoming,baseDocument:document,nativeContentActions:[{groupId:"actual-native-title",beforeDocument:document,document:incoming}]};
+ const publication=owner.registerActualMergedPublication({current:seed.next,publicationId:"actual-trusted-pub",packet,result:{document:incoming,conflicts:[]},leaseId:"actual-output"});
+ expect(resolve(owner,publication.next).title).toBe("Actual native title");
+ expect(publication.history).toBeDefined();
+ expect(publication.history!.stages).toHaveLength(1);
+ // History includes all authored fields, rather than a canvas whitelist.
+ expect(resolve(owner,publication.history!.sourceOnly.next).title).toBe(document.title);
+ expect(()=>owner.execute({kind:"registerActualMergedPublication",packet,result:{document:incoming,conflicts:[]}} as any)).toThrow(/Unknown/);
+ expect(()=>owner.registerActualMergedPublication({current:seed.next,publicationId:"actual-trusted-pub",packet:{...packet,other:"changed"},result:{document:incoming,conflicts:[]},leaseId:"changed"})).toThrow(/identity/);
+});
+
+it("normalizes real host undo projections without a public client validated flag",()=>{
+ const {owner,seed}=setup(),body=cloneSourceValue(resolve(owner,seed.next));
+ body.title="Actual compensated source";(body as any).futureRoot={value:"retained"};
+ const projection=owner.normalizeActualProjection({base:seed.next,document:body,leaseId:"host-result"});
+ expect(resolve(owner,projection.next).title).toBe(body.title);expect((resolve(owner,projection.next) as any).futureRoot).toEqual({value:"retained"});
+ expect(()=>owner.normalizeActualProjection({base:seed.next,document:{...body,createdAt:"invalid"},leaseId:"bad"})).toThrow(/ISO/);
+ expect(()=>owner.execute({kind:"normalizeActualProjection",base:seed.next,document:body} as any)).toThrow(/Unknown/);
+});
+it("rebases generic history over complete foreign root changes in the real owner",()=>{
+ const {owner,seed}=setup(),base=resolve(owner,seed.next);
+ const local=delta(owner.execute({kind:"draft",base:seed.next,transactionId:"author-root",edits:[{op:"set",path:["title"],value:"Own title"}],leaseId:"local"}));
+ const remote=delta(owner.execute({kind:"draft",base:local.next,transactionId:"foreign-root",edits:[{op:"set",path:["futureRoot"],value:{keep:"foreign"}},{op:"set",path:["comments"],value:[{id:"foreign",text:"Foreign",createdAt:base.createdAt,resolved:false}]}],leaseId:"remote"}));
+ const result=owner.execute({kind:"history",base:local.next,current:remote.next,entries:[seed.next],leaseId:"history"});
+ expect("rebasedHistory" in result).toBe(true);if(!("rebasedHistory" in result))return;
+ const target=resolve(owner,result.rebasedHistory[0].delta.next);
+ expect(target.title).toBe(base.title);expect((target as any).futureRoot).toEqual({keep:"foreign"});expect(target.comments![0].text).toBe("Foreign");expect(result.rebasedHistory[0].unchanged).toBe(false);
+ const changed=delta(owner.execute({kind:"draft",base:remote.next,transactionId:"remote-same-field",edits:[{op:"set",path:["title"],value:"Foreign title"}],leaseId:"remote"}));
+ const same=owner.execute({kind:"history",base:local.next,current:changed.next,entries:[seed.next],leaseId:"history"});
+ if(!("rebasedHistory" in same))throw new Error("Missing actual history response");expect(resolve(owner,same.rebasedHistory[0].delta.next).title).toBe("Foreign title");expect(same.rebasedHistory[0].unchanged).toBe(true);
+});

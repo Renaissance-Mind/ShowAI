@@ -52,3 +52,8 @@ it("reuses only the exact captured triplet while preserving foreign fields throu
  const guarded=nativeContentHistoryStages(current,base,incoming,actions,{baseline:base,current:oldCurrent,incoming,result:stale});
  expect(label(guarded.sourceOnly,"remote")).toBe("Web foreign");
 });
+it("keeps real root metadata edits as history stages rather than dropping them behind a canvas whitelist",()=>{
+ const before=fixture(),after=structuredClone(before);after.title="Native metadata edit";(after as any).futureMetadata={keep:true};
+ const result=nativeContentHistoryStages(before,before,after,[{groupId:"actual-root-fields",beforeDocument:before,document:after}]);
+ expect(result.stages).toHaveLength(1);expect(result.stages[0].document.title).toBe("Native metadata edit");expect((result.stages[0].before as any).futureMetadata).toBeUndefined();expect(result.sourceOnly.title).toBe(before.title);
+});

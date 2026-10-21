@@ -3,6 +3,7 @@ import {reconcileSurface,artifactVersion} from "./document.mjs";
 import {parseArtifact} from "../portable/validation.mjs";
 import {mergePageContent,canCommitPageMerge,type PageMergeConflict} from "../core/page-merge-model";
 import {inkWireResolutionCandidates} from "./ink-wire.mjs";
+import {nativeContentHistoryStages,type NativeContentHistoryAction} from "./native-content-history";
 import {nativeDocumentBodiesEqual} from "./native-document-content";
 import {applyNativeSourceDelta,diffNativeSource,shareNativeSource,type NativeSourceEdit} from "./native-source-delta.mjs";
 
@@ -16,6 +17,7 @@ export interface SourceSnapshotDelta {
   full?:ShowDocument;edits?:NativeSourceEdit[];conflicts:PageMergeConflict[];
   inkCandidates:ReturnType<typeof inkWireResolutionCandidates>;
   publicationId?:string;nativeBodyUnchanged?:boolean;
+  history?:{sourceOnly:SourceSnapshotDelta;stages:{groupId:string;delta:SourceSnapshotDelta}[]};
 }
 interface Lease {leaseId?:string}
 export type SourceRuntimeRequest =
@@ -24,13 +26,15 @@ export type SourceRuntimeRequest =
  | ({kind:"normalize";ref:SourceSnapshotRef}&Lease)
  | ({kind:"publication";current:SourceSnapshotRef;publicationId:string;packet:{document:ShowDocument;baseDocument:ShowDocument;pageId?:string;[key:string]:unknown}}&Lease)
  | ({kind:"merge";base:SourceSnapshotRef;current:SourceSnapshotRef;incoming:SourceSnapshotRef;mode?:"history"}&Lease)
+ | ({kind:"history";base:SourceSnapshotRef;current:SourceSnapshotRef;entries:SourceSnapshotRef[]}&Lease)
  | {kind:"delta";base:SourceSnapshotRef;next:SourceSnapshotRef}
  | {kind:"resolve";ref:SourceSnapshotRef}
  | {kind:"serialize";ref:SourceSnapshotRef}
  | {kind:"retain";leaseId:string;refs:SourceSnapshotRef[]}
  | {kind:"release";leaseId:string}
  | {kind:"dispose";scope:SourceScope};
-export type SourceRuntimeResponse=SourceSnapshotDelta|{ref:SourceSnapshotRef;document:ShowDocument}|{ref:SourceSnapshotRef;json:string}|{retained:number};
+export interface SourceHistoryResult {rebasedHistory:{delta:SourceSnapshotDelta;unchanged:boolean}[]}
+export type SourceRuntimeResponse=SourceHistoryResult|SourceSnapshotDelta|{ref:SourceSnapshotRef;document:ShowDocument}|{ref:SourceSnapshotRef;json:string}|{retained:number};
 export class SourceRuntimeError extends Error {constructor(readonly code:string,message:string){super(message)}}
 const fail=(message:string):never=>{throw new SourceRuntimeError("SOURCE_OWNERSHIP_CONFLICT",message)};
 const scopeKey=(scope:SourceScope)=>JSON.stringify([scope.homeId,scope.projectId,scope.pageId]);
@@ -142,6 +146,44 @@ export class SourceRuntimeOwner {
   catch(error){this.forget(ref.snapshotId);throw error}
   return {format:"showai-owned-source-v1",base:base?.ref??null,next:ref,...(base?{edits:preparedEdits??diffNativeSource(base.document,body)}:{full:body}),conflicts,inkCandidates:candidates};
  }
+ private rememberPublication(current:Snapshot,publicationId:string,packet:{document:ShowDocument;baseDocument:ShowDocument;pageId?:string;[key:string]:unknown}){
+  if(!publicationId||packet.document?.id!==current.ref.scope.pageId||packet.baseDocument?.id!==current.ref.scope.pageId||packet.pageId&&packet.pageId!==current.ref.scope.pageId)fail("Native publication has no matching actual source scope");
+  const key=scopeKey(current.ref.scope)+"\u0000"+publicationId,known=this.publications.get(key);
+  if(known&&diffNativeSource(known,packet).length)fail("Native publication identity names a different complete packet");
+  if(!known){const previous=[...this.publications.values()].at(-1),copy=cloneSourceValue(packet),value=freezeOwnedSource(previous?shareNativeSource(previous,copy):copy);this.publications.set(key,value);this.account(value,1)}
+ }
+ private finishPublication(current:Snapshot,publicationId:string,packet:{document:ShowDocument;baseDocument:ShowDocument;[key:string]:unknown},merged:{document:ShowDocument;conflicts:PageMergeConflict[]},leaseId?:string):SourceSnapshotDelta{
+  if(!canCommitPageMerge(merged))throw new SourceRuntimeError("SOURCE_MERGE_CONFLICT","Native publication requires explicit conflict resolution");
+  const actions=packet.nativeContentActions as NativeContentHistoryAction[]|undefined;
+  if(actions?.length&&!leaseId)fail("Native history publication requires an explicit response lease");
+  const result=this.register(current.ref.scope,normalizeSourceDocument(merged.document),"normalized",current,leaseId,merged.conflicts);
+  if(actions?.length){
+   const plan=nativeContentHistoryStages(current.document,packet.baseDocument,packet.document,actions,{baseline:packet.baseDocument,current:current.document,incoming:packet.document,result:merged});
+   const refs=[result.next];
+   const sourceOnly=this.register(current.ref.scope,plan.sourceOnly,"draft",current,undefined);
+   refs.push(sourceOnly.next);this.retain(leaseId!,refs);
+   let previous=this.get(sourceOnly.next);const stages:{groupId:string;delta:SourceSnapshotDelta}[]=[];
+   for(const stage of plan.stages){const next=this.register(current.ref.scope,stage.document,"draft",previous,undefined);refs.push(next.next);this.retain(leaseId!,refs);stages.push({groupId:stage.groupId,delta:next});previous=this.get(next.next)}
+   // The caller retains returned history refs before releasing this explicit
+   // response lease. No intermediate history document is normalized on UI.
+   this.retain(leaseId!,refs);
+   result.history={sourceOnly,stages};
+  }
+  return{...result,publicationId,nativeBodyUnchanged:nativeDocumentBodiesEqual(packet.document,this.get(result.next).document)};
+ }
+ /** Only an actual backend author/adoption+merge route can call this adapter.
+  * A public request never accepts a client-asserted merged result. */
+ registerActualMergedPublication(request:{current:SourceSnapshotRef;publicationId:string;packet:{document:ShowDocument;baseDocument:ShowDocument;[key:string]:unknown};result:{document:ShowDocument;conflicts:PageMergeConflict[]};leaseId?:string}):SourceSnapshotDelta{
+  const current=this.get(request.current);this.rememberPublication(current,request.publicationId,request.packet);
+  return this.finishPublication(current,request.publicationId,request.packet,request.result,request.leaseId);
+ }
+ /** Actual host projections (undo/resolution) still undergo full canonical
+  * normalization here. This adapter is not public client dispatch and does not
+  * borrow saved/publication proofs for a different source body. */
+ normalizeActualProjection(request:{base:SourceSnapshotRef;document:ShowDocument;leaseId?:string}):SourceSnapshotDelta{
+  const base=this.get(request.base);
+  return this.register(base.ref.scope,normalizeSourceDocument(cloneSourceValue(request.document)),"normalized",base,request.leaseId);
+ }
  /** Trusted host adapter only: actual backend normalization/CAS has already
   * completed. Never reachable through the client request discriminant. */
  registerActualSavedSnapshot(request:{scope:SourceScope;document:ShowDocument;base:SourceSnapshotRef;leaseId?:string}):SourceSnapshotDelta{
@@ -174,17 +216,22 @@ export class SourceRuntimeOwner {
    }
    case "publication":{
     const current=this.get(request.current),packet=request.packet;
-    if(!request.publicationId||packet.document?.id!==current.ref.scope.pageId||packet.baseDocument?.id!==current.ref.scope.pageId||packet.pageId&&packet.pageId!==current.ref.scope.pageId)fail("Native publication has no matching actual source scope");
-    const key=scopeKey(current.ref.scope)+"\u0000"+request.publicationId,known=this.publications.get(key);
-    if(known&&diffNativeSource(known,packet).length)fail("Native publication identity names a different complete packet");
-    if(!known){
-     const previous=[...this.publications.values()].at(-1),ownedPacket=freezeOwnedSource(previous?shareNativeSource(previous,cloneSourceValue(packet)):cloneSourceValue(packet));
-     this.publications.set(key,ownedPacket);this.account(ownedPacket,1);
-    }
+    this.rememberPublication(current,request.publicationId,packet);
     const merged=nativeDocumentBodiesEqual(packet.baseDocument,current.document)?{document:packet.document,conflicts:[]}:mergePageContent(packet.baseDocument,current.document,packet.document);
-    if(!canCommitPageMerge(merged))throw new SourceRuntimeError("SOURCE_MERGE_CONFLICT","Native publication requires explicit conflict resolution");
-    const result=this.register(current.ref.scope,normalizeSourceDocument(merged.document),"normalized",current,request.leaseId,merged.conflicts);
-    return {...result,publicationId:request.publicationId,nativeBodyUnchanged:nativeDocumentBodiesEqual(packet.document,this.get(result.next).document)};
+    return this.finishPublication(current,request.publicationId,packet,merged,request.leaseId);
+   }
+   case "history":{
+    const base=this.get(request.base),current=this.get(request.current),entries=request.entries.map(ref=>this.get(ref));
+    if(!request.leaseId)fail("History projection requires an explicit output lease");
+    if([current,...entries].some(entry=>scopeKey(entry.ref.scope)!==scopeKey(base.ref.scope)))fail("Source history crosses its actual home/project/page");
+    const refs:SourceSnapshotRef[]=[],history:SourceHistoryResult["rebasedHistory"]=[];
+    for(const entry of entries){
+     const merged=mergePageContent(base.document,current.document,entry.document,"history");
+     const projected=this.register(base.ref.scope,merged.document,"draft",entry,undefined,merged.conflicts);
+     refs.push(projected.next);this.retain(request.leaseId!,refs);
+     history.push({delta:projected,unchanged:nativeDocumentBodiesEqual(this.get(projected.next).document,current.document)});
+    }
+    return{rebasedHistory:history};
    }
    case "delta":{
     const base=this.get(request.base),next=this.get(request.next);
@@ -215,4 +262,14 @@ export function sourceRuntime(raw:string):string{service??=new SourceRuntimeOwne
 export function registerActualSavedSnapshot(raw:string):string{
  service??=new SourceRuntimeOwner();
  return JSON.stringify(service.registerActualSavedSnapshot(JSON.parse(raw)));
+}
+
+export function registerActualMergedPublication(raw:string):string{
+ service??=new SourceRuntimeOwner();
+ return JSON.stringify(service.registerActualMergedPublication(JSON.parse(raw)));
+}
+
+export function normalizeActualProjection(raw:string):string{
+ service??=new SourceRuntimeOwner();
+ return JSON.stringify(service.normalizeActualProjection(JSON.parse(raw)));
 }
