@@ -289,6 +289,39 @@ function check(
 }
 
 describe("shared analytic Bezier path kernel", () => {
+  it("retains a valid near-collinear large-origin cubic when repeated loop classification reaches the depth budget", () => {
+    // Minimal three-command numerical trace: local translation alone changes
+    // binary64 subdivision rounding, so keep the canonical origin as well.
+    const commands: Command[] = [
+      ["M", 100804.83027921774, 100760.40385414359],
+      [
+        "C",
+        100804.85297524599,
+        100760.42590444384,
+        100804.86432325804,
+        100760.43692959195,
+        100804.86857876956,
+        100760.4410640293,
+      ],
+      ["Z"],
+    ];
+    const original = structuredClone(commands);
+    const points: Point[] = Array.from({ length: 25 }, (_, i) => [
+      100804.8 + (i % 5) * 0.025,
+      100760.38 + Math.floor(i / 5) * 0.025,
+    ]);
+    const result = check(commands, points);
+    expect(result.mesh.rayPatches).toBeGreaterThan(0);
+    expect(result.compared).toBeGreaterThan(10);
+    expect(commands).toEqual(original);
+    const bounded = kernel.build(commands, identity, { maxDepth: 1 });
+    expect(bounded.rayPatches).toBeGreaterThan(0);
+    expect(bounded.patches.length).toBeLessThan(result.mesh.patches.length);
+    const hits = kernel.meshWinding(bounded, points);
+    points.forEach((point, i) =>
+      expect(hits[i].inside).toBe(kernel.pathWinding(commands, point).inside),
+    );
+  });
   it("keeps both directed lobes of a near-collinear cubic and an interior loop double point", () => {
     const near: Command[] = [
       ["M", 0, 0],

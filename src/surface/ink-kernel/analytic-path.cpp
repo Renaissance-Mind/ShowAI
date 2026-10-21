@@ -676,7 +676,12 @@ struct Sink {
       for (int i = 0; i < nr; i++)
         if (rr[i] > 1e-10 && rr[i] < 1 - 1e-10) {
           if (depth >= b->max_depth) {
-            error = SA_INK_RANGE;
+            // Near-degenerate loop roots may recur after binary64 splitting.
+            // Preserve the actual remaining cubic lens, exactly as the bounded
+            // inflection fallback above; exhausting classification depth is not
+            // permission to drop a valid curve or force more subdivisions.
+            solid(anchor, p[0], p[3], ci);
+            ray(p, ci, t0, t1);
             return;
           }
           P l[4], r[4];

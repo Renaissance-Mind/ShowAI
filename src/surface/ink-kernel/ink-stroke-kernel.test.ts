@@ -14,7 +14,7 @@ import { AnalyticPathKernel } from "./analytic-path.mjs";
 import { CompiledInkKernel, inkKernelProvenance } from "./compiled-ink.mjs";
 const kernel = new CompiledInkStroke(),
   analytic = new AnalyticPathKernel();
-let folder: string, executable: string;
+let folder: string, executable: string, progressExecutable: string;
 beforeAll(() => {
   folder = mkdtempSync(join(tmpdir(), "showai-circular-stroke-"));
   executable = join(folder, "stroke");
@@ -32,6 +32,21 @@ beforeAll(() => {
     "src/surface/ink-kernel/stroke-native-parity.cpp",
     "-o",
     executable,
+  ]);
+  progressExecutable = join(folder, "progress-contract");
+  execFileSync("clang++", [
+    "-std=c++17",
+    "-O3",
+    "-Wall",
+    "-Wextra",
+    "-Werror",
+    "-ffp-contract=off",
+    "-fno-exceptions",
+    "-fno-rtti",
+    "src/surface/ink-kernel/stroke-progress-contract.cpp",
+    "src/surface/ink-kernel/analytic-path.cpp",
+    "-o",
+    progressExecutable,
   ]);
 });
 afterAll(() => rmSync(folder, { recursive: true, force: true }));
@@ -604,6 +619,103 @@ it("removes only provably contained fallback proxies without changing disk-union
   expect(result.result.fallbackContours).toBe(1);
   expect(result.result.contours).toBe(1);
   expect(native(segments).equals(wasmBytes(segments))).toBe(true);
+});
+it("certifies nonuniform straight motion without treating tangential acceleration as folded ink", () => {
+  const segments: InkStrokeSegment[] = [
+    {
+      points: [
+        [0, 0],
+        [0.25, 0],
+        [1.5, 0],
+        [2, 0],
+      ],
+      radius: [1.75, 1.75],
+    },
+  ];
+  const input = structuredClone(segments),
+    prepared = oracle(segments, grid(-2, -2, 6, 4, 31), 0.0025);
+  expect(prepared.result.fallbackLeaves).toBe(0);
+  expect(prepared.result.contours).toBe(1);
+  expect(prepared.result.commands).toBeLessThan(24);
+  expect(segments).toEqual(input);
+  expect(
+    native(segments, { tolerance: 0.0025 }).equals(
+      wasmBytes(segments, { tolerance: 0.0025 }),
+    ),
+  ).toBe(true);
+});
+it("executes the real native interval normal/subnormal/overflow and strict-positivity contract", () => {
+  expect(execFileSync(progressExecutable, { encoding: "utf8" })).toContain(
+    "STROKE_PROGRESS_INTERVAL_CONTRACT_OK",
+  );
+});
+it("proves both curved envelopes below the real curvature fold and keeps actual folds on the fallback", () => {
+  const points: P[] = [
+    [0, 0],
+    [1, 1],
+    [2, 0],
+  ];
+  // |curvature| reaches exactly1 at t=1/2. Radius0.8 has
+  // s^3-r^2*C^2>0 everywhere; radius1 touches a fold and1.2 folds.
+  for (const radius of [0.8, 1, 1.2]) {
+    const segments: InkStrokeSegment[] = [{ points, radius: [radius, radius] }];
+    const result = oracle(segments, grid(-1.5, -1.5, 5, 4, 37), 0.0025);
+    if (radius < 1) expect(result.result.fallbackLeaves).toBe(0);
+    else expect(result.result.fallbackLeaves).toBeGreaterThan(0);
+    expect(
+      native(segments, { tolerance: 0.0025 }).equals(
+        wasmBytes(segments, { tolerance: 0.0025 }),
+      ),
+    ).toBe(true);
+  }
+});
+it("keeps every authored varying-radius knot through the polynomial progress certificate", () => {
+  const radii = [0.5, 0.65, 0.57, 0.7, 0.55],
+    segments: InkStrokeSegment[] = radii.slice(1).map((r, i) => ({
+      points: [
+        [i * 3, 0],
+        [i * 3 + 0.5, 0],
+        [i * 3 + 2.5, 0],
+        [i * 3 + 3, 0],
+      ],
+      radius: [radii[i], r],
+    }));
+  const original = structuredClone(segments);
+  const result = oracle(segments, grid(-1, -1, 14, 2, 41), 0.0025);
+  expect(result.result.fallbackLeaves).toBe(0);
+  expect(result.result.envelopeCurves).toBeGreaterThanOrEqual(
+    segments.length * 2,
+  );
+  expect(segments).toEqual(original);
+  expect(
+    native(segments, { tolerance: 0.0025 }).equals(
+      wasmBytes(segments, { tolerance: 0.0025 }),
+    ),
+  ).toBe(true);
+});
+it("conservatively falls back when interval polynomial products underflow and remains native/Wasm identical", () => {
+  const scale = 1e-120,
+    segments: InkStrokeSegment[] = [
+      {
+        points: [
+          [0, 0],
+          [0.25 * scale, 0],
+          [1.5 * scale, 0],
+          [2 * scale, 0],
+        ],
+        radius: [1.75 * scale, 1.75 * scale],
+      },
+    ];
+  const result = kernel.build(segments, { tolerance: 0.0025 });
+  expect(result.result.fallbackLeaves).toBeGreaterThan(0);
+  expect(
+    result.commands.flatMap((c) => c.slice(1)).every(Number.isFinite),
+  ).toBe(true);
+  expect(
+    native(segments, { tolerance: 0.0025 }).equals(
+      wasmBytes(segments, { tolerance: 0.0025 }),
+    ),
+  ).toBe(true);
 });
 it("matches the independent oracle on deterministic varied cubic/pressure geometry including tight folds", () => {
   let state = 59374;

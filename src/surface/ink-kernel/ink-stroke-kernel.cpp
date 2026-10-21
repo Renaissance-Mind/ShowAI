@@ -150,6 +150,224 @@ static Envelope envelope(const Curve &c, double t, double side) {
   double r = c.r0 + (c.r1 - c.r0) * t;
   return {add(p, mul(u, r)), add(v, add(mul(u, q), mul(du, r)))};
 }
+// A second, sufficient regularity certificate works on the exact polynomial
+// inputs, not sampled envelope points. Let s=|c'|^2, D=c'.c'', C=c' cross c'',
+// q=r' (constant on this authored element), and B=s^2-q^2*s+r*q*D. Direct
+// differentiation gives s*(E'_+/- . c')=B +/- r*sqrt(s-q^2)*C. Thus strict
+// positivity of S=s-q^2, B and P=B^2-r^2*S*C^2 proves forward progress of BOTH
+// envelopes. At q=0 this reduces to s>0 and s^3-r^2*C^2>0: tangential center
+// acceleration cancels exactly, instead of being mistaken for curvature.
+//
+// Every scalar operation is enclosed by adjacent binary64 values. Positive
+// Bernstein lower bounds prove positivity over the WHOLE parameter interval.
+// Bounded midpoint subdivision only tightens the certificate; an uncertain,
+// singular, nonfinite or exhausted certificate takes the existing fallback.
+// No allocator, libm nextafter, sampled acceptance, radius-knot removal or
+// change to the envelope fitting/arc tolerances is involved.
+struct ProgressInterval {
+  double lo, hi;
+};
+struct ProgressPolynomial {
+  ProgressInterval a[17]{};
+  uint32_t degree = 0;
+};
+static double progressStep(double x, bool up) {
+  static_assert(sizeof(double) == 8 && sizeof(uint64_t) == 8,
+                "binary64 interval arithmetic");
+  if (!finite(x))
+    return x;
+  uint64_t bits;
+  __builtin_memcpy(&bits, &x, sizeof(bits));
+  if (x == 0) {
+    bits = up ? uint64_t(1) : (uint64_t(1) << 63) | 1;
+  } else if ((x > 0) == up) {
+    ++bits;
+  } else {
+    --bits;
+  }
+  double result;
+  __builtin_memcpy(&result, &bits, sizeof(result));
+  return result;
+}
+static ProgressInterval progressPoint(double x) { return {x, x}; }
+static bool progressZero(ProgressInterval a) { return a.lo == 0 && a.hi == 0; }
+static ProgressInterval progressAdd(ProgressInterval a, ProgressInterval b) {
+  if (progressZero(a))
+    return b;
+  if (progressZero(b))
+    return a;
+  return {progressStep(a.lo + b.lo, false), progressStep(a.hi + b.hi, true)};
+}
+static ProgressInterval progressNegate(ProgressInterval a) {
+  return {-a.hi, -a.lo};
+}
+static ProgressInterval progressMultiply(ProgressInterval a,
+                                         ProgressInterval b) {
+  if (progressZero(a) || progressZero(b))
+    return {0, 0};
+  double v[4] = {a.lo * b.lo, a.lo * b.hi, a.hi * b.lo, a.hi * b.hi};
+  double lo = v[0], hi = v[0];
+  for (uint32_t i = 1; i < 4; i++) {
+    lo = min(lo, v[i]);
+    hi = max(hi, v[i]);
+  }
+  return {progressStep(lo, false), progressStep(hi, true)};
+}
+static ProgressPolynomial progressConstant(ProgressInterval a) {
+  ProgressPolynomial p{};
+  p.a[0] = a;
+  return p;
+}
+static ProgressPolynomial progressScale(const ProgressPolynomial &p,
+                                        ProgressInterval a) {
+  ProgressPolynomial q{};
+  q.degree = p.degree;
+  for (uint32_t i = 0; i <= p.degree; i++)
+    q.a[i] = progressMultiply(p.a[i], a);
+  return q;
+}
+static ProgressPolynomial progressSum(const ProgressPolynomial &a,
+                                      const ProgressPolynomial &b,
+                                      bool subtract = false) {
+  ProgressPolynomial q{};
+  q.degree = a.degree > b.degree ? a.degree : b.degree;
+  for (uint32_t i = 0; i <= q.degree; i++) {
+    ProgressInterval x = i <= a.degree ? a.a[i] : progressPoint(0),
+                     y = i <= b.degree ? b.a[i] : progressPoint(0);
+    q.a[i] = progressAdd(x, subtract ? progressNegate(y) : y);
+  }
+  return q;
+}
+static ProgressPolynomial progressProduct(const ProgressPolynomial &a,
+                                          const ProgressPolynomial &b) {
+  ProgressPolynomial q{};
+  q.degree = a.degree + b.degree;
+  for (uint32_t i = 0; i <= a.degree; i++)
+    for (uint32_t j = 0; j <= b.degree; j++)
+      q.a[i + j] = progressAdd(q.a[i + j], progressMultiply(a.a[i], b.a[j]));
+  return q;
+}
+static ProgressPolynomial progressDerivative(const ProgressPolynomial &p) {
+  ProgressPolynomial q{};
+  q.degree = p.degree ? p.degree - 1 : 0;
+  for (uint32_t i = 1; i <= p.degree; i++)
+    q.a[i - 1] = progressMultiply(p.a[i], progressPoint(i));
+  return q;
+}
+static ProgressPolynomial progressVelocity(const Curve &c, bool y) {
+  ProgressInterval d[3]{};
+  for (uint32_t i = 0; i < c.degree; i++)
+    d[i] = progressAdd(progressPoint(y ? c.p[i + 1].y : c.p[i + 1].x),
+                       progressPoint(-(y ? c.p[i].y : c.p[i].x)));
+  ProgressPolynomial v{};
+  v.degree = c.degree - 1;
+  v.a[0] = progressMultiply(d[0], progressPoint(c.degree));
+  if (c.degree >= 2)
+    v.a[1] = progressMultiply(progressAdd(d[1], progressNegate(d[0])),
+                              progressPoint(c.degree == 3 ? 6 : 2));
+  if (c.degree == 3)
+    v.a[2] = progressMultiply(
+        progressAdd(
+            progressAdd(d[2], progressMultiply(d[1], progressPoint(-2))), d[0]),
+        progressPoint(3));
+  return v;
+}
+static uint32_t progressBinomial(uint32_t n, uint32_t k) {
+  if (k > n - k)
+    k = n - k;
+  uint32_t result = 1;
+  for (uint32_t i = 1; i <= k; i++)
+    result = result * (n - i + 1) / i;
+  return result;
+}
+static bool progressPositive(const ProgressInterval *a, uint32_t degree,
+                             uint32_t depth, uint32_t &budget) {
+  if (!budget)
+    return false;
+  --budget;
+  bool positive = true;
+  for (uint32_t i = 0; i <= degree; i++) {
+    if (!finite(a[i].lo) || !finite(a[i].hi))
+      return false;
+    if (!(a[i].lo > 0))
+      positive = false;
+  }
+  if (positive)
+    return true;
+  if (depth == 8 || a[0].hi <= 0 || a[degree].hi <= 0)
+    return false;
+  ProgressInterval p[17], left[17], right[17];
+  for (uint32_t i = 0; i <= degree; i++)
+    p[i] = a[i];
+  left[0] = p[0];
+  right[degree] = p[degree];
+  for (uint32_t n = degree; n; n--) {
+    for (uint32_t i = 0; i < n; i++)
+      p[i] = progressMultiply(progressAdd(p[i], p[i + 1]), progressPoint(.5));
+    left[degree - n + 1] = p[0];
+    right[n - 1] = p[n - 1];
+  }
+  return progressPositive(left, degree, depth + 1, budget) &&
+         progressPositive(right, degree, depth + 1, budget);
+}
+static bool progressCertificate(const ProgressPolynomial &p, uint32_t &budget) {
+  ProgressInterval b[17]{};
+  for (uint32_t k = 0; k <= p.degree; k++)
+    for (uint32_t i = 0; i <= k; i++) {
+      uint32_t numerator = progressBinomial(k, i),
+               denominator = progressBinomial(p.degree, i);
+      double ratio = double(numerator) / denominator;
+      ProgressInterval weight =
+          numerator == denominator
+              ? progressPoint(1)
+              : ProgressInterval{progressStep(ratio, false),
+                                 progressStep(ratio, true)};
+      b[k] = progressAdd(b[k], progressMultiply(p.a[i], weight));
+    }
+  return progressPositive(b, p.degree, 0, budget);
+}
+static bool certifiedProgress(const Curve &c) {
+  if (!c.degree)
+    return false;
+  auto vx = progressVelocity(c, false), vy = progressVelocity(c, true);
+  auto ax = progressDerivative(vx), ay = progressDerivative(vy);
+  auto s = progressSum(progressProduct(vx, vx), progressProduct(vy, vy));
+  auto cross =
+      progressSum(progressProduct(vx, ay), progressProduct(vy, ax), true);
+  ProgressInterval q = progressAdd(progressPoint(c.r1), progressPoint(-c.r0));
+  uint32_t budget = 64;
+  if (c.r0 == c.r1) {
+    if (!progressCertificate(s, budget))
+      return false;
+    auto p = progressSum(progressProduct(progressProduct(s, s), s),
+                         progressScale(progressProduct(cross, cross),
+                                       progressMultiply(progressPoint(c.r0),
+                                                        progressPoint(c.r0))),
+                         true);
+    return progressCertificate(p, budget);
+  }
+  auto S = progressSum(s, progressConstant(progressMultiply(q, q)), true);
+  if (!progressCertificate(S, budget))
+    return false;
+  ProgressPolynomial radius{};
+  radius.degree = 1;
+  radius.a[0] = progressPoint(c.r0);
+  radius.a[1] = q;
+  auto dotProduct =
+      progressSum(progressProduct(vx, ax), progressProduct(vy, ay));
+  auto B =
+      progressSum(progressSum(progressProduct(s, s),
+                              progressScale(s, progressMultiply(q, q)), true),
+                  progressScale(progressProduct(radius, dotProduct), q));
+  if (!progressCertificate(B, budget))
+    return false;
+  auto P = progressSum(
+      progressProduct(B, B),
+      progressProduct(progressProduct(progressProduct(radius, radius), S),
+                      progressProduct(cross, cross)),
+      true);
+  return progressCertificate(P, budget);
+}
 // Convex-hull derivative bounds certify positive progress of both envelope
 // sides. This excludes local folded ribbons, not merely zero sqrt arguments.
 // A failed certificate subdivides, or selects the explicit disk-union fallback.
@@ -174,7 +392,9 @@ static bool regular(const Curve &c) {
     return false;
   double beta = __builtin_sqrt(1 - (q / h) * (q / h));
   double up = q * A / (h * h) * (1 + q / (h * beta)) + 2 * A / h;
-  return q + max(c.r0, c.r1) * up < h * .9;
+  if (q + max(c.r0, c.r1) * up < h * .9)
+    return true;
+  return certifiedProgress(c);
 }
 static bool leaf(Run &r, uint32_t depth) {
   r.result.maximum_depth =
