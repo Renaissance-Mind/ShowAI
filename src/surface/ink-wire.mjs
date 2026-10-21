@@ -532,6 +532,9 @@ export function inkWireDocumentFromCheckpoint(document, boardId, checkpoint) {
     state.strokes[source.id] = stroke;
     if (current && !current.deleted) visible.push({ id: source.id, node: current.node, layout: current.layout, placement: current.placement ?? registers.placement[0].value, born: source.creationOrder });
   }
+  // Checkpoint record/key order is an index detail; born order is the original
+  // logical paint order, including adjacent ink inside a transparent group.
+  visible.sort((a, b) => birthOrder(a.born, b.born));
   const removedIds = new Set(record.records.keys());
   const strip = node => { if (node.content) node.content = node.content.filter(child => !removedIds.has(child.attrs?.id)).map(strip); return node; };
   next.content = strip(next.content); next.layout = Object.fromEntries(Object.entries(next.layout ?? {}).filter(([id]) => !removedIds.has(id)));
