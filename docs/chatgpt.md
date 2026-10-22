@@ -44,7 +44,7 @@ Start a new chat, type `@`, choose **ShowAI**, then ask:
 
 Review writes when ChatGPT prompts. Continue by naming the saved project/Page or its ID. The agent reads the current source, saves with its hash/revision, checks the sync receipt and presents the saved Page. `page_present` keeps complete HTML/source even when only selected blocks fit the chat preview.
 
-Guidance comes from the server's `guide` tool, using the same seven workflow sources as the local plugin. This does not register native Skills in ChatGPT. A host may initially show only some tools; discover additional tools on the selected connection when the guide lists them.
+Guidance comes from the server's `guide` tool, using the same nine skills as the local plugin. This does not register native Skills in ChatGPT. A host may initially show only some tools; discover additional tools on the selected connection when the guide lists them.
 
 ## Updates and troubleshooting
 

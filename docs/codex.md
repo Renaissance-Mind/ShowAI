@@ -22,7 +22,7 @@ Installing the plugin, reloading the agent and a conversation picking up the new
 
 > Use ShowAI to build a mortgage calculator: price, down payment, rate and term are adjustable; show the monthly payment and total interest.
 
-The agent should use the ShowAI tools, save the page and present it. **Settings → Plugins** also shows, for each agent, whether ShowAI has received its first call (**Waiting for the first call** / **First call received**), with a shorter test prompt you can copy. If it answers in plain text, see [If the agent can't find ShowAI](quick-start.md#if-the-agent-cant-find-showai).
+The agent should use the ShowAI tools, save the page and present it. **Settings → Plugins** also shows, for each agent, whether the current installation has received its first call (**Waiting for the first call** / **Not called since this installation** / **First call received**), the latest failed connection with **Repair and reconnect**, and a shorter test prompt you can copy. If it answers in plain text, see [If the agent can't find ShowAI](quick-start.md#if-the-agent-cant-find-showai).
 
 ## Choose a library and project
 

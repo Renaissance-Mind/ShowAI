@@ -17,7 +17,7 @@ The page model, component compiler, authoring service, revision checks, export r
 
 ## Local use
 
-Find the actual runtime in the desktop's Connect Agent settings or the selected library's `agent-runtime.json`. `showai` below abbreviates that executable and its arguments. Inspect `runtime info --json` and `guide integration --json`.
+Find the actual runtime under **Settings → Plugins** (**Registered runtime** and the launch configuration) or in the selected library's `agent-runtime.json`. `showai` below abbreviates that executable and its arguments. Inspect `runtime info --json` and `guide integration --json`.
 
 ```sh
 showai public list --kind component --query chart --json

@@ -10,7 +10,7 @@
 
 支持 MCP 不代表支持 HTML 显示。兼容宿主可显示 MCP Apps/inline，纯文本宿主仍可保存项目、返回同步回执与文件链接。公共独立渲染、私有项目读写、实际显示分别核对。
 
-本机运行时来自设置中的实际启动配置或所选内容库的 agent-runtime.json。下面 showai 代表核实后的命令前缀：
+本机运行时见「设置 → 插件」中的「当前登记的运行时」与启动配置，或所选内容库的 agent-runtime.json。下面 showai 代表核实后的命令前缀：
 
 ```sh
 showai runtime info --json

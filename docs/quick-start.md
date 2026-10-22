@@ -51,10 +51,10 @@ Two more to try:
 | **Installed, disabled**                             | Click **Update and enable**.                                                                                                                                     |
 | ShowAI is enabled from another source               | Disable that plugin in the agent, then click **Check again** and install the app version.                                                                        |
 | The agent answers in text and never mentions ShowAI | The conversation started before the plugin loaded. Restart the agent and open a new conversation; asking explicitly with "Use ShowAI to …" helps.                |
-| The agent reports that it cannot connect to ShowAI  | If you moved the app or switched libraries, open **Settings → Plugins** and click **Update and enable**, then restart the agent.                                 |
-| A page was saved but you can't find it in the app   | The app and the plugin are using different content libraries. Compare **Settings → General → Content library** with the library shown in **Settings → Plugins**. |
+| The agent reports that it cannot connect to ShowAI  | Open **Settings → Plugins**. If **Registered runtime** shows a problem, click **Repair registration**; if the agent shows a failed connection or another library, click **Repair and reconnect** or **Update and enable**. Then restart the agent. |
+| A page was saved but you can't find it in the app   | The app and the plugin are using different content libraries. Compare **Settings → General → Content library** with **Plugin library** for that agent in **Settings → Plugins**. |
 
-Still stuck? [Open an issue](https://github.com/Renaissance-Mind/ShowAI/issues) with your agent and its version, the ShowAI version from **Settings → About**, and what the agent said.
+Still stuck? [Open an issue](https://github.com/Renaissance-Mind/ShowAI/issues) with your agent and its version, the ShowAI version from **Settings → About & feedback**, and what the agent said.
 
 ## 4. Keep working on it
 

@@ -51,10 +51,10 @@ Agent 会把界面保存为 ShowAI 中的一个页面并展示出来：支持内
 | 显示「已安装，尚未启用」            | 点「更新并启用」。                                                                                                       |
 | 提示已启用其他来源的 ShowAI 插件    | 先在 Agent 中停用原插件，再点「重新检测」并安装 App 版本。                                                               |
 | Agent 只用文字回答，没有提到 ShowAI | 对话在插件加载前就已开始。重启 Agent 并新开对话；提示词以“用 ShowAI……”开头会更明确。                                     |
-| Agent 报告无法连接 ShowAI           | 如果移动过 App 或切换过内容库，在「设置 → 插件」中点「更新并启用」，然后重启 Agent。                                     |
-| 页面已保存，但在 App 中找不到       | App 与插件使用了不同的内容库。对照「设置 → 通用 → 内容库」与「设置 → 插件」中显示的内容库。                              |
+| Agent 报告无法连接 ShowAI           | 打开「设置 → 插件」。「当前登记的运行时」显示问题时点「修复登记」；Agent 显示连接失败或连接了另一个内容库时点「修复并重新连接」或「更新并启用」。然后重启 Agent。 |
+| 页面已保存，但在 App 中找不到       | App 与插件使用了不同的内容库。对照「设置 → 通用 → 内容库」与「设置 → 插件」中该 Agent 的「插件连接的内容库」。              |
 
-仍未解决时，请[提交 Issue](https://github.com/Renaissance-Mind/ShowAI/issues)，写明 Agent 及其版本、「设置 → 关于」中的 ShowAI 版本，以及 Agent 的回复。
+仍未解决时，请[提交 Issue](https://github.com/Renaissance-Mind/ShowAI/issues)，写明 Agent 及其版本、「设置 → 关于与反馈」中的 ShowAI 版本，以及 Agent 的回复。
 
 ## 4. 继续修改
 

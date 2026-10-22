@@ -8,9 +8,11 @@
 
 本地插件的 `mcp.json` 启动 `mcp/launch.mjs`。启动器读取宿主指定的 `SHOWAI_HOME`，未指定时使用当前用户的 `~/.showai`，再读取该库的 `agent-runtime.json`。`SHOWAI_RUNTIME_CONFIG` 可显式指定配置文件，但其中 home 必须与选定库一致；出错时不搜索其他库。
 
-启动器只用 CLI 做 runtime info 能力探测和启动 MCP。运行时必须声明 `capabilities.agentOperations.protocol=showai-mcp-v1`。缺少时需要更新并登记目标 ShowAI 软件；更新 Skill 不会更新软件。插件本身不包含文档编译运行时。
+启动器只用 CLI 做 runtime info 能力探测和启动 MCP；探测结果按运行时文件缓存在库的 `local/` 中。运行时必须声明 `capabilities.agentOperations.protocol=showai-mcp-v1`。缺少时需要更新并登记目标 ShowAI 软件；更新 Skill 不会更新软件。插件本身不包含文档编译运行时。
 
-桌面 App 可在「设置 → 插件」给 Codex 或 Claude Code 安装插件。先安装目标宿主及其可用的插件管理 CLI；macOS 也会检测常见 Codex App 位置的内置 CLI。App 复制自带插件，以 App 可执行文件启动 launcher，无需 ShowAI 源码或单独安装 Node.js。安装器检查文件与启用状态，但宿主能力刷新和会话加载仍需分别确认。已有其他来源的 ShowAI 插件时，先在宿主中停用原插件，再安装 App 版本。此入口生成的连接绑定安装时的内容库。继续旧项目时，先确认项目实际所在的库；只有需要重新绑定目标库或移动了 App，才在 App 选定目标库后「更新并启用」，再刷新或重启宿主。外部宿主连接时启动 stdio MCP，App 窗口关闭后仍可使用，App 文件必须保留。
+启动器在启动 MCP 之前失败时（缺少或无法读取 `agent-runtime.json`、内容库不一致、运行时过旧或无法启动），仍完成 MCP 握手，只提供一个 `showai_connection_problem` 工具。看到这个工具时调用它，把返回的错误码、原因和修复步骤用用户的语言转述，例如在 ShowAI「设置 → 插件」点「修复登记」或「更新并启用」，再重启 Agent 会话。不要重试其他工具、换内容库或修改配置文件。ShowAI「设置 → 插件」也会显示这次失败。
+
+桌面 App 和本机浏览器版都可在「设置 → 插件」给 Codex 或 Claude Code 安装插件，该页同时显示「当前登记的运行时」与各插件连接的内容库。先安装目标宿主及其可用的插件管理 CLI；macOS 也会检测常见 Codex App 位置的内置 CLI。App 复制自带插件，以 App 可执行文件启动 launcher，无需 ShowAI 源码或单独安装 Node.js。安装器检查文件与启用状态，但宿主能力刷新和会话加载仍需分别确认。已有其他来源的 ShowAI 插件时，先在宿主中停用原插件，再安装 App 版本。此入口生成的连接绑定安装时的内容库。继续旧项目时，先确认项目实际所在的库；只有需要重新绑定目标库或移动了 App，才在 App 选定目标库后「更新并启用」，再刷新或重启宿主。外部宿主连接时启动 stdio MCP，App 窗口关闭后仍可使用，App 文件必须保留。
 
 源码方式的插件 launcher 使用系统 Node.js，需要 Node.js 22.12+ 和已登记的 ShowAI 软件。
 
@@ -29,6 +31,10 @@
 
 不修改系统 HOME，也不直接编辑库里的正式文件。运行期间库位置保持固定；要换库，宿主停止并重连另一个配置，再查 capabilities/context。
 
+## 无法恢复的失败与反馈
+
+工具返回 CONFLICT、NOT_FOUND、LOCKED 等可恢复错误时，按回执的 `nextStep` 处理，不当作故障上报。工具失败且无法恢复时（错误码为 ERROR、连接问题工具报告的启动失败，或按 `nextStep` 处理后仍失败），告诉用户哪一步失败，并给出错误码与 message；`userMessage` 是可直接转述的一句话。再提示用户在 ShowAI「设置 → 关于与反馈」点「复制诊断信息」，或打开 `showai_capabilities` / `runtime info` 返回的 `support.reportUrl` 提交反馈，排障说明见 `support.docsUrl`。不要代替用户提交反馈，不要转述 Token、密钥或本机路径。
+
 ## 自定义 Agent / 服务器 runner
 
 宿主也可直接启动已核实运行入口，追加 `mcp --home /ABSOLUTE_LIBRARY`；明确绑定项目时再追加 `--project PROJECT`。可选 `--presentation-directory /HOST_OUTPUT`。配置中的 command/args/env 用参数数组执行，不交给 shell eval。MCP 启动后，Agent 使用工具，不为每次读写拼接 shell 命令。
@@ -37,7 +43,7 @@ ShowAI 内置 Agent由宿主提供项目绑定 MCP；它安装的私有 Skill �
 
 ## 远程
 
-宿主连接明确的 HTTP MCP 地址，完成所需授权。授权可限定项目，也可覆盖该服务器账号当前及以后有权限的所有项目。`projects_list` 每次读取服务器最新成员权限；账号授权会发现后续同步到服务器的项目。仅保存在本机且尚未同步的项目不在远程列表中：请用户在 ShowAI 应用的“设置 → 服务器与同步”把项目同步到同一服务器账号，再重新调用 `projects_list`；仅授权单个项目的连接需重新授权为账号范围才能看到新项目。用户明确要求新项目时，且当前工具暴露 `project_create`、账号已授予 `projects.create`，使用该工具创建；保留返回的项目 ID 和 synchronization 回执，后续页面操作显式使用该 ID。创建超时或结果不明时，用同一个 operationId 和同一名称重试：已创建则返回原项目，不会重复创建；同一 operationId 换名称会被拒绝。不同请求使用不同 ID。受限授权或工具缺失时说明所缺权限，不绕过到本机创建。项目权限来自服务端当前成员身份。远程没有本机文件配置步骤，不能把用户电脑的 home 当作远程项目路径。远程网关部署与本机内容同步服务是不同模块。
+宿主连接明确的 HTTP MCP 地址，完成所需授权。授权可限定项目，也可覆盖该服务器账号当前及以后有权限的所有项目。`projects_list` 每次读取服务器最新成员权限；账号授权会发现后续同步到服务器的项目。仅保存在本机且尚未同步的项目不在远程列表中：请用户在 ShowAI 应用的“设置 → 账号与同步”把项目同步到同一服务器账号，再重新调用 `projects_list`；仅授权单个项目的连接需重新授权为账号范围才能看到新项目。用户明确要求新项目时，且当前工具暴露 `project_create`、账号已授予 `projects.create`，使用该工具创建；保留返回的项目 ID 和 synchronization 回执，后续页面操作显式使用该 ID。创建超时或结果不明时，用同一个 operationId 和同一名称重试：已创建则返回原项目，不会重复创建；同一 operationId 换名称会被拒绝。不同请求使用不同 ID。受限授权或工具缺失时说明所缺权限，不绕过到本机创建。项目权限来自服务端当前成员身份。远程没有本机文件配置步骤，不能把用户电脑的 home 当作远程项目路径。远程网关部署与本机内容同步服务是不同模块。
 
 GitHub／Google 登录由所选 ShowAI Server 的已配置登录方式提供。已有账号需先绑定对应身份。用户在第三方登录标签页完成验证后，该页显示一个 8 位完成码；用户回到 MCP 授权标签页填入完成码并继续，再确认项目或账号范围授权。完成码一次性、短期有效，由用户本人填写；模型不索取或转述。用户把完成码贴到对话中时不使用它，提醒其在授权页填写。模型不读取、索取或转发密码、登录轮询密钥和会话 Token。服务器未启用对应登录方式时报告实际错误，不把登录按钮可见当作登录已配置。
 

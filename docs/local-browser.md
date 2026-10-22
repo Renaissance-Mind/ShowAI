@@ -34,7 +34,7 @@ start.cmd --home C:\Users\you\ShowAI
 
 ## Files, saving and agent use
 
-Import, export, source-directory selection and publication preparation use the workbench's local file picker. It supports path entry, folder navigation, shortcuts, folder creation and overwrite confirmation. Exports write to the selected disk destination. Revealing a file opens the OS file manager; separate Page windows open browser tabs. Copying launch configuration depends on browser clipboard permission.
+Import, export, source-directory selection and publication preparation use the workbench's local file picker. It supports path entry, folder navigation, shortcuts, folder creation and overwrite confirmation. Exports write to the selected disk destination. Revealing a file opens the OS file manager; separate Page windows open browser tabs. Copying launch configuration depends on browser clipboard permission. **Settings → Plugins** installs the Codex and Claude Code plugins through their command-line tools, as the desktop app does, and copies a per-agent configuration (`claude mcp add`, Codex `config.toml`, `mcpServers` JSON).
 
 Auto-save and `Cmd/Ctrl+S` remain available. Unsaved, saving or conflicting state triggers the browser's leave prompt. Check **Saved** before leaving: a browser cannot wait for asynchronous saving in the same way as Electron, and a crash can lose pending edits.
 
