@@ -3,6 +3,7 @@ import {SourceRuntimeOwner,SourceRuntimeError,diffOwnedSource,cloneSourceValue,o
 import {appendPortableInkFromSource} from "./portable-ink-append.mjs";
 import {applyNativeSourceDelta,type NativeSourceEdit} from "./native-source-delta.mjs";
 import {nativeDocumentBodiesEqual} from "./native-document-content";
+import {measureNativeSync} from "./native-perf";
 
 export interface SourceRuntimeTransport {
  readonly sourceClientId?:string;
@@ -64,6 +65,10 @@ export class OwnedSourceSession {
  private externalGeneration=new Map<string,number>();
  private proofs=new WeakMap<ShowDocument,Set<string>>();
  private issuedDeltas=new WeakSet<SourceSnapshotDelta>();
+ // A prepared publication already owns an independent frozen UI projection.
+ // Reuse only that actual issued delta on the EXACT same captured UI root.
+ // Worker-private graphs never enter this cache; no ref/ID grants it authority.
+ private materializedDeltas=new WeakMap<SourceSnapshotDelta,{base:ShowDocument|undefined;document:ShowDocument}>();
  private pendingPins=new Map<string,Promise<SourceSnapshotRef>>();
  private publicationOutputs=new Map<string,SourceSnapshotRef>();
  private historyLeases=new Set<string>();
@@ -184,7 +189,10 @@ export class OwnedSourceSession {
  async barrier(){do{const active=this.tail;await active;if(this.failure)throw this.failure;if(active===this.tail&&!this.running&&!this.jobs.length)break;}while(true);return this.latestRef?await this.latestRef:null}
  /** Apply only against the actual frozen UI graph for the issued base. Older
   * normalized/save results never overwrite a newer local draft projection. */
- apply(delta:SourceSnapshotDelta,{publish=true,baseDocument}:{publish?:boolean;baseDocument?:ShowDocument}={}):ShowDocument|null{
+ apply(delta:SourceSnapshotDelta,options:{publish?:boolean;baseDocument?:ShowDocument}={}):ShowDocument|null{
+  return measureNativeSync("source.ui.apply",()=>this.applyOwnedDelta(delta,options));
+ }
+ private applyOwnedDelta(delta:SourceSnapshotDelta,{publish=true,baseDocument}:{publish?:boolean;baseDocument?:ShowDocument}={}):ShowDocument|null{
   if(this.disposed)throw new SourceRuntimeError("SOURCE_DISPOSED","Source page is retired");
   if(!this.issuedDeltas.has(delta))throw new SourceRuntimeError("SOURCE_NOT_OWNED","Source delta was not received from this session's actual owner transport");
   if(delta.format!=="showai-owned-source-v1"||delta.next.scope.homeId!==this.actualScope?.homeId||delta.next.scope.projectId!==this.projectId||delta.next.scope.pageId!==this.pageId||delta.base&&(delta.next.ownerId!==delta.base.ownerId||delta.next.epoch!==delta.base.epoch))throw new SourceRuntimeError("SOURCE_SCOPE","Owned delta belongs to another page");
@@ -195,11 +203,18 @@ export class OwnedSourceSession {
   if(delta.base&&!before)return null;
   if(publish&&(delta.base?this.latestDocument!==before:!!this.latestDocument))return null;
   if(delta.base&&baseDocument){const registered=bindings.get(baseDocument);if(!registered||registered.session!==this)throw new SourceRuntimeError("SOURCE_NOT_OWNED","Delta baseline is not an owned UI snapshot")}
-  const target=freezeOwnedSource(delta.base?applyNativeSourceDelta(before!,delta.edits??[]):cloneSourceValue(delta.full!));
+  const materialized=this.materializedDeltas.get(delta);
+  if(materialized&&materialized.base===before&&bindings.get(materialized.document)?.session===this&&this.proofs.get(materialized.document)?.has(key(delta.next))){
+   // Keep metadata attached to this prepared target by the actual Native
+   // bridge. Re-copying the old base here could overwrite the newer receipt.
+   return measureNativeSync("source.ui.applyPrepared",()=>{if(publish)this.publish(materialized.document,delta.next);return materialized.document;});
+  }
+  const target=measureNativeSync("source.ui.materialize",()=>freezeOwnedSource(delta.base?applyNativeSourceDelta(before!,delta.edits??[]):cloneSourceValue(delta.full!)));
   let known=this.proofs.get(target);if(!known)this.proofs.set(target,known=new Set());known.add(key(delta.next));
   this.remember(target,Promise.resolve(delta.next));
   if(before&&typeof window!=="undefined")window.showai?.inlineInk?.copyDocumentMetadata?.(before,target);
   if(delta.next.kind==="normalized")candidates.set(target,ownSourceValue(delta.inkCandidates));
+  this.materializedDeltas.set(delta,{base:before,document:target});
   if(publish)this.publish(target,delta.next);
   return target;
  }
