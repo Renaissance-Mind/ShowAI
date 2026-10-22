@@ -1565,6 +1565,29 @@ button.studio-tree-chevron:hover {
 .studio-page-list[data-view="large"] .studio-thumbnail-space {
   height: 210px;
 }
+.studio-page-list-add .studio-page-list-open {
+  justify-content: center;
+  color: var(--muted);
+}
+.studio-page-list-add .studio-page-list-open:hover:not(:disabled) {
+  color: var(--accent);
+}
+.studio-page-list[data-view]:not([data-view="list"]) .studio-page-list-add {
+  align-items: stretch;
+  border-style: dashed;
+  border-color: color-mix(in srgb, var(--muted) 45%, transparent);
+}
+.studio-page-list[data-view]:not([data-view="list"])
+  .studio-page-list-add
+  .studio-page-list-open {
+  min-height: calc(150px + 76px);
+}
+.studio-page-list[data-view="small"] .studio-page-list-add .studio-page-list-open {
+  min-height: calc(100px + 76px);
+}
+.studio-page-list[data-view="large"] .studio-page-list-add .studio-page-list-open {
+  min-height: calc(210px + 76px);
+}
 .studio-page-thumbnail .catalog-preview-content > .container-workspace {
   height: 640px;
 }

@@ -1559,14 +1559,17 @@ export default function Studio() {
       },
     ];
   }
-  function showDirectoryCreationMenu(anchor: HTMLElement) {
+  function showDirectoryCreationMenu(
+    anchor: HTMLElement,
+    point?: LibraryMenuPoint,
+  ) {
     if (!project || (selectedFolder && !currentFolder)) return;
     showMenu(
       currentFolder
         ? folderTarget(currentFolder, project.id)
         : projectTarget(project),
       anchor,
-      undefined,
+      point,
       false,
       true,
     );
@@ -3758,7 +3761,7 @@ export default function Studio() {
                           onDelete={() => beginBatchPages("delete")}
                         />
                       )}
-                      {visibleEntries.length ? (
+                      {visibleEntries.length || !query ? (
                           <div
                             className="studio-page-list"
                             data-view={directoryView}
@@ -3893,8 +3896,35 @@ export default function Studio() {
                               </button>
                             </div>
                           ))}
+                          {!query && !pageSelection.active && (
+                            <div className="studio-page-list-row studio-page-list-add">
+                              <button
+                                type="button"
+                                className="studio-page-list-open"
+                                aria-label={t("addContentHint")}
+                                aria-haspopup="menu"
+                                title={t("addContentHint")}
+                                disabled={contentCreationDisabled}
+                                onClick={(event) =>
+                                  showDirectoryCreationMenu(
+                                    event.currentTarget,
+                                    event.detail
+                                      ? { x: event.clientX, y: event.clientY }
+                                      : undefined,
+                                  )
+                                }
+                              >
+                                <Plus
+                                  size={directoryView === "list" ? 18 : 28}
+                                  strokeWidth={1.5}
+                                  aria-hidden="true"
+                                />
+                              </button>
+                            </div>
+                          )}
                         </div>
-                      ) : (
+                      ) : null}
+                      {!visibleEntries.length && (
                         <div className="studio-empty">
                           <FilePlus2 size={30} strokeWidth={1.2} />
                           <h2>
