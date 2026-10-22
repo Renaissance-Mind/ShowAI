@@ -174,8 +174,17 @@ export function isSafeUrl(value, image = false) {
   }
 }
 
+// A successful JSON check is context-independent except for the containing
+// depth. Only this module's successful check of an actual exclusive capture
+// can populate this weak cache; recursive freeze/caller flags never grant it.
+// Schema, model, capacity and cross-node validation still run on every body.
+const validatedCapturedJSON = new WeakSet();
 function validateJson(value, path, depth = 0) {
   if (depth > MAX_DEPTH) throw new Error(`${path} is nested too deeply.`);
+  if (value && typeof value === "object" && validatedCapturedJSON.has(value)) {
+    const summary = capturedContentSummary(value);
+    if (summary && depth + summary.maximumDepth <= MAX_DEPTH) return;
+  }
   if (value === null || typeof value === "boolean") return;
   if (typeof value === "number") {
     if (!Number.isFinite(value))
@@ -194,6 +203,7 @@ function validateJson(value, path, depth = 0) {
       if (!Object.hasOwn(value, i)) throw new Error(`${path} must contain dense JSON arrays.`);
       validateJson(value[i], `${path}[${i}]`, depth + 1);
     }
+    if (capturedContentSummary(value)) validatedCapturedJSON.add(value);
     return;
   }
   object(value, path);
@@ -207,6 +217,7 @@ function validateJson(value, path, depth = 0) {
       throw new Error(`${path} contains a reserved key.`);
     validateJson(item, `${path}.${key}`, depth + 1);
   }
+  if (capturedContentSummary(value)) validatedCapturedJSON.add(value);
 }
 
 function validateAttrs(attrs, path, permitted, surfaceIcon = false) {
