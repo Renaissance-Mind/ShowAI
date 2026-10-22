@@ -23,7 +23,7 @@ inline bool same_source(const Graph&g,const SABoundaryPath*paths,uint32_t path_c
     }
     return true;
 }
-struct OwnedSnapshot{Graph graph;Vector<SABoundaryEdge>output;OwnedSnapshot(const Graph&g,const Vector<SABoundaryEdge>&o):graph(g),output(o){}};
+struct OwnedSnapshot{Graph graph;uint32_t base_generation=0;OwnedSnapshot(const Graph&g,uint32_t base):graph(g),base_generation(base){}};
 struct LeaseSlot{Record<OwnedSnapshot>snapshot;SABoundarySnapshot report{};uint32_t generation=0,references=0;};
 struct alignas(16) Owner{
     static constexpr uint64_t signature=0x5341424f574e5231ull;
@@ -38,27 +38,15 @@ struct alignas(16) Owner{
 inline Owner*owner(void*state){if(!state||((uintptr_t)state&15u))return nullptr;uint64_t signature;copy_bytes(&signature,state,8);return signature==Owner::signature?(Owner*)state:nullptr;}
 struct OwnerCall{Owner&value;explicit OwnerCall(Owner&o):value(o){}~OwnerCall(){value.busy=0;}};
 inline bool valid_budget(const SABoundaryBudget&b){uint64_t sum=uint64_t(b.retained_bytes)+b.workspace_bytes;return b.max_commands&&b.max_commands<=1000000&&b.max_curves&&b.max_curves<=1000000&&b.max_pairs&&b.max_cuts&&b.max_edges&&b.max_leases&&b.max_leases<=1024&&b.max_sources&&b.max_sources<=1000000&&b.max_paths&&b.max_paths<=1000000&&b.max_polynomial_degree==64&&b.max_stored_bits==stored_bits&&b.max_polynomial_operations&&b.max_limb_operations&&b.retained_bytes>=4096&&b.workspace_bytes>=4096&&sum<=0x40000000u;}
-inline Vector<SABoundaryEdge> output_edges(Graph&g){
-    Vector<SABoundaryEdge>output(*g.context());
-    for(uint32_t index=0;index<g.edges.size()&&g.good();index++){
-        const auto&e=g.edges[index];const auto&source=static_cast<const Graph&>(g).curves[e.source];if(source.origins.empty()){g.context()->fail(SA_INK_RANGE);break;}
-        const auto&origin=source.origins[0];const auto&curve=source.geometry;SABoundaryEdge item{};item.source=static_cast<const Graph&>(g).blocks[origin.source].description.key;item.command_index=origin.command;item.degree=curve.controls.size()-1;item.from_vertex=e.direction>0?e.va:e.vb;item.to_vertex=e.direction>0?e.vb:e.va;item.flags=origin.flags;
-        item.origin[0]=lower(curve.controls[0].x);item.origin[1]=lower(curve.controls[0].y);Q ox=Q::from_double(*g.context(),item.origin[0]),oy=Q::from_double(*g.context(),item.origin[1]);
-        for(uint32_t j=0;j<curve.controls.size()&&g.good();j++){item.controls[j*2]=lower(curve.controls[j].x-ox);item.controls[j*2+1]=lower(curve.controls[j].y-oy);if(!finite_double(item.controls[j*2])||!finite_double(item.controls[j*2+1]))g.context()->fail(SA_INK_RANGE);}
-        item.parameter_bounds[0]=lower(e.a.lower);item.parameter_bounds[1]=upper(e.a.upper);item.parameter_bounds[2]=lower(e.b.lower);item.parameter_bounds[3]=upper(e.b.upper);item.parameter_certificate[0]=index*2;item.parameter_certificate[1]=index*2+1;
-        // direction is explicit, including the canonical source reversal. It is
-        // not inferred from rounded controls or a caller's source key.
-        item.direction=e.direction;output.push_back(item);
-    }
-    return output;
-}
 inline void append_q(Vector<uint32_t>&out,const Q&q){out.push_back(uint32_t(q.sign()));out.push_back(q.numerator().size());out.push_back(q.denominator().size());for(uint32_t i=0;i<q.numerator().size();i++)out.push_back(q.numerator().data()[i]);for(uint32_t i=0;i<q.denominator().size();i++)out.push_back(q.denominator().data()[i]);}
+inline uint32_t parameter_words(Owner&o,const Root&root,uint32_t*output,uint32_t capacity,uint32_t*required){Vector<uint32_t>words(o.math.numbers);words.push_back(root.definition().coefficients.size());for(const auto&q:root.definition().coefficients)append_q(words,q);append_q(words,root.lower);append_q(words,root.upper);if(o.math.numbers.status)return o.math.numbers.status;if(!output&&!capacity){*required=words.size();return SA_INK_OK;}if(capacity<words.size())return SA_INK_CAPACITY;for(uint32_t i=0;i<words.size();i++)output[i]=static_cast<const Vector<uint32_t>&>(words)[i];*required=words.size();return SA_INK_OK;}
+inline const ChunkTree<Edge>::Chunk*checked_block(const Graph&g,SABoundaryBlockKey key){if(key.reserved||key.epoch!=g.output_epoch||!key.curve||!key.revision)return nullptr;auto*chunk=g.edges.chunk(key.slot);return chunk&&chunk->identity==key.curve&&chunk->revision==key.revision?chunk:nullptr;}
 inline uint32_t available_slot(const Owner&o){if(o.next_generation==0xffffffffu)return no_index;for(uint32_t i=0;i<o.slots.size();i++)if(!o.slots[i].references)return i;return no_index;}
 inline uint32_t publish_graph(Owner&o,Graph&graph,uint32_t slot,uint64_t baseline,SABoundaryLease*output){
     Record<OwnedSnapshot>prepared;
-    {auto edges=output_edges(graph);if(o.math.numbers.status)return o.math.numbers.status;OwnedSnapshot snapshot(graph,edges);prepared=Record<OwnedSnapshot>::create(o.math.numbers,snapshot);}
-    if(o.math.numbers.status)return o.math.numbers.status;if(o.math.numbers.live_bytes>o.budget.retained_bytes)return SA_INK_CAPACITY;
-    SABoundarySnapshot report{};report.source_commands=graph.active_commands;report.source_curves=graph.curves.size()-graph.free_curves.size();report.exposed_edges=graph.edges.size();report.vertices=graph.parent.size();report.polynomial_operations=o.math.polynomial.operations;report.limb_operations=o.math.numbers.work;report.pair_proofs=graph.metrics.pair_proofs;report.pair_cache_hits=graph.metrics.pair_cache_hits;report.classifications=graph.metrics.classifications;report.bvh_visits=graph.metrics.bvh_visits;report.retained_peak_bytes=o.math.numbers.live_bytes;report.workspace_peak_bytes=o.math.numbers.peak_bytes-baseline;report.arena_peak_bytes=o.math.numbers.peak_bytes;report.baseline_bytes=baseline;report.prepared_bytes=o.math.numbers.live_bytes-baseline;
+    {if(o.math.numbers.status)return o.math.numbers.status;OwnedSnapshot snapshot(graph,o.current==no_index?0:o.slots[o.current].generation);prepared=Record<OwnedSnapshot>::create(o.math.numbers,snapshot);}
+    if(o.math.numbers.status)return o.math.numbers.status;if(o.math.numbers.live_bytes>o.budget.retained_bytes||o.math.numbers.peak_bytes-o.math.numbers.live_bytes>o.budget.workspace_bytes)return SA_INK_CAPACITY;
+    SABoundarySnapshot report{};report.source_commands=graph.active_commands;report.source_curves=graph.curves.size()-graph.free_curves.size();report.exposed_edges=graph.edges.size();report.vertices=graph.parent.size();report.polynomial_operations=o.math.polynomial.operations;report.limb_operations=o.math.numbers.work;report.pair_proofs=graph.metrics.pair_proofs;report.pair_cache_hits=graph.metrics.pair_cache_hits;report.classifications=graph.metrics.classifications;report.bvh_visits=graph.metrics.bvh_visits;report.retained_peak_bytes=o.math.numbers.live_bytes;report.workspace_peak_bytes=o.math.numbers.peak_bytes-o.math.numbers.live_bytes;report.arena_peak_bytes=o.math.numbers.peak_bytes;report.baseline_bytes=baseline;report.prepared_bytes=o.math.numbers.live_bytes-baseline;
     auto&target=o.slots[slot];target.snapshot=static_cast<Record<OwnedSnapshot>&&>(prepared);target.generation=o.next_generation++;target.references=2;target.report=report;
     uint32_t previous=o.current;o.current=slot;if(previous!=no_index)o.drop(previous);*output=o.lease(slot);return SA_INK_OK;
 }

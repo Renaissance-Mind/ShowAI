@@ -2,6 +2,7 @@
 #define SHOWAI_BOUNDARY_GRAPH_HPP
 #include "algebra.hpp"
 #include "paged-vector.hpp"
+#include "chunk-tree.hpp"
 #include "../include/boundary-kernel.h"
 namespace showai_boundary {
 constexpr uint32_t no_index=0xffffffffu;
@@ -47,14 +48,14 @@ inline Record<BlockNode> balance_node(Context&c,SABoundarySourceKey key,uint32_t
 inline Record<BlockNode> set_block(Context&c,const Record<BlockNode>&root,SABoundarySourceKey key,uint32_t index,Bounds own){if(c.status)return{};if(!root.valid())return block_node(c,key,index,own,{},{});const auto&n=*root.get();int order=compare_spatial(spatial_key(own),n.spatial);if(!order)order=compare_key(key,n.key);if(!order)return block_node(c,key,index,own,n.left,n.right);if(order<0){auto left=set_block(c,n.left,key,index,own);return balance_node(c,n.key,n.block,n.own,left,n.right);}auto right=set_block(c,n.right,key,index,own);return balance_node(c,n.key,n.block,n.own,n.left,right);}
 inline Record<BlockNode> remove_block(Context&c,const Record<BlockNode>&root,SABoundarySourceKey key,Bounds own){if(c.status||!root.valid())return root;const auto&n=*root.get();int order=compare_spatial(spatial_key(own),n.spatial);if(!order)order=compare_key(key,n.key);if(order<0){auto left=remove_block(c,n.left,key,own);return balance_node(c,n.key,n.block,n.own,left,n.right);}if(order>0){auto right=remove_block(c,n.right,key,own);return balance_node(c,n.key,n.block,n.own,n.left,right);}if(!n.left.valid())return n.right;if(!n.right.valid())return n.left;const BlockNode*next=n.right.get();while(next->left.valid())next=next->left.get();auto right=remove_block(c,n.right,next->key,next->own);return balance_node(c,next->key,next->block,next->own,n.left,right);}
 struct Cut{Root parameter;uint32_t vertex=0;Context*context()const{return parameter.context();}};
-struct Edge{uint32_t source=0,va=0,vb=0;Root a,b;int32_t direction=0;Weight left,right;Context*context()const{return a.context();}};
+struct Edge{uint32_t source=0,va=0,vb=0;Root a,b;int32_t direction=0;Weight left,right;SABoundaryEdge output{};Context*context()const{return a.context();}};
 struct Coincidence {uint32_t a=0,b=0;Q alpha,beta,lo,hi;Context*context()const{return alpha.context();}};
 struct ExactVertexBounds{Interval x,y;bool initialized=false;};
-struct GraphMetrics{uint64_t bvh_visits=0,pair_candidates=0,pair_proofs=0,pair_cache_hits=0,pair_hits=0,classifications=0,classification_cache_hits=0,winding_curves=0,classification_refinements=0;};
+struct GraphMetrics{uint64_t bvh_visits=0,pair_candidates=0,pair_proofs=0,pair_cache_hits=0,pair_hits=0,classifications=0,classification_cache_hits=0,winding_curves=0,classification_refinements=0,retained_blocks=0,assembled_arcs=0,flow_vertices=0,output_edges=0;};
 struct Graph {
-    Pointer<PolynomialContext>math;SABoundaryBudget budget{};Vector<SABoundaryPath>paths;PagedVector<CapturedBlock>blocks;PagedVector<SourceCurve>curves;PagedVector<uint32_t,6>curve_table,source_table,free_curves,free_blocks;uint32_t active_commands=0,active_sources=0,pair_count=0;uint64_t next_curve_identity=1;PagedVector<PairSlot>pair_table;
-    Record<BlockNode>block_tree,curve_tree;PagedVector<Vector<Cut>>cuts;PagedVector<uint32_t,6>parent;PagedVector<ExactVertexBounds>vertex_bounds;Vector<Edge>edges;Vector<Coincidence>coincidences;GraphMetrics metrics;uint32_t cut_count=0;
-    Graph(PolynomialContext&c,const SABoundaryBudget&b):math(&c),budget(b),paths(c.numbers),blocks(c.numbers),curves(c.numbers),curve_table(c.numbers),source_table(c.numbers),free_curves(c.numbers),free_blocks(c.numbers),pair_table(c.numbers),cuts(c.numbers),parent(c.numbers),vertex_bounds(c.numbers),edges(c.numbers),coincidences(c.numbers){}
+    Pointer<PolynomialContext>math;SABoundaryBudget budget{};Vector<SABoundaryPath>paths;PagedVector<CapturedBlock>blocks;PagedVector<SourceCurve>curves;PagedVector<uint32_t,6>curve_table,source_table,free_curves,free_blocks;uint32_t active_commands=0,active_sources=0,pair_count=0;uint64_t next_curve_identity=1,next_output_revision=1,output_epoch=1;bool output_reset=true;PagedVector<PairSlot>pair_table;
+    Record<BlockNode>block_tree,curve_tree;PagedVector<Vector<Cut>>cuts;PagedVector<uint32_t,6>parent;PagedVector<ExactVertexBounds>vertex_bounds;ChunkTree<Edge>edges;Vector<SABoundaryBlockChange>output_changes;Vector<Coincidence>coincidences;GraphMetrics metrics;uint32_t cut_count=0;
+    Graph(PolynomialContext&c,const SABoundaryBudget&b,uint64_t epoch=1):math(&c),budget(b),paths(c.numbers),blocks(c.numbers),curves(c.numbers),curve_table(c.numbers),source_table(c.numbers),free_curves(c.numbers),free_blocks(c.numbers),pair_table(c.numbers),cuts(c.numbers),parent(c.numbers),vertex_bounds(c.numbers),edges(c.numbers),output_changes(c.numbers),coincidences(c.numbers){output_epoch=epoch;}
     Context*context()const{return&math->numbers;}bool good()const{return math->numbers.status==SA_INK_OK;}bool step(){return math->step();}
 };
 template<class T,class Less>inline void sort(Vector<T>&values,Less less){uint32_t n=values.size();if(n<2||!values.context()||values.context()->status)return;auto sift=[&](uint32_t root,uint32_t end){for(;;){if(values.context()->status)return;uint32_t child=root*2+1;if(child>=end)return;if(child+1<end&&less(values[child],values[child+1]))++child;if(!less(values[root],values[child]))return;T swap=values[root];values[root]=values[child];values[child]=swap;root=child;}};for(uint32_t i=n/2;i&&!values.context()->status;i--)sift(i-1,n);for(uint32_t i=n;i>1&&!values.context()->status;i--){T swap=values[0];values[0]=values[i-1];values[i-1]=swap;sift(0,i-1);}}
@@ -187,9 +188,18 @@ inline bool neighborhood(Graph&g,const Point&center,const Point&T,const Point&N,
     return g.good();
 }
 inline bool separate(const Graph&g,Root&a,Root&b){for(uint32_t i=0;i<256&&g.good();i++){if(a.upper<b.lower)return true;refine(a);refine(b);}if(g.good())g.context()->fail(SA_INK_RANGE);return false;}
+inline SABoundaryBlockKey block_key(const Graph&g,uint32_t slot,const ChunkTree<Edge>::Chunk*chunk){return chunk?SABoundaryBlockKey{g.output_epoch,chunk->identity,chunk->revision,slot,0}:SABoundaryBlockKey{};}
+inline void append_edge(Graph&g,Edge edge){
+    if(g.next_output_revision==UINT64_MAX){g.context()->fail(SA_INK_CAPACITY);return;}const auto&source=static_cast<const Graph&>(g).curves[edge.source];if(source.origins.empty()){g.context()->fail(SA_INK_RANGE);return;}
+    const auto&origin=source.origins[0];const auto&curve=source.geometry;auto&item=edge.output;item.source=static_cast<const Graph&>(g).blocks[origin.source].description.key;item.command_index=origin.command;item.degree=curve.controls.size()-1;item.from_vertex=edge.direction>0?edge.va:edge.vb;item.to_vertex=edge.direction>0?edge.vb:edge.va;item.flags=origin.flags;item.direction=edge.direction;
+    item.origin[0]=lower(curve.controls[0].x);item.origin[1]=lower(curve.controls[0].y);Q ox=Q::from_double(*g.context(),item.origin[0]),oy=Q::from_double(*g.context(),item.origin[1]);
+    for(uint32_t j=0;j<curve.controls.size()&&g.good();j++){item.controls[j*2]=lower(curve.controls[j].x-ox);item.controls[j*2+1]=lower(curve.controls[j].y-oy);if(!finite_double(item.controls[j*2])||!finite_double(item.controls[j*2+1]))g.context()->fail(SA_INK_RANGE);}
+    item.parameter_bounds[0]=lower(edge.a.lower);item.parameter_bounds[1]=upper(edge.a.upper);item.parameter_bounds[2]=lower(edge.b.lower);item.parameter_bounds[3]=upper(edge.b.upper);const auto*old=g.edges.chunk(edge.source);uint32_t local=old?old->values.size():0;item.parameter_certificate[0]=local*2;item.parameter_certificate[1]=local*2+1;
+    if(g.good()&&g.edges.append(edge.source,source.identity,g.next_output_revision++,edge))++g.metrics.output_edges;
+}
 inline void classify(Graph&g,uint32_t index,uint32_t cut_index,Root a,Root b,uint32_t va,uint32_t vb){
     const auto&owned=static_cast<const Graph&>(g).curves[index];
-    if(owned.membership_valid&&owned.cache_generation==owned.cuts_generation){uint32_t lo=0,hi=owned.classes.size();while(lo<hi){uint32_t mid=lo+(hi-lo)/2;if(owned.classes[mid].cut<cut_index)lo=mid+1;else hi=mid;}if(lo<owned.classes.size()&&owned.classes[lo].cut==cut_index){const auto&cached=owned.classes[lo];++g.metrics.classification_cache_hits;if(cached.direction){if(g.edges.size()>=g.budget.max_edges){g.context()->fail(SA_INK_CAPACITY);return;}g.edges.push_back({index,find(g,va),find(g,vb),a,b,cached.direction,cached.left,cached.right});}return;}}
+    if(owned.membership_valid&&owned.cache_generation==owned.cuts_generation){uint32_t lo=0,hi=owned.classes.size();while(lo<hi){uint32_t mid=lo+(hi-lo)/2;if(owned.classes[mid].cut<cut_index)lo=mid+1;else hi=mid;}if(lo<owned.classes.size()&&owned.classes[lo].cut==cut_index){const auto&cached=owned.classes[lo];++g.metrics.classification_cache_hits;if(cached.direction){if(g.edges.size()>=g.budget.max_edges){g.context()->fail(SA_INK_CAPACITY);return;}append_edge(g,{index,find(g,va),find(g,vb),a,b,cached.direction,cached.left,cached.right});}return;}}
     if(!g.good()||compare(a,b)>=0||!separate(g,a,b))return;
     Q t=(a.upper+b.lower)/Q(2);const auto&curve=static_cast<const Graph&>(g).curves[index].geometry;
     Point C=at(curve,t),T=tangent(curve,t),N{-T.y,T.x};Q nx=N.x.absolute(),ny=N.y.absolute(),norm=nx>ny?nx:ny;
@@ -203,22 +213,26 @@ inline void classify(Graph&g,uint32_t index,uint32_t cut_index,Root a,Root b,uin
     g.cuts[index][cut_index].parameter=a;g.cuts[index][cut_index+1].parameter=b;
     auto&cached=g.curves[index];if(!cached.membership_valid||cached.cache_generation!=cached.cuts_generation){cached.classes.clear();cached.cache_generation=cached.cuts_generation;}cached.membership_valid=true;cached.classes.push_back({cut_index,a_filled==b_filled?0:a_filled?1:-1,left,right});if(a_filled==b_filled)return;
     if(g.edges.size()>=g.budget.max_edges){g.context()->fail(SA_INK_CAPACITY);return;}
-    g.edges.push_back({index,find(g,va),find(g,vb),a,b,a_filled?1:-1,left,right});
+    append_edge(g,{index,find(g,va),find(g,vb),a,b,a_filled?1:-1,left,right});
 }
 struct Arc{uint32_t curve=0,cut=0,va=0,vb=0;};
 struct ArcLookup{uint32_t curve=0,va=0,vb=0,arc=0;};
 inline uint64_t triple_hash(uint32_t a,uint32_t b,uint32_t c){uint64_t h=1469598103934665603ull;return mix(mix(mix(h,a),b),c);}
 inline uint32_t group_root(Vector<uint32_t>&groups,uint32_t i){while(groups.context()->status==SA_INK_OK&&groups[i]!=i){groups[i]=groups[groups[i]];i=groups[i];}return i;}
-inline void finish_graph(Graph&g){if(!g.good())return;
-    Vector<Arc>arcs(*g.context());Vector<uint32_t>starts(*g.context());starts.resize(g.curves.size()+1);
-    for(uint32_t i=0;i<g.curves.size()&&g.good();i++){
+inline void finish_graph(Graph&g,const Vector<uint32_t>*selection=nullptr){if(!g.good())return;g.edges.reset_metrics();
+    Vector<uint32_t>ordered(*g.context());if(selection)ordered=*selection;else for(uint32_t i=0;i<g.curves.size()&&g.good();i++)ordered.push_back(i);sort(ordered,[](uint32_t a,uint32_t b){return a<b;});
+    PagedVector<int64_t,4>balance(*g.context());balance.resize(g.parent.size());PagedVector<uint32_t,6>seen(*g.context());seen.resize(g.parent.size());Vector<uint32_t>touched(*g.context());
+    auto flow=[&](const Edge&e,int64_t multiplier){uint32_t a=find(g,e.va),b=find(g,e.vb);if(!static_cast<const PagedVector<uint32_t,6>&>(seen)[a]){seen[a]=1;touched.push_back(a);}if(!static_cast<const PagedVector<uint32_t,6>&>(seen)[b]){seen[b]=1;touched.push_back(b);}balance[a]+=multiplier*e.direction;balance[b]-=multiplier*e.direction;};
+    g.output_changes.clear();uint32_t retained=g.edges.chunk_count();for(uint32_t i:ordered){if(!g.good())return;SABoundaryBlockChange change{};const auto*old=g.edges.chunk(i);change.before=block_key(g,i,old);if(old){change.before_edges=old->values.size();for(const auto&e:old->values)flow(e,-1);--retained;}g.output_changes.push_back(change);g.edges.erase(i);}g.metrics.retained_blocks=retained;
+    Vector<Arc>arcs(*g.context());PagedVector<uint32_t,6>starts(*g.context()),ends(*g.context());starts.resize(g.curves.size());ends.resize(g.curves.size());
+    for(uint32_t i:ordered){if(!g.good()||!g.step())return;
         starts[i]=arcs.size();if(!static_cast<const Graph&>(g).curves[i].cuts_sorted){sort(g.cuts[i],[](const Cut&a,const Cut&b){return compare(a.parameter,b.parameter)<0;});g.curves[i].cuts_sorted=true;}const auto&cuts=static_cast<const Graph&>(g).cuts[i];
         for(uint32_t k=0;k+1<cuts.size()&&g.good();k++){
             if(arcs.size()>=g.budget.max_cuts){g.context()->fail(SA_INK_CAPACITY);return;}
-            arcs.push_back({i,k,find(g,cuts[k].vertex),find(g,cuts[k+1].vertex)});
-        }
+            arcs.push_back({i,k,find(g,cuts[k].vertex),find(g,cuts[k+1].vertex)});++g.metrics.assembled_arcs;
+        }ends[i]=arcs.size();
     }
-    starts[g.curves.size()]=arcs.size();Vector<uint32_t>groups(*g.context());groups.resize(arcs.size());
+    Vector<uint32_t>groups(*g.context());groups.resize(arcs.size());
     uint32_t capacity=8;while(uint64_t(capacity)<uint64_t(arcs.size())*2){if(capacity>0x40000000u){g.context()->fail(SA_INK_CAPACITY);return;}capacity*=2;}
     Vector<ArcLookup>lookup(*g.context());lookup.resize(capacity);
     for(uint32_t i=0;i<arcs.size()&&g.good();i++){
@@ -226,7 +240,7 @@ inline void finish_graph(Graph&g){if(!g.good())return;
         while(lookup[slot].arc&&g.good()){const auto&old=lookup[slot];if(old.curve==a.curve&&old.va==a.va&&old.vb==a.vb){g.context()->fail(SA_INK_RANGE);return;}slot=(slot+1)&(capacity-1);g.step();}
         lookup[slot]={a.curve,a.va,a.vb,i+1};
     }
-    for(const auto&relation:g.coincidences)for(uint32_t i=starts[relation.a];i<starts[relation.a+1]&&g.good();i++){
+    for(const auto&relation:g.coincidences)for(uint32_t i=starts[relation.a];i<ends[relation.a]&&g.good();i++){
         const auto&a=arcs[i];Root ca=static_cast<const Graph&>(g).cuts[a.curve][a.cut].parameter,cb=static_cast<const Graph&>(g).cuts[a.curve][a.cut+1].parameter;
         if(!separate(g,ca,cb))return;Q mid=(ca.upper+cb.lower)/Q(2);if(mid<relation.lo||mid>relation.hi)continue;
         uint32_t va=relation.alpha>Q(0)?a.va:a.vb,vb=relation.alpha>Q(0)?a.vb:a.va;
@@ -235,11 +249,11 @@ inline void finish_graph(Graph&g){if(!g.good())return;
         if(other==no_index){g.context()->fail(SA_INK_RANGE);return;}groups[group_root(groups,other)]=group_root(groups,i);
     }
     for(uint32_t i=0;i<arcs.size()&&g.good();i++)if(group_root(groups,i)==i){const auto&a=arcs[i];classify(g,a.curve,a.cut,static_cast<const Graph&>(g).cuts[a.curve][a.cut].parameter,static_cast<const Graph&>(g).cuts[a.curve][a.cut+1].parameter,a.va,a.vb);}
-    Vector<int32_t>balance(*g.context());balance.resize(g.parent.size());
-    for(const auto&e:g.edges){uint32_t a=find(g,e.va),b=find(g,e.vb);balance[e.direction>0?a:b]++;balance[e.direction>0?b:a]--;}
-    for(int32_t value:balance)if(value){g.context()->fail(SA_INK_RANGE);return;}
+    for(uint32_t j=0;j<ordered.size()&&g.good();j++){uint32_t i=ordered[j];auto&change=g.output_changes[j];if(const auto*next=g.edges.chunk(i)){change.after=block_key(g,i,next);change.after_edges=next->values.size();for(const auto&e:next->values)flow(e,1);}}
+    Vector<SABoundaryBlockChange>changes(*g.context());for(const auto&change:g.output_changes)if(change.before_edges||change.after_edges)changes.push_back(change);g.output_changes=static_cast<Vector<SABoundaryBlockChange>&&>(changes);
+    for(uint32_t v:touched){++g.metrics.flow_vertices;if(static_cast<const PagedVector<int64_t,4>&>(balance)[v]){g.context()->fail(SA_INK_RANGE);return;}}
     g.vertex_bounds.resize(g.parent.size());
-    for(uint32_t i=0;i<g.curves.size()&&g.good();i++){if(!static_cast<const Graph&>(g).curves[i].bounds_dirty)continue;for(const auto&cut:static_cast<const Graph&>(g).cuts[i]){
+    for(uint32_t i:ordered){if(!g.good())return;if(!static_cast<const Graph&>(g).curves[i].bounds_dirty)continue;for(const auto&cut:static_cast<const Graph&>(g).cuts[i]){
         uint32_t v=find(g,cut.vertex);auto&b=g.vertex_bounds[v];Interval x=evaluate(g.curves[i].geometry.x,{cut.parameter.lower,cut.parameter.upper}),y=evaluate(g.curves[i].geometry.y,{cut.parameter.lower,cut.parameter.upper});
         if(!b.initialized){b={x,y,true};}else{
             b.x={b.x.lower>x.lower?b.x.lower:x.lower,b.x.upper<x.upper?b.x.upper:x.upper};
@@ -263,7 +277,7 @@ inline void initialize_curves(Graph&g,const Vector<uint32_t>&selected){
         self_cuts(g,i);
     }
 }
-inline void construct(Graph&g){Vector<uint32_t>active(*g.context());for(uint32_t i=0;i<g.curves.size()&&g.good();i++)if(!static_cast<const Graph&>(g).curves[i].weight.zero())active.push_back(i);initialize_curves(g,active);for(uint32_t id:active){if(!g.good())break;query_curves(g,static_cast<const Graph&>(g).curves[id].bounds,[&](uint32_t other){if(id<other)add_pair(g,id,other);});}propagate(g);if(g.good())finish_graph(g);}
+inline void construct(Graph&g){Vector<uint32_t>active(*g.context());for(uint32_t i=0;i<g.curves.size()&&g.good();i++)if(!static_cast<const Graph&>(g).curves[i].weight.zero())active.push_back(i);initialize_curves(g,active);for(uint32_t id:active){if(!g.good())break;query_curves(g,static_cast<const Graph&>(g).curves[id].bounds,[&](uint32_t other){if(id<other)add_pair(g,id,other);});}propagate(g);if(g.good())finish_graph(g);g.coincidences.clear();}
 inline Interval primitive_area(const Curve&c,const Root&a,const Root&b,const Q&left){
     Polynomial p=(c.x-Polynomial(*c.owner(),left))*derivative(c.y),integral(*c.owner());integral.coefficients.resize(p.coefficients.size()+1);
     for(int i=0;i<=p.degree()&&p.valid();i++)integral.coefficients[uint32_t(i)+1]=p[i]/Q(i+1);

@@ -11,10 +11,10 @@ const root=resolve(dirname(fileURLToPath(import.meta.url)),'..');
 const source=join(root,'src/surface/ink-kernel');
 const clang=process.env.SHOWAI_INK_CLANG||'clang++';
 const linker=process.env.SHOWAI_INK_WASM_LD||'wasm-ld';
-const sourceFiles=['include/showai_ink.h','include/boundary-kernel.h','boundary-kernel.cpp','boundary/number.hpp','boundary/vector.hpp','boundary/record.hpp','boundary/paged-vector.hpp','boundary/polynomial.hpp','boundary/algebra.hpp','boundary/graph.hpp','boundary/source-delta.hpp','boundary/owner.hpp','boundary/wasm-runtime.cpp'];
-const api=['sa_boundary_state_bytes','sa_boundary_initialize','sa_boundary_prepare','sa_boundary_update','sa_boundary_retain','sa_boundary_release','sa_boundary_snapshot','sa_boundary_copy_edges','sa_boundary_copy_parameter','sa_boundary_measure_coverage','sa_boundary_destroy'];
+const sourceFiles=['include/showai_ink.h','include/boundary-kernel.h','boundary-kernel.cpp','boundary/number.hpp','boundary/vector.hpp','boundary/record.hpp','boundary/paged-vector.hpp','boundary/chunk-tree.hpp','boundary/polynomial.hpp','boundary/algebra.hpp','boundary/graph.hpp','boundary/source-delta.hpp','boundary/owner.hpp','boundary/wasm-runtime.cpp'];
+const api=['sa_boundary_state_bytes','sa_boundary_capacity','sa_boundary_initialize','sa_boundary_prepare','sa_boundary_update','sa_boundary_retain','sa_boundary_release','sa_boundary_snapshot','sa_boundary_blocks_snapshot','sa_boundary_copy_blocks','sa_boundary_copy_block_changes','sa_boundary_copy_block_edges','sa_boundary_copy_block_parameter','sa_boundary_copy_edges','sa_boundary_copy_parameter','sa_boundary_measure_coverage','sa_boundary_destroy'];
 const flags=['--target=wasm32-unknown-unknown','-mbulk-memory','-std=c++17','-O2','-ffp-contract=off','-fno-fast-math','-fno-exceptions','-fno-rtti','-fno-builtin','-nostdlib'];
-const linkFlags=['--no-entry','--stack-first','-z','stack-size=2097152','--initial-memory=4194304','--max-memory=268435456','--strip-all','--export-memory','--export=__heap_base',...api.map(name=>`--export=${name}`)];
+const linkFlags=['--no-entry','--stack-first','-z','stack-size=2097152','--initial-memory=4194304','--max-memory=536870912','--strip-all','--export-memory','--export=__heap_base',...api.map(name=>`--export=${name}`)];
 const hash=bytes=>createHash('sha256').update(bytes).digest('hex');
 const temporary=await mkdtemp(join(tmpdir(),'showai-boundary-wasm-'));
 try{

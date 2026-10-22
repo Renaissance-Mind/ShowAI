@@ -49,6 +49,13 @@ typedef struct {
     uint32_t parameter_certificate[2],flags;
     int32_t direction;
 } SABoundaryEdge;
+/* Keys address immutable derived records inside a validated lease. They never
+ * prove source equality and never cross a host owner / WASM instance domain. */
+typedef struct {uint64_t epoch,curve,revision;uint32_t slot,reserved;} SABoundaryBlockKey;
+typedef struct {SABoundaryBlockKey key;uint32_t edges,reserved;} SABoundaryBlock;
+typedef struct {SABoundaryBlockKey before,after;uint32_t before_edges,after_edges;} SABoundaryBlockChange;
+typedef struct {uint64_t retained_limit_bytes,workspace_limit_bytes,backing_bytes,arena_usable_bytes,live_bytes,peak_bytes;} SABoundaryCapacity;
+typedef struct {uint32_t base_generation,reset,change_count,block_count;uint64_t assembled_arcs,flow_vertices,retained_blocks,output_tree_nodes,output_edges;} SABoundaryBlocksSnapshot;
 typedef struct {
     uint32_t source_commands,source_curves,exposed_edges,vertices;
     uint64_t polynomial_operations,limb_operations,pair_proofs,pair_cache_hits;
@@ -67,6 +74,9 @@ typedef struct {
  * prepare is synchronous, bounded and failure-atomic; base must be the owner's
  * actual latest complete lease (or null only on its first publication). */
 uint32_t sa_boundary_state_bytes(void);
+/* Cold admission/diagnostics: reports the allocator's actual usable power-of-two
+ * capacity, not merely the supplied buffer length. Does not reset work/peaks. */
+uint32_t sa_boundary_capacity(void*state,SABoundaryCapacity*output);
 uint32_t sa_boundary_initialize(void*state,uint32_t state_bytes,uint32_t owner_namespace,void*arena,uint32_t arena_bytes,const SABoundaryBudget*budget);
 uint32_t sa_boundary_prepare(void*state,const SABoundaryLease*base,const SABoundaryPath*paths,uint32_t path_count,const SABoundarySourceBlock*sources,uint32_t source_count,const SAInkPathCommand*commands,uint32_t command_count,SABoundaryLease*output);
 /* Current captured fill rules/clip paths remain in force. Each source key
@@ -78,6 +88,18 @@ uint32_t sa_boundary_retain(void*state,SABoundaryLease lease);
 uint32_t sa_boundary_release(void*state,SABoundaryLease lease);
 uint32_t sa_boundary_snapshot(void*state,SABoundaryLease lease,SABoundarySnapshot*output);
 uint32_t sa_boundary_copy_edges(void*state,SABoundaryLease lease,uint32_t first,uint32_t count,SABoundaryEdge*output,uint32_t capacity);
+/* Live consumers apply every delta against base_generation. reset denotes an
+ * explicit complete preparation. A block with a zero key is absent. Changes
+ * own their captured old/new keys; unchanged blocks keep actual immutable
+ * records and their key. Camera updates need none of these copy operations.
+ * The legacy complete edge export above is intentionally explicit work. */
+uint32_t sa_boundary_blocks_snapshot(void*state,SABoundaryLease lease,SABoundaryBlocksSnapshot*output);
+/* Explicit complete block enumeration for cold attachment/recovery. */
+uint32_t sa_boundary_copy_blocks(void*state,SABoundaryLease lease,uint32_t first,uint32_t count,SABoundaryBlock*output,uint32_t capacity);
+uint32_t sa_boundary_copy_block_changes(void*state,SABoundaryLease lease,uint32_t first,uint32_t count,SABoundaryBlockChange*output,uint32_t capacity);
+uint32_t sa_boundary_copy_block_edges(void*state,SABoundaryLease lease,SABoundaryBlockKey block,uint32_t first,uint32_t count,SABoundaryEdge*output,uint32_t capacity);
+/* Certificates from block-copy are local to that exact immutable block key. */
+uint32_t sa_boundary_copy_block_parameter(void*state,SABoundaryLease lease,SABoundaryBlockKey block,uint32_t certificate,uint32_t*output,uint32_t capacity,uint32_t*required);
 /* Exact parameter certificate: [coefficient_count, Q..., lowerQ, upperQ]. Each
  * Q is [sign-as-int32,numerator_count,denominator_count,LE32 limbs...]. The
  * source polynomial and isolating interval remain authoritative. controls and
