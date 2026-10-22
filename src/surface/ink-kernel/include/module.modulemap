@@ -3,5 +3,9 @@ module ShowAIInkKernel {
     header "ink-input-kernel.h"
     header "analytic-path.h"
     header "ink-stroke-kernel.h"
+    explicit module PrivateStrokePlan {
+        header "stroke-plan-private.h"
+        export *
+    }
     export *
 }

@@ -1,4 +1,9 @@
 #include "include/ink-stroke-kernel.h"
+#include "stroke-path-checked.hpp"
+#if !defined(__wasm__)
+#include "include/stroke-plan-private.h"
+#include <new>
+#endif
 
 // Independent circular-sweep mathematics, not recovered vendor implementation.
 // Formula and singular cases:
@@ -25,6 +30,7 @@ struct Run {
   SAInkStrokeResult result{};
   SAInkPathCommand *output;
   SAInkStatus status = SA_INK_OK;
+  uint32_t output_capacity = 0xffffffffu;
   bool pending_fallback = false;
   Curve pending{};
   V fan_origin{};
@@ -35,6 +41,7 @@ struct Run {
   V fit_first_l{}, fit_first_r{}, fit_last_l{}, fit_last_r{};
 };
 static double abs(double v) { return v < 0 ? -v : v; }
+static double stroke_abs(double v) { return abs(v); }
 static double max(double a, double b) { return a > b ? a : b; }
 static double min(double a, double b) { return a < b ? a : b; }
 static bool finite(double x) { return __builtin_isfinite(x); }
@@ -420,7 +427,7 @@ static void command(Run &r, uint32_t op, V a = {0, 0}, V b = {0, 0},
                     V c = {0, 0}) {
   if (r.status != SA_INK_OK)
     return;
-  if (r.result.commands >= r.o.max_commands) {
+  if (r.result.commands >= r.o.max_commands || (r.output && r.result.commands >= r.output_capacity)) {
     r.status = SA_INK_CAPACITY;
     return;
   }
@@ -1098,7 +1105,7 @@ static bool gradualBinary64() {
 static SAInkStatus prepare(const SAInkStrokeSegment *segments, uint32_t count,
                            const SAInkStrokeOptions *o,
                            SAInkPathCommand *output,
-                           SAInkStrokeResult &result) {
+                           SAInkStrokeResult &result, uint32_t output_capacity = 0xffffffffu) {
   if (!span(o, sizeof(*o)) || !aligned(o) ||
       !span(segments, uint64_t(count) * sizeof(*segments)) || count > 100000 ||
       (count && !aligned(segments)) ||
@@ -1112,7 +1119,7 @@ static SAInkStatus prepare(const SAInkStrokeSegment *segments, uint32_t count,
     if (s.degree > 3 || s.reserved)
       return SA_INK_INVALID;
     for (uint32_t k = 0; k < 8; k++)
-      if (!finite(s.controls[k]) || abs(s.controls[k]) > 1e6 ||
+      if (!finite(s.controls[k]) || stroke_abs(s.controls[k]) > 1e6 ||
           (k > 2 * s.degree + 1 && s.controls[k] != 0))
         return SA_INK_INVALID;
     for (uint32_t k = 0; k < 2; k++)
@@ -1124,6 +1131,11 @@ static SAInkStatus prepare(const SAInkStrokeSegment *segments, uint32_t count,
   if (!gradualBinary64())
     return SA_INK_RANGE;
   Run run{*o, {}, output, SA_INK_OK};
+  run.output_capacity = output_capacity;
+#ifdef SHOWAI_STROKE_WALK_COUNTERS
+  extern void observe_stroke_walk(bool);
+  observe_stroke_walk(output != nullptr);
+#endif
   bool pendingRegular = false;
   Curve previous{};
   for (uint32_t i = 0; i < count && run.status == SA_INK_OK; i++) {
@@ -1158,6 +1170,149 @@ static SAInkStatus prepare(const SAInkStrokeSegment *segments, uint32_t count,
   return run.status;
 }
 } // namespace
+namespace showai_stroke_internal {
+#ifdef SHOWAI_STROKE_WALK_COUNTERS
+static WalkWork observed{};
+void reset_walk_work() { observed = {}; }
+WalkWork walk_work() { return observed; }
+#endif
+EmissionPlan::EmissionPlan(const SAInkStrokeSegment *s, uint32_t n,
+                           const SAInkStrokeOptions *o)
+    : source_(s), count_(n), original_options_(o),
+      status_(sa_stroke_path_counts(s, n, o, &required_)) {
+  if (status_ == SA_INK_OK)
+    options_ = *o;
+}
+bool EmissionPlan::overlaps_input(const void *p, uint64_t n) const {
+  return overlap(p, n, source_, uint64_t(count_) * sizeof(*source_)) ||
+         overlap(p, n, original_options_, sizeof(options_)) ||
+         overlap(p, n, this, sizeof(*this));
+}
+SAInkStatus EmissionPlan::counts(SAInkStrokeResult *out) const {
+  if (status_ != SA_INK_OK)
+    return status_;
+  if (!span(out, sizeof(*out)) || !aligned(out) ||
+      overlaps_input(out, sizeof(*out)))
+    return SA_INK_INVALID;
+  *out = required_;
+  return SA_INK_OK;
+}
+SAInkStatus EmissionPlan::emit(SAInkPathCommand *commands, uint32_t capacity,
+                               SAInkStrokeResult *out) const {
+  if (!span(out, sizeof(*out)) || !aligned(out))
+    return SA_INK_INVALID;
+  if (status_ != SA_INK_OK)
+    return status_;
+  if (capacity < required_.commands)
+    return SA_INK_CAPACITY;
+  if (required_.commands && (!commands || !aligned(commands)))
+    return SA_INK_INVALID;
+  const uint64_t bytes = uint64_t(required_.commands) * sizeof(*commands);
+  if (!span(commands, bytes) || overlaps_input(commands, bytes) ||
+      overlaps_input(out, sizeof(*out)) ||
+      overlap(out, sizeof(*out), commands, bytes))
+    return SA_INK_INVALID;
+  SAInkStrokeResult actual{};
+  auto status = prepare(source_, count_, &options_, commands, actual, capacity);
+  if (status != SA_INK_OK)
+    return status;
+  if (actual.commands != required_.commands ||
+      actual.contours != required_.contours ||
+      actual.leaves != required_.leaves ||
+      actual.envelope_curves != required_.envelope_curves ||
+      actual.fallback_leaves != required_.fallback_leaves ||
+      actual.fallback_contours != required_.fallback_contours ||
+      actual.sampled_checks != required_.sampled_checks ||
+      actual.maximum_depth != required_.maximum_depth ||
+      actual.sampled_envelope_error != required_.sampled_envelope_error ||
+      actual.fallback_center_bound != required_.fallback_center_bound ||
+      actual.arc_error_bound != required_.arc_error_bound)
+    return SA_INK_INVALID;
+  *out = actual;
+  return SA_INK_OK;
+}
+} // namespace showai_stroke_internal
+#ifdef SHOWAI_STROKE_WALK_COUNTERS
+namespace {
+void observe_stroke_walk(bool emission) {
+  if (emission)
+    ++showai_stroke_internal::observed.emissions;
+  else
+    ++showai_stroke_internal::observed.counts;
+}
+} // namespace
+#endif
+#if !defined(__wasm__)
+namespace {
+struct alignas(16) NativeStrokePlan {
+  uint64_t magic = 0x5354524f4b455031ull;
+  const NativeStrokePlan *owner = this;
+  showai_stroke_internal::EmissionPlan plan;
+  NativeStrokePlan(const SAInkStrokeSegment *s, uint32_t n,
+                   const SAInkStrokeOptions *o)
+      : plan(s, n, o) {}
+};
+bool valid_stroke_plan(const void *p) {
+  return span(p, sizeof(NativeStrokePlan)) &&
+         (uintptr_t(p) % alignof(NativeStrokePlan) == 0) &&
+         static_cast<const NativeStrokePlan *>(p)->magic ==
+             0x5354524f4b455031ull &&
+         static_cast<const NativeStrokePlan *>(p)->owner == p;
+}
+} // namespace
+extern "C" {
+uint32_t showai_private_stroke_plan_bytes() { return sizeof(NativeStrokePlan); }
+SAInkStatus showai_private_stroke_plan_initialize(void *p, uint32_t bytes,
+                                                  const SAInkStrokeSegment *s,
+                                                  uint32_t n,
+                                                  const SAInkStrokeOptions *o) {
+  if (bytes < sizeof(NativeStrokePlan) || !span(p, bytes) ||
+      uintptr_t(p) % alignof(NativeStrokePlan) ||
+      overlap(p, bytes, s, uint64_t(n) * sizeof(*s)) ||
+      overlap(p, bytes, o, sizeof(*o)))
+    return SA_INK_INVALID;
+  // Native owner zero-initializes fresh storage. Never overwrite a live plan.
+  if (valid_stroke_plan(p))
+    return SA_INK_INVALID;
+  auto *state = new (p) NativeStrokePlan(s, n, o);
+  auto status = state->plan.status();
+  if (status != SA_INK_OK) {
+    state->magic = 0;
+    state->owner = nullptr;
+    state->~NativeStrokePlan();
+  }
+  return status;
+}
+SAInkStatus showai_private_stroke_plan_counts(const void *p,
+                                              SAInkStrokeResult *out) {
+  if (!valid_stroke_plan(p) ||
+      overlap(out, sizeof(*out), p, sizeof(NativeStrokePlan)))
+    return SA_INK_INVALID;
+  return static_cast<const NativeStrokePlan *>(p)->plan.counts(out);
+}
+SAInkStatus showai_private_stroke_plan_build(const void *p,
+                                             SAInkPathCommand *out,
+                                             uint32_t capacity,
+                                             SAInkStrokeResult *result) {
+  if (!valid_stroke_plan(p) ||
+      overlap(out, uint64_t(capacity) * sizeof(*out), p,
+              sizeof(NativeStrokePlan)) ||
+      overlap(result, sizeof(*result), p, sizeof(NativeStrokePlan)))
+    return SA_INK_INVALID;
+  return static_cast<const NativeStrokePlan *>(p)->plan.emit(out, capacity,
+                                                             result);
+}
+SAInkStatus showai_private_stroke_plan_destroy(void *p) {
+  if (!valid_stroke_plan(p))
+    return SA_INK_INVALID;
+  auto *state = static_cast<NativeStrokePlan *>(p);
+  state->magic = 0;
+  state->owner = nullptr;
+  state->~NativeStrokePlan();
+  return SA_INK_OK;
+}
+}
+#endif
 extern "C" {
 uint32_t sa_stroke_geometry_version() { return SA_INK_STROKE_GEOMETRY_VERSION; }
 uint32_t sa_stroke_sizeof_segment() { return sizeof(SAInkStrokeSegment); }
@@ -1187,7 +1342,7 @@ SAInkStatus sa_stroke_resolve_segments(const SAInkStrokeSegment *input,
     if (s.degree > 3 || s.reserved)
       return SA_INK_INVALID;
     for (uint32_t k = 0; k < 8; k++)
-      if (!finite(s.controls[k]) || abs(s.controls[k]) > 1e6 ||
+      if (!finite(s.controls[k]) || stroke_abs(s.controls[k]) > 1e6 ||
           (k > 2 * s.degree + 1 && s.controls[k] != 0))
         return SA_INK_INVALID;
     for (uint32_t k = 0; k < 2; k++) {
@@ -1227,26 +1382,8 @@ SAInkStatus sa_stroke_path_build(const SAInkStrokeSegment *s, uint32_t n,
                                  SAInkStrokeResult *out) {
   if (!span(out, sizeof(*out)) || !aligned(out))
     return SA_INK_INVALID;
-  SAInkStrokeResult result;
-  auto status = prepare(s, n, o, nullptr, result);
-  if (status != SA_INK_OK)
-    return status;
-  if (capacity < result.commands)
-    return SA_INK_CAPACITY;
-  if (result.commands && (!commands || !aligned(commands)))
-    return SA_INK_INVALID;
-  uint64_t bytes = uint64_t(result.commands) * sizeof(*commands),
-           input = uint64_t(n) * sizeof(*s);
-  if (overlap(commands, bytes, s, input) ||
-      overlap(commands, bytes, o, sizeof(*o)) ||
-      overlap(out, sizeof(*out), commands, bytes) ||
-      overlap(out, sizeof(*out), s, input) ||
-      overlap(out, sizeof(*out), o, sizeof(*o)))
-    return SA_INK_INVALID;
-  status = prepare(s, n, o, commands, result);
-  if (status == SA_INK_OK)
-    *out = result;
-  return status;
+  const showai_stroke_internal::EmissionPlan plan(s,n,o);
+  return plan.emit(commands,capacity,out);
 }
 }
 

@@ -11,7 +11,7 @@ const clang = process.env.SHOWAI_INK_CLANG || 'clang++';
 const linker = process.env.SHOWAI_INK_WASM_LD || 'wasm-ld';
 const temporary = await mkdtemp(join(tmpdir(), 'showai-ink-wasm-'));
 const hash = bytes => createHash('sha256').update(bytes).digest('hex');
-const sources = ['include/showai_ink.h', 'showai_ink.cpp', 'include/ink-input-kernel.h', 'ink-input-kernel.cpp', 'include/analytic-path.h', 'analytic-path-checked.hpp', 'analytic-path.cpp', 'include/ink-stroke-kernel.h', 'ink-stroke-kernel.cpp', 'include/module.modulemap'];
+const sources = ['include/showai_ink.h', 'showai_ink.cpp', 'include/ink-input-kernel.h', 'ink-input-kernel.cpp', 'include/analytic-path.h', 'analytic-path-checked.hpp', 'analytic-path.cpp', 'include/ink-stroke-kernel.h', 'stroke-path-checked.hpp', 'include/stroke-plan-private.h', 'ink-stroke-kernel.cpp', 'include/module.modulemap'];
 const compilerFlags = ['--target=wasm32-unknown-unknown', '-mbulk-memory', '-std=c++17', '-O3', '-ffp-contract=off', '-fno-exceptions', '-fno-rtti', '-fno-builtin', '-nostdlib'];
 try {
   const object = join(temporary, 'ink.o'), inputObject = join(temporary, 'input.o'), analyticObject = join(temporary, 'analytic.o'), strokeObject = join(temporary, 'stroke.o'), wasm = join(temporary, 'ink.wasm');
