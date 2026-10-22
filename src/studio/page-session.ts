@@ -1,3 +1,4 @@
+import {flushPortableInputs,portableInputsPending,stopPortableInputs} from "../surface/portable-input-scope";
 import {shareNativeSource} from "../surface/native-source-delta.mjs";
 import {OwnedSourceSession,createSourceTransport,sourceSessionFor} from "../surface/source-client";
 import {isOwnedSource,type SourceSnapshotDelta} from "../surface/source-runtime";
@@ -80,7 +81,7 @@ export interface PageSession {
   isDirty(): boolean;
   isBusy(): boolean;
   isDurable(): boolean;
-  dispose(): void;
+  dispose(): Promise<void>;
 }
 export interface PageSessionOptions {
   clientId: string;
@@ -114,7 +115,8 @@ const ref = <T>(current: T) => ({ current });
 export function createPageSession(options: PageSessionOptions): PageSession {
   const listeners = new Set<() => void>();
   const metadataListeners = new Set<() => void>();
-  let disposed = false;
+  let disposed = false,retiring=false;
+  let retirement:Promise<void>|undefined;
   let notifying = false;
   let metadataChanged = false;
   let durableSequence = 0;
@@ -272,8 +274,9 @@ export function createPageSession(options: PageSessionOptions): PageSession {
   let sourceOwner:OwnedSourceSession|undefined;
   const retireSourceOwner=(owner:OwnedSourceSession|undefined)=>{
     if(!owner)return;
+    stopPortableInputs(owner);
     const writes=[...(pending.current?[pending.current]:[]),...draftWrites.current.values()];
-    void Promise.allSettled(writes).then(()=>owner.dispose()).catch(reason=>{
+    void flushPortableInputs(owner,true).then(()=>Promise.allSettled(writes)).then(()=>owner.dispose()).catch(reason=>{
       console.error("Source owner retirement failed",errorCode(reason));
     });
   };
@@ -421,6 +424,8 @@ export function createPageSession(options: PageSessionOptions): PageSession {
   };
 
   const flush = async (settle = true): Promise<boolean> => {
+    if(disposed)return false;
+    await flushPortableInputs(sourceOwner,settle);
     if(disposed)return false;
     if (pending.current) {
       const succeeded = await pending.current;
@@ -852,7 +857,7 @@ export function createPageSession(options: PageSessionOptions): PageSession {
   };
 
   const edit = (patch: Partial<ShowDocument>) => {
-    if (disposed || !current.current || recordRef.current?.readOnly) return;
+    if (disposed || !current.current || recordRef.current?.readOnly || (patch.id!==undefined&&patch.id!==current.current.id) || (retiring&&sourceSessionFor(patch as ShowDocument)!==sourceOwner)) return;
     const next = {
       ...current.current,
       ...patch,
@@ -1185,6 +1190,7 @@ export function createPageSession(options: PageSessionOptions): PageSession {
   };
 
   const retainDraft = async () => {
+    await flushPortableInputs(sourceOwner,false);
     if (current.current && projectRef.current)
       await persist(current.current, revision.current, projectRef.current);
   };
@@ -1214,7 +1220,7 @@ export function createPageSession(options: PageSessionOptions): PageSession {
   let saveStartedAt = 0;
   function scheduleSave() {
     if (
-      disposed ||
+      disposed ||retiring||
       blocked.current ||
       revision.current <= savedRevision.current
     )
@@ -1233,7 +1239,7 @@ export function createPageSession(options: PageSessionOptions): PageSession {
   }
   function scheduleDraft() {
     if (
-      disposed ||
+      disposed ||retiring||
       draftTimer.current ||
       revision.current <= savedRevision.current
     )
@@ -1260,6 +1266,7 @@ export function createPageSession(options: PageSessionOptions): PageSession {
   }
   const leave = async (): Promise<boolean> => {
     try {
+      await flushPortableInputs(sourceOwner,true);
       while (
         current.current &&
         projectRef.current &&
@@ -1312,18 +1319,31 @@ export function createPageSession(options: PageSessionOptions): PageSession {
     prepareResolution,
     prepareExternalResolution,
     clear,
-    isDirty: () => revision.current > savedRevision.current,
-    isBusy: () => !!pending.current || !!draftWrites.current.size,
+    isDirty: () => portableInputsPending(sourceOwner)||revision.current > savedRevision.current,
+    isBusy: () => portableInputsPending(sourceOwner)||!!pending.current || !!draftWrites.current.size,
     isDurable: () =>
-      durableSequence >= revision.current ||
-      revision.current <= savedRevision.current,
+      !portableInputsPending(sourceOwner)&&(durableSequence >= revision.current ||
+      revision.current <= savedRevision.current),
     dispose() {
-      disposed = true;
-      retireSourceOwner(sourceOwner);
-      clearTimeout(autoSaveTimer.current);
-      clearTimeout(draftTimer.current);
-      listeners.clear();
-      metadataListeners.clear();
+      if(retirement)return retirement;
+      retiring=true;stopPortableInputs(sourceOwner);
+      clearTimeout(autoSaveTimer.current);clearTimeout(draftTimer.current);
+      retirement=(async()=>{
+        // Existing accepted contacts are still real writers during retirement.
+        // Keep update callbacks alive until they have published and retained
+        // their actual full source; only then may the owner/Worker be retired.
+        await flushPortableInputs(sourceOwner,true);
+        if(current.current&&projectRef.current&&durableSequence<revision.current)
+          await persist(current.current,revision.current,projectRef.current);
+        while(pending.current||draftWrites.current.size){
+          const writes=[...(pending.current?[pending.current]:[]),...draftWrites.current.values()];
+          await Promise.all(writes);
+        }
+        await sourceOwner?.dispose();disposed=true;
+        clearTimeout(autoSaveTimer.current);clearTimeout(draftTimer.current);
+        listeners.clear();metadataListeners.clear();
+      })().catch(reason=>{retiring=false;retirement=undefined;throw reason});
+      return retirement;
     },
   };
   snapshot = readSnapshot();

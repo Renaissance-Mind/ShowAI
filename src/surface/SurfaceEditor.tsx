@@ -1,3 +1,6 @@
+import {PortableCubicContext} from "./PortableCubicContext";
+import {PortableInputScope,type PortableInputReservation} from "./portable-input-scope";
+import {appendNewPortableInk,appendPortableInkFromSource} from "./portable-ink-append.mjs";
 import {sourceSessionFor,diffOwnedSource,type OwnedSourceSession} from "./source-client";
 import {measureNativeSync} from "./native-perf";
 import { rebaseHistorySnapshots } from "./history-rebase";
@@ -114,6 +117,7 @@ function SurfaceEditor({
     at: number;
     inkActions?: Map<ContainerDocument,NativeInkHistoryAction>;
   }>(restored?.history ?? { past: [], future: [], group: "", at: 0 });
+  const pendingInkEdges=useRef(new Map<ContainerDocument,string>());
   const inkActions=useRef(history.current.inkActions??new Map<ContainerDocument,NativeInkHistoryAction>());
   useLayoutEffect(
     () => () => {
@@ -162,7 +166,9 @@ function SurfaceEditor({
       for(const value of projections){
         const old=value.before as ContainerDocument,action=inkActions.current.get(old);
         if(!history.current.past.includes(old)&&!history.current.future.includes(old))continue;
-        const next=value.unchanged&&!action?null:value.document as ContainerDocument;
+        const pending=pendingInkEdges.current.get(old);
+        const next=value.unchanged&&!action&&!pending?null:value.document as ContainerDocument;
+        pendingInkEdges.current.delete(old);if(next&&pending)pendingInkEdges.current.set(next,pending);
         replacement.set(old,next);if(next)historyReplacements.current.set(old,next);inkActions.current.delete(old);if(next&&action)inkActions.current.set(next,action);
       }
       const apply=(values:ContainerDocument[])=>values.flatMap(value=>replacement.has(value)?replacement.get(value)?[replacement.get(value)!]:[]:[value]);
@@ -177,6 +183,10 @@ function SurfaceEditor({
     const owner=sourceSessionFor(current.current);if(!owner||owner.disposed)return;
     void historyTail.current.then(()=>owner.releaseLease(historyLease.current)).catch(error=>{console.error("Source history retirement failed",error)});
   },[retainedState]);
+  const reservePortable=useRef<PortableInputReservation>(()=>{throw new Error("Portable input reservation is not installed")});
+  const portableScope=useMemo(()=>new PortableInputScope(options=>reservePortable.current(options),sourceSessionFor(document)),[document.id,sourceSessionFor(document)]);
+  const portableMount=useRef(0),portableActive=useRef(portableScope);portableActive.current=portableScope;
+  useEffect(()=>{const generation=++portableMount.current;return()=>{queueMicrotask(()=>{if(portableActive.current!==portableScope||portableMount.current===generation)void portableScope.close().catch(error=>{console.error("Retained cubic input could not retire",error)})})}},[portableScope]);
   const widgetChanges = useRef(
     new Map<string, (data: Record<string, unknown>) => void>(),
   );
@@ -251,7 +261,7 @@ function SurfaceEditor({
         const snapshot=nativeAction&&next===before?(owner?owner.snapshot(before) as ContainerDocument:{...before}):before;
         stack.past.push(snapshot);
         if(nativeAction)inkActions.current.set(snapshot,nativeAction);
-        if (stack.past.length > 80) { const expired=stack.past.shift();if(expired)inkActions.current.delete(expired); }
+        if (stack.past.length > 80&&!pendingInkEdges.current.size) { const expired=stack.past.shift();if(expired)inkActions.current.delete(expired); }
       }
       if(recordHistory){
         for(const discarded of stack.future)inkActions.current.delete(discarded);
@@ -286,6 +296,171 @@ function SurfaceEditor({
     },
     [settleGeometry,rebaseHistory,pinHistory],
   );
+reservePortable.current = (options) => {
+    if (latestReadOnly.current || options.pageId !== current.current.id)
+      throw new Error("Cubic contact belongs to a retired or read-only source");
+    const session = sourceSessionFor(current.current);
+    if (!session)
+      throw new Error(
+        "Cubic authoring requires an actual immutable source session",
+      );
+    if (!session.document || session.document.id !== options.pageId)
+      throw new Error("Cubic contact owner has no current source for this page");
+    if (session.document !== current.current) {
+      rebaseHistory(current.current, session.document as ContainerDocument);
+      current.current = session.document as ContainerDocument;
+    }
+    const before = session.snapshot(current.current) as ContainerDocument,
+      stack = history.current;
+    stack.past.push(before);
+    pendingInkEdges.current.set(before, options.strokeId);
+    for (const discarded of stack.future) inkActions.current.delete(discarded);
+    stack.future = [];
+    stack.group = "";
+    stack.at = 0;
+    pinHistory(session);
+    // Marks accepted input dirty using the existing author/save deadline. The
+    // save barrier below waits for this real contact, never writes a v1 stand-in.
+    latestChange.current(current.current);
+    refresh((v) => v + 1);
+    let acceptedSource: ContainerDocument | undefined,
+      ownedFailure: unknown,
+      failedHistoryTask: Promise<void> | undefined;
+    return {
+      fail(error) {
+        ownedFailure = error;
+        historyFailure.current = error;
+        refresh((v) => v + 1);
+      },
+      async complete(value) {
+        if (session.disposed || current.current.id !== options.pageId)
+          throw new Error("Accepted cubic input lost its source owner");
+        if (historyFailure.current === ownedFailure)
+          historyFailure.current = undefined;
+        if (failedHistoryTask && historyTail.current === failedHistoryTask)
+          historyTail.current = Promise.resolve();
+        await historyTail.current;
+        while (session.document !== current.current) {
+          const observed = session.document as ContainerDocument;
+          rebaseHistory(current.current, observed);
+          current.current = observed;
+          await historyTail.current;
+        }
+        const resolveBefore = () => {
+          let entry = before,
+            following = historyReplacements.current.get(entry);
+          while (following) {
+            entry = following;
+            following = historyReplacements.current.get(entry);
+          }
+          return entry;
+        };
+        const authoredBefore = resolveBefore(),
+          prior = current.current;
+        let source = acceptedSource,
+          next: ContainerDocument;
+        if (!source && prior.content === authoredBefore.content) {
+          // Only actual owned identical child-tree identity proves the Board's
+          // authored order is unchanged. Root metadata remains the latest UI.
+          next = session.replace(
+            appendNewPortableInk(prior, options.boardId, value.node, value.frame),
+          ) as ContainerDocument;
+          source = acceptedSource = next;
+        } else {
+          source = acceptedSource ??= session.captureExternal(
+            appendNewPortableInk(
+              authoredBefore,
+              options.boardId,
+              value.node,
+              value.frame,
+            ),
+            `${historyLease.current}:accepted-${options.strokeId}`,
+          ) as ContainerDocument;
+          const appended = appendPortableInkFromSource(
+            prior,
+            source,
+            options.boardId,
+            options.strokeId,
+          ) as ContainerDocument;
+          next =
+            appended === prior
+              ? prior
+              : (session.replace(appended) as ContainerDocument);
+        }
+        if (next !== prior) {
+          current.current = next;
+          latestChange.current(next);
+          refresh((v) => v + 1);
+          settleGeometry();
+        }
+        const task = historyTail.current.then(async () => {
+          const resolve = (entry: ContainerDocument) => {
+            let following = historyReplacements.current.get(entry);
+            while (following) {
+              entry = following;
+              following = historyReplacements.current.get(entry);
+            }
+            return entry;
+          };
+          const edge = resolve(before),
+            index = history.current.past.indexOf(edge);
+          if (index < 0)
+            throw new Error("Accepted cubic contact lost its reserved undo edge");
+          const entries = history.current.past.slice(index + 1);
+          const result = await session.appendInkHistory(
+            source,
+            options.boardId,
+            options.strokeId,
+            entries,
+            `${historyLease.current}:append-${options.strokeId}`,
+          );
+          try {
+            const replacements = new Map<ContainerDocument, ContainerDocument>();
+            entries.forEach((entry, index) => {
+              const replacement = result.documents[index] as ContainerDocument;
+              replacements.set(entry, replacement);
+              if (replacement !== entry) {
+                historyReplacements.current.set(entry, replacement);
+                const action = inkActions.current.get(entry);
+                inkActions.current.delete(entry);
+                if (action) inkActions.current.set(replacement, action);
+                const pending = pendingInkEdges.current.get(entry);
+                pendingInkEdges.current.delete(entry);
+                if (pending) pendingInkEdges.current.set(replacement, pending);
+              }
+            });
+            history.current.past = history.current.past.map(
+              (entry) => replacements.get(entry) ?? entry,
+            );
+            await session.retainHistory(
+              [...new Set([...history.current.past, ...history.current.future])],
+              historyLease.current,
+            );
+            pendingInkEdges.current.delete(edge);
+            if (!pendingInkEdges.current.size) {
+              while (history.current.past.length > 80) {
+                const expired = history.current.past.shift()!;
+                inkActions.current.delete(expired);
+              }
+              pinHistory(session);
+            }
+          } finally {
+            await result.release();
+            await session.releaseLease(
+              `${historyLease.current}:accepted-${options.strokeId}`,
+            );
+          }
+        });
+        historyTail.current = task;
+        try {
+          await task;
+        } catch (error) {
+          failedHistoryTask = task;
+          throw error;
+        }
+      },
+    };
+  };
   const inkSave = useRef(onInkSave);
   inkSave.current = onInkSave;
   useEffect(() => {
@@ -420,6 +595,7 @@ function SurfaceEditor({
   }, [document.id, inlineInkProjectId, readOnly, commit,rebaseHistory]);
   const travel = useCallback(
     async (redo = false) => {
+      await portableScope.flush(true);
       await window.showai?.inlineInk?.flush();
       geometrySettlement.current.generation++;
       await historyTail.current;if(historyFailure.current)throw historyFailure.current;
@@ -466,7 +642,7 @@ function SurfaceEditor({
       refresh((value) => value + 1);
       settleGeometry();
     },
-    [settleGeometry,inlineInkProjectId,pinHistory],
+    [settleGeometry,inlineInkProjectId,pinHistory,portableScope],
   );
   const undo = useCallback(() => travel(), [travel]);
   const redo = useCallback(() => travel(true), [travel]);
@@ -618,7 +794,7 @@ function SurfaceEditor({
     [readOnly],
   );
   return (
-    <div
+    <PortableCubicContext.Provider value={portableScope}><div
       className="surface-editor-shell"
       onKeyDownCapture={(event) => {
         if (
@@ -664,7 +840,7 @@ function SurfaceEditor({
       <InkConflictInspector document={current.current} projectId={inlineInkProjectId} host={inspectorHost}
         beforeResolve={onInkSave} getDocument={()=>current.current}
         onResolve={value=>commit(value,"ink-conflict-resolution")} readOnly={readOnly}/>
-    </div>
+    </div></PortableCubicContext.Provider>
   );
 }
 export default memo(SurfaceEditor);

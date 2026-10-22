@@ -1,3 +1,5 @@
+import {OwnedSourceSession,createSourceTransport} from "./surface/source-client";
+import {flushPortableInputs,portableInputsPending,stopPortableInputs} from "./surface/portable-input-scope";
 import { CAPACITY, formatBytes } from "./portable/capacity.mjs";
 import { linearContent } from "./surface/document.mjs";
 import { upgradeResource } from "./surface/containers.mjs";
@@ -87,6 +89,47 @@ export default function App() {
   const buttonRef = useRef<HTMLButtonElement>(null);
   const current = useRef(page);
   const currentComponents = useRef(components);
+const sourceOwner = useRef<OwnedSourceSession | undefined>(undefined);
+  const pageComponents = useRef(new Map<string, CompiledComponent[]>());
+  pageComponents.current.set(page.id, components);
+  useEffect(() => {
+    const owner = new OwnedSourceSession(
+      "standalone-canvas",
+      page.id,
+      createSourceTransport(async () => {
+        throw new Error("Standalone canvas has no native backend");
+      }, `standalone-canvas:${location.origin}`),
+    );
+    sourceOwner.current = owner;
+    setPage((value) => owner.replace(value));
+    return () => {
+      stopPortableInputs(owner);
+      void flushPortableInputs(owner, true)
+        .then(async () => {
+          const source = owner.document;
+          if (source) {
+            const artifact = {
+              format: "showai" as const,
+              version: 1 as const,
+              document: source,
+              components: pageComponents.current.get(owner.pageId) ?? [],
+            };
+            retainCanvasArtifact(localStorage, artifact);
+            if (current.current.id === owner.pageId)
+              saveCanvasArtifact(localStorage, artifact);
+          }
+          await owner.dispose();
+          if (
+            sourceOwner.current === owner ||
+            sourceOwner.current?.pageId !== owner.pageId
+          )
+            pageComponents.current.delete(owner.pageId);
+        })
+        .catch((error) => {
+          console.error("Standalone accepted ink could not retire", error);
+        });
+    };
+  }, [page.id]);
   const blocked = useRef(!!initial.error);
   const importGeneration = useRef(0);
   current.current = page;
@@ -104,9 +147,10 @@ export default function App() {
     document.title = page.title ? `${page.title} · ShowAI` : "ShowAI";
   }, [page.title]);
 
-  const persist = useCallback(() => {
+  const persist = useCallback(async () => {
     if (blocked.current) return;
     try {
+      await flushPortableInputs(sourceOwner.current,false);
       saveCanvasArtifact(localStorage, {
         format: "showai",
         version: 1,
@@ -128,9 +172,12 @@ export default function App() {
     const hide = () => {
       if (document.visibilityState === "hidden") persist();
     };
+    const guard=(event:BeforeUnloadEvent)=>{if(portableInputsPending(sourceOwner.current)){event.preventDefault();event.returnValue="";}};
+    window.addEventListener("beforeunload",guard);
     window.addEventListener("pagehide", persist);
     document.addEventListener("visibilitychange", hide);
     return () => {
+      window.removeEventListener("beforeunload",guard);
       window.removeEventListener("pagehide", persist);
       document.removeEventListener("visibilitychange", hide);
     };
@@ -182,17 +229,19 @@ export default function App() {
   }, [menuOpen]);
 
   const update = useCallback((changes: Partial<ShowDocument>) => {
-    setPage((document) => ({
-      ...document,
-      ...changes,
-      updatedAt: new Date().toISOString(),
-    }));
+    setPage(document=>{
+      if(changes.id!==undefined&&changes.id!==document.id)return document;
+      const value={...document,...changes,updatedAt:new Date().toISOString()};
+      return sourceOwner.current?.pageId===value.id?sourceOwner.current.replace(value):value;
+    });
   }, []);
 
   async function exportPage(kind: "html" | "json" | "md") {
     setMenuOpen(false);
     setBusy(true);
     try {
+      await flushPortableInputs(sourceOwner.current,true);
+      await sourceOwner.current?.barrier();
       const source = current.current;
       const name = source.title.trim() || "ShowAI";
       if (kind === "html")
@@ -278,10 +327,13 @@ export default function App() {
       });
       if (request !== importGeneration.current) return;
       incomingComponents = materialized.components ?? [];
+      await flushPortableInputs(sourceOwner.current,true);
+      if(request!==importGeneration.current)return;
+      const outgoing=sourceOwner.current?.document??current.current;
       retainCanvasArtifact(localStorage, {
         format: "showai",
         version: 1,
-        document: current.current,
+        document: outgoing,
         components: currentComponents.current,
       });
       if (blocked.current)

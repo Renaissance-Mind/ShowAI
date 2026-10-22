@@ -112,7 +112,7 @@ export class PageSessions {
       )
     )
       throw new Error(t("keepDraftsBeforeSwitch"));
-    for (const session of new Set(this.pages.values())) session.dispose();
+    for (const session of new Set(this.pages.values())) void session.dispose().catch(error=>console.error("Page retirement failed",error));
     this.pages.clear();
     this.viewStates.clear();
     this.tabViews.clear();
@@ -203,7 +203,7 @@ export class PageSessions {
       this.pages.delete(key);
       this.stale.delete(session);
       this.changedComponents.delete(session);
-      session.dispose();
+      void session.dispose().catch(error=>console.error("Page retirement failed",error));
     }
   }
   async open(
@@ -293,7 +293,7 @@ export class PageSessions {
         if (this.tabViews.get(view.tabId) === viewKey)
           this.tabViews.delete(view.tabId);
       }
-    session.dispose();
+    void session.dispose().catch(error=>console.error("Page retirement failed",error));
     this.publish({
       views: this.snapshot.views.filter((view) => view.session !== session),
       ...(this.snapshot.active === session
@@ -377,12 +377,13 @@ export class PageSessions {
     );
   }
   async shutdown() {
-    await Promise.all(
+    const results=await Promise.all(
       [...new Set(this.pages.values())].map((session) => session.leave()),
     );
+    if(!results.every(Boolean))throw new Error("Some page sources have not reached durable recovery storage");
+    await Promise.all([...new Set(this.pages.values())].map(session=>session.dispose()));
     this.disposed = true;
     clearTimeout(this.refreshTimer);
-    for (const session of new Set(this.pages.values())) session.dispose();
     this.pages.clear();
     this.viewStates.clear();
     this.tabViews.clear();

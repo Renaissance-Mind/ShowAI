@@ -1,3 +1,4 @@
+import {PortableCubicDrawingInput,PortableCubicPreview} from "./PortableCubicDrawingInput";
 import { isEditableDrawing } from "./portable-ink.mjs";
 import { LibraryContextMenu } from "../studio/LibraryNavigation";
 import type { LibraryContextMenuItem } from "../studio/LibraryNavigation";
@@ -2039,11 +2040,12 @@ export default function PageSurface({
           world={worldRef}
           point={(x, y) => controls.current.point(x, y)}
         />
-        {drawingTool &&
-          !(
-            window.showai?.inlineInk &&
-            (drawingTool === "pen" || drawingTool === "highlighter")
-          ) &&
+        {enabled&&!printing&&<PortableCubicPreview boardId={containerId??pageId} camera={camera}/>}
+        {(drawingTool==='pen'||drawingTool==='highlighter')&&!window.showai?.inlineInk&&enabled&&!locked&&onDraw&&<PortableCubicDrawingInput
+          pageId={boardDocument?.id??pageId} boardId={containerId??pageId} tool={drawingTool} color={drawColor}
+          width={drawStrokeWidth} pressure={drawPressure} camera={camera} panHeld={spaceHeld} ruler={ruler}
+          point={(x,y)=>controls.current.point(x,y)} name={t("drawing.area")}/>}
+        {drawingTool && drawingTool!=="pen"&&drawingTool!=="highlighter"&&
           enabled &&
           !locked &&
           onDraw && (

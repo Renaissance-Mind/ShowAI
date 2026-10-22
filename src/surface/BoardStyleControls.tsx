@@ -220,9 +220,7 @@ export function BoardStyleControls({
           {width === undefined && <small>{t("style.mixed")}</small>}
         </label>
       </div>
-      {typeof document !== "undefined" &&
-        document.documentElement.dataset.native === "ios" &&
-        (drawings.length
+      {(drawings.length
           ? drawings.every((node) =>
               ["pen", "highlighter"].includes(node.attrs!.tool),
             )
