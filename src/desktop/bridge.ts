@@ -8,6 +8,19 @@ export interface DesktopError {
   currentHash?: string;
   currentRevision?: string;
   conflictId?: string;
+  /** Node system error code such as ENOSPC, EACCES, EROFS or ENOENT. */
+  errno?: string;
+  syscall?: string;
+  /** File the system error is about. */
+  path?: string;
+  /** CAPACITY_EXCEEDED: what exceeded its limit, with sizes in bytes. */
+  kind?: string;
+  actualBytes?: number;
+  limitBytes?: number;
+  /** Browser mode: HTTP status of a failed request to the local service. */
+  status?: number;
+  saveFailed?: boolean;
+  details?: Record<string, unknown>;
 }
 
 export interface DesktopInfo {

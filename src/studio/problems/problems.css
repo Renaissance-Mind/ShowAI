@@ -1,0 +1,250 @@
+.problem-notice {
+  --tone: var(--danger);
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  color: var(--text);
+  font-size: 13px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.problem-notice.tone-warning {
+  --tone: var(--warning);
+}
+.problem-notice.tone-info {
+  --tone: var(--info);
+}
+.problem-notice-icon {
+  display: flex;
+  color: var(--tone);
+  padding-top: 2px;
+}
+.problem-notice-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.problem-notice-title {
+  font-weight: 600;
+  font-size: 14px;
+  margin: 0;
+}
+.problem-notice-count {
+  margin-left: 8px;
+  font-weight: 400;
+  font-size: 12px;
+  color: var(--muted);
+}
+.problem-notice p {
+  margin: 0;
+}
+.problem-notice-safety {
+  color: var(--text);
+}
+.problem-notice-safety.is-windowOnly {
+  color: var(--danger);
+}
+.problem-notice-cause {
+  color: var(--muted);
+}
+.problem-notice-actions,
+.problem-notice-detail-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+}
+.problem-notice-actions button {
+  white-space: nowrap;
+  min-height: 31px;
+  padding: 5px 10px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--paper);
+  color: var(--text);
+  font-size: 13px;
+}
+.problem-notice-actions button.is-primary {
+  background: var(--text);
+  border-color: var(--text);
+  color: var(--paper);
+}
+.problem-notice-actions button.is-destructive {
+  color: var(--danger);
+}
+.problem-notice-details summary {
+  width: fit-content;
+  cursor: pointer;
+  color: var(--muted);
+  font-size: 12px;
+}
+.problem-notice-details pre {
+  margin: 6px 0 0;
+  max-height: 180px;
+  overflow: auto;
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  white-space: pre-wrap;
+  color: var(--text);
+}
+.problem-notice-detail-actions button {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 6px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 12px;
+}
+.problem-notice-detail-actions button:hover {
+  background: var(--hover);
+  color: var(--text);
+}
+.problem-notice-copy-error {
+  color: var(--danger);
+  font-size: 12px;
+}
+.problem-notice-close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted);
+  flex-shrink: 0;
+}
+.problem-notice-close:hover {
+  background: var(--hover);
+  color: var(--text);
+}
+/* L2: attached banner. */
+.problem-notice.is-banner {
+  padding: 10px 18px;
+  border-bottom: 1px solid var(--line);
+  background: color-mix(in srgb, var(--tone) 8%, var(--paper));
+}
+/* L3: inside a dialog the caller owns. */
+.problem-notice.is-dialog {
+  padding: 4px 0;
+}
+/* L4: recovery page. */
+.problem-notice.is-page {
+  flex-direction: column;
+  align-items: stretch;
+  max-width: 560px;
+  margin: 12vh auto 0;
+  padding: 0 24px;
+  font-size: 14px;
+}
+.problem-notice.is-page .problem-notice-title {
+  font-size: 22px;
+  margin: 4px 0;
+}
+/* L1: compact toast. */
+.problem-notice.is-toast {
+  align-items: center;
+  padding: 10px 14px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--paper);
+  box-shadow: var(--shadow);
+}
+.problem-notice.is-toast > svg {
+  color: var(--tone);
+}
+.problem-notice-link {
+  border: 0;
+  background: transparent;
+  color: var(--accent);
+  font-weight: 600;
+  padding: 2px 4px;
+}
+.notice-stack {
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+}
+.notice-stack-toggle {
+  align-self: stretch;
+  text-align: left;
+  padding: 4px 18px 5px 44px;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--muted);
+  font-size: 12px;
+}
+.notice-stack-toggle:hover {
+  color: var(--text);
+}
+.studio-toast-stack {
+  position: fixed;
+  bottom: 18px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 250;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  max-width: min(560px, calc(100vw - 32px));
+}
+.studio-toast-stack .studio-toast {
+  position: static;
+  transform: none;
+  max-width: 100%;
+  /* A light surface keeps the tone icons legible in both themes. */
+  background: var(--paper);
+  color: var(--text);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 10px 16px;
+}
+.studio-toast-icon {
+  display: flex;
+  flex-shrink: 0;
+}
+.studio-toast.is-success .studio-toast-icon {
+  color: var(--success);
+}
+.studio-toast.is-info .studio-toast-icon {
+  color: var(--info);
+}
+.studio-toast.is-warning {
+  border-color: color-mix(in srgb, var(--warning) 45%, var(--line));
+}
+.studio-toast.is-warning .studio-toast-icon {
+  color: var(--warning);
+}
+.studio-toast-action {
+  border: 0;
+  background: transparent;
+  color: var(--accent);
+  font-weight: 600;
+  padding: 2px 4px;
+  white-space: nowrap;
+}
+.studio-toast-close {
+  display: flex;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  padding: 3px;
+  border-radius: 5px;
+}
+.studio-toast-close:hover {
+  background: var(--hover);
+  color: var(--text);
+}

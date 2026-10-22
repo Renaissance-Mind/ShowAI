@@ -39,11 +39,13 @@ export function installBrowserBridge() {
       response.headers.get("content-type")?.includes("application/json") !==
         true
     )
-      throw new Error(
-        t("requestFailed", { status: response.status }),
+      throw Object.assign(
+        new Error(t("requestFailed", { status: response.status })),
+        { code: "HTTP_ERROR", status: response.status },
       );
     const result = (await response.json()) as DesktopResponse<T>;
-    if (!result.ok) throw result.error;
+    // Keep the structured error (code, errno, path…) and add the HTTP status.
+    if (!result.ok) throw { ...result.error, status: response.status };
     return result.data;
   }
   async function openWindow<T>(

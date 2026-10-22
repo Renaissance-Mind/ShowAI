@@ -1182,9 +1182,11 @@ export function errorResult(error: unknown) {
       ? error.code
       : "ERROR";
   const message = error instanceof Error ? error.message : String(error);
+  const system = systemErrorFacts(error);
   return {
     code,
     message,
+    ...system,
     ...(error instanceof CapacityError
       ? {
           kind: error.kind,
@@ -1213,4 +1215,28 @@ export function errorResult(error: unknown) {
       ? { details: error.details }
       : {}),
   };
+}
+
+/**
+ * Node system errors (ENOSPC, EACCES, EROFS, ENOENT…) keep their errno code,
+ * syscall and path so the workbench can explain them; also read one wrapped
+ * `cause`, which is how library writes rethrow file errors.
+ */
+function systemErrorFacts(
+  error: unknown,
+): { errno?: string; syscall?: string; path?: string } {
+  for (const candidate of [
+    error,
+    error && typeof error === "object" ? (error as { cause?: unknown }).cause : undefined,
+  ]) {
+    if (!candidate || typeof candidate !== "object") continue;
+    const { code, syscall, path } = candidate as Record<string, unknown>;
+    if (typeof code !== "string" || !/^E[A-Z0-9]+$/.test(code)) continue;
+    return {
+      errno: code,
+      ...(typeof syscall === "string" ? { syscall } : {}),
+      ...(typeof path === "string" ? { path } : {}),
+    };
+  }
+  return {};
 }
