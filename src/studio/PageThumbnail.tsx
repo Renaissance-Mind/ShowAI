@@ -15,16 +15,22 @@ import CatalogPreview from "./CatalogPreview";
 import { desktop, errorMessage } from "./bridge";
 import type { LoadedPage } from "./usePage";
 
-/** Load only visible cards; the library stays inexpensive even with large folders.
- * The page fills the card width at a 4:3 stage, so boards and documents share one shape. */
+/**
+ * Load only visible cards; the library stays inexpensive even with large folders.
+ * Documents flow into up to four columns to fill the card; boards show their
+ * content's bounds with a margin, centred, so a drawn shape never becomes the edge.
+ */
 export default function PageThumbnail({
   projectId,
   pageId,
   updatedAt,
+  padding,
 }: {
   projectId: string;
   pageId: string;
   updatedAt: string;
+  /** Margin around the page; small previews inside folder cards use less. */
+  padding?: number;
 }) {
   const host = useRef<HTMLSpanElement>(null);
   const [visible, setVisible] = useState(false);
@@ -63,7 +69,7 @@ export default function PageThumbnail({
     () => (record ? upgradeResource(record.document) : null),
     [record],
   );
-  const boardTransform = useMemo(() => {
+  const board = useMemo(() => {
     if (!record || record.document.content.attrs?.kind !== "board")
       return undefined;
     const doc = record.document;
@@ -73,13 +79,17 @@ export default function PageThumbnail({
         ? [frameBounds({ ...frame, height: frame.height ?? 460 })]
         : [];
     });
-    if (!boxes.length) return "none";
+    if (!boxes.length) return { width: 960, height: 640, transform: "none" };
     const left = Math.min(...boxes.map((b) => b.x)),
       top = Math.min(...boxes.map((b) => b.y));
     const width = Math.max(...boxes.map((b) => b.x + b.width)) - left;
     const height = Math.max(...boxes.map((b) => b.y + b.height)) - top;
-    const scale = Math.min(920 / Math.max(1, width), 680 / Math.max(1, height));
-    return `translate(${(960 - width * scale) / 2 - left * scale}px, ${(720 - height * scale) / 2 - top * scale}px) scale(${scale})`;
+    const margin = Math.max(48, 0.14 * Math.max(width, height));
+    return {
+      width: Math.ceil(width + margin * 2),
+      height: Math.ceil(height + margin * 2),
+      transform: `translate(${margin - left}px, ${margin - top}px)`,
+    };
   }, [record]);
   return (
     <span
@@ -87,7 +97,16 @@ export default function PageThumbnail({
       className="studio-page-thumbnail"
       aria-hidden="true"
       inert
-      style={{ "--thumbnail-transform": boardTransform } as CSSProperties}
+      data-board={board ? true : undefined}
+      style={
+        board
+          ? ({
+              "--thumbnail-transform": board.transform,
+              "--board-width": `${board.width}px`,
+              "--board-height": `${board.height}px`,
+            } as CSSProperties)
+          : undefined
+      }
     >
       {error ? (
         <span>{error}</span>
@@ -97,12 +116,13 @@ export default function PageThumbnail({
           <CustomComponentsProvider components={record.components}>
             <CatalogPreview
               thumbnail
-              fitWidth
               label={record.document.title}
               resetKey={updatedAt}
-              width={960}
+              width={board?.width ?? 960}
+              maxColumns={board ? 1 : 4}
+              padding={padding}
             >
-              {boardTransform ? (
+              {board ? (
                 <ContainerRuntime
                   document={previewDocument!}
                   hideTitle

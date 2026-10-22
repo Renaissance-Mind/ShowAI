@@ -22,7 +22,36 @@ export function previewFit(
 export function previewZoom(value: number) {
   return Math.max(0.05, Math.min(3, value));
 }
-/** Scale content to the viewport width exactly; the height is cropped by the card. */
-export function previewFitWidth(viewportWidth: number, width: number) {
-  return viewportWidth > 0 && width > 0 ? viewportWidth / width : 1;
+/**
+ * Split a tall page into balanced columns (1 to `max`) when that lets the
+ * preview show it larger: the count whose combined shape best matches the
+ * viewport wins, so a long document fills a wide card instead of becoming a
+ * thin strip, and a short one keeps a single column.
+ */
+export function previewColumns(
+  viewportWidth: number,
+  viewportHeight: number,
+  width: number,
+  height: number,
+  gap: number,
+  max = 4,
+  padding = 10,
+) {
+  let best = 1,
+    bestScale = 0;
+  for (let columns = 1; columns <= max; columns++) {
+    const scale = previewFit(
+      viewportWidth,
+      viewportHeight,
+      columns * width + (columns - 1) * gap,
+      height / columns,
+      padding,
+    );
+    // Another column must enlarge the page noticeably to be worth the split.
+    if (scale > bestScale * 1.1) {
+      best = columns;
+      bestScale = scale;
+    }
+  }
+  return best;
 }

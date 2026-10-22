@@ -6,10 +6,13 @@ import {
   type ReactNode,
 } from "react";
 import { Search, Focus, Expand } from "../ui/icons";
-import { previewFit, previewFitWidth, previewZoom } from "./preview-geometry";
+import { previewColumns, previewFit, previewZoom } from "./preview-geometry";
 import { errorMessage } from "./bridge";
 import { useTranslator } from "../i18n/react";
 import messages from "../i18n/messages/catalog";
+
+/** Space between columns of a split page, in page pixels. */
+const COLUMN_GAP = 64;
 
 export default function CatalogPreview({
   children,
@@ -18,7 +21,8 @@ export default function CatalogPreview({
   resetKey,
   accessory,
   thumbnail = false,
-  fitWidth = false,
+  maxColumns = 1,
+  padding = thumbnail ? 10 : 24,
   minHeight,
 }: {
   children: ReactNode;
@@ -27,8 +31,10 @@ export default function CatalogPreview({
   resetKey?: string | number;
   accessory?: ReactNode;
   thumbnail?: boolean;
-  /** Fill the viewport width and crop the height, as directory cards do. */
-  fitWidth?: boolean;
+  /** Let a tall page flow into up to this many balanced columns. */
+  maxColumns?: number;
+  /** Margin kept around the fitted page, in screen pixels. */
+  padding?: number;
   minHeight?: number;
 }) {
   const t = useTranslator(messages);
@@ -40,11 +46,17 @@ export default function CatalogPreview({
   const [manual, setManual] = useState<number | null>(null),
     [zoomOpen, setZoomOpen] = useState(false),
     [error, setError] = useState("");
+  const [columns, setColumns] = useState(1);
+  const layout = useRef({ columns: 1, singleHeight: 0 });
   const scale = manual ?? size.fit;
   useEffect(() => {
     setManual(null);
     setZoomOpen(false);
   }, [resetKey]);
+  useLayoutEffect(() => {
+    layout.current = { columns: 1, singleHeight: 0 };
+    setColumns(1);
+  }, [resetKey, width, maxColumns]);
   useLayoutEffect(() => {
     const paper = content.current,
       area = viewport.current;
@@ -53,15 +65,34 @@ export default function CatalogPreview({
     const measure = () => {
       const w = Math.max(width, paper.scrollWidth),
         h = Math.max(1, paper.scrollHeight, paper.offsetHeight);
-      const fit = fitWidth
-        ? previewFitWidth(area.clientWidth, w)
-        : previewFit(
-            area.clientWidth,
-            Math.max(1, area.clientHeight - (accessory ? 46 : 0)),
-            w,
-            h,
-            thumbnail ? 10 : 24,
-          );
+      if (maxColumns > 1) {
+        // Decide from the one-column height; a split page only re-measures when it clearly grew.
+        const current = layout.current;
+        if (current.columns === 1) current.singleHeight = h;
+        else if (h * current.columns > current.singleHeight * 1.5)
+          current.singleHeight = h * current.columns;
+        const next = previewColumns(
+          area.clientWidth,
+          area.clientHeight,
+          width,
+          current.singleHeight,
+          COLUMN_GAP,
+          maxColumns,
+          padding,
+        );
+        if (next !== current.columns) {
+          current.columns = next;
+          setColumns(next);
+          return;
+        }
+      }
+      const fit = previewFit(
+        area.clientWidth,
+        Math.max(1, area.clientHeight - (accessory ? 46 : 0)),
+        w,
+        h,
+        padding,
+      );
       setSize((current) =>
         current.width === w && current.height === h && current.fit === fit
           ? current
@@ -80,7 +111,7 @@ export default function CatalogPreview({
       cancelAnimationFrame(frame);
       observer.disconnect();
     };
-  }, [width, resetKey, thumbnail, fitWidth, !!accessory]);
+  }, [width, resetKey, padding, maxColumns, !!accessory]);
   useEffect(() => {
     if (!zoomOpen) return;
     const outside = (event: PointerEvent) => {
@@ -92,7 +123,7 @@ export default function CatalogPreview({
   return (
     <div
       ref={stage}
-      className={`catalog-preview${thumbnail ? " is-thumbnail" : ""}${fitWidth ? " fits-width" : ""}`}
+      className={`catalog-preview${thumbnail ? " is-thumbnail" : ""}`}
       aria-label={label}
       data-preview-scale={scale}
     >
@@ -107,6 +138,7 @@ export default function CatalogPreview({
         <div
           className="catalog-preview-center"
           style={{
+            padding,
             minWidth: size.width * scale,
             minHeight: size.height * scale,
           }}
@@ -118,7 +150,15 @@ export default function CatalogPreview({
             <div
               ref={content}
               className="catalog-preview-content"
-              style={{ width, minHeight, transform: `scale(${scale})` }}
+              data-columns={columns > 1 ? columns : undefined}
+              style={{
+                width:
+                  columns > 1 ? columns * width + (columns - 1) * COLUMN_GAP : width,
+                columnCount: columns > 1 ? columns : undefined,
+                columnGap: columns > 1 ? COLUMN_GAP : undefined,
+                minHeight,
+                transform: `scale(${scale})`,
+              }}
             >
               {children}
             </div>
