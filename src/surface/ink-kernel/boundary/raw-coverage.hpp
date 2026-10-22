@@ -1,7 +1,23 @@
 #ifndef SHOWAI_RAW_COVERAGE_HPP
 #define SHOWAI_RAW_COVERAGE_HPP
 #include "coverage-mesh.hpp"
+#include "../analytic-path-checked.hpp"
 namespace showai_boundary {
+/* Factory-local const input/options/count binding. No source or caller count
+ * can be supplied to emit, and this borrow never leaves the synchronous raw
+ * factory. It adds no source copy or persistent arena/GPU lifetime. */
+class RawAnalyticCapture final {
+    const showai_analytic_internal::CheckedEmissionPlan plan_;
+public:
+    RawAnalyticCapture(const SAInkPathCommand *c, uint32_t n, const double *m,
+                       const SAAnalyticBudget *b) : plan_(c, n, m, b) {}
+    SAInkStatus status() const { return plan_.status_; }
+    const SAAnalyticCounts &counts() const { return plan_.required_; }
+    SAInkStatus emit(SAAnalyticPatch *p, uint32_t pc, SAAnalyticVertex *v,
+                     uint32_t vc, SAAnalyticCounts *out) const {
+        return plan_.emit(p, pc, v, vc, out);
+    }
+};
 /* Original closed-path derivative, not a new source format or a caller proof.
  * Root's private C adapter must capture actual immutable commands. Generation
  * below is an echo, never an authority. Matrices use [a,b,c,d], x'=ax+cy.
@@ -290,11 +306,11 @@ inline uint32_t build_raw_coverage_mesh(PolynomialContext&c,const SAInkPathComma
  using namespace raw_coverage;auto&ctx=c.numbers;reason=boundary_klm_none;
  if(ctx.status)return ctx.status;
  if((count&&!commands)||!o.maximum_commands||count>o.maximum_commands||o.maximum_commands>100000||!o.maximum_patches||o.maximum_patches>100000||o.maximum_vertices<3||o.maximum_vertices>1000000||!o.maximum_draws||o.maximum_draws>333333||!o.maximum_analytic_depth||o.maximum_analytic_depth>32||o.reserved||!finite_double(o.maximum_forward_norm)||!(o.maximum_forward_norm>0)||!finite_double(o.maximum_inverse_norm)||!(o.maximum_inverse_norm>0)||!finite_double(o.maximum_geometry_error_pixels)||!(o.maximum_geometry_error_pixels>0)||output.mesh.vertices.context()!=&ctx){reason=boundary_klm_invalid;return SA_INK_INVALID;}
- double identity[6]={1,0,0,1,0,0};SAAnalyticBudget budget{o.maximum_commands,o.maximum_patches,o.maximum_analytic_depth,0};SAAnalyticCounts counts{};auto status=sa_analytic_path_counts(commands,count,identity,&budget,&counts);if(status)return status;
+ double identity[6]={1,0,0,1,0,0};SAAnalyticBudget budget{o.maximum_commands,o.maximum_patches,o.maximum_analytic_depth,0};const RawAnalyticCapture captured(commands,count,identity,&budget);auto status=captured.status();if(status)return status;SAAnalyticCounts counts=captured.counts();
  // Admission includes the actual source factory temporary output and final mesh.
  if(counts.vertices>o.maximum_vertices||counts.vertices/3>o.maximum_draws){reason=boundary_klm_capacity;return SA_INK_CAPACITY;}
  Vector<SAAnalyticPatch>patches(ctx);Vector<SAAnalyticVertex>vertices(ctx);patches.resize(counts.patches);vertices.resize(counts.vertices);Vector<Command>metadata(ctx);metadata.resize(count);
- if(ctx.status)return ctx.status;status=sa_analytic_path_build(commands,count,identity,&budget,counts.patches?&patches[0]:nullptr,patches.size(),counts.vertices?&vertices[0]:nullptr,vertices.size(),&counts);if(status)return status;
+ if(ctx.status)return ctx.status;status=captured.emit(counts.patches?&patches[0]:nullptr,patches.size(),counts.vertices?&vertices[0]:nullptr,vertices.size(),&counts);if(status)return status;
  double current[2]{},origin[2]{};
  for(uint32_t i=0;i<count;i++){auto&meta=metadata[i];for(uint32_t axis=0;axis<2;axis++){meta.start[axis]=current[axis];if(commands[i].operation==0)origin[axis]=commands[i].values[axis];meta.origin[axis]=origin[axis];if(commands[i].operation<4)current[axis]=commands[i].values[2*commands[i].operation+axis-(commands[i].operation?2:0)];else current[axis]=origin[axis];}}
  RawCoverageMesh staged(ctx);staged.source_generation=generation;bool hasBounds=false;

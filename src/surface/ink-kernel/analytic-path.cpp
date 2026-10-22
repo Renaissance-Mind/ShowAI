@@ -1,3 +1,4 @@
+#include "analytic-path-checked.hpp"
 #include "include/analytic-path.h"
 
 // Independent implementation of the public Loop/Blinn construction (2005),
@@ -496,6 +497,7 @@ struct Sink {
   SAInkStatus error;
   const double *matrix;
   int orientation;
+  uint32_t patch_capacity = 0xffffffffu, vertex_capacity = 0xffffffffu;
   P offset(P p) const {
     return {matrix[0] * p.x + matrix[2] * p.y,
             matrix[1] * p.x + matrix[3] * p.y};
@@ -511,6 +513,14 @@ struct Sink {
     if (counts.patches >= b->max_patches ||
         counts.vertices > 0xffffffffu - nv) {
       error = SA_INK_RANGE;
+      return;
+    }
+    // Checked emission cannot write beyond the ACTUAL admitted arrays, even
+    // if an internal misuse breaks the immutable-span precondition.
+    if ((patches || vertices) &&
+        (counts.patches >= patch_capacity || counts.vertices > vertex_capacity ||
+         nv > vertex_capacity - counts.vertices)) {
+      error = SA_INK_CAPACITY;
       return;
     }
     SAAnalyticPatch patch = {};
@@ -917,6 +927,54 @@ static int triangle(const SAAnalyticVertex *a, double x, double y, double *bary,
   return 1;
 }
 } // namespace
+namespace showai_analytic_internal {
+#ifdef SHOWAI_ANALYTIC_WALK_COUNTERS
+static WalkWork observed_walks{};
+void reset_walk_work() { observed_walks = {}; }
+WalkWork walk_work() { return observed_walks; }
+#endif
+CheckedEmissionPlan::CheckedEmissionPlan(const SAInkPathCommand *c, uint32_t n,
+    const double *m, const SAAnalyticBudget *b)
+    : commands_(c), count_(n), original_matrix_(m), original_budget_(b),
+      status_(sa_analytic_path_counts(c, n, m, b, &required_)) {
+  if (status_ != SA_INK_OK) return;
+  for (uint32_t i = 0; i < 6; ++i) matrix_[i] = m[i];
+  budget_ = *b;
+}
+SAInkStatus CheckedEmissionPlan::emit(SAAnalyticPatch *p, uint32_t pc,
+    SAAnalyticVertex *v, uint32_t vc, SAAnalyticCounts *out) const {
+  if (status_ != SA_INK_OK) return status_;
+  if (!out || (required_.patches && !p) || (required_.vertices && !v) ||
+      pc < required_.patches || vc < required_.vertices)
+    return SA_INK_CAPACITY;
+  const uint64_t pn = uint64_t(required_.patches) * sizeof(*p),
+      vn = uint64_t(required_.vertices) * sizeof(*v),
+      cn = uint64_t(count_) * sizeof(*commands_);
+  // Preserve the public builder's real alias rules, including ORIGINAL option
+  // addresses. Capturing options must not make an aliased public output legal.
+  if (overlap(p, pn, v, vn) || overlap(p, pn, commands_, cn) ||
+      overlap(v, vn, commands_, cn) || overlap(p, pn, original_matrix_, 48) ||
+      overlap(v, vn, original_matrix_, 48) || overlap(p, pn, original_budget_, sizeof(budget_)) ||
+      overlap(v, vn, original_budget_, sizeof(budget_)) ||
+      overlap(out, sizeof(*out), p, pn) || overlap(out, sizeof(*out), v, vn) ||
+      overlap(out, sizeof(*out), commands_, cn) ||
+      overlap(out, sizeof(*out), original_matrix_, 48) ||
+      overlap(out, sizeof(*out), original_budget_, sizeof(budget_)))
+    return SA_INK_INVALID;
+  Sink s = {&budget_, p, v, {}, SA_INK_OK, matrix_,
+            affine_orientation(matrix_), pc, vc};
+#ifdef SHOWAI_ANALYTIC_WALK_COUNTERS
+  ++observed_walks.emissions;
+#endif
+  const auto status = walk(commands_, count_, matrix_, &s, 0, 0, nullptr, nullptr);
+  if (status != SA_INK_OK) return status;
+  if (s.counts.patches != required_.patches || s.counts.vertices != required_.vertices ||
+      s.counts.ray_patches != required_.ray_patches || s.counts.reserved != required_.reserved)
+    return SA_INK_INVALID;
+  *out = s.counts;
+  return SA_INK_OK;
+}
+}
 extern "C" {
 uint32_t sa_analytic_abi_version() { return SA_ANALYTIC_ABI_VERSION; }
 uint32_t sa_analytic_sizeof_patch() { return sizeof(SAAnalyticPatch); }
@@ -930,6 +988,9 @@ SAInkStatus sa_analytic_path_counts(const SAInkPathCommand *c, uint32_t n,
       overlap(out, sizeof(*out), b, sizeof(*b)))
     return SA_INK_INVALID;
   Sink s = {b, nullptr, nullptr, {}, SA_INK_OK, m, affine_orientation(m)};
+#ifdef SHOWAI_ANALYTIC_WALK_COUNTERS
+  ++showai_analytic_internal::observed_walks.counts;
+#endif
   auto status = walk(c, n, m, &s, 0, 0, nullptr, nullptr);
   if (status == SA_INK_OK)
     *out = s.counts;
@@ -940,28 +1001,8 @@ SAInkStatus sa_analytic_path_build(const SAInkPathCommand *c, uint32_t n,
                                    SAAnalyticPatch *p, uint32_t pc,
                                    SAAnalyticVertex *v, uint32_t vc,
                                    SAAnalyticCounts *out) {
-  SAAnalyticCounts required;
-  auto status = sa_analytic_path_counts(c, n, m, b, &required);
-  if (status != SA_INK_OK)
-    return status;
-  if (!out || (required.patches && !p) || (required.vertices && !v) ||
-      pc < required.patches || vc < required.vertices)
-    return SA_INK_CAPACITY;
-  uint64_t pn = (uint64_t)required.patches * sizeof(*p),
-           vn = (uint64_t)required.vertices * sizeof(*v),
-           cn = (uint64_t)n * sizeof(*c);
-  if (overlap(p, pn, v, vn) || overlap(p, pn, c, cn) || overlap(v, vn, c, cn) ||
-      overlap(p, pn, m, 48) || overlap(v, vn, m, 48) ||
-      overlap(p, pn, b, sizeof(*b)) || overlap(v, vn, b, sizeof(*b)) ||
-      overlap(out, sizeof(*out), p, pn) || overlap(out, sizeof(*out), v, vn) ||
-      overlap(out, sizeof(*out), c, cn) || overlap(out, sizeof(*out), m, 48) ||
-      overlap(out, sizeof(*out), b, sizeof(*b)))
-    return SA_INK_INVALID;
-  Sink s = {b, p, v, {}, SA_INK_OK, m, affine_orientation(m)};
-  status = walk(c, n, m, &s, 0, 0, nullptr, nullptr);
-  if (status == SA_INK_OK)
-    *out = s.counts;
-  return status;
+  const showai_analytic_internal::CheckedEmissionPlan plan(c, n, m, b);
+  return plan.emit(p, pc, v, vc, out);
 }
 SAInkStatus sa_analytic_bezier_evaluate(const double *c, uint32_t degree,
                                         double t, SAInkPoint *out,
