@@ -145,6 +145,31 @@
     }
    ],
    "pages": {
+    "1b6dc3fc-a168-5ede-8cd2-fb3e22566de4": {
+     "title": "开发自定义组件",
+     "icon": "🧪",
+     "file": "zh-CN/pages/1b6dc3fc-a168-5ede-8cd2-fb3e22566de4.json",
+     "sha256": "d211c92e70e550cbe2f07ad7ac625bf15f1d6986aabc66fc9a6b80cd1f5b9c77",
+     "components": [
+      "zh-CN/components/doc-hero@1.0.0-7c2bbe84b003.json",
+      "zh-CN/components/doc-tree@1.0.0-74d9519ab11b.json",
+      "zh-CN/components/doc-steps@1.0.0-660edad476b2.json",
+      "zh-CN/components/doc-diagram@1.0.0-9ceb1b83b733.json",
+      "zh-CN/components/doc-cards@1.0.0-96ea3af150bd.json"
+     ]
+    },
+    "c207d0b8-8aa9-5290-95a5-2a6c4484456c": {
+     "title": "CLI 与 MCP 参考",
+     "icon": "⌨️",
+     "file": "zh-CN/pages/c207d0b8-8aa9-5290-95a5-2a6c4484456c.json",
+     "sha256": "e4dd1b4a732dd963065237e13df0e1a78d3b76ac4ac27d1154cdab6d270ead08",
+     "components": [
+      "zh-CN/components/doc-hero@1.0.0-7c2bbe84b003.json",
+      "zh-CN/components/doc-commands@1.0.0-f2cb922c18c3.json",
+      "zh-CN/components/doc-compare@1.0.0-3a5b6ff02c26.json",
+      "zh-CN/components/doc-cards@1.0.0-96ea3af150bd.json"
+     ]
+    },
     "963599de-ed81-58ea-be92-5b68937966f8": {
      "title": "连接 Agent 时的常见问题",
      "icon": "🔍",
@@ -385,31 +410,6 @@
       "zh-CN/components/doc-tree@1.0.0-74d9519ab11b.json",
       "zh-CN/components/doc-cards@1.0.0-96ea3af150bd.json"
      ]
-    },
-    "1b6dc3fc-a168-5ede-8cd2-fb3e22566de4": {
-     "title": "开发自定义组件",
-     "icon": "🧪",
-     "file": "zh-CN/pages/1b6dc3fc-a168-5ede-8cd2-fb3e22566de4.json",
-     "sha256": "a6acf31f7b5eed21e1d183859920fb810dd1778580d53e225da9481d3122273e",
-     "components": [
-      "zh-CN/components/doc-hero@1.0.0-7c2bbe84b003.json",
-      "zh-CN/components/doc-tree@1.0.0-74d9519ab11b.json",
-      "zh-CN/components/doc-steps@1.0.0-660edad476b2.json",
-      "zh-CN/components/doc-diagram@1.0.0-9ceb1b83b733.json",
-      "zh-CN/components/doc-cards@1.0.0-96ea3af150bd.json"
-     ]
-    },
-    "c207d0b8-8aa9-5290-95a5-2a6c4484456c": {
-     "title": "CLI 与 MCP 参考",
-     "icon": "⌨️",
-     "file": "zh-CN/pages/c207d0b8-8aa9-5290-95a5-2a6c4484456c.json",
-     "sha256": "ec4ecb6b2b100cee1f2b28ce758d1299d1dbbc14c60c448d0a380b5b098a56d4",
-     "components": [
-      "zh-CN/components/doc-hero@1.0.0-7c2bbe84b003.json",
-      "zh-CN/components/doc-commands@1.0.0-f2cb922c18c3.json",
-      "zh-CN/components/doc-compare@1.0.0-3a5b6ff02c26.json",
-      "zh-CN/components/doc-cards@1.0.0-96ea3af150bd.json"
-     ]
     }
    }
   },
@@ -531,6 +531,31 @@
     }
    ],
    "pages": {
+    "1b6dc3fc-a168-5ede-8cd2-fb3e22566de4": {
+     "title": "Develop Custom Components",
+     "icon": "🧪",
+     "file": "en/pages/1b6dc3fc-a168-5ede-8cd2-fb3e22566de4.json",
+     "sha256": "a54b1cce2d8da4e8e6b2fdb3b8197af90d777359b47aa59bb9f0b31f68f43680",
+     "components": [
+      "en/components/doc-hero@1.0.0-6aa1b6a2a0e9.json",
+      "en/components/doc-tree@1.0.0-5ff06117c9a5.json",
+      "en/components/doc-steps@1.0.0-0c4f6546ba7a.json",
+      "en/components/doc-diagram@1.0.0-6aac721ab95e.json",
+      "en/components/doc-cards@1.0.0-25e52118b12f.json"
+     ]
+    },
+    "c207d0b8-8aa9-5290-95a5-2a6c4484456c": {
+     "title": "CLI & MCP Reference",
+     "icon": "⌨️",
+     "file": "en/pages/c207d0b8-8aa9-5290-95a5-2a6c4484456c.json",
+     "sha256": "13f152b2a3c8beb0d474a23a404dd4ae3a71fddf975e52b049bfff5f2cfe2384",
+     "components": [
+      "en/components/doc-hero@1.0.0-6aa1b6a2a0e9.json",
+      "en/components/doc-commands@1.0.0-9832e342e037.json",
+      "en/components/doc-compare@1.0.0-6450bf2fc82c.json",
+      "en/components/doc-cards@1.0.0-25e52118b12f.json"
+     ]
+    },
     "963599de-ed81-58ea-be92-5b68937966f8": {
      "title": "Connecting an agent: common problems",
      "icon": "🔍",
@@ -769,31 +794,6 @@
      "components": [
       "en/components/doc-hero@1.0.0-6aa1b6a2a0e9.json",
       "en/components/doc-tree@1.0.0-5ff06117c9a5.json",
-      "en/components/doc-cards@1.0.0-25e52118b12f.json"
-     ]
-    },
-    "1b6dc3fc-a168-5ede-8cd2-fb3e22566de4": {
-     "title": "Develop Custom Components",
-     "icon": "🧪",
-     "file": "en/pages/1b6dc3fc-a168-5ede-8cd2-fb3e22566de4.json",
-     "sha256": "71ff91da9b57c76861c52cee9b4a679de54473a5a53b71813d661cdae54abbb9",
-     "components": [
-      "en/components/doc-hero@1.0.0-6aa1b6a2a0e9.json",
-      "en/components/doc-tree@1.0.0-5ff06117c9a5.json",
-      "en/components/doc-steps@1.0.0-0c4f6546ba7a.json",
-      "en/components/doc-diagram@1.0.0-6aac721ab95e.json",
-      "en/components/doc-cards@1.0.0-25e52118b12f.json"
-     ]
-    },
-    "c207d0b8-8aa9-5290-95a5-2a6c4484456c": {
-     "title": "CLI & MCP Reference",
-     "icon": "⌨️",
-     "file": "en/pages/c207d0b8-8aa9-5290-95a5-2a6c4484456c.json",
-     "sha256": "d6d63e6222bbe62eeef1a3911dc4804d8afbdfbc5af958fd68e93290c043d913",
-     "components": [
-      "en/components/doc-hero@1.0.0-6aa1b6a2a0e9.json",
-      "en/components/doc-commands@1.0.0-9832e342e037.json",
-      "en/components/doc-compare@1.0.0-6450bf2fc82c.json",
       "en/components/doc-cards@1.0.0-25e52118b12f.json"
      ]
     }
