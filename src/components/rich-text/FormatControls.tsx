@@ -20,6 +20,7 @@ import {
   Underline,
 } from "../../ui/icons";
 import "./format-controls.css";
+import { ToolbarPanel } from "../../editor/ToolbarPanel";
 
 const textColors = [
   "#292733",
@@ -81,9 +82,18 @@ export function FormatControls({
       if (event.target instanceof Node && !root.current?.contains(event.target))
         close();
     };
+    const escape = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      event.preventDefault();
+      event.stopPropagation();
+      close();
+      colorButton.current?.focus();
+    };
+    document.addEventListener("keydown", escape, true);
     document.addEventListener("pointerdown", outside);
     editor.on("selectionUpdate", close);
     return () => {
+      document.removeEventListener("keydown", escape, true);
       document.removeEventListener("pointerdown", outside);
       editor.off("selectionUpdate", close);
     };
@@ -268,6 +278,7 @@ export function FormatControls({
           aria-expanded={colorsOpen}
           aria-controls={panelId}
           onMouseDown={(event) => event.preventDefault()}
+          onPointerDown={(event) => event.stopPropagation()}
           onClick={() => setColorsOpen(!colorsOpen)}
         >
           <span className="rich-format-color-icon">
@@ -339,101 +350,101 @@ export function FormatControls({
           )}
       </div>
       {colorsOpen && (
-        <div
-          id={panelId}
+        <ToolbarPanel
           className="rich-format-color-panel"
-          role="group"
-          aria-label={t("format.colors")}
+          onDismiss={() => setColorsOpen(false)}
         >
-          {(["text", "highlight"] as const).map((kind) => {
-            const isText = kind === "text";
-            const current = isText ? textColor : highlightColor;
-            const label = isText
-              ? t("format.textColor")
-              : t("format.highlightColor");
-            const apply = (color: string) =>
-              isText
-                ? editor.chain().focus().setMark("textStyle", { color }).run()
-                : editor
-                    .chain()
-                    .focus()
-                    .setMark("highlight", { color, mode: highlightMode })
-                    .run();
-            return (
-              <div className="rich-format-palette" key={kind}>
-                <span className="rich-format-panel-label">{label}</span>
-                <div className="rich-format-swatches">
-                  {(isText ? textColors : highlightColors).map((color) => (
-                    <button
-                      type="button"
-                      key={color}
-                      className={`rich-format-swatch${current === color ? " is-active" : ""}`}
-                      style={{ background: color }}
-                      aria-label={`${label} ${color}`}
-                      title={color}
-                      aria-pressed={current === color}
-                      onMouseDown={(event) => event.preventDefault()}
-                      onClick={() => apply(color)}
-                    />
-                  ))}
-                  <label
-                    className="rich-format-custom-color"
-                    title={t("format.customColor")}
-                  >
-                    <input
-                      type="color"
-                      aria-label={label}
-                      value={current}
-                      onChange={(event) => apply(event.target.value)}
-                    />
-                  </label>
-                </div>
-                {!isText && (
-                  <div
-                    className="rich-format-highlight-modes"
-                    role="group"
-                    aria-label={t("format.highlightMode")}
-                  >
-                    {(["lower", "full"] as const).map((mode) => (
+          <div id={panelId} role="group" aria-label={t("format.colors")}>
+            {(["text", "highlight"] as const).map((kind) => {
+              const isText = kind === "text";
+              const current = isText ? textColor : highlightColor;
+              const label = isText
+                ? t("format.textColor")
+                : t("format.highlightColor");
+              const apply = (color: string) =>
+                isText
+                  ? editor.chain().focus().setMark("textStyle", { color }).run()
+                  : editor
+                      .chain()
+                      .focus()
+                      .setMark("highlight", { color, mode: highlightMode })
+                      .run();
+              return (
+                <div className="rich-format-palette" key={kind}>
+                  <span className="rich-format-panel-label">{label}</span>
+                  <div className="rich-format-swatches">
+                    {(isText ? textColors : highlightColors).map((color) => (
                       <button
                         type="button"
-                        key={mode}
-                        aria-pressed={highlightMode === mode}
+                        key={color}
+                        className={`rich-format-swatch${current === color ? " is-active" : ""}`}
+                        style={{ background: color }}
+                        aria-label={`${label} ${color}`}
+                        title={color}
+                        aria-pressed={current === color}
                         onMouseDown={(event) => event.preventDefault()}
-                        onClick={() =>
-                          editor
-                            .chain()
-                            .focus()
-                            .setMark("highlight", {
-                              color: highlightColor,
-                              mode,
-                            })
-                            .run()
-                        }
-                      >
-                        <span
-                          className={`rich-format-highlight-preview is-${mode}`}
-                          style={
-                            {
-                              "--highlight-preview": highlightColor,
-                            } as React.CSSProperties
+                        onClick={() => apply(color)}
+                      />
+                    ))}
+                    <label
+                      className="rich-format-custom-color"
+                      title={t("format.customColor")}
+                    >
+                      <input
+                        type="color"
+                        aria-label={label}
+                        value={current}
+                        onChange={(event) => apply(event.target.value)}
+                      />
+                    </label>
+                  </div>
+                  {!isText && (
+                    <div
+                      className="rich-format-highlight-modes"
+                      role="group"
+                      aria-label={t("format.highlightMode")}
+                    >
+                      {(["lower", "full"] as const).map((mode) => (
+                        <button
+                          type="button"
+                          key={mode}
+                          aria-pressed={highlightMode === mode}
+                          onMouseDown={(event) => event.preventDefault()}
+                          onClick={() =>
+                            editor
+                              .chain()
+                              .focus()
+                              .setMark("highlight", {
+                                color: highlightColor,
+                                mode,
+                              })
+                              .run()
                           }
                         >
-                          Aa
-                        </span>
-                        {t(
-                          mode === "lower"
-                            ? "format.highlightLower"
-                            : "format.highlightFull",
-                        )}
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
+                          <span
+                            className={`rich-format-highlight-preview is-${mode}`}
+                            style={
+                              {
+                                "--highlight-preview": highlightColor,
+                              } as React.CSSProperties
+                            }
+                          >
+                            Aa
+                          </span>
+                          {t(
+                            mode === "lower"
+                              ? "format.highlightLower"
+                              : "format.highlightFull",
+                          )}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </ToolbarPanel>
       )}
     </div>
   );

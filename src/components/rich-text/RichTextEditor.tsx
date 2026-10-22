@@ -40,6 +40,7 @@ import { clearWidgetSelection } from "./widget-selection";
 import { externalContentTransaction } from "./external-content";
 import { CellSelection } from "@tiptap/pm/tables";
 import { SelectionToolbar } from "../../editor/SelectionToolbar";
+import { ToolbarPanel } from "../../editor/ToolbarPanel";
 import { TableSelectionActions } from "./TableSelectionActions";
 import {
   documentTableActionMeta,
@@ -149,6 +150,27 @@ type DialogState = {
   /** The selection already carried a note when the dialog opened. */
   hadNote?: boolean;
 };
+
+function DialogBackdrop({
+  children,
+  className,
+  onDismiss,
+}: {
+  children: ReactNode;
+  className?: string;
+  onDismiss: () => void;
+}) {
+  return (
+    <div
+      className={className}
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) onDismiss();
+      }}
+    >
+      {children}
+    </div>
+  );
+}
 
 function ToolButton({
   label,
@@ -276,6 +298,7 @@ export default function RichTextEditor({
   const [styleMenu, setStyleMenu] = useState(false);
   const [insertMenu, setInsertMenu] = useState(false);
   const [dialog, setDialog] = useState<DialogState | null>(null);
+  const [dialogToolbar, setDialogToolbar] = useState<HTMLElement | null>(null);
   const [dialogError, setDialogError] = useState("");
   const [notice, setNotice] = useState("");
   const [bubble, setBubble] = useState<{
@@ -283,6 +306,12 @@ export default function RichTextEditor({
     top: number;
     bottom: number;
   } | null>(null);
+  useEffect(() => {
+    if (!bubble && dialogToolbar) {
+      setDialog(null);
+      setDialogToolbar(null);
+    }
+  }, [Boolean(bubble), dialogToolbar]);
   const dismissedSelection = useRef<string | null>(null);
   // Native selects and color pickers blur ProseMirror before they emit a value.
   const selectionMenuInteracting = useRef(false);
@@ -512,7 +541,11 @@ export default function RichTextEditor({
   useEffect(() => {
     if (!dialog) return;
     const focusFrame = requestAnimationFrame(() =>
-      document.querySelector<HTMLInputElement>(".editor-modal input")?.focus(),
+      document
+        .querySelector<HTMLInputElement>(
+          ".editor-modal input, .editor-modal textarea",
+        )
+        ?.focus(),
     );
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
@@ -524,7 +557,7 @@ export default function RichTextEditor({
       if (event.key !== "Tab") return;
       const targets = Array.from(
         document.querySelectorAll<HTMLElement>(
-          ".editor-modal button:not(:disabled), .editor-modal input:not(:disabled)",
+          ".editor-modal button:not(:disabled), .editor-modal input:not(:disabled), .editor-modal textarea:not(:disabled)",
         ),
       );
       const first = targets[0];
@@ -789,9 +822,12 @@ export default function RichTextEditor({
       });
       setDialogError("");
       setInsertMenu(false);
-      setBubble(null);
+      const toolbar =
+        type !== "image" ? document.getElementById(selectionMenuId) : null;
+      setDialogToolbar(toolbar);
+      if (!toolbar) setBubble(null);
     },
-    [editor],
+    [editor, selectionMenuId],
   );
 
   /** Add, change or remove the hover note of the selected text or formula. */
@@ -1294,6 +1330,7 @@ export default function RichTextEditor({
           editor.state.selection.to,
         ).length
       : 0;
+  const DialogContainer = dialogToolbar ? ToolbarPanel : DialogBackdrop;
   const formatButtons = (!minimal || bubble) && (
     <FormatControls
       editor={editor}
@@ -2034,16 +2071,19 @@ export default function RichTextEditor({
         )}
       {dialog &&
         createPortal(
-          <div
-            className="editor-modal-backdrop"
-            onMouseDown={(event) => {
-              if (event.target === event.currentTarget) setDialog(null);
+          <DialogContainer
+            className={
+              dialogToolbar ? "editor-format-panel" : "editor-modal-backdrop"
+            }
+            onDismiss={() => {
+              setDialog(null);
+              editor.commands.focus();
             }}
           >
             <form
               className="editor-modal"
               role="dialog"
-              aria-modal="true"
+              aria-modal={dialogToolbar ? undefined : true}
               aria-labelledby="editor-dialog-title"
               onKeyDown={(event) => {
                 if (event.key === "Escape") setDialog(null);
@@ -2261,8 +2301,8 @@ export default function RichTextEditor({
                 </button>
               </div>
             </form>
-          </div>,
-          document.body,
+          </DialogContainer>,
+          dialogToolbar ?? document.body,
         )}
       {readOnly && (
         <span className="editor-readonly-note">

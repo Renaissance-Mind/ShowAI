@@ -43,13 +43,20 @@ export function SelectionToolbar({
             bottom: bounds.bottom,
           }
         : anchor;
+      const panel = element.querySelector<HTMLElement>(".editor-toolbar-panel");
+      const panelHeight = panel?.getBoundingClientRect().height ?? 0;
+      // Reserve space above the bar for its independent secondary panel.
+      const minimumTop =
+        panelHeight && viewportTop + panelHeight + height + 24 < innerHeight
+          ? viewportTop + panelHeight + 8
+          : viewportTop;
       const next = {
         left: Math.max(
           8,
           Math.min(point.left - width / 2, window.innerWidth - width - 8),
         ),
         top: Math.max(
-          viewportTop,
+          minimumTop,
           Math.min(
             point.top - height - 8 >= viewportTop
               ? point.top - height - 8
@@ -67,6 +74,13 @@ export function SelectionToolbar({
     place();
     const observer = new ResizeObserver(place);
     observer.observe(element);
+    const panels = new MutationObserver(() => {
+      element
+        .querySelectorAll(".editor-toolbar-panel")
+        .forEach((panel) => observer.observe(panel));
+      place();
+    });
+    panels.observe(element, { childList: true, subtree: true });
     // Ancestors can move the anchor while the anchor's own size stays unchanged.
     if (anchorElement)
       for (
@@ -79,6 +93,7 @@ export function SelectionToolbar({
     if (anchorElement) window.addEventListener("scroll", place, true);
     return () => {
       observer.disconnect();
+      panels.disconnect();
       window.removeEventListener("resize", place);
       if (anchorElement) window.removeEventListener("scroll", place, true);
     };

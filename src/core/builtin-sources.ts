@@ -34,6 +34,8 @@ import richTextModel from "../components/rich-text/model.mjs?raw";
 import richTextHighlight from "../components/rich-text/reading-highlight.ts?raw";
 import sharedSelectionToolbar from "../editor/SelectionToolbar.tsx?raw";
 import sharedSelectionToolbarCss from "../editor/selection-toolbar.css?raw";
+import toolbarPanel from "../editor/ToolbarPanel.tsx?raw";
+import toolbarPanelCss from "../editor/toolbar-panel.css?raw";
 import workspaceEditor from "../editor/workspace-editor.tsx?raw";
 import editorNodeJson from "../editor/node-json.ts?raw";
 import { g2BuiltinSources } from "./g2-builtin-sources";
@@ -228,6 +230,8 @@ const sources: Record<string, string> = {
   "rich-text/reading-highlight.ts": richTextHighlight,
   "editor/SelectionToolbar.tsx": sharedSelectionToolbar,
   "editor/selection-toolbar.css": sharedSelectionToolbarCss,
+  "editor/ToolbarPanel.tsx": toolbarPanel,
+  "editor/toolbar-panel.css": toolbarPanelCss,
   "editor/workspace-editor.tsx": workspaceEditor,
   "editor/node-json.ts": editorNodeJson,
   "icons.ts": icons,
