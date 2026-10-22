@@ -2729,16 +2729,15 @@ test("Kimi installed package discovers tools, delivers offline previews and reje
       await readFile(join(plugin, "kimi.plugin.json"), "utf8"),
     );
     const server = manifest.mcpServers.showai;
-    expect(server.command).toBe("node");
-    expect(server.executor).toBe("local");
+    expect(server.command).toBe("sh");
     expect(manifest.interface.mcpOverrides.showai.displayName).toBeTruthy();
     await run(["runtime", "register"], { home: isolated });
     const output = join(isolated, "host-output");
     await client.connect(
       new StdioClientTransport({
-        command: process.execPath,
+        command: server.command,
         args: server.args,
-        cwd: resolve(plugin, server.cwd),
+        cwd: resolve(plugin, server.cwd ?? "."),
         env: {
           ...environment(),
           ...server.env,
@@ -2804,8 +2803,8 @@ test("Kimi installed package discovers tools, delivers offline previews and reje
       "Kimi launch verified",
     );
     await expect(
-      execute(process.execPath, server.args, {
-        cwd: resolve(plugin, server.cwd),
+      execute(server.command, server.args, {
+        cwd: resolve(plugin, server.cwd ?? "."),
         env: {
           ...environment(),
           SHOWAI_HOME: join(isolated, "other"),

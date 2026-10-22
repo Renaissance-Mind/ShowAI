@@ -9,7 +9,7 @@ This plugin includes a Skill and a local MCP launcher. It connects Kimi Work to 
 ### Install and update
 
 1. Install and start ShowAI so it registers its runtime. This plugin requires the four-stage template workflow and the merged MCP tool surface (v2). Installing the plugin does not update ShowAI itself.
-2. Register this directory (`plugins-kimi/showai`) as a local plugin in Kimi Work. In a Kimi Work session, ask it to register this directory using its built-in plugin manager. The MCP command runs with the installed plugin as its working directory; Node.js 22.12+ must be available to the host.
+2. Register this directory (`plugins-kimi/showai`) as a local plugin in Kimi Work. In a Kimi Work session, ask it to register this directory using its built-in plugin manager. The MCP command runs with the installed plugin as its working directory. The launcher uses `sh` and Node.js 22.12+ from the host's PATH; Kimi for macOS supplies both. Other hosts need a POSIX shell and Node on PATH. The shell entry avoids Kimi's native-binary rewrite of a direct `node` manifest command, which does not launch JavaScript correctly in its Electron host.
 3. Open **Plugins → Personal → ShowAI** and install or update it. Registration alone does not install the plugin. Verify that the plugin details list both the ShowAI Skill and the ShowAI MCP server.
 4. Enable the plugin and verify a real `showai_capabilities` call. Tool names may have a host prefix. An existing conversation may need to refresh its available tools; use the host's refresh flow and verify the call again.
 
@@ -34,7 +34,7 @@ See [Agent integration](https://github.com/Renaissance-Mind/ShowAI/blob/main/doc
 ### 安装与更新
 
 1. 安装并启动 ShowAI，让应用注册运行时。运行时需要支持四阶段模板流程与合并后的 MCP 工具接口（v2）；安装插件不会更新 ShowAI 应用。
-2. 将本目录（`plugins-kimi/showai`）注册为 Kimi Work 本机插件。可以在 Kimi Work 会话里要求它使用内置插件管理工具注册该目录。MCP 以安装后的插件目录为工作目录，宿主需能找到 Node.js 22.12+。
+2. 将本目录（`plugins-kimi/showai`）注册为 Kimi Work 本机插件。可以在 Kimi Work 会话里要求它使用内置插件管理工具注册该目录。MCP 以安装后的插件目录为工作目录，通过 `sh` 调用宿主 PATH 中的 Node.js 22.12+；macOS 版 Kimi 自带所需环境，其他宿主需提供 POSIX shell 和 Node。该启动方式适配 Kimi 的 Electron 宿主，避免直接声明 `node` 时被重写为无法启动 JavaScript 的宿主内部子命令。
 3. 打开「插件 → 个人 → ShowAI」并安装或更新。注册成功还不代表安装成功；插件详情应同时列出 ShowAI Skill 和 ShowAI MCP 服务。
 4. 启用插件，实际调用一次 `showai_capabilities`。工具名称可能带宿主前缀；已有会话需要刷新可用工具时，沿宿主流程刷新后重新验证调用。
 
