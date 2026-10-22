@@ -258,3 +258,17 @@
     margin-inline: 2px;
   }
 }
+
+.rich-format-clear-highlight {
+  margin-top: 12px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--muted, #777);
+  font: inherit;
+  cursor: pointer;
+}
+.rich-format-clear-highlight:disabled {
+  opacity: 0.4;
+  cursor: default;
+}

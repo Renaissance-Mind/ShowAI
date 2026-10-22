@@ -56,9 +56,12 @@ export function FormatControls({
 }) {
   const t = useTranslator(messages);
   const tn = useTranslator(noteMessages);
-  const [colorsOpen, setColorsOpen] = useState(false);
+  const [colorPanel, setColorPanel] = useState<"text" | "highlight" | null>(
+    null,
+  );
   const root = useRef<HTMLDivElement>(null);
   const colorButton = useRef<HTMLButtonElement>(null);
+  const highlightButton = useRef<HTMLButtonElement>(null);
   const panelId = useId();
   const textColor = editor.getAttributes("textStyle").color ?? "#292733";
   const highlightColor = editor.getAttributes("highlight").color ?? "#e8eed0";
@@ -76,8 +79,8 @@ export function FormatControls({
           : AlignLeft;
 
   useEffect(() => {
-    if (!colorsOpen) return;
-    const close = () => setColorsOpen(false);
+    if (!colorPanel) return;
+    const close = () => setColorPanel(null);
     const outside = (event: PointerEvent) => {
       if (event.target instanceof Node && !root.current?.contains(event.target))
         close();
@@ -87,7 +90,10 @@ export function FormatControls({
       event.preventDefault();
       event.stopPropagation();
       close();
-      colorButton.current?.focus();
+      (colorPanel === "highlight"
+        ? highlightButton
+        : colorButton
+      ).current?.focus();
     };
     document.addEventListener("keydown", escape, true);
     document.addEventListener("pointerdown", outside);
@@ -97,7 +103,7 @@ export function FormatControls({
       document.removeEventListener("pointerdown", outside);
       editor.off("selectionUpdate", close);
     };
-  }, [colorsOpen, editor]);
+  }, [colorPanel, editor]);
 
   const action = (
     label: string,
@@ -129,11 +135,14 @@ export function FormatControls({
       ref={root}
       className="rich-format-controls"
       onKeyDown={(event) => {
-        if (colorsOpen && event.key === "Escape") {
+        if (colorPanel && event.key === "Escape") {
           event.preventDefault();
           event.stopPropagation();
-          setColorsOpen(false);
-          colorButton.current?.focus();
+          setColorPanel(null);
+          (colorPanel === "highlight"
+            ? highlightButton
+            : colorButton
+          ).current?.focus();
         }
       }}
       onClickCapture={(event) => {
@@ -142,7 +151,7 @@ export function FormatControls({
             ".rich-format-colors-toggle, .rich-format-color-panel",
           )
         )
-          setColorsOpen(false);
+          setColorPanel(null);
       }}
     >
       <div
@@ -272,14 +281,14 @@ export function FormatControls({
         <button
           ref={colorButton}
           type="button"
-          className={`rich-format-colors-toggle${colorsOpen ? " is-active" : ""}`}
-          aria-label={t("format.colors")}
-          title={t("format.colors")}
-          aria-expanded={colorsOpen}
-          aria-controls={panelId}
+          className={`rich-format-colors-toggle${colorPanel === "text" ? " is-active" : ""}`}
+          aria-label={t("format.textColor")}
+          title={t("format.textColor")}
+          aria-expanded={colorPanel === "text"}
+          aria-controls={colorPanel === "text" ? panelId : undefined}
           onMouseDown={(event) => event.preventDefault()}
           onPointerDown={(event) => event.stopPropagation()}
-          onClick={() => setColorsOpen(!colorsOpen)}
+          onClick={() => setColorPanel(colorPanel === "text" ? null : "text")}
         >
           <span className="rich-format-color-icon">
             <Type size={16} />
@@ -287,23 +296,26 @@ export function FormatControls({
           </span>
           <ChevronDown size={11} />
         </button>
-        {action(
-          t("format.highlight"),
+        <button
+          ref={highlightButton}
+          type="button"
+          className={`rich-format-colors-toggle${colorPanel === "highlight" ? " is-active" : ""}`}
+          aria-label={t("format.highlightColor")}
+          title={t("format.highlightColor")}
+          aria-expanded={colorPanel === "highlight"}
+          aria-controls={colorPanel === "highlight" ? panelId : undefined}
+          onMouseDown={(event) => event.preventDefault()}
+          onPointerDown={(event) => event.stopPropagation()}
+          onClick={() =>
+            setColorPanel(colorPanel === "highlight" ? null : "highlight")
+          }
+        >
           <span className="rich-format-color-icon">
             <Highlighter size={16} />
             <i style={{ background: highlightColor }} />
-          </span>,
-          editor.isActive("highlight"),
-          () =>
-            editor
-              .chain()
-              .focus()
-              .toggleMark("highlight", {
-                color: highlightColor,
-                mode: highlightMode,
-              })
-              .run(),
-        )}
+          </span>
+          <ChevronDown size={11} />
+        </button>
       </div>
       <span className="rich-format-divider" aria-hidden="true" />
       <div
@@ -349,13 +361,22 @@ export function FormatControls({
             onNote,
           )}
       </div>
-      {colorsOpen && (
+      {colorPanel && (
         <ToolbarPanel
+          key={colorPanel}
           className="rich-format-color-panel"
-          onDismiss={() => setColorsOpen(false)}
+          onDismiss={() => setColorPanel(null)}
         >
-          <div id={panelId} role="group" aria-label={t("format.colors")}>
-            {(["text", "highlight"] as const).map((kind) => {
+          <div
+            id={panelId}
+            role="group"
+            aria-label={t(
+              colorPanel === "text"
+                ? "format.textColor"
+                : "format.highlightColor",
+            )}
+          >
+            {[colorPanel].map((kind) => {
               const isText = kind === "text";
               const current = isText ? textColor : highlightColor;
               const label = isText
@@ -398,6 +419,19 @@ export function FormatControls({
                       />
                     </label>
                   </div>
+                  {!isText && (
+                    <button
+                      type="button"
+                      className="rich-format-clear-highlight"
+                      disabled={!editor.isActive("highlight")}
+                      onMouseDown={(event) => event.preventDefault()}
+                      onClick={() =>
+                        editor.chain().focus().unsetHighlight().run()
+                      }
+                    >
+                      {t("format.removeHighlight")}
+                    </button>
+                  )}
                   {!isText && (
                     <div
                       className="rich-format-highlight-modes"
