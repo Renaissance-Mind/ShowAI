@@ -452,6 +452,13 @@ export class SourceRuntimeOwner {
   if(!entry.transport){entry.transport=transport;if(this.publications.get(scopeKey(current.ref.scope)+"\u0000"+envelope.publicationId)===entry)this.account(transport,1)}
   return this.unchangedNativePublication(current,{publicationId:envelope.publicationId,sourceVersion:envelope.sourceVersion,packet:entry.packet,leaseId:request.leaseId},entry,observer);
  }
+ /** Private host resolve only. Body and proofs come from the same actual get;
+  * public resolve/client JSON never supplies or manufactures these proofs. */
+ resolveActualSnapshot(ref:SourceSnapshotRef){
+  const actual=this.get(ref),modelValidated=this.validatedBodies.has(actual.document);
+  return {format:"showai-resolved-source-v1" as const,ref:actual.ref,document:actual.document,
+   modelValidated,nativeOrigin:modelValidated?actual.nativeOrigin?.identity??null:null};
+ }
  /** Trusted adapter only: a ref or kind flag alone never proves a different
   * Swift/JSON body. The exact comparator includes every root field, timestamp,
   * sample, tombstone and retained variant. No JSON serialization is involved. */
@@ -624,4 +631,9 @@ export function registerActualNativePublicationIfUnchanged(raw:string,observer?:
 /** Private actual-host envelope adapter; never a public source request kind. */
 export function registerActualNativeEnvelope(raw:string,observer?:SourceRuntimeObserver,expectedRef?:SourceSnapshotRef):string{
  service??=new SourceRuntimeOwner();return JSON.stringify(service.registerActualNativeEnvelopeJSON(raw,observer,expectedRef));
+}
+
+/** Private native adapter; deliberately absent from the public dispatcher. */
+export function resolveActualSourceSnapshot(ref:SourceSnapshotRef){
+ service??=new SourceRuntimeOwner();return service.resolveActualSnapshot(ref);
 }
