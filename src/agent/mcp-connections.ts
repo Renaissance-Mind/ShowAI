@@ -9,13 +9,31 @@ import { atomicRename } from "../core/atomic-rename";
 export interface AgentConnectionRecord {
   client: string;
   version?: string;
+  /** Plugin version of the latest connection (SHOWAI_PLUGIN_VERSION from the plugin launcher). */
+  pluginVersion?: string;
+  /** Plugin version that made the latest tool call. */
+  callPluginVersion?: string;
   firstConnectedAt: string;
   lastConnectedAt: string;
   firstCallAt?: string;
   lastCallAt?: string;
+  /** Only a launcher failure was recorded; the connection times are that failure's. */
+  neverConnected?: true;
+  /** Latest launcher failure of this client, written before the MCP handshake. */
+  lastFailure?: AgentConnectionFailure;
+}
+
+/** Written by plugins/showai/mcp/launch.mjs when it cannot start the runtime. Already redacted. */
+export interface AgentConnectionFailure {
+  code: string;
+  message: string;
+  detail?: string;
+  pluginVersion?: string;
+  at: string;
 }
 
 const directory = (root: string) => join(root, "local", "agent-connections");
+// launch.mjs names failure records the same way with a "-failure" suffix.
 function fileName(client: string) {
   const slug = client
     .toLowerCase()
@@ -45,17 +63,54 @@ export async function readAgentConnections(
       throw error;
     },
   );
-  const records: AgentConnectionRecord[] = [];
+  const records = new Map<string, AgentConnectionRecord>();
+  const failures: (AgentConnectionFailure & { client: string })[] = [];
   for (const name of names.filter((name) => name.endsWith(".json")).sort()) {
-    const record = await readRecord(join(directory(root), name));
+    const path = join(directory(root), name);
+    if (name.endsWith("-failure.json")) {
+      const failure = JSON.parse(await readFile(path, "utf8"));
+      if (
+        failure?.format === "showai-connection-failure" &&
+        typeof failure.client === "string" &&
+        typeof failure.code === "string" &&
+        typeof failure.at === "string"
+      )
+        failures.push(failure);
+      continue;
+    }
+    const record = await readRecord(path);
     if (
       record &&
       typeof record.client === "string" &&
       typeof record.firstConnectedAt === "string"
     )
-      records.push(record);
+      records.set(record.client, record);
   }
-  return records;
+  for (const failure of failures) {
+    const { client, code, message, detail, pluginVersion, at } = failure;
+    const lastFailure = {
+      code,
+      message: String(message ?? ""),
+      ...(typeof detail === "string" ? { detail } : {}),
+      ...(typeof pluginVersion === "string" ? { pluginVersion } : {}),
+      at,
+    };
+    const record = records.get(client);
+    // A host that never connected still appears with its failure.
+    records.set(
+      client,
+      record
+        ? { ...record, lastFailure }
+        : {
+            client,
+            firstConnectedAt: at,
+            lastConnectedAt: at,
+            neverConnected: true,
+            lastFailure,
+          },
+    );
+  }
+  return [...records.values()];
 }
 
 /** Records the connection before the MCP server sees each message. Call before connect. */
@@ -112,10 +167,13 @@ export class McpConnectionRecorder {
         await mkdir(directory(this.root), { recursive: true });
         const path = join(directory(this.root), fileName(client.name));
         const previous = await readRecord(path);
+        const pluginVersion = process.env.SHOWAI_PLUGIN_VERSION || undefined;
         const record: AgentConnectionRecord = {
           ...previous,
           client: client.name,
           ...(client.version ? { version: client.version } : {}),
+          ...(event === "connected" ? { pluginVersion } : {}),
+          ...(event === "called" ? { callPluginVersion: pluginVersion } : {}),
           firstConnectedAt: previous?.firstConnectedAt ?? at,
           lastConnectedAt:
             event === "connected" ? at : (previous?.lastConnectedAt ?? at),

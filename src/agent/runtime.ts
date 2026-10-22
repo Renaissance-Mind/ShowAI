@@ -1,6 +1,6 @@
 import { COMPONENT_PARAMETER_CAPABILITIES } from "../portable/component-parameters.mjs";
 import { CAPACITY } from "../portable/capacity.mjs";
-import { access, mkdir, writeFile, rename } from "node:fs/promises";
+import { access, mkdir, readFile, writeFile, rename } from "node:fs/promises";
 import { randomUUID } from "node:crypto";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -9,6 +9,7 @@ import { versionedLibrary } from "../core/library-runtime";
 import { findViewerTemplate } from "./exporter";
 import { GUIDE_TOPICS } from "./guides";
 import { TEMPLATE_WORKFLOW_CAPABILITIES } from "../portable/template-bundle.mjs";
+import { supportInfo } from "./support";
 
 /** Tool names and parameters the installed plugin skills describe. */
 export const TOOL_SURFACE_PROTOCOL = "showai-mcp-tools-v2";
@@ -18,33 +19,190 @@ export interface RuntimeLaunch {
   args: string[];
   env: Record<string, string>;
 }
-export async function registerRuntime(home: string, launch: RuntimeLaunch) {
+/** Which kind of build registered itself; a packaged App replaces a development build of the same version. */
+export type RuntimeChannel = "packaged" | "development";
+export interface RuntimeRegistration {
+  format: "showai-agent-runtime";
+  protocol: 1;
+  version: string;
+  home: string;
+  launch: RuntimeLaunch;
+  channel?: RuntimeChannel;
+  registeredAt?: string;
+}
+
+function validLaunch(launch: RuntimeLaunch) {
   if (
     !launch.command ||
     !launch.args.length ||
     launch.args.some((arg) => typeof arg !== "string")
   )
     throw new Error("A runtime launch needs a command and CLI arguments.");
+}
+
+/** Explicit registration: `runtime register` and 修复登记 always replace the file. */
+export async function registerRuntime(
+  home: string,
+  launch: RuntimeLaunch,
+  channel?: RuntimeChannel,
+) {
+  validLaunch(launch);
   await access(launch.args[0]);
   const path = join(resolve(home), "agent-runtime.json");
   await mkdir(dirname(path), { recursive: true });
   const temporary = join(dirname(path), `.agent-runtime-${randomUUID()}.tmp`);
-  await writeFile(
-    temporary,
-    JSON.stringify(
-      {
-        format: "showai-agent-runtime",
-        protocol: 1,
-        version,
-        home: resolve(home),
-        launch,
-      },
-      null,
-      2,
-    ) + "\n",
-  );
+  const registration: RuntimeRegistration = {
+    format: "showai-agent-runtime",
+    protocol: 1,
+    version,
+    home: resolve(home),
+    launch,
+    ...(channel ? { channel } : {}),
+    registeredAt: new Date().toISOString(),
+  };
+  await writeFile(temporary, JSON.stringify(registration, null, 2) + "\n");
   await rename(temporary, path);
   return { path, version, home: resolve(home), launch };
+}
+
+/** Numeric x.y.z comparison; pre-release and build suffixes are ignored. */
+export function compareVersions(left: string, right: string) {
+  const parts = (value: string) =>
+    value
+      .split(/[-+]/)[0]
+      .split(".")
+      .map((part) => Number.parseInt(part, 10) || 0);
+  const a = parts(left),
+    b = parts(right);
+  for (let index = 0; index < Math.max(a.length, b.length); index++) {
+    const difference = (a[index] ?? 0) - (b[index] ?? 0);
+    if (difference) return Math.sign(difference);
+  }
+  return 0;
+}
+
+const reachable = (path: string) =>
+  access(path).then(
+    () => true,
+    (error: NodeJS.ErrnoException) => {
+      if (error.code === "ENOENT" || error.code === "ENOTDIR") return false;
+      throw error;
+    },
+  );
+
+export type RegistrationState =
+  /** This App's launch is registered. */
+  | "current"
+  /** Another App or build is registered. */
+  | "other"
+  | "missing"
+  | "invalid";
+export interface RuntimeRegistrationStatus {
+  path: string;
+  state: RegistrationState;
+  /** How another registration compares with this App. */
+  reason?: "newer" | "same-version" | "older" | "unreachable" | "other-library";
+  registered?: {
+    version: string;
+    command: string;
+    entry: string;
+    protocol: number;
+    home: string;
+    channel?: RuntimeChannel;
+    registeredAt?: string;
+  };
+  current: { version: string; entry: string };
+}
+
+/** Reads agent-runtime.json and compares it with this App's launch. */
+export async function runtimeRegistrationStatus(
+  home: string,
+  launch: RuntimeLaunch,
+  channel?: RuntimeChannel,
+): Promise<RuntimeRegistrationStatus> {
+  const path = join(resolve(home), "agent-runtime.json");
+  const current = { version, entry: launch.args[0] };
+  const text = await readFile(path, "utf8").catch(
+    (error: NodeJS.ErrnoException) => {
+      if (error.code === "ENOENT") return undefined;
+      throw error;
+    },
+  );
+  if (text === undefined) return { path, state: "missing", current };
+  let value: Partial<RuntimeRegistration> | undefined;
+  try {
+    value = JSON.parse(text);
+  } catch {
+    // A damaged registration is a state the person repairs, not a startup failure.
+    return { path, state: "invalid", current };
+  }
+  if (
+    value?.format !== "showai-agent-runtime" ||
+    value.protocol !== 1 ||
+    typeof value.version !== "string" ||
+    typeof value.home !== "string" ||
+    typeof value.launch?.command !== "string" ||
+    !Array.isArray(value.launch.args) ||
+    typeof value.launch.args[0] !== "string"
+  )
+    return { path, state: "invalid", current };
+  const registered = {
+    version: value.version,
+    command: value.launch.command,
+    entry: value.launch.args[0],
+    protocol: value.protocol,
+    home: value.home,
+    ...(value.channel ? { channel: value.channel } : {}),
+    ...(value.registeredAt ? { registeredAt: value.registeredAt } : {}),
+  };
+  if (
+    registered.command === launch.command &&
+    registered.entry === launch.args[0] &&
+    resolve(registered.home) === resolve(home)
+  )
+    return { path, state: "current", registered, current };
+  const order = compareVersions(registered.version, version);
+  const reason =
+    resolve(registered.home) !== resolve(home)
+      ? "other-library"
+      : !(await reachable(registered.command)) ||
+          !(await reachable(registered.entry))
+        ? "unreachable"
+        : order > 0
+          ? "newer"
+          : order < 0 ||
+              (registered.channel !== "packaged" && channel === "packaged")
+            ? "older"
+            : "same-version";
+  return { path, state: "other", reason, registered, current };
+}
+
+/**
+ * Startup registration. Replaces only a missing, invalid, unreachable or older
+ * registration, or this App's own; another valid App or build is kept, so the last
+ * started instance does not silently take over the library's plugin connection.
+ */
+export async function registerRuntimeOnStartup(
+  home: string,
+  launch: RuntimeLaunch,
+  channel: RuntimeChannel,
+) {
+  validLaunch(launch);
+  const status = await runtimeRegistrationStatus(home, launch, channel);
+  if (
+    status.state === "other" &&
+    (status.reason === "newer" || status.reason === "same-version")
+  ) {
+    process.stderr.write(
+      `ShowAI kept the registered runtime ${status.registered!.version} (${status.registered!.entry}). Use Settings → Plugins → Repair registration to register this App.\n`,
+    );
+    return { ...status, written: false };
+  }
+  await registerRuntime(home, launch, channel);
+  return {
+    ...(await runtimeRegistrationStatus(home, launch, channel)),
+    written: true,
+  };
 }
 export async function runtimeInfo(home: string) {
   const viewer = await findViewerTemplate();
@@ -107,6 +265,7 @@ export async function runtimeInfo(home: string) {
       sourceArchive: hasArchive ? archive : null,
     },
     guideTopics: GUIDE_TOPICS,
+    support: await supportInfo(),
     launch: {
       command: process.execPath,
       args: [

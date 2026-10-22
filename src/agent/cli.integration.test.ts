@@ -22,6 +22,7 @@ import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js"
 import { parseArtifact } from "../portable/validation.mjs";
 import { ContentLibrary as GitLibrary } from "../core/content-library";
 import { FileStore } from "../core/store";
+import { readAgentConnections } from "./mcp-connections";
 
 const execute = promisify(execFile);
 let home: string;
@@ -514,6 +515,10 @@ test("external runtime records an executable launch and exposes only relevant gu
   expect(info.projectResolution.mode).toBe("directory");
   expect(info.launch.args).toEqual([cli]);
   expect(info.guideTopics).toContain("template-extraction");
+  expect(info.support).toMatchObject({
+    reportUrl: "https://github.com/Renaissance-Mind/ShowAI/issues/new",
+    appPath: "设置 → 关于与反馈",
+  });
   const registration = await run(["runtime", "register"]);
   const config = JSON.parse(await readFile(registration.path, "utf8"));
   const output = await execute(
@@ -2684,28 +2689,75 @@ test("plugin launcher starts library MCP with explicit host delivery and refuses
       projectId: project.id,
       title: "Launch verified",
     });
+    // Receipts name the project and link to the page in the App.
+    const openUrl = `showai://project/${project.id}/page/${page.document.id}`;
+    expect(page).toMatchObject({
+      projectName: "Launched through installed protocol",
+      openUrl,
+    });
     const presentation = await call("page_present", {
       projectId: project.id,
       pageId: page.document.id,
+    });
+    expect(presentation).toMatchObject({
+      projectName: "Launched through installed protocol",
+      openUrl,
     });
     expect(presentation.delivery.inline.startsWith(output)).toBe(true);
     expect(await readFile(presentation.delivery.html, "utf8")).toContain(
       "Launch verified",
     );
-    await expect(
-      execute(
-        process.execPath,
-        [join(repository, "plugins/showai/mcp/launch.mjs")],
-        {
-          env: {
-            ...environment(),
-            SHOWAI_HOME: join(isolated, "different"),
-            SHOWAI_RUNTIME_CONFIG: join(isolated, "agent-runtime.json"),
-          },
-          timeout: 10000,
-        },
-      ),
-    ).rejects.toThrow();
+    // The launcher passes the plugin version into the connection record and caches its probe.
+    const { version: pluginVersion } = JSON.parse(
+      await readFile(join(repository, "plugins/showai/plugin.json"), "utf8"),
+    );
+    const record = (await readAgentConnections(isolated)).find(
+      (item) => item.client === "plugin-launch-acceptance",
+    );
+    expect(record).toMatchObject({
+      pluginVersion,
+      callPluginVersion: pluginVersion,
+    });
+    expect(
+      JSON.parse(
+        await readFile(join(isolated, "local/agent-runtime-probe.json"), "utf8"),
+      ).info.ok,
+    ).toBe(true);
+    const capabilities = await call("showai_capabilities");
+    expect(capabilities.support).toMatchObject({
+      reportUrl: "https://github.com/Renaissance-Mind/ShowAI/issues/new",
+      docsUrl: "https://showai.renaissancemind.ai/doc/agent-troubleshooting",
+      appPath: "设置 → 关于与反馈",
+    });
+    // A mismatched library still answers the handshake, with only the diagnostic tool.
+    const mismatch = new Client({ name: "codex-mcp-client", version: "1" });
+    await mismatch.connect(
+      new StdioClientTransport({
+        command: process.execPath,
+        args: [join(repository, "plugins/showai/mcp/launch.mjs")],
+        env: {
+          ...environment(),
+          SHOWAI_HOME: join(isolated, "different"),
+          SHOWAI_RUNTIME_CONFIG: join(isolated, "agent-runtime.json"),
+        } as Record<string, string>,
+        stderr: "pipe",
+      }),
+    );
+    try {
+      expect((await mismatch.listTools()).tools.map((tool) => tool.name)).toEqual(
+        ["showai_connection_problem"],
+      );
+      const problem = await mismatch.callTool({
+        name: "showai_connection_problem",
+        arguments: {},
+      });
+      expect(problem.isError).toBe(true);
+      expect((problem.structuredContent as any).error.code).toBe(
+        "LIBRARY_MISMATCH",
+      );
+    } finally {
+      await mismatch.close();
+    }
   } finally {
     await client.close();
     await rm(isolated, { recursive: true, force: true });

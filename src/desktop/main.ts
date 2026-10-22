@@ -51,10 +51,11 @@ import { openLibrary } from "../core/open-library";
 import { versionedLibrary } from "../core/library-runtime";
 import type { LoadedPage } from "../studio/usePage";
 import { BackgroundWorker } from "../core/background-worker";
-import { registerRuntime } from "../agent/runtime";
+import { registerRuntimeOnStartup } from "../agent/runtime";
 import {
   DesktopPluginInstaller,
   desktopPluginActions,
+  pluginInstallerAction,
 } from "../plugin/desktop-install";
 import { AgentHost, agentActions } from "../agent-host/host";
 import {
@@ -296,7 +297,11 @@ async function useHome(home?: string): Promise<void> {
     }),
   );
   service = new AgentService({ root: store.root });
-  await registerRuntime(store.root, info().cli);
+  await registerRuntimeOnStartup(
+    store.root,
+    info().cli,
+    app.isPackaged ? "packaged" : "development",
+  );
   maintenance = new MaintenanceScheduler(store.root).start();
   syncManager(store.root).start();
   watcher = watch(store.root, {
@@ -666,8 +671,8 @@ async function handle(
   window: BrowserWindow,
 ): Promise<unknown> {
   maintenance?.markActivity();
-  if (action === "plugins:status") return pluginInstaller.status();
-  if (action === "plugins:install") return pluginInstaller.install(args.host);
+  if (desktopPluginActions.has(action))
+    return pluginInstallerAction(pluginInstaller, action, args);
   if (action === "agent:remoteDevice") return remoteConnector.status();
   if (action === "agent:approveRemoteClient")
     return remoteConnector.approveClient(
@@ -1503,6 +1508,7 @@ else {
             ? join(process.cwd(), "plugins/dsh-showai")
             : join(runtimePath(), "assets/dsh-plugin"),
         runtime: () => info(),
+        channel: app.isPackaged ? "packaged" : "development",
       });
       remoteConnector = new RemoteMacConnector(agentHost, () => store.root);
       void remoteConnector

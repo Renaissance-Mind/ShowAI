@@ -918,13 +918,13 @@ export class FileStore {
       if (matches.length > 1)
         throw new CoreError(
           "CONFLICT",
-          "Multiple ShowAI projects own this source directory. Specify --project.",
+          "Multiple ShowAI projects own this source directory. Choose one with projects_list and pass its projectId (CLI: --project).",
         );
       const project = matches[0];
       if (project?.archived)
         throw new CoreError(
           "CONFLICT",
-          "The project for this directory is archived. Restore it or specify --project.",
+          "The project for this directory is archived. Ask the user to restore it in ShowAI, or pass another projectId from projects_list (CLI: --project).",
         );
       if (project) return { project, created: false };
       return {

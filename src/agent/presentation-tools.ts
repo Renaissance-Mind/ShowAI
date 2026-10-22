@@ -25,6 +25,7 @@ import {
   componentResourceUri,
 } from "./mcp-ui";
 import { errorResult } from "./service";
+import { supportInfo } from "./support";
 import { randomUUID } from "node:crypto";
 import { mkdir, mkdtemp, readdir, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -268,6 +269,7 @@ export function registerPresentationTools(
       mcpSuccess({
         version,
         agentProtocol: "showai-mcp-v1",
+        support: await supportInfo(),
         templateWorkflow: {
           ...TEMPLATE_WORKFLOW_CAPABILITIES,
           taskContexts: options.privateProjects !== false,

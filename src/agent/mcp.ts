@@ -195,6 +195,26 @@ export function createMcpServer(options: {
     destructiveHint: false,
     openWorldHint: false,
   };
+  // Local connections share the library with the ShowAI App, which opens showai:// links.
+  // Remote connections deliver through their own storage and have no local App.
+  const openLinks = !options.storeProjectPresentation;
+  /** Where the saved page lives, so the Agent can say "saved to project X — open it here". */
+  const withOpenLink = async <T,>(result: T, pageId?: unknown): Promise<T> => {
+    const value = result as Record<string, unknown> | null;
+    const page =
+      typeof pageId === "string"
+        ? pageId
+        : ((value?.document as { id?: unknown } | undefined)?.id ??
+          value?.pageId);
+    if (!openLinks || typeof page !== "string" || !value) return result;
+    const project = await service.store.readProject(projectId);
+    return {
+      ...value,
+      projectId,
+      projectName: project.name,
+      openUrl: `showai://project/${encodeURIComponent(projectId)}/page/${encodeURIComponent(page)}`,
+    } as T;
+  };
 
   registerDatasetTools(
     register,
@@ -458,18 +478,20 @@ export function createMcpServer(options: {
       ...metadata
     }) =>
       call(
-        () =>
-          service.createPage(projectId, {
-            title,
-            kind,
-            parentId,
-            blocks,
-            ...(document ? { document: validateDocument(document) } : {}),
-            components: components as unknown as
-              CompiledComponent[] | undefined,
-            remoteComponents: remoteComponents as unknown as
-              PublishedComponentLocator[] | undefined,
-          }),
+        async () =>
+          withOpenLink(
+            await service.createPage(projectId, {
+              title,
+              kind,
+              parentId,
+              blocks,
+              ...(document ? { document: validateDocument(document) } : {}),
+              components: components as unknown as
+                CompiledComponent[] | undefined,
+              remoteComponents: remoteComponents as unknown as
+                PublishedComponentLocator[] | undefined,
+            }),
+          ),
         metadata,
       ),
   );
@@ -501,16 +523,18 @@ export function createMcpServer(options: {
       ...metadata
     }) =>
       call(
-        () =>
-          service.savePage(
-            projectId,
-            pageId,
-            validateDocument(document),
-            baseHash,
-            components as unknown as CompiledComponent[] | undefined,
-            remoteComponents as unknown as
-              PublishedComponentLocator[] | undefined,
-            baseRevision,
+        async () =>
+          withOpenLink(
+            await service.savePage(
+              projectId,
+              pageId,
+              validateDocument(document),
+              baseHash,
+              components as unknown as CompiledComponent[] | undefined,
+              remoteComponents as unknown as
+                PublishedComponentLocator[] | undefined,
+              baseRevision,
+            ),
           ),
         metadata,
       ).then((result) => compactMcpResult(result, response)),
@@ -1100,11 +1124,16 @@ export function createMcpServer(options: {
                 ),
               )
             ).delivery;
+        const location = (await withOpenLink({}, value.pageId)) as {
+          projectName?: string;
+          openUrl?: string;
+        };
         return {
           ...mcpSuccess({
             title: value.title,
             pageId: value.pageId,
             projectId,
+            ...location,
             hash: value.hash,
             revision: value.revision,
             delivery,

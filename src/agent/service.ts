@@ -2,6 +2,7 @@ import { CatalogService, type CatalogSelection } from "./catalog-service";
 export type { CatalogSelection } from "./catalog-service";
 import { blocksDocument } from "./page-authoring";
 import { CapacityError } from "../portable/capacity.mjs";
+import { PluginInstallError } from "../plugin/plugin-errors";
 import { ReadBaselines } from "../core/read-baselines";
 import { readBoard, type BoardReadInput } from "./board-reading";
 import { EditorDrafts } from "../core/editor-drafts";
@@ -1176,17 +1177,97 @@ export class AgentService extends CatalogService {
   }
 }
 
+/**
+ * What an Agent does next for common codes (tool names, not CLI flags) and one
+ * sentence it can relay to the person. Agent-facing text is English; the Agent
+ * relays it in the person's language.
+ */
+const AGENT_GUIDANCE: Record<string, { nextStep: string; userMessage: string }> =
+  {
+    CONFLICT: {
+      nextStep:
+        "Re-read the current version (page_read, dataset_read or the matching read tool), apply your change to it and retry with the new baseHash/baseRevision. Never resend the unchanged request.",
+      userMessage:
+        "The content changed after it was read, so ShowAI did not overwrite it. Nothing was lost.",
+    },
+    NOT_FOUND: {
+      nextStep:
+        "List what exists (projects_list, pages_list or library_search) and retry with an ID from that result.",
+      userMessage:
+        "ShowAI could not find that project or page in the connected library.",
+    },
+    INVALID_DATA: {
+      nextStep:
+        "Correct the input described in message and call the same tool again; read guide for the expected format.",
+      userMessage:
+        "ShowAI rejected part of the request as invalid. Nothing was saved.",
+    },
+    INVALID_PATH: {
+      nextStep:
+        "Use an absolute path on this machine, or an ID returned by ShowAI tools, and call again.",
+      userMessage: "ShowAI could not use the given file or folder path.",
+    },
+    LOCKED: {
+      nextStep:
+        "Another ShowAI operation holds the library. Wait a few seconds and retry the same call once.",
+      userMessage:
+        "ShowAI is finishing another operation on this library. Nothing was changed.",
+    },
+    SNAPSHOT_EXPIRED: {
+      nextStep: "Read the page again to get a new snapshotId, then continue.",
+      userMessage: "The page view ShowAI returned earlier has expired.",
+    },
+    MISSING_BASELINE: {
+      nextStep:
+        "Read the current version with page_read and compare it directly; the earlier baseline is no longer kept.",
+      userMessage:
+        "ShowAI no longer keeps the earlier version needed for this comparison.",
+    },
+    SOURCE_UNAVAILABLE: {
+      nextStep:
+        "Ask the user to make the linked file available on this device, or work with the stored copy.",
+      userMessage:
+        "A file linked to this data cannot be read on this device. The stored copy is unchanged.",
+    },
+    CONFIRMATION_REQUIRED: {
+      nextStep:
+        "Ask the user to decide as described in details, then call again with their decision.",
+      userMessage: "ShowAI needs your decision before it continues.",
+    },
+    CAPACITY_EXCEEDED: {
+      nextStep:
+        "Reduce the content below the limit in message (split the page, link large files instead of embedding) and retry.",
+      userMessage:
+        "The content is larger than ShowAI allows for one save. Nothing was saved.",
+    },
+  };
+const UNRECOVERABLE_GUIDANCE = {
+  nextStep:
+    "Tell the user which step failed with this code and message. Point them to showai_capabilities support (ShowAI Settings → About & feedback → Copy diagnostics, or reportUrl). Do not file a report for them or relay tokens or local paths.",
+  userMessage: "ShowAI could not complete this step.",
+};
+
 export function errorResult(error: unknown) {
   const code =
-    error instanceof CoreError || error instanceof CapacityError
+    error instanceof CoreError ||
+    error instanceof CapacityError ||
+    error instanceof PluginInstallError
       ? error.code
       : "ERROR";
   const message = error instanceof Error ? error.message : String(error);
   const system = systemErrorFacts(error);
+  const guidance =
+    error instanceof PluginInstallError
+      ? undefined
+      : (AGENT_GUIDANCE[code] ?? (code === "ERROR" ? UNRECOVERABLE_GUIDANCE : undefined));
   return {
     code,
     message,
     ...system,
+    ...(guidance ?? {}),
+    ...(error instanceof PluginInstallError && error.details
+      ? { details: error.details }
+      : {}),
     ...(error instanceof CapacityError
       ? {
           kind: error.kind,
@@ -1199,7 +1280,7 @@ export function errorResult(error: unknown) {
           saveFailed: true,
           recovery: error.recovery,
           nextStep:
-            "保存失败。重新读取当前资源并比较修改，解决冲突后用新的 baseHash/baseRevision 保存；或放弃本次修改。不得原样重复覆盖。",
+            "The save failed. Re-read the current resource, compare it with your change, resolve the conflict and save with the new baseHash/baseRevision, or abandon this change. Never resend the same overwrite.",
         }
       : {}),
     ...(error instanceof CoreError && error.conflictId

@@ -16,6 +16,8 @@ export function compactMcpResult(
   const record = data as Record<string, unknown>;
   const fields = [
     "projectId",
+    "projectName",
+    "openUrl",
     "pageId",
     "title",
     "hash",

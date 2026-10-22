@@ -58,7 +58,7 @@ export class CatalogService {
     if (!projectId)
       throw new CoreError(
         "INVALID_DATA",
-        "A resolved projectId is required. Resolve the host directory with projects current, or specify --project.",
+        "A resolved projectId is required. Call project_resolve or projects_list and pass projectId (CLI: projects current or --project).",
       );
     if (this.projectId && projectId !== this.projectId)
       throw new CoreError(
