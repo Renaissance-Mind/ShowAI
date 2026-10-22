@@ -481,6 +481,18 @@ export class SourceRuntimeOwner {
   const document=measured(observer,"saved.capture",()=>captureOwnedJSON(request.document));
   return this.register(base.ref.scope,document,"normalized",base,request.leaseId,[],undefined,observer);
  }
+ /** Private actual Store receipt only. The host has compared the complete
+  * committed record to its actual normalized witness; only this scalar may
+  * differ. Resolve the real base again and run the SAME saved registration and
+  * final capacity gate, never a caller-asserted validated/public request flag. */
+ registerActualSavedMetadata(request:{scope:SourceScope;base:SourceSnapshotRef;updatedAt:string;leaseId?:string},observer?:SourceRuntimeObserver):SourceSnapshotDelta{
+  if(Object.keys(request).some(key=>!["scope","base","updatedAt","leaseId"].includes(key)))fail("Saved metadata contains an unproved field");
+  const base=this.get(request.base);
+  if(scopeKey(scope(request.scope))!==scopeKey(base.ref.scope)||!this.validatedBodies.has(base.document))fail("Saved metadata has no matching actual normalized body");
+  if(!Object.hasOwn(base.document,"updatedAt")||!isDocumentTimestamp(request.updatedAt))fail("Saved metadata requires its actual valid timestamp");
+  const document=applyCapturedSourceDelta(base.document,[{op:"set",path:["updatedAt"],value:request.updatedAt}]) as ShowDocument;
+  return this.registerActualSavedSnapshot({scope:base.ref.scope,base:base.ref,document,leaseId:request.leaseId},observer);
+ }
  /** Actual saved backend JSON only; no public execute kind can assert saved
   * validation. Parse creates/owns data, expectedBase is separately live-resolved,
   * and final model capacity still gates the complete actual stored body. */
@@ -636,4 +648,10 @@ export function registerActualNativeEnvelope(raw:string,observer?:SourceRuntimeO
 /** Private native adapter; deliberately absent from the public dispatcher. */
 export function resolveActualSourceSnapshot(ref:SourceSnapshotRef){
  service??=new SourceRuntimeOwner();return service.resolveActualSnapshot(ref);
+}
+
+/** Private actual saved-receipt adapter; absent from public execute(). */
+export function registerActualSavedMetadata(raw:string,observer?:SourceRuntimeObserver):string{
+ service??=new SourceRuntimeOwner();
+ return JSON.stringify(service.registerActualSavedMetadata(measured(observer,"metadata.parse",()=>parseOwnedJSON(raw)) as Parameters<SourceRuntimeOwner["registerActualSavedMetadata"]>[0],observer));
 }
