@@ -53,176 +53,138 @@
     "status": "ready"
   },
   "g2-arcdiagram": {
-    "status": "limited",
-    "note": "离线打包片段超出对话约 1 MB 的预算，对话中改用在线阅读器，需要联网；禁止外网的宿主（如 Kimi Work）改用图片或整理成文档。"
+    "status": "ready"
   },
   "g2-area": {
-    "status": "limited",
-    "note": "离线打包片段超出对话约 1 MB 的预算，对话中改用在线阅读器，需要联网；禁止外网的宿主（如 Kimi Work）改用图片或整理成文档。"
+    "status": "ready"
   },
   "g2-bar": {
-    "status": "limited",
-    "note": "离线打包片段超出对话约 1 MB 的预算，对话中改用在线阅读器，需要联网；禁止外网的宿主（如 Kimi Work）改用图片或整理成文档。"
+    "status": "ready"
   },
   "g2-bi-directional-bar": {
-    "status": "limited",
-    "note": "离线打包片段超出对话约 1 MB 的预算，对话中改用在线阅读器，需要联网；禁止外网的宿主（如 Kimi Work）改用图片或整理成文档。"
+    "status": "ready"
   },
   "g2-boxplot": {
-    "status": "limited",
-    "note": "离线打包片段超出对话约 1 MB 的预算，对话中改用在线阅读器，需要联网；禁止外网的宿主（如 Kimi Work）改用图片或整理成文档。"
+    "status": "ready"
   },
   "g2-bubble-chart": {
-    "status": "limited",
-    "note": "离线打包片段超出对话约 1 MB 的预算，对话中改用在线阅读器，需要联网；禁止外网的宿主（如 Kimi Work）改用图片或整理成文档。"
+    "status": "ready"
   },
   "g2-bubble-map": {
     "status": "limited",
     "note": "离线打包片段超出对话约 1 MB 的预算，对话中改用在线阅读器，需要联网；禁止外网的宿主（如 Kimi Work）改用图片或整理成文档。"
   },
   "g2-bullet": {
-    "status": "limited",
-    "note": "离线打包片段超出对话约 1 MB 的预算，对话中改用在线阅读器，需要联网；禁止外网的宿主（如 Kimi Work）改用图片或整理成文档。"
+    "status": "ready"
   },
   "g2-chord": {
-    "status": "limited",
-    "note": "离线打包片段超出对话约 1 MB 的预算，对话中改用在线阅读器，需要联网；禁止外网的宿主（如 Kimi Work）改用图片或整理成文档。"
+    "status": "ready"
   },
   "g2-choropleth-map": {
     "status": "limited",
     "note": "离线打包片段超出对话约 1 MB 的预算，对话中改用在线阅读器，需要联网；禁止外网的宿主（如 Kimi Work）改用图片或整理成文档。"
   },
   "g2-color-map": {
-    "status": "limited",
-    "note": "离线打包片段超出对话约 1 MB 的预算，对话中改用在线阅读器，需要联网；禁止外网的宿主（如 Kimi Work）改用图片或整理成文档。"
+    "status": "ready"
   },
   "g2-contourline": {
-    "status": "limited",
-    "note": "离线打包片段超出对话约 1 MB 的预算，对话中改用在线阅读器，需要联网；禁止外网的宿主（如 Kimi Work）改用图片或整理成文档。"
+    "status": "ready"
   },
   "g2-distributioncurve": {
-    "status": "limited",
-    "note": "离线打包片段超出对话约 1 MB 的预算，对话中改用在线阅读器，需要联网；禁止外网的宿主（如 Kimi Work）改用图片或整理成文档。"
+    "status": "ready"
   },
   "g2-donut-chart": {
-    "status": "limited",
-    "note": "离线打包片段超出对话约 1 MB 的预算，对话中改用在线阅读器，需要联网；禁止外网的宿主（如 Kimi Work）改用图片或整理成文档。"
+    "status": "ready"
   },
   "g2-dot-map": {
     "status": "limited",
     "note": "离线打包片段超出对话约 1 MB 的预算，对话中改用在线阅读器，需要联网；禁止外网的宿主（如 Kimi Work）改用图片或整理成文档。"
   },
   "g2-funnel": {
-    "status": "limited",
-    "note": "离线打包片段超出对话约 1 MB 的预算，对话中改用在线阅读器，需要联网；禁止外网的宿主（如 Kimi Work）改用图片或整理成文档。"
+    "status": "ready"
   },
   "g2-gantt": {
-    "status": "limited",
-    "note": "离线打包片段超出对话约 1 MB 的预算，对话中改用在线阅读器，需要联网；禁止外网的宿主（如 Kimi Work）改用图片或整理成文档。"
+    "status": "ready"
   },
   "g2-gauge": {
-    "status": "limited",
-    "note": "离线打包片段超出对话约 1 MB 的预算，对话中改用在线阅读器，需要联网；禁止外网的宿主（如 Kimi Work）改用图片或整理成文档。"
+    "status": "ready"
   },
   "g2-heatmap": {
-    "status": "limited",
-    "note": "离线打包片段超出对话约 1 MB 的预算，对话中改用在线阅读器，需要联网；禁止外网的宿主（如 Kimi Work）改用图片或整理成文档。"
+    "status": "ready"
   },
   "g2-histogram": {
     "status": "limited",
     "note": "离线打包片段超出对话约 1 MB 的预算，对话中改用在线阅读器，需要联网；禁止外网的宿主（如 Kimi Work）改用图片或整理成文档。"
   },
   "g2-k-chart": {
-    "status": "limited",
-    "note": "离线打包片段超出对话约 1 MB 的预算，对话中改用在线阅读器，需要联网；禁止外网的宿主（如 Kimi Work）改用图片或整理成文档。"
+    "status": "ready"
   },
   "g2-kagi": {
-    "status": "limited",
-    "note": "离线打包片段超出对话约 1 MB 的预算，对话中改用在线阅读器，需要联网；禁止外网的宿主（如 Kimi Work）改用图片或整理成文档。"
+    "status": "ready"
   },
   "g2-line": {
-    "status": "limited",
-    "note": "离线打包片段超出对话约 1 MB 的预算，对话中改用在线阅读器，需要联网；禁止外网的宿主（如 Kimi Work）改用图片或整理成文档。"
+    "status": "ready"
   },
   "g2-mosaic": {
-    "status": "limited",
-    "note": "离线打包片段超出对话约 1 MB 的预算，对话中改用在线阅读器，需要联网；禁止外网的宿主（如 Kimi Work）改用图片或整理成文档。"
+    "status": "ready"
   },
   "g2-multi-set-bar": {
-    "status": "limited",
-    "note": "离线打包片段超出对话约 1 MB 的预算，对话中改用在线阅读器，需要联网；禁止外网的宿主（如 Kimi Work）改用图片或整理成文档。"
+    "status": "ready"
   },
   "g2-pack": {
-    "status": "limited",
-    "note": "离线打包片段超出对话约 1 MB 的预算，对话中改用在线阅读器，需要联网；禁止外网的宿主（如 Kimi Work）改用图片或整理成文档。"
+    "status": "ready"
   },
   "g2-parallel": {
-    "status": "limited",
-    "note": "离线打包片段超出对话约 1 MB 的预算，对话中改用在线阅读器，需要联网；禁止外网的宿主（如 Kimi Work）改用图片或整理成文档。"
+    "status": "ready"
   },
   "g2-pie": {
-    "status": "limited",
-    "note": "离线打包片段超出对话约 1 MB 的预算，对话中改用在线阅读器，需要联网；禁止外网的宿主（如 Kimi Work）改用图片或整理成文档。"
+    "status": "ready"
   },
   "g2-radar-chart": {
-    "status": "limited",
-    "note": "离线打包片段超出对话约 1 MB 的预算，对话中改用在线阅读器，需要联网；禁止外网的宿主（如 Kimi Work）改用图片或整理成文档。"
+    "status": "ready"
   },
   "g2-radial-bar": {
-    "status": "limited",
-    "note": "离线打包片段超出对话约 1 MB 的预算，对话中改用在线阅读器，需要联网；禁止外网的宿主（如 Kimi Work）改用图片或整理成文档。"
+    "status": "ready"
   },
   "g2-regressioncurve": {
-    "status": "limited",
-    "note": "离线打包片段超出对话约 1 MB 的预算，对话中改用在线阅读器，需要联网；禁止外网的宿主（如 Kimi Work）改用图片或整理成文档。"
+    "status": "ready"
   },
   "g2-rose": {
-    "status": "limited",
-    "note": "离线打包片段超出对话约 1 MB 的预算，对话中改用在线阅读器，需要联网；禁止外网的宿主（如 Kimi Work）改用图片或整理成文档。"
+    "status": "ready"
   },
   "g2-sankey": {
-    "status": "limited",
-    "note": "离线打包片段超出对话约 1 MB 的预算，对话中改用在线阅读器，需要联网；禁止外网的宿主（如 Kimi Work）改用图片或整理成文档。"
+    "status": "ready"
   },
   "g2-scatter-plot": {
-    "status": "limited",
-    "note": "离线打包片段超出对话约 1 MB 的预算，对话中改用在线阅读器，需要联网；禁止外网的宿主（如 Kimi Work）改用图片或整理成文档。"
+    "status": "ready"
   },
   "g2-spiral": {
-    "status": "limited",
-    "note": "离线打包片段超出对话约 1 MB 的预算，对话中改用在线阅读器，需要联网；禁止外网的宿主（如 Kimi Work）改用图片或整理成文档。"
+    "status": "ready"
   },
   "g2-stacked-area": {
-    "status": "limited",
-    "note": "离线打包片段超出对话约 1 MB 的预算，对话中改用在线阅读器，需要联网；禁止外网的宿主（如 Kimi Work）改用图片或整理成文档。"
+    "status": "ready"
   },
   "g2-stacked-bar": {
-    "status": "limited",
-    "note": "离线打包片段超出对话约 1 MB 的预算，对话中改用在线阅读器，需要联网；禁止外网的宿主（如 Kimi Work）改用图片或整理成文档。"
+    "status": "ready"
   },
   "g2-stem-leaf": {
-    "status": "limited",
-    "note": "离线打包片段超出对话约 1 MB 的预算，对话中改用在线阅读器，需要联网；禁止外网的宿主（如 Kimi Work）改用图片或整理成文档。"
+    "status": "ready"
   },
   "g2-sunburst": {
     "status": "limited",
     "note": "离线打包片段超出对话约 1 MB 的预算，对话中改用在线阅读器，需要联网；禁止外网的宿主（如 Kimi Work）改用图片或整理成文档。"
   },
   "g2-treemap": {
-    "status": "limited",
-    "note": "离线打包片段超出对话约 1 MB 的预算，对话中改用在线阅读器，需要联网；禁止外网的宿主（如 Kimi Work）改用图片或整理成文档。"
+    "status": "ready"
   },
   "g2-venn": {
-    "status": "limited",
-    "note": "离线打包片段超出对话约 1 MB 的预算，对话中改用在线阅读器，需要联网；禁止外网的宿主（如 Kimi Work）改用图片或整理成文档。"
+    "status": "ready"
   },
   "g2-violin": {
-    "status": "limited",
-    "note": "离线打包片段超出对话约 1 MB 的预算，对话中改用在线阅读器，需要联网；禁止外网的宿主（如 Kimi Work）改用图片或整理成文档。"
+    "status": "ready"
   },
   "g2-wordcloud": {
-    "status": "limited",
-    "note": "离线打包片段超出对话约 1 MB 的预算，对话中改用在线阅读器，需要联网；禁止外网的宿主（如 Kimi Work）改用图片或整理成文档。"
+    "status": "ready"
   },
   "gallery": {
     "status": "ready"
