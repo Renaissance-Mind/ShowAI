@@ -1017,7 +1017,7 @@ export function createMcpServer(options: {
     "page_present",
     {
       description:
-        "Present a saved Page or selected block preview. Complete HTML/source always retain the whole Page. Does not save or synchronize. Use returned delivery and display contract; do not guess an output directory.",
+        "Present a saved Page or selected block preview. Complete HTML/source always retain the whole Page. Does not save or synchronize. Use returned delivery and display contract; do not guess an output directory. externalSnapshots lists data from files outside the library embedded in the delivery files; before handing those files to anyone else, show the sizes to the person and get their agreement.",
       inputSchema: {
         pageId: z.string().min(1),
         blockIds: z.array(z.string().min(1)).min(1).optional(),
@@ -1066,6 +1066,9 @@ export function createMcpServer(options: {
               ...(blockIds ? { blockIds } : {}),
             },
             ...(value.inlineError ? { inlineError: value.inlineError } : {}),
+            ...(value.externalSnapshots
+              ? { externalSnapshots: value.externalSnapshots }
+              : {}),
           }),
           _meta: {
             showai: {

@@ -415,7 +415,20 @@ export async function readExternal(
         "INVALID_DATA",
         `${basename(path)} is ${before.size} bytes; a dataset holds at most ${limit} bytes.`,
       );
-    const text = await file.readFile("utf8");
+    let text: string;
+    try {
+      // Undecodable bytes would be read as replacement characters and
+      // written back, damaging the file.
+      text = new TextDecoder("utf-8", { fatal: true }).decode(
+        await file.readFile(),
+      );
+    } catch (error) {
+      if (!(error instanceof TypeError)) throw error;
+      throw new CoreError(
+        "INVALID_DATA",
+        `${basename(path)} is not UTF-8 text. Save it as UTF-8 (in Excel: CSV UTF-8) and read it again.`,
+      );
+    }
     const after = await file.stat();
     if (stampOf(before) !== stampOf(after))
       throw new CoreError(

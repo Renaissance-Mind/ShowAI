@@ -30,6 +30,8 @@
 | 宿主能打开或发布本地文件（文件预览、Claude Artifact 等）    | 使用 delivery.html：离线完整页，打开不需要联网                                                                                                                                                                                        |
 | 无内嵌显示                                                  | 交付项目、Page、版本、保存/同步结果；需要时附文件链接                                                                                                                                                                                 |
 
+结果带 `externalSnapshots` 时，delivery 文件中含有来自内容库以外文件的数据快照；只在对话中展示无需询问，交给别人或上传前按 [共享数据](shared-data.md#外部文件中的数据) 告诉用户大小并取得同意。
+
 delivery.inline 优先携带压缩后的本地阅读器与本页组件，多数页面几百 KB，打开不联网；只有压缩后仍超出聊天预算时才改为在线片段。delivery.html 始终是离线完整文件。delivery.compact 与 delivery.online 只带页面数据、内嵌图片和自定义组件：compact 是放进对话的片段，online 是可单独打开的完整网页文件。两者的阅读器依次从 ShowAI 阅读器源（reader.showai.renaissancemind.ai）、jsDelivr、unpkg 加载：每个来源等待 1.5 秒后启动下一个，先完成者挂载，15 秒仍未完成显示错误。online 只用于需要分享、在联网环境打开的小体积完整文件。display 中的 inlineAvailable、compactAvailable、onlineAvailable 只表示文件是否存在，不代表是否联网。
 
 显式 page_export 的 reader:"cdn" 写在线页，reader:"bundled" 强制离线。加载错误可能来自网络、宿主策略或阅读器异常；没有控制台证据时不直接断言来源被拦截，改为交付 delivery.html。安装插件只更新连接与技能，不更新软件运行时，也不能预热对话宿主的浏览器缓存。

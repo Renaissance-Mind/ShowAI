@@ -71,6 +71,11 @@ export async function presentPage(input: {
         ...preview,
         ...(online ? { online } : {}),
         ...(compact ? { compact } : {}),
+        // Delivery files embed data read from files outside the library;
+        // whoever hands them on decides with these sizes.
+        ...(full.externalSnapshots
+          ? { externalSnapshots: full.externalSnapshots }
+          : {}),
         // This operation never initiates synchronization. HTTP adds its verified receipt.
         persistence: { savedToProject: true, synchronized: false },
         bytes: {

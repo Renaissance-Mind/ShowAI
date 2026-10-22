@@ -109,6 +109,19 @@ describe("external dataset files", () => {
     );
   });
 
+  it("refuse files that are not UTF-8 instead of damaging them", async () => {
+    const folder = await directory();
+    const path = join(folder, "gbk.csv");
+    // "名称\n你好" in GBK, as a Chinese Excel "CSV" save writes it.
+    await writeFile(
+      path,
+      Buffer.from([0xc3, 0xfb, 0xb3, 0xc6, 0x0a, 0xc4, 0xe3, 0xba, 0xc3, 0x0a]),
+    );
+    await expect(readExternal(path, "csv", 1024)).rejects.toThrow(
+      /not UTF-8 text/,
+    );
+  });
+
   it("report changes of linked files and links as dataset keys", async () => {
     const home = await directory();
     const folder = await directory();

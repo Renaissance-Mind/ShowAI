@@ -257,6 +257,12 @@ test("a dataset reads and writes a CSV file outside the library", async () => {
     (await call("dataset_link", { datasetId, path: json })).error.message,
   ).toMatch(/reads a csv file/);
   await ok("dataset_link", { datasetId, path: csv });
+  // Conversation delivery files carry the data too and say so.
+  const presented = await ok("page_present", { pageId: page.document.id });
+  expect(presented.externalSnapshots.datasets[0]).toMatchObject({
+    datasetId,
+    available: true,
+  });
   expect(
     (await ok("dataset_read", { datasetId })).dataset.value.rows,
   ).toHaveLength(3);
