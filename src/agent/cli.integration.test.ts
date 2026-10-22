@@ -4,6 +4,7 @@ import { build } from "esbuild";
 import { execFile } from "node:child_process";
 import {
   copyFile,
+  cp,
   mkdtemp,
   mkdir,
   readFile,
@@ -15,6 +16,7 @@ import {
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { promisify } from "node:util";
+import { gunzipSync } from "node:zlib";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import { parseArtifact } from "../portable/validation.mjs";
@@ -2704,6 +2706,114 @@ test("plugin launcher starts library MCP with explicit host delivery and refuses
         },
       ),
     ).rejects.toThrow();
+  } finally {
+    await client.close();
+    await rm(isolated, { recursive: true, force: true });
+  }
+}, 60000);
+
+test("Kimi installed package discovers tools, delivers offline previews and rejects another library", async () => {
+  const isolated = await mkdtemp(join(tmpdir(), "showai-kimi-plugin-"));
+  const plugin = join(isolated, "installed plugin");
+  const client = new Client({ name: "kimi-plugin-acceptance", version: "1" });
+  const call = async (name: string, args: Record<string, unknown> = {}) => {
+    const result = await client.callTool({ name, arguments: args });
+    expect(result.isError, JSON.stringify(result.content)).not.toBe(true);
+    return (result.structuredContent as any).data;
+  };
+  try {
+    await cp(join(repository, "plugins-kimi/showai"), plugin, {
+      recursive: true,
+    });
+    const manifest = JSON.parse(
+      await readFile(join(plugin, "kimi.plugin.json"), "utf8"),
+    );
+    const server = manifest.mcpServers.showai;
+    expect(server.command).toBe("node");
+    expect(server.executor).toBe("local");
+    expect(manifest.interface.mcpOverrides.showai.displayName).toBeTruthy();
+    await run(["runtime", "register"], { home: isolated });
+    const output = join(isolated, "host-output");
+    await client.connect(
+      new StdioClientTransport({
+        command: process.execPath,
+        args: server.args,
+        cwd: resolve(plugin, server.cwd),
+        env: {
+          ...environment(),
+          ...server.env,
+          SHOWAI_HOME: isolated,
+          SHOWAI_PRESENTATION_DIR: output,
+        } as Record<string, string>,
+      }),
+    );
+    const names = (await client.listTools()).tools.map((tool) => tool.name);
+    expect(names).toEqual(
+      expect.arrayContaining([
+        "showai_capabilities",
+        "show_component",
+        "project_context",
+        "projects_list",
+        "page_create",
+        "page_read",
+        "page_present",
+        "template_context",
+        "template_guide",
+        "organization_update",
+      ]),
+    );
+    const capabilities = await call("showai_capabilities");
+    expect(capabilities.presentation.declaredHostDisplay).toBe("fragment-file");
+    expect(capabilities.templateWorkflow.protocol).toBe(
+      "showai-template-workflow-v2",
+    );
+    expect((await call("project_context")).root).toBe(isolated);
+    const shown = await call("show_component", {
+      kind: "text",
+      data: { format: "markdown", content: "Kimi offline preview" },
+    });
+    expect(shown.delivery.mode).toBe("fragment-file");
+    expect(shown.persistence.savedToProject).toBe(false);
+    expect(shown.delivery.inline.startsWith(output)).toBe(true);
+    const inline = await readFile(shown.delivery.inline, "utf8");
+    const packed = inline.match(/data-showai-packed-data="gzip">([^<]+)</);
+    expect(packed).not.toBeNull();
+    const offline = JSON.parse(
+      gunzipSync(Buffer.from(JSON.parse(packed![1]).data, "base64")).toString(),
+    );
+    expect(offline.artifact).toContain("Kimi offline preview");
+    expect(offline.modules.length).toBeGreaterThan(0);
+    expect(await call("projects_list")).toEqual([]);
+    const project = await call("project_create", { name: "Kimi saved page" });
+    const page = await call("page_create", {
+      projectId: project.id,
+      title: "Kimi launch verified",
+      blocks: [
+        {
+          kind: "text",
+          data: { format: "markdown", content: "Saved from Kimi protocol" },
+        },
+      ],
+    });
+    const presentation = await call("page_present", {
+      projectId: project.id,
+      pageId: page.document.id,
+    });
+    expect(presentation.delivery.inline.startsWith(output)).toBe(true);
+    expect(await readFile(presentation.delivery.html, "utf8")).toContain(
+      "Kimi launch verified",
+    );
+    await expect(
+      execute(process.execPath, server.args, {
+        cwd: resolve(plugin, server.cwd),
+        env: {
+          ...environment(),
+          SHOWAI_HOME: join(isolated, "other"),
+          SHOWAI_RUNTIME_CONFIG: join(isolated, "agent-runtime.json"),
+        },
+        timeout: 10000,
+      }),
+    ).rejects.toThrow(/library mismatch/);
   } finally {
     await client.close();
     await rm(isolated, { recursive: true, force: true });
