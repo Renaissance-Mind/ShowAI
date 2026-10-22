@@ -1,3 +1,4 @@
+#include "native-parity-stdio.hpp"
 #include "include/ink-input-kernel.h"
 #include <cstdio>
 #include <cstring>
@@ -17,6 +18,7 @@ static bool emit(const void *state) {
   return true;
 }
 int main() {
+  sa_test_binary_stdio();
   uint32_t n, predicted, correction;
   if (std::fread(&n, 4, 1, stdin) != 1 ||
       std::fread(&predicted, 4, 1, stdin) != 1 ||

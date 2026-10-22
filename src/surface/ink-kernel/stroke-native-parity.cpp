@@ -1,3 +1,4 @@
+#include "native-parity-stdio.hpp"
 #include "include/ink-stroke-kernel.h"
 #include <cstdint>
 #include <cstdio>
@@ -82,6 +83,7 @@ static int contract() {
   return 0;
 }
 int main(int argc, char **argv) {
+  sa_test_binary_stdio();
   if (argc > 1 && std::strcmp(argv[1], "--style") == 0) {
     uint32_t n;
     if (std::fread(&n, 4, 1, stdin) != 1 || n > 100000)

@@ -1,3 +1,4 @@
+#include "native-parity-stdio.hpp"
 // Test executable only: libc/vector are not dependencies of the kernel.
 #include "include/analytic-path.h"
 #include <cstdint>
@@ -10,6 +11,7 @@ static void write(const void *p, size_t n) {
     std::abort();
 }
 int main() {
+  sa_test_binary_stdio();
   uint32_t header[3];
   double affine[6];
   SAAnalyticBudget budget;

@@ -1,3 +1,4 @@
+#include "native-parity-stdio.hpp"
 #include "include/analytic-path.h"
 #include "include/ink-stroke-kernel.h"
 #include <cstdio>
@@ -83,6 +84,7 @@ static int contract() {
   return 0;
 }
 int main(int argc, char **) {
+  sa_test_binary_stdio();
   if (argc > 1)
     return contract();
   uint32_t n = 0;

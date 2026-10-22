@@ -1,8 +1,10 @@
+#include "native-parity-stdio.hpp"
 #include "include/ink-input-kernel.h"
 #include <cstdio>
 #include <cstdlib>
 #include <vector>
 int main(){
+  sa_test_binary_stdio();
     uint32_t header[4];SAInkInputConfig config;
     if(std::fread(header,sizeof(header),1,stdin)!=1||std::fread(&config,sizeof(config),1,stdin)!=1)return 2;
     uint32_t n=header[0],batch=header[1],predicted=header[2],correction=header[3];

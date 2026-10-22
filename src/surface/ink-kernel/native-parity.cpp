@@ -1,3 +1,4 @@
+#include "native-parity-stdio.hpp"
 // Executable regression harness; not part of the freestanding runtime target.
 #include "include/showai_ink.h"
 #include <cstdio>
@@ -7,6 +8,7 @@ static void read(void *p,size_t size,size_t count=1){if(std::fread(p,size,count,
 static void write(const void *p,size_t size,size_t count=1){if(std::fwrite(p,size,count,stdout)!=count)std::exit(91);}
 static void check(SAInkStatus status){if(status!=SA_INK_OK){uint32_t code=(uint32_t)status;write(&code,4);std::exit(1);}}
 int main(){
+  sa_test_binary_stdio();
     uint32_t header[6];read(header,4,6);uint32_t n=header[0],commands_count=header[3]==UINT32_MAX ? 0 : header[3],queries=header[4],segments=header[5];
     if(n>SA_INK_MAX_SAMPLES||commands_count>SA_INK_MAX_MASK_COMMANDS||queries>100000||segments>100000)return 92;
     SAInkStyle style={};style.brush=header[1];style.pressure=header[2];read(&style.source_width,8);read(&style.width,8);read(style.affine,8,6);
