@@ -50,3 +50,5 @@ extern "C" uint32_t sabt_curve_pair(const double*a,uint32_t ac,const double*b,ui
 #include "../boundary-kernel.cpp"
 
 #include "graph-delta-test-api.hpp"
+
+#include "correspondence-test-api.hpp"

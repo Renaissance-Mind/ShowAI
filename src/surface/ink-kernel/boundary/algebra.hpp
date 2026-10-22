@@ -31,7 +31,28 @@ inline bool overlap(Interval a,Interval b){return a.lower<=b.upper&&b.lower<=a.u
 struct PairHit{Root a,b;Context*context()const{return a.context();}};
 struct PairProof{bool complete=false,coincident=false;Q alpha,beta;Vector<PairHit>hits;PairProof()=default;explicit PairProof(PolynomialContext&c):alpha(Q::from_signed(c.numbers,0)),beta(alpha),hits(c.numbers){}Context*context()const{return hits.context();}};
 inline PairProof directional_intersections(const Curve&a,const Curve&b){auto&c=*a.owner();PairProof proof(c);auto relation=correspondence(a,b);if(!relation.complete||c.numbers.status!=SA_INK_OK)return proof;if(relation.result.zero()){c.numbers.fail(SA_INK_RANGE);return proof;}auto rt=squarefree(relation.result);auto gx=substitute(b.x,relation.parameter)-RationalFunction(a.x),gy=substitute(b.y,relation.parameter)-RationalFunction(a.y);auto valid=gcd(gcd(rt,gx.numerator),gy.numerator);auto reverse=resultant(equation(b.x,a.x),equation(b.y,a.y));auto ur=roots(reverse);auto tr=roots(rt);Q width(Integer::from(c.numbers,1),Integer::from(c.numbers,1).shifted_left(48));
- for(Root t:tr){if(c.numbers.status!=SA_INK_OK)return proof;if(root_of(t,relation.forbidden)||!root_of(t,valid)){c.numbers.fail(SA_INK_RANGE);return proof;}Interval ui;bool good=false;for(uint32_t i=0;i<200&&c.numbers.status==SA_INK_OK;i++){good=try_divide(evaluate(relation.parameter.numerator,Interval{t.lower,t.upper}),evaluate(relation.parameter.denominator,Interval{t.lower,t.upper}),ui);if(good&&(ui.upper<Q(0)||ui.lower>Q(1)||(ui.lower>=Q(0)&&ui.upper<=Q(1)&&ui.upper-ui.lower<width)))break;refine(t);}if(!good){c.numbers.fail(SA_INK_RANGE);return proof;}if(ui.upper<Q(0)||ui.lower>Q(1))continue;if(root_of(t,relation.parameter.numerator))ui={Q(0),Q(0)};else if(root_of(t,relation.parameter.numerator-relation.parameter.denominator))ui={Q(1),Q(1)};if(ui.lower<Q(0)||ui.upper>Q(1)){c.numbers.fail(SA_INK_RANGE);return proof;}int match=-1;for(uint32_t i=0;i<ur.size()&&c.numbers.status==SA_INK_OK;i++)if(overlap(ui,{ur[i].lower,ur[i].upper})){if(match>=0){c.numbers.fail(SA_INK_RANGE);return proof;}match=(int)i;}if(match<0){c.numbers.fail(SA_INK_RANGE);return proof;}proof.hits.push_back({t,ur[(uint32_t)match]});}
+ for(Root t:tr){
+  if(c.numbers.status!=SA_INK_OK)return proof;if(root_of(t,relation.forbidden)||!root_of(t,valid)){c.numbers.fail(SA_INK_RANGE);return proof;}
+  // A rational image interval and two isolated reverse-root intervals may
+  // share a non-root endpoint. Closed interval overlap is only a candidate,
+  // never proof that the first candidate is the actual corresponding root.
+  bool at_zero=root_of(t,relation.parameter.numerator),at_one=root_of(t,relation.parameter.numerator-relation.parameter.denominator),outside=false;int match=-1;
+  if(at_zero&&at_one){c.numbers.fail(SA_INK_RANGE);return proof;}
+  for(uint32_t round=0;round<200&&c.numbers.status==SA_INK_OK;round++){
+   Interval ui;bool mapped=true;if(at_zero)ui={Q(0),Q(0)};else if(at_one)ui={Q(1),Q(1)};else mapped=try_divide(evaluate(relation.parameter.numerator,Interval{t.lower,t.upper}),evaluate(relation.parameter.denominator,Interval{t.lower,t.upper}),ui);
+   if(mapped&&(ui.upper<Q(0)||ui.lower>Q(1))){outside=true;break;}
+   if(mapped&&ui.lower>=Q(0)&&ui.upper<=Q(1)&&ui.upper-ui.lower<width){
+    uint32_t count=0;int candidate=-1;for(uint32_t i=0;i<ur.size()&&c.numbers.status==SA_INK_OK;i++)if(overlap(ui,{ur[i].lower,ur[i].upper})){candidate=int(i);++count;}
+    if(count==1){match=candidate;break;}
+    // Every valid actual image is a reverse-resultant root, so no candidate
+    // is a failed certificate. Multiple candidates require more evidence.
+    if(!count){c.numbers.fail(SA_INK_RANGE);return proof;}
+    if(round+1<200)for(uint32_t i=0;i<ur.size()&&c.numbers.status==SA_INK_OK;i++)if(overlap(ui,{ur[i].lower,ur[i].upper}))refine(ur[i]);
+   }
+   if(round+1<200)refine(t);
+  }
+  if(c.numbers.status!=SA_INK_OK)return proof;if(outside)continue;if(match<0){c.numbers.fail(SA_INK_RANGE);return proof;}proof.hits.push_back({t,ur[uint32_t(match)]});
+ }
  proof.complete=c.numbers.status==SA_INK_OK;return proof;}
 inline PairProof curve_pair(const Curve&a,const Curve&b){if(!a.owner()||a.owner()!=b.owner()){if(a.context())a.context()->fail(SA_INK_INVALID);return{};}auto&c=*a.owner();PairProof result(c);if(c.numbers.status!=SA_INK_OK)return result;if(affine_coincidence(a,b,result.alpha,result.beta)){result.coincident=true;result.complete=c.numbers.status==SA_INK_OK;return result;}if(c.numbers.status!=SA_INK_OK)return result;
  // A singular rational-univariate projection may become regular in the other
