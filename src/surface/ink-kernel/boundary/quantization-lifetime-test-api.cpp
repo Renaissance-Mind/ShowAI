@@ -30,10 +30,19 @@ extern "C" uint32_t saqt_source_pins(void*memory,uint32_t bytes,uint32_t*output,
         BoundaryQuantizationSourcePin changed;if(BoundaryQuantizationSourcePin::capture(stateA,next,changed))return SA_INK_INVALID;
         if(a.latest()||!changed.latest()||!a.base_of(changed)||a.base_of(b)||changed.same_snapshot(a))return SA_INK_INVALID;++checks;
         if(shared.get()->graph.edges.size()!=4||shared.get()->graph.blocks[0].commands[0].values[0]!=0||changed.get()->graph.blocks[0].commands[0].values[0]!=2)return SA_INK_INVALID;++checks;
-        if(sa_boundary_release(stateA,next))return SA_INK_INVALID;
+        SAInkPathCommand later[5]={{0,0,{4,0}},{1,0,{5,0}},{1,0,{5,1}},{1,0,{4,1}},{4,0,{}}};SABoundaryLease latest{};
+        if(sa_boundary_update(stateA,&next,&mutation,1,later,5,&latest))return SA_INK_INVALID;
+        BoundaryQuantizationSourcePin advanced;if(BoundaryQuantizationSourcePin::capture(stateA,latest,advanced))return SA_INK_INVALID;
+        // Ordered intermediate catch-up is valid even after source ran ahead.
+        if(changed.latest()||!advanced.latest()||!a.base_of(changed)||!changed.base_of(advanced)||a.base_of(advanced))return SA_INK_INVALID;++checks;
+        SABoundaryPath alternate=path;alternate.fill=SA_BOUNDARY_EVENODD;SABoundaryLease reset{};
+        if(sa_boundary_prepare(stateA,&latest,&alternate,1,&block,1,commands,5,&reset))return SA_INK_INVALID;
+        BoundaryQuantizationSourcePin cold;if(BoundaryQuantizationSourcePin::capture(stateA,reset,cold))return SA_INK_INVALID;
+        if(advanced.base_of(cold)||!cold.latest()||!cold.get()->graph.output_reset||advanced.get()->graph.output_epoch==cold.get()->graph.output_epoch)return SA_INK_INVALID;++checks;
+        if(sa_boundary_release(stateA,next)||sa_boundary_release(stateA,latest)||sa_boundary_release(stateA,reset))return SA_INK_INVALID;
         if(sa_boundary_release(stateA,A)||sa_boundary_destroy(stateA)!=SA_INK_INVALID)return SA_INK_INVALID;++checks;
         a.reset();if(sa_boundary_destroy(stateA)!=SA_INK_INVALID||!shared.get()||shared.get()->graph.edges.size()!=4)return SA_INK_INVALID;++checks;
-        shared.reset();if(sa_boundary_destroy(stateA)!=SA_INK_INVALID)return SA_INK_INVALID;changed.reset();if(sa_boundary_destroy(stateA))return SA_INK_INVALID;++checks;
+        shared.reset();if(sa_boundary_destroy(stateA)!=SA_INK_INVALID)return SA_INK_INVALID;changed.reset();advanced.reset();cold.reset();if(sa_boundary_destroy(stateA))return SA_INK_INVALID;++checks;
         b.reset();if(sa_boundary_release(stateB,B)||sa_boundary_destroy(stateB))return SA_INK_INVALID;++checks;
     }
     for(uint32_t i=0;i<sizeof(Owner);i++)if(raw[i]||raw[8*1024*1024+i])return SA_INK_INVALID;

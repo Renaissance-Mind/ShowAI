@@ -29,6 +29,6 @@ int main(int argc,char**argv){if(argc!=2)return 1;FILE*f=std::fopen(argv[1],"wb"
   uint32_t status=saqt_fixture(0,1e-9,10000,512,512,1000000000ull,memory.data(),uint32_t(memory.size()*8),output.data(),1);
   if(status!=SA_INK_CAPACITY)return 9;for(uint32_t word:output)if(word!=0x5a5a5a5a)return 10;uint32_t header[3]={107,status,0};if(std::fwrite(header,sizeof(header),1,f)!=1)return 4;
  }
- {std::vector<uint64_t>memory(16*1024*1024/8);uint32_t output[8]{};if(saqt_source_pins(memory.data(),uint32_t(memory.size()*8),output,8)||output[0]!=10)return 12;uint32_t header[3]={108,0,8};if(std::fwrite(header,sizeof(header),1,f)!=1||std::fwrite(output,sizeof(output),1,f)!=1)return 13;}
+ {std::vector<uint64_t>memory(16*1024*1024/8);uint32_t output[8]{};if(saqt_source_pins(memory.data(),uint32_t(memory.size()*8),output,8)||output[0]!=12)return 12;uint32_t header[3]={108,0,8};if(std::fwrite(header,sizeof(header),1,f)!=1||std::fwrite(output,sizeof(output),1,f)!=1)return 13;}
  std::fclose(f);std::printf("BOUNDARY_QUANTIZATION_NATIVE_OK positive=%u atomicFailures=11\n",total);return 0;
 }
