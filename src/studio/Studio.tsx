@@ -24,6 +24,7 @@ import {
   useMemo,
   useRef,
   useState,
+  type CSSProperties,
   type MouseEvent as ReactMouseEvent,
   type ReactNode,
 } from "react";
@@ -117,6 +118,8 @@ import {
   type ExternalSnapshotReport,
 } from "./ExternalSnapshotDialog";
 import PageThumbnail from "./PageThumbnail";
+import FolderThumbnail, { type FolderThumbnailEntry } from "./FolderThumbnail";
+import { useDirectoryColumns } from "./directory-grid";
 import {
   BatchPagesDialog,
   DirectorySelectionBar,
@@ -2376,6 +2379,31 @@ export default function Studio() {
     selectedProject ? folderPreferences(selectedProject, selectedFolder) : {},
     organization.entryOrder?.[selectedProject ?? ""],
   );
+  const thumbnailSize =
+    view === "project" && directoryView !== "list" ? directoryView : null;
+  const directoryGrid = useDirectoryColumns(thumbnailSize);
+  const folderChildren = new Map<string, ReturnType<typeof directoryEntries>>();
+  if (thumbnailSize)
+    for (const item of directoryEntries(folders, pages)) {
+      const parent = item.parentId ?? "";
+      if (!folderChildren.has(parent)) folderChildren.set(parent, []);
+      folderChildren.get(parent)!.push(item);
+    }
+  /** The first entries of a folder, in its own order, for its pocket thumbnails. */
+  function folderThumbnailEntries(folderId: string): FolderThumbnailEntry[] {
+    return sortDirectoryItems(
+      folderChildren.get(folderId) ?? [],
+      folderPreferences(selectedProject!, folderId),
+      organization.entryOrder?.[selectedProject!],
+    )
+      .slice(0, 3)
+      .map((item) => ({
+        kind: item.kind,
+        id: item.id,
+        updatedAt: item.updatedAt,
+        count: folderChildren.get(item.id)?.length ?? 0,
+      }));
+  }
   const selectablePages = visibleEntries.filter(
     (item) => item.target.kind === "page",
   );
@@ -3794,9 +3822,18 @@ export default function Studio() {
                     <>
                       {visibleEntries.length || !query ? (
                           <div
+                            ref={directoryGrid.ref}
                             className="studio-page-list"
                             data-view={directoryView}
                             data-selecting={pageSelection.active || undefined}
+                            style={
+                              directoryGrid.columns
+                                ? ({
+                                    "--directory-columns":
+                                      directoryGrid.columns,
+                                  } as CSSProperties)
+                                : undefined
+                            }
                           >
                           {visibleEntries.map(({ target, updatedAt }) => (
                             <div
@@ -3845,16 +3882,26 @@ export default function Studio() {
                                 </button>
                               )}
                               {target.kind === "folder" && <span className="studio-page-checkbox-spacer" aria-hidden="true" />}
-                                {directoryView !== "list" &&
-                                  target.kind === "page" && (
+                                {thumbnailSize &&
+                                  (target.kind === "page" ? (
                                     <PageThumbnail
                                       projectId={target.projectId}
                                       pageId={target.id}
                                       updatedAt={updatedAt}
                                     />
-                                  )}
+                                  ) : (
+                                    <FolderThumbnail
+                                      projectId={target.projectId}
+                                      entries={folderThumbnailEntries(target.id)}
+                                      count={
+                                        folderChildren.get(target.id)?.length ??
+                                        0
+                                      }
+                                    />
+                                  ))}
                               <button
                                 className="studio-page-list-open"
+                                title={thumbnailSize ? target.title : undefined}
                                 onClick={(event) => {
                                   if (pageSelection.active && target.kind === "page")
                                     pageSelection.toggle(target.id, event.shiftKey);
@@ -3865,13 +3912,6 @@ export default function Studio() {
                                     openTargetClick(target, event);
                                 }}
                               >
-                                  {directoryView !== "list" && (
-                                    <span className="studio-thumbnail-space">
-                                      {target.kind === "folder" && (
-                                        <Folder size={64} strokeWidth={1} />
-                                      )}
-                                    </span>
-                                  )}
                                 <span className="studio-page-list-icon">
                                   {target.kind === "folder" ? (
                                     <PageIcon
@@ -3892,7 +3932,11 @@ export default function Studio() {
                                 </span>
                                 <strong>{target.title}</strong>
                                 {target.pinned && (
-                                  <Pin size={12} aria-label={t("pinned")} />
+                                  <Pin
+                                    className="studio-page-pin"
+                                    size={12}
+                                    aria-label={t("pinned")}
+                                  />
                                 )}
                                 <time>{shortDate(updatedAt)}</time>
                               </button>

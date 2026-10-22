@@ -15,7 +15,8 @@ import CatalogPreview from "./CatalogPreview";
 import { desktop, errorMessage } from "./bridge";
 import type { LoadedPage } from "./usePage";
 
-/** Load only visible cards; the library stays inexpensive even with large folders. */
+/** Load only visible cards; the library stays inexpensive even with large folders.
+ * The page fills the card width at a 4:3 stage, so boards and documents share one shape. */
 export default function PageThumbnail({
   projectId,
   pageId,
@@ -77,8 +78,8 @@ export default function PageThumbnail({
       top = Math.min(...boxes.map((b) => b.y));
     const width = Math.max(...boxes.map((b) => b.x + b.width)) - left;
     const height = Math.max(...boxes.map((b) => b.y + b.height)) - top;
-    const scale = Math.min(920 / Math.max(1, width), 600 / Math.max(1, height));
-    return `translate(${(960 - width * scale) / 2 - left * scale}px, ${(640 - height * scale) / 2 - top * scale}px) scale(${scale})`;
+    const scale = Math.min(920 / Math.max(1, width), 680 / Math.max(1, height));
+    return `translate(${(960 - width * scale) / 2 - left * scale}px, ${(720 - height * scale) / 2 - top * scale}px) scale(${scale})`;
   }, [record]);
   return (
     <span
@@ -96,6 +97,7 @@ export default function PageThumbnail({
           <CustomComponentsProvider components={record.components}>
             <CatalogPreview
               thumbnail
+              fitWidth
               label={record.document.title}
               resetKey={updatedAt}
               width={960}

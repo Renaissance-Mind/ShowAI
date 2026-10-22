@@ -22,3 +22,7 @@ export function previewFit(
 export function previewZoom(value: number) {
   return Math.max(0.05, Math.min(3, value));
 }
+/** Scale content to the viewport width exactly; the height is cropped by the card. */
+export function previewFitWidth(viewportWidth: number, width: number) {
+  return viewportWidth > 0 && width > 0 ? viewportWidth / width : 1;
+}

@@ -6,7 +6,7 @@ import {
   type ReactNode,
 } from "react";
 import { Search, Focus, Expand } from "../ui/icons";
-import { previewFit, previewZoom } from "./preview-geometry";
+import { previewFit, previewFitWidth, previewZoom } from "./preview-geometry";
 import { errorMessage } from "./bridge";
 import { useTranslator } from "../i18n/react";
 import messages from "../i18n/messages/catalog";
@@ -18,6 +18,7 @@ export default function CatalogPreview({
   resetKey,
   accessory,
   thumbnail = false,
+  fitWidth = false,
   minHeight,
 }: {
   children: ReactNode;
@@ -26,6 +27,8 @@ export default function CatalogPreview({
   resetKey?: string | number;
   accessory?: ReactNode;
   thumbnail?: boolean;
+  /** Fill the viewport width and crop the height, as directory cards do. */
+  fitWidth?: boolean;
   minHeight?: number;
 }) {
   const t = useTranslator(messages);
@@ -50,13 +53,15 @@ export default function CatalogPreview({
     const measure = () => {
       const w = Math.max(width, paper.scrollWidth),
         h = Math.max(1, paper.scrollHeight, paper.offsetHeight);
-      const fit = previewFit(
-        area.clientWidth,
-        Math.max(1, area.clientHeight - (accessory ? 46 : 0)),
-        w,
-        h,
-        thumbnail ? 10 : 24,
-      );
+      const fit = fitWidth
+        ? previewFitWidth(area.clientWidth, w)
+        : previewFit(
+            area.clientWidth,
+            Math.max(1, area.clientHeight - (accessory ? 46 : 0)),
+            w,
+            h,
+            thumbnail ? 10 : 24,
+          );
       setSize((current) =>
         current.width === w && current.height === h && current.fit === fit
           ? current
@@ -75,7 +80,7 @@ export default function CatalogPreview({
       cancelAnimationFrame(frame);
       observer.disconnect();
     };
-  }, [width, resetKey, thumbnail, !!accessory]);
+  }, [width, resetKey, thumbnail, fitWidth, !!accessory]);
   useEffect(() => {
     if (!zoomOpen) return;
     const outside = (event: PointerEvent) => {
@@ -87,7 +92,7 @@ export default function CatalogPreview({
   return (
     <div
       ref={stage}
-      className={`catalog-preview${thumbnail ? " is-thumbnail" : ""}`}
+      className={`catalog-preview${thumbnail ? " is-thumbnail" : ""}${fitWidth ? " fits-width" : ""}`}
       aria-label={label}
       data-preview-scale={scale}
     >
