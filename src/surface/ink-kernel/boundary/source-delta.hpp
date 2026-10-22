@@ -44,7 +44,7 @@ inline bool upsert_source(Graph&g,const SABoundarySourceBlock&description,const 
     if(next.has_bounds){dirty.include(next.bounds);g.block_tree=set_block(*g.context(),g.block_tree,next.description.key,index,next.bounds);}return g.good();
 }
 inline void construct_delta(Graph&g,const SourceDirty&dirty){
-    if(!g.good())return;g.output_reset=false;g.coincidences.clear();g.metrics={};PagedVector<uint32_t,6>marked(*g.context());marked.resize(g.curves.size());Vector<uint32_t>selected(*g.context());
+    if(!g.good())return;g.output_reset=false;g.coincidences.clear();g.point_aliases.clear();g.vertex_changes.clear();g.metrics={};PagedVector<uint32_t,6>marked(*g.context());marked.resize(g.curves.size());Vector<uint32_t>selected(*g.context());
     auto mark=[&](uint32_t id){if(id<g.curves.size()&&!static_cast<const PagedVector<uint32_t,6>&>(marked)[id]){marked[id]=1;selected.push_back(id);}};
     for(uint32_t id:dirty.curves)mark(id);for(Bounds box:dirty.support)query_curves(g,box,mark);
     // Coincident intervals share cuts. Include the exact retained component;
@@ -56,6 +56,6 @@ inline void construct_delta(Graph&g,const SourceDirty&dirty){
     for(uint32_t i:selected){if(!g.good())return;const auto&source=static_cast<const Graph&>(g).curves[i];if(source.weight.zero())continue;for(const auto&record:source.proofs){const auto&p=*record.get();if(!p.proof.coincident||static_cast<const Graph&>(g).curves[p.a].weight.zero()||static_cast<const Graph&>(g).curves[p.b].weight.zero())continue;if(!static_cast<const PagedVector<uint32_t,6>&>(marked)[p.a]||!static_cast<const PagedVector<uint32_t,6>&>(marked)[p.b]){g.context()->fail(SA_INK_RANGE);return;}if(p.a!=i)continue;Q a=p.proof.beta,b=p.proof.beta+p.proof.alpha,lo=a<b?a:b,hi=a>b?a:b;if(lo<Q(0))lo=Q(0);if(hi>Q(1))hi=Q(1);if(lo<hi)g.coincidences.push_back({p.a,p.b,p.proof.alpha,p.proof.beta,lo,hi});}}
     propagate(g,&marked);if(g.good())finish_graph(g,&selected);g.coincidences.clear();
 }
-inline void reset_topology(Graph&g){g.cuts.clear();g.parent.clear();g.vertex_bounds.clear();g.edges.clear();g.coincidences.clear();g.cut_count=0;g.metrics={};}
+inline void reset_topology(Graph&g){g.cuts.clear();g.parent.clear();g.parent_size.clear();g.vertex_bounds.clear();g.point_authorities.clear();g.vertex_certificates.clear();g.vertex_incidence.clear();g.point_aliases.clear();g.vertex_changes.clear();g.incident_endpoint_count=0;g.edges.clear();g.coincidences.clear();g.cut_count=0;g.metrics={};}
 }
 #endif

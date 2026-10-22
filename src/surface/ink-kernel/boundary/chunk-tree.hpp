@@ -49,6 +49,7 @@ public:
     uint64_t visits()const{return visits_;}uint64_t created_nodes()const{return created_;}void reset_metrics(){visits_=created_=0;}
     const Chunk*chunk(uint32_t key)const{const Node*n=root_.get();while(n){if(key==n->key)return n->chunk.get();n=(key<n->key?n->left:n->right).get();}return nullptr;}
     const Chunk*chunk_at(uint32_t index,uint32_t&key)const{const Node*n=root_.get();while(n){uint32_t left=chunks(n->left);if(index<left)n=n->left.get();else if(index==left){key=n->key;return n->chunk.get();}else{index-=left+1;n=n->right.get();}}if(ctx_)ctx_->fail(SA_INK_RANGE);return nullptr;}
+    Record<Chunk>chunk_record(uint32_t key)const{const Node*n=root_.get();while(n){if(key==n->key)return n->chunk;n=(key<n->key?n->left:n->right).get();}return{};}
     bool same_chunk(uint32_t key,const ChunkTree&other)const{return context()==other.context()&&chunk(key)&&chunk(key)==other.chunk(key);}
     bool set_owned(uint32_t key,uint64_t identity,uint64_t revision,const SharedChunkValues<T>&values){
         if(!ctx_||ctx_->status)return false;if(values.context()!=ctx_){ctx_->fail(SA_INK_INVALID);return false;}if(values.empty())return erase(key);auto c=Record<Chunk>::create(*ctx_,Chunk(identity,revision,values));if(!c.valid())return false;auto next=put(root_,key,c);if(ctx_->status)return false;root_=static_cast<Record<Node>&&>(next);return true;
