@@ -5,6 +5,14 @@
 extern "C" {
 #endif
 // Native implementation submodule only, never a WASM export/public C skip API.
+// Native caller-admitted scratch factory. Computes actual commands/counts in
+// one walk. Scratch may be partially written on failure; result stays untouched.
+// It is never a public atomic-output build or a caller-supplied count bypass.
+__attribute__((visibility("default"))) SAInkStatus
+showai_private_stroke_prepare_scratch(const SAInkStrokeSegment *, uint32_t,
+                                     const SAInkStrokeOptions *,
+                                     SAInkPathCommand *, uint32_t,
+                                     SAInkStrokeResult *);
 // Caller owns immutable packed source/options throughout this state lifetime.
 // Fresh state storage must be zeroed, 16-byte aligned, and stay at the same
 // address until destroy. A copied state is not a second initialized owner.
