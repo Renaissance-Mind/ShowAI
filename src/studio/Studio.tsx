@@ -170,6 +170,7 @@ import {
 import { useSampleProject } from "./sample-project";
 import AutoHideSidebar from "./AutoHideSidebar";
 import WorkspaceTabs, { WorkspaceHistory } from "./WorkspaceTabs";
+import { WorkspaceSwipeNavigation } from "./WorkspaceSwipeNavigation";
 import { useWorkspaceTabs } from "./useWorkspaceTabs";
 import {
   clickDisposition,
@@ -2757,6 +2758,7 @@ export default function Studio() {
       return true;
     },
   });
+  const studioRoot = useRef<HTMLDivElement>(null);
   const assistantOpen = workspace.assistantOpen;
   const changeAssistantOpen = (open: boolean) =>
     workspace.setAssistantOpen(open, workspace.activeId);
@@ -3569,6 +3571,7 @@ export default function Studio() {
   return (
     <ComponentLibraryContext.Provider value={pickerLibrary}>
       <div
+        ref={studioRoot}
         className={`studio ${view === "templates" || view === "components" ? "catalog-view" : ""} ${view === "templates" ? "templates-view" : ""} ${view === "components" ? "components-view" : ""}`}
         data-navigation-state={navigationUpdating ? "updating" : "current"}
         data-window-fullscreen={windowFullscreen}
@@ -3578,6 +3581,20 @@ export default function Studio() {
             : undefined
         }
       >
+        <WorkspaceSwipeNavigation
+          rootRef={studioRoot}
+          busy={
+            workspace.switching ||
+            routing ||
+            !workspaceReady ||
+            !!dialog ||
+            !capabilities.tabs
+          }
+          canBack={workspace.canBack}
+          canForward={workspace.canForward}
+          locationKey={`${info?.home}:${workspace.activeId}:${JSON.stringify(workspaceEntry.location)}`}
+          onStep={(offset) => void workspace.step(offset).catch(report)}
+        />
         <AutoHideSidebar
           enabled={view === "page" && !!page.draft}
           mobileBoardKey={

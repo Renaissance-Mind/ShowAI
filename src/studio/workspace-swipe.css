@@ -1,0 +1,57 @@
+:root:has(.studio),
+.studio {
+  overscroll-behavior-x: none;
+}
+.studio-history-swipe {
+  position: fixed;
+  top: 50%;
+  left: 0;
+  z-index: 150;
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  background: var(--paper);
+  color: var(--text);
+  box-shadow: var(--shadow);
+  pointer-events: none;
+  opacity: calc(0.3 + var(--swipe-progress) * 0.7);
+  transform: translate(calc(-36px + var(--swipe-progress) * 56px), -50%)
+    scale(calc(0.85 + var(--swipe-progress) * 0.15));
+  transition:
+    opacity 100ms,
+    transform 80ms ease-out,
+    background-color 120ms;
+}
+.studio-history-swipe[data-direction="forward"] {
+  left: auto;
+  right: 0;
+  transform: translate(calc(36px - var(--swipe-progress) * 56px), -50%)
+    scale(calc(0.85 + var(--swipe-progress) * 0.15));
+}
+.studio-history-swipe[data-committed] {
+  background: var(--accent);
+  color: var(--paper);
+}
+.studio-history-swipe[data-leaving] {
+  opacity: 0;
+  transform: translate(-48px, -50%) scale(0.85);
+  transition:
+    opacity 180ms,
+    transform 180ms ease-in;
+}
+.studio-history-swipe[data-direction="forward"][data-leaving] {
+  transform: translate(48px, -50%) scale(0.85);
+}
+@media (prefers-reduced-motion: reduce) {
+  .studio-history-swipe,
+  .studio-history-swipe[data-direction] {
+    transform: translate(16px, -50%);
+    transition: opacity 100ms;
+  }
+  .studio-history-swipe[data-direction="forward"] {
+    transform: translate(-16px, -50%);
+  }
+}
