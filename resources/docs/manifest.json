@@ -145,6 +145,53 @@
     }
    ],
    "pages": {
+    "963599de-ed81-58ea-be92-5b68937966f8": {
+     "title": "连接 Agent 时的常见问题",
+     "icon": "🔍",
+     "file": "zh-CN/pages/963599de-ed81-58ea-be92-5b68937966f8.json",
+     "sha256": "f2a01dbedad215e763f1c0dbd9678a3f5b64fb49d5971071b0aab31a946f65c8",
+     "components": [
+      "zh-CN/components/doc-hero@1.0.0-7c2bbe84b003.json",
+      "zh-CN/components/doc-steps@1.0.0-660edad476b2.json",
+      "zh-CN/components/doc-cards@1.0.0-96ea3af150bd.json"
+     ]
+    },
+    "0b49bb7a-052c-5fe7-a05f-f647bb862a91": {
+     "title": "快速上手",
+     "icon": "🚀",
+     "file": "zh-CN/pages/0b49bb7a-052c-5fe7-a05f-f647bb862a91.json",
+     "sha256": "f344d447b52cfd8d030be460c450a583974d47cb0683bf5e3e94e7719ae5f264",
+     "components": [
+      "zh-CN/components/doc-hero@1.0.0-7c2bbe84b003.json",
+      "zh-CN/components/doc-steps@1.0.0-660edad476b2.json",
+      "zh-CN/components/doc-sequence@1.0.0-54ea7e21b2eb.json",
+      "zh-CN/components/doc-cards@1.0.0-96ea3af150bd.json"
+     ]
+    },
+    "e8c001a7-4e9f-5515-a2e4-8ed6085ef46d": {
+     "title": "在 Agent 中使用",
+     "icon": "🤝",
+     "file": "zh-CN/pages/e8c001a7-4e9f-5515-a2e4-8ed6085ef46d.json",
+     "sha256": "68f56a73d9af7321552e094158af738c288c40ef8bf511781ee285ce2b54e647",
+     "components": [
+      "zh-CN/components/doc-hero@1.0.0-7c2bbe84b003.json",
+      "zh-CN/components/doc-compare@1.0.0-3a5b6ff02c26.json",
+      "zh-CN/components/doc-steps@1.0.0-660edad476b2.json",
+      "zh-CN/components/doc-sequence@1.0.0-54ea7e21b2eb.json",
+      "zh-CN/components/doc-cards@1.0.0-96ea3af150bd.json"
+     ]
+    },
+    "6e51cbfe-9394-571a-aa5a-5ff2fa96610e": {
+     "title": "技能与工作流程",
+     "icon": "🧠",
+     "file": "zh-CN/pages/6e51cbfe-9394-571a-aa5a-5ff2fa96610e.json",
+     "sha256": "f918eb7f767b0a51c12fda82574bfb1f90317f7818eb2d44de9efeb435d4185a",
+     "components": [
+      "zh-CN/components/doc-hero@1.0.0-7c2bbe84b003.json",
+      "zh-CN/components/doc-cards@1.0.0-96ea3af150bd.json",
+      "zh-CN/components/doc-compare@1.0.0-3a5b6ff02c26.json"
+     ]
+    },
     "2e9af66b-0a83-58f6-b3f5-a480f0f6abab": {
      "title": "ShowAI 文档",
      "icon": "📚",
@@ -155,18 +202,6 @@
       "zh-CN/components/doc-cards@1.0.0-96ea3af150bd.json",
       "zh-CN/components/doc-steps@1.0.0-660edad476b2.json",
       "zh-CN/components/doc-diagram@1.0.0-9ceb1b83b733.json"
-     ]
-    },
-    "0b49bb7a-052c-5fe7-a05f-f647bb862a91": {
-     "title": "快速上手",
-     "icon": "🚀",
-     "file": "zh-CN/pages/0b49bb7a-052c-5fe7-a05f-f647bb862a91.json",
-     "sha256": "0210b32f0bf871aa98fdb90ae9d38dcfb094cc1e59cac9c6ec8d51266f9da7c6",
-     "components": [
-      "zh-CN/components/doc-hero@1.0.0-7c2bbe84b003.json",
-      "zh-CN/components/doc-steps@1.0.0-660edad476b2.json",
-      "zh-CN/components/doc-sequence@1.0.0-54ea7e21b2eb.json",
-      "zh-CN/components/doc-cards@1.0.0-96ea3af150bd.json"
      ]
     },
     "5130253b-e1ae-5e03-bf87-ec58d245de28": {
@@ -196,30 +231,6 @@
       "zh-CN/components/doc-cards@1.0.0-96ea3af150bd.json"
      ]
     },
-    "e8c001a7-4e9f-5515-a2e4-8ed6085ef46d": {
-     "title": "在 Agent 中使用",
-     "icon": "🤝",
-     "file": "zh-CN/pages/e8c001a7-4e9f-5515-a2e4-8ed6085ef46d.json",
-     "sha256": "0367ad20da0ebe1815199a46141cfc6c9fc2ae5c48b1a9d2a3718fb633030ff5",
-     "components": [
-      "zh-CN/components/doc-hero@1.0.0-7c2bbe84b003.json",
-      "zh-CN/components/doc-compare@1.0.0-3a5b6ff02c26.json",
-      "zh-CN/components/doc-steps@1.0.0-660edad476b2.json",
-      "zh-CN/components/doc-sequence@1.0.0-54ea7e21b2eb.json",
-      "zh-CN/components/doc-cards@1.0.0-96ea3af150bd.json"
-     ]
-    },
-    "963599de-ed81-58ea-be92-5b68937966f8": {
-     "title": "连接 Agent 时的常见问题",
-     "icon": "🔍",
-     "file": "zh-CN/pages/963599de-ed81-58ea-be92-5b68937966f8.json",
-     "sha256": "404b95ad90ae71b1aa48a52f764e8f960c58c8e30487b625fdcf6924cf48d592",
-     "components": [
-      "zh-CN/components/doc-hero@1.0.0-7c2bbe84b003.json",
-      "zh-CN/components/doc-steps@1.0.0-660edad476b2.json",
-      "zh-CN/components/doc-cards@1.0.0-96ea3af150bd.json"
-     ]
-    },
     "cf5d1ce9-369c-55de-923f-8da2ce92c74d": {
      "title": "网页版 ChatGPT（邀请制）",
      "icon": "💬",
@@ -241,17 +252,6 @@
       "zh-CN/components/doc-compare@1.0.0-3a5b6ff02c26.json",
       "zh-CN/components/doc-diagram@1.0.0-9ceb1b83b733.json",
       "zh-CN/components/doc-cards@1.0.0-96ea3af150bd.json"
-     ]
-    },
-    "6e51cbfe-9394-571a-aa5a-5ff2fa96610e": {
-     "title": "技能与工作流程",
-     "icon": "🧠",
-     "file": "zh-CN/pages/6e51cbfe-9394-571a-aa5a-5ff2fa96610e.json",
-     "sha256": "5016dc17668ed08457d57f0b43ee1ac1a52a21a36b5a6ee8b0f59771fd5423a1",
-     "components": [
-      "zh-CN/components/doc-hero@1.0.0-7c2bbe84b003.json",
-      "zh-CN/components/doc-cards@1.0.0-96ea3af150bd.json",
-      "zh-CN/components/doc-compare@1.0.0-3a5b6ff02c26.json"
      ]
     },
     "c907d80d-f305-5558-bcbf-29ffd17d0f5d": {
@@ -531,6 +531,53 @@
     }
    ],
    "pages": {
+    "963599de-ed81-58ea-be92-5b68937966f8": {
+     "title": "Connecting an agent: common problems",
+     "icon": "🔍",
+     "file": "en/pages/963599de-ed81-58ea-be92-5b68937966f8.json",
+     "sha256": "7748019516ef6a5f46cdbfee74c2068ebc8f973d93c4108b280f26e06f69997f",
+     "components": [
+      "en/components/doc-hero@1.0.0-6aa1b6a2a0e9.json",
+      "en/components/doc-steps@1.0.0-0c4f6546ba7a.json",
+      "en/components/doc-cards@1.0.0-25e52118b12f.json"
+     ]
+    },
+    "0b49bb7a-052c-5fe7-a05f-f647bb862a91": {
+     "title": "Quick Start",
+     "icon": "🚀",
+     "file": "en/pages/0b49bb7a-052c-5fe7-a05f-f647bb862a91.json",
+     "sha256": "d91f963ee1ca4dab77ddfb89ab7f9d0691a69800ec0b1ccf7cc0b1c504b999e8",
+     "components": [
+      "en/components/doc-hero@1.0.0-6aa1b6a2a0e9.json",
+      "en/components/doc-steps@1.0.0-0c4f6546ba7a.json",
+      "en/components/doc-sequence@1.0.0-a540b813aa99.json",
+      "en/components/doc-cards@1.0.0-25e52118b12f.json"
+     ]
+    },
+    "e8c001a7-4e9f-5515-a2e4-8ed6085ef46d": {
+     "title": "Use with an Agent",
+     "icon": "🤝",
+     "file": "en/pages/e8c001a7-4e9f-5515-a2e4-8ed6085ef46d.json",
+     "sha256": "d493019392a9847f7080ae6184cdeeaeaea84e9622821b4f035b5d11a71cf1ac",
+     "components": [
+      "en/components/doc-hero@1.0.0-6aa1b6a2a0e9.json",
+      "en/components/doc-compare@1.0.0-6450bf2fc82c.json",
+      "en/components/doc-steps@1.0.0-0c4f6546ba7a.json",
+      "en/components/doc-sequence@1.0.0-a540b813aa99.json",
+      "en/components/doc-cards@1.0.0-25e52118b12f.json"
+     ]
+    },
+    "6e51cbfe-9394-571a-aa5a-5ff2fa96610e": {
+     "title": "Skills & Workflows",
+     "icon": "🧠",
+     "file": "en/pages/6e51cbfe-9394-571a-aa5a-5ff2fa96610e.json",
+     "sha256": "9e155da23e52da812164c3b72601876ee08c1c315491bd2577080a7de1ae6ea2",
+     "components": [
+      "en/components/doc-hero@1.0.0-6aa1b6a2a0e9.json",
+      "en/components/doc-cards@1.0.0-25e52118b12f.json",
+      "en/components/doc-compare@1.0.0-6450bf2fc82c.json"
+     ]
+    },
     "2e9af66b-0a83-58f6-b3f5-a480f0f6abab": {
      "title": "ShowAI Documentation",
      "icon": "📚",
@@ -541,18 +588,6 @@
       "en/components/doc-cards@1.0.0-25e52118b12f.json",
       "en/components/doc-steps@1.0.0-0c4f6546ba7a.json",
       "en/components/doc-diagram@1.0.0-6aac721ab95e.json"
-     ]
-    },
-    "0b49bb7a-052c-5fe7-a05f-f647bb862a91": {
-     "title": "Quick Start",
-     "icon": "🚀",
-     "file": "en/pages/0b49bb7a-052c-5fe7-a05f-f647bb862a91.json",
-     "sha256": "fe1da64d840792166cf5432cedd59c1edb0c5c7659de9a9aed45ea588784de93",
-     "components": [
-      "en/components/doc-hero@1.0.0-6aa1b6a2a0e9.json",
-      "en/components/doc-steps@1.0.0-0c4f6546ba7a.json",
-      "en/components/doc-sequence@1.0.0-a540b813aa99.json",
-      "en/components/doc-cards@1.0.0-25e52118b12f.json"
      ]
     },
     "5130253b-e1ae-5e03-bf87-ec58d245de28": {
@@ -582,30 +617,6 @@
       "en/components/doc-cards@1.0.0-25e52118b12f.json"
      ]
     },
-    "e8c001a7-4e9f-5515-a2e4-8ed6085ef46d": {
-     "title": "Use with an Agent",
-     "icon": "🤝",
-     "file": "en/pages/e8c001a7-4e9f-5515-a2e4-8ed6085ef46d.json",
-     "sha256": "f0b47f866a96fd44b7a0a461224817d45e485f7821a07a613cf1e195318ca668",
-     "components": [
-      "en/components/doc-hero@1.0.0-6aa1b6a2a0e9.json",
-      "en/components/doc-compare@1.0.0-6450bf2fc82c.json",
-      "en/components/doc-steps@1.0.0-0c4f6546ba7a.json",
-      "en/components/doc-sequence@1.0.0-a540b813aa99.json",
-      "en/components/doc-cards@1.0.0-25e52118b12f.json"
-     ]
-    },
-    "963599de-ed81-58ea-be92-5b68937966f8": {
-     "title": "Connecting an agent: common problems",
-     "icon": "🔍",
-     "file": "en/pages/963599de-ed81-58ea-be92-5b68937966f8.json",
-     "sha256": "0bd58806bf46c26c665289f3c643ef61f4e66cffcaf6d23e0ac2cd452f8ad004",
-     "components": [
-      "en/components/doc-hero@1.0.0-6aa1b6a2a0e9.json",
-      "en/components/doc-steps@1.0.0-0c4f6546ba7a.json",
-      "en/components/doc-cards@1.0.0-25e52118b12f.json"
-     ]
-    },
     "cf5d1ce9-369c-55de-923f-8da2ce92c74d": {
      "title": "ChatGPT on the web (invite only)",
      "icon": "💬",
@@ -627,17 +638,6 @@
       "en/components/doc-compare@1.0.0-6450bf2fc82c.json",
       "en/components/doc-diagram@1.0.0-6aac721ab95e.json",
       "en/components/doc-cards@1.0.0-25e52118b12f.json"
-     ]
-    },
-    "6e51cbfe-9394-571a-aa5a-5ff2fa96610e": {
-     "title": "Skills & Workflows",
-     "icon": "🧠",
-     "file": "en/pages/6e51cbfe-9394-571a-aa5a-5ff2fa96610e.json",
-     "sha256": "f9007b1401df05570d8add7d824424b868067bff4c03b1f350b67cf7dd4ece11",
-     "components": [
-      "en/components/doc-hero@1.0.0-6aa1b6a2a0e9.json",
-      "en/components/doc-cards@1.0.0-25e52118b12f.json",
-      "en/components/doc-compare@1.0.0-6450bf2fc82c.json"
      ]
     },
     "c907d80d-f305-5558-bcbf-29ffd17d0f5d": {
