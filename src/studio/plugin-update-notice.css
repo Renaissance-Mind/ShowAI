@@ -1,0 +1,45 @@
+.plugin-update-notice {
+  position: fixed;
+  right: 18px;
+  /* Clear of the development marker and the centered toast. */
+  bottom: 52px;
+  z-index: 240;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: min(360px, calc(100vw - 36px));
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--paper);
+  color: var(--text);
+  box-shadow: var(--shadow);
+  font-size: 13px;
+  line-height: 1.55;
+  animation: showai-rise-in var(--duration-slow) var(--ease-out);
+}
+.plugin-update-notice-text {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.plugin-update-notice-text p {
+  margin: 0;
+  color: var(--muted);
+}
+.plugin-update-notice-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+.plugin-update-notice .plugin-update-notice-primary {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--paper);
+}
+.plugin-update-notice .settings-button:disabled {
+  opacity: 0.6;
+}

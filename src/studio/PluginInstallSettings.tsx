@@ -14,8 +14,11 @@ import { desktop, errorMessage } from "./bridge";
 import {
   pluginActionBlocked,
   pluginActionLabel,
+  pluginHostList,
   pluginHostNames,
+  pluginNeedsUpdate,
   usePluginHosts,
+  type PluginBatchResult,
 } from "./usePluginHosts";
 import { AGENT_TROUBLESHOOTING, connectionHost } from "./AgentReadiness";
 import type { Onboarding } from "./sample-project";
@@ -174,9 +177,11 @@ function VerifyConnection({ hosts }: { hosts: PluginInstallation[] }) {
 
 export default function PluginInstallSettings({ home }: { home: string }) {
   const t = useTranslator(messages);
-  const { hosts, busy, error, receipt, refresh, install } =
+  const { hosts, busy, error, receipt, refresh, install, updateAll } =
     usePluginHosts(home);
+  const [batch, setBatch] = useState<PluginBatchResult | null>(null);
   const installed = hosts.filter((host) => host.installed && host.enabled);
+  const outdated = hosts.filter(pluginNeedsUpdate);
   return (
     <div className="plugin-install-settings" aria-busy={!!busy}>
       <div className="settings-row">
@@ -184,6 +189,18 @@ export default function PluginInstallSettings({ home }: { home: string }) {
           <h3>{t("title")}</h3>
           <p>{t("detail")}</p>
         </div>
+        {outdated.length > 1 && (
+          <button
+            className="settings-button"
+            disabled={!!busy}
+            onClick={() => {
+              setBatch(null);
+              void updateAll(outdated.map((host) => host.host)).then(setBatch);
+            }}
+          >
+            {busy === "all" ? t("updatingAll") : t("updateAll")}
+          </button>
+        )}
         <button
           className="settings-button"
           disabled={!!busy}
@@ -231,7 +248,10 @@ export default function PluginInstallSettings({ home }: { home: string }) {
           <button
             className="settings-button"
             disabled={!!busy || pluginActionBlocked(host)}
-            onClick={() => void install(host.host)}
+            onClick={() => {
+              setBatch(null);
+              void install(host.host);
+            }}
           >
             {busy === host.host ? t("installing") : t(pluginActionLabel(host))}
           </button>
@@ -241,6 +261,25 @@ export default function PluginInstallSettings({ home }: { home: string }) {
         <p role="alert" className="plugin-install-error">
           {error}
         </p>
+      )}
+      {batch && (
+        <div role="status" className="plugin-install-result">
+          {batch.updated.length > 0 && (
+            <p>
+              {t("batchUpdated", {
+                hosts: pluginHostList(batch.updated),
+              })}
+            </p>
+          )}
+          {batch.failed.map((item) => (
+            <p key={item.host} role="alert" className="plugin-install-error">
+              {t("batchFailed", {
+                host: pluginHostNames[item.host],
+                message: item.message,
+              })}
+            </p>
+          ))}
+        </div>
       )}
       {receipt && (
         <div role="status" className="plugin-install-result">

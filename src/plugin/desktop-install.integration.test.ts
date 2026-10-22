@@ -17,6 +17,7 @@ describe.skipIf(!output || !config)(
     let installer: DesktopPluginInstaller;
     let home: string;
     let cli: RuntimeLaunch;
+    let bundle: string;
     const saved = {
       CODEX_HOME: process.env.CODEX_HOME,
       CLAUDE_CONFIG_DIR: process.env.CLAUDE_CONFIG_DIR,
@@ -37,7 +38,7 @@ describe.skipIf(!output || !config)(
         env: { ...registered.launch.env, SHOWAI_HOME: home },
       };
       await registerRuntime(home, cli);
-      const bundle = join(root, "app-resources/agent-plugin");
+      bundle = join(root, "app-resources/agent-plugin");
       await cp(resolve("plugins/showai"), bundle, { recursive: true });
       installer = new DesktopPluginInstaller({
         root: join(root, "profile/external-plugins"),
@@ -146,7 +147,23 @@ describe.skipIf(!output || !config)(
         installed: true,
         enabled: true,
         installedPath: first.installedPath,
+        current: true,
       });
+      // A newer App bundle leaves the staged files stale until they are prepared again.
+      const probe = join(bundle, "skills/update-probe.txt");
+      await writeFile(probe, "newer bundle\n");
+      try {
+        const [, , stale] = await installer.status();
+        expect(stale).toMatchObject({ installed: true, current: false });
+        expect(stale.expected).not.toBe(status.expected);
+        await installer.install("deepseek");
+        const [, , refreshed] = await installer.status();
+        expect(refreshed).toMatchObject({ current: true });
+        expect(refreshed.expected).toBe(stale.expected);
+      } finally {
+        await rm(probe);
+        await installer.install("deepseek");
+      }
       const patch = await readFile(
         join(first.installedPath, "cordis.patch.yml"),
         "utf8",

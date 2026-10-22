@@ -4,6 +4,7 @@ import type {
   PluginInstallation,
   PluginInstallReceipt,
 } from "../plugin/desktop-install";
+import { getLocale } from "../i18n";
 import { desktop, errorMessage } from "./bridge";
 
 export const pluginHostNames: Record<PluginHost, string> = {
@@ -11,6 +12,14 @@ export const pluginHostNames: Record<PluginHost, string> = {
   claude: "Claude Code",
   deepseek: "DeepSeek Harness",
 };
+
+/** Host names as one phrase in the interface language ("Codex and Claude Code"). */
+export function pluginHostList(hosts: PluginHost[]) {
+  return new Intl.ListFormat(getLocale(), {
+    style: "long",
+    type: "conjunction",
+  }).format(hosts.map((host) => pluginHostNames[host]));
+}
 
 /** Label key (pluginInstall messages) of the install action for one host. */
 export function pluginActionLabel(host: PluginInstallation) {
@@ -62,6 +71,24 @@ export function pluginActionBlocked(host: PluginInstallation) {
 }
 
 /**
+ * The host runs the App's plugin, but from an earlier App, another library or a
+ * moved App. Hosts without the plugin or with another source are left alone.
+ */
+export function pluginNeedsUpdate(host: PluginInstallation) {
+  return (
+    !pluginActionBlocked(host) &&
+    host.installed &&
+    host.enabled &&
+    host.current === false
+  );
+}
+
+export interface PluginBatchResult {
+  updated: PluginHost[];
+  failed: { host: PluginHost; message: string }[];
+}
+
+/**
  * Desktop plugin detection and installation shared by Settings → Plugins and
  * the welcome. `home` is null where the host CLIs are unreachable (browser
  * workbench, iPad); nothing is scanned then.
@@ -69,7 +96,7 @@ export function pluginActionBlocked(host: PluginInstallation) {
 export function usePluginHosts(home: string | null) {
   const [hosts, setHosts] = useState<PluginInstallation[]>([]);
   const [scanned, setScanned] = useState(false);
-  const [busy, setBusy] = useState<PluginHost | "scan" | null>(null);
+  const [busy, setBusy] = useState<PluginHost | "scan" | "all" | null>(null);
   const [error, setError] = useState("");
   const [receipt, setReceipt] = useState<PluginInstallReceipt | null>(null);
   const mounted = useRef(true);
@@ -120,5 +147,32 @@ export function usePluginHosts(home: string | null) {
       if (mounted.current) setBusy(null);
     }
   }, []);
-  return { hosts, scanned, busy, error, receipt, refresh, install };
+  /** Updates hosts one at a time; the App installs a single plugin at once. */
+  const updateAll = useCallback(async (targets: PluginHost[]) => {
+    setBusy("all");
+    setError("");
+    setReceipt(null);
+    const result: PluginBatchResult = { updated: [], failed: [] };
+    try {
+      for (const host of targets) {
+        try {
+          await desktop.invoke<PluginInstallReceipt>("plugins:install", {
+            host,
+          });
+          result.updated.push(host);
+        } catch (reason) {
+          // Each host is updated independently; one failure must not stop the others.
+          result.failed.push({ host, message: errorMessage(reason) });
+        }
+      }
+      const next = await desktop.invoke<PluginInstallation[]>("plugins:status");
+      if (mounted.current) setHosts(next);
+    } catch (reason) {
+      if (mounted.current) setError(errorMessage(reason));
+    } finally {
+      if (mounted.current) setBusy(null);
+    }
+    return result;
+  }, []);
+  return { hosts, scanned, busy, error, receipt, refresh, install, updateAll };
 }

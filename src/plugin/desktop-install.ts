@@ -43,8 +43,10 @@ export interface PluginInstallation {
   installed: boolean;
   enabled: boolean;
   version?: string;
-  /** Codex and Claude Code: the installed copy is the one this App would install now (same plugin files, runtime and library). */
+  /** The installed or staged copy is the one this App would install now (same plugin files, runtime and library). */
   current?: boolean;
+  /** Identifies what this App would install now; it changes with the App, its bundled plugin or the library. */
+  expected?: string;
   installedPath?: string;
   otherSources: string[];
   error?: string;
@@ -194,15 +196,29 @@ export class DesktopPluginInstaller {
     return join(this.options.root, "deepseek/showai");
   }
 
-  private async inspectDsh(executable: string): Promise<PluginInstallation> {
+  private async inspectDsh(
+    executable: string,
+    expected?: Promise<string>,
+  ): Promise<PluginInstallation> {
     const target = this.dshTarget();
-    const staged = await readFile(join(target, "package.json"), "utf8").then(
-      (text) => JSON.parse(text) as { version?: string },
-      (error: NodeJS.ErrnoException) => {
-        if (error.code === "ENOENT") return undefined;
-        throw error;
-      },
+    const optionalJson = <T>(path: string) =>
+      readFile(path, "utf8").then(
+        (text) => JSON.parse(text) as T,
+        (error: NodeJS.ErrnoException) => {
+          if (error.code === "ENOENT") return undefined;
+          throw error;
+        },
+      );
+    const staged = await optionalJson<{ version?: string }>(
+      join(target, "package.json"),
     );
+    // The staging receipt records which App bundle, runtime and library produced the files.
+    const receipt = staged
+      ? await optionalJson<{ version?: string; source?: string }>(
+          join(this.options.root, "deepseek-install.json"),
+        )
+      : undefined;
+    const source = expected ? await expected : undefined;
     const state = await inspectDshProfile({
       target,
       skillNames: await readdir(join(this.options.pluginRoot(), "skills")),
@@ -213,6 +229,11 @@ export class DesktopPluginInstaller {
       installed: state.installed,
       enabled: state.enabled,
       version: staged?.version,
+      current:
+        staged && source
+          ? receipt?.source === source && receipt.version === staged.version
+          : undefined,
+      expected: source,
       installedPath: staged ? target : undefined,
       otherSources: state.otherSource ? [state.otherSource] : [],
       dsh: dshSteps(target, state),
@@ -238,12 +259,33 @@ export class DesktopPluginInstaller {
     return { manifest, original, version };
   }
 
+  /**
+   * What a staged Harness bundle should be built from: the bundled Harness files, the bundled
+   * plugin and this runtime launch, which includes the library.
+   */
+  private async dshSource() {
+    const [bundle, plugin] = await Promise.all([
+      pluginFingerprint(this.options.dshBundleRoot()),
+      pluginFingerprint(this.options.pluginRoot()),
+    ]);
+    return createHash("sha256")
+      .update(
+        JSON.stringify([
+          bundle.treeSha256,
+          plugin.treeSha256,
+          this.options.runtime(),
+        ]),
+      )
+      .digest("hex")
+      .slice(0, 12);
+  }
+
   private async inspect(
     host: PluginHost,
     executable: string,
     expected?: Promise<string>,
   ): Promise<PluginInstallation> {
-    if (host === "deepseek") return this.inspectDsh(executable);
+    if (host === "deepseek") return this.inspectDsh(executable, expected);
     const data = JSON.parse(await this.command(executable, ["list", "--json"]));
     const items = host === "codex" ? data.installed : data;
     if (!Array.isArray(items))
@@ -263,6 +305,7 @@ export class DesktopPluginInstaller {
       version: own?.version,
       current:
         !!own?.version && !!expected && own.version === (await expected),
+      expected: expected ? await expected : undefined,
       installedPath: own?.installedPath ?? own?.installPath,
       otherSources: items
         .filter((item) => {
@@ -299,7 +342,7 @@ export class DesktopPluginInstaller {
               host,
               executable,
               host === "deepseek"
-                ? undefined
+                ? this.dshSource()
                 : (expected ??= this.expectedVersion().then(
                     (item) => item.version,
                   )),
@@ -336,6 +379,7 @@ export class DesktopPluginInstaller {
     if (!executable)
       throw new Error("Install DeepSeek Harness first, then refresh.");
     const runtime = this.options.runtime();
+    const source = await this.dshSource();
     const staged = await stageDshBundle({
       target: this.dshTarget(),
       bundleRoot: this.options.dshBundleRoot(),
@@ -356,7 +400,7 @@ export class DesktopPluginInstaller {
     await writeFile(
       join(this.options.root, "deepseek-install.json"),
       JSON.stringify(
-        { ...receipt, verifiedAt: new Date().toISOString() },
+        { ...receipt, source, verifiedAt: new Date().toISOString() },
         null,
         2,
       ) + "\n",

@@ -152,6 +152,7 @@ import {
 import TemplateThumbnail from "./TemplateThumbnail";
 import RecentPages, { recentPages } from "./RecentPages";
 import Welcome from "./Welcome";
+import PluginUpdateNotice from "./PluginUpdateNotice";
 import {
   BuiltinDocPage,
   DocsNavigation,
@@ -4018,6 +4019,23 @@ export default function Studio() {
           </main>
           </AssistantWorkbench>
         </AutoHideSidebar>
+        <PluginUpdateNotice
+          home={
+            info && info.mode !== "browser" && capabilities.localPlugins
+              ? info.home
+              : null
+          }
+          // Settings → Plugins and the welcome list the same hosts with their own actions.
+          hidden={
+            (view === "settings" && settingsSection === "plugins") ||
+            (view === "docs" && docPage?.id === WELCOME_DOC) ||
+            (view === "projects" && workspaceReady && welcoming && !showDocs)
+          }
+          onOpenSettings={() => {
+            setSettingsSection("plugins");
+            void navigate("settings").catch(report);
+          }}
+        />
         {notice && (
           <div className="studio-toast" role="status">
             <Check size={14} />

@@ -10,6 +10,7 @@ import {
 import {
   pluginActionLabel,
   pluginHostState,
+  pluginNeedsUpdate,
   pluginUpToDate,
 } from "./usePluginHosts";
 
@@ -162,5 +163,28 @@ describe("host plugin connection", () => {
     expect(
       pluginHostState({ ...host, otherSources: ["showai@other"] }),
     ).toBe("connect.otherSource");
+  });
+
+  it("offers a startup update only for the App's own outdated plugin", () => {
+    const outdated: PluginInstallation = {
+      host: "claude",
+      executable: "/usr/local/bin/claude",
+      installed: true,
+      enabled: true,
+      current: false,
+      otherSources: [],
+    };
+    expect(pluginNeedsUpdate(outdated)).toBe(true);
+    // Harness bundles report freshness the same way once staged and enabled.
+    expect(pluginNeedsUpdate({ ...outdated, host: "deepseek" })).toBe(true);
+    expect(pluginNeedsUpdate({ ...outdated, current: true })).toBe(false);
+    // Unknown freshness (nothing to compare) is not reported as an update.
+    expect(pluginNeedsUpdate({ ...outdated, current: undefined })).toBe(false);
+    expect(pluginNeedsUpdate({ ...outdated, enabled: false })).toBe(false);
+    expect(pluginNeedsUpdate({ ...outdated, installed: false })).toBe(false);
+    expect(
+      pluginNeedsUpdate({ ...outdated, otherSources: ["showai@other"] }),
+    ).toBe(false);
+    expect(pluginNeedsUpdate({ ...outdated, error: "failed" })).toBe(false);
   });
 });

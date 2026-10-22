@@ -45,6 +45,16 @@ export default defineMessages("pluginInstall", {
       "重启 DeepSeek Harness，加载工具、Skills 与对话内预览。以后更新插件文件后同样需要重启。",
     copyPath: "复制路径",
     copied: "已复制",
+    updateAll: "全部更新",
+    updatingAll: "正在更新…",
+    noticeTitle: "ShowAI 插件有可用更新",
+    noticeDetail:
+      "{hosts} 中的插件与当前 App 或内容库不一致，更新后重启对应 Agent 生效。",
+    later: "稍后",
+    openSettings: "插件设置",
+    batchUpdated: "已更新 {hosts}。重启对应 Agent 后加载新的工具和 Skills。",
+    batchFailed: "{host} 未能更新：{message}",
+    done: "知道了",
   },
   en: {
     title: "Install the ShowAI plugin",
@@ -96,5 +106,16 @@ export default defineMessages("pluginInstall", {
       "Restart DeepSeek Harness to load the tools, Skills and inline previews. Restart again after each plugin file update.",
     copyPath: "Copy path",
     copied: "Copied",
+    updateAll: "Update all",
+    updatingAll: "Updating…",
+    noticeTitle: "ShowAI plugin update available",
+    noticeDetail:
+      "The plugin in {hosts} does not match this App or library. Update it, then restart the agent.",
+    later: "Later",
+    openSettings: "Plugin settings",
+    batchUpdated:
+      "Updated {hosts}. Restart each agent to load the new tools and Skills.",
+    batchFailed: "Could not update {host}: {message}",
+    done: "Done",
   },
 });
