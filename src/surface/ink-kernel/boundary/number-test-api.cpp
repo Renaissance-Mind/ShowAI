@@ -46,3 +46,5 @@ extern "C" uint32_t sabt_curve_pair(const double*a,uint32_t ac,const double*b,ui
 }
 
 #include "graph-test-api.hpp"
+
+#include "../boundary-kernel.cpp"

@@ -39,16 +39,39 @@ typedef struct {
     double origin[2];
     double controls[8]; /* binary64 local to origin; derived only */
     double parameter_bounds[4]; /* outward t0.lower/upper,t1.lower/upper */
-    uint32_t parameter_certificate[2],flags,reserved;
+    uint32_t parameter_certificate[2],flags;
+    int32_t direction;
 } SABoundaryEdge;
 typedef struct {
     uint32_t source_commands,source_curves,exposed_edges,vertices;
     uint64_t polynomial_operations,limb_operations,pair_proofs,pair_cache_hits;
     uint64_t classifications,bvh_visits,retained_peak_bytes,workspace_peak_bytes;
+    uint64_t arena_peak_bytes,baseline_bytes,prepared_bytes;
 } SABoundarySnapshot;
-/* API declarations land with their complete implementation, validation and
- * Native/Wasm tests. The typed POD contract is intentionally additive to the
- * existing path ABI; no new wire/persistence identity or document format. */
+/* State and its arena are private to one serial host owner. State starts zeroed.
+ * owner_namespace is nonzero and unique for the entire host lifetime; it scopes
+ * opaque leases, never establishes source equality. The arena cannot alias any
+ * input/output/state bytes and must remain stable until successful destroy.
+ * All budgets include active, cached, prepared and externally retained leases.
+ * prepare is synchronous, bounded and failure-atomic; base must be the owner's
+ * actual latest complete lease (or null only on its first publication). */
+uint32_t sa_boundary_state_bytes(void);
+uint32_t sa_boundary_initialize(void*state,uint32_t state_bytes,uint32_t owner_namespace,void*arena,uint32_t arena_bytes,const SABoundaryBudget*budget);
+uint32_t sa_boundary_prepare(void*state,const SABoundaryLease*base,const SABoundaryPath*paths,uint32_t path_count,const SABoundarySourceBlock*sources,uint32_t source_count,const SAInkPathCommand*commands,uint32_t command_count,SABoundaryLease*output);
+uint32_t sa_boundary_retain(void*state,SABoundaryLease lease);
+uint32_t sa_boundary_release(void*state,SABoundaryLease lease);
+uint32_t sa_boundary_snapshot(void*state,SABoundaryLease lease,SABoundarySnapshot*output);
+uint32_t sa_boundary_copy_edges(void*state,SABoundaryLease lease,uint32_t first,uint32_t count,SABoundaryEdge*output,uint32_t capacity);
+/* Exact parameter certificate: [coefficient_count, Q..., lowerQ, upperQ]. Each
+ * Q is [sign-as-int32,numerator_count,denominator_count,LE32 limbs...]. The
+ * source polynomial and isolating interval remain authoritative. controls and
+ * origin in SABoundaryEdge are outward-lower binary64 approximations of the
+ * original (not flattened) canonical curve; interval endpoints are NOT silently
+ * substituted into it. A renderer chooses an explicit quantization policy.
+ * count-query: output may be null only when capacity is zero. */
+uint32_t sa_boundary_copy_parameter(void*state,SABoundaryLease lease,uint32_t certificate,uint32_t*output,uint32_t capacity,uint32_t*required);
+/* Fails while any external lease remains. Does not invalidate live leases. */
+uint32_t sa_boundary_destroy(void*state);
 #ifdef __cplusplus
 }
 #endif

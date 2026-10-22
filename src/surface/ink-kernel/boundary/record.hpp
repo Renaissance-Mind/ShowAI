@@ -17,6 +17,10 @@ public:
     ~Record(){release();}
     bool valid()const{return ctx_&&offset_!=no_block;}Context*context()const{return ctx_;}
     const T*get()const{return valid()?(const T*)ctx_->payload(offset_):nullptr;}
+    // Internal structural drafts own this handle; sharing never grants mutable
+    // access to a retained record. A failed clone leaves every old handle intact.
+    T*edit(){if(!valid()||ctx_->status)return nullptr;if(ctx_->block(offset_).refs>1){auto next=create(*ctx_,*get());if(!next.valid()||ctx_->status)return nullptr;*this=static_cast<Record&&>(next);}return(T*)ctx_->payload(offset_);}
+
 };
 static_assert(sizeof(Record<uint32_t>)==16,"portable record layout");
 }

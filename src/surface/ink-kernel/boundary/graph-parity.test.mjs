@@ -2,7 +2,8 @@ import assert from 'node:assert/strict';
 import {readFile,writeFile} from 'node:fs/promises';
 import {execFileSync} from 'node:child_process';
 import {join} from 'node:path';
-import {fixtures} from './graph-fixtures-data.mjs';
+import {fixtures as baseFixtures} from './graph-fixtures-data.mjs';
+const fixtures=process.env.SHOWAI_BOUNDARY_PRESSURE_FIXTURES?[...baseFixtures,...JSON.parse(await readFile(process.env.SHOWAI_BOUNDARY_PRESSURE_FIXTURES,'utf8'))]:baseFixtures;
 const root=process.env.SHOWAI_BOUNDARY_TEST_OUTPUT;if(!root)throw Error('private test output directory required');
 const bytes=await readFile(join(root,'boundary-test.wasm')),module=new WebAssembly.Module(bytes);assert.deepEqual(WebAssembly.Module.imports(module),[]);
 const {exports:ex}=new WebAssembly.Instance(module,{});const base=(Number(ex.__heap_base.value)+15)&~15,arena=base+262144,arenaBytes=64*1024*1024;
@@ -20,7 +21,7 @@ for(const fixture of fixtures){
    for(let i=0;i<6;i++){const value=i+1<cmd.length?numeric(cmd[i+1]):0;f64(value);dv.setFloat64(offset+8+i*8,value,true);}commandIndex++;
   }
  }
- u32(fixture.pixels.length);for(let i=0;i<fixture.pixels.length;i++){const p=fixture.pixels[i],q=[p.x,p.y,p.x+1,p.y+1];for(let j=0;j<4;j++){f64(q[j]);dv.setFloat64(queries+i*32+j*8,q[j],true);}f64(Number(p.area));}
+ u32(fixture.pixels.length);for(let i=0;i<fixture.pixels.length;i++){const p=fixture.pixels[i],q=p.rect??[p.x,p.y,p.x+1,p.y+1];for(let j=0;j<4;j++){f64(q[j]);dv.setFloat64(queries+i*32+j*8,q[j],true);}f64(Number(p.area));}
  u.fill(0x5a5a5a5a,output/4,output/4+4096);u.fill(0x5a5a5a5a,metadata/4,metadata/4+8);
  const status=ex.sabt_graph(ranges,fixture.paths.length,commands,commandIndex,queries,fixture.pixels.length,arena,arenaBytes,10000000000n,output,4096,metadata),meta=[...u.slice(metadata/4,metadata/4+8)];
  assert.equal(status,0,`graph fixture ${fixture.name} status${status}`);assert.equal(meta[1],fixture.pixels.length);assert.equal(meta[2],81);

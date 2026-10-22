@@ -10,7 +10,7 @@ const clang=process.env.SHOWAI_INK_CLANG||'clang++';
 const linker=process.env.SHOWAI_INK_WASM_LD||'wasm-ld';
 const output=process.env.SHOWAI_BOUNDARY_TEST_OUTPUT;
 if(!output)throw new Error('SHOWAI_BOUNDARY_TEST_OUTPUT must name a private test output directory');
-const files=['include/showai_ink.h','boundary/number.hpp','boundary/vector.hpp','boundary/record.hpp','boundary/polynomial.hpp','boundary/algebra.hpp','boundary/number-test-api.cpp','include/boundary-kernel.h','boundary/graph.hpp','boundary/graph-test-api.hpp'];
+const files=['include/showai_ink.h','boundary/number.hpp','boundary/vector.hpp','boundary/record.hpp','boundary/polynomial.hpp','boundary/algebra.hpp','boundary/number-test-api.cpp','include/boundary-kernel.h','boundary/graph.hpp','boundary/graph-test-api.hpp','boundary/owner.hpp','boundary/paged-vector.hpp','boundary-kernel.cpp'];
 const flags=['--target=wasm32-unknown-unknown','-mbulk-memory','-std=c++17','-O2','-ffp-contract=off','-fno-exceptions','-fno-rtti','-fno-builtin','-nostdlib'];
 const tmp=await mkdtemp(join(tmpdir(),'showai-boundary-test-'));
 try{
