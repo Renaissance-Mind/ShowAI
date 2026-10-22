@@ -85,7 +85,7 @@ dataset_create({projectId, name:"全景 OKR", fromBlock:{pageId, blockId, baseHa
 
 ## 外部文件中的数据
 
-用户的数据已经在内容库以外的目录（脚本生成的 JSON、表格导出的 CSV 等），或希望数据留在某个目录里由其他工具一起维护时，用 `dataset_link` 让共享数据直接读写那个文件，而不是复制进项目。先确认 `showai_capabilities.datasets.externalFiles.available`；远程连接不能链接本机文件。
+用户的数据已经在内容库以外的目录（脚本生成的 JSON、表格导出的 CSV 等），或希望数据留在某个目录里由其他工具一起维护时，用 `dataset_link` 让共享数据直接读写那个文件，而不是复制进项目。先确认 `showai_capabilities.datasets.externalFiles.available`；为 false（远程连接或旧版运行时）时说明当前连接不能链接本机文件，请用户在本机 ShowAI 中操作或更新运行时，不要改成把文件复制进页面。
 
 - 文件格式按扩展名：`.json` 保存任意 JSON 值；`.csv`、`.tsv` 读成 `{columns, rows}`，第一行是列名，单元格读成文字、数字或 true/false。CSV/TSV 只能保存这种表格结构，嵌套值会被拒绝。文件必须是 UTF-8 文本；中文版 Excel 默认的「CSV」是 GBK，会以 INVALID_DATA 拒绝读取，请用户另存为「CSV UTF-8」。Excel 打开期间保存的文件会在下次读取时出现；它可能改写日期和数字格式，写回的值以文件中实际的文字为准。
 - 表格要有 `id` 列，表格组件中的修改才能写回对应行；绑定表格时用 collections 的 `from:"rows[*]"`。读取后 `columns` 没有 `id` 时告诉用户：没有 id 的行在组件里只读，只能在原文件中修改。用户同意由 Agent 补上时，读出 rows，为每行加上稳定的 id，用 `dataset_apply({op:"set", path:"rows", value:新rows})` 一次写回（这会改写整个文件，先确认文件没有其他程序正在编辑）；或者请用户在原工具里加一列 id。
@@ -93,8 +93,8 @@ dataset_create({projectId, name:"全景 OKR", fromBlock:{pageId, blockId, baseHa
 - 只链接用户指明的文件，不猜路径，也不链接内容库内部的文件。路径只记录在这台设备上，文件内容也不随项目同步。项目在其他设备打开时，那里会返回 `SOURCE_UNAVAILABLE`（`details.source` 带格式和文件名），`dataset_list` 标出 `source.available:false`，绑定块显示「共享数据「名称」读取外部文件「文件名」，这台设备还没有链接它。」和「链接文件…」按钮；链接过但文件读不到时显示「……现在无法读取」并给出路径。向用户说明：先把文件放到这台设备上（同步盘、拷贝等），再由用户点「链接文件…」选择它，或告诉 Agent 文件的绝对路径后用 `dataset_link({projectId, datasetId, path})` 链接。文件格式必须与原来相同。没有这份文件时数据无法恢复，`path:null` 也需要能读到文件。
 - 读写与项目内的共享数据相同：每次读取都读文件，每次写入都原子地写回文件并保留原来的缩进、换行和引号；文件在别处被修改后，打开的窗口会更新，基于旧读取的写入按记录和字段合并。文件读取后又被改动时写入返回 CONFLICT，重新读取后再写。文件不可读或内容不符合 schema 时返回 `SOURCE_UNAVAILABLE` 并说明原因。
 - `dataset_link({projectId, datasetId, path:null})` 把文件当前内容复制回内容库并停止读写该文件；`dataset_delete` 只删除共享数据和链接。两者都保留文件本身。
-- 导出（html、inline、site 和工作台导出的页面源）会把外部数据作为快照写进导出文件。这样的导出先返回 `CONFIRMATION_REQUIRED`，什么也不写：`details.externalSnapshots` 列出每份外部数据的名称、文件、文件大小、写入导出的快照字节数（`snapshotBytes`）和使用它的块，以及合计。把这些告诉用户，说明快照不会随文件更新、收到导出文件的人能看到这些数据；用户同意后再用 `externalData:"embed"` 重新导出。`available:false` 表示文件现在读不到，导出后这些块不显示数据。
-- `page_present` 在对话里展示当前数据，不需要确认；但它的 delivery 文件（delivery.html 等）同样带着这些数据，结果中的 `externalSnapshots` 列出大小。只在对话中展示时无需询问；要把 delivery 文件交给别人或上传时，先按上一条告诉用户并取得同意。
+- 导出（html、inline、site 和工作台导出的页面源）会把外部数据作为快照写进导出文件。这样的导出先返回 `CONFIRMATION_REQUIRED`，什么也不写：`details.externalSnapshots` 列出每份外部数据的名称、文件、文件大小、写入导出的快照字节数（`snapshotBytes`）和使用它的块，以及合计。把这些告诉用户，说明快照不会随文件更新、收到导出文件的人能看到这些数据；用户同意后再用 `externalData:"embed"` 重新导出。`available:false` 表示文件现在读不到，导出后这些块不显示数据。用户不同意时不导出这些数据：可以用 `blockIds` 只导出不含这些块的部分（报告只统计选中的块），或不导出。
+- `page_present` 在对话里展示当前数据，不需要确认；但它的 delivery 文件（delivery.html 等）同样带着这些数据，结果中的 `externalSnapshots` 列出大小。只在对话中展示时无需询问；要把 delivery 文件交给别人或上传时，先按上一条告诉用户并取得同意；之前生成的 delivery 可能已过时，交付前重新 page_present 或改用 page_export 得到当前快照。
 
 ## 其他
 
