@@ -12,6 +12,7 @@ import { Folder, Loader2, Trash2, X } from "../ui/icons";
 import { desktop, errorMessage } from "./bridge";
 import Dialog from "./Dialog";
 import type { LibraryTarget } from "./LibraryNavigation";
+import { marqueeIds, type MarqueeBounds } from "./directory-marquee";
 
 export function useDirectoryPageSelection(scope: string, pageIds: string[]) {
   const [state, setState] = useState({
@@ -79,12 +80,8 @@ export function useDirectoryMarquee(
   scope: string,
   enabled: boolean,
 ) {
-  const [rectangle, setRectangle] = useState<{
-    left: number;
-    top: number;
-    width: number;
-    height: number;
-  } | null>(null);
+  // Pointer motion only paints this overlay; it must not render the workbench.
+  const overlayRef = useRef<HTMLDivElement>(null);
   const latest = useRef(selection);
   latest.current = selection;
   const gesture = useRef<{
@@ -98,10 +95,21 @@ export function useDirectoryMarquee(
     active: boolean;
     previous: string[];
     wasActive: boolean;
+    entries?: (MarqueeBounds & { id: string })[];
   } | null>(null);
   const suppressClick = useRef(false);
   useEffect(() => {
     let frame = 0;
+    let resize: ResizeObserver | undefined;
+    let changes: MutationObserver | undefined;
+    const schedule = () => {
+      if (!frame) frame = requestAnimationFrame(update);
+    };
+    const invalidate = () => {
+      if (!gesture.current?.active) return;
+      gesture.current.entries = undefined;
+      schedule();
+    };
     const finish = (cancel = false) => {
       const current = gesture.current;
       if (!current) return;
@@ -116,13 +124,35 @@ export function useDirectoryMarquee(
       if (current.element.hasPointerCapture(current.pointerId))
         current.element.releasePointerCapture(current.pointerId);
       cancelAnimationFrame(frame);
-      setRectangle(null);
+      frame = 0;
+      resize?.disconnect();
+      changes?.disconnect();
+      current.element.removeEventListener("scroll", schedule);
+      if (overlayRef.current) overlayRef.current.hidden = true;
     };
     const update = () => {
+      frame = 0;
       const current = gesture.current;
       if (!current?.active) return;
       const { element, clientX, clientY } = current;
       const bounds = element.getBoundingClientRect();
+      const scrollTop = element.scrollTop;
+      const scrollLeft = element.scrollLeft;
+      // Read geometry together, once per gesture or actual directory reflow.
+      // Scrolling translates content coordinates without remeasuring every card.
+      current.entries ??= Array.from(
+        element.querySelectorAll<HTMLElement>("[data-selectable]"),
+        (row) => {
+          const rect = row.getBoundingClientRect();
+          return {
+            id: row.dataset.libraryId!,
+            left: rect.left - bounds.left + scrollLeft,
+            right: rect.right - bounds.left + scrollLeft,
+            top: rect.top - bounds.top + scrollTop,
+            bottom: rect.bottom - bounds.top + scrollTop,
+          };
+        },
+      );
       const edge = 40;
       const speed = (position: number, start: number, end: number) =>
         position < start + edge
@@ -130,16 +160,15 @@ export function useDirectoryMarquee(
           : position > end - edge
             ? Math.min(18, (position - end + edge) / 3)
             : 0;
-      element.scrollTop += speed(clientY, bounds.top, bounds.bottom);
       const x = Math.max(bounds.left, Math.min(bounds.right, clientX));
       const y = Math.max(bounds.top, Math.min(bounds.bottom, clientY));
-      const originX = bounds.left + current.x - element.scrollLeft;
-      const originY = bounds.top + current.y - element.scrollTop;
+      const originX = bounds.left + current.x - scrollLeft;
+      const originY = bounds.top + current.y - scrollTop;
       const left = Math.min(originX, x);
       const top = Math.min(originY, y);
       const right = Math.max(originX, x);
       const bottom = Math.max(originY, y);
-      const nextRectangle = {
+      const rectangle = {
         left: Math.max(bounds.left, left),
         top: Math.max(bounds.top, top),
         width: Math.max(
@@ -151,30 +180,32 @@ export function useDirectoryMarquee(
           Math.min(bounds.bottom, bottom) - Math.max(bounds.top, top),
         ),
       };
-      setRectangle((previous) =>
-        previous &&
-        previous.left === nextRectangle.left &&
-        previous.top === nextRectangle.top &&
-        previous.width === nextRectangle.width &&
-        previous.height === nextRectangle.height
-          ? previous
-          : nextRectangle,
+      latest.current.replace(
+        marqueeIds(
+          current.entries,
+          {
+            left: left - bounds.left + scrollLeft,
+            right: right - bounds.left + scrollLeft,
+            top: top - bounds.top + scrollTop,
+            bottom: bottom - bounds.top + scrollTop,
+          },
+          current.base,
+        ),
       );
-      const ids = new Set(current.base);
-      element
-        .querySelectorAll<HTMLElement>("[data-selectable]")
-        .forEach((row) => {
-          const rect = row.getBoundingClientRect();
-          if (
-            rect.right > left &&
-            rect.left < right &&
-            rect.bottom > top &&
-            rect.top < bottom
-          )
-            ids.add(row.dataset.libraryId!);
-        });
-      latest.current.replace([...ids]);
-      frame = requestAnimationFrame(update);
+      if (overlayRef.current) {
+        const overlay = overlayRef.current;
+        overlay.hidden = false;
+        overlay.style.left = `${rectangle.left}px`;
+        overlay.style.top = `${rectangle.top}px`;
+        overlay.style.width = `${rectangle.width}px`;
+        overlay.style.height = `${rectangle.height}px`;
+      }
+      // Keep ticking only while the pointer actually moves the scroll position.
+      const delta = speed(clientY, bounds.top, bounds.bottom);
+      if (delta) {
+        element.scrollTop = scrollTop + delta;
+        if (element.scrollTop !== scrollTop) schedule();
+      }
     };
     const move = (event: PointerEvent) => {
       const current = gesture.current;
@@ -195,8 +226,17 @@ export function useDirectoryMarquee(
           return;
         current.active = true;
         current.element.setPointerCapture(current.pointerId);
-        update();
+        resize = new ResizeObserver(invalidate);
+        resize.observe(current.element);
+        const list = current.element.querySelector(".studio-page-list");
+        if (list) {
+          resize.observe(list);
+          changes = new MutationObserver(invalidate);
+          changes.observe(list, { childList: true });
+        }
+        current.element.addEventListener("scroll", schedule, { passive: true });
       }
+      schedule();
       event.preventDefault();
     };
     const up = (event: PointerEvent) => {
@@ -205,6 +245,7 @@ export function useDirectoryMarquee(
         gesture.current.clientX = event.clientX;
         gesture.current.clientY = event.clientY;
         cancelAnimationFrame(frame);
+        frame = 0;
         update();
       } else if (!gesture.current.base.length) latest.current.clear();
       finish();
@@ -226,6 +267,7 @@ export function useDirectoryMarquee(
       window.addEventListener("pointercancel", cancel);
       window.addEventListener("blur", cancel);
       window.addEventListener("keydown", key);
+      window.addEventListener("resize", invalidate);
     }
     return () => {
       finish();
@@ -234,10 +276,11 @@ export function useDirectoryMarquee(
       window.removeEventListener("pointercancel", cancel);
       window.removeEventListener("blur", cancel);
       window.removeEventListener("keydown", key);
+      window.removeEventListener("resize", invalidate);
     };
   }, [scope, enabled]);
   return {
-    rectangle,
+    overlayRef,
     onPointerDown: (event: ReactPointerEvent<HTMLElement>) => {
       suppressClick.current = false;
       if (

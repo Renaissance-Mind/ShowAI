@@ -3656,12 +3656,12 @@ export default function Studio() {
                 onDelete={() => beginBatchPages("delete")}
               />
             )}
-            {directoryMarquee.rectangle && (
-              <div
-                className="studio-directory-marquee"
-                style={directoryMarquee.rectangle}
-              />
-            )}
+            <div
+              ref={directoryMarquee.overlayRef}
+              className="studio-directory-marquee"
+              hidden
+              aria-hidden="true"
+            />
             <NoticeStack>
             {problemQueue.problems.map((entry) => (
               <ProblemNotice

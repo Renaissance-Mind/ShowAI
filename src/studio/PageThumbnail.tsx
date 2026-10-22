@@ -1,4 +1,6 @@
 import {
+  memo,
+  startTransition,
   useEffect,
   useMemo,
   useRef,
@@ -14,13 +16,16 @@ import { CustomComponentsProvider } from "../components/custom/CustomBlock";
 import CatalogPreview from "./CatalogPreview";
 import { desktop, errorMessage } from "./bridge";
 import type { LoadedPage } from "./usePage";
+import { ThumbnailRetention } from "./thumbnail-retention";
+
+const retainedPreviews = new ThumbnailRetention(32);
 
 /**
- * Load only visible cards; the library stays inexpensive even with large folders.
+ * Load nearby cards and retain recent renders while scrolling back.
  * Documents flow into up to four columns to fill the card; boards show their
  * content's bounds with a margin, centred, so a drawn shape never becomes the edge.
  */
-export default function PageThumbnail({
+export default memo(function PageThumbnail({
   projectId,
   pageId,
   updatedAt,
@@ -33,6 +38,7 @@ export default function PageThumbnail({
   padding?: number;
 }) {
   const host = useRef<HTMLSpanElement>(null);
+  const retentionKey = useRef(Symbol());
   const [visible, setVisible] = useState(false);
   const [record, setRecord] = useState<LoadedPage | null>(null);
   const [error, setError] = useState("");
@@ -40,11 +46,21 @@ export default function PageThumbnail({
   const key = `${projectId}:${pageId}:${updatedAt}`;
   useEffect(() => {
     const observer = new IntersectionObserver(
-      ([entry]) => setVisible(entry.isIntersecting),
+      ([entry]) => {
+        retainedPreviews.update(
+          retentionKey.current,
+          entry.isIntersecting,
+          () => setVisible(false),
+        );
+        if (entry.isIntersecting) setVisible(true);
+      },
       { rootMargin: "100px" },
     );
     if (host.current) observer.observe(host.current);
-    return () => observer.disconnect();
+    return () => {
+      observer.disconnect();
+      retainedPreviews.remove(retentionKey.current);
+    };
   }, []);
   useEffect(() => {
     if (!visible || loadedKey.current === key) return;
@@ -54,7 +70,7 @@ export default function PageThumbnail({
       (value) => {
         if (!cancelled) {
           loadedKey.current = key;
-          setRecord(value);
+          startTransition(() => setRecord(value));
         }
       },
       (reason) => {
@@ -145,4 +161,4 @@ export default function PageThumbnail({
       )}
     </span>
   );
-}
+});
