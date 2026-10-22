@@ -26,6 +26,7 @@ struct RawCoverageCertificate {
 struct RawCoverageMesh {
     BoundaryCoverageMesh mesh; RawCoverageCertificate certificate{};
     uint64_t source_generation=0;
+    uint32_t regularized_curves=0; // regular analytic intervals proved flat, never labelled RAY
     double source_control_bounds[4]{}; // conservative minX,minY,maxX,maxY; not AA support
     explicit RawCoverageMesh(Context&c):mesh(c){}
 };
@@ -204,6 +205,7 @@ inline uint32_t build_raw_coverage_mesh(PolynomialContext&c,const SAInkPathComma
  for(const auto&p:patches){if(!ctx.step())return ctx.status;if(p.command_index>=count){reason=boundary_klm_invalid;return SA_INK_INVALID;}const auto&meta=metadata[p.command_index];
   if(p.mode==SA_ANALYTIC_RAY){double error=0;if(!chord(c,commands[p.command_index],meta,p,error)){reason=boundary_klm_ray;return ctx.status?ctx.status:SA_INK_RANGE;}cert.actual_regularization_error_source=max(cert.actual_regularization_error_source,error);if(mul(o.maximum_forward_norm,sum(cert.actual_position_error_source,cert.actual_regularization_error_source))>o.maximum_geometry_error_pixels){reason=boundary_klm_error_budget;return SA_INK_RANGE;}++cert.regularized_rays;continue;}
   uint32_t hullIndices[4]{},hullCount=p.mode==SA_ANALYTIC_CUBIC?hull(p.controls,hullIndices):0;if(p.mode==SA_ANALYTIC_CUBIC&&(hullCount<3||(hullCount-2)*3!=p.vertex_count)){reason=boundary_klm_invalid;return SA_INK_INVALID;}
+  const auto patchCertificate=cert;const uint32_t patchVertices=staged.mesh.vertices.size(),patchDraws=staged.mesh.draws.size();
   for(uint32_t i=0;i<p.vertex_count;i+=3){BoundaryCoverageVertex tri[3]{};double positions[6]{};uint32_t quadMask=0;
    for(uint32_t j=0;j<3;j++){const auto&v=vertices[p.first_vertex+i+j];double x=0,y=0;bool found=false;
     if(p.mode==SA_ANALYTIC_SOLID){uint32_t k=j==0?0:p.winding>0?j:3-j;double choices[6]={p.origin[0],p.origin[1],p.controls[0],p.controls[1],p.controls[6],p.controls[7]};x=choices[2*k];y=choices[2*k+1];found=float(x-p.origin[0])==v.x&&float(y-p.origin[1])==v.y;tri[j].l=tri[j].m=1;}
@@ -214,7 +216,25 @@ inline uint32_t build_raw_coverage_mesh(PolynomialContext&c,const SAInkPathComma
    }
    if(p.mode==SA_ANALYTIC_QUADRATIC&&quadMask!=7){reason=boundary_klm_invalid;return SA_INK_INVALID;}
    uint32_t kind=p.mode==SA_ANALYTIC_SOLID?boundary_coverage_solid:p.mode==SA_ANALYTIC_QUADRATIC?boundary_coverage_embedded_quad:boundary_coverage_cubic;
-   if(!emit(c,staged,positions,tri,p.winding,meta.origin[0],meta.origin[1],p.command_index,kind,o,reason))return ctx.status?ctx.status:reason==boundary_klm_capacity?SA_INK_CAPACITY:SA_INK_RANGE;
+   if(!emit(c,staged,positions,tri,p.winding,meta.origin[0],meta.origin[1],p.command_index,kind,o,reason)){
+    // A valid but rounding-scale regular cubic can have a nonzero encoded
+    // triangle whose extended-center functional cannot stay finite without
+    // losing a coefficient. Do not weaken finite_fields or emit binary RAY.
+    // The analytic factory already emitted this interval's oriented chord fan.
+    // Prove the ORIGINAL restricted curve is within the same geometric budget
+    // of that retained chord (including its binary64 endpoint rounding), then
+    // remove the entire lens transaction, not merely its failing triangle.
+    double error=0;
+    if(!ctx.status&&reason==boundary_klm_zero_gradient&&p.mode==SA_ANALYTIC_CUBIC&&
+       chord(c,commands[p.command_index],meta,p,error)&&
+       mul(o.maximum_forward_norm,sum(patchCertificate.actual_position_error_source,
+           max(patchCertificate.actual_regularization_error_source,error)))<=o.maximum_geometry_error_pixels){
+     if(!staged.mesh.vertices.resize(patchVertices)||!staged.mesh.draws.resize(patchDraws))return ctx.status;
+     cert=patchCertificate;cert.actual_regularization_error_source=max(cert.actual_regularization_error_source,error);
+     ++staged.regularized_curves;reason=boundary_klm_none;break;
+    }
+    return ctx.status?ctx.status:reason==boundary_klm_capacity?SA_INK_CAPACITY:SA_INK_RANGE;
+   }
   }
  }
  if(ctx.status)return ctx.status;staged.mesh.source_edges=count;staged.mesh.vertex_bytes=uint64_t(staged.mesh.vertices.size())*sizeof(BoundaryCoverageVertex);output=static_cast<RawCoverageMesh&&>(staged);return SA_INK_OK;
