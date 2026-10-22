@@ -1,7 +1,11 @@
 // Injected by the development launcher only; never included in a distribution.
 import info from "virtual:showai-development-info";
 
-if (!new URLSearchParams(location.search).has("componentPreview")) {
+const previewParameters = new URLSearchParams(location.search);
+if (
+  !previewParameters.has("componentPreview") &&
+  !previewParameters.has("pagePreview")
+) {
   const badge = document.createElement("div");
   badge.dataset.showaiDevelopment = "true";
   badge.style.cssText =

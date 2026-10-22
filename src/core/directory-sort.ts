@@ -24,6 +24,7 @@ export interface DirectoryEntry {
   pinned: boolean;
   createdAt: string;
   updatedAt: string;
+  hash?: string;
 }
 
 export function directoryEntries(

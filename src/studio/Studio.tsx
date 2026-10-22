@@ -2436,6 +2436,7 @@ export default function Studio() {
     [
       ...filteredFolders.map((item) => ({
         target: folderTarget(item, selectedProject!),
+        hash: "",
         name: item.name,
         pinned: item.pinned,
         createdAt: item.createdAt,
@@ -2443,6 +2444,7 @@ export default function Studio() {
       })),
       ...filteredPages.map((item) => ({
         target: pageTarget(item, selectedProject!),
+        hash: item.hash,
         name: item.title || tc("untitled"),
         pinned: item.favorite,
         createdAt: item.createdAt,
@@ -2467,7 +2469,7 @@ export default function Studio() {
       organization.entryOrder?.[selectedProject!],
     )
       .slice(0, 3)
-      .map(({ kind, id, updatedAt }) => ({ kind, id, updatedAt }));
+      .map(({ kind, id, updatedAt, hash }) => ({ kind, id, updatedAt, hash }));
   }
   const pageSelection = useDirectoryPageSelection(
     JSON.stringify([info?.home, view, selectedProject, selectedFolder, query]),
@@ -3995,7 +3997,7 @@ export default function Studio() {
                             data-view={directoryView}
                             data-selecting={pageSelection.active || undefined}
                           >
-                          {visibleEntries.map(({ target, updatedAt }) => (
+                          {visibleEntries.map(({ target, updatedAt, hash }) => (
                             <div
                               key={target.id}
                                 {...(!pageSelection.active ? libraryDrag.bindings.row(target, false) : {})}
@@ -4045,6 +4047,7 @@ export default function Studio() {
                                       projectId={target.projectId}
                                       pageId={target.id}
                                       updatedAt={updatedAt}
+                                      hash={hash}
                                     />
                                   ) : (
                                     <FolderThumbnail

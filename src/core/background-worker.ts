@@ -6,7 +6,10 @@ import { CoreError } from "./model";
 
 /** A separate execution queue per workload; idle workers do not keep a host alive. */
 export class BackgroundWorker {
-  constructor(private readonly idleMs = 15000) {}
+  constructor(
+    private readonly idleMs = 15000,
+    private readonly options?: { path: string; data?: unknown },
+  ) {}
   private worker?: Worker;
   private idle?: ReturnType<typeof setTimeout>;
   private pending = new Map<
@@ -18,18 +21,23 @@ export class BackgroundWorker {
   >();
   private start() {
     if (this.worker) return this.worker;
-    const path = [
-      process.env.SHOWAI_INDEX_WORKER,
-      fileURLToPath(new URL("./index-worker.mjs", import.meta.url)),
-      fileURLToPath(
-        new URL("../../dist-agent/index-worker.mjs", import.meta.url),
-      ),
-    ].find((path) => path && existsSync(path));
-    if (!path)
+    const path =
+      this.options?.path ??
+      [
+        process.env.SHOWAI_INDEX_WORKER,
+        fileURLToPath(new URL("./index-worker.mjs", import.meta.url)),
+        fileURLToPath(
+          new URL("../../dist-agent/index-worker.mjs", import.meta.url),
+        ),
+      ].find((path) => path && existsSync(path));
+    if (!path || !existsSync(path))
       throw new Error(
         "The content worker is missing. Build the ShowAI runtime first.",
       );
-    const worker = new Worker(path, { execArgv: [] });
+    const worker = new Worker(path, {
+      execArgv: [],
+      workerData: this.options?.data,
+    });
     this.worker = worker;
     const failed = (error: unknown) => {
       if (this.worker !== worker) return;
@@ -78,5 +86,15 @@ export class BackgroundWorker {
       this.pending.set(id, { resolve: (data) => resolve(data as T), reject });
       worker.postMessage({ id, home, action, args });
     });
+  }
+
+  async close() {
+    const worker = this.worker;
+    this.worker = undefined;
+    clearTimeout(this.idle);
+    for (const request of this.pending.values())
+      request.reject(new CoreError("NOT_FOUND", "Background work stopped."));
+    this.pending.clear();
+    if (worker) await worker.terminate();
   }
 }

@@ -6,6 +6,7 @@ export interface FolderThumbnailEntry {
   kind: "folder" | "page";
   id: string;
   updatedAt: string;
+  hash?: string;
 }
 
 /**
@@ -43,6 +44,7 @@ export default memo(
                   projectId={projectId}
                   pageId={entry.id}
                   updatedAt={entry.updatedAt}
+                  hash={entry.hash}
                   padding={3}
                 />
               ) : (
@@ -64,7 +66,7 @@ export default memo(
       return (
         entry.kind === other.kind &&
         entry.id === other.id &&
-        entry.updatedAt === other.updatedAt
+        entry.updatedAt === other.updatedAt && entry.hash === other.hash
       );
     }),
 );

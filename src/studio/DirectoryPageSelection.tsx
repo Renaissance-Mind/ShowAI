@@ -1,5 +1,6 @@
 import {
   useEffect,
+  useLayoutEffect,
   useRef,
   useState,
   type PointerEvent as ReactPointerEvent,
@@ -82,6 +83,15 @@ export function useDirectoryMarquee(
 ) {
   // Pointer motion only paints this overlay; it must not render the workbench.
   const overlayRef = useRef<HTMLDivElement>(null);
+  const t = useTranslator(studioMessages);
+  const label = useRef(t);
+  label.current = t;
+  const repaint = useRef<() => void>(() => {});
+  // A navigation or toolbar render may commit while dragging; reapply the live
+  // highlight without publishing transient pointer positions to Studio.
+  useLayoutEffect(() => {
+    repaint.current();
+  });
   const latest = useRef(selection);
   latest.current = selection;
   const gesture = useRef<{
@@ -95,30 +105,77 @@ export function useDirectoryMarquee(
     active: boolean;
     previous: string[];
     wasActive: boolean;
-    entries?: (MarqueeBounds & { id: string })[];
+    entries?: (MarqueeBounds & { id: string; row: HTMLElement })[];
+    ids?: string[];
   } | null>(null);
   const suppressClick = useRef(false);
   useEffect(() => {
     let frame = 0;
     let resize: ResizeObserver | undefined;
     let changes: MutationObserver | undefined;
+    const paint = () => {
+      const current = gesture.current;
+      if (!current?.active || !current.ids) return;
+      const ids = new Set(current.ids);
+      const entries =
+        current.entries ??
+        Array.from(
+          current.element.querySelectorAll<HTMLElement>("[data-selectable]"),
+          (row) => ({ id: row.dataset.libraryId!, row }),
+        );
+      for (const entry of entries) {
+        const selected = ids.has(entry.id);
+        if (entry.row.classList.contains("selected") !== selected)
+          entry.row.classList.toggle("selected", selected);
+        const check = entry.row.querySelector(".studio-page-checkbox");
+        if (check?.getAttribute("aria-checked") !== String(selected))
+          check?.setAttribute("aria-checked", String(selected));
+      }
+      const bar = current.element
+        .closest(".studio-main")
+        ?.querySelector(".studio-page-selection");
+      const count = bar?.querySelector(".studio-page-selection-count");
+      const text = label.current("selectedPages", { count: ids.size });
+      if (count && count.textContent !== text) count.textContent = text;
+      const all = bar?.querySelector<HTMLInputElement>(
+        ".studio-page-select-all input",
+      );
+      if (all) {
+        all.checked = ids.size === entries.length;
+        all.indeterminate = ids.size > 0 && !all.checked;
+      }
+      bar
+        ?.querySelectorAll<HTMLButtonElement>(".studio-button")
+        .forEach((button) => {
+          button.disabled = !ids.size;
+        });
+    };
+    repaint.current = paint;
     const schedule = () => {
-      if (!frame) frame = requestAnimationFrame(update);
+      if (!frame) frame = requestAnimationFrame(() => update());
     };
     const invalidate = () => {
       if (!gesture.current?.active) return;
       gesture.current.entries = undefined;
       schedule();
     };
-    const finish = (cancel = false) => {
+    const finish = (cancel = false, commit = true) => {
       const current = gesture.current;
       if (!current) return;
       if (current.active) {
         suppressClick.current = true;
+        if (cancel || !commit) {
+          current.ids = cancel
+            ? current.wasActive
+              ? current.previous
+              : []
+            : latest.current.ids;
+          paint();
+        }
         if (cancel) {
           if (current.wasActive) latest.current.replace(current.previous);
           else latest.current.clear();
-        }
+        } else if (commit) latest.current.replace(current.ids ?? current.base);
       }
       gesture.current = null;
       if (current.element.hasPointerCapture(current.pointerId))
@@ -130,7 +187,7 @@ export function useDirectoryMarquee(
       current.element.removeEventListener("scroll", schedule);
       if (overlayRef.current) overlayRef.current.hidden = true;
     };
-    const update = () => {
+    const update = (final = false) => {
       frame = 0;
       const current = gesture.current;
       if (!current?.active) return;
@@ -146,6 +203,7 @@ export function useDirectoryMarquee(
           const rect = row.getBoundingClientRect();
           return {
             id: row.dataset.libraryId!,
+            row,
             left: rect.left - bounds.left + scrollLeft,
             right: rect.right - bounds.left + scrollLeft,
             top: rect.top - bounds.top + scrollTop,
@@ -180,18 +238,18 @@ export function useDirectoryMarquee(
           Math.min(bounds.bottom, bottom) - Math.max(bounds.top, top),
         ),
       };
-      latest.current.replace(
-        marqueeIds(
-          current.entries,
-          {
-            left: left - bounds.left + scrollLeft,
-            right: right - bounds.left + scrollLeft,
-            top: top - bounds.top + scrollTop,
-            bottom: bottom - bounds.top + scrollTop,
-          },
-          current.base,
-        ),
+      const ids = marqueeIds(
+        current.entries,
+        {
+          left: left - bounds.left + scrollLeft,
+          right: right - bounds.left + scrollLeft,
+          top: top - bounds.top + scrollTop,
+          bottom: bottom - bounds.top + scrollTop,
+        },
+        current.base,
       );
+      current.ids = ids;
+      paint();
       if (overlayRef.current) {
         const overlay = overlayRef.current;
         overlay.hidden = false;
@@ -202,7 +260,7 @@ export function useDirectoryMarquee(
       }
       // Keep ticking only while the pointer actually moves the scroll position.
       const delta = speed(clientY, bounds.top, bounds.bottom);
-      if (delta) {
+      if (delta && !final) {
         element.scrollTop = scrollTop + delta;
         if (element.scrollTop !== scrollTop) schedule();
       }
@@ -225,6 +283,7 @@ export function useDirectoryMarquee(
         )
           return;
         current.active = true;
+        latest.current.replace(current.base);
         current.element.setPointerCapture(current.pointerId);
         resize = new ResizeObserver(invalidate);
         resize.observe(current.element);
@@ -246,7 +305,7 @@ export function useDirectoryMarquee(
         gesture.current.clientY = event.clientY;
         cancelAnimationFrame(frame);
         frame = 0;
-        update();
+        update(true);
       } else if (!gesture.current.base.length) latest.current.clear();
       finish();
     };
@@ -257,7 +316,7 @@ export function useDirectoryMarquee(
         (gesture.current || latest.current.active)
       ) {
         event.preventDefault();
-        finish();
+        finish(false, false);
         latest.current.clear();
       }
     };
@@ -270,7 +329,8 @@ export function useDirectoryMarquee(
       window.addEventListener("resize", invalidate);
     }
     return () => {
-      finish();
+      finish(false, false);
+      repaint.current = () => {};
       window.removeEventListener("pointermove", move);
       window.removeEventListener("pointerup", up);
       window.removeEventListener("pointercancel", cancel);
@@ -452,7 +512,9 @@ export function BatchPagesDialog({
   );
   // Folders move only within their project, and never into themselves.
   const movingFolders = new Set(
-    targets.filter((target) => target.kind === "folder").map((target) => target.id),
+    targets
+      .filter((target) => target.kind === "folder")
+      .map((target) => target.id),
   );
   const insideMovingFolder = (folder: FolderMetadata) => {
     const seen = new Set<string>();
@@ -503,10 +565,9 @@ export function BatchPagesDialog({
         </p>
         {movingFolders.size > 0 && (
           <p className="studio-delete-description">
-            {t(
-              operation === "move" ? "moveFoldersNote" : "deleteFoldersNote",
-              { count: movingFolders.size },
-            )}
+            {t(operation === "move" ? "moveFoldersNote" : "deleteFoldersNote", {
+              count: movingFolders.size,
+            })}
           </p>
         )}
         {operation === "move" && (

@@ -1605,11 +1605,11 @@ button.studio-tree-chevron:hover {
 .studio-page-thumbnail .catalog-preview-content > .container-workspace {
   height: auto;
 }
-.studio-page-thumbnail[data-board] .catalog-preview-content {
+.studio-page-thumbnail-content[data-board] .catalog-preview-content {
   padding: 0;
   min-height: 0;
 }
-.studio-page-thumbnail[data-board]
+.studio-page-thumbnail-content[data-board]
   .catalog-preview-content
   > .container-workspace {
   width: var(--board-width);
@@ -1726,6 +1726,26 @@ button.studio-tree-chevron:hover {
 }
 
 .studio-page-thumbnail .native-ink-world { transform: var(--thumbnail-transform); }
+
+.studio-page-thumbnail-content {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.studio-page-thumbnail > img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+}
+.page-capture-stage.studio-page-thumbnail {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  content-visibility: visible;
+}
 
 .studio-directory-marquee {
   position: fixed;

@@ -296,15 +296,15 @@ try {
 
   const studio = join(fixture, "src/studio/Studio.tsx");
   const studioSource = await readFile(studio, "utf8");
-  assert.ok(studioSource.includes('t("newProject")'));
+  assert.ok(studioSource.includes('className="studio-main"'));
   await writeFile(
     studio,
-    studioSource.replaceAll('t("newProject")', 't("newProject") + "热更新"'),
+    studioSource.replace(
+      'className="studio-main"',
+      'className="studio-main" data-development-smoke="live"',
+    ),
   );
-  await page
-    .getByRole("button", { name: "新建项目热更新", exact: true })
-    .first()
-    .waitFor();
+  await page.locator('[data-development-smoke="live"]').waitFor();
   assert.equal((await receipt()).backendPid, original.backendPid);
   record("React source updates through HMR without restarting the backend");
   const portable = join(fixture, "src/portable/main.tsx");
@@ -615,10 +615,33 @@ try {
     browser = await chromium.connectOverCDP(`http://127.0.0.1:${debugPort}`);
   }
   const updatedPage =
-    mode === "desktop" ? browser.contexts()[0].pages()[0] : page;
+    mode === "desktop"
+      ? await poll(
+          async () =>
+            browser
+              .contexts()[0]
+              .pages()
+              .find(
+                (candidate) => candidate.url().split("?")[0] === original.url,
+              ),
+          Boolean,
+          "restarted workbench window",
+        )
+      : page;
   await updatedPage.waitForFunction(() => !!window.showai);
   await poll(
-    () => updatedPage.evaluate(() => window.showai.invoke("projects:list")),
+    async () => {
+      try {
+        return await updatedPage.evaluate(() =>
+          window.showai.invoke("projects:list"),
+        );
+      } catch (error) {
+        // The native restart and the guarded renderer reload can overlap.
+        if (String(error).includes("Execution context was destroyed"))
+          return [];
+        throw error;
+      }
+    },
     (value) => value.some((item) => item.id === project.id),
     "API reconnect",
   );

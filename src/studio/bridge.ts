@@ -6,6 +6,7 @@ import type {
 import type { Locale } from "../i18n";
 import type { TabCommand } from "../workbench/tab-shortcuts";
 export interface DesktopBridge {
+  pageThumbnails?: boolean;
   inlineInk?: import("../surface/inline-ink").InlineInkBridge;
   openWindow?(
     args: Record<string, unknown>,

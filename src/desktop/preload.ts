@@ -22,6 +22,7 @@ if (process.isMainFrame) {
     ipcRenderer.send("showai:close-result", { requestId, allow });
   });
   const bridge: ShowAIBridge = {
+    pageThumbnails: true,
     setAppearance(appearance) {
       return ipcRenderer.invoke("showai:set-appearance", appearance);
     },
@@ -45,15 +46,24 @@ if (process.isMainFrame) {
       args: Record<string, unknown> = {},
     ): Promise<T> {
       const result = (
+        action === "pages:thumbnail" ||
+        action === "pages:thumbnailCancel" ||
+        action === "pages:previewData" ||
         action === "components:thumbnail" ||
         action === "components:thumbnailCancel" ||
         action === "components:previewData"
           ? await ipcRenderer.invoke(
-              action === "components:thumbnail"
-                ? "showai:thumbnail"
-                : action === "components:thumbnailCancel"
+              action.startsWith("pages:")
+                ? action === "pages:thumbnailCancel"
                   ? "showai:thumbnail-cancel"
-                  : "showai:previewData",
+                  : action === "pages:previewData"
+                    ? "showai:previewData"
+                    : "showai:pages:thumbnail"
+                : action === "components:thumbnail"
+                  ? "showai:thumbnail"
+                  : action === "components:thumbnailCancel"
+                    ? "showai:thumbnail-cancel"
+                    : "showai:previewData",
               args,
             )
           : await ipcRenderer.invoke("showai:invoke", action, args)

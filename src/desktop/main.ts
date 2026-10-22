@@ -2,7 +2,7 @@ import { changedResources } from "../core/change-notification";
 import { watchDatasetSources } from "../core/dataset-sources";
 import { OwnWrites } from "../core/own-writes";
 import { ModelResourceClient } from "../sync/model-resources";
-import "./component-thumbnails";
+import { configurePageThumbnails } from "./component-thumbnails";
 import {
   app,
   BrowserWindow,
@@ -32,6 +32,9 @@ import { MaintenanceScheduler } from "../core/maintenance-scheduler";
 import { syncManager } from "../sync/manager";
 import { deepLinkInvitation } from "../sync/server-url";
 import { openLibrary } from "../core/open-library";
+import { versionedLibrary } from "../core/library-runtime";
+import type { LoadedPage } from "../studio/usePage";
+import { BackgroundWorker } from "../core/background-worker";
 import { registerRuntime } from "../agent/runtime";
 import {
   DesktopPluginInstaller,
@@ -475,6 +478,27 @@ async function handle(
     await ownWrites.record(String(window.webContents.id), saved);
   return result;
 }
+
+const pagePreviewWorker = new BackgroundWorker(15000, {
+  path: join(directory, "page-preview-worker.mjs"),
+  data: {
+    compilerEntry: app.isPackaged
+      ? join(process.resourcesPath, "runtime/scripts/cli.mjs")
+      : join(repository, "package.json"),
+  },
+});
+app.on("will-quit", () => {
+  void pagePreviewWorker.close();
+});
+configurePageThumbnails({
+  authorize: trustedSender,
+  identity: async () => ({
+    home: store.root,
+    revision: (await versionedLibrary(store.root)?.head()) ?? null,
+  }),
+  load: async (_owner, args) =>
+    pagePreviewWorker.invoke<LoadedPage>(store.root, "pages:preview", args),
+});
 
 function isWorkbenchLocation(source: string): boolean {
   if (!URL.canParse(source)) return false;

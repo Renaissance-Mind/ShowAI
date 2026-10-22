@@ -281,6 +281,16 @@ const entrypoints = [
           external: ["electron"],
           format: "cjs",
         },
+        {
+          input: "src/desktop/page-preview-worker.ts",
+          output: "desktop/page-preview-worker.mjs",
+          external: [],
+          plugins: [rawSourcePlugin, {
+            name: "page-preview-compiler",
+            setup(builder) { builder.onResolve({ filter: /^esbuild$/ }, () => ({ path: join(root, "src/desktop/page-preview-compiler.ts") })); },
+          }],
+          banner,
+        },
       ]),
 ];
 async function compile() {

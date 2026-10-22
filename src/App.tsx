@@ -14,25 +14,31 @@ const Studio = lazy(() => import("./studio/Studio"));
 const ComponentPreviewPage = lazy(
   () => import("./studio/ComponentPreviewPage"),
 );
+const PagePreviewPage = lazy(() => import("./studio/PagePreviewPage"));
 export default function App() {
+  const params = new URLSearchParams(location.search);
+  const capture = params.has("componentPreview") || params.has("pagePreview");
   const theme = useAppearanceTheme();
   const locale = useLocale();
   const t = useTranslator(messages);
   useLayoutEffect(() => installIconTooltips(document), []);
   useLayoutEffect(() => installKeyboardFocus(document), []);
   useLayoutEffect(() => {
+    if (capture) return;
     const favicon = document.querySelector<HTMLLinkElement>("#showai-favicon");
     if (favicon) favicon.href = appIconForTheme(theme);
     void window.showai?.setAppearance?.(theme).catch((error) => {
       console.error("Couldn't update the desktop icon", error);
     });
-  }, [theme]);
+  }, [theme, capture]);
   useLayoutEffect(() => {
+    if (capture) return;
     void window.showai?.setLocale?.(locale).catch((error) => {
       console.error("Couldn't update the desktop language", error);
     });
-  }, [locale]);
+  }, [locale, capture]);
   const preview = new URLSearchParams(location.search).has("componentPreview");
+  const pagePreview = new URLSearchParams(location.search).has("pagePreview");
   return (
     <Suspense
       fallback={
@@ -41,7 +47,9 @@ export default function App() {
         </div>
       }
     >
-      {preview ? (
+      {pagePreview ? (
+        <PagePreviewPage />
+      ) : preview ? (
         <ComponentPreviewPage />
       ) : window.showai ? (
         <Studio />

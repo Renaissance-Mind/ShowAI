@@ -48,6 +48,28 @@ await build({
   bundle: true,
   external: ["electron"],
 });
+await build({
+  entryPoints: [join(root, "src/desktop/page-preview-worker.ts")],
+  outfile: join(root, "dist-desktop/page-preview-worker.mjs"),
+  platform: "node",
+  target: "node22",
+  format: "esm",
+  bundle: true,
+  plugins: [
+    rawSourcePlugin,
+    {
+      name: "page-preview-compiler",
+      setup(builder) {
+        builder.onResolve({ filter: /^esbuild$/ }, () => ({
+          path: join(root, "src/desktop/page-preview-compiler.ts"),
+        }));
+      },
+    },
+  ],
+  banner: {
+    js: 'import { createRequire as __cr } from "node:module"; const require = __cr(import.meta.url);',
+  },
+});
 await writeFile(
   join(root, "dist-desktop/build-info.json"),
   JSON.stringify(frontendManifest(), null, 2) + "\n",
