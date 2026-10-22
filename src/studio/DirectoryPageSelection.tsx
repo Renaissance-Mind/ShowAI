@@ -162,7 +162,7 @@ export function useDirectoryMarquee(
       );
       const ids = new Set(current.base);
       element
-        .querySelectorAll<HTMLElement>("[data-selectable-page]")
+        .querySelectorAll<HTMLElement>("[data-selectable]")
         .forEach((row) => {
           const rect = row.getBoundingClientRect();
           if (
@@ -291,6 +291,7 @@ export function DirectorySelectionBar({
   onDelete: () => void;
 }) {
   const t = useTranslator(studioMessages);
+  const tc = useTranslator(commonMessages);
   const all = total > 0 && selection.ids.length === total;
   return (
     <div
@@ -329,7 +330,7 @@ export function DirectorySelectionBar({
         onClick={onDelete}
       >
         <Trash2 size={15} />
-        {t("deletePages")}
+        {tc("delete")}
       </button>
       <button
         className="studio-icon"
@@ -406,6 +407,20 @@ export function BatchPagesDialog({
   const sameLocation = targets.every(
     (target) => target.projectId === projectId && target.parentId === parentId,
   );
+  // Folders move only within their project, and never into themselves.
+  const movingFolders = new Set(
+    targets.filter((target) => target.kind === "folder").map((target) => target.id),
+  );
+  const insideMovingFolder = (folder: FolderMetadata) => {
+    const seen = new Set<string>();
+    let current: FolderMetadata | undefined = folder;
+    while (current && !seen.has(current.id)) {
+      if (movingFolders.has(current.id)) return true;
+      seen.add(current.id);
+      current = folders.find((item) => item.id === current!.parentId);
+    }
+    return false;
+  };
   return (
     <Dialog
       title={t(operation === "move" ? "movePages" : "deletePages")}
@@ -443,6 +458,14 @@ export function BatchPagesDialog({
             { count: targets.length },
           )}
         </p>
+        {movingFolders.size > 0 && (
+          <p className="studio-delete-description">
+            {t(
+              operation === "move" ? "moveFoldersNote" : "deleteFoldersNote",
+              { count: movingFolders.size },
+            )}
+          </p>
+        )}
         {operation === "move" && (
           <>
             <label>
@@ -450,7 +473,7 @@ export function BatchPagesDialog({
               <select
                 aria-label={t("targetProject")}
                 value={projectId}
-                disabled={busy}
+                disabled={busy || movingFolders.size > 0}
                 onChange={(event) => {
                   setProjectId(event.target.value);
                   setParentId(null);
@@ -479,6 +502,7 @@ export function BatchPagesDialog({
                   {loaded ? t("projectRoot") : tc("loading")}
                 </option>
                 {folders
+                  .filter((folder) => !insideMovingFolder(folder))
                   .map((folder) => ({ folder, path: path(folder) }))
                   .sort((a, b) => a.path.localeCompare(b.path))
                   .map(({ folder, path }) => (

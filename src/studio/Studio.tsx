@@ -2468,19 +2468,16 @@ export default function Studio() {
       .slice(0, 3)
       .map(({ kind, id, updatedAt }) => ({ kind, id, updatedAt }));
   }
-  const selectablePages = visibleEntries.filter(
-    (item) => item.target.kind === "page",
-  );
   const pageSelection = useDirectoryPageSelection(
     JSON.stringify([info?.home, view, selectedProject, selectedFolder, query]),
-    selectablePages.map((item) => item.id),
+    visibleEntries.map((item) => item.id),
   );
   const directoryMarquee = useDirectoryMarquee(
     pageSelection,
     JSON.stringify([info?.home, view, selectedProject, selectedFolder, query]),
     view === "project" && !dialog,
   );
-  const selectedPageTargets = selectablePages
+  const selectedPageTargets = visibleEntries
     .filter((item) => pageSelection.ids.includes(item.id))
     .map((item) => item.target);
   function beginBatchPages(operation: "move" | "delete") {
@@ -2493,6 +2490,7 @@ export default function Studio() {
     const { operation, targets } = dialog;
     const home = info?.home;
     let completed = 0;
+    const done = new Set<string>();
     movingLibrary.current = true;
     try {
       await reorderQueue.current;
@@ -2501,15 +2499,67 @@ export default function Studio() {
         setView("page");
         return;
       }
+      const folderIds = new Set(
+        targets.filter((target) => target.kind === "folder").map((target) => target.id),
+      );
+      const insideSelectedFolder = (
+        projectId: string | null,
+        parentId: string | null,
+      ) => {
+        const seen = new Set<string>();
+        while (parentId && !seen.has(parentId)) {
+          if (folderIds.has(parentId)) return true;
+          seen.add(parentId);
+          parentId =
+            contents[projectId ?? ""]?.folders.find(
+              (item) => item.id === parentId,
+            )?.parentId ?? null;
+        }
+        return false;
+      };
+      const openInsideFolder = insideSelectedFolder(
+        page.projectId,
+        page.draft?.parentId ?? null,
+      );
       if (
         targets.some(
           (target) =>
             target.projectId === page.projectId && target.id === page.draft?.id,
-        )
+        ) ||
+        (operation === "delete" && openInsideFolder)
       ) {
         if (!(await page.clear())) return;
       }
-      for (const target of targets) {
+      // Pages go first so a page inside a selected folder is handled before its folder.
+      for (const target of [
+        ...targets.filter((target) => target.kind === "page"),
+        ...targets.filter((target) => target.kind === "folder"),
+      ]) {
+        if (target.kind === "folder") {
+          if (operation === "delete")
+            await desktop.invoke("folders:remove", {
+              expectedHome: home,
+              projectId: target.projectId,
+              folderId: target.id,
+            });
+          else {
+            if (!destination)
+              throw new Error("A destination is required to move folders.");
+            await desktop.invoke("sidebar:moveEntry", {
+              expectedHome: home,
+              kind: "folder",
+              projectId: target.projectId,
+              id: target.id,
+              destinationProjectId: destination.projectId,
+              parentId: destination.parentId,
+              placement: "after",
+            });
+          }
+          completed++;
+          done.add(target.id);
+          pageSelection.remove(target.id);
+          continue;
+        }
         const record = await desktop.invoke<LoadedPage>("pages:get", {
           expectedHome: home,
           projectId: target.projectId,
@@ -2539,6 +2589,7 @@ export default function Studio() {
           });
         }
         completed++;
+        done.add(target.id);
         page.sessions.forgetPage(target.projectId, target.id);
         pageSelection.remove(target.id);
       }
@@ -2555,6 +2606,11 @@ export default function Studio() {
       }
       pageSelection.clear();
       setDialog(null);
+      if (
+        operation === "delete" &&
+        insideSelectedFolder(selectedProject, selectedFolder)
+      )
+        setSelectedFolder(null);
       setNotice(
         t(operation === "move" ? "pagesMoved" : "pagesDeleted", {
           count: completed,
@@ -2563,7 +2619,10 @@ export default function Studio() {
     } catch (reason) {
       setDialog((current) =>
         current?.type === "batchPages"
-          ? { ...current, targets: targets.slice(completed) }
+          ? {
+              ...current,
+              targets: targets.filter((target) => !done.has(target.id)),
+            }
           : current,
       );
       throw new Error(
@@ -3329,7 +3388,7 @@ export default function Studio() {
           {view === "project" && (
             <button
               className="studio-button"
-              disabled={!selectablePages.length}
+              disabled={!visibleEntries.length}
               aria-pressed={pageSelection.active}
               onClick={() =>
                 pageSelection.active ? pageSelection.clear() : pageSelection.start()
@@ -3592,7 +3651,7 @@ export default function Studio() {
             {view === "project" && pageSelection.active && (
               <DirectorySelectionBar
                 selection={pageSelection}
-                total={selectablePages.length}
+                total={visibleEntries.length}
                 onMove={() => beginBatchPages("move")}
                 onDelete={() => beginBatchPages("delete")}
               />
@@ -3924,7 +3983,7 @@ export default function Studio() {
                               key={target.id}
                                 {...(!pageSelection.active ? libraryDrag.bindings.row(target, false) : {})}
                                 data-library-id={target.id}
-                                data-selectable-page={target.kind === "page" || undefined}
+                                data-selectable
                               className={`studio-page-list-row${pageSelection.ids.includes(target.id) ? " selected" : ""}`}
                               onContextMenu={(event) => {
                                 event.preventDefault();
@@ -3952,20 +4011,17 @@ export default function Studio() {
                                 if (anchor) showMenu(target, anchor);
                               }}
                             >
-                              {target.kind === "page" && (
-                                <button
-                                  type="button"
-                                  role="checkbox"
-                                  aria-checked={pageSelection.ids.includes(target.id)}
-                                  aria-label={t("selectPage", { title: target.title })}
-                                  className="studio-page-checkbox"
-                                  onPointerDown={(event) => event.stopPropagation()}
-                                  onClick={(event) => pageSelection.toggle(target.id, event.shiftKey)}
-                                >
-                                  {pageSelection.ids.includes(target.id) && <Check size={14} />}
-                                </button>
-                              )}
-                              {target.kind === "folder" && <span className="studio-page-checkbox-spacer" aria-hidden="true" />}
+                              <button
+                                type="button"
+                                role="checkbox"
+                                aria-checked={pageSelection.ids.includes(target.id)}
+                                aria-label={t("selectPage", { title: target.title })}
+                                className="studio-page-checkbox"
+                                onPointerDown={(event) => event.stopPropagation()}
+                                onClick={(event) => pageSelection.toggle(target.id, event.shiftKey)}
+                              >
+                                <Check size={12} strokeWidth={3} />
+                              </button>
                                 {directoryView !== "list" &&
                                   (target.kind === "page" ? (
                                     <PageThumbnail
@@ -3982,7 +4038,7 @@ export default function Studio() {
                               <button
                                 className="studio-page-list-open"
                                 onClick={(event) => {
-                                  if (pageSelection.active && target.kind === "page")
+                                  if (pageSelection.active)
                                     pageSelection.toggle(target.id, event.shiftKey);
                                   else openTargetClick(target, event);
                                 }}

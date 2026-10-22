@@ -1780,23 +1780,41 @@ button.studio-tree-chevron:hover {
   color: var(--muted);
   margin-right: auto;
 }
+/* Selection checks: a ring that fills with a tick. */
 .studio-page-checkbox {
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  width: 20px;
-  height: 20px;
+  box-sizing: border-box;
+  width: 18px;
+  height: 18px;
   padding: 0;
-  margin: 0 4px 0 8px;
-  border: 1px solid var(--muted);
-  border-radius: 4px;
+  margin: 0 4px 0 10px;
+  border: 1.5px solid color-mix(in srgb, var(--muted) 65%, transparent);
+  border-radius: 50%;
   background: var(--paper);
-  color: var(--accent);
+  color: transparent;
   opacity: 0;
+  transition:
+    opacity 0.12s ease,
+    background-color 0.12s ease,
+    border-color 0.12s ease;
+}
+.studio-page-checkbox svg {
+  transform: scale(0.5);
+  transition: transform 0.16s cubic-bezier(0.3, 1.5, 0.5, 1);
+}
+.studio-page-checkbox:hover {
+  border-color: var(--accent);
 }
 .studio-page-checkbox[aria-checked="true"] {
   border-color: var(--accent);
+  background: var(--accent);
+  color: var(--paper);
+}
+.studio-page-checkbox[aria-checked="true"] svg {
+  transform: scale(1);
 }
 .studio-page-list-row:hover .studio-page-checkbox,
 .studio-page-list-row:focus-within .studio-page-checkbox,
@@ -1805,26 +1823,40 @@ button.studio-tree-chevron:hover {
 }
 .studio-page-list-row.selected {
   background: var(--hover);
-  box-shadow: inset 3px 0 var(--accent);
 }
 .studio-page-list[data-view]:not([data-view="list"]) .studio-page-checkbox {
   position: absolute;
-  left: 12px;
-  top: 12px;
+  left: 20px;
+  top: 20px;
+  width: 22px;
+  height: 22px;
   margin: 0;
   z-index: 2;
-  box-shadow: 0 1px 4px #0002;
+  border: 1.5px solid #fff;
+  background: #00000026;
+  box-shadow: 0 1px 4px #00000040;
+  backdrop-filter: blur(3px);
+}
+.studio-page-list[data-view]:not([data-view="list"]) .studio-page-checkbox:hover {
+  background: #00000040;
+}
+.studio-page-list[data-view]:not([data-view="list"]) .studio-page-checkbox[aria-checked="true"] {
+  border-color: #fff;
+  background: var(--accent);
+}
+.studio-page-list[data-view]:not([data-view="list"]) .studio-page-list-row.selected {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent);
 }
 @media (hover: none) {
-  .studio-page-checkbox { opacity: 1; }
+  .studio-page-checkbox {
+    opacity: 1;
+  }
 }
-.studio-page-checkbox-spacer {
-  flex-shrink: 0;
-  width: 20px;
-  margin: 0 4px 0 8px;
-}
-.studio-page-list[data-view]:not([data-view="list"]) .studio-page-checkbox-spacer {
-  display: none;
+@media (prefers-reduced-motion: reduce) {
+  .studio-page-checkbox svg {
+    transition: none;
+  }
 }
 /* Page toolbar button with a visible text label (the Agent panel toggle). */
 .studio-icon.studio-icon-labeled {

@@ -57,6 +57,10 @@ try {
     parentId: folder.id,
     name: "待整理",
   });
+  const shelf = await invoke("folders:create", {
+    projectId: source.id,
+    name: "整理目标",
+  });
   const destination = await invoke("folders:create", {
     projectId: other.id,
     name: "目标资料",
@@ -84,7 +88,7 @@ try {
   const row = (id) =>
     list.locator(`.studio-page-list-row[data-library-id="${id}"]`);
   const check = (id) => row(id).getByRole("checkbox");
-  const bar = page.getByRole("region", { name: "页面批量操作" });
+  const bar = page.getByRole("region", { name: "批量操作" });
   const waitFor = async (read, accepts) => {
     const deadline = Date.now() + 15000;
     let value;
@@ -119,14 +123,14 @@ try {
   await row(pages[0].id).locator(".studio-page-list-open").click();
   await page.getByRole("textbox", { name: "页面标题", exact: true }).waitFor();
   await openFolder(source.id);
-  await page.getByRole("button", { name: "选择页面", exact: true }).click();
+  await page.getByRole("button", { name: "选择", exact: true }).click();
   assert.equal(
     await bar.getByRole("button", { name: "移动", exact: true }).isDisabled(),
     true,
   );
   assert.equal(
     await bar
-      .getByRole("button", { name: "删除页面", exact: true })
+      .getByRole("button", { name: "删除", exact: true })
       .isDisabled(),
     true,
   );
@@ -138,13 +142,13 @@ try {
   );
   await row(pages[1].id).locator(".studio-page-list-open").click();
   assert.equal((await checkedIds()).length, 2);
-  await bar.getByRole("checkbox", { name: "全选页面" }).check();
+  await bar.getByRole("checkbox", { name: "全选" }).check();
   assert.equal(
     (await checkedIds()).length,
-    4,
-    "Folders and descendant pages are excluded from select all",
+    6,
+    "Select all covers the folders and pages shown, not descendant pages",
   );
-  await bar.getByRole("checkbox", { name: "全选页面" }).uncheck();
+  await bar.getByRole("checkbox", { name: "全选" }).uncheck();
   assert.equal((await checkedIds()).length, 0);
   result.checks.push(
     "Normal opening, checkbox and Shift range selection, row toggling, select all and disabled empty actions",
@@ -164,7 +168,7 @@ try {
   await check(pages[1].id).click();
   await page.screenshot({ path: join(output, "list-selection.png") });
   await bar.getByRole("button", { name: "移动", exact: true }).click();
-  let dialog = page.getByRole("dialog", { name: "移动页面", exact: true });
+  let dialog = page.getByRole("dialog", { name: "移动所选项", exact: true });
   await dialog.getByRole("combobox", { name: "目标文件夹" }).waitFor();
   await waitFor(
     () => dialog.getByRole("combobox", { name: "目标文件夹" }).isEnabled(),
@@ -205,7 +209,7 @@ try {
   await check(pages[1].id).click();
   await page.screenshot({ path: join(output, "thumbnail-selection.png") });
   await bar.getByRole("button", { name: "移动", exact: true }).click();
-  dialog = page.getByRole("dialog", { name: "移动页面", exact: true });
+  dialog = page.getByRole("dialog", { name: "移动所选项", exact: true });
   await waitFor(
     () => dialog.getByRole("combobox", { name: "目标文件夹" }).isEnabled(),
     Boolean,
@@ -222,7 +226,7 @@ try {
   await check(pages[0].id).click();
   await check(pages[1].id).click();
   await bar.getByRole("button", { name: "移动", exact: true }).click();
-  dialog = page.getByRole("dialog", { name: "移动页面", exact: true });
+  dialog = page.getByRole("dialog", { name: "移动所选项", exact: true });
   await dialog
     .getByRole("combobox", { name: "目标项目" })
     .selectOption(other.id);
@@ -257,7 +261,7 @@ try {
   await check(pages[2].id).click();
   await check(pages[3].id).click();
   await bar.getByRole("button", { name: "移动", exact: true }).click();
-  dialog = page.getByRole("dialog", { name: "移动页面", exact: true });
+  dialog = page.getByRole("dialog", { name: "移动所选项", exact: true });
   await dialog
     .getByRole("combobox", { name: "目标项目" })
     .selectOption(other.id);
@@ -283,7 +287,7 @@ try {
   await dialog.getByRole("alert").waitFor();
   assert.match(
     await dialog.getByRole("alert").innerText(),
-    /已完成 1 个页面，剩余 1 个页面未完成/,
+    /已完成 1 项，剩余 1 项未完成/,
   );
   assert.equal((await fileDocument(firstMoved, other.id)).parentId, null);
   await moveOne(concurrentPage, concurrent.id, source.id);
@@ -298,23 +302,65 @@ try {
   await openFolder(destination.id);
   await check(pages[0].id).click();
   await check(pages[1].id).click();
-  await bar.getByRole("button", { name: "删除页面", exact: true }).click();
-  dialog = page.getByRole("dialog", { name: "删除页面", exact: true });
-  assert.match(await dialog.innerText(), /删除选中的 2 个页面/);
+  await bar.getByRole("button", { name: "删除", exact: true }).click();
+  dialog = page.getByRole("dialog", { name: "删除所选项", exact: true });
+  assert.match(await dialog.innerText(), /删除选中的 2 项/);
   await dialog.getByRole("button", { name: "取消", exact: true }).click();
   assert.equal((await record(pages[0].id, other.id)).document.archived, false);
   assert.equal((await checkedIds()).length, 2);
-  await bar.getByRole("button", { name: "删除页面", exact: true }).click();
-  dialog = page.getByRole("dialog", { name: "删除页面", exact: true });
+  await bar.getByRole("button", { name: "删除", exact: true }).click();
+  dialog = page.getByRole("dialog", { name: "删除所选项", exact: true });
   await dialog.getByRole("button", { name: "删除", exact: true }).click();
   await dialog.waitFor({ state: "hidden" });
   assert.equal((await fileDocument(pages[0].id, other.id)).archived, true);
   assert.equal((await fileDocument(pages[1].id, other.id)).archived, true);
   assert.equal((await fileDocument(pages[2].id, other.id)).archived, false);
+  result.checks.push(
+    "Delete confirmation, cancel preserving selection, persistent batch archive and unselected-page preservation",
+  );
+
+  // Folders join batch selection; they move only inside their project and never into themselves.
+  await openFolder(source.id);
+  await page.getByRole("button", { name: "选择", exact: true }).click();
+  await check(folder.id).click();
+  await bar.getByRole("button", { name: "移动", exact: true }).click();
+  dialog = page.getByRole("dialog", { name: "移动所选项", exact: true });
+  const folderSelect = dialog.getByRole("combobox", { name: "目标文件夹" });
+  await waitFor(() => folderSelect.isEnabled(), Boolean);
+  assert.equal(
+    await dialog.getByRole("combobox", { name: "目标项目" }).isDisabled(),
+    true,
+  );
+  const options = await folderSelect
+    .locator("option")
+    .evaluateAll((items) => items.map((item) => item.value));
+  assert.equal(options.includes(folder.id), false);
+  assert.equal(options.includes(nested.id), false);
+  await folderSelect.selectOption(shelf.id);
+  await dialog.getByRole("button", { name: "移动", exact: true }).click();
+  await dialog.waitFor({ state: "hidden" });
+  const folderParent = async (id) =>
+    (await invoke("folders:list", { projectId: source.id })).find(
+      (item) => item.id === id,
+    )?.parentId;
+  assert.equal(await folderParent(folder.id), shelf.id);
+  await page.getByRole("button", { name: "选择", exact: true }).click();
+  await check(shelf.id).click();
+  await bar.getByRole("button", { name: "删除", exact: true }).click();
+  dialog = page.getByRole("dialog", { name: "删除所选项", exact: true });
+  assert.match(await dialog.innerText(), /连同里面的内容一起删除/);
+  await dialog.getByRole("button", { name: "删除", exact: true }).click();
+  await dialog.waitFor({ state: "hidden" });
+  assert.equal(
+    (await invoke("folders:list", { projectId: source.id })).some(
+      (item) => item.id === shelf.id,
+    ),
+    false,
+  );
   assert.deepEqual(errors, []);
   assert.deepEqual(await page.getByRole("alert").allTextContents(), []);
   result.checks.push(
-    "Delete confirmation, cancel preserving selection, persistent batch archive and unselected-page preservation",
+    "Folder batch move stays in the project, excludes the folder and its descendants, and batch delete archives a folder",
   );
   result.passed = true;
 } catch (error) {
