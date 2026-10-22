@@ -2,7 +2,7 @@
 #include "conditioned-klm.hpp"
 using namespace showai_boundary;
 extern "C" uint32_t sack_fixture(uint32_t fixture,void*memory,uint32_t bytes,uint32_t*output,uint32_t capacity){
-    if(fixture>14||!memory||!output||!capacity||((uintptr_t)memory&15)||((uintptr_t)output&3))return SA_INK_INVALID;
+    if(fixture>15||!memory||!output||!capacity||((uintptr_t)memory&15)||((uintptr_t)output&3))return SA_INK_INVALID;
     PolynomialContext c;if(!c.numbers.initialize(memory,bytes,1000000000ull))return c.numbers.status;
     uint32_t status=0;
     {
@@ -18,6 +18,7 @@ extern "C" uint32_t sack_fixture(uint32_t fixture,void*memory,uint32_t bytes,uin
         if(fixture==10){uint64_t bits=0x7ff8000000000000ull;copy_bytes(&e.controls[0],&bits,8);}
         if(fixture==11)e.error_l1=1;
         if(fixture==13)options.maximum_conditioning_cells=1;
+        if(fixture==15){options.source_to_pixels[0]=options.source_to_pixels[3]=0.01;}
         if(fixture==14){e.vertex_b=e.vertex_a;const double closed[8]={0,0,-1,1,1,1,0,0};for(uint32_t i=0;i<8;i++)e.controls[i]=closed[i];}
         if(fixture==12){
             const SAInkPathCommand source_commands[]={{0,0,{0,0}},{3,0,{0,1,1,1,1,0}},{4,0,{}}};
@@ -34,7 +35,7 @@ extern "C" uint32_t sack_fixture(uint32_t fixture,void*memory,uint32_t bytes,uin
         Vector<uint32_t>staged(c.numbers);staged.push_back(status);staged.push_back(reason);
         auto u64=[&](uint64_t v){staged.push_back(uint32_t(v));staged.push_back(uint32_t(v>>32));};auto number=[&](double v){uint64_t bits;copy_bytes(&bits,&v,8);u64(bits);};auto single=[&](float v){uint32_t bits;copy_bytes(&bits,&v,4);staged.push_back(bits);};
         if(!status){
-            staged.push_back(e.degree);staged.push_back(uint32_t(e.direction));for(double value:e.controls)number(value);
+            staged.push_back(e.degree);staged.push_back(uint32_t(e.direction));for(double value:e.controls)number(value);for(double value:options.source_to_pixels)number(value);
             staged.push_back(out.closure.from_vertex);staged.push_back(out.closure.to_vertex);for(double v:out.closure.from)number(v);for(double v:out.closure.to)number(v);
             staged.push_back(out.conditioning_cells);staged.push_back(out.patches.size());staged.push_back(out.vertices.size());staged.push_back(out.audits.size());
             for(const auto&p:out.patches){staged.push_back(p.mode);staged.push_back(uint32_t(p.winding));single(p.sign);staged.push_back(p.first_vertex);staged.push_back(p.vertex_count);for(double x:p.origin)number(x);}

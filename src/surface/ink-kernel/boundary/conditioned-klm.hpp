@@ -53,14 +53,25 @@ struct Cell {Q values[3][3];uint32_t depth=0;};
 inline Q gradient_lower(PolynomialContext&c,const Q f[3][3],const SAAnalyticVertex*v,uint32_t mode,const BoundaryKLMOptions&o,const Q&required,uint32_t&visited,BoundaryKLMReason&reason){
     Vector<Cell>pending(c.numbers);Cell first{};for(uint32_t i=0;i<3;i++){first.values[i][0]=Q::from_double(c.numbers,v[i].k);first.values[i][1]=Q::from_double(c.numbers,v[i].l);first.values[i][2]=Q::from_double(c.numbers,v[i].m);}pending.push_back(first);
     Q minimum=Q::from_signed(c.numbers,0);
+    Q a=Q::from_double(c.numbers,o.source_to_pixels[0]),b=Q::from_double(c.numbers,o.source_to_pixels[1]),d=Q::from_double(c.numbers,o.source_to_pixels[3]),z=Q::from_double(c.numbers,o.source_to_pixels[2]),det=a*d-b*z;
+    if(det.zero()){reason=boundary_klm_invalid;return Q(0);}
+    const Q inverse_transpose[2][2]={{d/det,-b/det},{-z/det,a/det}};
     while(!pending.empty()&&c.numbers.status==SA_INK_OK){
         if(visited++>=o.maximum_conditioning_cells){reason=boundary_klm_capacity;return Q(0);}if(!c.step())return Q(0);
         Cell cell=pending.back();pending.pop_back();Interval range[3];for(uint32_t j=0;j<3;j++){Q lo=cell.values[0][j],hi=lo;for(uint32_t i=1;i<3;i++){if(cell.values[i][j]<lo)lo=cell.values[i][j];if(cell.values[i][j]>hi)hi=cell.values[i][j];}range[j]={lo,hi};}
-        Q lower=Q::from_signed(c.numbers,0),upper=lower;
+        Q lower=Q::from_signed(c.numbers,0);Interval source_gradient[2];
         for(uint32_t axis=0;axis<2;axis++){
             Interval g;if(mode==SA_ANALYTIC_QUADRATIC)g=add(multiply(range[0],{Q(2)*f[0][axis],Q(2)*f[0][axis]}),{-f[1][axis],-f[1][axis]});
             else g=add(add(multiply(square(range[0]),{Q(3)*f[0][axis],Q(3)*f[0][axis]}),negate(multiply(range[2],{f[1][axis],f[1][axis]}))),negate(multiply(range[1],{f[2][axis],f[2][axis]})));
-            Q component=minimum_abs(g);if(component>lower)lower=component;upper+=absolute_max(g.lower,g.upper);
+            source_gradient[axis]=g;Q component=minimum_abs(g);if(component>lower)lower=component;
+        }
+        // The ramp is defined in physical pixels. Saturation must use the
+        // actual inverse-transpose metric, not a source-coordinate gradient.
+        // In particular zoom<1 widens the active band in source coordinates.
+        Q upper=Q::from_signed(c.numbers,0);
+        for(uint32_t axis=0;axis<2;axis++){
+            Interval pixel=add(multiply(source_gradient[0],{inverse_transpose[axis][0],inverse_transpose[axis][0]}),multiply(source_gradient[1],{inverse_transpose[axis][1],inverse_transpose[axis][1]}));
+            upper+=absolute_max(pixel.lower,pixel.upper);
         }
         Interval field=mode==SA_ANALYTIC_QUADRATIC?add(square(range[0]),negate(range[1])):add({range[0].lower*range[0].lower*range[0].lower,range[0].upper*range[0].upper*range[0].upper},negate(multiply(range[1],range[2])));
         // A zero derivative away from the zero set is valid: F/|grad F|
