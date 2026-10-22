@@ -6,7 +6,7 @@
 
 ## 模型
 
-- 共享数据是项目里的一个独立资源，保存一份 JSON 值，有自己的 hash 和 revision；写入只需传读到的 `baseHash`。读写用 `dataset_list`、`dataset_read`、`dataset_create`、`dataset_apply`、`dataset_delete`。`dataset_read` 同时返回本项目中使用它的页面与块（`references`）。
+- 共享数据是项目里的一个独立资源，保存一份 JSON 值，有自己的 hash 和 revision；写入只需传读到的 `baseHash`。读写用 `dataset_list`、`dataset_read`、`dataset_create`、`dataset_apply`、`dataset_delete`。`dataset_read` 同时返回本项目中使用它的页面与块（`references`）。值也可以放在内容库以外的文件里，见下文「外部文件中的数据」。
 - 组件块通过 `data.$binding` 绑定共享数据。页面只保存绑定设置和这个块自己的值；共享数据变化不会改变页面的 hash，页面的保存冲突也不涉及共享数据。
 - 组件照常收到 `{data, onChange, readOnly}`，不需要任何新接口。宿主从共享数据生成组件参数，把 `onChange` 交回的整份参数按记录 id 拆成对共享数据的修改。组件要满足两点：列表条目有稳定 `id`，收到新的 `data` 时以它为准，见 [组件设计](../../create-component/references/component-authoring.md)。
 
@@ -83,6 +83,17 @@ dataset_create({projectId, name:"全景 OKR", fromBlock:{pageId, blockId, baseHa
 6. 处理副本行：取 `bindings[].props.rows`，把副本行里只在目标页面填写的字段（如开始准备、确认、类型）抄到对应的映射行，去掉副本行，保留手填行，用一次 `component.props.set({rows})` 保存。这些字段进入 `$binding.overlay`，副本行从块中删除。
 7. 与用户一起停用原来的同步脚本，再读取两页核对一致。
 
+## 外部文件中的数据
+
+用户的数据已经在内容库以外的目录（脚本生成的 JSON、表格导出的 CSV 等），或希望数据留在某个目录里由其他工具一起维护时，用 `dataset_link` 让共享数据直接读写那个文件，而不是复制进项目。先确认 `showai_capabilities.datasets.externalFiles.available`；远程连接不能链接本机文件。
+
+- 文件格式按扩展名：`.json` 保存任意 JSON 值；`.csv`、`.tsv` 读成 `{columns, rows}`，第一行是列名，单元格读成文字、数字或 true/false。表格要有 `id` 列，写入才能按记录定位（`rows[id=m1].date`），绑定表格时用 collections 的 `from:"rows[*]"`。CSV/TSV 只能保存这种表格结构，嵌套值会被拒绝。
+- 从已有文件新建：`dataset_link({projectId, name, path:"/绝对路径/schedule.csv"})`。把项目里已有的共享数据移到新文件：`dataset_link({projectId, datasetId, path, use:"dataset"})`。用一个已有文件替换共享数据的值：`use:"file"`（两边都有数据时必须写明，替换前与用户确认）。已链接的外部数据在另一台设备上只需 `dataset_link({projectId, datasetId, path})` 链接本机的那份文件。链接永远不会覆盖已有文件。
+- 只链接用户指明的文件，不猜路径，也不链接内容库内部的文件。路径只记录在这台设备上；项目同步到其他设备时，那里会返回 `SOURCE_UNAVAILABLE`（`details.source` 带格式和文件名），`dataset_list` 标出 `source.available:false`，绑定块显示需要链接文件。把情况告诉用户，由用户在那台设备上链接自己的文件。
+- 读写与项目内的共享数据相同：每次读取都读文件，每次写入都原子地写回文件并保留原来的缩进、换行和引号；文件在别处被修改后，打开的窗口会更新，基于旧读取的写入按记录和字段合并。文件读取后又被改动时写入返回 CONFLICT，重新读取后再写。文件不可读或内容不符合 schema 时返回 `SOURCE_UNAVAILABLE` 并说明原因。
+- `dataset_link({projectId, datasetId, path:null})` 把文件当前内容复制回内容库并停止读写该文件；`dataset_delete` 只删除共享数据和链接。两者都保留文件本身。
+- 导出（html、inline、site 和工作台导出的页面源）会把外部数据作为快照写进导出文件。这样的导出先返回 `CONFIRMATION_REQUIRED`，什么也不写：`details.externalSnapshots` 列出每份外部数据的名称、文件、文件大小、写入导出的快照字节数（`snapshotBytes`）和使用它的块，以及合计。把这些告诉用户，说明快照不会随文件更新、收到导出文件的人能看到这些数据；用户同意后再用 `externalData:"embed"` 重新导出。`available:false` 表示文件现在读不到，导出后这些块不显示数据。`page_present` 的对话预览与页面图像直接显示当前数据，不需要确认。
+
 ## 其他
 
-共享数据和组件参数一样最大 8 MiB。导出、图像与 board_read 使用导出或渲染那一刻的最新数据快照；导出文件不再含绑定。页面移到其他项目后仍读原项目的共享数据（`binding.project`）。存为模板时，绑定块保存为当前数据的副本。项目同步按记录和字段合并两台设备的修改；无法合并的字段保留两份并生成说明页。
+共享数据和组件参数一样最大 8 MiB，外部文件也一样。导出、图像与 board_read 使用导出或渲染那一刻的最新数据快照；导出文件不再含绑定。页面移到其他项目后仍读原项目的共享数据（`binding.project`）。存为模板时，绑定块保存为当前数据的副本。项目同步按记录和字段合并两台设备的修改；无法合并的字段保留两份并生成说明页。

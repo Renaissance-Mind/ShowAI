@@ -195,6 +195,23 @@ export class AgentService extends CatalogService {
         this.datasets.apply(this.requireProject(projectId), datasetId, input),
     );
   }
+  datasetLink(projectId: string, input: Parameters<DatasetService["link"]>[1]) {
+    return this.mutation("Link dataset file", [projectId, input], () =>
+      this.datasets.link(this.requireProject(projectId), input),
+    );
+  }
+  datasetEmbed(projectId: string, datasetId: string, baseHash?: string) {
+    return this.mutation(
+      "Copy dataset into library",
+      [projectId, datasetId, baseHash],
+      () =>
+        this.datasets.embed(
+          this.requireProject(projectId),
+          datasetId,
+          baseHash,
+        ),
+    );
+  }
   datasetDelete(projectId: string, datasetId: string, baseHash: string) {
     return this.mutation(
       "Delete dataset",
@@ -825,6 +842,7 @@ export class AgentService extends CatalogService {
     reader?: "bundled" | "cdn";
     revision?: string;
     importedSnapshot?: { importId: string; snapshotId: string };
+    externalData?: "embed";
   }) {
     return exportPage({
       root: this.store.root,

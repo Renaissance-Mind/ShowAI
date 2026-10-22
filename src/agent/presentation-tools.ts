@@ -301,7 +301,14 @@ export function registerPresentationTools(
             "dataset_create",
             "dataset_apply",
             "dataset_delete",
+            ...(options.transport === "http" ? [] : ["dataset_link"]),
           ],
+          externalFiles: {
+            available: options.transport !== "http",
+            tool: "dataset_link",
+            formats: ["json", "csv", "tsv"],
+            exportConfirmation: { parameter: "externalData", value: "embed" },
+          },
           pageOperations: [
             "component.binding.set",
             "component.binding.remove",

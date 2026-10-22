@@ -1,4 +1,11 @@
-import { resolveDocumentDatasets } from "../core/dataset-resolution";
+import {
+  externalSnapshotReport,
+  resolveDocumentDatasets,
+  type BindingRead,
+  type ExternalSnapshotReport,
+} from "../core/dataset-resolution";
+import { CoreError } from "../core/model";
+import { visitNodes } from "../surface/document.mjs";
 import { CAPACITY, assertBytes } from "../portable/capacity.mjs";
 import {
   access,
@@ -64,6 +71,12 @@ export interface ExportOptions {
   presentation?: "spatial" | "reading";
   /** Inline prefers the compressed local reader, with CDN as a size fallback. */
   reader?: ReaderMode;
+  /**
+   * "embed" confirms embedding snapshots of datasets read from files outside
+   * the library. Without it such an export stops with CONFIRMATION_REQUIRED
+   * and the sizes, and writes nothing.
+   */
+  externalData?: "embed";
 }
 export interface ExportResult {
   format: ExportFormat;
@@ -76,6 +89,94 @@ export interface ExportResult {
   components: "bundled" | "remote";
   reader: ReaderMode;
   requiresNetwork: boolean;
+  /** Snapshots of external datasets embedded in the export. */
+  externalSnapshots?: ExternalSnapshotReport;
+}
+
+export function formatBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / 1024 / 1024).toFixed(2)} MB`;
+}
+
+/** Ids of the blocks an exported (possibly partial) document contains. */
+function blockIdsOf(document: ShowDocument): string[] {
+  const ids: string[] = [];
+  visitNodes(document.content, (node) => {
+    if (typeof node.attrs?.id === "string") ids.push(node.attrs.id);
+  });
+  return ids;
+}
+
+/**
+ * Stops an export that would embed external data the person has not
+ * agreed to, reporting what it would embed.
+ */
+export function assertExternalSnapshots(
+  report: ExternalSnapshotReport,
+  externalData: "embed" | undefined,
+): void {
+  if (!report.datasets.length || externalData === "embed") return;
+  const listed = report.datasets
+    .map(
+      (item) =>
+        `"${item.name ?? item.datasetId}" ${
+          item.available
+            ? formatBytes(item.snapshotBytes)
+            : "(file unavailable; its blocks would be exported without data)"
+        }`,
+    )
+    .join(", ");
+  const error = new CoreError(
+    "CONFIRMATION_REQUIRED",
+    `This export embeds snapshots of ${report.datasets.length} dataset(s) read from files outside the library: ${listed}; ${formatBytes(report.snapshotBytes)} in all. Nothing was written. Show these sizes to the person and export again with externalData "embed" only if they agree.`,
+  );
+  error.details = { externalSnapshots: report };
+  throw error;
+}
+
+/**
+ * What an export of these pages or blocks would embed from external
+ * datasets, without building it.
+ */
+export async function analyzeExport(options: {
+  root?: string;
+  projectId: string;
+  pageId?: string;
+  blockIds?: string[];
+}): Promise<ExternalSnapshotReport> {
+  const store = new FileStore(options.root);
+  const pages = options.pageId
+    ? [{ id: options.pageId }]
+    : await store.listPages(options.projectId, { includeArchived: false });
+  const resolved: {
+    pageId: string;
+    bindings: BindingRead[];
+    blockIds?: string[];
+  }[] = [];
+  for (const page of pages) {
+    const record = await store.readPage(options.projectId, page.id, {
+      checkpoint: false,
+    });
+    if (!options.pageId && record.document.archived) continue;
+    const { document, bindings } = await resolveDocumentDatasets(
+      store,
+      options.projectId,
+      record.document,
+    );
+    resolved.push({
+      pageId: page.id,
+      bindings,
+      ...(options.blockIds
+        ? {
+            blockIds: blockIdsOf(
+              selectDocumentBlocks(document, options.blockIds),
+            ),
+          }
+        : {}),
+    });
+  }
+  return externalSnapshotReport(resolved);
 }
 
 async function exists(path: string): Promise<boolean> {
@@ -296,12 +397,23 @@ export async function exportPage(
         checkpoint: false,
       }));
     // Shared data is resolved into the exported copy; the reader has no library.
-    const fullDocument = (
-      await resolveDocumentDatasets(store, options.projectId, record.document)
-    ).document;
+    const resolved = await resolveDocumentDatasets(
+      store,
+      options.projectId,
+      record.document,
+    );
+    const fullDocument = resolved.document;
     const sourceDocument = selection
       ? selectDocumentBlocks(fullDocument, selection.blockIds)
       : fullDocument;
+    const externalSnapshots = externalSnapshotReport([
+      {
+        pageId: options.pageId,
+        bindings: resolved.bindings,
+        ...(selection ? { blockIds: blockIdsOf(sourceDocument) } : {}),
+      },
+    ]);
+    assertExternalSnapshots(externalSnapshots, options.externalData);
     const components =
       historical?.components ??
       (await resolveDocumentComponents(
@@ -373,6 +485,7 @@ export async function exportPage(
       components: componentMode,
       reader: deliveredReader,
       requiresNetwork: deliveredReader === "cdn" || remoteComponents.length > 0,
+      ...(externalSnapshots.datasets.length ? { externalSnapshots } : {}),
     };
   }
 
@@ -390,20 +503,21 @@ export async function exportPage(
       store.readPage(options.projectId, page.id, { checkpoint: false }),
     ),
   );
-  let documents = (
+  const resolvedPages = (
     await Promise.all(
-      records.map(
-        async (record) =>
-          (
-            await resolveDocumentDatasets(
-              store,
-              options.projectId,
-              record.document,
-            )
-          ).document,
+      records.map((record) =>
+        resolveDocumentDatasets(store, options.projectId, record.document),
       ),
     )
-  ).filter((document) => options.pageId || !document.archived);
+  ).filter(({ document }) => options.pageId || !document.archived);
+  const externalSnapshots = externalSnapshotReport(
+    resolvedPages.map(({ document, bindings }) => ({
+      pageId: document.id,
+      bindings,
+    })),
+  );
+  assertExternalSnapshots(externalSnapshots, options.externalData);
+  let documents = resolvedPages.map(({ document }) => document);
   if (!documents.length)
     throw new Error("This project has no active pages to export.");
   for (const document of documents) assertOfflineImages(document);
@@ -618,5 +732,6 @@ export async function exportPage(
     components: componentMode,
     reader: "bundled",
     requiresNetwork: allRemote.length > 0,
+    ...(externalSnapshots.datasets.length ? { externalSnapshots } : {}),
   };
 }

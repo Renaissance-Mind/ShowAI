@@ -1,6 +1,6 @@
 import { createHash, randomUUID } from "node:crypto";
 import { readdir, rm, stat } from "node:fs/promises";
-import { join } from "node:path";
+import { basename, join } from "node:path";
 import { CAPACITY, assertContent } from "../portable/capacity.mjs";
 import {
   applyOperations,
@@ -27,6 +27,20 @@ import { assertProps } from "../components/custom/schema";
 import type { JsonSchema } from "../components/custom/types";
 import type { ShowDocument } from "./model";
 import { visitNodes } from "../surface/document.mjs";
+import {
+  DatasetSourceLinks,
+  externalPath,
+  fileProblem,
+  isDatasetSource,
+  readExternal,
+  serializeSource,
+  sourceFormat,
+  writeExternal,
+  type DatasetSource,
+  type ExternalFileState,
+  type ExternalRead,
+  type SourceFormat,
+} from "./dataset-sources";
 
 /** A project's shared data: one JSON value that several page blocks read and write. */
 export interface DatasetDocument {
@@ -46,6 +60,11 @@ export interface DatasetDocument {
   };
   /** Optional JSON Schema every write must satisfy. */
   schema?: JsonSchema;
+  /**
+   * The value lives in a file outside the library, linked on each device
+   * (see dataset-sources). The stored file then has no value.
+   */
+  source?: DatasetSource;
   value: unknown;
 }
 export interface DatasetRecord {
@@ -53,7 +72,16 @@ export interface DatasetRecord {
   hash: string;
   revision?: string;
   path: string;
+  /** The linked file the value was read from. */
+  external?: ExternalFileState;
 }
+/** An external source as listed: linked on this device and readable, or why not. */
+export type DatasetSourceSummary = DatasetSource & {
+  path?: string;
+  bytes?: number;
+  available: boolean;
+  error?: string;
+};
 export interface DatasetSummary {
   id: string;
   name: string;
@@ -64,6 +92,7 @@ export interface DatasetSummary {
   revision?: string;
   bytes: number;
   origin?: DatasetDocument["origin"];
+  source?: DatasetSourceSummary;
 }
 export interface DatasetReference {
   projectId: string;
@@ -158,6 +187,7 @@ export function validateDataset(
         "updatedAt",
         "origin",
         "schema",
+        "source",
         "value",
       ].includes(key)
     )
@@ -205,6 +235,10 @@ export function validateDataset(
       "INVALID_DATA",
       "A dataset schema is a JSON Schema object.",
     );
+  if (dataset.source !== undefined && !isDatasetSource(dataset.source))
+    throw new CoreError("INVALID_DATA", "Invalid dataset source.");
+  // An external dataset's stored file has no value; its file supplies it.
+  if (dataset.source && dataset.value === undefined) return dataset;
   if (!("value" in dataset))
     throw new CoreError("INVALID_DATA", "A dataset needs a value.");
   try {
@@ -238,10 +272,88 @@ export function datasetReferencesIn(
   return blocks;
 }
 
+/** The dataset as stored in the library: an external dataset keeps no value. */
+function storedDataset(dataset: DatasetDocument): Omit<
+  DatasetDocument,
+  "value"
+> & {
+  value?: unknown;
+} {
+  if (!dataset.source) return dataset;
+  const { value: _value, ...stored } = dataset;
+  return stored;
+}
+
+/** Checks a value for a dataset, naming where it came from on failure. */
+function assertDatasetValue(
+  value: unknown,
+  schema: JsonSchema | undefined,
+  origin?: string,
+) {
+  try {
+    assertJsonTree(value);
+    assertContent(value, "Dataset value", CAPACITY.datasetBytes);
+    if (schema) assertProps(schema, value);
+  } catch (error) {
+    if (!origin) invalid(error);
+    const message = error instanceof Error ? error.message : String(error);
+    throw new CoreError("INVALID_DATA", `${origin}: ${message}`);
+  }
+}
+
+function sourceUnavailable(
+  dataset: DatasetDocument,
+  path: string | undefined,
+  problem: string,
+): CoreError {
+  const error = new CoreError(
+    "SOURCE_UNAVAILABLE",
+    path
+      ? `Dataset "${dataset.name}" reads ${path}, which cannot be read on this device (${problem}). Fix or restore the file, or link another file with dataset_link.`
+      : `Dataset "${dataset.name}" reads an external file${dataset.source?.name ? ` (${dataset.source.name})` : ""} that is not linked on this device. Link it with dataset_link or in the shared data dialog.`,
+  );
+  error.details = {
+    datasetId: dataset.id,
+    name: dataset.name,
+    source: { ...dataset.source, ...(path ? { path } : {}) },
+  };
+  return error;
+}
+
+interface LoadedDataset {
+  record: DatasetRecord;
+  /** The external file as read, for a write that replaces it. */
+  read?: ExternalRead;
+}
+
+export interface DatasetLinkInput {
+  /** An existing dataset to link; omitted creates a new dataset. */
+  datasetId?: string;
+  /** New dataset id (creation only). */
+  id?: string;
+  name?: string;
+  description?: string;
+  schema?: JsonSchema;
+  /** Absolute path of a file outside the library. */
+  path: string;
+  format?: SourceFormat;
+  /**
+   * "file" adopts the file's content as the value; "dataset" writes the
+   * current value (or `value` when creating) into a new file. An existing
+   * file is never overwritten.
+   */
+  use?: "file" | "dataset";
+  /** The value of a new dataset whose file does not exist yet. */
+  value?: unknown;
+  origin?: DatasetDocument["origin"];
+}
+
 export class DatasetStore {
   private readonly files;
+  readonly links: DatasetSourceLinks;
   constructor(readonly store: FileStore) {
     this.files = store.datasetFiles();
+    this.links = new DatasetSourceLinks(store.root);
   }
   get root() {
     return this.files.root;
@@ -266,10 +378,11 @@ export class DatasetStore {
     );
   }
 
-  private async record(
+  /** The stored dataset file, without reading an external source. */
+  private async stored(
     projectId: string,
     datasetId: string,
-  ): Promise<DatasetRecord> {
+  ): Promise<{ dataset: DatasetDocument; path: string }> {
     const path = this.path(projectId, datasetId);
     let value: unknown;
     try {
@@ -279,14 +392,76 @@ export class DatasetStore {
         throw new CoreError("NOT_FOUND", `Dataset not found: ${datasetId}`);
       throw error;
     }
-    const dataset = validateDataset(value, datasetId);
+    return { dataset: validateDataset(value, datasetId), path };
+  }
+
+  /** Reads the linked file of an external dataset. */
+  private async readSource(
+    projectId: string,
+    dataset: DatasetDocument,
+    linked?: string,
+  ): Promise<ExternalRead> {
+    const path = linked ?? (await this.links.get(projectId, dataset.id));
+    if (!path) throw sourceUnavailable(dataset, undefined, "not linked");
+    let read: ExternalRead;
+    try {
+      read = await readExternal(
+        path,
+        dataset.source!.format,
+        CAPACITY.datasetBytes,
+      );
+    } catch (error) {
+      if (error instanceof CoreError) {
+        if (error.code === "CONFLICT") throw error;
+        throw sourceUnavailable(dataset, path, error.message);
+      }
+      throw sourceUnavailable(dataset, path, fileProblem(error));
+    }
+    try {
+      assertDatasetValue(read.value, dataset.schema, basename(path));
+    } catch (error) {
+      throw sourceUnavailable(
+        dataset,
+        path,
+        error instanceof Error ? error.message : String(error),
+      );
+    }
+    return read;
+  }
+
+  private async load(
+    projectId: string,
+    datasetId: string,
+  ): Promise<LoadedDataset> {
+    const { dataset: stored, path } = await this.stored(projectId, datasetId);
     const revision = await this.revision(path);
+    let dataset = stored;
+    let read: ExternalRead | undefined;
+    if (stored.source) {
+      read = await this.readSource(projectId, stored);
+      dataset = {
+        ...stored,
+        updatedAt: [stored.updatedAt, read.state.modifiedAt].sort().at(-1)!,
+        value: read.value,
+      };
+    }
     return {
-      dataset,
-      hash: datasetHash(dataset),
-      path,
-      ...(revision ? { revision } : {}),
+      record: {
+        dataset,
+        hash: datasetHash(dataset),
+        path,
+        ...(revision ? { revision } : {}),
+        ...(read ? { external: read.state } : {}),
+      },
+      ...(read ? { read } : {}),
     };
+  }
+
+  private async record(
+    projectId: string,
+    datasetId: string,
+  ): Promise<DatasetRecord> {
+    return (await this.load(projectId, datasetId)).record;
   }
 
   async read(projectId: string, datasetId: string): Promise<DatasetRecord> {
@@ -306,7 +481,39 @@ export class DatasetStore {
     for (const name of names) {
       const id = name.slice(0, -5);
       if (!/^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/.test(id)) continue;
-      const record = await this.record(projectId, id);
+      let record: DatasetRecord;
+      let source: DatasetSourceSummary | undefined;
+      try {
+        record = await this.record(projectId, id);
+        if (record.dataset.source)
+          source = {
+            ...record.dataset.source,
+            path: record.external!.path,
+            bytes: record.external!.bytes,
+            available: true,
+          };
+      } catch (error) {
+        // A missing or broken linked file still lists the dataset.
+        if (!(
+          error instanceof CoreError && error.code === "SOURCE_UNAVAILABLE"
+        ))
+          throw error;
+        const { dataset, path } = await this.stored(projectId, id);
+        const linked = (error.details?.source as { path?: string }).path;
+        source = {
+          ...dataset.source!,
+          ...(linked ? { path: linked } : {}),
+          available: false,
+          error: error.message,
+        };
+        const revision = await this.revision(path);
+        record = {
+          dataset,
+          hash: datasetHash(dataset),
+          path,
+          ...(revision ? { revision } : {}),
+        };
+      }
       summaries.push({
         id,
         name: record.dataset.name,
@@ -317,8 +524,12 @@ export class DatasetStore {
         updatedAt: record.dataset.updatedAt,
         hash: record.hash,
         ...(record.revision ? { revision: record.revision } : {}),
-        bytes: Buffer.byteLength(JSON.stringify(record.dataset.value)),
+        bytes:
+          record.dataset.value === undefined
+            ? 0
+            : Buffer.byteLength(JSON.stringify(record.dataset.value)),
         ...(record.dataset.origin ? { origin: record.dataset.origin } : {}),
+        ...(source ? { source } : {}),
       });
     }
     return summaries.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
@@ -337,7 +548,10 @@ export class DatasetStore {
       expected !== undefined
     )
       state!.expected.set(managed, state!.expected.get(managed) ?? expected);
-    await this.files.write(path, `${JSON.stringify(dataset, null, 2)}\n`);
+    await this.files.write(
+      path,
+      `${JSON.stringify(storedDataset(dataset), null, 2)}\n`,
+    );
   }
 
   async create(
@@ -355,19 +569,7 @@ export class DatasetStore {
     return this.files.lock(`dataset-${projectId}-${id}`, async () => {
       await this.files.readProject(projectId);
       const path = this.path(projectId, id);
-      const exists = await this.record(projectId, id).then(
-        () => true,
-        (error) => {
-          if (error instanceof CoreError && error.code === "NOT_FOUND")
-            return false;
-          throw error;
-        },
-      );
-      if (exists)
-        throw new CoreError(
-          "CONFLICT",
-          `A dataset with id ${id} already exists.`,
-        );
+      await this.assertAbsent(projectId, id);
       const now = new Date().toISOString();
       const dataset = validateDataset({
         format: "showai-dataset",
@@ -384,6 +586,218 @@ export class DatasetStore {
       await this.write(path, dataset, null);
       // The committing transaction attaches the new revision.
       return { dataset, hash: datasetHash(dataset), path };
+    });
+  }
+
+  private async assertAbsent(projectId: string, id: string) {
+    const exists = await this.stored(projectId, id).then(
+      () => true,
+      (error) => {
+        if (error instanceof CoreError && error.code === "NOT_FOUND")
+          return false;
+        throw error;
+      },
+    );
+    if (exists)
+      throw new CoreError(
+        "CONFLICT",
+        `A dataset with id ${id} already exists.`,
+      );
+  }
+
+  /**
+   * Keeps a dataset's value in a file outside the library: creates a dataset
+   * from a file, moves an existing dataset's value into a new file, or links
+   * this device's copy of an external dataset's file.
+   */
+  async link(
+    projectId: string,
+    input: DatasetLinkInput,
+  ): Promise<DatasetRecord & { created: boolean; wroteFile: boolean }> {
+    const path = externalPath(this.root, input.path);
+    const format = sourceFormat(path, input.format);
+    if (input.use !== undefined && !["file", "dataset"].includes(input.use))
+      throw new CoreError("INVALID_DATA", 'use is "file" or "dataset".');
+    const id =
+      input.datasetId !== undefined
+        ? assertId(input.datasetId)
+        : input.id === undefined
+          ? randomUUID()
+          : assertId(input.id);
+    return this.files.lock(`dataset-${projectId}-${id}`, async () => {
+      await this.files.readProject(projectId);
+      const exists = await stat(path).then(
+        (info) => {
+          if (!info.isFile())
+            throw new CoreError("INVALID_PATH", `${path} is not a file.`);
+          return true;
+        },
+        (error: NodeJS.ErrnoException) => {
+          if (error.code === "ENOENT") return false;
+          throw new CoreError(
+            "INVALID_PATH",
+            `Cannot use ${path}: ${fileProblem(error)}.`,
+          );
+        },
+      );
+      const use = input.use ?? (exists ? "file" : "dataset");
+      if (use === "file" && !exists)
+        throw new CoreError(
+          "NOT_FOUND",
+          `${path} does not exist. Choose an existing file, or use "dataset" to write the data into a new file.`,
+        );
+      if (use === "dataset" && exists)
+        throw new CoreError(
+          "CONFLICT",
+          `${path} already exists and is never overwritten. Choose a new file name, or use "file" to read this file instead.`,
+        );
+      const now = new Date().toISOString();
+      const source: DatasetSource = {
+        kind: "file",
+        format,
+        name: basename(path),
+      };
+      let current: LoadedDataset | undefined;
+      let base: DatasetDocument;
+      if (input.datasetId === undefined) {
+        await this.assertAbsent(projectId, id);
+        if (typeof input.name !== "string" || !input.name.trim())
+          throw new CoreError("INVALID_DATA", "A new dataset needs a name.");
+        if (use === "file" && input.value !== undefined)
+          throw new CoreError(
+            "INVALID_DATA",
+            "The file supplies the value; omit value, or choose a new file to write it into.",
+          );
+        if (use === "dataset" && input.value === undefined)
+          throw new CoreError(
+            "INVALID_DATA",
+            "Give the value to write into the new file.",
+          );
+        base = {
+          format: "showai-dataset",
+          version: 1,
+          id,
+          name: input.name.trim(),
+          ...(input.description ? { description: input.description } : {}),
+          createdAt: now,
+          updatedAt: now,
+          ...(input.origin ? { origin: input.origin } : {}),
+          ...(input.schema ? { schema: input.schema } : {}),
+          value: input.value,
+        };
+      } else {
+        if (input.value !== undefined || input.id !== undefined)
+          throw new CoreError(
+            "INVALID_DATA",
+            "Linking an existing dataset takes its value from the file or the dataset; omit value and id.",
+          );
+        const stored = await this.stored(projectId, id);
+        if (stored.dataset.source && stored.dataset.source.format !== format)
+          throw new CoreError(
+            "INVALID_DATA",
+            `This dataset reads a ${stored.dataset.source.format} file; choose a .${stored.dataset.source.format} file.`,
+          );
+        if (!stored.dataset.source && use === "file" && input.use !== "file")
+          throw new CoreError(
+            "CONFLICT",
+            `Both the dataset and ${basename(path)} hold data. Pass use "file" to replace the dataset's value with the file, or choose a new file name to write the dataset into.`,
+          );
+        if (use === "dataset") current = await this.load(projectId, id);
+        base = current?.record.dataset ?? stored.dataset;
+        if (input.name !== undefined || input.description !== undefined)
+          throw new CoreError(
+            "INVALID_DATA",
+            "Rename an existing dataset with dataset_apply.",
+          );
+      }
+      let value: unknown;
+      let wroteFile = false;
+      if (use === "dataset") {
+        value = base.value;
+        assertDatasetValue(value, base.schema);
+        await writeExternal(path, serializeSource(value, format), null).catch(
+          (error) => {
+            if (error instanceof CoreError) throw error;
+            throw new CoreError(
+              "INVALID_PATH",
+              `Cannot write ${path}: ${fileProblem(error)}.`,
+            );
+          },
+        );
+        wroteFile = true;
+      }
+      const dataset = validateDataset({
+        ...base,
+        source,
+        ...(input.datasetId === undefined || !base.source
+          ? { updatedAt: now }
+          : {}),
+        value: undefined,
+      });
+      const read = await this.readSource(projectId, dataset, path);
+      const stored = await this.stored(projectId, id).catch((error) => {
+        if (error instanceof CoreError && error.code === "NOT_FOUND")
+          return undefined;
+        throw error;
+      });
+      if (
+        !stored ||
+        canonicalJson(storedDataset(stored.dataset)) !==
+          canonicalJson(storedDataset({ ...dataset, value: undefined }))
+      )
+        await this.write(
+          this.path(projectId, id),
+          dataset,
+          stored ? ((await this.revision(stored.path)) ?? null) : null,
+        );
+      await this.links.set(projectId, id, path);
+      const loaded = {
+        ...dataset,
+        updatedAt: [dataset.updatedAt, read.state.modifiedAt].sort().at(-1)!,
+        value: read.value,
+      };
+      return {
+        dataset: loaded,
+        hash: datasetHash(loaded),
+        path: this.path(projectId, id),
+        external: read.state,
+        created: input.datasetId === undefined,
+        wroteFile,
+      };
+    });
+  }
+
+  /**
+   * Copies an external dataset's current value into the library and stops
+   * reading the file; the file itself is left as it is.
+   */
+  async embed(
+    projectId: string,
+    datasetId: string,
+    input: { baseHash?: string } = {},
+  ): Promise<DatasetRecord> {
+    return this.files.lock(`dataset-${projectId}-${datasetId}`, async () => {
+      await this.files.readProject(projectId);
+      const { record } = await this.load(projectId, datasetId);
+      if (!record.dataset.source)
+        throw new CoreError(
+          "INVALID_DATA",
+          "This dataset already keeps its value in the library.",
+        );
+      if (input.baseHash !== undefined && input.baseHash !== record.hash)
+        throw new CoreError(
+          "CONFLICT",
+          "The dataset changed since it was read.",
+          { currentHash: record.hash, currentRevision: record.revision },
+        );
+      const { source: _source, ...rest } = record.dataset;
+      const dataset = validateDataset({
+        ...rest,
+        updatedAt: new Date().toISOString(),
+      });
+      await this.write(record.path, dataset, record.revision ?? null);
+      await this.links.set(projectId, datasetId, null);
+      return { dataset, hash: datasetHash(dataset), path: record.path };
     });
   }
 
@@ -415,7 +829,8 @@ export class DatasetStore {
       );
     return this.files.lock(`dataset-${projectId}-${datasetId}`, async () => {
       await this.files.readProject(projectId);
-      const current = await this.record(projectId, datasetId);
+      const loaded = await this.load(projectId, datasetId);
+      const current = loaded.record;
       const sameBase =
         (input.baseHash === undefined || input.baseHash === current.hash) &&
         (input.baseRevision === undefined ||
@@ -477,12 +892,11 @@ export class DatasetStore {
         input.schema === null
           ? undefined
           : (input.schema ?? current.dataset.schema);
-      if (
-        !result.changed &&
-        name === current.dataset.name &&
-        description === current.dataset.description &&
-        schema === current.dataset.schema
-      )
+      const metadataChanged =
+        name !== current.dataset.name ||
+        description !== current.dataset.description ||
+        schema !== current.dataset.schema;
+      if (!result.changed && !metadataChanged)
         return { record: current, conflicts: [], changed: false };
       const { description: _old, schema: _schema, ...rest } = current.dataset;
       const dataset = validateDataset({
@@ -493,9 +907,31 @@ export class DatasetStore {
         updatedAt: new Date().toISOString(),
         value: result.value,
       });
-      await this.write(current.path, dataset, current.revision ?? null);
+      let external = current.external;
+      if (loaded.read) {
+        const { read } = loaded;
+        if (result.changed) {
+          // Serializing first rejects values the file format cannot hold.
+          const text = serializeSource(
+            dataset.value,
+            read.state.format,
+            read.layout,
+          );
+          await writeExternal(read.state.path, text, read.stamp);
+          external = (
+            await this.readSource(projectId, dataset, read.state.path)
+          ).state;
+        }
+        if (metadataChanged)
+          await this.write(current.path, dataset, current.revision ?? null);
+      } else await this.write(current.path, dataset, current.revision ?? null);
       return {
-        record: { dataset, hash: datasetHash(dataset), path: current.path },
+        record: {
+          dataset,
+          hash: datasetHash(dataset),
+          path: current.path,
+          ...(external ? { external } : {}),
+        },
         conflicts: [],
         changed: true,
       };
@@ -543,7 +979,10 @@ export class DatasetStore {
     return references;
   }
 
-  /** Deletes an unused dataset; bound blocks must be detached first. */
+  /**
+   * Deletes an unused dataset; bound blocks must be detached first. An
+   * external dataset's file is kept; only its link is removed.
+   */
   async remove(
     projectId: string,
     datasetId: string,
@@ -559,7 +998,17 @@ export class DatasetStore {
       throw error;
     }
     return this.files.lock(`dataset-${projectId}-${datasetId}`, async () => {
-      const current = await this.record(projectId, datasetId);
+      const stored = await this.stored(projectId, datasetId);
+      // An unreadable linked file still lets the dataset be deleted by its stored hash.
+      const current = await this.record(projectId, datasetId).catch((error) => {
+        if (error instanceof CoreError && error.code === "SOURCE_UNAVAILABLE")
+          return {
+            ...stored,
+            hash: datasetHash(stored.dataset),
+            revision: undefined,
+          };
+        throw error;
+      });
       if (current.hash !== input.baseHash)
         throw new CoreError(
           "CONFLICT",
@@ -569,14 +1018,16 @@ export class DatasetStore {
             currentRevision: current.revision,
           },
         );
+      const revision = current.revision ?? (await this.revision(stored.path));
       const state = libraryMutations.getStore();
-      const managed = logicalPath(this.root, current.path);
+      const managed = logicalPath(this.root, stored.path);
       if (state && managed)
         state.expected.set(
           managed,
-          state.expected.get(managed) ?? current.revision ?? null,
+          state.expected.get(managed) ?? revision ?? null,
         );
-      await this.files.remove(current.path);
+      await this.files.remove(stored.path);
+      await this.links.set(projectId, datasetId, null);
       return { removed: true as const, id: datasetId };
     });
   }

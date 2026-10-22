@@ -35,6 +35,7 @@ interface DatasetFile {
     pageId?: string;
     blockId?: string;
   };
+  source?: { kind: "file"; format: string; name?: string };
   updatedAt: string;
 }
 interface DatasetRecord {
@@ -42,6 +43,22 @@ interface DatasetRecord {
   hash: string;
   revision?: string;
   readOnly?: boolean;
+  external?: {
+    path: string;
+    format: string;
+    bytes: number;
+    modifiedAt: string;
+  };
+}
+/** Where the value of an external dataset comes from, as last read. */
+export interface DatasetSourceState {
+  format: string;
+  name?: string;
+  path?: string;
+  bytes?: number;
+  modifiedAt?: string;
+  /** False while the linked file cannot be read on this device. */
+  available: boolean;
 }
 export interface HeldConflict extends DatasetConflict {
   id: string;
@@ -69,6 +86,9 @@ export interface DatasetSnapshot {
   conflicts: HeldConflict[];
   recovered: RecoveredDraft[];
   error?: string;
+  errorCode?: string;
+  /** Present for a dataset whose value lives in a file outside the library. */
+  source?: DatasetSourceState;
   canUndo: boolean;
   canRedo: boolean;
 }
@@ -82,6 +102,14 @@ function errorCode(error: unknown): string | undefined {
   return error && typeof error === "object" && "code" in error
     ? String(error.code)
     : undefined;
+}
+/** The external source a SOURCE_UNAVAILABLE error names. */
+function unavailableSource(error: unknown): DatasetSourceState | undefined {
+  if (errorCode(error) !== "SOURCE_UNAVAILABLE") return undefined;
+  const source = (
+    error as { details?: { source?: Omit<DatasetSourceState, "available"> } }
+  ).details?.source;
+  return source ? { ...source, available: false } : undefined;
 }
 
 interface HistoryEntry {
@@ -168,6 +196,11 @@ export class DatasetSession {
       this.publish({
         status: errorCode(error) === "NOT_FOUND" ? "missing" : "error",
         error: errorText(error),
+        errorCode: errorCode(error),
+        source: unavailableSource(error),
+        name:
+          (error as { details?: { name?: string } }).details?.name ??
+          this.snapshot.name,
       });
       return;
     }
@@ -189,7 +222,12 @@ export class DatasetSession {
       } else if (draft.pending.length || draft.held.length)
         recovered.push(draft);
     }
-    this.publish({ status: "ready", recovered, error: undefined });
+    this.publish({
+      status: "ready",
+      recovered,
+      error: undefined,
+      errorCode: undefined,
+    });
     if (this.snapshot.dirty) this.scheduleSave(0);
   }
 
@@ -200,6 +238,20 @@ export class DatasetSession {
       description: record.dataset.description,
       origin: record.dataset.origin,
       readOnly: !!record.readOnly,
+      source: record.dataset.source
+        ? {
+            format: record.dataset.source.format,
+            name: record.dataset.source.name,
+            ...(record.external
+              ? {
+                  path: record.external.path,
+                  bytes: record.external.bytes,
+                  modifiedAt: record.external.modifiedAt,
+                }
+              : {}),
+            available: true,
+          }
+        : undefined,
     };
   }
 
@@ -507,7 +559,10 @@ export class DatasetSession {
       >("datasets:get", {
         projectId: this.projectId,
         datasetId: this.datasetId,
-        ifHash: this.base.hash,
+        // After a source error the same content still needs its new source details.
+        ...(this.snapshot.errorCode === "SOURCE_UNAVAILABLE"
+          ? {}
+          : { ifHash: this.base.hash }),
       });
       if ("unchanged" in result) {
         if (!!result.readOnly !== this.snapshot.readOnly)
@@ -515,14 +570,22 @@ export class DatasetSession {
         return;
       }
       this.rebase(result);
-      this.publish({ status: "ready" });
+      this.publish({ status: "ready", error: undefined, errorCode: undefined });
       if (this.snapshot.dirty) this.scheduleSave();
       await this.persistDraft();
     } catch (error) {
       this.publish(
         errorCode(error) === "NOT_FOUND"
           ? { status: "missing", error: errorText(error) }
-          : { error: errorText(error) },
+          : errorCode(error) === "SOURCE_UNAVAILABLE"
+            ? {
+                // The linked file went away: show why instead of stale values.
+                status: "error",
+                error: errorText(error),
+                errorCode: "SOURCE_UNAVAILABLE",
+                source: unavailableSource(error),
+              }
+            : { error: errorText(error) },
       );
     } finally {
       this.refreshQueued = false;

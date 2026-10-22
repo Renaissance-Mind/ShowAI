@@ -15,6 +15,8 @@ export const datasetActions = new Set([
   "datasets:get",
   "datasets:create",
   "datasets:apply",
+  "datasets:link",
+  "datasets:embed",
   "datasets:remove",
   "datasets:references",
   "datasets:draftSave",
@@ -24,6 +26,8 @@ export const datasetActions = new Set([
 export const datasetMutationActions = new Set([
   "datasets:create",
   "datasets:apply",
+  "datasets:link",
+  "datasets:embed",
   "datasets:remove",
 ]);
 
@@ -128,6 +132,27 @@ export async function handleDatasetAction(
           args.description === null ? null : optionalText(args, "description"),
       });
     }
+    case "datasets:link": {
+      const use = args.use;
+      if (use !== undefined && use !== "file" && use !== "dataset")
+        throw new CoreError("INVALID_DATA", 'use is "file" or "dataset".');
+      return datasets.link(projectId, {
+        ...(args.datasetId !== undefined
+          ? { datasetId: id(args, "datasetId") }
+          : {}),
+        ...(args.id !== undefined ? { id: id(args, "id") } : {}),
+        path: optionalText(args, "path") ?? "",
+        ...(use ? { use } : {}),
+        ...(args.name !== undefined
+          ? { name: optionalText(args, "name") }
+          : {}),
+        ...(args.value !== undefined ? { value: args.value } : {}),
+      });
+    }
+    case "datasets:embed":
+      return datasets.embed(projectId, id(args, "datasetId"), {
+        baseHash: optionalText(args, "baseHash"),
+      });
     case "datasets:remove":
       return datasets.remove(projectId, id(args, "datasetId"), {
         baseHash: optionalText(args, "baseHash") ?? "",

@@ -30,12 +30,15 @@ export async function presentPage(input: {
         input.projectId,
         input.pageId,
       );
+      // A conversation view shows external data like page images do; only
+      // file exports ask before embedding it.
       const full = await service.export({
         projectId: input.projectId,
         pageId: input.pageId,
         format: "html",
         presentation: "reading",
         out: join(directory, "page.html"),
+        externalData: "embed",
       });
       const html = await readFile(full.path, "utf8");
       const source = await readFile(full.sourcePaths[0], "utf8");
@@ -47,6 +50,7 @@ export async function presentPage(input: {
             format: "html",
             presentation: "reading",
             out: join(directory, "selection.html"),
+            externalData: "embed",
           })
         : undefined;
       const previewHtml = selected

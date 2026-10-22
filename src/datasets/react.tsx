@@ -394,6 +394,27 @@ export function BoundWidget({
         {t("loading")}
       </p>
     );
+  else if (snapshot.errorCode === "SOURCE_UNAVAILABLE")
+    body = (
+      <div className="dataset-message" role="alert">
+        <p>
+          {snapshot.source?.path
+            ? t("sourceUnreadable", {
+                name: snapshot.name ?? compiled?.dataset ?? "",
+                path: snapshot.source.path,
+              })
+            : t("sourceUnlinked", {
+                name: snapshot.name ?? compiled?.dataset ?? "",
+                file: snapshot.source?.name ?? "",
+              })}
+        </p>
+        {openSettings && (
+          <button type="button" onClick={openSettings}>
+            {t("linkSourceAction")}
+          </button>
+        )}
+      </div>
+    );
   else if (snapshot.status === "missing" || snapshot.status === "error")
     body = (
       <p className="dataset-message" role="alert">

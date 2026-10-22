@@ -46,9 +46,11 @@ const tools: Record<GuideTopic, string[]> = {
     "dataset_read",
     "dataset_create",
     "dataset_apply",
+    "dataset_link",
     "dataset_delete",
     "page_read",
     "page_apply",
+    "page_export",
   ],
   containers: [
     "catalog_describe",

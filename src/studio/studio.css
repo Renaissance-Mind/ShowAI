@@ -1017,6 +1017,37 @@ button.studio-tree-chevron:hover {
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
+.external-snapshots table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.external-snapshots th,
+.external-snapshots td {
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+  vertical-align: top;
+}
+.external-snapshots td:nth-child(3),
+.external-snapshots td:nth-child(4),
+.external-snapshots tfoot td {
+  white-space: nowrap;
+}
+.external-snapshots tfoot th {
+  text-align: right;
+}
+.external-snapshots-path {
+  overflow-wrap: anywhere;
+}
+.external-snapshots-muted {
+  color: var(--muted);
+  font-size: 12px;
+}
+.external-snapshots-warning {
+  color: #b85842;
+  font-size: 12px;
+}
 .studio-template-picker {
   padding: 6px;
 }

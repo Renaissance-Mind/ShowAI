@@ -33,6 +33,169 @@ interface Summary {
   updatedAt: string;
   hash: string;
   bytes: number;
+  source?: {
+    format: string;
+    name?: string;
+    path?: string;
+    available: boolean;
+  };
+}
+
+function formatSize(bytes: number) {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / 1024 / 1024).toFixed(2)} MB`;
+}
+
+/** Asks the host for a data file; null when the person cancels. */
+async function chooseDataFile(
+  scope: DatasetScopeValue,
+  projectId: string,
+  mode: "open" | "save",
+  name?: string,
+): Promise<string | null> {
+  const result = await scope.client.transport.invoke<{ path: string } | null>(
+    "datasets:chooseFile",
+    { projectId, mode, ...(name ? { name } : {}) },
+  );
+  return result?.path ?? null;
+}
+
+/** Where a bound dataset keeps its value, and moving it to or from a file. */
+function SourceSection({
+  scope,
+  projectId,
+  datasetId,
+  snapshot,
+}: {
+  scope: DatasetScopeValue;
+  projectId: string;
+  datasetId: string;
+  snapshot: DatasetSnapshot | undefined;
+}) {
+  const t = useTranslator(messages);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const session = scope.client.session(projectId, datasetId);
+  const source = snapshot?.source;
+  const run = async (action: () => Promise<unknown>) => {
+    setBusy(true);
+    setError("");
+    try {
+      // Unsaved edits are written first, so the file receives them.
+      if (snapshot?.status === "ready" && !(await session.flush()))
+        throw new Error(t("sourceUnsaved"));
+      await action();
+      await session.refresh();
+    } catch (caught) {
+      setError(errorMessage(caught));
+    } finally {
+      setBusy(false);
+    }
+  };
+  const link = (mode: "open" | "save") =>
+    run(async () => {
+      const path = await chooseDataFile(scope, projectId, mode, snapshot?.name);
+      if (!path) return;
+      await scope.client.transport.invoke("datasets:link", {
+        projectId,
+        datasetId,
+        path,
+        ...(mode === "save" ? { use: "dataset" } : {}),
+        // Choosing a file for library data replaces it with the file's content.
+        ...(mode === "open" && !source ? { use: "file" } : {}),
+      });
+    });
+  const embed = () =>
+    run(async () => {
+      if (
+        !window.confirm(
+          t("embedConfirm", {
+            name: snapshot?.name ?? datasetId,
+            path: source?.path ?? source?.name ?? "",
+          }),
+        )
+      )
+        return;
+      await scope.client.transport.invoke("datasets:embed", {
+        projectId,
+        datasetId,
+        ...(snapshot?.hash ? { baseHash: snapshot.hash } : {}),
+      });
+    });
+  const locked = busy || scope.readOnly;
+  return (
+    <section>
+      <h3>{t("sourceTitle")}</h3>
+      {!source ? (
+        <>
+          <p className="dataset-muted">{t("sourceLibrary")}</p>
+          <p className="dataset-muted">{t("moveToFileHint")}</p>
+          <button
+            type="button"
+            className="dataset-secondary"
+            disabled={locked || snapshot?.status !== "ready"}
+            onClick={() => void link("save")}
+          >
+            {t("moveToFile")}
+          </button>
+        </>
+      ) : (
+        <>
+          {source.available && source.path ? (
+            <>
+              <p className="dataset-source-path">
+                {t("sourceFile", { path: source.path })}
+              </p>
+              <p className="dataset-muted">
+                {t("sourceFileMeta", {
+                  format: source.format.toUpperCase(),
+                  size: formatSize(source.bytes ?? 0),
+                  time: source.modifiedAt
+                    ? new Date(source.modifiedAt).toLocaleString()
+                    : "",
+                })}
+              </p>
+            </>
+          ) : (
+            <p className="dataset-message" role="alert">
+              {source.path
+                ? t("sourceUnreadable", {
+                    name: snapshot?.name ?? datasetId,
+                    path: source.path,
+                  })
+                : t("sourceUnlinked", {
+                    name: snapshot?.name ?? datasetId,
+                    file: source.name ?? "",
+                  })}
+            </p>
+          )}
+          <div className="dataset-row">
+            <button
+              type="button"
+              disabled={locked}
+              onClick={() => void link("open")}
+            >
+              {source.available ? t("relinkFile") : t("linkFileHere")}
+            </button>
+            <button
+              type="button"
+              disabled={locked || !source.available}
+              onClick={() => void embed()}
+            >
+              {t("embedSource")}
+            </button>
+          </div>
+          <p className="dataset-muted">{t("embedHint")}</p>
+        </>
+      )}
+      {error && (
+        <p className="dataset-message" role="alert">
+          {error}
+        </p>
+      )}
+    </section>
+  );
 }
 interface Reference {
   projectId: string;
@@ -272,6 +435,12 @@ function BoundSettings({
           {t("datasetId", { id: binding.dataset })}
         </p>
       </section>
+      <SourceSection
+        scope={scope}
+        projectId={projectId}
+        datasetId={binding.dataset}
+        snapshot={snapshot}
+      />
       <section>
         <h3>{t("references")}</h3>
         <References
@@ -467,6 +636,28 @@ function BindChoices({
       setError(errorMessage(caught));
     }
   };
+  const createFromFile = async () => {
+    setBusy(true);
+    setError("");
+    try {
+      const path = await chooseDataFile(scope, scope.projectId, "open");
+      if (!path) return;
+      const file = path.split(/[\\/]/).at(-1) ?? path;
+      const record = await scope.client.transport.invoke<{
+        dataset: { id: string };
+      }>("datasets:link", {
+        projectId: scope.projectId,
+        name: file.replace(/\.[^.]+$/, "") || file,
+        path,
+      });
+      await load();
+      setChosen(record.dataset.id);
+    } catch (caught) {
+      setError(errorMessage(caught));
+    } finally {
+      setBusy(false);
+    }
+  };
   const remove = async (summary: Summary) => {
     setError("");
     try {
@@ -520,6 +711,15 @@ function BindChoices({
         {datasets && !datasets.length && (
           <p className="dataset-muted">{t("noDatasets")}</p>
         )}
+        <p className="dataset-muted">{t("createFromFileHint")}</p>
+        <button
+          type="button"
+          className="dataset-secondary"
+          disabled={busy || scope.readOnly}
+          onClick={() => void createFromFile()}
+        >
+          {t("createFromFile")}
+        </button>
         {!!datasets?.length && (
           <ul className="dataset-choices" aria-label={t("chooseDataset")}>
             {datasets.map((summary) => (
@@ -532,6 +732,18 @@ function BindChoices({
                     onChange={() => setChosen(summary.id)}
                   />
                   <span>{summary.name}</span>
+                  {summary.source && (
+                    <span
+                      className="dataset-muted"
+                      title={summary.source.path ?? summary.source.name}
+                    >
+                      {summary.source.available
+                        ? t("externalBadge", {
+                            file: summary.source.name ?? summary.source.format,
+                          })
+                        : t("externalUnavailable")}
+                    </span>
+                  )}
                   <span className="dataset-muted">
                     {t("updated", {
                       time: new Date(summary.updatedAt).toLocaleString(),

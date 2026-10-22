@@ -246,7 +246,11 @@ export type CoreErrorCode =
   | "MISSING_BASELINE"
   | "INVALID_PATH"
   | "INVALID_DATA"
-  | "LOCKED";
+  | "LOCKED"
+  /** A dataset's linked external file cannot be read on this device. */
+  | "SOURCE_UNAVAILABLE"
+  /** The action needs the person's decision first; details describe it. */
+  | "CONFIRMATION_REQUIRED";
 
 export class CoreError extends Error {
   readonly code: CoreErrorCode;

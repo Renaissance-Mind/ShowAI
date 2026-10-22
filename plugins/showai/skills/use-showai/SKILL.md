@@ -1,6 +1,6 @@
 ---
 name: use-showai
-description: 通过 ShowAI MCP 连接、查找与阅读内容，处理用户粘贴或对话附带的 ShowAI 引用与组件状态，管理项目、文件夹、侧栏、页面迁移与草稿，让多个页面的组件共用并同时修改一份共享数据，查询组件模板及引用，处理保存冲突。先按用户要的结果选择讨论、对话展示或文档路径，保存前核实连接和项目归属；对话中直接展示组件、页面创作、组件开发、模板创建分别进入专门技能。
+description: 通过 ShowAI MCP 连接、查找与阅读内容，处理用户粘贴或对话附带的 ShowAI 引用与组件状态，管理项目、文件夹、侧栏、页面迁移与草稿，让多个页面的组件共用并同时修改一份共享数据（也可直接读写内容库以外的 JSON/CSV 文件），查询组件模板及引用，处理保存冲突。先按用户要的结果选择讨论、对话展示或文档路径，保存前核实连接和项目归属；对话中直接展示组件、页面创作、组件开发、模板创建分别进入专门技能。
 ---
 
 # 使用 ShowAI
@@ -56,7 +56,7 @@ Agent 通过 MCP 操作 ShowAI。App、网页、CLI 和 MCP 共用内容核心�
 | 创建、整理或恢复项目与文件夹         | `projects_list({includeArchived?})` / `folders_list({projectId,includeArchived?})` → `project_update` / `folder_create` / `folder_update`；真实文件夹不能由同名 Page 替代，见[内容组织接口](references/runtime.md#内容组织接口)                                                            |
 | 移动页面、调整层级、分组和排序       | `entry_move` / `directory_sort`；库或远程连接用 `sidebar_read` / `sidebar_group_create` / `sidebar_group_update` / `sidebar_project_move`。先核实目标身份与权限，见[内容组织接口](references/runtime.md#内容组织接口)                                                                      |
 | 查组件或模板被哪些内容引用           | `catalog_references({projectId,kind,id,version?,integrity?})`，返回当前项目中的逻辑路径和节点 ID；正向依赖仍用 `catalog_describe({view:"dependencies"})`                                                                                                                                   |
-| 多个页面或组件共用、同时修改一份数据 | 确认 `showai_capabilities.datasets` 后读 [共享数据](references/shared-data.md) 与 `guide({topic:"datasets"})`；`dataset_list` / `dataset_read`、`dataset_create`（含 fromBlock）、`page_apply` 的 `component.binding.set`、`dataset_apply`、`dataset_delete`。不要用脚本在页面之间复制数据 |
+| 多个页面或组件共用、同时修改一份数据，或组件要读写内容库以外目录中的数据文件 | 确认 `showai_capabilities.datasets` 后读 [共享数据](references/shared-data.md) 与 `guide({topic:"datasets"})`；`dataset_list` / `dataset_read`、`dataset_create`（含 fromBlock）、`dataset_link`（外部 JSON/CSV/TSV 文件）、`page_apply` 的 `component.binding.set`、`dataset_apply`、`dataset_delete`。不要用脚本在页面之间复制数据，也不要把外部文件复制进页面 |
 | 找回或管理尚未保存的草稿             | `drafts_list` → `draft_read`；保留编辑用 `draft_save`，明确放弃用 `draft_remove`，保存一致内容后用 `draft_complete`。代次冲突保留新稿，见[草稿接口](references/runtime.md#草稿接口)                                                                                                        |
 | 用户粘贴或附带 ShowAI 引用、组件状态 | 按下文「处理用户引用」核对版本、按 ID 读取，再进入对应任务                                                                                                                                                                                                                                 |
 | 阅读数据、长页局部                   | 默认 structured；先 `detail:"outline"` 获取节点 ID，再用 `blockIds` 取局部；纯源读取用 `rendered:false`                                                                                                                                                                                    |

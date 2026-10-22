@@ -37,7 +37,12 @@ import {
   setMaintenancePolicy,
 } from "../core/maintenance-scheduler";
 import { AgentService } from "../agent/service";
-import { assertExportDestination, exportPage } from "../agent/exporter";
+import {
+  analyzeExport,
+  assertExportDestination,
+  assertExternalSnapshots,
+  exportPage,
+} from "../agent/exporter";
 import { assertId, CoreError, FileStore } from "../core/store";
 import type { PageRecord, ProjectBinding } from "../core/model";
 import { isDirectorySortBy } from "../core/directory-sort";
@@ -83,7 +88,10 @@ import type {
 } from "../components/custom/types";
 import type { ComponentManifest, JsonSchema } from "../components/custom/types";
 import type { DesktopInfo } from "../desktop/bridge";
-import { resolveDocumentDatasets } from "../core/dataset-resolution";
+import {
+  externalSnapshotReport,
+  resolveDocumentDatasets,
+} from "../core/dataset-resolution";
 import {
   datasetActions,
   datasetMutationActions,
@@ -203,8 +211,10 @@ export const workbenchActions = new Set([
   "catalog:preparePublish",
   "catalog:verifyPublish",
   "dialog:openPage",
+  "export:analyze",
   "export:page",
   "export:site",
+  "datasets:chooseFile",
   "fs:reveal",
   "settings:chooseHome",
   "clipboard:write",
@@ -295,6 +305,13 @@ function readerDelivery(
   if (args.reader !== "bundled" && args.reader !== "cdn")
     throw new CoreError("INVALID_DATA", "Choose the bundled or cdn reader.");
   return args.reader;
+}
+/** "embed" confirms embedding snapshots of datasets read from external files. */
+function externalData(args: Record<string, unknown>): "embed" | undefined {
+  if (args.externalData === undefined) return undefined;
+  if (args.externalData !== "embed")
+    throw new CoreError("INVALID_DATA", 'externalData must be "embed".');
+  return "embed";
 }
 
 export interface OpenDialogOptions {
@@ -1390,6 +1407,40 @@ export function createWorkbench(
           content: await readFile(path, "utf8"),
         };
       }
+      case "export:analyze": {
+        const id = projectId(args);
+        const page = text(args, "pageId", true);
+        return analyzeExport({
+          root: store.root,
+          projectId: id,
+          ...(page ? { pageId: assertId(page) } : {}),
+        });
+      }
+      case "datasets:chooseFile": {
+        const id = projectId(args);
+        await store.readProject(id);
+        const filters = [
+          { name: tf("filter.datasetFile"), extensions: ["json", "csv", "tsv"] },
+        ];
+        if (args.mode === "save") {
+          const selection = await host.saveDialog({
+            title: tf("title.datasetSaveFile"),
+            defaultPath: `${filename(text(args, "name", true) ?? "data")}.json`,
+            filters,
+          });
+          return selection.canceled || !selection.filePath
+            ? null
+            : { path: selection.filePath };
+        }
+        const selection = await host.openDialog({
+          title: tf("title.datasetOpenFile"),
+          properties: ["openFile"],
+          filters,
+        });
+        return selection.canceled || !selection.filePaths[0]
+          ? null
+          : { path: selection.filePaths[0] };
+      }
       case "export:page": {
         const id = projectId(args),
           page = pageId(args);
@@ -1415,9 +1466,16 @@ export function createWorkbench(
         await assertExportDestination(store.root, id, selection.filePath);
         if (format === "json") {
           // Like HTML exports, the file carries the shared data its blocks show.
-          const document = (
-            await resolveDocumentDatasets(store, id, record.document)
-          ).document;
+          const resolved = await resolveDocumentDatasets(
+            store,
+            id,
+            record.document,
+          );
+          assertExternalSnapshots(
+            externalSnapshotReport([{ pageId: page, bindings: resolved.bindings }]),
+            externalData(args),
+          );
+          const document = resolved.document;
           const source = serializeArtifact(document, record.components);
           await writeFile(selection.filePath, source, "utf8");
           return {
@@ -1435,6 +1493,7 @@ export function createWorkbench(
           presentation: text(args, "presentation", true) as
             "spatial" | "reading" | undefined,
           reader: readerDelivery(args),
+          externalData: externalData(args),
           out: selection.filePath,
           overwrite: true,
         });
@@ -1452,6 +1511,7 @@ export function createWorkbench(
           projectId: id,
           format: "site",
           components: componentDelivery(args),
+          externalData: externalData(args),
           out: selection.filePaths[0],
           overwrite: true,
         });

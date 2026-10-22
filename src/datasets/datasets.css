@@ -166,6 +166,30 @@
   color: var(--muted);
   font-size: 12px;
 }
+.dataset-dialog-body .dataset-secondary {
+  justify-self: start;
+}
+.dataset-message > button {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-control);
+  padding: 4px 10px;
+  background: var(--paper);
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+.dataset-message > button:hover {
+  background: var(--hover);
+}
+.dataset-source-path {
+  margin: 0;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+.dataset-message > p {
+  margin: 0 0 6px;
+}
 .dataset-keys {
   display: flex;
   flex-wrap: wrap;

@@ -548,7 +548,7 @@ export function createMcpServer(options: {
     "page_export",
     {
       description:
-        'Build HTML, a conversation fragment or a static site. Select page blocks with blockIds for partial HTML/inline display; partial exports default to reading layout. Bundled components are offline; remote needs verified locators. Inline requires bundled components. reader: HTML defaults offline; inline prefers the compressed local reader with CDN as a size fallback. reader:"bundled" forces offline and reader:"cdn" requests online loading. This does not upload a site.',
+        'Build HTML, a conversation fragment or a static site. Select page blocks with blockIds for partial HTML/inline display; partial exports default to reading layout. Bundled components are offline; remote needs verified locators. Inline requires bundled components. reader: HTML defaults offline; inline prefers the compressed local reader with CDN as a size fallback. reader:"bundled" forces offline and reader:"cdn" requests online loading. When blocks show datasets read from files outside the library, the call returns CONFIRMATION_REQUIRED with details.externalSnapshots (sizes per dataset) and writes nothing; show the sizes to the person and repeat with externalData:"embed" only if they agree. This does not upload a site.',
       inputSchema: {
         pageId: z.string().optional(),
         blockIds: z.array(z.string().min(1)).min(1).optional(),
@@ -558,6 +558,7 @@ export function createMcpServer(options: {
         reader: z.enum(["bundled", "cdn"]).optional(),
         out: z.string().min(1),
         overwrite: z.boolean().optional(),
+        externalData: z.literal("embed").optional(),
       },
       annotations: write,
     },
@@ -570,6 +571,7 @@ export function createMcpServer(options: {
       out,
       overwrite,
       presentation,
+      externalData,
     }) =>
       call(() =>
         service.export({
@@ -582,6 +584,7 @@ export function createMcpServer(options: {
           out,
           overwrite,
           presentation,
+          externalData,
         }),
       ),
   );

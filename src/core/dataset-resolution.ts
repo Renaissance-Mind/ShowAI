@@ -1,7 +1,9 @@
 import {
+  componentProps,
   readBinding,
   resolveBinding,
   snapshotBinding,
+  withComponentProps,
   type BindingIssue,
 } from "../datasets/binding.mjs";
 import { visitNodes } from "../surface/document.mjs";
@@ -28,7 +30,81 @@ export interface BindingRead {
   sources?: Record<string, string>;
   issues: BindingIssue[];
   error?: string;
+  /** The dataset reads a file outside the library (see dataset-sources). */
+  source?: {
+    format: string;
+    name?: string;
+    path?: string;
+    bytes?: number;
+    available: boolean;
+  };
+  /** Bytes the resolved snapshot adds to the block's stored data. */
+  snapshotBytes?: number;
 }
+
+/** One external dataset whose snapshot an export would embed. */
+export interface ExternalSnapshot {
+  projectId: string;
+  datasetId: string;
+  name?: string;
+  format: string;
+  path?: string;
+  /** Size of the linked file when it was read. */
+  fileBytes?: number;
+  /** JSON bytes the export adds for this dataset, over all its blocks. */
+  snapshotBytes: number;
+  blocks: { pageId: string; blockId: string }[];
+  /** False when the file cannot be read: its blocks are exported without data. */
+  available: boolean;
+  error?: string;
+}
+export interface ExternalSnapshotReport {
+  datasets: ExternalSnapshot[];
+  snapshotBytes: number;
+}
+
+/**
+ * Aggregates the external datasets of resolved pages, optionally limited to
+ * selected blocks, so the person can decide before their data is embedded.
+ */
+export function externalSnapshotReport(
+  pages: { pageId: string; bindings: BindingRead[]; blockIds?: string[] }[],
+): ExternalSnapshotReport {
+  const datasets = new Map<string, ExternalSnapshot>();
+  for (const page of pages)
+    for (const binding of page.bindings) {
+      if (!binding.source) continue;
+      if (page.blockIds && !page.blockIds.includes(binding.blockId)) continue;
+      const key = `${binding.projectId}/${binding.datasetId}`;
+      const entry = datasets.get(key) ?? {
+        projectId: binding.projectId,
+        datasetId: binding.datasetId,
+        ...(binding.name ? { name: binding.name } : {}),
+        format: binding.source.format,
+        ...(binding.source.path ? { path: binding.source.path } : {}),
+        ...(binding.source.bytes !== undefined
+          ? { fileBytes: binding.source.bytes }
+          : {}),
+        snapshotBytes: 0,
+        blocks: [],
+        available: binding.source.available,
+        ...(binding.error ? { error: binding.error } : {}),
+      };
+      entry.snapshotBytes += binding.snapshotBytes ?? 0;
+      entry.blocks.push({ pageId: page.pageId, blockId: binding.blockId });
+      datasets.set(key, entry);
+    }
+  const list = [...datasets.values()].sort(
+    (a, b) => b.snapshotBytes - a.snapshotBytes,
+  );
+  return {
+    datasets: list,
+    snapshotBytes: list.reduce((sum, item) => sum + item.snapshotBytes, 0),
+  };
+}
+
+const jsonBytes = (value: unknown) =>
+  Buffer.byteLength(JSON.stringify(value ?? null));
 
 /**
  * Resolves every bound block of a document. The returned document carries the
@@ -78,6 +154,14 @@ export async function resolveDocumentDatasets(
     try {
       record = await load(project, binding.dataset);
     } catch (error) {
+      if (error instanceof CoreError && error.code === "SOURCE_UNAVAILABLE") {
+        const details = error.details as {
+          name?: string;
+          source?: { format: string; name?: string; path?: string };
+        };
+        if (details.name) read.name = details.name;
+        read.source = { ...details.source!, available: false };
+      }
       read.error =
         error instanceof CoreError && error.code === "NOT_FOUND"
           ? `The dataset ${binding.dataset} is missing in project ${project}.`
@@ -86,6 +170,16 @@ export async function resolveDocumentDatasets(
             : String(error);
       continue;
     }
+    if (record.external)
+      read.source = {
+        format: record.external.format,
+        ...(record.dataset.source?.name
+          ? { name: record.dataset.source.name }
+          : {}),
+        path: record.external.path,
+        bytes: record.external.bytes,
+        available: true,
+      };
     Object.assign(read, {
       name: record.dataset.name,
       hash: record.hash,
@@ -110,10 +204,26 @@ export async function resolveDocumentDatasets(
             item.source ? formatPath(item.source) : "",
           ]),
         );
-      replacements.set(
-        blockId,
-        snapshotBinding(kind, node.attrs!.data, record.dataset.value),
+      const snapshot = snapshotBinding(
+        kind,
+        node.attrs!.data,
+        record.dataset.value,
       );
+      replacements.set(blockId, snapshot);
+      // What the dataset adds beyond the block's own values (its binding settings aside).
+      if (record.external)
+        read.snapshotBytes = Math.max(
+          0,
+          jsonBytes(snapshot) -
+            jsonBytes(
+              withComponentProps(
+                kind,
+                node.attrs!.data,
+                componentProps(kind, node.attrs!.data),
+                null,
+              ),
+            ),
+        );
     } catch (error) {
       read.error = error instanceof Error ? error.message : String(error);
     }

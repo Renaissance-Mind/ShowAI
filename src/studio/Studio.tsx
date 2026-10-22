@@ -112,6 +112,10 @@ import {
   type LibraryContextMenuItem,
 } from "./LibraryNavigation";
 import Dialog from "./Dialog";
+import {
+  ExternalSnapshotDialog,
+  type ExternalSnapshotReport,
+} from "./ExternalSnapshotDialog";
 import PageThumbnail from "./PageThumbnail";
 import {
   BatchPagesDialog,
@@ -499,6 +503,10 @@ export default function Studio() {
     setQuery("");
   }, [view]);
   const [dialog, setDialog] = useState<DialogState>(null);
+  const [snapshotDecision, setSnapshotDecision] = useState<{
+    report: ExternalSnapshotReport;
+    decide: (embed: boolean) => void;
+  } | null>(null);
   const dialogRef = useRef(dialog);
   dialogRef.current = dialog;
   const [notice, setNotice] = useState("");
@@ -1391,6 +1399,25 @@ export default function Studio() {
     await refresh();
     setNotice(t("pageImported"));
   }
+  /**
+   * Data read from files outside the library is embedded as a snapshot only
+   * after the person sees its size: "embed", undefined (none) or null (cancel).
+   */
+  async function externalDataChoice(
+    projectId: string,
+    pageId?: string,
+  ): Promise<"embed" | undefined | null> {
+    const report = await desktop.invoke<ExternalSnapshotReport>(
+      "export:analyze",
+      { projectId, ...(pageId ? { pageId } : {}) },
+    );
+    if (!report.datasets.length) return undefined;
+    const embed = await new Promise<boolean>((decide) =>
+      setSnapshotDecision({ report, decide }),
+    );
+    setSnapshotDecision(null);
+    return embed ? "embed" : null;
+  }
   async function exportPage(
     format: "html" | "json" | "inline",
     components: "bundled" | "remote" = "bundled",
@@ -1401,6 +1428,11 @@ export default function Studio() {
     setBusy(true);
     setContextMenu(null);
     try {
+      const externalData = await externalDataChoice(
+        selectedProject,
+        page.draft.id,
+      );
+      if (externalData === null) return;
       const result = await desktop.invoke<{ path: string } | null>(
         "export:page",
         {
@@ -1410,6 +1442,7 @@ export default function Studio() {
           components,
           presentation,
           reader,
+          ...(externalData ? { externalData } : {}),
         },
       );
       if (result) setNotice(t("pageExported"));
@@ -1423,9 +1456,15 @@ export default function Studio() {
     if (!selectedProject || !(await page.flush())) return;
     setBusy(true);
     try {
+      const externalData = await externalDataChoice(selectedProject);
+      if (externalData === null) return;
       const result = await desktop.invoke<{ path: string } | null>(
         "export:site",
-        { projectId: selectedProject, components },
+        {
+          projectId: selectedProject,
+          components,
+          ...(externalData ? { externalData } : {}),
+        },
       );
       if (result)
         setNotice(
@@ -4306,6 +4345,12 @@ export default function Studio() {
                     },
                   ]
             }
+          />
+        )}
+        {snapshotDecision && (
+          <ExternalSnapshotDialog
+            report={snapshotDecision.report}
+            onDecide={snapshotDecision.decide}
           />
         )}
         {dialog?.type === "pageIcon" && (

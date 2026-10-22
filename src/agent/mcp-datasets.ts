@@ -8,13 +8,17 @@ export const datasetTools = [
   "dataset_read",
   "dataset_create",
   "dataset_apply",
+  "dataset_link",
   "dataset_delete",
 ] as const;
 export const datasetWriteTools = new Set<string>([
   "dataset_create",
   "dataset_apply",
+  "dataset_link",
   "dataset_delete",
 ]);
+/** Tools that read or write files of the connected device. */
+export const datasetLocalTools = new Set<string>(["dataset_link"]);
 
 const jsonObject = z.record(z.string(), z.unknown());
 const segment = z.union([
@@ -149,6 +153,57 @@ export function registerDatasetTools(
           }),
         metadata,
       ),
+  );
+  register(
+    "dataset_link",
+    {
+      description:
+        'Keep a dataset\'s value in a file outside the content library (.json any JSON value; .csv/.tsv as {columns, rows}). Without datasetId, create a dataset from an existing file, or with value write a new file. With datasetId, move the dataset\'s value into a new file (use "dataset"), replace it with an existing file (use "file"), or link this device\'s copy of an external dataset\'s file. path null copies the current file content into the library and stops reading the file (the file is kept). Files are never overwritten by linking; later writes to the dataset write the file. The link is per device; exports that embed such data need externalData "embed" after the person agrees (see guide datasets).',
+      inputSchema: {
+        ...changeSchema,
+        datasetId: z.string().min(1).max(128).optional(),
+        path: z.union([z.string().min(1).max(4096), z.null()]),
+        format: z.enum(["json", "csv", "tsv"]).optional(),
+        use: z.enum(["file", "dataset"]).optional(),
+        name: z.string().min(1).max(200).optional(),
+        description: z.string().max(4000).optional(),
+        value: z.unknown().optional(),
+        schema: jsonObject.optional(),
+        baseHash: z.string().min(1).optional(),
+      },
+      annotations: annotations.write,
+    },
+    ({
+      datasetId,
+      path,
+      format,
+      use,
+      name,
+      description,
+      value,
+      schema,
+      baseHash,
+      ...metadata
+    }) =>
+      call(() => {
+        if (path === null) {
+          if (!datasetId)
+            throw new Error(
+              "path null needs the datasetId to copy into the library.",
+            );
+          return service.datasetEmbed(projectId, datasetId, baseHash);
+        }
+        return service.datasetLink(projectId, {
+          ...(datasetId ? { datasetId } : {}),
+          path,
+          format,
+          use,
+          name,
+          description,
+          value,
+          schema,
+        });
+      }, metadata),
   );
   register(
     "dataset_delete",

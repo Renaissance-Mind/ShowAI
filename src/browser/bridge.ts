@@ -117,6 +117,22 @@ export function installBrowserBridge() {
         defaultName: `${name}${args.format === "json" ? ".showai.json" : ".html"}`,
       };
     }
+    if (action === "datasets:chooseFile")
+      dialogs[action] =
+        args.mode === "save"
+          ? {
+              title: t("title.datasetSaveFile"),
+              kind: "save",
+              defaultName: `${String(args.name ?? "data")
+                .replace(/[<>:"/\\|?*\x00-\x1f]/g, "_")
+                .slice(0, 100)}.json`,
+              extensions: ["json", "csv", "tsv"],
+            }
+          : {
+              title: t("title.datasetOpenFile"),
+              kind: "file",
+              extensions: ["json", "csv", "tsv"],
+            };
     if (action === "settings:chooseHome") {
       const info = await request<{ home: string }>("invoke", {
         action: "app:info",

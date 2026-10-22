@@ -1,4 +1,4 @@
-import { datasetWriteTools } from "./mcp-datasets";
+import { datasetLocalTools, datasetWriteTools } from "./mcp-datasets";
 import {
   CAPACITY,
   CapacityError,
@@ -60,6 +60,7 @@ const writeTools = new Set([
   "workspace_resolve",
 ]);
 const localOnly = new Set([
+  ...datasetLocalTools,
   "component_import",
   "publication_prepare",
   "workspace_recover_package",

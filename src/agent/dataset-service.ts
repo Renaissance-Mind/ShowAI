@@ -19,6 +19,7 @@ import {
   DatasetBaselines,
   DatasetStore,
   sharedPropsSchema,
+  type DatasetLinkInput,
   type DatasetRecord,
 } from "../core/datasets";
 import { applyOperations } from "../core/diff";
@@ -208,6 +209,16 @@ export class DatasetService {
     return this.datasets.apply(projectId, datasetId, input, {
       throwOnConflict: true,
     });
+  }
+
+  /** Keeps a dataset's value in a file outside the library (see DatasetStore.link). */
+  link(projectId: string, input: DatasetLinkInput) {
+    return this.datasets.link(projectId, input);
+  }
+
+  /** Copies an external dataset's value into the library and stops reading its file. */
+  embed(projectId: string, datasetId: string, baseHash?: string) {
+    return this.datasets.embed(projectId, datasetId, { baseHash });
   }
 
   async remove(projectId: string, datasetId: string, baseHash: string) {

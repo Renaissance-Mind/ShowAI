@@ -79,6 +79,9 @@ Shared datasets (one value that blocks on several pages read and write; see guid
   datasets read DATASET --project PROJECT [--path 'objectives[id=o1]']
   datasets create --project PROJECT --name NAME --input VALUE_OR_FROM_BLOCK.json
   datasets apply DATASET --project PROJECT --input operations.json --base-hash HASH
+  datasets link [DATASET] --project PROJECT --file /abs/data.json|.csv|.tsv [--name NAME] [--use file|dataset] [--input VALUE.json]
+  datasets link DATASET --project PROJECT --embed [--base-hash HASH]
+    Keeps the value in a file outside the library (linked on this device); --embed copies it back.
   datasets delete DATASET --project PROJECT --base-hash HASH
 
 Discover only what you need:
@@ -94,6 +97,7 @@ Discover only what you need:
 Display a full page or selected blocks:
   export --project PROJECT --page PAGE [--blocks ID,ID] --format html|inline --out PATH [--reader bundled|cdn]
     html defaults to an offline page; --reader cdn writes a small online page. inline uses the CDN reader when available.
+    Pages showing data from files outside the library stop with the snapshot sizes; add --external-data embed once agreed.
 
 Read one Page through structured data, an image or interactive HTML:
   boards read PAGE --project PROJECT [--board BOARD_NODE] [--state OPTIONS.json]
@@ -133,6 +137,7 @@ function parseArguments(args: string[]): Arguments {
     "no-open",
     "draft",
     "public",
+    "embed",
   ]);
   const strings = new Set([
     "state",
@@ -216,6 +221,8 @@ function parseArguments(args: string[]): Arguments {
     "token-file",
     "registration-key-file",
     "invite",
+    "use",
+    "external-data",
   ]);
   for (let index = 0; index < args.length; index++) {
     const argument = args[index];
@@ -929,6 +936,37 @@ async function runCliCommand(argv: string[]): Promise<unknown> {
           baseHash: option(args, "base-hash", true)!,
         });
       }
+      if (action === "link") {
+        requireCount(args, 2, 3);
+        const dataset = args.positional[2];
+        if (args.options.embed) {
+          if (!dataset) throw new Error("datasets link --embed needs DATASET.");
+          return service.datasetEmbed(
+            await project(),
+            dataset,
+            option(args, "base-hash"),
+          );
+        }
+        const use = option(args, "use");
+        if (use !== undefined && !["file", "dataset"].includes(use))
+          throw new Error("--use must be file or dataset.");
+        const format = option(args, "format");
+        if (format !== undefined && !["json", "csv", "tsv"].includes(format))
+          throw new Error("--format must be json, csv or tsv.");
+        return service.datasetLink(await project(), {
+          ...(dataset ? { datasetId: dataset } : {}),
+          path: resolve(option(args, "file", true)!),
+          ...(format ? { format: format as "json" | "csv" | "tsv" } : {}),
+          ...(use ? { use: use as "file" | "dataset" } : {}),
+          ...(option(args, "name") ? { name: option(args, "name") } : {}),
+          ...(option(args, "description")
+            ? { description: option(args, "description") }
+            : {}),
+          ...(option(args, "input")
+            ? { value: await readJson(option(args, "input")!) }
+            : {}),
+        });
+      }
       if (action === "delete") {
         requireCount(args, 3);
         return service.datasetDelete(
@@ -970,6 +1008,15 @@ async function runCliCommand(argv: string[]): Promise<unknown> {
           : {}),
         presentation: option(args, "presentation") as
           "spatial" | "reading" | undefined,
+        ...(option(args, "external-data")
+          ? {
+              externalData: (() => {
+                if (option(args, "external-data") !== "embed")
+                  throw new Error("--external-data must be embed.");
+                return "embed" as const;
+              })(),
+            }
+          : {}),
       });
     }
     case "catalog": {
@@ -1410,7 +1457,7 @@ export async function runCli(argv: string[]): Promise<unknown> {
       ["current", "create", "bind"].includes(action)) ||
     (command === "pages" && ["create", "save", "apply"].includes(action)) ||
     (command === "datasets" &&
-      ["create", "apply", "delete"].includes(action)) ||
+      ["create", "apply", "link", "delete"].includes(action)) ||
     (command === "template" &&
       ["apply", "instantiate", "save", "import"].includes(action)) ||
     (command === "catalog" &&

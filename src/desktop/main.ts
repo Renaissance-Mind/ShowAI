@@ -1,4 +1,5 @@
 import { changedResources } from "../core/change-notification";
+import { watchDatasetSources } from "../core/dataset-sources";
 import { OwnWrites } from "../core/own-writes";
 import { ModelResourceClient } from "../sync/model-resources";
 import "./component-thumbnails";
@@ -77,6 +78,7 @@ let agentHost: AgentHost;
 let pluginInstaller: DesktopPluginInstaller;
 let remoteConnector: RemoteMacConnector;
 let watcher: FSWatcher | undefined;
+let sources: ReturnType<typeof watchDatasetSources> | undefined;
 let maintenance: MaintenanceScheduler | undefined;
 let notification: ReturnType<typeof setTimeout> | undefined;
 // A window already holds the record of its own save; skip that echo for it.
@@ -187,9 +189,20 @@ async function useHome(home?: string): Promise<void> {
   if (store) await syncManager(store.root).stop();
   await maintenance?.stop();
   await watcher?.close();
+  await sources?.close();
   ownWrites.clear();
   store = new FileStore(home);
   await openLibrary(store.root);
+  // Linked external files of datasets refresh the blocks bound to them.
+  sources = watchDatasetSources(store.root, (datasets) =>
+    broadcast("files", {
+      type: "files",
+      home: store.root,
+      projectIds: [],
+      pageIds: [],
+      datasets,
+    }),
+  );
   service = new AgentService({ root: store.root });
   await registerRuntime(store.root, info().cli);
   maintenance = new MaintenanceScheduler(store.root).start();
@@ -938,6 +951,7 @@ else {
       agentHost?.close();
       clearTimeout(notification);
       await watcher?.close();
+      await sources?.close();
       await maintenance?.stop();
       await syncManager(store.root).stop();
       for (const window of windows) if (!window.isDestroyed()) window.destroy();

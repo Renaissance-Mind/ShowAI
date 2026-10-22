@@ -78,6 +78,30 @@ export default defineMessages("datasets", {
     close: "关闭",
     invalidJson: "绑定设置不是有效的 JSON：{error}",
     issueCount: { one: "{count} 条映射提示", other: "{count} 条映射提示" },
+    sourceTitle: "数据来源",
+    sourceLibrary: "数据保存在内容库中。",
+    sourceFile: "外部文件：{path}",
+    sourceFileMeta: "{format} · {size} · 修改于 {time}",
+    sourceUnreadable:
+      "共享数据「{name}」读取的外部文件 {path} 现在无法读取。修复文件或重新链接后会自动恢复显示。",
+    sourceUnlinked:
+      "共享数据「{name}」读取外部文件「{file}」，这台设备还没有链接它。",
+    sourceUnsaved: "还有未保存的修改，保存完成后再更改数据来源。",
+    linkSourceAction: "链接文件…",
+    moveToFile: "移到外部文件…",
+    moveToFileHint:
+      "把当前数据写入一个新的 JSON、CSV 或 TSV 文件。之后的修改都写入该文件，内容库只记录文件位置；其他设备需要各自链接自己的文件。CSV/TSV 只能保存 { columns, rows } 形式的表格数据。",
+    relinkFile: "更换文件…",
+    linkFileHere: "链接本机文件…",
+    embedSource: "复制到内容库",
+    embedHint: "复制到内容库后不再读写这个文件，文件本身保留。",
+    embedConfirm:
+      "把「{name}」的当前数据复制到内容库，并停止读写 {path}？文件本身会保留。",
+    createFromFile: "从外部文件创建…",
+    createFromFileHint:
+      "也可以直接读取内容库以外的 JSON、CSV 或 TSV 文件。组件中的修改会写回该文件，文件在别处被修改后组件会自动更新。",
+    externalBadge: "外部文件 · {file}",
+    externalUnavailable: "外部文件不可用",
   },
   en: {
     shared: "Shared data",
@@ -164,5 +188,31 @@ export default defineMessages("datasets", {
     close: "Close",
     invalidJson: "The binding settings are not valid JSON: {error}",
     issueCount: { one: "{count} mapping note", other: "{count} mapping notes" },
+    sourceTitle: "Data source",
+    sourceLibrary: "The data is stored in the content library.",
+    sourceFile: "External file: {path}",
+    sourceFileMeta: "{format} · {size} · modified {time}",
+    sourceUnreadable:
+      "Shared data “{name}” reads {path}, which can't be read right now. It reappears once the file is fixed or linked again.",
+    sourceUnlinked:
+      "Shared data “{name}” reads the external file “{file}”, which isn't linked on this device yet.",
+    sourceUnsaved:
+      "Some changes are not saved yet. Change the data source after they are saved.",
+    linkSourceAction: "Link file…",
+    moveToFile: "Move to an external file…",
+    moveToFileHint:
+      "Writes the current data into a new JSON, CSV or TSV file. Later changes are written to that file and the library only records where it is; other devices link their own copy. CSV/TSV hold table data as { columns, rows }.",
+    relinkFile: "Change file…",
+    linkFileHere: "Link a file on this device…",
+    embedSource: "Copy into the library",
+    embedHint:
+      "After copying into the library the file is no longer read or written; the file itself is kept.",
+    embedConfirm:
+      "Copy the current data of “{name}” into the library and stop reading and writing {path}? The file is kept.",
+    createFromFile: "Create from an external file…",
+    createFromFileHint:
+      "Shared data can also read a JSON, CSV or TSV file outside the library. Edits in components are written back to the file, and changes made elsewhere update the components.",
+    externalBadge: "External file · {file}",
+    externalUnavailable: "External file unavailable",
   },
 });

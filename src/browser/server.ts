@@ -1,5 +1,6 @@
 import { CAPACITY, formatBytes } from "../portable/capacity.mjs";
 import { changedResources } from "../core/change-notification";
+import { watchDatasetSources } from "../core/dataset-sources";
 import { OwnWrites } from "../core/own-writes";
 import { ModelResourceClient } from "../sync/model-resources";
 import { createServer, type ServerResponse } from "node:http";
@@ -95,6 +96,7 @@ export async function startBrowserServer(options: BrowserServerOptions) {
     typeof value === "string" && /^[\w-]{1,100}$/.test(value) ? value : "";
   let timer: ReturnType<typeof setTimeout> | undefined;
   let watcher!: ReturnType<typeof watch>;
+  let sources: ReturnType<typeof watchDatasetSources> | undefined;
   let maintenance: MaintenanceScheduler | undefined;
   let origin = options.development?.origin ?? "";
   const info = (): DesktopInfo => ({
@@ -139,6 +141,17 @@ export async function startBrowserServer(options: BrowserServerOptions) {
     store = new FileStore(home);
     ownWrites.clear();
     await openLibrary(store.root);
+    await sources?.close();
+    // Linked external files of datasets refresh the blocks bound to them.
+    sources = watchDatasetSources(store.root, (datasets) =>
+      notify("files", {
+        type: "files",
+        home: store.root,
+        projectIds: [],
+        pageIds: [],
+        datasets,
+      }),
+    );
     service = new AgentService({ root: store.root });
     if (options.registerAgentRuntime !== false)
       await registerRuntime(store.root, info().cli);
@@ -596,6 +609,7 @@ export async function startBrowserServer(options: BrowserServerOptions) {
   } catch (error) {
     clearInterval(heartbeat);
     await watcher.close();
+    await sources?.close();
     throw error;
   }
   async function close() {
@@ -607,6 +621,7 @@ export async function startBrowserServer(options: BrowserServerOptions) {
     clearInterval(heartbeat);
     clearTimeout(timer);
     await watcher.close();
+    await sources?.close();
     await maintenance?.stop();
     for (const client of clients.keys()) client.end();
     await new Promise<void>((done, reject) => {
