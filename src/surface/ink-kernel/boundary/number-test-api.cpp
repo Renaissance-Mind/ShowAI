@@ -1,5 +1,6 @@
 #include "number.hpp"
 #include "polynomial.hpp"
+#include "algebra.hpp"
 // This translation unit is compiled only by the exact-kernel tests. It does
 // not add a public document/API format or enter the production WASM module.
 using namespace showai_boundary;
@@ -36,3 +37,12 @@ extern "C" uint32_t sabt_polynomial_roots(const double*values,uint32_t count,uin
     Vector<uint32_t>staged(c.numbers);for(const Root&root:r){const Q*pair[2]={&root.lower,&root.upper};for(const Q*value:pair){staged.push_back((uint32_t)value->sign());staged.push_back(value->numerator().size());staged.push_back(value->denominator().size());for(uint32_t k=0;k<value->numerator().size();k++)staged.push_back(value->numerator().data()[k]);for(uint32_t k=0;k<value->denominator().size();k++)staged.push_back(value->denominator().data()[k]);}
     }if(c.numbers.status!=SA_INK_OK)return c.numbers.status;if(staged.size()>capacity)return SA_INK_CAPACITY;const auto&frozen=staged;for(uint32_t i=0;i<frozen.size();i++)output[i]=frozen[i];metadata[0]=(int32_t)r.size();metadata[1]=(int32_t)staged.size();metadata[2]=0;metadata[3]=(int32_t)c.numbers.work;metadata[4]=(int32_t)(c.numbers.work>>32);metadata[5]=(int32_t)c.numbers.peak_bytes;metadata[6]=(int32_t)c.polynomial.operations;metadata[7]=0;return SA_INK_OK;
 }
+
+extern "C" uint32_t sabt_curve_pair(const double*a,uint32_t ac,const double*b,uint32_t bc,void*memory,uint32_t bytes,uint64_t work_limit,uint32_t*output,uint32_t capacity,int32_t*metadata){
+    if(!a||!b||ac<2||ac>4||bc<2||bc>4||!output||!metadata||capacity<2048||((uintptr_t)a&7u)||((uintptr_t)b&7u)||((uintptr_t)output&3u)||((uintptr_t)metadata&3u)||overlap(memory,bytes,a,uint64_t(ac)*16)||overlap(memory,bytes,b,uint64_t(bc)*16)||overlap(memory,bytes,output,uint64_t(capacity)*4)||overlap(memory,bytes,metadata,32)||overlap(output,uint64_t(capacity)*4,a,uint64_t(ac)*16)||overlap(output,uint64_t(capacity)*4,b,uint64_t(bc)*16)||overlap(output,uint64_t(capacity)*4,metadata,32)||overlap(metadata,32,a,uint64_t(ac)*16)||overlap(metadata,32,b,uint64_t(bc)*16))return SA_INK_INVALID;
+    PolynomialContext c;if(!c.numbers.initialize(memory,bytes,work_limit))return c.numbers.status;Point ap[4],bp[4];for(uint32_t i=0;i<ac;i++)ap[i]={Q::from_double(c.numbers,a[2*i]),Q::from_double(c.numbers,a[2*i+1])};for(uint32_t i=0;i<bc;i++)bp[i]={Q::from_double(c.numbers,b[2*i]),Q::from_double(c.numbers,b[2*i+1])};auto A=from_controls(c,ap,ac),B=from_controls(c,bp,bc);auto proof=curve_pair(A,B);if(c.numbers.status!=SA_INK_OK)return c.numbers.status;if(!proof.complete)return SA_INK_RANGE;Vector<uint32_t>staged(c.numbers);
+    auto encode=[&](const Q&value){staged.push_back(uint32_t(value.sign()));staged.push_back(value.numerator().size());staged.push_back(value.denominator().size());for(uint32_t i=0;i<value.numerator().size();i++)staged.push_back(value.numerator().data()[i]);for(uint32_t i=0;i<value.denominator().size();i++)staged.push_back(value.denominator().data()[i]);};
+    if(proof.coincident){encode(proof.alpha);encode(proof.beta);}else for(const auto&hit:proof.hits){encode(hit.a.lower);encode(hit.a.upper);encode(hit.b.lower);encode(hit.b.upper);}if(c.numbers.status!=SA_INK_OK)return c.numbers.status;if(staged.size()>capacity)return SA_INK_CAPACITY;const auto&frozen=staged;for(uint32_t i=0;i<frozen.size();i++)output[i]=frozen[i];metadata[0]=(int32_t)proof.hits.size();metadata[1]=(int32_t)staged.size();metadata[2]=proof.coincident?1:0;metadata[3]=(int32_t)c.numbers.work;metadata[4]=(int32_t)(c.numbers.work>>32);metadata[5]=(int32_t)c.numbers.peak_bytes;metadata[6]=(int32_t)c.polynomial.operations;metadata[7]=0;return SA_INK_OK;
+}
+
+#include "graph-test-api.hpp"
