@@ -90,7 +90,7 @@ export function createMcpServer(options: {
     {
       instructions:
         options.instructions ??
-        `ShowAI creates interactive pages in project ${projectId}. This connection is bound to that project. Start Board understanding with board_read: full image or overview plus overlapping tiles, then use snapshotId for image-local elements and Page sources. Ordinary Page reading defaults to structured JSON/Markdown. Use image for visual checks and html for browser DOM and interaction checks; guide reading documents capture and source queries. Retain the current source hash and revision before writing; versioned page writes require baseRevision. Use catalog summaries to choose resources and explicit views for details or source. Shared revisions are immutable; fork/merge into this project. Shared promotion or published registration needs an explicit CLI/desktop action.`,
+        `ShowAI project ${projectId}. Call guide first.`,
     },
   );
   const register: McpServer["registerTool"] = (name, config, callback) => {
@@ -202,7 +202,7 @@ export function createMcpServer(options: {
     "guide",
     {
       description:
-        "Read one focused ShowAI guide only when that operation is needed. Omitting topic lists the available guides.",
+        "Read a focused ShowAI guide; without topic, list the guides.",
       inputSchema: {
         topic: z.enum(GUIDE_TOPICS).optional(),
         stage: z.enum(TEMPLATE_STAGES).optional(),
@@ -226,7 +226,7 @@ export function createMcpServer(options: {
     "template_context",
     {
       description:
-        "Resolve the mandatory system baseline, selected template READMEs, exact refs and template component library for this task. No shared current template is changed; omitted templates use connection defaults, templates:[] uses only the system baseline. Reuse returned refs and knownHash.",
+        "Resolve the system baseline, selected template READMEs, exact refs and template components for this task. templates:[] uses only the system baseline.",
       inputSchema: {
         templates: z.array(templateSelection).max(8).optional(),
         knownHash: z
@@ -264,7 +264,7 @@ export function createMcpServer(options: {
     "template_guide",
     {
       description:
-        "Read only one presentation stage: mandatory system instructions plus the selected exact template guides. Guide folders expose their main README and additional filenames; file reads stay within that stage. Omitted templates use connection defaults; templates:[] reads only the system stage. Does not execute component code or select global state.",
+        "Read one presentation stage: the system instructions plus the selected template guides for that stage. templates:[] reads only the system stage; file reads an additional guide file.",
       inputSchema: {
         stage: z.enum(TEMPLATE_STAGES),
         templates: z.array(templateSelection).max(8).optional(),
@@ -293,7 +293,7 @@ export function createMcpServer(options: {
     "project_context",
     {
       description:
-        "Initialize page/component work: inspect the bound project and receive the complete compact component index (names, descriptions, scenarios and one-line props signatures), its revision and workflow guidance. It cannot select another project.",
+        "Return the project and its compact component index (names, descriptions, scenarios, props signatures) with the index revision.",
       inputSchema: {
         knownCatalogRevision: z
           .string()
@@ -316,8 +316,7 @@ export function createMcpServer(options: {
   register(
     "pages_list",
     {
-      description:
-        "List page titles, identities and current hashes in the bound project.",
+      description: "List pages with titles, IDs and hashes.",
       inputSchema: { includeArchived: z.boolean().optional() },
       annotations: readOnly,
     },
@@ -328,7 +327,7 @@ export function createMcpServer(options: {
     "page_read",
     {
       description:
-        "Read one Page in structured (default JSON/Markdown), image (PNG) or html (browser accessibility/DOM plus an interactive file) view. Use structured for content/data, image to verify styling, and html/actions to check interactions. detail=outline discovers IDs; blockIds selects a component/region. All views share source hash and pinned component refs. draft=true edits only a temporary preview. See guide reading.",
+        'Read a Page as structured JSON/Markdown (default), a PNG image, or html (DOM, accessibility tree and an interactive file; actions run interactions). detail:"outline" lists block IDs; blockIds selects blocks.',
       inputSchema: {
         pageId: z.string().min(1),
         ...pageReadSchema.shape,
@@ -371,7 +370,7 @@ export function createMcpServer(options: {
     "board_read",
     {
       description:
-        "Read a native Board visually by default: a clear full image for small boards, or overview plus overlapping tiles and element/Page indexes. Use the returned snapshotId for tile, pixel region, element and original-source queries. All images and source stay pinned to that capture; reading never saves. boardId is required when the resource root is a Page. See guide reading.",
+        "Read a Board: a full image for small boards, otherwise an overview with overlapping tiles and element/Page indexes. Pass the returned snapshotId with mode tile/region/element/source for details. boardId selects a Board inside a Page.",
       inputSchema: { pageId: z.string().min(1), ...boardReadSchema.shape },
       annotations: readOnly,
     },
@@ -413,7 +412,7 @@ export function createMcpServer(options: {
     "page_create",
     {
       description:
-        'Create a page in the bound project. Prefer blocks:[{kind,data}] (catalog components in reading order, e.g. {kind:"text",data:{format:"markdown",content:"..."}}) over a full nested document; keep it to a few blocks and add the rest with page_apply component.insert. Optional artifact components are imported into this project; remote components are fetched and verified.',
+        'Create a Page or Board. Prefer blocks:[{kind,data}] in reading order, e.g. {kind:"text",data:{format:"markdown",content:"..."}}, and add more with page_apply component.insert.',
       inputSchema: {
         ...changeSchema,
         title: z.string().optional(),
@@ -459,7 +458,7 @@ export function createMcpServer(options: {
     "page_save",
     {
       description:
-        "Save a page with its current baseHash; rejects stale content with CONFLICT. Use guide authoring for the editing workflow.",
+        "Save a full Page document with its baseHash; stale content returns CONFLICT.",
       inputSchema: {
         ...changeSchema,
         pageId: z.string(),
@@ -501,7 +500,7 @@ export function createMcpServer(options: {
     "page_apply",
     {
       description:
-        'Apply stable-block-id operations with a current baseHash. Query guide authoring for the operation shapes. Add components with {type:"component.insert",kind,data,parentId?,afterId?} rather than block.insert of a nested node, change existing component data with {type:"component.props.set",blockId,props} rather than block.replace, and keep each call shallow and short. On a block bound to a dataset, component.props.set writes the dataset (guide datasets); component.binding.set/remove bind or detach a block.',
+        'Apply operations by stable block id with the Page\'s baseHash. Insert components with {type:"component.insert",kind,data,parentId?,afterId?} and change their data with {type:"component.props.set",blockId,props}. Other operations: guide authoring.',
       inputSchema: {
         ...changeSchema,
         pageId: z.string(),
@@ -536,8 +535,7 @@ export function createMcpServer(options: {
   register(
     "page_diff",
     {
-      description:
-        "Compare a page with a previous read hash, including user edits, without accepting or overwriting changes.",
+      description: "Compare a Page with an earlier read hash.",
       inputSchema: { pageId: z.string(), sinceHash: z.string().min(1) },
       annotations: readOnly,
     },
@@ -548,7 +546,7 @@ export function createMcpServer(options: {
     "page_export",
     {
       description:
-        'Build HTML, a conversation fragment or a static site. Select page blocks with blockIds for partial HTML/inline display; partial exports default to reading layout. Bundled components are offline; remote needs verified locators. Inline requires bundled components. reader: HTML defaults offline; inline prefers the compressed local reader with CDN as a size fallback. reader:"bundled" forces offline and reader:"cdn" requests online loading. When blocks show datasets read from files outside the library, the call returns CONFIRMATION_REQUIRED with details.externalSnapshots (sizes per dataset) and writes nothing; show the sizes to the person and repeat with externalData:"embed" only if they agree. This does not upload a site.',
+        'Export a Page as HTML, an inline conversation fragment or a static site at out; blockIds exports part of it. Data from files outside the library returns CONFIRMATION_REQUIRED with sizes; repeat with externalData:"embed" after the person agrees.',
       inputSchema: {
         pageId: z.string().optional(),
         blockIds: z.array(z.string().min(1)).min(1).optional(),
@@ -593,7 +591,7 @@ export function createMcpServer(options: {
     "catalog_list",
     {
       description:
-        "Return all component/template names, descriptions and scenarios, plus a one-line props signature per component, with identities for detail lookup. Components default to built-ins plus the selected project's components; explicitly set scope to query global/published/all. Omit query/limit/cursor for the full result; explicit limit/cursor opts into pagination. Full schemas, examples and source require catalog_describe.",
+        "List component and template names, descriptions, scenarios and one-line props signatures. Defaults to built-ins plus this project's components; scope selects global/published/all; limit/cursor paginate.",
       inputSchema: {
         kind: z.enum(["component", "template"]).optional(),
         scope: scopeSchema.optional(),
@@ -610,7 +608,7 @@ export function createMcpServer(options: {
     "catalog_describe",
     {
       description:
-        "Read a summary by default. parameters joins schema, semantic meanings and samples with optional parameterPath, pagination and knownHash. guide provides the versioned use contract, schema and a compact example; development provides implementation guidance without source. Read examples/dependencies/full as needed. Executable source requires view=source. Legacy missing documentation is explicitly marked.",
+        "Describe a component or template. view: summary (default), guide (use contract, schema, example), parameters (paged by parameterPath/offset/limit), development, examples, dependencies, source or full.",
       inputSchema: {
         id: z.string(),
         kind: z.enum(["component", "template"]).optional(),
@@ -636,7 +634,7 @@ export function createMcpServer(options: {
     "component_import",
     {
       description:
-        "Import and compile a local component package into this project. Existing revisions cannot be overwritten.",
+        "Import and compile a local component package directory into this project.",
       inputSchema: { ...changeSchema, directory: z.string().min(1) },
       annotations: write,
     },
@@ -647,7 +645,7 @@ export function createMcpServer(options: {
     "component_save",
     {
       description:
-        "Save explicitly supplied component source as a new immutable revision in this project. Read guide catalog and source view first.",
+        "Save component source as a new immutable revision in this project.",
       inputSchema: { ...changeSchema, source: jsonObject },
       annotations: write,
     },
@@ -670,7 +668,7 @@ export function createMcpServer(options: {
     "template_apply",
     {
       description:
-        "Create a resource preserving the template Page/Board kind, or insert into pageId with its current baseHash/baseRevision and optional parentId. Returns the updated page and hash.",
+        "Create a resource from a template, or insert it into pageId with its baseHash/baseRevision and optional parentId.",
       inputSchema: {
         ...changeSchema,
         templateId: z.string(),
@@ -700,7 +698,7 @@ export function createMcpServer(options: {
     "template_save",
     {
       description:
-        "Create an immutable project template from a page, legacy definition, or input:{bundle:{format:1,files,assets?}}. Folder bundles compile and register their namespaced components automatically and return a compact receipt. Read guide templates for the portable contract.",
+        "Create an immutable project template from pageId or input:{bundle:{format:1,files,assets?}}; bundled components are compiled and registered.",
       inputSchema: {
         ...changeSchema,
         pageId: z.string().optional(),
@@ -745,7 +743,7 @@ export function createMcpServer(options: {
     "catalog_fork",
     {
       description:
-        "Fork an exact shared or current-project revision into a new revision owned by this project.",
+        "Fork an exact revision into a new revision owned by this project.",
       inputSchema: {
         ...changeSchema,
         ref: refSchema,
@@ -766,7 +764,7 @@ export function createMcpServer(options: {
     "catalog_merge_preview",
     {
       description:
-        "Preview a three-way merge without writing. Defaults to conflict paths; view=source explicitly returns the editable candidate and conflict values.",
+        'Preview a three-way merge without writing; view:"source" returns the candidate and conflict values.',
       inputSchema: {
         base: refSchema,
         ours: refSchema,
@@ -799,7 +797,7 @@ export function createMcpServer(options: {
     "catalog_merge_resolve",
     {
       description:
-        "Save a reviewed merge resolution as a new project revision. Shared scopes cannot be overwritten from this connection.",
+        "Save a reviewed merge resolution as a new project revision.",
       inputSchema: {
         ...changeSchema,
         base: refSchema,
@@ -824,8 +822,7 @@ export function createMcpServer(options: {
   register(
     "publication_prepare",
     {
-      description:
-        "Prepare local static publication files from exact refs. Does not upload or register a shared published release. Query guide publish for the explicit next step.",
+      description: "Prepare local static publication files from exact refs.",
       inputSchema: { refs: z.array(refSchema).min(1), out: z.string() },
       annotations: write,
     },
@@ -835,7 +832,7 @@ export function createMcpServer(options: {
     "publication_list",
     {
       description:
-        "List small verified publication references already registered in the local shared library; no network or registration writes.",
+        "List verified publication references in the local shared library.",
       inputSchema: {
         limit: z.number().int().min(1).max(50).optional(),
         cursor: z.string().optional(),
@@ -848,7 +845,7 @@ export function createMcpServer(options: {
     "library_search",
     {
       description:
-        "Search this project's page body, nested containers, component/template descriptions and source, returning node locations.",
+        "Search this project's pages, containers and component/template descriptions and source; returns node locations.",
       inputSchema: {
         query: z.string(),
         kind: z
@@ -864,8 +861,7 @@ export function createMcpServer(options: {
   register(
     "page_merge_preview",
     {
-      description:
-        "Compare a local draft, its exact base and the current page; conflicts retain all three values.",
+      description: "Compare a local draft, its base and the current Page.",
       inputSchema: {
         pageId: z.string(),
         baseRevision: z.string(),
@@ -886,7 +882,7 @@ export function createMcpServer(options: {
     "page_merge_save",
     {
       description:
-        "Commit a reviewed resolved page, rechecking the current resource revision.",
+        "Save a reviewed merged Page, rechecking the current revision.",
       inputSchema: {
         ...changeSchema,
         pageId: z.string(),
@@ -920,7 +916,7 @@ export function createMcpServer(options: {
     "workspace_recover_package",
     {
       description:
-        "Retain external package source, schema and assets as an editable local draft, restore the immutable version projection, then publish edits as a new version.",
+        "Recover an external package change as an editable local draft and restore the immutable version.",
       inputSchema: { conflictId: z.string(), clientId: z.string() },
       annotations: write,
     },
@@ -937,7 +933,7 @@ export function createMcpServer(options: {
     "workspace_conflict",
     {
       description:
-        "Read the preserved external bytes and their formal/baseline versions.",
+        "Read a retained external change with its formal and baseline versions.",
       inputSchema: { id: z.string() },
       annotations: readOnly,
     },
@@ -947,7 +943,7 @@ export function createMcpServer(options: {
     "workspace_resolve",
     {
       description:
-        "Resolve an external change by discard, validated page import or reviewed merge. Preserved external snapshots remain available.",
+        "Resolve an external change by discard, page import or reviewed merge.",
       inputSchema: {
         ...changeSchema,
         id: z.string(),
@@ -981,8 +977,7 @@ export function createMcpServer(options: {
     register(
       "project_sync_status",
       {
-        description:
-          "Inspect synchronization for this bound project only. No HTML display is required.",
+        description: "Return synchronization status for this project.",
         inputSchema: {},
         annotations: readOnly,
       },
@@ -992,7 +987,7 @@ export function createMcpServer(options: {
       "project_sync",
       {
         description:
-          "Synchronize this already-connected project after local MCP writes, then inspect the returned status/error/remoteHead. Leaves local-only projects local. Does not connect a server or expose other projects.",
+          "Synchronize this connected project and return status, error and remoteHead.",
         inputSchema: {},
         annotations: write,
       },
@@ -1017,7 +1012,7 @@ export function createMcpServer(options: {
     "page_present",
     {
       description:
-        "Present a saved Page or selected block preview. Complete HTML/source always retain the whole Page. Does not save or synchronize. Use returned delivery and display contract; do not guess an output directory. externalSnapshots lists data from files outside the library embedded in the delivery files; before handing those files to anyone else, show the sizes to the person and get their agreement.",
+        "Present a saved Page, or selected blocks inline, and return host delivery references. externalSnapshots lists embedded data from files outside the library; get the person's agreement before sharing those files.",
       inputSchema: {
         pageId: z.string().min(1),
         blockIds: z.array(z.string().min(1)).min(1).optional(),
@@ -1153,7 +1148,7 @@ export async function startPublicMcp(root: string) {
     { name: "showai", version: packageMetadata.version },
     {
       instructions:
-        "Create presentations without a personal project or synchronization. To show one to five components in the conversation, read the chosen public component's guide, then show_component. For a complete standalone document, discover public resources, customize their document/source, then render_document. Use the returned inline/HTML files or MCP Apps resource only when your harness supports that display. No project data is available on this connection.",
+        "ShowAI public components and templates, without a project. Call guide first.",
     },
   );
   server.registerTool(

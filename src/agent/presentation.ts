@@ -39,14 +39,9 @@ export const presentationSchema = {
   document: object
     .optional()
     .describe(
-      "Complete ShowAI document. Custom nodes must be {type:'widget',attrs:{id,kind:'custom',data:{componentId,version,props}}}; do not use the component ID as kind. Read component schemas before authoring.",
+      "Complete ShowAI document. Custom nodes are {type:'widget',attrs:{id,kind:'custom',data:{componentId,version,props}}}.",
     ),
-  templateId: z
-    .string()
-    .optional()
-    .describe(
-      "Public template ID; get its editable source and customize it, or instantiate it directly.",
-    ),
+  templateId: z.string().optional().describe("Public template ID."),
   templateVersion: z.string().optional(),
   templateIntegrity: z
     .string()
@@ -58,14 +53,14 @@ export const presentationSchema = {
     .max(20)
     .optional()
     .describe(
-      "Editable component packages with manifest, schema, source, files and assets; compiled in an isolated temporary workspace.",
+      "Unsaved component packages (manifest, schema, source, files, assets).",
     ),
   blockIds: z
     .array(z.string().min(1))
     .min(1)
     .optional()
     .describe(
-      "Optional node IDs to show inline. Complete HTML and source retain the full document.",
+      "Node IDs to show inline; HTML and source keep the full document.",
     ),
 };
 export type PresentationInput = z.infer<z.ZodObject<typeof presentationSchema>>;
@@ -408,13 +403,11 @@ export const showComponentSchema = {
     .string()
     .min(1)
     .optional()
-    .describe(
-      "One component: a built-in kind such as chart, flowchart or scene-3d, or custom. Use blocks for several.",
-    ),
+    .describe("Component kind, e.g. chart, flowchart or custom."),
   data: object
     .optional()
     .describe(
-      "The component's parameters, exactly as page_apply component.insert data. Custom components use {componentId,version,props}.",
+      "Component data as in component.insert; custom components use {componentId,version,props}.",
     ),
   blocks: z
     .array(showBlock)
@@ -422,39 +415,35 @@ export const showComponentSchema = {
     .max(SHOW_COMPONENT_LIMIT)
     .optional()
     .describe(
-      `Up to ${SHOW_COMPONENT_LIMIT} components shown together in order, each {kind,data}. Use instead of kind/data. More content belongs in a saved Page.`,
+      "Several components in order, each {kind,data}, instead of kind/data.",
     ),
   projectId: z
     .string()
     .min(1)
     .optional()
-    .describe(
-      "Only to resolve custom components saved in that project. Nothing is saved there.",
-    ),
+    .describe("Project whose saved custom components to resolve."),
   componentSources: z
     .array(object)
     .max(SHOW_COMPONENT_LIMIT)
     .optional()
     .describe(
-      "Unsaved component packages (manifest, schema, source, files, assets), compiled in an isolated temporary workspace for preview.",
+      "Unsaved component packages (manifest, schema, source, files, assets).",
     ),
   title: z
     .string()
     .max(300)
     .optional()
-    .describe(
-      "Accessible name and host card title. It is not drawn above the component.",
-    ),
+    .describe("Accessible name and host card title."),
   delivery: z
     .enum(SHOW_DELIVERIES)
     .optional()
     .describe(
-      "auto follows the plugin's declared host display. mcp-app attaches the MCP Apps component view and writes no file; fragment-file writes the inline fragment for hosts that reference a file (Codex visualize); compact returns a few-KB fragment text for hosts where the model writes HTML; image returns a PNG.",
+      "auto follows the host display declared by the plugin; mcp-app attaches an MCP Apps view, fragment-file writes a fragment file, compact returns fragment text, image returns a PNG.",
     ),
   theme: z
     .enum(["light", "dark"])
     .optional()
-    .describe("Image delivery only. Other deliveries follow the host theme."),
+    .describe("Theme for image delivery."),
 };
 export type ShowComponentInput = z.infer<
   z.ZodObject<typeof showComponentSchema>

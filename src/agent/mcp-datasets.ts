@@ -60,8 +60,7 @@ export function registerDatasetTools(
   register(
     "dataset_list",
     {
-      description:
-        "List the project's shared datasets (id, name, hash, size). Blocks on any page can bind to one; read guide datasets first.",
+      description: "List the project's shared datasets (id, name, hash, size).",
       inputSchema: {},
       annotations: annotations.readOnly,
     },
@@ -71,7 +70,7 @@ export function registerDatasetTools(
     "dataset_read",
     {
       description:
-        "Read a dataset's value, hash and the pages of this project whose blocks use it. path (e.g. objectives[id=o1].keyResults) narrows the value. Keep the hash for dataset_apply.",
+        "Read a dataset's value and hash and the pages that use it. path (e.g. objectives[id=o1].keyResults) narrows the value.",
       inputSchema: { datasetId: z.string().min(1), path: path.optional() },
       annotations: annotations.readOnly,
     },
@@ -82,7 +81,7 @@ export function registerDatasetTools(
     "dataset_create",
     {
       description:
-        "Create a dataset from a JSON value, or share an existing component block with fromBlock {pageId, blockId, baseHash, baseRevision?, local?}: its props move into the dataset (except local keys) and the block is bound to it in the same save.",
+        "Create a dataset from value, or from a block with fromBlock {pageId,blockId,baseHash}: its props (except local keys) move into the dataset and the block is bound to it.",
       inputSchema: {
         ...changeSchema,
         name: z.string().min(1).max(200),
@@ -121,7 +120,7 @@ export function registerDatasetTools(
     "dataset_apply",
     {
       description:
-        'Change a dataset with id-addressed operations and the baseHash you read: {op:"set",path,value}, {op:"remove",path}, {op:"insert",path:list,value,after?}, {op:"move",path:item,after}. Paths select records by id ({"id":"t1"} or [id=t1]). Changes since your read merge per record and field; a field changed differently by both returns CONFLICT with details.conflicts and writes nothing.',
+        'Change a dataset with the baseHash you read: {op:"set",path,value}, {op:"remove",path}, {op:"insert",path:list,value,after?}, {op:"move",path:item,after}. Path segments select records by id ({"id":"t1"} or [id=t1]). Concurrent edits merge per field; a conflicting field returns CONFLICT.',
       inputSchema: {
         ...changeSchema,
         datasetId: z.string().min(1),
@@ -158,7 +157,7 @@ export function registerDatasetTools(
     "dataset_link",
     {
       description:
-        'Keep a dataset\'s value in a file outside the content library (.json any JSON value; .csv/.tsv as {columns, rows}). Without datasetId, create a dataset from an existing file, or with value write a new file. With datasetId, move the dataset\'s value into a new file (use "dataset"), replace it with an existing file (use "file"), or link this device\'s copy of an external dataset\'s file. path null copies the current file content into the library and stops reading the file (the file is kept). Files are never overwritten by linking; later writes to the dataset write the file. The link is per device; exports that embed such data need externalData "embed" after the person agrees (see guide datasets).',
+        'Keep a dataset\'s value in a file outside the library (.json, or .csv/.tsv as {columns,rows}). Without datasetId, create a dataset from path, or write value to a new file. With datasetId, use:"dataset" moves its value into path, use:"file" replaces it with that file, and path alone links this device\'s copy of an external dataset. path:null copies the file back into the library.',
       inputSchema: {
         ...changeSchema,
         datasetId: z.string().min(1).max(128).optional(),
@@ -209,7 +208,7 @@ export function registerDatasetTools(
     "dataset_delete",
     {
       description:
-        "Delete a dataset no block uses. While pages still bind to it the call fails with details.references; detach those blocks first with page_apply component.binding.remove.",
+        "Delete a dataset that no block uses; otherwise fails with details.references.",
       inputSchema: {
         ...changeSchema,
         datasetId: z.string().min(1),

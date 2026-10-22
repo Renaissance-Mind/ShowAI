@@ -259,8 +259,7 @@ export function registerPresentationTools(
   server.registerTool(
     "showai_capabilities",
     {
-      description:
-        "Discover ShowAI capabilities before choosing a workflow. Presentation and project synchronization are independent. No login required.",
+      description: "Return this connection's ShowAI capabilities.",
       inputSchema: {},
       annotations: readOnly,
       _meta: { securitySchemes: noAuth },
@@ -392,7 +391,7 @@ export function registerPresentationTools(
     "public_catalog_list",
     {
       description:
-        "Return all public component/template names, descriptions and scenarios, plus a one-line props signature per component, without login or synchronization. Omit query/limit/cursor for the full catalog; explicit limit/cursor opts into pagination. Read details with public_catalog_describe.",
+        "List public component and template names, descriptions, scenarios and one-line props signatures; limit/cursor paginate.",
       inputSchema: {
         kind: z.enum(["component", "template"]).optional(),
         query: z.string().optional(),
@@ -408,7 +407,7 @@ export function registerPresentationTools(
     "public_catalog_describe",
     {
       description:
-        "Read public component guides, schemas, examples and editable source, or public template source. Customize locally or pass source to render_document; synchronization is optional.",
+        "Read a public component's guide, schema, examples or source, or a public template's source.",
       inputSchema: {
         id: z.string(),
         stage: z.enum(TEMPLATE_STAGES).optional(),
@@ -437,7 +436,7 @@ export function registerPresentationTools(
     "render_document",
     {
       description:
-        "Render a complete standalone ShowAI document (several sections, a template, or an offline file) using public components/templates or supplied custom sources, without saving it. Showing one to five components in the conversation uses show_component; work to keep uses page_create/save then page_present. Anonymous, independent of shared projects. Hosts without inline still receive usable HTML/source delivery. Read the relevant component schema first.",
+        "Render a complete standalone document from public components/templates or supplied sources without saving it.",
       inputSchema: presentationSchema,
       annotations: readOnly,
       _meta: { securitySchemes: noAuth, ...readerToolMeta },
@@ -482,7 +481,7 @@ export function registerPresentationTools(
   server.registerTool(
     "show_component",
     {
-      description: `Show 1–${SHOW_COMPONENT_LIMIT} components directly in the conversation, without a project or Page. Use it for a visualization the user wants to see now; nothing is saved. Read the chosen component's guide first; kind/data are exactly page_apply component.insert data, so a shown component can later be saved unchanged with page_create blocks or component.insert.`,
+      description: `Show 1–${SHOW_COMPONENT_LIMIT} components in the conversation without saving. kind/data match page_apply component.insert, so the same component can later be saved in a Page.`,
       inputSchema: showComponentSchema,
       annotations: readOnly,
       _meta: { securitySchemes: noAuth, ...componentToolMeta },

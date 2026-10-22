@@ -56,7 +56,7 @@ export function registerOrganizationTools(
     "folders_list",
     {
       description:
-        "List real project folders and their hierarchy, icons, pins and directory preferences. includeArchived includes archived ancestors and children.",
+        "List project folders with hierarchy, icons, pins and sort settings.",
       inputSchema: { includeArchived: z.boolean().optional() },
       annotations: read,
     },
@@ -66,7 +66,7 @@ export function registerOrganizationTools(
     "folder_create",
     {
       description:
-        "Create a real folder in this project. parentId is a folder identity, or null for the project root. A Page is not a folder.",
+        "Create a folder in this project; parentId is a folder or null for the root.",
       inputSchema: {
         ...metadata,
         name: z.string().trim().min(1).max(1000),
@@ -82,7 +82,7 @@ export function registerOrganizationTools(
     "folder_update",
     {
       description:
-        "Rename a folder, change its icon/pin, or archive/restore it. Archiving hides its descendants without deleting content. Move with entry_move.",
+        "Rename a folder, change its icon or pin, or archive/restore it.",
       inputSchema: {
         ...metadata,
         folderId: id,
@@ -103,7 +103,7 @@ export function registerOrganizationTools(
     "project_update",
     {
       description:
-        "Rename this project, change its icon/pin, or archive/restore it. Remote archive/restore requires current project administrator permission. Content is retained.",
+        "Rename this project, change its icon or pin, or archive/restore it.",
       inputSchema: {
         ...metadata,
         name: z.string().trim().min(1).max(1000).optional(),
@@ -120,7 +120,7 @@ export function registerOrganizationTools(
     "directory_sort",
     {
       description:
-        "Set sorting for the project's root (parentId:null) or one folder. Manual placement uses entry_move with relativeId/placement.",
+        "Set child sorting for the project root (parentId:null) or a folder.",
       inputSchema: {
         ...metadata,
         parentId: id.nullable(),
@@ -135,7 +135,7 @@ export function registerOrganizationTools(
     "entry_move",
     {
       description:
-        "Move/reorder a page or folder. Pages may move between authorized projects with their pinned component dependencies. Folders move only within their project. Page moves require baseHash/baseRevision; reorderOnly changes sibling order without changing content. parentId is a destination folder, or null for root.",
+        "Move or reorder a page or folder. parentId is the destination folder (null for root); relativeId/placement set the position. Pages need baseHash/baseRevision and may move to destinationProjectId; reorderOnly keeps content unchanged.",
       inputSchema: {
         ...metadata,
         kind: z.enum(["page", "folder"]),
@@ -183,7 +183,7 @@ export function registerOrganizationTools(
       "sidebar_read",
       {
         description:
-          "Read this library/remote connection's sidebar groups and manual order. Sidebar groups/order belong to this connection's workspace; they are not project content synchronized to other devices.",
+          "Read this connection's sidebar groups and manual project order.",
         inputSchema: {},
         annotations: read,
       },
@@ -192,8 +192,7 @@ export function registerOrganizationTools(
     register(
       "sidebar_group_create",
       {
-        description:
-          "Create a sidebar group in this library/remote connection. It contains project memberships, not Pages or folders.",
+        description: "Create a sidebar group for projects.",
         inputSchema: { ...metadata, name: z.string().trim().min(1).max(1000) },
         annotations: write,
       },
@@ -202,8 +201,7 @@ export function registerOrganizationTools(
     register(
       "sidebar_group_update",
       {
-        description:
-          "Rename a sidebar group, or pass name:null to remove the group while retaining its projects.",
+        description: "Rename a sidebar group, or remove it with name:null.",
         inputSchema: {
           ...metadata,
           sidebarGroupId: id,
@@ -218,7 +216,7 @@ export function registerOrganizationTools(
       "sidebar_project_move",
       {
         description:
-          "Move this project into projects, pinned, or a sidebar group ID, optionally before/after another authorized project. Project pin changes sync; sidebar groups/order stay in this connection's workspace.",
+          "Move this project to projects, pinned or a sidebar group, optionally before/after another project.",
         inputSchema: {
           ...metadata,
           sectionId: id,
@@ -238,7 +236,7 @@ export function registerOrganizationTools(
     "catalog_references",
     {
       description:
-        "Find exact component/template reference sites in this project's current pages and packages. Optional version/integrity restrict the target; returns logical source paths and block IDs.",
+        "Find where a component or template is referenced in this project's pages and packages; version/integrity narrow the target.",
       inputSchema: {
         kind: z.enum(["component", "template"]),
         id: z.string().min(1),
@@ -253,8 +251,7 @@ export function registerOrganizationTools(
   register(
     "drafts_list",
     {
-      description:
-        "List retained editor drafts in this project and this connection's workspace. Drafts do not sync to other devices and are not saved Pages.",
+      description: "List editor drafts in this project's connection workspace.",
       inputSchema: {
         clientId: z.string().min(1).optional(),
         resourceId: z.string().min(1).optional(),
@@ -267,8 +264,7 @@ export function registerOrganizationTools(
   register(
     "draft_read",
     {
-      description:
-        "Read one retained draft in this project, including its current generation. Read/merge/save through normal page/package operations before completing it.",
+      description: "Read one draft and its current generation.",
       inputSchema: { draftId: z.string().regex(/^[a-f0-9]{64}$/) },
       annotations: read,
     },
@@ -278,7 +274,7 @@ export function registerOrganizationTools(
     "draft_save",
     {
       description:
-        "Retain an editable page/component/template draft in this project's connection workspace. This does not save formal content or synchronize the draft. Sequence guards same-client updates; page drafts may include their exact baseline.",
+        "Save an editable page/component/template draft in this connection's workspace; drafts are not formal content and do not sync. sequence orders one client's updates.",
       inputSchema: {
         kind: z.enum(["page", "component", "template"]),
         clientId: z.string().min(1).max(1000),
@@ -305,7 +301,7 @@ export function registerOrganizationTools(
     "draft_remove",
     {
       description:
-        "Explicitly discard a reviewed draft generation. A newer generation is retained and returns CONFLICT. The discarded payload is retained locally for recovery.",
+        "Discard a reviewed draft generation; a newer generation returns CONFLICT.",
       inputSchema: {
         draftId: z.string().regex(/^[a-f0-9]{64}$/),
         generation: z.string().uuid(),
@@ -319,7 +315,7 @@ export function registerOrganizationTools(
     "draft_complete",
     {
       description:
-        "Complete a page draft only after saving its exact content. Requires the read generation and committed page revision; differing content/newer drafts are retained.",
+        "Complete a page draft after saving its exact content, with the draft generation and the saved page revision.",
       inputSchema: {
         draftId: z.string().regex(/^[a-f0-9]{64}$/),
         generation: z.string().uuid(),

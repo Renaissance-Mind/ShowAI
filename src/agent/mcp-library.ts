@@ -38,7 +38,7 @@ export function createLibraryMcpServer(options: {
     projectId: "unselected",
     projectAccess: "library",
     instructions:
-      "Use ShowAI MCP for document operations. This connection is fixed to one local content library. Inspect project_context, then projects_list for existing content or project_resolve with a trusted host sourceDirectory for new formal work. Pass projectId explicitly to every project tool. Start Board understanding with board_read images and indexes; use snapshotId for tile, element and Page source details. There is no shared mutable current project. Read current complete source before editing; save with the returned hash/revision. Use page_present after saving. A visualization the user only wants to see in the conversation uses show_component (1–5 components, no project, nothing saved); keep it later by saving the same {kind,data} in a Page. render_document is only for a complete standalone document. Connection failure is not permission to switch libraries, use authoring CLI, or silently produce an unsaved file.",
+      "ShowAI content library. Call guide first; pass projectId to project tools.",
     decorateTool(name, tool) {
       if (name === "guide") return;
       if (name === "project_context") {
@@ -108,8 +108,7 @@ export function createLibraryMcpServer(options: {
   server.registerTool(
     "projects_list",
     {
-      description:
-        "List existing projects in this fixed local library. Does not create a project.",
+      description: "List projects in this library.",
       inputSchema: { includeArchived: z.boolean().optional() },
       annotations: readOnly,
     },
@@ -119,7 +118,7 @@ export function createLibraryMcpServer(options: {
     "project_resolve",
     {
       description:
-        "Resolve a trusted host sourceDirectory to a formal project, creating its mapping only if missing. Use projects_list for read-only lookup. Never use a plugin, preview, or temporary directory as the user's project.",
+        "Resolve the user's project directory (absolute sourceDirectory) to its project, creating the mapping if missing.",
       inputSchema: {
         sourceDirectory: z
           .string()
@@ -142,8 +141,7 @@ export function createLibraryMcpServer(options: {
   server.registerTool(
     "project_create",
     {
-      description:
-        "Create a separately named project only when requested by the user. Ordinary new content uses project_resolve.",
+      description: "Create a separately named project.",
       inputSchema: { name: z.string().min(1).max(1000) },
       annotations: { ...readOnly, readOnlyHint: false },
     },
