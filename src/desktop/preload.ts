@@ -1,26 +1,56 @@
 import { contextBridge, ipcRenderer } from "electron";
 import type { TabCommand } from "../workbench/tab-shortcuts";
-import type {
-  DesktopChange,
-  DesktopResponse,
-  DesktopWindowState,
-  ShowAIBridge,
+import {
+  closeAllowed,
+  type CloseResult,
+  type DesktopChange,
+  type DesktopResponse,
+  type DesktopWindowState,
+  type MenuCommand,
+  type ShowAIBridge,
+  type UnsavedPage,
 } from "./bridge";
 
 if (process.isMainFrame) {
-  const closeListeners = new Set<() => Promise<boolean>>();
+  const closeListeners = new Set<() => Promise<CloseResult>>();
   const reloadListeners = new Set<() => Promise<boolean>>();
   ipcRenderer.on("showai:before-close", async (_event, requestId: string) => {
     let allow = false;
+    const pages: UnsavedPage[] = [];
+    let reason = "";
     try {
-      allow = (
-        await Promise.all([...closeListeners].map((listener) => listener()))
-      ).every(Boolean);
-    } catch {
+      const results = await Promise.all(
+        [...closeListeners].map((listener) => listener()),
+      );
+      allow = results.every(closeAllowed);
+      for (const result of results)
+        if (typeof result === "object") pages.push(...(result.pages ?? []));
+    } catch (error) {
       allow = false;
+      reason = error instanceof Error ? error.message : String(error);
     }
-    ipcRenderer.send("showai:close-result", { requestId, allow });
+    ipcRenderer.send("showai:close-result", { requestId, allow, pages, reason });
   });
+  // Uncaught renderer failures reach the main-process log for problem reports.
+  const forward = (kind: string, value: unknown, fallback: string) => {
+    const error = value instanceof Error ? value : undefined;
+    ipcRenderer.send("showai:renderer-error", {
+      kind,
+      message: (error?.message ?? (fallback || String(value))).slice(0, 4000),
+      stack: error?.stack?.slice(0, 8000),
+      location: location.pathname.split("/").pop(),
+    });
+  };
+  window.addEventListener("error", (event) =>
+    forward(
+      "error",
+      event.error,
+      `${event.message} (${String(event.filename).split("/").pop()}:${event.lineno}:${event.colno})`,
+    ),
+  );
+  window.addEventListener("unhandledrejection", (event) =>
+    forward("unhandledrejection", event.reason, ""),
+  );
   const bridge: ShowAIBridge = {
     pageThumbnails: true,
     setAppearance(appearance) {
@@ -96,6 +126,23 @@ if (process.isMainFrame) {
       ipcRenderer.on("showai:tab-command", receive);
       return () => ipcRenderer.removeListener("showai:tab-command", receive);
     },
+    onMenuCommand(listener) {
+      const receive = (
+        _event: Electron.IpcRendererEvent,
+        command: MenuCommand,
+      ) => listener(command);
+      ipcRenderer.on("showai:menu-command", receive);
+      return () => ipcRenderer.removeListener("showai:menu-command", receive);
+    },
+    logPath() {
+      return ipcRenderer.invoke("logs:path");
+    },
+    openLogFolder() {
+      return ipcRenderer.invoke("logs:open-folder");
+    },
+    diagnostics() {
+      return ipcRenderer.invoke("showai:diagnostics");
+    },
     onRefreshPage(listener) {
       const receive = () => listener();
       ipcRenderer.on("showai:refresh-page", receive);
@@ -116,7 +163,7 @@ if (process.isMainFrame) {
                   listener(),
                 ),
               )
-            ).every(Boolean);
+            ).every(closeAllowed);
           },
         }
       : {}),

@@ -1,4 +1,5 @@
-import type { DesktopChange } from "../desktop/bridge";
+import type { DesktopChange, UnsavedPage } from "../desktop/bridge";
+import { serializeArtifact } from "../portable/validation.mjs";
 import {
   createPageSession,
   type LoadedPage,
@@ -314,6 +315,30 @@ export class PageSessions {
       [...new Set(this.pages.values())].map((session) => session.leave()),
     );
     return retained.every(Boolean);
+  }
+  /** Pages whose changes are not yet durable on disk, with their source for export. */
+  unsavedPages(): UnsavedPage[] {
+    return [...new Set(this.pages.values())].flatMap((session) => {
+      if (session.isDurable()) return [];
+      const state = session.getSnapshot();
+      if (!state.draft || !state.projectId) return [];
+      let source: string | undefined;
+      // Export is a convenience; an unserializable draft still gets listed.
+      try {
+        source = serializeArtifact(state.draft, state.record?.components);
+      } catch (error) {
+        console.error("Unsaved page source could not be prepared", error);
+      }
+      return [
+        {
+          projectId: state.projectId,
+          pageId: state.draft.id,
+          title: state.draft.title || common("untitled"),
+          reason: state.error,
+          ...(source ? { source } : {}),
+        },
+      ];
+    });
   }
   hasUnretainedChanges() {
     return [...new Set(this.pages.values())].some(

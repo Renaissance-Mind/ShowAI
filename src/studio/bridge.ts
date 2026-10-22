@@ -1,7 +1,9 @@
 import type {
+  CloseResult,
   DesktopAppearance,
   DesktopChange,
   DesktopWindowState,
+  MenuCommand,
 } from "../desktop/bridge";
 import type { Locale } from "../i18n";
 import type { TabCommand } from "../workbench/tab-shortcuts";
@@ -25,7 +27,11 @@ export interface DesktopBridge {
   onChange(listener: (change: DesktopChange) => void): () => void;
   onTabCommand?(listener: (command: TabCommand) => void): () => void;
   onRefreshPage?(listener: () => void): () => void;
-  onBeforeClose(listener: () => Promise<boolean>): () => void;
+  onMenuCommand?(listener: (command: MenuCommand) => void): () => void;
+  logPath?(): Promise<string>;
+  openLogFolder?(): Promise<void>;
+  diagnostics?(): Promise<string>;
+  onBeforeClose(listener: () => Promise<CloseResult>): () => void;
   onBeforeReload?(listener: () => Promise<boolean>): () => void;
   setDirty?(dirty: boolean): void;
   prepareReload?(): Promise<boolean>;
@@ -65,7 +71,10 @@ export const desktop = {
   onRefreshPage(listener: () => void) {
     return window.showai?.onRefreshPage?.(listener) ?? (() => {});
   },
-  onBeforeClose(listener: () => Promise<boolean>) {
+  onMenuCommand(listener: (command: MenuCommand) => void) {
+    return window.showai?.onMenuCommand?.(listener) ?? (() => {});
+  },
+  onBeforeClose(listener: () => Promise<CloseResult>) {
     return window.showai?.onBeforeClose(listener) ?? (() => {});
   },
   onBeforeReload(listener: () => Promise<boolean>) {

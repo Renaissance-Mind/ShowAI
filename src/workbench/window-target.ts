@@ -5,6 +5,8 @@ export interface WindowTarget {
   /** Comma-separated content IDs to highlight once the page opens. */
   blocks?: string;
   invite?: string;
+  /** The App's first window brings back the tabs of the previous session. */
+  restoreTabs?: boolean;
 }
 
 export function windowQuery(target?: WindowTarget): Record<string, string> {
@@ -16,5 +18,6 @@ export function windowQuery(target?: WindowTarget): Record<string, string> {
       ...(target.folderId ? { folder: target.folderId } : {}),
     };
   }
-  return target?.invite ? { invite: target.invite } : {};
+  if (target?.invite) return { invite: target.invite };
+  return target?.restoreTabs ? { restore: "tabs" } : {};
 }

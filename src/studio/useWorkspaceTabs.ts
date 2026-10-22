@@ -48,10 +48,10 @@ export function useWorkspaceTabs({
     if (!library.current) return;
     // Storage failures must not turn a successful navigation into an apparent failure.
     try {
-      sessionStorage.setItem(
-        `showai:tabs:${library.current}`,
-        JSON.stringify({ version: 1, ...next }),
-      );
+      const bytes = JSON.stringify({ version: 1, ...next });
+      sessionStorage.setItem(`showai:tabs:${library.current}`, bytes);
+      // The most recent window's tabs come back when the App starts again.
+      localStorage.setItem(`showai:tabs:last:${library.current}`, bytes);
     } catch (error) {
       latest.current.onError(error);
     }
@@ -87,21 +87,39 @@ export function useWorkspaceTabs({
       const firstLibrary = !library.current;
       library.current = home;
       let saved: WorkspaceTabsState | undefined;
+      let previousLaunch = false;
+      const params = new URLSearchParams(location.search);
       try {
         saved = parseWorkspaceTabs(
           sessionStorage.getItem(`showai:tabs:${home}`),
         );
+        if (!saved && firstLibrary && params.get("restore") === "tabs") {
+          saved = parseWorkspaceTabs(
+            localStorage.getItem(`showai:tabs:last:${home}`),
+          );
+          previousLaunch = !!saved;
+        }
       } catch (error) {
         latest.current.onError(error);
       }
-      const params = new URLSearchParams(location.search);
       // An explicit page/invitation launch takes priority over a previous session.
       const explicit =
         firstLibrary && (params.has("project") || params.has("invite"));
       if (saved && !explicit && !restored.current) {
         restored.current = true;
         if (firstLibrary) launch.current = "restored";
-        void activate(saved).catch(latest.current.onError);
+        // Tabs from an earlier launch may name pages deleted since; start fresh then.
+        const fresh = () => publish(createWorkspace(latest.current.entry));
+        void activate(saved).then(
+          (opened) => {
+            if (!opened && previousLaunch) fresh();
+          },
+          (error) => {
+            if (!previousLaunch) return latest.current.onError(error);
+            console.warn("Previous tabs could not be restored", error);
+            fresh();
+          },
+        );
       } else {
         restored.current = true;
         if (firstLibrary) launch.current = "new";

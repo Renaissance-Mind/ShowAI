@@ -581,6 +581,14 @@ describe("workspace sessions against the real loopback workbench", () => {
     await entered.promise;
     try {
       a.edit({ title: "My retained edit" });
+      // A close blocked now can name the page and export its unsaved source.
+      const unsaved = sessions.unsavedPages();
+      expect(unsaved.map((page) => [page.pageId, page.title])).toEqual([
+        [first.document.id, "My retained edit"],
+      ]);
+      expect(JSON.parse(unsaved[0].source!).document.title).toBe(
+        "My retained edit",
+      );
       await sessions.open(project, second.document.id, "b");
       await writeFile(
         first.path,

@@ -15,7 +15,7 @@ import {
   rename,
 } from "node:fs/promises";
 import { dirname, extname, isAbsolute, join, resolve, sep } from "node:path";
-import { homedir } from "node:os";
+import { arch, homedir, release } from "node:os";
 import { randomBytes, randomUUID, timingSafeEqual } from "node:crypto";
 import { watch } from "chokidar";
 import { version } from "../../package.json";
@@ -89,6 +89,16 @@ export async function startBrowserServer(options: BrowserServerOptions) {
   let service = new AgentService({ root: store.root });
   const token = options.development?.token ?? randomBytes(32).toString("hex");
   const webRoot = await realpath(options.webRoot);
+  // The built frontend records the commit it came from; report it in App info.
+  const sourceCommit =
+    /<meta name="showai-source" content="([^"]+)"/.exec(
+      await readFile(join(webRoot, "index.html"), "utf8").catch(
+        (error: NodeJS.ErrnoException) => {
+          if (error.code === "ENOENT") return "";
+          throw error;
+        },
+      ),
+    )?.[1] ?? "unknown";
   const clients = new Map<ServerResponse, string>();
   // A browser tab already holds the record of its own save; skip that echo for it.
   const ownWrites = new OwnWrites();
@@ -105,6 +115,10 @@ export async function startBrowserServer(options: BrowserServerOptions) {
     platform: process.platform,
     packaged: !options.development,
     mode: "browser",
+    sourceCommit,
+    arch: arch(),
+    osVersion: release(),
+    versions: { node: process.versions.node },
     cli: {
       command: process.execPath,
       args: [resolve(options.cliEntry)],
@@ -301,6 +315,17 @@ export async function startBrowserServer(options: BrowserServerOptions) {
               );
             const home = await selectedPath(args, true);
             await new FileStore(home).listProjects();
+            await watcher.close();
+            clearTimeout(timer);
+            // Only a library that actually opens is remembered for the next launch.
+            const previous = store.root;
+            try {
+              await useHome(home);
+            } catch (error) {
+              await useHome(previous);
+              notify("home");
+              throw error;
+            }
             await mkdir(dirname(options.settingsPath), { recursive: true });
             const temporary = `${options.settingsPath}.${randomUUID()}.tmp`;
             await writeFile(temporary, JSON.stringify({ home }) + "\n", {
@@ -308,9 +333,6 @@ export async function startBrowserServer(options: BrowserServerOptions) {
               mode: 0o600,
             });
             await rename(temporary, options.settingsPath);
-            await watcher.close();
-            clearTimeout(timer);
-            await useHome(home);
             notify("home");
             return info();
           }

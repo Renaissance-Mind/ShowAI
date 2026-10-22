@@ -328,6 +328,11 @@ describe("opening library targets", () => {
     expect(windowQuery({ projectId: "project-a" })).toEqual({
       project: "project-a",
     });
+    // Only the App's first window restores the previous session's tabs.
+    expect(windowQuery({ restoreTabs: true })).toEqual({ restore: "tabs" });
+    expect(
+      windowQuery({ projectId: "project-a", restoreTabs: true }),
+    ).toEqual({ project: "project-a" });
     expect(
       windowQuery({ projectId: "project-a", folderId: "folder-a" }),
     ).toEqual({ project: "project-a", folder: "folder-a" });

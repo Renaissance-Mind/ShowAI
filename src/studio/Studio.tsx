@@ -85,7 +85,11 @@ import type {
   DirectorySortBy,
 } from "../core/model";
 import { orderSidebarProjects } from "../core/sidebar-order";
-import type { DesktopInfo, DesktopChange } from "../desktop/bridge";
+import type {
+  DesktopInfo,
+  DesktopChange,
+  MenuCommand,
+} from "../desktop/bridge";
 import type { ShowArtifact, ShowDocument } from "../types";
 import type {
   BuiltinComponentMetadata,
@@ -167,6 +171,7 @@ import {
   useBuiltinDocTitle,
 } from "./BuiltinDocs";
 import {
+  builtinDocLink,
   builtinDocs,
   DOCS_HOME,
   DOCS_VISIBLE_KEY,
@@ -239,6 +244,7 @@ import { useLocale, useTranslator } from "../i18n/react";
 import commonMessages from "../i18n/messages/common";
 import studioMessages from "../i18n/messages/studio";
 import assistantMessages from "../i18n/messages/assistant";
+import shellMessages from "../i18n/messages/appShell";
 import AssistantWorkbench from "./assistant/AssistantWorkbench";
 import { referenceHeading } from "./assistant/targets";
 import type { AgentTarget } from "../agent-host/types";
@@ -363,6 +369,7 @@ export default function Studio() {
   const tc = useTranslator(commonMessages);
   const ta = useTranslator(assistantMessages);
   const tn = useTranslator(navigationMessages);
+  const tshell = useTranslator(shellMessages);
   useEffect(() => {
     const wake = () => {
       if (document.visibilityState === "visible" && navigator.onLine)
@@ -651,6 +658,7 @@ export default function Studio() {
   const [newMenu, setNewMenu] = useState<HTMLElement | null>(null);
   const [externalChangeCount, setExternalChangeCount] = useState(0);
   const [exportMenu, setExportMenu] = useState<HTMLElement | null>(null);
+  const exportSiteButton = useRef<HTMLButtonElement>(null);
   const [dark, setDark] = useState(() => {
     const saved = localStorage.getItem("showai:appearance");
     return saved
@@ -3005,6 +3013,15 @@ export default function Studio() {
       const index = workspace.tabs.findIndex(
         (tab) => tab.id === workspace.activeId,
       );
+      // Like other Mac apps, closing the last tab closes the window.
+      if (
+        command === "close" &&
+        workspace.tabs.length === 1 &&
+        info?.mode === "desktop"
+      ) {
+        window.close();
+        return;
+      }
       const operation =
         command === "new"
           ? workspace.add
@@ -3033,7 +3050,67 @@ export default function Studio() {
       unsubscribe();
       window.removeEventListener("keydown", key, true);
     };
-  }, [workspace, workspaceReady, report, capabilities.tabs]);
+  }, [workspace, workspaceReady, report, capabilities.tabs, info?.mode]);
+  // Native menu items carry out the same actions as the workbench controls.
+  const menuCommand = useRef<(command: MenuCommand) => void>(() => {});
+  menuCommand.current = (command) => {
+    const doc = (slug: string) => {
+      const url = `https://showai.renaissancemind.ai/doc${slug ? `/${slug}` : ""}`;
+      const link = builtinDocLink(url);
+      if (showDocs && link) return openDoc(link.pageId, link.hash);
+      window.open(url, "_blank");
+      return Promise.resolve(true);
+    };
+    // Later feedback features take over these events; until then use the About page.
+    const unhandled = (name: string, detail?: unknown) =>
+      window.dispatchEvent(new CustomEvent(name, { cancelable: true, detail }));
+    const about = () => {
+      setSettingsSection("about");
+      return navigate("settings");
+    };
+    const operations: Record<MenuCommand, () => Promise<unknown> | void> = {
+      newProject: () => setDialog({ type: "project" }),
+      newPage: () =>
+        selectedRef.current
+          ? beginNewPage(selectedRef.current, selectedFolderRef.current)
+          : setDialog({ type: "project" }),
+      newTab: () => {
+        if (capabilities.tabs && workspaceReady) return workspace.add();
+      },
+      import: () =>
+        selectedProject ? importPage() : setDialog({ type: "project" }),
+      export: () => {
+        if (view === "page" && page.draft) return exportPage("html");
+        if (view === "project" && exportSiteButton.current)
+          setExportMenu(exportSiteButton.current);
+      },
+      settings: () => navigate("settings"),
+      projects: () => navigate("projects"),
+      docs: () => doc(""),
+      faq: () => doc("agent-troubleshooting"),
+      about,
+      reportProblem: () => {
+        if (unhandled("showai:open-feedback", { source: "menu" })) return about();
+      },
+      copyDiagnostics: async () => {
+        if (!unhandled("showai:copy-diagnostics") || !window.showai?.diagnostics)
+          return;
+        await desktop.invoke("clipboard:write", {
+          text: await window.showai.diagnostics(),
+        });
+        setNotice(tshell("diagnostics.copied"));
+      },
+      shortcuts: () => {
+        unhandled("showai:open-shortcuts");
+      },
+    };
+    if (dialogRef.current && command !== "copyDiagnostics") return;
+    void Promise.resolve(operations[command]?.()).catch(report);
+  };
+  useEffect(
+    () => desktop.onMenuCommand((command) => menuCommand.current(command)),
+    [],
+  );
   const action = (operation: () => Promise<unknown>) => () => {
     void operation().catch(report);
   };
@@ -3676,6 +3753,7 @@ export default function Studio() {
                 <Upload size={15} />
               </button>
               {capabilities.exportSite && <button
+                ref={exportSiteButton}
                 className="studio-icon"
                 disabled={!pages.length || busy}
                 aria-haspopup="menu"

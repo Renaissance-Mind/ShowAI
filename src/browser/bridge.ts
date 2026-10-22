@@ -1,10 +1,33 @@
 import { chooseLocalPath, type FileDialogOptions } from "./FileDialog";
-import type { DesktopChange, DesktopResponse } from "../desktop/bridge";
+import {
+  closeAllowed,
+  type CloseResult,
+  type DesktopChange,
+  type DesktopResponse,
+} from "../desktop/bridge";
 import type { LoadedPage } from "../studio/usePage";
 import { translator } from "../i18n";
 import messages from "../i18n/messages/files";
+import shellMessages from "../i18n/messages/appShell";
 
 const t = translator(messages);
+const shell = translator(shellMessages);
+
+export type ConnectionState = "connected" | "lost" | "restarted";
+let connection: ConnectionState = "connected";
+/** The local service connection, shown by the workbench banner. */
+export function connectionState() {
+  return connection;
+}
+function announce(state: ConnectionState) {
+  if (state === connection) return;
+  // A new access token only comes with a page refresh; reconnecting can't recover it.
+  if (connection === "restarted") return;
+  connection = state;
+  window.dispatchEvent(new CustomEvent("showai:connection", { detail: state }));
+}
+const failure = (code: string, message: string) =>
+  Object.assign(new Error(message), { code });
 
 declare global {
   interface Window {
@@ -16,7 +39,7 @@ export function installBrowserBridge() {
   const config = window.__SHOWAI_LOCAL__;
   if (!config || window.showai) return;
   const listeners = new Set<(change: DesktopChange) => void>();
-  const closeListeners = new Set<() => Promise<boolean>>();
+  const closeListeners = new Set<() => Promise<CloseResult>>();
   const reloadListeners = new Set<() => Promise<boolean>>();
   let dirty = false;
   // Lets the server skip echoing this tab's own saves back to it.
@@ -25,15 +48,27 @@ export function installBrowserBridge() {
     route: string,
     args: Record<string, unknown>,
   ): Promise<T> {
-    const response = await fetch(`/api/${route}`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${config!.token}`,
-        "X-ShowAI-Client": client,
-      },
-      body: JSON.stringify(args),
-    });
+    let response: Response;
+    try {
+      response = await fetch(`/api/${route}`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${config!.token}`,
+          "X-ShowAI-Client": client,
+        },
+        body: JSON.stringify(args),
+      });
+    } catch (error) {
+      // fetch rejects with a TypeError when the loopback service is gone.
+      if (!(error instanceof TypeError)) throw error;
+      announce("lost");
+      throw failure("SERVICE_UNREACHABLE", shell("connection.unreachable"));
+    }
+    if (response.status === 401) {
+      announce("restarted");
+      throw failure("SERVICE_RESTARTED", shell("connection.restarted"));
+    }
     if (
       !response.ok &&
       response.headers.get("content-type")?.includes("application/json") !==
@@ -152,18 +187,35 @@ export function installBrowserBridge() {
   // Thumbnail frames only read their component; a persistent connection per
   // frame would exhaust the browser's connections to this loopback host.
   if (!new URLSearchParams(location.search).has("componentPreview")) {
-    const events = new EventSource(
-      `/api/events?token=${encodeURIComponent(config.token)}&client=${client}`,
-    );
-    events.onmessage = (event) => {
-      const change = JSON.parse(event.data) as DesktopChange;
-      for (const listener of listeners) listener(change);
+    const connect = () => {
+      const events = new EventSource(
+        `/api/events?token=${encodeURIComponent(config.token)}&client=${client}`,
+      );
+      events.onmessage = (event) => {
+        const change = JSON.parse(event.data) as DesktopChange;
+        for (const listener of listeners) listener(change);
+      };
+      // Reconnects trigger a refresh even if changes happened while the connection was lost.
+      events.onopen = () => {
+        announce("connected");
+        for (const listener of listeners)
+          listener({ type: "files", home: "", all: true });
+      };
+      events.onerror = () => {
+        announce("lost");
+        // The browser retries by itself unless the service refused the stream.
+        if (events.readyState !== EventSource.CLOSED) return;
+        setTimeout(() => {
+          void request("invoke", { action: "app:info", args: {} }).then(
+            () => connect(),
+            (error: { code?: string }) => {
+              if (error.code !== "SERVICE_RESTARTED") connect();
+            },
+          );
+        }, 3000);
+      };
     };
-    // Reconnects trigger a refresh even if changes happened while the connection was lost.
-    events.onopen = () => {
-      for (const listener of listeners)
-        listener({ type: "files", home: "", all: true });
-    };
+    connect();
   }
   window.addEventListener("beforeunload", (event) => {
     if (dirty) {
@@ -216,7 +268,7 @@ export function installBrowserBridge() {
                   listener(),
                 ),
               )
-            ).every(Boolean);
+            ).every(closeAllowed);
           },
         }
       : {}),

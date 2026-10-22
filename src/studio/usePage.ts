@@ -107,7 +107,12 @@ export function usePage(home?: string) {
     [sessions],
   );
   useEffect(
-    () => desktop.onBeforeClose(() => sessions.prepareClose()),
+    () =>
+      desktop.onBeforeClose(async () =>
+        (await sessions.prepareClose())
+          ? true
+          : { allow: false, pages: sessions.unsavedPages() },
+      ),
     [sessions],
   );
   useEffect(

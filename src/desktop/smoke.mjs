@@ -306,17 +306,20 @@ try {
     "({count:window.__closeCount,bridge:!!window.showai})",
   );
   assert.deepEqual(refusal, { count: 1, bridge: true });
+  // The refusal is explained in a dialog; quitting meanwhile joins that same
+  // request instead of asking the page again.
   await main(`${native}.app.quit(); 'quit requested'`);
   await new Promise((done) => setTimeout(done, 300));
   assert.deepEqual(
     await renderer("({count:window.__closeCount,bridge:!!window.showai})"),
-    { count: 2, bridge: true },
+    { count: 1, bridge: true },
   );
   await renderer("window.__release();'released'");
   // Reply before closing the last window. Windows quits the event loop at that
   // point, so another inspector evaluation can wait forever for a response.
+  // Destroying the window dismisses the open explanation dialog with it.
   await main(
-    `setTimeout(()=>{const window=${workbench};window.once('closed',()=>${native}.app.quit());window.close();},50); 'requested'`,
+    `setTimeout(()=>{const window=${workbench};window.once('closed',()=>${native}.app.quit());window.destroy();},50); 'requested'`,
   );
   const exited = new Promise((resolve, reject) => {
     const timeout = setTimeout(

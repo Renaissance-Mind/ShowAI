@@ -33,6 +33,44 @@ export interface DesktopInfo {
   cli: { command: string; args: string[]; env: Record<string, string> };
   /** False where the host publishes the documentation itself (the public website). */
   builtinDocs?: boolean;
+  /** Source commit the App was built from; "unknown" when it was not recorded. */
+  sourceCommit?: string;
+  arch?: string;
+  osVersion?: string;
+  versions?: { node: string; electron?: string; chrome?: string };
+}
+
+/** Native menu items the workbench carries out with its existing actions. */
+export type MenuCommand =
+  | "newProject"
+  | "newPage"
+  | "newTab"
+  | "import"
+  | "export"
+  | "settings"
+  | "projects"
+  | "docs"
+  | "faq"
+  | "about"
+  | "reportProblem"
+  | "copyDiagnostics"
+  | "shortcuts";
+
+/** A page whose changes could not be written when its window was closing. */
+export interface UnsavedPage {
+  projectId: string;
+  pageId: string;
+  title: string;
+  reason: string;
+  /** Page source (.showai.json) of the unsaved draft, for export. */
+  source?: string;
+}
+
+/** A close listener either allows closing or explains which pages hold it open. */
+export type CloseResult = boolean | { allow: boolean; pages?: UnsavedPage[] };
+
+export function closeAllowed(result: CloseResult): boolean {
+  return typeof result === "boolean" ? result : result.allow === true;
 }
 
 export interface DesktopChange {
@@ -85,7 +123,13 @@ export interface ShowAIBridge {
   onChange(listener: (change: DesktopChange) => void): () => void;
   onTabCommand?(listener: (command: TabCommand) => void): () => void;
   onRefreshPage?(listener: () => void): () => void;
-  onBeforeClose(listener: () => Promise<boolean>): () => void;
+  onMenuCommand?(listener: (command: MenuCommand) => void): () => void;
+  /** Desktop only: the main-process log and its folder. */
+  logPath?(): Promise<string>;
+  openLogFolder?(): Promise<void>;
+  /** Plain-text diagnostics (versions, platform, library, log path), redacted. */
+  diagnostics?(): Promise<string>;
+  onBeforeClose(listener: () => Promise<CloseResult>): () => void;
   onBeforeReload?(listener: () => Promise<boolean>): () => void;
   prepareReload?(): Promise<boolean>;
 }

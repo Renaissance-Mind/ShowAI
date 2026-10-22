@@ -7,6 +7,7 @@ import { useLocale, useTranslator } from "./i18n/react";
 import messages from "./i18n/messages/common";
 import { registerBuiltinDisplayText } from "./components/component-display";
 import { builtinEnglish } from "./components/builtin-display-text";
+import { ConnectionBanner } from "./ConnectionBanner";
 // Editing hosts show built-in component names in English; readers never need them.
 registerBuiltinDisplayText(builtinEnglish);
 const CanvasApp = lazy(() => import("./CanvasApp"));
@@ -52,7 +53,10 @@ export default function App() {
       ) : preview ? (
         <ComponentPreviewPage />
       ) : window.showai ? (
-        <Studio />
+        <>
+          {window.__SHOWAI_LOCAL__ && <ConnectionBanner />}
+          <Studio />
+        </>
       ) : (
         <CanvasApp />
       )}

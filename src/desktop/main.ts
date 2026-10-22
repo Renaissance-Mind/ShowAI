@@ -20,7 +20,20 @@ import {
 } from "electron";
 import type { IpcMainEvent, IpcMainInvokeEvent, NativeImage } from "electron";
 import { watch, type FSWatcher } from "chokidar";
-import { mkdir, readFile, writeFile, realpath } from "node:fs/promises";
+import {
+  mkdir,
+  readFile,
+  writeFile,
+  realpath,
+  rename,
+  stat,
+  access,
+  constants as fsConstants,
+} from "node:fs/promises";
+import { readFileSync } from "node:fs";
+import { execFileSync } from "node:child_process";
+import { homedir } from "node:os";
+import { captureConsole, createMainLog, redactLogText } from "./main-log";
 import { atomicRename } from "../core/atomic-rename";
 import { dirname, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -70,6 +83,8 @@ import type {
   DesktopChange,
   DesktopInfo,
   DesktopResponse,
+  MenuCommand,
+  UnsavedPage,
 } from "./bridge";
 
 const t = translator(desktopMessages);
@@ -92,11 +107,16 @@ const ownWrites = new OwnWrites();
 let pendingDeepLink = process.argv.find((argument) =>
   argument.startsWith("showai://"),
 );
+interface CloseReply {
+  allow: boolean;
+  pages: UnsavedPage[];
+  reason: string;
+}
 const closeRequests = new Map<
   number,
   {
     requestId: string;
-    resolve: (allow: boolean | null) => void;
+    resolve: (reply: CloseReply | null) => void;
     timer: ReturnType<typeof setTimeout>;
     promise: Promise<boolean>;
   }
@@ -108,8 +128,50 @@ app.setName("ShowAI");
 // Chromium reports this to the renderer as the system language.
 const pinnedLocale = languageOverride();
 if (pinnedLocale) app.commandLine.appendSwitch("lang", pinnedLocale);
-if (process.env.SHOWAI_USER_DATA)
+if (process.env.SHOWAI_USER_DATA) {
   app.setPath("userData", resolve(process.env.SHOWAI_USER_DATA));
+  // Isolated instances keep their log next to their own profile.
+  app.setAppLogsPath(join(resolve(process.env.SHOWAI_USER_DATA), "logs"));
+}
+// Main process, Agent host and renderer failures, for problem reports.
+const mainLog = createMainLog({
+  directory: app.getPath("logs"),
+  fallback: (message) => process.stderr.write(`${message}\n`),
+});
+captureConsole(mainLog);
+process.on("uncaughtExceptionMonitor", (error) =>
+  mainLog.write("error", "main", "Uncaught exception:", error),
+);
+process.on("unhandledRejection", (reason) =>
+  console.error("Unhandled rejection:", reason),
+);
+mainLog.write(
+  "info",
+  "main",
+  `ShowAI ${app.getVersion()} starting (${process.platform} ${process.arch}, Electron ${process.versions.electron})`,
+);
+
+/** Commit recorded at build time; development reads it from the checkout. */
+const sourceCommit = (() => {
+  try {
+    const recorded = JSON.parse(
+      readFileSync(join(directory, "build-info.json"), "utf8"),
+    ) as { sourceCommit?: unknown };
+    if (typeof recorded.sourceCommit === "string") return recorded.sourceCommit;
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+  }
+  if (app.isPackaged) return "unknown";
+  try {
+    return execFileSync("git", ["rev-parse", "HEAD"], {
+      cwd: process.cwd(),
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "ignore"],
+    }).trim();
+  } catch {
+    return "unknown";
+  }
+})();
 
 function iconForAppearance(appearance: DesktopAppearance): NativeImage {
   const cached = appearanceIcons.get(appearance);
@@ -151,12 +213,36 @@ function info(): DesktopInfo {
     version: app.getVersion(),
     platform: process.platform,
     packaged: app.isPackaged,
+    mode: "desktop",
+    sourceCommit,
+    arch: process.arch,
+    osVersion: process.getSystemVersion(),
+    versions: {
+      node: process.versions.node,
+      electron: process.versions.electron,
+      chrome: process.versions.chrome,
+    },
     cli: {
       command: process.execPath,
       args: [join(runtimePath(), "scripts", "cli.mjs")],
       env: { ELECTRON_RUN_AS_NODE: "1", SHOWAI_HOME: store.root },
     },
   };
+}
+
+/** Plain-text environment summary for problem reports; paths are redacted. */
+function diagnostics(extra: string[] = []): string {
+  const lines = [
+    `ShowAI ${app.getVersion()} (${app.isPackaged ? "packaged" : "development"}, desktop)`,
+    `Source commit: ${sourceCommit}`,
+    `Platform: ${process.platform} ${process.getSystemVersion()} ${process.arch}`,
+    `Electron ${process.versions.electron} · Chrome ${process.versions.chrome} · Node ${process.versions.node}`,
+    `Language: ${getLocale()}`,
+    `Library: ${store ? store.root : "(not open)"}`,
+    `Log: ${mainLog.path}`,
+    ...extra,
+  ];
+  return redactLogText(lines.join("\n"), homedir());
 }
 
 function broadcast(type: DesktopChange["type"], change?: DesktopChange): void {
@@ -260,8 +346,11 @@ interface DesktopSettings {
   locale?: Locale;
 }
 
+class InvalidSettings extends Error {}
+const settingsPath = () => join(app.getPath("userData"), "showai-settings.json");
+
 async function readSettings(): Promise<DesktopSettings> {
-  const path = join(app.getPath("userData"), "showai-settings.json");
+  const path = settingsPath();
   let contents: string;
   try {
     contents = await readFile(path, "utf8");
@@ -269,9 +358,18 @@ async function readSettings(): Promise<DesktopSettings> {
     if ((error as NodeJS.ErrnoException).code === "ENOENT") return {};
     throw error;
   }
-  const settings = JSON.parse(contents) as { home?: unknown; locale?: unknown };
+  let settings: { home?: unknown; locale?: unknown };
+  try {
+    settings = JSON.parse(contents);
+  } catch (error) {
+    throw new InvalidSettings(`ShowAI settings are not valid JSON: ${(error as Error).message}`);
+  }
+  if (!settings || typeof settings !== "object" || Array.isArray(settings))
+    throw new InvalidSettings("ShowAI settings are not an object.");
   if (settings.home !== undefined && typeof settings.home !== "string")
-    throw new Error("ShowAI settings contain an invalid home directory.");
+    throw new InvalidSettings(
+      "ShowAI settings contain an invalid home directory.",
+    );
   return {
     home: settings.home,
     // An unknown saved language falls back to the system language.
@@ -294,8 +392,41 @@ async function saveSettings(update: DesktopSettings): Promise<void> {
   await atomicRename(temporary, path);
 }
 
+/** The window a menu item acts on; a new window when none is open. */
+async function menuWindow(target?: unknown): Promise<BrowserWindow> {
+  if (target instanceof BrowserWindow && windows.has(target)) return target;
+  const focused = BrowserWindow.getFocusedWindow();
+  if (focused && windows.has(focused)) return focused;
+  const first = [...windows].find((window) => !window.isDestroyed());
+  if (first) return first;
+  // A window that is still starting may miss the command; it opens either way.
+  return createWindow();
+}
+
+function sendMenuCommand(command: MenuCommand) {
+  return (_item: unknown, target: unknown) => {
+    void menuWindow(target)
+      .then((window) => {
+        window.show();
+        window.webContents.send("showai:menu-command", command);
+      })
+      .catch((error) => console.error("ShowAI menu command:", error));
+  };
+}
+
+async function openLogFolder(): Promise<void> {
+  await mkdir(mainLog.directory, { recursive: true });
+  const error = await shell.openPath(mainLog.directory);
+  if (error) throw new Error(error);
+}
+
 function buildApplicationMenu() {
   const darwin = process.platform === "darwin";
+  const settings = {
+    label: t("menu.settings"),
+    accelerator: "CommandOrControl+,",
+    click: sendMenuCommand("settings"),
+  };
   Menu.setApplicationMenu(
     Menu.buildFromTemplate([
       ...(darwin
@@ -304,6 +435,8 @@ function buildApplicationMenu() {
               role: "appMenu" as const,
               submenu: [
                 { role: "about" as const, label: t("menu.about") },
+                { type: "separator" as const },
+                settings,
                 { type: "separator" as const },
                 {
                   role: "services" as const,
@@ -319,6 +452,45 @@ function buildApplicationMenu() {
             },
           ]
         : []),
+      {
+        role: "fileMenu",
+        label: t("menu.file"),
+        submenu: [
+          { label: t("menu.newProject"), click: sendMenuCommand("newProject") },
+          {
+            label: t("menu.newPage"),
+            accelerator: "CommandOrControl+N",
+            click: sendMenuCommand("newPage"),
+          },
+          {
+            label: t("menu.newTab"),
+            accelerator: "CommandOrControl+T",
+            click: sendMenuCommand("newTab"),
+          },
+          {
+            label: t("menu.newWindow"),
+            accelerator: "CommandOrControl+Shift+N",
+            click: () =>
+              void createWindow().catch((error) =>
+                dialog.showErrorBox(
+                  t("openWindowFailed"),
+                  errorResult(error).message,
+                ),
+              ),
+          },
+          { type: "separator" },
+          { label: t("menu.import"), click: sendMenuCommand("import") },
+          { label: t("menu.export"), click: sendMenuCommand("export") },
+          ...(darwin
+            ? []
+            : [
+                { type: "separator" as const },
+                settings,
+                { type: "separator" as const },
+                { role: "quit" as const, label: t("menu.quit") },
+              ]),
+        ],
+      },
       {
         role: "editMenu",
         label: t("menu.edit"),
@@ -353,7 +525,14 @@ function buildApplicationMenu() {
                 window.webContents.send("showai:refresh-page");
             },
           },
-          { role: "toggleDevTools", label: t("menu.toggleDevTools") },
+          ...(app.isPackaged
+            ? []
+            : [
+                {
+                  role: "toggleDevTools" as const,
+                  label: t("menu.toggleDevTools"),
+                },
+              ]),
           { type: "separator" },
           { role: "resetZoom", label: t("menu.resetZoom") },
           { role: "zoomIn", label: t("menu.zoomIn") },
@@ -374,6 +553,37 @@ function buildApplicationMenu() {
                 { role: "front" as const, label: t("menu.front") },
               ]
             : [{ role: "close" as const, label: t("menu.close") }]),
+        ],
+      },
+      {
+        role: "help",
+        label: t("menu.help"),
+        submenu: [
+          { label: t("menu.docs"), click: sendMenuCommand("docs") },
+          { label: t("menu.faq"), click: sendMenuCommand("faq") },
+          { label: t("menu.shortcuts"), click: sendMenuCommand("shortcuts") },
+          { type: "separator" },
+          {
+            label: t("menu.reportProblem"),
+            click: sendMenuCommand("reportProblem"),
+          },
+          {
+            label: t("menu.copyDiagnostics"),
+            click: sendMenuCommand("copyDiagnostics"),
+          },
+          {
+            label: t("menu.openLogFolder"),
+            click: () =>
+              void openLogFolder().catch((error) =>
+                console.error("ShowAI log folder:", error),
+              ),
+          },
+          ...(darwin
+            ? []
+            : [
+                { type: "separator" as const },
+                { label: t("menu.about"), click: sendMenuCommand("about") },
+              ]),
         ],
       },
     ]),
@@ -415,8 +625,16 @@ async function nativeAction(
       if (selection.canceled || !selection.filePaths[0]) return null;
       const home = await realpath(selection.filePaths[0]);
       await new FileStore(home).listProjects();
+      // Only a library that actually opens is remembered for the next launch.
+      const previous = store.root;
+      try {
+        await useHome(home);
+      } catch (error) {
+        await useHome(previous);
+        broadcast("home");
+        throw error;
+      }
       await saveSettings({ home });
-      await useHome(home);
       broadcast("home");
       return info();
     }
@@ -552,19 +770,151 @@ function trustedSender(
   return window;
 }
 
+const shortText = (value: unknown, limit: number) =>
+  typeof value === "string" ? value.slice(0, limit) : "";
+
+/** Page details reported by a renderer that could not save before closing. */
+function unsavedPages(value: unknown): UnsavedPage[] {
+  if (!Array.isArray(value)) return [];
+  return value.slice(0, 100).flatMap((item): UnsavedPage[] => {
+    if (!item || typeof item !== "object") return [];
+    const page = item as Record<string, unknown>;
+    const source =
+      typeof page.source === "string" && page.source.length <= 64 * 1024 * 1024
+        ? page.source
+        : undefined;
+    return [
+      {
+        projectId: shortText(page.projectId, 200),
+        pageId: shortText(page.pageId, 200),
+        title: shortText(page.title, 200),
+        reason: shortText(page.reason, 1000),
+        ...(source ? { source } : {}),
+      },
+    ];
+  });
+}
+
+function safeFileName(title: string): string {
+  return (
+    title
+      .replace(/[<>:"/\\|?*\x00-\x1f]/g, "_")
+      .trim()
+      .slice(0, 100) || "ShowAI"
+  );
+}
+
+async function exportUnsavedPages(
+  window: BrowserWindow,
+  pages: UnsavedPage[],
+): Promise<string | null> {
+  const selection = await dialog.showOpenDialog(window, {
+    title: t("close.exportTitle"),
+    properties: ["openDirectory", "createDirectory"],
+  });
+  const folder = selection.filePaths[0];
+  if (selection.canceled || !folder) return null;
+  let written = 0;
+  for (const page of pages) {
+    if (!page.source) continue;
+    const base = safeFileName(page.title);
+    for (let index = 0; ; index++) {
+      const path = join(
+        folder,
+        `${base}${index ? ` (${index + 1})` : ""}.showai.json`,
+      );
+      try {
+        await writeFile(path, page.source, { encoding: "utf8", flag: "wx" });
+        written++;
+        break;
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error;
+      }
+    }
+  }
+  return t("close.exported", { count: written, path: folder });
+}
+
+/** Explains why a window cannot close yet; never refuses silently. */
+async function blockedClose(
+  window: BrowserWindow,
+  reply: CloseReply,
+): Promise<"retry" | "discard" | "keep"> {
+  let notice = "";
+  for (;;) {
+    const pages = reply.pages;
+    const exportable = pages.some((page) => page.source);
+    const list = pages
+      .slice(0, 10)
+      .map(
+        (page) =>
+          `• ${page.title || page.pageId} — ${page.reason || t("close.unknownReason")}`,
+      );
+    if (pages.length > 10) list.push(`…`);
+    const buttons = [
+      t("close.retry"),
+      ...(exportable ? [t("close.export")] : []),
+      t("discardAndClose"),
+      t("keepEditing"),
+    ];
+    const choice = await dialog.showMessageBox(window, {
+      type: "warning",
+      message: pages.length
+        ? t("close.blockedTitle", { count: pages.length })
+        : t("close.blockedUnknownTitle"),
+      detail: [
+        ...(list.length ? [list.join("\n")] : []),
+        ...(!pages.length && reply.reason ? [reply.reason] : []),
+        t("close.blockedDetail"),
+        ...(notice ? [notice] : []),
+      ].join("\n\n"),
+      buttons,
+      defaultId: 0,
+      cancelId: buttons.length - 1,
+      noLink: true,
+    });
+    // A window destroyed meanwhile has nothing left to keep open.
+    if (window.isDestroyed()) return "discard";
+    const label = buttons[choice.response];
+    if (label === t("close.retry")) return "retry";
+    if (label === t("discardAndClose")) return "discard";
+    if (label === t("keepEditing")) return "keep";
+    notice = (await exportUnsavedPages(window, pages)) ?? notice;
+  }
+}
+
 function requestClose(window: BrowserWindow): Promise<boolean> {
   if (window.isDestroyed()) return Promise.resolve(true);
   const pending = closeRequests.get(window.id);
   if (pending) return pending.promise;
   const requestId = randomUUID();
-  let resolveResult!: (allow: boolean | null) => void;
-  const received = new Promise<boolean | null>((resolve) => {
+  let resolveResult!: (reply: CloseReply | null) => void;
+  const received = new Promise<CloseReply | null>((resolve) => {
     resolveResult = resolve;
   });
   const timer = setTimeout(() => resolveResult(null), 20000);
-  const promise = received
-    .then(async (allow) => {
-      if (allow !== null || window.isDestroyed()) return allow ?? true;
+  // A window that goes away settles its close request, even while a dialog is open.
+  const closed = new Promise<boolean>((resolve) =>
+    window.once("closed", () => resolve(true)),
+  );
+  const decided = received.then(async (reply): Promise<boolean> => {
+      if (window.isDestroyed()) return true;
+      if (reply?.allow) return true;
+      if (reply) {
+        mainLog.write(
+          "warn",
+          "main",
+          `Close blocked: ${reply.pages.length} unsaved page(s)`,
+          reply.pages.map((page) => `${page.pageId}: ${page.reason}`),
+          reply.reason,
+        );
+        const decision = await blockedClose(window, reply);
+        if (decision === "discard") return true;
+        if (decision === "keep") return false;
+        clearTimeout(timer);
+        closeRequests.delete(window.id);
+        return requestClose(window);
+      }
       const choice = await dialog.showMessageBox(window, {
         type: "warning",
         message: t("unsavedMessage"),
@@ -575,12 +925,12 @@ function requestClose(window: BrowserWindow): Promise<boolean> {
         noLink: true,
       });
       return choice.response === 1;
-    })
-    .finally(() => {
-      clearTimeout(timer);
-      if (closeRequests.get(window.id)?.requestId === requestId)
-        closeRequests.delete(window.id);
     });
+  const promise = Promise.race([decided, closed]).finally(() => {
+    clearTimeout(timer);
+    if (closeRequests.get(window.id)?.requestId === requestId)
+      closeRequests.delete(window.id);
+  });
   closeRequests.set(window.id, {
     requestId,
     resolve: resolveResult,
@@ -591,9 +941,83 @@ function requestClose(window: BrowserWindow): Promise<boolean> {
   return promise;
 }
 
+/** Renderer crashes, failed loads and hangs get a way out instead of a blank window. */
+function watchWindowHealth(window: BrowserWindow): void {
+  let open = false;
+  const offer = async (
+    title: string,
+    detail: string,
+    details: string,
+    waitable = false,
+  ) => {
+    if (open || window.isDestroyed()) return;
+    open = true;
+    try {
+      for (;;) {
+        const buttons = [
+          t("action.reload"),
+          t("action.closeWindow"),
+          t("action.copyDetails"),
+          ...(waitable ? [t("action.wait")] : []),
+        ];
+        const choice = await dialog.showMessageBox(window, {
+          type: "error",
+          message: title,
+          detail,
+          buttons,
+          defaultId: 0,
+          cancelId: waitable ? 3 : 1,
+          noLink: true,
+        });
+        if (window.isDestroyed()) return;
+        if (choice.response === 2) {
+          clipboard.writeText(diagnostics(["", details]));
+          continue;
+        }
+        if (choice.response === 0) window.webContents.reload();
+        if (choice.response === 1) window.destroy();
+        return;
+      }
+    } finally {
+      open = false;
+    }
+  };
+  window.webContents.on("render-process-gone", (_event, details) => {
+    console.error("ShowAI renderer gone:", details);
+    if (details.reason === "clean-exit") return;
+    void offer(
+      t("window.crashedTitle"),
+      t("window.crashedDetail", { reason: details.reason }),
+      `render-process-gone: ${details.reason} (exit ${details.exitCode})`,
+    );
+  });
+  window.webContents.on(
+    "did-fail-load",
+    (_event, code, description, url, isMainFrame) => {
+      // -3 is an aborted navigation, replaced by another load.
+      if (!isMainFrame || code === -3) return;
+      console.error("ShowAI window load failed:", code, description, url);
+      void offer(
+        t("window.loadFailedTitle"),
+        t("window.loadFailedDetail", { reason: `${description} ${code}` }),
+        `did-fail-load: ${code} ${description} ${url}`,
+      );
+    },
+  );
+  window.on("unresponsive", () => {
+    console.error("ShowAI window unresponsive");
+    void offer(
+      t("window.unresponsiveTitle"),
+      t("window.unresponsiveDetail"),
+      "unresponsive",
+      true,
+    );
+  });
+}
+
 async function createWindow(page?: WindowTarget): Promise<BrowserWindow> {
   const window = new BrowserWindow({
-    width: page ? 1120 : 1320,
+    width: page && !page.restoreTabs ? 1120 : 1320,
     height: 880,
     minWidth: 760,
     minHeight: 560,
@@ -614,6 +1038,7 @@ async function createWindow(page?: WindowTarget): Promise<BrowserWindow> {
   });
   windows.add(window);
   preparePreviewWindows(window);
+  watchWindowHealth(window);
   applyWindowAppearance(
     window,
     nativeTheme.shouldUseDarkColors ? "dark" : "light",
@@ -652,7 +1077,7 @@ async function createWindow(page?: WindowTarget): Promise<BrowserWindow> {
     });
   });
   window.on("closed", () => {
-    closeRequests.get(window.id)?.resolve(true);
+    closeRequests.get(window.id)?.resolve({ allow: true, pages: [], reason: "" });
     windows.delete(window);
   });
   window.webContents.setWindowOpenHandler(({ url }) => {
@@ -702,6 +1127,67 @@ async function createWindow(page?: WindowTarget): Promise<BrowserWindow> {
   return window;
 }
 
+class DeepLinkPageMissing extends Error {
+  constructor(
+    message: string,
+    readonly original: unknown,
+  ) {
+    super(message);
+  }
+}
+
+/** A link that cannot open never quits the App; the main window explains why. */
+async function handleDeepLink(source: string): Promise<void> {
+  try {
+    await openDeepLink(source);
+    return;
+  } catch (error) {
+    console.error("ShowAI link failed:", source.split("?")[0], error);
+    const window =
+      [...windows].find((window) => !window.isDestroyed()) ??
+      (await createWindow());
+    window.show();
+    window.focus();
+    const missing =
+      error instanceof DeepLinkPageMissing &&
+      ["NOT_FOUND", "ENOENT", "INVALID_PATH"].includes(
+        errorResult(error.original).code,
+      );
+    const malformed =
+      !missing &&
+      (error instanceof TypeError ||
+        (error instanceof CoreError && error.code === "INVALID_PATH"));
+    const buttons = [
+      ...(missing ? [t("deepLink.openProjects")] : []),
+      t("deepLink.copyLink"),
+      t("action.close"),
+    ];
+    const choice = await dialog.showMessageBox(window, {
+      type: "warning",
+      message: missing
+        ? t("deepLink.missingTitle")
+        : malformed
+          ? t("deepLink.malformedTitle")
+          : t("deepLink.failedTitle"),
+      detail: missing
+        ? t("deepLink.missingDetail", {
+            home: redactLogText(store.root, homedir()),
+          })
+        : malformed
+          ? t("deepLink.malformedDetail")
+          : errorResult(error).message,
+      buttons,
+      defaultId: 0,
+      cancelId: buttons.length - 1,
+      noLink: true,
+    });
+    const label = buttons[choice.response];
+    if (label === t("deepLink.copyLink")) clipboard.writeText(source);
+    if (label === t("deepLink.openProjects") && !window.isDestroyed())
+      window.webContents.send("showai:menu-command", "projects");
+  }
+}
+
 async function openDeepLink(source: string): Promise<void> {
   const url = new URL(source);
   if (url.protocol === "showai:" && url.hostname === "login") {
@@ -728,10 +1214,7 @@ async function openDeepLink(source: string): Promise<void> {
     parts.length !== 3 ||
     parts[1] !== "page"
   )
-    throw new CoreError(
-      "INVALID_PATH",
-      "Expected showai://project/PROJECT/page/PAGE[?blocks=ID,ID].",
-    );
+    throw new CoreError("INVALID_PATH", t("deepLink.malformedDetail"));
   const project = assertId(parts[0]),
     page = assertId(parts[2]);
   // A copied ShowAI reference names the blocks to highlight.
@@ -740,12 +1223,170 @@ async function openDeepLink(source: string): Promise<void> {
     .filter(Boolean)
     .slice(0, 100)
     .map(assertId);
-  await store.readPage(project, page);
+  await store.readPage(project, page).catch((error) => {
+    throw new DeepLinkPageMissing(errorResult(error).message, error);
+  });
   await createWindow({
     projectId: project,
     pageId: page,
     ...(blocks.length ? { blocks: blocks.join(",") } : {}),
   });
+}
+
+class StartupCancelled extends Error {}
+
+function quitNow(): void {
+  allowedQuit = true;
+  app.quit();
+}
+
+/** Damaged settings are moved aside so the next launch can start cleanly. */
+async function startupSettings(): Promise<
+  DesktopSettings & { damagedBackup?: string }
+> {
+  try {
+    return await readSettings();
+  } catch (error) {
+    if (!(error instanceof InvalidSettings)) throw error;
+    const backup = `${settingsPath()}.damaged-${new Date()
+      .toISOString()
+      .replace(/[:.]/g, "-")}`;
+    await rename(settingsPath(), backup);
+    console.error("ShowAI settings were damaged and backed up:", backup, error);
+    return { damagedBackup: backup };
+  }
+}
+
+async function libraryProblem(
+  home: string,
+): Promise<"missing" | "notDirectory" | undefined> {
+  try {
+    if (!(await stat(home)).isDirectory()) return "notDirectory";
+  } catch (error) {
+    const code = (error as NodeJS.ErrnoException).code;
+    if (code === "ENOENT" || code === "ENOTDIR") return "missing";
+    throw error;
+  }
+  await access(home, fsConstants.R_OK | fsConstants.W_OK);
+}
+
+/**
+ * Opens the remembered library. A missing one is never replaced by a new
+ * empty library: the person decides to wait, choose another or use the default.
+ */
+async function openStartupLibrary(
+  saved: string | undefined,
+  damagedBackup?: string,
+): Promise<void> {
+  if (process.env.SHOWAI_HOME) return useHome(process.env.SHOWAI_HOME);
+  const defaultHome = join(homedir(), ".showai");
+  const shown = (path: string) => redactLogText(path, homedir());
+  let home = saved;
+  let prompt: { message: string; detail: string } | undefined = damagedBackup
+    ? {
+        message: t("settings.corruptTitle"),
+        detail: t("settings.corruptDetail", { backup: shown(damagedBackup) }),
+      }
+    : undefined;
+  for (;;) {
+    if (!prompt && home) {
+      const problem = await libraryProblem(home).catch((error) => {
+        prompt = {
+          message: t("library.unavailableTitle"),
+          detail: t("library.unavailableDetail", {
+            path: shown(home!),
+            reason: errorResult(error).message,
+          }),
+        };
+        return undefined;
+      });
+      if (problem === "missing")
+        prompt = {
+          message: t("library.missingTitle"),
+          detail: t("library.missingDetail", { path: shown(home) }),
+        };
+      if (problem === "notDirectory")
+        prompt = {
+          message: t("library.missingTitle"),
+          detail: t("library.notDirectory", { path: shown(home) }),
+        };
+    }
+    if (!prompt) {
+      try {
+        await useHome(home);
+        if (home !== saved || damagedBackup) await saveSettings({ home });
+        return;
+      } catch (error) {
+        console.error("ShowAI library unavailable:", error);
+        prompt = {
+          message: t("library.unavailableTitle"),
+          detail: t("library.unavailableDetail", {
+            path: shown(home ?? defaultHome),
+            reason: errorResult(error).message,
+          }),
+        };
+      }
+    }
+    mainLog.write("warn", "main", `${prompt.message}: ${prompt.detail}`);
+    const retry = !damagedBackup || home !== undefined;
+    const buttons = [
+      ...(retry ? [t("action.retry")] : []),
+      t("library.choose"),
+      t("library.useDefault", { path: shown(defaultHome) }),
+      t("action.quit"),
+    ];
+    const choice = await dialog.showMessageBox({
+      type: "warning",
+      message: prompt.message,
+      detail: prompt.detail,
+      buttons,
+      defaultId: 0,
+      cancelId: buttons.length - 1,
+      noLink: true,
+    });
+    const label = buttons[choice.response];
+    if (label === t("action.quit")) throw new StartupCancelled();
+    if (label === t("library.choose")) {
+      const selection = await dialog.showOpenDialog({
+        title: t("library.chooseTitle"),
+        defaultPath: home ? dirname(home) : homedir(),
+        properties: ["openDirectory", "createDirectory"],
+      });
+      if (selection.canceled || !selection.filePaths[0]) continue;
+      home = await realpath(selection.filePaths[0]);
+    }
+    if (label === t("library.useDefault", { path: shown(defaultHome) }))
+      home = undefined;
+    prompt = undefined;
+  }
+}
+
+async function startupFailed(error: unknown): Promise<void> {
+  console.error("ShowAI startup failed:", error);
+  const message = errorResult(error).message;
+  for (;;) {
+    const buttons = [
+      t("action.copyDiagnostics"),
+      t("action.openLogFolder"),
+      t("action.quit"),
+    ];
+    const choice = await dialog.showMessageBox({
+      type: "error",
+      message: t("startFailed"),
+      detail: `${message}\n\n${t("startFailedDetail")}`,
+      buttons,
+      defaultId: 2,
+      cancelId: 2,
+      noLink: true,
+    });
+    if (choice.response === 0)
+      clipboard.writeText(diagnostics(["", `Startup error: ${message}`]));
+    else if (choice.response === 1)
+      await openLogFolder().catch((reason) =>
+        console.error("ShowAI log folder:", reason),
+      );
+    else break;
+  }
 }
 
 if (!app.requestSingleInstanceLock()) app.quit();
@@ -760,12 +1401,7 @@ else {
         message.type === "showai:development-focus"
       ) {
         if ("url" in message && typeof message.url === "string")
-          void openDeepLink(message.url).catch((error) =>
-            dialog.showErrorBox(
-              t("openPageFailed"),
-              errorResult(error).message,
-            ),
-          );
+          void handleDeepLink(message.url);
         else {
           const window = [...windows][0];
           if (window) {
@@ -792,17 +1428,11 @@ else {
   app.on("open-url", (event, url) => {
     event.preventDefault();
     if (!app.isReady()) pendingDeepLink = url;
-    else
-      void openDeepLink(url).catch((error) =>
-        dialog.showErrorBox(t("openPageFailed"), errorResult(error).message),
-      );
+    else void handleDeepLink(url);
   });
   app.on("second-instance", (_event, argv) => {
     const link = argv.find((argument) => argument.startsWith("showai://"));
-    if (link)
-      void openDeepLink(link).catch((error) =>
-        dialog.showErrorBox(t("openPageFailed"), errorResult(error).message),
-      );
+    if (link) void handleDeepLink(link);
     else {
       const window = [...windows][0];
       window?.show();
@@ -812,13 +1442,17 @@ else {
   app
     .whenReady()
     .then(async () => {
-      const settings = await readSettings();
+      // Startup dialogs use the system language until the saved one is known.
+      setLocale(
+        pinnedLocale ?? resolveLocale(app.getPreferredSystemLanguages()),
+      );
+      const settings = await startupSettings();
       setLocale(
         pinnedLocale ??
           settings.locale ??
           resolveLocale(app.getPreferredSystemLanguages()),
       );
-      await useHome(process.env.SHOWAI_HOME ?? settings.home);
+      await openStartupLibrary(settings.home, settings.damagedBackup);
       process.env.SHOWAI_VIEWER ??= join(
         runtimePath(),
         "assets",
@@ -910,6 +1544,43 @@ else {
           throw new CoreError("INVALID_DATA", "Unknown appearance.");
         applyWindowAppearance(window, appearance);
       });
+      ipcMain.handle("logs:path", (event) => {
+        trustedSender(event);
+        return mainLog.path;
+      });
+      ipcMain.handle("logs:open-folder", async (event) => {
+        trustedSender(event);
+        await openLogFolder();
+      });
+      ipcMain.handle("showai:diagnostics", (event) => {
+        trustedSender(event);
+        return diagnostics();
+      });
+      const rendererReports = new Map<number, { minute: number; count: number }>();
+      ipcMain.on("showai:renderer-error", (event, payload: unknown) => {
+        let window: BrowserWindow;
+        try {
+          window = trustedSender(event);
+        } catch {
+          return;
+        }
+        if (!payload || typeof payload !== "object") return;
+        // A render loop must not fill the log; keep at most 30 reports a minute.
+        const minute = Math.floor(Date.now() / 60000);
+        const budget = rendererReports.get(window.id);
+        const count = budget?.minute === minute ? budget.count + 1 : 1;
+        rendererReports.set(window.id, { minute, count });
+        if (count > 30) return;
+        const report = payload as Record<string, unknown>;
+        mainLog.write(
+          "error",
+          "renderer",
+          `${shortText(report.kind, 40)}: ${shortText(report.message, 4000)}`,
+          ...(typeof report.stack === "string"
+            ? [`\n${shortText(report.stack, 8000)}`]
+            : []),
+        );
+      });
       ipcMain.on("showai:close-result", (event, payload: unknown) => {
         let window: BrowserWindow;
         try {
@@ -918,14 +1589,26 @@ else {
           return;
         }
         if (!payload || typeof payload !== "object") return;
-        const result = payload as { requestId?: unknown; allow?: unknown };
+        const result = payload as {
+          requestId?: unknown;
+          allow?: unknown;
+          pages?: unknown;
+          reason?: unknown;
+        };
         const pending = closeRequests.get(window.id);
         if (
           pending &&
           pending.requestId === result.requestId &&
           typeof result.allow === "boolean"
         )
-          pending.resolve(result.allow);
+          pending.resolve({
+            allow: result.allow,
+            pages: unsavedPages(result.pages),
+            reason:
+              typeof result.reason === "string"
+                ? result.reason.slice(0, 2000)
+                : "",
+          });
       });
       ipcMain.handle(
         "showai:invoke",
@@ -962,17 +1645,17 @@ else {
           }
         },
       );
-      if (pendingDeepLink) await openDeepLink(pendingDeepLink);
-      else await createWindow();
+      if (pendingDeepLink) await handleDeepLink(pendingDeepLink);
+      else await createWindow({ restoreTabs: true });
       if (!app.isPackaged && process.env.SHOWAI_DEV_URL)
         process.send?.({ type: "ready", home: store.root });
       app.on("activate", () => {
         if (!windows.size) void createWindow();
       });
     })
-    .catch((error) => {
-      dialog.showErrorBox(t("startFailed"), errorResult(error).message);
-      app.quit();
+    .catch(async (error) => {
+      if (!(error instanceof StartupCancelled)) await startupFailed(error);
+      quitNow();
     });
   app.on("window-all-closed", () => {
     if (process.platform !== "darwin") app.quit();
@@ -996,7 +1679,7 @@ else {
       await watcher?.close();
       await sources?.close();
       await maintenance?.stop();
-      await syncManager(store.root).stop();
+      if (store) await syncManager(store.root).stop();
       for (const window of windows) if (!window.isDestroyed()) window.destroy();
       app.quit();
     });
