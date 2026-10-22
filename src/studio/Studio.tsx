@@ -16,6 +16,7 @@ import { readNavigationCache, writeNavigationCache } from "./navigation-cache";
 import { applyLibraryMove, type LibraryContents } from "./library-move";
 import { ComponentLibraryContext } from "../components/ComponentLibrary";
 import { insertComponent } from "../surface/component-insertion";
+import { useAppearancePreference } from "../design/appearance-preference";
 import { findSurfaceNode } from "../surface/document.mjs";
 import { upgradeResource } from "../surface/containers.mjs";
 import {
@@ -24,6 +25,7 @@ import {
   useMemo,
   useRef,
   useState,
+  type DragEvent,
   type MouseEvent as ReactMouseEvent,
   type ReactNode,
 } from "react";
@@ -39,6 +41,7 @@ import {
   Search,
   CodeXml,
   Download,
+  BookOpen,
   FolderMinus,
   Globe,
   Package,
@@ -68,6 +71,7 @@ import {
   Plus,
   History,
   Upload,
+  X,
   ArchiveRestore,
   Cloud,
   EyeOff,
@@ -90,7 +94,7 @@ import type {
   DesktopChange,
   MenuCommand,
 } from "../desktop/bridge";
-import type { ShowArtifact, ShowDocument } from "../types";
+import type { ShowDocument } from "../types";
 import type {
   BuiltinComponentMetadata,
   CompiledComponent,
@@ -106,9 +110,11 @@ import {
   containerMenuItems,
   type EditorControls,
 } from "../surface/EditorControls";
-import { parseArtifact } from "../lib/artifact";
-import { parseMarkdown } from "../lib/markdown";
-import { newDocument } from "../lib/document";
+import {
+  IMPORT_SIZE_LIMIT,
+  importedArtifact,
+  isImportablePageFile,
+} from "./page-import";
 import { desktop, errorMessage } from "./bridge";
 import { workbenchCapabilities } from "./capabilities";
 import { usePage, type LoadedPage } from "./usePage";
@@ -659,12 +665,20 @@ export default function Studio() {
   const [externalChangeCount, setExternalChangeCount] = useState(0);
   const [exportMenu, setExportMenu] = useState<HTMLElement | null>(null);
   const exportSiteButton = useRef<HTMLButtonElement>(null);
-  const [dark, setDark] = useState(() => {
-    const saved = localStorage.getItem("showai:appearance");
-    return saved
-      ? saved === "dark"
-      : matchMedia("(prefers-color-scheme: dark)").matches;
-  });
+  const [fileDrop, setFileDrop] = useState(false);
+  const [assistantPrefill, setAssistantPrefill] = useState<{
+    key: string;
+    pageId: string;
+    text: string;
+  } | null>(null);
+  const [pageExportMenu, setPageExportMenu] = useState<HTMLElement | null>(
+    null,
+  );
+  const [exportReceipt, setExportReceipt] = useState<{
+    message: string;
+    path: string;
+  } | null>(null);
+  const appearance = useAppearancePreference();
   const [componentProject, setComponentProject] = useState("all");
   const componentProjectRef = useRef(componentProject);
   componentProjectRef.current = componentProject;
@@ -1126,10 +1140,6 @@ export default function Studio() {
   ]);
 
   useEffect(() => {
-    document.documentElement.dataset.theme = dark ? "dark" : "light";
-    localStorage.setItem("showai:appearance", dark ? "dark" : "light");
-  }, [dark]);
-  useEffect(() => {
     if (!info || sidebarHome.current !== info.home) return;
     localStorage.setItem(
       sidebarExpansionKey(info.home),
@@ -1140,6 +1150,11 @@ export default function Studio() {
       }),
     );
   }, [info?.home, expandedProjects, expandedFolders, collapsedSections]);
+  useEffect(() => {
+    if (!exportReceipt) return;
+    const timer = setTimeout(() => setExportReceipt(null), 10000);
+    return () => clearTimeout(timer);
+  }, [exportReceipt]);
   useEffect(() => {
     document.title =
       view === "page" && page.draft
@@ -1516,7 +1531,7 @@ export default function Studio() {
       setDialog(null);
       setView("page");
       await refresh();
-      return true;
+      return created.document.id;
     } catch (reason) {
       report(reason, { action: operation("op.createPage") });
       return false;
@@ -1533,33 +1548,39 @@ export default function Studio() {
     changeAssistantOpen(true);
     focusAssistantInput();
   }
-  async function importPage() {
-    if (!selectedProject) return;
+  /** One import path for the toolbar, the 「添加内容」 menu and files dropped on the directory. */
+  async function importPage(
+    directory: { projectId: string; parentId: string | null } | null =
+      selectedProject
+        ? { projectId: selectedProject, parentId: selectedFolder }
+        : null,
+    dropped?: { name: string; content: string }[],
+  ) {
+    if (!directory) return;
     if (!(await page.flush())) return;
-    const file = await desktop.invoke<{ name: string; content: string } | null>(
-      "dialog:openPage",
-    );
-    if (!file) return;
-    let artifact: ShowArtifact;
-    if (/\.(md|markdown|txt)$/i.test(file.name)) {
-      const document = newDocument(file.name.replace(/\.[^.]+$/, ""));
-      document.content = parseMarkdown(file.content);
-      artifact = { format: "showai", version: 1, document };
-    } else if (/\.html?$/i.test(file.name)) {
-      const dom = new DOMParser().parseFromString(file.content, "text/html");
-      artifact = parseArtifact(
-        dom.getElementById("showai-data")?.textContent ?? "",
-      );
-    } else artifact = parseArtifact(file.content);
-    const imported = await desktop.invoke<LoadedPage>("pages:import", {
-      projectId: selectedProject,
-      parentId: selectedFolder,
-      artifact,
-    });
-    await openPage(imported.document.id, selectedProject);
-    setView("page");
+    const files = dropped ?? [
+      await desktop.invoke<{ name: string; content: string } | null>(
+        "dialog:openPage",
+      ),
+    ];
+    const chosen = files.filter((file) => !!file);
+    if (!chosen.length) return;
+    let imported: LoadedPage | undefined;
+    for (const file of chosen)
+      imported = await desktop.invoke<LoadedPage>("pages:import", {
+        ...directory,
+        artifact: importedArtifact(file),
+      });
+    if (chosen.length === 1 && imported) {
+      await openPage(imported.document.id, directory.projectId);
+      setView("page");
+    }
     await refresh();
-    setNotice(t("pageImported"));
+    setNotice(
+      chosen.length === 1
+        ? t("pageImported")
+        : t("pagesImported", { count: chosen.length }),
+    );
   }
   /**
    * Data read from files outside the library is embedded as a snapshot only
@@ -1608,7 +1629,8 @@ export default function Studio() {
         },
       );
       resolveProblem(operation("op.exportPage"));
-      if (result) setNotice(t("pageExported"));
+      if (result)
+        setExportReceipt({ message: t("pageExported"), path: result.path });
     } catch (reason) {
       report(reason, {
         action: operation("op.exportPage"),
@@ -1638,11 +1660,13 @@ export default function Studio() {
       );
       resolveProblem(operation("op.exportSite"));
       if (result)
-        setNotice(
-          components === "remote"
-            ? t("siteExportedRemote")
-            : t("siteExportedBundled"),
-        );
+        setExportReceipt({
+          message:
+            components === "remote"
+              ? t("siteExportedRemote")
+              : t("siteExportedBundled"),
+          path: result.path,
+        });
     } catch (reason) {
       report(reason, {
         action: operation("op.exportSite"),
@@ -1736,6 +1760,101 @@ export default function Studio() {
         label: tn("newPageForAgent"),
         icon: <Sparkles size={15} />,
         onSelect: action(() => createPageForAgent(directory)),
+      },
+      {
+        label: t("create.fromTemplate"),
+        icon: <FilePlus2 size={15} />,
+        separatorBefore: true,
+        onSelect: action(() =>
+          beginNewPage(directory.projectId, directory.parentId),
+        ),
+      },
+      {
+        label: t("create.import"),
+        icon: <Upload size={15} />,
+        onSelect: action(() => importPage(directory)),
+      },
+    ];
+  }
+  /** The grouped export menu shared by the top-bar ↗ button and the page 「…」 menu. */
+  function pageExportMenuItems(): LibraryContextMenuItem[] {
+    const target = activePageTarget();
+    const common = t("exportGroup.common"),
+      agents = t("exportGroup.agents"),
+      advanced = t("exportGroup.advanced");
+    return [
+      {
+        group: common,
+        label: t("exportHtml"),
+        description: t("exportHtmlDetail"),
+        icon: <ArrowUpRight size={15} />,
+        disabled: busy,
+        onSelect: () => void exportPage("html"),
+      },
+      ...(capabilities.advancedPageExport
+        ? [
+            {
+              group: common,
+              label: t("exportReadingShort"),
+              description: t("exportReadingDetail"),
+              icon: <BookOpen size={15} />,
+              disabled: busy,
+              onSelect: () => void exportPage("html", "bundled", "reading"),
+            },
+            {
+              group: agents,
+              label: t("exportSnippetShort"),
+              description: t("exportSnippetDetail"),
+              icon: <CodeXml size={15} />,
+              disabled: busy,
+              onSelect: () => void exportPage("inline"),
+            },
+          ]
+        : []),
+      ...(target
+        ? [
+            {
+              group: agents,
+              label: tc("copyReference"),
+              description: t("copyPageReferenceDetail"),
+              icon: <AtSign size={15} />,
+              onSelect: action(() =>
+                copyPageReference(target.projectId, {
+                  kind: "page",
+                  pageId: target.id,
+                }),
+              ),
+            },
+          ]
+        : []),
+      ...(capabilities.advancedPageExport
+        ? [
+            {
+              group: advanced,
+              label: t("exportOnlinePageShort"),
+              description: t("exportOnlinePageDetail"),
+              icon: <Globe size={15} />,
+              disabled: busy,
+              onSelect: () =>
+                void exportPage("html", "bundled", "reading", "cdn"),
+            },
+            {
+              group: advanced,
+              label: t("exportWithPublished"),
+              description: t("exportWithPublishedDetail"),
+              icon: <Globe size={15} />,
+              disabled: busy,
+              onSelect: () => void exportPage("html", "remote"),
+            },
+          ]
+        : []),
+      {
+        group: advanced,
+        label: tc("downloadSource"),
+        description: t("downloadSourceDetail"),
+        icon: <Download size={15} />,
+        disabled: busy,
+        onSelect: () => void exportPage("json"),
       },
     ];
   }
@@ -2547,6 +2666,29 @@ export default function Studio() {
     selectedRef.current = page.projectId;
     setView("page");
   }
+  /** Page templates create a page here; workflow templates hand a prompt to an agent. */
+  function templateDialogActions(record: LoadedTemplate, owner?: string) {
+    const projectId =
+      owner ??
+      selectedProject ??
+      (componentProject !== "all" ? componentProject : null);
+    return {
+      ...(templateHasPage(record)
+        ? {
+            createUnavailable: !projectId || contentCreationDisabled,
+            onCreatePage: async () => {
+              if (!projectId) return;
+              await createPage(record.id, record, undefined, {
+                projectId,
+                parentId: projectId === selectedProject ? selectedFolder : null,
+              });
+            },
+          }
+        : {}),
+      onCopyPrompt: (prompt: string) =>
+        desktop.invoke<void>("clipboard:write", { text: prompt }),
+    };
+  }
   async function viewComponent(
     item: CatalogComponent,
     expectedDialog?: Exclude<DialogState, null>,
@@ -3204,6 +3346,58 @@ export default function Studio() {
     busy ||
     !!syncReadOnly ||
     (!!selectedFolder && !currentFolder);
+  async function importDroppedFiles(files: File[]) {
+    if (!project) return;
+    const accepted = files.filter(
+      (file) => isImportablePageFile(file.name) && file.size <= IMPORT_SIZE_LIMIT,
+    );
+    const skipped = files.filter((file) => !accepted.includes(file));
+    if (skipped.length)
+      setNotice(
+        t("dropImportUnsupported", {
+          names: skipped.map((file) => file.name).join(", "),
+        }),
+        { kind: "warning" },
+      );
+    if (!accepted.length) return;
+    const contents = await Promise.all(
+      accepted.map(async (file) => ({
+        name: file.name,
+        content: await file.text(),
+      })),
+    );
+    await importPage(
+      { projectId: project.id, parentId: currentFolder?.id ?? null },
+      contents,
+    );
+  }
+  const carriesFiles = (event: DragEvent) =>
+    event.dataTransfer.types.includes("Files");
+  // Files dropped on the directory view import like 「添加内容 → 导入文件…」.
+  const directoryFileDrop =
+    view === "project" && project && !contentCreationDisabled
+      ? {
+          "data-file-drop": true,
+          onDragOver: (event: DragEvent) => {
+            if (!carriesFiles(event)) return;
+            event.preventDefault();
+            event.dataTransfer.dropEffect = "copy";
+            setFileDrop(true);
+          },
+          onDragLeave: (event: DragEvent) => {
+            if (!event.currentTarget.contains(event.relatedTarget as Node))
+              setFileDrop(false);
+          },
+          onDrop: (event: DragEvent) => {
+            if (!carriesFiles(event)) return;
+            event.preventDefault();
+            setFileDrop(false);
+            void importDroppedFiles([...event.dataTransfer.files]).catch(
+              report,
+            );
+          },
+        }
+      : {};
   // Stable row handlers let memoized LibraryRows skip unrelated Studio renders.
   const rowHandlers = useRef({
     openTargetClick,
@@ -3274,6 +3468,20 @@ export default function Studio() {
         setSettingsSection("agent");
         void navigate("settings").catch(report);
       }}
+      onStartPrompt={
+        sampleProjectId
+          ? async (text) => {
+              // Only the built-in Agent can take it: write it on a new page of the sample project.
+              const pageId = await createPage("blank", undefined, "page", {
+                projectId: sampleProjectId,
+                parentId: null,
+              });
+              if (!pageId) return;
+              setAssistantPrefill({ key: crypto.randomUUID(), pageId, text });
+              changeAssistantOpen(true);
+            }
+          : undefined
+      }
       onOpenPluginSettings={() => {
         setSettingsSection("plugins");
         void navigate("settings").catch(report);
@@ -3843,8 +4051,14 @@ export default function Studio() {
               className="studio-icon"
               aria-label={tc("export")}
               title={t("exportPage")}
+              aria-haspopup="menu"
               disabled={busy}
-              onClick={() => void exportPage("html")}
+              onClick={(event) => {
+                const anchor = event.currentTarget;
+                setPageExportMenu((current) =>
+                  current === anchor ? null : anchor,
+                );
+              }}
             >
               <ArrowUpRight size={14} />
             </button>
@@ -3965,6 +4179,8 @@ export default function Studio() {
               setSettingsSection("agent");
               void navigate("settings").catch(report);
             }}
+            prefill={assistantPrefill}
+            onPrefillUsed={() => setAssistantPrefill(null)}
           >
           <main
             className="studio-main"
@@ -4209,8 +4425,9 @@ export default function Studio() {
                       await openProject(id);
                     }}
                   info={info}
-                  dark={dark}
-                  onDarkChange={setDark}
+                  appearance={appearance.preference}
+                  theme={appearance.theme}
+                  onAppearanceChange={appearance.setPreference}
                   onMigrate={() => setDialog({ type: "migration" })}
                   onOpenShortcuts={() => setDialog({ type: "shortcuts" })}
                   docsVisible={docsVisible}
@@ -4268,7 +4485,15 @@ export default function Studio() {
               ) : view === "page" && page.draft ? null : (
                 <div
                   className={`studio-library${view === "components" ? " studio-component-library" : ""}`}
+                  {...directoryFileDrop}
                 >
+                  {fileDrop && view === "project" && project && (
+                    <div className="studio-file-drop" role="status">
+                      {t("dropImport", {
+                        title: currentFolder?.name ?? project.name,
+                      })}
+                    </div>
+                  )}
                   {view === "projects" && (
                     <RecentPages
                       pages={recent}
@@ -4613,6 +4838,48 @@ export default function Studio() {
           }}
         />
         <ToastViewport toasts={toasts.toasts} onDismiss={toasts.dismiss} />
+        {exportReceipt && (
+          <div className="studio-toast studio-export-receipt" role="status">
+            <Check size={14} />
+            <span className="studio-export-receipt-text">
+              <span>{exportReceipt.message}</span>
+              <code title={exportReceipt.path}>{exportReceipt.path}</code>
+            </span>
+            {capabilities.revealFiles && (
+              <button
+                type="button"
+                onClick={action(async () => {
+                  await desktop.invoke("export:reveal", {
+                    path: exportReceipt.path,
+                  });
+                  setExportReceipt(null);
+                })}
+              >
+                {t(
+                  info?.platform === "darwin"
+                    ? "revealInFinder"
+                    : "revealInFileManager",
+                )}
+              </button>
+            )}
+            <button
+              type="button"
+              className="studio-export-receipt-close"
+              aria-label={tc("close")}
+              onClick={() => setExportReceipt(null)}
+            >
+              <X size={14} />
+            </button>
+          </div>
+        )}
+        {pageExportMenu && view === "page" && page.draft && (
+          <LibraryContextMenu
+            anchor={pageExportMenu}
+            label={t("exportMenuLabel")}
+            onClose={() => setPageExportMenu(null)}
+            items={pageExportMenuItems()}
+          />
+        )}
         {capabilities.exportSite && exportMenu && (
           <LibraryContextMenu
             anchor={exportMenu}
@@ -4752,7 +5019,7 @@ export default function Studio() {
               contextMenu.creationOnly
                 ? creationMenuItems(contextMenu.target)
                 : [
-                    ...(capabilities.tabs ? [
+                    ...(capabilities.tabs && !contextMenu.pageTools ? [
                     {
                       label: t("openInNewTab"),
                       icon: <PanelsTopLeft size={15} />,
@@ -4783,7 +5050,7 @@ export default function Studio() {
                       ? [
                           {
                             // Like copying a link, for Agents outside ShowAI.
-                            label: ta("pageReference.copyPage"),
+                            label: tc("copyReference"),
                             icon: <AtSign size={15} />,
                             onSelect: action(() =>
                               copyPageReference(contextMenu.target.projectId, {
@@ -4944,39 +5211,11 @@ export default function Studio() {
                             }),
                           },
                           {
-                            label: tc("downloadSource"),
-                            icon: <Download size={15} />,
-                            onSelect: () => void exportPage("json"),
-                          },
-                          ...(capabilities.advancedPageExport ? [
-                          {
-                            label: t("exportWithPublished"),
-                            icon: <Globe size={15} />,
-                            onSelect: () => void exportPage("html", "remote"),
-                          },
-                          {
-                            label: t("exportSnippet"),
-                            icon: <CodeXml size={15} />,
-                            onSelect: () => void exportPage("inline"),
-                          },
-                          {
-                            label: t("exportReading"),
+                            label: t("exportMenu"),
                             icon: <ArrowUpRight size={15} />,
                             onSelect: () =>
-                              void exportPage("html", "bundled", "reading"),
+                              setPageExportMenu(contextMenu.anchor),
                           },
-                          {
-                            label: t("exportOnlinePage"),
-                            icon: <Globe size={15} />,
-                            onSelect: () =>
-                              void exportPage(
-                                "html",
-                                "bundled",
-                                "reading",
-                                "cdn",
-                              ),
-                          },
-                          ] : []),
                         ]
                       : []),
                     {
@@ -5308,6 +5547,7 @@ export default function Studio() {
             record={dialog.record}
             components={dialog.record.components ?? []}
             onClose={closeDialog}
+            {...templateDialogActions(dialog.record, dialog.projectId)}
           />
         )}
         {dialog?.type === "component" && (
@@ -5340,6 +5580,8 @@ export default function Studio() {
               (dialog.custom?.scope !== "project" ||
                 page.projectId === dialog.projectId)
             }
+            insertPageTitle={page.draft?.title || tc("untitled")}
+            insertUnavailable={dialog.custom?.role !== "page-outline"}
             onInsert={addBlock}
             onClose={closeDialog}
           />

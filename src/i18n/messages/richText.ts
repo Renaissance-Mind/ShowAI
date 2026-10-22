@@ -99,6 +99,10 @@ export default defineMessages("richText", {
     "insert.addToDocument": "添加到文档",
     "insert.blockTypes": "内容块类型",
     "insert.noResults": "没有找到相关内容块",
+    "insert.fromSelection": "插入…",
+    "insert.fromSelectionTitle": "在所选内容的段落之后插入内容，与输入 / 相同",
+    "block.noManualEditing": "此组件暂不支持手动编辑参数",
+    "assistant.editComponent": "让 Agent 修改此组件…",
 
     "block.handle": "移动或管理内容块",
     "block.handleTitle": "拖动排序 · 点击管理",
@@ -107,8 +111,8 @@ export default defineMessages("richText", {
     "block.moveUp": "向上移动",
     "block.moveDown": "向下移动",
     "block.duplicate": "复制内容块",
-    "assistant.ask": "让 AI 处理",
-    "assistant.askBlock": "让 AI 处理此块",
+    "assistant.ask": "让 Agent 处理…",
+    "assistant.askBlock": "让 Agent 处理…",
     "assistant.referenceSelection":
       "复制引用（{count} 个块），可粘贴到 Claude Code 或 Codex",
     "assistant.referenceBlock": "复制此块的引用",
@@ -268,6 +272,10 @@ export default defineMessages("richText", {
     "insert.addToDocument": "Add to document",
     "insert.blockTypes": "Block types",
     "insert.noResults": "No matching blocks",
+    "insert.fromSelection": "Insert…",
+    "insert.fromSelectionTitle": "Insert content after the selected paragraph, same as typing /",
+    "block.noManualEditing": "This component’s parameters can’t be edited by hand yet",
+    "assistant.editComponent": "Ask Agent to change this component…",
 
     "block.handle": "Move or manage block",
     "block.handleTitle": "Drag to reorder · Click to manage",
@@ -276,8 +284,8 @@ export default defineMessages("richText", {
     "block.moveUp": "Move up",
     "block.moveDown": "Move down",
     "block.duplicate": "Duplicate block",
-    "assistant.ask": "Ask AI",
-    "assistant.askBlock": "Ask AI about this block",
+    "assistant.ask": "Ask Agent…",
+    "assistant.askBlock": "Ask Agent…",
     "assistant.referenceSelection": {
       one: "Copy a reference ({count} block) to paste into Claude Code or Codex",
       other:

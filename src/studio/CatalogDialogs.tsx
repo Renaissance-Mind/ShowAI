@@ -11,7 +11,7 @@ import type {
 } from "../components/custom/types";
 import { Widget } from "../components/blocks/Widget";
 import { SurfaceReader } from "../portable/SurfaceReader";
-import { BookOpen, Sparkles, Layers, Plus } from "../ui/icons";
+import { BookOpen, Sparkles, Layers, Plus, Copy } from "../ui/icons";
 import type { ShowDocument } from "../types";
 import ComponentAdjustmentSummary from "./ComponentAdjustmentSummary";
 import ComponentParameterFacts from "./ComponentParameterFacts";
@@ -25,6 +25,7 @@ import Dialog from "./Dialog";
 import { componentDisplayName } from "../components/component-display";
 import { useTranslator } from "../i18n/react";
 import messages from "../i18n/messages/catalog";
+import { templateAgentPrompt } from "./template-actions";
 import "./catalog.css";
 import "./catalog-workspace.css";
 
@@ -92,14 +93,65 @@ export function TemplateDialog({
   record,
   components,
   onClose,
+  onCreatePage,
+  createUnavailable,
+  onCopyPrompt,
 }: {
   record: LoadedTemplate;
   components: CompiledComponent[];
   onClose: () => void;
+  /** Present for templates that produce a page; disabled while no project is open. */
+  onCreatePage?: () => Promise<void>;
+  createUnavailable?: boolean;
+  /** Workflow templates hand their exact ref to an agent through a prompt. */
+  onCopyPrompt?: (prompt: string) => Promise<void>;
 }) {
   const t = useTranslator(messages);
   const panelId = useId();
   const [tab, setTab] = useState<"about" | "guides" | "usage">("about");
+  const [busy, setBusy] = useState(false);
+  const [status, setStatus] = useState<{
+    error: boolean;
+    text: string;
+    /** Shown for copying by hand when the clipboard is unavailable. */
+    prompt?: string;
+  } | null>(null);
+  const run = async (
+    operation: () => Promise<void>,
+    done?: string,
+    prompt?: string,
+  ) => {
+    setBusy(true);
+    setStatus(null);
+    try {
+      await operation();
+      if (done) setStatus({ error: false, text: done });
+    } catch (reason) {
+      setStatus({
+        error: true,
+        text: prompt
+          ? t("agentPromptCopyFailed", { reason: errorMessage(reason) })
+          : errorMessage(reason),
+        prompt,
+      });
+    } finally {
+      setBusy(false);
+    }
+  };
+  const copyPrompt = onCopyPrompt && record.workflow && (
+    <button
+      type="button"
+      className={onCreatePage ? "studio-text-button" : "studio-button primary"}
+      disabled={busy}
+      onClick={() => {
+        const prompt = templateAgentPrompt(record);
+        void run(() => onCopyPrompt(prompt), t("agentPromptCopied"), prompt);
+      }}
+    >
+      <Copy size={15} />
+      {t("copyAgentPrompt")}
+    </button>
+  );
   return (
     <Dialog
       title={record.name}
@@ -108,6 +160,32 @@ export function TemplateDialog({
       className="catalog-template-dialog"
       titleAccessory={
         <span className="catalog-component-version">v{record.version}</span>
+      }
+      headerActions={
+        (onCreatePage || copyPrompt) && (
+          <>
+            {createUnavailable && onCreatePage && (
+              <span className="catalog-action-reason">
+                {t("templateNeedsProject")}
+              </span>
+            )}
+            {copyPrompt}
+            {onCreatePage && (
+              <button
+                type="button"
+                className="studio-button primary"
+                disabled={busy || createUnavailable}
+                title={
+                  createUnavailable ? t("templateNeedsProject") : undefined
+                }
+                onClick={() => void run(onCreatePage)}
+              >
+                <Plus size={16} />
+                {t("useTemplate")}
+              </button>
+            )}
+          </>
+        )
       }
       headerContent={
         <CatalogTabs
@@ -144,6 +222,23 @@ export function TemplateDialog({
           )[tab],
         )}
       >
+        {status && (
+          <p
+            className={status.error ? "studio-form-error" : "catalog-action-status"}
+            role={status.error ? "alert" : "status"}
+          >
+            {status.text}
+          </p>
+        )}
+        {status?.prompt && (
+          <textarea
+            className="catalog-agent-prompt"
+            aria-label={t("copyAgentPrompt")}
+            readOnly
+            value={status.prompt}
+            onFocus={(event) => event.currentTarget.select()}
+          />
+        )}
         {tab === "guides" && record.bundle && (
           <TemplateWorkflowView bundle={record.bundle} />
         )}
@@ -221,6 +316,8 @@ export function ComponentDialog({
   builtin,
   custom,
   canInsert,
+  insertPageTitle,
+  insertUnavailable,
   onInsert,
   onClose,
   loadSource,
@@ -228,6 +325,10 @@ export function ComponentDialog({
   builtin?: BuiltinComponentMetadata;
   custom?: CompiledComponent;
   canInsert: boolean;
+  /** The open page the component goes into, named on the button. */
+  insertPageTitle?: string;
+  /** Keeps the button visible but disabled, saying a page must be open first. */
+  insertUnavailable?: boolean;
   onInsert: (kind: string, data: Record<string, unknown>) => Promise<void>;
   onClose: () => void;
   loadSource?: () => Promise<ComponentSource>;
@@ -283,16 +384,32 @@ export function ComponentDialog({
         />
       }
       headerActions={
-        canInsert && (
-          <button
-            type="button"
-            className="studio-text-button"
-            disabled={busy}
-            onClick={() => void insert()}
-          >
-            <Plus size={16} />
-            {t("insertIntoPage")}
-          </button>
+        (canInsert || insertUnavailable) && (
+          <>
+            {!canInsert && (
+              <span className="catalog-action-reason">
+                {t("insertNeedsPage")}
+              </span>
+            )}
+            <button
+              type="button"
+              className="studio-text-button"
+              disabled={busy || !canInsert}
+              title={canInsert ? undefined : t("insertNeedsPage")}
+              onClick={() => void insert()}
+            >
+              <Plus size={16} />
+              {canInsert && insertPageTitle
+                ? t("insertIntoNamedPage", {
+                    // Long titles stay readable in the header; the full title is the page's.
+                    title:
+                      insertPageTitle.length > 14
+                        ? `${insertPageTitle.slice(0, 13)}…`
+                        : insertPageTitle,
+                  })
+                : t("insertIntoPage")}
+            </button>
+          </>
         )
       }
     >

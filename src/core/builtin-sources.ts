@@ -62,6 +62,7 @@ import capacity from "../portable/capacity.mjs?raw";
 import ownedJson from "../portable/owned-json.mjs?raw";
 import sdk from "../components/blocks/sdk.tsx?raw";
 import actionHost from "../components/blocks/action-host.tsx?raw";
+import manualEditing from "../components/blocks/manual-editing.ts?raw";
 import gestureBoundary from "../components/blocks/GestureBoundary.tsx?raw";
 import viewportLock from "../components/blocks/ViewportLock.tsx?raw";
 import viewportLockCss from "../components/blocks/viewport-lock.css?raw";
@@ -261,6 +262,7 @@ const sources: Record<string, string> = {
   "owned-json.mjs": ownedJson,
   "sdk.tsx": sdk,
   "action-host.tsx": actionHost,
+  "manual-editing.ts": manualEditing,
   "GestureBoundary.tsx": gestureBoundary,
   "ViewportLock.tsx": viewportLock,
   "viewport-lock.css": viewportLockCss,

@@ -3,7 +3,7 @@ import { defineMessages } from "../index";
 // File and folder pickers: native dialog titles plus the browser-mode picker.
 export default defineMessages("files", {
   "zh-CN": {
-    "title.importPage": "导入 ShowAI 页面",
+    "title.importPage": "导入文件",
     "title.componentSource": "选择组件源码目录",
     "title.publishPackage": "选择发布包保存位置",
     "title.siteOutput": "选择网站输出目录",
@@ -11,7 +11,7 @@ export default defineMessages("files", {
     "title.exportPage": "导出页面",
     "title.datasetOpenFile": "选择数据文件",
     "title.datasetSaveFile": "把共享数据保存为外部文件",
-    "filter.page": "ShowAI 页面",
+    "filter.page": "可导入的文件（ShowAI 页面、HTML、Markdown、文本）",
     "filter.pageSource": "ShowAI 页面源",
     "filter.html": "HTML 页面",
     "filter.datasetFile": "数据文件（JSON、CSV、TSV）",
@@ -40,7 +40,7 @@ export default defineMessages("files", {
     popupClosed: "新窗口已关闭，请重新打开。",
   },
   en: {
-    "title.importPage": "Import ShowAI page",
+    "title.importPage": "Import file",
     "title.componentSource": "Choose component source folder",
     "title.publishPackage": "Choose where to save the publish package",
     "title.siteOutput": "Choose website output folder",
@@ -48,7 +48,7 @@ export default defineMessages("files", {
     "title.exportPage": "Export page",
     "title.datasetOpenFile": "Choose a data file",
     "title.datasetSaveFile": "Save shared data as an external file",
-    "filter.page": "ShowAI page",
+    "filter.page": "Importable files (ShowAI page, HTML, Markdown, text)",
     "filter.pageSource": "ShowAI page source",
     "filter.html": "HTML page",
     "filter.datasetFile": "Data file (JSON, CSV, TSV)",

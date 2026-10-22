@@ -223,6 +223,7 @@ export const workbenchActions = new Set([
   "clipboard:write",
   "media:open",
   "media:reveal",
+  "export:reveal",
   "app:openPageWindow",
   "app:openWindow",
   ...datasetActions,
@@ -339,6 +340,24 @@ export interface WorkbenchHost {
   ): Promise<{ canceled: boolean; filePath?: string }>;
   invoke(action: string, args: Record<string, unknown>): Promise<unknown>;
 }
+
+/**
+ * Files exported by this host process; the export notice may reveal only these.
+ * One store per process, like local media grants, because each action call
+ * creates its own workbench.
+ */
+const exportedPaths = new Set<string>();
+export function rememberExport<T>(result: T): T {
+  const path = (result as { path?: unknown } | null)?.path;
+  if (typeof path === "string") {
+    exportedPaths.delete(path);
+    exportedPaths.add(path);
+    if (exportedPaths.size > 50)
+      exportedPaths.delete(exportedPaths.values().next().value!);
+  }
+  return result;
+}
+export const revealableExport = (path: string) => exportedPaths.has(path);
 
 export function createWorkbench(
   store: FileStore,
@@ -1439,7 +1458,12 @@ export function createWorkbench(
         const result = await host.openDialog({
           title: tf("title.importPage"),
           properties: ["openFile"],
-          filters: [{ name: tf("filter.page"), extensions: ["json", "html"] }],
+          filters: [
+            {
+              name: tf("filter.page"),
+              extensions: ["json", "html", "htm", "md", "markdown", "txt"],
+            },
+          ],
         });
         if (result.canceled || !result.filePaths[0]) return null;
         const path = result.filePaths[0];
@@ -1524,13 +1548,13 @@ export function createWorkbench(
           const document = resolved.document;
           const source = serializeArtifact(document, record.components);
           await writeFile(selection.filePath, source, "utf8");
-          return {
+          return rememberExport({
             format,
             path: selection.filePath,
             bytes: Buffer.byteLength(source),
-          };
+          });
         }
-        return exportPage({
+        return rememberExport(await exportPage({
           root: store.root,
           projectId: id,
           pageId: page,
@@ -1542,7 +1566,7 @@ export function createWorkbench(
           externalData: externalData(args),
           out: selection.filePath,
           overwrite: true,
-        });
+        }));
       }
       case "export:site": {
         const id = projectId(args);
@@ -1552,7 +1576,7 @@ export function createWorkbench(
           properties: ["openDirectory", "createDirectory"],
         });
         if (selection.canceled || !selection.filePaths[0]) return null;
-        return exportPage({
+        return rememberExport(await exportPage({
           root: store.root,
           projectId: id,
           format: "site",
@@ -1560,7 +1584,17 @@ export function createWorkbench(
           externalData: externalData(args),
           out: selection.filePaths[0],
           overwrite: true,
-        });
+        }));
+      }
+      case "export:reveal": {
+        const path = required(args, "path");
+        if (!revealableExport(path))
+          throw new CoreError(
+            "NOT_FOUND",
+            "Only files exported in this session can be revealed. Export the page again.",
+          );
+        // The host reveals a path the action layer vouches for, like granted media.
+        return host.invoke("media:reveal", { path });
       }
       case "fs:reveal":
       case "settings:chooseHome":

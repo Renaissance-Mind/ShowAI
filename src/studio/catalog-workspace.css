@@ -530,7 +530,7 @@
 @media (max-width: 1050px) {
   .studio-modal.catalog-component-dialog > header,
   .studio-modal.catalog-template-dialog > header {
-    grid-template-columns: minmax(120px, 1fr) auto 72px;
+    grid-template-columns: minmax(120px, 1fr) auto minmax(72px, auto);
     padding: 0 18px;
     gap: 12px;
   }

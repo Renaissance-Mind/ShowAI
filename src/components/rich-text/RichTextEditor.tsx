@@ -5,6 +5,8 @@ import { primitiveNodeTypes, primitiveContentNode } from "./model.mjs";
 import { CAPACITY, formatBytes } from "../../portable/capacity.mjs";
 import { translator } from "../../i18n";
 import { useTranslator } from "../../i18n/react";
+import commonMessages from "../../i18n/messages/common";
+import { supportsManualEditing } from "../blocks/manual-editing";
 import messages from "../../i18n/messages/richText";
 import noteMessages from "../../i18n/messages/richTextNotes";
 import ExpandableSearch from "../ExpandableSearch";
@@ -239,6 +241,7 @@ export default function RichTextEditor({
   retentionKey,
 }: RichTextEditorProps) {
   const t = useTranslator(messages);
+  const tc = useTranslator(commonMessages);
   const tn = useTranslator(noteMessages);
   const latestOnChange = useRef(onChange);
   const selectionMenuId = useId();
@@ -1318,6 +1321,11 @@ export default function RichTextEditor({
   if (!editor)
     return <div className="editor-loading" aria-label={t("openingDocument")} />;
 
+  // Components without a settings form or in-place editing are changed by an agent.
+  const hoverNode = hover && blockMenu ? editor.state.doc.nodeAt(hover.pos) : null;
+  const hoverNeedsAgent =
+    hoverNode?.type.name === "widget" &&
+    !supportsManualEditing(String(hoverNode.attrs.kind ?? ""));
   const textStyle = editor.isActive("heading")
     ? t("block.heading", { level: editor.getAttributes("heading").level })
     : t("block.text");
@@ -1767,6 +1775,11 @@ export default function RichTextEditor({
                     <Copy size={15} />
                     {t("block.duplicate")}
                   </button>
+                  {hoverNeedsAgent && (
+                    <p className="block-menu-note">
+                      {t("block.noManualEditing")}
+                    </p>
+                  )}
                   {assistant && (
                     <button
                       onClick={(event) => {
@@ -1788,7 +1801,9 @@ export default function RichTextEditor({
                       }}
                     >
                       <Sparkles size={15} />
-                      {t("assistant.askBlock")}
+                      {hoverNeedsAgent
+                        ? t("assistant.editComponent")
+                        : tc("askAgent")}
                     </button>
                   )}
                   {assistant && (
@@ -1812,7 +1827,7 @@ export default function RichTextEditor({
                       }}
                     >
                       <AtSign size={15} />
-                      {t("assistant.referenceBlock")}
+                      {tc("copyReference")}
                     </button>
                   )}
                   <div className="menu-rule" />
@@ -1832,7 +1847,7 @@ export default function RichTextEditor({
                     }}
                   >
                     <Trash2 size={15} />
-                    {t("block.delete")}
+                    {tc("delete")}
                   </button>
                 </div>
               </>
@@ -1923,8 +1938,8 @@ export default function RichTextEditor({
               <button
                 type="button"
                 className="editor-bubble-assistant"
-                aria-label={t("assistant.ask")}
-                title={t("assistant.ask")}
+                aria-label={tc("askAgent")}
+                title={tc("askAgent")}
                 onClick={() => {
                   const { from, to } = editor.state.selection;
                   const anchor = bubble;
@@ -1939,14 +1954,12 @@ export default function RichTextEditor({
                 }}
               >
                 <Sparkles size={15} />
-                <span>AI</span>
+                <span>{tc("askAgent")}</span>
               </button>
               <button
                 type="button"
                 className="editor-tool editor-bubble-reference"
-                aria-label={t("assistant.referenceSelection", {
-                  count: bubbleBlockCount,
-                })}
+                aria-label={tc("copyReference")}
                 title={t("assistant.referenceSelection", {
                   count: bubbleBlockCount,
                 })}
@@ -1967,6 +1980,32 @@ export default function RichTextEditor({
               </button>
             </>
           )}
+          {
+            <>
+              <span className="toolbar-divider" aria-hidden="true" />
+              <button
+                type="button"
+                className="editor-bubble-insert"
+                aria-label={t("insert.fromSelection")}
+                title={t("insert.fromSelectionTitle")}
+                onMouseDown={(event) => event.preventDefault()}
+                onClick={() => {
+                  // Same entry as «/», opened at the end of the selected block so
+                  // the insertion neither replaces nor splits the selected text.
+                  const end = editor.state.selection.$to.end();
+                  selectionMenuInteracting.current = false;
+                  setBubble(null);
+                  editor.commands.setTextSelection(end);
+                  openSlash();
+                  // The toolbar closes after this click; keep typing in the search field.
+                  setTimeout(() => slashInputRef.current?.focus(), 0);
+                }}
+              >
+                <Plus size={15} />
+                <span>{t("insert.fromSelection")}</span>
+              </button>
+            </>
+          }
         </SelectionToolbar>
       )}
       {slash &&

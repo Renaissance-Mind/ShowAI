@@ -568,24 +568,20 @@ export function ExternalConflictDialog({
                 </div>
               </div>
             ) : tab === "compare" ? (
+              // Three names only: your changes (the unsaved draft, else the saved
+              // version), the changes made elsewhere, and the version before both.
               <div className="history-conflict-values">
-                {draftDocument && (
-                  <div>
-                    <h3>{t("unsavedAppDraft")}</h3>
-                    <Value value={draftDocument} />
-                  </div>
-                )}
-                <div>
-                  <h3>{t("originalBase")}</h3>
-                  <Value value={detail.baseline} />
-                </div>
                 <div>
                   <h3>{t("savedVersion")}</h3>
-                  <Value value={detail.current} />
+                  <Value value={draftDocument ?? detail.current} />
                 </div>
                 <div>
                   <h3>{t("externalVersion")}</h3>
                   <Value value={detail.external} />
+                </div>
+                <div>
+                  <h3>{t("originalBase")}</h3>
+                  <Value value={detail.baseline} />
                 </div>
               </div>
             ) : (

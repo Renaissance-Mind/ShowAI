@@ -426,7 +426,7 @@ try {
     .click();
   await page
     .getByRole("dialog")
-    .getByRole("button", { name: "插入页面", exact: true })
+    .getByRole("button", { name: /^插入到「/ })
     .click();
   saved = await poll(
     read,

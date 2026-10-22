@@ -1033,3 +1033,11 @@
   -webkit-user-select: text;
   user-select: text;
 }
+.block-menu .block-menu-note {
+  margin: 2px 0 4px;
+  padding: 4px 8px;
+  color: var(--muted, #777);
+  font-size: 12px;
+  line-height: 1.4;
+  max-width: 220px;
+}

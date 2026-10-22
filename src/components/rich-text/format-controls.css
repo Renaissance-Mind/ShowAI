@@ -265,3 +265,18 @@
   opacity: 0.4;
   cursor: default;
 }
+.rich-text-selection-toolbar .editor-bubble-insert {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 30px;
+  padding: 0 8px;
+  border-radius: 7px;
+  color: var(--editor-muted, #6b6b6b);
+  font: 500 12px/1.2 var(--font-ui, system-ui, sans-serif);
+  cursor: pointer;
+}
+.rich-text-selection-toolbar .editor-bubble-insert:hover {
+  background: var(--editor-soft);
+  color: var(--accent, #6c805f);
+}

@@ -7,7 +7,7 @@ function readTheme(): AppearanceTheme {
   if (theme === "light" || theme === "dark") return theme;
   const saved = localStorage.getItem("showai:appearance");
   return saved === "dark" ||
-    (!saved && matchMedia("(prefers-color-scheme: dark)").matches)
+    (saved !== "light" && matchMedia("(prefers-color-scheme: dark)").matches)
     ? "dark"
     : "light";
 }

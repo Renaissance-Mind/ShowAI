@@ -33,6 +33,8 @@ export default defineMessages("onboarding", {
     "prompts.title": "试试这样问",
     "prompts.hint":
       "点击复制完整提示词，粘贴到 Claude Code 或 Codex 的新对话中。",
+    "prompts.hintBuiltin": "点击后会在示例项目中新建一个页面，打开内置 Agent 并填好提示词，检查后发送。",
+    "prompts.hintCopyOnly": "点击复制完整提示词。安装 Claude Code 或 Codex 后粘贴到它的新对话中；也可以先在「Agent 设置」中配置内置 Agent，再回到这里。",
     "prompts.copied": "已复制",
     "prompts.mortgage": "做一个房贷计算器",
     "prompts.mortgagePrompt":
@@ -128,6 +130,8 @@ export default defineMessages("onboarding", {
     "prompts.title": "Try asking",
     "prompts.hint":
       "Click to copy the full prompt, then paste it into a new Claude Code or Codex conversation.",
+    "prompts.hintBuiltin": "Click to create a page in the Examples project, open the built-in agent and fill in the prompt. Review it, then send.",
+    "prompts.hintCopyOnly": "Click to copy the full prompt. Paste it into a new Claude Code or Codex conversation once one is installed, or set up the built-in agent in Agent settings first and come back here.",
     "prompts.copied": "Copied",
     "prompts.mortgage": "Build a mortgage calculator",
     "prompts.mortgagePrompt":

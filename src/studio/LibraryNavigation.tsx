@@ -220,6 +220,10 @@ interface LibraryMenuItemBase {
   separatorBefore?: boolean;
   shortcut?: string;
   checked?: boolean;
+  /** One line under the label that says what the action produces. */
+  description?: string;
+  /** Items sharing a group follow one heading; a new group starts a new section. */
+  group?: string;
 }
 export type LibraryContextMenuItem = LibraryMenuItemBase &
   (
@@ -524,8 +528,15 @@ export function LibraryContextMenu({
     >
       {items.map((item, index) => (
         <div key={`${index}-${item.label}`} role="none">
-          {item.separatorBefore && index > 0 && (
-            <div role="separator" className="studio-context-menu-separator" />
+          {(item.separatorBefore ||
+            (!!item.group && item.group !== items[index - 1]?.group)) &&
+            index > 0 && (
+              <div role="separator" className="studio-context-menu-separator" />
+            )}
+          {item.group && item.group !== items[index - 1]?.group && (
+            <div role="presentation" className="studio-context-menu-group">
+              {item.group}
+            </div>
           )}
           {item.control ? (
             <LibraryMenuControl item={item} />
@@ -547,7 +558,16 @@ export function LibraryContextMenu({
                   {item.icon}
                 </span>
               )}
-              <span>{item.label}</span>
+              {item.description ? (
+                <span className="studio-context-menu-text">
+                  <span>{item.label}</span>
+                  <span className="studio-context-menu-description">
+                    {item.description}
+                  </span>
+                </span>
+              ) : (
+                <span>{item.label}</span>
+              )}
               {item.shortcut && (
                 <span
                   className="studio-context-menu-shortcut"

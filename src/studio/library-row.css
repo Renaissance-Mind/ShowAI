@@ -135,3 +135,21 @@
 .library-drag-active [data-library-id] {
   will-change: transform;
 }
+.studio-context-menu-group {
+  padding: 6px 8px 2px;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 16px;
+}
+.studio-context-menu-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.studio-context-menu-description {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 16px;
+  white-space: normal;
+  max-width: 260px;
+}

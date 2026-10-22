@@ -17,7 +17,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { Settings2 } from "../../ui/icons";
+import { Settings2, Sparkles } from "../../ui/icons";
 import type { BlockProps } from "../blocks/types";
 import {
   viewportLockKey,
@@ -183,6 +183,8 @@ function SandboxComponent({
   const [draft, setDraft] = useState("");
   const [draftError, setDraftError] = useState("");
   const [validating, setValidating] = useState(false);
+  // Raw JSON is the advanced path; without an agent it is the only one, so it starts open.
+  const [jsonOpen, setJsonOpen] = useState(false);
   const draftBase = useRef("");
   const settingsButton = useRef<HTMLButtonElement>(null);
   const pendingValidation = useRef<{
@@ -227,6 +229,7 @@ function SandboxComponent({
     requestAnimationFrame(() => settingsButton.current?.focus());
   };
   const openEditor = () => {
+    setJsonOpen(!latest.current.assistant);
     draftBase.current = JSON.stringify(latest.current.parsed.props);
     setDraft(JSON.stringify(latest.current.parsed.props, null, 2));
     setDraftError("");
@@ -548,6 +551,37 @@ function SandboxComponent({
             }
           }}
         >
+          <p className="custom-props-note">{t("noManualEditing")}</p>
+          {assistant && (
+            <button
+              type="button"
+              className="custom-props-agent"
+              onClick={(event) => {
+                const id = blockId();
+                if (!id) return;
+                const rect = event.currentTarget.getBoundingClientRect();
+                closeEditor();
+                assistant.open({
+                  kind: "blocks",
+                  blockIds: [id],
+                  anchor: {
+                    left: rect.right,
+                    top: rect.top,
+                    bottom: rect.bottom,
+                  },
+                });
+              }}
+            >
+              <Sparkles size={14} aria-hidden="true" />
+              {t("askAgentToEdit")}
+            </button>
+          )}
+          <details
+            className="custom-props-advanced"
+            open={jsonOpen}
+            onToggle={(event) => setJsonOpen(event.currentTarget.open)}
+          >
+          <summary>{t("advancedJson")}</summary>
           <label htmlFor={`${channel}-props`}>{t("data")}</label>
           <textarea
             id={`${channel}-props`}
@@ -567,13 +601,21 @@ function SandboxComponent({
               {draftError}
             </p>
           )}
+          </details>
           <div className="custom-props-actions">
             <button type="button" onClick={closeEditor}>
               {tc("cancel")}
             </button>
-            <button type="button" disabled={validating} onClick={saveDraft}>
-              {validating ? t("validating") : t("apply")}
-            </button>
+            {jsonOpen && (
+              <button
+                type="button"
+                className="is-primary"
+                disabled={validating}
+                onClick={saveDraft}
+              >
+                {validating ? t("validating") : t("apply")}
+              </button>
+            )}
           </div>
         </div>
       )}

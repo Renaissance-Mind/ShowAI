@@ -87,6 +87,7 @@ import PageIconDialog from "../studio/PageIconDialog";
 import { PageWidthSwitch } from "./PageWidthSwitch";
 import { BoardTools } from "./BoardTools";
 import { useTranslator } from "../i18n/react";
+import commonMessages from "../i18n/messages/common";
 import messages from "../i18n/messages/surface";
 
 // Attribute commands replace nested values explicitly, retaining source ink and
@@ -186,6 +187,7 @@ export function ContainerRuntime({
   inspectorHost?: HTMLElement | null;
 }) {
   const t = useTranslator(messages);
+  const tc = useTranslator(commonMessages);
   const ot = useTranslator(outlineMessages);
   const [outlineSettingsId, setOutlineSettingsId] = useState<string | null>(null);
   const document = useMemo(
@@ -948,7 +950,7 @@ export function ContainerRuntime({
                       select(null);
                     }}
                   >
-                    {t("inspector.delete")}
+                    {tc("delete")}
                   </button>
                 </aside>
               </InspectorOutlet>

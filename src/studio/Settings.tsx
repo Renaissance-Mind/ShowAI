@@ -8,18 +8,21 @@ import {
   Info,
   Keyboard,
   Shapes,
+  Monitor,
   Moon,
   Settings2,
   Sun,
   Terminal,
 } from "../ui/icons";
 import type { DesktopInfo } from "../desktop/bridge";
+import type { AppearancePreference } from "../design/appearance-preference";
 import {
   isLanguagePreference,
   LOCALE_NAMES,
   LOCALES,
   setLanguagePreference,
 } from "../i18n";
+import { useState } from "react";
 import { useLanguagePreference, useTranslator } from "../i18n/react";
 import messages from "../i18n/messages/settings";
 import "./settings.css";
@@ -146,8 +149,9 @@ export function SettingsPanel({
   onOpenProject,
   section,
   info,
-  dark,
-  onDarkChange,
+  appearance,
+  theme: currentTheme,
+  onAppearanceChange,
   onChooseHome,
   onCopyHome,
   onMigrate,
@@ -159,8 +163,9 @@ export function SettingsPanel({
   onOpenProject?: (projectId: string) => Promise<void>;
   section: SettingsSection;
   info: DesktopInfo | null;
-  dark: boolean;
-  onDarkChange: (dark: boolean) => void;
+  appearance: AppearancePreference;
+  theme: "light" | "dark";
+  onAppearanceChange: (appearance: AppearancePreference) => void;
   onChooseHome: () => void;
   onCopyHome: () => void;
   /** Unused: Settings → Plugins copies a configuration per host. */
@@ -173,6 +178,8 @@ export function SettingsPanel({
 }) {
   const t = useTranslator(messages);
   const language = useLanguagePreference();
+  // Storage statistics are read only once the maintenance section is opened.
+  const [maintenanceOpen, setMaintenanceOpen] = useState(false);
   section = availableSettingsSection(section, info?.platform);
   const current = sections.find((item) => item.id === section)!;
   return (
@@ -254,7 +261,21 @@ export function SettingsPanel({
         </section>
       )}
       {section === "general" && info?.libraryVersion === 2 && (
-        <LibrarySpace key={info.home} home={info.home} />
+        <details
+          className="settings-group settings-advanced"
+          onToggle={(event) => setMaintenanceOpen(event.currentTarget.open)}
+        >
+          <summary>
+            <ChevronRight size={14} aria-hidden="true" />
+            {t("advancedStorage")}
+          </summary>
+          <p className="settings-advanced-detail">
+            {t("advancedStorageDetail")}
+          </p>
+          {maintenanceOpen && (
+            <LibrarySpace key={info.home} home={info.home} />
+          )}
+        </details>
       )}
       {section === "appearance" && (
         <section
@@ -262,45 +283,30 @@ export function SettingsPanel({
           aria-labelledby="settings-theme-title"
         >
           <h2 id="settings-theme-title">{t("interface")}</h2>
-          <div className="settings-row">
-            <div className="settings-row-text">
-              <label htmlFor="settings-theme">{t("theme")}</label>
-            </div>
-            <div className="settings-select">
-              <select
-                id="settings-theme"
-                value={dark ? "dark" : "light"}
-                onChange={(event) =>
-                  onDarkChange(event.target.value === "dark")
-                }
-              >
-                <option value="light">{t("light")}</option>
-                <option value="dark">{t("dark")}</option>
-              </select>
-              <ChevronDown size={14} aria-hidden="true" />
-            </div>
-          </div>
           <fieldset className="settings-theme-options">
-            <legend className="settings-sr-only">{t("themePreview")}</legend>
-            {(["light", "dark"] as const).map((theme) => {
-              const selected = dark === (theme === "dark");
-              const Icon = theme === "light" ? Sun : Moon;
+            <legend className="settings-theme-legend">{t("theme")}</legend>
+            {(["system", "light", "dark"] as const).map((option) => {
+              const selected = appearance === option;
+              const Icon =
+                option === "system" ? Monitor : option === "light" ? Sun : Moon;
               return (
                 <label
                   className={`settings-theme-option ${selected ? "selected" : ""}`}
-                  key={theme}
+                  key={option}
                 >
                   <input
                     type="radio"
-                    name="settings-theme-preview"
-                    value={theme}
+                    name="settings-theme"
+                    value={option}
                     checked={selected}
-                    onChange={() => onDarkChange(theme === "dark")}
+                    onChange={() => onAppearanceChange(option)}
                   />
-                  <ThemePreview theme={theme} />
+                  <ThemePreview
+                    theme={option === "system" ? currentTheme : option}
+                  />
                   <span className="settings-theme-label">
                     <Icon size={16} strokeWidth={1.7} aria-hidden="true" />
-                    <span>{t(theme)}</span>
+                    <span>{t(option === "system" ? "themeSystem" : option)}</span>
                     <span className="settings-radio-mark" aria-hidden="true" />
                   </span>
                 </label>

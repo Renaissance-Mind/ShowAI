@@ -1893,3 +1893,48 @@ button.studio-tree-chevron:hover {
   color: var(--accent);
   background: var(--accent-soft);
 }
+.studio-library[data-file-drop] {
+  position: relative;
+  min-height: 100%;
+}
+.studio-file-drop {
+  position: absolute;
+  inset: 8px;
+  z-index: 20;
+  display: grid;
+  place-items: center;
+  border: 2px dashed var(--accent, #3b82f6);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--paper) 86%, transparent);
+  color: var(--text);
+  font-size: 14px;
+  pointer-events: none;
+}
+.studio-export-receipt {
+  max-width: min(640px, calc(100vw - 32px));
+}
+.studio-export-receipt-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  gap: 2px;
+}
+.studio-export-receipt-text code {
+  font-size: 11px;
+  opacity: 0.75;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.studio-export-receipt > button {
+  flex: none;
+  color: inherit;
+  border: 1px solid color-mix(in srgb, var(--paper) 40%, transparent);
+  border-radius: 5px;
+  padding: 3px 8px;
+  font-size: 12px;
+}
+.studio-export-receipt > .studio-export-receipt-close {
+  border: 0;
+  padding: 3px;
+}

@@ -33,6 +33,7 @@ import { flushSync } from "react-dom";
 import { fingerNavigatesBoard, isBoardShape } from "./board-input.mjs";
 import { labelCapable } from "./drawing-label.mjs";
 import { useTranslator } from "../i18n/react";
+import commonMessages from "../i18n/messages/common";
 import messages from "../i18n/messages/surface";
 import { AssistantContext } from "../components/assistant-context";
 import {
@@ -278,6 +279,7 @@ export default function PageSurface({
   onToolChange,
 }: Props) {
   const t = useTranslator(messages);
+  const tc = useTranslator(commonMessages);
   const assistant = useContext(AssistantContext);
   const mobile =
     typeof document !== "undefined" &&
@@ -965,12 +967,12 @@ export default function PageSurface({
       ...(assistant
         ? [
             {
-              label: t("menu.assistant"),
+              label: tc("askAgent"),
               icon: <Sparkles size={14} />,
               onSelect: () => askAssistant(ids, anchor),
             },
             {
-              label: t("menu.reference", { count: ids.length }),
+              label: tc("copyReference"),
               icon: <AtSign size={14} />,
               onSelect: () => assistant.reference(boardTarget(ids, anchor)),
             },
@@ -1077,7 +1079,7 @@ export default function PageSurface({
       {
         label: many
           ? t("menu.deleteMany", { count: ids.length })
-          : t("menu.delete"),
+          : tc("delete"),
         icon: <Trash2 size={14} />,
         danger: true,
         separatorBefore: true,
@@ -2011,7 +2013,7 @@ export default function PageSurface({
                       ? [
                           {
                             label: board.ids.size
-                              ? t("menu.reference", { count: board.ids.size })
+                              ? tc("copyReference")
                               : t("menu.referenceBoard"),
                             icon: <AtSign size={14} />,
                             separatorBefore: true,
@@ -2310,9 +2312,9 @@ export default function PageSurface({
                       onDeleteSelection?.(selectedIds);
                       board.select(null);
                     }}
-                    aria-label={t("board.deleteSelected")}
+                    aria-label={tc("delete")}
                     title={t("tool.withShortcut", {
-                      label: t("board.deleteSelected"),
+                      label: tc("delete"),
                       key: "Delete",
                     })}
                   >

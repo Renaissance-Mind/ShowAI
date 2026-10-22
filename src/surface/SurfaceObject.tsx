@@ -24,7 +24,6 @@ import {
   GripHorizontal,
   LockKeyhole,
   Settings2,
-  Trash2,
   Maximize2,
 } from "../ui/icons";
 import type { NodeLayout } from "./types";
@@ -510,23 +509,16 @@ export function SurfaceObject({
               <Maximize2 size={14} />
             </button>
           )}
+          {/* Delete lives in the module settings, the context menu and the Delete key;
+              the header keeps one entry per action instead of a second trash can. */}
           {!actions.readOnly && (
-            <>
-              <button
-                type="button"
-                aria-label={t("object.settings", { name })}
-                onClick={() => actions.inspect?.(id)}
-              >
-                <Settings2 size={14} />
-              </button>
-              <button
-                type="button"
-                aria-label={t("object.delete", { name })}
-                onClick={() => actions.remove?.(id)}
-              >
-                <Trash2 size={14} />
-              </button>
-            </>
+            <button
+              type="button"
+              aria-label={t("object.settings", { name })}
+              onClick={() => actions.inspect?.(id)}
+            >
+              <Settings2 size={14} />
+            </button>
           )}
         </div>
       )}

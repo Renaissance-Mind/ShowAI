@@ -67,7 +67,7 @@ export default defineMessages("agentSettings", {
     chatgptHelp:
       "先保存来源，再连接 ChatGPT。使用套餐额度需在授权页允许；可用模型以账号返回的列表为准。",
     reauthorizeChatgpt: "重新授权 ChatGPT",
-    continueWithChatgpt: "Continue with ChatGPT",
+    continueWithChatgpt: "使用 ChatGPT 继续",
     disconnect: "断开连接",
     managePlanUsage: "管理套餐用量",
     testModel: "测试模型调用",

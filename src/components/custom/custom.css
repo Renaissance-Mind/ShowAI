@@ -38,7 +38,7 @@
     13px/1.5 system-ui,
     sans-serif;
 }
-.custom-props-editor > label {
+.custom-props-editor label {
   display: block;
   font-weight: 600;
   margin-bottom: 8px;
@@ -79,7 +79,7 @@
   background: transparent;
   cursor: pointer;
 }
-.custom-props-actions button:last-child {
+.custom-props-actions button.is-primary {
   color: #fff;
   background: var(--accent, #547c63);
   border-color: transparent;
@@ -210,4 +210,26 @@
   .showai-local-media {
     backdrop-filter: none;
   }
+}
+.custom-props-note {
+  margin: 0 0 10px;
+  color: var(--muted, #6b726b);
+}
+.custom-props-agent {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 10px;
+  padding: 5px 12px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  font: inherit;
+  color: #fff;
+  background: var(--accent, #547c63);
+  cursor: pointer;
+}
+.custom-props-advanced > summary {
+  cursor: pointer;
+  color: var(--muted, #6b726b);
+  margin-bottom: 8px;
 }

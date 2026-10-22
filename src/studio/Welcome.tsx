@@ -4,7 +4,14 @@ import type { SampleState } from "../core/onboarding";
 import { useTranslator } from "../i18n/react";
 import messages from "../i18n/messages/onboarding";
 import pluginMessages from "../i18n/messages/pluginInstall";
-import { Check, Copy, ExternalLink, Loader2, Plus } from "../ui/icons";
+import {
+  Check,
+  Copy,
+  ExternalLink,
+  Loader2,
+  Plus,
+  Sparkles,
+} from "../ui/icons";
 import { desktop, errorMessage } from "./bridge";
 import AgentBrandIcon from "./AgentBrandIcon";
 import {
@@ -48,6 +55,7 @@ export default function Welcome({
   onOpenAgentSettings,
   onOpenPluginSettings,
   onCreateProject,
+  onStartPrompt,
 }: {
   info: DesktopInfo | null;
   samples: SampleState | null;
@@ -60,6 +68,8 @@ export default function Welcome({
   onOpenAgentSettings: () => void;
   onOpenPluginSettings: () => void;
   onCreateProject: () => void;
+  /** Writes the prompt into the built-in Agent on a new sample page. */
+  onStartPrompt?: (prompt: string) => Promise<void>;
 }) {
   const t = useTranslator(messages);
   const tp = useTranslator(pluginMessages);
@@ -104,6 +114,31 @@ export default function Welcome({
     !plugins.hosts.some(
       (host) => host.host !== "deepseek" && !!host.executable,
     );
+  // Prompts go where they can be used: an external host takes a pasted prompt,
+  // otherwise a ready built-in Agent receives it on a new page.
+  const externalHost =
+    desktopPlugins &&
+    plugins.hosts.some((host) => host.host !== "deepseek" && !!host.executable);
+  const promptMode: "builtin" | "copy" | "copyOnly" | null =
+    desktopPlugins && !plugins.scanned
+      ? null
+      : externalHost
+        ? "copy"
+        : onStartPrompt && readiness?.kind === "ready"
+          ? "builtin"
+          : "copyOnly";
+  const [starting, setStarting] = useState<string | null>(null);
+  const start = async (key: (typeof PROMPTS)[number]) => {
+    setCopyError(null);
+    setStarting(key);
+    try {
+      await onStartPrompt!(t(`prompts.${key}Prompt`));
+    } catch (reason) {
+      setCopyError({ key, message: errorMessage(reason) });
+    } finally {
+      setStarting(null);
+    }
+  };
   const sampleCards =
     samples?.state === "seeded"
       ? SAMPLE_KEYS.filter((key) => samples.pages[key])
@@ -282,7 +317,15 @@ export default function Welcome({
         aria-labelledby="welcome-prompts"
       >
         <h3 id="welcome-prompts">{t("prompts.title")}</h3>
-        <p className="studio-welcome-hint">{t("prompts.hint")}</p>
+        <p className="studio-welcome-hint">
+          {t(
+            promptMode === "builtin"
+              ? "prompts.hintBuiltin"
+              : promptMode === "copyOnly"
+                ? "prompts.hintCopyOnly"
+                : "prompts.hint",
+          )}
+        </p>
         <div className="studio-welcome-prompts">
           {PROMPTS.map((key) => (
             <button
@@ -291,9 +334,16 @@ export default function Welcome({
               className="studio-welcome-prompt"
               data-copied={copied === key || undefined}
               title={t(`prompts.${key}Prompt`)}
-              onClick={() => void copy(key)}
+              disabled={!!starting}
+              onClick={() =>
+                void (promptMode === "builtin" ? start(key) : copy(key))
+              }
             >
-              {copied === key ? (
+              {starting === key ? (
+                <Loader2 size={13} className="studio-spin" aria-hidden="true" />
+              ) : promptMode === "builtin" ? (
+                <Sparkles size={13} aria-hidden="true" />
+              ) : copied === key ? (
                 <Check size={13} aria-hidden="true" />
               ) : (
                 <Copy size={13} aria-hidden="true" />

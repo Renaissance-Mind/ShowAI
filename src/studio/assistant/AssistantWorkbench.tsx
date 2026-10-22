@@ -455,6 +455,8 @@ export default function AssistantWorkbench({
   onLocate,
   onReference,
   onOpenSettings,
+  prefill,
+  onPrefillUsed,
   children,
 }: {
   enabled: boolean;
@@ -468,6 +470,9 @@ export default function AssistantWorkbench({
   /** Saves and copies a reference to the target for an Agent outside ShowAI. */
   onReference: (target: AgentTarget) => void;
   onOpenSettings: () => void;
+  /** A prompt to place in a new conversation's composer once this page's panel is open. */
+  prefill?: { key: string; pageId: string; text: string } | null;
+  onPrefillUsed?: () => void;
   children: ReactNode;
 }) {
   const t = useTranslator(strings);
@@ -650,6 +655,20 @@ export default function AssistantWorkbench({
       stopped = true;
     };
   }, [projectId, open, loadSummaries, select, executionRevision]);
+  // A prefilled prompt starts a new conversation, so it never lands in an older thread.
+  const prefillStarted = useRef<string | null>(null);
+  useEffect(() => {
+    if (!prefill || !open || !projectId || prefill.pageId !== pageId) return;
+    if (prefillStarted.current !== prefill.key) {
+      prefillStarted.current = prefill.key;
+      startNew();
+      return;
+    }
+    if (!fresh) return;
+    setDraft(prefill.text);
+    onPrefillUsed?.();
+    requestAnimationFrame(() => input.current?.focus());
+  }, [prefill, open, projectId, pageId, fresh, composerKey]);
   // Re-read when the panel reappears, e.g. after changing Agent settings.
   const agent = useAgentStatus(
     (open && enabled) || !!composer,
