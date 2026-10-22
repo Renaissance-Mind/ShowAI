@@ -1,6 +1,7 @@
 #ifndef SHOWAI_BOUNDARY_OWNER_HPP
 #define SHOWAI_BOUNDARY_OWNER_HPP
 #include "graph.hpp"
+#include "source-delta.hpp"
 namespace showai_boundary {
 inline bool memory_overlap(const void*a,uint64_t an,const void*b,uint64_t bn){uint64_t x=(uintptr_t)a,y=(uintptr_t)b;if((!a&&an)||(!b&&bn)||an>UINTPTR_MAX-x||bn>UINTPTR_MAX-y)return true;return an&&bn&&x<y+bn&&y<x+an;}
 inline bool zero_bytes(const void*p,uint32_t count){const auto*b=(const uint8_t*)p;for(uint32_t i=0;i<count;i++)if(b[i])return false;return true;}
@@ -29,8 +30,8 @@ struct alignas(16) Owner{
     uint64_t magic=signature;uint32_t name=0,busy=0,current=no_index,next_generation=1,backing_bytes=0;SABoundaryBudget budget{};PolynomialContext math;Vector<LeaseSlot,1>slots;
     Owner(uint32_t n,const SABoundaryBudget&b):name(n),budget(b),slots(math.numbers){}
     bool begin(){if(busy)return false;busy=1;math.numbers.begin_work(budget.max_limb_operations);math.polynomial.operations=0;math.polynomial.max_operations=budget.max_polynomial_operations;math.numbers.peak_bytes=math.numbers.live_bytes;return true;}
-    bool valid(SABoundaryLease lease)const{return !lease.reserved&&lease.owner==name&&lease.slot<slots.size()&&slots[lease.slot].references&&slots[lease.slot].generation==lease.generation&&slots[lease.slot].snapshot.valid();}
-    SABoundaryLease lease(uint32_t slot)const{return{name,slot,slots[slot].generation,0};}
+    bool valid(SABoundaryLease lease)const{return !lease.reserved&&lease.owner==uint64_t((uintptr_t)this)&&lease.epoch==name&&lease.slot<slots.size()&&slots[lease.slot].references&&slots[lease.slot].generation==lease.generation&&slots[lease.slot].snapshot.valid();}
+    SABoundaryLease lease(uint32_t slot)const{return{uint64_t((uintptr_t)this),name,slot,slots[slot].generation,0};}
     void drop(uint32_t slot){auto&s=slots[slot];if(!--s.references){s.snapshot={};s.report={};}}
     bool external_memory(const void*p,uint64_t bytes)const{return !memory_overlap(p,bytes,this,sizeof(Owner))&&!memory_overlap(p,bytes,math.numbers.memory,backing_bytes);}
 };
@@ -40,8 +41,8 @@ inline bool valid_budget(const SABoundaryBudget&b){uint64_t sum=uint64_t(b.retai
 inline Vector<SABoundaryEdge> output_edges(Graph&g){
     Vector<SABoundaryEdge>output(*g.context());
     for(uint32_t index=0;index<g.edges.size()&&g.good();index++){
-        const auto&e=g.edges[index];const auto&source=g.curves[e.source];if(source.origins.empty()){g.context()->fail(SA_INK_RANGE);break;}
-        const auto&origin=source.origins[0];const auto&curve=source.geometry;SABoundaryEdge item{};item.source=g.blocks[origin.source].description.key;item.command_index=origin.command;item.degree=curve.controls.size()-1;item.from_vertex=e.direction>0?e.va:e.vb;item.to_vertex=e.direction>0?e.vb:e.va;item.flags=origin.flags;
+        const auto&e=g.edges[index];const auto&source=static_cast<const Graph&>(g).curves[e.source];if(source.origins.empty()){g.context()->fail(SA_INK_RANGE);break;}
+        const auto&origin=source.origins[0];const auto&curve=source.geometry;SABoundaryEdge item{};item.source=static_cast<const Graph&>(g).blocks[origin.source].description.key;item.command_index=origin.command;item.degree=curve.controls.size()-1;item.from_vertex=e.direction>0?e.va:e.vb;item.to_vertex=e.direction>0?e.vb:e.va;item.flags=origin.flags;
         item.origin[0]=lower(curve.controls[0].x);item.origin[1]=lower(curve.controls[0].y);Q ox=Q::from_double(*g.context(),item.origin[0]),oy=Q::from_double(*g.context(),item.origin[1]);
         for(uint32_t j=0;j<curve.controls.size()&&g.good();j++){item.controls[j*2]=lower(curve.controls[j].x-ox);item.controls[j*2+1]=lower(curve.controls[j].y-oy);if(!finite_double(item.controls[j*2])||!finite_double(item.controls[j*2+1]))g.context()->fail(SA_INK_RANGE);}
         item.parameter_bounds[0]=lower(e.a.lower);item.parameter_bounds[1]=upper(e.a.upper);item.parameter_bounds[2]=lower(e.b.lower);item.parameter_bounds[3]=upper(e.b.upper);item.parameter_certificate[0]=index*2;item.parameter_certificate[1]=index*2+1;
@@ -52,5 +53,14 @@ inline Vector<SABoundaryEdge> output_edges(Graph&g){
     return output;
 }
 inline void append_q(Vector<uint32_t>&out,const Q&q){out.push_back(uint32_t(q.sign()));out.push_back(q.numerator().size());out.push_back(q.denominator().size());for(uint32_t i=0;i<q.numerator().size();i++)out.push_back(q.numerator().data()[i]);for(uint32_t i=0;i<q.denominator().size();i++)out.push_back(q.denominator().data()[i]);}
+inline uint32_t available_slot(const Owner&o){if(o.next_generation==0xffffffffu)return no_index;for(uint32_t i=0;i<o.slots.size();i++)if(!o.slots[i].references)return i;return no_index;}
+inline uint32_t publish_graph(Owner&o,Graph&graph,uint32_t slot,uint64_t baseline,SABoundaryLease*output){
+    Record<OwnedSnapshot>prepared;
+    {auto edges=output_edges(graph);if(o.math.numbers.status)return o.math.numbers.status;OwnedSnapshot snapshot(graph,edges);prepared=Record<OwnedSnapshot>::create(o.math.numbers,snapshot);}
+    if(o.math.numbers.status)return o.math.numbers.status;if(o.math.numbers.live_bytes>o.budget.retained_bytes)return SA_INK_CAPACITY;
+    SABoundarySnapshot report{};report.source_commands=graph.active_commands;report.source_curves=graph.curves.size()-graph.free_curves.size();report.exposed_edges=graph.edges.size();report.vertices=graph.parent.size();report.polynomial_operations=o.math.polynomial.operations;report.limb_operations=o.math.numbers.work;report.pair_proofs=graph.metrics.pair_proofs;report.pair_cache_hits=graph.metrics.pair_cache_hits;report.classifications=graph.metrics.classifications;report.bvh_visits=graph.metrics.bvh_visits;report.retained_peak_bytes=o.math.numbers.live_bytes;report.workspace_peak_bytes=o.math.numbers.peak_bytes-baseline;report.arena_peak_bytes=o.math.numbers.peak_bytes;report.baseline_bytes=baseline;report.prepared_bytes=o.math.numbers.live_bytes-baseline;
+    auto&target=o.slots[slot];target.snapshot=static_cast<Record<OwnedSnapshot>&&>(prepared);target.generation=o.next_generation++;target.references=2;target.report=report;
+    uint32_t previous=o.current;o.current=slot;if(previous!=no_index)o.drop(previous);*output=o.lease(slot);return SA_INK_OK;
+}
 }
 #endif

@@ -25,13 +25,19 @@ typedef struct {
     uint32_t retained_bytes,workspace_bytes;
 } SABoundaryBudget;
 /* Leases are owner-issued opaque references, scoped to one initialized state.
- * Callers cannot fabricate validity from these words: every entry point checks
- * the live lease record. Active/inflight leases keep immutable source, curves,
+ * Every entry point checks the exact state binding, host epoch and live lease
+ * record. These process-local handles never establish source/data equality. Active/inflight leases keep immutable source, curves,
  * pair certificates and output records alive. No writable source/arena view is
  * returned. The host owner keeps the caller-owned backing buffers private.
  * A generation/key shortcut cannot replace actual captured source comparison.
  */
-typedef struct { uint32_t owner,slot,generation,reserved; } SABoundaryLease;
+typedef struct { uint64_t owner;uint32_t epoch,slot,generation,reserved; } SABoundaryLease;
+typedef enum { SA_BOUNDARY_UPSERT_SOURCE=0,SA_BOUNDARY_REMOVE_SOURCE=1 } SABoundaryMutationOperation;
+typedef struct {
+    uint32_t operation,reserved[3];
+    /* A removal contains only key; all remaining source bytes must be zero. */
+    SABoundarySourceBlock source;
+} SABoundarySourceMutation;
 typedef enum { SA_BOUNDARY_IMPLICIT_CLOSE=1,SA_BOUNDARY_NET_COLLINEAR=2,SA_BOUNDARY_REVERSED_SOURCE=4 } SABoundaryEdgeFlag;
 typedef struct {
     SABoundarySourceKey source;
@@ -49,8 +55,9 @@ typedef struct {
     uint64_t arena_peak_bytes,baseline_bytes,prepared_bytes;
 } SABoundarySnapshot;
 /* State and its arena are private to one serial host owner. State starts zeroed.
- * owner_namespace is nonzero and unique for the entire host lifetime; it scopes
- * opaque leases, never establishes source equality. The arena cannot alias any
+ * owner_namespace is a nonzero host epoch. When reusing the same state storage
+ * after destroy, the host uses a fresh epoch. A lease additionally binds the
+ * exact state address, so a repeated epoch cannot alias a different owner. The arena cannot alias any
  * input/output/state bytes and must remain stable until successful destroy.
  * All budgets include active, cached, prepared and externally retained leases.
  * prepare is synchronous, bounded and failure-atomic; base must be the owner's
@@ -58,6 +65,11 @@ typedef struct {
 uint32_t sa_boundary_state_bytes(void);
 uint32_t sa_boundary_initialize(void*state,uint32_t state_bytes,uint32_t owner_namespace,void*arena,uint32_t arena_bytes,const SABoundaryBudget*budget);
 uint32_t sa_boundary_prepare(void*state,const SABoundaryLease*base,const SABoundaryPath*paths,uint32_t path_count,const SABoundarySourceBlock*sources,uint32_t source_count,const SAInkPathCommand*commands,uint32_t command_count,SABoundaryLease*output);
+/* Current captured fill rules/clip paths remain in force. Each source key
+ * occurs once; packet order has no Boolean meaning. Actual old/new capture
+ * determines affected support. Same key with changed bytes is not unchanged.
+ * Full prepare handles changes to the logical path definitions themselves. */
+uint32_t sa_boundary_update(void*state,const SABoundaryLease*base,const SABoundarySourceMutation*mutations,uint32_t mutation_count,const SAInkPathCommand*commands,uint32_t command_count,SABoundaryLease*output);
 uint32_t sa_boundary_retain(void*state,SABoundaryLease lease);
 uint32_t sa_boundary_release(void*state,SABoundaryLease lease);
 uint32_t sa_boundary_snapshot(void*state,SABoundaryLease lease,SABoundarySnapshot*output);
@@ -70,6 +82,11 @@ uint32_t sa_boundary_copy_edges(void*state,SABoundaryLease lease,uint32_t first,
  * substituted into it. A renderer chooses an explicit quantization policy.
  * count-query: output may be null only when capacity is zero. */
 uint32_t sa_boundary_copy_parameter(void*state,SABoundaryLease lease,uint32_t certificate,uint32_t*output,uint32_t capacity,uint32_t*required);
+/* Bounded mathematical query/validation, not the render loop. Rectangles are
+ * [left,bottom,right,top]; each output pair encloses the normalized Boolean
+ * pixel area. No quadrature samples or flattened geometry establish validity.
+ * Explicit budget/range failures leave the whole caller output unchanged. */
+uint32_t sa_boundary_measure_coverage(void*state,SABoundaryLease lease,const double*rectangles,uint32_t count,double*output,uint32_t capacity);
 /* Fails while any external lease remains. Does not invalidate live leases. */
 uint32_t sa_boundary_destroy(void*state);
 #ifdef __cplusplus
