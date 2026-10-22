@@ -69,7 +69,11 @@ test("a dataset reads and writes a CSV file outside the library", async () => {
     csv,
     'id,title,date,done\r\nm1,体检,2026-10-23,false\r\nm2,"复盘, 周会",2026-10-24,false\r\n',
   );
-  const linked = await ok("dataset_link", { name: "日程", path: csv });
+  const linked = await ok("dataset_write", {
+    action: "link",
+    name: "日程",
+    path: csv,
+  });
   expect(linked).toMatchObject({ created: true, wroteFile: false });
   expect(linked.external).toMatchObject({ path: csv, format: "csv" });
   expect(linked.dataset.source).toEqual({
@@ -167,16 +171,17 @@ test("a dataset reads and writes a CSV file outside the library", async () => {
   );
 
   // A change made elsewhere is read next time and merges with a stale write.
-  const before = await ok("dataset_read", { datasetId });
+  const before = await ok("dataset_read", { action: "read", datasetId });
   await new Promise((done) => setTimeout(done, 20));
   await writeFile(
     csv,
     'id,title,date,done\r\nm1,体检,2026-10-23,true\r\nm2,"复盘, 周会",2026-10-24,false\r\nm3,出差,2026-10-29,false\r\n',
   );
-  const after = await ok("dataset_read", { datasetId });
+  const after = await ok("dataset_read", { action: "read", datasetId });
   expect(after.hash).not.toBe(before.hash);
   expect(after.dataset.value.rows).toHaveLength(3);
-  await ok("dataset_apply", {
+  await ok("dataset_write", {
+    action: "apply",
     datasetId,
     baseHash: before.hash,
     operations: [{ op: "set", path: "rows[id=m2].date", value: "2026-10-25" }],
@@ -188,9 +193,10 @@ test("a dataset reads and writes a CSV file outside the library", async () => {
     "m3,出差,2026-10-29,false",
     "",
   ]);
-  const rejected = await call("dataset_apply", {
+  const rejected = await call("dataset_write", {
+    action: "apply",
     datasetId,
-    baseHash: (await ok("dataset_read", { datasetId })).hash,
+    baseHash: (await ok("dataset_read", { action: "read", datasetId })).hash,
     operations: [{ op: "set", path: "rows[id=m3].title", value: { x: 1 } }],
   });
   expect(rejected.error.code).toBe("INVALID_DATA");
@@ -233,13 +239,13 @@ test("a dataset reads and writes a CSV file outside the library", async () => {
     join(root, "local", "dataset-sources.json"),
     JSON.stringify({ format: "showai-dataset-sources", version: 1, links: {} }),
   );
-  const unlinked = await call("dataset_read", { datasetId });
+  const unlinked = await call("dataset_read", { action: "read", datasetId });
   expect(unlinked.error.code).toBe("SOURCE_UNAVAILABLE");
   expect(unlinked.error.details.source).toMatchObject({
     format: "csv",
     name: "schedule.csv",
   });
-  const listed = await ok("dataset_list");
+  const listed = await ok("dataset_read", { action: "list" });
   expect(listed[0].source).toMatchObject({ available: false });
   read = await ok("page_read", { pageId: page.document.id, rendered: false });
   expect(read.bindings[0].source).toMatchObject({ available: false });
@@ -254,9 +260,10 @@ test("a dataset reads and writes a CSV file outside the library", async () => {
   const json = join(outside, "wrong.json");
   await writeFile(json, "{}");
   expect(
-    (await call("dataset_link", { datasetId, path: json })).error.message,
+    (await call("dataset_write", { action: "link", datasetId, path: json }))
+      .error.message,
   ).toMatch(/reads a csv file/);
-  await ok("dataset_link", { datasetId, path: csv });
+  await ok("dataset_write", { action: "link", datasetId, path: csv });
   // Conversation delivery files carry the data too and say so.
   const presented = await ok("page_present", { pageId: page.document.id });
   expect(presented.externalSnapshots.datasets[0]).toMatchObject({
@@ -264,11 +271,13 @@ test("a dataset reads and writes a CSV file outside the library", async () => {
     available: true,
   });
   expect(
-    (await ok("dataset_read", { datasetId })).dataset.value.rows,
+    (await ok("dataset_read", { action: "read", datasetId })).dataset.value
+      .rows,
   ).toHaveLength(3);
 
   // Linking a file inside the library is refused.
-  const inside = await call("dataset_link", {
+  const inside = await call("dataset_write", {
+    action: "link",
     name: "x",
     path: join(root, "x.json"),
   });
@@ -287,7 +296,7 @@ test("a dataset reads and writes a CSV file outside the library", async () => {
   });
   await ok("dataset_delete", {
     datasetId,
-    baseHash: (await ok("dataset_read", { datasetId })).hash,
+    baseHash: (await ok("dataset_read", { action: "read", datasetId })).hash,
   });
   expect(await exists(csv)).toBe(true);
   expect(
@@ -298,7 +307,8 @@ test("a dataset reads and writes a CSV file outside the library", async () => {
 }, 240_000);
 
 test("library data moves into a new JSON file and back", async () => {
-  const created = await ok("dataset_create", {
+  const created = await ok("dataset_write", {
+    action: "create",
     name: "指标",
     value: { title: "指标", items: [{ id: "a", value: 1 }] },
   });
@@ -306,17 +316,22 @@ test("library data moves into a new JSON file and back", async () => {
   const path = join(outside, "metrics.json");
   await writeFile(path, "{}");
   // Both hold data: linking an existing file needs an explicit choice.
-  const ambiguous = await call("dataset_link", { datasetId, path });
+  const ambiguous = await call("dataset_write", {
+    action: "link",
+    datasetId,
+    path,
+  });
   expect(ambiguous.error.code).toBe("CONFLICT");
   // An existing file is never overwritten.
-  const overwrite = await call("dataset_link", {
+  const overwrite = await call("dataset_write", {
+    action: "link",
     datasetId,
     path,
     use: "dataset",
   });
   expect(overwrite.error.code).toBe("CONFLICT");
   await rm(path);
-  const moved = await ok("dataset_link", { datasetId, path });
+  const moved = await ok("dataset_write", { action: "link", datasetId, path });
   expect(moved).toMatchObject({ created: false, wroteFile: true });
   expect(JSON.parse(await readFile(path, "utf8"))).toEqual(
     created.dataset.value,
@@ -326,8 +341,9 @@ test("library data moves into a new JSON file and back", async () => {
     path,
     '{\n    "title": "指标",\n    "items": [\n        {\n            "id": "a",\n            "value": 1\n        }\n    ]\n}\n',
   );
-  const current = await ok("dataset_read", { datasetId });
-  await ok("dataset_apply", {
+  const current = await ok("dataset_read", { action: "read", datasetId });
+  await ok("dataset_write", {
+    action: "apply",
     datasetId,
     baseHash: current.hash,
     operations: [{ op: "set", path: "items[id=a].value", value: 2 }],
@@ -336,7 +352,7 @@ test("library data moves into a new JSON file and back", async () => {
   expect(await readFile(path, "utf8")).toBe(
     '{\n    "title": "指标",\n    "items": [\n        {\n            "id": "a",\n            "value": 2\n        }\n    ]\n}\n',
   );
-  const listed = (await ok("dataset_list")).find(
+  const listed = (await ok("dataset_read", { action: "list" })).find(
     (item: { id: string }) => item.id === datasetId,
   );
   expect(listed).toMatchObject({
@@ -345,15 +361,20 @@ test("library data moves into a new JSON file and back", async () => {
   });
 
   // Copying back into the library stops using the file and keeps it.
-  const embedded = await ok("dataset_link", { datasetId, path: null });
+  const embedded = await ok("dataset_write", {
+    action: "link",
+    datasetId,
+    path: null,
+  });
   expect(embedded.dataset.source).toBeUndefined();
   expect(embedded.dataset.value.items[0].value).toBe(2);
   await writeFile(path, '{"title":"changed later"}');
   expect(
-    (await ok("dataset_read", { datasetId })).dataset.value.items[0].value,
+    (await ok("dataset_read", { action: "read", datasetId })).dataset.value
+      .items[0].value,
   ).toBe(2);
   const capabilities = await ok("showai_capabilities");
-  expect(capabilities.datasets.tools).toContain("dataset_link");
+  expect(capabilities.datasets.tools).toContain("dataset_write");
   expect(capabilities.datasets.externalFiles).toMatchObject({
     available: true,
     exportConfirmation: { parameter: "externalData", value: "embed" },

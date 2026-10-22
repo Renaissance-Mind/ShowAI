@@ -437,9 +437,7 @@ export const showComponentSchema = {
   delivery: z
     .enum(SHOW_DELIVERIES)
     .optional()
-    .describe(
-      "auto follows the host display declared by the plugin; mcp-app attaches an MCP Apps view, fragment-file writes a fragment file, compact returns fragment text, image returns a PNG.",
-    ),
+    .describe("auto follows the plugin's declared host display."),
   theme: z
     .enum(["light", "dark"])
     .optional()

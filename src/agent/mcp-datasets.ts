@@ -2,23 +2,12 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
 import type { AgentService } from "./service";
+import { actionTool, type ToolAction } from "./mcp-actions";
 
-export const datasetTools = [
-  "dataset_list",
-  "dataset_read",
-  "dataset_create",
-  "dataset_apply",
-  "dataset_link",
-  "dataset_delete",
-] as const;
 export const datasetWriteTools = new Set<string>([
-  "dataset_create",
-  "dataset_apply",
-  "dataset_link",
+  "dataset_write",
   "dataset_delete",
 ]);
-/** Tools that read or write files of the connected device. */
-export const datasetLocalTools = new Set<string>(["dataset_link"]);
 
 const jsonObject = z.record(z.string(), z.unknown());
 const segment = z.union([
@@ -56,37 +45,47 @@ export function registerDatasetTools(
     write: Record<string, boolean>;
   },
   changeSchema: z.ZodRawShape,
+  /** Linking reads and writes files of the connected device. */
+  localFiles: boolean,
 ) {
-  register(
-    "dataset_list",
+  const datasetId = z.string().min(1).max(128);
+  const datasetName = z.string().min(1).max(200);
+  const description = z.string().max(4000);
+  const baseHash = z.string().min(1);
+  const read = actionTool(
+    "Read shared datasets: list them, or read one's value, hash and the pages using it; path (e.g. a[id=o1].b) narrows the value.",
     {
-      description: "List the project's shared datasets (id, name, hash, size).",
-      inputSchema: {},
-      annotations: annotations.readOnly,
+      list: {
+        fields: {},
+        run: () => call(() => service.datasetList(projectId)),
+      },
+      read: {
+        fields: { datasetId, path: path.optional() },
+        run: ({ datasetId, path }) =>
+          call(() =>
+            service.datasetRead(projectId, datasetId as string, {
+              path: path as z.infer<typeof path> | undefined,
+            }),
+          ),
+      },
     },
-    () => call(() => service.datasetList(projectId)),
   );
   register(
     "dataset_read",
     {
-      description:
-        "Read a dataset's value and hash and the pages that use it. path (e.g. objectives[id=o1].keyResults) narrows the value.",
-      inputSchema: { datasetId: z.string().min(1), path: path.optional() },
+      description: read.description,
+      inputSchema: read.inputSchema,
       annotations: annotations.readOnly,
     },
-    ({ datasetId, path }) =>
-      call(() => service.datasetRead(projectId, datasetId, { path })),
+    read.handler,
   );
-  register(
-    "dataset_create",
-    {
-      description:
-        "Create a dataset from value, or from a block with fromBlock {pageId,blockId,baseHash}: its props (except local keys) move into the dataset and the block is bound to it.",
-      inputSchema: {
+  const actions: Record<string, ToolAction> = {
+    create: {
+      fields: {
         ...changeSchema,
-        name: z.string().min(1).max(200),
-        datasetId: z.string().min(1).max(128).optional(),
-        description: z.string().max(4000).optional(),
+        name: datasetName,
+        datasetId: datasetId.optional(),
+        description: description.optional(),
         value: z.unknown().optional(),
         schema: jsonObject.optional(),
         fromBlock: z
@@ -100,109 +99,128 @@ export function registerDatasetTools(
           .strict()
           .optional(),
       },
-      annotations: annotations.write,
+      run: ({
+        name,
+        datasetId,
+        description,
+        value,
+        schema,
+        fromBlock,
+        ...metadata
+      }) =>
+        call(
+          () =>
+            service.datasetCreate(projectId, {
+              name: name as string,
+              ...(datasetId ? { id: datasetId as string } : {}),
+              description: description as string | undefined,
+              value,
+              schema: schema as Record<string, unknown> | undefined,
+              fromBlock: fromBlock as Parameters<
+                typeof service.datasetCreate
+              >[1]["fromBlock"],
+            }),
+          metadata,
+        ),
     },
-    ({ name, datasetId, description, value, schema, fromBlock, ...metadata }) =>
-      call(
-        () =>
-          service.datasetCreate(projectId, {
-            name,
-            ...(datasetId ? { id: datasetId } : {}),
-            description,
-            value,
-            schema,
-            fromBlock,
-          }),
-        metadata,
-      ),
-  );
-  register(
-    "dataset_apply",
-    {
-      description:
-        'Change a dataset with the baseHash you read: {op:"set",path,value}, {op:"remove",path}, {op:"insert",path:list,value,after?}, {op:"move",path:item,after}. Path segments select records by id ({"id":"t1"} or [id=t1]). Concurrent edits merge per field; a conflicting field returns CONFLICT.',
-      inputSchema: {
+    apply: {
+      fields: {
         ...changeSchema,
-        datasetId: z.string().min(1),
-        baseHash: z.string().min(1),
+        datasetId,
+        baseHash,
         operations: z.array(operation).max(5000),
-        name: z.string().min(1).max(200).optional(),
-        description: z.union([z.string().max(4000), z.null()]).optional(),
-        schema: z.union([jsonObject, z.null()]).optional(),
+        name: datasetName.optional(),
+        description: description.nullable().optional(),
+        schema: jsonObject.nullable().optional(),
       },
-      annotations: annotations.write,
+      run: ({
+        datasetId,
+        baseHash,
+        operations,
+        name,
+        description,
+        schema,
+        ...metadata
+      }) =>
+        call(
+          () =>
+            service.datasetApply(projectId, datasetId as string, {
+              baseHash: baseHash as string,
+              operations: operations as z.infer<typeof operation>[],
+              name: name as string | undefined,
+              description: description as string | null | undefined,
+              schema: schema as Record<string, unknown> | null | undefined,
+            }),
+          metadata,
+        ),
     },
-    ({
-      datasetId,
-      baseHash,
-      operations,
-      name,
-      description,
-      schema,
-      ...metadata
-    }) =>
-      call(
-        () =>
-          service.datasetApply(projectId, datasetId, {
-            baseHash,
-            operations,
-            name,
-            description,
-            schema,
-          }),
-        metadata,
-      ),
-  );
-  register(
-    "dataset_link",
-    {
-      description:
-        'Keep a dataset\'s value in a file outside the library (.json, or .csv/.tsv as {columns,rows}). Without datasetId, create a dataset from path, or write value to a new file. With datasetId, use:"dataset" moves its value into path, use:"file" replaces it with that file, and path alone links this device\'s copy of an external dataset. path:null copies the file back into the library.',
-      inputSchema: {
+  };
+  if (localFiles)
+    actions.link = {
+      fields: {
         ...changeSchema,
-        datasetId: z.string().min(1).max(128).optional(),
+        datasetId: datasetId.optional(),
         path: z.union([z.string().min(1).max(4096), z.null()]),
         format: z.enum(["json", "csv", "tsv"]).optional(),
         use: z.enum(["file", "dataset"]).optional(),
-        name: z.string().min(1).max(200).optional(),
-        description: z.string().max(4000).optional(),
+        name: datasetName.optional(),
+        description: description.optional(),
         value: z.unknown().optional(),
         schema: jsonObject.optional(),
-        baseHash: z.string().min(1).optional(),
+        baseHash: baseHash.optional(),
       },
+      run: ({
+        datasetId,
+        path,
+        format,
+        use,
+        name,
+        description,
+        value,
+        schema,
+        baseHash,
+        ...metadata
+      }) =>
+        call(() => {
+          if (path === null) {
+            if (!datasetId)
+              throw new Error(
+                "path null needs the datasetId to copy into the library.",
+              );
+            return service.datasetEmbed(
+              projectId,
+              datasetId as string,
+              baseHash as string | undefined,
+            );
+          }
+          return service.datasetLink(projectId, {
+            ...(datasetId ? { datasetId: datasetId as string } : {}),
+            path: path as string,
+            format: format as "json" | "csv" | "tsv" | undefined,
+            use: use as "file" | "dataset" | undefined,
+            name: name as string | undefined,
+            description: description as string | undefined,
+            value,
+            schema: schema as Record<string, unknown> | undefined,
+          });
+        }, metadata),
+    };
+  const write = actionTool(
+    `Change shared datasets (guide datasets). create takes value, or fromBlock {pageId,blockId,baseHash} to move a block's props into the dataset and bind it. apply takes the read baseHash and operations {op:"set",path,value}, {op:"remove",path}, {op:"insert",path:list,value,after?}, {op:"move",path:item,after}; path segments select records by id ([id=t1]).${
+      localFiles
+        ? " link keeps the value in a .json/.csv/.tsv file outside the library; path:null copies it back."
+        : ""
+    }`,
+    actions,
+  );
+  register(
+    "dataset_write",
+    {
+      description: write.description,
+      inputSchema: write.inputSchema,
       annotations: annotations.write,
     },
-    ({
-      datasetId,
-      path,
-      format,
-      use,
-      name,
-      description,
-      value,
-      schema,
-      baseHash,
-      ...metadata
-    }) =>
-      call(() => {
-        if (path === null) {
-          if (!datasetId)
-            throw new Error(
-              "path null needs the datasetId to copy into the library.",
-            );
-          return service.datasetEmbed(projectId, datasetId, baseHash);
-        }
-        return service.datasetLink(projectId, {
-          ...(datasetId ? { datasetId } : {}),
-          path,
-          format,
-          use,
-          name,
-          description,
-          value,
-          schema,
-        });
-      }, metadata),
+    write.handler,
   );
   register(
     "dataset_delete",

@@ -56,6 +56,13 @@ if (
   throw new Error(
     "This plugin requires the versioned component parameter runtime. Update/register the intended ShowAI runtime and reconnect; skill installation alone does not update the tool protocol.",
   );
+if (
+  info.data?.capabilities?.agentOperations?.toolSurface !==
+  "showai-mcp-tools-v2"
+)
+  throw new Error(
+    "This plugin describes the merged ShowAI tools (organization_update, dataset_write, draft_write and others). Update/register the intended ShowAI runtime and reconnect; installing the plugin alone does not change the runtime's tools.",
+  );
 const args = [...config.launch.args, "mcp"];
 if (process.env.SHOWAI_TEMPLATES) {
   if (!process.env.SHOWAI_PROJECT_ID)

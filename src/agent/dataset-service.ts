@@ -477,7 +477,7 @@ export class DatasetService {
       ).filter((key) => !compiled.props!.local.has(key));
       if (extra.length)
         invalidData(
-          `Block ${node.attrs?.id} takes ${extra.join(", ")} from dataset ${binding.dataset}. Change them with component.props.set (page_apply) or dataset_apply instead of storing them in the page.`,
+          `Block ${node.attrs?.id} takes ${extra.join(", ")} from dataset ${binding.dataset}. Change them with component.props.set (page_apply) or dataset_write(action:apply) instead of storing them in the page.`,
         );
     });
   }

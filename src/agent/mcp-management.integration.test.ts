@@ -52,7 +52,8 @@ test("library MCP organizes real folders, projects and sidebar entries with scop
   const a = await call(c, "project_create", { name: "Source" });
   const b = await call(c, "project_create", { name: "Destination" });
   const projectId = a.id;
-  const folder = await call(c, "folder_create", {
+  const folder = await call(c, "organization_update", {
+    action: "create_folder",
     projectId,
     name: "Promotion",
     icon: "📁",
@@ -60,7 +61,8 @@ test("library MCP organizes real folders, projects and sidebar entries with scop
   });
   expect(
     (
-      await call(c, "folder_create", {
+      await call(c, "organization_update", {
+        action: "create_folder",
         projectId,
         name: "Promotion",
         icon: "📁",
@@ -68,37 +70,47 @@ test("library MCP organizes real folders, projects and sidebar entries with scop
       })
     ).id,
   ).toBe(folder.id);
-  const child = await call(c, "folder_create", {
+  const child = await call(c, "organization_update", {
+    action: "create_folder",
     projectId,
     name: "Materials",
     parentId: folder.id,
   });
-  await call(c, "folder_update", {
+  await call(c, "organization_update", {
+    action: "update_folder",
     projectId,
     folderId: folder.id,
     name: "Launch",
     pinned: true,
     archived: true,
   });
-  expect(await call(c, "folders_list", { projectId })).toEqual([]);
   expect(
-    await call(c, "folders_list", { projectId, includeArchived: true }),
+    await call(c, "organization_read", { action: "folders", projectId }),
+  ).toEqual([]);
+  expect(
+    await call(c, "organization_read", {
+      action: "folders",
+      projectId,
+      includeArchived: true,
+    }),
   ).toHaveLength(2);
-  await call(c, "folder_update", {
+  await call(c, "organization_update", {
+    action: "update_folder",
     projectId,
     folderId: folder.id,
     archived: false,
   });
   expect(
-    (await call(c, "folders_list", { projectId })).find(
+    (await call(c, "organization_read", { action: "folders", projectId })).find(
       (f: any) => f.id === folder.id,
     ),
   ).toMatchObject({ name: "Launch", pinned: true });
   expect(
     (
       await c.callTool({
-        name: "entry_move",
+        name: "organization_update",
         arguments: {
+          action: "move",
           projectId,
           kind: "folder",
           id: folder.id,
@@ -107,13 +119,15 @@ test("library MCP organizes real folders, projects and sidebar entries with scop
       })
     ).isError,
   ).toBe(true);
-  await call(c, "entry_move", {
+  await call(c, "organization_update", {
+    action: "move",
     projectId,
     kind: "folder",
     id: child.id,
     parentId: null,
   });
-  await call(c, "directory_sort", {
+  await call(c, "organization_update", {
+    action: "sort",
     projectId,
     parentId: null,
     sortBy: "name",
@@ -125,14 +139,25 @@ test("library MCP organizes real folders, projects and sidebar entries with scop
   });
   expect(page.document.parentId).toBe(folder.id);
   const bound = await connect(createMcpServer({ root, projectId }));
-  expect((await bound.listTools()).tools.map((t) => t.name)).not.toContain(
-    "sidebar_read",
-  );
+  const boundTools = (await bound.listTools()).tools;
+  expect(
+    (
+      boundTools.find((t) => t.name === "organization_read")?.inputSchema
+        .properties?.action as { enum?: string[] }
+    ).enum,
+  ).toEqual(["folders"]);
+  expect(
+    (
+      boundTools.find((t) => t.name === "organization_update")?.inputSchema
+        .properties?.action as { enum?: string[] }
+    ).enum,
+  ).not.toContain("create_group");
   expect(
     (
       await bound.callTool({
-        name: "entry_move",
+        name: "organization_update",
         arguments: {
+          action: "move",
           projectId,
           kind: "page",
           id: page.document.id,
@@ -144,7 +169,8 @@ test("library MCP organizes real folders, projects and sidebar entries with scop
       })
     ).isError,
   ).toBe(true);
-  const moved = await call(c, "entry_move", {
+  const moved = await call(c, "organization_update", {
+    action: "move",
     projectId,
     kind: "page",
     id: page.document.id,
@@ -158,33 +184,46 @@ test("library MCP organizes real folders, projects and sidebar entries with scop
   expect((await call(c, "pages_list", { projectId: b.id }))[0].id).toBe(
     page.document.id,
   );
-  const sidebar = await call(c, "sidebar_group_create", {
+  const sidebar = await call(c, "organization_update", {
+    action: "create_group",
     projectId,
     name: "Research",
   });
   const group = sidebar.groups.find((g: any) => g.name === "Research");
-  await call(c, "sidebar_project_move", { projectId, sectionId: group.id });
-  await call(c, "sidebar_project_move", {
+  await call(c, "organization_update", {
+    action: "move_project",
+    projectId,
+    sectionId: group.id,
+  });
+  await call(c, "organization_update", {
+    action: "move_project",
     projectId: b.id,
     sectionId: group.id,
     relativeProjectId: projectId,
     placement: "before",
   });
   expect(
-    (await call(c, "sidebar_read", { projectId })).projectGroups[projectId],
+    (await call(c, "organization_read", { action: "sidebar", projectId }))
+      .projectGroups[projectId],
   ).toBe(group.id);
-  await call(c, "sidebar_group_update", {
+  await call(c, "organization_update", {
+    action: "update_group",
     projectId,
     sidebarGroupId: group.id,
     name: "Projects",
   });
-  await call(c, "sidebar_group_update", {
+  await call(c, "organization_update", {
+    action: "update_group",
     projectId,
     sidebarGroupId: group.id,
     name: null,
   });
-  expect((await call(c, "sidebar_read", { projectId })).groups).toEqual([]);
-  await call(c, "project_update", {
+  expect(
+    (await call(c, "organization_read", { action: "sidebar", projectId }))
+      .groups,
+  ).toEqual([]);
+  await call(c, "organization_update", {
+    action: "update_project",
     projectId,
     name: "Renamed",
     icon: "🧠",
@@ -199,7 +238,11 @@ test("library MCP organizes real folders, projects and sidebar entries with scop
       (p: any) => p.id === projectId,
     ),
   ).toMatchObject({ name: "Renamed", archived: true, pinned: true });
-  await call(c, "project_update", { projectId, archived: false });
+  await call(c, "organization_update", {
+    action: "update_project",
+    projectId,
+    archived: false,
+  });
   expect(
     (await call(c, "project_context", { projectId })).project.folders,
   ).toHaveLength(2);
@@ -225,29 +268,42 @@ test("draft operations retain generations, reject foreign projects and complete 
     baseContent: page.document,
     sequence: 1,
   };
-  const draft = await call(c, "draft_save", input);
-  expect((await call(c, "drafts_list", { projectId }))[0].generation).toBe(
-    draft.generation,
-  );
+  const draft = await call(c, "draft_write", { action: "save", ...input });
   expect(
-    (await call(c, "draft_read", { projectId, draftId: draft.id })).content
-      .title,
+    (await call(c, "draft_read", { action: "list", projectId }))[0].generation,
+  ).toBe(draft.generation);
+  expect(
+    (
+      await call(c, "draft_read", {
+        action: "read",
+        projectId,
+        draftId: draft.id,
+      })
+    ).content.title,
   ).toBe("Saved draft");
-  for (const name of ["draft_read", "draft_remove", "draft_complete"])
+  for (const [name, args] of [
+    ["draft_read", { action: "read", draftId: draft.id }],
+    ["draft_remove", { draftId: draft.id, generation: draft.generation }],
+    [
+      "draft_write",
+      {
+        action: "complete",
+        draftId: draft.id,
+        generation: draft.generation,
+        revision: page.revision,
+      },
+    ],
+  ] as const)
     expect(
       (
         await c.callTool({
           name,
-          arguments: {
-            projectId: other,
-            draftId: draft.id,
-            generation: draft.generation,
-            revision: page.revision,
-          },
+          arguments: { projectId: other, ...args },
         })
       ).isError,
     ).toBe(true);
-  const newer = await call(c, "draft_save", {
+  const newer = await call(c, "draft_write", {
+    action: "save",
     ...input,
     sequence: 2,
     content: { ...page.document, title: "Unsaved" },
@@ -267,8 +323,9 @@ test("draft operations retain generations, reject foreign projects and complete 
   expect(
     (
       await c.callTool({
-        name: "draft_complete",
+        name: "draft_write",
         arguments: {
+          action: "complete",
           projectId,
           draftId: draft.id,
           generation: newer.generation,
@@ -278,22 +335,34 @@ test("draft operations retain generations, reject foreign projects and complete 
     ).isError,
   ).toBe(true);
   expect(
-    (await call(c, "draft_read", { projectId, draftId: draft.id })).content
-      .title,
+    (
+      await call(c, "draft_read", {
+        action: "read",
+        projectId,
+        draftId: draft.id,
+      })
+    ).content.title,
   ).toBe("Unsaved");
   await call(c, "draft_remove", {
     projectId,
     draftId: draft.id,
     generation: newer.generation,
   });
-  const exact = await call(c, "draft_save", { ...input, sequence: 3 });
+  const exact = await call(c, "draft_write", {
+    action: "save",
+    ...input,
+    sequence: 3,
+  });
   expect(
-    await call(c, "draft_complete", {
+    await call(c, "draft_write", {
+      action: "complete",
       projectId,
       draftId: exact.id,
       generation: exact.generation,
       revision: page.revision,
     }),
   ).toMatchObject({ completed: true });
-  expect(await call(c, "drafts_list", { projectId })).toEqual([]);
+  expect(await call(c, "draft_read", { action: "list", projectId })).toEqual(
+    [],
+  );
 });

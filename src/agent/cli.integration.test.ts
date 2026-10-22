@@ -2227,8 +2227,9 @@ test("bound MCP discloses catalog details on demand and cannot mutate shared or 
     expect(listing.nextCursor).toBeTruthy();
     const escaped = data(
       await client.callTool({
-        name: "catalog_fork",
+        name: "catalog_version",
         arguments: {
+          action: "fork",
           ref: privateComponent.ref,
           version: "1.0.0",
           id: "escape-attempt",
@@ -2640,8 +2641,8 @@ test("search, storage maintenance and conflicts are reachable from CLI and proje
     expect(
       unpack(
         await client.callTool({
-          name: "workspace_conflicts",
-          arguments: { projectId: project.id },
+          name: "workspace_conflict",
+          arguments: { action: "list", projectId: project.id },
         }),
       ).data,
     ).toEqual([]);

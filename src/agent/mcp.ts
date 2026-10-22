@@ -29,7 +29,7 @@ import type {
   EditablePackage,
   SaveTemplateInput,
 } from "../components/custom/types";
-import type { PageOperation } from "../core/model";
+import { CoreError, type PageOperation } from "../core/model";
 import type { PublishedComponentLocator } from "../core/publication";
 import { CATALOG_VIEWS } from "./disclosure";
 import { GUIDE_TOPICS } from "./guides";
@@ -43,6 +43,19 @@ import { TEMPLATE_STAGES } from "../portable/template-bundle.mjs";
 import type { TemplateSelection } from "./template-workflow";
 import { compactMcpResult } from "./mcp-response";
 import { boardReadSchema, type BoardReadResult } from "./board-reading";
+import { actionTool, strictToolInputs } from "./mcp-actions";
+
+// Capture tuning stays available to the service; agents use the defaults.
+const boardTuning = {
+  tilePixels: true,
+  overlapPixels: true,
+  maxImages: true,
+  pageLimit: true,
+  elementLimit: true,
+  margin: true,
+  imageScope: true,
+  theme: true,
+} as const;
 import { pageWriteCapture, type PageWrite } from "../core/page-write-capture";
 import { savePageWrites } from "../agent-host/page-undo";
 import { WorkspaceService } from "./workspace-service";
@@ -85,13 +98,15 @@ export function createMcpServer(options: {
 }): McpServer {
   const service = new AgentService(options);
   const projectId = service.requireProject(options.projectId);
-  const server = new McpServer(
-    { name: "showai", version: packageMetadata.version },
-    {
-      instructions:
-        options.instructions ??
-        `ShowAI project ${projectId}. Call guide first.`,
-    },
+  const server = strictToolInputs(
+    new McpServer(
+      { name: "showai", version: packageMetadata.version },
+      {
+        instructions:
+          options.instructions ??
+          `ShowAI project ${projectId}. Call guide first.`,
+      },
+    ),
   );
   const register: McpServer["registerTool"] = (name, config, callback) => {
     // All project operations accept an explicit identity, including bound connections.
@@ -188,6 +203,7 @@ export function createMcpServer(options: {
     call,
     { readOnly, write },
     changeSchema,
+    options.presentation?.transport !== "http",
   );
   registerOrganizationTools(
     register,
@@ -330,7 +346,7 @@ export function createMcpServer(options: {
         'Read a Page as structured JSON/Markdown (default), a PNG image, or html (DOM, accessibility tree and an interactive file; actions run interactions). detail:"outline" lists block IDs; blockIds selects blocks.',
       inputSchema: {
         pageId: z.string().min(1),
-        ...pageReadSchema.shape,
+        ...pageReadSchema.omit({ out: true, overwrite: true }).shape,
         response: z.enum(["full", "source", "receipt"]).default("full"),
       },
       annotations: readOnly,
@@ -371,7 +387,10 @@ export function createMcpServer(options: {
     {
       description:
         "Read a Board: a full image for small boards, otherwise an overview with overlapping tiles and element/Page indexes. Pass the returned snapshotId with mode tile/region/element/source for details. boardId selects a Board inside a Page.",
-      inputSchema: { pageId: z.string().min(1), ...boardReadSchema.shape },
+      inputSchema: {
+        pageId: z.string().min(1),
+        ...boardReadSchema.omit(boardTuning).shape,
+      },
       annotations: readOnly,
     },
     ({ pageId, ...input }) =>
@@ -630,33 +649,35 @@ export function createMcpServer(options: {
     ({ id, ...input }) =>
       call(() => service.catalogDescribe(id, { projectId, ...input })),
   );
-  register(
-    "component_import",
-    {
-      description:
-        "Import and compile a local component package directory into this project.",
-      inputSchema: { ...changeSchema, directory: z.string().min(1) },
-      annotations: write,
-    },
-    ({ directory, ...metadata }) =>
-      call(() => service.importComponent(directory, projectId), metadata),
-  );
+  const localFiles = options.presentation?.transport !== "http";
   register(
     "component_save",
     {
-      description:
-        "Save component source as a new immutable revision in this project.",
-      inputSchema: { ...changeSchema, source: jsonObject },
+      description: localFiles
+        ? "Save component source as a new immutable revision in this project, or import and compile a local package directory. Pass exactly one of source or directory."
+        : "Save component source as a new immutable revision in this project.",
+      inputSchema: {
+        ...changeSchema,
+        source: jsonObject.optional(),
+        ...(localFiles ? { directory: z.string().min(1).optional() } : {}),
+      },
       annotations: write,
     },
-    ({ source, ...metadata }) =>
+    ({ source, directory, ...metadata }) =>
       call(() => {
+        if (!source === !directory)
+          throw new CoreError(
+            "INVALID_DATA",
+            "Pass exactly one of source or directory.",
+          );
+        if (directory)
+          return service.importComponent(directory as string, projectId);
         if (
-          !(source.manifest as Record<string, unknown> | undefined)
+          !(source!.manifest as Record<string, unknown> | undefined)
             ?.documentation
         )
           throw new Error(
-            "New component authoring requires manifest.documentation. Read guide component for the contract; use component_import only for an existing legacy package.",
+            "New component authoring requires manifest.documentation. Read guide component for the contract; import an existing legacy package with directory.",
           );
         return service.saveComponent(
           projectId,
@@ -739,26 +760,74 @@ export function createMcpServer(options: {
           : saved;
       }, metadata),
   );
-  register(
-    "catalog_fork",
+  const revisionId = z.string().optional();
+  const revisionVersion = z.string();
+  const catalogVersion = actionTool(
+    "Save a project-owned revision: fork an exact revision, or save a reviewed merge.",
     {
-      description:
-        "Fork an exact revision into a new revision owned by this project.",
-      inputSchema: {
-        ...changeSchema,
-        ref: refSchema,
-        id: z.string().optional(),
-        version: z.string(),
-        name: z.string().optional(),
+      fork: {
+        fields: {
+          ...changeSchema,
+          ref: refSchema,
+          id: revisionId,
+          version: revisionVersion,
+          name: z.string().optional(),
+        },
+        run: ({ ref, operationId, message, groupId, ...target }) =>
+          call(
+            () =>
+              service.fork(
+                projectId,
+                ref as z.infer<typeof refSchema>,
+                target as { id?: string; version: string; name?: string },
+              ),
+            {
+              operationId: operationId as string | undefined,
+              message: message as string | undefined,
+              groupId: groupId as string | undefined,
+            },
+          ),
       },
+      merge: {
+        fields: {
+          ...changeSchema,
+          base: refSchema,
+          ours: refSchema,
+          theirs: refSchema,
+          id: revisionId,
+          version: revisionVersion,
+          resolved: jsonObject,
+        },
+        run: ({ resolved, operationId, message, groupId, ...input }) =>
+          call(
+            () =>
+              service.resolveMerge(projectId, {
+                ...(input as {
+                  base: z.infer<typeof refSchema>;
+                  ours: z.infer<typeof refSchema>;
+                  theirs: z.infer<typeof refSchema>;
+                  id?: string;
+                  version: string;
+                }),
+                resolved: resolved as unknown as EditablePackage,
+              }),
+            {
+              operationId: operationId as string | undefined,
+              message: message as string | undefined,
+              groupId: groupId as string | undefined,
+            },
+          ),
+      },
+    },
+  );
+  register(
+    "catalog_version",
+    {
+      description: catalogVersion.description,
+      inputSchema: catalogVersion.inputSchema,
       annotations: write,
     },
-    ({ ref, operationId, message, groupId, ...target }) =>
-      call(() => service.fork(projectId, ref, target), {
-        operationId,
-        message,
-        groupId,
-      }),
+    catalogVersion.handler,
   );
   register(
     "catalog_merge_preview",
@@ -789,35 +858,9 @@ export function createMcpServer(options: {
                 path,
                 kind,
               })),
-              next: "Read catalog_merge_preview with view=source, resolve conflicts, then catalog_merge_resolve with a new version.",
+              next: "Read catalog_merge_preview with view=source, resolve conflicts, then catalog_version action merge with a new version.",
             };
       }),
-  );
-  register(
-    "catalog_merge_resolve",
-    {
-      description:
-        "Save a reviewed merge resolution as a new project revision.",
-      inputSchema: {
-        ...changeSchema,
-        base: refSchema,
-        ours: refSchema,
-        theirs: refSchema,
-        id: z.string().optional(),
-        version: z.string(),
-        resolved: jsonObject,
-      },
-      annotations: write,
-    },
-    ({ resolved, operationId, message, groupId, ...input }) =>
-      call(
-        () =>
-          service.resolveMerge(projectId, {
-            ...input,
-            resolved: resolved as unknown as EditablePackage,
-          }),
-        { operationId, message, groupId },
-      ),
   );
   register(
     "publication_prepare",
@@ -903,64 +946,80 @@ export function createMcpServer(options: {
         { operationId, message, groupId },
       ),
   );
-  register(
-    "workspace_conflicts",
+  const workspaceConflict = actionTool(
+    "Read retained external file changes in this project: list them, or read one with its formal and baseline versions.",
     {
-      description: "List retained external file changes in this project.",
-      inputSchema: {},
-      annotations: readOnly,
+      list: {
+        fields: {},
+        run: () => call(() => service.workspaceConflicts(projectId)),
+      },
+      read: {
+        fields: { id: z.string() },
+        run: ({ id }) => call(() => service.workspaceConflict(id as string)),
+      },
     },
-    () => call(() => service.workspaceConflicts(projectId)),
-  );
-  register(
-    "workspace_recover_package",
-    {
-      description:
-        "Recover an external package change as an editable local draft and restore the immutable version.",
-      inputSchema: { conflictId: z.string(), clientId: z.string() },
-      annotations: write,
-    },
-    ({ conflictId, clientId }) =>
-      call(() =>
-        service.recoverPackageConflict({
-          id: conflictId,
-          clientId,
-          targetProjectId: projectId,
-        }),
-      ),
   );
   register(
     "workspace_conflict",
     {
-      description:
-        "Read a retained external change with its formal and baseline versions.",
-      inputSchema: { id: z.string() },
+      description: workspaceConflict.description,
+      inputSchema: workspaceConflict.inputSchema,
       annotations: readOnly,
     },
-    ({ id }) => call(() => service.workspaceConflict(id)),
+    workspaceConflict.handler,
+  );
+  const workspaceResolve = actionTool(
+    "Resolve an external change by discard, page import or reviewed merge (preserved snapshots remain available), or recover an external package change as an editable local draft and restore the immutable version.",
+    {
+      resolve: {
+        fields: {
+          ...changeSchema,
+          id: z.string(),
+          resolution: z.enum(["discard", "import", "merge"]),
+          document: jsonObject.optional(),
+        },
+        run: ({ operationId, message, groupId, document, id, resolution }) =>
+          call(
+            () =>
+              service.resolveWorkspaceConflict({
+                id: id as string,
+                resolution: resolution as "discard" | "import" | "merge",
+                ...(document
+                  ? {
+                      document: validateDocument(
+                        document as Record<string, unknown>,
+                      ),
+                    }
+                  : {}),
+              }),
+            {
+              operationId: operationId as string | undefined,
+              message: message as string | undefined,
+              groupId: groupId as string | undefined,
+            },
+          ),
+      },
+      recover_package: {
+        fields: { id: z.string(), clientId: z.string() },
+        run: ({ id, clientId }) =>
+          call(() =>
+            service.recoverPackageConflict({
+              id: id as string,
+              clientId: clientId as string,
+              targetProjectId: projectId,
+            }),
+          ),
+      },
+    },
   );
   register(
     "workspace_resolve",
     {
-      description:
-        "Resolve an external change by discard, page import or reviewed merge.",
-      inputSchema: {
-        ...changeSchema,
-        id: z.string(),
-        resolution: z.enum(["discard", "import", "merge"]),
-        document: jsonObject.optional(),
-      },
+      description: workspaceResolve.description,
+      inputSchema: workspaceResolve.inputSchema,
       annotations: write,
     },
-    ({ operationId, message, groupId, document, ...input }) =>
-      call(
-        () =>
-          service.resolveWorkspaceConflict({
-            ...input,
-            ...(document ? { document: validateDocument(document) } : {}),
-          }),
-        { operationId, message, groupId },
-      ),
+    workspaceResolve.handler,
   );
   if (options.presentation?.transport !== "http") {
     const syncState = async () => {
@@ -1144,12 +1203,14 @@ export async function startMcp(options: {
 }
 
 export async function startPublicMcp(root: string) {
-  const server = new McpServer(
-    { name: "showai", version: packageMetadata.version },
-    {
-      instructions:
-        "ShowAI public components and templates, without a project. Call guide first.",
-    },
+  const server = strictToolInputs(
+    new McpServer(
+      { name: "showai", version: packageMetadata.version },
+      {
+        instructions:
+          "ShowAI public components and templates, without a project. Call guide first.",
+      },
+    ),
   );
   server.registerTool(
     "guide",

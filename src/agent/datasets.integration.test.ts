@@ -242,7 +242,8 @@ test("two pages share one dataset; both write, merge and conflict at the field",
   const board = widget(overview.document, "custom");
 
   // Share the board's data; the page keeps only the binding and its title.
-  const shared = await ok("dataset_create", {
+  const shared = await ok("dataset_write", {
+    action: "create",
     name: "OKR",
     fromBlock: {
       pageId: overview.document.id,
@@ -383,20 +384,23 @@ test("two pages share one dataset; both write, merge and conflict at the field",
   );
 
   // Two writers from the same read: different fields merge, the same field conflicts.
-  const read = await ok("dataset_read", { datasetId });
+  const read = await ok("dataset_read", { action: "read", datasetId });
   const path = (id: string, field: string) =>
     `objectives[id=o1].keyResults[id=k1].tasks[id=${id}].${field}`;
-  await ok("dataset_apply", {
+  await ok("dataset_write", {
+    action: "apply",
     datasetId,
     baseHash: read.hash,
     operations: [{ op: "set", path: path("t2", "due"), value: "2026-10-26" }],
   });
-  await ok("dataset_apply", {
+  await ok("dataset_write", {
+    action: "apply",
     datasetId,
     baseHash: read.hash,
     operations: [{ op: "set", path: path("t1", "title"), value: "写使用指南" }],
   });
-  const conflict = await call("dataset_apply", {
+  const conflict = await call("dataset_write", {
+    action: "apply",
     datasetId,
     baseHash: read.hash,
     operations: [{ op: "set", path: path("t2", "due"), value: "2026-10-30" }],
@@ -409,6 +413,7 @@ test("two pages share one dataset; both write, merge and conflict at the field",
     theirs: "2026-10-26",
   });
   const merged = await ok("dataset_read", {
+    action: "read",
     datasetId,
     path: "objectives[id=o1].keyResults[id=k1].tasks",
   });
@@ -498,5 +503,5 @@ test("two pages share one dataset; both write, merge and conflict at the field",
     available: true,
   });
   const guide = await ok("guide", { topic: "datasets" });
-  expect(guide.tools).toContain("dataset_apply");
+  expect(guide.tools).toContain("dataset_write");
 }, 240_000);

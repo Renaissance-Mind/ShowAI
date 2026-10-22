@@ -9,6 +9,10 @@ import { versionedLibrary } from "../core/library-runtime";
 import { findViewerTemplate } from "./exporter";
 import { GUIDE_TOPICS } from "./guides";
 import { TEMPLATE_WORKFLOW_CAPABILITIES } from "../portable/template-bundle.mjs";
+
+/** Tool names and parameters the installed plugin skills describe. */
+export const TOOL_SURFACE_PROTOCOL = "showai-mcp-tools-v2";
+
 export interface RuntimeLaunch {
   command: string;
   args: string[];
@@ -84,6 +88,7 @@ export async function runtimeInfo(home: string) {
         libraryProjects: true,
         pagePresent: true,
         workspaceManagement: "showai-workspace-management-v1",
+        toolSurface: TOOL_SURFACE_PROTOCOL,
       },
       remoteAuthentication: "oauth2-project-grants",
     },

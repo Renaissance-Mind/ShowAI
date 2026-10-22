@@ -309,8 +309,8 @@ function sourceUnavailable(
   const error = new CoreError(
     "SOURCE_UNAVAILABLE",
     path
-      ? `Dataset "${dataset.name}" reads ${path}, which cannot be read on this device (${problem}). Fix or restore the file, or link another file with dataset_link.`
-      : `Dataset "${dataset.name}" reads an external file${dataset.source?.name ? ` (${dataset.source.name})` : ""} that is not linked on this device. Link it with dataset_link or in the shared data dialog.`,
+      ? `Dataset "${dataset.name}" reads ${path}, which cannot be read on this device (${problem}). Fix or restore the file, or link another file with dataset_write(action:link).`
+      : `Dataset "${dataset.name}" reads an external file${dataset.source?.name ? ` (${dataset.source.name})` : ""} that is not linked on this device. Link it with dataset_write(action:link) or in the shared data dialog.`,
   );
   error.details = {
     datasetId: dataset.id,
@@ -707,7 +707,7 @@ export class DatasetStore {
         if (input.name !== undefined || input.description !== undefined)
           throw new CoreError(
             "INVALID_DATA",
-            "Rename an existing dataset with dataset_apply.",
+            "Rename an existing dataset with dataset_write(action:apply).",
           );
       }
       let value: unknown;

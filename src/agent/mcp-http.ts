@@ -1,4 +1,4 @@
-import { datasetLocalTools, datasetWriteTools } from "./mcp-datasets";
+import { datasetWriteTools } from "./mcp-datasets";
 import {
   CAPACITY,
   CapacityError,
@@ -25,7 +25,7 @@ import {
 import { RemoteWorkspaces, type RemoteWorkspaceContext } from "./mcp-workspace";
 import {
   organizationWriteTools,
-  sidebarTools,
+  sidebarOperations,
   draftTools,
 } from "./mcp-organization";
 import {
@@ -54,16 +54,12 @@ const writeTools = new Set([
   "component_save",
   "template_apply",
   "template_save",
-  "catalog_fork",
-  "catalog_merge_resolve",
+  "catalog_version",
   "page_merge_save",
   "workspace_resolve",
 ]);
 const localOnly = new Set([
-  ...datasetLocalTools,
-  "component_import",
   "publication_prepare",
-  "workspace_recover_package",
   "workspace_conflict",
   "workspace_resolve",
 ]);
@@ -545,7 +541,7 @@ export async function createMcpHttpApp(options: McpHttpOptions) {
                 );
               }
               if (
-                name === "drafts_list" &&
+                name === "draft_read" &&
                 Array.isArray(result.structuredContent?.data)
               ) {
                 const reverse = Object.fromEntries(
@@ -888,7 +884,8 @@ export async function createMcpHttpApp(options: McpHttpOptions) {
           for (const key of ["destinationProjectId", "relativeProjectId"])
             if (typeof params?.arguments?.[key] === "string")
               participants.push(params.arguments[key] as string);
-          if (sidebarTools.has(name))
+          const operation = `${name}:${String(params?.arguments?.action ?? "")}`;
+          if (sidebarOperations.has(operation))
             participants.push(
               ...(await workspaces.projects(grant, true)).map((p) => p.id),
             );
@@ -900,19 +897,20 @@ export async function createMcpHttpApp(options: McpHttpOptions) {
               (context) => execute(request, body, context, grant),
               {
                 administrator:
-                  name === "project_update" &&
+                  operation === "organization_update:update_project" &&
                   typeof params?.arguments?.archived === "boolean"
                     ? project
                     : undefined,
                 synchronizeWrites:
                   !draftTools.has(name) &&
-                  !["sidebar_group_create", "sidebar_group_update"].includes(
-                    name,
-                  ),
+                  ![
+                    "organization_update:create_group",
+                    "organization_update:update_group",
+                  ].includes(operation),
                 writeProjectIds: writeTools.has(name)
                   ? [
                       project,
-                      ...(name === "entry_move" &&
+                      ...(operation === "organization_update:move" &&
                       typeof params?.arguments?.destinationProjectId ===
                         "string"
                         ? [params.arguments.destinationProjectId]
@@ -960,7 +958,7 @@ export async function createMcpHttpApp(options: McpHttpOptions) {
               ...(result.result.structuredContent ?? {}),
               synchronization,
               ...(synchronizations.length > 1 ? { synchronizations } : {}),
-              ...(draftTools.has(name) || sidebarTools.has(name)
+              ...(draftTools.has(name) || sidebarOperations.has(operation)
                 ? {
                     workspace: {
                       scope: "connection",

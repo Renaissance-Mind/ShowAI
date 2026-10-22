@@ -363,7 +363,17 @@ test("anonymous clients discover and customize public resources without a projec
   expect(
     tools.tools.find((t) => t.name === "page_save")?.inputSchema.properties,
   ).toHaveProperty("projectId");
-  expect(tools.tools.some((t) => t.name === "component_import")).toBe(false);
+  // Device-file operations are not part of the hosted tools.
+  expect(
+    tools.tools.find((t) => t.name === "component_save")?.inputSchema
+      .properties,
+  ).not.toHaveProperty("directory");
+  expect(
+    (
+      tools.tools.find((t) => t.name === "dataset_write")?.inputSchema
+        .properties?.action as { enum?: string[] }
+    ).enum,
+  ).toEqual(["create", "apply"]);
   expect(
     tools.tools.find((t) => t.name === "page_export")?.inputSchema.properties,
   ).not.toHaveProperty("out");
@@ -1044,22 +1054,46 @@ test("remote management persists real folders, dependencies, sidebar preferences
       tools.find((t) => t.name === name)!.inputSchema.properties,
     ).not.toHaveProperty("remoteComponents");
   }
-  const folder = await call("folder_create", { name: "Promotion", icon: "📁" });
-  const child = await call("folder_create", {
+  const folder = await call("organization_update", {
+    action: "create_folder",
+    name: "Promotion",
+    icon: "📁",
+  });
+  const child = await call("organization_update", {
+    action: "create_folder",
     name: "Sources",
     parentId: folder.id,
   });
-  await call("folder_update", {
+  await call("organization_update", {
+    action: "update_folder",
     folderId: folder.id,
     name: "Launch",
     pinned: true,
     archived: true,
   });
-  expect(await call("folders_list")).toEqual([]);
-  expect(await call("folders_list", { includeArchived: true })).toHaveLength(2);
-  await call("folder_update", { folderId: folder.id, archived: false });
-  await call("entry_move", { kind: "folder", id: child.id, parentId: null });
-  await call("directory_sort", { parentId: null, sortBy: "name" });
+  expect(await call("organization_read", { action: "folders" })).toEqual([]);
+  expect(
+    await call("organization_read", {
+      action: "folders",
+      includeArchived: true,
+    }),
+  ).toHaveLength(2);
+  await call("organization_update", {
+    action: "update_folder",
+    folderId: folder.id,
+    archived: false,
+  });
+  await call("organization_update", {
+    action: "move",
+    kind: "folder",
+    id: child.id,
+    parentId: null,
+  });
+  await call("organization_update", {
+    action: "sort",
+    parentId: null,
+    sortBy: "name",
+  });
   const source = parameterComponent("workspace-move-reader");
   const component = await call("component_save", { source });
   const page = await call("page_create", {
@@ -1105,8 +1139,9 @@ test("remote management persists real folders, dependencies, sidebar preferences
   expect(
     (
       await selected.callTool({
-        name: "entry_move",
+        name: "organization_update",
         arguments: {
+          action: "move",
           projectId,
           destinationProjectId: b.id,
           kind: "page",
@@ -1118,8 +1153,9 @@ test("remote management persists real folders, dependencies, sidebar preferences
     ).isError,
   ).toBe(true);
   const movedResult = await c.callTool({
-    name: "entry_move",
+    name: "organization_update",
     arguments: {
+      action: "move",
       projectId: a.id,
       destinationProjectId: b.id,
       kind: "page",
@@ -1156,21 +1192,34 @@ test("remote management persists real folders, dependencies, sidebar preferences
       })
     ).items.some((item: any) => item.blockId === "transfer-widget"),
   ).toBe(true);
-  const sidebar = await call("sidebar_group_create", { name: "Research" });
+  const sidebar = await call("organization_update", {
+    action: "create_group",
+    name: "Research",
+  });
   const group = sidebar.groups.find((g: any) => g.name === "Research");
-  await call("sidebar_project_move", { sectionId: group.id });
-  await call("sidebar_project_move", {
+  await call("organization_update", {
+    action: "move_project",
+    sectionId: group.id,
+  });
+  await call("organization_update", {
+    action: "move_project",
     projectId: b.id,
     sectionId: group.id,
     relativeProjectId: a.id,
     placement: "before",
   });
-  expect((await call("sidebar_read")).projectGroups[a.id]).toBe(group.id);
-  await call("sidebar_group_update", {
+  expect(
+    (await call("organization_read", { action: "sidebar" })).projectGroups[
+      a.id
+    ],
+  ).toBe(group.id);
+  await call("organization_update", {
+    action: "update_group",
     sidebarGroupId: group.id,
     name: "Active research",
   });
-  const draft = await call("draft_save", {
+  const draft = await call("draft_write", {
+    action: "save",
     projectId: b.id,
     kind: "page",
     resourceId: page.document.id,
@@ -1181,19 +1230,27 @@ test("remote management persists real folders, dependencies, sidebar preferences
     baseContent: moved.page.document,
   });
   expect(
-    (await call("draft_read", { projectId: b.id, draftId: draft.id })).content
-      .id,
+    (
+      await call("draft_read", {
+        action: "read",
+        projectId: b.id,
+        draftId: draft.id,
+      })
+    ).content.id,
   ).toBe(page.document.id);
   expect(
     (
       await c.callTool({
         name: "draft_read",
-        arguments: { projectId: a.id, draftId: draft.id },
+        arguments: { action: "read", projectId: a.id, draftId: draft.id },
       })
     ).isError,
   ).toBe(true);
-  expect((await call("drafts_list", { projectId: b.id }))[0].id).toBe(draft.id);
-  await call("draft_complete", {
+  expect(
+    (await call("draft_read", { action: "list", projectId: b.id }))[0].id,
+  ).toBe(draft.id);
+  await call("draft_write", {
+    action: "complete",
     projectId: b.id,
     draftId: draft.id,
     generation: draft.generation,
@@ -1204,20 +1261,23 @@ test("remote management persists real folders, dependencies, sidebar preferences
     home: "authored home",
     binding: { sourceDirectory: "authored data" },
   };
-  const packageDraft = await call("draft_save", {
+  const packageDraft = await call("draft_write", {
+    action: "save",
     kind: "component",
     resourceId: "authored-metadata-keys",
     clientId: "remote-editor",
     content: payload,
   });
   expect(
-    (await call("draft_read", { draftId: packageDraft.id })).content,
+    (await call("draft_read", { action: "read", draftId: packageDraft.id }))
+      .content,
   ).toEqual(payload);
   await call("draft_remove", {
     draftId: packageDraft.id,
     generation: packageDraft.generation,
   });
-  await call("project_update", {
+  await call("organization_update", {
+    action: "update_project",
     name: "Managed remotely",
     icon: "🧠",
     pinned: true,
@@ -1237,7 +1297,10 @@ test("remote management persists real folders, dependencies, sidebar preferences
     name: "Managed remotely",
     archived: true,
   });
-  await call("project_update", { archived: false });
+  await call("organization_update", {
+    action: "update_project",
+    archived: false,
+  });
   await manager.run(a.id);
   await manager.run(b.id);
   await manager.stop();
@@ -1255,21 +1318,28 @@ test("remote management persists real folders, dependencies, sidebar preferences
   const readOnly = await client(
     (await authorize("projects.read", "account")).access_token,
   );
-  for (const name of [
-    "folder_create",
-    "project_update",
-    "directory_sort",
-    "draft_save",
-    "sidebar_group_create",
-  ])
-    expect(
-      (
-        await readOnly.callTool({
-          name,
-          arguments: { projectId: a.id, name: "Denied" },
-        })
-      ).isError,
-    ).toBe(true);
+  for (const [name, args] of [
+    ["organization_update", { action: "create_folder", name: "Denied" }],
+    ["organization_update", { action: "update_project", name: "Denied" }],
+    ["organization_update", { action: "sort", parentId: null, sortBy: "name" }],
+    [
+      "draft_write",
+      {
+        action: "complete",
+        draftId: "0".repeat(64),
+        generation: "00000000-0000-4000-8000-000000000000",
+        revision: "r",
+      },
+    ],
+    ["organization_update", { action: "create_group", name: "Denied" }],
+  ] as const) {
+    const denied = await readOnly.callTool({
+      name,
+      arguments: { projectId: a.id, ...args },
+    });
+    expect(denied.isError).toBe(true);
+    expect(denied._meta?.["mcp/www_authenticate"]).toBeTruthy();
+  }
   expect(
     (
       await c.callTool({
@@ -1335,16 +1405,21 @@ test("remote management rechecks viewer/editor membership and administrator-only
   expect(
     (
       await c.callTool({
-        name: "folder_create",
-        arguments: { projectId: id, name: "Denied viewer write" },
+        name: "organization_update",
+        arguments: {
+          action: "create_folder",
+          projectId: id,
+          name: "Denied viewer write",
+        },
       })
     ).isError,
   ).toBe(true);
   expect(
     (
       await c.callTool({
-        name: "entry_move",
+        name: "organization_update",
         arguments: {
+          action: "move",
           projectId,
           destinationProjectId: id,
           kind: "page",
@@ -1357,40 +1432,51 @@ test("remote management rechecks viewer/editor membership and administrator-only
   await changeRole("editor");
   data(
     await c.callTool({
-      name: "folder_create",
-      arguments: { projectId: id, name: "Allowed editor write" },
+      name: "organization_update",
+      arguments: {
+        action: "create_folder",
+        projectId: id,
+        name: "Allowed editor write",
+      },
     }),
   );
   expect(
     (
       await c.callTool({
-        name: "project_update",
-        arguments: { projectId: id, archived: true },
+        name: "organization_update",
+        arguments: { action: "update_project", projectId: id, archived: true },
       })
     ).isError,
   ).toBe(true);
   expect(
     data(
-      await c.callTool({ name: "folders_list", arguments: { projectId: id } }),
+      await c.callTool({
+        name: "organization_read",
+        arguments: { action: "folders", projectId: id },
+      }),
     ) as unknown as any[],
   ).toHaveLength(1);
   data(
     await c.callTool({
-      name: "project_update",
-      arguments: { projectId: id, name: "Editor renamed content" },
+      name: "organization_update",
+      arguments: {
+        action: "update_project",
+        projectId: id,
+        name: "Editor renamed content",
+      },
     }),
   );
   await changeRole("admin");
   data(
     await c.callTool({
-      name: "project_update",
-      arguments: { projectId: id, archived: true },
+      name: "organization_update",
+      arguments: { action: "update_project", projectId: id, archived: true },
     }),
   );
   data(
     await c.callTool({
-      name: "project_update",
-      arguments: { projectId: id, archived: false },
+      name: "organization_update",
+      arguments: { action: "update_project", projectId: id, archived: false },
     }),
   );
 }, 60000);

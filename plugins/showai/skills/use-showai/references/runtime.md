@@ -45,33 +45,33 @@ GitHub／Google 登录由所选 ShowAI Server 的已配置登录方式提供。�
 
 先读 `showai_capabilities.management` 和当前工具参数。项目操作都显式传 `projectId`。只读查找不创建项目或文件夹；用户要求整理内容时才执行对应写操作。项目、文件夹、正式 Page 和侧栏分组是不同对象，分别使用各自接口。
 
-| 目标                             | 接口与关键参数                                                                                                                                                                                          |
-| -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 找项目与已归档项目               | `projects_list({includeArchived:true})`；默认不含已归档项目                                                                                                                                             |
-| 项目名称、图标、置顶、归档与恢复 | `project_update({projectId,name?,icon?,pinned?,archived?})`；`archived:false` 恢复，归档保留内容。远程归档/恢复需要当前 admin 权限                                                                      |
-| 读取真实目录                     | `folders_list({projectId,includeArchived?})` 返回文件夹 ID、parentId、图标、置顶与排序偏好；`pages_list({projectId,includeArchived:false})` 取活动页面，省略 includeArchived 保留包含归档页的兼容行为   |
-| 创建文件夹                       | `folder_create({projectId,name,icon?,parentId?})`；parentId 省略或 null 表示项目根目录                                                                                                                  |
-| 更新文件夹                       | `folder_update({projectId,folderId,name?,icon?,pinned?,archived?})`；归档隐藏后代，恢复保留原层级                                                                                                       |
-| 在文件夹中创建 Page/Board        | `page_create({projectId,parentId:文件夹ID,title,kind?})`；内容树中的 Page/Board 容器不充当目录                                                                                                          |
-| 移动或排序条目                   | `entry_move({projectId,kind:"page"或"folder",id,destinationProjectId?,parentId,relativeId?,placement?:"before"或"after",reorderOnly?,baseHash?,baseRevision?})`；parentId 是目标文件夹，null 表示根目录 |
-| 设置目录排序                     | `directory_sort({projectId,parentId,sortBy:"name"或"createdAt"或"updatedAt"或"manual"})`；只影响该目录直接子项                                                                                          |
-| 读侧栏组织                       | `sidebar_read({projectId})`；项目绑定连接不暴露库级分组工具                                                                                                                                             |
-| 创建、改名或移除侧栏分组         | `sidebar_group_create({projectId,name})`；`sidebar_group_update({projectId,sidebarGroupId,name})`，name:null 移除分组并保留项目                                                                         |
-| 项目分组和手动顺序               | `sidebar_project_move({projectId,sectionId,relativeProjectId?,placement?})`；sectionId 是 projects、pinned 或真实侧栏分组 ID                                                                            |
+| 目标                             | 接口与关键参数                                                                                                                                                                                                                 |
+| -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 找项目与已归档项目               | `projects_list({includeArchived:true})`；默认不含已归档项目                                                                                                                                                                    |
+| 项目名称、图标、置顶、归档与恢复 | `organization_update({projectId,action:"update_project",name?,icon?,pinned?,archived?})`；`archived:false` 恢复，归档保留内容。远程归档/恢复需要当前 admin 权限                                                                |
+| 读取真实目录                     | `organization_read({projectId,action:"folders",includeArchived?})` 返回文件夹 ID、parentId、图标、置顶与排序偏好；`pages_list({projectId,includeArchived:false})` 取活动页面，省略 includeArchived 保留包含归档页的兼容行为    |
+| 创建文件夹                       | `organization_update({projectId,action:"create_folder",name,icon?,parentId?})`；parentId 省略或 null 表示项目根目录                                                                                                            |
+| 更新文件夹                       | `organization_update({projectId,action:"update_folder",folderId,name?,icon?,pinned?,archived?})`；归档隐藏后代，恢复保留原层级                                                                                                 |
+| 在文件夹中创建 Page/Board        | `page_create({projectId,parentId:文件夹ID,title,kind?})`；内容树中的 Page/Board 容器不充当目录                                                                                                                                 |
+| 移动或排序条目                   | `organization_update({projectId,action:"move",kind:"page"或"folder",id,destinationProjectId?,parentId,relativeId?,placement?:"before"或"after",reorderOnly?,baseHash?,baseRevision?})`；parentId 是目标文件夹，null 表示根目录 |
+| 设置目录排序                     | `organization_update({projectId,action:"sort",parentId,sortBy:"name"或"createdAt"或"updatedAt"或"manual"})`；只影响该目录直接子项                                                                                              |
+| 读侧栏组织                       | `organization_read({projectId,action:"sidebar"})`；项目绑定连接不提供侧栏动作                                                                                                                                                  |
+| 创建、改名或移除侧栏分组         | `organization_update({projectId,action:"create_group",name})`；`organization_update({projectId,action:"update_group",sidebarGroupId,name})`，name:null 移除分组并保留项目                                                      |
+| 项目分组和手动顺序               | `organization_update({projectId,action:"move_project",sectionId,relativeProjectId?,placement?})`；sectionId 是 projects、pinned 或真实侧栏分组 ID                                                                              |
 
 同项目内的页面改名、图标、收藏、归档、恢复和 parentId 修改，仍可使用 `page_apply` 的 `page.set`。字段里的 parentId 是目录 ID；块操作里的 parentId 是内容容器 ID。页面移动前读取完整当前源并传 baseHash/baseRevision；reorderOnly 只改同层顺序时无需页面内容版本。文件夹只支持项目内移动，不能移入自身或后代。新建或改动目录不会自动重组正文。
 
-跨项目页面移动使用 `entry_move`，完整保留页面身份，并迁移其精确组件依赖。库连接允许本库项目之间移动；项目绑定连接只允许本项目。远程先从 `projects_list` 取得来源与目标 ID，两个项目都必须在当前授权内且可编辑；调用后检查 `synchronizations` 中的每个项目。远程依次同步目标与来源，中断时保留同步顺序并先恢复待办，不宣称跨两个项目具有服务器事务原子性。结果含错误或未同步状态时说明现状，不能创建另一份 Page 冒充移动成功。
+跨项目页面移动使用 `organization_update` 的 move，完整保留页面身份，并迁移其精确组件依赖。库连接允许本库项目之间移动；项目绑定连接只允许本项目。远程先从 `projects_list` 取得来源与目标 ID，两个项目都必须在当前授权内且可编辑；调用后检查 `synchronizations` 中的每个项目。远程依次同步目标与来源，中断时保留同步顺序并先恢复待办，不宣称跨两个项目具有服务器事务原子性。结果含错误或未同步状态时说明现状，不能创建另一份 Page 冒充移动成功。
 
 文件夹、项目属性、目录排序和 Page 属于可同步的项目内容。侧栏分组、项目分组关系及库级手动顺序属于当前工作区偏好：本机保存在该库，远程保存在该授权连接的持久工作区，不会随项目同步到其他设备。远程回执的 `workspace.sidebarOrganizationSynchronized:false` 明确这一范围；项目自身的 pinned 属性仍会同步。不要把连接偏好描述为跨设备账号配置。
 
 ## 草稿接口
 
-`drafts_list({projectId,clientId?,resourceId?,kind?})` 只读当前项目的保留草稿，kind 是 page、component 或 template。用返回的 id 调用 `draft_read({projectId,draftId})`，读取内容、baseRevision、当前 generation 与作者信息。草稿独立于已保存 Page，也独立于外部文件冲突快照；恢复时先核对原稿、当前正式内容与用户意图。
+`draft_read({projectId,action:"list",clientId?,resourceId?,kind?})` 只读当前项目的保留草稿，kind 是 page、component 或 template。用返回的 id 调用 `draft_read({projectId,action:"read",draftId})`，读取内容、baseRevision、当前 generation 与作者信息。草稿独立于已保存 Page，也独立于外部文件冲突快照；恢复时先核对原稿、当前正式内容与用户意图。
 
-`draft_save({projectId,kind,clientId,resourceId,content,baseRevision?,baseContent?,title?,sequence?})` 保留未提交内容。clientId 是当前编辑客户端的稳定标识；同一客户端使用递增 sequence，同一 sequence 的不同内容会冲突。page 草稿的 baseContent 是准确的源 Page 基线，不使用截取片段或重新猜测的数据。保存草稿不等于保存正式内容。
+`draft_write({projectId,action:"save",kind,clientId,resourceId,content,baseRevision?,baseContent?,title?,sequence?})` 保留未提交内容。clientId 是当前编辑客户端的稳定标识；同一客户端使用递增 sequence，同一 sequence 的不同内容会冲突。page 草稿的 baseContent 是准确的源 Page 基线，不使用截取片段或重新猜测的数据。保存草稿不等于保存正式内容。
 
-明确放弃已阅读草稿时调用 `draft_remove({projectId,draftId,generation})`；只处理读取到的代次，发现新代次时报告冲突并保留。丢弃内容仍由本地恢复机制保留。page 草稿先通过正常 page_save/page_apply/合并路径保存，再用 `draft_complete({projectId,draftId,generation,revision})` 完成；revision 来自实际保存结果，正式内容必须与该代草稿一致。组件和模板使用各自保存流程，成功后按用户意图移除已处理草稿。
+明确放弃已阅读草稿时调用 `draft_remove({projectId,draftId,generation})`；只处理读取到的代次，发现新代次时报告冲突并保留。丢弃内容仍由本地恢复机制保留。page 草稿先通过正常 page_save/page_apply/合并路径保存，再用 `draft_write({projectId,action:"complete",draftId,generation,revision})` 完成；revision 来自实际保存结果，正式内容必须与该代草稿一致。组件和模板使用各自保存流程，成功后按用户意图移除已处理草稿。
 
 草稿不会随项目同步。本机接口只访问当前库中的项目草稿；远程接口只访问该授权连接持久工作区的项目草稿，不能读取另一设备尚未上传的编辑草稿。远程回执的 `workspace.draftsSynchronized:false` 表示这一点。草稿接口不可访问其他项目或全局未归属草稿。
 

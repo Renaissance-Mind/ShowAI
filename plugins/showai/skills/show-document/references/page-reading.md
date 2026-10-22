@@ -4,9 +4,9 @@
 
 ## Board 默认看图
 
-理解 Board 时先调用 `board_read({projectId,pageId,boardId?})`。pageId 是保存资源 ID；资源根是 Board 时可省略 boardId，嵌入 Page 的 Board 用其稳定节点 ID。小画布返回清晰全图，大画布返回最长边 1200 像素的总览与重叠裁切图。默认窗口 1600×1600、重叠 200 像素；可用 tilePixels、overlapPixels、scale 调整。图片以 MCP 图像附件返回，imageKey、attachmentIndex、pixelSize、bounds、imageToBoard 说明附件和画布坐标的对应关系。
+理解 Board 时先调用 `board_read({projectId,pageId,boardId?})`。pageId 是保存资源 ID；资源根是 Board 时可省略 boardId，嵌入 Page 的 Board 用其稳定节点 ID。小画布返回清晰全图，大画布返回最长边 1200 像素的总览与重叠裁切图。窗口为 1600×1600、重叠 200 像素；scale 调整截图分辨率。图片以 MCP 图像附件返回，imageKey、attachmentIndex、pixelSize、bounds、imageToBoard 说明附件和画布坐标的对应关系。
 
-保留 snapshotId。一次至多八张图；coverage.nextCursor 非空时用相同 snapshotId、mode:visual 和 cursor 继续。仅省略空窗口，coverage 保留完整网格、占用区间与空窗数；需要空窗时可显式读取。pageIndex 枚举包括隐藏正文在内的嵌套 Page，pageCoverage.nextOffset 用 pageOffset 继续。每张裁切图附 elementIndex，稳定 nodeId 不随裁切变化；长索引用 elementOffset/elementLimit 分页。
+保留 snapshotId。一次至多八张图；coverage.nextCursor 非空时用相同 snapshotId、mode:visual 和 cursor 继续。仅省略空窗口，coverage 保留完整网格、占用区间与空窗数；需要空窗时可显式读取。pageIndex 枚举包括隐藏正文在内的嵌套 Page，pageCoverage.nextOffset 用 pageOffset 继续。每张裁切图附 elementIndex，稳定 nodeId 不随裁切变化；长索引用 elementOffset 继续。
 
 ```json
 { "projectId": "项目ID", "pageId": "资源ID" }
@@ -18,7 +18,7 @@
 
 - `board_read({snapshotId,mode:"tile",tileIds:["T1"]})` 只返回指定裁切图。
 - `board_read({snapshotId,mode:"region",tileId:"T1",pointPx:{x:420,y:300}})` 用图像像素找候选元素并截图；rectPx 可替代 pointPx。候选可能有重叠对象，按 nodeId 再查。像素输入始终对应原裁切图分辨率；scale 只提高细节截图分辨率。超过单图尺寸时缩小 region。
-- `board_read({snapshotId,mode:"element",nodeId:"对象ID",detail:"both",tileId:"T1",imageScope:"tile"})` 验证元素在 T1 中，返回该图内的局部截图与完整原始节点。省略 imageScope 或使用 element 可查看整个对象外框；大对象图像分页。detail:source 只读源。
+- `board_read({snapshotId,mode:"element",nodeId:"对象ID",detail:"both",tileId:"T1"})` 验证元素出现在 T1 中，返回整个对象外框的截图与完整原始节点；大对象图像分页。只看 T1 内的局部用 mode:region。detail:source 只读源。
 - `page_read({snapshotId,blockIds:["Page节点ID"],rendered:false,response:"source"})` 读取该 Page 完整正文和原始组件数据，包含其外框之外的内容。截图保持 Page 当前可见范围；原始正文不受外框裁切。省略 blockIds 可读整个保存资源。
 - `board_read({snapshotId,mode:"source"})` 返回 Board 格式化原始子树、layout、surfaceViews、父路径与外部连接引用；画笔保留 points、extent、颜色和粗细，组件保留原始 props。
 
@@ -30,8 +30,7 @@
   "mode": "element",
   "nodeId": "Page节点ID",
   "tileId": "T1",
-  "detail": "both",
-  "imageScope": "tile"
+  "detail": "both"
 }
 ```
 

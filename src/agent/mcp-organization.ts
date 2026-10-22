@@ -4,32 +4,24 @@ import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import { WorkspaceService } from "./workspace-service";
 import type { EditorDraftInput } from "../core/editor-drafts";
 import { validateDocument } from "../portable/validation.mjs";
+import { actionTool, type ToolAction } from "./mcp-actions";
 
 export const organizationWriteTools = new Set([
-  "folder_create",
-  "folder_update",
-  "project_update",
-  "directory_sort",
-  "entry_move",
-  "sidebar_group_create",
-  "sidebar_group_update",
-  "sidebar_project_move",
-  "draft_save",
+  "organization_update",
+  "draft_write",
   "draft_remove",
-  "draft_complete",
 ]);
-export const sidebarTools = new Set([
-  "sidebar_read",
-  "sidebar_group_create",
-  "sidebar_group_update",
-  "sidebar_project_move",
+/** Operations on this connection's sidebar, keyed tool:action. */
+export const sidebarOperations = new Set([
+  "organization_read:sidebar",
+  "organization_update:create_group",
+  "organization_update:update_group",
+  "organization_update:move_project",
 ]);
 export const draftTools = new Set([
-  "drafts_list",
   "draft_read",
-  "draft_save",
+  "draft_write",
   "draft_remove",
-  "draft_complete",
 ]);
 
 export function registerOrganizationTools(
@@ -52,186 +44,204 @@ export function registerOrganizationTools(
     openWorldHint: false,
   };
   const write = { ...read, readOnlyHint: false };
-  register(
-    "folders_list",
-    {
-      description:
-        "List project folders with hierarchy, icons, pins and sort settings.",
-      inputSchema: { includeArchived: z.boolean().optional() },
-      annotations: read,
+  const name = z.string().trim().min(1).max(1000);
+  const groupName = name.nullable();
+  const parentId = id.nullable();
+  const placement = z.enum(["before", "after"]);
+  const readActions: Record<string, ToolAction> = {
+    folders: {
+      fields: { includeArchived: z.boolean().optional() },
+      run: ({ includeArchived }) =>
+        call(() => service.folders(includeArchived as boolean | undefined)),
     },
-    ({ includeArchived }) => call(() => service.folders(includeArchived)),
-  );
-  register(
-    "folder_create",
-    {
-      description:
-        "Create a folder in this project; parentId is a folder or null for the root.",
-      inputSchema: {
+  };
+  const updateActions: Record<string, ToolAction> = {
+    create_folder: {
+      fields: {
         ...metadata,
-        name: z.string().trim().min(1).max(1000),
+        name,
         icon: z.string().optional(),
-        parentId: id.nullable().optional(),
+        parentId: parentId.optional(),
       },
-      annotations: write,
+      run: ({ name, icon, parentId, ...meta }) =>
+        call(
+          () =>
+            service.createFolder({
+              name: name as string,
+              icon: icon as string | undefined,
+              parentId: parentId as string | null | undefined,
+            }),
+          meta,
+        ),
     },
-    ({ name, icon, parentId, ...meta }) =>
-      call(() => service.createFolder({ name, icon, parentId }), meta),
-  );
-  register(
-    "folder_update",
-    {
-      description:
-        "Rename a folder, change its icon or pin, or archive/restore it.",
-      inputSchema: {
+    update_folder: {
+      fields: {
         ...metadata,
         folderId: id,
-        name: z.string().trim().min(1).max(1000).optional(),
+        name: name.optional(),
         icon: z.string().optional(),
         pinned: z.boolean().optional(),
         archived: z.boolean().optional(),
       },
-      annotations: write,
+      run: ({ folderId, name, icon, pinned, archived, ...meta }) =>
+        call(
+          () =>
+            service.updateFolder(folderId as string, {
+              name: name as string | undefined,
+              icon: icon as string | undefined,
+              pinned: pinned as boolean | undefined,
+              archived: archived as boolean | undefined,
+            }),
+          meta,
+        ),
     },
-    ({ folderId, name, icon, pinned, archived, ...meta }) =>
-      call(
-        () => service.updateFolder(folderId, { name, icon, pinned, archived }),
-        meta,
-      ),
-  );
-  register(
-    "project_update",
-    {
-      description:
-        "Rename this project, change its icon or pin, or archive/restore it.",
-      inputSchema: {
+    update_project: {
+      fields: {
         ...metadata,
-        name: z.string().trim().min(1).max(1000).optional(),
+        name: name.optional(),
         icon: z.string().optional(),
         pinned: z.boolean().optional(),
         archived: z.boolean().optional(),
       },
-      annotations: write,
+      run: ({ name, icon, pinned, archived, ...meta }) =>
+        call(
+          () =>
+            service.updateProject({
+              name: name as string | undefined,
+              icon: icon as string | undefined,
+              pinned: pinned as boolean | undefined,
+              archived: archived as boolean | undefined,
+            }),
+          meta,
+        ),
     },
-    ({ name, icon, pinned, archived, ...meta }) =>
-      call(() => service.updateProject({ name, icon, pinned, archived }), meta),
-  );
-  register(
-    "directory_sort",
-    {
-      description:
-        "Set child sorting for the project root (parentId:null) or a folder.",
-      inputSchema: {
+    sort: {
+      fields: {
         ...metadata,
-        parentId: id.nullable(),
+        parentId,
         sortBy: z.enum(["name", "createdAt", "updatedAt", "manual"]),
       },
-      annotations: write,
+      run: ({ parentId, sortBy, ...meta }) =>
+        call(
+          () =>
+            service.sort(
+              parentId as string | null,
+              sortBy as "name" | "createdAt" | "updatedAt" | "manual",
+            ),
+          meta,
+        ),
     },
-    ({ parentId, sortBy, ...meta }) =>
-      call(() => service.sort(parentId, sortBy), meta),
-  );
-  register(
-    "entry_move",
-    {
-      description:
-        "Move or reorder a page or folder. parentId is the destination folder (null for root); relativeId/placement set the position. Pages need baseHash/baseRevision and may move to destinationProjectId; reorderOnly keeps content unchanged.",
-      inputSchema: {
+    move: {
+      fields: {
         ...metadata,
         kind: z.enum(["page", "folder"]),
         id,
         destinationProjectId: id.optional(),
-        parentId: id.nullable(),
+        parentId,
         relativeId: id.optional(),
-        placement: z.enum(["before", "after"]).optional(),
+        placement: placement.optional(),
         reorderOnly: z.boolean().optional(),
         baseHash: z.string().min(1).optional(),
         baseRevision: z.string().min(1).optional(),
       },
-      annotations: write,
-    },
-    ({
-      kind,
-      id: entryId,
-      destinationProjectId,
-      parentId,
-      relativeId,
-      placement,
-      reorderOnly,
-      baseHash,
-      baseRevision,
-      ...meta
-    }) =>
-      call(
-        () =>
-          service.moveEntry({
-            kind,
-            id: entryId,
-            destinationProjectId: destinationProjectId ?? service.projectId,
-            parentId,
-            relativeId,
-            placement,
-            reorderOnly,
-            baseHash,
-            baseRevision,
-          }),
-        meta,
-      ),
-  );
-  if (service.options.libraryAccess) {
-    register(
-      "sidebar_read",
-      {
-        description:
-          "Read this connection's sidebar groups and manual project order.",
-        inputSchema: {},
-        annotations: read,
-      },
-      () => call(() => service.sidebar()),
-    );
-    register(
-      "sidebar_group_create",
-      {
-        description: "Create a sidebar group for projects.",
-        inputSchema: { ...metadata, name: z.string().trim().min(1).max(1000) },
-        annotations: write,
-      },
-      ({ name, ...meta }) => call(() => service.createGroup(name), meta),
-    );
-    register(
-      "sidebar_group_update",
-      {
-        description: "Rename a sidebar group, or remove it with name:null.",
-        inputSchema: {
-          ...metadata,
-          sidebarGroupId: id,
-          name: z.string().trim().min(1).max(1000).nullable(),
-        },
-        annotations: write,
-      },
-      ({ sidebarGroupId, name, ...meta }) =>
-        call(() => service.updateGroup(sidebarGroupId, name), meta),
-    );
-    register(
-      "sidebar_project_move",
-      {
-        description:
-          "Move this project to projects, pinned or a sidebar group, optionally before/after another project.",
-        inputSchema: {
-          ...metadata,
-          sectionId: id,
-          relativeProjectId: id.optional(),
-          placement: z.enum(["before", "after"]).optional(),
-        },
-        annotations: write,
-      },
-      ({ sectionId, relativeProjectId, placement, ...meta }) =>
+      run: ({
+        kind,
+        id: entryId,
+        destinationProjectId,
+        parentId,
+        relativeId,
+        placement,
+        reorderOnly,
+        baseHash,
+        baseRevision,
+        ...meta
+      }) =>
         call(
-          () => service.moveProject(sectionId, relativeProjectId, placement),
+          () =>
+            service.moveEntry({
+              kind: kind as "page" | "folder",
+              id: entryId as string,
+              destinationProjectId:
+                (destinationProjectId as string | undefined) ??
+                service.projectId,
+              parentId: parentId as string | null,
+              relativeId: relativeId as string | undefined,
+              placement: placement as "before" | "after" | undefined,
+              reorderOnly: reorderOnly as boolean | undefined,
+              baseHash: baseHash as string | undefined,
+              baseRevision: baseRevision as string | undefined,
+            }),
           meta,
         ),
-    );
+    },
+  };
+  if (service.options.libraryAccess) {
+    readActions.sidebar = {
+      fields: {},
+      run: () => call(() => service.sidebar()),
+    };
+    updateActions.create_group = {
+      fields: { ...metadata, name },
+      run: ({ name, ...meta }) =>
+        call(() => service.createGroup(name as string), meta),
+    };
+    updateActions.update_group = {
+      fields: { ...metadata, sidebarGroupId: id, name: groupName },
+      run: ({ sidebarGroupId, name, ...meta }) =>
+        call(
+          () =>
+            service.updateGroup(
+              sidebarGroupId as string,
+              name as string | null,
+            ),
+          meta,
+        ),
+    };
+    updateActions.move_project = {
+      fields: {
+        ...metadata,
+        sectionId: id,
+        relativeProjectId: id.optional(),
+        placement: placement.optional(),
+      },
+      run: ({ sectionId, relativeProjectId, placement, ...meta }) =>
+        call(
+          () =>
+            service.moveProject(
+              sectionId as string,
+              relativeProjectId as string | undefined,
+              placement as "before" | "after" | undefined,
+            ),
+          meta,
+        ),
+    };
   }
+  const organizationRead = actionTool(
+    "Read project folders or this connection's sidebar groups and project order.",
+    readActions,
+  );
+  register(
+    "organization_read",
+    {
+      description: organizationRead.description,
+      inputSchema: organizationRead.inputSchema,
+      annotations: read,
+    },
+    organizationRead.handler,
+  );
+  const organizationUpdate = actionTool(
+    "Change folders, this project or the sidebar. parentId is a folder or null for the root; page moves need baseHash/baseRevision; sectionId is projects, pinned or a sidebar group; update_group with name:null removes it.",
+    updateActions,
+  );
+  register(
+    "organization_update",
+    {
+      description: organizationUpdate.description,
+      inputSchema: organizationUpdate.inputSchema,
+      annotations: write,
+    },
+    organizationUpdate.handler,
+  );
   register(
     "catalog_references",
     {
@@ -248,82 +258,96 @@ export function registerOrganizationTools(
     ({ kind, id: target, version, integrity }) =>
       call(() => service.references(kind, target, { version, integrity })),
   );
-  register(
-    "drafts_list",
+  const draftId = z.string().regex(/^[a-f0-9]{64}$/);
+  const generation = z.string().uuid();
+  const draftRead = actionTool(
+    "Read editor drafts in this project's connection workspace; drafts are not formal content and do not sync.",
     {
-      description: "List editor drafts in this project's connection workspace.",
-      inputSchema: {
-        clientId: z.string().min(1).optional(),
-        resourceId: z.string().min(1).optional(),
-        kind: z.enum(["page", "component", "template"]).optional(),
+      list: {
+        fields: {
+          clientId: z.string().min(1).optional(),
+          resourceId: z.string().min(1).optional(),
+          kind: z.enum(["page", "component", "template"]).optional(),
+        },
+        run: (input) =>
+          call(() =>
+            service.drafts(input as Parameters<typeof service.drafts>[0]),
+          ),
       },
-      annotations: read,
+      read: {
+        fields: { draftId },
+        run: ({ draftId }) => call(() => service.readDraft(draftId as string)),
+      },
     },
-    (input) => call(() => service.drafts(input)),
   );
   register(
     "draft_read",
     {
-      description: "Read one draft and its current generation.",
-      inputSchema: { draftId: z.string().regex(/^[a-f0-9]{64}$/) },
+      description: draftRead.description,
+      inputSchema: draftRead.inputSchema,
       annotations: read,
     },
-    ({ draftId }) => call(() => service.readDraft(draftId)),
+    draftRead.handler,
+  );
+  const draftWrite = actionTool(
+    "Save an editable draft, or complete a page draft after saving its exact content.",
+    {
+      save: {
+        fields: {
+          kind: z.enum(["page", "component", "template"]),
+          clientId: z.string().min(1).max(1000),
+          resourceId: id,
+          content: z.unknown(),
+          baseRevision: z.string().optional(),
+          baseContent: z.record(z.string(), z.unknown()).optional(),
+          title: z.string().optional(),
+          sequence: z.number().int().nonnegative().optional(),
+        },
+        run: ({ baseContent, ...input }) =>
+          call(() =>
+            service.saveDraft({
+              ...input,
+              ...(baseContent
+                ? {
+                    baseContent: validateDocument(
+                      baseContent as Record<string, unknown>,
+                    ),
+                  }
+                : {}),
+            } as Omit<EditorDraftInput, "projectId" | "actor">),
+          ),
+      },
+      complete: {
+        fields: { draftId, generation, revision: z.string().min(1) },
+        run: ({ draftId, generation, revision }) =>
+          call(() =>
+            service.completeDraft(
+              draftId as string,
+              generation as string,
+              revision as string,
+            ),
+          ),
+      },
+    },
   );
   register(
-    "draft_save",
+    "draft_write",
     {
-      description:
-        "Save an editable page/component/template draft in this connection's workspace; drafts are not formal content and do not sync. sequence orders one client's updates.",
-      inputSchema: {
-        kind: z.enum(["page", "component", "template"]),
-        clientId: z.string().min(1).max(1000),
-        resourceId: id,
-        content: z.unknown(),
-        baseRevision: z.string().optional(),
-        baseContent: z.record(z.string(), z.unknown()).optional(),
-        title: z.string().optional(),
-        sequence: z.number().int().nonnegative().optional(),
-      },
+      description: draftWrite.description,
+      inputSchema: draftWrite.inputSchema,
       annotations: write,
     },
-    ({ baseContent, ...input }) =>
-      call(() =>
-        service.saveDraft({
-          ...input,
-          ...(baseContent
-            ? { baseContent: validateDocument(baseContent) }
-            : {}),
-        } as Omit<EditorDraftInput, "projectId" | "actor">),
-      ),
+    draftWrite.handler,
   );
   register(
     "draft_remove",
     {
       description:
         "Discard a reviewed draft generation; a newer generation returns CONFLICT.",
-      inputSchema: {
-        draftId: z.string().regex(/^[a-f0-9]{64}$/),
-        generation: z.string().uuid(),
-      },
+      inputSchema: { draftId, generation },
       annotations: { ...write, destructiveHint: true },
     },
     ({ draftId, generation }) =>
       call(() => service.removeDraft(draftId, generation)),
-  );
-  register(
-    "draft_complete",
-    {
-      description:
-        "Complete a page draft after saving its exact content, with the draft generation and the saved page revision.",
-      inputSchema: {
-        draftId: z.string().regex(/^[a-f0-9]{64}$/),
-        generation: z.string().uuid(),
-        revision: z.string().min(1),
-      },
-      annotations: write,
-    },
-    ({ draftId, generation, revision }) =>
-      call(() => service.completeDraft(draftId, generation, revision)),
   );
 }
