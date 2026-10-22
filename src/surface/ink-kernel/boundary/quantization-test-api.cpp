@@ -96,4 +96,5 @@ extern "C" uint32_t saqt_fixture(uint32_t fixture,double tolerance,uint32_t refi
     }
     if(c.numbers.live_bytes)return SA_INK_INVALID;return result;
 }
+#include "quantization-lifetime-test-api.cpp"
 #include "wasm-runtime.cpp"
