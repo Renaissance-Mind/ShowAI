@@ -39,6 +39,15 @@ public:
     bool valid()const{return owner_&&owner_->valid(lease_);}
     const OwnedSnapshot*get()const{return valid()?static_cast<const Owner*>(owner_)->slots[lease_.slot].snapshot.get():nullptr;}
     SABoundaryLease source()const{return lease_;}
+    bool latest()const{return valid()&&owner_->current==lease_.slot;}
+    bool same_snapshot(const BoundaryQuantizationSourcePin&other)const{
+        return valid()&&other.valid()&&domain()==other.domain()&&get()==other.get();
+    }
+    bool base_of(const BoundaryQuantizationSourcePin&next)const{
+        return valid()&&next.valid()&&domain()==next.domain()&&
+            next.get()->base_generation==lease_.generation&&
+            get()->graph.output_epoch==next.get()->graph.output_epoch&&!next.get()->graph.output_reset;
+    }
     const Owner*domain()const{return owner_;}
     void reset(){drop();}
 };

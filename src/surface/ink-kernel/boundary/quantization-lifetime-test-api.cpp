@@ -23,10 +23,17 @@ extern "C" uint32_t saqt_source_pins(void*memory,uint32_t bytes,uint32_t*output,
         auto*actual=owner(stateA);auto&slot=actual->slots[A.slot];const uint32_t references=slot.references;slot.references=0xffffffffu;
         if(BoundaryQuantizationSourcePin::capture(stateA,A,b)!=SA_INK_CAPACITY||b.get()!=retained)return SA_INK_INVALID;slot.references=references;++checks;
         BoundaryQuantizationSourcePin shared=a;
-        if(!shared.valid()||shared.get()!=a.get())return SA_INK_INVALID;
+        if(!shared.valid()||shared.get()!=a.get()||!shared.same_snapshot(a)||!a.latest()||a.same_snapshot(b))return SA_INK_INVALID;
+        SABoundarySourceMutation mutation{};mutation.source=block;
+        SAInkPathCommand shifted[5]={{0,0,{2,0}},{1,0,{3,0}},{1,0,{3,1}},{1,0,{2,1}},{4,0,{}}};SABoundaryLease next{};
+        if(sa_boundary_update(stateA,&A,&mutation,1,shifted,5,&next))return SA_INK_INVALID;
+        BoundaryQuantizationSourcePin changed;if(BoundaryQuantizationSourcePin::capture(stateA,next,changed))return SA_INK_INVALID;
+        if(a.latest()||!changed.latest()||!a.base_of(changed)||a.base_of(b)||changed.same_snapshot(a))return SA_INK_INVALID;++checks;
+        if(shared.get()->graph.edges.size()!=4||shared.get()->graph.blocks[0].commands[0].values[0]!=0||changed.get()->graph.blocks[0].commands[0].values[0]!=2)return SA_INK_INVALID;++checks;
+        if(sa_boundary_release(stateA,next))return SA_INK_INVALID;
         if(sa_boundary_release(stateA,A)||sa_boundary_destroy(stateA)!=SA_INK_INVALID)return SA_INK_INVALID;++checks;
         a.reset();if(sa_boundary_destroy(stateA)!=SA_INK_INVALID||!shared.get()||shared.get()->graph.edges.size()!=4)return SA_INK_INVALID;++checks;
-        shared.reset();if(sa_boundary_destroy(stateA))return SA_INK_INVALID;++checks;
+        shared.reset();if(sa_boundary_destroy(stateA)!=SA_INK_INVALID)return SA_INK_INVALID;changed.reset();if(sa_boundary_destroy(stateA))return SA_INK_INVALID;++checks;
         b.reset();if(sa_boundary_release(stateB,B)||sa_boundary_destroy(stateB))return SA_INK_INVALID;++checks;
     }
     for(uint32_t i=0;i<sizeof(Owner);i++)if(raw[i]||raw[8*1024*1024+i])return SA_INK_INVALID;
