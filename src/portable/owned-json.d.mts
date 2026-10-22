@@ -13,6 +13,7 @@ export interface CapturedContentSummary {
   readonly prettyDepthFactor: number;
   readonly maximumDepth: number;
   readonly resources: CapturedResourceTree | null;
+  readonly bookkeepingBytes: number;
 }
 /** Read-only evidence from actual capture. Generic recursive freeze has none. */
 export function capturedContentSummary(

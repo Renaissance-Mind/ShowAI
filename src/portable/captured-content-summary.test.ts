@@ -237,3 +237,70 @@ it("captures accessor baselines before exact sharing and cannot lend proof to la
   expect(capturedContentSummary(result)).toBeDefined();
   expect(measureContent(result)).toEqual(measureContent(plain(canonical)));
 });
+it("cannot borrow an inherited prototype branch into an actual captured target", () => {
+  const before = captureOwnedJSON({}),
+    target = captureOwnedJSON(
+      JSON.parse('{"__proto__":{"__sourceSummaryProtoRead":1}}'),
+    );
+  let reads = 0,
+    result: unknown;
+  try {
+    Object.defineProperty(Object.prototype, "__sourceSummaryProtoRead", {
+      configurable: true,
+      enumerable: true,
+      get() {
+        return ++reads <= 2 ? 1 : "x".repeat(1024);
+      },
+    });
+    result = shareCapturedJSON(before, target);
+  } finally {
+    delete (Object.prototype as any).__sourceSummaryProtoRead;
+  }
+  expect(reads).toBe(0);
+  expect(result).toBe(target);
+  expect(result).toEqual(target);
+  expect(measureContent(result)).toEqual(measureContent(plain(target)));
+});
+it("does not use inherited attrs or id getters as array source identities", () => {
+  const before = captureOwnedJSON({ nodes: [{ value: 1 }] }),
+    target = captureOwnedJSON({ nodes: [{ value: 2 }, { value: 1 }] }),
+    calls: string[] = [];
+  let result: unknown;
+  try {
+    Object.defineProperty(Object.prototype, "attrs", {
+      configurable: true,
+      get() {
+        calls.push("attrs");
+        return { id: "borrowed" };
+      },
+    });
+    Object.defineProperty(Object.prototype, "id", {
+      configurable: true,
+      get() {
+        calls.push("id");
+        return "borrowed";
+      },
+    });
+    result = shareCapturedJSON(before, target);
+  } finally {
+    delete (Object.prototype as any).attrs;
+    delete (Object.prototype as any).id;
+  }
+  expect(calls).toEqual([]);
+  expect(result).toEqual(target);
+  expect(measureContent(result)).toEqual(measureContent(plain(target)));
+});
+it("charges newly retained resource leaves and indices without charging a borrowed child index again", () => {
+  const uri = "data:image/png;base64,AQ==",
+    held = captureOwnedJSON({ resources: Array(10000).fill(uri) }),
+    index = capturedContentSummary(held.resources)!;
+  expect(index.bookkeepingBytes).toBeGreaterThan(10000 * 40);
+  const parent = captureOwnedJSON({ a: held.resources, b: held.resources }),
+    summary = capturedContentSummary(parent)!;
+  expect(summary.bookkeepingBytes).toBeLessThan(1024);
+  expect(ownedJSONMetrics(parent)!.bytes).toBeLessThan(
+    ownedJSONMetrics(held.resources)!.bytes,
+  );
+  expect(measureContent(parent).resourceCount).toBe(1);
+  expect(measureContent(parent)).toEqual(measureContent(plain(parent)));
+});

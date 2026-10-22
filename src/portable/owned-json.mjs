@@ -48,6 +48,7 @@ function summarizeCaptured(value, keys, array) {
     prettyPadding = length ? (array ? 3 : 4) * length + 1 : 0,
     prettyDepthFactor = length ? 2 * (length + 1) : 0,
     maximumDepth = 0,
+    resourceLeaves = 0,
     resources;
   for (const key of keys) {
     if (!array) {
@@ -63,6 +64,7 @@ function summarizeCaptured(value, keys, array) {
       jsonBytes += bytes;
       maximumDepth = Math.max(maximumDepth, 1);
       if (resource) {
+        resourceLeaves++;
         resources ??= [];
         resources.push(
           Object.freeze({ value: resource.value, bytes: resource.bytes }),
@@ -95,6 +97,9 @@ function summarizeCaptured(value, keys, array) {
     prettyDepthFactor,
     maximumDepth,
     resources: tree,
+    bookkeepingBytes:
+      resourceLeaves * 48 +
+      (resources?.length > 1 ? 48 + resources.length * 8 : 0),
   });
 }
 
@@ -194,16 +199,11 @@ function capturePlain(
   contentSummaries.set(result, summary);
   // Logical residency includes bookkeeping for the retained summary/index.
   // These graph estimates are separate from JavaScript heap measurement.
-  const metric = metrics.get(result),
-    resourceIndex = summary.resources
-      ? Array.isArray(summary.resources)
-        ? summary.resources.length * 8
-        : 16
-      : 0;
+  const metric = metrics.get(result);
   metrics.set(
     result,
     Object.freeze({
-      bytes: metric.bytes + 128 + resourceIndex,
+      bytes: metric.bytes + 128 + summary.bookkeepingBytes,
       children: metric.children,
     }),
   );
@@ -251,15 +251,32 @@ export function parseOwnedJSON(raw, base) {
 export function shareCapturedJSON(base, target) {
   const before = captureOwnedJSON(base),
     after = captureOwnedJSON(target);
-  const stableId = (value) =>
-    value && typeof value === "object" && !Array.isArray(value)
-      ? typeof value.attrs?.id === "string" && value.attrs.id
-        ? value.attrs.id
-        : typeof value.id === "string" && value.id
-          ? value.id
-          : null
+  const stableId = (value) => {
+    if (!value || typeof value !== "object" || Array.isArray(value))
+      return null;
+    const attrs = Object.hasOwn(value, "attrs") ? value.attrs : undefined;
+    if (
+      attrs &&
+      typeof attrs === "object" &&
+      Object.hasOwn(attrs, "id") &&
+      typeof attrs.id === "string" &&
+      attrs.id
+    )
+      return attrs.id;
+    return Object.hasOwn(value, "id") &&
+      typeof value.id === "string" &&
+      value.id
+      ? value.id
       : null;
+  };
   const share = (one, two) => {
+    if (
+      (one && typeof one === "object" && !plainOwned.has(one)) ||
+      (two && typeof two === "object" && !plainOwned.has(two))
+    )
+      throw new Error(
+        "Exact sharing requires actual independently captured branches",
+      );
     if (one === two) return one;
     if (
       !one ||
@@ -287,7 +304,11 @@ export function shareCapturedJSON(base, target) {
     }
     const result = array ? [] : {};
     for (const key of keys) {
-      const prior = byId ? byId.get(stableId(two[key])) : one[key],
+      const prior = byId
+          ? byId.get(stableId(two[key]))
+          : Object.hasOwn(one, key)
+            ? one[key]
+            : undefined,
         child = share(prior, two[key]);
       Object.defineProperty(result, key, {
         value: child,
