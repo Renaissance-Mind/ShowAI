@@ -39,7 +39,7 @@ inline uint32_t build_raw_coverage_mesh(PolynomialContext&,const SAInkPathComman
 namespace raw_coverage {
 inline double abs(double x){return x<0?-x:x;}
 inline double max(double a,double b){return a>b?a:b;}
-inline double up(double x){if(!finite_double(x)||x<0)return x;uint64_t b;copy_bytes(&b,&x,8);++b;copy_bytes(&x,&b,8);return x;}
+inline double up(double x){if(!finite_double(x)||x<0)return x;uint64_t b;copy_bytes(&b,&x,8);if((b&0x7fffffffffffffffull)==0)b=0;++b;copy_bytes(&x,&b,8);return x;}
 inline double sum(double a,double b){return up(a+b);}
 inline double mul(double a,double b){return up(a*b);}
 inline double half_ulp_double(double x){uint64_t b;copy_bytes(&b,&x,8);uint32_t e=uint32_t((b>>52)&2047);if(e<=53){uint64_t z=1;double d;copy_bytes(&d,&z,8);return d;}uint64_t z=uint64_t(e-53)<<52;double d;copy_bytes(&d,&z,8);return d;}
