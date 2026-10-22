@@ -6,7 +6,7 @@ import type {JSONContent} from "@tiptap/core";
 import type {Camera} from "./model";
 import type {NodeLayout} from "./types";
 import {clientMatrix,matrixValues,measureNativeBoard} from "./board-native-projection";
-import {inkUIRegions} from "./ink-ui-regions";
+import {nativeBoardUIRegions} from "./ink-ui-regions";
 import {finishBoardDrawing} from "./board-drawing.mjs";
 declare global { interface Window { showaiApplyingNativeCamera?:boolean } }
 
@@ -79,7 +79,7 @@ export function useNativeBoard(options:NativeBoardOptions){
       if(measureNativeSync("board.visibility",()=>!surface.getClientRects().length||document.visibilityState==="hidden"))return;
       const size=measureNativeSync("board.surfaceSize",()=>surface.clientWidth+":"+surface.clientHeight);
       if(poseDocument!==source||poseSize!==size){poses=measureNativeBoard(surface,world,source);poseDocument=source;poseSize=size}
-      const holes=measureNativeSync("board.inkUIRegions",()=>inkUIRegions(document.querySelectorAll<HTMLElement>("[data-surface-ui],.surface-toolbar,.studio-context-menu,.studio-modal-shade,.container-inspector,.studio-sidebar-shell:not([data-sidebar-mode=hidden]) .studio-sidebar,.studio-mobile-sidebar-edge,.studio-mobile-sidebar-scrim,.studio-mobile-navigation-tools")));
+      const holes=measureNativeSync("board.inkUIRegions",()=>nativeBoardUIRegions(document.querySelectorAll<HTMLElement>("[data-surface-ui],.surface-toolbar,.studio-context-menu,.studio-modal-shade,.container-inspector,.studio-sidebar-shell:not([data-sidebar-mode=hidden]) .studio-sidebar,.studio-mobile-sidebar-edge,.studio-mobile-sidebar-scrim,.studio-mobile-navigation-tools")));
       const style=measureNativeSync("board.surfaceStyle",()=>getComputedStyle(surface));
       const capturedControl=lane?control?.record:undefined;
       const packet=measureNativeSync("board.packet",()=>({...(capturedControl?{controlIntent:capturedControl}:{}),token,pageId:source.id,boardId:v.boardId,nativeScene:true,tool:v.tool??"select",color:v.color,fillColor:v.fillColor??"none",width:v.width,pressure:v.pressure,ruler:v.ruler,

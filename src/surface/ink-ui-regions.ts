@@ -1,6 +1,6 @@
 /** Screen-space cutouts must match painted UI, including scrolling/clipping.
  * Offscreen toolbar children still have DOM rectangles; sending those raw
- * rectangles to PencilKit would erase ink beyond the actual toolbar. */
+ * rectangles to the native canvas would erase ink beyond the actual toolbar. */
 export function inkUIRegions(elements: Iterable<Element>) {
   const styles = new Map<Element, CSSStyleDeclaration>();
   const rectangles = new Map<Element, DOMRect>();
@@ -63,4 +63,17 @@ export function inkUIRegions(elements: Iterable<Element>) {
     }
   }
   return regions;
+}
+
+/** The native scene owns presentation/input inside its retained DOM world.
+ * That world is a layout mirror, not interactive overlay UI. A real top-layer
+ * panel can escape it and still needs a cutout in the native input surface. */
+export function nativeBoardUIRegions(elements: Iterable<Element>) {
+  function* candidates() {
+    for (const element of elements) {
+      const world = element.closest('.page-surface[data-native-board-active="true"] > .surface-scroll > .surface-world');
+      if (!world || element.closest(":popover-open,:modal")) yield element;
+    }
+  }
+  return inkUIRegions(candidates());
 }
