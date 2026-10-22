@@ -1,5 +1,5 @@
 // Test-only transport. No this-file ABI is exposed by the production kernel.
-#include "quantization.hpp"
+#include "quantization-block.hpp"
 using namespace showai_boundary;
 static uint32_t quantization_test_stage=0;
 extern "C" uint32_t saqt_stage(){return quantization_test_stage;}
@@ -7,6 +7,39 @@ namespace {
 inline void encode_q(Vector<uint32_t>&out,const Q&q){out.push_back(uint32_t(q.sign()));out.push_back(q.numerator().size());out.push_back(q.denominator().size());for(uint32_t i=0;i<q.numerator().size();i++)out.push_back(q.numerator().data()[i]);for(uint32_t i=0;i<q.denominator().size();i++)out.push_back(q.denominator().data()[i]);}
 inline void encode_root(Vector<uint32_t>&out,const Root&r){out.push_back(r.definition().coefficients.size());for(const auto&q:r.definition().coefficients)encode_q(out,q);encode_q(out,r.lower);encode_q(out,r.upper);}
 inline uint64_t source_hash(const Graph&g){uint64_t h=1469598103934665603ull;for(const auto&e:g.edges){h=hash_curve(g.curves[e.source].geometry)^h;h=hash_integer(h,e.a.lower.numerator());h=hash_integer(h,e.a.lower.denominator());h=hash_integer(h,e.a.upper.numerator());h=hash_integer(h,e.a.upper.denominator());h=hash_integer(h,e.b.lower.numerator());h=hash_integer(h,e.b.lower.denominator());h=hash_integer(h,e.b.upper.numerator());h=hash_integer(h,e.b.upper.denominator());h=hash_polynomial(h,e.a.definition());h=hash_polynomial(h,e.b.definition());}return h;}
+inline bool verify_actual_blocks(const Graph&g,const BoundaryQuantizedGraph&cold,const BoundaryQuantizationOptions&o){
+    auto&c=*g.context();Vector<Record<BoundaryQuantizedVertex>,1>records(c);
+    for(const auto&v:cold.vertices)records.push_back(Record<BoundaryQuantizedVertex>::create(c,v));
+    uint32_t processed=0;bool okay=true;
+    g.edges.each_chunk([&](uint32_t slot,const ChunkTree<Edge>::Chunk&chunk){
+        if(!okay||!g.good())return;Vector<BoundaryQuantizedAnchorPair,1>pairs(c);
+        for(const auto&e:chunk.values){BoundaryQuantizedAnchorPair pair;const uint32_t ids[2]={boundary_quantization::vertex_root(g,e.va),boundary_quantization::vertex_root(g,e.vb)};
+            for(const auto&r:records){if(r.get()->vertex==ids[0])pair.a=r;if(r.get()->vertex==ids[1])pair.b=r;}pairs.push_back(pair);}
+        SABoundaryBlockKey key{g.output_epoch,chunk.identity,chunk.revision,slot,0};BoundaryQuantizedBlock derived(c);
+        if(quantize_boundary_block(g,key,pairs,o,derived)||derived.arcs.size()!=chunk.values.size()){okay=false;return;}
+        for(uint32_t i=0;i<derived.arcs.size();i++){
+            const auto&arc=derived.arcs[i];const auto&e=arc.edge;const BoundaryQuantizedEdge*expected=nullptr;
+            for(const auto&candidate:cold.edges)if(&g.edges[candidate.edge]==&chunk.values[i]){expected=&candidate;break;}
+            if(!expected||arc.a.get()!=pairs[i].a.get()||arc.b.get()!=pairs[i].b.get()||e.edge!=i||e.certificate_a!=2*i||e.certificate_b!=2*i+1){okay=false;break;}
+            if(e.degree!=expected->degree||e.error_l1!=expected->error_l1||e.parameter_error_l1!=expected->parameter_error_l1||e.control_error_l1!=expected->control_error_l1){okay=false;break;}
+            for(uint32_t j=0;j<8;j++)if(e.controls[j]!=expected->controls[j])okay=false;++processed;
+        }
+        // Actual changed/retired keys are rejected, without replacing old bytes.
+        const auto*old=derived.arcs.empty()?nullptr:&derived.arcs[0];key.revision++;
+        if(quantize_boundary_block(g,key,pairs,o,derived)!=SA_INK_INVALID||(!derived.arcs.empty()&&old!=&derived.arcs[0]))okay=false;
+        key.revision--;Vector<BoundaryQuantizedAnchorPair,1>missing(c);
+        if(quantize_boundary_block(g,key,missing,o,derived)!=SA_INK_INVALID||old!=&derived.arcs[0])okay=false;
+        if(chunk.values.size()>1){auto limited=o;limited.maximum_edges=chunk.values.size()-1;
+            if(quantize_boundary_block(g,key,pairs,limited,derived)!=SA_INK_CAPACITY||old!=&derived.arcs[0])okay=false;}
+        // A failure after earlier arcs were staged cannot publish a partial block.
+        BoundaryQuantizedVertex wrong=*pairs[pairs.size()-1].b.get();wrong.vertex=no_index;
+        pairs[pairs.size()-1].b=Record<BoundaryQuantizedVertex>::create(c,wrong);
+        const uint64_t work_limit=c.max_work;
+        if(quantize_boundary_block(g,key,pairs,o,derived)!=SA_INK_INVALID||old!=&derived.arcs[0])okay=false;
+        c.begin_work(work_limit);
+    });
+    return okay&&g.good()&&processed==cold.edges.size();
+}
 inline bool overlap_memory(const void*a,uint64_t na,const void*b,uint64_t nb){return na&&nb&&uint64_t((uintptr_t)a)<uint64_t((uintptr_t)b)+nb&&uint64_t((uintptr_t)b)<uint64_t((uintptr_t)a)+na;}
 }
 extern "C" uint32_t saqt_fixture(uint32_t fixture,double tolerance,uint32_t refinements,uint32_t max_vertices,uint32_t max_edges,uint64_t work_limit,void*memory,uint32_t bytes,uint32_t*output,uint32_t capacity){
@@ -36,17 +69,21 @@ extern "C" uint32_t saqt_fixture(uint32_t fixture,double tolerance,uint32_t refi
             const auto&curve=static_cast<const Graph&>(graph).curves[quadratic].geometry;
             auto endpoints=roots(curve.y-Polynomial(c,Q::from_double(c.numbers,1e-80)));
             if(endpoints.size()!=2||!graph.good())return SA_INK_RANGE;
-            const uint32_t a=vertex(graph),b=vertex(graph);Edge lower{};lower.source=quadratic;lower.va=a;lower.vb=b;lower.a=endpoints[0];lower.b=endpoints[1];lower.direction=1;graph.edges.push_back(lower);
-            Edge upper{};upper.source=line;upper.va=a;upper.vb=b;upper.a=affine_root(endpoints[0],Q(1)/Q(3),Q(1)/Q(3));upper.b=affine_root(endpoints[1],Q(1)/Q(3),Q(1)/Q(3));upper.direction=-1;graph.edges.push_back(upper);
+            const uint32_t a=vertex(graph),b=vertex(graph);Edge lower{};lower.source=quadratic;lower.va=a;lower.vb=b;lower.a=endpoints[0];lower.b=endpoints[1];lower.direction=1;append_edge(graph,lower);
+            Edge upper{};upper.source=line;upper.va=a;upper.vb=b;upper.a=affine_root(endpoints[0],Q(1)/Q(3),Q(1)/Q(3));upper.b=affine_root(endpoints[1],Q(1)/Q(3),Q(1)/Q(3));upper.direction=-1;append_edge(graph,upper);
         }else construct(graph);if(!graph.good())return c.numbers.status;
-        if(fixture==10)graph.edges[0].b=graph.edges[0].a;
-        if(fixture==11){Root old=graph.edges[0].a;graph.edges[0].a=graph.edges[0].b;graph.edges[0].b=old;}
+        if(fixture==10||fixture==11){
+            Edge changed=static_cast<const Graph&>(graph).edges[0];
+            if(fixture==10)changed.b=changed.a;else{Root old=changed.a;changed.a=changed.b;changed.b=old;}
+            Vector<Edge,1>replacement(c.numbers);replacement.push_back(changed);
+            graph.edges.set(changed.source,graph.curves[changed.source].identity,graph.next_output_revision++,replacement);
+        }
         quantization_test_stage=2;const uint64_t before=source_hash(graph);
         c.numbers.begin_work(work_limit);c.polynomial.operations=0;c.numbers.peak_bytes=c.numbers.live_bytes;if(fixture==12)c.polynomial.max_operations=1;
         BoundaryQuantizedGraph quantized(c.numbers);quantized.options.origin[0]=123;BoundaryQuantizedVertex sentinel{};sentinel.vertex=0x5a5a5a5a;quantized.vertices.push_back(sentinel);
         quantization_test_stage=3;result=quantize_boundary_graph(graph,options,quantized);
         if(result){if(quantized.options.origin[0]!=123||quantized.vertices.size()!=1||static_cast<const Vector<BoundaryQuantizedVertex>&>(quantized.vertices)[0].vertex!=0x5a5a5a5a)return SA_INK_INVALID;return result;}
-        if(before!=source_hash(graph))return SA_INK_INVALID;
+        if(before!=source_hash(graph)||!verify_actual_blocks(graph,quantized,options)||before!=source_hash(graph))return SA_INK_INVALID;
         quantization_test_stage=4;Vector<uint32_t>staged(c.numbers);staged.push_back(0x53415131);staged.push_back(fixture);staged.push_back(quantized.vertices.size());staged.push_back(quantized.edges.size());
         auto word64=[&](uint64_t v){staged.push_back(uint32_t(v));staged.push_back(uint32_t(v>>32));};auto number=[&](double v){uint64_t bits;copy_bytes(&bits,&v,8);word64(bits);};
         number(options.origin[0]);number(options.origin[1]);number(options.maximum_error_l1);

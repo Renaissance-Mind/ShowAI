@@ -9,7 +9,7 @@ try{
  await mkdir(output,{recursive:true});await writeFile(join(output,'quantization.wasm'),bytes);
  execFileSync(clang,['-std=c++17','-O2','-ffp-contract=off','-fno-fast-math',join(source,'quantization-native-contract.cpp'),'-o',join(output,'quantization-native-contract')],{stdio:'inherit'});
  execFileSync(join(output,'quantization-native-contract'),[join(output,'quantization-native.bin')],{stdio:'inherit'});
- const hash=v=>createHash('sha256').update(v).digest('hex'),files=['quantization.hpp','quantization-test-api.cpp','quantization-native-contract.cpp','graph.hpp','owner.hpp','algebra.hpp','polynomial.hpp','number.hpp','vector.hpp','record.hpp','paged-vector.hpp','wasm-runtime.cpp'];
+ const hash=v=>createHash('sha256').update(v).digest('hex'),files=['quantization.hpp','quantization-block.hpp','quantization-test-api.cpp','quantization-native-contract.cpp','graph.hpp','owner.hpp','chunk-tree.hpp','algebra.hpp','polynomial.hpp','number.hpp','vector.hpp','record.hpp','paged-vector.hpp','wasm-runtime.cpp','../include/boundary-kernel.h','../include/showai_ink.h'];
  const manifest={testOnly:true,imports,sha256:hash(bytes),flags,compiler:execFileSync(clang,['--version'],{encoding:'utf8'}).split('\n')[0],files:Object.fromEntries(await Promise.all(files.map(async p=>[p,hash(await readFile(join(source,p)))])))};
  await writeFile(join(output,'quantization-manifest.json'),JSON.stringify(manifest,null,2)+'\n');
 }finally{await rm(tmp,{recursive:true,force:true})}

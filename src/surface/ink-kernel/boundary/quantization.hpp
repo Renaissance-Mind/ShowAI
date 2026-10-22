@@ -83,9 +83,12 @@ inline bool anchor(const Curve&curve,Root root,uint32_t vertex,uint32_t edge,uin
         if(!refine_owned(root,m,o)){if(c.status==SA_INK_OK)c.fail(SA_INK_RANGE);return false;}
     }return false;
 }
-inline bool edge(const Graph&g,uint32_t index,const BoundaryQuantizedVertex&a,const BoundaryQuantizedVertex&b,
-                 const BoundaryQuantizationOptions&o,BoundaryQuantizationMetrics&m,BoundaryQuantizedEdge&output){
-    auto&c=*g.context();const auto&edge=g.edges[index];const auto&source=g.curves[edge.source];const auto&curve=source.geometry;
+/* The supplied edge comes from an actual retained immutable source chunk.
+ * index is the certificate index within that binding (flat only for cold export).
+ * This entry permits changed-block consumers to avoid any flat-tree traversal. */
+inline bool captured_edge(const Graph&g,const Edge&edge,uint32_t index,const BoundaryQuantizedVertex&a,const BoundaryQuantizedVertex&b,
+                          const BoundaryQuantizationOptions&o,BoundaryQuantizationMetrics&m,BoundaryQuantizedEdge&output){
+    auto&c=*g.context();if(edge.source>=g.curves.size()){c.fail(SA_INK_INVALID);return false;}const auto&source=g.curves[edge.source];const auto&curve=source.geometry;
     if(source.origins.empty()||curve.controls.size()<2||curve.controls.size()>4||(edge.direction!=1&&edge.direction!=-1)||index>0x7ffffffeu){c.fail(SA_INK_RANGE);return false;}
     Root lo=edge.a,hi=edge.b;if(lo.context()!=&c||hi.context()!=&c){c.fail(SA_INK_INVALID);return false;}if(!root_domain(lo,m,o)||!root_domain(hi,m,o))return false;
     // Exact order only. Same algebraic roots do not become an artificial span.
@@ -114,6 +117,11 @@ inline bool edge(const Graph&g,uint32_t index,const BoundaryQuantizedVertex&a,co
         bool changed=false;if(!lo.exact()){if(!refine_owned(lo,m,o))return false;changed=true;}if(!hi.exact()){if(!refine_owned(hi,m,o))return false;changed=true;}
         if(!changed){c.fail(SA_INK_RANGE);return false;}
     }return false;
+}
+inline bool edge(const Graph&g,uint32_t index,const BoundaryQuantizedVertex&a,const BoundaryQuantizedVertex&b,
+                 const BoundaryQuantizationOptions&o,BoundaryQuantizationMetrics&m,BoundaryQuantizedEdge&output){
+    if(index>=g.edges.size()){g.context()->fail(SA_INK_INVALID);return false;}
+    return captured_edge(g,g.edges[index],index,a,b,o,m,output);
 }
 }
 /* Full explicit lease export, NOT a tail/live interface. New vertices are
