@@ -2,7 +2,7 @@
 #include "conditioned-klm.hpp"
 using namespace showai_boundary;
 extern "C" uint32_t sack_fixture(uint32_t fixture,void*memory,uint32_t bytes,uint32_t*output,uint32_t capacity){
-    if(fixture>13||!memory||!output||!capacity||((uintptr_t)memory&15)||((uintptr_t)output&3))return SA_INK_INVALID;
+    if(fixture>14||!memory||!output||!capacity||((uintptr_t)memory&15)||((uintptr_t)output&3))return SA_INK_INVALID;
     PolynomialContext c;if(!c.numbers.initialize(memory,bytes,1000000000ull))return c.numbers.status;
     uint32_t status=0;
     {
@@ -18,6 +18,7 @@ extern "C" uint32_t sack_fixture(uint32_t fixture,void*memory,uint32_t bytes,uin
         if(fixture==10){uint64_t bits=0x7ff8000000000000ull;copy_bytes(&e.controls[0],&bits,8);}
         if(fixture==11)e.error_l1=1;
         if(fixture==13)options.maximum_conditioning_cells=1;
+        if(fixture==14){e.vertex_b=e.vertex_a;const double closed[8]={0,0,-1,1,1,1,0,0};for(uint32_t i=0;i<8;i++)e.controls[i]=closed[i];}
         if(fixture==12){
             const SAInkPathCommand source_commands[]={{0,0,{0,0}},{3,0,{0,1,1,1,1,0}},{4,0,{}}};
             const SABoundaryPath path{0,0,{0,0}};SABoundarySourceBlock source{};source.key.words[0]=17;source.command_count=3;source.affine[0]=source.affine[3]=1;

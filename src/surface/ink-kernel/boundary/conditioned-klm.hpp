@@ -116,7 +116,7 @@ inline bool audit(PolynomialContext&c,const BoundaryQuantizedEdge&e,const SAAnal
 inline uint32_t condition_quantized_boundary_arc(PolynomialContext&c,const BoundaryQuantizedEdge&e,
         const BoundaryKLMOptions&o,BoundaryKLMArc&output,BoundaryKLMReason&reason){
     reason=boundary_klm_none;auto&ctx=c.numbers;if(ctx.status!=SA_INK_OK)return ctx.status;
-    if(e.degree<1||e.degree>3||(e.direction!=1&&e.direction!=-1)||e.vertex_a==e.vertex_b||!finite_double(e.error_l1)||e.error_l1<0||
+    if(e.degree<1||e.degree>3||(e.direction!=1&&e.direction!=-1)||!finite_double(e.error_l1)||e.error_l1<0||
        o.reserved||!o.maximum_patches||!o.maximum_vertices||!o.maximum_depth||o.maximum_patches>100000||o.maximum_vertices>1000000||o.maximum_depth>32||!o.maximum_conditioning_cells||o.maximum_conditioning_cells>1000000||o.maximum_conditioning_depth>24||
        !finite_double(o.maximum_residual_over_gradient_pixels)||!(o.maximum_residual_over_gradient_pixels>0)||output.patches.context()!=&ctx||output.vertices.context()!=&ctx||output.audits.context()!=&ctx){reason=boundary_klm_invalid;return SA_INK_INVALID;}
     for(uint32_t i=0;i<4;i++)if(!finite_double(o.source_to_pixels[i])){reason=boundary_klm_invalid;return SA_INK_INVALID;}
