@@ -6,7 +6,7 @@
 
 ## 模型
 
-- 共享数据是项目里的一个独立资源，保存一份 JSON 值，有自己的 hash 和 revision；写入只需传读到的 `baseHash`。读写用 `dataset_read`（list / read）、`dataset_write`（create / apply / link）与 `dataset_delete`。`dataset_read` 同时返回本项目中使用它的页面与块（`references`）。值也可以放在内容库以外的文件里，见下文「外部文件中的数据」。
+- 共享数据是项目里的一个独立资源，保存一份 JSON 值，有自己的 hash 和 revision；写入只需传读到的 `baseHash`。读写用 `dataset_read`（list / read）、`dataset_write`（create / apply / link）与 `dataset_delete`。`dataset_read({projectId, action:"list"})` 列出共享数据；`dataset_read({projectId, action:"read", datasetId, path?})` 读取一份的值与 hash，同时返回本项目中使用它的页面与块（`references`）。值也可以放在内容库以外的文件里，见下文「外部文件中的数据」。
 - 组件块通过 `data.$binding` 绑定共享数据。页面只保存绑定设置和这个块自己的值；共享数据变化不会改变页面的 hash，页面的保存冲突也不涉及共享数据。
 - 组件照常收到 `{data, onChange, readOnly}`，不需要任何新接口。宿主从共享数据生成组件参数，把 `onChange` 交回的整份参数按记录 id 拆成对共享数据的修改。组件要满足两点：列表条目有稳定 `id`，收到新的 `data` 时以它为准，见 [组件设计](../../create-component/references/component-authoring.md)。
 
