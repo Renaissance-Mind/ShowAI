@@ -56,7 +56,7 @@ export function useNativeBoard(options:NativeBoardOptions){
       if(value.primitive){
         const p=value.primitive;
         if(!["rectangle","ellipse","arrow","region"].includes(p.tool))throw new Error("Unsupported native primitive");
-        const result=finishBoardDrawing(p.tool as Parameters<typeof finishBoardDrawing>[0],{color:o.color,fillColor:o.fillColor??"none",strokeWidth:o.width},
+        const result=finishBoardDrawing(p.tool as Parameters<typeof finishBoardDrawing>[0],p.style??{color:o.color,fillColor:o.fillColor??"none",strokeWidth:o.width},
           {origin:p.start,release:p.end,points:[p.start,p.end],moved:Math.hypot(p.end.x-p.start.x,p.end.y-p.start.y)*o.camera.current.scale>=3,scale:o.camera.current.scale});
         result.node.attrs!.id=p.id;o.onDrawing?.(result.node,result.frame);
       }

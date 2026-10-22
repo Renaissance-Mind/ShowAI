@@ -73,7 +73,7 @@ export interface InkCommand {
   clearSelection?: boolean;
   selection?: string[];
   layouts?: Record<string,NodeLayout>;
-  primitive?: {id:string;tool:string;start:{x:number;y:number};end:{x:number;y:number}};
+  primitive?: {id:string;tool:string;style?:import("./types").DrawingStyle;start:{x:number;y:number};end:{x:number;y:number}};
   activate?: string;
   shapeGesture?: {
     id: string;
