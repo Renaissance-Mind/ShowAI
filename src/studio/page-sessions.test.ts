@@ -13,6 +13,8 @@ import {findSurfaceNode,reconcileSurface} from "../surface/document.mjs";
 import type { LoadedPage } from "./page-session";
 import type { ContainerDocument } from "../types";
 import type { JSONContent } from "@tiptap/core";
+import {HistoryTravelQueue} from "../surface/history-travel-queue";
+import {sourceSessionFor} from "../surface/source-client";
 
 function deferred() {
   let release!: () => void;
@@ -104,6 +106,52 @@ describe("workspace sessions against the real loopback workbench", () => {
     await sessions.open(project, first.document.id, "a");
     return a;
   }
+  it("joins an accepted asynchronous Undo while its own Native publication save remains acyclic",async()=>{
+    const page=await warm(),owner=sourceSessionFor(page.getSnapshot().draft!)!,queue=new HistoryTravelQueue(owner),gate=deferred(),entered=deferred();
+    const travel=queue.enqueue(async()=>{
+      page.edit({title:"actual publication before Undo"});
+      expect(await page.flushPublishedSource()).toBe(true);
+      entered.release();await gate.promise;
+      page.edit({title:"actual completed Undo"});
+    });
+    let saved=false;const flush=page.flush().then(result=>{saved=result;return result});
+    await entered.promise;expect(saved).toBe(false);expect(page.isDirty()).toBe(true);expect(page.isBusy()).toBe(true);
+    gate.release();await travel;expect(await flush).toBe(true);
+    const disk=await invoke<LoadedPage>("pages:get",{projectId:project,pageId:first.document.id});
+    expect(disk.document.title).toBe("actual completed Undo");expect(page.isDirty()).toBe(false);await queue.close();
+  });
+  it("keeps the actual owner alive through a pending travel during disposal and durably retains its final source",async()=>{
+    const page=await warm(),owner=sourceSessionFor(page.getSnapshot().draft!)!,queue=new HistoryTravelQueue(owner),gate=deferred(),entered=deferred();
+    const travel=queue.enqueue(async()=>{entered.release();await gate.promise;page.edit(owner.replace({...owner.document!,title:"accepted Undo completed while retiring"}))});
+    await entered.promise;let disposed=false;const retiring=page.dispose().then(()=>{disposed=true});
+    await Promise.resolve();expect(disposed).toBe(false);expect(owner.disposed).toBe(false);
+    gate.release();await travel;await retiring;expect(owner.disposed).toBe(true);
+    const drafts=await invoke<{id:string}[]>("drafts:list",{projectId:project,resourceId:first.document.id});expect(drafts.length).toBeGreaterThan(0);
+    const read=await invoke<{content:ContainerDocument}>("drafts:read",{id:drafts[0].id});expect(read.content.title).toBe("accepted Undo completed while retiring");
+    await queue.close();
+  });
+  it("serializes accepted trips from separate mounted views of the same actual source",async()=>{
+    const page=await warm(),owner=sourceSessionFor(page.getSnapshot().draft!)!,one=new HistoryTravelQueue(owner),two=new HistoryTravelQueue(owner),gate=deferred(),entered=deferred(),steps:string[]=[];
+    const firstWork=one.enqueue(async()=>{steps.push("first began");entered.release();await gate.promise;page.edit({title:"first view completed"});steps.push("first published")});
+    const secondWork=two.enqueue(async()=>{expect(page.getSnapshot().draft!.title).toBe("first view completed");page.edit({title:"second view completed"});steps.push("second published")});
+    await entered.promise;expect(steps).toEqual(["first began"]);const flush=page.flush();gate.release();await Promise.all([firstWork,secondWork]);expect(await flush).toBe(true);
+    expect(steps).toEqual(["first began","first published","second published"]);const disk=await invoke<LoadedPage>("pages:get",{projectId:project,pageId:first.document.id});expect(disk.document.title).toBe("second view completed");await one.close();await two.close();
+  });
+  it.each(["reload","copy"] as const)("retains an uncertain failed Undo and recovers through actual %s without replay",async recovery=>{
+    const page=await warm(),owner=sourceSessionFor(page.getSnapshot().draft!)!,queue=new HistoryTravelQueue(owner),failure=new Error("inverse committed, actual response unavailable");let inverses=0;
+    await expect(queue.enqueue(async()=>{inverses++;page.edit({title:"actual known recovery body"});await page.flushPublishedSource();throw failure})).rejects.toBe(failure);
+    await expect(page.flush()).rejects.toBe(failure);
+    expect(page.getSnapshot().status).toBe("error");expect(page.getSnapshot().error).toContain(failure.message);expect(page.isDurable()).toBe(false);
+    const retained=page.getSnapshot().availableDrafts[0]!;
+    const actual=await invoke<{content:ContainerDocument}>("drafts:read",{id:retained.id});expect(actual.content.title).toBe("actual known recovery body");
+    await expect(page.retry()).rejects.toBe(failure);expect(inverses).toBe(1);
+    const anotherView=new HistoryTravelQueue(owner);await expect(anotherView.enqueue(async()=>{inverses++})).rejects.toBe(failure);expect(inverses).toBe(1);
+    if(recovery==="reload")await page.reload();else expect(await page.keepCopy()).not.toBeNull();
+    const fresh=sourceSessionFor(page.getSnapshot().draft!)!;expect(fresh).not.toBe(owner);expect(page.getSnapshot().status).toBe("saved");
+    const retainedAfter=await invoke<{content:ContainerDocument}>("drafts:read",{id:retained.id});expect(retainedAfter.content.title).toBe("actual known recovery body");
+    const next=new HistoryTravelQueue(fresh);await next.enqueue(async()=>{page.edit({title:"new owned action after recovery"})});expect(await page.flush()).toBe(true);
+    expect(inverses).toBe(1);await next.close();
+  });
   it("retires a moved page's retained editors and reloads its destination on reopen", async () => {
     const originalSession = await warm();
     await sessions.open(project, second.document.id, "b");

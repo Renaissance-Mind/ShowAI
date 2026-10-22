@@ -1,5 +1,6 @@
 import {OwnedSourceSession,createSourceTransport} from "./surface/source-client";
 import {flushPortableInputs,portableInputsPending,stopPortableInputs} from "./surface/portable-input-scope";
+import {flushHistoryTravels,historyTravelsPending,stopHistoryTravels} from "./surface/history-travel-queue";
 import { CAPACITY, formatBytes } from "./portable/capacity.mjs";
 import { linearContent } from "./surface/document.mjs";
 import { upgradeResource } from "./surface/containers.mjs";
@@ -104,7 +105,8 @@ const sourceOwner = useRef<OwnedSourceSession | undefined>(undefined);
     setPage((value) => owner.replace(value));
     return () => {
       stopPortableInputs(owner);
-      void flushPortableInputs(owner, true)
+      stopHistoryTravels(owner);
+      void flushHistoryTravels(owner).then(()=>flushPortableInputs(owner, true))
         .then(async () => {
           const source = owner.document;
           if (source) {
@@ -150,6 +152,7 @@ const sourceOwner = useRef<OwnedSourceSession | undefined>(undefined);
   const persist = useCallback(async () => {
     if (blocked.current) return;
     try {
+      await flushHistoryTravels(sourceOwner.current);
       await flushPortableInputs(sourceOwner.current,false);
       saveCanvasArtifact(localStorage, {
         format: "showai",
@@ -172,7 +175,7 @@ const sourceOwner = useRef<OwnedSourceSession | undefined>(undefined);
     const hide = () => {
       if (document.visibilityState === "hidden") persist();
     };
-    const guard=(event:BeforeUnloadEvent)=>{if(portableInputsPending(sourceOwner.current)){event.preventDefault();event.returnValue="";}};
+    const guard=(event:BeforeUnloadEvent)=>{if(historyTravelsPending(sourceOwner.current)||portableInputsPending(sourceOwner.current)){event.preventDefault();event.returnValue="";}};
     window.addEventListener("beforeunload",guard);
     window.addEventListener("pagehide", persist);
     document.addEventListener("visibilitychange", hide);
@@ -240,6 +243,7 @@ const sourceOwner = useRef<OwnedSourceSession | undefined>(undefined);
     setMenuOpen(false);
     setBusy(true);
     try {
+      await flushHistoryTravels(sourceOwner.current);
       await flushPortableInputs(sourceOwner.current,true);
       await sourceOwner.current?.barrier();
       const source = current.current;
@@ -327,6 +331,7 @@ const sourceOwner = useRef<OwnedSourceSession | undefined>(undefined);
       });
       if (request !== importGeneration.current) return;
       incomingComponents = materialized.components ?? [];
+      await flushHistoryTravels(sourceOwner.current);
       await flushPortableInputs(sourceOwner.current,true);
       if(request!==importGeneration.current)return;
       const outgoing=sourceOwner.current?.document??current.current;

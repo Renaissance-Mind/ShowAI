@@ -79,6 +79,7 @@ function PageContent({
           retainedState={view.surface}
           inlineInkProjectId={state.projectId ?? undefined}
           onInkSave={view.session.flush}
+          onPublishedInkSave={view.session.flushPublishedSource}
         />
       </DatasetScope>
     </CustomComponentsProvider>

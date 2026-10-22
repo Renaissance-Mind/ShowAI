@@ -1,4 +1,5 @@
 import {flushPortableInputs,portableInputsPending,stopPortableInputs} from "../surface/portable-input-scope";
+import {flushHistoryTravels,historyTravelsPending,historyTravelsRunning,historyTravelFailure,observeHistoryTravels,stopHistoryTravels,settleHistoryTravels,retireRecoveredHistoryTravels} from "../surface/history-travel-queue";
 import {shareNativeSource} from "../surface/native-source-delta.mjs";
 import {OwnedSourceSession,createSourceTransport,sourceSessionFor} from "../surface/source-client";
 import {isOwnedSource,type SourceSnapshotDelta} from "../surface/source-runtime";
@@ -62,6 +63,9 @@ export interface PageSession {
   edit(patch: Partial<ShowDocument>): void;
   editContent(content: JSONContent): void;
   flush(settle?: boolean): Promise<boolean>;
+  /** Native publication persistence called while an accepted Undo may itself
+   * be awaiting that publication. Still performs ordinary draft/save/CAS. */
+  flushPublishedSource(settle?: boolean): Promise<boolean>;
   leave(): Promise<boolean>;
   reload(): Promise<void>;
   reloadCurrent(): Promise<boolean>;
@@ -133,12 +137,13 @@ export function createPageSession(options: PageSessionOptions): PageSession {
     };
   }
   function readSnapshot(): PageSnapshot {
+    const travelFailure=historyTravelFailure(sourceOwner),travelPending=historyTravelsPending(sourceOwner);
     return {
       draft,
       renderVersion,
       record,
-      status,
-      error,
+      status:travelFailure?"error":status,
+      error:error||(travelFailure?errorMessage(travelFailure.error):""),
       draftNotice,
       conflictId,
       mergeBase,
@@ -146,8 +151,8 @@ export function createPageSession(options: PageSessionOptions): PageSession {
       saveFailureAttempt,
       projectId: projectRef.current,
       availableDrafts,
-      dirty: revision.current > savedRevision.current,
-      busy: !!pending.current || !!draftWrites.current.size,
+      dirty: travelPending||revision.current > savedRevision.current,
+      busy: historyTravelsRunning(sourceOwner)||!!pending.current || !!draftWrites.current.size,
     };
   }
   function publish() {
@@ -272,11 +277,13 @@ export function createPageSession(options: PageSessionOptions): PageSession {
   const clientId = ref<string | undefined>(options.clientId);
   const retained = ref<EditorDraftRecord | null>(null);
   let sourceOwner:OwnedSourceSession|undefined;
+  let stopTravelObservation:(()=>void)|undefined;
   const retireSourceOwner=(owner:OwnedSourceSession|undefined)=>{
     if(!owner)return;
     stopPortableInputs(owner);
+    stopHistoryTravels(owner);
     const writes=[...(pending.current?[pending.current]:[]),...draftWrites.current.values()];
-    void flushPortableInputs(owner,true).then(()=>Promise.allSettled(writes)).then(()=>owner.dispose()).catch(reason=>{
+    void flushHistoryTravels(owner).then(()=>flushPortableInputs(owner,true)).then(()=>Promise.allSettled(writes)).then(()=>owner.dispose()).catch(reason=>{
       console.error("Source owner retirement failed",errorCode(reason));
     });
   };
@@ -284,6 +291,9 @@ export function createPageSession(options: PageSessionOptions): PageSession {
     if(!sourceOwner||sourceOwner.projectId!==ownerProject||sourceOwner.pageId!==pageId||sourceOwner.disposed){
       const previous=sourceOwner;
       sourceOwner=new OwnedSourceSession(ownerProject,pageId,createSourceTransport(options.invoke,options.sourceHomeId,{headlessHomeId:`page-session:${options.clientId}`}));
+      stopTravelObservation?.();
+      const actual=sourceOwner;
+      stopTravelObservation=observeHistoryTravels(actual,()=>{if(sourceOwner===actual)publish()});
       retireSourceOwner(previous);
     }
     return sourceOwner;
@@ -423,13 +433,13 @@ export function createPageSession(options: PageSessionOptions): PageSession {
     }
   };
 
-  const flush = async (settle = true): Promise<boolean> => {
+  const flushPublishedSource = async (settle = true): Promise<boolean> => {
     if(disposed)return false;
     await flushPortableInputs(sourceOwner,settle);
     if(disposed)return false;
     if (pending.current) {
       const succeeded = await pending.current;
-      return succeeded && settle ? flush(true) : succeeded;
+      return succeeded && settle ? flushPublishedSource(true) : succeeded;
     }
     if (!current.current || !projectRef.current || blocked.current)
       return !blocked.current;
@@ -681,6 +691,29 @@ export function createPageSession(options: PageSessionOptions): PageSession {
     }
   };
 
+  const preserveHistoryFailure=async(reason:unknown)=>{
+    if(current.current&&projectRef.current){
+      const recovery=await persist(current.current,revision.current,projectRef.current);
+      setAvailableDrafts(items=>[recovery,...items.filter(item=>item.id!==recovery.id)]);
+    }
+    blocked.current=true;setError(errorMessage(reason));setStatus("error");setSaveFailureAttempt(value=>value+1);
+  };
+  const flush = async (settle=true):Promise<boolean>=>{
+    if(disposed)return false;
+    const owner=sourceOwner;
+    if(historyTravelsPending(owner)){
+      try{await flushHistoryTravels(owner)}
+      catch(reason){if(sourceOwner===owner)await preserveHistoryFailure(reason);throw reason}
+    }
+    return flushPublishedSource(settle);
+  };
+  const backgroundFlush=()=>{
+    const owner=sourceOwner;
+    void flush(false).catch(reason=>{
+      if(sourceOwner!==owner||disposed)return;
+      blocked.current=true;setError(errorMessage(reason));setStatus("error");
+    });
+  };
   const install = (projectId: string, page: LoadedPage) => {
     setSaveFailureAttempt(0);
     resolution.current = null;
@@ -1055,6 +1088,12 @@ export function createPageSession(options: PageSessionOptions): PageSession {
     const ticket = ++opening.current;
     if (pending.current) await pending.current;
     if (!projectRef.current || !current.current) return;
+    const failedOwner=sourceOwner&&historyTravelFailure(sourceOwner)?sourceOwner:undefined;
+    if(failedOwner){
+      stopHistoryTravels(failedOwner);
+      await settleHistoryTravels(failedOwner);
+      await preserveHistoryFailure(historyTravelFailure(failedOwner)!.error);
+    }else if(historyTravelsPending(sourceOwner))await flushHistoryTravels(sourceOwner);
     const projectId = projectRef.current,
       pageId = current.current.id,
       sequence = revision.current;
@@ -1074,6 +1113,13 @@ export function createPageSession(options: PageSessionOptions): PageSession {
       setError(t("editedWhileReadingFile"));
       return;
     }
+    if(failedOwner){
+      await retireRecoveredHistoryTravels(failedOwner);
+      if(sourceOwner!==failedOwner||revision.current!==sequence)return;
+      stopTravelObservation?.();stopTravelObservation=undefined;sourceOwner=undefined;
+      retireSourceOwner(failedOwner);
+      setRenderVersion(value=>value+1);
+    }
     install(projectId, loaded);
   };
 
@@ -1081,6 +1127,9 @@ export function createPageSession(options: PageSessionOptions): PageSession {
     const ticket = ++opening.current;
     if (pending.current) await pending.current;
     if (!projectRef.current || !current.current) return null;
+    const failedOwner=sourceOwner&&historyTravelFailure(sourceOwner)?sourceOwner:undefined;
+    if(failedOwner){stopHistoryTravels(failedOwner);await settleHistoryTravels(failedOwner)}
+    else if(historyTravelsPending(sourceOwner))await flushHistoryTravels(sourceOwner);
     const projectId = projectRef.current,
       pageId = current.current.id,
       sequence = revision.current;
@@ -1101,7 +1150,7 @@ export function createPageSession(options: PageSessionOptions): PageSession {
       return null;
     const latest = current.current,
       changedDuringCopy = revision.current !== sequence;
-    if (!changedDuringCopy) {
+    if (!changedDuringCopy&&!failedOwner) {
       await options.invoke("drafts:remove", {
         id: sourceDraft.id,
         generation: sourceDraft.generation,
@@ -1111,6 +1160,12 @@ export function createPageSession(options: PageSessionOptions): PageSession {
           id: sourceOrigin.id,
           generation: sourceOrigin.generation,
         });
+    }
+    if(failedOwner){
+      await retireRecoveredHistoryTravels(failedOwner);
+      if(sourceOwner!==failedOwner)return null;
+      stopTravelObservation?.();stopTravelObservation=undefined;sourceOwner=undefined;
+      retireSourceOwner(failedOwner);
     }
     install(projectId, copied);
     if (changedDuringCopy) {
@@ -1190,6 +1245,10 @@ export function createPageSession(options: PageSessionOptions): PageSession {
   };
 
   const retainDraft = async () => {
+    if(historyTravelsPending(sourceOwner)){
+      try{await flushHistoryTravels(sourceOwner)}
+      catch(reason){await preserveHistoryFailure(reason);throw reason}
+    }
     await flushPortableInputs(sourceOwner,false);
     if (current.current && projectRef.current)
       await persist(current.current, revision.current, projectRef.current);
@@ -1234,7 +1293,7 @@ export function createPageSession(options: PageSessionOptions): PageSession {
     autoSaveTimer.current = setTimeout(() => {
       autoSaveTimer.current = undefined;
       saveStartedAt = 0;
-      void flush(false);
+      backgroundFlush();
     }, delay);
   }
   function scheduleDraft() {
@@ -1265,6 +1324,10 @@ export function createPageSession(options: PageSessionOptions): PageSession {
     }, options.draftDelayMs ?? 200);
   }
   const leave = async (): Promise<boolean> => {
+    if(historyTravelsPending(sourceOwner)){
+      try{await flushHistoryTravels(sourceOwner)}
+      catch(reason){await preserveHistoryFailure(reason);return false}
+    }
     try {
       await flushPortableInputs(sourceOwner,true);
       while (
@@ -1278,7 +1341,7 @@ export function createPageSession(options: PageSessionOptions): PageSession {
           projectRef.current,
         );
       if (!blocked.current && revision.current > savedRevision.current)
-        void flush(false);
+        backgroundFlush();
       return true;
     } catch (reason) {
       setError(t("draftSaveFailed", { error: errorMessage(reason) }));
@@ -1307,6 +1370,7 @@ export function createPageSession(options: PageSessionOptions): PageSession {
     edit,
     editContent,
     flush,
+    flushPublishedSource,
     leave,
     reload,
     reloadCurrent,
@@ -1319,19 +1383,22 @@ export function createPageSession(options: PageSessionOptions): PageSession {
     prepareResolution,
     prepareExternalResolution,
     clear,
-    isDirty: () => portableInputsPending(sourceOwner)||revision.current > savedRevision.current,
-    isBusy: () => portableInputsPending(sourceOwner)||!!pending.current || !!draftWrites.current.size,
+    isDirty: () => historyTravelsPending(sourceOwner)||portableInputsPending(sourceOwner)||revision.current > savedRevision.current,
+    isBusy: () => historyTravelsRunning(sourceOwner)||portableInputsPending(sourceOwner)||!!pending.current || !!draftWrites.current.size,
     isDurable: () =>
-      !portableInputsPending(sourceOwner)&&(durableSequence >= revision.current ||
+      !historyTravelsPending(sourceOwner)&&!portableInputsPending(sourceOwner)&&(durableSequence >= revision.current ||
       revision.current <= savedRevision.current),
     dispose() {
       if(retirement)return retirement;
       retiring=true;stopPortableInputs(sourceOwner);
+      stopHistoryTravels(sourceOwner);
       clearTimeout(autoSaveTimer.current);clearTimeout(draftTimer.current);
       retirement=(async()=>{
         // Existing accepted contacts are still real writers during retirement.
         // Keep update callbacks alive until they have published and retained
         // their actual full source; only then may the owner/Worker be retired.
+        try{await flushHistoryTravels(sourceOwner)}
+        catch(reason){await preserveHistoryFailure(reason);throw reason}
         await flushPortableInputs(sourceOwner,true);
         if(current.current&&projectRef.current&&durableSequence<revision.current)
           await persist(current.current,revision.current,projectRef.current);
@@ -1339,7 +1406,7 @@ export function createPageSession(options: PageSessionOptions): PageSession {
           const writes=[...(pending.current?[pending.current]:[]),...draftWrites.current.values()];
           await Promise.all(writes);
         }
-        await sourceOwner?.dispose();disposed=true;
+        await sourceOwner?.dispose();disposed=true;stopTravelObservation?.();stopTravelObservation=undefined;
         clearTimeout(autoSaveTimer.current);clearTimeout(draftTimer.current);
         listeners.clear();metadataListeners.clear();
       })().catch(reason=>{retiring=false;retirement=undefined;throw reason});

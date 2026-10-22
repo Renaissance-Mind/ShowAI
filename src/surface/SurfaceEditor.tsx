@@ -1,4 +1,5 @@
 import {PortableCubicContext} from "./PortableCubicContext";
+import {HistoryTravelQueue,observeHistoryTravels} from "./history-travel-queue";
 import {PortableInputScope,type PortableInputReservation} from "./portable-input-scope";
 import {appendNewPortableInk,appendPortableInkFromSource} from "./portable-ink-append.mjs";
 import {sourceSessionFor,diffOwnedSource,type OwnedSourceSession} from "./source-client";
@@ -71,6 +72,7 @@ function SurfaceEditor({
   inspectorHost,
   inlineInkProjectId,
   onInkSave,
+  onPublishedInkSave,
   onOpenEmbeddedSurface,
 }: {
   document: ShowDocument;
@@ -85,6 +87,7 @@ function SurfaceEditor({
   inspectorHost?: HTMLElement | null;
   inlineInkProjectId?: string;
   onInkSave?: () => Promise<boolean>;
+  onPublishedInkSave?: () => Promise<boolean>;
   onOpenEmbeddedSurface?: (id:string) => void;
 }) {
   const document = useMemo<ContainerDocument>(
@@ -97,7 +100,7 @@ function SurfaceEditor({
   );
   const geometry = useMemo(() => new SurfaceGeometryStore(), [document.id]);
   const restored =
-    retainedState?.document?.id === document.id ? retainedState : undefined;
+    retainedState?.document?.id === document.id && sourceSessionFor(retainedState.document)===sourceSessionFor(document) ? retainedState : undefined;
   if (retainedState && !retainedState.runtime) retainedState.runtime = {};
   const current = useRef<ContainerDocument>(restored?.document ?? document);
   const authorBaseline=useRef<ShowDocument>(document);
@@ -123,6 +126,13 @@ function SurfaceEditor({
     () => () => {
       if (!retainedState) return;
       retainedState.document = current.current;
+      if(travelQueue.pending){
+        // A remount must observe the same history consumption when the old
+        // accepted callback eventually finishes; a copied stack would be stale.
+        history.current.inkActions=inkActions.current;
+        retainedState.history=history.current;
+        return;
+      }
       retainedState.history = {
         ...history.current,
         past: [...history.current.past],
@@ -185,6 +195,10 @@ function SurfaceEditor({
   },[retainedState]);
   const reservePortable=useRef<PortableInputReservation>(()=>{throw new Error("Portable input reservation is not installed")});
   const portableScope=useMemo(()=>new PortableInputScope(options=>reservePortable.current(options),sourceSessionFor(document)),[document.id,sourceSessionFor(document)]);
+  const travelQueue=useMemo(()=>new HistoryTravelQueue(sourceSessionFor(document)),[document.id,sourceSessionFor(document)]);
+  useEffect(()=>{const owner=sourceSessionFor(document);if(owner)return observeHistoryTravels(owner,()=>refresh(value=>value+1))},[travelQueue]);
+  const travelMount=useRef(0),travelActive=useRef(travelQueue);travelActive.current=travelQueue;
+  useEffect(()=>{const generation=++travelMount.current;return()=>{queueMicrotask(()=>{if(travelActive.current!==travelQueue||travelMount.current===generation)void travelQueue.close().catch(error=>{console.error("Source history could not retire",error)})})}},[travelQueue]);
   const portableMount=useRef(0),portableActive=useRef(portableScope);portableActive.current=portableScope;
   useEffect(()=>{const generation=++portableMount.current;return()=>{queueMicrotask(()=>{if(portableActive.current!==portableScope||portableMount.current===generation)void portableScope.close().catch(error=>{console.error("Retained cubic input could not retire",error)})})}},[portableScope]);
   const widgetChanges = useRef(
@@ -461,8 +475,8 @@ reservePortable.current = (options) => {
       },
     };
   };
-  const inkSave = useRef(onInkSave);
-  inkSave.current = onInkSave;
+  const inkSave = useRef(onPublishedInkSave??onInkSave);
+  inkSave.current = onPublishedInkSave??onInkSave;
   useEffect(() => {
     const bridge = window.showai?.inlineInk;
     if (!bridge || !inlineInkProjectId || readOnly) return;
@@ -591,14 +605,28 @@ reservePortable.current = (options) => {
       },
     );
     bridge.setDocument?.(document.id, current.current);
-    return ()=>{bound=false;unbind()};
-  }, [document.id, inlineInkProjectId, readOnly, commit,rebaseHistory]);
+    return ()=>{
+      const retire=()=>{bound=false;unbind()};
+      // An accepted trip still needs this actual listener to finish its Native
+      // preflush/publication. React cleanup itself cannot await that barrier.
+      if(travelQueue.pending)void travelQueue.settled().then(retire);else retire();
+    };
+  }, [document.id, inlineInkProjectId, readOnly, commit,rebaseHistory,travelQueue]);
   const travel = useCallback(
-    async (redo = false) => {
+    (redo = false) => travelQueue.enqueue(async () => {
+      if(latestReadOnly.current||current.current.id!==document.id)throw new InkEditConflict("History source is retired or read-only");
       await portableScope.flush(true);
       await window.showai?.inlineInk?.flush();
       geometrySettlement.current.generation++;
       await historyTail.current;if(historyFailure.current)throw historyFailure.current;
+      const owner=travelQueue.owner;
+      while(owner?.document&&owner.document!==current.current){
+        if(owner.disposed||current.current.id!==document.id||sourceSessionFor(current.current)!==owner)throw new InkEditConflict("History source changed while flushing");
+        rebaseHistory(current.current,owner.document as ContainerDocument);
+        current.current=owner.document as ContainerDocument;
+        await historyTail.current;if(historyFailure.current)throw historyFailure.current;
+      }
+      if(latestReadOnly.current||current.current.id!==document.id||sourceSessionFor(current.current)!==owner)throw new InkEditConflict("History source changed while flushing");
       const stack = history.current,
         source = redo ? stack.future : stack.past,
         next = source.at(-1);
@@ -641,8 +669,8 @@ reservePortable.current = (options) => {
       latestChange.current(restored);
       refresh((value) => value + 1);
       settleGeometry();
-    },
-    [settleGeometry,inlineInkProjectId,pinHistory,portableScope],
+    }),
+    [settleGeometry,inlineInkProjectId,pinHistory,portableScope,travelQueue,document.id,rebaseHistory],
   );
   const undo = useCallback(() => travel(), [travel]);
   const redo = useCallback(() => travel(true), [travel]);
@@ -834,8 +862,8 @@ reservePortable.current = (options) => {
         onControlsChange={onControlsChange}
         retainedState={retainedState?.runtime}
         inspectorHost={inspectorHost}
-        canUndo={!!history.current.past.length}
-        canRedo={!!history.current.future.length}
+        canUndo={!travelQueue.failure&&!!history.current.past.length}
+        canRedo={!travelQueue.failure&&!!history.current.future.length}
       />
       <InkConflictInspector document={current.current} projectId={inlineInkProjectId} host={inspectorHost}
         beforeResolve={onInkSave} getDocument={()=>current.current}
