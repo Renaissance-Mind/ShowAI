@@ -11,7 +11,8 @@ typedef struct { uint32_t words[4]; } SABoundarySourceKey;
 typedef enum { SA_BOUNDARY_NONZERO=0,SA_BOUNDARY_EVENODD=1 } SABoundaryFill;
 typedef enum { SA_BOUNDARY_PAINT=0,SA_BOUNDARY_CLIP=1 } SABoundaryPathRole;
 /* Logical path0 is the paint. Later paths are actual clip membership tests.
- * Source blocks may contribute many independently closed contours to a path. */
+ * Source blocks may contribute many independently closed contours to a path.
+ * The dimension is arena-owned and budgeted, not a fixed clip-depth limit. */
 typedef struct { uint32_t fill,role,reserved[2]; } SABoundaryPath;
 typedef struct {
     SABoundarySourceKey key;
@@ -57,7 +58,10 @@ typedef struct {
 /* State and its arena are private to one serial host owner. State starts zeroed.
  * owner_namespace is a nonzero host epoch. When reusing the same state storage
  * after destroy, the host uses a fresh epoch. A lease additionally binds the
- * exact state address, so a repeated epoch cannot alias a different owner. The arena cannot alias any
+ * exact state address within its Native process or WASM linear memory. The host
+ * additionally binds leases to the actual WASM instance: independent instances
+ * can have identical offsets/epochs and C cannot distinguish those domains.
+ * The arena cannot alias any
  * input/output/state bytes and must remain stable until successful destroy.
  * All budgets include active, cached, prepared and externally retained leases.
  * prepare is synchronous, bounded and failure-atomic; base must be the owner's

@@ -13,12 +13,22 @@ inline Bounds curve_bounds(const Curve&c){Bounds b;bool first=true;for(const aut
 inline Bounds unite(Bounds a,Bounds b){return{a.x0<b.x0?a.x0:b.x0,a.y0<b.y0?a.y0:b.y0,a.x1>b.x1?a.x1:b.x1,a.y1>b.y1?a.y1:b.y1};}
 inline bool overlap(Bounds a,Bounds b){return a.x0<=b.x1&&b.x0<=a.x1&&a.y0<=b.y1&&b.y0<=a.y1;}
 inline bool contains(Bounds b,double x,double y){return b.x0<=x&&x<=b.x1&&b.y0<=y&&y<=b.y1;}
-struct Weight{int32_t values[8]{};int32_t&operator[](uint32_t i){return values[i];}int32_t operator[](uint32_t i)const{return values[i];}bool zero()const{for(auto x:values)if(x)return false;return true;}};
+// Missing entries are exact zero. Copies share arena storage until an actual
+// write; the logical-path dimension is governed by the caller's whole budget,
+// not a fixed Board clip-depth assumption.
+struct Weight{
+    Vector<int32_t,1>values;
+    Weight()=default;explicit Weight(Context&c):values(c){}
+    Context*context()const{return values.context();}
+    int32_t&operator[](uint32_t i){if(i>=values.size())values.resize(i+1);return values[i];}
+    int32_t operator[](uint32_t i)const{return i<values.size()?values[i]:0;}
+    bool zero()const{for(auto x:values)if(x)return false;return true;}
+};
 struct Origin {uint32_t source=0,command=0,flags=0;};
 struct CachedClass{uint32_t cut=0;int32_t direction=0;Weight left,right;};
 struct CachedPair{uint32_t a=0,b=0;uint64_t a_identity=0,b_identity=0;PairProof proof;CachedPair()=default;CachedPair(uint32_t x,uint32_t y,uint64_t xi,uint64_t yi,const PairProof&p):a(x),b(y),a_identity(xi),b_identity(yi),proof(p){}};
 struct PairSlot{Record<CachedPair>record;uint32_t occupied=0;};
-struct SourceCurve {Curve geometry;Weight weight;Vector<Origin>origins;Vector<Record<CachedPair>>proofs;Vector<CachedClass>classes;uint64_t identity=0,cuts_generation=0,cache_generation=0;bool membership_valid=false,cuts_sorted=false,bounds_dirty=true;Bounds bounds;SourceCurve()=default;explicit SourceCurve(PolynomialContext&c):geometry(c),origins(c.numbers),proofs(c.numbers),classes(c.numbers){}Context*context()const{return geometry.context();}};
+struct SourceCurve {Curve geometry;Weight weight;Vector<Origin>origins;Vector<Record<CachedPair>>proofs;Vector<CachedClass>classes;uint64_t identity=0,cuts_generation=0,cache_generation=0;bool membership_valid=false,cuts_sorted=false,bounds_dirty=true;Bounds bounds;SourceCurve()=default;explicit SourceCurve(PolynomialContext&c):geometry(c),weight(c.numbers),origins(c.numbers),proofs(c.numbers),classes(c.numbers){}Context*context()const{return geometry.context();}};
 struct BlockCurve {uint32_t curve=0;int32_t weight=0;};
 struct CapturedBlock {SABoundarySourceBlock description{};Vector<SAInkPathCommand>commands;Vector<BlockCurve>curves;Bounds bounds;bool has_bounds=false,closed=false,active=false;CapturedBlock()=default;explicit CapturedBlock(Context&c):commands(c),curves(c){}Context*context()const{return commands.context();}};
 struct SpatialKey {uint32_t words[4]{};};
@@ -77,7 +87,7 @@ inline uint64_t hash_key(SABoundarySourceKey key){uint64_t h=1469598103934665603
 inline uint32_t source_slot(const Graph&g,SABoundarySourceKey key){if(g.source_table.empty())return no_index;uint32_t mask=g.source_table.size()-1,slot=uint32_t(hash_key(key))&mask;for(uint32_t count=0;count<g.source_table.size();count++,slot=(slot+1)&mask){uint32_t value=g.source_table[slot];if(!value)return no_index;if(value!=no_index&&same_key(g.blocks[value-1].description.key,key))return slot;}return no_index;}
 inline void index_source(Graph&g,uint32_t index){uint32_t mask=g.source_table.size()-1,slot=uint32_t(hash_key(static_cast<const Graph&>(g).blocks[index].description.key))&mask,tombstone=no_index;for(uint32_t count=0;count<g.source_table.size()&&g.good();count++,slot=(slot+1)&mask){uint32_t value=static_cast<const Graph&>(g).source_table[slot];if(value==no_index){if(tombstone==no_index)tombstone=slot;continue;}if(!value){g.source_table[tombstone==no_index?slot:tombstone]=index+1;return;}g.step();}if(g.good()&&tombstone!=no_index){g.source_table[tombstone]=index+1;return;}g.context()->fail(SA_INK_CAPACITY);}
 inline bool capture(Graph&g,const SABoundaryPath*paths,uint32_t path_count,const SABoundarySourceBlock*sources,uint32_t source_count,const SAInkPathCommand*commands,uint32_t command_count){
-    if(!paths||!path_count||path_count>8||path_count>g.budget.max_paths||source_count>g.budget.max_sources||command_count>g.budget.max_commands||(!sources&&source_count)||(!commands&&command_count)){g.context()->fail(SA_INK_INVALID);return false;}
+    if(!paths||!path_count||path_count>g.budget.max_paths||source_count>g.budget.max_sources||command_count>g.budget.max_commands||(!sources&&source_count)||(!commands&&command_count)){g.context()->fail(SA_INK_INVALID);return false;}
     for(uint32_t i=0;i<path_count;i++){if(paths[i].fill>1||paths[i].role!=(i?SA_BOUNDARY_CLIP:SA_BOUNDARY_PAINT)||paths[i].reserved[0]||paths[i].reserved[1]){g.context()->fail(SA_INK_INVALID);return false;}g.paths.push_back(paths[i]);}
     uint32_t table=8;while(table<uint64_t(g.budget.max_curves)*2u){if(table>0x40000000u){g.context()->fail(SA_INK_CAPACITY);return false;}table*=2;}g.curve_table.resize(table);uint32_t source_capacity=8;while(uint64_t(source_capacity)<uint64_t(g.budget.max_sources)*2){if(source_capacity>0x40000000u){g.context()->fail(SA_INK_CAPACITY);return false;}source_capacity*=2;}g.source_table.resize(source_capacity);uint32_t pair_capacity=8;while(uint64_t(pair_capacity)<uint64_t(g.budget.max_pairs)*2){if(pair_capacity>0x40000000u){g.context()->fail(SA_INK_CAPACITY);return false;}pair_capacity*=2;}g.pair_table.resize(pair_capacity);uint32_t key_capacity=8;while(key_capacity<uint64_t(source_count)*2){if(key_capacity>0x40000000u){g.context()->fail(SA_INK_CAPACITY);return false;}key_capacity*=2;}Vector<uint32_t>source_keys(*g.context());source_keys.resize(key_capacity);uint64_t total=0;
     for(uint32_t source=0;source<source_count&&g.good();source++){const auto&description=sources[source];if(description.reserved||description.path_index>=path_count||description.first_command>command_count||description.command_count>command_count-description.first_command){g.context()->fail(SA_INK_INVALID);return false;}total+=description.command_count;if(total>g.budget.max_commands){g.context()->fail(SA_INK_CAPACITY);return false;}uint64_t kh=1469598103934665603ull;for(uint32_t word:description.key.words)kh=mix(kh,word);uint32_t ks=uint32_t(kh)&(key_capacity-1);while(source_keys[ks]&&g.good()){if(same_key(sources[source_keys[ks]-1].key,description.key)){g.context()->fail(SA_INK_INVALID);return false;}ks=(ks+1)&(key_capacity-1);g.step();}source_keys[ks]=source+1;for(uint32_t i=0;i<6;i++)if(!finite_double(description.affine[i])){g.context()->fail(SA_INK_INVALID);return false;}
@@ -120,7 +130,7 @@ inline void propagate(Graph&g,const PagedVector<uint32_t,6>*marked=nullptr){for(
 inline int derivative_sign(const Polynomial&p,Root&r,uint32_t&order){Polynomial d=p;order=0;while(!d.zero()&&d.valid()){int sign=sign_at(d,r);if(sign)return sign;d=derivative(d);++order;}return 0;}
 inline bool filled(const Graph&g,const Weight&w){for(uint32_t p=0;p<g.paths.size();p++)if(g.paths[p].fill?(w[p]%2==0):(w[p]==0))return false;return true;}
 inline Weight winding(Graph&g,const Point&q,bool boundary_error=false){
-    Weight result;if(!g.block_tree.valid())return result;Vector<Record<BlockNode>,1>pending(*g.context());pending.push_back(g.block_tree);
+    Weight result(*g.context());if(!g.block_tree.valid())return result;Vector<Record<BlockNode>,1>pending(*g.context());pending.push_back(g.block_tree);
     double xlo=lower(q.x),xhi=upper(q.x),ylo=lower(q.y),yhi=upper(q.y);
     while(!pending.empty()&&g.good()){
         auto record=pending.back();pending.pop_back();const auto&node=*record.get();++g.metrics.bvh_visits;if(!g.step())return result;

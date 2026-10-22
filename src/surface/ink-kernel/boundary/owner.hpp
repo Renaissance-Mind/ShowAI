@@ -37,7 +37,7 @@ struct alignas(16) Owner{
 };
 inline Owner*owner(void*state){if(!state||((uintptr_t)state&15u))return nullptr;uint64_t signature;copy_bytes(&signature,state,8);return signature==Owner::signature?(Owner*)state:nullptr;}
 struct OwnerCall{Owner&value;explicit OwnerCall(Owner&o):value(o){}~OwnerCall(){value.busy=0;}};
-inline bool valid_budget(const SABoundaryBudget&b){uint64_t sum=uint64_t(b.retained_bytes)+b.workspace_bytes;return b.max_commands&&b.max_commands<=1000000&&b.max_curves&&b.max_curves<=1000000&&b.max_pairs&&b.max_cuts&&b.max_edges&&b.max_leases&&b.max_leases<=1024&&b.max_sources&&b.max_sources<=1000000&&b.max_paths&&b.max_paths<=8&&b.max_polynomial_degree==64&&b.max_stored_bits==stored_bits&&b.max_polynomial_operations&&b.max_limb_operations&&b.retained_bytes>=4096&&b.workspace_bytes>=4096&&sum<=0x40000000u;}
+inline bool valid_budget(const SABoundaryBudget&b){uint64_t sum=uint64_t(b.retained_bytes)+b.workspace_bytes;return b.max_commands&&b.max_commands<=1000000&&b.max_curves&&b.max_curves<=1000000&&b.max_pairs&&b.max_cuts&&b.max_edges&&b.max_leases&&b.max_leases<=1024&&b.max_sources&&b.max_sources<=1000000&&b.max_paths&&b.max_paths<=1000000&&b.max_polynomial_degree==64&&b.max_stored_bits==stored_bits&&b.max_polynomial_operations&&b.max_limb_operations&&b.retained_bytes>=4096&&b.workspace_bytes>=4096&&sum<=0x40000000u;}
 inline Vector<SABoundaryEdge> output_edges(Graph&g){
     Vector<SABoundaryEdge>output(*g.context());
     for(uint32_t index=0;index<g.edges.size()&&g.good();index++){
