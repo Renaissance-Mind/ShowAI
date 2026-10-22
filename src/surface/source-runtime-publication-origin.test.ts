@@ -136,3 +136,23 @@ it("does not treat a repaired timestamp as capacity proof for an oversized captu
  expect(()=>owner.registerActualMergedPublication(request)).toThrow(/Page structure/);
  expect(resolve(owner,seed.next)).toEqual(document);
 });
+
+it("binds a fully normalized actual host projection independently of a transport packet",()=>{
+ const {owner,document,seed,scope}=setup();
+ const body=structuredClone(document);body.title="Actual compensation result";(body as any).futureRoot={unknown:["é","é",null]};
+ const origin={format:"showai-native-projection-origin-v1" as const,publicationId:"actual-inverse-result",scope,boardId:document.content.attrs!.id as string,token:"actual-token",sourceVersion:7};
+ const output=owner.normalizeActualProjection({base:seed.next,document:body,origin,leaseId:"inverse"}),canonical=resolve(owner,output.next);
+ expect(owner.nativePublicationDocumentMatching({ref:output.next,document:canonical})).toEqual(origin);
+ expect(()=>owner.normalizeActualProjection({base:seed.next,document:{...canonical,title:"another actual body"},origin,leaseId:"inverse"})).toThrow(/identity/);
+ expect(owner.nativePublicationDocumentMatching({ref:output.next,document:canonical})).toEqual(origin);
+ body.title="Caller mutated after return";origin.sourceVersion=99;
+ expect(owner.nativePublicationDocumentMatching({ref:output.next,document:canonical})?.sourceVersion).toBe(7);
+ const timestamp=owner.execute({kind:"draft",base:output.next,transactionId:"storage-time",edits:[{op:"set",path:["updatedAt"],value:"2026-10-22T02:00:00.000Z"}],leaseId:"time"}) as SourceSnapshotDelta;
+ expect(owner.nativePublicationDocumentMatching({ref:timestamp.next,document:resolve(owner,timestamp.next)})?.sourceVersion).toBe(7);
+ const foreign=owner.execute({kind:"draft",base:timestamp.next,transactionId:"actual-foreign-edit",edits:[{op:"set",path:["futureRoot","unknown",0],value:"new foreign value"}],leaseId:"foreign"}) as SourceSnapshotDelta;
+ expect(owner.nativePublicationDocumentMatching({ref:foreign.next,document:resolve(owner,foreign.next)})).toBeNull();
+ expect(()=>owner.normalizeActualProjection({base:seed.next,document:{...document,createdAt:"invalid"},origin:{...origin,sourceVersion:8}})).toThrow(/ISO/);
+ expect(()=>owner.normalizeActualProjection({base:seed.next,document,origin:{...origin,scope:{...scope,projectId:"other"}}})).toThrow(/scope/);
+ expect(()=>owner.execute({kind:"normalizeActualProjection",base:seed.next,document,origin} as any)).toThrow(/Unknown/);
+ owner.execute({kind:"dispose",scope});expect(()=>owner.resolveActualSnapshot(output.next)).toThrow(/expired/);
+});

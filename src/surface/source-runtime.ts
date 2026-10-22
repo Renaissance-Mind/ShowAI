@@ -165,13 +165,13 @@ function onlySharedTimestampChanged(before:ShowDocument,after:ShowDocument):bool
 /** A private factory record, never a public request/asserted normalized flag.
  * The input ref must still resolve to its actual complete immutable body. */
 export interface NativePublicationOrigin {
- format:"showai-native-publication-origin-v1";publicationId:string;scope:SourceScope;
+ format:"showai-native-publication-origin-v1"|"showai-native-projection-origin-v1";publicationId:string;scope:SourceScope;
  boardId:string;token:string;sourceVersion:number;
 }
 type NativePublicationPacket={document:ShowDocument;baseDocument:ShowDocument;pageId?:string;[key:string]:unknown};
 interface PublicationTransport {scope:SourceScope;boardId:string;token:string;sourceVersion:number}
 interface PublicationEntry {packet:NativePublicationPacket;canonical?:ShowDocument;canonicalBase?:ShowDocument;transport?:PublicationTransport}
-interface PublicationOriginRecord {identity:NativePublicationOrigin;packet:NativePublicationPacket}
+interface PublicationOriginRecord {identity:NativePublicationOrigin;packet?:NativePublicationPacket}
 export interface NativeSourceEnvelope {
  format:"showai-native-source-v1";scope:{projectId:string;pageId:string;boardId:string;token:string};
  publicationId:string;basePublicationId:string|null;sourceVersion:number;
@@ -280,7 +280,7 @@ export class SourceRuntimeOwner {
   // A live pinned origin outlives the eight-entry replay cache. It still binds
   // its immutable complete P even if another actual call reuses that identity.
   for(const snapshot of this.snapshots.values())if(snapshot.nativeOrigin?.identity.publicationId===publicationId&&scopeKey(snapshot.ref.scope)===scopeKey(current.ref.scope)){
-   if(!privateJSONEqual(snapshot.nativeOrigin.packet,packet))fail("Native publication identity names a different complete packet");
+   if(!snapshot.nativeOrigin.packet||!privateJSONEqual(snapshot.nativeOrigin.packet,packet))fail("Native publication identity names a different complete packet");
   }
   const previous=[...this.publications.values()].at(-1)?.packet,copy=parsedPacket?parsedPacket():captureOwnedJSON(packet),value=captureOwnedJSON(parsedPacket?copy:previous?shareNativeSource(previous,copy):copy);
   normalizationReadableBodies.add(value.document);normalizationReadableBodies.add(value.baseDocument);
@@ -381,7 +381,7 @@ export class SourceRuntimeOwner {
   if(!isDocumentTimestamp(current.document.updatedAt))return null;
   let unchanged=false;
   const origin=current.nativeOrigin;
-  if(origin&&this.validatedBodies.has(current.document)&&origin.identity.publicationId===request.publicationId&&scopeKey(origin.identity.scope)===scopeKey(current.ref.scope)){
+  if(origin?.packet&&this.validatedBodies.has(current.document)&&origin.identity.publicationId===request.publicationId&&scopeKey(origin.identity.scope)===scopeKey(current.ref.scope)){
    // Same actually proved P after a failed save/ACK; timestamp-only COW has
    // already retained its official model/capacity proof, not a caller token.
    unchanged=privateJSONEqual(origin.packet,packet);
@@ -389,7 +389,7 @@ export class SourceRuntimeOwner {
   if(!unchanged){
    let base:ShowDocument;
    if(this.validatedBodies.has(current.document)&&
-      (privateJSONEqual(packet.baseDocument,current.document)||origin&&privateJSONEqual(origin.packet.document,packet.baseDocument)))base=current.document;
+      (privateJSONEqual(packet.baseDocument,current.document)||origin?.packet&&privateJSONEqual(origin.packet.document,packet.baseDocument)))base=current.document;
    else{
     base=entry.canonicalBase??measured(observer,"unchanged.normalizeBase",()=>freezeOwnedSource(normalizeOwnedSourceDocument(packet.baseDocument,observer && ((stage,time)=>observer("unchanged.base."+stage,time)))));
     if(!entry.canonicalBase){entry.canonicalBase=base;if(this.publications.get(scopeKey(current.ref.scope)+"\u0000"+request.publicationId)===entry)this.account(base,1)}
@@ -437,7 +437,7 @@ export class SourceRuntimeOwner {
    let previous=cached?.transport?{packet:cached.packet,transport:cached.transport}:undefined;
    if(!previous)for(const snapshot of this.snapshots.values()){
     const origin=snapshot.nativeOrigin;
-    if(origin?.identity.publicationId===envelope.basePublicationId&&scopeKey(origin.identity.scope)===scopeKey(current.ref.scope)){
+    if(origin?.packet&&origin.identity.publicationId===envelope.basePublicationId&&scopeKey(origin.identity.scope)===scopeKey(current.ref.scope)){
      previous={packet:origin.packet,transport:origin.identity};break;
     }
    }
@@ -469,9 +469,29 @@ export class SourceRuntimeOwner {
  /** Actual host projections (undo/resolution) still undergo full canonical
   * normalization here. This adapter is not public client dispatch and does not
   * borrow saved/publication proofs for a different source body. */
- normalizeActualProjection(request:{base:SourceSnapshotRef;document:ShowDocument;leaseId?:string}):SourceSnapshotDelta{
-  const base=this.get(request.base);
-  return this.register(base.ref.scope,normalizeOwnedSourceDocument(cloneSourceValue(request.document)),"normalized",base,request.leaseId);
+ normalizeActualProjection(request:{base:SourceSnapshotRef;document:ShowDocument;leaseId?:string;origin?:NativePublicationOrigin}):SourceSnapshotDelta{
+  // This endpoint is private to the host's actual compensation factory. It
+  // always performs complete model/capacity normalization; public execute has
+  // no origin assertion or projection request. Capture metadata before any
+  // observer/caller can mutate it, then bind only to the actual output ref.
+  const base=this.get(request.base),origin=request.origin===undefined?undefined:captureOwnedJSON(request.origin);
+  if(origin){
+   const id=(value:unknown)=>typeof value==="string"&&value.length>0&&value.length<=256;
+   if(Object.keys(origin).some(key=>!["format","publicationId","scope","boardId","token","sourceVersion"].includes(key))||
+    origin.format!=="showai-native-projection-origin-v1"||scopeKey(scope(origin.scope))!==scopeKey(base.ref.scope)||
+    !id(origin.publicationId)||!id(origin.boardId)||!id(origin.token)||!Number.isSafeInteger(origin.sourceVersion)||origin.sourceVersion<0)
+    fail("Actual host projection origin crosses its captured source scope or identity");
+  }
+  const document=normalizeOwnedSourceDocument(cloneSourceValue(request.document));
+  if(origin)for(const actual of this.snapshots.values()){
+   const known=actual.nativeOrigin;
+   if(known?.identity.publicationId===origin.publicationId&&scopeKey(known.identity.scope)===scopeKey(base.ref.scope)&&
+    (!privateJSONEqual(known.identity,origin)||!privateDocumentBodiesEqual(actual.document,document)))
+    fail("Actual host projection identity names a different complete source body");
+  }
+  const result=this.register(base.ref.scope,document,"normalized",base,request.leaseId);
+  if(origin)this.bindNativeOrigin({record:freezeOwnedSource({identity:origin})},result);
+  return result;
  }
  /** Trusted host adapter only: actual backend normalization/CAS has already
   * completed. Never reachable through the client request discriminant. */
