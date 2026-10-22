@@ -8,11 +8,55 @@ import agentHostMessages from "../i18n/messages/agentHost";
 
 const t = translator(agentHostMessages);
 
+let loginPath: string[] = [];
+let loginPathResolved: Promise<string[]> | undefined;
+const PATH_MARKER = "__SHOWAI_PATH__";
+
+/**
+ * A Finder-launched App inherits launchd's short PATH, without nvm, volta, asdf or
+ * other shell setups. Ask the person's login shell once, so host CLIs installed
+ * there are found too. A failing or slow shell leaves the fixed directories.
+ */
+export function resolveLoginShellPath(): Promise<string[]> {
+  if (process.platform === "win32") return Promise.resolve([]);
+  loginPathResolved ??= new Promise<string[]>((done) => {
+    const shell = process.env.SHELL || "/bin/zsh";
+    const child = spawn(
+      shell,
+      ["-ilc", `printf '${PATH_MARKER}%s${PATH_MARKER}' "$PATH"`],
+      {
+        stdio: ["ignore", "pipe", "ignore"],
+        env: { ...process.env, ELECTRON_RUN_AS_NODE: undefined },
+        windowsHide: true,
+      },
+    );
+    let output = "";
+    const timer = setTimeout(() => child.kill("SIGKILL"), 5000);
+    child.stdout.setEncoding("utf8");
+    child.stdout.on("data", (chunk: string) => (output += chunk));
+    const finish = () => {
+      clearTimeout(timer);
+      const match = new RegExp(`${PATH_MARKER}(.*)${PATH_MARKER}`, "s").exec(
+        output,
+      );
+      loginPath = match ? match[1].split(delimiter).filter(Boolean) : [];
+      done(loginPath);
+    };
+    child.once("error", (error) => {
+      console.error(`ShowAI could not read the login shell PATH: ${error.message}`);
+      finish();
+    });
+    child.once("close", finish);
+  });
+  return loginPathResolved;
+}
+
 export function executablePaths() {
   return [
     ...new Set(
       [
         ...(process.env.PATH ?? "").split(delimiter),
+        ...loginPath,
         join(homedir(), ".local/bin"),
         join(homedir(), ".npm-global/bin"),
         "/opt/homebrew/bin",
@@ -23,6 +67,7 @@ export function executablePaths() {
   ];
 }
 export async function findExecutable(name: string): Promise<string | null> {
+  await resolveLoginShellPath();
   for (const directory of executablePaths()) {
     for (const extension of process.platform === "win32"
       ? [".exe", ".cmd", ".bat", ""]

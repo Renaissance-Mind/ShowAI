@@ -27,7 +27,7 @@ import LibrarySpace from "./LibrarySpace";
 import IconViewer from "./IconViewer";
 import SyncSettings, { type ProjectSyncRequest } from "./SyncSettings";
 import AgentSettings from "./AgentSettings";
-import PluginInstallSettings from "./PluginInstallSettings";
+import PluginInstallSettings, { LaunchConfigCopy } from "./PluginInstallSettings";
 import { workbenchCapabilities } from "./capabilities";
 
 const sections = [
@@ -150,7 +150,6 @@ export function SettingsPanel({
   onDarkChange,
   onChooseHome,
   onCopyHome,
-  onCopyConfig,
   onMigrate,
   onOpenShortcuts,
   docsVisible,
@@ -164,7 +163,8 @@ export function SettingsPanel({
   onDarkChange: (dark: boolean) => void;
   onChooseHome: () => void;
   onCopyHome: () => void;
-  onCopyConfig: () => void;
+  /** Unused: Settings → Plugins copies a configuration per host. */
+  onCopyConfig?: () => void;
   onMigrate: () => void;
   onOpenShortcuts: () => void;
   /** Absent where the host publishes its own documentation. */
@@ -340,38 +340,16 @@ export function SettingsPanel({
           aria-labelledby="settings-plugins-title"
         >
           <h2 id="settings-plugins-title">{t("localConnection")}</h2>
-          {info?.mode === "browser" ? (
-            <p>{t("pluginsDesktopOnly")}</p>
-          ) : info ? (
-            <PluginInstallSettings home={info.home} />
-          ) : null}
+          {info && <PluginInstallSettings home={info.home} />}
           <div className="settings-row">
             <div className="settings-row-text">
-              <h3>{t("launchConfig")}</h3>
+              <h3>
+                <Terminal size={15} aria-hidden="true" /> {t("launchConfig")}
+              </h3>
+              {!info && <p>{t("readingLaunchConfig")}</p>}
             </div>
-            <button
-              className="settings-button"
-              disabled={!info}
-              onClick={onCopyConfig}
-            >
-              <Copy size={14} aria-hidden="true" />
-              {t("copyLaunchConfig")}
-            </button>
           </div>
-          <details className="settings-config">
-            <summary>
-              <ChevronRight size={14} aria-hidden="true" />
-              <Terminal size={15} aria-hidden="true" />
-              {t("launchConfig")}
-            </summary>
-            <pre>
-              <code>
-                {info
-                  ? JSON.stringify(info.cli, null, 2)
-                  : t("readingLaunchConfig")}
-              </code>
-            </pre>
-          </details>
+          <LaunchConfigCopy info={info} />
         </section>
       )}
       {section === "about" && (

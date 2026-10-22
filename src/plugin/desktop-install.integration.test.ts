@@ -45,6 +45,7 @@ describe.skipIf(!output || !config)(
         pluginRoot: () => bundle,
         dshBundleRoot: () => resolve("plugins/dsh-showai"),
         runtime: () => ({ home, cli }),
+        channel: "development",
       });
     });
     afterAll(async () => {

@@ -5,19 +5,27 @@ import {
   readFile,
   readdir,
   realpath,
+  rename,
   rm,
   writeFile,
 } from "node:fs/promises";
 import { constants } from "node:fs";
 import { createHash } from "node:crypto";
 import { homedir } from "node:os";
-import { delimiter, isAbsolute, join } from "node:path";
+import { delimiter, isAbsolute, join, resolve } from "node:path";
+import { randomUUID } from "node:crypto";
 import {
   execute,
   executablePaths,
   findExecutable,
 } from "../agent-host/process";
-import type { RuntimeLaunch } from "../agent/runtime";
+import {
+  registerRuntime,
+  runtimeRegistrationStatus,
+  type RuntimeChannel,
+  type RuntimeLaunch,
+} from "../agent/runtime";
+import { PluginInstallError, VERIFIED_HOST_VERSIONS } from "./plugin-errors";
 import {
   inspectDshProfile,
   stageDshBundle,
@@ -50,6 +58,14 @@ export interface PluginInstallation {
   installedPath?: string;
   otherSources: string[];
   error?: string;
+  /** Code of `error` for a localized message; the raw text stays in `error`. */
+  errorCode?: string;
+  /** Library the installed plugin is bound to (from the install receipt). */
+  boundHome?: string;
+  /** Not found: the directories searched, for the person to compare with their shell. */
+  searched?: string[];
+  /** Executable the person chose by hand. */
+  manualPath?: string;
   /** DeepSeek Harness only: the staged bundle and remaining host-side steps. */
   dsh?: DshPendingSteps;
 }
@@ -68,7 +84,35 @@ const identity = `showai@${marketplaceName}`;
 export const desktopPluginActions = new Set([
   "plugins:status",
   "plugins:install",
+  "plugins:runtime",
+  "plugins:repairRuntime",
+  "plugins:setPath",
+  "plugins:launchConfig",
 ]);
+
+/** One dispatch for the desktop IPC handler and the local browser server. */
+export function pluginInstallerAction(
+  installer: DesktopPluginInstaller,
+  action: string,
+  args: Record<string, unknown>,
+) {
+  switch (action) {
+    case "plugins:status":
+      return installer.status();
+    case "plugins:install":
+      return installer.install(args.host);
+    case "plugins:runtime":
+      return installer.runtimeStatus();
+    case "plugins:repairRuntime":
+      return installer.repairRuntime();
+    case "plugins:setPath":
+      return installer.setPath(args);
+    case "plugins:launchConfig":
+      return installer.launchConfig();
+    default:
+      throw new PluginInstallError("PLUGIN_UNKNOWN_HOST", `Unknown plugin action: ${action}`);
+  }
+}
 
 export async function pluginFingerprint(root: string) {
   const files: [string, string][] = [];
@@ -86,7 +130,11 @@ export async function pluginFingerprint(root: string) {
             .update(await readFile(path))
             .digest("hex"),
         ]);
-      else throw new Error(`Unsupported plugin file: ${name}`);
+      else
+        throw new PluginInstallError(
+          "PLUGIN_BUNDLE_INVALID",
+          `Unsupported plugin file: ${name}`,
+        );
     }
   }
   await visit(root);
@@ -157,7 +205,19 @@ async function hostExecutable(host: PluginHost) {
   return null;
 }
 
-/** Desktop-only: fixed hosts and arguments; renderer cannot supply commands or paths. */
+/** Plugin hosts the App drives through their official CLIs. */
+export const PLUGIN_HOSTS = ["codex", "claude", "deepseek"] as const;
+function pluginHost(value: unknown): PluginHost {
+  if (!PLUGIN_HOSTS.includes(value as PluginHost))
+    throw new PluginInstallError("PLUGIN_UNKNOWN_HOST", "Unknown plugin host.");
+  return value as PluginHost;
+}
+
+/**
+ * Fixed hosts and arguments; the page cannot supply commands. The only path it
+ * supplies is a host executable the person chose, which must exist and be executable.
+ * The desktop App and the local browser server share it: both run on the person's machine.
+ */
 export class DesktopPluginInstaller {
   private pending = false;
   constructor(
@@ -166,8 +226,77 @@ export class DesktopPluginInstaller {
       pluginRoot: () => string;
       dshBundleRoot: () => string;
       runtime: () => { home: string; cli: RuntimeLaunch };
+      channel: RuntimeChannel;
     },
   ) {}
+
+  private manualPaths(): Promise<Partial<Record<PluginHost, string>>> {
+    return readFile(join(this.options.root, "host-paths.json"), "utf8").then(
+      (text) => JSON.parse(text) as Partial<Record<PluginHost, string>>,
+      (error: NodeJS.ErrnoException) => {
+        if (error.code === "ENOENT") return {};
+        throw error;
+      },
+    );
+  }
+
+  /** The person's chosen executable wins over detection while it still exists. */
+  private async hostExecutable(host: PluginHost) {
+    const manual = (await this.manualPaths())[host];
+    if (manual && (await exists(manual, constants.X_OK))) return manual;
+    return hostExecutable(host);
+  }
+
+  /** Persists a host executable chosen by hand; an empty path returns to detection. */
+  async setPath(input: Record<string, unknown>) {
+    const host = pluginHost(input.host);
+    const path = typeof input.path === "string" ? input.path.trim() : "";
+    if (path && (!isAbsolute(path) || !(await exists(path, constants.X_OK))))
+      throw new PluginInstallError(
+        "PLUGIN_PATH_INVALID",
+        "Choose an existing executable by its absolute path.",
+        { path },
+      );
+    const paths = await this.manualPaths();
+    if (path) paths[host] = resolve(path);
+    else delete paths[host];
+    await mkdir(this.options.root, { recursive: true });
+    const target = join(this.options.root, "host-paths.json");
+    const temporary = `${target}.${randomUUID()}.tmp`;
+    await writeFile(temporary, JSON.stringify(paths, null, 2) + "\n");
+    await rename(temporary, target);
+    return this.status();
+  }
+
+  /** The library's runtime registration compared with this App. */
+  runtimeStatus() {
+    const runtime = this.options.runtime();
+    return runtimeRegistrationStatus(
+      runtime.home,
+      runtime.cli,
+      this.options.channel,
+    );
+  }
+
+  /** 修复登记: registers this App for the current library, replacing any other registration. */
+  async repairRuntime() {
+    const runtime = this.options.runtime();
+    await registerRuntime(runtime.home, runtime.cli, this.options.channel);
+    return this.runtimeStatus();
+  }
+
+  /**
+   * How to start the plugin's launcher by hand: the App's executable runs
+   * mcp/launch.mjs, which checks the registered runtime and starts its `mcp` entry.
+   */
+  launchConfig() {
+    const runtime = this.options.runtime();
+    return {
+      command: runtime.cli.command,
+      args: [join(this.options.pluginRoot(), "mcp/launch.mjs")],
+      env: { ...runtime.cli.env, SHOWAI_HOME: runtime.home },
+    };
+  }
 
   private async command(executable: string, args: string[]) {
     const env: NodeJS.ProcessEnv = {
@@ -182,14 +311,42 @@ export class DesktopPluginInstaller {
       timeout: 120000,
     });
     if (result.code !== 0)
-      throw new Error(
-        (
-          result.stderr ||
-          result.stdout ||
-          `Plugin command exited ${result.code}`
-        ).trim(),
+      throw new PluginInstallError(
+        "PLUGIN_HOST_COMMAND_FAILED",
+        `${executable} plugin ${args.join(" ")} exited ${result.code}.`,
+        {
+          command: ["plugin", ...args].join(" "),
+          exitCode: result.code,
+          output: (result.stderr || result.stdout).trim().slice(-8000),
+        },
       );
     return result.stdout;
+  }
+
+  /** Older host CLIs print text or another JSON shape for `--json`; that needs a newer host. */
+  private async listJson(
+    host: "codex" | "claude",
+    executable: string,
+    args: string[],
+  ) {
+    const output = await this.command(executable, args);
+    try {
+      return JSON.parse(output);
+    } catch {
+      throw this.tooOld(host, output);
+    }
+  }
+
+  private tooOld(host: "codex" | "claude", output: string) {
+    return new PluginInstallError(
+      "PLUGIN_HOST_TOO_OLD",
+      `This ${host === "codex" ? "Codex" : "Claude Code"} does not report plugins as JSON; update it to ${VERIFIED_HOST_VERSIONS[host]} or later.`,
+      {
+        host,
+        minimumVersion: VERIFIED_HOST_VERSIONS[host],
+        output: output.trim().slice(-8000),
+      },
+    );
   }
 
   private dshTarget() {
@@ -250,7 +407,10 @@ export class DesktopPluginInstaller {
       await readFile(join(this.options.pluginRoot(), "plugin.json"), "utf8"),
     );
     if (manifest.name !== "showai" || typeof manifest.version !== "string")
-      throw new Error("Invalid bundled ShowAI plugin.");
+      throw new PluginInstallError(
+        "PLUGIN_BUNDLE_INVALID",
+        "Invalid bundled ShowAI plugin.",
+      );
     const original = await pluginFingerprint(this.options.pluginRoot());
     const version = `${manifest.version}+desktop.${createHash("sha256")
       .update(JSON.stringify([original.treeSha256, this.options.runtime()]))
@@ -286,12 +446,19 @@ export class DesktopPluginInstaller {
     expected?: Promise<string>,
   ): Promise<PluginInstallation> {
     if (host === "deepseek") return this.inspectDsh(executable, expected);
-    const data = JSON.parse(await this.command(executable, ["list", "--json"]));
-    const items = host === "codex" ? data.installed : data;
-    if (!Array.isArray(items))
-      throw new Error(
-        "Unrecognized plugin list. Update the host application and retry.",
-      );
+    const data = await this.listJson(host, executable, ["list", "--json"]);
+    const items = host === "codex" ? data?.installed : data;
+    if (!Array.isArray(items)) throw this.tooOld(host, JSON.stringify(data));
+    const receipt = await readFile(
+      join(this.options.root, `${host}-install.json`),
+      "utf8",
+    ).then(
+      (text) => JSON.parse(text) as { home?: unknown },
+      (error: NodeJS.ErrnoException) => {
+        if (error.code === "ENOENT") return undefined;
+        throw error;
+      },
+    );
     const own = items.find(
       (item) =>
         (item.pluginId ?? item.id) === identity &&
@@ -307,6 +474,9 @@ export class DesktopPluginInstaller {
         !!own?.version && !!expected && own.version === (await expected),
       expected: expected ? await expected : undefined,
       installedPath: own?.installedPath ?? own?.installPath,
+      ...(own && typeof receipt?.home === "string"
+        ? { boundHome: receipt.home }
+        : {}),
       otherSources: items
         .filter((item) => {
           const id = item.pluginId ?? item.id;
@@ -324,18 +494,20 @@ export class DesktopPluginInstaller {
   async status() {
     await mkdir(this.options.root, { recursive: true });
     let expected: Promise<string> | undefined;
+    const manual = await this.manualPaths();
     return Promise.all(
-      (["codex", "claude", "deepseek"] as const).map(
+      PLUGIN_HOSTS.map(
         async (host): Promise<PluginInstallation> => {
-          const executable = await hostExecutable(host);
+          const executable = await this.hostExecutable(host);
           const base = {
             host,
             executable,
             installed: false,
             enabled: false,
             otherSources: [],
+            ...(manual[host] ? { manualPath: manual[host] } : {}),
           };
-          if (!executable) return base;
+          if (!executable) return { ...base, searched: executablePaths() };
           // Each host is an independent I/O boundary; one failure must not hide the other.
           try {
             return await this.inspect(
@@ -351,6 +523,9 @@ export class DesktopPluginInstaller {
             return {
               ...base,
               error: error instanceof Error ? error.message : String(error),
+              ...(error instanceof PluginInstallError
+                ? { errorCode: error.code }
+                : {}),
             };
           }
         },
@@ -358,11 +533,13 @@ export class DesktopPluginInstaller {
     );
   }
 
-  async install(host: unknown): Promise<PluginInstallReceipt> {
-    if (host !== "codex" && host !== "claude" && host !== "deepseek")
-      throw new Error("Unknown plugin host.");
+  async install(input: unknown): Promise<PluginInstallReceipt> {
+    const host = pluginHost(input);
     if (this.pending)
-      throw new Error("A plugin installation is already running.");
+      throw new PluginInstallError(
+        "PLUGIN_BUSY",
+        "A plugin installation is already running.",
+      );
     this.pending = true;
     try {
       return host === "deepseek"
@@ -375,9 +552,13 @@ export class DesktopPluginInstaller {
 
   /** Harness installs bundles itself; the App stages files and reports the remaining steps. */
   private async stageDsh(): Promise<PluginInstallReceipt> {
-    const executable = await hostExecutable("deepseek");
+    const executable = await this.hostExecutable("deepseek");
     if (!executable)
-      throw new Error("Install DeepSeek Harness first, then refresh.");
+      throw new PluginInstallError(
+        "PLUGIN_HOST_MISSING",
+        "Install DeepSeek Harness first, then refresh.",
+        { host: "deepseek" },
+      );
     const runtime = this.options.runtime();
     const source = await this.dshSource();
     const staged = await stageDshBundle({
@@ -408,29 +589,35 @@ export class DesktopPluginInstaller {
     return receipt;
   }
 
-  private async installHost(host: PluginHost): Promise<PluginInstallReceipt> {
+  private async installHost(
+    host: "codex" | "claude",
+  ): Promise<PluginInstallReceipt> {
     await mkdir(this.options.root, { recursive: true });
-    const executable = await hostExecutable(host);
+    const executable = await this.hostExecutable(host);
     if (!executable)
-      throw new Error(
+      throw new PluginInstallError(
+        "PLUGIN_HOST_MISSING",
         `Install ${host === "codex" ? "Codex" : "Claude Code"} first, then refresh.`,
+        { host },
       );
     const before = await this.inspect(host, executable);
     if (before.otherSources.length)
-      throw new Error(
+      throw new PluginInstallError(
+        "PLUGIN_OTHER_SOURCE",
         `ShowAI is already enabled from ${before.otherSources.join(", ")}. Disable that plugin in the host before installing the App version.`,
+        { host, sources: before.otherSources },
       );
     const marketplace = join(this.options.root, host);
     const source = join(marketplace, "plugins/showai");
-    const registered = JSON.parse(
-      await this.command(executable, ["marketplace", "list", "--json"]),
-    );
+    const registered = await this.listJson(host, executable, [
+      "marketplace",
+      "list",
+      "--json",
+    ]);
     const marketplaces =
-      host === "codex" ? registered.marketplaces : registered;
+      host === "codex" ? registered?.marketplaces : registered;
     if (!Array.isArray(marketplaces))
-      throw new Error(
-        "Unrecognized marketplace list. Update the host application and retry.",
-      );
+      throw this.tooOld(host, JSON.stringify(registered));
     const existing = marketplaces.find((item) => item.name === marketplaceName);
     if (existing) {
       const path = host === "codex" ? existing.root : existing.path;
@@ -438,8 +625,10 @@ export class DesktopPluginInstaller {
         typeof path !== "string" ||
         (await realpath(path)) !== (await realpath(marketplace))
       )
-        throw new Error(
+        throw new PluginInstallError(
+          "PLUGIN_MARKETPLACE_CONFLICT",
           "The showai-desktop marketplace belongs to another installation. Manage that source in the host before retrying.",
+          { host, path },
         );
     }
     const runtime = this.options.runtime();
@@ -452,7 +641,8 @@ export class DesktopPluginInstaller {
       force: false,
     });
     if ((await pluginFingerprint(source)).treeSha256 !== original.treeSha256)
-      throw new Error(
+      throw new PluginInstallError(
+        "PLUGIN_BUNDLE_CHANGED",
         "The bundled plugin changed while being copied. Retry after the build finishes.",
       );
     const json = async (path: string, value: unknown) => {
@@ -552,16 +742,26 @@ export class DesktopPluginInstaller {
       !installedPath ||
       !isAbsolute(installedPath)
     )
-      throw new Error(
+      throw new PluginInstallError(
+        "PLUGIN_NOT_CONFIRMED",
         "The host did not confirm the expected plugin version is installed and enabled. Check its plugin settings.",
+        {
+          host,
+          expectedVersion: version,
+          reportedVersion: after.version ?? null,
+          installed: after.installed,
+          enabled: after.enabled,
+        },
       );
     const actual = await pluginFingerprint(installedPath);
     if (
       actual.treeSha256 !== expected.treeSha256 ||
       (await pluginFingerprint(source)).treeSha256 !== expected.treeSha256
     )
-      throw new Error(
+      throw new PluginInstallError(
+        "PLUGIN_FILES_MISMATCH",
         "Installed plugin files do not match the App bundle. Refresh the host's plugin cache and retry.",
+        { host, installedPath },
       );
     const receipt = {
       host,

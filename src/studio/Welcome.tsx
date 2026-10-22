@@ -7,6 +7,12 @@ import pluginMessages from "../i18n/messages/pluginInstall";
 import { Check, Copy, ExternalLink, Loader2, Plus } from "../ui/icons";
 import { desktop, errorMessage } from "./bridge";
 import AgentBrandIcon from "./AgentBrandIcon";
+import {
+  PluginError,
+  RestartHints,
+  RUNTIME_FAILURES,
+  VerifyConnection,
+} from "./PluginInstallSettings";
 import { workbenchCapabilities } from "./capabilities";
 import {
   pluginActionBlocked,
@@ -57,11 +63,9 @@ export default function Welcome({
 }) {
   const t = useTranslator(messages);
   const tp = useTranslator(pluginMessages);
-  // Host CLIs are only reachable from the desktop App's main process.
+  // The desktop App and the local browser server both reach the host CLIs on this machine.
   const desktopPlugins =
-    !!info &&
-    info.mode !== "browser" &&
-    workbenchCapabilities(info.platform).localPlugins;
+    !!info && workbenchCapabilities(info.platform).localPlugins;
   const plugins = usePluginHosts(desktopPlugins ? info.home : null);
   const agent = useAgentStatus(!!info, null);
   const executionLabel = useExecutionLabel(agent.status);
@@ -87,6 +91,9 @@ export default function Welcome({
       setCopyError({ key, message: errorMessage(reason) });
     }
   };
+  const installedHosts = plugins.hosts.filter(
+    (host) => host.installed && host.enabled,
+  );
   const shown = plugins.hosts.filter(
     (host) => host.host !== "deepseek" || !!host.executable,
   );
@@ -144,11 +151,11 @@ export default function Welcome({
                 <span className="studio-welcome-host-text">
                   <strong>{pluginHostNames[host.host]}</strong>
                   <span className="studio-welcome-host-state">
-                    {t(pluginHostState(host, auth))}
+                    {t(pluginHostState(host, auth, info?.home))}
                   </span>
                 </span>
                 {host.executable &&
-                  !pluginUpToDate(host) &&
+                  !pluginUpToDate(host, info?.home) &&
                   (pluginActionBlocked(host) ? (
                     // Another plugin source or a host error is explained in Settings → Plugins.
                     <button
@@ -167,30 +174,12 @@ export default function Welcome({
                     >
                       {plugins.busy === host.host
                         ? tp("installing")
-                        : tp(pluginActionLabel(host))}
+                        : tp(pluginActionLabel(host, info?.home))}
                     </button>
                   ))}
               </li>
             );
           })}
-          {!desktopPlugins && info && (
-            <li className="studio-welcome-host studio-welcome-note">
-              <span className="studio-welcome-host-text">
-                <span className="studio-welcome-host-state">
-                  {t("connect.desktopOnly")}
-                </span>
-              </span>
-              <a
-                className="settings-button"
-                href={AGENT_HOSTS_GUIDE}
-                target="_blank"
-                rel="noreferrer"
-              >
-                <ExternalLink size={13} aria-hidden="true" />
-                {t("connect.hostGuide")}
-              </a>
-            </li>
-          )}
           <li
             className="studio-welcome-host"
             data-host="builtin"
@@ -250,13 +239,15 @@ export default function Welcome({
             </button>
           </div>
         )}
+        {info?.mode === "browser" && desktopPlugins && (
+          <p className="studio-welcome-hint">{t("connect.installHere")}</p>
+        )}
         {plugins.receipt && (
           <div role="status" className="studio-welcome-result">
             <p>
-              {plugins.receipt.dsh ? tp("dshStagedDone") : tp("success")}{" "}
-              {plugins.receipt.dsh ? "" : tp("refreshHost")}
+              {plugins.receipt.dsh ? tp("dshStagedDone") : tp("success")}
             </p>
-            {plugins.receipt.dsh && (
+            {plugins.receipt.dsh ? (
               <button
                 type="button"
                 className="settings-button"
@@ -264,14 +255,26 @@ export default function Welcome({
               >
                 {t("connect.settings")}
               </button>
+            ) : (
+              <RestartHints hosts={[plugins.receipt.host]} />
             )}
           </div>
         )}
-        {plugins.error && (
-          <p role="alert" className="studio-welcome-error">
-            {plugins.error}
-          </p>
+        {/* After an installation, the first call from the agent confirms the connection here. */}
+        {plugins.receipt && !plugins.receipt.dsh && installedHosts.length > 0 && (
+          <div className="studio-welcome-verify plugin-install-settings">
+            <VerifyConnection
+              hosts={installedHosts}
+              busy={!!plugins.busy}
+              onRepair={(host, failure) =>
+                plugins.install(host, {
+                  repairRuntime: RUNTIME_FAILURES.has(failure),
+                })
+              }
+            />
+          </div>
         )}
+        <PluginError message={plugins.error} details={plugins.errorDetails} />
       </section>
 
       <section

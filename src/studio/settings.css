@@ -634,6 +634,73 @@
 .plugin-verify-hosts li[data-state="called"] span {
   color: var(--accent);
 }
+.plugin-verify-hosts li[data-state="failed"] span {
+  color: var(--danger, #c43d3d);
+}
+.plugin-verify-detail {
+  flex-basis: 100%;
+}
+.plugin-install-error p {
+  margin: 0;
+}
+.plugin-install-error summary,
+.plugin-manual-path summary {
+  cursor: pointer;
+  font-size: 12px;
+  color: var(--muted);
+}
+.plugin-install-details {
+  margin: 6px 0 0;
+  max-height: 180px;
+  overflow: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-size: 11px;
+  color: var(--muted);
+}
+.plugin-install-code {
+  display: block;
+  font-size: 11px;
+  overflow-wrap: anywhere;
+  color: var(--muted);
+}
+.plugin-manual-path {
+  margin-top: 6px;
+}
+.plugin-install-searched {
+  margin: 4px 0;
+  padding-left: 16px;
+  font-size: 11px;
+}
+.plugin-manual-label {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+}
+.plugin-manual-label input {
+  flex: 1;
+  min-width: 0;
+  padding: 5px 8px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--paper);
+  color: var(--text);
+  font: 12px ui-monospace, "SFMono-Regular", Consolas, monospace;
+}
+.plugin-launch-config .settings-config {
+  margin-top: 8px;
+}
+.plugin-launch-config .settings-config summary {
+  justify-content: space-between;
+}
+@media (max-width: 560px) {
+  .plugin-install-path {
+    flex-wrap: wrap;
+  }
+}
 .plugin-verify a {
   display: inline-flex;
   align-items: center;

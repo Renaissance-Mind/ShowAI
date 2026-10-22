@@ -28,7 +28,12 @@ import {
 import { MaintenanceScheduler } from "../core/maintenance-scheduler";
 import { syncManager } from "../sync/manager";
 import { openLibrary } from "../core/open-library";
-import { registerRuntime } from "../agent/runtime";
+import { registerRuntimeOnStartup } from "../agent/runtime";
+import {
+  DesktopPluginInstaller,
+  desktopPluginActions,
+  pluginInstallerAction,
+} from "../plugin/desktop-install";
 import { CoreError, FileStore, assertId } from "../core/store";
 import { setLocale } from "../i18n";
 import {
@@ -168,7 +173,11 @@ export async function startBrowserServer(options: BrowserServerOptions) {
     );
     service = new AgentService({ root: store.root });
     if (options.registerAgentRuntime !== false)
-      await registerRuntime(store.root, info().cli);
+      await registerRuntimeOnStartup(
+        store.root,
+        info().cli,
+        options.development ? "development" : "packaged",
+      );
     maintenance = new MaintenanceScheduler(store.root).start();
     syncManager(store.root).start();
     watcher = watch(store.root, {
@@ -227,6 +236,19 @@ export async function startBrowserServer(options: BrowserServerOptions) {
         ? join(process.cwd(), "plugins/showai")
         : resolve(dirname(options.cliEntry), "../assets/agent-plugin"),
   });
+  // The local server runs on the person's machine, so it installs plugins through
+  // the host CLIs exactly like the desktop App (Windows and Linux have only this mode).
+  const assets = (name: string) =>
+    options.development
+      ? join(process.cwd(), "plugins", name === "agent-plugin" ? "showai" : "dsh-showai")
+      : resolve(dirname(options.cliEntry), "../assets", name);
+  const pluginInstaller = new DesktopPluginInstaller({
+    root: join(dirname(options.settingsPath), "external-plugins"),
+    pluginRoot: () => assets("agent-plugin"),
+    dshBundleRoot: () => assets("dsh-plugin"),
+    runtime: () => info(),
+    channel: options.development ? "development" : "packaged",
+  });
   const remoteConnector = new RemoteMacConnector(agentHost, () => store.root);
   void remoteConnector
     .start()
@@ -248,6 +270,8 @@ export async function startBrowserServer(options: BrowserServerOptions) {
     return resolved;
   }
   async function invoke(action: string, args: Record<string, unknown>) {
+    if (desktopPluginActions.has(action))
+      return pluginInstallerAction(pluginInstaller, action, args);
     if (action === "agent:remoteDevice") return remoteConnector.status();
     if (action === "agent:approveRemoteClient")
       return remoteConnector.approveClient(
@@ -536,6 +560,7 @@ export async function startBrowserServer(options: BrowserServerOptions) {
             typeof action !== "string" ||
             (!workbenchActions.has(action) &&
               !agentActions.has(action) &&
+              !desktopPluginActions.has(action) &&
               !remoteDeviceActions.has(action)) ||
             !args ||
             typeof args !== "object" ||
