@@ -1,3 +1,4 @@
+import {captureNativeBoardControl,type NativeBoardControlRecord,type NativeBoardControlHandle} from "./native-board-control";
 import {measureNativeSync} from "./native-perf";
 import {useEffect,useRef,useState,type RefObject} from "react";
 import type {ShowDocument} from "../types";
@@ -17,6 +18,7 @@ export interface NativeBoardOptions {
   onLayout?:(frames:Record<string,NodeLayout>)=>void;
   onDrawing?:(node:JSONContent,frame:NodeLayout)=>void;
   onActivate?:(id:string)=>void;
+  control?:RefObject<NativeBoardControlHandle|null>;
 }
 
 /** All tools share one native scene. DOM measurements belong to content/layout
@@ -25,8 +27,15 @@ export function useNativeBoard(options:NativeBoardOptions){
   const current=useRef(options);current.current=options;
   const [owner,setOwner]=useState<{pageId:string;boardId:string;token:string}|null>(null);
   const invalidation=useRef<(()=>void)|null>(null), cameraVersion=useRef(0), previousInk=useRef("pen");
-  if(options.tool==="pen"||options.tool==="highlighter")previousInk.current=options.tool;
   const active=options.enabled&&typeof window!=="undefined"&&window.showai?.inlineInk?.nativeScene===true;
+  const controlState=useRef<{key:string;record:NativeBoardControlRecord;send?:()=>void}|undefined>(undefined);
+  const controlKey=options.document?.id+":"+options.boardId;
+  const laneAvailable=active&&typeof window.showai?.inlineInk?.toolIntent==="function";
+  if(laneAvailable&&(!controlState.current||controlState.current.key!==controlKey)){
+    controlState.current={key:controlKey,record:captureNativeBoardControl(undefined,{tool:options.tool??"select",color:options.color,fillColor:options.fillColor??"none",width:options.width,pressure:options.pressure,ruler:options.ruler})};
+    if(options.tool==="pen"||options.tool==="highlighter")previousInk.current=options.tool;
+  }
+  if(options.control)options.control.current=laneAvailable?{update(patch){const state=controlState.current!;state.record=captureNativeBoardControl(state.record,{...state.record.control,...patch});if(patch.tool==="pen"||patch.tool==="highlighter")previousInk.current=patch.tool;state.send?.()}}:null;
   useEffect(()=>{invalidation.current?.()});
   useEffect(()=>{
     const bridge=window.showai?.inlineInk;
@@ -51,14 +60,17 @@ export function useNativeBoard(options:NativeBoardOptions){
           {origin:p.start,release:p.end,points:[p.start,p.end],moved:Math.hypot(p.end.x-p.start.x,p.end.y-p.start.y)*o.camera.current.scale>=3,scale:o.camera.current.scale});
         result.node.attrs!.id=p.id;o.onDrawing?.(result.node,result.frame);
       }
-      if(value.tool)o.onTool(value.tool==="toggleEraser"?(o.tool==="eraser"?previousInk.current:"eraser"):value.tool==="previous"?previousInk.current:value.tool);
+      if(value.tool)o.onTool(value.tool==="toggleEraser"?((controlState.current?.record.control.tool??o.tool)==="eraser"?previousInk.current:"eraser"):value.tool==="previous"?previousInk.current:value.tool);
     });
   },[active,options.document?.id,options.boardId]);
   useEffect(()=>{
     const bridge=window.showai?.inlineInk,o=current.current,surface=o.root.current,world=o.world.current;
     if(!active||!bridge||!surface||!world||!o.document)return;
-    const token=crypto.randomUUID();
-    let alive=true,pending=false,dirty=false,frame=0,lastKey="",lastDocument:ShowDocument|undefined;
+    const token=crypto.randomUUID(),control=controlState.current,lane=typeof bridge.toolIntent==="function";
+    const sendControl=()=>{if(!alive||!lane||!control)return;const record=control.record;
+      void bridge.toolIntent!({pageId:o.document!.id,boardId:o.boardId,token,...record}).catch(error=>{if(alive)surface.dispatchEvent(new CustomEvent("showai:ink-error",{bubbles:true,detail:String(error)}))});
+    };
+    let alive=true,pending=false,dirty=false,frame=0,controlStarted=false,lastKey="",lastDocument:ShowDocument|undefined;
     let poseDocument:ShowDocument|undefined,poseSize="",poses:ReturnType<typeof measureNativeBoard>|undefined,lastPoses:typeof poses;
     const schedule=()=>{dirty=true;if(alive&&!pending&&!frame)frame=requestAnimationFrame(()=>{frame=0;void send()})};
     const send=async()=>{
@@ -69,7 +81,8 @@ export function useNativeBoard(options:NativeBoardOptions){
       if(poseDocument!==source||poseSize!==size){poses=measureNativeBoard(surface,world,source);poseDocument=source;poseSize=size}
       const holes=measureNativeSync("board.inkUIRegions",()=>inkUIRegions(document.querySelectorAll<HTMLElement>("[data-surface-ui],.surface-toolbar,.studio-context-menu,.studio-modal-shade,.container-inspector,.studio-sidebar-shell:not([data-sidebar-mode=hidden]) .studio-sidebar,.studio-mobile-sidebar-edge,.studio-mobile-sidebar-scrim,.studio-mobile-navigation-tools")));
       const style=measureNativeSync("board.surfaceStyle",()=>getComputedStyle(surface));
-      const packet=measureNativeSync("board.packet",()=>({token,pageId:source.id,boardId:v.boardId,nativeScene:true,tool:v.tool??"select",color:v.color,fillColor:v.fillColor??"none",width:v.width,pressure:v.pressure,ruler:v.ruler,
+      const capturedControl=lane?control?.record:undefined;
+      const packet=measureNativeSync("board.packet",()=>({...(capturedControl?{controlIntent:capturedControl}:{}),token,pageId:source.id,boardId:v.boardId,nativeScene:true,tool:v.tool??"select",color:v.color,fillColor:v.fillColor??"none",width:v.width,pressure:v.pressure,ruler:v.ruler,
         dark:document.documentElement.dataset.theme==="dark",widthPx:surface.clientWidth,heightPx:surface.clientHeight,
         viewport:measureNativeSync("board.viewportMatrix",()=>matrixValues(clientMatrix(surface,surface.offsetWidth,surface.offsetHeight))),camera:{...v.camera.current},cameraVersion:cameraVersion.current,
         selection:v.selection?.()??[],holes,grid:surface.classList.contains("has-board-grid"),background:measureNativeSync("board.backgroundColor",()=>style.backgroundColor)}));
@@ -78,6 +91,7 @@ export function useNativeBoard(options:NativeBoardOptions){
       pending=true;
       try{
         surface.dataset.nativeInkToken=token;
+        if(lane&&!controlStarted){controlStarted=true;sendControl()}
         const accepted=await bridge.frame({...packet,...(poses!==lastPoses?{objects:poses}:{}),document:source});
         if(!alive||accepted===false)return;
         lastKey=key;lastDocument=source;lastPoses=poses;
@@ -86,6 +100,7 @@ export function useNativeBoard(options:NativeBoardOptions){
       }catch(error){surface.dispatchEvent(new CustomEvent("showai:ink-error",{bubbles:true,detail:String(error)}));throw error}
       finally{pending=false;if(dirty)schedule()}
     };
+    if(control)control.send=sendControl;
     invalidation.current=schedule;
     const observer=new MutationObserver(changes=>{
       if(changes.some(change=>change.target!==world&&world.contains(change.target)))poseDocument=undefined;
@@ -98,7 +113,7 @@ export function useNativeBoard(options:NativeBoardOptions){
     surface.addEventListener("showai:viewport-change",viewport);surface.addEventListener("showai:ink-refresh",refresh);
     window.addEventListener("resize",schedule);document.addEventListener("scroll",schedule,true);document.addEventListener("visibilitychange",schedule);
     schedule();
-    return()=>{alive=false;setOwner(previous=>previous?.token===token?null:previous);if(invalidation.current===schedule)invalidation.current=null;cancelAnimationFrame(frame);observer.disconnect();resize.disconnect();
+    return()=>{alive=false;if(control?.send===sendControl)control.send=undefined;setOwner(previous=>previous?.token===token?null:previous);if(invalidation.current===schedule)invalidation.current=null;cancelAnimationFrame(frame);observer.disconnect();resize.disconnect();
       surface.removeEventListener("showai:viewport-change",viewport);surface.removeEventListener("showai:ink-refresh",refresh);window.removeEventListener("resize",schedule);document.removeEventListener("scroll",schedule,true);document.removeEventListener("visibilitychange",schedule);
       void bridge.hide(o.document!.id,o.boardId,token).finally(()=>{if(surface.dataset.nativeInkToken===token){delete surface.dataset.nativeBoardActive;delete surface.dataset.nativeInkToken}});
     };

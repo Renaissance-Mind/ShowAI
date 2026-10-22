@@ -75,6 +75,7 @@ export function useInlineInk({
   onDrawing,
   onActivate,
   fillColor,
+  control,
 }: {
   root: RefObject<HTMLDivElement | null>;
   world: RefObject<HTMLDivElement | null>;
@@ -100,9 +101,10 @@ export function useInlineInk({
   onDrawing?: NativeBoardOptions["onDrawing"];
   onActivate?: NativeBoardOptions["onActivate"];
   fillColor?: string;
+  control?:NativeBoardOptions["control"];
 }) {
   const nativeScene=useNativeBoard({root,world,camera:viewCamera,document:source,boardId,tool,color,width,pressure,ruler,enabled,
-    onCamera,onTool,onClearSelection,selection,onSelection,onLayout,onDrawing,onActivate,fillColor});
+    onCamera,onTool,onClearSelection,selection,onSelection,onLayout,onDrawing,onActivate,fillColor,control});
   const legacyEnabled=enabled&&(typeof window==="undefined"||window.showai?.inlineInk?.nativeScene!==true);
   const current = useRef({
     source,

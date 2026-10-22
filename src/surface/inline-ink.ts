@@ -40,6 +40,7 @@ export interface InkFrame {
   boardId: string;
   document?: ShowDocument;
   tool: string;
+  controlIntent?:import("./native-board-control").NativeBoardControlRecord;
   nativeScene?: boolean;
   objects?: import("./board-native-projection").NativeObjectProjection[];
   selection?: string[];
@@ -101,6 +102,8 @@ export interface InlineInkBridge {
     projectId: string,
     listener: (value: InkUpdate, applied?: () => void) => Promise<boolean>,
   ): () => void;
+  /** Applied-input acknowledgement is independent of the scene/frame ACK. */
+  toolIntent?(value:{pageId:string;boardId:string;token:string}&import("./native-board-control").NativeBoardControlRecord):Promise<import("./native-board-control").NativeBoardToolReceipt>;
   frame(value: InkFrame): Promise<void | boolean>;
   viewport?(
     value: Pick<

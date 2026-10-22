@@ -1020,15 +1020,16 @@ function ContainerView({
     arrow: { color: "#252629", fillColor: "none", strokeWidth: 2.5 },
     eraser: { color: "#252629", fillColor: "none", strokeWidth: 24 },
   });
-  const styleKey =
-    tool === "pen" || tool === "highlighter" || tool === "eraser" || tool === "arrow"
-      ? tool
-      : tool === "text" ? "pen" : "shape";
+  const toolValue=useRef(tool),styleValues=useRef(styles);
+  const keyForTool=(value:BoardTool|null)=>value==="pen"||value==="highlighter"||value==="eraser"||value==="arrow"?value:value==="text"?"pen":"shape";
+  const styleKey=keyForTool(tool);
   const style = styles[styleKey];
   const chooseTool = (next: BoardTool | null) => {
     // Finish the outgoing contact now; its checkpoint continues independently
     // of the selected tool. Native hide retains the original durability barrier.
-    const saving = window.showai?.inlineInk?.flush();
+    viewport.current?.configureNativeInput(next,styleValues.current[keyForTool(next)]);
+    const saving = next===toolValue.current ? undefined:window.showai?.inlineInk?.flush();
+    toolValue.current=next;
     runtime.activate(id);
     runtime.select(null);
     runtime.inspect(null);
@@ -1471,10 +1472,10 @@ function ContainerView({
             );
             // A current selection takes precedence over the active drawing tool.
             if (!drawings.length) {
-              setStyles((before) => ({
-                ...before,
-                [styleKey]: { ...before[styleKey], ...patch },
-              }));
+              const key=keyForTool(toolValue.current),next={...styleValues.current,[key]:{...styleValues.current[key],...patch}};
+              styleValues.current=next;
+              viewport.current?.configureNativeInput(toolValue.current,next[key]);
+              setStyles(next);
               return;
             }
             let next = runtime.current.current;
@@ -1562,7 +1563,7 @@ function ContainerView({
                   );
                   runtime.commit(inserted.document);
                   runtime.select(inserted.nodeId);
-                  setTool(null);
+                  chooseTool(null);
                   return inserted.nodeId;
                 }
           }
@@ -1571,7 +1572,7 @@ function ContainerView({
               ? undefined
               : (point, position) => runtime.openComponents(id, point, position)
           }
-          onDrawExit={() => setTool(null)}
+          onDrawExit={() => chooseTool(null)}
           onToolChange={chooseTool}
           onDraw={
             readOnly

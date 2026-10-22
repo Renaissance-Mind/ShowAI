@@ -1,3 +1,4 @@
+import type {NativeBoardControlHandle} from "./native-board-control";
 import {PortableCubicDrawingInput,PortableCubicPreview} from "./PortableCubicDrawingInput";
 import { isEditableDrawing } from "./portable-ink.mjs";
 import { LibraryContextMenu } from "../studio/LibraryNavigation";
@@ -106,6 +107,7 @@ export interface SurfaceHandle {
   point: (x: number, y: number) => { x: number; y: number };
   /** Start editing an object's text at its end, e.g. right after creating it. */
   edit: (id: string) => void;
+  configureNativeInput:(tool:BoardTool|null,style:DrawingStyle)=>void;
 }
 interface Props {
   children: ReactNode;
@@ -310,11 +312,14 @@ export default function PageSurface({
       enabled && !locked,
       { reading: !onMove, anchorScreen: !embedded, panMode },
     );
-  const [ruler, setRuler] = useState(false);
+  const [ruler, setRuler] = useState(false),rulerValue=useRef(false);
+  const nativeControl=useRef<NativeBoardControlHandle|null>(null);
+  const changeRuler=()=>{const next=!rulerValue.current;rulerValue.current=next;nativeControl.current?.update({ruler:next});setRuler(next)};
   const nativeScene=useInlineInk({
     root: rootRef,
     world: worldRef,
     camera,
+    control:nativeControl,
     document: boardDocument,
     boardId: containerId ?? "",
     tool: drawTool,
@@ -837,6 +842,7 @@ export default function PageSurface({
     reveal: (id) => focusAfterMount([id], true),
     point: (x, y) => controls.current.point(x, y),
     edit: editObject,
+    configureNativeInput:(tool,style)=>nativeControl.current?.update({tool:tool??"select",color:style.color,fillColor:style.fillColor??"none",width:style.strokeWidth,pressure:style.pressure!==false,ruler:rulerValue.current}),
   }));
   const addText = (point: { x: number; y: number }) => {
     // Offset by the text box padding so typing starts where the user clicked.
@@ -2359,7 +2365,7 @@ export default function PageSurface({
                         aria-label={t("tool.ruler")}
                         title={t("tool.ruler")}
                         aria-pressed={ruler}
-                        onClick={() => setRuler((value) => !value)}
+                        onClick={changeRuler}
                       >
                         <Ruler size={15} />
                       </button>
@@ -2558,7 +2564,7 @@ export default function PageSurface({
                 aria-label={t("tool.ruler")}
                 title={t("tool.ruler")}
                 aria-pressed={ruler}
-                onClick={() => setRuler((value) => !value)}
+                onClick={changeRuler}
               >
                 <Ruler size={15} />
               </button>
