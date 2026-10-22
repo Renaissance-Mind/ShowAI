@@ -16,9 +16,11 @@ extern "C" uint32_t sarc_build(const SAInkPathCommand*commands,uint32_t count,vo
  {RawCoverageMesh m(c.numbers);BoundaryKLMReason reason;auto s=build_raw_coverage_mesh(c,commands,count,0x123456780000002aull,options(),m,reason);auto e=encode(c.numbers,m,s,reason,output,capacity);if(e)return e;}return c.numbers.live_bytes?SA_INK_INVALID:SA_INK_OK;
 }
 extern "C" uint32_t sarc_fixture(uint32_t fixture,void*memory,uint32_t bytes,uint32_t*output,uint32_t capacity){
- if(fixture>17||!memory||!output||capacity<4||((uintptr_t)memory&15)||((uintptr_t)output&3))return SA_INK_INVALID;PolynomialContext c;if(!c.numbers.initialize(memory,bytes,1000000000ull))return c.numbers.status;
+ if(fixture>19||!memory||!output||capacity<4||((uintptr_t)memory&15)||((uintptr_t)output&3))return SA_INK_INVALID;PolynomialContext c;if(!c.numbers.initialize(memory,bytes,1000000000ull))return c.numbers.status;
  {Vector<SAInkPathCommand>cmd(c.numbers);auto emit=[&](uint32_t op,double a=0,double b=0,double d=0,double e=0,double f=0,double g=0){cmd.push_back({op,0,{a,b,d,e,f,g}});};auto rect=[&](double x,double y,double X,double Y,bool reverse){emit(0,x,y);if(reverse){emit(1,x,Y);emit(1,X,Y);emit(1,X,y);}else{emit(1,X,y);emit(1,X,Y);emit(1,x,Y);}emit(4);};
- if(fixture==1)rect(-16,-8,16,8,true);
+ if(fixture==19){emit(0,0,0);emit(2,0,1e-17,1e-17,0);emit(4);}
+ else if(fixture==18){emit(0,0,0);emit(3,0,1e-17,1e-17,1e-17,1e-17,0);emit(4);}
+ else if(fixture==1)rect(-16,-8,16,8,true);
  else if(fixture==2){emit(0,-16,-8);emit(2,0,16,16,-8);emit(4);}
  else if(fixture==3){emit(0,-16,-8);emit(3,-16,16,16,16,16,-8);emit(4);}
  else if(fixture==4){rect(-16,-12,16,12,false);rect(-6,-4,6,4,true);}
@@ -38,7 +40,7 @@ extern "C" uint32_t sarc_fixture(uint32_t fixture,void*memory,uint32_t bytes,uin
  if(fixture==16){double matrices[][4]={{1,0,0,1},{.01,0,0,.01},{32,0,0,32},{0,-32,32,0},{-2,1,.5,3}};for(auto&m:matrices)if(!raw_coverage_supports(result.certificate,m))return SA_INK_INVALID;double no[][4]={{0,0,0,0},{1,1,1,1},{257,0,0,1},{.001,0,0,.001}};for(auto&m:no)if(raw_coverage_supports(result.certificate,m))return SA_INK_INVALID;}
  // A true, visibly curved WHOLE command may not inherit the tiny chord proof
  // of just one analytic fallback interval (actual command329 regression).
- if(fixture==17){SAInkPathCommand curve{3,0,{1,1,2,1,3,0}};raw_coverage::Command meta{};SAAnalyticPatch p{};p.parameter_start=0;p.parameter_end=1;p.controls[6]=3;double error=0;if(!raw_coverage::chord(c,curve,meta,p,error)||error<.5)return SA_INK_INVALID;curve.values[0]=-1;curve.values[2]=4;if(raw_coverage::chord(c,curve,meta,p,error))return SA_INK_INVALID;RawCoverageMesh empty(c.numbers);if(build_raw_coverage_mesh(c,nullptr,0,43,o,empty,reason)||empty.mesh.vertices.size()||empty.source_generation!=43)return SA_INK_INVALID;}
+ if(fixture==17){SAInkPathCommand curve{3,0,{1,1,2,1,3,0}};raw_coverage::Command meta{};SAAnalyticPatch p{};p.parameter_start=0;p.parameter_end=1;p.controls[6]=3;double error=0;if(!raw_coverage::chord(c,curve,meta,p,error)||error<.5)return SA_INK_INVALID;curve.values[0]=-1;curve.values[2]=4;if(!raw_coverage::chord(c,curve,meta,p,error)||error*256<=.02)return SA_INK_INVALID;RawCoverageMesh empty(c.numbers);if(build_raw_coverage_mesh(c,nullptr,0,43,o,empty,reason)||empty.mesh.vertices.size()||empty.source_generation!=43)return SA_INK_INVALID;}
  s=build_raw_coverage_mesh(c,cmd.begin(),cmd.size(),42,o,result,reason);if(s&&before!=hash(result))return SA_INK_INVALID;
  uint32_t expected=fixture<7||fixture>=16?0:fixture<9?2:fixture==9||fixture==15?3:1;if(s!=expected)return SA_INK_INVALID;auto encoded=encode(c.numbers,result,s,reason,output,capacity);if(encoded)return encoded;
  }return c.numbers.live_bytes?SA_INK_INVALID:SA_INK_OK;
