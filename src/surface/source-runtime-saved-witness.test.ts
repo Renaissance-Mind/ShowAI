@@ -52,3 +52,11 @@ it("applies official final capacity to growing/escaped timestamps and leaves its
  const next=f.owner.registerActualSavedMetadata({scope:f.scope,base:seed.next,updatedAt:"2026-10-23",leaseId:"same-boundary"});
  expect(f.owner.resolveActualSnapshot(next.next).document.updatedAt).toBe("2026-10-23");
 },60000);
+
+it("captures an object adapter's metadata once before checking and registering it",()=>{
+ const f=fixture(),timestamp="2026-10-22T00:01:00.000Z";let reads=0;
+ const request={scope:f.scope,base:f.seed.next,leaseId:"single-capture",get updatedAt(){reads++;return reads===1?timestamp:"invalid second read"}};
+ const result=f.owner.registerActualSavedMetadata(request);
+ expect(f.owner.resolveActualSnapshot(result.next).document.updatedAt).toBe(timestamp);
+ expect(reads).toBe(1);
+});

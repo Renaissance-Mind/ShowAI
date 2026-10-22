@@ -486,6 +486,9 @@ export class SourceRuntimeOwner {
   * differ. Resolve the real base again and run the SAME saved registration and
   * final capacity gate, never a caller-asserted validated/public request flag. */
  registerActualSavedMetadata(request:{scope:SourceScope;base:SourceSnapshotRef;updatedAt:string;leaseId?:string},observer?:SourceRuntimeObserver):SourceSnapshotDelta{
+  // Object adapters retain their defensive boundary too: read accessors once,
+  // then validate/use the same sealed scalar. Raw JSON is already captured.
+  request=captureOwnedJSON(request);
   if(Object.keys(request).some(key=>!["scope","base","updatedAt","leaseId"].includes(key)))fail("Saved metadata contains an unproved field");
   const base=this.get(request.base);
   if(scopeKey(scope(request.scope))!==scopeKey(base.ref.scope)||!this.validatedBodies.has(base.document))fail("Saved metadata has no matching actual normalized body");
