@@ -48,6 +48,9 @@ import nativeInkContract from "../surface/native-ink.mjs?raw";
 import portableInkContract from "../surface/portable-ink.mjs?raw";
 import portableInkV2 from "../surface/portable-ink-v2.mjs?raw";
 import cubicInk from "../surface/cubic-ink.mjs?raw";
+import cubicInkCore from "../surface/cubic-ink-core.mjs?raw";
+import portableCubicClient from "../surface/portable-cubic-client.mjs?raw";
+import compiledInkInput from "../surface/ink-kernel/compiled-ink-input.mjs?raw";
 import compiledInk from "../surface/ink-kernel/compiled-ink.mjs?raw";
 import inkStrokeKernel from "../surface/ink-kernel/ink-stroke-kernel.mjs?raw";
 import inkKernelWasm from "../surface/ink-kernel/ink-kernel-wasm.mjs?raw";
@@ -56,6 +59,7 @@ import nativeInkPreview from "../surface/NativeInkPreview.tsx?raw";
 import objectContext from "../surface/object-context.ts?raw";
 import nativeInkCss from "../surface/native-ink.css?raw";
 import capacity from "../portable/capacity.mjs?raw";
+import ownedJson from "../portable/owned-json.mjs?raw";
 import sdk from "../components/blocks/sdk.tsx?raw";
 import actionHost from "../components/blocks/action-host.tsx?raw";
 import gestureBoundary from "../components/blocks/GestureBoundary.tsx?raw";
@@ -242,6 +246,9 @@ const sources: Record<string, string> = {
   "portable-ink.mjs": portableInkContract,
   "portable-ink-v2.mjs": portableInkV2,
   "cubic-ink.mjs": cubicInk,
+  "cubic-ink-core.mjs": cubicInkCore,
+  "portable-cubic-client.mjs": portableCubicClient,
+  "ink-kernel/compiled-ink-input.mjs": compiledInkInput,
   "ink-kernel/compiled-ink.mjs": compiledInk,
   "ink-kernel/ink-stroke-kernel.mjs": inkStrokeKernel,
   "ink-kernel/ink-kernel-wasm.mjs": inkKernelWasm,
@@ -251,6 +258,7 @@ const sources: Record<string, string> = {
   "surface/source-runtime.ts": frameSourceRuntime,
   "native-ink.css": nativeInkCss,
   "capacity.mjs": capacity,
+  "owned-json.mjs": ownedJson,
   "sdk.tsx": sdk,
   "action-host.tsx": actionHost,
   "GestureBoundary.tsx": gestureBoundary,
@@ -385,6 +393,7 @@ export const builtinSources: Record<string, string> = Object.fromEntries(
           : '"./NativeInkPreview"',
       )
       .replaceAll('"../portable/capacity.mjs"', '"./capacity.mjs"')
+      .replaceAll('"../portable/owned-json.mjs"', '"./owned-json.mjs"')
       .replaceAll(
         '"../../portable/capacity.mjs"',
         name.startsWith("rich-text/")
