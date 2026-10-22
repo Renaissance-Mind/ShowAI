@@ -26,10 +26,12 @@ typedef struct {
   double float_cast_error_pixels;
 } SACoverageDraw;
 typedef struct {
+  /* Bounds source regularization + Float32 position casting, not KLM
+   * residual/gradient, GPU interpolation or final pixel-alpha error. */
   double maximum_forward_norm,maximum_inverse_norm,maximum_geometry_error_pixels;
   double actual_position_error_source,actual_regularization_error_source;
   double maximum_field_value,maximum_field_derivative_source;
-  uint64_t absolute_contribution_bound;
+  uint64_t absolute_contribution_bound; /* emitted triangles, not actual winding */
   uint32_t regularized_rays,degenerate_triangles;
 } SACoverageCertificate;
 typedef struct {
