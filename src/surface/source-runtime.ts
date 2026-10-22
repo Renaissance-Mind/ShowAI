@@ -156,8 +156,16 @@ export interface NativePublicationOrigin {
  boardId:string;token:string;sourceVersion:number;
 }
 type NativePublicationPacket={document:ShowDocument;baseDocument:ShowDocument;pageId?:string;[key:string]:unknown};
-interface PublicationEntry {packet:NativePublicationPacket;canonical?:ShowDocument;canonicalBase?:ShowDocument}
+interface PublicationTransport {scope:SourceScope;boardId:string;token:string;sourceVersion:number}
+interface PublicationEntry {packet:NativePublicationPacket;canonical?:ShowDocument;canonicalBase?:ShowDocument;transport?:PublicationTransport}
 interface PublicationOriginRecord {identity:NativePublicationOrigin;packet:NativePublicationPacket}
+export interface NativeSourceEnvelope {
+ format:"showai-native-source-v1";scope:{projectId:string;pageId:string;boardId:string;token:string};
+ publicationId:string;basePublicationId:string|null;sourceVersion:number;
+ full?:NativePublicationPacket;edits?:NativeSourceEdit[];
+}
+export interface NativeSourceEnvelopeRequest {current:SourceSnapshotRef;envelope:NativeSourceEnvelope;leaseId?:string}
+export type NativeSourceEnvelopeResult=SourceSnapshotDelta|null|{requiresFull:true};
 interface Snapshot {ref:SourceSnapshotRef;document:ShowDocument;candidates:SourceSnapshotDelta["inkCandidates"];conflicts:PageMergeConflict[];nativeOrigin?:PublicationOriginRecord}
 /** Same synchronous service runs in Native JSC, a browser worker or Node.
  * No transport/client is allowed to construct a registered reference itself. */
@@ -181,7 +189,7 @@ export class SourceRuntimeOwner {
   for(const child of metric.children)this.account(child,direction);
  }
  private forget(id:string){const entry=this.snapshots.get(id);if(entry){this.snapshots.delete(id);this.account(entry.document,-1);if(entry.nativeOrigin)this.account(entry.nativeOrigin,-1)}}
- private forgetPublication(key:string){const entry=this.publications.get(key);if(entry){this.publications.delete(key);this.account(entry.packet,-1);if(entry.canonical)this.account(entry.canonical,-1);if(entry.canonicalBase)this.account(entry.canonicalBase,-1)}}
+ private forgetPublication(key:string){const entry=this.publications.get(key);if(entry){this.publications.delete(key);this.account(entry.packet,-1);if(entry.canonical)this.account(entry.canonical,-1);if(entry.canonicalBase)this.account(entry.canonicalBase,-1);if(entry.transport)this.account(entry.transport,-1)}}
  private prunePublications(){while(this.publications.size>8||this.publications.size&&this.residentBytes>this.limits.bytes)this.forgetPublication(this.publications.keys().next().value!)}
  constructor(options:{ownerId?:string;epoch?:string;maximumUnleased?:number;maximumPinned?:number;maximumResidentBytes?:number}={}){
   this.ownerId=options.ownerId??crypto.randomUUID();this.epoch=options.epoch??crypto.randomUUID();this.limits={unleased:options.maximumUnleased??64,pinned:options.maximumPinned??256,bytes:options.maximumResidentBytes??96*1024*1024};
@@ -383,6 +391,41 @@ export class SourceRuntimeOwner {
   const current=this.get(request.current),entry=measured(observer,"rememberPublication",()=>this.rememberPublication(current,request.publicationId,request.packet,()=>request.packet));
   return this.unchangedNativePublication(current,request,entry,observer);
  }
+ /** Actual host transport only. The complete previous packet is resolved from
+  * this owner's retained capture, never asserted by a Web descriptor. Applying
+  * exact transport edits preserves its untouched sealed branches. A missing
+  * baseline requests the same captured full packet; it never guesses a source.
+  * This adapter is deliberately absent from the public execute dispatcher. */
+ registerActualNativeEnvelopeJSON(raw:string,observer?:SourceRuntimeObserver):NativeSourceEnvelopeResult{
+  const request=measured(observer,"parse",()=>parseOwnedJSON(raw)) as NativeSourceEnvelopeRequest;
+  const current=this.get(request.current),envelope=request.envelope,s=envelope?.scope;
+  const id=(value:unknown):value is string=>typeof value==="string"&&value.length>0&&value.length<=256;
+  if(!envelope||envelope.format!=="showai-native-source-v1"||!s||s.projectId!==current.ref.scope.projectId||s.pageId!==current.ref.scope.pageId||!id(s.boardId)||!id(s.token)||!id(envelope.publicationId)||
+   !Number.isSafeInteger(envelope.sourceVersion)||envelope.sourceVersion<0||envelope.basePublicationId!==null&&!id(envelope.basePublicationId))fail("Actual Native source envelope has a different captured scope or identity");
+  const full=Object.hasOwn(envelope,"full"),edits=Object.hasOwn(envelope,"edits");
+  if(full===edits||edits&&(!envelope.basePublicationId||!Array.isArray(envelope.edits))||Object.keys(envelope).some(key=>!["format","scope","publicationId","basePublicationId","sourceVersion",full?"full":"edits"].includes(key))||Object.keys(s).some(key=>!["projectId","pageId","boardId","token"].includes(key)))fail("Actual Native source envelope requires one complete packet or exact transport edits");
+  let packet:NativePublicationPacket;
+  if(full)packet=envelope.full!;
+  else{
+   const cached=this.publications.get(scopeKey(current.ref.scope)+"\u0000"+envelope.basePublicationId);
+   let previous=cached?.transport?{packet:cached.packet,transport:cached.transport}:undefined;
+   if(!previous)for(const snapshot of this.snapshots.values()){
+    const origin=snapshot.nativeOrigin;
+    if(origin?.identity.publicationId===envelope.basePublicationId&&scopeKey(origin.identity.scope)===scopeKey(current.ref.scope)){
+     previous={packet:origin.packet,transport:origin.identity};break;
+    }
+   }
+   if(!previous)return{requiresFull:true};
+   if(previous.transport.boardId!==s.boardId||previous.transport.token!==s.token||previous.transport.sourceVersion>envelope.sourceVersion)fail("Actual Native source envelope crosses its retained Board, token or version");
+   packet=measured(observer,"envelope.apply",()=>captureOwnedJSON(applyNativeSourceDelta(previous!.packet,envelope.edits!) as NativePublicationPacket));
+  }
+  if(!packet||packet.pageId!==s.pageId||packet.boardId!==s.boardId||packet.token!==s.token||packet.document?.id!==s.pageId||packet.baseDocument?.id!==s.pageId)fail("Actual Native source packet differs from its captured envelope");
+  const entry=measured(observer,"rememberPublication",()=>this.rememberPublication(current,envelope.publicationId,packet,()=>packet));
+  const transport=freezeOwnedSource({scope:{...current.ref.scope},boardId:s.boardId,token:s.token,sourceVersion:envelope.sourceVersion});
+  if(entry.transport&&diffOwnedSource(entry.transport,transport).length)fail("Native publication identity names a different captured transport");
+  if(!entry.transport){entry.transport=transport;if(this.publications.get(scopeKey(current.ref.scope)+"\u0000"+envelope.publicationId)===entry)this.account(transport,1)}
+  return this.unchangedNativePublication(current,{publicationId:envelope.publicationId,sourceVersion:envelope.sourceVersion,packet:entry.packet,leaseId:request.leaseId},entry,observer);
+ }
  /** Trusted adapter only: a ref or kind flag alone never proves a different
   * Swift/JSON body. The exact comparator includes every root field, timestamp,
   * sample, tombstone and retained variant. No JSON serialization is involved. */
@@ -539,4 +582,9 @@ export function nativePublicationDocumentMatching(request:{ref:SourceSnapshotRef
 /** Private captured-publication factory; never accepted by execute(). */
 export function registerActualNativePublicationIfUnchanged(raw:string,observer?:SourceRuntimeObserver):string{
  service??=new SourceRuntimeOwner();return JSON.stringify(service.registerActualNativeJSONIfUnchanged(raw,observer));
+}
+
+/** Private actual-host envelope adapter; never a public source request kind. */
+export function registerActualNativeEnvelope(raw:string,observer?:SourceRuntimeObserver):string{
+ service??=new SourceRuntimeOwner();return JSON.stringify(service.registerActualNativeEnvelopeJSON(raw,observer));
 }
