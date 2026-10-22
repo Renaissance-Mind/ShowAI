@@ -1,4 +1,4 @@
-import {freezeOwnedJSON,isOwnedJSON,captureOwnedJSON} from "./owned-json.mjs";
+import {freezeOwnedJSON,isOwnedJSON,captureOwnedJSON,capturedContentSummary,shareCapturedJSON} from "./owned-json.mjs";
 import {shareNativeSource} from "../surface/native-source-delta.mjs";
 import { validateInkArchiveGroup } from "../surface/ink-archive-group.mjs";
 import { isResource } from "../surface/containers.mjs";
@@ -1128,7 +1128,8 @@ export function shareSourceSnapshotDocument(base, canonical) {
   const receipt = ownedDocumentCapacity.get(canonical);
   if (receipt && (!isOwnedJSON(base) || !isOwnedJSON(canonical)))
     throw new Error("Source capacity sharing requires actual owned graphs.");
-  const result = shareNativeSource(base, canonical);
+  const result = capturedContentSummary(base)&&capturedContentSummary(canonical)
+    ? shareCapturedJSON(base,canonical) : shareNativeSource(base, canonical);
   if (!receipt) return result;
   const held = captureOwnedJSON(result);
   rememberOwnedCapacity(held, receipt.sizes, receipt.maximumDepth);

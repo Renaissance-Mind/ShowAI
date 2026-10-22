@@ -1,10 +1,15 @@
-import { CAPACITY, assertBytes, utf8Bytes } from "./capacity.mjs";
+import {
+  CAPACITY,
+  assertBytes,
+  utf8Bytes,
+  dataUrlContent,
+} from "./capacity.mjs";
 // One actual recursive ownership registry shared by source factories and their
 // private validation adapters. Object.isFrozen(root) alone is never proof.
 const owned = new WeakSet(),
   metrics = new WeakMap(),
   plainOwned = new WeakSet(),
-  plainBytes = new WeakMap();
+  contentSummaries = new WeakMap();
 export function freezeOwnedJSON(value) {
   if (typeof value === "number" && !Number.isFinite(value))
     throw new TypeError("Invalid native source delta: non-JSON value");
@@ -31,6 +36,70 @@ export function freezeOwnedJSON(value) {
 export const isOwnedJSON = (value) =>
   !!value && typeof value === "object" && owned.has(value);
 export const ownedJSONMetrics = (value) => metrics.get(value);
+/** Read-only evidence for this module's actual captured data. Generic freezing
+ * cannot install it; caller-authored reports never enter this private map. */
+export const capturedContentSummary = (value) =>
+  value && typeof value === "object" ? contentSummaries.get(value) : undefined;
+
+function scalarContent(value) {
+  const bytes = scalarBytes(value),
+    resource = dataUrlContent(value);
+  return {
+    structureBytes: resource?.structureBytes ?? bytes,
+    jsonBytes: bytes,
+    prettyPadding: 0,
+    prettyDepthFactor: 0,
+    maximumDepth: 0,
+    resources: resource
+      ? Object.freeze({ value: resource.value, bytes: resource.bytes })
+      : null,
+  };
+}
+function summarizeCaptured(value, keys, array) {
+  const length = keys.length;
+  let structureBytes = 2 + Math.max(0, length - 1),
+    jsonBytes = structureBytes,
+    prettyPadding = length ? (array ? 3 : 4) * length + 1 : 0,
+    prettyDepthFactor = length ? 2 * (length + 1) : 0,
+    maximumDepth = 0,
+    resources;
+  for (const key of keys) {
+    if (!array) {
+      const bytes = scalarBytes(key) + 1;
+      structureBytes += bytes;
+      jsonBytes += bytes;
+    }
+    const child = value[key],
+      summary =
+        child && typeof child === "object"
+          ? contentSummaries.get(child)
+          : scalarContent(child);
+    if (!summary)
+      throw new Error("Captured JSON child has no actual content summary");
+    structureBytes += summary.structureBytes;
+    jsonBytes += summary.jsonBytes;
+    prettyPadding += summary.prettyPadding + summary.prettyDepthFactor;
+    prettyDepthFactor += summary.prettyDepthFactor;
+    maximumDepth = Math.max(maximumDepth, 1 + summary.maximumDepth);
+    if (summary.resources) {
+      resources ??= [];
+      resources.push(summary.resources);
+    }
+  }
+  const tree = !resources
+    ? null
+    : resources.length === 1
+      ? resources[0]
+      : Object.freeze(resources);
+  return Object.freeze({
+    structureBytes,
+    jsonBytes,
+    prettyPadding,
+    prettyDepthFactor,
+    maximumDepth,
+    resources: tree,
+  });
+}
 
 // This proof is separate from generic recursive freezing: only an exclusive
 // JSON.parse graph or an independent data capture can enter this registry.
@@ -124,17 +193,24 @@ function capturePlain(
   // The source is now actual plain data; this sealing walk visits only new
   // immediate children. Previously proved branches are never re-frozen.
   freezeOwnedJSON(result);
-  let bytes = 2 + Math.max(0, keys.length - 1);
-  for (const key of keys) {
-    if (!array) bytes += scalarBytes(key) + 1;
-    const child = result[key];
-    bytes +=
-      child && typeof child === "object"
-        ? plainBytes.get(child)
-        : scalarBytes(child);
-  }
+  const summary = summarizeCaptured(result, keys, array);
+  contentSummaries.set(result, summary);
+  // Logical residency includes bookkeeping for the retained summary/index.
+  // These graph estimates are separate from JavaScript heap measurement.
+  const metric = metrics.get(result),
+    resourceIndex = summary.resources
+      ? Array.isArray(summary.resources)
+        ? summary.resources.length * 8
+        : 16
+      : 0;
+  metrics.set(
+    result,
+    Object.freeze({
+      bytes: metric.bytes + 128 + resourceIndex,
+      children: metric.children,
+    }),
+  );
   plainOwned.add(result);
-  plainBytes.set(result, bytes);
   if (!exclusive) captured.set(value, result);
   return result;
 }
@@ -170,4 +246,62 @@ export function parseOwnedJSON(raw, base) {
     { bytes: 0 },
     candidate,
   );
+}
+
+/** Exact sharing within independent, sealed JSON captures. The identity exit
+ * is safe only after this factory's actual capture, including accessor inputs.
+ * Reordered object arrays retain equal old leaves by their real unique IDs. */
+export function shareCapturedJSON(base, target) {
+  const before = captureOwnedJSON(base),
+    after = captureOwnedJSON(target);
+  const stableId = (value) =>
+    value && typeof value === "object" && !Array.isArray(value)
+      ? typeof value.attrs?.id === "string" && value.attrs.id
+        ? value.attrs.id
+        : typeof value.id === "string" && value.id
+          ? value.id
+          : null
+      : null;
+  const share = (one, two) => {
+    if (one === two) return one;
+    if (
+      !one ||
+      !two ||
+      typeof one !== "object" ||
+      typeof two !== "object" ||
+      Array.isArray(one) !== Array.isArray(two)
+    )
+      return two;
+    const array = Array.isArray(two),
+      keys = Object.keys(two);
+    let sameBefore = Object.keys(one).length === keys.length,
+      sameAfter = true,
+      byId;
+    if (array && one.length && stableId(one[0])) {
+      byId = new Map();
+      for (const child of one) {
+        const id = stableId(child);
+        if (!id || byId.has(id)) {
+          byId = undefined;
+          break;
+        }
+        byId.set(id, child);
+      }
+    }
+    const result = array ? [] : {};
+    for (const key of keys) {
+      const prior = byId ? byId.get(stableId(two[key])) : one[key],
+        child = share(prior, two[key]);
+      Object.defineProperty(result, key, {
+        value: child,
+        enumerable: true,
+        writable: true,
+        configurable: true,
+      });
+      sameBefore = sameBefore && Object.hasOwn(one, key) && child === one[key];
+      sameAfter = sameAfter && child === two[key];
+    }
+    return sameBefore ? one : sameAfter ? two : result;
+  };
+  return captureOwnedJSON(share(before, after));
 }

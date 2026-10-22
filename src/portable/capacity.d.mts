@@ -29,6 +29,10 @@ export class CapacityError extends Error {
 }
 export function assertBytes(kind: string, bytes: number, maximum: number): void;
 export function base64Bytes(encoded: string): number;
+/** Pure classifier; it does not attach an owned capacity proof or admit bytes. */
+export function dataUrlContent(
+  value: unknown,
+): { value: string; bytes: number; structureBytes: number } | null;
 export interface ContentSize {
   structureBytes: number;
   resourceBytes: number;
@@ -38,15 +42,22 @@ export interface ContentSize {
 }
 export function measureContent(value: unknown): ContentSize;
 /** Internal traversal evidence; null for reports not produced by measureContent. */
-export function contentMeasurementDepth(report:ContentSize):number|null;
+export function contentMeasurementDepth(report: ContentSize): number | null;
 /** Byte comparison, not a document validation proof. */
-export function nonResourceReplacementDoesNotGrow(before: unknown, after: unknown): boolean;
+export function nonResourceReplacementDoesNotGrow(
+  before: unknown,
+  after: unknown,
+): boolean;
 export function assertContent(
   value: unknown,
   kind?: string,
   maximum?: number,
 ): ContentSize;
-export function assertContentSizes(sizes: ContentSize, kind?: string, maximum?: number): ContentSize;
+export function assertContentSizes(
+  sizes: ContentSize,
+  kind?: string,
+  maximum?: number,
+): ContentSize;
 export function assertCompiledComponent(component: {
   html: string;
   inline?: { script: string; styles: string };

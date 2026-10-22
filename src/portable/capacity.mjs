@@ -1,3 +1,4 @@
+import { capturedContentSummary } from "./owned-json.mjs";
 /** Byte budgets for distinct architectural boundaries. Binary resources are measured decoded. */
 const MiB = 1024 * 1024;
 export const CAPACITY = Object.freeze({
@@ -80,24 +81,74 @@ export function base64Bytes(encoded) {
     throw new Error("Non-canonical base64 resource.");
   return (encoded.length / 4) * 3 - padding;
 }
+/** Pure classification used while an actual independent JSON branch seals.
+ * It does not admit a resource: the ordinary measurement gate checks limits. */
+export function dataUrlContent(value) {
+  if (typeof value !== "string") return null;
+  const match = /^data:([\w.+\/-]+);base64,([A-Za-z0-9+/]*={0,2})$/.exec(value);
+  if (!match || match[2].length % 4 || !canonicalPadding(match[2])) return null;
+  return {
+    value,
+    bytes: base64Bytes(match[2]),
+    structureBytes: utf8Bytes(JSON.stringify(`asset:${match[1]}:sha256`)),
+  };
+}
 // Extra traversal evidence stays private: ordinary measurement report shape is
 // unchanged, and a caller-created numeric report cannot assert a measured depth.
-const measurementDepth=new WeakMap();
-export const contentMeasurementDepth=report=>measurementDepth.get(report) ?? null;
+const measurementDepth = new WeakMap();
+export const contentMeasurementDepth = (report) =>
+  measurementDepth.get(report) ?? null;
 /** Mirrors storage's whole-string data-URL extraction; URLs inside code remain structure. */
 export function measureContent(value) {
+  const held = capturedContentSummary(value);
+  if (held) {
+    if (held.maximumDepth > 64)
+      throw new Error("Capacity input is nested too deeply.");
+    let resourceBytes = 0;
+    const resources = new Set(),
+      visited = new Set(),
+      pending = held.resources ? [held.resources] : [];
+    while (pending.length) {
+      const tree = pending.pop();
+      if (visited.has(tree)) continue;
+      visited.add(tree);
+      if (Array.isArray(tree)) {
+        for (const child of tree) pending.push(child);
+        continue;
+      }
+      assertBytes(
+        "Single resource (decoded)",
+        tree.bytes,
+        CAPACITY.resourceBytes,
+      );
+      if (!resources.has(tree.value)) {
+        resources.add(tree.value);
+        resourceBytes += tree.bytes;
+      }
+    }
+    const result = {
+      structureBytes: held.structureBytes,
+      resourceBytes,
+      resourceCount: resources.size,
+      jsonBytes: held.jsonBytes,
+      prettyJsonBytes: held.jsonBytes + held.prettyPadding,
+    };
+    measurementDepth.set(result, held.maximumDepth);
+    return result;
+  }
   let structureBytes = 0,
     resourceBytes = 0,
     jsonBytes = 0,
     prettyPadding = 0;
-  const resources = new Set();let maximumDepth=0;
+  const resources = new Set();
+  let maximumDepth = 0;
   const addStructure = (bytes) => {
     structureBytes += bytes;
     jsonBytes += bytes;
   };
   const visit = (entry, depth = 0) => {
     if (depth > 64) throw new Error("Capacity input is nested too deeply.");
-    maximumDepth=Math.max(maximumDepth,depth);
+    maximumDepth = Math.max(maximumDepth, depth);
     if (typeof entry === "string") {
       const match = /^data:([\w.+\/-]+);base64,([A-Za-z0-9+/]*={0,2})$/.exec(
         entry,
@@ -130,22 +181,28 @@ export function measureContent(value) {
     } else addStructure(utf8Bytes(JSON.stringify(entry)));
   };
   visit(value);
-  const result={
+  const result = {
     structureBytes,
     resourceBytes,
     resourceCount: resources.size,
     jsonBytes,
     prettyJsonBytes: jsonBytes + prettyPadding,
   };
-  measurementDepth.set(result,maximumDepth);return result;
+  measurementDepth.set(result, maximumDepth);
+  return result;
 }
 /** Local byte comparison only. A caller must separately prove that one
  * existing field changed and that its real base body satisfies all limits.
  * New/different resources require a whole-body deduplicated measurement. */
 export function nonResourceReplacementDoesNotGrow(before, after) {
-  const oldSize = measureContent(before), newSize = measureContent(after);
-  return !oldSize.resourceCount && !newSize.resourceCount &&
-    newSize.structureBytes <= oldSize.structureBytes && newSize.jsonBytes <= oldSize.jsonBytes;
+  const oldSize = measureContent(before),
+    newSize = measureContent(after);
+  return (
+    !oldSize.resourceCount &&
+    !newSize.resourceCount &&
+    newSize.structureBytes <= oldSize.structureBytes &&
+    newSize.jsonBytes <= oldSize.jsonBytes
+  );
 }
 export function assertContent(
   value,
@@ -156,7 +213,11 @@ export function assertContent(
 }
 /** Apply the same limits to an internally measured report or a proven upper
  * bound. Reports themselves are measurements, never document-validation proof. */
-export function assertContentSizes(sizes, kind = "Page structure", maximum = CAPACITY.pageStructureBytes) {
+export function assertContentSizes(
+  sizes,
+  kind = "Page structure",
+  maximum = CAPACITY.pageStructureBytes,
+) {
   assertBytes(kind, sizes.structureBytes, maximum);
   assertBytes(
     "Page resources (decoded, unique URLs)",
