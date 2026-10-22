@@ -41,20 +41,6 @@ export const ownedJSONMetrics = (value) => metrics.get(value);
 export const capturedContentSummary = (value) =>
   value && typeof value === "object" ? contentSummaries.get(value) : undefined;
 
-function scalarContent(value) {
-  const bytes = scalarBytes(value),
-    resource = dataUrlContent(value);
-  return {
-    structureBytes: resource?.structureBytes ?? bytes,
-    jsonBytes: bytes,
-    prettyPadding: 0,
-    prettyDepthFactor: 0,
-    maximumDepth: 0,
-    resources: resource
-      ? Object.freeze({ value: resource.value, bytes: resource.bytes })
-      : null,
-  };
-}
 function summarizeCaptured(value, keys, array) {
   const length = keys.length;
   let structureBytes = 2 + Math.max(0, length - 1),
@@ -69,11 +55,22 @@ function summarizeCaptured(value, keys, array) {
       structureBytes += bytes;
       jsonBytes += bytes;
     }
-    const child = value[key],
-      summary =
-        child && typeof child === "object"
-          ? contentSummaries.get(child)
-          : scalarContent(child);
+    const child = value[key];
+    if (!child || typeof child !== "object") {
+      const bytes = scalarBytes(child),
+        resource = dataUrlContent(child);
+      structureBytes += resource?.structureBytes ?? bytes;
+      jsonBytes += bytes;
+      maximumDepth = Math.max(maximumDepth, 1);
+      if (resource) {
+        resources ??= [];
+        resources.push(
+          Object.freeze({ value: resource.value, bytes: resource.bytes }),
+        );
+      }
+      continue;
+    }
+    const summary = contentSummaries.get(child);
     if (!summary)
       throw new Error("Captured JSON child has no actual content summary");
     structureBytes += summary.structureBytes;
