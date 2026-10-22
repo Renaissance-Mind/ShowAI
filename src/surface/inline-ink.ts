@@ -57,6 +57,7 @@ export interface InkFrame {
   viewport: number[];
   camera: { x: number; y: number; scale: number };
   cameraVersion: number;
+  cameraIntent?:import("./native-board-camera").NativeCameraIntent;
   poses?: Record<string, number[]>;
   holes: { x: number; y: number; width: number; height: number }[];
   shapes?: { x: number; y: number; width: number; height: number }[];
@@ -67,6 +68,7 @@ export interface InkCommand {
   boardId: string;
   camera?: InkFrame["camera"];
   cameraVersion?: number;
+  cameraAuthority?:import("./native-board-camera").NativeCameraAuthority;
   navigating?: boolean;
   tool?: string;
   error?: string;

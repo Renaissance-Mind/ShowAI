@@ -1,3 +1,4 @@
+import {initialNativeCameraState,captureNativeCameraIntent,observeNativeCameraAuthority} from "./native-board-camera";
 import {captureNativeBoardControl,type NativeBoardControlRecord,type NativeBoardControlHandle} from "./native-board-control";
 import {measureNativeSync} from "./native-perf";
 import {useEffect,useRef,useState,type RefObject} from "react";
@@ -26,6 +27,7 @@ export interface NativeBoardOptions {
 export function useNativeBoard(options:NativeBoardOptions){
   const current=useRef(options);current.current=options;
   const [owner,setOwner]=useState<{pageId:string;boardId:string;token:string}|null>(null);
+  const cameraAuthority=useRef(initialNativeCameraState()),bindingToken=useRef<string|undefined>(undefined);
   const invalidation=useRef<(()=>void)|null>(null), cameraVersion=useRef(0), previousInk=useRef("pen");
   const active=options.enabled&&typeof window!=="undefined"&&window.showai?.inlineInk?.nativeScene===true;
   const controlState=useRef<{key:string;record:NativeBoardControlRecord;token?:string;send?:()=>void}|undefined>(undefined);
@@ -42,16 +44,17 @@ export function useNativeBoard(options:NativeBoardOptions){
     if(!active||!bridge||!options.document)return;
     return bridge.onCommand(value=>{
       const o=current.current;
-      if(value.pageId!==o.document?.id||value.boardId!==o.boardId||value.token&&value.token!==controlState.current?.token)return;
+      if(value.pageId!==o.document?.id||value.boardId!==o.boardId||value.token&&value.token!==bindingToken.current)return;
       if(value.error)throw new Error(value.error);
       if(value.clearSelection)o.onClearSelection();
       if(value.selection)o.onSelection?.(value.selection);
       if(value.layouts)o.onLayout?.(value.layouts);
       if(value.activate)o.onActivate?.(value.activate);
+      if(value.cameraAuthority)cameraAuthority.current=observeNativeCameraAuthority(cameraAuthority.current,value.cameraAuthority);
       if(value.camera){
         cameraVersion.current=value.cameraVersion??cameraVersion.current;
         const previous=window.showaiApplyingNativeCamera;window.showaiApplyingNativeCamera=true;
-        try{o.onCamera(value.camera,true)}finally{window.showaiApplyingNativeCamera=previous}
+        try{const actual=o.camera.current;if(actual.x!==value.camera.x||actual.y!==value.camera.y||actual.scale!==value.camera.scale)o.onCamera(value.camera,true)}finally{window.showaiApplyingNativeCamera=previous}
       }
       if(value.primitive){
         const p=value.primitive;
@@ -66,10 +69,12 @@ export function useNativeBoard(options:NativeBoardOptions){
   useEffect(()=>{
     const bridge=window.showai?.inlineInk,o=current.current,surface=o.root.current,world=o.world.current;
     if(!active||!bridge||!surface||!world||!o.document)return;
+    cameraAuthority.current=initialNativeCameraState();cameraVersion.current=0;
     const token=crypto.randomUUID(),control=controlState.current,lane=typeof bridge.toolIntent==="function";
     const sendControl=()=>{if(!alive||!lane||!control)return;const record=control.record;
       void bridge.toolIntent!({pageId:o.document!.id,boardId:o.boardId,token,...record}).catch(error=>{if(alive)surface.dispatchEvent(new CustomEvent("showai:ink-error",{bubbles:true,detail:String(error)}))});
     };
+    bindingToken.current=token;
     let alive=true,pending=false,dirty=false,frame=0,controlStarted=false,lastKey="",lastDocument:ShowDocument|undefined;
     let poseDocument:ShowDocument|undefined,poseSize="",poses:ReturnType<typeof measureNativeBoard>|undefined,lastPoses:typeof poses;
     const schedule=()=>{dirty=true;if(alive&&!pending&&!frame)frame=requestAnimationFrame(()=>{frame=0;void send()})};
@@ -84,7 +89,7 @@ export function useNativeBoard(options:NativeBoardOptions){
       const capturedControl=lane?control?.record:undefined;
       const packet=measureNativeSync("board.packet",()=>({...(capturedControl?{controlIntent:capturedControl}:{}),token,pageId:source.id,boardId:v.boardId,nativeScene:true,tool:v.tool??"select",color:v.color,fillColor:v.fillColor??"none",width:v.width,pressure:v.pressure,ruler:v.ruler,
         dark:document.documentElement.dataset.theme==="dark",widthPx:surface.clientWidth,heightPx:surface.clientHeight,
-        viewport:measureNativeSync("board.viewportMatrix",()=>matrixValues(clientMatrix(surface,surface.offsetWidth,surface.offsetHeight))),camera:{...v.camera.current},cameraVersion:cameraVersion.current,
+        viewport:measureNativeSync("board.viewportMatrix",()=>matrixValues(clientMatrix(surface,surface.offsetWidth,surface.offsetHeight))),camera:{...v.camera.current},cameraVersion:cameraVersion.current,...(cameraAuthority.current.intent?{cameraIntent:cameraAuthority.current.intent}:{}),
         selection:v.selection?.()??[],holes,grid:surface.classList.contains("has-board-grid"),background:measureNativeSync("board.backgroundColor",()=>style.backgroundColor)}));
       const key=measureNativeSync("board.packetKey",()=>JSON.stringify(packet));
       if(key===lastKey&&source===lastDocument&&poses===lastPoses)return;
@@ -108,12 +113,12 @@ export function useNativeBoard(options:NativeBoardOptions){
     });
     observer.observe(document.documentElement,{subtree:true,childList:true,attributes:true,attributeFilter:["style","class","hidden","open","data-sidebar-mode","data-mobile-sidebar","data-theme","data-native-orientation","data-dragging"]});
     const resize=new ResizeObserver(()=>{poseSize="";schedule()});resize.observe(surface);
-    const viewport=()=>{if(window.showaiApplyingNativeCamera)return;cameraVersion.current++;schedule()};
+    const viewport=()=>{if(window.showaiApplyingNativeCamera)return;cameraVersion.current++;cameraAuthority.current=captureNativeCameraIntent(cameraAuthority.current,current.current.camera.current);schedule()};
     const refresh=()=>{lastDocument=undefined;poseDocument=undefined;lastKey="";schedule()};
     surface.addEventListener("showai:viewport-change",viewport);surface.addEventListener("showai:ink-refresh",refresh);
     window.addEventListener("resize",schedule);document.addEventListener("scroll",schedule,true);document.addEventListener("visibilitychange",schedule);
     schedule();
-    return()=>{alive=false;if(control?.send===sendControl){control.send=undefined;control.token=undefined}setOwner(previous=>previous?.token===token?null:previous);if(invalidation.current===schedule)invalidation.current=null;cancelAnimationFrame(frame);observer.disconnect();resize.disconnect();
+    return()=>{alive=false;if(bindingToken.current===token)bindingToken.current=undefined;if(control?.send===sendControl){control.send=undefined;control.token=undefined}setOwner(previous=>previous?.token===token?null:previous);if(invalidation.current===schedule)invalidation.current=null;cancelAnimationFrame(frame);observer.disconnect();resize.disconnect();
       surface.removeEventListener("showai:viewport-change",viewport);surface.removeEventListener("showai:ink-refresh",refresh);window.removeEventListener("resize",schedule);document.removeEventListener("scroll",schedule,true);document.removeEventListener("visibilitychange",schedule);
       void bridge.hide(o.document!.id,o.boardId,token).finally(()=>{if(surface.dataset.nativeInkToken===token){delete surface.dataset.nativeBoardActive;delete surface.dataset.nativeInkToken}});
     };
