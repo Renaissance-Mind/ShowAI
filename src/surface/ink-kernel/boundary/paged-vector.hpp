@@ -22,7 +22,7 @@ template<class T,uint32_t Bits=4>class PagedVector{
 public:
     PagedVector()=default;explicit PagedVector(Context&c):ctx_(&c){}
     Context*context()const{return ctx_;}uint32_t size()const{return count_;}bool empty()const{return !count_;}
-    const T&operator[](uint32_t index)const{if(index>=count_){if(ctx_)ctx_->fail(SA_INK_RANGE);return invalid_;}const Node*node=root_.get();for(uint32_t level=level_;level&&node;--level){uint32_t shift=level*Bits;node=node->children[(index>>shift)&(width-1)].get();}if(!node||!node->page.valid())return zero_;return node->page.get()->values[index&(width-1)];}
+    const T&operator[](uint32_t index)const{if(index>=count_){if(ctx_)ctx_->fail(SA_INK_RANGE);return invalid_;}uint32_t covered_bits=(level_+1)*Bits;if(covered_bits<32&&(index>>covered_bits))return zero_;const Node*node=root_.get();for(uint32_t level=level_;level&&node;--level){uint32_t shift=level*Bits;node=node->children[(index>>shift)&(width-1)].get();}if(!node||!node->page.valid())return zero_;return node->page.get()->values[index&(width-1)];}
     T&operator[](uint32_t index){if(index>=count_){if(ctx_)ctx_->fail(SA_INK_RANGE);return invalid_;}T*value=editable(index);return value?*value:invalid_;}
     const T&back()const{return(*this)[count_?count_-1:0];}T&back(){return(*this)[count_?count_-1:0];}
     bool push_back(const T&value){if(count_==0xffffffffu){if(ctx_)ctx_->fail(SA_INK_CAPACITY);return false;}T*destination=editable(count_);if(!destination)return false;*destination=value;if(ctx_->status)return false;++count_;return true;}
