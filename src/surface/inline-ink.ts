@@ -62,6 +62,7 @@ export interface InkFrame {
   shapes?: { x: number; y: number; width: number; height: number }[];
 }
 export interface InkCommand {
+  token?:string;
   pageId: string;
   boardId: string;
   camera?: InkFrame["camera"];

@@ -28,7 +28,7 @@ export function useNativeBoard(options:NativeBoardOptions){
   const [owner,setOwner]=useState<{pageId:string;boardId:string;token:string}|null>(null);
   const invalidation=useRef<(()=>void)|null>(null), cameraVersion=useRef(0), previousInk=useRef("pen");
   const active=options.enabled&&typeof window!=="undefined"&&window.showai?.inlineInk?.nativeScene===true;
-  const controlState=useRef<{key:string;record:NativeBoardControlRecord;send?:()=>void}|undefined>(undefined);
+  const controlState=useRef<{key:string;record:NativeBoardControlRecord;token?:string;send?:()=>void}|undefined>(undefined);
   const controlKey=options.document?.id+":"+options.boardId;
   const laneAvailable=active&&typeof window.showai?.inlineInk?.toolIntent==="function";
   if(laneAvailable&&(!controlState.current||controlState.current.key!==controlKey)){
@@ -42,7 +42,7 @@ export function useNativeBoard(options:NativeBoardOptions){
     if(!active||!bridge||!options.document)return;
     return bridge.onCommand(value=>{
       const o=current.current;
-      if(value.pageId!==o.document?.id||value.boardId!==o.boardId)return;
+      if(value.pageId!==o.document?.id||value.boardId!==o.boardId||value.token&&value.token!==controlState.current?.token)return;
       if(value.error)throw new Error(value.error);
       if(value.clearSelection)o.onClearSelection();
       if(value.selection)o.onSelection?.(value.selection);
@@ -100,7 +100,7 @@ export function useNativeBoard(options:NativeBoardOptions){
       }catch(error){surface.dispatchEvent(new CustomEvent("showai:ink-error",{bubbles:true,detail:String(error)}));throw error}
       finally{pending=false;if(dirty)schedule()}
     };
-    if(control)control.send=sendControl;
+    if(control){control.token=token;control.send=sendControl}
     invalidation.current=schedule;
     const observer=new MutationObserver(changes=>{
       if(changes.some(change=>change.target!==world&&world.contains(change.target)))poseDocument=undefined;
@@ -113,7 +113,7 @@ export function useNativeBoard(options:NativeBoardOptions){
     surface.addEventListener("showai:viewport-change",viewport);surface.addEventListener("showai:ink-refresh",refresh);
     window.addEventListener("resize",schedule);document.addEventListener("scroll",schedule,true);document.addEventListener("visibilitychange",schedule);
     schedule();
-    return()=>{alive=false;if(control?.send===sendControl)control.send=undefined;setOwner(previous=>previous?.token===token?null:previous);if(invalidation.current===schedule)invalidation.current=null;cancelAnimationFrame(frame);observer.disconnect();resize.disconnect();
+    return()=>{alive=false;if(control?.send===sendControl){control.send=undefined;control.token=undefined}setOwner(previous=>previous?.token===token?null:previous);if(invalidation.current===schedule)invalidation.current=null;cancelAnimationFrame(frame);observer.disconnect();resize.disconnect();
       surface.removeEventListener("showai:viewport-change",viewport);surface.removeEventListener("showai:ink-refresh",refresh);window.removeEventListener("resize",schedule);document.removeEventListener("scroll",schedule,true);document.removeEventListener("visibilitychange",schedule);
       void bridge.hide(o.document!.id,o.boardId,token).finally(()=>{if(surface.dataset.nativeInkToken===token){delete surface.dataset.nativeBoardActive;delete surface.dataset.nativeInkToken}});
     };
