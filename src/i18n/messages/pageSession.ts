@@ -8,9 +8,8 @@ export default defineMessages("pageSession", {
     "status.changed": "待保存",
     "status.retained": "本机草稿已保留",
     "status.failed": "保存失败",
-    savedWithExternalConflict:
-      "正式修改已保存，但外部文件也有修改，外部版本已保留。请处理冲突。",
-    externalUnresolved: "外部文件有未处理修改，外部版本已保留。",
+    savedWithExternalConflict: "你的修改已保存，但另一处也有修改，已单独保留。请处理冲突。",
+    externalUnresolved: "另一处的修改尚未处理，已单独保留。",
     legacyDraftNoBase:
       "这份旧库草稿缺少可靠的基础版本，已保留在本机。可以保留为副本，或载入正式版本。",
     draftRestoredWithChanges:
@@ -38,10 +37,8 @@ export default defineMessages("pageSession", {
     "status.changed": "Unsaved",
     "status.retained": "Local draft kept",
     "status.failed": "Couldn't save",
-    savedWithExternalConflict:
-      "Your changes were saved, but the file was also changed elsewhere. The external version is kept. Resolve the conflict.",
-    externalUnresolved:
-      "The file has unresolved external changes. The external version is kept.",
+    savedWithExternalConflict: "Your changes were saved, but changes were also made elsewhere and are kept separately. Resolve the conflict.",
+    externalUnresolved: "Changes made elsewhere are not resolved yet and are kept separately.",
     legacyDraftNoBase:
       "This draft from an older library has no reliable base version and is kept on this device. Keep it as a copy, or load the saved version.",
     draftRestoredWithChanges:
