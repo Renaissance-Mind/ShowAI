@@ -70,18 +70,34 @@ inline uint32_t vertex_root(const Graph&g,uint32_t v){
     uint32_t steps=0;while(v<g.parent.size()&&g.parent[v]!=v){if(++steps>g.parent.size()){g.context()->fail(SA_INK_RANGE);return no_index;}v=g.parent[v];}
     if(v>=g.parent.size()){g.context()->fail(SA_INK_RANGE);return no_index;}return v;
 }
-inline bool anchor(const Curve&curve,Root root,uint32_t vertex,uint32_t edge,uint32_t endpoint,
+inline bool anchor_polynomials(const Polynomial&x_polynomial,const Polynomial&y_polynomial,Root root,uint32_t vertex,uint32_t edge,uint32_t endpoint,
                    const BoundaryQuantizationOptions&o,BoundaryQuantizationMetrics&m,BoundaryQuantizedVertex&output){
-    auto&c=*curve.context();if(root.context()!=&c){c.fail(SA_INK_INVALID);return false;}if(!root_domain(root,m,o))return false;
+    if(!x_polynomial.context())return false;auto&c=*x_polynomial.context();if(y_polynomial.owner()!=x_polynomial.owner()||root.context()!=&c){c.fail(SA_INK_INVALID);return false;}if(!root_domain(root,m,o))return false;
     const Q ox=Q::from_double(c,o.origin[0]),oy=Q::from_double(c,o.origin[1]),allowed=Q::from_double(c,o.maximum_error_l1)/Q(8);
     while(c.status==SA_INK_OK){
-        ++m.vertex_attempts;auto x=evaluate(curve.x,Interval{root.lower,root.upper}),y=evaluate(curve.y,Interval{root.lower,root.upper});
+        ++m.vertex_attempts;auto x=evaluate(x_polynomial,Interval{root.lower,root.upper}),y=evaluate(y_polynomial,Interval{root.lower,root.upper});
         double px=0,py=0;if(!nearest_lower_tie((x.lower+x.upper)/Q(2)-ox,px)||!nearest_lower_tie((y.lower+y.upper)/Q(2)-oy,py))return false;
         const Q qx=Q::from_double(c,px)+ox,qy=Q::from_double(c,py)+oy;
         const Q error=maximum((qx-x.lower).absolute(),(qx-x.upper).absolute())+maximum((qy-y.lower).absolute(),(qy-y.upper).absolute());
         if(error<=allowed){BoundaryQuantizedVertex staged{};staged.vertex=vertex;staged.representative_edge=edge;staged.endpoint=endpoint;staged.position[0]=px;staged.position[1]=py;if(!upper_bound(error,staged.error_l1))return false;output=staged;return true;}
         if(!refine_owned(root,m,o)){if(c.status==SA_INK_OK)c.fail(SA_INK_RANGE);return false;}
     }return false;
+}
+inline bool anchor(const Curve&curve,Root root,uint32_t vertex,uint32_t edge,uint32_t endpoint,
+                   const BoundaryQuantizationOptions&o,BoundaryQuantizationMetrics&m,BoundaryQuantizedVertex&output){
+    return anchor_polynomials(curve.x,curve.y,root,vertex,edge,endpoint,o,m,output);
+}
+// PointAuthority may hold an exact rational position independent of any source
+// slot. Quantize after exact origin subtraction; no approximate absolute point.
+inline bool anchor_exact_point(const Point&point,uint32_t vertex,uint32_t edge,uint32_t endpoint,
+                   const BoundaryQuantizationOptions&o,BoundaryQuantizationMetrics&m,BoundaryQuantizedVertex&output){
+    if(!point.context())return false;auto&c=*point.context();
+    if((point.x.context()&&point.x.context()!=&c)||(point.y.context()&&point.y.context()!=&c)){c.fail(SA_INK_INVALID);return false;}
+    ++m.vertex_attempts;const Q ox=Q::from_double(c,o.origin[0]),oy=Q::from_double(c,o.origin[1]),allowed=Q::from_double(c,o.maximum_error_l1)/Q(8);
+    BoundaryQuantizedVertex staged{};staged.vertex=vertex;staged.representative_edge=edge;staged.endpoint=endpoint;
+    if(!nearest_lower_tie(point.x-ox,staged.position[0])||!nearest_lower_tie(point.y-oy,staged.position[1]))return false;
+    const Q error=(Q::from_double(c,staged.position[0])+ox-point.x).absolute()+(Q::from_double(c,staged.position[1])+oy-point.y).absolute();
+    if(error>allowed){c.fail(SA_INK_RANGE);return false;}if(!upper_bound(error,staged.error_l1))return false;output=staged;return c.status==SA_INK_OK;
 }
 /* The supplied edge comes from an actual retained immutable source chunk.
  * index is the certificate index within that binding (flat only for cold export).
