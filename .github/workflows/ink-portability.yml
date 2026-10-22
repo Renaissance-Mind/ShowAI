@@ -1,0 +1,45 @@
+name: Editable ink portability
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 45
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - run: npm ci
+      - run: clang++ --version
+      - run: npx playwright install chromium
+      - run: npm run check
+      - name: Native and WASM geometry, editable source and concurrent merge
+        run: >-
+          npx vitest run src/surface/ink-kernel
+          src/surface/portable-ink-v2.test.ts
+          src/surface/portable-cubic-concurrent.test.ts
+          src/surface/ink-operations.test.ts src/surface/ink-wire.test.ts
+          --maxWorkers=2 --testTimeout=60000 --hookTimeout=60000
+          --reporter=default --reporter=json
+          --outputFile=output/playwright/ink-portability-tests.json
+      - name: Production browser writing, erase, history and cold reopen
+        run: |
+          export SHOWAI_BROWSER_EXECUTABLE="$(node --input-type=module -e 'import {chromium} from "playwright-core";process.stdout.write(chromium.executablePath())')"
+          node scripts/test-portable-cubic-ui.mjs
+      - name: Sandboxed Electron writing and durable Undo/Redo
+        run: |
+          npm run desktop:build
+          node scripts/portable-cubic-desktop-smoke.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: editable-ink-windows-${{ github.sha }}
+          path: output/playwright/
+          if-no-files-found: warn
