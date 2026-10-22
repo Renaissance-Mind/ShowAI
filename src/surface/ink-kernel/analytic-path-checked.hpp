@@ -13,7 +13,16 @@ namespace showai_analytic_internal {
  * Core holds its immutable raw Array through withUnsafeBufferPointer until the
  * complete C prepare returns. Concurrent mutation violates that existing input
  * span contract; this object does not authorize a mutable external snapshot. */
-class __attribute__((visibility("hidden"))) CheckedEmissionPlan final {
+// Apple partial ld -r localizes hidden private externs inside ShowAIInkKernel.
+// The real coverage target must resolve these C++ implementation symbols after
+// that step. This header is never in a public module map or the C API. WASM
+// still marks the class hidden and its linker exports only public C functions.
+#if defined(__wasm__)
+#define SHOWAI_ANALYTIC_PLAN_VISIBILITY "hidden"
+#else
+#define SHOWAI_ANALYTIC_PLAN_VISIBILITY "default"
+#endif
+class __attribute__((visibility(SHOWAI_ANALYTIC_PLAN_VISIBILITY))) CheckedEmissionPlan final {
     const SAInkPathCommand *const commands_;
     const uint32_t count_;
     const double *const original_matrix_;
@@ -33,6 +42,7 @@ class __attribute__((visibility("hidden"))) CheckedEmissionPlan final {
         const double *, const SAAnalyticBudget *, SAAnalyticPatch *, uint32_t,
         SAAnalyticVertex *, uint32_t, SAAnalyticCounts *);
 };
+#undef SHOWAI_ANALYTIC_PLAN_VISIBILITY
 #ifdef SHOWAI_ANALYTIC_WALK_COUNTERS
 struct WalkWork { uint64_t counts, emissions; };
 __attribute__((visibility("hidden"))) void reset_walk_work();
