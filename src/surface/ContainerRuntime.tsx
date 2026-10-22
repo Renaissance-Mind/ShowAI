@@ -1025,10 +1025,10 @@ function ContainerView({
   const styleKey=keyForTool(tool);
   const style = styles[styleKey];
   const chooseTool = (next: BoardTool | null) => {
-    // Finish the outgoing contact now; its checkpoint continues independently
-    // of the selected tool. Native hide retains the original durability barrier.
-    viewport.current?.configureNativeInput(next,styleValues.current[keyForTool(next)]);
-    const saving = next===toolValue.current ? undefined:window.showai?.inlineInk?.flush();
+    // The native control lane seals and registers the outgoing contact. Its
+    // captured/queued ownership is not an ACK and does not force a checkpoint.
+    const nativeControlled=viewport.current?.configureNativeInput(next,styleValues.current[keyForTool(next)]);
+    const saving = next===toolValue.current||nativeControlled ? undefined:window.showai?.inlineInk?.flush();
     toolValue.current=next;
     runtime.activate(id);
     runtime.select(null);

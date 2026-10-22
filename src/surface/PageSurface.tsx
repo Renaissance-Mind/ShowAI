@@ -107,7 +107,7 @@ export interface SurfaceHandle {
   point: (x: number, y: number) => { x: number; y: number };
   /** Start editing an object's text at its end, e.g. right after creating it. */
   edit: (id: string) => void;
-  configureNativeInput:(tool:BoardTool|null,style:DrawingStyle)=>void;
+  configureNativeInput:(tool:BoardTool|null,style:DrawingStyle)=>boolean;
 }
 interface Props {
   children: ReactNode;
@@ -842,7 +842,7 @@ export default function PageSurface({
     reveal: (id) => focusAfterMount([id], true),
     point: (x, y) => controls.current.point(x, y),
     edit: editObject,
-    configureNativeInput:(tool,style)=>nativeControl.current?.update({tool:tool??"select",color:style.color,fillColor:style.fillColor??"none",width:style.strokeWidth,pressure:style.pressure!==false,ruler:rulerValue.current}),
+    configureNativeInput:(tool,style)=>{const control=nativeControl.current;if(!control)return false;control.update({tool:tool??"select",color:style.color,fillColor:style.fillColor??"none",width:style.strokeWidth,pressure:style.pressure!==false,ruler:rulerValue.current});return true},
   }));
   const addText = (point: { x: number; y: number }) => {
     // Offset by the text box padding so typing starts where the user clicked.
