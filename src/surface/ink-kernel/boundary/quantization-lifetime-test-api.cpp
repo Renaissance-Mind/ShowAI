@@ -1,5 +1,4 @@
 // Test-only actual source-owner API transport; no production/public ABI addition.
-#include "../boundary-kernel.cpp"
 #include "quantization-source-pin.hpp"
 extern "C" uint32_t saqt_source_pins(void*memory,uint32_t bytes,uint32_t*output,uint32_t capacity){
     if(!memory||((uintptr_t)memory&15u)||bytes<16*1024*1024||!output||capacity<8||memory_overlap(memory,bytes,output,uint64_t(capacity)*4))return SA_INK_INVALID;
@@ -22,6 +21,10 @@ extern "C" uint32_t saqt_source_pins(void*memory,uint32_t bytes,uint32_t*output,
         auto bad=A;++bad.epoch;if(BoundaryQuantizationSourcePin::capture(stateA,bad,b)!=SA_INK_INVALID||b.get()!=retained)return SA_INK_INVALID;++checks;
         auto*actual=owner(stateA);auto&slot=actual->slots[A.slot];const uint32_t references=slot.references;slot.references=0xffffffffu;
         if(BoundaryQuantizationSourcePin::capture(stateA,A,b)!=SA_INK_CAPACITY||b.get()!=retained)return SA_INK_INVALID;slot.references=references;++checks;
+        {const uint32_t before=static_cast<const Owner*>(actual)->slots[A.slot].references;BoundaryQuantizationSourcePin cleanup=a;
+         actual->math.numbers.fail(SA_INK_RANGE);cleanup.reset();
+         if(static_cast<const Owner*>(actual)->slots[A.slot].references!=before||actual->math.numbers.status!=SA_INK_RANGE)return SA_INK_INVALID;
+         actual->math.numbers.begin_work(actual->budget.max_limb_operations);++checks;}
         BoundaryQuantizationSourcePin shared=a;
         if(!shared.valid()||shared.get()!=a.get()||!shared.same_snapshot(a)||!a.latest()||a.same_snapshot(b))return SA_INK_INVALID;
         SABoundarySourceMutation mutation{};mutation.source=block;

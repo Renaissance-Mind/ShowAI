@@ -32,7 +32,10 @@ struct alignas(16) Owner{
     bool begin(){if(busy)return false;busy=1;math.numbers.begin_work(budget.max_limb_operations);math.polynomial.operations=0;math.polynomial.max_operations=budget.max_polynomial_operations;math.numbers.peak_bytes=math.numbers.live_bytes;return true;}
     bool valid(SABoundaryLease lease)const{return !lease.reserved&&lease.owner==uint64_t((uintptr_t)this)&&lease.epoch==name&&lease.slot<slots.size()&&slots[lease.slot].references&&slots[lease.slot].generation==lease.generation&&slots[lease.slot].snapshot.valid();}
     SABoundaryLease lease(uint32_t slot)const{return{uint64_t((uintptr_t)this),name,slot,slots[slot].generation,0};}
-    void drop(uint32_t slot){auto&s=slots[slot];if(!--s.references){s.snapshot={};s.report={};}}
+    // Owner is noncopyable; this registry is unique. Lifecycle cleanup must
+    // remain possible after arithmetic failure, without Vector::unique/allocate.
+    LeaseSlot&edit_slot(uint32_t slot){return const_cast<LeaseSlot&>(static_cast<const Owner*>(this)->slots[slot]);}
+    void drop(uint32_t slot){auto&s=edit_slot(slot);if(!--s.references){s.snapshot={};s.report={};}}
     bool external_memory(const void*p,uint64_t bytes)const{return !memory_overlap(p,bytes,this,sizeof(Owner))&&!memory_overlap(p,bytes,math.numbers.memory,backing_bytes);}
 };
 inline Owner*owner(void*state){if(!state||((uintptr_t)state&15u))return nullptr;uint64_t signature;copy_bytes(&signature,state,8);return signature==Owner::signature?(Owner*)state:nullptr;}

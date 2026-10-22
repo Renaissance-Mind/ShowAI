@@ -10,11 +10,15 @@ namespace showai_boundary {
 // A raw lease is never a cross-WASM-instance or cross-state capability.
 class BoundaryQuantizationSourcePin {
     Pointer<Owner>owner_;SABoundaryLease lease_{};
+    // Owner's slot registry is unique (Owner is noncopyable). Lifecycle
+    // bookkeeping must not use Vector::edit while an arithmetic failure is set.
+    // It performs no allocation and preserves that original failure status.
+    static LeaseSlot&slot(Owner&owner,uint32_t index){return owner.edit_slot(index);}
     void drop(){if(owner_){owner_->drop(lease_.slot);owner_=nullptr;lease_={};}}
     bool retain(const BoundaryQuantizationSourcePin&other){
         if(!other.owner_)return true;
         if(!other.owner_->valid(other.lease_)){other.owner_->math.numbers.fail(SA_INK_INVALID);return false;}
-        auto&slot=other.owner_->slots[other.lease_.slot];
+        auto&slot=BoundaryQuantizationSourcePin::slot(*other.owner_,other.lease_.slot);
         if(slot.references==0xffffffffu){other.owner_->math.numbers.fail(SA_INK_CAPACITY);return false;}
         ++slot.references;owner_=other.owner_;lease_=other.lease_;return true;
     }
@@ -32,7 +36,7 @@ public:
     static uint32_t capture(void*state,SABoundaryLease lease,BoundaryQuantizationSourcePin&output){
         auto*actual=showai_boundary::owner(state);
         if(!actual||actual->busy||!actual->valid(lease))return SA_INK_INVALID;
-        auto&slot=actual->slots[lease.slot];if(slot.references==0xffffffffu)return SA_INK_CAPACITY;
+        auto&slot=BoundaryQuantizationSourcePin::slot(*actual,lease.slot);if(slot.references==0xffffffffu)return SA_INK_CAPACITY;
         BoundaryQuantizationSourcePin staged;++slot.references;staged.owner_=actual;staged.lease_=lease;
         output=static_cast<BoundaryQuantizationSourcePin&&>(staged);return SA_INK_OK;
     }
