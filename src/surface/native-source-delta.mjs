@@ -1,3 +1,4 @@
+import { captureOwnedJSON } from "../portable/owned-json.mjs";
 /** Exact JSON transport edits. This carries existing source packets; it is not
  * an editing/causal protocol. The caller owns publication identity and receipt
  * validation. Neither inserted values nor mutable UI objects become baselines. */
@@ -94,7 +95,7 @@ export function diffNativeSource(base, next) {
 /** Apply all edits before returning any result. Each touched ancestor is cloned
  * once, untouched private subtrees remain private, and base/edits are unchanged
  * even when a later edit is malformed. Never expose this result to mutable UI. */
-export function applyNativeSourceDelta(base, edits) {
+function applySourceDelta(base, edits, inserted, mutableInsertedRoot) {
   if (!Array.isArray(edits)) fail("edits must be an array");
   let result = base;
   const owned = new WeakSet();
@@ -125,11 +126,11 @@ export function applyNativeSourceDelta(base, edits) {
     return parent;
   };
   for (const edit of edits) {
-    if (!object(edit) || !Array.isArray(edit.path) || !["set", "remove", "resize", "splice"].includes(edit.op)) fail("unknown edit");
+    if (!object(edit) || !own(edit, "path") || !own(edit, "op") || !Array.isArray(edit.path) || !["set", "remove", "resize", "splice"].includes(edit.op)) fail("unknown edit");
     const expected = edit.op === "set" ? ["op", "path", "value"] : edit.op === "resize" ? ["op", "path", "length"] : edit.op === "splice" ? ["op", "path", "index", "deleteCount", "items"] : ["op", "path"];
     if (Object.keys(edit).length !== expected.length || expected.some(key => !own(edit, key))) fail("unexpected edit fields");
     const path = edit.path;
-    if (edit.op === "set" && !path.length) { result = cloneJSON(edit.value); if (object(result)) owned.add(result); continue; }
+    if (edit.op === "set" && !path.length) { result = inserted(edit.value); if (mutableInsertedRoot && object(result)) owned.add(result); continue; }
     if (edit.op === "splice") {
       const parent = path.length ? parentAt(path.slice(0, -1)) : null, key = path.at(-1);
       if (parent) { keyFor(parent, key); if (!own(parent, key)) fail("missing splice target"); }
@@ -137,7 +138,7 @@ export function applyNativeSourceDelta(base, edits) {
       if (!Array.isArray(value) || !Number.isSafeInteger(edit.index) || edit.index < 0 || edit.index > value.length ||
         !Number.isSafeInteger(edit.deleteCount) || edit.deleteCount < 0 || edit.deleteCount > value.length - edit.index || !Array.isArray(edit.items))
         fail("splice requires an existing array and valid range");
-      const items = cloneJSON(edit.items);
+      const items = inserted(edit.items);
       // No argument spreading: a large inserted JSON array must not exceed the
       // engine's function-argument limit. All values are already independent.
       const copy = value.slice(0, edit.index).concat(items, value.slice(edit.index + edit.deleteCount));
@@ -161,9 +162,23 @@ export function applyNativeSourceDelta(base, edits) {
     if (edit.op === "remove") {
       if (Array.isArray(parent) || !own(parent, key)) fail("remove requires an existing object field");
       delete parent[key];
-    } else define(parent, key, cloneJSON(edit.value));
+    } else define(parent, key, inserted(edit.value));
   }
   return result;
+}
+
+/** Mutable callers retain independent copies of every inserted value. */
+export function applyNativeSourceDelta(base, edits) {
+  return applySourceDelta(base, edits, cloneJSON, true);
+}
+
+/** Closed ownership boundary: both inputs become independent sealed JSON data
+ * before edits execute. Only actually captured inserted branches may be reused;
+ * every writable ancestor is local and the complete result seals before escape.
+ * A root set is NOT mutable local ownership: later edits must path-copy it too. */
+export function applyCapturedSourceDelta(base, edits) {
+  const capturedBase = captureOwnedJSON(base), capturedEdits = captureOwnedJSON(edits);
+  return captureOwnedJSON(applySourceDelta(capturedBase, capturedEdits, value => value, false));
 }
 
 /** After complete model normalization, retain only exactly equal old UI

@@ -8,7 +8,7 @@ import {inkWireResolutionCandidates} from "./ink-wire.mjs";
 import {nativeContentHistoryStages,type NativeContentHistoryAction} from "./native-content-history";
 import {nativeDocumentBodiesEqual} from "./native-document-content";
 import {appendPortableInkFromSource} from "./portable-ink-append.mjs";
-import {applyNativeSourceDelta,diffNativeSource,shareNativeSource,type NativeSourceEdit} from "./native-source-delta.mjs";
+import {applyCapturedSourceDelta,applyNativeSourceDelta,diffNativeSource,shareNativeSource,type NativeSourceEdit} from "./native-source-delta.mjs";
 
 export interface SourceScope {homeId:string;projectId:string;pageId:string}
 export interface SourceSnapshotRef {
@@ -335,10 +335,21 @@ export class SourceRuntimeOwner {
   if(origin)this.bindNativeOrigin(origin,result,observer);
   return result;
  }
+ /** Only a live owner-held ref can supply a parse candidate. The raw request
+  * still names and validates the exact same ref after parsing, before mutation. */
+ private capturedJSON(raw:string,expected:SourceSnapshotRef|undefined,field:"current"|"base",envelope=false,observer?:SourceRuntimeObserver):unknown{
+  const actual=expected?this.get(expected):undefined;
+  const previous=[...this.publications.values()].at(-1)?.packet;
+  const packet=actual?{...previous,document:actual.document,baseDocument:actual.document}:previous??null;
+  const candidate=field==="base"?(actual?{document:actual.document}:undefined):envelope?{envelope:{full:packet}}:{packet,...(actual?{result:{document:actual.document}}:{})};
+  const request=measured(observer,"parse",()=>parseOwnedJSON(raw,candidate)) as Record<string,unknown>;
+  if(actual&&!sameSourceRef(request[field] as SourceSnapshotRef,actual.ref))fail("Captured JSON baseline differs from its separately retained actual ref");
+  return request;
+ }
  /** The only consuming entry creates its own independent object graph here.
   * General object callers cannot opt out of defensive capture or validation. */
- registerActualMergedJSON(raw:string,observer?:SourceRuntimeObserver):SourceSnapshotDelta{
-  const request=measured(observer,"parse",()=>parseOwnedJSON(raw,{packet:[...this.publications.values()].at(-1)?.packet??null})) as Parameters<SourceRuntimeOwner["registerActualMergedPublication"]>[0];
+ registerActualMergedJSON(raw:string,observer?:SourceRuntimeObserver,expectedRef?:SourceSnapshotRef):SourceSnapshotDelta{
+  const request=this.capturedJSON(raw,expectedRef,"current",false,observer) as Parameters<SourceRuntimeOwner["registerActualMergedPublication"]>[0];
   const current=this.get(request.current);
   const entry=measured(observer,"rememberPublication",()=>this.rememberPublication(current,request.publicationId,request.packet,()=>request.packet));
   const origin=request.sourceVersion===undefined?undefined:this.prepareNativeOrigin(current,request.publicationId,entry,request.result.document,request.sourceVersion,observer);
@@ -386,8 +397,8 @@ export class SourceRuntimeOwner {
   const current=this.get(request.current),entry=measured(observer,"rememberPublication",()=>this.rememberPublication(current,request.publicationId,request.packet));
   return this.unchangedNativePublication(current,request,entry,observer);
  }
- registerActualNativeJSONIfUnchanged(raw:string,observer?:SourceRuntimeObserver):SourceSnapshotDelta|null{
-  const request=measured(observer,"parse",()=>parseOwnedJSON(raw,{packet:[...this.publications.values()].at(-1)?.packet??null})) as Parameters<SourceRuntimeOwner["registerActualNativePublicationIfUnchanged"]>[0];
+ registerActualNativeJSONIfUnchanged(raw:string,observer?:SourceRuntimeObserver,expectedRef?:SourceSnapshotRef):SourceSnapshotDelta|null{
+  const request=this.capturedJSON(raw,expectedRef,"current",false,observer) as Parameters<SourceRuntimeOwner["registerActualNativePublicationIfUnchanged"]>[0];
   const current=this.get(request.current),entry=measured(observer,"rememberPublication",()=>this.rememberPublication(current,request.publicationId,request.packet,()=>request.packet));
   return this.unchangedNativePublication(current,request,entry,observer);
  }
@@ -396,8 +407,8 @@ export class SourceRuntimeOwner {
   * exact transport edits preserves its untouched sealed branches. A missing
   * baseline requests the same captured full packet; it never guesses a source.
   * This adapter is deliberately absent from the public execute dispatcher. */
- registerActualNativeEnvelopeJSON(raw:string,observer?:SourceRuntimeObserver):NativeSourceEnvelopeResult{
-  const request=measured(observer,"parse",()=>parseOwnedJSON(raw)) as NativeSourceEnvelopeRequest;
+ registerActualNativeEnvelopeJSON(raw:string,observer?:SourceRuntimeObserver,expectedRef?:SourceSnapshotRef):NativeSourceEnvelopeResult{
+  const request=this.capturedJSON(raw,expectedRef,"current",true,observer) as NativeSourceEnvelopeRequest;
   const current=this.get(request.current),envelope=request.envelope,s=envelope?.scope;
   const id=(value:unknown):value is string=>typeof value==="string"&&value.length>0&&value.length<=256;
   if(!envelope||envelope.format!=="showai-native-source-v1"||!s||s.projectId!==current.ref.scope.projectId||s.pageId!==current.ref.scope.pageId||!id(s.boardId)||!id(s.token)||!id(envelope.publicationId)||
@@ -417,7 +428,7 @@ export class SourceRuntimeOwner {
    }
    if(!previous)return{requiresFull:true};
    if(previous.transport.boardId!==s.boardId||previous.transport.token!==s.token||previous.transport.sourceVersion>envelope.sourceVersion)fail("Actual Native source envelope crosses its retained Board, token or version");
-   packet=measured(observer,"envelope.apply",()=>captureOwnedJSON(applyNativeSourceDelta(previous!.packet,envelope.edits!) as NativePublicationPacket));
+   packet=measured(observer,"envelope.apply",()=>applyCapturedSourceDelta(previous!.packet,envelope.edits!) as NativePublicationPacket);
   }
   if(!packet||packet.pageId!==s.pageId||packet.boardId!==s.boardId||packet.token!==s.token||packet.document?.id!==s.pageId||packet.baseDocument?.id!==s.pageId)fail("Actual Native source packet differs from its captured envelope");
   const entry=measured(observer,"rememberPublication",()=>this.rememberPublication(current,envelope.publicationId,packet,()=>packet));
@@ -442,10 +453,18 @@ export class SourceRuntimeOwner {
  }
  /** Trusted host adapter only: actual backend normalization/CAS has already
   * completed. Never reachable through the client request discriminant. */
- registerActualSavedSnapshot(request:{scope:SourceScope;document:ShowDocument;base:SourceSnapshotRef;leaseId?:string}):SourceSnapshotDelta{
+ registerActualSavedSnapshot(request:{scope:SourceScope;document:ShowDocument;base:SourceSnapshotRef;leaseId?:string},observer?:SourceRuntimeObserver):SourceSnapshotDelta{
   const base=this.get(request.base);
   if(scopeKey(scope(request.scope))!==scopeKey(base.ref.scope))fail("Saved source crosses its actual home/project/page");
-  return this.register(base.ref.scope,cloneSourceValue(request.document),"normalized",base,request.leaseId);
+  const document=measured(observer,"saved.capture",()=>captureOwnedJSON(request.document));
+  return this.register(base.ref.scope,document,"normalized",base,request.leaseId,[],undefined,observer);
+ }
+ /** Actual saved backend JSON only; no public execute kind can assert saved
+  * validation. Parse creates/owns data, expectedBase is separately live-resolved,
+  * and final model capacity still gates the complete actual stored body. */
+ registerActualSavedJSON(raw:string,expectedBase?:SourceSnapshotRef,observer?:SourceRuntimeObserver):SourceSnapshotDelta{
+  const request=this.capturedJSON(raw,expectedBase,"base",false,observer) as Parameters<SourceRuntimeOwner["registerActualSavedSnapshot"]>[0];
+  return this.registerActualSavedSnapshot(request,observer);
  }
  execute(request:SourceRuntimeRequest):SourceRuntimeResponse{
   switch(request.kind){
@@ -554,14 +573,14 @@ export function sourceRuntime(raw:string):string{service??=new SourceRuntimeOwne
 
 /** Only a backend adapter may expose this in its private validation VM. Public
  * sourceRuntime requests have no saved/validated flag that bypasses validation. */
-export function registerActualSavedSnapshot(raw:string):string{
+export function registerActualSavedSnapshot(raw:string,expectedBase?:SourceSnapshotRef,observer?:SourceRuntimeObserver):string{
  service??=new SourceRuntimeOwner();
- return JSON.stringify(service.registerActualSavedSnapshot(parseOwnedJSON(raw) as Parameters<SourceRuntimeOwner["registerActualSavedSnapshot"]>[0]));
+ return JSON.stringify(service.registerActualSavedJSON(raw,expectedBase,observer));
 }
 
-export function registerActualMergedPublication(raw:string,observer?:SourceRuntimeObserver):string{
+export function registerActualMergedPublication(raw:string,observer?:SourceRuntimeObserver,expectedRef?:SourceSnapshotRef):string{
  service??=new SourceRuntimeOwner();
- return JSON.stringify(service.registerActualMergedJSON(raw,observer));
+ return JSON.stringify(service.registerActualMergedJSON(raw,observer,expectedRef));
 }
 
 export function normalizeActualProjection(raw:string):string{
@@ -580,11 +599,11 @@ export function nativePublicationDocumentMatching(request:{ref:SourceSnapshotRef
 }
 
 /** Private captured-publication factory; never accepted by execute(). */
-export function registerActualNativePublicationIfUnchanged(raw:string,observer?:SourceRuntimeObserver):string{
- service??=new SourceRuntimeOwner();return JSON.stringify(service.registerActualNativeJSONIfUnchanged(raw,observer));
+export function registerActualNativePublicationIfUnchanged(raw:string,observer?:SourceRuntimeObserver,expectedRef?:SourceSnapshotRef):string{
+ service??=new SourceRuntimeOwner();return JSON.stringify(service.registerActualNativeJSONIfUnchanged(raw,observer,expectedRef));
 }
 
 /** Private actual-host envelope adapter; never a public source request kind. */
-export function registerActualNativeEnvelope(raw:string,observer?:SourceRuntimeObserver):string{
- service??=new SourceRuntimeOwner();return JSON.stringify(service.registerActualNativeEnvelopeJSON(raw,observer));
+export function registerActualNativeEnvelope(raw:string,observer?:SourceRuntimeObserver,expectedRef?:SourceSnapshotRef):string{
+ service??=new SourceRuntimeOwner();return JSON.stringify(service.registerActualNativeEnvelopeJSON(raw,observer,expectedRef));
 }
