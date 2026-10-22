@@ -11,6 +11,13 @@ inline bool verify_actual_blocks(const Graph&g,const BoundaryQuantizedGraph&cold
     auto&c=*g.context();Vector<Record<BoundaryQuantizedVertex>,1>records(c);
     for(const auto&v:cold.vertices)records.push_back(Record<BoundaryQuantizedVertex>::create(c,v));
     uint32_t processed=0;bool okay=true;
+    for(const auto&v:cold.vertices){
+        const auto&e=g.edges[v.representative_edge];const auto&curve=g.curves[e.source].geometry;const Root&parameter=v.endpoint?e.b:e.a;
+        if(parameter.exact()){
+            const Point point=at(curve,parameter.lower);BoundaryQuantizationMetrics metrics{};BoundaryQuantizedVertex derived{};
+            if(!boundary_quantization::anchor_exact_point(point,v.vertex,v.representative_edge,v.endpoint,o,metrics,derived)||metrics.root_refinements||metrics.vertex_attempts!=1||derived.position[0]!=v.position[0]||derived.position[1]!=v.position[1]||derived.error_l1!=v.error_l1)return false;
+        }
+    }
     g.edges.each_chunk([&](uint32_t slot,const ChunkTree<Edge>::Chunk&chunk){
         if(!okay||!g.good())return;Vector<BoundaryQuantizedAnchorPair,1>pairs(c);
         for(const auto&e:chunk.values){BoundaryQuantizedAnchorPair pair;const uint32_t ids[2]={boundary_quantization::vertex_root(g,e.va),boundary_quantization::vertex_root(g,e.vb)};
