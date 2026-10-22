@@ -27,6 +27,7 @@ struct RawCoverageMesh {
     BoundaryCoverageMesh mesh; RawCoverageCertificate certificate{};
     uint64_t source_generation=0;
     uint32_t regularized_curves=0; // regular analytic intervals proved flat, never labelled RAY
+    uint32_t regularization_segments=0; // bounded exact source-restricted chord leaves
     double source_control_bounds[4]{}; // conservative minX,minY,maxX,maxY; not AA support
     explicit RawCoverageMesh(Context&c):mesh(c){}
 };
@@ -162,12 +163,16 @@ inline bool emit(PolynomialContext&c,RawCoverageMesh&out,const double*positions,
  BoundaryCoverageDraw draw{};draw.origin[0]=ox;draw.origin[1]=oy;draw.first=out.mesh.vertices.size();draw.count=3;draw.source_edge=command;draw.kind=kind;draw.float_cast_error_pixels=mul(error,o.maximum_forward_norm);
  for(uint32_t i=0;i<3;i++)out.mesh.vertices.push_back(v[i]);out.mesh.draws.push_back(draw);++cert.absolute_contribution_bound;return !c.numbers.status;
 }
-inline bool chord(PolynomialContext&c,const SAInkPathCommand&command,const Command&meta,const SAAnalyticPatch&p,double&error){
+inline bool restricted_cubic(PolynomialContext&c,const SAInkPathCommand&command,const Command&meta,const SAAnalyticPatch&p,Point restricted[4]){
  if(command.operation!=3||!(p.parameter_start>=0&&p.parameter_end<=1&&p.parameter_start<p.parameter_end))return false;
  auto&ctx=c.numbers;Point original[4];original[0]={Q::from_double(ctx,meta.start[0]),Q::from_double(ctx,meta.start[1])};for(uint32_t i=1;i<4;i++)original[i]={Q::from_double(ctx,command.values[2*i-2]),Q::from_double(ctx,command.values[2*i-1])};
- Q t[2]={Q::from_double(ctx,p.parameter_start),Q::from_double(ctx,p.parameter_end)};Point restricted[4];
+ Q t[2]={Q::from_double(ctx,p.parameter_start),Q::from_double(ctx,p.parameter_end)};
  for(uint32_t i=0;i<4;i++){Point v[4];for(uint32_t j=0;j<4;j++)v[j]=original[j];for(uint32_t level=0;level<3;level++){Q x=t[level<3-i?0:1];for(uint32_t j=0;j<3-level;j++)v[j]={v[j].x*(Q(1)-x)+v[j+1].x*x,v[j].y*(Q(1)-x)+v[j+1].y*x};}restricted[i]=v[0];}
- Point a{Q::from_double(ctx,p.controls[0]),Q::from_double(ctx,p.controls[1])},b{Q::from_double(ctx,p.controls[6]),Q::from_double(ctx,p.controls[7])};Q dx=b.x-a.x,dy=b.y-a.y,den=dx*dx+dy*dy;
+ return !ctx.status;
+}
+inline bool chord_error(PolynomialContext&c,const Point restricted[4],const double av[2],const double bv[2],double&error){
+ auto&ctx=c.numbers;
+ Point a{Q::from_double(ctx,av[0]),Q::from_double(ctx,av[1])},b{Q::from_double(ctx,bv[0]),Q::from_double(ctx,bv[1])};Q dx=b.x-a.x,dy=b.y-a.y,den=dx*dx+dy*dy;
  Q maximumX=Q::from_signed(ctx,0),maximumY=Q::from_signed(ctx,0),previous(0);bool monotone=true;
  for(uint32_t i=0;i<4;i++){
   Q projection=den.zero()?Q(0):((restricted[i].x-a.x)*dx+(restricted[i].y-a.y)*dy)/den;
@@ -183,6 +188,99 @@ inline bool chord(PolynomialContext&c,const SAInkPathCommand&command,const Comma
   if(ex>maximumX)maximumX=ex;if(ey>maximumY)maximumY=ey;
  }}
  return !ctx.status&&boundary_quantization::upper_bound(maximumX+maximumY,error);
+}
+inline bool chord(PolynomialContext&c,const SAInkPathCommand&command,const Command&meta,const SAAnalyticPatch&p,double&error){
+ Point controls[4];double a[2]={p.controls[0],p.controls[1]},b[2]={p.controls[6],p.controls[7]};
+ return restricted_cubic(c,command,meta,p,controls)&&chord_error(c,controls,a,b,error);
+}
+/* Actual preflight of the original factory vertices. A newly admitted
+ * polyline interval cannot consume headroom needed by a later original fan.
+ * This is the same position-cast calculation as emit, not a larger tolerance. */
+inline bool original_cast_error(const Vector<SAAnalyticPatch>&patches,const Vector<Command>&metadata,
+ const SAInkPathCommand*commands,double&error){
+ error=0;
+ for(const auto&p:patches){
+  if(p.mode==SA_ANALYTIC_RAY)continue;const auto&meta=metadata[p.command_index];
+  double positions[8]{};uint32_t count=0;
+  if(p.mode==SA_ANALYTIC_SOLID){count=3;positions[0]=p.origin[0];positions[1]=p.origin[1];positions[2]=p.controls[0];positions[3]=p.controls[1];positions[4]=p.controls[6];positions[5]=p.controls[7];}
+  else if(p.mode==SA_ANALYTIC_QUADRATIC){count=3;positions[0]=meta.start[0];positions[1]=meta.start[1];for(uint32_t j=0;j<4;j++)positions[j+2]=commands[p.command_index].values[j];}
+  else if(p.mode==SA_ANALYTIC_CUBIC){uint32_t indices[4]{};count=hull(p.controls,indices);if(count<3)return false;for(uint32_t j=0;j<count;j++){positions[j*2]=p.controls[indices[j]*2];positions[j*2+1]=p.controls[indices[j]*2+1];}}
+  else return false;
+  for(uint32_t j=0;j<count;j++){
+   float x=float(positions[j*2]-meta.origin[0]),y=float(positions[j*2+1]-meta.origin[1]);if(!finite_double(x)||!finite_double(y))return false;
+   error=max(error,sum(difference_error(positions[j*2],meta.origin[0],x),difference_error(positions[j*2+1],meta.origin[1],y)));
+  }
+ }
+ return true;
+}
+inline double float_cell_error(double bound){
+ float f=float(bound);if(!finite_double(f))return double(f);uint32_t bits;copy_bytes(&bits,&f,4);uint32_t e=(bits>>23)&255;
+ uint64_t encoded=uint64_t(int(e?e:1)-127-24+1023)<<52;double half;copy_bytes(&half,&encoded,8);
+ return sum(half,half_ulp_double(bound));
+}
+/* Replace only an actual unresolved interval by a certified polyline. The
+ * factory's original chord fan remains; the added oriented fans have that
+ * chord as their opposite boundary, so the signed sum follows the polyline.
+ * Every shared split endpoint is rounded ONCE from the original exact cubic.
+ * Each leaf charges the exact Bernstein/chord error plus all retained triangle
+ * position casting under the unchanged physical metric envelope. */
+inline uint32_t refine_ray(PolynomialContext&c,const SAInkPathCommand&command,const Command&meta,const SAAnalyticPatch&p,
+ const RawCoverageOptions&o,RawCoverageMesh&out,double originalCast,uint32_t leafBudget,BoundaryKLMReason&reason){
+ auto&ctx=c.numbers;
+ struct Cell {Point controls[4];double a[2]{},b[2]{};uint32_t depth=0;};
+ Cell first;if(!restricted_cubic(c,command,meta,p,first.controls)){reason=boundary_klm_ray;return ctx.status?ctx.status:SA_INK_RANGE;}
+ first.a[0]=p.controls[0];first.a[1]=p.controls[1];first.b[0]=p.controls[6];first.b[1]=p.controls[7];
+ // Convex bounds of the exact restricted curve plus the once-rounded shared
+ // binary64 endpoint bound every later split anchor. The Float32 cell bound
+ // reserves casting headroom BEFORE choosing any chord leaf, without storing
+ // a full polyline or revising already admitted geometry after another leaf.
+ double futureCast[2]{};
+ for(uint32_t axis=0;axis<2;axis++){
+  Q local=Q::from_signed(ctx,0),world=local,origin=Q::from_double(ctx,meta.origin[axis]);
+  for(uint32_t j=0;j<4;j++){const Q&value=axis?first.controls[j].y:first.controls[j].x;local=boundary_quantization::maximum(local,(value-origin).absolute());world=boundary_quantization::maximum(world,value.absolute());}
+  for(uint32_t endpoint=0;endpoint<2;endpoint++){double value=endpoint?first.b[axis]:first.a[axis];Q exact=Q::from_double(ctx,value);local=boundary_quantization::maximum(local,(exact-origin).absolute());world=boundary_quantization::maximum(world,exact.absolute());}
+  double localBound=0,worldBound=0;if(!boundary_quantization::upper_bound(local,localBound)||!boundary_quantization::upper_bound(world,worldBound))return ctx.status;
+  futureCast[axis]=float_cell_error(sum(localBound,half_ulp_double(worldBound)));
+ }
+ const double castBound=max(originalCast,sum(futureCast[0],futureCast[1]));
+ const double anchor[2]={first.a[0],first.a[1]};
+ const Point qa{Q::from_double(ctx,anchor[0]),Q::from_double(ctx,anchor[1])};
+ Vector<Cell,1>pending(ctx);pending.push_back(first);
+ while(!pending.empty()&&!ctx.status){
+  if(!ctx.step())return ctx.status;Cell cell=pending.back();pending.pop_back();double error=0;
+  if(!chord_error(c,cell.controls,cell.a,cell.b,error)){reason=boundary_klm_ray;return ctx.status?ctx.status:SA_INK_RANGE;}
+  auto&cert=out.certificate;
+  // The emitted triangles must also satisfy this same combined budget;
+  // admission here never widens the policy or bypasses their casting check.
+  double previous=cert.actual_regularization_error_source;
+  bool admitted=mul(o.maximum_forward_norm,sum(max(cert.actual_position_error_source,castBound),max(previous,error)))<=o.maximum_geometry_error_pixels;
+  if(admitted){
+   if(out.regularization_segments>=leafBudget){reason=boundary_klm_capacity;return SA_INK_CAPACITY;}
+   // The whole source factory and every added leaf share one patch cap.
+   ++out.regularization_segments;cert.actual_regularization_error_source=max(previous,error);
+   Point a{Q::from_double(ctx,cell.a[0]),Q::from_double(ctx,cell.a[1])},b{Q::from_double(ctx,cell.b[0]),Q::from_double(ctx,cell.b[1])};
+   Q area=(a.x-qa.x)*(b.y-qa.y)-(a.y-qa.y)*(b.x-qa.x);if(ctx.status)return ctx.status;
+   if(area.zero()){++cert.degenerate_triangles;continue;}
+   BoundaryCoverageVertex tri[3]{};for(auto&v:tri)v.l=v.m=1;
+   double positions[6]={anchor[0],anchor[1],cell.a[0],cell.a[1],cell.b[0],cell.b[1]};
+   if(!emit(c,out,positions,tri,area.sign(),meta.origin[0],meta.origin[1],p.command_index,boundary_coverage_solid,o,reason))return ctx.status?ctx.status:reason==boundary_klm_capacity?SA_INK_CAPACITY:SA_INK_RANGE;
+   continue;
+  }
+  if(cell.depth>=o.maximum_analytic_depth){reason=boundary_klm_error_budget;return SA_INK_RANGE;}
+  Cell left,right;left.depth=right.depth=cell.depth+1;
+  for(uint32_t axis=0;axis<2;axis++){left.a[axis]=cell.a[axis];right.b[axis]=cell.b[axis];}
+  Point work[4];for(uint32_t i=0;i<4;i++)work[i]=cell.controls[i];
+  left.controls[0]=work[0];right.controls[3]=work[3];
+  for(uint32_t level=1;level<=3;level++){
+   for(uint32_t i=0;i<4-level;i++)work[i]={(work[i].x+work[i+1].x)/Q(2),(work[i].y+work[i+1].y)/Q(2)};
+   left.controls[level]=work[0];right.controls[3-level]=work[3-level];
+  }
+  double midpoint[2];if(!boundary_quantization::nearest_lower_tie(work[0].x,midpoint[0])||!boundary_quantization::nearest_lower_tie(work[0].y,midpoint[1]))return ctx.status;
+  for(uint32_t axis=0;axis<2;axis++)left.b[axis]=right.a[axis]=midpoint[axis];
+  // Depth first, in original source direction; the stack has depth+1 cells.
+  pending.push_back(right);pending.push_back(left);
+ }
+ return ctx.status;
 }
 }
 inline bool raw_coverage_supports(const RawCoverageCertificate&c,const double*m){
@@ -201,9 +299,13 @@ inline uint32_t build_raw_coverage_mesh(PolynomialContext&c,const SAInkPathComma
  for(uint32_t i=0;i<count;i++){auto&meta=metadata[i];for(uint32_t axis=0;axis<2;axis++){meta.start[axis]=current[axis];if(commands[i].operation==0)origin[axis]=commands[i].values[axis];meta.origin[axis]=origin[axis];if(commands[i].operation<4)current[axis]=commands[i].values[2*commands[i].operation+axis-(commands[i].operation?2:0)];else current[axis]=origin[axis];}}
  RawCoverageMesh staged(ctx);staged.source_generation=generation;bool hasBounds=false;
  for(uint32_t i=0;i<count;i++)if(commands[i].operation<4){uint32_t points=commands[i].operation?commands[i].operation:1;for(uint32_t j=0;j<points;j++){double x=commands[i].values[2*j],y=commands[i].values[2*j+1];auto&b=staged.source_control_bounds;if(!hasBounds){b[0]=b[2]=x;b[1]=b[3]=y;hasBounds=true;}else{if(x<b[0])b[0]=x;if(y<b[1])b[1]=y;if(x>b[2])b[2]=x;if(y>b[3])b[3]=y;}}}
+ double originalCast=0;if(counts.ray_patches&&!original_cast_error(patches,metadata,commands,originalCast)){reason=boundary_klm_invalid;return SA_INK_INVALID;}
  auto&cert=staged.certificate;cert.maximum_forward_norm=o.maximum_forward_norm;cert.maximum_inverse_norm=o.maximum_inverse_norm;cert.maximum_geometry_error_pixels=o.maximum_geometry_error_pixels;
  for(const auto&p:patches){if(!ctx.step())return ctx.status;if(p.command_index>=count){reason=boundary_klm_invalid;return SA_INK_INVALID;}const auto&meta=metadata[p.command_index];
-  if(p.mode==SA_ANALYTIC_RAY){double error=0;if(!chord(c,commands[p.command_index],meta,p,error)){reason=boundary_klm_ray;return ctx.status?ctx.status:SA_INK_RANGE;}cert.actual_regularization_error_source=max(cert.actual_regularization_error_source,error);if(mul(o.maximum_forward_norm,sum(cert.actual_position_error_source,cert.actual_regularization_error_source))>o.maximum_geometry_error_pixels){reason=boundary_klm_error_budget;return SA_INK_RANGE;}++cert.regularized_rays;continue;}
+  if(p.mode==SA_ANALYTIC_RAY){double error=0;if(!chord(c,commands[p.command_index],meta,p,error)){reason=boundary_klm_ray;return ctx.status?ctx.status:SA_INK_RANGE;}
+   if(mul(o.maximum_forward_norm,sum(max(cert.actual_position_error_source,originalCast),max(cert.actual_regularization_error_source,error)))<=o.maximum_geometry_error_pixels){cert.actual_regularization_error_source=max(cert.actual_regularization_error_source,error);}
+   else{uint32_t refined=refine_ray(c,commands[p.command_index],meta,p,o,staged,originalCast,o.maximum_patches-counts.patches,reason);if(refined)return refined;}
+   ++cert.regularized_rays;continue;}
   uint32_t hullIndices[4]{},hullCount=p.mode==SA_ANALYTIC_CUBIC?hull(p.controls,hullIndices):0;if(p.mode==SA_ANALYTIC_CUBIC&&(hullCount<3||(hullCount-2)*3!=p.vertex_count)){reason=boundary_klm_invalid;return SA_INK_INVALID;}
   const auto patchCertificate=cert;const uint32_t patchVertices=staged.mesh.vertices.size(),patchDraws=staged.mesh.draws.size();
   for(uint32_t i=0;i<p.vertex_count;i+=3){BoundaryCoverageVertex tri[3]{};double positions[6]{};uint32_t quadMask=0;
