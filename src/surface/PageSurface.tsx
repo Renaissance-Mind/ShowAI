@@ -36,6 +36,7 @@ import messages from "../i18n/messages/surface";
 import { AssistantContext } from "../components/assistant-context";
 import {
   useContext,
+  useCallback,
   useEffect,
   useLayoutEffect,
   useImperativeHandle,
@@ -523,22 +524,29 @@ export default function PageSurface({
   const hoverWindow = useRef({ id: "", since: 0, until: 0 });
   const hoverFrame = useRef(0);
   const bindTarget = useRef<HTMLElement | null>(null);
-  const highlightTarget = (x: number | null, y?: number, exclude?: string) => {
-    let next: HTMLElement | null = null;
-    if (x !== null && Number.isFinite(x) && Number.isFinite(y)) {
-      const hit = board.hitTest(x, y!);
-      if (
-        hit &&
-        hit.id !== exclude &&
-        !(hit.node.type === "drawing" && hit.node.attrs?.tool === "arrow")
-      )
-        next = hit.element;
-    }
-    if (next === bindTarget.current) return;
-    bindTarget.current?.classList.remove("is-bind-target");
-    next?.classList.add("is-bind-target");
-    bindTarget.current = next;
-  };
+  const currentBoard = useRef(board);
+  useLayoutEffect(() => {
+    currentBoard.current = board;
+  }, [board]);
+  const highlightTarget = useCallback(
+    (x: number | null, y?: number, exclude?: string) => {
+      let next: HTMLElement | null = null;
+      if (x !== null && Number.isFinite(x) && Number.isFinite(y)) {
+        const hit = currentBoard.current.hitTest(x, y!);
+        if (
+          hit &&
+          hit.id !== exclude &&
+          !(hit.node.type === "drawing" && hit.node.attrs?.tool === "arrow")
+        )
+          next = hit.element;
+      }
+      if (next === bindTarget.current) return;
+      bindTarget.current?.classList.remove("is-bind-target");
+      next?.classList.add("is-bind-target");
+      bindTarget.current = next;
+    },
+    [],
+  );
   const clearHover = () => {
     cancelAnimationFrame(hoverFrame.current);
     hovered.current?.classList.remove("is-hovered");
@@ -1144,6 +1152,7 @@ export default function PageSurface({
       onRemove,
       onMove,
       onConnect,
+      highlightTarget,
       labelEditing,
       onLabel,
       revealAll,

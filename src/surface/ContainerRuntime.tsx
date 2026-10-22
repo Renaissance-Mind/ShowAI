@@ -1083,37 +1083,107 @@ function ContainerView({
       );
     runtime.requestReveal(null);
   }, [runtime.revealRequest]);
-  const actions: ObjectActions = {
-    geometry: runtime.geometry,
-    scale: 1,
-    selected: runtime.selected,
-    select: runtime.select,
-    inspect: runtime.inspect,
-    expand: runtime.expand,
-    readOnly,
-    revealAll: kind === "page" || reading,
-    revealed: new Set(),
-    move: readOnly
-      ? undefined
-      : (nodeId, frame) =>
-          runtime.commit(
-            transformObjects(
-              runtime.geometry.materialize(runtime.current.current),
-              { [nodeId]: frame },
+  const actions = useMemo<ObjectActions>(
+    () => ({
+      geometry: runtime.geometry,
+      scale: 1,
+      selected: runtime.selected,
+      select: runtime.select,
+      inspect: runtime.inspect,
+      expand: runtime.expand,
+      readOnly,
+      revealAll: kind === "page" || reading,
+      revealed: new Set(),
+      move: readOnly
+        ? undefined
+        : (nodeId, frame) =>
+            runtime.commit(
+              transformObjects(
+                runtime.geometry.materialize(runtime.current.current),
+                { [nodeId]: frame },
+              ),
             ),
-          ),
-    remove: readOnly
-      ? undefined
-      : (nodeId) => {
-          runtime.commit(
-            removeNode(
-              runtime.geometry.materialize(runtime.current.current),
-              nodeId,
-            ),
-          );
-          runtime.select(null);
-        },
-  };
+      remove: readOnly
+        ? undefined
+        : (nodeId) => {
+            runtime.commit(
+              removeNode(
+                runtime.geometry.materialize(runtime.current.current),
+                nodeId,
+              ),
+            );
+            runtime.select(null);
+          },
+    }),
+    [runtime, readOnly, kind, reading],
+  );
+  // Local tool/style state must not broadcast a new object context. These
+  // handlers capture the actual runtime and are renewed on document, selection
+  // or permission context changes; mutations still read its current source.
+  const transformObjectFrames = useCallback(
+    (frames: Record<string, NodeLayout>, group?: string) =>
+      runtime.commit(
+        transformObjects(
+          runtime.geometry.materialize(runtime.current.current),
+          frames,
+        ),
+        group,
+      ),
+    [runtime],
+  );
+  const connectObject = useCallback<NonNullable<ObjectActions["connect"]>>(
+    (nodeId, endpoint, point) => {
+      const source = runtime.geometry.materialize(runtime.current.current),
+        entry = findSurfaceNode(source, nodeId);
+      if (!entry || !source.layout[nodeId]) return;
+      const endpoints = arrowEndpoints(entry.node, source.layout[nodeId]);
+      endpoints[endpoint === "start" ? 0 : 1] = point;
+      const bindings = { ...entry.node.attrs?.bindings };
+      const binding = bindingAtPoint(
+        source,
+        entry.parent!.attrs!.id,
+        point,
+        8 / (viewport.current?.scale() ?? 1),
+      );
+      if (binding) bindings[endpoint] = binding;
+      else delete bindings[endpoint];
+      const resolved = arrowFromEndpoints(
+        entry.node,
+        source.layout[nodeId],
+        endpoints,
+        bindings,
+      );
+      runtime.commit(
+        editNode(
+          {
+            ...source,
+            layout: { ...source.layout, [nodeId]: resolved.frame },
+          },
+          nodeId,
+          (node) => {
+            node.attrs = resolved.node.attrs;
+          },
+        ),
+      );
+    },
+    [runtime],
+  );
+  const setObjectLabel = useCallback<NonNullable<ObjectActions["setLabel"]>>(
+    (nodeId, label, minHeight) => {
+      let next = runtime.geometry.materialize(runtime.current.current);
+      const frame = next.layout?.[nodeId];
+      if (minHeight && frame && minHeight > (frame.height ?? 0))
+        next = transformObjects(next, {
+          [nodeId]: { ...frame, height: minHeight },
+        });
+      next = editNode(next, nodeId, (node) => {
+        if (label) node.attrs = { ...node.attrs, label };
+        else delete node.attrs!.label;
+      }) as ContainerDocument;
+      runtime.commit(next);
+    },
+    [runtime],
+  );
   // A borderless Page blends into its Board: no frame and no title line.
   const heading =
     header ??
@@ -1219,18 +1289,7 @@ function ContainerView({
           geometry={runtime.geometry}
           boardDocument={runtime.document}
           containerId={id}
-          onTransform={
-            readOnly
-              ? undefined
-              : (frames, group) =>
-                  runtime.commit(
-                    transformObjects(
-                      runtime.geometry.materialize(runtime.current.current),
-                      frames,
-                    ),
-                    group,
-                  )
-          }
+          onTransform={readOnly ? undefined : transformObjectFrames}
           onDuplicate={
             readOnly
               ? undefined
@@ -1387,49 +1446,7 @@ function ContainerView({
           onInspect={runtime.inspect}
           onExpand={runtime.expand}
           onMove={actions.move}
-          onConnect={
-            readOnly
-              ? undefined
-              : (nodeId, endpoint, point) => {
-                  const source = runtime.geometry.materialize(
-                      runtime.current.current,
-                    ),
-                    entry = findSurfaceNode(source, nodeId);
-                  if (!entry || !source.layout[nodeId]) return;
-                  const endpoints = arrowEndpoints(
-                    entry.node,
-                    source.layout[nodeId],
-                  );
-                  endpoints[endpoint === "start" ? 0 : 1] = point;
-                  const bindings = { ...entry.node.attrs?.bindings };
-                  const binding = bindingAtPoint(
-                    source,
-                    entry.parent!.attrs!.id,
-                    point,
-                    8 / (viewport.current?.scale() ?? 1),
-                  );
-                  if (binding) bindings[endpoint] = binding;
-                  else delete bindings[endpoint];
-                  const resolved = arrowFromEndpoints(
-                    entry.node,
-                    source.layout[nodeId],
-                    endpoints,
-                    bindings,
-                  );
-                  runtime.commit(
-                    editNode(
-                      {
-                        ...source,
-                        layout: { ...source.layout, [nodeId]: resolved.frame },
-                      },
-                      nodeId,
-                      (node) => {
-                        node.attrs = resolved.node.attrs;
-                      },
-                    ),
-                  );
-                }
-          }
+          onConnect={readOnly ? undefined : connectObject}
           onRemove={actions.remove}
           onViews={
             readOnly
@@ -1498,25 +1515,7 @@ function ContainerView({
             // Dragging a slider or color picker is one undo step.
             runtime.commit(next, `style:${[...drawings].sort().join(",")}`);
           }}
-          onLabel={
-            readOnly
-              ? undefined
-              : (nodeId, label, minHeight) => {
-                  let next = runtime.geometry.materialize(
-                    runtime.current.current,
-                  );
-                  const frame = next.layout?.[nodeId];
-                  if (minHeight && frame && minHeight > (frame.height ?? 0))
-                    next = transformObjects(next, {
-                      [nodeId]: { ...frame, height: minHeight },
-                    });
-                  next = editNode(next, nodeId, (node) => {
-                    if (label) node.attrs = { ...node.attrs, label };
-                    else delete node.attrs!.label;
-                  }) as ContainerDocument;
-                  runtime.commit(next);
-                }
-          }
+          onLabel={readOnly ? undefined : setObjectLabel}
           onTidy={
             readOnly
               ? undefined
