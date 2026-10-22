@@ -250,16 +250,22 @@ inline uint32_t refine_ray(PolynomialContext&c,const SAInkPathCommand&command,co
  // binary64 endpoint bound every later split anchor. The Float32 cell bound
  // reserves casting headroom BEFORE choosing any chord leaf, without storing
  // a full polyline or revising already admitted geometry after another leaf.
+ // One binary64 endpoint is already the shared fan anchor. Rebase only
+ // these derived RAY triangles to it. Whole-subpath MOVE distance can make
+ // a conservative Float cell wider than the remaining error budget forever,
+ // even after the actual chord error has converged. Both the future-cast
+ // proof and emit use this exact same origin; original fans/preflight and
+ // the accumulated geometric error policy remain unchanged.
+ const double anchor[2]={first.a[0],first.a[1]};
  double futureCast[2]{};
  for(uint32_t axis=0;axis<2;axis++){
-  Q local=Q::from_signed(ctx,0),world=local,origin=Q::from_double(ctx,meta.origin[axis]);
+  Q local=Q::from_signed(ctx,0),world=local,origin=Q::from_double(ctx,anchor[axis]);
   for(uint32_t j=0;j<4;j++){const Q&value=axis?first.controls[j].y:first.controls[j].x;local=boundary_quantization::maximum(local,(value-origin).absolute());world=boundary_quantization::maximum(world,value.absolute());}
   for(uint32_t endpoint=0;endpoint<2;endpoint++){double value=endpoint?first.b[axis]:first.a[axis];Q exact=Q::from_double(ctx,value);local=boundary_quantization::maximum(local,(exact-origin).absolute());world=boundary_quantization::maximum(world,exact.absolute());}
   double localBound=0,worldBound=0;if(!boundary_quantization::upper_bound(local,localBound)||!boundary_quantization::upper_bound(world,worldBound))return ctx.status;
   futureCast[axis]=float_cell_error(sum(localBound,half_ulp_double(worldBound)));
  }
  const double castBound=max(originalCast,sum(futureCast[0],futureCast[1]));
- const double anchor[2]={first.a[0],first.a[1]};
  const Point qa{Q::from_double(ctx,anchor[0]),Q::from_double(ctx,anchor[1])};
  Vector<Cell,1>pending(ctx);pending.push_back(first);
  while(!pending.empty()&&!ctx.status){
@@ -279,7 +285,7 @@ inline uint32_t refine_ray(PolynomialContext&c,const SAInkPathCommand&command,co
    if(area.zero()){++cert.degenerate_triangles;continue;}
    BoundaryCoverageVertex tri[3]{};for(auto&v:tri)v.l=v.m=1;
    double positions[6]={anchor[0],anchor[1],cell.a[0],cell.a[1],cell.b[0],cell.b[1]};
-   if(!emit(c,out,positions,tri,area.sign(),meta.origin[0],meta.origin[1],p.command_index,boundary_coverage_solid,o,reason))return ctx.status?ctx.status:reason==boundary_klm_capacity?SA_INK_CAPACITY:SA_INK_RANGE;
+   if(!emit(c,out,positions,tri,area.sign(),anchor[0],anchor[1],p.command_index,boundary_coverage_solid,o,reason))return ctx.status?ctx.status:reason==boundary_klm_capacity?SA_INK_CAPACITY:SA_INK_RANGE;
    continue;
   }
   if(cell.depth>=o.maximum_analytic_depth){reason=boundary_klm_error_budget;return SA_INK_RANGE;}
