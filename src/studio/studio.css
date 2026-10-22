@@ -1610,17 +1610,20 @@ button.studio-tree-chevron:hover {
 .catalog-preview-content[data-columns] {
   column-rule: 3px solid var(--line);
 }
-/* Folder cards: a soft folder shape holding the first entries as small sheets. */
+/* Folder previews: a tinted ground with the first entries fanned like sheets. */
 .studio-folder-thumbnail {
-  --folder-fill: color-mix(in srgb, var(--muted) 10%, var(--surface));
-  --folder-tab: color-mix(in srgb, var(--muted) 18%, var(--surface));
   position: absolute;
   top: 12px;
   left: 12px;
   right: 12px;
   height: 150px;
-  display: block;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
   pointer-events: none;
+  background: color-mix(in srgb, var(--brand-accent) 13%, var(--surface));
+  border-bottom: 1px solid var(--line);
 }
 .studio-page-list[data-view="small"] .studio-folder-thumbnail {
   height: 100px;
@@ -1628,38 +1631,13 @@ button.studio-tree-chevron:hover {
 .studio-page-list[data-view="large"] .studio-folder-thumbnail {
   height: 210px;
 }
-.studio-folder-thumbnail::before {
-  content: "";
+.studio-folder-sheet {
   position: absolute;
-  left: 0;
-  top: 0;
-  width: min(38%, 112px);
-  height: 18px;
-  background: var(--folder-tab);
-  border-radius: 6px 0 0 0;
-  clip-path: polygon(0 0, calc(100% - 14px) 0, 100% 100%, 0 100%);
-}
-.studio-folder-body {
-  position: absolute;
-  inset: 9px 0 0;
-  box-sizing: border-box;
-  display: flex;
-  flex-wrap: wrap;
-  align-content: flex-start;
-  justify-content: center;
-  gap: 8px;
-  padding: 14px 12px 12px;
-  overflow: hidden;
-  background: var(--folder-fill);
-  border-top: 2px solid var(--folder-tab);
-  border-radius: 0 8px 8px 8px;
-}
-/* Sheets that do not fit beside the others wrap onto a hidden second row. */
-.studio-folder-item {
-  position: relative;
-  flex: none;
-  height: 100%;
+  left: 50%;
+  top: 15%;
+  height: 78%;
   aspect-ratio: 3 / 4;
+  translate: -50% 0;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1668,36 +1646,71 @@ button.studio-tree-chevron:hover {
   background: var(--paper);
   border-radius: 4px;
   box-shadow:
-    0 0 0 1px var(--line),
-    0 2px 6px #0000000f;
+    0 0 0 1px color-mix(in srgb, var(--brand-accent) 18%, var(--line)),
+    0 3px 10px #0000001a;
+  transform-origin: 50% 100%;
   transition:
-    transform 0.16s ease,
-    box-shadow 0.16s ease;
+    transform 0.22s cubic-bezier(0.2, 0.8, 0.2, 1),
+    box-shadow 0.22s ease;
 }
-.studio-folder-item[data-kind="folder"] {
-  background: color-mix(in srgb, var(--muted) 6%, var(--paper));
+.studio-folder-sheet[data-kind="folder"] {
+  background: color-mix(in srgb, var(--brand-accent) 6%, var(--paper));
 }
-.studio-page-list-row:hover .studio-folder-item {
-  transform: translateY(-3px);
+.studio-folder-sheet[data-position="1"] {
+  transform: translateX(-38%) rotate(-8deg);
+}
+.studio-folder-sheet[data-position="2"] {
+  transform: translateX(38%) rotate(8deg);
+}
+.studio-folder-thumbnail[data-sheets="2"] .studio-folder-sheet[data-position="0"] {
+  transform: translateX(16%) rotate(3deg);
+}
+.studio-folder-thumbnail[data-sheets="2"] .studio-folder-sheet[data-position="1"] {
+  transform: translateX(-24%) rotate(-6deg);
+}
+/* Hovering the card spreads the fan and lifts the front sheet. */
+.studio-page-list-row:hover .studio-folder-sheet {
   box-shadow:
-    0 0 0 1px var(--line),
-    0 6px 14px #00000017;
+    0 0 0 1px color-mix(in srgb, var(--brand-accent) 18%, var(--line)),
+    0 8px 18px #00000024;
 }
-.studio-page-list[data-view] .studio-folder-item > .studio-page-thumbnail {
+.studio-page-list-row:hover .studio-folder-sheet[data-position="0"] {
+  transform: translateY(-8%);
+}
+.studio-page-list-row:hover .studio-folder-sheet[data-position="1"] {
+  transform: translateX(-62%) translateY(-2%) rotate(-12deg);
+}
+.studio-page-list-row:hover .studio-folder-sheet[data-position="2"] {
+  transform: translateX(62%) translateY(-2%) rotate(12deg);
+}
+.studio-page-list-row:hover
+  .studio-folder-thumbnail[data-sheets="2"]
+  .studio-folder-sheet[data-position="0"] {
+  transform: translateX(30%) translateY(-6%) rotate(6deg);
+}
+.studio-page-list-row:hover
+  .studio-folder-thumbnail[data-sheets="2"]
+  .studio-folder-sheet[data-position="1"] {
+  transform: translateX(-36%) translateY(-2%) rotate(-9deg);
+}
+@media (prefers-reduced-motion: reduce) {
+  .studio-folder-sheet {
+    transition: none;
+  }
+}
+.studio-page-list[data-view] .studio-folder-sheet > .studio-page-thumbnail {
   inset: 0;
   height: auto;
   border: 0;
 }
-.studio-folder-item .catalog-preview,
-.studio-folder-item .catalog-preview-content {
+.studio-folder-sheet .catalog-preview,
+.studio-folder-sheet .catalog-preview-content {
   background: var(--paper);
   border: 0;
 }
-.studio-folder-body:has(> .studio-folder-empty) {
-  align-content: center;
-}
 .studio-folder-empty {
-  color: color-mix(in srgb, var(--muted) 55%, transparent);
+  color: color-mix(in srgb, var(--brand-accent) 45%, var(--muted));
+  opacity: 0.6;
 }
 .studio-page-thumbnail
   :is(.surface-toolbar, .container-workspace-bar, .surface-object-header) {

@@ -1,3 +1,4 @@
+import type { CSSProperties } from "react";
 import { Folder } from "../ui/icons";
 import PageThumbnail from "./PageThumbnail";
 
@@ -8,9 +9,9 @@ export interface FolderThumbnailEntry {
 }
 
 /**
- * A folder card: a soft folder shape holding its first entries as small
- * portrait sheets, as many as fit side by side (at most four). Subfolders
- * appear as folder sheets so a card never loads more than four pages.
+ * A folder's preview: its first entries as a small fan of sheets on a tinted
+ * ground that sets folders apart from pages. The first entry stands in front;
+ * subfolders appear as folder sheets, so a card loads at most three pages.
  */
 export default function FolderThumbnail({
   projectId,
@@ -19,32 +20,38 @@ export default function FolderThumbnail({
   projectId: string;
   entries: FolderThumbnailEntry[];
 }) {
+  const sheets = entries.slice(0, 3);
   return (
-    <span className="studio-folder-thumbnail" aria-hidden="true" inert>
-      <span className="studio-folder-body">
-        {entries.length ? (
-          entries.slice(0, 4).map((entry) => (
-            <span
-              key={entry.id}
-              className="studio-folder-item"
-              data-kind={entry.kind}
-            >
-              {entry.kind === "page" ? (
-                <PageThumbnail
-                  projectId={projectId}
-                  pageId={entry.id}
-                  updatedAt={entry.updatedAt}
-                  padding={3}
-                />
-              ) : (
-                <Folder size={18} strokeWidth={1.5} />
-              )}
-            </span>
-          ))
-        ) : (
-          <Folder className="studio-folder-empty" size={30} strokeWidth={1} />
-        )}
-      </span>
+    <span
+      className="studio-folder-thumbnail"
+      data-sheets={sheets.length}
+      aria-hidden="true"
+      inert
+    >
+      {sheets.length ? (
+        sheets.map((entry, index) => (
+          <span
+            key={entry.id}
+            className="studio-folder-sheet"
+            data-kind={entry.kind}
+            data-position={index}
+            style={{ zIndex: sheets.length - index } as CSSProperties}
+          >
+            {entry.kind === "page" ? (
+              <PageThumbnail
+                projectId={projectId}
+                pageId={entry.id}
+                updatedAt={entry.updatedAt}
+                padding={3}
+              />
+            ) : (
+              <Folder size={18} strokeWidth={1.5} />
+            )}
+          </span>
+        ))
+      ) : (
+        <Folder className="studio-folder-empty" size={30} strokeWidth={1} />
+      )}
     </span>
   );
 }

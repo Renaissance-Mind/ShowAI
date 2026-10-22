@@ -2391,7 +2391,7 @@ export default function Studio() {
       folderPreferences(selectedProject!, folderId),
       organization.entryOrder?.[selectedProject!],
     )
-      .slice(0, 4)
+      .slice(0, 3)
       .map(({ kind, id, updatedAt }) => ({ kind, id, updatedAt }));
   }
   const selectablePages = visibleEntries.filter(
