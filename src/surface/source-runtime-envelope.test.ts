@@ -86,3 +86,20 @@ it("preserves actual foreign edits and native semantic actions on the ordinary m
  content.request.envelope.edits=diffNativeSource(f.packet,content.packet);
  expect(f.owner.registerActualNativeEnvelopeJSON(JSON.stringify(content.request))).toBeNull();
 });
+it("preserves a pinned actual baseline after a canonical failure and still accepts its later correct delta",()=>{
+ const f=setup({maximumResidentBytes:1,maximumUnleased:0}),first=output(f.owner.registerActualNativeEnvelopeJSON(JSON.stringify(f.request))),before=body(f.owner,first.next);
+ const invalid=nextRequest(f,first,"invalid-source"),node=invalid.packet.document.content.content![1];
+ // Corrupt a genuinely generated source after its independent first capture.
+ node.attrs!.ink.geometryVersion=2;invalid.request.envelope.edits=diffNativeSource(f.packet,invalid.packet);
+ expect(()=>f.owner.registerActualNativeEnvelopeJSON(JSON.stringify(invalid.request))).toThrow(/version|Unsupported|ink/);
+ expect(body(f.owner,first.next)).toBe(before);expect(f.owner.nativePublicationDocumentMatching({ref:first.next,document:before})?.publicationId).toBe("actual-first");
+ const next=nextRequest(f,first),result=output(f.owner.registerActualNativeEnvelopeJSON(JSON.stringify(next.request)));
+ expect(body(f.owner,result.next).content.content).toHaveLength(2);
+});
+it("keeps the previous actual origin and lease intact when the new output exceeds retention budget",()=>{
+ const f=setup({maximumPinned:2}),first=output(f.owner.registerActualNativeEnvelopeJSON(JSON.stringify(f.request))),before=body(f.owner,first.next),next=nextRequest(f,first);
+ expect(()=>f.owner.registerActualNativeEnvelopeJSON(JSON.stringify(next.request))).toThrow(/retention/);
+ expect(body(f.owner,first.next)).toBe(before);expect(f.owner.nativePublicationDocumentMatching({ref:first.next,document:before})?.sourceVersion).toBe(1);
+ f.owner.execute({kind:"release",leaseId:"current"});
+ const result=output(f.owner.registerActualNativeEnvelopeJSON(JSON.stringify(next.request)));expect(body(f.owner,result.next).content.content).toHaveLength(2);
+});
