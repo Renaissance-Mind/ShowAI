@@ -68,7 +68,6 @@ import {
   Plus,
   History,
   Upload,
-  X,
 } from "../ui/icons";
 import type {
   ProjectSummary,
@@ -190,6 +189,20 @@ import {
 import { TemplateDialog, ComponentDialog } from "./CatalogDialogs";
 import "./studio.css";
 import {
+  NoticeStack,
+  ProblemNotice,
+  ToastViewport,
+  bindProblemActions,
+  configureProblemRedaction,
+  labelProblem,
+  useProblemQueue,
+  useToasts,
+  type ReportOptions,
+  type ToastOptions,
+} from "./problems";
+import errorMessages from "../i18n/messages/errors";
+import { translator } from "../i18n";
+import {
   LibrarySearchResults,
   ExternalConflictDialog,
   WorkspaceConflictsDialog,
@@ -281,6 +294,10 @@ type DialogState =
       custom?: CompiledComponent;
     }
   | null;
+
+/** Operation names for problem titles; read the locale on each call. */
+const operation = translator(errorMessages);
+const LOAD_LIBRARY = "loadLibrary";
 
 function shortDate(value: string) {
   return new Intl.DateTimeFormat(getLocale(), {
@@ -512,8 +529,17 @@ export default function Studio() {
   } | null>(null);
   const dialogRef = useRef(dialog);
   dialogRef.current = dialog;
-  const [notice, setNotice] = useState("");
-  const [problem, setProblem] = useState("");
+  const toasts = useToasts();
+  const { show: showToast, clear: clearToasts } = toasts;
+  /** L1 toast; an empty message clears transient toasts. */
+  const setNotice = useCallback(
+    (message: string, options?: ToastOptions) => {
+      if (message) showToast(message, options);
+      else clearToasts();
+    },
+    [showToast, clearToasts],
+  );
+  const problemQueue = useProblemQueue();
   const [busy, setBusy] = useState(false);
   const [revealNode, setRevealNode] = useState<string | null>(null);
   const [editorControls, setEditorControls] = useState<EditorControls | null>(
@@ -671,10 +697,19 @@ export default function Studio() {
   const initialized = useRef(false);
   const closeDialog = useCallback(() => setDialog(null), []);
 
+  const { report: queueProblem, resolve: resolveProblem } = problemQueue;
+  /**
+   * Shows a failed operation in the problem queue. Pass the operation name
+   * (`{ action: te("op.exportSite") }`) so the title says what failed; a
+   * later success of the same operation clears it via resolveProblem.
+   */
   const report = useCallback(
-    (error: unknown) => setProblem(errorMessage(error)),
-    [],
+    (error: unknown, options?: ReportOptions) => queueProblem(error, options),
+    [queueProblem],
   );
+  useEffect(() => {
+    configureProblemRedaction(info?.home ? { library: info.home } : {});
+  }, [info?.home]);
   useEffect(() => {
     if (view !== "page") return;
     const refreshPage = () => {
@@ -810,9 +845,20 @@ export default function Studio() {
   const refresh = useCallback(
     (change?: DesktopChange) => {
       queueNavigationScope(navigationScope.current, change);
-      return refreshNavigation();
+      return refreshNavigation().then(
+        (value) => {
+          resolveProblem(LOAD_LIBRARY);
+          return value;
+        },
+        (error: unknown) => {
+          throw labelProblem(error, {
+            action: operation("op.loadLibrary"),
+            key: LOAD_LIBRARY,
+          });
+        },
+      );
     },
-    [refreshNavigation],
+    [refreshNavigation, resolveProblem],
   );
   // A library the App just created gets its sample project once.
   const sampleProject = useSampleProject(
@@ -1039,11 +1085,6 @@ export default function Studio() {
     );
   }, [info?.home, expandedProjects, expandedFolders, collapsedSections]);
   useEffect(() => {
-    if (!notice) return;
-    const timer = setTimeout(() => setNotice(""), 3000);
-    return () => clearTimeout(timer);
-  }, [notice]);
-  useEffect(() => {
     document.title =
       view === "page" && page.draft
         ? `${page.draft.title || tc("untitled")} — ShowAI`
@@ -1259,7 +1300,9 @@ export default function Studio() {
     void openTarget(
       target,
       clickDisposition(event, info?.platform === "darwin"),
-    ).catch(report);
+    ).catch((error) =>
+      report(error, { action: operation("op.open"), object: target.title }),
+    );
   }
   /** Built-in documentation opens like a page: in this tab, or a new one on a modified click. */
   async function openDoc(
@@ -1369,7 +1412,7 @@ export default function Studio() {
       setView("page");
       await refresh();
     } catch (reason) {
-      report(reason);
+      report(reason, { action: operation("op.createPage") });
     } finally {
       setBusy(false);
     }
@@ -1448,9 +1491,17 @@ export default function Studio() {
           ...(externalData ? { externalData } : {}),
         },
       );
+      resolveProblem(operation("op.exportPage"));
       if (result) setNotice(t("pageExported"));
     } catch (reason) {
-      report(reason);
+      report(reason, {
+        action: operation("op.exportPage"),
+        retry: () => void exportPage(format, components, presentation, reader),
+        handlers: {
+          chooseLocation: () =>
+            void exportPage(format, components, presentation, reader),
+        },
+      });
     } finally {
       setBusy(false);
     }
@@ -1469,6 +1520,7 @@ export default function Studio() {
           ...(externalData ? { externalData } : {}),
         },
       );
+      resolveProblem(operation("op.exportSite"));
       if (result)
         setNotice(
           components === "remote"
@@ -1476,7 +1528,11 @@ export default function Studio() {
             : t("siteExportedBundled"),
         );
     } catch (reason) {
-      report(reason);
+      report(reason, {
+        action: operation("op.exportSite"),
+        retry: () => void exportSite(components),
+        handlers: { chooseLocation: () => void exportSite(components) },
+      });
     } finally {
       setBusy(false);
     }
@@ -1801,7 +1857,11 @@ export default function Studio() {
       if (!stack.length) return;
       event.preventDefault();
       event.stopPropagation();
-      void replayLibraryRef.current(event.shiftKey).catch(report);
+      void replayLibraryRef.current(event.shiftKey).catch((error) =>
+        report(error, {
+          action: operation(event.shiftKey ? "op.redoMove" : "op.undoMove"),
+        }),
+      );
     };
     window.addEventListener("keydown", key, true);
     return () => window.removeEventListener("keydown", key, true);
@@ -1857,7 +1917,7 @@ export default function Studio() {
         }
       } catch (error) {
         failed = true;
-        report(error);
+        report(error, { action: operation("op.move") });
       } finally {
         sidebarRevision.current++;
         reorderCount.current--;
@@ -2025,7 +2085,7 @@ export default function Studio() {
           source.id,
           moved ? drop.projectId! : source.projectId,
         ).catch(report);
-      report(error);
+      report(error, { action: operation("op.move") });
       return moved;
     } finally {
       if (moved && source.kind !== "project" && sidebarHome.current === home)
@@ -2037,7 +2097,21 @@ export default function Studio() {
       sidebarRevision.current++;
       reorderCount.current--;
       movingLibrary.current = false;
-      if (moved && sidebarHome.current === home) setNotice(t("moved"));
+      if (moved && sidebarHome.current === home)
+        setNotice(
+          t("moved"),
+          inverse
+            ? {
+                action: {
+                  label: operation("toast.undo"),
+                  onSelect: () =>
+                    void replayLibraryRef.current(false).catch((error) =>
+                      report(error, { action: operation("op.undoMove") }),
+                    ),
+                },
+              }
+            : undefined,
+        );
     }
   }
   const libraryDrag = useLibraryDragController({
@@ -2234,7 +2308,7 @@ export default function Studio() {
       !page.projectId ||
       page.projectId !== selectedRef.current
     ) {
-      setNotice(t("openPageFirst"));
+      setNotice(t("openPageFirst"), { kind: "warning" });
       return;
     }
     const source = upgradeResource(page.draft);
@@ -2299,7 +2373,7 @@ export default function Studio() {
     }),
     [selectedProject],
   );
-  const loading = !info && !problem;
+  const loading = !info && !problemQueue.problems.length;
   const recent = useMemo(
     () => recentPages(projects, contents),
     [projects, contents],
@@ -3242,10 +3316,14 @@ export default function Studio() {
             <>
               <button className="studio-icon" aria-label={t("libraryUndo")} title={t("libraryUndo")}
                 disabled={historyBusy.current || !libraryUndo.current.length}
-                onClick={() => void replayLibraryMove(false).catch(report)}><Undo2 size={16} /></button>
+                onClick={() => void replayLibraryMove(false).catch((error) =>
+                  report(error, { action: operation("op.undoMove") }),
+                )}><Undo2 size={16} /></button>
               <button className="studio-icon" aria-label={t("libraryRedo")} title={t("libraryRedo")}
                 disabled={historyBusy.current || !libraryRedo.current.length}
-                onClick={() => void replayLibraryMove(true).catch(report)}><Redo2 size={16} /></button>
+                onClick={() => void replayLibraryMove(true).catch((error) =>
+                  report(error, { action: operation("op.redoMove") }),
+                )}><Redo2 size={16} /></button>
             </>
           )}
           {view === "project" && (
@@ -3297,7 +3375,11 @@ export default function Studio() {
               </button>}
               <button
                 className="studio-icon"
-                onClick={action(importPage)}
+                onClick={() =>
+                  void importPage().catch((error) =>
+                    report(error, { action: operation("op.importPage") }),
+                  )
+                }
                 aria-label={tc("import")}
                 title={tc("import")}
               >
@@ -3521,20 +3603,40 @@ export default function Studio() {
                 style={directoryMarquee.rectangle}
               />
             )}
-            {problem && (
-              <div className="studio-problem" role="alert">
-                <span>{problem}</span>
-                <button
-                  className="studio-icon"
-                  aria-label={t("dismissError")}
-                  onClick={() => setProblem("")}
-                >
-                  <X size={15} />
-                </button>
-              </div>
-            )}
+            <NoticeStack>
+            {problemQueue.problems.map((entry) => (
+              <ProblemNotice
+                key={`problem-${entry.id}`}
+                data-priority={3}
+                problem={entry.problem}
+                count={entry.count}
+                reportable={entry.problem.code !== "LOCKED"}
+                actions={bindProblemActions(entry.problem.actions, {
+                  // Repeating the operation replaces this notice.
+                  ...Object.fromEntries(
+                    Object.entries({ ...entry.handlers, retry: entry.retry })
+                      .filter(([, handler]) => handler)
+                      .map(([id, handler]) => [
+                        id,
+                        () => {
+                          problemQueue.dismiss(entry.id);
+                          handler!();
+                        },
+                      ]),
+                  ),
+                  reload: () => window.location.reload(),
+                  librarySpace: capabilities.manageLibrary
+                    ? () => {
+                        setSettingsSection("general");
+                        void navigate("settings").catch(report);
+                      }
+                    : undefined,
+                })}
+                onDismiss={() => problemQueue.dismiss(entry.id)}
+              />
+            ))}
             {!!page.backgroundIssues.length && (
-              <div className="studio-conflict" role="alert">
+              <div className="studio-conflict" role="alert" data-priority={3}>
                 <p>{t("backgroundSaveIssue")}</p>
                 {page.backgroundIssues.map((issue) => (
                   <button
@@ -3549,13 +3651,13 @@ export default function Studio() {
               </div>
             )}
             {view === "page" && page.draftNotice && !page.error && (
-              <div className="studio-conflict" role="status">
+              <div className="studio-conflict" role="status" data-priority={1}>
                 <p>{page.draftNotice}</p>
               </div>
             )}
             {view === "page" &&
               !!page.record?.retainedSyncConflicts?.length && (
-                <div className="studio-conflict" role="status">
+                <div className="studio-conflict" role="status" data-priority={2}>
                   <p>{t("retainedSyncConflict")}</p>
                   {page.record.retainedSyncConflicts
                     .flatMap((item) => item.variants)
@@ -3574,7 +3676,7 @@ export default function Studio() {
                 </div>
               )}
             {view === "page" && page.error && (
-              <div className="studio-conflict" role="alert">
+              <div className="studio-conflict" role="alert" data-priority={4}>
                 <div>
                   <strong>
                     {page.status === "conflict"
@@ -3642,7 +3744,7 @@ export default function Studio() {
               </div>
             )}
             {view === "page" && !!page.availableDrafts.length && (
-              <div className="studio-conflict" role="status">
+              <div className="studio-conflict" role="status" data-priority={2}>
                 <p>{t("draftsAvailable")}</p>
                 {page.availableDrafts.map((item) => (
                   <button
@@ -3658,6 +3760,7 @@ export default function Studio() {
                 ))}
               </div>
             )}
+            </NoticeStack>
             <div
               ref={catalogScrollRef}
               tabIndex={view === "project" ? -1 : undefined}
@@ -4068,12 +4171,7 @@ export default function Studio() {
             void navigate("settings").catch(report);
           }}
         />
-        {notice && (
-          <div className="studio-toast" role="status">
-            <Check size={14} />
-            {notice}
-          </div>
-        )}
+        <ToastViewport toasts={toasts.toasts} onDismiss={toasts.dismiss} />
         {capabilities.exportSite && exportMenu && (
           <LibraryContextMenu
             anchor={exportMenu}
@@ -4524,7 +4622,7 @@ export default function Studio() {
                 );
                 setDialog({ type: "template", record, projectId: target });
               }
-              setNotice(t("externalKeptAsDraft"));
+              setNotice(t("externalKeptAsDraft"), { kind: "warning" });
             }}
             onClose={closeDialog}
             onResolved={async () => {
