@@ -73,24 +73,68 @@ inline bool field_range(const BoundaryCoverageVertex*v,const RawCoverageOptions&
  double det=dx1*dy2-dx2*dy1;
  double error=mul(16*0x1p-52,sum(abs(dx1*dy2),abs(dx2*dy1)));
  double lower=abs(det)-error;if(!(lower>0))return false;
- double maximum=0,derivative=0;
+ double maximum=0,derivative=0,values[3]{},pixelDerivatives[3]{};
  for(uint32_t j=0;j<3;j++){
-  double z[3];for(uint32_t i=0;i<3;i++){z[i]=j==0?v[i].k:j==1?v[i].l:v[i].m;maximum=max(maximum,abs(z[i]));}
+  double z[3],maximumJ=0;for(uint32_t i=0;i<3;i++){z[i]=j==0?v[i].k:j==1?v[i].l:v[i].m;maximumJ=max(maximumJ,abs(z[i]));}
   double f1=abs(z[1]-z[0]),f2=abs(z[2]-z[0]);
   double x=up(sum(mul(f1,abs(dy2)),mul(f2,abs(dy1)))/lower),y=up(sum(mul(f1,abs(dx2)),mul(f2,abs(dx1)))/lower);
-  derivative=max(derivative,sum(x,y));
+  double sourceDerivative=sum(x,y);maximum=max(maximum,maximumJ);derivative=max(derivative,sourceDerivative);
+  pixelDerivatives[j]=mul(sourceDerivative,o.maximum_inverse_norm);
+  // Default center interpolation may lie outside a skinny MSAA-covered
+  // triangle. Each functional needs its own extended helper bound; mixing
+  // maxima across unrelated K/L/M can spuriously exceed Float32 range.
+  values[j]=sum(maximumJ,mul(2,pixelDerivatives[j]));
  }
  cert.maximum_field_value=max(cert.maximum_field_value,maximum);cert.maximum_field_derivative_source=max(cert.maximum_field_derivative_source,derivative);
- double pixelDerivative=mul(derivative,o.maximum_inverse_norm);
- // Helper invocations can extend a derivative quad by two pixel axes.
- // Only helper interpolation needs that extended field bound; covered samples
- // remain in the triangle convex hull. F/gradient bounds use the latter.
- double value=sum(maximum,mul(2,pixelDerivative));
- double field=sum(mul(mul(maximum,maximum),maximum),mul(maximum,maximum));
- double gradient=sum(mul(mul(3,mul(maximum,maximum)),pixelDerivative),mul(mul(2,maximum),pixelDerivative));
+ double field=sum(mul(mul(values[0],values[0]),values[0]),mul(values[1],values[2]));
+ double gradient=sum(mul(mul(3,mul(values[0],values[0])),pixelDerivatives[0]),
+                     sum(mul(values[2],pixelDerivatives[1]),mul(values[1],pixelDerivatives[2])));
  // Explicit Float32 exponent headroom, not a denominator epsilon or an AA
  // accuracy promise. Zero gradients follow the witnessed finite shader branch.
- return finite_double(value)&&value<0x1p120&&finite_double(field)&&finite_double(gradient)&&field<0x1p120&&mul(2,mul(gradient,gradient))<0x1p120;
+ return finite_double(values[0])&&finite_double(values[1])&&finite_double(values[2])&&
+        values[0]<0x1p120&&values[1]<0x1p120&&values[2]<0x1p120&&
+        finite_double(field)&&finite_double(gradient)&&field<0x1p120&&mul(2,mul(gradient,gradient))<0x1p120;
+}
+/* The cubic implicit is homogeneous with weights (2,3,3):
+ * (s^2 K)^3-(s^3 L)(s^3 M)=s^6 F. Its screen gradient has the
+ * same positive factor, so the observed ramp F/length(gradient) is unchanged.
+ * Power-of-two scaling must roundtrip each encoded scalar exactly. This
+ * addresses finite exponent range; it never substitutes a binary RAY or
+ * claims that an uncertain implicit/cusp has become geometrically correct. */
+inline bool finite_fields(BoundaryCoverageVertex v[3],uint32_t kind,const RawCoverageOptions&o,RawCoverageCertificate&cert){
+ RawCoverageCertificate candidate=cert;
+ if(field_range(v,o,candidate)){cert=candidate;return true;}
+ if(kind!=boundary_coverage_cubic&&kind!=boundary_coverage_embedded_quad)return false;
+ for(uint32_t step=0;step<32;step++){
+  if(kind==boundary_coverage_embedded_quad){
+   // Preserve M==K for the audited quadratic embedding. K/M scale by1/4,
+   // L by1/16, hence both F and its gradient scale exactly by1/64.
+   for(uint32_t i=0;i<3;i++){
+    float k=v[i].k*.25f,l=v[i].l*.0625f,m=v[i].m*.25f;
+    if(k*4!=v[i].k||l*16!=v[i].l||m*4!=v[i].m)return false;
+    v[i].k=k;v[i].l=l;v[i].m=m;
+   }
+   candidate=cert;if(field_range(v,o,candidate)){cert=candidate;return true;}continue;
+  }
+  // K'=K/4 fixes F'=F/64. Distribute the six remaining binary exponents
+  // between L and M: a tiny functional need not underflow just because its
+  // partner can safely carry more of the scaling. All scalar casts must
+  // exact-roundtrip; this is an algebraic identity, not an epsilon edit.
+  BoundaryCoverageVertex best[3]{};bool found=false;double bestMaximum=0;
+  for(uint32_t exponent=0;exponent<=6;exponent++){
+   float lScale=1,mScale=1;for(uint32_t k=0;k<exponent;k++)lScale*=.5f;for(uint32_t k=exponent;k<6;k++)mScale*=.5f;
+   BoundaryCoverageVertex attempt[3];bool valid=true;double maximum=0;
+   for(uint32_t i=0;i<3;i++){
+    attempt[i]=v[i];float k=v[i].k*.25f,l=v[i].l*lScale,m=v[i].m*mScale;
+    if(k*4!=v[i].k||l/lScale!=v[i].l||m/mScale!=v[i].m){valid=false;break;}
+    attempt[i].k=k;attempt[i].l=l;attempt[i].m=m;maximum=max(maximum,max(abs(l),abs(m)));
+   }
+   if(valid&&(!found||maximum<bestMaximum)){found=true;bestMaximum=maximum;for(uint32_t i=0;i<3;i++)best[i]=attempt[i];}
+  }
+  if(!found)return false;for(uint32_t i=0;i<3;i++)v[i]=best[i];
+  candidate=cert;if(field_range(v,o,candidate)){cert=candidate;return true;}
+ }
+ return false;
 }
 inline bool emit(PolynomialContext&c,RawCoverageMesh&out,const double*positions,BoundaryCoverageVertex v[3],int winding,
  double ox,double oy,uint32_t command,uint32_t kind,const RawCoverageOptions&o,BoundaryKLMReason&reason){
@@ -112,7 +156,7 @@ inline bool emit(PolynomialContext&c,RawCoverageMesh&out,const double*positions,
   // there is no finite affine interpolant/coverage lens to submit. This is
   // counted derived collapse, never removal of authoritative source commands.
   ++cert.degenerate_triangles;return true;}orientation=exact.sign();}
- if(kind!=boundary_coverage_solid&&!field_range(v,o,cert)){reason=boundary_klm_zero_gradient;return false;}
+ if(kind!=boundary_coverage_solid&&!finite_fields(v,kind,o,cert)){reason=boundary_klm_zero_gradient;return false;}
  if(orientation!=winding){auto z=v[1];v[1]=v[2];v[2]=z;}
  BoundaryCoverageDraw draw{};draw.origin[0]=ox;draw.origin[1]=oy;draw.first=out.mesh.vertices.size();draw.count=3;draw.source_edge=command;draw.kind=kind;draw.float_cast_error_pixels=mul(error,o.maximum_forward_norm);
  for(uint32_t i=0;i<3;i++)out.mesh.vertices.push_back(v[i]);out.mesh.draws.push_back(draw);++cert.absolute_contribution_bound;return !c.numbers.status;
@@ -123,12 +167,20 @@ inline bool chord(PolynomialContext&c,const SAInkPathCommand&command,const Comma
  Q t[2]={Q::from_double(ctx,p.parameter_start),Q::from_double(ctx,p.parameter_end)};Point restricted[4];
  for(uint32_t i=0;i<4;i++){Point v[4];for(uint32_t j=0;j<4;j++)v[j]=original[j];for(uint32_t level=0;level<3;level++){Q x=t[level<3-i?0:1];for(uint32_t j=0;j<3-level;j++)v[j]={v[j].x*(Q(1)-x)+v[j+1].x*x,v[j].y*(Q(1)-x)+v[j+1].y*x};}restricted[i]=v[0];}
  Point a{Q::from_double(ctx,p.controls[0]),Q::from_double(ctx,p.controls[1])},b{Q::from_double(ctx,p.controls[6]),Q::from_double(ctx,p.controls[7])};Q dx=b.x-a.x,dy=b.y-a.y,den=dx*dx+dy*dy;
- Q maximumX(0),maximumY(0),previous(0);
+ Q maximumX=Q::from_signed(ctx,0),maximumY=Q::from_signed(ctx,0),previous(0);bool monotone=true;
  for(uint32_t i=0;i<4;i++){
   Q projection=den.zero()?Q(0):((restricted[i].x-a.x)*dx+(restricted[i].y-a.y)*dy)/den;
-  if(i==0)projection=Q(0);else if(i==3)projection=Q(1);else if(projection<Q(0)||projection>Q(1)||projection<previous)return false;
+  if(i==0)projection=Q(0);else if(i==3)projection=Q(1);else if(projection<Q(0)||projection>Q(1)||projection<previous)monotone=false;
   previous=projection;Q ex=(restricted[i].x-a.x-dx*projection).absolute(),ey=(restricted[i].y-a.y-dy*projection).absolute();if(ex>maximumX)maximumX=ex;if(ey>maximumY)maximumY=ey;
  }
+ // If a rounding-scale tangent reverses, projection onto the chord cannot
+ // certify a monotone reparameterization. Compare the original restricted
+ // cubic directly with the linear chord parameter instead. This charges all
+ // longitudinal/backtracking motion as well as transverse/endpoint error.
+ if(!monotone){maximumX=Q::from_signed(ctx,0);maximumY=Q::from_signed(ctx,0);for(uint32_t i=0;i<4;i++){
+  Q t=Q::from_signed(ctx,i)/Q(3),ex=(restricted[i].x-a.x-dx*t).absolute(),ey=(restricted[i].y-a.y-dy*t).absolute();
+  if(ex>maximumX)maximumX=ex;if(ey>maximumY)maximumY=ey;
+ }}
  return !ctx.status&&boundary_quantization::upper_bound(maximumX+maximumY,error);
 }
 }
