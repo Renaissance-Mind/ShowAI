@@ -82,3 +82,21 @@ it("uses the held expected ref after entry and re-resolves it after a reentrant 
  const saved=setup(),request={scope:saved.scope,base:saved.seed.next,document:saved.base,leaseId:"saved"};
  expect(()=>saved.owner.registerActualSavedJSON(JSON.stringify(request),saved.seed.next,(stage)=>{if(stage==="parse")saved.owner.execute({kind:"dispose",scope:saved.scope})})).toThrow(/expired/);
 });
+
+it("preserves a native origin across the actual timestamp-only saved receipt without comparing the retained body again",()=>{
+ const f=setup(),first=f.owner.registerActualNativeEnvelopeJSON(f.raw,undefined,f.seed.next) as SourceSnapshotDelta;
+ const baseline=body(f.owner,first.next),document=structuredClone(baseline);document.updatedAt="2026-10-22T03:04:05Z";
+ const stages:string[]=[],saved=f.owner.registerActualSavedJSON(JSON.stringify({scope:f.scope,base:first.next,document,leaseId:"saved-native"}),first.next,(stage)=>stages.push(stage));
+ const actual=body(f.owner,saved.next);
+ expect(actual).toEqual(document);expect(actual.content).toBe(baseline.content);
+ expect(actual.content.content![0].attrs!.ink.capture.raw).toBe(baseline.content.content![0].attrs!.ink.capture.raw);
+ expect(f.owner.nativePublicationDocumentMatching({ref:saved.next,document:actual})?.sourceVersion).toBe(1);
+ expect(stages).not.toContain("register.nativeOrigin.compare");
+ for(const edit of [(d:ShowDocument)=>{d.title="backend title"},(d:ShowDocument)=>{d.content.content![0].attrs!.color="#abcdef"},(d:ShowDocument)=>{(d as any).futureRoot.extra="backend root"}]){
+  const changed=structuredClone(document);edit(changed);const compared:string[]=[];
+  const result=f.owner.registerActualSavedJSON(JSON.stringify({scope:f.scope,base:saved.next,document:changed,leaseId:"changed-native"}),saved.next,(stage)=>compared.push(stage));
+  const resultBody=body(f.owner,result.next);expect(resultBody).toEqual(changed);
+  expect(compared).toContain("register.nativeOrigin.compare");
+  expect(f.owner.nativePublicationDocumentMatching({ref:result.next,document:resultBody})).toBeNull();
+ }
+});

@@ -251,7 +251,8 @@ export class SourceRuntimeOwner {
   }else timestampProof=timestampOnly;
   const ref=freezeOwnedSource({format:"showai-source-snapshot-v1" as const,ownerId:this.ownerId,epoch:this.epoch,snapshotId:`snapshot-${++this.nextId}`,scope:{...targetScope},kind});
   const candidates=measured(observer,"register.candidates",()=>timestampProof&&base?base.candidates:kind==="normalized"?inkWireResolutionCandidates(body):[]);
-  const nativeOrigin=base?.nativeOrigin&&this.validatedBodies.has(body)&&isDocumentTimestamp(body.updatedAt)&&nativeDocumentBodiesEqual(base.document,body)?base.nativeOrigin:undefined;
+  const nativeOrigin=base?.nativeOrigin&&this.validatedBodies.has(body)&&isDocumentTimestamp(body.updatedAt)&&
+   (timestampProof||measured(observer,"register.nativeOrigin.compare",()=>nativeDocumentBodiesEqual(base.document,body)))?base.nativeOrigin:undefined;
   this.snapshots.set(ref.snapshotId,{ref,document:body,candidates,conflicts,...(nativeOrigin?{nativeOrigin}:{})});measured(observer,"register.account",()=>{this.account(body,1);if(nativeOrigin)this.account(nativeOrigin,1)});
   try{measured(observer,"register.retain",()=>{if(leaseId)this.retain(leaseId,[ref]);else this.prune(new Set([ref.snapshotId]));});}
   catch(error){this.forget(ref.snapshotId);throw error}
