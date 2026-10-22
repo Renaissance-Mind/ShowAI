@@ -121,6 +121,7 @@ import {
   BatchPagesDialog,
   DirectorySelectionBar,
   useDirectoryPageSelection,
+  useDirectoryMarquee,
   type PageDestination,
 } from "./DirectoryPageSelection";
 import PageIcon from "../components/PageIcon";
@@ -2382,6 +2383,11 @@ export default function Studio() {
     JSON.stringify([info?.home, view, selectedProject, selectedFolder, query]),
     selectablePages.map((item) => item.id),
   );
+  const directoryMarquee = useDirectoryMarquee(
+    pageSelection,
+    JSON.stringify([info?.home, view, selectedProject, selectedFolder, query]),
+    view === "project" && !dialog,
+  );
   const selectedPageTargets = selectablePages
     .filter((item) => pageSelection.ids.includes(item.id))
     .map((item) => item.target);
@@ -3483,6 +3489,20 @@ export default function Studio() {
             aria-labelledby={`workspace-tab-${workspace.activeId}`}
           >
             {topbar}
+            {view === "project" && pageSelection.active && (
+              <DirectorySelectionBar
+                selection={pageSelection}
+                total={selectablePages.length}
+                onMove={() => beginBatchPages("move")}
+                onDelete={() => beginBatchPages("delete")}
+              />
+            )}
+            {directoryMarquee.rectangle && (
+              <div
+                className="studio-directory-marquee"
+                style={directoryMarquee.rectangle}
+              />
+            )}
             {problem && (
               <div className="studio-problem" role="alert">
                 <span>{problem}</span>
@@ -3622,6 +3642,24 @@ export default function Studio() {
             )}
             <div
               ref={catalogScrollRef}
+              tabIndex={view === "project" ? -1 : undefined}
+              onKeyDown={(event) => {
+                if (
+                  view !== "project" || dialog ||
+                  (event.target as HTMLElement).closest(
+                    "input,textarea,[contenteditable=true]",
+                  )
+                ) return;
+                if (
+                  (event.metaKey || event.ctrlKey) &&
+                  event.key.toLowerCase() === "a"
+                ) {
+                  event.preventDefault();
+                  pageSelection.selectAll();
+                }
+              }}
+              onPointerDown={directoryMarquee.onPointerDown}
+              onClickCapture={directoryMarquee.onClickCapture}
               className={`studio-scroll${(view === "page" && page.draft) || (view === "docs" && docPage && docPage.id !== WELCOME_DOC) ? " has-page-surface" : ""}`}
                 onContextMenu={(event) => {
                   if (event.defaultPrevented || view !== "project" || !project)
@@ -3754,43 +3792,18 @@ export default function Studio() {
                   )}
                   {view === "project" && (
                     <>
-                      {pageSelection.active && (
-                        <DirectorySelectionBar
-                          selection={pageSelection}
-                          total={selectablePages.length}
-                          onMove={() => beginBatchPages("move")}
-                          onDelete={() => beginBatchPages("delete")}
-                        />
-                      )}
                       {visibleEntries.length || !query ? (
                           <div
                             className="studio-page-list"
                             data-view={directoryView}
                             data-selecting={pageSelection.active || undefined}
-                            onKeyDown={(event) => {
-                              if (
-                                dialog ||
-                                (event.target as HTMLElement).closest(
-                                  "input,textarea,[contenteditable=true]",
-                                )
-                              ) return;
-                              if (event.key === "Escape" && pageSelection.active) {
-                                event.preventDefault();
-                                pageSelection.clear();
-                              } else if (
-                                (event.metaKey || event.ctrlKey) &&
-                                event.key.toLowerCase() === "a"
-                              ) {
-                                event.preventDefault();
-                                pageSelection.selectAll();
-                              }
-                            }}
                           >
                           {visibleEntries.map(({ target, updatedAt }) => (
                             <div
                               key={target.id}
                                 {...(!pageSelection.active ? libraryDrag.bindings.row(target, false) : {})}
                                 data-library-id={target.id}
+                                data-selectable-page={target.kind === "page" || undefined}
                               className={`studio-page-list-row${pageSelection.ids.includes(target.id) ? " selected" : ""}`}
                               onContextMenu={(event) => {
                                 event.preventDefault();

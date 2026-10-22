@@ -1,4 +1,9 @@
-import { useEffect, useRef, useState } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  type PointerEvent as ReactPointerEvent,
+} from "react";
 import type { FolderMetadata, ProjectSummary } from "../core/model";
 import { useTranslator } from "../i18n/react";
 import studioMessages from "../i18n/messages/studio";
@@ -32,6 +37,15 @@ export function useDirectoryPageSelection(scope: string, pageIds: string[]) {
     active,
     ids,
     clear,
+    replace: (ids: string[]) =>
+      setState((current) =>
+        current.scope === scope &&
+        current.active &&
+        current.ids.length === ids.length &&
+        current.ids.every((id, index) => id === ids[index])
+          ? current
+          : { scope, active: true, ids, anchor: "" },
+      ),
     start: () => setState({ scope, active: true, ids: [], anchor: "" }),
     selectAll: () =>
       setState({ scope, active: true, ids: [...pageIds], anchor: "" }),
@@ -55,6 +69,212 @@ export function useDirectoryPageSelection(scope: string, pageIds: string[]) {
         else next.add(item);
       }
       setState({ scope, active: true, ids: [...next], anchor: id });
+    },
+  };
+}
+
+/** Start on empty directory space so opening and dragging entries keep their existing meaning. */
+export function useDirectoryMarquee(
+  selection: ReturnType<typeof useDirectoryPageSelection>,
+  scope: string,
+  enabled: boolean,
+) {
+  const [rectangle, setRectangle] = useState<{
+    left: number;
+    top: number;
+    width: number;
+    height: number;
+  } | null>(null);
+  const latest = useRef(selection);
+  latest.current = selection;
+  const gesture = useRef<{
+    element: HTMLElement;
+    pointerId: number;
+    x: number;
+    y: number;
+    clientX: number;
+    clientY: number;
+    base: string[];
+    active: boolean;
+    previous: string[];
+    wasActive: boolean;
+  } | null>(null);
+  const suppressClick = useRef(false);
+  useEffect(() => {
+    let frame = 0;
+    const finish = (cancel = false) => {
+      const current = gesture.current;
+      if (!current) return;
+      if (current.active) {
+        suppressClick.current = true;
+        if (cancel) {
+          if (current.wasActive) latest.current.replace(current.previous);
+          else latest.current.clear();
+        }
+      }
+      gesture.current = null;
+      if (current.element.hasPointerCapture(current.pointerId))
+        current.element.releasePointerCapture(current.pointerId);
+      cancelAnimationFrame(frame);
+      setRectangle(null);
+    };
+    const update = () => {
+      const current = gesture.current;
+      if (!current?.active) return;
+      const { element, clientX, clientY } = current;
+      const bounds = element.getBoundingClientRect();
+      const edge = 40;
+      const speed = (position: number, start: number, end: number) =>
+        position < start + edge
+          ? -Math.min(18, (start + edge - position) / 3)
+          : position > end - edge
+            ? Math.min(18, (position - end + edge) / 3)
+            : 0;
+      element.scrollTop += speed(clientY, bounds.top, bounds.bottom);
+      const x = Math.max(bounds.left, Math.min(bounds.right, clientX));
+      const y = Math.max(bounds.top, Math.min(bounds.bottom, clientY));
+      const originX = bounds.left + current.x - element.scrollLeft;
+      const originY = bounds.top + current.y - element.scrollTop;
+      const left = Math.min(originX, x);
+      const top = Math.min(originY, y);
+      const right = Math.max(originX, x);
+      const bottom = Math.max(originY, y);
+      const nextRectangle = {
+        left: Math.max(bounds.left, left),
+        top: Math.max(bounds.top, top),
+        width: Math.max(
+          0,
+          Math.min(bounds.right, right) - Math.max(bounds.left, left),
+        ),
+        height: Math.max(
+          0,
+          Math.min(bounds.bottom, bottom) - Math.max(bounds.top, top),
+        ),
+      };
+      setRectangle((previous) =>
+        previous &&
+        previous.left === nextRectangle.left &&
+        previous.top === nextRectangle.top &&
+        previous.width === nextRectangle.width &&
+        previous.height === nextRectangle.height
+          ? previous
+          : nextRectangle,
+      );
+      const ids = new Set(current.base);
+      element
+        .querySelectorAll<HTMLElement>("[data-selectable-page]")
+        .forEach((row) => {
+          const rect = row.getBoundingClientRect();
+          if (
+            rect.right > left &&
+            rect.left < right &&
+            rect.bottom > top &&
+            rect.top < bottom
+          )
+            ids.add(row.dataset.libraryId!);
+        });
+      latest.current.replace([...ids]);
+      frame = requestAnimationFrame(update);
+    };
+    const move = (event: PointerEvent) => {
+      const current = gesture.current;
+      if (!current || event.pointerId !== current.pointerId) return;
+      current.clientX = event.clientX;
+      current.clientY = event.clientY;
+      if (!current.active) {
+        const bounds = current.element.getBoundingClientRect();
+        if (
+          Math.hypot(
+            event.clientX -
+              bounds.left +
+              current.element.scrollLeft -
+              current.x,
+            event.clientY - bounds.top + current.element.scrollTop - current.y,
+          ) < 6
+        )
+          return;
+        current.active = true;
+        current.element.setPointerCapture(current.pointerId);
+        update();
+      }
+      event.preventDefault();
+    };
+    const up = (event: PointerEvent) => {
+      if (event.pointerId !== gesture.current?.pointerId) return;
+      if (gesture.current.active) {
+        gesture.current.clientX = event.clientX;
+        gesture.current.clientY = event.clientY;
+        cancelAnimationFrame(frame);
+        update();
+      } else if (!gesture.current.base.length) latest.current.clear();
+      finish();
+    };
+    const cancel = () => finish(true);
+    const key = (event: KeyboardEvent) => {
+      if (
+        event.key === "Escape" &&
+        (gesture.current || latest.current.active)
+      ) {
+        event.preventDefault();
+        finish();
+        latest.current.clear();
+      }
+    };
+    if (enabled) {
+      window.addEventListener("pointermove", move, { passive: false });
+      window.addEventListener("pointerup", up);
+      window.addEventListener("pointercancel", cancel);
+      window.addEventListener("blur", cancel);
+      window.addEventListener("keydown", key);
+    }
+    return () => {
+      finish();
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", up);
+      window.removeEventListener("pointercancel", cancel);
+      window.removeEventListener("blur", cancel);
+      window.removeEventListener("keydown", key);
+    };
+  }, [scope, enabled]);
+  return {
+    rectangle,
+    onPointerDown: (event: ReactPointerEvent<HTMLElement>) => {
+      suppressClick.current = false;
+      if (
+        !enabled ||
+        event.button !== 0 ||
+        event.pointerType === "touch" ||
+        (event.target as HTMLElement).closest(
+          "button,input,a,textarea,select,[contenteditable=true],.studio-page-list-row",
+        )
+      )
+        return;
+      const element = event.currentTarget;
+      const bounds = element.getBoundingClientRect();
+      gesture.current = {
+        element,
+        pointerId: event.pointerId,
+        x: event.clientX - bounds.left + element.scrollLeft,
+        y: event.clientY - bounds.top + element.scrollTop,
+        clientX: event.clientX,
+        clientY: event.clientY,
+        base:
+          event.shiftKey || event.metaKey || event.ctrlKey
+            ? latest.current.ids
+            : [],
+        previous: latest.current.ids,
+        wasActive: latest.current.active,
+        active: false,
+      };
+      element.focus({ preventScroll: true });
+      event.preventDefault();
+    },
+    onClickCapture: (event: React.MouseEvent) => {
+      if (suppressClick.current) {
+        event.preventDefault();
+        event.stopPropagation();
+        suppressClick.current = false;
+      }
     },
   };
 }

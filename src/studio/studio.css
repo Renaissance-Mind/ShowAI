@@ -221,6 +221,7 @@ button.studio-tree-chevron:hover {
   padding-top: 8px;
 }
 .studio-main {
+  position: relative;
   flex: 1;
   min-width: 0;
   display: flex;
@@ -1598,18 +1599,42 @@ button.studio-tree-chevron:hover {
 
 .studio-page-thumbnail .native-ink-world { transform: var(--thumbnail-transform); }
 
+.studio-directory-marquee {
+  position: fixed;
+  pointer-events: none;
+  z-index: 125;
+  border: 1px solid var(--accent);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  box-sizing: border-box;
+}
 .studio-page-selection {
+  position: absolute;
+  bottom: max(24px, env(safe-area-inset-bottom));
+  left: 50%;
+  transform: translateX(-50%);
+  width: max-content;
+  max-width: calc(100% - 32px);
+  box-sizing: border-box;
   display: flex;
   align-items: center;
+  justify-content: center;
   flex-wrap: wrap;
-  gap: 8px;
-  padding: 10px 0;
-  margin-bottom: 8px;
-  position: sticky;
-  top: 0;
+  gap: 12px;
+  padding: 10px 14px;
   background: var(--paper);
-  z-index: 3;
-  border-bottom: 1px solid var(--line);
+  z-index: 121;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  box-shadow: 0 8px 32px #0002, 0 2px 8px #0001;
+}
+.studio-main:has(> .studio-page-selection) .studio-library {
+  padding-bottom: 140px;
+}
+.studio-scroll[tabindex="-1"]:focus {
+  outline: none;
+}
+.studio-scroll:has(.studio-page-list) {
+  user-select: none;
 }
 .studio-page-select-all {
   display: flex;
