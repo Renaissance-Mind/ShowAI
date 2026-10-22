@@ -213,3 +213,17 @@ export function parseWorkspaceTabs(
   if (!ids.has(state.activeId)) return;
   return { tabs: state.tabs, activeId: state.activeId };
 }
+
+/** Templates, components and settings are side trips from the library. */
+const detourViews = new Set<WorkspaceView>(["templates", "components", "settings"]);
+
+/**
+ * The history offset that "Back" in templates, components or settings takes:
+ * the nearest earlier entry outside those views, or null when the tab began there.
+ */
+export function detourReturnOffset(tab: WorkspaceTab): number | null {
+  for (let index = tab.cursor - 1; index >= 0; index--)
+    if (!detourViews.has(tab.entries[index].location.view))
+      return index - tab.cursor;
+  return null;
+}

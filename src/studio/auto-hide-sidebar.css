@@ -191,3 +191,29 @@
     transition: none;
   }
 }
+
+.studio-sidebar-hint {
+  position: fixed;
+  left: 14px;
+  bottom: 18px;
+  z-index: 240;
+  max-width: 300px;
+  display: grid;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: var(--text);
+  color: var(--paper);
+  box-shadow: var(--shadow);
+  font-size: 13px;
+  line-height: 1.5;
+  animation: showai-rise-in var(--duration-slow) var(--ease-out);
+}
+.studio-sidebar-hint button {
+  justify-self: end;
+  padding: 2px 8px;
+  border: 1px solid color-mix(in srgb, var(--paper) 40%, transparent);
+  border-radius: 5px;
+  color: inherit;
+  font: inherit;
+}

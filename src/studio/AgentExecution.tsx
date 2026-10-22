@@ -197,8 +197,10 @@ export function RemoteDeviceSettings() {
   if (remoteExecution()) return null;
   if (!state)
     return (
-      <section className="settings-group agent-device-settings">
-        <h2>{t("useThisComputerFromIPad")}</h2>
+      <details className="settings-group agent-device-settings">
+        <summary>
+          <h2>{t("useThisComputerFromIPad")}</h2>
+        </summary>
         {error ? (
           <p role="alert" className="agent-error">
             {error}
@@ -209,7 +211,7 @@ export function RemoteDeviceSettings() {
         <button className="settings-button" onClick={() => void refresh()}>
           {t("refresh")}
         </button>
-      </section>
+      </details>
     );
   const change = (value: Partial<ConnectorSettings>) =>
     setState({ ...state, settings: { ...state.settings, ...value } });
@@ -225,9 +227,15 @@ export function RemoteDeviceSettings() {
       setBusy(false);
     }
   };
+  // Pairing is secondary to choosing an Agent: collapsed until a device asks.
   return (
-    <section className="settings-group agent-device-settings">
-      <h2>{t("useThisComputerFromIPad")}</h2>
+    <details
+      className="settings-group agent-device-settings"
+      open={state.pendingClients.length > 0 || undefined}
+    >
+      <summary>
+        <h2>{t("useThisComputerFromIPad")}</h2>
+      </summary>
       <p className="settings-help">{t("nearbyHelp")}</p>
       <label className="settings-row agent-nearby-toggle">
         <input
@@ -391,6 +399,6 @@ export function RemoteDeviceSettings() {
           {error || state.error}
         </p>
       )}
-    </section>
+    </details>
   );
 }

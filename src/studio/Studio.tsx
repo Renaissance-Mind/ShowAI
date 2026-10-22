@@ -68,6 +68,12 @@ import {
   Plus,
   History,
   Upload,
+  ArchiveRestore,
+  Cloud,
+  EyeOff,
+  FileDiff,
+  Keyboard,
+  Presentation,
 } from "../ui/icons";
 import type {
   ProjectSummary,
@@ -177,7 +183,20 @@ import {
   libraryEntry,
   type OpenDisposition,
 } from "./open-target";
-import type { WorkspaceEntry, WorkspaceView } from "./workspace-tabs";
+import {
+  detourReturnOffset,
+  type WorkspaceEntry,
+  type WorkspaceView,
+} from "./workspace-tabs";
+import navigationMessages from "../i18n/messages/navigation";
+import {
+  DeletedItemsDialog,
+  HiddenProjectsDialog,
+  ShortcutsDialog,
+  restoreItem,
+  type RestoreTarget,
+} from "./LibraryNavigationDialogs";
+import { clientIsMac, isDeleteShortcut } from "./keyboard-shortcuts";
 import { tabShortcut, type TabCommand } from "../workbench/tab-shortcuts";
 import { useWindowFullscreen } from "./useWindowFullscreen";
 import { ComponentCatalog, ComponentNavigation } from "./ComponentCatalog";
@@ -283,6 +302,9 @@ type DialogState =
     }
   | { type: "rename"; target: LibraryTarget }
   | { type: "delete"; target: LibraryTarget }
+  | { type: "deletedItems" }
+  | { type: "hiddenProjects" }
+  | { type: "shortcuts" }
   | {
       type: "template";
       record: LoadedTemplate;
@@ -299,6 +321,18 @@ type DialogState =
 /** Operation names for problem titles; read the locale on each call. */
 const operation = translator(errorMessages);
 const LOAD_LIBRARY = "loadLibrary";
+/** The Agent panel mounts its input after opening; focus it once it can take text. */
+function focusAssistantInput(started = Date.now()) {
+  const input = document.querySelector<HTMLTextAreaElement>(
+    ".assistant-input textarea",
+  );
+  if (input && !input.disabled) {
+    input.focus();
+    return;
+  }
+  if (Date.now() - started < 3000)
+    window.setTimeout(() => focusAssistantInput(started), 100);
+}
 
 function shortDate(value: string) {
   return new Intl.DateTimeFormat(getLocale(), {
@@ -328,6 +362,7 @@ export default function Studio() {
   const t = useTranslator(studioMessages);
   const tc = useTranslator(commonMessages);
   const ta = useTranslator(assistantMessages);
+  const tn = useTranslator(navigationMessages);
   useEffect(() => {
     const wake = () => {
       if (document.visibilityState === "visible" && navigator.onLine)
@@ -353,6 +388,8 @@ export default function Studio() {
   const windowFullscreen = useWindowFullscreen();
   const [info, setInfo] = useState<DesktopInfo | null>(null);
   const capabilities = workbenchCapabilities(info?.platform);
+  const externalChangesAvailable =
+    capabilities.externalChanges && info?.libraryVersion === 2;
   // Built-in documentation; the website workbench publishes its own instead.
   const [docPage, setDocPage] = useState<{ id: string; hash: string } | null>(
     null,
@@ -541,6 +578,14 @@ export default function Studio() {
     [showToast, clearToasts],
   );
   const problemQueue = useProblemQueue();
+  // Undoable notices: the toast carries a 撤销 action and stays 10 s.
+  const notifyWithUndo = (message: string, run: () => Promise<unknown>) => {
+    showToast(message, {
+      kind: "success",
+      duration: 10000,
+      action: { label: tn("undo"), onSelect: () => void run().catch(report) },
+    });
+  };
   const [busy, setBusy] = useState(false);
   const [revealNode, setRevealNode] = useState<string | null>(null);
   const [editorControls, setEditorControls] = useState<EditorControls | null>(
@@ -603,6 +648,8 @@ export default function Studio() {
     creationOnly?: boolean;
   } | null>(null);
   const [projectsMenu, setProjectsMenu] = useState<HTMLElement | null>(null);
+  const [newMenu, setNewMenu] = useState<HTMLElement | null>(null);
+  const [externalChangeCount, setExternalChangeCount] = useState(0);
   const [exportMenu, setExportMenu] = useState<HTMLElement | null>(null);
   const [dark, setDark] = useState(() => {
     const saved = localStorage.getItem("showai:appearance");
@@ -1109,6 +1156,55 @@ export default function Studio() {
     window.addEventListener("keydown", handle);
     return () => window.removeEventListener("keydown", handle);
   }, []);
+  const openSearchRef = useRef<() => void>(() => {});
+  useEffect(() => {
+    const search = (event: KeyboardEvent) => {
+      if (
+        !(event.metaKey || event.ctrlKey) ||
+        event.altKey ||
+        event.shiftKey ||
+        event.key.toLowerCase() !== "k" ||
+        event.defaultPrevented ||
+        dialogRef.current
+      )
+        return;
+      event.preventDefault();
+      openSearchRef.current();
+    };
+    // The desktop Help menu and Settings → About open the shortcut overview.
+    const shortcuts = () => setDialog({ type: "shortcuts" });
+    window.addEventListener("keydown", search);
+    window.addEventListener("showai:open-shortcuts", shortcuts);
+    return () => {
+      window.removeEventListener("keydown", search);
+      window.removeEventListener("showai:open-shortcuts", shortcuts);
+    };
+  }, []);
+  // External edits are listed only while some are waiting for a decision.
+  useEffect(() => {
+    if (!externalChangesAvailable || dialog) return;
+    let active = true;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const load = () =>
+      void desktop.invoke<unknown[]>("workspace:conflicts").then(
+        (items) => {
+          if (active) setExternalChangeCount(items.length);
+        },
+        (error) => console.error("Could not read external file changes", error),
+      );
+    load();
+    const unsubscribe = desktop.onChange(() => {
+      clearTimeout(timer);
+      timer = setTimeout(load, 600);
+    });
+    window.addEventListener("focus", load);
+    return () => {
+      active = false;
+      clearTimeout(timer);
+      unsubscribe();
+      window.removeEventListener("focus", load);
+    };
+  }, [externalChangesAvailable, !!dialog, info?.home]);
 
   async function navigate(next: View) {
     if (routingRef.current) return;
@@ -1382,11 +1478,11 @@ export default function Studio() {
       : dialog?.type === "newPage"
         ? dialog.parentId
         : selectedFolder;
-    if (!projectId) return;
+    if (!projectId) return false;
     if (!(await page.flush())) {
       setDialog(null);
       setView("page");
-      return;
+      return false;
     }
     setBusy(true);
     try {
@@ -1412,11 +1508,22 @@ export default function Studio() {
       setDialog(null);
       setView("page");
       await refresh();
+      return true;
     } catch (reason) {
       report(reason, { action: operation("op.createPage") });
+      return false;
     } finally {
       setBusy(false);
     }
+  }
+  /** A blank page with the Agent panel open and its input focused. */
+  async function createPageForAgent(directory: {
+    projectId: string;
+    parentId: string | null;
+  }) {
+    if (!(await createPage("blank", undefined, "page", directory))) return;
+    changeAssistantOpen(true);
+    focusAssistantInput();
   }
   async function importPage() {
     if (!selectedProject) return;
@@ -1612,13 +1719,96 @@ export default function Studio() {
       },
       {
         label: t("create.board"),
-        icon: <LayoutTemplate size={15} />,
+        icon: <Presentation size={15} />,
         onSelect: action(() =>
           createPage("blank", undefined, "board", directory),
         ),
       },
+      {
+        label: tn("newPageForAgent"),
+        icon: <Sparkles size={15} />,
+        onSelect: action(() => createPageForAgent(directory)),
+      },
     ];
   }
+  /** The sidebar's New menu: content for the current project, then a new project. */
+  function newMenuItems(): LibraryContextMenuItem[] {
+    const directory =
+      (view === "project" || view === "page") &&
+      project &&
+      !(selectedFolder && !currentFolder)
+        ? currentFolder
+          ? folderTarget(currentFolder, project.id)
+          : projectTarget(project)
+        : null;
+    return [
+      ...(directory
+        ? creationMenuItems(directory).map((item) => ({
+            ...item,
+            disabled: contentCreationDisabled,
+          }))
+        : []),
+      {
+        label: tn("newProject"),
+        icon: <FolderPlus size={15} />,
+        separatorBefore: !!directory,
+        onSelect: () => setDialog({ type: "project" }),
+      },
+    ];
+  }
+  function beginRename(target: LibraryTarget) {
+    const currentProject =
+      target.kind === "project"
+        ? projects.find((item) => item.id === target.projectId)
+        : undefined;
+    setDialog(
+      currentProject
+        ? { type: "project", project: currentProject }
+        : target.kind === "folder"
+          ? {
+              type: "folder",
+              projectId: target.projectId,
+              parentId: target.parentId,
+              target,
+            }
+          : { type: "rename", target },
+    );
+  }
+  /** F2 and Delete on a focused sidebar or folder row. */
+  function libraryKeyCommand(target: LibraryTarget, command: "rename" | "delete") {
+    if (dialogRef.current) return;
+    setContextMenu(null);
+    if (command === "rename") beginRename(target);
+    else setDialog({ type: "delete", target });
+  }
+  /** Back from templates, components or settings returns to where the person was. */
+  async function leaveDetour() {
+    const tab = workspace.tabs.find((item) => item.id === workspace.activeId);
+    const offset = tab ? detourReturnOffset(tab) : null;
+    if (offset === null) await navigate("projects");
+    else await workspace.step(offset);
+  }
+  function openLibrarySearch() {
+    if (view === "templates" || view === "components") {
+      document
+        .querySelector<HTMLInputElement>(".catalog-list-search input")
+        ?.focus();
+      return;
+    }
+    const open = () => {
+      setSearchLibrary(true);
+      document
+        .querySelector<HTMLButtonElement>(
+          ".studio-topbar .expandable-search-trigger",
+        )
+        ?.click();
+    };
+    if (document.querySelector(".studio-topbar .expandable-search-trigger"))
+      open();
+    // Libraries without full-text search offer it on Recent only.
+    else void navigate("projects").then(() => setTimeout(open, 50), report);
+  }
+  openSearchRef.current = openLibrarySearch;
   function showDirectoryCreationMenu(
     anchor: HTMLElement,
     point?: LibraryMenuPoint,
@@ -2241,7 +2431,24 @@ export default function Studio() {
       setView("project");
     }
     await refresh();
-    setNotice(t("deleted"));
+    notifyWithUndo(tn("deletedNamed", { title: target.title }), () =>
+      restoreDeleted(restoreTargetOf(target)),
+    );
+  }
+  const restoreTargetOf = (target: LibraryTarget): RestoreTarget =>
+    target.kind === "project"
+      ? { kind: "project", projectId: target.projectId, title: target.title }
+      : {
+          kind: target.kind,
+          projectId: target.projectId,
+          id: target.id,
+          title: target.title,
+        };
+  /** Deleting archives; restoring brings the item back where it was. */
+  async function restoreDeleted(target: RestoreTarget) {
+    await restoreItem(target);
+    await refresh();
+    setNotice(tn("restoredNamed", { title: target.title }));
   }
   function renderChildren(
     projectId: string,
@@ -2294,6 +2501,7 @@ export default function Studio() {
           }
           onOpen={openRow}
           onMenu={showRowMenu}
+          onCommand={rowCommand}
         />
         {target.kind === "folder" && expandedFolders[target.id] && (
           <div className="studio-tree-children">
@@ -2614,11 +2822,17 @@ export default function Studio() {
         insideSelectedFolder(selectedProject, selectedFolder)
       )
         setSelectedFolder(null);
-      setNotice(
-        t(operation === "move" ? "pagesMoved" : "pagesDeleted", {
-          count: completed,
-        }),
-      );
+      const message = t(operation === "move" ? "pagesMoved" : "pagesDeleted", {
+        count: completed,
+      });
+      if (operation === "delete")
+        notifyWithUndo(message, async () => {
+          for (const target of targets)
+            await restoreItem(restoreTargetOf(target));
+          await refresh();
+          setNotice(tn("pagesRestored", { count: targets.length }));
+        });
+      else setNotice(message);
     } catch (reason) {
       setDialog((current) =>
         current?.type === "batchPages"
@@ -2914,8 +3128,22 @@ export default function Studio() {
     !!syncReadOnly ||
     (!!selectedFolder && !currentFolder);
   // Stable row handlers let memoized LibraryRows skip unrelated Studio renders.
-  const rowHandlers = useRef({ openTargetClick, showMenu, toggleProject });
-  rowHandlers.current = { openTargetClick, showMenu, toggleProject };
+  const rowHandlers = useRef({
+    openTargetClick,
+    showMenu,
+    toggleProject,
+    libraryKeyCommand,
+  });
+  rowHandlers.current = {
+    openTargetClick,
+    showMenu,
+    toggleProject,
+    libraryKeyCommand,
+  };
+  const rowCommand = useCallback<NonNullable<LibraryRowProps["onCommand"]>>(
+    (target, command) => rowHandlers.current.libraryKeyCommand(target, command),
+    [],
+  );
   const openRow = useCallback<LibraryRowProps["onOpen"]>(
     (target, event) => rowHandlers.current.openTargetClick(target, event),
     [],
@@ -2978,6 +3206,15 @@ export default function Studio() {
   );
   const sidebarNavigation = (
     <SidebarNavigation
+      current={
+        view === "projects"
+          ? "recent"
+          : view === "templates" ||
+              view === "components" ||
+              view === "settings"
+            ? view
+            : null
+      }
       onSelect={(section) =>
         void navigate(section === "recent" ? "projects" : section).catch(report)
       }
@@ -2991,8 +3228,10 @@ export default function Studio() {
         view === "settings") && (
         <button
           className="studio-sidebar-back"
-          aria-label={t("backToRecent")}
-          onClick={action(() => navigate("projects"))}
+          aria-label={tn("backToPrevious")}
+          title={tn("backToPrevious")}
+          disabled={routing || workspace.switching}
+          onClick={action(leaveDetour)}
         >
           <ArrowLeft size={17} strokeWidth={1.7} aria-hidden="true" />
           <span>{tc("back")}</span>
@@ -3030,12 +3269,9 @@ export default function Studio() {
           collapsed={collapsedSections}
           setCollapsed={setCollapsedSections}
           onCreate={(groupId) => setDialog({ type: "project", groupId })}
-          onAddContent={
-            (view === "project" || view === "page") && project
-              ? showDirectoryCreationMenu
-              : undefined
+          onNew={(anchor) =>
+            setNewMenu((current) => (current === anchor ? null : anchor))
           }
-          addDisabled={contentCreationDisabled}
           onMenu={(anchor) =>
             setProjectsMenu((current) => (current === anchor ? null : anchor))
           }
@@ -3068,6 +3304,7 @@ export default function Studio() {
                 onToggle={rowToggle("project", item.id)}
                 onOpen={openRow}
                 onMenu={showRowMenu}
+                onCommand={rowCommand}
               />
               {expandedProjects[item.id] && (
                 <div className="studio-tree-children">
@@ -3211,19 +3448,6 @@ export default function Studio() {
       )}
 
       <div className="studio-header-actions">
-        {view === "project" && project && (
-          <button
-            type="button"
-            className="studio-icon"
-            aria-label={t("addContentHint")}
-            aria-haspopup="menu"
-            title={t("addContent")}
-            disabled={contentCreationDisabled}
-            onClick={(event) => showDirectoryCreationMenu(event.currentTarget)}
-          >
-            <Plus size={16} aria-hidden="true" />
-          </button>
-        )}
         {view === "templates" && (
           <div className="studio-library-toolbar catalog-scope-controls">
             <label>
@@ -3307,17 +3531,20 @@ export default function Studio() {
             />
           </label>
         )}
-        {capabilities.externalChanges && info?.libraryVersion === 2 && (
-          <>
-            <button
-              className="studio-icon"
-              aria-label={t("viewExternalChanges")}
-              title={t("viewExternalChanges")}
-              onClick={() => setDialog({ type: "workspaceConflicts" })}
-            >
-              <FolderOpen size={16} />
-            </button>
-          </>
+        {externalChangesAvailable && externalChangeCount > 0 && (
+          <button
+            className="studio-icon studio-icon-count"
+            aria-label={tn("externalChangesCount", {
+              count: externalChangeCount,
+            })}
+            title={tn("externalChangesCount", { count: externalChangeCount })}
+            onClick={() => setDialog({ type: "workspaceConflicts" })}
+          >
+            <FileDiff size={16} aria-hidden="true" />
+            <span className="studio-icon-badge" aria-hidden="true">
+              {externalChangeCount > 99 ? "99+" : externalChangeCount}
+            </span>
+          </button>
         )}
         {(view === "projects" ||
           view === "project" ||
@@ -3612,6 +3839,7 @@ export default function Studio() {
             !!dialog ||
             libraryDrag.dragging ||
             !!projectsMenu ||
+            !!newMenu ||
             !!groupMenu ||
             !!contextMenu?.anchor.closest(".studio-sidebar")
           }
@@ -3906,6 +4134,7 @@ export default function Studio() {
                   dark={dark}
                   onDarkChange={setDark}
                   onMigrate={() => setDialog({ type: "migration" })}
+                  onOpenShortcuts={() => setDialog({ type: "shortcuts" })}
                   docsVisible={docsVisible}
                   onDocsVisibleChange={
                     docsAvailable ? changeDocsVisible : undefined
@@ -4017,6 +4246,17 @@ export default function Studio() {
                                   });
                               }}
                               onKeyDown={(event) => {
+                                if (
+                                  event.key === "F2" ||
+                                  isDeleteShortcut(event, clientIsMac())
+                                ) {
+                                  event.preventDefault();
+                                  libraryKeyCommand(
+                                    target,
+                                    event.key === "F2" ? "rename" : "delete",
+                                  );
+                                  return;
+                                }
                                 if (
                                   event.key !== "ContextMenu" &&
                                   !(event.shiftKey && event.key === "F10")
@@ -4147,6 +4387,53 @@ export default function Studio() {
                                 : t("projectEmpty")}
                           </h2>
                           {!query && <p>{t("emptyHint")}</p>}
+                          {!query && project && (
+                            <div
+                              className="studio-empty-actions"
+                              role="group"
+                              aria-label={tn("emptyActions")}
+                            >
+                              <button
+                                type="button"
+                                className="studio-button"
+                                disabled={contentCreationDisabled}
+                                onClick={action(() =>
+                                  createPage("blank", undefined, "page", {
+                                    projectId: project.id,
+                                    parentId: selectedFolder,
+                                  }),
+                                )}
+                              >
+                                <FileText size={15} aria-hidden="true" />
+                                {tn("newPage")}
+                              </button>
+                              <button
+                                type="button"
+                                className="studio-button primary"
+                                disabled={contentCreationDisabled}
+                                onClick={action(() =>
+                                  createPageForAgent({
+                                    projectId: project.id,
+                                    parentId: selectedFolder,
+                                  }),
+                                )}
+                              >
+                                <Sparkles size={15} aria-hidden="true" />
+                                {tn("newPageForAgent")}
+                              </button>
+                              <button
+                                type="button"
+                                className="studio-button"
+                                disabled={contentCreationDisabled}
+                                onClick={action(() =>
+                                  beginNewPage(project.id, selectedFolder),
+                                )}
+                              >
+                                <LayoutTemplate size={15} aria-hidden="true" />
+                                {tn("newFromTemplate")}
+                              </button>
+                            </div>
+                          )}
                         </div>
                       )}
                     </>
@@ -4283,7 +4570,44 @@ export default function Studio() {
                 icon: <FolderPlus size={15} />,
                 onSelect: () => setDialog({ type: "group" }),
               },
+              {
+                label: tn("deletedItems"),
+                icon: <ArchiveRestore size={15} />,
+                separatorBefore: true,
+                onSelect: () => setDialog({ type: "deletedItems" }),
+              },
+              {
+                label: tn("hiddenProjects"),
+                icon: <EyeOff size={15} />,
+                onSelect: () => setDialog({ type: "hiddenProjects" }),
+              },
+              ...(externalChangesAvailable
+                ? [
+                    {
+                      label: externalChangeCount
+                        ? tn("externalChangesCount", {
+                            count: externalChangeCount,
+                          })
+                        : tn("externalChanges"),
+                      icon: <FileDiff size={15} />,
+                      onSelect: () => setDialog({ type: "workspaceConflicts" }),
+                    },
+                  ]
+                : []),
+              {
+                label: tn("keyboardShortcuts"),
+                icon: <Keyboard size={15} />,
+                onSelect: () => setDialog({ type: "shortcuts" }),
+              },
             ]}
+          />
+        )}
+        {newMenu && (
+          <LibraryContextMenu
+            anchor={newMenu}
+            label={tn("newMenu")}
+            onClose={() => setNewMenu(null)}
+            items={newMenuItems()}
           />
         )}
         {groupMenu && (
@@ -4396,27 +4720,8 @@ export default function Studio() {
                       label: tc("rename"),
                       separatorBefore: true,
                       icon: <Pencil size={15} />,
-                      onSelect: () => {
-                        const currentProject =
-                          contextMenu.target.kind === "project"
-                            ? projects.find(
-                                (item) =>
-                                  item.id === contextMenu.target.projectId,
-                              )
-                            : undefined;
-                        setDialog(
-                          currentProject
-                            ? { type: "project", project: currentProject }
-                            : contextMenu.target.kind === "folder"
-                              ? {
-                                  type: "folder",
-                                  projectId: contextMenu.target.projectId,
-                                  parentId: contextMenu.target.parentId,
-                                  target: contextMenu.target,
-                                }
-                              : { type: "rename", target: contextMenu.target },
-                        );
-                      },
+                      shortcut: "F2",
+                      onSelect: () => beginRename(contextMenu.target),
                     },
                     ...(contextMenu.target.kind === "page"
                       ? [
@@ -4460,7 +4765,7 @@ export default function Studio() {
                               intent === "share" ? (
                                 <Globe size={15} />
                               ) : (
-                                <Upload size={15} />
+                                <Cloud size={15} />
                               ),
                             onSelect: action(async () => {
                               const projectId = contextMenu.target.projectId;
@@ -4476,18 +4781,28 @@ export default function Studio() {
                           })),
                           {
                             label: accountFlow("hide"),
-                            icon: <FolderMinus size={15} />,
+                            icon: <EyeOff size={15} />,
                             onSelect: action(async () => {
+                              const { projectId, title } = contextMenu.target;
                               if (!(await page.flush())) return;
                               await desktop.invoke("sync:projectVisibility", {
-                                projectId: contextMenu.target.projectId,
+                                projectId,
                                 visible: false,
                               });
-                              if (
-                                selectedProject === contextMenu.target.projectId
-                              )
+                              if (selectedProject === projectId)
                                 await navigate("projects");
                               await refresh();
+                              notifyWithUndo(
+                                tn("hiddenNamed", { name: title }),
+                                async () => {
+                                  await desktop.invoke(
+                                    "sync:projectVisibility",
+                                    { projectId, visible: true },
+                                  );
+                                  await refresh();
+                                  setNotice(tn("shownNamed", { name: title }));
+                                },
+                              );
                             }),
                           },
                           {
@@ -4799,6 +5114,31 @@ export default function Studio() {
             onApply={applyBatchPages}
           />
         )}
+        {dialog?.type === "deletedItems" && (
+          <DeletedItemsDialog
+            onClose={closeDialog}
+            onRestored={async (target) => {
+              await refresh();
+              setNotice(tn("restoredNamed", { title: target.title }));
+            }}
+          />
+        )}
+        {dialog?.type === "hiddenProjects" && (
+          <HiddenProjectsDialog
+            onClose={closeDialog}
+            onShown={async (shown) => {
+              await refresh();
+              setNotice(tn("shownNamed", { name: shown.name }));
+            }}
+          />
+        )}
+        {dialog?.type === "shortcuts" && (
+          <ShortcutsDialog
+            tabs={capabilities.tabs}
+            windows={capabilities.windows}
+            onClose={closeDialog}
+          />
+        )}
         {dialog?.type === "delete" && (
           <DeleteDialog
             target={dialog.target}
@@ -4850,7 +5190,7 @@ export default function Studio() {
                 onClick={() => void createPage("blank", undefined, "board")}
               >
                 <span>
-                  <LayoutTemplate size={21} />
+                  <Presentation size={21} />
                 </span>
                 <div>
                   <strong>{t("blankBoard")}</strong>
@@ -5074,6 +5414,7 @@ function DeleteDialog({
   onDelete: () => Promise<void>;
 }) {
   const t = useTranslator(studioMessages);
+  const tn = useTranslator(navigationMessages);
   const tc = useTranslator(commonMessages);
   const [busy, setBusy] = useState(false),
     [error, setError] = useState("");
@@ -5093,6 +5434,7 @@ function DeleteDialog({
           {t("deleteConfirm", { title: target.title })}
           {target.kind !== "page" && t("deleteChildren")}
         </p>
+        <p className="settings-help">{tn("deleteRestoreHint")}</p>
         {error && (
           <p className="studio-form-error" role="alert">
             {error}

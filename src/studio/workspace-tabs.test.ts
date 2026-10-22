@@ -4,6 +4,7 @@ import {
   closeWorkspaceTab,
   createWorkspace,
   currentEntry,
+  detourReturnOffset,
   moveWorkspaceTab,
   parseWorkspaceTabs,
   recentEntry,
@@ -157,6 +158,26 @@ describe("workspace tabs", () => {
       "page-c",
     ]);
     expect(state.tabs[1]).toEqual(other);
+  });
+
+  it("returns from templates, components and settings to the entry before the side trip", () => {
+    const view = (name: "settings" | "templates" | "components"): WorkspaceEntry => ({
+      location: { view: name, projectId: null, folderId: null, pageId: null },
+      title: name,
+      scrollTop: 0,
+    });
+    let state = visitWorkspace(createWorkspace(), page("page-a"));
+    state = visitWorkspace(state, view("templates"));
+    state = visitWorkspace(state, view("components"));
+    state = visitWorkspace(state, view("settings"));
+    expect(detourReturnOffset(state.tabs[0])).toBe(-3);
+    state = {
+      ...state,
+      tabs: [{ ...state.tabs[0], cursor: 2 }],
+    };
+    expect(detourReturnOffset(state.tabs[0])).toBe(-1);
+    const fresh = createWorkspace(view("settings"));
+    expect(detourReturnOffset(fresh.tabs[0])).toBeNull();
   });
 
   it("updates a renamed or moved page in place, including its reading position", () => {

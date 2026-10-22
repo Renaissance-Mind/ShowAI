@@ -577,7 +577,8 @@
   gap: 14px;
 }
 .studio-settings .agent-settings .agent-runtime-choice > span,
-.studio-settings .agent-settings .settings-group > h2 {
+.studio-settings .agent-settings .settings-group > h2,
+.studio-settings .agent-settings .settings-group > summary > h2 {
   font-family: var(--font-ui);
   font-size: 13px;
   font-weight: 500;
@@ -673,4 +674,31 @@
 .device-model-configure:hover {
   color: var(--text);
   background: var(--hover);
+}
+
+/* iPad pairing is its own collapsed group below the Agent choice. */
+details.agent-device-settings > summary {
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  list-style: none;
+}
+details.agent-device-settings > summary::-webkit-details-marker {
+  display: none;
+}
+details.agent-device-settings > summary::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-right: 1.5px solid var(--muted);
+  border-bottom: 1.5px solid var(--muted);
+  transform: rotate(-45deg);
+  transition: transform var(--duration-fast, 120ms) var(--ease-out, ease);
+}
+details.agent-device-settings[open] > summary::before {
+  transform: rotate(45deg);
+}
+.studio-settings .agent-settings details.agent-device-settings > summary > h2 {
+  margin: 0;
 }

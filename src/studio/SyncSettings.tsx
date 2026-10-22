@@ -34,6 +34,8 @@ import { useTranslator } from "../i18n/react";
 import messages from "../i18n/messages/sync";
 import common from "../i18n/messages/common";
 import flowMessages from "../i18n/messages/accountFlow";
+import navigationMessages from "../i18n/messages/navigation";
+import { syncListedProjects } from "./sync-project-list";
 import "./sync-settings.css";
 type Status = Omit<SyncConfiguration, "connections"> & {
   connections: Omit<SyncConfiguration["connections"][number], "token">[];
@@ -100,6 +102,7 @@ export default function SyncSettings({
   const [projectQuery, setProjectQuery] = useState("");
   const [dashboardFocused, setDashboardFocused] = useState(false);
   const t = useTranslator(messages);
+  const tn = useTranslator(navigationMessages);
   const tc = useTranslator(common);
   const role = (value: ProjectRole) => t(roleKeys[value]);
   const [status, setStatus] = useState<Status | null>(null),
@@ -896,7 +899,10 @@ export default function SyncSettings({
             </select>
           </div>
           <ul className="sync-project-list">
-            {localProjects.map((project) => {
+            {syncListedProjects(
+              localProjects,
+              new Set(status.projects.map((item) => item.projectId)),
+            ).map((project) => {
               const binding = bindingFor(project.id),
                 connection =
                   binding &&
@@ -927,6 +933,11 @@ export default function SyncSettings({
                         {hidden.has(project.id) && (
                           <span className="sync-badge">
                             {t("hiddenOnDevice")}
+                          </span>
+                        )}
+                        {project.archived && (
+                          <span className="sync-badge">
+                            {tn("deletedBadge")}
                           </span>
                         )}
                       </strong>

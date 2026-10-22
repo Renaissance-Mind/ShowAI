@@ -6,6 +6,7 @@ import {
   Copy,
   Folder,
   Info,
+  Keyboard,
   Shapes,
   Moon,
   Settings2,
@@ -151,6 +152,7 @@ export function SettingsPanel({
   onCopyHome,
   onCopyConfig,
   onMigrate,
+  onOpenShortcuts,
   docsVisible,
   onDocsVisibleChange,
 }: {
@@ -164,6 +166,7 @@ export function SettingsPanel({
   onCopyHome: () => void;
   onCopyConfig: () => void;
   onMigrate: () => void;
+  onOpenShortcuts: () => void;
   /** Absent where the host publishes its own documentation. */
   docsVisible?: boolean;
   onDocsVisibleChange?: (visible: boolean) => void;
@@ -413,6 +416,20 @@ export function SettingsPanel({
                 </dd>
               </div>
             </dl>
+          </section>
+          <section
+            className="settings-group"
+            aria-labelledby="settings-shortcuts-title"
+          >
+            <div className="settings-row">
+              <div className="settings-row-text">
+                <h3 id="settings-shortcuts-title">{t("keyboardShortcuts")}</h3>
+              </div>
+              <button className="settings-button" onClick={onOpenShortcuts}>
+                <Keyboard size={14} aria-hidden="true" />
+                {t("showShortcuts")}
+              </button>
+            </div>
           </section>
         </>
       )}

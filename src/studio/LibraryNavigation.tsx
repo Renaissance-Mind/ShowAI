@@ -1,3 +1,4 @@
+import { clientIsMac, isDeleteShortcut } from "./keyboard-shortcuts";
 import {
   memo,
   useId,
@@ -62,6 +63,8 @@ export interface LibraryRowProps {
     anchor: HTMLElement,
     point?: LibraryMenuPoint,
   ) => void;
+  /** F2 renames and Delete (⌘⌫ on macOS) deletes the focused row. */
+  onCommand?: (target: LibraryTarget, command: "rename" | "delete") => void;
 }
 
 function LibraryRowView({
@@ -71,6 +74,7 @@ function LibraryRowView({
   onToggle,
   onOpen,
   onMenu,
+  onCommand,
 }: LibraryRowProps) {
   const t = useTranslator(sidebarMessages);
   const tc = useTranslator(commonMessages);
@@ -86,6 +90,15 @@ function LibraryRowView({
   const Icon =
     target.kind === "page" ? FileText : expanded ? FolderOpen : Folder;
   const openKeyboardMenu = (event: KeyboardEvent<HTMLDivElement>) => {
+    if (
+      onCommand &&
+      (event.key === "F2" || isDeleteShortcut(event, clientIsMac()))
+    ) {
+      event.preventDefault();
+      event.stopPropagation();
+      onCommand(target, event.key === "F2" ? "rename" : "delete");
+      return;
+    }
     if (event.key !== "ContextMenu" && !(event.shiftKey && event.key === "F10"))
       return;
     event.preventDefault();
@@ -195,7 +208,8 @@ export const LibraryRow = memo(
     previous.expanded === next.expanded &&
     previous.onToggle === next.onToggle &&
     previous.onOpen === next.onOpen &&
-    previous.onMenu === next.onMenu,
+    previous.onMenu === next.onMenu &&
+    previous.onCommand === next.onCommand,
 );
 
 interface LibraryMenuItemBase {

@@ -11,6 +11,12 @@ import { appIconForTheme } from "../design/app-icon";
 import { useAppearanceTheme } from "../design/useAppearanceTheme";
 import { useTranslator } from "../i18n/react";
 import sidebarMessages from "../i18n/messages/sidebar";
+import navigationMessages from "../i18n/messages/navigation";
+import {
+  clientIsMac,
+  formatShortcut,
+  isSidebarToggleShortcut,
+} from "./keyboard-shortcuts";
 import "./auto-hide-sidebar.css";
 import { mobileNavigationLayout, sidebarSwipe } from "./mobile-navigation.mjs";
 import "./mobile-navigation.css";
@@ -18,6 +24,7 @@ import "./mobile-navigation.css";
 const minimumWidth = 200;
 const maximumWidth = 480;
 const widthPreference = "showai:sidebar-width";
+const hintPreference = "showai:sidebar-auto-hide-hint";
 
 /** Keep the first view docked; subsequent edge reveals float over the document. */
 export default function AutoHideSidebar({
@@ -42,6 +49,9 @@ export default function AutoHideSidebar({
   onMobileBack?: () => void;
 }) {
   const t = useTranslator(sidebarMessages);
+  const tn = useTranslator(navigationMessages);
+  const toggleKeys = formatShortcut("Mod+\\", clientIsMac());
+  const [hint, setHint] = useState(false);
   const appIcon = appIconForTheme(useAppearanceTheme());
   const nativeTouch = document.documentElement.dataset.native === "ios";
   const [nativeOpen, setNativeOpen] = useState(false);
@@ -159,6 +169,28 @@ export default function AutoHideSidebar({
     if (nativeTouch) setNativeOpen(false);
   }, [enabled, locked, mobileBoardKey]);
 
+  const toggleLocked = () =>
+    setLocked((current) => {
+      localStorage.setItem("showai:sidebar-locked", String(!current));
+      return !current;
+    });
+  useEffect(() => {
+    if (nativeTouch) return;
+    const key = (event: KeyboardEvent) => {
+      if (!isSidebarToggleShortcut(event) || event.repeat) return;
+      event.preventDefault();
+      setHint(false);
+      toggleLocked();
+    };
+    window.addEventListener("keydown", key);
+    return () => window.removeEventListener("keydown", key);
+  }, [nativeTouch]);
+  useEffect(() => {
+    if (!hint) return;
+    const timer = window.setTimeout(() => setHint(false), 9000);
+    return () => window.clearTimeout(timer);
+  }, [hint]);
+
   useEffect(() => {
     const update = () => {
       setViewportWidth(window.innerWidth);
@@ -220,6 +252,11 @@ export default function AutoHideSidebar({
         return;
       }
       setPosition("hidden");
+      // The first automatic hide explains where the sidebar went, once.
+      if (!localStorage.getItem(hintPreference)) {
+        localStorage.setItem(hintPreference, "shown");
+        setHint(true);
+      }
     }, 300);
     return () => window.clearTimeout(timer);
   }, [
@@ -266,9 +303,10 @@ export default function AutoHideSidebar({
     ? nativeOpen
       ? t("collapseSidebar")
       : t("expandSidebar")
-    : locked
-      ? t("unlockSidebar")
-      : t("lockSidebar");
+    : tn("withShortcut", {
+        label: locked ? tn("autoHideSidebar") : tn("pinSidebar"),
+        keys: toggleKeys,
+      });
   const focusNavigation = () => {
     window.requestAnimationFrame(() => {
       sidebar.current?.querySelector<HTMLButtonElement>("button")?.focus();
@@ -422,9 +460,8 @@ export default function AutoHideSidebar({
                   if (event.detail === 0) setNativeOpen((value) => !value);
                   return;
                 }
-                const next = !locked;
-                localStorage.setItem("showai:sidebar-locked", String(next));
-                setLocked(next);
+                setHint(false);
+                toggleLocked();
               }}
             >
               <PanelLeft size={19} strokeWidth={1.7} aria-hidden="true" />
@@ -561,6 +598,14 @@ export default function AutoHideSidebar({
         </div>
         {children}
       </div>
+      {hint && (
+        <div className="studio-sidebar-hint" role="status">
+          <span>{tn("autoHideHint", { keys: toggleKeys })}</span>
+          <button type="button" onClick={() => setHint(false)}>
+            {tn("dismissHint")}
+          </button>
+        </div>
+      )}
     </>
   );
 }

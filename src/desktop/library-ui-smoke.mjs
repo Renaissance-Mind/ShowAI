@@ -144,13 +144,15 @@ try {
       .click();
   const addContent = async (label) => {
     await page
-      .getByRole("button", { name: "添加内容", exact: true })
+      .getByRole("button", { name: "新建页面、白板、文件夹或项目", exact: true })
       .click();
-    const menu = page.getByRole("menu", { name: "添加内容", exact: true });
+    const menu = page.getByRole("menu", { name: "新建", exact: true });
     assert.deepEqual(await menu.getByRole("menuitem").allTextContents(), [
       "文件夹",
       "页面",
       "白板",
+      "新页面并交给 Agent…",
+      "新建项目",
     ]);
     await menu.getByRole("menuitem", { name: label, exact: true }).click();
   };

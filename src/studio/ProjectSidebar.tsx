@@ -14,8 +14,8 @@ import type {
 import { orderSidebarProjects } from "../core/sidebar-order";
 import { useLibraryDrag } from "./LibraryDrag";
 import { useTranslator } from "../i18n/react";
-import commonMessages from "../i18n/messages/common";
 import sidebarMessages from "../i18n/messages/sidebar";
+import navigationMessages from "../i18n/messages/navigation";
 
 export default function ProjectSidebar({
   projects,
@@ -25,8 +25,7 @@ export default function ProjectSidebar({
   setCollapsed,
   renderProject,
   onCreate,
-  onAddContent,
-  addDisabled = false,
+  onNew,
   onMenu,
   onGroupMenu,
   docs,
@@ -38,15 +37,15 @@ export default function ProjectSidebar({
   setCollapsed: Dispatch<SetStateAction<Record<string, boolean>>>;
   renderProject: (project: ProjectSummary) => ReactNode;
   onCreate: (groupId?: string) => void;
-  onAddContent?: (anchor: HTMLButtonElement) => void;
-  addDisabled?: boolean;
+  /** Opens the New menu: content for the current project, and a new project. */
+  onNew: (anchor: HTMLButtonElement) => void;
   onMenu: (anchor: HTMLElement) => void;
   onGroupMenu: (group: ProjectGroup, anchor: HTMLElement) => void;
-  /** The built-in documentation, pinned under the add button. */
+  /** The built-in documentation, pinned under the New button. */
   docs?: ReactNode;
 }) {
   const t = useTranslator(sidebarMessages);
-  const tc = useTranslator(commonMessages);
+  const tn = useTranslator(navigationMessages);
   const drag = useLibraryDrag();
   projects = orderSidebarProjects(projects, organization.projectOrder);
   const selected = projects.find((item) => item.id === selectedProject);
@@ -156,16 +155,13 @@ export default function ProjectSidebar({
       <button
         className="studio-new-project"
         type="button"
-        disabled={onAddContent ? addDisabled : false}
-        aria-label={onAddContent ? t("addContent") : t("newProject")}
-        aria-haspopup={onAddContent ? "menu" : undefined}
-        title={onAddContent ? t("addContentHint") : undefined}
-        onClick={(event) =>
-          onAddContent ? onAddContent(event.currentTarget) : onCreate()
-        }
+        aria-label={tn("newHint")}
+        aria-haspopup="menu"
+        title={tn("newHint")}
+        onClick={(event) => onNew(event.currentTarget)}
       >
         <Plus size={17} aria-hidden="true" />
-        <span>{onAddContent ? tc("add") : t("newProject")}</span>
+        <span>{tn("new")}</span>
       </button>
       {docs}
       {!!pinned.length && section("pinned", t("section.pinned"), pinned)}

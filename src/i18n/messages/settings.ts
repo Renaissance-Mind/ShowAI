@@ -21,9 +21,11 @@ export default defineMessages("settings", {
     upgradeLibrary: "升级内容库",
     upgradeLibraryDetail: "导入现有内容并启用当前内容存储，原始文件保留。",
     sidebar: "侧栏",
+    keyboardShortcuts: "键盘快捷键",
+    showShortcuts: "查看快捷键",
     builtinDocs: "显示 ShowAI 文档",
     builtinDocsDetail:
-      "在「添加」下方固定 ShowAI 文档文件夹，包含开始使用和使用说明。文档随 App 一起更新，与官网一致。",
+      "在侧栏「新建…」按钮下方固定 ShowAI 文档文件夹，包含开始使用和使用说明。文档随 App 一起更新，与官网一致。",
     interface: "界面",
     theme: "主题",
     themePreview: "主题预览",
@@ -65,9 +67,11 @@ export default defineMessages("settings", {
     upgradeLibraryDetail:
       "Import existing content and switch to the current storage format. Original files are kept.",
     sidebar: "Sidebar",
+    keyboardShortcuts: "Keyboard shortcuts",
+    showShortcuts: "Show shortcuts",
     builtinDocs: "Show ShowAI Documentation",
     builtinDocsDetail:
-      "Pin the ShowAI Documentation folder under Add, with Get started and the user guide. It updates with the App and matches the website.",
+      "Pin the ShowAI Documentation folder under the sidebar's New… button, with Get started and the user guide. It updates with the App and matches the website.",
     interface: "Interface",
     theme: "Theme",
     themePreview: "Theme preview",

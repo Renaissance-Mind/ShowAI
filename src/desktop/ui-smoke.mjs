@@ -138,7 +138,9 @@ try {
     .getByRole("textbox", { name: "项目名称", exact: true })
     .fill(projectName);
   await page.getByRole("button", { name: "创建项目", exact: true }).click();
-  await page.getByRole("button", { name: "添加内容", exact: true }).click();
+  await page
+    .getByRole("button", { name: "新建页面、白板、文件夹或项目", exact: true })
+    .click();
   await page.getByRole("menuitem", { name: "页面", exact: true }).click();
   const title = page.getByRole("textbox", { name: "页面标题", exact: true });
   const editor = page.getByRole("textbox", { name: "文档内容", exact: true });

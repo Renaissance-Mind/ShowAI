@@ -11,8 +11,11 @@ const sections = [
 ] as const;
 
 export default function SidebarNavigation({
+  current,
   onSelect,
 }: {
+  /** The section the workspace shows now, or null for projects and pages. */
+  current: SidebarSection | null;
   onSelect: (section: SidebarSection) => void;
 }) {
   const t = useTranslator(sidebarMessages);
@@ -25,6 +28,8 @@ export default function SidebarNavigation({
         <button
           key={section}
           aria-label={t(label)}
+          aria-current={current === section ? "page" : undefined}
+          className={current === section ? "active" : undefined}
           title={t(label)}
           onClick={() => onSelect(section)}
         >

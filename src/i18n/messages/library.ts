@@ -32,10 +32,10 @@ export default defineMessages("library", {
       "可清理 {count} 个文件，共 {size}。保留 {drafts} 份草稿及 {conflicts} 份冲突快照。",
     showCleanupFiles: "查看待清理文件",
     cleanUpFiles: "清理这些文件",
-    fullArchive: "完整归档",
-    archiveLocation: "归档保存位置",
+    fullArchive: "完整备份",
+    archiveLocation: "备份保存位置",
     archivePlaceholder: "完整的新文件夹路径",
-    saveArchive: "保存完整归档",
+    saveArchive: "保存完整备份",
     maintenanceRunning: "后台维护正在进行，编辑草稿仍可保留。",
     maintenanceFailed: "上一次维护未完成：{error}",
     projectStorage: "项目存储空间",
@@ -50,7 +50,7 @@ export default defineMessages("library", {
     "column.size": "文件大小",
     "column.allocated": "磁盘分配",
     "column.files": "文件数",
-    archived: "已归档",
+    archived: "已删除",
     retained: "保留文件",
     noProjects: "内容库中暂无项目。",
     sharedStorage:
@@ -59,7 +59,7 @@ export default defineMessages("library", {
     "toast.compacted": "压缩完成：{before} → {after}，内容完整保留。",
     "toast.indexRebuilt": "搜索和引用索引已重建。",
     "toast.cleaned": "清理完成，正式内容已保留。",
-    "toast.archived": "完整归档已保存并验证：{path}",
+    "toast.archived": "完整备份已保存并验证：{path}",
 
     // Library upgrade dialog
     "upgrade.title": "升级内容库",
@@ -114,10 +114,10 @@ export default defineMessages("library", {
     },
     showCleanupFiles: "Show files to clean up",
     cleanUpFiles: "Clean up these files",
-    fullArchive: "Full archive",
-    archiveLocation: "Archive location",
+    fullArchive: "Full backup",
+    archiveLocation: "Backup location",
     archivePlaceholder: "Full path to a new folder",
-    saveArchive: "Save full archive",
+    saveArchive: "Save full backup",
     maintenanceRunning: "Background maintenance is running. Your drafts are kept.",
     maintenanceFailed: "The last maintenance run didn't finish: {error}",
     projectStorage: "Project storage",
@@ -135,7 +135,7 @@ export default defineMessages("library", {
     "column.size": "File size",
     "column.allocated": "Allocated on disk",
     "column.files": "Files",
-    archived: "Archived",
+    archived: "Deleted",
     retained: "Files kept",
     noProjects: "There are no projects in the library yet.",
     sharedStorage:
@@ -144,7 +144,7 @@ export default defineMessages("library", {
     "toast.compacted": "Compaction finished: {before} → {after}. All content is kept.",
     "toast.indexRebuilt": "Search and reference indexes rebuilt.",
     "toast.cleaned": "Cleanup finished. Saved content is kept.",
-    "toast.archived": "Full archive saved and verified: {path}",
+    "toast.archived": "Full backup saved and verified: {path}",
 
     "upgrade.title": "Upgrade library",
     "upgrade.unsaved":
