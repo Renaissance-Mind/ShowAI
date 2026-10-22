@@ -1,4 +1,4 @@
-import {freezeOwnedJSON,isOwnedJSON,ownedJSONMetrics,captureOwnedJSON,parseOwnedJSON} from "../portable/owned-json.mjs";
+import {freezeOwnedJSON,isOwnedJSON,ownedJSONMetrics,capturedContentSummary,captureOwnedJSON,parseOwnedJSON} from "../portable/owned-json.mjs";
 import type {ShowDocument} from "../types";
 import {assertContent,CapacityError,nonResourceReplacementDoesNotGrow} from "../portable/capacity.mjs";
 import {reconcileSurface,artifactVersion} from "./document.mjs";
@@ -87,6 +87,19 @@ const equalOwned=(one:unknown,two:unknown):boolean=>{
  if(Array.isArray(one)&&Array.isArray(two))return one.length===two.length&&one.every((value,index)=>equalOwned(value,two[index]));
  const keys=Object.keys(one);return keys.length===Object.keys(two).length&&keys.every(key=>Object.hasOwn(two,key)&&equalOwned((one as Record<string,unknown>)[key],(two as Record<string,unknown>)[key]));
 };
+// Only actual private JSON captures and this module's registered factory
+// bodies can use identity below. Public shallow/generic freeze is not enough;
+// mutable external callers keep their complete literal comparison boundary.
+const readableJSON=(value:unknown):boolean=>!!value&&typeof value==="object"&&isOwnedSource(value)&&
+ (normalizationReadableBodies.has(value as ShowDocument)||!!capturedContentSummary(value));
+function privateJSONEqual(one:unknown,two:unknown):boolean{
+ return readableJSON(one)&&readableJSON(two)?equalOwned(one,two):!diffNativeSource(one,two).length;
+}
+function privateDocumentBodiesEqual(one:ShowDocument,two:ShowDocument):boolean{
+ if(!readableJSON(one)||!readableJSON(two))return nativeDocumentBodiesEqual(one,two);
+ const keys=Object.keys(one).filter(key=>key!=="updatedAt"),other=Object.keys(two).filter(key=>key!=="updatedAt");
+ return keys.length===other.length&&keys.every(key=>Object.hasOwn(two,key)&&equalOwned((one as unknown as Record<string,unknown>)[key],(two as unknown as Record<string,unknown>)[key]));
+}
 /** Unlike generic mutable-source diff, both inputs are actual owned snapshots.
  * Identity shortcuts are restricted to this module's recursively frozen data. */
 export function diffOwnedSource(before:unknown,next:unknown):NativeSourceEdit[]{
@@ -252,7 +265,7 @@ export class SourceRuntimeOwner {
   const ref=freezeOwnedSource({format:"showai-source-snapshot-v1" as const,ownerId:this.ownerId,epoch:this.epoch,snapshotId:`snapshot-${++this.nextId}`,scope:{...targetScope},kind});
   const candidates=measured(observer,"register.candidates",()=>timestampProof&&base?base.candidates:kind==="normalized"?inkWireResolutionCandidates(body):[]);
   const nativeOrigin=base?.nativeOrigin&&this.validatedBodies.has(body)&&isDocumentTimestamp(body.updatedAt)&&
-   (timestampProof||measured(observer,"register.nativeOrigin.compare",()=>nativeDocumentBodiesEqual(base.document,body)))?base.nativeOrigin:undefined;
+   (timestampProof||measured(observer,"register.nativeOrigin.compare",()=>privateDocumentBodiesEqual(base.document,body)))?base.nativeOrigin:undefined;
   this.snapshots.set(ref.snapshotId,{ref,document:body,candidates,conflicts,...(nativeOrigin?{nativeOrigin}:{})});measured(observer,"register.account",()=>{this.account(body,1);if(nativeOrigin)this.account(nativeOrigin,1)});
   try{measured(observer,"register.retain",()=>{if(leaseId)this.retain(leaseId,[ref]);else this.prune(new Set([ref.snapshotId]));});}
   catch(error){this.forget(ref.snapshotId);throw error}
@@ -262,12 +275,12 @@ export class SourceRuntimeOwner {
  private rememberPublication(current:Snapshot,publicationId:string,packet:NativePublicationPacket,parsedPacket?:()=>typeof packet):PublicationEntry{
   if(!publicationId||packet.document?.id!==current.ref.scope.pageId||packet.baseDocument?.id!==current.ref.scope.pageId||packet.pageId&&packet.pageId!==current.ref.scope.pageId)fail("Native publication has no matching actual source scope");
   const key=scopeKey(current.ref.scope)+"\u0000"+publicationId,known=this.publications.get(key);
-  if(known&&diffNativeSource(known.packet,packet).length)fail("Native publication identity names a different complete packet");
+  if(known&&!privateJSONEqual(known.packet,packet))fail("Native publication identity names a different complete packet");
   if(known)return known;
   // A live pinned origin outlives the eight-entry replay cache. It still binds
   // its immutable complete P even if another actual call reuses that identity.
   for(const snapshot of this.snapshots.values())if(snapshot.nativeOrigin?.identity.publicationId===publicationId&&scopeKey(snapshot.ref.scope)===scopeKey(current.ref.scope)){
-   if(diffNativeSource(snapshot.nativeOrigin.packet,packet).length)fail("Native publication identity names a different complete packet");
+   if(!privateJSONEqual(snapshot.nativeOrigin.packet,packet))fail("Native publication identity names a different complete packet");
   }
   const previous=[...this.publications.values()].at(-1)?.packet,copy=parsedPacket?parsedPacket():captureOwnedJSON(packet),value=captureOwnedJSON(parsedPacket?copy:previous?shareNativeSource(previous,copy):copy);
   normalizationReadableBodies.add(value.document);normalizationReadableBodies.add(value.baseDocument);
@@ -285,7 +298,7 @@ export class SourceRuntimeOwner {
   // The ordinary path will normalize exactly P, including its timestamp.
   // A real merged/canonical difference requires running
   // the SAME full factory on captured P, including capacity and causal fields.
-  const equivalent=measured(observer,"origin.compare",()=>!diffNativeSource(packet.document,merged).length);
+  const equivalent=measured(observer,"origin.compare",()=>privateJSONEqual(packet.document,merged));
   let canonical:ShowDocument|undefined;
   if(!equivalent||!isDocumentTimestamp(packet.document.updatedAt)){
    canonical=entry.canonical??measured(observer,"origin.normalize",()=>freezeOwnedSource(normalizeOwnedSourceDocument(packet.document)));
@@ -296,7 +309,7 @@ export class SourceRuntimeOwner {
  private bindNativeOrigin(prepared:{record:PublicationOriginRecord;canonical?:ShowDocument},result:SourceSnapshotDelta,observer?:SourceRuntimeObserver){
   const actual=this.get(result.next),record=prepared.record;
   if(actual.nativeOrigin){this.account(actual.nativeOrigin,-1);delete actual.nativeOrigin}
-  if(prepared.canonical&&!measured(observer,"origin.bodyCompare",()=>nativeDocumentBodiesEqual(prepared.canonical!,actual.document)))return;
+  if(prepared.canonical&&!measured(observer,"origin.bodyCompare",()=>privateDocumentBodiesEqual(prepared.canonical!,actual.document)))return;
   actual.nativeOrigin=record;this.account(record,1);this.prune(new Set([result.next.snapshotId]));
  }
  /** Trusted host adapter only. An actual ref attached to another document is
@@ -305,7 +318,7 @@ export class SourceRuntimeOwner {
   * the host must separately check its real save baseline/CAS. */
  nativePublicationDocumentMatching(request:{ref:SourceSnapshotRef;document:ShowDocument}):NativePublicationOrigin|null{
   const actual=this.get(request.ref);
-  return actual.nativeOrigin&&this.validatedBodies.has(actual.document)&&!diffNativeSource(actual.document,request.document).length?actual.nativeOrigin.identity:null;
+  return actual.nativeOrigin&&this.validatedBodies.has(actual.document)&&privateJSONEqual(actual.document,request.document)?actual.nativeOrigin.identity:null;
  }
  private finishPublication(current:Snapshot,publicationId:string,packet:{document:ShowDocument;baseDocument:ShowDocument;[key:string]:unknown},merged:{document:ShowDocument;conflicts:PageMergeConflict[]},leaseId?:string,observer?:SourceRuntimeObserver,parsedDocument?:()=>ShowDocument,actualCanonicalResult?:ShowDocument):SourceSnapshotDelta{
   if(!canCommitPageMerge(merged))throw new SourceRuntimeError("SOURCE_MERGE_CONFLICT","Native publication requires explicit conflict resolution");
@@ -325,7 +338,7 @@ export class SourceRuntimeOwner {
    this.retain(leaseId!,refs);
    result.history={sourceOnly,stages};
   }});
-  return{...result,publicationId,nativeBodyUnchanged:measured(observer,"bodyCompare",()=>nativeDocumentBodiesEqual(packet.document,this.get(result.next).document))};
+  return{...result,publicationId,nativeBodyUnchanged:measured(observer,"bodyCompare",()=>privateDocumentBodiesEqual(packet.document,this.get(result.next).document))};
  }
  /** Only an actual backend author/adoption+merge route can call this adapter.
   * A public request never accepts a client-asserted merged result. */
@@ -371,16 +384,17 @@ export class SourceRuntimeOwner {
   if(origin&&this.validatedBodies.has(current.document)&&origin.identity.publicationId===request.publicationId&&scopeKey(origin.identity.scope)===scopeKey(current.ref.scope)){
    // Same actually proved P after a failed save/ACK; timestamp-only COW has
    // already retained its official model/capacity proof, not a caller token.
-   unchanged=!diffNativeSource(origin.packet,packet).length;
+   unchanged=privateJSONEqual(origin.packet,packet);
   }
   if(!unchanged){
    let base:ShowDocument;
-   if(origin&&this.validatedBodies.has(current.document)&&!diffNativeSource(origin.packet.document,packet.baseDocument).length)base=current.document;
+   if(this.validatedBodies.has(current.document)&&
+      (privateJSONEqual(packet.baseDocument,current.document)||origin&&privateJSONEqual(origin.packet.document,packet.baseDocument)))base=current.document;
    else{
     base=entry.canonicalBase??measured(observer,"unchanged.normalizeBase",()=>freezeOwnedSource(normalizeOwnedSourceDocument(packet.baseDocument,observer && ((stage,time)=>observer("unchanged.base."+stage,time)))));
     if(!entry.canonicalBase){entry.canonicalBase=base;if(this.publications.get(scopeKey(current.ref.scope)+"\u0000"+request.publicationId)===entry)this.account(base,1)}
    }
-   unchanged=measured(observer,"unchanged.compareBase",()=>nativeDocumentBodiesEqual(base,current.document));
+   unchanged=measured(observer,"unchanged.compareBase",()=>privateDocumentBodiesEqual(base,current.document));
   }
   if(!unchanged)return null;
   // A raw/draft ref is not itself capacity proof. Equality above proves all
@@ -443,7 +457,7 @@ export class SourceRuntimeOwner {
   * sample, tombstone and retained variant. No JSON serialization is involved. */
  normalizedDocumentMatching(request:{ref:SourceSnapshotRef;document:ShowDocument}):ShowDocument|null{
   const current=this.get(request.ref);
-  return this.validatedBodies.has(current.document)&&!diffNativeSource(current.document,request.document).length?current.document:null;
+  return this.validatedBodies.has(current.document)&&privateJSONEqual(current.document,request.document)?current.document:null;
  }
  /** Actual host projections (undo/resolution) still undergo full canonical
   * normalization here. This adapter is not public client dispatch and does not
@@ -470,14 +484,17 @@ export class SourceRuntimeOwner {
  execute(request:SourceRuntimeRequest):SourceRuntimeResponse{
   switch(request.kind){
    case "seed":{
-    const copy=cloneSourceValue(request.document),proof=request.proof??"draft";
+    const captured=!!capturedContentSummary(request.document),copy=captured?request.document:cloneSourceValue(request.document),proof=request.proof??"draft";
+    if(captured)normalizationReadableBodies.add(copy);
     return this.register(request.scope,proof==="normalized"?normalizeOwnedSourceDocument(copy):copy,proof,null,request.leaseId);
    }
    case "draft":{
     const base=this.get(request.base);if(!request.transactionId)fail("Source draft requires an actual transaction identity");
     const key=scopeKey(base.ref.scope)+"\u0000"+request.transactionId,known=this.transactions.get(key);
     if(known){if(!sameSourceRef(known.base,base.ref)||diffNativeSource(known.edits,request.edits).length)fail("Source transaction identity names different edits");const next=this.get(known.next);return{format:"showai-owned-source-v1",base:base.ref,next:next.ref,edits:cloneSourceValue(known.edits),conflicts:[],inkCandidates:next.candidates};}
-    const edits=freezeOwnedSource(cloneSourceValue(request.edits)),target=applyNativeSourceDelta(base.document,edits),result=this.register(base.ref.scope,target,"draft",base,request.leaseId,[],edits);
+    const captured=!!capturedContentSummary(base.document)&&!!capturedContentSummary(request.edits);
+    const edits=captured?request.edits:freezeOwnedSource(cloneSourceValue(request.edits));
+    const target=captured?applyCapturedSourceDelta(base.document,edits):applyNativeSourceDelta(base.document,edits),result=this.register(base.ref.scope,target,"draft",base,request.leaseId,[],edits);
     if(request.leaseId)this.retain(request.leaseId,[base.ref,result.next]);
     this.transactions.set(key,{base:base.ref,edits,next:result.next,leaseId:request.leaseId});this.account(edits,1);this.prune(new Set([result.next.snapshotId]));return result;
    }
@@ -499,7 +516,7 @@ export class SourceRuntimeOwner {
    case "publication":{
     const current=this.get(request.current),packet=request.packet;
     this.rememberPublication(current,request.publicationId,packet);
-    const merged=nativeDocumentBodiesEqual(packet.baseDocument,current.document)?{document:packet.document,conflicts:[]}:mergePageContent(packet.baseDocument,current.document,packet.document);
+    const merged=privateDocumentBodiesEqual(packet.baseDocument,current.document)?{document:packet.document,conflicts:[]}:mergePageContent(packet.baseDocument,current.document,packet.document);
     return this.finishPublication(current,request.publicationId,packet,merged,request.leaseId);
    }
    case "historyAppendInk":{
@@ -544,7 +561,7 @@ export class SourceRuntimeOwner {
      const merged=mergePageContent(base.document,current.document,entry.document,"history");
      const projected=this.register(base.ref.scope,merged.document,"draft",entry,undefined,merged.conflicts);
      refs.push(projected.next);this.retain(request.leaseId!,refs);
-     history.push({delta:projected,unchanged:nativeDocumentBodiesEqual(this.get(projected.next).document,current.document)});
+     history.push({delta:projected,unchanged:privateDocumentBodiesEqual(this.get(projected.next).document,current.document)});
     }
     return{rebasedHistory:history};
    }
