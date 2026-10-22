@@ -392,7 +392,6 @@ export function FormatControls({
                       .run();
               return (
                 <div className="rich-format-palette" key={kind}>
-                  <span className="rich-format-panel-label">{label}</span>
                   <div className="rich-format-swatches">
                     {(isText ? textColors : highlightColors).map((color) => (
                       <button
