@@ -46,6 +46,7 @@ import {
 import { assertId, CoreError, FileStore } from "../core/store";
 import type { PageRecord, ProjectBinding } from "../core/model";
 import { isDirectorySortBy } from "../core/directory-sort";
+import { deletedEntries } from "../core/deleted-entries";
 import {
   getComponent,
   blankDocument,
@@ -169,6 +170,8 @@ export const workbenchActions = new Set([
   "projects:rename",
   "projects:pin",
   "projects:remove",
+  "library:deleted",
+  "library:restore",
   "sidebar:get",
   "sidebar:moveProject",
   "sidebar:moveEntry",
@@ -876,6 +879,49 @@ export function createWorkbench(
         });
       case "projects:remove":
         return store.updateProject(projectId(args), { archived: true });
+      case "library:deleted": {
+        const projects = await store.listProjects({ includeArchived: true });
+        return deletedEntries(
+          await Promise.all(
+            projects.map(async (project) => ({
+              project,
+              ...(project.archived
+                ? { folders: [], pages: [] }
+                : {
+                    folders: await store.listFolders(project.id, {
+                      includeArchived: true,
+                    }),
+                    pages: await store.listPages(project.id),
+                  }),
+            })),
+          ),
+        );
+      }
+      case "library:restore": {
+        const kind = required(args, "kind");
+        const id = projectId(args);
+        if (kind === "project")
+          return store.updateProject(id, { archived: false });
+        if (kind === "folder")
+          return store.updateFolder(
+            id,
+            assertId(required(args, "folderId")),
+            { archived: false },
+          );
+        if (kind !== "page")
+          throw new CoreError("INVALID_DATA", "Choose a project, folder or page.");
+        const original = await store.readPage(id, pageId(args));
+        return enrichPage(
+          id,
+          await store.savePage(
+            id,
+            original.document.id,
+            { ...original.document, archived: false },
+            original.hash,
+            original.revision,
+          ),
+        );
+      }
       case "folders:list":
         return store.listFolders(projectId(args));
       case "folders:create":
@@ -1575,6 +1621,7 @@ export function createWorkbench(
     "projects:rename",
     "projects:pin",
     "projects:remove",
+    "library:restore",
     "projects:group",
     "groups:create",
     "groups:rename",
