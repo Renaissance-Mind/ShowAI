@@ -1,6 +1,11 @@
 @import "./tokens.css";
 @import "./content.css";
 
+/* Rings appear only during keyboard navigation (see ui/keyboard-focus.ts). */
+:root:not([data-keyboard-focus]) :focus-visible {
+  outline: none !important;
+}
+
 .studio {
   font-size: 14px;
   line-height: 1.5;

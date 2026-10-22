@@ -2166,6 +2166,7 @@ export default function RichTextEditor({
                 <button
                   type="button"
                   aria-label={t("dialog.close")}
+                  data-no-tooltip
                   onClick={() => setDialog(null)}
                 >
                   <X size={18} />

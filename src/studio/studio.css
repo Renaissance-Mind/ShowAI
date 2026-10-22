@@ -940,6 +940,9 @@ button.studio-tree-chevron:hover {
   flex-direction: column;
   overflow: hidden;
 }
+.studio-modal:focus {
+  outline: none;
+}
 .studio-modal.wide {
   width: min(920px, 100%);
 }

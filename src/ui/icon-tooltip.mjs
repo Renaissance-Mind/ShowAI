@@ -26,8 +26,8 @@ export function installIconTooltips(root) {
   let active = null;
   let nativeTitle = null;
   let hideTimer = 0;
-  let focusTimer = 0;
-  let pointerFocus = false;
+  // Only keyboard navigation reveals focus tooltips; script focus after a click or shortcut stays quiet.
+  let keyboardNav = false;
   let hovered = null;
   let focused = null;
 
@@ -52,7 +52,10 @@ export function installIconTooltips(root) {
         element.getRootNode() === root &&
         element.matches("button, summary, a, [role='button']"),
     );
-    if (control) return label(control) ? control : null;
+    if (control)
+      return label(control) && !control.hasAttribute("data-no-tooltip")
+        ? control
+        : null;
     for (const element of path) {
       if (!element?.matches || element.getRootNode() !== root) continue;
       if (element === tip) return tip;
@@ -166,7 +169,7 @@ export function installIconTooltips(root) {
     leave();
   };
   const focus = (event) => {
-    if (pointerFocus) return;
+    if (!keyboardNav) return;
     focused = target(event);
     show(focused);
   };
@@ -175,6 +178,15 @@ export function installIconTooltips(root) {
     leave();
   };
   const key = (event) => {
+    const field = event.composedPath()[0];
+    if (
+      event.key === "Tab" ||
+      (/^(Arrow(Up|Down|Left|Right)|Home|End|Page(Up|Down))$/.test(event.key) &&
+        !field?.closest?.(
+          'input, textarea, select, [contenteditable]:not([contenteditable="false"])',
+        ))
+    )
+      keyboardNav = true;
     if (event.key === "Escape") hide();
   };
   const dismiss = () => {
@@ -184,11 +196,7 @@ export function installIconTooltips(root) {
   };
   const pointerDown = () => {
     dismiss();
-    pointerFocus = true;
-    win.clearTimeout(focusTimer);
-    focusTimer = win.setTimeout(() => {
-      pointerFocus = false;
-    }, 0);
+    keyboardNav = false;
   };
   const observer = new win.MutationObserver(() => {
     if (!active) return;
@@ -231,7 +239,6 @@ export function installIconTooltips(root) {
   win.addEventListener("resize", dismiss);
   win.addEventListener("blur", dismiss);
   return () => {
-    win.clearTimeout(focusTimer);
     hide();
     observer.disconnect();
     for (const [name, handler] of listeners)

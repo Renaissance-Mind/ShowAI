@@ -40,7 +40,7 @@ export default function Dialog({
           className.includes("catalog-")
             ? '[role="tab"][aria-selected="true"]'
             : "input:not([disabled]),textarea:not([disabled]),select:not([disabled])",
-        ) ?? panel.current?.querySelector<HTMLElement>("button"))
+        ) ?? panel.current)
     )?.focus();
     const handle = (event: KeyboardEvent) => {
       // A local file picker can sit above a component or publication dialog.
@@ -128,6 +128,7 @@ export default function Dialog({
                 <button
                   className="studio-icon"
                   aria-label={t("closeDialog")}
+                  data-no-tooltip
                   onClick={onClose}
                 >
                   <X size={18} />
@@ -141,6 +142,7 @@ export default function Dialog({
                 <button
                   className="studio-icon"
                   aria-label={t("closeDialog")}
+                  data-no-tooltip
                   onClick={onClose}
                 >
                   <X size={18} />

@@ -1,4 +1,5 @@
 import { installIconTooltips } from "./ui/icon-tooltip.mjs";
+import { installKeyboardFocus } from "./ui/keyboard-focus";
 import { lazy, Suspense, useLayoutEffect } from "react";
 import { appIconForTheme } from "./design/app-icon";
 import { useAppearanceTheme } from "./design/useAppearanceTheme";
@@ -18,6 +19,7 @@ export default function App() {
   const locale = useLocale();
   const t = useTranslator(messages);
   useLayoutEffect(() => installIconTooltips(document), []);
+  useLayoutEffect(() => installKeyboardFocus(document), []);
   useLayoutEffect(() => {
     const favicon = document.querySelector<HTMLLinkElement>("#showai-favicon");
     if (favicon) favicon.href = appIconForTheme(theme);
