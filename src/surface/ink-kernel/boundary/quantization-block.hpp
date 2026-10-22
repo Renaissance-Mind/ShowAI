@@ -10,6 +10,9 @@ namespace showai_boundary {
 // owner. The full cold exporter remains available separately.
 struct BoundaryQuantizedAnchorPair {
     Record<BoundaryQuantizedVertex>a,b;
+    // Actual current endpoint topology, independent of the anchor's immutable
+    // original representative metadata after a proved vertex alias/union.
+    uint32_t vertex_a=no_index,vertex_b=no_index;
 };
 struct BoundaryQuantizedArc {
     BoundaryQuantizedEdge edge{};
@@ -40,11 +43,12 @@ inline uint32_t quantize_boundary_block(const Graph&g,SABoundaryBlockKey key,
         if(!pair.a.valid()||!pair.b.valid()||pair.a.context()!=&c||pair.b.context()!=&c){c.fail(SA_INK_INVALID);break;}
         const auto&a=*pair.a.get();const auto&b=*pair.b.get();
         const uint32_t va=boundary_quantization::vertex_root(g,e.va),vb=boundary_quantization::vertex_root(g,e.vb);
-        if(a.vertex!=va||b.vertex!=vb||a.reserved||b.reserved||
+        const uint32_t topology_a=pair.vertex_a==no_index?a.vertex:pair.vertex_a,topology_b=pair.vertex_b==no_index?b.vertex:pair.vertex_b;
+        if(topology_a!=va||topology_b!=vb||a.reserved||b.reserved||
            !finite_double(a.position[0])||!finite_double(a.position[1])||!finite_double(b.position[0])||!finite_double(b.position[1])||
            !finite_double(a.error_l1)||!finite_double(b.error_l1)||a.error_l1<0||b.error_l1<0){c.fail(SA_INK_INVALID);break;}
         BoundaryQuantizedArc arc;arc.a=pair.a;arc.b=pair.b;
-        if(!boundary_quantization::captured_edge(g,e,i,a,b,o,staged.metrics,arc.edge)){if(g.good())c.fail(SA_INK_RANGE);break;}
+        if(!boundary_quantization::captured_edge(g,e,i,a,b,o,staged.metrics,arc.edge,topology_a,topology_b)){if(g.good())c.fail(SA_INK_RANGE);break;}
         if(!staged.arcs.push_back(arc))break;
     }
     if(!g.good())return c.status;

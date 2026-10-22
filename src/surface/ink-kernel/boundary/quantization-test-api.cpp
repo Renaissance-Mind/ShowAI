@@ -14,7 +14,7 @@ inline bool verify_actual_blocks(const Graph&g,const BoundaryQuantizedGraph&cold
     g.edges.each_chunk([&](uint32_t slot,const ChunkTree<Edge>::Chunk&chunk){
         if(!okay||!g.good())return;Vector<BoundaryQuantizedAnchorPair,1>pairs(c);
         for(const auto&e:chunk.values){BoundaryQuantizedAnchorPair pair;const uint32_t ids[2]={boundary_quantization::vertex_root(g,e.va),boundary_quantization::vertex_root(g,e.vb)};
-            for(const auto&r:records){if(r.get()->vertex==ids[0])pair.a=r;if(r.get()->vertex==ids[1])pair.b=r;}pairs.push_back(pair);}
+            for(const auto&r:records){if(r.get()->vertex==ids[0])pair.a=r;if(r.get()->vertex==ids[1])pair.b=r;}pair.vertex_a=ids[0];pair.vertex_b=ids[1];pairs.push_back(pair);}
         SABoundaryBlockKey key{g.output_epoch,chunk.identity,chunk.revision,slot,0};BoundaryQuantizedBlock derived(c);
         if(quantize_boundary_block(g,key,pairs,o,derived)||derived.arcs.size()!=chunk.values.size()){okay=false;return;}
         for(uint32_t i=0;i<derived.arcs.size();i++){
@@ -24,6 +24,17 @@ inline bool verify_actual_blocks(const Graph&g,const BoundaryQuantizedGraph&cold
             if(e.degree!=expected->degree||e.error_l1!=expected->error_l1||e.parameter_error_l1!=expected->parameter_error_l1||e.control_error_l1!=expected->control_error_l1){okay=false;break;}
             for(uint32_t j=0;j<8;j++)if(e.controls[j]!=expected->controls[j])okay=false;++processed;
         }
+        // Representative metadata is not current endpoint topology. A proved
+        // alias can preserve anchor bits/record metadata while the current graph
+        // uses a different canonical index; this math stage checks that topology
+        // against the actual source and includes endpoint adjustment in its bound.
+        if(!pairs.empty()){
+            BoundaryQuantizedVertex representative=*pairs[0].a.get();representative.vertex=0x7ffffffeu;
+            pairs[0].a=Record<BoundaryQuantizedVertex>::create(c,representative);
+            BoundaryQuantizedBlock metadata(c);
+            if(quantize_boundary_block(g,key,pairs,o,metadata)||metadata.arcs[0].a.get()!=pairs[0].a.get()||metadata.arcs[0].edge.vertex_a!=pairs[0].vertex_a||metadata.arcs[0].a.get()->vertex!=0x7ffffffeu){okay=false;return;}
+            for(uint32_t j=0;j<8;j++)if(metadata.arcs[0].edge.controls[j]!=derived.arcs[0].edge.controls[j])okay=false;
+        }
         // Actual changed/retired keys are rejected, without replacing old bytes.
         const auto*old=derived.arcs.empty()?nullptr:&derived.arcs[0];key.revision++;
         if(quantize_boundary_block(g,key,pairs,o,derived)!=SA_INK_INVALID||(!derived.arcs.empty()&&old!=&derived.arcs[0]))okay=false;
@@ -32,8 +43,7 @@ inline bool verify_actual_blocks(const Graph&g,const BoundaryQuantizedGraph&cold
         if(chunk.values.size()>1){auto limited=o;limited.maximum_edges=chunk.values.size()-1;
             if(quantize_boundary_block(g,key,pairs,limited,derived)!=SA_INK_CAPACITY||old!=&derived.arcs[0])okay=false;}
         // A failure after earlier arcs were staged cannot publish a partial block.
-        BoundaryQuantizedVertex wrong=*pairs[pairs.size()-1].b.get();wrong.vertex=no_index;
-        pairs[pairs.size()-1].b=Record<BoundaryQuantizedVertex>::create(c,wrong);
+        pairs[pairs.size()-1].vertex_b=0x7fffffffu;
         const uint64_t work_limit=c.max_work;
         if(quantize_boundary_block(g,key,pairs,o,derived)!=SA_INK_INVALID||old!=&derived.arcs[0])okay=false;
         c.begin_work(work_limit);

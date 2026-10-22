@@ -87,7 +87,8 @@ inline bool anchor(const Curve&curve,Root root,uint32_t vertex,uint32_t edge,uin
  * index is the certificate index within that binding (flat only for cold export).
  * This entry permits changed-block consumers to avoid any flat-tree traversal. */
 inline bool captured_edge(const Graph&g,const Edge&edge,uint32_t index,const BoundaryQuantizedVertex&a,const BoundaryQuantizedVertex&b,
-                          const BoundaryQuantizationOptions&o,BoundaryQuantizationMetrics&m,BoundaryQuantizedEdge&output){
+                          const BoundaryQuantizationOptions&o,BoundaryQuantizationMetrics&m,BoundaryQuantizedEdge&output,
+                          uint32_t topology_a=no_index,uint32_t topology_b=no_index){
     auto&c=*g.context();if(edge.source>=g.curves.size()){c.fail(SA_INK_INVALID);return false;}const auto&source=g.curves[edge.source];const auto&curve=source.geometry;
     if(source.origins.empty()||curve.controls.size()<2||curve.controls.size()>4||(edge.direction!=1&&edge.direction!=-1)||index>0x7ffffffeu){c.fail(SA_INK_RANGE);return false;}
     Root lo=edge.a,hi=edge.b;if(lo.context()!=&c||hi.context()!=&c){c.fail(SA_INK_INVALID);return false;}if(!root_domain(lo,m,o)||!root_domain(hi,m,o))return false;
@@ -103,7 +104,7 @@ inline bool captured_edge(const Graph&g,const Edge&edge,uint32_t index,const Bou
     while(g.good()){
         ++m.edge_attempts;const Q alpha=lo.midpoint(),beta=hi.midpoint();Curve exact=restricted(curve,alpha,beta);
         if(exact.controls.size()<2||exact.controls.size()>4){c.fail(SA_INK_RANGE);return false;}
-        BoundaryQuantizedEdge staged{};const auto&origin=source.origins[0];if(origin.source>=g.blocks.size()){c.fail(SA_INK_RANGE);return false;}staged.source=g.blocks[origin.source].description.key;staged.command_index=origin.command;staged.source_flags=origin.flags;staged.edge=index;staged.curve=edge.source;staged.degree=exact.controls.size()-1;staged.vertex_a=a.vertex;staged.vertex_b=b.vertex;staged.curve_identity=source.identity;staged.direction=edge.direction;staged.certificate_a=index*2;staged.certificate_b=index*2+1;
+        BoundaryQuantizedEdge staged{};const auto&origin=source.origins[0];if(origin.source>=g.blocks.size()){c.fail(SA_INK_RANGE);return false;}staged.source=g.blocks[origin.source].description.key;staged.command_index=origin.command;staged.source_flags=origin.flags;staged.edge=index;staged.curve=edge.source;staged.degree=exact.controls.size()-1;staged.vertex_a=topology_a==no_index?a.vertex:topology_a;staged.vertex_b=topology_b==no_index?b.vertex:topology_b;staged.curve_identity=source.identity;staged.direction=edge.direction;staged.certificate_a=index*2;staged.certificate_b=index*2+1;
         Q ex=Q::from_signed(c,0),ey=ex;
         for(uint32_t i=0;i<exact.controls.size()&&g.good();i++){
             const auto&p=exact.controls[i];double x=0,y=0;
