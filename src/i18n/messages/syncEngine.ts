@@ -5,6 +5,12 @@ export default defineMessages("syncEngine", {
   "zh-CN": {
     "server.status": "服务器返回 {status}",
     "network.failed": "同步网络请求失败。",
+    "network.unavailable":
+      "无法连接服务器，请检查网络。本机修改会保留，连接恢复后自动同步。",
+    "server.failed": "服务器出错（{status}），稍后会自动重试。本机修改会保留。",
+    "server.notShowAI":
+      "这似乎不是 ShowAI 服务器地址，是否漏了 /cloud？例如 https://showai.example.com/cloud。",
+    "server.invalidResponse": "服务器返回了无法识别的内容（{status}）。",
     "network.redirected":
       "服务器地址发生重定向，请使用最终服务器基址重新连接。",
     "url.invalidBase":
@@ -93,6 +99,13 @@ export default defineMessages("syncEngine", {
   en: {
     "server.status": "The server returned {status}",
     "network.failed": "Sync network request failed.",
+    "network.unavailable":
+      "Cannot reach the server. Check your network. Local changes are kept and sync resumes when the connection is back.",
+    "server.failed":
+      "The server hit an error ({status}). Sync will retry automatically; local changes are kept.",
+    "server.notShowAI":
+      "This does not look like a ShowAI Server address. Did you leave out /cloud? For example https://showai.example.com/cloud.",
+    "server.invalidResponse": "The server returned a response ShowAI cannot read ({status}).",
     "network.redirected":
       "The server address redirected. Reconnect using the final server base URL.",
     "url.invalidBase":

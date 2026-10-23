@@ -28,6 +28,7 @@ export default function ProjectSidebar({
   onNew,
   onMenu,
   onGroupMenu,
+  unreadable,
   docs,
 }: {
   projects: ProjectSummary[];
@@ -41,6 +42,8 @@ export default function ProjectSidebar({
   onNew: (anchor: HTMLButtonElement) => void;
   onMenu: (anchor: HTMLElement) => void;
   onGroupMenu: (group: ProjectGroup, anchor: HTMLElement) => void;
+  /** Rows for project folders that could not be read. */
+  unreadable?: ReactNode;
   /** The built-in documentation, pinned under the New button. */
   docs?: ReactNode;
 }) {
@@ -143,6 +146,7 @@ export default function ProjectSidebar({
           )}
         >
           {items.map(renderProject)}
+          {id === "projects" && unreadable}
           {!items.length && group && (
             <div className="studio-group-empty">{t("noProjects")}</div>
           )}

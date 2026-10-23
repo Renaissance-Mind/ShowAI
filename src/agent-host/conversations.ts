@@ -183,6 +183,8 @@ export class ConversationStore {
   private cache = new Map<string, AgentConversation>();
   private listed = new Set<string>();
   private writes = new Map<string, Promise<void>>();
+  /** Last write failure per conversation; cleared by the next successful write. */
+  private failures = new Map<string, string>();
   private timers = new Map<string, ReturnType<typeof setTimeout>>();
   constructor(private readonly root: string) {}
   private directory(projectId: string) {
@@ -275,9 +277,26 @@ export class ConversationStore {
           this.file(conversation.projectId, conversation.id),
           conversation,
         ),
+      )
+      .then(
+        () => {
+          this.failures.delete(conversation.id);
+        },
+        (error: Error) => {
+          this.failures.set(conversation.id, error.message);
+          throw error;
+        },
       );
     this.writes.set(conversation.id, next);
     return next;
+  }
+  /** Waits for queued writes so a reader sees whether they reached disk. */
+  async settled(id: string) {
+    await this.writes.get(id)?.catch(() => {});
+  }
+  /** Why the conversation's latest write failed, if it did. */
+  persistFailure(id: string): string | undefined {
+    return this.failures.get(id);
   }
   /** Coalesce frequent event updates during a run. */
   schedule(conversation: AgentConversation) {

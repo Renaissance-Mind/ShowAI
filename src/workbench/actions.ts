@@ -22,9 +22,9 @@ import {
   wrapSurface,
   surfaceKind,
 } from "../surface/containers.mjs";
-import { readFile, writeFile, stat } from "node:fs/promises";
+import { readFile, writeFile, stat, realpath } from "node:fs/promises";
 import { localMediaGrants } from "./local-media";
-import { join, sep, resolve } from "node:path";
+import { join, sep, resolve, dirname, relative, isAbsolute } from "node:path";
 import { randomUUID, createHash } from "node:crypto";
 import { changeContext, withChangeContext } from "../core/history-context";
 import { pageReference } from "../core/page-reference";
@@ -173,6 +173,7 @@ export const workbenchActions = new Set([
   "drafts:remove",
   "drafts:complete",
   "projects:list",
+  "projects:scan",
   "projects:create",
   "projects:rename",
   "projects:pin",
@@ -235,6 +236,7 @@ export const workbenchActions = new Set([
   "media:open",
   "media:reveal",
   "export:reveal",
+  "library:reveal",
   "app:openPageWindow",
   "app:openWindow",
   ...datasetActions,
@@ -252,6 +254,16 @@ export function text(
 }
 export const required = (args: Record<string, unknown>, key: string) =>
   text(args, key)!;
+function projectScope(args: Record<string, unknown>) {
+  const projectIds = args.projectIds;
+  if (projectIds === undefined) return undefined;
+  if (!Array.isArray(projectIds) || projectIds.length > PROJECT_SCOPE_LIMIT)
+    throw new CoreError(
+      "INVALID_DATA",
+      "Project scope must be an array of project identities.",
+    );
+  return projectIds.map((id) => assertId(id));
+}
 export const projectId = (args: Record<string, unknown>) =>
   assertId(required(args, "projectId"));
 export const pageId = (args: Record<string, unknown>) =>
@@ -794,20 +806,9 @@ export function createWorkbench(
           required(args, "revision"),
         );
       case "projects:list": {
-        const projectIds =
-          args.projectIds === undefined ? undefined : args.projectIds;
-        if (
-          projectIds !== undefined &&
-          (!Array.isArray(projectIds) ||
-            projectIds.length > PROJECT_SCOPE_LIMIT)
-        )
-          throw new CoreError(
-            "INVALID_DATA",
-            "Project scope must be an array of project identities.",
-          );
         const projects = await store.listProjects({
           includeArchived: args.includeArchived === true,
-          projectIds: projectIds?.map((id) => assertId(id)),
+          projectIds: projectScope(args),
         });
         if (args.includeHidden === true) return projects;
         const hidden = new Set(
@@ -815,6 +816,24 @@ export function createWorkbench(
             [],
         );
         return projects.filter((project) => !hidden.has(project.id));
+      }
+      case "projects:scan": {
+        // Like projects:list, but a project that cannot be read is reported
+        // beside the others instead of failing the whole list.
+        const scanned = await store.scanProjects({
+          includeArchived: args.includeArchived === true,
+          projectIds: projectScope(args),
+        });
+        const hidden = new Set(
+          (await syncManager(store.root).configuration()).hiddenProjectIds ??
+            [],
+        );
+        return {
+          projects: scanned.projects.filter(
+            (project) => args.includeHidden === true || !hidden.has(project.id),
+          ),
+          unreadable: scanned.unreadable,
+        };
       }
       case "sidebar:get":
         return store.readSidebar();
@@ -1658,6 +1677,27 @@ export function createWorkbench(
         return host.invoke(action, args);
       case "media:open":
         return localMediaGrants.grant(args.path);
+      case "library:reveal": {
+        // Reveals a location inside this library only, e.g. the folder a save
+        // could not write; a missing target shows its nearest existing parent.
+        const root = await realpath(store.root);
+        let target = resolve(root, required(args, "path"));
+        const inside = (path: string) => {
+          const local = relative(root, path);
+          return !local.startsWith("..") && !isAbsolute(local);
+        };
+        if (!inside(target))
+          throw new CoreError("INVALID_PATH", "Only locations inside the library can be shown.");
+        while (
+          target !== root &&
+          !(await stat(target).then(() => true, () => false))
+        )
+          target = dirname(target);
+        target = await realpath(target);
+        if (!inside(target))
+          throw new CoreError("INVALID_PATH", "Only locations inside the library can be shown.");
+        return host.invoke("media:reveal", { path: target });
+      }
       case "media:reveal": {
         const grant = localMediaGrants.resolve(required(args, "token"));
         if (!grant)

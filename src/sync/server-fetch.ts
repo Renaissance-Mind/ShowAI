@@ -58,10 +58,9 @@ export async function serverFetch(
     idempotent: inspection || method === "GET" || method === "HEAD",
   }).catch((error: unknown) => {
     if (init?.signal?.aborted) throw init.signal.reason;
-    throw new TypeError(
-      error instanceof Error ? error.message : t("network.failed"),
-      { cause: error },
-    );
+    // The translated sentence is shown; the transport's own text stays in
+    // the cause for technical details.
+    throw new TypeError(t("network.failed"), { cause: error });
   });
   if (
     response.statusCode >= 300 &&

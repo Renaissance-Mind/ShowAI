@@ -66,6 +66,7 @@ import type {
   SidebarOrganization,
   SidebarEntryMove,
   ShowDocument,
+  UnreadableProject,
 } from "./model";
 
 export { CoreError } from "./model";
@@ -838,22 +839,69 @@ export class FileStore {
   async listProjects(
     options: { includeArchived?: boolean; projectIds?: string[] } = {},
   ): Promise<ProjectSummary[]> {
+    const { projects, failures } = await this.readProjects(options, false);
+    if (failures.length) throw failures[0].error;
+    return projects;
+  }
+
+  /**
+   * Lists every readable project and reports the others by directory, so one
+   * damaged project does not hide the rest of the library.
+   */
+  async scanProjects(
+    options: { includeArchived?: boolean; projectIds?: string[] } = {},
+  ): Promise<{
+    projects: ProjectSummary[];
+    unreadable: UnreadableProject[];
+  }> {
+    const { projects, failures } = await this.readProjects(options, true);
+    return {
+      projects,
+      unreadable: failures.map(({ directory, error }) => ({
+        directory,
+        path: join(workspaceRoot(this.root), "projects", directory),
+        code:
+          error instanceof CoreError
+            ? error.code
+            : ((error as NodeJS.ErrnoException)?.code ?? "ERROR"),
+        message: error instanceof Error ? error.message : String(error),
+      })),
+    };
+  }
+
+  private async readProjects(
+    options: { includeArchived?: boolean; projectIds?: string[] },
+    isolate: boolean,
+  ): Promise<{
+    projects: ProjectSummary[];
+    failures: { directory: string; error: unknown }[];
+  }> {
     if (
       !libraryReadSnapshot.getStore() &&
       !libraryMutations.getStore() &&
       versionedLibrary(this.root)
     )
-      return withLibrarySnapshot(this.root, () => this.listProjects(options));
+      return withLibrarySnapshot(this.root, () =>
+        this.readProjects(options, isolate),
+      );
     const path = join(workspaceRoot(this.root), "projects");
     const names = await this.contentNames(path, "directory");
     const projects: ProjectSummary[] = [];
+    const failures: { directory: string; error: unknown }[] = [];
     for (const name of names) {
       if (options.projectIds && !options.projectIds.includes(name)) continue;
-      const project = await this.readProject(name);
-      if (project.archived && !options.includeArchived) continue;
-      const pages = await this.listPages(project.id, {
-        includeArchived: !!options.includeArchived,
-      });
+      let project: ProjectMetadata, pages: PageSummary[];
+      try {
+        project = await this.readProject(name);
+        if (project.archived && !options.includeArchived) continue;
+        pages = await this.listPages(project.id, {
+          includeArchived: !!options.includeArchived,
+        });
+      } catch (error) {
+        failures.push({ directory: name, error });
+        if (!isolate) break;
+        continue;
+      }
       projects.push({
         ...project,
         folders: options.includeArchived
@@ -868,10 +916,13 @@ export class FileStore {
         pageCount: pages.length,
       });
     }
-    return orderSidebarProjects(
-      projects,
-      (await this.readSidebar()).projectOrder,
-    );
+    return {
+      projects: orderSidebarProjects(
+        projects,
+        (await this.readSidebar()).projectOrder,
+      ),
+      failures,
+    };
   }
 
   async createProject(input: {

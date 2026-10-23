@@ -12,6 +12,7 @@ const empty: PageSnapshot = {
   renderVersion: 0,
   status: "saved",
   error: "",
+  draftDurable: true,
   draftNotice: "",
   reviewingConflict: false,
   saveFailureAttempt: 0,
@@ -61,6 +62,8 @@ function sameStudioView(previous: StudioView, next: StudioView) {
     x.draft?.favorite === y.draft?.favorite &&
     x.record === y.record &&
     x.error === y.error &&
+    x.failure === y.failure &&
+    (y.status !== "error" || x.draftDurable === y.draftDurable) &&
     x.renderVersion === y.renderVersion &&
     x.draftNotice === y.draftNotice &&
     x.conflictId === y.conflictId &&

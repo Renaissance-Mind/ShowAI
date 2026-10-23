@@ -45,7 +45,10 @@ export class ProjectEventStream {
     );
   }
   start() {
-    if (this.stopped || this.socket) return;
+    // A pending reconnect keeps its backoff: every failed sync cycle rewrites
+    // the configuration and calls start() again, which must not reconnect at
+    // once and wake the next cycle in a tight loop.
+    if (this.stopped || this.socket || this.timer) return;
     const endpoint = new URL(`${this.url}/api/events`);
     endpoint.protocol = endpoint.protocol === "https:" ? "wss:" : "ws:";
     const socket = new WebSocket(endpoint, [

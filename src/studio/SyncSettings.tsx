@@ -77,7 +77,8 @@ const emptyForm = {
 };
 export type ProjectSyncRequest = {
   projectId: string;
-  intent: "share" | "sync";
+  /** signIn: the project's account must sign in again. */
+  intent: "share" | "sync" | "signIn";
   key: number;
 };
 const pendingInviteKey = "showai:pending-invitation";
@@ -111,6 +112,11 @@ export default function SyncSettings({
     [error, setError] = useState(""),
     [message, setMessage] = useState("");
   const [form, setForm] = useState(emptyForm);
+  // The server is probed when its address is committed, not on every keystroke.
+  const [probeUrl, setProbeUrl] = useState(emptyForm.url);
+  const [registrationMode, setRegistrationMode] = useState("");
+  const [advancedOpen, setAdvancedOpen] = useState(false);
+  const registrationKeyInput = useRef<HTMLInputElement>(null);
   const [showConnect, setShowConnect] = useState(false),
     [server, setServer] = useState("");
   const [issuedToken, setIssuedToken] = useState("");
@@ -163,10 +169,12 @@ export default function SyncSettings({
       coalescedTask(async () => {
         const [next, projects] = await Promise.all([
           desktop.invoke<Status>("sync:status"),
-          desktop.invoke<ProjectSummary[]>("projects:list", {
-            includeArchived: true,
-            includeHidden: true,
-          }),
+          desktop
+            .invoke<{ projects: ProjectSummary[] }>("projects:scan", {
+              includeArchived: true,
+              includeHidden: true,
+            })
+            .then((scan) => scan.projects),
         ]);
         setStatus((current) => retainEqual(current, next));
         setLocalProjects((current) => retainEqual(current, projects));
@@ -212,6 +220,14 @@ export default function SyncSettings({
     const binding = status.projects.find(
       (item) => item.projectId === request.projectId,
     );
+    if (request.intent === "signIn") {
+      const connection = status.connections.find(
+        (item) => item.id === binding?.connectionId,
+      );
+      if (connection)
+        openConnect({ url: connection.url, account: connection.user.name });
+      return;
+    }
     if (binding && request.intent === "share") {
       if (binding.role === "admin")
         void run(() =>
@@ -367,6 +383,16 @@ export default function SyncSettings({
       continue: form.mode === "login",
       personalToken: register && form.tokenOnly,
       invite: preview?.invite,
+    }).catch((error: unknown) => {
+      // The server needs a registration key: open the field and focus it.
+      if (
+        (error as { details?: { field?: string } })?.details?.field ===
+        "registrationKey"
+      ) {
+        setAdvancedOpen(true);
+        requestAnimationFrame(() => registrationKeyInput.current?.focus());
+      }
+      throw error;
     });
     setShowConnect(false);
     setIssuedToken(connection.issuedPersonalToken ?? "");
@@ -419,6 +445,8 @@ export default function SyncSettings({
   }
   function openConnect(next: Partial<typeof emptyForm> = {}) {
     setForm({ ...emptyForm, ...next });
+    setProbeUrl(next.url ?? emptyForm.url);
+    setAdvancedOpen(false);
     setShowConnect(true);
     setConnectRequest((value) => value + 1);
     setError("");
@@ -454,6 +482,10 @@ export default function SyncSettings({
     status.projects.find((item) => item.projectId === projectId);
   const projectsOn = (connectionId: string) =>
     status.projects.filter((item) => item.connectionId === connectionId).length;
+  const stateLabel = (item: Binding) =>
+    item.status === "offline" && item.errorKind
+      ? t(`state.offline.${item.errorKind}`)
+      : t(stateKeys[item.status]);
   const attention = status.projects.filter(
     (item) => stateTones[item.status] === "problem",
   ).length;
@@ -619,14 +651,25 @@ export default function SyncSettings({
                 <input
                   type="url"
                   value={form.url}
+                  aria-describedby="sync-server-url-hint"
                   onChange={(event) =>
                     setForm({ ...form, url: event.target.value })
                   }
+                  onBlur={() => setProbeUrl(form.url)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") {
+                      event.preventDefault();
+                      setProbeUrl(form.url);
+                    }
+                  }}
                 />
+                <span className="settings-help" id="sync-server-url-hint">
+                  {t("serverUrlHint")}
+                </span>
               </label>
             </details>
             <ServiceLogin
-              url={form.url}
+              url={probeUrl}
               registrationKey={form.registrationKey}
               invite={preview?.invite}
               onMethods={(methods) =>
@@ -636,6 +679,7 @@ export default function SyncSettings({
                   ),
                 )
               }
+              onInfo={(info) => setRegistrationMode(info.registration ?? "")}
               onConnected={(id) => run(() => connected(id)).then(() => {})}
             />
             <details
@@ -651,6 +695,7 @@ export default function SyncSettings({
                 className="sync-connect-form"
                 onSubmit={(event) => {
                   event.preventDefault();
+                  setProbeUrl(form.url);
                   void run(connect);
                 }}
               >
@@ -665,6 +710,7 @@ export default function SyncSettings({
                         setForm({ ...form, token: event.target.value })
                       }
                     />
+                    <span className="settings-help">{t("tokenHint")}</span>
                   </label>
                 ) : (
                   <div className="sync-field-grid">
@@ -693,13 +739,25 @@ export default function SyncSettings({
                     </label>
                   </div>
                 )}
-                <details>
+                <details
+                  open={advancedOpen}
+                  onToggle={(event) => setAdvancedOpen(event.currentTarget.open)}
+                >
                   <summary>{f("advanced")}</summary>
-                  {!preview && (
+                  {preview ? (
+                    form.mode === "register" && (
+                      <p className="settings-help">{t("inviteRegistration")}</p>
+                    )
+                  ) : (
                     <label className="sync-field">
                       <span>{t("registrationKey")}</span>
                       <input
+                        ref={registrationKeyInput}
                         type="password"
+                        required={
+                          form.mode === "register" &&
+                          registrationMode === "controlled"
+                        }
                         value={form.registrationKey}
                         onChange={(event) =>
                           setForm({
@@ -708,18 +766,29 @@ export default function SyncSettings({
                           })
                         }
                       />
+                      <span className="settings-help">
+                        {t("registrationKeyHelp")}
+                      </span>
                     </label>
                   )}
                   <label className="sync-field">
                     <span>{t("connectMethod")}</span>
                     <select
                       value={form.mode}
-                      onChange={(event) =>
-                        setForm({
-                          ...form,
-                          mode: event.target.value as ConnectMode,
-                        })
-                      }
+                      onChange={(event) => {
+                        const mode = event.target.value as ConnectMode;
+                        setForm({ ...form, mode });
+                        // A server that controls registration needs its key first.
+                        if (
+                          mode === "register" &&
+                          !preview &&
+                          registrationMode === "controlled" &&
+                          !form.registrationKey
+                        )
+                          requestAnimationFrame(() =>
+                            registrationKeyInput.current?.focus(),
+                          );
+                      }}
                     >
                       <option value="login">{f("continue")}</option>
                       <option value="token">{t("mode.token")}</option>
@@ -752,6 +821,9 @@ export default function SyncSettings({
                 ? t("projectsAttention", { count: attention })
                 : t("section.projectsHelp")}
             </p>
+            {localProjects.some((project) => !bindingFor(project.id)) && (
+              <p className="settings-help">{t("storedLocallyNote")}</p>
+            )}
           </div>
           <button
             className="settings-button"
@@ -850,7 +922,7 @@ export default function SyncSettings({
                   </div>
                 ) : (
                   <div className="sync-invitation-actions">
-                    <p className="settings-help">{f("verifyToJoin")}</p>
+                    <p className="settings-help">{t("signInBeforeJoin")}</p>
                     <button
                       className="settings-button sync-primary"
                       disabled={busy}
@@ -944,16 +1016,14 @@ export default function SyncSettings({
                       <span>
                         {connection
                           ? `${connection.name} · ${connection.user.name} · ${role(binding!.role)}`
-                          : t("storedLocally")}
+                          : ""}
                         {binding?.status === "synced" && binding.syncedAt
                           ? ` · ${t("syncedAt", { date: syncTime(binding.syncedAt) })}`
                           : ""}
                       </span>
                     </div>
                     <span className={`sync-state is-${tone}`}>
-                      {binding
-                        ? t(stateKeys[binding.status])
-                        : t("status.local")}
+                      {binding ? stateLabel(binding) : t("status.local")}
                     </span>
                     <div className="sync-project-actions">
                       {binding?.status === "conflict" ? (
@@ -981,12 +1051,27 @@ export default function SyncSettings({
                           disabled={busy}
                           onClick={() =>
                             void run(async () => {
-                              await desktop.invoke("sync:run", {
-                                projectId: project.id,
-                              });
-                              setMessage(
-                                t("toast.synced", { name: project.name }),
+                              const next = await desktop.invoke<Status>(
+                                "sync:run",
+                                { projectId: project.id },
                               );
+                              // Only a synced result is reported as 已同步.
+                              const result = next.projects.find(
+                                (item) => item.projectId === project.id,
+                              );
+                              if (result?.status === "synced")
+                                setMessage(
+                                  t("toast.synced", { name: project.name }),
+                                );
+                              else
+                                throw new Error(
+                                  t("syncNowIncomplete", {
+                                    name: project.name,
+                                    reason:
+                                      result?.error ??
+                                      (result ? stateLabel(result) : ""),
+                                  }),
+                                );
                             })
                           }
                         >
@@ -1022,9 +1107,16 @@ export default function SyncSettings({
                     </div>
                   </div>
                   {binding?.error && (
-                    <p className="sync-error sync-project-error">
-                      {binding.error}
-                    </p>
+                    <div className="sync-error sync-project-error">
+                      <p>{binding.error}</p>
+                      {binding.errorDetail &&
+                        binding.errorDetail !== binding.error && (
+                          <details>
+                            <summary>{t("errorDetails")}</summary>
+                            <code>{binding.errorDetail}</code>
+                          </details>
+                        )}
+                    </div>
                   )}
                   {open && (
                     <div className="sync-project-details">
@@ -1270,7 +1362,7 @@ export default function SyncSettings({
           returnFocus={panelTrigger.current}
           title={
             panel === "upload"
-              ? f("uploadTitle")
+              ? f(uploadProject?.intent === "share" ? "shareTitle" : "uploadTitle")
               : panel === "projects"
                 ? f("viewProjects")
               : panel === "dashboard"
@@ -1314,7 +1406,7 @@ export default function SyncSettings({
                   }
                 </h3>
                 <p>
-                  {f("uploadHelp", {
+                  {f(uploadProject.intent === "share" ? "shareHelp" : "uploadHelp", {
                     name:
                       localProjects.find(
                         (project) => project.id === uploadProject.projectId,
@@ -1343,13 +1435,15 @@ export default function SyncSettings({
                           );
                         } else {
                           setPanel(null);
+                          // Attaching starts the sync; it has not finished yet.
                           setMessage(
-                            t("toast.synced", {
+                            t("toast.uploaded", {
                               name:
                                 localProjects.find(
                                   (project) =>
                                     project.id === uploadProject.projectId,
                                 )?.name ?? "",
+                              server: connectionLabel(uploadTarget),
                             }),
                           );
                         }

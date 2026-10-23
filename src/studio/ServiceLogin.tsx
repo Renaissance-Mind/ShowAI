@@ -15,6 +15,7 @@ export default function ServiceLogin({
   registrationKey,
   invite,
   onMethods,
+  onInfo,
   connectionId,
   onConnected,
 }: {
@@ -22,6 +23,8 @@ export default function ServiceLogin({
   registrationKey: string;
   invite?: string;
   onMethods?: (methods: string[]) => void;
+  /** Server facts such as whether registration needs a key. */
+  onInfo?: (info: { auth: string[]; registration?: string }) => void;
   connectionId?: string;
   onConnected: (id: string) => Promise<void>;
 }) {
@@ -33,32 +36,42 @@ export default function ServiceLogin({
     [confirming, setConfirming] = useState(false),
     [error, setError] = useState(""),
     [busy, setBusy] = useState(false);
+  // After a mistyped code: attempts left and a ticking expiry.
+  const [remaining, setRemaining] = useState<number | null>(null),
+    [now, setNow] = useState(Date.now);
+  useEffect(() => {
+    if (remaining === null || !flow) return;
+    const timer = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, [remaining, flow]);
   useEffect(() => {
     setMethods([]);
     setFlow(null);
     setError("");
     if (!url) return;
+    // The parent passes the address once it is committed (blur or submit),
+    // so typing does not probe the server on every keystroke.
     let cancelled = false;
-    const timer = setTimeout(() => {
-      void desktop
-        .invoke<{ auth: string[] }>("sync:serverInfo", { url })
-        .then((info) => {
-          if (!cancelled) {
-            setMethods(info.auth);
-            onMethods?.(info.auth);
-          }
-        })
-        .catch((reason) => {
-          if (!cancelled) {
-            setMethods([]);
-            setError(errorMessage(reason));
-            onMethods?.([]);
-          }
-        });
-    }, 400);
+    void desktop
+      .invoke<{ auth: string[]; registration?: string }>("sync:serverInfo", {
+        url,
+      })
+      .then((info) => {
+        if (!cancelled) {
+          setMethods(info.auth);
+          onMethods?.(info.auth);
+          onInfo?.(info);
+        }
+      })
+      .catch((reason) => {
+        if (!cancelled) {
+          setMethods([]);
+          setError(errorMessage(reason));
+          onMethods?.([]);
+        }
+      });
     return () => {
       cancelled = true;
-      clearTimeout(timer);
     };
   }, [url, invite, connectionId]);
   async function finish(
@@ -68,6 +81,7 @@ export default function ServiceLogin({
     const result = await desktop.invoke<{
       status: string;
       connection?: { id: string };
+      remainingAttempts?: number;
     }>("sync:finishLogin", {
       url: current.serverUrl,
       id: current.id,
@@ -81,6 +95,12 @@ export default function ServiceLogin({
       return true;
     }
     if (result.status === "confirm") setConfirming(true);
+    if (result.status === "invalidCode") {
+      setRemaining(result.remainingAttempts ?? null);
+      setNow(Date.now());
+      setError(t("login.invalidCode"));
+      setCode("");
+    }
     return false;
   }
   useEffect(() => {
@@ -116,6 +136,7 @@ export default function ServiceLogin({
     setError("");
     setCode("");
     setConfirming(false);
+    setRemaining(null);
     try {
       setFlow(
         await desktop.invoke<Flow>("sync:beginLogin", {
@@ -149,6 +170,15 @@ export default function ServiceLogin({
       {error && (
         <p role="alert" className="sync-error">
           {error}
+          {remaining !== null && flow && (
+            <>
+              {" "}
+              {t("login.attemptsLeft", {
+                count: remaining,
+                time: countdown(flow.expiresAt - now),
+              })}
+            </>
+          )}
         </p>
       )}
       {!["email"].includes(flow?.provider ?? "") && (
@@ -274,6 +304,8 @@ export default function ServiceLogin({
             setFlow(null);
             setCode("");
             setConfirming(false);
+            setRemaining(null);
+            setError("");
           }}
         >
           {t("login.cancel")}
@@ -281,4 +313,9 @@ export default function ServiceLogin({
       )}
     </div>
   );
+}
+
+function countdown(milliseconds: number) {
+  const seconds = Math.max(0, Math.round(milliseconds / 1000));
+  return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
 }

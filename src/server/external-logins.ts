@@ -889,16 +889,27 @@ export class ExternalLogins {
         "UPDATE login_flows SET status='failed' WHERE id=? AND status=? AND claimed>=5",
         [id, awaiting],
       );
+      // Tell the client how many attempts remain so a typo keeps the flow.
+      const [attempts] = await this.db.all<{ claimed: number }>(
+        "SELECT claimed FROM login_flows WHERE id=?",
+        [id],
+      );
+      const details = {
+        remainingAttempts: Math.max(0, 5 - (attempts?.claimed ?? 5)),
+        expiresAt: row.expires_at,
+      };
       throw email
         ? new SyncError(
             401,
             "INVALID_EMAIL_CODE",
             "验证码无效或尝试次数已达上限，请重新发起登录。",
+            details,
           )
         : new SyncError(
             401,
             "INVALID_COMPLETION_CODE",
             "完成码无效或尝试次数已达上限，请重新发起登录。",
+            details,
           );
     }
     const acquired = await this.db.run(

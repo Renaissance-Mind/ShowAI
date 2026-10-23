@@ -1846,11 +1846,15 @@ export class AgentHost {
             assertId(z.string().parse(args.projectId)),
           )
         ).map(summary);
-      case "agent:conversation":
-        return this.conversations.get(
+      case "agent:conversation": {
+        const conversation = await this.conversations.get(
           assertId(z.string().parse(args.projectId)),
           z.string().uuid().parse(args.id),
         );
+        await this.conversations.settled(conversation.id);
+        const persistError = this.conversations.persistFailure(conversation.id);
+        return persistError ? { ...conversation, persistError } : conversation;
+      }
       case "agent:turn": {
         const conversation = await this.conversations.get(
           assertId(z.string().parse(args.projectId)),
@@ -1858,7 +1862,15 @@ export class AgentHost {
         );
         const turn = conversation.turns.find((item) => item.id === args.id);
         if (!turn) throw new Error(t("conversation.notFound"));
-        return { turn, threadId: conversation.threadId };
+        // A finished turn reports whether its final write reached disk.
+        if (turn.state !== "running")
+          await this.conversations.settled(conversation.id);
+        const persistError = this.conversations.persistFailure(conversation.id);
+        return {
+          turn,
+          threadId: conversation.threadId,
+          ...(persistError ? { persistError } : {}),
+        };
       }
       case "agent:undo":
         return this.undoTurn(

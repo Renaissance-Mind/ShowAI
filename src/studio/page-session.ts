@@ -52,6 +52,10 @@ export interface PageSnapshot {
   record: LoadedPage | null;
   status: SaveStatus;
   error: string;
+  /** The thrown value behind `error`, for classifying save failures. */
+  failure?: unknown;
+  /** The latest edit is retained in a local draft (or nothing is unsaved). */
+  draftDurable: boolean;
   draftNotice: string;
   conflictId?: string;
   mergeBase?: string;
@@ -161,6 +165,8 @@ export function createPageSession(options: PageSessionOptions): PageSession {
       record,
       status:travelFailure?"error":status,
       error:error||(travelFailure?errorMessage(travelFailure.error):""),
+      failure:error?failure:travelFailure?.error,
+      draftDurable:durableSequence>=revision.current||revision.current<=savedRevision.current,
       draftNotice,
       conflictId,
       mergeBase,
@@ -184,6 +190,8 @@ export function createPageSession(options: PageSessionOptions): PageSession {
       snapshot.record !== metadata.record ||
       snapshot.status !== metadata.status ||
       snapshot.error !== metadata.error ||
+      snapshot.failure !== metadata.failure ||
+      (snapshot.status === "error" && snapshot.draftDurable !== metadata.draftDurable) ||
       snapshot.renderVersion !== metadata.renderVersion ||
       snapshot.draftNotice !== metadata.draftNotice ||
       snapshot.conflictId !== metadata.conflictId ||
@@ -242,12 +250,20 @@ export function createPageSession(options: PageSessionOptions): PageSession {
     },
   );
   let error: string = "";
+  let failure: unknown;
   const setError = setter<string>(
     () => error,
     (value) => {
       error = value;
+      failure = undefined;
     },
   );
+  /** Shows a thrown save failure and keeps the value for classification. */
+  const setFailure = (reason: unknown, text = errorMessage(reason)) => {
+    setError(text);
+    failure = reason;
+    publish();
+  };
   let conflictId: string | undefined = undefined;
   const setConflictId = setter<string | undefined>(
     () => conflictId,
@@ -568,7 +584,7 @@ export function createPageSession(options: PageSessionOptions): PageSession {
           } catch (reason) {
             blocked.current = true;
             setStatus("error");
-            setError(errorMessage(reason));
+            setFailure(reason);
             setSaveFailureAttempt((value) => value + 1);
             return false;
           }
@@ -757,7 +773,7 @@ export function createPageSession(options: PageSessionOptions): PageSession {
             setConflictId(String(reason.conflictId));
           blocked.current = true;
           setStatus(errorCode(reason) === "CONFLICT" ? "conflict" : "error");
-          setError(errorMessage(reason));
+          setFailure(reason);
           return false;
         }finally{
           if(capturedOwner)await capturedOwner.releaseLease(saveLease).catch(reason=>console.error("Source save lease cleanup failed",errorCode(reason)));
@@ -789,7 +805,7 @@ export function createPageSession(options: PageSessionOptions): PageSession {
       const recovery=await persist(current.current,revision.current,projectRef.current);
       setAvailableDrafts(items=>[recovery,...items.filter(item=>item.id!==recovery.id)]);
     }
-    blocked.current=true;setError(errorMessage(reason));setStatus("error");setSaveFailureAttempt(value=>value+1);
+    blocked.current=true;setFailure(reason);setStatus("error");setSaveFailureAttempt(value=>value+1);
   };
   const flush = async (settle=true):Promise<boolean>=>{
     if(disposed)return false;
@@ -804,7 +820,7 @@ export function createPageSession(options: PageSessionOptions): PageSession {
     const owner=sourceOwner;
     void flush(false).catch(reason=>{
       if(sourceOwner!==owner||disposed)return;
-      blocked.current=true;setError(errorMessage(reason));setStatus("error");
+      blocked.current=true;setFailure(reason);setStatus("error");
     });
   };
   const install = (projectId: string, page: LoadedPage) => {
@@ -1184,7 +1200,7 @@ export function createPageSession(options: PageSessionOptions): PageSession {
         base.current !== knownBase
       )
         return;
-      setError(errorMessage(reason));
+      setFailure(reason);
       setStatus("error");
     }
   });
@@ -1291,7 +1307,7 @@ export function createPageSession(options: PageSessionOptions): PageSession {
 
   const retry = async () => {
     try{await sourceOwner?.retryRegistration();}
-    catch(reason){blocked.current=true;setError(errorMessage(reason));setStatus("error");return false;}
+    catch(reason){blocked.current=true;setFailure(reason);setStatus("error");return false;}
     blocked.current = false;
     setError("");
     const saved = await flush();
@@ -1426,7 +1442,7 @@ export function createPageSession(options: PageSessionOptions): PageSession {
             );
         })
         .catch((reason) => {
-          setError(t("draftSaveFailed", { error: errorMessage(reason) }));
+          setFailure(reason, t("draftSaveFailed", { error: errorMessage(reason) }));
           setStatus("error");
           blocked.current = true;
         });
@@ -1453,7 +1469,7 @@ export function createPageSession(options: PageSessionOptions): PageSession {
         backgroundFlush();
       return true;
     } catch (reason) {
-      setError(t("draftSaveFailed", { error: errorMessage(reason) }));
+      setFailure(reason, t("draftSaveFailed", { error: errorMessage(reason) }));
       setStatus("error");
       blocked.current = true;
       return false;

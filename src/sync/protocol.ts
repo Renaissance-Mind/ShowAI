@@ -259,6 +259,9 @@ export interface ServerConnection {
   capabilities?: string[];
   expiresAt?: string;
 }
+/** network: no connection; auth: sign-in needed; server: the server failed;
+ * local: this device could not read or write the library. */
+export type SyncErrorKind = "network" | "auth" | "server" | "local";
 export interface ProjectConnection {
   projectId: string;
   connectionId: string;
@@ -269,6 +272,10 @@ export interface ProjectConnection {
   status:
     "pending" | "synced" | "offline" | "conflict" | "revoked" | "save-failed";
   error?: string;
+  /** Why the last sync failed, so the workbench can say what to do. */
+  errorKind?: SyncErrorKind;
+  /** Original error text for technical details; `error` is translated. */
+  errorDetail?: string;
   syncedAt?: string;
   pendingCreation?: boolean;
 }

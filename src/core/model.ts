@@ -55,6 +55,15 @@ export interface ProjectSummary extends ProjectMetadata {
   pageCount: number;
 }
 
+/** A project directory whose metadata or pages could not be read. */
+export interface UnreadableProject {
+  directory: string;
+  /** Absolute path of the project directory. */
+  path: string;
+  code: string;
+  message: string;
+}
+
 export interface ProjectGroup {
   id: string;
   name: string;

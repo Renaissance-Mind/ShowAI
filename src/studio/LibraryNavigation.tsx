@@ -67,6 +67,8 @@ export interface LibraryRowProps {
   ) => void;
   /** F2 renames and Delete (⌘⌫ on macOS) deletes the focused row. */
   onCommand?: (target: LibraryTarget, command: "rename" | "delete") => void;
+  /** Short status after the title, e.g. a project's sync state. */
+  marker?: { label: string; title?: string; tone?: "warning" | "muted" };
 }
 
 function LibraryRowView({
@@ -77,6 +79,7 @@ function LibraryRowView({
   onOpen,
   onMenu,
   onCommand,
+  marker,
 }: LibraryRowProps) {
   const t = useTranslator(sidebarMessages);
   const tc = useTranslator(commonMessages);
@@ -171,6 +174,14 @@ function LibraryRowView({
             {t("agentCreated")}
           </span>
         )}
+        {marker && (
+          <span
+            className={`studio-tree-marker is-${marker.tone ?? "muted"}`}
+            title={marker.title}
+          >
+            {marker.label}
+          </span>
+        )}
         {target.pinned && (
           <span className="studio-tree-pin-slot">
             <Pin
@@ -221,6 +232,8 @@ export const LibraryRow = memo(
     previous.active === next.active &&
     previous.expanded === next.expanded &&
     previous.onToggle === next.onToggle &&
+    previous.marker?.label === next.marker?.label &&
+    previous.marker?.title === next.marker?.title &&
     previous.onOpen === next.onOpen &&
     previous.onMenu === next.onMenu &&
     previous.onCommand === next.onCommand,

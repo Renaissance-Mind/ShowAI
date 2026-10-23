@@ -493,7 +493,7 @@ export class SyncManager {
         body: data === undefined ? undefined : JSON.stringify(data),
         signal: AbortSignal.timeout(30_000),
       });
-      const value = await response.json();
+      const value = await serverJson(response);
       if (response.ok) return value as T;
       // BUSY is returned before the server performs any work, so waiting and
       // repeating the same request is safe for every endpoint.
@@ -598,7 +598,18 @@ export class SyncManager {
             personalToken: input.personalToken,
             device: `ShowAI · ${hostname().slice(0, 180)}`,
           },
-        );
+        ).catch((error: unknown) => {
+          // Tell the form which field is missing so it can open and focus it.
+          if (
+            error instanceof SyncError &&
+            error.code === "REGISTRATION_KEY_REQUIRED"
+          ) {
+            const required = new CoreError("CONFIRMATION_REQUIRED", error.message);
+            required.details = { field: "registrationKey" };
+            throw required;
+          }
+          throw error;
+        });
     if (result.serverId !== info.serverId)
       throw new CoreError("CONFLICT", t("server.identityChanged"));
     const existing = config.connections.find(
@@ -698,19 +709,37 @@ export class SyncManager {
   }) {
     const completionCode =
       input.completionCode || this.loginCompletions.get(input.id);
-    const result = await this.request<{ status: string; token?: string }>(
-      { url: serverBaseUrl(input.url), token: "" },
-      "/api/auth/finish",
-      "POST",
-      {
-        id: input.id,
-        pollSecret: input.pollSecret,
-        code: input.code,
-        completionCode,
-      },
-    ).finally(() => {
+    let result: { status: string; token?: string };
+    try {
+      result = await this.request<{ status: string; token?: string }>(
+        { url: serverBaseUrl(input.url), token: "" },
+        "/api/auth/finish",
+        "POST",
+        {
+          id: input.id,
+          pollSecret: input.pollSecret,
+          code: input.code,
+          completionCode,
+        },
+      );
+    } catch (error) {
+      // A mistyped code keeps the login; only an exhausted flow ends it.
+      const remaining = (
+        error instanceof SyncError
+          ? (error.details as { remainingAttempts?: unknown } | undefined)
+          : undefined
+      )?.remainingAttempts;
+      if (
+        error instanceof SyncError &&
+        ["INVALID_COMPLETION_CODE", "INVALID_EMAIL_CODE"].includes(error.code) &&
+        typeof remaining === "number" &&
+        remaining > 0
+      )
+        return { status: "invalidCode" as const, remainingAttempts: remaining };
+      throw error;
+    } finally {
       if (completionCode) this.loginCompletions.delete(input.id);
-    });
+    }
     if (result.status === "confirm") return { status: "confirm" };
     if (result.status !== "completed" || !result.token)
       return { status: "pending" };
@@ -791,6 +820,8 @@ export class SyncManager {
       for (const project of config.projects.filter((item) => item.connectionId === connectionId)) {
         project.status = "offline";
         delete project.error;
+        delete project.errorKind;
+        delete project.errorDetail;
       }
     });
     return this.status();
@@ -1142,7 +1173,13 @@ export class SyncManager {
       const project = config.projects.find(
         (item) => item.projectId === projectId,
       );
-      if (project) Object.assign(project, patch);
+      if (!project) return;
+      // Clearing the message clears its classification too.
+      if ("error" in patch && patch.error === undefined) {
+        delete project.errorKind;
+        delete project.errorDetail;
+      }
+      Object.assign(project, patch);
     });
   }
   private async cacheRecord(
@@ -2059,12 +2096,7 @@ export class SyncManager {
                   : "offline";
           await this.state(project.projectId, {
             status,
-            error:
-              error instanceof SyncError && error.status === 401
-                ? t("session.expired")
-                : error instanceof Error
-                  ? error.message
-                  : String(error),
+            ...syncFailure(error),
           });
         }
       }
@@ -2200,5 +2232,65 @@ export class SyncManager {
     );
     if (project?.role === "viewer" || project?.status === "revoked")
       throw new CoreError("CONFLICT", t("role.readOnly"));
+  }
+}
+
+/**
+ * Classifies a failed project sync: a translated message for the workbench,
+ * the kind of failure, and the original text for technical details.
+ */
+export function syncFailure(
+  error: unknown,
+): Pick<ProjectConnection, "error" | "errorKind" | "errorDetail"> {
+  const original = error instanceof Error ? error.message : String(error);
+  const cause =
+    error instanceof Error && error.cause instanceof Error
+      ? error.cause.message
+      : undefined;
+  if (error instanceof SyncError) {
+    if (error.status === 401)
+      return {
+        error: t("session.expired"),
+        errorKind: "auth",
+        errorDetail: original,
+      };
+    return {
+      error: error.status >= 500 ? t("server.failed", { status: error.status }) : original,
+      errorKind: "server",
+      errorDetail: `${error.code} · ${error.status} · ${original}`,
+    };
+  }
+  // serverFetch reports transport failures as TypeError; timeouts abort.
+  if (
+    error instanceof TypeError ||
+    (error instanceof Error &&
+      (error.name === "TimeoutError" || error.name === "AbortError"))
+  )
+    return {
+      error: t("network.unavailable"),
+      errorKind: "network",
+      errorDetail: cause ? `${original} (${cause})` : original,
+    };
+  return { error: original, errorKind: "local", errorDetail: original };
+}
+
+/**
+ * Reads a server JSON response. A web page instead of JSON usually means the
+ * address points at the website rather than the ShowAI Server base.
+ */
+async function serverJson(response: Response) {
+  const body = await response.text();
+  try {
+    return JSON.parse(body);
+  } catch {
+    const html =
+      /^\s*</.test(body) ||
+      /text\/html/i.test(response.headers.get("content-type") ?? "");
+    throw new CoreError(
+      "INVALID_DATA",
+      html
+        ? t("server.notShowAI")
+        : t("server.invalidResponse", { status: response.status }),
+    );
   }
 }

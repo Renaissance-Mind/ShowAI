@@ -28,6 +28,8 @@ export interface BackgroundPageIssue {
   pageId: string;
   title: string;
   error: string;
+  /** retire: closing the page could not write its ink or history. */
+  kind?: "save" | "retire";
 }
 interface WorkspaceSnapshot {
   active: PageSession | null;
@@ -53,6 +55,8 @@ export class PageSessions {
   private ticket = 0;
   private disposed = false;
   private dirty = false;
+  /** Pages whose release failed after their session was closed. */
+  private retirementIssues: (BackgroundPageIssue & { home?: string })[] = [];
   private snapshot: WorkspaceSnapshot = {
     active: null,
     activeView: null,
@@ -100,7 +104,10 @@ export class PageSessions {
     this.snapshot = {
       ...this.snapshot,
       ...patch,
-      issues,
+      issues: [
+        ...issues,
+        ...this.retirementIssues.filter((issue) => issue.home === this.home),
+      ],
       revision: this.snapshot.revision + 1,
     };
     for (const listener of this.listeners) listener();
@@ -113,7 +120,7 @@ export class PageSessions {
       )
     )
       throw new Error(t("keepDraftsBeforeSwitch"));
-    for (const session of new Set(this.pages.values())) void session.dispose().catch(error=>console.error("Page retirement failed",error));
+    for (const session of new Set(this.pages.values())) this.retire(session);
     this.pages.clear();
     this.viewStates.clear();
     this.tabViews.clear();
@@ -123,6 +130,34 @@ export class PageSessions {
     this.ticket++;
     this.home = home;
     this.publish({ active: null, activeView: null, views: [] });
+  }
+  /**
+   * Closes a page session. A release that cannot write ink or history is
+   * shown as a background issue, not only logged.
+   */
+  private retire(session: PageSession) {
+    const state = session.getSnapshot();
+    const home = this.home;
+    void session.dispose().catch((error: unknown) => {
+      console.error("Page retirement failed", error);
+      if (!state.draft || !state.projectId) return;
+      const issue = {
+        projectId: state.projectId,
+        pageId: state.draft.id,
+        title: state.draft.title || common("untitled"),
+        error: error instanceof Error ? error.message : String(error),
+        kind: "retire" as const,
+        home,
+      };
+      this.retirementIssues = [
+        ...this.retirementIssues.filter(
+          (item) =>
+            item.pageId !== issue.pageId || item.projectId !== issue.projectId,
+        ),
+        issue,
+      ];
+      this.publish();
+    });
   }
   private pageKey(projectId: string, pageId: string) {
     return JSON.stringify([projectId, pageId]);
@@ -204,7 +239,7 @@ export class PageSessions {
       this.pages.delete(key);
       this.stale.delete(session);
       this.changedComponents.delete(session);
-      void session.dispose().catch(error=>console.error("Page retirement failed",error));
+      this.retire(session);
     }
   }
   async open(
@@ -218,6 +253,10 @@ export class PageSessions {
       this.setHome(info.home);
     }
     const ticket = ++this.ticket;
+    // Opening the page again shows its recoverable drafts in place.
+    this.retirementIssues = this.retirementIssues.filter(
+      (issue) => issue.pageId !== pageId || issue.projectId !== projectId,
+    );
     const previous = this.snapshot.active;
     if (previous && !(await previous.leave())) return false;
     if (ticket !== this.ticket) return false;
@@ -294,7 +333,7 @@ export class PageSessions {
         if (this.tabViews.get(view.tabId) === viewKey)
           this.tabViews.delete(view.tabId);
       }
-    void session.dispose().catch(error=>console.error("Page retirement failed",error));
+    this.retire(session);
     this.publish({
       views: this.snapshot.views.filter((view) => view.session !== session),
       ...(this.snapshot.active === session

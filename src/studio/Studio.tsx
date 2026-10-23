@@ -17,7 +17,7 @@ import { applyLibraryMove, type LibraryContents } from "./library-move";
 import { ComponentLibraryContext } from "../components/ComponentLibrary";
 import { insertComponent } from "../surface/component-insertion";
 import { useAppearancePreference } from "../design/appearance-preference";
-import { findSurfaceNode } from "../surface/document.mjs";
+import { artifactVersion, findSurfaceNode } from "../surface/document.mjs";
 import { upgradeResource } from "../surface/containers.mjs";
 import {
   useCallback,
@@ -79,6 +79,7 @@ import {
   Keyboard,
   LifeBuoy,
   Presentation,
+  TriangleAlert,
 } from "../ui/icons";
 import type {
   ProjectSummary,
@@ -88,6 +89,7 @@ import type {
   SidebarOrganization,
   DirectoryPreferences,
   DirectorySortBy,
+  UnreadableProject,
 } from "../core/model";
 import { orderSidebarProjects } from "../core/sidebar-order";
 import type {
@@ -188,6 +190,15 @@ import {
 } from "./builtin-docs";
 import { useSampleProject } from "./sample-project";
 import AutoHideSidebar from "./AutoHideSidebar";
+import {
+  DiscardDraftDialog,
+  SaveFailureBanner,
+  SaveStatusMark,
+  focusSaveBanner,
+} from "./SaveProblem";
+import { largestBlock } from "./save-problem";
+import { useSyncOverview } from "./useSyncOverview";
+import syncMessages from "../i18n/messages/sync";
 import WorkspaceTabs, { WorkspaceHistory } from "./WorkspaceTabs";
 import { WorkspaceSwipeNavigation } from "./WorkspaceSwipeNavigation";
 import { useWorkspaceTabs } from "./useWorkspaceTabs";
@@ -225,6 +236,7 @@ import {
   NoticeStack,
   ProblemNotice,
   ToastViewport,
+  describeError,
   bindProblemActions,
   configureProblemRedaction,
   labelProblem,
@@ -298,6 +310,7 @@ type DialogState =
       saveFailure?: boolean;
     }
   | { type: "externalConflict"; id: string; saveFailure?: boolean }
+  | { type: "discardDraft" }
   | { type: "project"; project?: ProjectSummary; groupId?: string }
   | { type: "group"; group?: ProjectGroup; projectId?: string }
   | { type: "moveProject"; projectId: string }
@@ -343,6 +356,10 @@ type DialogState =
     }
   | null;
 
+type ProjectScan = {
+  projects: ProjectSummary[];
+  unreadable: UnreadableProject[];
+};
 /** Operation names for problem titles; read the locale on each call. */
 const operation = translator(errorMessages);
 const LOAD_LIBRARY = "loadLibrary";
@@ -436,6 +453,10 @@ export default function Studio() {
   const docTitle = useBuiltinDocTitle();
   const locale = useLocale();
   const [projects, setProjects] = useState<ProjectSummary[]>([]);
+  const [unreadableProjects, setUnreadableProjects] = useState<
+    UnreadableProject[]
+  >([]);
+  const [dismissedUnreadable, setDismissedUnreadable] = useState<string[]>([]);
   const [savedOrganization, setOrganization] = useState<SidebarOrganization>({
     groups: [],
     projectGroups: {},
@@ -466,35 +487,31 @@ export default function Studio() {
     anchor: HTMLElement;
   } | null>(null);
   const [selectedProject, setSelectedProject] = useState<string | null>(null);
-  const [syncReadOnly, setSyncReadOnly] = useState<boolean | undefined>();
-  useEffect(() => {
-    let active = true;
-    setSyncReadOnly(undefined);
-    const refreshPermission = async () => {
-      const state = await desktop.invoke<{
-        projects: { projectId: string; role: string; status: string }[];
-      }>("sync:status");
-      const connection = state.projects.find(
-        (project) => project.projectId === selectedProject,
-      );
-      if (active)
-        setSyncReadOnly(
-          connection?.role === "viewer" || connection?.status === "revoked",
-        );
+  // Sync state for project rows, the page header and workbench banners.
+  const syncOverview = useSyncOverview(info?.home);
+  const syncReadOnly = syncOverview.loaded
+    ? syncOverview.markers.get(selectedProject ?? "") === "readOnly"
+    : undefined;
+  const ts = useTranslator(syncMessages);
+  const projectSyncMarker = (projectId: string) => {
+    const marker = syncOverview.markers.get(projectId);
+    if (!marker) return undefined;
+    const binding = syncOverview.bindings.get(projectId);
+    return {
+      label: ts(
+        marker === "readOnly"
+          ? "marker.readOnly"
+          : marker === "signIn"
+            ? "marker.signIn"
+            : "marker.unsynced",
+      ),
+      title: binding?.error,
+      tone: marker === "readOnly" ? ("muted" as const) : ("warning" as const),
     };
-    void refreshPermission().catch((error) =>
-      console.error("Could not update project sync permissions", error),
-    );
-    const timer = setInterval(() => {
-      void refreshPermission().catch((error) =>
-        console.error("Could not update project sync permissions", error),
-      );
-    }, 3000);
-    return () => {
-      active = false;
-      clearInterval(timer);
-    };
-  }, [selectedProject, info?.home]);
+  };
+  const selectedMarker = selectedProject
+    ? projectSyncMarker(selectedProject)
+    : undefined;
   const [savedContents, setContents] = useState<LibraryContents>({});
   const [pendingLibraryMove, setPendingLibraryMove] = useState<{
     home: string;
@@ -855,13 +872,13 @@ export default function Studio() {
           const scope = { expectedHome: appInfo.home };
           const changedHome = sidebarHome.current !== appInfo.home;
           const full = requested.all || changedHome;
-          const [next, sidebar] = await Promise.all([
+          const [scanned, sidebar] = await Promise.all([
             full || requested.ids.size
-              ? desktop.invoke<ProjectSummary[]>("projects:list", {
+              ? desktop.invoke<ProjectScan>("projects:scan", {
                   ...scope,
                   ...(full ? {} : { projectIds: [...requested.ids] }),
                 })
-              : Promise.resolve([] as ProjectSummary[]),
+              : Promise.resolve({ projects: [], unreadable: [] } as ProjectScan),
             full || requested.sidebar
               ? desktop.invoke<SidebarOrganization>("sidebar:get", scope)
               : Promise.resolve(navigationState.current.organization),
@@ -880,6 +897,21 @@ export default function Studio() {
             setCollapsedSections(saved.collapsedSections);
           }
           setInfo((current) => retainEqual(current, appInfo));
+          const next = scanned.projects;
+          if (full || requested.ids.size)
+            setUnreadableProjects((current) =>
+              retainEqual(
+                current,
+                full
+                  ? scanned.unreadable
+                  : [
+                      ...current.filter(
+                        (item) => !requested.ids.has(item.directory),
+                      ),
+                      ...scanned.unreadable,
+                    ],
+              ),
+            );
           const nextProjects = mergeNavigationProjects(
             navigationState.current.projects,
             next,
@@ -936,6 +968,8 @@ export default function Studio() {
         } catch (error) {
           // A failed scoped read must remain pending when another change asks for a retry.
           mergeNavigationScope(navigationScope.current, requested);
+          // The failure is reported; the list must not look like it is still loading.
+          setNavigationUpdating(false);
           throw error;
         }
       }),
@@ -978,8 +1012,8 @@ export default function Studio() {
         const loadComponents = async (): Promise<CatalogComponent[]> => {
           if (requestedProject !== "all") {
             const project = (
-              await desktop.invoke<ProjectSummary[]>("projects:list")
-            ).find((item) => item.id === requestedProject);
+              await desktop.invoke<ProjectScan>("projects:scan")
+            ).projects.find((item) => item.id === requestedProject);
             if (!project) {
               componentProjectRef.current = "all";
               setComponentProject("all");
@@ -1003,7 +1037,9 @@ export default function Studio() {
             desktop.invoke<CatalogComponent[]>("components:list", {
               scope: "all",
             }),
-            desktop.invoke<ProjectSummary[]>("projects:list"),
+            desktop
+              .invoke<ProjectScan>("projects:scan")
+              .then((scan) => scan.projects),
           ]);
           const local = await Promise.all(
             allProjects.map(async (project) => {
@@ -1567,6 +1603,30 @@ export default function Studio() {
     } finally {
       setBusy(false);
     }
+  }
+  /** Copies the open read-only page into a new project this device owns. */
+  async function saveLocalCopy() {
+    const draft = page.draft;
+    if (!draft) return;
+    const source = { ...draft, parentId: null };
+    const name = ts("readOnly.copyName", { name: project?.name ?? draft.title });
+    const created = await desktop.invoke<ProjectSummary>("projects:create", {
+      name,
+      icon: project?.icon,
+    });
+    const imported = await desktop.invoke<LoadedPage>("pages:import", {
+      projectId: created.id,
+      parentId: null,
+      artifact: {
+        format: "showai",
+        version: artifactVersion(source),
+        document: source,
+        components: page.record?.components ?? [],
+      },
+    });
+    await refresh();
+    await openPage(imported.document.id, created.id);
+    setNotice(ts("readOnly.copied", { name }));
   }
   /** A blank page with the Agent panel open and its input focused. */
   async function createPageForAgent(directory: {
@@ -3673,6 +3733,27 @@ export default function Studio() {
             setProjectsMenu((current) => (current === anchor ? null : anchor))
           }
           onGroupMenu={(group, anchor) => setGroupMenu({ group, anchor })}
+          unreadable={unreadableProjects.map((item) => (
+            <button
+              key={item.directory}
+              type="button"
+              className="studio-unreadable-project"
+              title={item.message}
+              onClick={() => {
+                setDismissedUnreadable((current) =>
+                  current.filter((directory) => directory !== item.directory),
+                );
+                requestAnimationFrame(() =>
+                  document
+                    .getElementById(`unreadable-${item.directory}`)
+                    ?.focus(),
+                );
+              }}
+            >
+              <TriangleAlert size={14} aria-hidden="true" />
+              <span>{t("unreadableProject", { name: item.directory })}</span>
+            </button>
+          ))}
           docs={
             showDocs ? (
               <DocsNavigation
@@ -3692,6 +3773,7 @@ export default function Studio() {
             <div key={item.id}>
               <LibraryRow
                 target={projectTarget(item)}
+                marker={projectSyncMarker(item.id)}
                 active={
                   selectedProject === item.id &&
                   view === "project" &&
@@ -3720,6 +3802,18 @@ export default function Studio() {
       {navigationUpdating && (
         <span className="studio-navigation-updating" role="status">
           {t("updatingProjects")}
+        </span>
+      )}
+      {syncOverview.unavailable && (
+        <span
+          className="studio-navigation-updating studio-sync-unavailable"
+          role="status"
+          title={ts("marker.statusUnavailableDetail", {
+            count: syncOverview.failures,
+            error: syncOverview.lastError,
+          })}
+        >
+          {ts("marker.statusUnavailable")}
         </span>
       )}
       {view === "settings" ||
@@ -3752,6 +3846,14 @@ export default function Studio() {
                 fallback={<Folder size={17} />}
               />
               <span>{project?.name ?? t("heading.project")}</span>
+              {selectedMarker && (
+                <span
+                  className={`studio-tree-marker is-${selectedMarker.tone}`}
+                  title={selectedMarker.title}
+                >
+                  {selectedMarker.label}
+                </span>
+              )}
             </button>
           )}
           {breadcrumbFolders.map((item) => (
@@ -3807,6 +3909,16 @@ export default function Studio() {
                   })
                 }
               />
+              {page.draft && (
+                <SaveStatusMark
+                  sessions={page.sessions}
+                  onShowProblem={() => {
+                    if (focusSaveBanner()) return;
+                    if (page.conflictId)
+                      setDialog({ type: "externalConflict", id: page.conflictId });
+                  }}
+                />
+              )}
             </>
           )}
         </div>
@@ -4348,10 +4460,130 @@ export default function Studio() {
                 onDismiss={() => problemQueue.dismiss(entry.id)}
               />
             ))}
-            {!!page.backgroundIssues.length && (
+            {syncOverview.expired.map((entry) => (
+              <div
+                key={`expired-${entry.connectionId}`}
+                className="studio-conflict"
+                role="alert"
+                data-priority={3}
+              >
+                <div>
+                  <strong>{ts("loginExpired.title")}</strong>
+                  <p>
+                    {ts("loginExpired.body", {
+                      names: entry.projectIds
+                        .map(
+                          (id) =>
+                            `「${projects.find((item) => item.id === id)?.name ?? id}」`,
+                        )
+                        .join(""),
+                    })}
+                  </p>
+                </div>
+                <button
+                  onClick={action(async () => {
+                    setSyncRequest({
+                      projectId: entry.projectIds[0],
+                      intent: "signIn",
+                      key: Date.now(),
+                    });
+                    setSettingsSection("sync");
+                    await navigate("settings");
+                  })}
+                >
+                  {ts("loginExpired.action")}
+                </button>
+              </div>
+            ))}
+            {(view === "page" || view === "project") &&
+              selectedProject &&
+              syncReadOnly && (
+                <div className="studio-conflict" role="status" data-priority={2}>
+                  <p>
+                    {ts(
+                      syncOverview.bindings.get(selectedProject)?.status ===
+                        "revoked"
+                        ? "readOnly.revokedBanner"
+                        : "readOnly.banner",
+                      { name: project?.name ?? "" },
+                    )}
+                  </p>
+                  {view === "page" && page.draft && (
+                    <button onClick={action(saveLocalCopy)}>
+                      {ts("readOnly.copy")}
+                    </button>
+                  )}
+                </div>
+              )}
+            {unreadableProjects
+              .filter((item) => !dismissedUnreadable.includes(item.directory))
+              .map((item) => (
+                <div
+                  key={`unreadable-${item.directory}`}
+                  id={`unreadable-${item.directory}`}
+                  tabIndex={-1}
+                  data-priority={2}
+                >
+                  <ProblemNotice
+                    problem={{
+                      ...describeError(item, {
+                        action: t("readProject"),
+                        object: item.directory,
+                      }),
+                      title: t("unreadableProject", { name: item.directory }),
+                      cause: t("unreadableProjectCause"),
+                    }}
+                    tone="warning"
+                    actions={[
+                      {
+                        label: t(
+                          info?.platform === "darwin"
+                            ? "revealInFinder"
+                            : "revealLocation",
+                        ),
+                        onSelect: () =>
+                          void desktop
+                            .invoke("library:reveal", { path: item.path })
+                            .catch(report),
+                      },
+                    ]}
+                    onDismiss={() =>
+                      setDismissedUnreadable((current) => [
+                        ...current,
+                        item.directory,
+                      ])
+                    }
+                  />
+                </div>
+              ))}
+            {page.backgroundIssues
+              .filter((issue) => issue.kind === "retire")
+              .map((issue) => (
+                <div
+                  key={`retire-${issue.projectId}:${issue.pageId}`}
+                  className="studio-conflict"
+                  role="alert"
+                  data-priority={3}
+                >
+                  <div>
+                    <strong>{t("retireIssueTitle", { title: issue.title })}</strong>
+                    <p>{t("retireIssueBody", { error: issue.error })}</p>
+                  </div>
+                  <button
+                    onClick={action(() =>
+                      openPage(issue.pageId, issue.projectId),
+                    )}
+                  >
+                    {t("openPageAgain")}
+                  </button>
+                </div>
+              ))}
+            {page.backgroundIssues.some((issue) => issue.kind !== "retire") && (
               <div className="studio-conflict" role="alert" data-priority={3}>
                 <p>{t("backgroundSaveIssue")}</p>
-                {page.backgroundIssues.map((issue) => (
+                {page.backgroundIssues
+                  .filter((issue) => issue.kind !== "retire")
+                  .map((issue) => (
                   <button
                     key={`${issue.projectId}:${issue.pageId}`}
                     onClick={action(() =>
@@ -4409,31 +4641,54 @@ export default function Studio() {
                     ))}
                 </div>
               )}
-            {view === "page" && page.error && (
-              <div className="studio-conflict" role="alert" data-priority={4}>
+            {view === "page" && page.error && page.status !== "conflict" && (
+              <SaveFailureBanner
+                data-priority={4}
+                state={{
+                  error: page.error,
+                  failure: page.failure,
+                  dirty: page.dirty,
+                  draftDurable: page.draftDurable,
+                  title: page.draft?.title,
+                }}
+                platform={info?.platform}
+                onRetry={action(page.retry)}
+                onKeepCopy={action(async () => {
+                  const copy = await page.keepCopy();
+                  if (copy) {
+                    await refresh();
+                    setNotice(t("draftKeptAsCopy"));
+                  }
+                })}
+                onLibrarySpace={
+                  capabilities.manageLibrary
+                    ? () => {
+                        setSettingsSection("general");
+                        void navigate("settings").catch(report);
+                      }
+                    : undefined
+                }
+                onReveal={(path) =>
+                  void desktop.invoke("library:reveal", { path }).catch(report)
+                }
+                onLocateLargest={() => {
+                  const id = largestBlock(page.draft?.content);
+                  if (id && page.draft) void locateAssistantTarget(page.draft.id, [id]);
+                }}
+              />
+            )}
+            {view === "page" && page.error && page.status === "conflict" && (
+              <div
+                className="studio-conflict studio-save-conflict"
+                role="alert"
+                tabIndex={-1}
+                data-priority={4}
+              >
                 <div>
-                  <strong>
-                    {page.status === "conflict"
-                      ? t("saveConflictTitle")
-                      : t("saveProblemTitle")}
-                  </strong>
+                  <strong>{t("saveConflictTitle")}</strong>
                   <p>{page.error}</p>
                 </div>
-                {page.status !== "conflict" && (
-                  <button
-                    onClick={action(async () => {
-                      const copy = await page.keepCopy();
-                      if (copy) {
-                        await refresh();
-                        setNotice(t("draftKeptAsCopy"));
-                      }
-                    })}
-                  >
-                    {t("keepAsCopy")}
-                  </button>
-                )}
-                {page.status === "conflict" ? (
-                  <>
+                <>
                     {page.reviewingConflict && (
                       <button onClick={action(page.retry)}>
                         {t("saveAgain")}
@@ -4466,15 +4721,13 @@ export default function Studio() {
                         {t("compareAndMerge")}
                       </button>
                     ) : null}
-                    <button onClick={action(page.acceptResolution)}>
+                    <button
+                      className="is-destructive"
+                      onClick={() => setDialog({ type: "discardDraft" })}
+                    >
                       {t("discardAndLoad")}
                     </button>
-                  </>
-                ) : (
-                    <button onClick={action(page.retry)}>
-                      {t("retrySave")}
-                    </button>
-                )}
+                </>
               </div>
             )}
             {view === "page" && !!page.availableDrafts.length && (
@@ -5599,6 +5852,13 @@ export default function Studio() {
             tabs={capabilities.tabs}
             windows={capabilities.windows}
             onClose={closeDialog}
+          />
+        )}
+        {dialog?.type === "discardDraft" && (
+          <DiscardDraftDialog
+            editedAt={page.draft?.updatedAt}
+            onClose={closeDialog}
+            onConfirm={page.acceptResolution}
           />
         )}
         {dialog?.type === "delete" && (

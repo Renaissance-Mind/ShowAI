@@ -734,12 +734,12 @@ export default function AssistantWorkbench({
         if (polling || Date.now() < nextPoll) return;
         polling = true;
         void desktop
-          .invoke<{ turn: AgentTurn; threadId?: string }>("agent:turn", {
+          .invoke<{ turn: AgentTurn; threadId?: string; persistError?: string }>("agent:turn", {
             projectId: conversation.projectId,
             conversationId: conversation.id,
             id: running.id,
           })
-          .then(({ turn, threadId }) => {
+          .then(({ turn, threadId, persistError }) => {
             failures = 0;
             if (stopped) return;
             const recoveredError = pollingError;
@@ -753,6 +753,7 @@ export default function AssistantWorkbench({
                 ? {
                     ...current,
                     threadId,
+                    persistError,
                     turns: current.turns.map((item) =>
                       item.id === turn.id ? turn : item,
                     ),
@@ -1216,7 +1217,13 @@ export default function AssistantWorkbench({
                 <p className="assistant-empty">{t("panel.empty")}</p>
               </div>
             ) : (
-              turns.map((turn, index) => (
+              <>
+              {conversation?.persistError && (
+                <p className="assistant-error" role="alert">
+                  {t("panel.persistFailed", { error: conversation.persistError })}
+                </p>
+              )}
+              {turns.map((turn, index) => (
                 <TurnView
                   key={turn.id}
                   turn={turn}
@@ -1263,7 +1270,8 @@ export default function AssistantWorkbench({
                     )()
                   }
                 />
-              ))
+              ))}
+              </>
             )}
           </div>
           <form

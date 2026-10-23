@@ -51,6 +51,28 @@ export default defineMessages("pageSession", {
     "author.cli": "命令行工具",
     "author.agent": "Agent",
     "author.otherTool": "其他工具",
+    "save.action": "保存",
+    "save.title.diskFull": "「{title}」还没有保存：磁盘空间不足",
+    "save.title.permission": "「{title}」还没有保存：没有写入权限",
+    "save.title.capacity": "「{title}」还没有保存：页面超过大小上限",
+    "save.cause.diskFull":
+      "内容库所在磁盘的可用空间不足。释放空间后再重试保存。",
+    "save.cause.permission":
+      "ShowAI 没有写入内容库这个位置的权限。检查该文件夹的权限后再重试保存。",
+    "save.cause.capacity":
+      "页面内容超过了单页的大小上限。删减或拆分占用最多的组件后再重试保存。",
+    "save.librarySpace": "查看内容库空间",
+    "save.revealFinder": "在访达中显示",
+    "save.reveal": "显示所在位置",
+    "save.locateLargest": "定位最大的组件",
+    "save.statusLabel": "保存状态：{status}",
+    "save.showProblem": "查看保存问题",
+    "discard.title": "放弃修改并载入当前文件？",
+    "discard.body":
+      "本机草稿中的修改（最后编辑于 {time}）会被删除，并载入当前文件的版本。删除后无法恢复。",
+    "discard.bodyUnknown":
+      "本机草稿中的修改会被删除，并载入当前文件的版本。删除后无法恢复。",
+    "discard.confirm": "放弃修改",
   },
   en: {
     "status.saved": "Saved on this device",
@@ -109,5 +131,27 @@ export default defineMessages("pageSession", {
     "author.cli": "A command-line tool",
     "author.agent": "An Agent",
     "author.otherTool": "Another tool",
+    "save.action": "Save",
+    "save.title.diskFull": "“{title}” is not saved: the disk is full",
+    "save.title.permission": "“{title}” is not saved: no write permission",
+    "save.title.capacity": "“{title}” is not saved: the page is over its size limit",
+    "save.cause.diskFull":
+      "The disk that holds the library is out of space. Free up space, then save again.",
+    "save.cause.permission":
+      "ShowAI cannot write to this location in the library. Check the folder's permissions, then save again.",
+    "save.cause.capacity":
+      "The page is larger than a single page may be. Shorten or split the largest component, then save again.",
+    "save.librarySpace": "View library storage",
+    "save.revealFinder": "Show in Finder",
+    "save.reveal": "Show location",
+    "save.locateLargest": "Find the largest component",
+    "save.statusLabel": "Save status: {status}",
+    "save.showProblem": "Show the save problem",
+    "discard.title": "Discard changes and load the current file?",
+    "discard.body":
+      "The changes in your local draft (last edited {time}) will be deleted and the current file loaded. This cannot be undone.",
+    "discard.bodyUnknown":
+      "The changes in your local draft will be deleted and the current file loaded. This cannot be undone.",
+    "discard.confirm": "Discard changes",
   },
 });

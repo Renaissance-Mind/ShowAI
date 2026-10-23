@@ -177,6 +177,8 @@ export interface AgentConversation {
   createdAt: string;
   updatedAt: string;
   turns: AgentTurn[];
+  /** Set in responses when the conversation could not be written to disk. */
+  persistError?: string;
 }
 export interface AgentConversationSummary {
   id: string;
