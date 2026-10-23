@@ -6,7 +6,7 @@ import { join } from "node:path";
 import { spawn, execFile, type ChildProcess } from "node:child_process";
 import { promisify } from "node:util";
 import { WebSocketServer, WebSocket } from "ws";
-import { watch, type FSWatcher } from "chokidar";
+import { watchLibrary, type LibraryWatcher } from "../core/library-watcher";
 import { readOptional, writeProtected } from "./storage";
 import { translator } from "../i18n";
 import lanMessages from "../i18n/messages/lanPairing";
@@ -79,7 +79,7 @@ export class LanPeerServer {
   private sockets = new WebSocketServer({ noServer: true, maxPayload: 1024 });
   private clients = new Map<WebSocket, TrustedPeer>();
   private publisher?: ChildProcess;
-  private watcher?: FSWatcher;
+  private watcher?: LibraryWatcher;
   private changes?: ReturnType<typeof setTimeout>;
   private pending = new Map<string, PairRequest>();
   private trusted: TrustedPeer[] = [];
@@ -175,6 +175,9 @@ export class LanPeerServer {
     if (!settings || !(settings.nearbyEnabled ?? settings.enabled)) return;
     const sharedHome = this.home();
     await mkdir(this.root, { recursive: true, mode: 0o700 });
+    await mkdir(join(workspaceRoot(sharedHome), "projects"), {
+      recursive: true,
+    });
     const keyPath = join(this.root, "identity.key"),
       certPath = join(this.root, "identity.crt");
     if (!(await readOptionalFile(keyPath))) {
@@ -265,9 +268,13 @@ export class LanPeerServer {
     });
     this.server = server;
     this.port = (server.address() as { port: number }).port;
-    this.watcher = watch(join(workspaceRoot(sharedHome), "projects"), {
-      ignoreInitial: true,
-      depth: 8,
+    this.watcher = watchLibrary(
+      join(workspaceRoot(sharedHome), "projects"),
+      () => false,
+    );
+    this.watcher.on("error", (error) => {
+      this.error = error.message;
+      console.error("ShowAI nearby library watcher:", error);
     });
     this.watcher.on("all", () => {
       clearTimeout(this.changes);

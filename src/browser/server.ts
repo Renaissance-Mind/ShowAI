@@ -17,7 +17,7 @@ import {
 import { dirname, extname, isAbsolute, join, resolve, sep } from "node:path";
 import { arch, homedir } from "node:os";
 import { randomBytes, randomUUID, timingSafeEqual } from "node:crypto";
-import { watch } from "chokidar";
+import { watchLibrary } from "../core/library-watcher";
 import { version } from "../../package.json";
 import { AgentService, errorResult } from "../agent/service";
 import { AgentHost, agentActions } from "../agent-host/host";
@@ -114,7 +114,7 @@ export async function startBrowserServer(options: BrowserServerOptions) {
   const clientId = (value: unknown) =>
     typeof value === "string" && /^[\w-]{1,100}$/.test(value) ? value : "";
   let timer: ReturnType<typeof setTimeout> | undefined;
-  let watcher!: ReturnType<typeof watch>;
+  let watcher!: ReturnType<typeof watchLibrary>;
   let sources: ReturnType<typeof watchDatasetSources> | undefined;
   let maintenance: MaintenanceScheduler | undefined;
   let origin = options.development?.origin ?? "";
@@ -184,32 +184,28 @@ export async function startBrowserServer(options: BrowserServerOptions) {
       );
     maintenance = new MaintenanceScheduler(store.root).start();
     syncManager(store.root).start();
-    watcher = watch(store.root, {
-      ignoreInitial: true,
-      depth: 9,
-      awaitWriteFinish: { stabilityThreshold: 120, pollInterval: 40 },
-      ignored: (path) =>
-        path
-          .slice(store.root.length)
-          .split(sep)
-          .some(
-            (part) =>
-              [
-                "snapshots",
-                "exports",
-                ".locks",
-                "tmp",
-                "node_modules",
-                "repository.git",
-                "history",
-                "local",
-                "cache",
-                "index.sqlite",
-                "index.sqlite-wal",
-                "index.sqlite-shm",
-              ].includes(part) || part.endsWith(".tmp"),
-          ),
-    });
+    watcher = watchLibrary(store.root, (path) =>
+      path
+        .slice(store.root.length)
+        .split(sep)
+        .some(
+          (part) =>
+            [
+              "snapshots",
+              "exports",
+              ".locks",
+              "tmp",
+              "node_modules",
+              "repository.git",
+              "history",
+              "local",
+              "cache",
+              "index.sqlite",
+              "index.sqlite-wal",
+              "index.sqlite-shm",
+            ].includes(part) || part.endsWith(".tmp"),
+        ),
+    );
     const paths = new Set<string>();
     watcher.on("all", (_event, path) => {
       paths.add(path);

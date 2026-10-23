@@ -21,7 +21,7 @@ import {
   shell,
 } from "electron";
 import type { IpcMainEvent, IpcMainInvokeEvent, NativeImage } from "electron";
-import { watch, type FSWatcher } from "chokidar";
+import { watchLibrary, type LibraryWatcher } from "../core/library-watcher";
 import {
   mkdir,
   readFile,
@@ -114,7 +114,7 @@ let service: AgentService;
 let agentHost: AgentHost;
 let pluginInstaller: DesktopPluginInstaller;
 let remoteConnector: RemoteMacConnector;
-let watcher: FSWatcher | undefined;
+let watcher: LibraryWatcher | undefined;
 let sources: ReturnType<typeof watchDatasetSources> | undefined;
 let maintenance: MaintenanceScheduler | undefined;
 let notification: ReturnType<typeof setTimeout> | undefined;
@@ -328,31 +328,27 @@ async function useHome(home?: string): Promise<void> {
   );
   maintenance = new MaintenanceScheduler(store.root).start();
   syncManager(store.root).start();
-  watcher = watch(store.root, {
-    ignoreInitial: true,
-    depth: 9,
-    awaitWriteFinish: { stabilityThreshold: 120, pollInterval: 40 },
-    ignored: (path) =>
-      relative(store.root, path)
-        .split(sep)
-        .some(
-          (part) =>
-            [
-              "snapshots",
-              "exports",
-              ".locks",
-              "tmp",
-              "node_modules",
-              "repository.git",
-              "history",
-              "local",
-              "cache",
-              "index.sqlite",
-              "index.sqlite-wal",
-              "index.sqlite-shm",
-            ].includes(part) || part.endsWith(".tmp"),
-        ),
-  });
+  watcher = watchLibrary(store.root, (path) =>
+    relative(store.root, path)
+      .split(sep)
+      .some(
+        (part) =>
+          [
+            "snapshots",
+            "exports",
+            ".locks",
+            "tmp",
+            "node_modules",
+            "repository.git",
+            "history",
+            "local",
+            "cache",
+            "index.sqlite",
+            "index.sqlite-wal",
+            "index.sqlite-shm",
+          ].includes(part) || part.endsWith(".tmp"),
+      ),
+  );
   const paths = new Set<string>();
   watcher.on("all", (_event, path) => {
     paths.add(path);

@@ -35,9 +35,9 @@ const env = {
 };
 delete env.ELECTRON_RUN_AS_NODE;
 const result = { passed: false, checks: [], home, output };
-let app, page;
+let app, page, appChild;
 process.once("exit", () => {
-  const child = app?.process();
+  const child = appChild;
   if (child && child.exitCode === null && child.signalCode === null)
     child.kill("SIGKILL");
 });
@@ -56,7 +56,7 @@ process.on("uncaughtException", async (error) => {
     () => undefined,
   );
   await writeFile(join(output, "result.json"), JSON.stringify(result, null, 2));
-  if (app) await stopTestProcess(app.process());
+  if (appChild) await stopTestProcess(appChild);
   process.exit(1);
 });
 try {
@@ -68,7 +68,8 @@ try {
     cwd: root,
     env,
   });
-  app.process().stderr.on("data", (data) => process.stderr.write(data));
+  appChild = app.process();
+  appChild.stderr.on("data", (data) => process.stderr.write(data));
   page = await app.firstWindow();
   page.on("framenavigated", (frame) => {
     if (frame === page.mainFrame())
@@ -570,6 +571,7 @@ try {
       cwd: root,
       env,
     });
+    appChild = app.process();
     page = await app.firstWindow();
     await page.waitForFunction(
       () =>
@@ -616,8 +618,8 @@ try {
   process.exitCode = 1;
 } finally {
   await writeFile(join(output, "result.json"), JSON.stringify(result, null, 2));
-  if (app) {
-    const child = app.process();
+  if (app && appChild) {
+    const child = appChild;
     const timeout = setTimeout(() => {
       result.forcedShutdown = true;
       child.kill("SIGKILL");
