@@ -13,7 +13,7 @@ import type {
 import { useInlineInk } from "./useInlineInk";
 import { BoardGestureInput } from "./BoardGestureInput";
 import { DrawingInput } from "./Drawing";
-import { boardToolForKey } from "./board-tools";
+import { boardEditDescription, boardToolForKey } from "./board-tools";
 import type { JSONContent } from "@tiptap/core";
 import type { BoardTool, BoardDrawingTool, DrawingStyle } from "./types";
 import { findSurfaceNode } from "./document.mjs";
@@ -1958,7 +1958,7 @@ export default function PageSurface({
           locked
             ? t("board.descriptionLocked")
             : onTransform
-              ? t("board.descriptionEdit")
+              ? boardEditDescription(t)
               : t("board.descriptionRead")
         }
       >

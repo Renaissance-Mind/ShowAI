@@ -26,15 +26,26 @@ import messages from "../i18n/messages/surface";
 
 const translate = translator(messages);
 
+/**
+ * Containers are saved with the untranslated default name "Page" or "Board"
+ * (containers.mjs); the interface shows those as the localized kind instead.
+ */
+export function hasDefaultName(node: JSONContent) {
+  return (
+    node.type === "surface" &&
+    (node.attrs?.name === "Page" || node.attrs?.name === "Board")
+  );
+}
+
 export function nodeName(node: JSONContent) {
   const t = translate;
   return String(
-    node.attrs?.name ||
+    (!hasDefaultName(node) && node.attrs?.name) ||
       node.attrs?.data?.title ||
       (
         {
           region: t("node.region"),
-          surface: node.attrs?.kind === "board" ? "Board" : "Page",
+          surface: t(node.attrs?.kind === "board" ? "node.board" : "node.page"),
           drawing: t("node.drawing"),
           richText: t("node.text"),
           image: t("node.image"),

@@ -14,11 +14,11 @@ export default defineMessages("assistant", {
     "pageReference.pageChanged": "页面已切换，请重新引用。",
     "pageReference.untitled": "未命名页面",
     "pageReference.headingSelection":
-      "ShowAI 引用 · 选区（{count} 个块）·《{title}》· 版本 {version}",
+      "ShowAI 引用 · 选区（{count} 个内容块）·《{title}》· 版本 {version}",
     "pageReference.headingBoard":
-      "ShowAI 引用 · Board 中 {count} 个对象 ·《{title}》· 版本 {version}",
+      "ShowAI 引用 · 白板中 {count} 个对象 ·《{title}》· 版本 {version}",
     "pageReference.headingBoardAll":
-      "ShowAI 引用 · 整个 Board ·《{title}》· 版本 {version}",
+      "ShowAI 引用 · 整个白板 ·《{title}》· 版本 {version}",
     "pageReference.headingPage": "ShowAI 引用 · 整页 ·《{title}》· 版本 {version}",
     "pageReference.copyPage": "复制页面引用",
     "componentState.remove": "移除组件状态，不随消息发送",
@@ -90,7 +90,7 @@ export default defineMessages("assistant", {
     "reference.point": "Reference point",
     "reference.region": "Reference area",
     "reference.remove": "Remove location reference",
-    "reference.noCanvas": "Open a Board before marking a reference location.",
+    "reference.noCanvas": "Open a board before marking a reference location.",
     "pageReference.copied":
       "Saved · referencing version {version} · copied to paste into Claude Code or Codex",
     "pageReference.pageChanged": "The page changed. Reference it again.",
@@ -101,12 +101,12 @@ export default defineMessages("assistant", {
         "ShowAI reference · selection ({count} blocks) · “{title}” · version {version}",
     },
     "pageReference.headingBoard": {
-      one: "ShowAI reference · {count} Board object · “{title}” · version {version}",
+      one: "ShowAI reference · {count} board object · “{title}” · version {version}",
       other:
-        "ShowAI reference · {count} Board objects · “{title}” · version {version}",
+        "ShowAI reference · {count} board objects · “{title}” · version {version}",
     },
     "pageReference.headingBoardAll":
-      "ShowAI reference · whole Board · “{title}” · version {version}",
+      "ShowAI reference · whole board · “{title}” · version {version}",
     "pageReference.headingPage":
       "ShowAI reference · whole page · “{title}” · version {version}",
     "pageReference.copyPage": "Copy page reference",
@@ -161,8 +161,8 @@ export default defineMessages("assistant", {
       other: "{count} blocks",
     },
     "target.board": {
-      one: "{count} whiteboard object",
-      other: "{count} whiteboard objects",
+      one: "{count} board object",
+      other: "{count} board objects",
     },
     "target.remove": "Use the whole page",
     "composer.label": "Ask Agent",

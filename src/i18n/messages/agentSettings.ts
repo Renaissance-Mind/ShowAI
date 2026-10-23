@@ -106,7 +106,7 @@ export default defineMessages("agentSettings", {
       "按需下载官方 SDK 与运行时，使用独立账号、会话和 ShowAI 插件。",
     runInShowAI: "在页面中使用",
     inPageHelp:
-      "在页面中选中文字、打开内容块菜单或右键白板对象，选择「让 AI 处理」；点顶栏的 AI 按钮查看项目的全部对话。这里的执行方式和模型来源用于新对话。",
+      "在页面中选中文字、打开内容块菜单或右键白板对象，选择「让 Agent 处理…」；点顶栏的 Agent 按钮查看项目的全部对话。这里的执行方式和模型来源用于新对话。",
     storage: "存储与运行位置",
     taskWorkspace: "任务工作区：",
     credentialRoot: "账号与运行时：",
@@ -244,7 +244,7 @@ export default defineMessages("agentSettings", {
       "Downloads the official SDK and runtime when needed, with its own account, sessions and ShowAI plugin.",
     runInShowAI: "Use in pages",
     inPageHelp:
-      "Select text, open a block menu or right-click whiteboard objects in a page and choose “Ask AI”. Use the AI button in the top bar to see all conversations of the project. The mode and model source here apply to new conversations.",
+      "Select text, open a block menu or right-click board objects in a page and choose “Ask Agent…”. Use the Agent button in the top bar to see all conversations of the project. The mode and model source here apply to new conversations.",
     storage: "Storage and runtime locations",
     taskWorkspace: "Task workspace: ",
     credentialRoot: "Accounts and runtime: ",

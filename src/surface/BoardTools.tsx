@@ -12,7 +12,7 @@ import {
   Lasso,
   Type,
 } from "../ui/icons";
-import { boardTools } from "./board-tools";
+import { boardToolKeys, boardToolShortcut, boardTools } from "./board-tools";
 import type { BoardTool } from "./types";
 import "./board-tools.css";
 import { useTranslator } from "../i18n/react";
@@ -84,8 +84,11 @@ export function BoardTools({
               type="button"
               key={key}
               aria-label={t(label)}
-              aria-keyshortcuts={key}
-              title={t("tool.withShortcut", { label: t(label), key })}
+              aria-keyshortcuts={boardToolKeys(value).join(" ")}
+              title={t("tool.withShortcut", {
+                label: t(label),
+                key: boardToolShortcut(value),
+              })}
               aria-pressed={tool === value}
               onClick={() => onChange(value)}
             >

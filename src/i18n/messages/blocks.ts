@@ -5,11 +5,11 @@ export default defineMessages("blocks", {
   "zh-CN": {
     blockActions: "组件操作",
     closeSettings: "关闭设置",
-    editBlock: "编辑区块",
+    editBlock: "编辑组件",
   },
   en: {
-    blockActions: "Block actions",
+    blockActions: "Component actions",
     closeSettings: "Close settings",
-    editBlock: "Edit block",
+    editBlock: "Edit component",
   },
 });

@@ -57,6 +57,7 @@ import type {
 } from "./types";
 import {
   SurfaceContent,
+  hasDefaultName,
   nodeName,
   type ContentRenderer,
 } from "./SurfaceContent";
@@ -608,8 +609,11 @@ export function ContainerRuntime({
                         <span>
                           {index === 0
                             ? (!hideTitle && document.title) ||
-                              (surfaceKind(node) === "page" && "Page") ||
-                              "Board"
+                              t(
+                                surfaceKind(node) === "page"
+                                  ? "node.page"
+                                  : "node.board",
+                              )
                             : nodeName(node)}
                         </span>
                       </button>
@@ -672,8 +676,10 @@ export function ContainerRuntime({
                     <input
                       aria-label={t("inspector.nameLabel")}
                       value={
-                        selectedEntry.node.attrs?.name ??
-                        nodeName(selectedEntry.node)
+                        hasDefaultName(selectedEntry.node)
+                          ? nodeName(selectedEntry.node)
+                          : (selectedEntry.node.attrs?.name ??
+                            nodeName(selectedEntry.node))
                       }
                       maxLength={200}
                       onChange={(event) =>
@@ -1007,6 +1013,7 @@ function ContainerView({
   reading?: boolean;
   nativeInkBackground?: boolean;
 }) {
+  const t = useTranslator(messages);
   const runtime = useContext(Context),
     id = node.attrs!.id,
     kind = surfaceKind(node),
@@ -1231,7 +1238,7 @@ function ContainerView({
                 : undefined
             }
             data-input-surface={id}
-            aria-label={`Page ${nodeName(node)}`}
+            aria-label={t("node.pageLabel", { name: nodeName(node) })}
             onScroll={(event) => {
               if (!runtime.printing && !matchMedia("print").matches)
                 runtime.scrolls.set(persistKey, event.currentTarget.scrollTop);
@@ -1277,7 +1284,7 @@ function ContainerView({
     <div
       className={`container-board${root ? " is-root" : ""}${enabled ? " is-active" : ""}`}
       data-container-root={id}
-      aria-label={`Board ${nodeName(node)}`}
+      aria-label={t("node.boardLabel", { name: nodeName(node) })}
       onPointerDownCapture={(event) => {
         if (
           (event.target as Element).closest("[data-container-root]") ===

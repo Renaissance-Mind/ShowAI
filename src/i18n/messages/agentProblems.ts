@@ -78,18 +78,18 @@ export default defineMessages("agentProblems", {
     "summary.model_not_found":
       "The model service can’t find the selected model",
     "summary.runtime_missing": "The Codex SDK isn’t installed yet",
-    "summary.agent_missing": "The selected local agent wasn’t found",
-    "summary.sign_in_required": "The local agent needs you to sign in again",
+    "summary.agent_missing": "The selected local Agent wasn’t found",
+    "summary.sign_in_required": "The local Agent needs you to sign in again",
     "summary.network": "Couldn’t reach the model service",
-    "summary.sandbox": "The agent’s sandbox blocked an operation",
+    "summary.sandbox": "The Agent’s sandbox blocked an operation",
     "summary.process_exited": "{name} quit unexpectedly",
     "summary.process_exited_code":
       "{name} quit unexpectedly (exit code {code})",
-    "summary.timeout": "The agent timed out",
+    "summary.timeout": "The Agent timed out",
     "summary.provider_error": "The model service returned an error",
-    "summary.unknown": "The agent run failed",
+    "summary.unknown": "The Agent run failed",
     "cause.no_model_source":
-      "The built-in agent needs a model source: sign in with a ChatGPT plan or add an API key. You can also switch to Codex installed on this Mac.",
+      "The built-in Agent needs a model source: sign in with a ChatGPT plan or add an API key. You can also switch to Codex installed on this Mac.",
     "cause.source_removed":
       "The model source this conversation started with was removed from settings. A new conversation uses the current source.",
     "cause.credentials_missing.chatgpt":
@@ -109,17 +109,17 @@ export default defineMessages("agentProblems", {
     "cause.runtime_missing":
       "Install the Codex SDK in Agent settings before using a model API.",
     "cause.agent_missing":
-      "Install and sign in to the local agent, then check again, or use a model API instead.",
+      "Install and sign in to the local Agent, then check again, or use a model API instead.",
     "cause.sign_in_required":
-      "Sign in again in the local agent, then check again.",
+      "Sign in again in the local Agent, then check again.",
     "cause.network":
       "Check the network, proxy settings and the source address, then retry.",
     "cause.sandbox":
-      "The agent can only write inside its own work folder, and the operation went beyond it.",
+      "The Agent can only write inside its own work folder, and the operation went beyond it.",
     "cause.process_exited":
-      "The agent process quit before finishing this turn. Check the log, then retry.",
+      "The Agent process quit before finishing this turn. Check the log, then retry.",
     "cause.timeout":
-      "The agent didn’t finish in time. Check the network or model service, then retry.",
+      "The Agent didn’t finish in time. Check the network or model service, then retry.",
     "cause.provider_error":
       "The provider couldn’t handle the request right now (HTTP {status}). Retry later.",
     "cause.unknown":

@@ -48,7 +48,7 @@ export default defineMessages("pageOutline", {
     headingsHint: "以标题节点 ID 为键设置 title 或 hidden。",
     sourceCode: "目录组件可在组件库的“页面目录”分类中编辑。",
     rendererError: "目录组件：{error}",
-    errorMissingTarget: "目标不存在或不属于当前 Page。",
+    errorMissingTarget: "目标不存在或不属于当前页面。",
   },
   en: {
     entryTitle: "Display title",
@@ -100,8 +100,8 @@ export default defineMessages("pageOutline", {
     headingsHint:
       "Use heading node IDs as keys with title or hidden overrides.",
     sourceCode:
-      "Edit outline components in the Page outlines category of the component library.",
+      "Edit outline components in the “Page outlines” category of the component library.",
     rendererError: "Outline component: {error}",
-    errorMissingTarget: "Target is missing or outside this Page.",
+    errorMissingTarget: "Target is missing or outside this page.",
   },
 });
