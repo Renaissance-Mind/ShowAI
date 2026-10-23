@@ -12,6 +12,7 @@ const server = await startBrowserServer({
   development: {
     origin: process.env.SHOWAI_DEV_URL!,
     token: process.env.SHOWAI_DEV_TOKEN!,
+    sourceCommit: process.env.SHOWAI_DEV_SOURCE_COMMIT,
   },
 });
 process.send?.({ type: "ready", home: server.home });

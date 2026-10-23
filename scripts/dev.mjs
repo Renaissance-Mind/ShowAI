@@ -14,6 +14,7 @@ import { rawSourcePlugin } from "./raw-source-plugin.mjs";
 import { developmentSessions } from "./dev-session.mjs";
 import { developmentControl } from "./dev-control.mjs";
 import { developmentCache } from "./dev-cache.mjs";
+import { identityRefresher } from "./dev-identity.mjs";
 
 const startupTime = performance.now();
 const root = fileURLToPath(new URL("../", import.meta.url));
@@ -208,6 +209,7 @@ const sessions = developmentSessions(vite.ws);
 let child,
   watcher,
   identityWatcher,
+  identityRefresh,
   stopping = false,
   rebuilding = false,
   requested = false,
@@ -439,7 +441,7 @@ async function launch() {
     mode === "desktop" ? (await import("electron")).default : process.execPath;
   const next = spawn(executable, args, {
     cwd: root,
-    env: environment,
+    env: { ...environment, SHOWAI_DEV_SOURCE_COMMIT: identity.commit },
     stdio: ["inherit", "inherit", "inherit", "ipc"],
   });
   child = next;
@@ -585,6 +587,7 @@ async function stop() {
   }
   vite.ws.send("showai:stopped", {});
   await watcher?.close();
+  identityRefresh?.close();
   await identityWatcher?.close();
   await Promise.all(
     [...compilers.values()].map((compiler) => compiler.dispose()),
@@ -638,18 +641,25 @@ try {
     resolve(root, git(["rev-parse", "--git-path", path])),
   );
   identityWatcher = watch(gitPaths, { ignoreInitial: true });
-  identityWatcher.on("all", () => {
-    identity = readIdentity();
-    const module = vite.environments.client.moduleGraph.getModuleById(
-      "\0virtual:showai-development-info",
-    );
-    if (module) vite.environments.client.moduleGraph.invalidateModule(module);
-    vite.ws.send("showai:identity", identity);
-    if (readyReceipt)
-      void writeSession().catch((error) =>
-        console.error("无法更新开发版本记录", error),
+  // A transient git failure (e.g. EINTR while another checkout moves refs)
+  // is retried and logged; it must never stop the development server.
+  identityRefresh = identityRefresher({
+    read: readIdentity,
+    apply: (next) => {
+      identity = next;
+      const module = vite.environments.client.moduleGraph.getModuleById(
+        "\0virtual:showai-development-info",
       );
+      if (module)
+        vite.environments.client.moduleGraph.invalidateModule(module);
+      vite.ws.send("showai:identity", identity);
+      if (readyReceipt)
+        void writeSession().catch((error) =>
+          console.error("无法更新开发版本记录", error),
+        );
+    },
   });
+  identityWatcher.on("all", () => identityRefresh.refresh());
   identityWatcher.on("error", (error) => {
     console.error(error);
     void stop();

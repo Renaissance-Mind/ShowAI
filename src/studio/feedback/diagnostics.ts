@@ -64,11 +64,6 @@ export function versionLine(info: DesktopInfo | null) {
 
 export function platformLine(info: DesktopInfo | null) {
   if (!info) return "—";
-  // The browser workbench's server reports the kernel release, not the macOS version.
-  if (info.mode === "browser" && info.platform === "darwin")
-    return ["macOS", info.osVersion && `(Darwin ${info.osVersion})`, info.arch]
-      .filter(Boolean)
-      .join(" ");
   return [platforms[info.platform] ?? info.platform, info.osVersion, info.arch]
     .filter(Boolean)
     .join(" ");

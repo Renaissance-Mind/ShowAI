@@ -22,7 +22,7 @@ import {
   symlink,
   writeFile,
 } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { release, tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { startBrowserServer } from "./server";
 import { AgentService } from "../agent/service";
@@ -479,6 +479,9 @@ test("browser workbench, standalone CLI and a second client share real files and
   const info = await invoke<DesktopInfo>("app:info");
   expect(info.mode).toBe("browser");
   expect(info.cli.args).toEqual([cli]);
+  // The browser host reports the macOS product version, as the desktop app does.
+  if (process.platform === "darwin")
+    expect(info.osVersion).not.toBe(release());
   const registration = JSON.parse(
     await readFile(join(home, "agent-runtime.json"), "utf8"),
   );
