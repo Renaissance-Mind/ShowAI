@@ -5,7 +5,7 @@ import { defineMessages } from "../index";
 export default defineMessages("richText", {
   "zh-CN": {
     region: "富文本",
-    opening: "正在打开富文本…",
+    opening: "正在打开内容…",
     openingDocument: "正在打开文档",
     documentContent: "文档内容",
     placeholder: "输入 / 添加内容",
@@ -177,7 +177,7 @@ export default defineMessages("richText", {
   },
   en: {
     region: "Rich text",
-    opening: "Opening rich text…",
+    opening: "Opening content…",
     openingDocument: "Opening document",
     documentContent: "Document content",
     placeholder: "Type / to add content",

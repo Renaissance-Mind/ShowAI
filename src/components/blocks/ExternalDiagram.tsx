@@ -241,6 +241,14 @@ function ExternalDiagramBlock({
         label={t("diagram")}
         unlockDescription={t("unlockDescription")}
       />
+      {!ready && (
+        // Covers the reserved frame area until the diagram document loads.
+        <div className="sb-diagram-pending">
+          <div role="status" style={{ height: Number(data.height ?? 560) }}>
+            <span>{t("loading")}</span>
+          </div>
+        </div>
+      )}
       <iframe
         ref={iframe}
         title={text(data.title, name)}

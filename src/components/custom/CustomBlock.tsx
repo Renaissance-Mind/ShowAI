@@ -39,6 +39,7 @@ import { componentContextIssue } from "./component-context.mjs";
 import { BindingBasisContext } from "../../datasets/basis";
 import { ComponentStatus } from "../blocks/ComponentStatus";
 import widgetMessages from "../../i18n/messages/widget";
+import { PendingNotice } from "../../ui/PendingNotice";
 import {
   installFrameErrorReporter,
   readFrameRuntimeError,
@@ -580,6 +581,8 @@ function SandboxComponent({
 
   // No height since the (re)load counts as empty: a failed first render may never resize.
   const blank = !!(crash || error) && (measured === null || measured <= 4);
+  // The frame reports its first height once the component has rendered.
+  const starting = measured === null && !crash && !error;
   return (
     <section
       className="showai-custom-block"
@@ -699,6 +702,12 @@ function SandboxComponent({
           attached={!blank}
         />
       )}
+      <PendingNotice
+        active={starting}
+        overlay
+        label={tw("loading")}
+        minHeight={height}
+      />
       <iframe
         ref={iframe}
         title={component.name}

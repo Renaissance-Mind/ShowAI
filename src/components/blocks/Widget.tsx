@@ -26,6 +26,7 @@ import { BoundWidgetHost, hasBinding } from "../../datasets/widget-host";
 import { translator } from "../../i18n";
 import { useTranslator } from "../../i18n/react";
 import messages from "../../i18n/messages/widget";
+import { PendingNotice } from "../../ui/PendingNotice";
 
 const widgetMessages = translator(messages);
 
@@ -213,21 +214,19 @@ const WidgetBody = memo(function WidgetBody({
     <BlockBoundary key={kind} kind={kind} data={data} readOnly={readOnly}>
       <Suspense
         fallback={
-          <section
+          <PendingNotice
             className="sb-block"
             data-preview-pending="true"
-            role="status"
-            style={{
-              minHeight:
-                typeof data.height === "number"
-                  ? data.height
-                  : kind.startsWith("g2-")
-                    ? 320
-                    : 180,
-            }}
-          >
-            {t("loading")}
-          </section>
+            label={t("loading")}
+            lines={2}
+            minHeight={
+              typeof data.height === "number"
+                ? data.height
+                : kind.startsWith("g2-")
+                  ? 320
+                  : 180
+            }
+          />
         }
       >
         <RichTextEnvironment.Provider value={environment}>

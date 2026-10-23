@@ -7,6 +7,7 @@ export default defineMessages("pluginInstall", {
       "让 Codex、Claude Code 或 DeepSeek Harness 读写 ShowAI 内容。插件与运行时由 App 提供，连接时自动启动 MCP。",
     refresh: "重新检测",
     scanning: "正在检测…",
+    scanningHosts: "正在检测这台电脑上的 Agent…",
     missing:
       "未找到宿主。请先安装 Codex 或 Claude Code，并确保其命令行工具可用，再重新检测。",
     scanFailed: "无法读取插件状态，请检查下方错误或更新宿主后重试。",
@@ -108,6 +109,7 @@ export default defineMessages("pluginInstall", {
       "Let Codex, Claude Code or DeepSeek Harness work with ShowAI content. The App supplies the plugin and runtime; MCP starts automatically when connected.",
     refresh: "Check again",
     scanning: "Checking…",
+    scanningHosts: "Checking the Agents on this computer…",
     missing:
       "Host not found. Install Codex or Claude Code and make its command-line tool available, then check again.",
     scanFailed:

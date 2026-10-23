@@ -17,6 +17,7 @@ import { getLocale } from "../i18n";
 import { useTranslator } from "../i18n/react";
 import messages from "../i18n/messages/pluginInstall";
 import onboardingMessages from "../i18n/messages/onboarding";
+import { PendingNotice } from "../ui/PendingNotice";
 import { Copy, ExternalLink } from "../ui/icons";
 import { desktop, errorMessage } from "./bridge";
 import {
@@ -506,6 +507,7 @@ export default function PluginInstallSettings({ home }: { home: string }) {
   const t = useTranslator(messages);
   const {
     hosts,
+    scanned,
     busy,
     error,
     errorDetails,
@@ -554,6 +556,12 @@ export default function PluginInstallSettings({ home }: { home: string }) {
           onRepair={() => void repairRuntime()}
         />
       )}
+      <PendingNotice
+        active={!scanned && !hosts.length}
+        label={t("scanningHosts")}
+        lines={4}
+        minHeight={320}
+      />
       {hosts.map((host) => {
         const mismatch = pluginLibraryMismatch(host, home);
         return (

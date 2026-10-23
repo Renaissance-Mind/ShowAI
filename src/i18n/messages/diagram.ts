@@ -6,6 +6,7 @@ export default defineMessages("diagram", {
     "family.archify": "Archify 交互架构图",
     "family.diagramDesign": "Diagram Design 图形",
     "family.fireworks": "Fireworks 技术图",
+    loading: "正在加载图示…",
     fileTooLarge: "请选择 8 MiB 以内的 HTML 或 SVG 文件。",
     changedElsewhere:
       "图形已被其他修改更新。草稿已保留，请重新读取并合并后保存。",
@@ -51,6 +52,7 @@ export default defineMessages("diagram", {
     "presentation.controls": "显示阅读控件",
   },
   en: {
+    loading: "Loading diagram…",
     "family.archify": "Archify architecture diagram",
     "family.diagramDesign": "Diagram Design graphic",
     "family.fireworks": "Fireworks technical diagram",

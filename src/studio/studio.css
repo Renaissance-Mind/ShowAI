@@ -1339,9 +1339,11 @@ button.studio-tree-chevron:hover {
     transform: rotate(360deg);
   }
 }
+/* Views enter partly visible: when the first frames are late (a cold start or a
+   busy main thread), the content is already there instead of a blank pane. */
 @keyframes studio-enter {
   from {
-    opacity: 0;
+    opacity: 0.4;
     translate: 0 4px;
   }
   to {
