@@ -44,6 +44,7 @@ export function workspaceHash(
 
 /** External content stays in place and is independently retained before resolution. */
 export class WorkspaceProtection {
+  private inspectedTree?: { revision: string | null; paths: Set<string> };
   constructor(
     readonly library: Pick<
       GitLibrary,
@@ -127,11 +128,16 @@ export class WorkspaceProtection {
     paths: string[],
     revision: string | null,
   ): Promise<WorkspaceConflict[]> {
-    const tree = new Set(
-      (revision ? await this.library.tree(revision) : []).map(
-        (entry) => entry.path,
-      ),
-    );
+    if (!this.inspectedTree || this.inspectedTree.revision !== revision)
+      this.inspectedTree = {
+        revision,
+        paths: new Set(
+          (revision ? await this.library.tree(revision) : []).map(
+            (entry) => entry.path,
+          ),
+        ),
+      };
+    const tree = this.inspectedTree.paths;
     const present = paths.filter((path) => tree.has(path));
     const committed =
       revision && present.length

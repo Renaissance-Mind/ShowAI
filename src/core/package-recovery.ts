@@ -141,7 +141,12 @@ async function inspectWorkspaceResources(
     });
     if (!info) return;
     if (info.isDirectory())
-      for (const name of await readdir(absolute)) {
+      for (const name of await readdir(absolute).catch(
+        (error: NodeJS.ErrnoException) => {
+          if (error.code === "ENOENT") return [];
+          throw error;
+        },
+      )) {
         if (
           ["node_modules", ".git"].includes(name) ||
           name.startsWith(".source-")
@@ -155,19 +160,22 @@ async function inspectWorkspaceResources(
   const protection = new WorkspaceProtection(library),
     conflicts = [],
     all = [...paths];
-  for (let offset = 0; offset < all.length; offset += 16)
-    conflicts.push(
-      ...(await protection.inspect(all.slice(offset, offset + 16), head)),
-    );
+  for (let offset = 0; offset < all.length; offset += 16) {
+    const found = await withLibraryLock(library.root, async () => {
+      const current = await library.head();
+      return protection.inspect(all.slice(offset, offset + 16), current);
+    });
+    conflicts.push(...found);
+  }
   return conflicts;
 }
 export async function scanWorkspaceResources(
   library: GitLibrary,
   projectId?: string,
 ) {
-  return withLibraryLock(library.root, () =>
-    inspectWorkspaceResources(library, projectId),
-  );
+  // Directory discovery and other batches must not monopolize the writer lease.
+  // Recovery transactions still retain their existing outer lease atomically.
+  return inspectWorkspaceResources(library, projectId);
 }
 export async function recoverExternalPackage(
   library: GitLibrary,
