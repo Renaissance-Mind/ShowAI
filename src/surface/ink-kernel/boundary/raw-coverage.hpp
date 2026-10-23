@@ -224,9 +224,78 @@ inline bool chord_error(PolynomialContext&c,const Point restricted[4],const doub
  }}
  return !ctx.status&&boundary_quantization::upper_bound(maximumX+maximumY,error);
 }
-inline bool chord(PolynomialContext&c,const SAInkPathCommand&command,const Command&meta,const SAAnalyticPatch&p,double&error){
- Point controls[4];double a[2]={p.controls[0],p.controls[1]},b[2]={p.controls[6],p.controls[7]};
- return restricted_cubic(c,command,meta,p,controls)&&chord_error(c,controls,a,b,error);
+/* Outward binary64 filter for the exact restricted Bernstein controls. Every
+ * primitive encloses its real result, including subnormals. A proved chord
+ * error replaces only the expensive proof, preserving the analytic factory's
+ * actual vertices. Uncertain/over-budget bounds use the exact rational proof.
+ * Final admission still charges endpoint rounding and Float32 position error
+ * under the original transform envelope and geometric tolerance. */
+struct Enclosure {double lo=0,hi=0;};
+inline double adjacent(double x,bool positive){
+ if(!finite_double(x))return x;uint64_t bits;copy_bytes(&bits,&x,8);
+ if((bits&0x7fffffffffffffffull)==0)bits=positive?1:0x8000000000000001ull;
+ else if((x>0)==positive)++bits;else --bits;
+ copy_bytes(&x,&bits,8);return x;
+}
+inline Enclosure enclose(double x){return{x,x};}
+inline Enclosure add(Enclosure a,Enclosure b){return{adjacent(a.lo+b.lo,false),adjacent(a.hi+b.hi,true)};}
+inline Enclosure negate(Enclosure a){return{-a.hi,-a.lo};}
+inline Enclosure subtract(Enclosure a,Enclosure b){return add(a,negate(b));}
+inline Enclosure multiply(Enclosure a,Enclosure b){
+ double v[4]={a.lo*b.lo,a.lo*b.hi,a.hi*b.lo,a.hi*b.hi},lo=v[0],hi=v[0];
+ for(uint32_t i=1;i<4;i++){if(v[i]<lo)lo=v[i];if(v[i]>hi)hi=v[i];}
+ return{adjacent(lo,false),adjacent(hi,true)};
+}
+inline double magnitude(Enclosure a){return max(abs(a.lo),abs(a.hi));}
+inline bool valid(Enclosure a){return finite_double(a.lo)&&finite_double(a.hi)&&a.lo<=a.hi;}
+inline bool chord_enclosure(const Enclosure controls[4][2],const double a[2],const double b[2],double&error){
+ for(uint32_t i=0;i<4;i++)for(uint32_t axis=0;axis<2;axis++)if(!valid(controls[i][axis]))return false;
+ Enclosure d[2]={subtract(enclose(b[0]),enclose(a[0])),subtract(enclose(b[1]),enclose(a[1]))};
+ Enclosure den=add(multiply(d[0],d[0]),multiply(d[1],d[1]));
+ if(!valid(d[0])||!valid(d[1])||!valid(den))return false;
+ Enclosure n[2];double crossMax=0;
+ for(uint32_t i=1;i<3;i++){
+  Enclosure x=subtract(controls[i][0],enclose(a[0])),y=subtract(controls[i][1],enclose(a[1]));
+  n[i-1]=add(multiply(x,d[0]),multiply(y,d[1]));
+  Enclosure cross=subtract(multiply(x,d[1]),multiply(y,d[0]));if(!valid(n[i-1])||!valid(cross))return false;
+  crossMax=max(crossMax,magnitude(cross));
+ }
+ double mx=0,my=0;
+ if(valid(den)&&den.lo>0&&n[0].lo>=0&&n[1].hi<=den.lo&&n[0].hi<=n[1].lo){
+  // A monotone projected Bernstein parameter maps [0,1] onto the chord.
+  mx=max(magnitude(subtract(controls[0][0],enclose(a[0]))),magnitude(subtract(controls[3][0],enclose(b[0]))));
+  my=max(magnitude(subtract(controls[0][1],enclose(a[1]))),magnitude(subtract(controls[3][1],enclose(b[1]))));
+  mx=max(mx,up(mul(magnitude(d[1]),crossMax)/den.lo));
+  my=max(my,up(mul(magnitude(d[0]),crossMax)/den.lo));
+ }else{
+  // Parameter-wise convex bound also covers reversals and zero-length chords.
+  for(uint32_t i=0;i<4;i++){
+   Enclosure t=i==0?enclose(0):i==3?enclose(1):Enclosure{adjacent(double(i)/3,false),adjacent(double(i)/3,true)};
+   Enclosure ex=subtract(subtract(controls[i][0],enclose(a[0])),multiply(d[0],t)),ey=subtract(subtract(controls[i][1],enclose(a[1])),multiply(d[1],t));
+   if(!valid(ex)||!valid(ey))return false;mx=max(mx,magnitude(ex));my=max(my,magnitude(ey));
+  }
+ }
+ error=sum(mx,my);return finite_double(error);
+}
+inline bool restricted_enclosure(const SAInkPathCommand&command,const Command&meta,const SAAnalyticPatch&p,Enclosure restricted[4][2]){
+ if(command.operation!=3||!(p.parameter_start>=0&&p.parameter_end<=1&&p.parameter_start<p.parameter_end))return false;
+ Enclosure t[2]={enclose(p.parameter_start),enclose(p.parameter_end)};
+ for(uint32_t i=0;i<4;i++)for(uint32_t axis=0;axis<2;axis++){
+  Enclosure v[4];v[0]=enclose(meta.start[axis]);for(uint32_t j=1;j<4;j++)v[j]=enclose(command.values[2*j-2+axis]);
+  for(uint32_t level=0;level<3;level++){
+   Enclosure x=t[level<3-i?0:1],oneMinus=subtract(enclose(1),x);
+   for(uint32_t j=0;j<3-level;j++)v[j]=add(multiply(v[j],oneMinus),multiply(v[j+1],x));
+  }
+  if(!valid(v[0]))return false;restricted[i][axis]=v[0];
+ }
+ return true;
+}
+
+inline bool chord(PolynomialContext&c,const SAInkPathCommand&command,const Command&meta,const SAAnalyticPatch&p,double&error,double filterLimit=0){
+ double a[2]={p.controls[0],p.controls[1]},b[2]={p.controls[6],p.controls[7]};
+ Enclosure bounds[4][2];double filtered=0;
+ if(filterLimit>0&&restricted_enclosure(command,meta,p,bounds)&&chord_enclosure(bounds,a,b,filtered)&&filtered<=filterLimit){error=filtered;return true;}
+ Point controls[4];return restricted_cubic(c,command,meta,p,controls)&&chord_error(c,controls,a,b,error);
 }
 /* Actual preflight of the original factory vertices. A newly admitted
  * polyline interval cannot consume headroom needed by a later original fan.
@@ -344,7 +413,7 @@ inline uint32_t build_raw_coverage_mesh(PolynomialContext&c,const SAInkPathComma
  double originalCast=0;if(counts.ray_patches&&!original_cast_error(patches,metadata,commands,o,originalCast)){reason=boundary_klm_invalid;return SA_INK_INVALID;}
  auto&cert=staged.certificate;cert.maximum_forward_norm=o.maximum_forward_norm;cert.maximum_inverse_norm=o.maximum_inverse_norm;cert.maximum_geometry_error_pixels=o.maximum_geometry_error_pixels;
  for(const auto&p:patches){if(!ctx.step())return ctx.status;if(p.command_index>=count){reason=boundary_klm_invalid;return SA_INK_INVALID;}const auto&meta=metadata[p.command_index];
-  if(p.mode==SA_ANALYTIC_RAY){double error=0;if(!chord(c,commands[p.command_index],meta,p,error)){reason=boundary_klm_ray;return ctx.status?ctx.status:SA_INK_RANGE;}
+  if(p.mode==SA_ANALYTIC_RAY){double error=0;if(!chord(c,commands[p.command_index],meta,p,error,o.maximum_geometry_error_pixels/o.maximum_forward_norm-max(cert.actual_position_error_source,originalCast))){reason=boundary_klm_ray;return ctx.status?ctx.status:SA_INK_RANGE;}
    if(mul(o.maximum_forward_norm,sum(max(cert.actual_position_error_source,originalCast),max(cert.actual_regularization_error_source,error)))<=o.maximum_geometry_error_pixels){cert.actual_regularization_error_source=max(cert.actual_regularization_error_source,error);}
    else{uint32_t refined=refine_ray(c,commands[p.command_index],meta,p,o,staged,originalCast,o.maximum_patches-counts.patches,reason);if(refined)return refined;}
    ++cert.regularized_rays;continue;}
@@ -370,7 +439,7 @@ inline uint32_t build_raw_coverage_mesh(PolynomialContext&c,const SAInkPathComma
     // remove the entire lens transaction, not merely its failing triangle.
     double error=0;
     if(!ctx.status&&reason==boundary_klm_zero_gradient&&p.mode==SA_ANALYTIC_CUBIC&&
-       chord(c,commands[p.command_index],meta,p,error)&&
+       chord(c,commands[p.command_index],meta,p,error,o.maximum_geometry_error_pixels/o.maximum_forward_norm-patchCertificate.actual_position_error_source)&&
        mul(o.maximum_forward_norm,sum(patchCertificate.actual_position_error_source,
            max(patchCertificate.actual_regularization_error_source,error)))<=o.maximum_geometry_error_pixels){
      if(!staged.mesh.vertices.resize(patchVertices)||!staged.mesh.draws.resize(patchDraws))return ctx.status;
