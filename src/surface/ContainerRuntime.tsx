@@ -1,3 +1,4 @@
+import {readBoardToolPreferences,saveBoardToolPreferences,boardStyleKey,boardToolPreferencesChanged,boardToolPreferencesKey} from "./board-tool-preferences";
 import { PageOutline, PageOutlinePrint } from "./PageOutline";
 import { OutlineSettings } from "./OutlineSettings";
 import type { OutlineViewState } from "./page-outline.mjs";
@@ -51,7 +52,6 @@ import { ArrowLeft, ChevronRight, LayoutDashboard, X } from "../ui/icons";
 import type { ContainerDocument, ShowDocument } from "../types";
 import type {
   BoardTool,
-  DrawingStyle,
   NodeLayout,
   PageWidthMode,
 } from "./types";
@@ -1012,16 +1012,19 @@ function ContainerView({
   const viewport = useRef<SurfaceHandle>(null),
     page = useRef<HTMLDivElement>(null);
   const pageShell = useRef<HTMLDivElement>(null);
-  const [tool, setTool] = useState<BoardTool | null>(null);
-  const [styles, setStyles] = useState<Record<string, DrawingStyle>>({
-    pen: { color: "#252629", fillColor: "none", strokeWidth: 2.5 },
-    highlighter: { color: "#facc15", fillColor: "none", strokeWidth: 16 },
-    shape: { color: "#252629", fillColor: "none", strokeWidth: 2.5 },
-    arrow: { color: "#252629", fillColor: "none", strokeWidth: 2.5 },
-    eraser: { color: "#252629", fillColor: "none", strokeWidth: 24 },
-  });
+  const [preferences] = useState(readBoardToolPreferences);
+  const [tool, setTool] = useState<BoardTool | null>(preferences.tool);
+  const [styles, setStyles] = useState(preferences.styles);
   const toolValue=useRef(tool),styleValues=useRef(styles);
-  const keyForTool=(value:BoardTool|null)=>value==="pen"||value==="highlighter"||value==="eraser"||value==="arrow"?value:value==="text"?"pen":"shape";
+  styleValues.current=styles;
+  const keyForTool=boardStyleKey;
+  useEffect(() => {
+    const refresh = () => {const next=readBoardToolPreferences();styleValues.current=next.styles;setStyles(next.styles)};
+    const storage = (event:StorageEvent) => {if(event.key===boardToolPreferencesKey || event.key===null)refresh()};
+    window.addEventListener(boardToolPreferencesChanged,refresh);
+    window.addEventListener("storage",storage);
+    return () => {window.removeEventListener(boardToolPreferencesChanged,refresh);window.removeEventListener("storage",storage)};
+  }, []);
   const styleKey=keyForTool(tool);
   const style = styles[styleKey];
   const chooseTool = (next: BoardTool | null) => {
@@ -1034,6 +1037,7 @@ function ContainerView({
     runtime.select(null);
     runtime.inspect(null);
     setTool(next);
+    saveBoardToolPreferences({tool:next});
     return saving;
   };
   const enabled = root || runtime.active === id;
@@ -1476,6 +1480,7 @@ function ContainerView({
               styleValues.current=next;
               viewport.current?.configureNativeInput(toolValue.current,next[key]);
               setStyles(next);
+              saveBoardToolPreferences({style:{key,patch}});
               return;
             }
             let next = runtime.current.current;

@@ -85,7 +85,7 @@ export function BoardTools({
               key={key}
               aria-label={t(label)}
               aria-keyshortcuts={key}
-              title={t("tool.withShortcut", { label: t(label), key })}
+              title={mobile ? t(label) : t("tool.withShortcut", { label: t(label), key })}
               aria-pressed={tool === value}
               onClick={() => onChange(value)}
             >

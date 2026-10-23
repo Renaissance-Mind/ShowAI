@@ -52,8 +52,8 @@ export function DockableBoardToolbar({
   const [dock, setDock] = useState(() => {
     try {
       const saved = readToolbarDock(localStorage.getItem(preference));
-      return mobile && saved.floating
-        ? { edge: saved.edge, position: saved.position }
+      return mobile
+        ? { edge: saved.edge, position: 0.5 }
         : saved;
     } catch {
       return readToolbarDock(null);
@@ -190,7 +190,7 @@ export function DockableBoardToolbar({
     const point = freePosition();
     const target: ToolbarDock = {
       edge: current.edge,
-      position: horizontal(current.edge)
+      position: mobile && current.snapped ? 0.5 : horizontal(current.edge)
         ? point.x / Math.max(1, bounds.width)
         : point.y / Math.max(1, bounds.height),
     };
