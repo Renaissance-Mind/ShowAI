@@ -33,7 +33,7 @@ it("persists a latest image across application restarts and renderer versions", 
   expect(await new PagePreviewCache(cache.directory).latest(reference)).toEqual(
     { image, fingerprint: "old-renderer" },
   );
-  expect(pagePreviewSize).toEqual({ width: 640, height: 440, padding: 20 });
+  expect(pagePreviewSize).toEqual({ width: 640, height: 440, padding: 8 });
 });
 
 it("invalidates freshness without clearing the image, including on restart", async () => {

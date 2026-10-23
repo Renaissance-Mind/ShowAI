@@ -1,10 +1,11 @@
-/** Fit the entire natural content, preserving its aspect ratio. */
+/** Preserve proportions; document thumbnails can fill the width of the card. */
 export function previewFit(
   viewportWidth: number,
   viewportHeight: number,
   width: number,
   height: number,
   padding = 24,
+  mode: "contain" | "width" = "contain",
 ) {
   if (
     width <= 0 ||
@@ -13,11 +14,10 @@ export function previewFit(
     viewportHeight <= padding * 2
   )
     return 1;
-  return Math.min(
-    1,
-    (viewportWidth - padding * 2) / width,
-    (viewportHeight - padding * 2) / height,
-  );
+  const horizontal = Math.min(1, (viewportWidth - padding * 2) / width);
+  return mode === "width"
+    ? horizontal
+    : Math.min(horizontal, (viewportHeight - padding * 2) / height);
 }
 export function previewZoom(value: number) {
   return Math.max(0.05, Math.min(3, value));

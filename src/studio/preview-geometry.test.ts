@@ -26,3 +26,14 @@ test("a narrow or hidden preview keeps one column", () => {
   expect(previewColumns(120, 400, 960, 3000, 64)).toBe(1);
   expect(previewColumns(0, 0, 960, 3000, 64)).toBe(1);
 });
+test("a four-column document fills the card width even when its full height cannot fit", () => {
+  const width = 4 * 960 + 3 * 64;
+  const scale = previewFit(640, 440, width, 15000, 8, "width");
+  expect(width * scale).toBe(624);
+  expect(15000 * scale).toBeGreaterThan(440);
+});
+test("board and catalog previews still fit their complete height by default", () => {
+  const scale = previewFit(640, 440, 960, 4000, 8);
+  expect(4000 * scale).toBe(424);
+  expect(960 * scale).toBeLessThan(624);
+});

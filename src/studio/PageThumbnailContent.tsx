@@ -65,6 +65,7 @@ export default function PageThumbnailContent({
           resetKey={updatedAt}
           width={board?.width ?? 960}
           maxColumns={board ? 1 : 4}
+          fitMode={board ? "contain" : "width"}
           padding={padding}
         >
           {board ? (

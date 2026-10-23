@@ -24,7 +24,7 @@ interface Entry extends PreviewReference {
 }
 
 /** A single fitted image serves small/medium/large cards, folder fans and prefetch. */
-export const pagePreviewSize = { width: 640, height: 440, padding: 20 };
+export const pagePreviewSize = { width: 640, height: 440, padding: 8 };
 const digest = (value: string | Buffer) =>
   createHash("sha256").update(value).digest("hex");
 const keyFor = (reference: PreviewReference) =>

@@ -22,6 +22,7 @@ export default function CatalogPreview({
   accessory,
   thumbnail = false,
   maxColumns = 1,
+  fitMode = "contain",
   padding = thumbnail ? 10 : 24,
   minHeight,
 }: {
@@ -33,6 +34,8 @@ export default function CatalogPreview({
   thumbnail?: boolean;
   /** Let a tall page flow into up to this many balanced columns. */
   maxColumns?: number;
+  /** Document thumbnails fill the width and show the page from its top. */
+  fitMode?: "contain" | "width";
   /** Margin kept around the fitted page, in screen pixels. */
   padding?: number;
   minHeight?: number;
@@ -92,6 +95,7 @@ export default function CatalogPreview({
         w,
         h,
         padding,
+        fitMode,
       );
       setSize((current) =>
         current.width === w && current.height === h && current.fit === fit
@@ -111,7 +115,7 @@ export default function CatalogPreview({
       cancelAnimationFrame(frame);
       observer.disconnect();
     };
-  }, [width, resetKey, padding, maxColumns, !!accessory]);
+  }, [width, resetKey, padding, maxColumns, fitMode, !!accessory]);
   useEffect(() => {
     if (!zoomOpen) return;
     const outside = (event: PointerEvent) => {
@@ -126,6 +130,7 @@ export default function CatalogPreview({
       className={`catalog-preview${thumbnail ? " is-thumbnail" : ""}`}
       aria-label={label}
       data-preview-scale={scale}
+      data-preview-fit={fitMode}
     >
       {accessory && (
         <div className="catalog-preview-accessory">{accessory}</div>

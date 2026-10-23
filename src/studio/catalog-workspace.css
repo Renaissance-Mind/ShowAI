@@ -303,6 +303,12 @@
 .catalog-preview.is-thumbnail .catalog-preview-center {
   padding: 10px;
 }
+.catalog-preview.is-thumbnail[data-preview-fit="width"] .catalog-preview-center {
+  align-items: start;
+}
+.catalog-preview.is-thumbnail[data-preview-fit="width"] .catalog-preview-viewport {
+  overflow: hidden;
+}
 .catalog-preview.is-thumbnail .catalog-preview-content {
   padding: 20px;
 }
