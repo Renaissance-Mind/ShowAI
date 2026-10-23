@@ -404,14 +404,31 @@ inline uint32_t build_raw_coverage_mesh(PolynomialContext&c,const SAInkPathComma
  double identity[6]={1,0,0,1,0,0};SAAnalyticBudget budget{o.maximum_commands,o.maximum_patches,o.maximum_analytic_depth,0};const RawAnalyticCapture captured(commands,count,identity,&budget);auto status=captured.status();if(status)return status;SAAnalyticCounts counts=captured.counts();
  // Admission includes the actual source factory temporary output and final mesh.
  if(counts.vertices>o.maximum_vertices||counts.vertices/3>o.maximum_draws){reason=boundary_klm_capacity;return SA_INK_CAPACITY;}
- Vector<SAAnalyticPatch>patches(ctx);Vector<SAAnalyticVertex>vertices(ctx);patches.resize(counts.patches);vertices.resize(counts.vertices);Vector<Command>metadata(ctx);metadata.resize(count);
- if(ctx.status)return ctx.status;status=captured.emit(counts.patches?&patches[0]:nullptr,patches.size(),counts.vertices?&vertices[0]:nullptr,vertices.size(),&counts);if(status)return status;
+ // Scratch follows closed source subpaths, independently of the retained
+ // result. Keeping every original patch/vertex beside a growing final mesh
+ // makes an otherwise small stroke depend on contiguous whole-input scratch.
+ Vector<Command>metadata(ctx);metadata.resize(count);if(ctx.status)return ctx.status;
+ auto stream=[&](auto&&consume)->uint32_t{
+  for(uint32_t first=0;first<count;){
+   uint32_t end=first+1;
+   while(end<count){if(end-first>=512&&commands[end].operation==SA_INK_MOVE&&commands[end-1].operation==SA_INK_CLOSE)break;++end;}
+   const RawAnalyticCapture part(commands+first,end-first,identity,&budget);if(part.status())return part.status();
+   SAAnalyticCounts required=part.counts();Vector<SAAnalyticPatch>patches(ctx);Vector<SAAnalyticVertex>vertices(ctx);
+   patches.resize(required.patches);vertices.resize(required.vertices);if(ctx.status)return ctx.status;
+   uint32_t result=part.emit(required.patches?&patches[0]:nullptr,patches.size(),required.vertices?&vertices[0]:nullptr,vertices.size(),&required);if(result)return result;
+   for(uint32_t i=0;i<patches.size();i++)patches[i].command_index+=first;
+   result=consume(patches,vertices);if(result)return result;first=end;
+  }
+  return ctx.status;
+ };
  double current[2]{},origin[2]{};
  for(uint32_t i=0;i<count;i++){auto&meta=metadata[i];for(uint32_t axis=0;axis<2;axis++){meta.start[axis]=current[axis];if(commands[i].operation==0)origin[axis]=commands[i].values[axis];meta.origin[axis]=origin[axis];if(commands[i].operation<4)current[axis]=commands[i].values[2*commands[i].operation+axis-(commands[i].operation?2:0)];else current[axis]=origin[axis];}}
  RawCoverageMesh staged(ctx);staged.source_generation=generation;bool hasBounds=false;
  for(uint32_t i=0;i<count;i++)if(commands[i].operation<4){uint32_t points=commands[i].operation?commands[i].operation:1;for(uint32_t j=0;j<points;j++){double x=commands[i].values[2*j],y=commands[i].values[2*j+1];auto&b=staged.source_control_bounds;if(!hasBounds){b[0]=b[2]=x;b[1]=b[3]=y;hasBounds=true;}else{if(x<b[0])b[0]=x;if(y<b[1])b[1]=y;if(x>b[2])b[2]=x;if(y>b[3])b[3]=y;}}}
- double originalCast=0;if(counts.ray_patches&&!original_cast_error(patches,metadata,commands,o,originalCast)){reason=boundary_klm_invalid;return SA_INK_INVALID;}
+ double originalCast=0;
+ if(counts.ray_patches){status=SAInkStatus(stream([&](const auto&patches,const auto&)->uint32_t{double cast=0;if(!original_cast_error(patches,metadata,commands,o,cast)){reason=boundary_klm_invalid;return SA_INK_INVALID;}originalCast=max(originalCast,cast);return SA_INK_OK;}));if(status)return status;}
  auto&cert=staged.certificate;cert.maximum_forward_norm=o.maximum_forward_norm;cert.maximum_inverse_norm=o.maximum_inverse_norm;cert.maximum_geometry_error_pixels=o.maximum_geometry_error_pixels;
+ uint32_t emitted=stream([&](const auto&patches,const auto&vertices)->uint32_t{
  for(const auto&p:patches){if(!ctx.step())return ctx.status;if(p.command_index>=count){reason=boundary_klm_invalid;return SA_INK_INVALID;}const auto&meta=metadata[p.command_index];
   if(p.mode==SA_ANALYTIC_RAY){double error=0;if(!chord(c,commands[p.command_index],meta,p,error,o.maximum_geometry_error_pixels/o.maximum_forward_norm-max(cert.actual_position_error_source,originalCast))){reason=boundary_klm_ray;return ctx.status?ctx.status:SA_INK_RANGE;}
    if(mul(o.maximum_forward_norm,sum(max(cert.actual_position_error_source,originalCast),max(cert.actual_regularization_error_source,error)))<=o.maximum_geometry_error_pixels){cert.actual_regularization_error_source=max(cert.actual_regularization_error_source,error);}
@@ -450,6 +467,8 @@ inline uint32_t build_raw_coverage_mesh(PolynomialContext&c,const SAInkPathComma
    }
   }
  }
+ return ctx.status;
+ });if(emitted)return emitted;
  if(ctx.status)return ctx.status;staged.mesh.source_edges=count;staged.mesh.vertex_bytes=uint64_t(staged.mesh.vertices.size())*sizeof(BoundaryCoverageVertex);output=static_cast<RawCoverageMesh&&>(staged);return SA_INK_OK;
 }
 }
