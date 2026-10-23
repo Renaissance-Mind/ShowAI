@@ -492,10 +492,25 @@ app.on("will-quit", () => {
 });
 configurePageThumbnails({
   authorize: trustedSender,
-  identity: async () => ({
-    home: store.root,
-    revision: (await versionedLibrary(store.root)?.head()) ?? null,
-  }),
+  identity: async ({ projectId, pageId }) => {
+    const library = versionedLibrary(store.root);
+    // Page hashes already cover page edits. Unrelated projects/pages must not
+    // invalidate every cached thumbnail whenever an Agent writes to the library.
+    const dependencies =
+      library &&
+      (await library.resourceRevisions([
+        `projects/${projectId}/pages/${pageId}`,
+        `projects/${projectId}/datasets`,
+        `projects/${projectId}/packages`,
+        `projects/${projectId}/assets`,
+        "packages/components",
+        "packages/published/components",
+      ]));
+    return {
+      home: store.root,
+      revision: dependencies ? JSON.stringify([...dependencies]) : null,
+    };
+  },
   load: async (_owner, args) =>
     pagePreviewWorker.invoke<LoadedPage>(store.root, "pages:preview", args),
 });

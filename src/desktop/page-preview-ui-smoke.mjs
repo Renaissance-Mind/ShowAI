@@ -30,8 +30,10 @@ const result = { passed: false, checks: [], home, output };
 let app, page;
 try {
   app = await _electron.launch({
-    executablePath: electron,
-    args: [process.env.SHOWAI_TEST_DESKTOP_ENTRY ?? root],
+    executablePath: process.env.SHOWAI_TEST_EXECUTABLE ?? electron,
+    args: process.env.SHOWAI_TEST_EXECUTABLE
+      ? []
+      : [process.env.SHOWAI_TEST_DESKTOP_ENTRY ?? root],
     cwd: root,
     env,
   });
@@ -48,13 +50,23 @@ try {
   await page.locator(".studio-sidebar").waitFor();
   await page.waitForFunction(() => {
     const tab = document.querySelector('[role="tab"][aria-selected="true"]');
-    return tab && !tab.hasAttribute("disabled") && document.querySelector('[data-navigation-state="current"]');
+    return (
+      tab &&
+      !tab.hasAttribute("disabled") &&
+      document.querySelector('[data-navigation-state="current"]')
+    );
   });
   const invoke = (action, args = {}) =>
-    page.evaluate(({ action, args }) => window.showai.invoke(action, args), {
-      action,
-      args,
-    });
+    page.evaluate(
+      ({ action, args }) =>
+        window.showai.invoke(action, args).catch((error) => {
+          throw new Error(`${action}: ${JSON.stringify(error)}`);
+        }),
+      {
+        action,
+        args,
+      },
+    );
   assert.equal((await invoke("app:info")).home, home);
   assert.equal(await page.evaluate(() => window.showai.pageThumbnails), true);
   console.log("Native preview bridge ready");
@@ -72,6 +84,24 @@ try {
     )
     .click();
   await page.locator(".studio-page-list").waitFor();
+  await page.evaluate(() => {
+    const started = performance.now();
+    window.__previewLoad = { started, images: [] };
+    const observer = new MutationObserver(() => {
+      const count = document.querySelectorAll(
+        ".studio-page-thumbnail > img",
+      ).length;
+      const timings = window.__previewLoad.images;
+      if (count > timings.length)
+        timings.push(
+          ...Array(count - timings.length).fill(performance.now() - started),
+        );
+    });
+    observer.observe(document.querySelector(".studio-scroll"), {
+      childList: true,
+      subtree: true,
+    });
+  });
   await page.getByRole("button", { name: "视图", exact: true }).click();
   await page
     .getByRole("menuitemradio", { name: "缩略图（中）", exact: true })
@@ -146,7 +176,13 @@ try {
   for (const delta of [450, 450, -450, -450]) await page.mouse.wheel(0, delta);
   console.log("Input gestures completed; waiting for background previews");
   await page.waitForFunction(
-    () => document.querySelectorAll(".studio-page-thumbnail > img").length >= 3,
+    () => {
+      const failure = document.querySelector(".studio-page-thumbnail [title]");
+      if (failure) throw new Error(failure.getAttribute("title"));
+      return (
+        document.querySelectorAll(".studio-page-thumbnail > img").length >= 3
+      );
+    },
     undefined,
     { timeout: 90000 },
   );
@@ -162,6 +198,26 @@ try {
   assert.equal(geometry.renderedReaders, 0);
   assert.equal(geometry.liveIframes, 0);
   result.geometry = geometry;
+  result.loadMs = await page.evaluate(() => window.__previewLoad.images);
+  console.log("First previews ready:", result.loadMs);
+  await page.waitForFunction(
+    () =>
+      [...document.querySelectorAll("[data-preview-raster]")]
+        .filter((element) => {
+          const bounds = element.getBoundingClientRect();
+          return (
+            bounds.bottom > 150 &&
+            bounds.top < innerHeight &&
+            bounds.right > 240
+          );
+        })
+        .every((element) => element.querySelector("img")),
+    undefined,
+    { timeout: 90000 },
+  );
+  result.viewportLoadMs = await page.evaluate(
+    () => window.__previewLoad.images,
+  );
   result.checks.push(
     "Cold preview generation, marquee and scrolling retain only raster images in the directory",
   );
@@ -188,6 +244,63 @@ try {
   assert.equal(first, cached);
   assert.ok(first.startsWith("data:image/png;base64,"));
   result.checks.push("Persistent raster cache returns the same image");
+  if (process.env.SHOWAI_TEST_EXPECT_WARM) {
+    const warm = await app.evaluate(async ({ BrowserWindow }) => {
+      const captures = BrowserWindow.getAllWindows().filter((window) =>
+        window.webContents.getURL().includes("pagePreview="),
+      );
+      if (!captures.length) throw new Error("Missing warm capture shell");
+      globalThis.__previewNavigations = 0;
+      return Promise.all(
+        captures.map((capture) => {
+          capture.webContents.on(
+            "did-finish-load",
+            () => globalThis.__previewNavigations++,
+          );
+          return capture.webContents.executeJavaScript(`
+        window.__captureUpdates = 0;
+        window.addEventListener('showai:page-preview', () => window.__captureUpdates++);
+        ({ empty: !document.querySelector('.studio-page-thumbnail-content'), iframes: document.querySelectorAll('iframe').length });
+      `);
+        }),
+      );
+    });
+    assert.ok(warm.every((capture) => capture.empty && capture.iframes === 0));
+    const other = (await invoke("projects:list")).find(
+      (project) => project.id !== projectId,
+    );
+    assert.ok(other);
+    await invoke("projects:rename", {
+      projectId: other.id,
+      name: `${other.name} cache check`,
+    });
+    const afterEdit = performance.now();
+    assert.equal(
+      await invoke("pages:thumbnail", {
+        ...reference,
+        requestId: crypto.randomUUID(),
+      }),
+      first,
+    );
+    result.cacheAfterUnrelatedEditMs = performance.now() - afterEdit;
+    assert.equal(
+      await app.evaluate(async ({ BrowserWindow }) => {
+        const captures = BrowserWindow.getAllWindows().filter((window) =>
+          window.webContents.getURL().includes("pagePreview="),
+        );
+        const counts = await Promise.all(
+          captures.map((capture) =>
+            capture.webContents.executeJavaScript("window.__captureUpdates"),
+          ),
+        );
+        return counts.reduce((sum, count) => sum + count, 0);
+      }),
+      0,
+    );
+    result.checks.push(
+      "Unrelated library edits keep existing page snapshots cached",
+    );
+  }
   const dark = await invoke("pages:thumbnail", {
     ...reference,
     theme: "dark",
@@ -195,6 +308,12 @@ try {
   });
   assert.notEqual(dark, first);
   result.checks.push("Appearance participates in cache identity");
+  if (process.env.SHOWAI_TEST_EXPECT_WARM) {
+    assert.equal(await app.evaluate(() => globalThis.__previewNavigations), 0);
+    result.checks.push(
+      "Successive captures reuse the renderer without application navigation",
+    );
+  }
   await assert.rejects(invoke("pages:previewData"), /./);
   await assert.rejects(
     invoke("pages:thumbnail", {
@@ -219,7 +338,7 @@ try {
     "Capture has its own renderer process",
   );
   result.checks.push(
-    "Capture renderer runs in a separate process and is unloaded after capture",
+    "Capture renderers run outside the workbench process and unmount page content between captures",
   );
   result.performance = await page.evaluate(() => {
     const p = window.__previewPerf;
@@ -259,7 +378,11 @@ try {
       result.forcedShutdown = true;
       child.kill("SIGKILL");
     }, 10000);
-    try { await app.close(); } finally { clearTimeout(timeout); }
+    try {
+      await app.close();
+    } finally {
+      clearTimeout(timeout);
+    }
   }
   await rm(join(output, "profile"), { recursive: true, force: true });
   if (!process.env.SHOWAI_TEST_HOME)

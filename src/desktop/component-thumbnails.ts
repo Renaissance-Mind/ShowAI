@@ -14,13 +14,14 @@ import {
 } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { CoreError } from "../core/store";
 import { errorResult } from "../agent/service";
-import type { DesktopResponse } from "./bridge";
+import type { DesktopResponse, PagePreviewCapture } from "./bridge";
 import { translator } from "../i18n";
 import messages from "../i18n/messages/desktop";
 import type { LoadedPage } from "../studio/usePage";
+import { CaptureQueue } from "./preview-queue";
 
 const t = translator(messages);
 
@@ -33,7 +34,9 @@ interface PageCapture {
 }
 interface PageThumbnailSource {
   authorize: (event: Electron.IpcMainInvokeEvent) => unknown;
-  identity: () => Promise<{ home: string; revision: string | null }>;
+  identity: (
+    reference: Record<string, string>,
+  ) => Promise<{ home: string; revision: string | null }>;
   load: (
     owner: WebContents,
     args: Record<string, string>,
@@ -46,6 +49,7 @@ export function configurePageThumbnails(source: PageThumbnailSource) {
 interface PreviewLease {
   owner: WebContents;
   cancelled: boolean;
+  priority?: number;
   stop?: () => void;
 }
 const pending = new Map<
@@ -53,17 +57,21 @@ const pending = new Map<
   { task: Promise<string>; leases: Set<PreviewLease>; stop?: () => void }
 >();
 const requests = new Map<string, PreviewLease>();
-let previewWindow: BrowserWindow | undefined;
-let previewIdle: ReturnType<typeof setTimeout> | undefined;
+const previewWindows = new Set<BrowserWindow>();
+const busyPreviews = new Set<BrowserWindow>();
+const previewIdle = new WeakMap<BrowserWindow, ReturnType<typeof setTimeout>>();
 const observedOwners = new WeakSet<WebContents>();
 let developmentRenderer:
   { identity: string; bytes: Promise<Buffer> } | undefined;
-function closePreview() {
-  clearTimeout(previewIdle);
-  if (previewWindow && !previewWindow.isDestroyed()) previewWindow.destroy();
-  previewWindow = undefined;
+function closePreview(window?: BrowserWindow) {
+  for (const preview of window ? [window] : [...previewWindows]) {
+    clearTimeout(previewIdle.get(preview));
+    previewWindows.delete(preview);
+    busyPreviews.delete(preview);
+    if (!preview.isDestroyed()) preview.destroy();
+  }
 }
-app.on("before-quit", closePreview);
+app.on("before-quit", () => closePreview());
 function trustedOwner(event: Electron.IpcMainInvokeEvent) {
   const sender = event.senderFrame;
   const location = new URL(sender?.url ?? "about:blank");
@@ -77,9 +85,9 @@ function trustedOwner(event: Electron.IpcMainInvokeEvent) {
 
 const previewData = new Map<
   number,
-  BuiltinComponentMetadata | CompiledComponent | LoadedPage
+  BuiltinComponentMetadata | CompiledComponent | PagePreviewCapture
 >();
-let queue: Promise<unknown> = Promise.resolve();
+const captures = new CaptureQueue(2);
 const lastPruned = new Map<string, number>();
 async function prunePreviews(directory: string) {
   if (Date.now() - (lastPruned.get(directory) ?? 0) < 60000) return;
@@ -126,34 +134,51 @@ async function capture(
   cache: string,
   owner: WebContents,
   page?: PageCapture,
+  started?: (window: BrowserWindow) => void,
 ): Promise<string> {
+  const captureToken = randomUUID();
   const component =
-    page?.record ??
+    (page
+      ? ({
+          id: captureToken,
+          record: page.record,
+          theme: reference.theme,
+          padding: page.padding,
+        } satisfies PagePreviewCapture)
+      : undefined) ??
     ((await owner.executeJavaScript(
       `window.showai.invoke("components:get", ${JSON.stringify(reference)})`,
     )) as BuiltinComponentMetadata | CompiledComponent);
-  clearTimeout(previewIdle);
-  const preview =
-    previewWindow && !previewWindow.isDestroyed()
-      ? previewWindow
-      : new BrowserWindow({
-          width: 720,
-          height: 420,
-          useContentSize: true,
-          show: false,
-          backgroundColor: reference.theme === "dark" ? "#222222" : "#f7f7f7",
-          webPreferences: {
-            preload: join(directory, "preload.cjs"),
-            sandbox: true,
-            contextIsolation: true,
-            nodeIntegration: false,
-            backgroundThrottling: false,
-          },
-        });
-  if (previewWindow !== preview) {
+  const available = [...previewWindows].find(
+    (window) => !window.isDestroyed() && !busyPreviews.has(window),
+  );
+  const preview = available
+    ? available
+    : new BrowserWindow({
+        width: 720,
+        height: 420,
+        useContentSize: true,
+        show: false,
+        backgroundColor: reference.theme === "dark" ? "#222222" : "#f7f7f7",
+        webPreferences: {
+          preload: join(directory, "preload.cjs"),
+          sandbox: true,
+          contextIsolation: true,
+          nodeIntegration: false,
+          backgroundThrottling: false,
+        },
+      });
+  clearTimeout(previewIdle.get(preview));
+  busyPreviews.add(preview);
+  started?.(preview);
+  if (!previewWindows.has(preview)) {
     preview.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
     preview.webContents.on("will-navigate", (event) => event.preventDefault());
-    previewWindow = preview;
+    previewWindows.add(preview);
+    preview.once("closed", () => {
+      previewWindows.delete(preview);
+      busyPreviews.delete(preview);
+    });
   }
   const width = page?.width ?? 720;
   const height = page?.height ?? 420;
@@ -170,7 +195,7 @@ async function capture(
         if (lease.owner === owner) lease.cancelled = true;
       if (
         BrowserWindow.getAllWindows().every(
-          (window) => window === previewWindow || !window.isVisible(),
+          (window) => previewWindows.has(window) || !window.isVisible(),
         )
       )
         closePreview();
@@ -189,7 +214,16 @@ async function capture(
       }),
       thumbnailCapture: "1",
     };
-    if (process.env.SHOWAI_DEV_URL) {
+    if (
+      page &&
+      new URL(preview.webContents.getURL() || "about:blank").searchParams.has(
+        "pagePreview",
+      )
+    ) {
+      await preview.webContents.executeJavaScript(
+        `window.dispatchEvent(new Event("showai:page-preview"))`,
+      );
+    } else if (process.env.SHOWAI_DEV_URL) {
       const url = new URL(process.env.SHOWAI_DEV_URL);
       for (const [key, value] of Object.entries(query))
         url.searchParams.set(key, value);
@@ -203,6 +237,10 @@ async function capture(
       const deadline = Date.now() + 12000;
       const poll = () => {
         const stage = document.querySelector('[data-preview-ready]');
+        if (${!!page} && stage?.dataset.previewId !== ${JSON.stringify(captureToken)}) {
+          if (Date.now() > deadline) return reject(new Error(${JSON.stringify(t("previewTimeout"))}));
+          return setTimeout(poll, 20);
+        }
         if (stage?.dataset.previewError) return reject(new Error(stage.dataset.previewError));
         if (stage?.dataset.previewReady === 'true') return requestAnimationFrame(() => resolve(true));
         if (Date.now() > deadline) return reject(new Error(${JSON.stringify(t("previewTimeout"))}));
@@ -222,11 +260,22 @@ async function capture(
     return `data:image/png;base64,${png.toString("base64")}`;
   } finally {
     previewData.delete(captureId);
-    if (!preview.isDestroyed()) {
-      // Destroy scripts, iframe renderers, timers and WebGL immediately after the shot.
-      await preview.loadURL("about:blank");
-      previewIdle = setTimeout(closePreview, 10000);
-      previewIdle.unref();
+    try {
+      if (!preview.isDestroyed()) {
+        // Unmount content (including iframe renderers and timers), but keep the
+        // capture shell warm so the next page does not reload the application.
+        if (page)
+          await preview.webContents.executeJavaScript(`
+          window.dispatchEvent(new Event("showai:page-preview-clear"));
+          new Promise(resolve => requestAnimationFrame(() => resolve()));
+        `);
+        else await preview.loadURL("about:blank");
+        const idle = setTimeout(() => closePreview(preview), 10000);
+        previewIdle.set(preview, idle);
+        idle.unref();
+      }
+    } finally {
+      busyPreviews.delete(preview);
     }
   }
 }
@@ -300,7 +349,7 @@ ipcMain.handle(
           let entry = pending.get(key);
           if (!entry) {
             const leases = new Set<PreviewLease>();
-            const task = queue.then(() => {
+            const task = captures.enqueue(async () => {
               const active = [...leases].find(
                 (lease) => !lease.cancelled && !lease.owner.isDestroyed(),
               );
@@ -313,10 +362,6 @@ ipcMain.handle(
             });
             entry = { task, leases };
             pending.set(key, entry);
-            queue = task.then(
-              () => undefined,
-              () => undefined,
-            );
             const cleanup = () => {
               if (pending.get(key) === entry) pending.delete(key);
             };
@@ -368,17 +413,25 @@ ipcMain.handle(
         args.height > 1024 ||
         !Number.isFinite(args.padding) ||
         args.padding < 0 ||
-        args.padding > 100
+        args.padding > 100 ||
+        (args.priority !== undefined &&
+          (!Number.isFinite(args.priority) ||
+            args.priority < 0 ||
+            args.priority > 100000))
       )
         throw new CoreError("INVALID_DATA", "Invalid page preview dimensions.");
-      const lease: PreviewLease = { owner: event.sender, cancelled: false };
+      const lease: PreviewLease = {
+        owner: event.sender,
+        cancelled: false,
+        priority: args.priority ?? 0,
+      };
       requests.set(requestKey, lease);
-      const identity = await pageSource.identity();
       const reference = {
         projectId: args.projectId,
         pageId: args.pageId,
         theme: args.theme,
       };
+      const identity = await pageSource.identity(reference);
       const renderer = process.env.SHOWAI_DEV_URL
         ? await stat(
             join(process.env.SHOWAI_DEV_RUNTIME!, "assets/reader-source.json"),
@@ -421,7 +474,7 @@ ipcMain.handle(
       let entry = pending.get(pendingKey);
       if (!entry) {
         const leases = new Set<PreviewLease>();
-        let capturing = false;
+        let capturing: BrowserWindow | undefined;
         const stop = () => {
           if (
             capturing &&
@@ -429,38 +482,60 @@ ipcMain.handle(
               (lease) => !lease.cancelled && !lease.owner.isDestroyed(),
             )
           )
-            closePreview();
+            closePreview(capturing);
         };
-        const task = queue.then(async () => {
-          const active = [...leases].find(
-            (lease) => !lease.cancelled && !lease.owner.isDestroyed(),
-          );
-          if (!active)
-            throw new CoreError("NOT_FOUND", "Preview request was cancelled.");
-          const record = await pageSource!.load(active.owner, reference);
-          const owner = [...leases].find(
-            (lease) => !lease.cancelled && !lease.owner.isDestroyed(),
-          )?.owner;
-          if ((await pageSource!.identity()).home !== identity.home || !owner)
-            throw new CoreError("NOT_FOUND", "Preview request was cancelled.");
-          capturing = true;
-          try {
-            return await capture(reference, cache, owner, {
-              width: args.width,
-              height: args.height,
-              padding: args.padding,
-              record,
-            });
-          } finally {
-            capturing = false;
-          }
-        });
+        const task = captures.enqueue(
+          async () => {
+            const active = [...leases].find(
+              (lease) => !lease.cancelled && !lease.owner.isDestroyed(),
+            );
+            if (!active)
+              throw new CoreError(
+                "NOT_FOUND",
+                "Preview request was cancelled.",
+              );
+            const record = await pageSource!.load(active.owner, reference);
+            const owner = [...leases].find(
+              (lease) => !lease.cancelled && !lease.owner.isDestroyed(),
+            )?.owner;
+            if (
+              (await pageSource!.identity(reference)).home !== identity.home ||
+              !owner
+            )
+              throw new CoreError(
+                "NOT_FOUND",
+                "Preview request was cancelled.",
+              );
+            try {
+              return await capture(
+                reference,
+                cache,
+                owner,
+                {
+                  width: args.width,
+                  height: args.height,
+                  padding: args.padding,
+                  record,
+                },
+                (window) => {
+                  capturing = window;
+                },
+              );
+            } finally {
+              capturing = undefined;
+            }
+          },
+          () =>
+            Math.min(
+              ...[...leases]
+                .filter(
+                  (lease) => !lease.cancelled && !lease.owner.isDestroyed(),
+                )
+                .map((lease) => lease.priority ?? 0),
+            ),
+        );
         entry = { task, leases, stop };
         pending.set(pendingKey, entry);
-        queue = task.then(
-          () => undefined,
-          () => undefined,
-        );
         const cleanup = () => {
           if (pending.get(pendingKey) === entry) pending.delete(pendingKey);
         };
@@ -505,7 +580,7 @@ ipcMain.handle(
   (
     event,
   ): DesktopResponse<
-    BuiltinComponentMetadata | CompiledComponent | LoadedPage
+    BuiltinComponentMetadata | CompiledComponent | PagePreviewCapture
   > => {
     const component = previewData.get(event.sender.id);
     if (event.senderFrame !== event.sender.mainFrame || !component)

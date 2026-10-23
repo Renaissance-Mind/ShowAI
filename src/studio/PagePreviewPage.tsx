@@ -1,38 +1,50 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import PageThumbnailContent from "./PageThumbnailContent";
-import type { LoadedPage } from "./usePage";
+import type { PagePreviewCapture } from "../desktop/bridge";
 import { desktop, errorMessage } from "./bridge";
 import "./studio.css";
 import "./catalog-workspace.css";
 
 /** Only the capture window receives this page's data; the directory gets a PNG. */
 export default function PagePreviewPage() {
-  const [record, setRecord] = useState<LoadedPage>();
+  const [capture, setCapture] = useState<PagePreviewCapture>();
   const [error, setError] = useState("");
   const [ready, setReady] = useState(false);
   const stage = useRef<HTMLSpanElement>(null);
-  const args = JSON.parse(
-    new URLSearchParams(location.search).get("pagePreview")!,
-  );
   useLayoutEffect(() => {
-    document.documentElement.dataset.theme = args.theme;
-  }, [args.theme]);
+    if (capture) document.documentElement.dataset.theme = capture.theme;
+  }, [capture]);
   useEffect(() => {
-    let current = true;
-    void desktop.invoke<LoadedPage>("pages:previewData").then(
-      (value) => {
-        if (current) setRecord(value);
-      },
-      (reason) => {
-        if (current) setError(errorMessage(reason));
-      },
-    );
+    let generation = 0;
+    const clear = () => {
+      generation++;
+      setCapture(undefined);
+      setReady(false);
+      setError("");
+    };
+    const load = () => {
+      clear();
+      const current = generation;
+      void desktop.invoke<PagePreviewCapture>("pages:previewData").then(
+        (value) => {
+          if (current === generation) setCapture(value);
+        },
+        (reason) => {
+          if (current === generation) setError(errorMessage(reason));
+        },
+      );
+    };
+    window.addEventListener("showai:page-preview", load);
+    window.addEventListener("showai:page-preview-clear", clear);
+    load();
     return () => {
-      current = false;
+      generation++;
+      window.removeEventListener("showai:page-preview", load);
+      window.removeEventListener("showai:page-preview-clear", clear);
     };
   }, []);
   useEffect(() => {
-    if (!record || !stage.current) return;
+    if (!capture || !stage.current) return;
     let current = true;
     const loaded = new Set<MessageEventSource>();
     const receive = (event: MessageEvent) => {
@@ -76,19 +88,21 @@ export default function PagePreviewPage() {
       current = false;
       window.removeEventListener("message", receive);
     };
-  }, [record]);
+  }, [capture]);
   return (
     <span
       ref={stage}
       className="studio-page-thumbnail page-capture-stage"
       data-preview-ready={ready && !error ? "true" : "false"}
       data-preview-error={error || undefined}
+      data-preview-id={capture?.id}
     >
-      {record && (
+      {capture && (
         <PageThumbnailContent
-          record={record}
-          updatedAt={record.hash}
-          padding={args.padding}
+          key={capture.id}
+          record={capture.record}
+          updatedAt={capture.record.hash}
+          padding={capture.padding}
         />
       )}
       {error && <span role="alert">{error}</span>}

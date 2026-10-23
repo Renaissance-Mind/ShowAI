@@ -175,29 +175,39 @@ function RasterPageThumbnail({
     const requestId = crypto.randomUUID();
     let submitted = false;
     setError("");
-    void previewWork(async () => {
-      submitted = true;
-      return desktop.invoke<string>("pages:thumbnail", {
-        projectId,
-        pageId,
-        hash: hash ?? updatedAt,
-        theme,
-        ...size,
-        refresh: generation > 0,
-        requestId,
-      });
-    }, controller.signal).then(
-      (value) => {
-        if (!controller.signal.aborted)
-          startTransition(() => {
-            loadedKey.current = key;
-            setImage(value);
-          });
-      },
-      (reason) => {
-        if (!controller.signal.aborted) setError(errorMessage(reason));
-      },
-    );
+    // The desktop capture queue owns expensive work. Submit raster requests
+    // immediately so cached images do not wait for other pages or input idle.
+    void Promise.resolve()
+      .then(async () => {
+        if (controller.signal.aborted) return "";
+        submitted = true;
+        const bounds = host.current!.getBoundingClientRect();
+        return desktop.invoke<string>("pages:thumbnail", {
+          projectId,
+          pageId,
+          hash: hash ?? updatedAt,
+          theme,
+          ...size,
+          refresh: generation > 0,
+          requestId,
+          priority: Math.min(
+            100000,
+            Math.max(0, bounds.top - innerHeight, -bounds.bottom),
+          ),
+        });
+      })
+      .then(
+        (value) => {
+          if (!controller.signal.aborted)
+            startTransition(() => {
+              loadedKey.current = key;
+              setImage(value);
+            });
+        },
+        (reason) => {
+          if (!controller.signal.aborted) setError(errorMessage(reason));
+        },
+      );
     return () => {
       controller.abort();
       if (submitted)

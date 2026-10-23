@@ -53,6 +53,14 @@ export interface DesktopWindowState {
   fullScreen: boolean;
 }
 
+/** Private data delivered only to the background page capture frame. */
+export interface PagePreviewCapture {
+  id: string;
+  theme: string;
+  padding: number;
+  record: import("../studio/usePage").LoadedPage;
+}
+
 export type DesktopAppearance = "light" | "dark";
 
 export interface ShowAIBridge {
