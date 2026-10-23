@@ -230,12 +230,12 @@ describe("workspace sessions against the real loopback workbench", () => {
     });
     expect(remaining.some((item) => item.id === retained.id)).toBe(false);
   });
-  async function saveForeignDraft(content:ContainerDocument,clientId="previous-window",baseContent:ContainerDocument|null=first.document,sequence=2){
+  async function saveForeignDraft(content:LoadedPage["document"],clientId="previous-window",baseContent:LoadedPage["document"]|null=first.document,sequence=2){
     return invoke<import("../core/editor-drafts").EditorDraftRecord>("drafts:save",{input:{kind:"page",clientId,projectId:project,resourceId:first.document.id,
       ...(baseContent?{baseRevision:first.revision,baseContent}:{}),content,sequence}});
   }
-  async function expectRetained(id:string,content:ContainerDocument){
-    const stored=await invoke<{content:ContainerDocument}>("drafts:read",{id});expect(stored.content).toEqual(content);
+  async function expectRetained(id:string,content:LoadedPage["document"]){
+    const stored=await invoke<{content:LoadedPage["document"]}>("drafts:read",{id});expect(stored.content).toEqual(content);
   }
   it("hides another window's saved copy while retaining its exact original body",async()=>{
     const body={...first.document,createdAt:"2000-01-01T00:00:00.000Z",updatedAt:"2001-01-01T00:00:00.000Z"};
