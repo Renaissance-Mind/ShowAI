@@ -257,6 +257,13 @@ import commonMessages from "../i18n/messages/common";
 import studioMessages from "../i18n/messages/studio";
 import assistantMessages from "../i18n/messages/assistant";
 import shellMessages from "../i18n/messages/appShell";
+import pageSessionMessages from "../i18n/messages/pageSession";
+import {
+  ExternalChangeNotice,
+  flashBlocks,
+  locateBlocks,
+} from "./ExternalChangeNotice";
+import { authorName, writerName } from "./external-change";
 import AssistantWorkbench from "./assistant/AssistantWorkbench";
 import { referenceHeading } from "./assistant/targets";
 import type { AgentTarget } from "../agent-host/types";
@@ -386,6 +393,7 @@ export default function Studio() {
   // 关于与反馈 opens on its report form or diagnostics preview on request.
   const [feedbackRequest, setFeedbackRequest] = useState<FeedbackRequest>();
   const feedbackRequestId = useRef(0);
+  const tps = useTranslator(pageSessionMessages);
   useEffect(() => {
     const wake = () => {
       if (document.visibilityState === "visible" && navigator.onLine)
@@ -1727,6 +1735,13 @@ export default function Studio() {
     icon: item.icon,
     pinned: !!item.favorite,
     parentId: item.parentId ?? null,
+    ...(item.agentCreated
+      ? {
+          agentCreated: item.agentCreated.label
+            ? writerName(item.agentCreated.label)
+            : "Agent",
+        }
+      : {}),
   });
   const activePageTarget = (): LibraryTarget | null =>
     page.draft && page.projectId
@@ -3311,6 +3326,48 @@ export default function Studio() {
   const action = (operation: () => Promise<unknown>) => () => {
     void operation().catch(report);
   };
+  // An external write just installed into the open page: outline what changed.
+  const externalChange = view === "page" ? page.externalChange : undefined;
+  useEffect(() => {
+    if (externalChange?.fresh)
+      flashBlocks(catalogScrollRef.current, externalChange.blockIds);
+  }, [externalChange]);
+  // Opening a page an Agent created clears its 「Agent 新建」 mark.
+  const openedPage =
+    view === "page" && page.projectId && page.draft
+      ? { projectId: page.projectId, pageId: page.draft.id }
+      : null;
+  const openedAgentPage =
+    openedPage &&
+    contents[openedPage.projectId]?.pages.some(
+      (item) => item.id === openedPage.pageId && item.agentCreated,
+    )
+      ? openedPage
+      : null;
+  useEffect(() => {
+    if (!openedAgentPage) return;
+    const { projectId, pageId } = openedAgentPage;
+    void desktop
+      .invoke("pages:markSeen", { projectId, pageId })
+      .then(() =>
+        setContents((current) =>
+          current[projectId]
+            ? {
+                ...current,
+                [projectId]: {
+                  ...current[projectId],
+                  pages: current[projectId].pages.map((item) =>
+                    item.id === pageId
+                      ? { ...item, agentCreated: undefined }
+                      : item,
+                  ),
+                },
+              }
+            : current,
+        ),
+      )
+      .catch(report);
+  }, [openedAgentPage?.projectId, openedAgentPage?.pageId, report]);
 
   function searchTarget(result: SearchResult): LibraryTarget | undefined {
     const match = result.path.match(
@@ -4305,6 +4362,27 @@ export default function Studio() {
                   </button>
                 ))}
               </div>
+            )}
+            {externalChange && (
+              <ExternalChangeNotice
+                key={`external-${externalChange.id}`}
+                data-priority={2}
+                change={externalChange}
+                onLocate={() =>
+                  locateBlocks(catalogScrollRef.current, externalChange.blockIds)
+                }
+                onUndo={action(async () => {
+                  const name = authorName(externalChange.author);
+                  const outcome = await page.undoExternalChange();
+                  if (outcome === "merged")
+                    setNotice(tps("external.undone", { name }), {
+                      kind: "success",
+                    });
+                  else if (outcome === "conflict")
+                    setNotice(tps("external.undoConflict"), { kind: "warning" });
+                })}
+                onDismiss={action(page.dismissExternalChange)}
+              />
             )}
             {view === "page" && page.draftNotice && !page.error && (
               <div className="studio-conflict" role="status" data-priority={1}>

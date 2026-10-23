@@ -30,6 +30,27 @@ export default defineMessages("pageSession", {
     conflictNotForPage: "冲突不属于当前页面。",
     draftSaveFailed: "本机草稿保存失败：{error}",
     keepDraftsBeforeSwitch: "切换内容库前需要可靠保留所有页面草稿。",
+    fileChangedBy:
+      "{name} 修改了这个文件。请选择保留本地草稿，或载入文件版本。",
+    "external.title": "{name} 刚更新了这个页面的 {count} 处",
+    "external.cause":
+      "修改处已短暂高亮。撤销只恢复这次写入前的内容，你的编辑会保留。",
+    "external.restoredCause":
+      "这是页面上次打开时收到的修改。撤销只恢复这次写入前的内容，你的编辑会保留。",
+    "external.details": "修改者：{name}\n来源：{channel}\n写入时间：{time}",
+    "external.locate": "定位修改",
+    "external.undo": "撤销此次修改",
+    "external.dismiss": "知道了",
+    "external.undone": "已撤销 {name} 的修改",
+    "external.undoConflict":
+      "无法自动撤销：你也修改了同样的内容。页面保持不变，可以手动调整。",
+    "external.snapshotMissing":
+      "这次修改的写入前快照已过期或已清除，无法撤销。页面保持不变。",
+    "external.resolveFirst": "请先处理当前的保存冲突，再撤销这次修改。",
+    "author.otherWindow": "另一个窗口",
+    "author.cli": "命令行工具",
+    "author.agent": "Agent",
+    "author.otherTool": "其他工具",
   },
   en: {
     "status.saved": "Saved on this device",
@@ -63,5 +84,30 @@ export default defineMessages("pageSession", {
     draftSaveFailed: "Couldn't save the local draft: {error}",
     keepDraftsBeforeSwitch:
       "All page drafts must be safely kept before switching libraries.",
+    fileChangedBy:
+      "{name} changed this file. Keep your local draft, or load the file version.",
+    "external.title": {
+      one: "{name} just updated {count} place on this page",
+      other: "{name} just updated {count} places on this page",
+    },
+    "external.cause":
+      "The changes are briefly highlighted. Undo restores only what this write replaced; your own edits are kept.",
+    "external.restoredCause":
+      "This change arrived while the page was last open. Undo restores only what this write replaced; your own edits are kept.",
+    "external.details": "Changed by: {name}\nSource: {channel}\nWritten at: {time}",
+    "external.locate": "Show changes",
+    "external.undo": "Undo this change",
+    "external.dismiss": "Got it",
+    "external.undone": "Undid the change by {name}",
+    "external.undoConflict":
+      "Couldn't undo automatically: you also edited the same content. The page is unchanged; adjust it by hand.",
+    "external.snapshotMissing":
+      "The snapshot from before this change has expired or was cleared, so it can't be undone. The page is unchanged.",
+    "external.resolveFirst":
+      "Resolve the current save conflict before undoing this change.",
+    "author.otherWindow": "Another window",
+    "author.cli": "A command-line tool",
+    "author.agent": "An Agent",
+    "author.otherTool": "Another tool",
   },
 });

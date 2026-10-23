@@ -68,7 +68,8 @@ function sameStudioView(previous: StudioView, next: StudioView) {
     x.reviewingConflict === y.reviewingConflict &&
     x.saveFailureAttempt === y.saveFailureAttempt &&
     x.projectId === y.projectId &&
-    x.availableDrafts === y.availableDrafts
+    x.availableDrafts === y.availableDrafts &&
+    x.externalChange === y.externalChange
   );
 }
 
@@ -232,6 +233,18 @@ export function usePage(home?: string) {
       sessions.getSnapshot().active?.prepareExternalResolution(document, id),
     [sessions],
   );
+  const undoExternalChange = useCallback(
+    () =>
+      sessions.getSnapshot().active?.undoExternalChange() ??
+      Promise.resolve("stale" as const),
+    [sessions],
+  );
+  const dismissExternalChange = useCallback(
+    () =>
+      sessions.getSnapshot().active?.dismissExternalChange() ??
+      Promise.resolve(),
+    [sessions],
+  );
   const live = () => sessions.getSnapshot().active?.getSnapshot() ?? empty;
   return {
     ...state,
@@ -265,6 +278,8 @@ export function usePage(home?: string) {
     acceptResolution,
     prepareResolution,
     prepareExternalResolution,
+    undoExternalChange,
+    dismissExternalChange,
     flushAll: () => sessions.flushAll(),
     prepareClose: () => sessions.prepareClose(),
     backgroundIssues: sessions

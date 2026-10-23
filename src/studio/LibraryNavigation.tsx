@@ -45,6 +45,8 @@ export type LibraryTarget =
       pinned: boolean;
       parentId: string | null;
       icon?: string;
+      /** Writer name when an Agent created this page and it has not been opened. */
+      agentCreated?: string;
     };
 
 export interface LibraryMenuPoint {
@@ -159,6 +161,16 @@ function LibraryRowView({
           <Icon size={15} aria-hidden="true" />
         )}
         <span className="studio-tree-title">{title}</span>
+        {"agentCreated" in target && target.agentCreated !== undefined && (
+          <span
+            className="agent-created-mark"
+            role="img"
+            aria-label={t("agentCreatedBy", { name: target.agentCreated })}
+            title={t("agentCreatedBy", { name: target.agentCreated })}
+          >
+            {t("agentCreated")}
+          </span>
+        )}
         {target.pinned && (
           <span className="studio-tree-pin-slot">
             <Pin
@@ -197,7 +209,9 @@ const sameTarget = (a: LibraryTarget, b: LibraryTarget) =>
     a.title === b.title &&
     a.icon === b.icon &&
     a.pinned === b.pinned &&
-    a.parentId === b.parentId);
+    a.parentId === b.parentId &&
+    ("agentCreated" in a ? a.agentCreated : undefined) ===
+      ("agentCreated" in b ? b.agentCreated : undefined));
 
 /** Targets are rebuilt with each navigation render; rows compare their fields. */
 export const LibraryRow = memo(

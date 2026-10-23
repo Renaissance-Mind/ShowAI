@@ -1,0 +1,53 @@
+/* Changed blocks after an external write: outlined, then fading out. */
+.external-change-layer {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 30;
+  animation: external-change-fade var(--external-change-duration, 4200ms)
+    ease-in forwards;
+}
+.external-change-box {
+  position: fixed;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--info) 14%, transparent);
+  box-shadow: inset 3px 0 0 var(--info);
+}
+@keyframes external-change-fade {
+  0%,
+  55% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .external-change-layer {
+    animation-timing-function: steps(1, end);
+  }
+}
+
+/* 「Agent 新建」 on sidebar rows and in 最近, cleared when the page is opened. */
+.agent-created-mark {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 6px;
+  font-size: 11px;
+  line-height: 1;
+  color: var(--info);
+  white-space: nowrap;
+}
+.agent-created-mark::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+}
+.studio-tree-main .agent-created-mark {
+  font-size: 0;
+  gap: 0;
+}

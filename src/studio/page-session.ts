@@ -15,6 +15,12 @@ import { translator } from "../i18n";
 import commonMessages from "../i18n/messages/common";
 import pageSessionMessages from "../i18n/messages/pageSession";
 import { repairEditorLinks } from "../surface/editor-links.mjs";
+import type {
+  ChangeAuthor,
+  ExternalChange,
+  StoredExternalChange,
+} from "../core/external-changes";
+import { authorName } from "./external-change";
 
 const t = translator(pageSessionMessages);
 const common = translator(commonMessages);
@@ -29,6 +35,13 @@ export interface LoadedPage extends PageRecord {
   incomingCrossDevice?: boolean;
   sourceSnapshot?: SourceSnapshotDelta;
   sourceSnapshotDeliveryId?: string;
+  /** Writer of this version, read from the library's change record. */
+  changedBy?: ChangeAuthor;
+}
+/** An installed write by another writer, shown above the page until dismissed. */
+export interface ExternalChangeNotice extends ExternalChange {
+  /** False when restored after reopening: nothing on the page is new to highlight. */
+  fresh: boolean;
 }
 export type PageRefresh = LoadedPage | { unchanged: true; readOnly?: boolean };
 export type SaveStatus =
@@ -46,6 +59,7 @@ export interface PageSnapshot {
   saveFailureAttempt: number;
   projectId: string | null;
   availableDrafts: EditorDraftRecord[];
+  externalChange?: ExternalChangeNotice;
   dirty: boolean;
   busy: boolean;
 }
@@ -81,6 +95,9 @@ export interface PageSession {
     hash: string,
   ): void;
   prepareExternalResolution(document: ShowDocument, id: string): void;
+  /** Merges the inverse of the noticed external write into the page and saves it normally. */
+  undoExternalChange(): Promise<"merged" | "conflict" | "stale">;
+  dismissExternalChange(): Promise<void>;
   clear(): Promise<boolean>;
   isDirty(): boolean;
   isBusy(): boolean;
@@ -151,6 +168,7 @@ export function createPageSession(options: PageSessionOptions): PageSession {
       saveFailureAttempt,
       projectId: projectRef.current,
       availableDrafts,
+      externalChange,
       dirty: travelPending||revision.current > savedRevision.current,
       busy: historyTravelsRunning(sourceOwner)||!!pending.current || !!draftWrites.current.size,
     };
@@ -175,7 +193,8 @@ export function createPageSession(options: PageSessionOptions): PageSession {
       snapshot.projectId !== metadata.projectId ||
       snapshot.dirty !== metadata.dirty ||
       snapshot.busy !== metadata.busy ||
-      snapshot.availableDrafts !== metadata.availableDrafts
+      snapshot.availableDrafts !== metadata.availableDrafts ||
+      snapshot.externalChange !== metadata.externalChange
     ) {
       metadata = snapshot;
       metadataChanged = true;
@@ -357,6 +376,80 @@ export function createPageSession(options: PageSessionOptions): PageSession {
       availableDrafts = value;
     },
   );
+  let externalChange: ExternalChangeNotice | undefined = undefined;
+  const setExternalChange = setter<ExternalChangeNotice | undefined>(
+    () => externalChange,
+    (value) => {
+      externalChange = value;
+    },
+  );
+  // Snapshots of recent installed writes; the library's local/ copy survives reloads.
+  const externalDocuments = new Map<
+    string,
+    { before: ShowDocument; after: ShowDocument }
+  >();
+  const noteExternalChange = (
+    projectId: string,
+    before: ShowDocument,
+    loaded: LoadedPage,
+  ) => {
+    const pageId = loaded.document.id;
+    void options
+      .invoke<ExternalChange | null>("pages:recordExternalChange", {
+        projectId,
+        pageId,
+        before,
+        after: loaded.document,
+        revision: loaded.revision,
+        hash: loaded.hash,
+      })
+      .then(
+        (change) => {
+          if (
+            !change ||
+            disposed ||
+            projectRef.current !== projectId ||
+            current.current?.id !== pageId
+          )
+            return;
+          externalDocuments.set(change.id, { before, after: loaded.document });
+          for (const id of [...externalDocuments.keys()].slice(0, -5))
+            externalDocuments.delete(id);
+          setExternalChange({ ...change, fresh: true });
+        },
+        // The write is installed either way; only its notice and undo are missing.
+        (reason) =>
+          console.error("External change snapshot failed", errorCode(reason)),
+      );
+  };
+  /** After reopening, the newest snapshot still describes the current version. */
+  const restoreExternalChange = (projectId: string, page: LoadedPage) => {
+    const pageId = page.document.id;
+    void options
+      .invoke<StoredExternalChange[]>("pages:externalChanges", {
+        projectId,
+        pageId,
+      })
+      .then(
+        ([latest]) => {
+          if (
+            !latest ||
+            latest.hash !== page.hash ||
+            latest.revision !== page.revision ||
+            disposed ||
+            projectRef.current !== projectId ||
+            current.current?.id !== pageId ||
+            externalChange
+          )
+            return;
+          const { before, after, ...summary } = latest;
+          externalDocuments.set(latest.id, { before, after });
+          setExternalChange({ ...summary, fresh: false });
+        },
+        (reason) =>
+          console.error("External change snapshots unreadable", errorCode(reason)),
+      );
+  };
   let draftNotice: string = "";
   const setDraftNotice = setter<string>(
     () => draftNotice,
@@ -651,7 +744,7 @@ export function createPageSession(options: PageSessionOptions): PageSession {
                     setDraft(document);
                     setRecord(recordRef.current);
                   });
-                if(outcome==="merged")continue;
+                if(outcome==="merged"){noteExternalChange(projectRef.current!,baseline,remote);continue;}
               }
             } catch (refreshError) {
               reason = refreshError;
@@ -739,6 +832,12 @@ export function createPageSession(options: PageSessionOptions): PageSession {
     recoveredFrom.current = null;
     setAvailableDrafts([]);
     setDraftNotice("");
+    if (
+      externalChange &&
+      (externalChange.projectId !== projectId ||
+        externalChange.pageId !== page.document.id)
+    )
+      setExternalChange(undefined);
     setStatus(page.workspaceConflicts?.length ? "conflict" : "saved");
     setError(page.workspaceConflicts?.length ? t("externalUnresolved") : "");
     blocked.current = !!page.workspaceConflicts?.length;
@@ -771,6 +870,7 @@ export function createPageSession(options: PageSessionOptions): PageSession {
     )
       return true;
     install(projectId, loaded);
+    restoreExternalChange(projectId, loaded);
     const drafts = initial
       ? []
       : await options.invoke<EditorDraftRecord[]>("drafts:list", {
@@ -1052,6 +1152,7 @@ export function createPageSession(options: PageSessionOptions): PageSession {
               setRecord(recordRef.current);
               scheduleDraft();scheduleSave();
             });
+          if(outcome==="merged")noteExternalChange(projectId,baseline,loaded);
           if(outcome!=="conflict")return;
         }
         if (
@@ -1065,8 +1166,16 @@ export function createPageSession(options: PageSessionOptions): PageSession {
         setConflictId(loaded.workspaceConflicts?.[0]?.id);
         blocked.current = true;
         setStatus("conflict");
-        setError(t("fileChangedElsewhere"));
-      } else install(projectId, loaded);
+        setError(
+          loaded.changedBy && !loaded.workspaceConflicts?.length
+            ? t("fileChangedBy", { name: authorName(loaded.changedBy) })
+            : t("fileChangedElsewhere"),
+        );
+      } else {
+        const before = recordRef.current?.document;
+        install(projectId, loaded);
+        if (before) noteExternalChange(projectId, before, loaded);
+      }
     } catch (reason) {
       if (
         projectRef.current !== projectId ||
@@ -1350,6 +1459,65 @@ export function createPageSession(options: PageSessionOptions): PageSession {
       return false;
     }
   };
+  // Undo is a three-way merge of before→after reversed into the current page:
+  // edits made since the write stay, and the result is an ordinary edit whose
+  // save checks the base like any other, so a newer file version leads to the
+  // usual merge or conflict instead of being overwritten.
+  const undoExternalChange = async (): Promise<
+    "merged" | "conflict" | "stale"
+  > => {
+    const change = externalChange,
+      projectId = projectRef.current;
+    if (!change || !projectId || current.current?.id !== change.pageId)
+      return "stale";
+    if (blocked.current) throw new Error(t("external.resolveFirst"));
+    let documents = externalDocuments.get(change.id);
+    if (!documents) {
+      const entry = (
+        await options.invoke<StoredExternalChange[]>("pages:externalChanges", {
+          projectId,
+          pageId: change.pageId,
+        })
+      ).find((item) => item.id === change.id);
+      if (!entry) throw new Error(t("external.snapshotMissing"));
+      documents = { before: entry.before, after: entry.after };
+    }
+    const outcome = await mergeCurrentWith(
+      documents.after,
+      documents.before,
+      () =>
+        projectRef.current === projectId &&
+        current.current?.id === change.pageId &&
+        !blocked.current,
+      (document) => {
+        revision.current++;
+        setDraft(document);
+        if (!blocked.current) setStatus("changed");
+        scheduleDraft();
+      },
+    );
+    if (outcome !== "merged") return outcome;
+    setExternalChange(undefined);
+    externalDocuments.delete(change.id);
+    await options.invoke("pages:dismissExternalChange", {
+      projectId,
+      pageId: change.pageId,
+      id: change.id,
+    });
+    await flush();
+    return outcome;
+  };
+  const dismissExternalChange = async () => {
+    const change = externalChange;
+    if (!change) return;
+    setExternalChange(undefined);
+    externalDocuments.delete(change.id);
+    await options.invoke("pages:dismissExternalChange", {
+      projectId: change.projectId,
+      pageId: change.pageId,
+      id: change.id,
+    });
+  };
   const api: PageSession = {
     id: crypto.randomUUID(),
     getSnapshot: () => snapshot,
@@ -1382,6 +1550,8 @@ export function createPageSession(options: PageSessionOptions): PageSession {
     acceptResolution,
     prepareResolution,
     prepareExternalResolution,
+    undoExternalChange,
+    dismissExternalChange,
     clear,
     isDirty: () => historyTravelsPending(sourceOwner)||portableInputsPending(sourceOwner)||revision.current > savedRevision.current,
     isBusy: () => historyTravelsRunning(sourceOwner)||portableInputsPending(sourceOwner)||!!pending.current || !!draftWrites.current.size,

@@ -7,6 +7,8 @@ import { getLocale, translator } from "../i18n";
 import { useTranslator } from "../i18n/react";
 import commonMessages from "../i18n/messages/common";
 import sidebarMessages from "../i18n/messages/sidebar";
+import { writerName } from "./external-change";
+import "./external-change.css";
 
 const translate = translator(sidebarMessages);
 const absoluteTimeFormats = new Map<string, Intl.DateTimeFormat>();
@@ -159,7 +161,21 @@ export default function RecentPages({
               <PageIcon value={page.icon} size={19} />
             </span>
             <span className="studio-recent-page-details">
-              <strong>{page.title || tc("untitled")}</strong>
+              <strong>
+                {page.title || tc("untitled")}
+                {page.agentCreated && (
+                  <span
+                    className="agent-created-mark"
+                    title={t("agentCreatedBy", {
+                      name: page.agentCreated.label
+                        ? writerName(page.agentCreated.label)
+                        : "Agent",
+                    })}
+                  >
+                    {t("agentCreated")}
+                  </span>
+                )}
+              </strong>
               <span className="studio-recent-page-project">
                 {page.projectName}
               </span>
