@@ -82,3 +82,33 @@
     display: none;
   }
 }
+/* Placed just before the frame: covers its reserved area while it loads and
+   only fades in after a short delay, so fast loads show nothing. */
+.sb-diagram-pending {
+  position: relative;
+  height: 0;
+}
+.sb-diagram-pending > [role="status"] {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--muted, #6b6b6b);
+  font-size: 13px;
+  pointer-events: none;
+  animation: sb-diagram-pending-in 160ms ease-out 180ms both;
+}
+@keyframes sb-diagram-pending-in {
+  from {
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sb-diagram-pending > [role="status"] {
+    animation-duration: 1ms;
+  }
+}

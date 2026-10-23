@@ -1929,6 +1929,29 @@ export class SyncManager {
     });
     this.trace("synchronize-complete", phaseStarted);
   }
+  /**
+   * Creates a project that stays on this device even when new projects
+   * default to a server account. Its id is recorded before the project
+   * exists, so no background cycle can enroll it in between.
+   */
+  async createLocalProject<T extends { id: string }>(
+    create: (id: string) => Promise<T>,
+  ) {
+    const id = crypto.randomUUID();
+    await this.update((config) => {
+      config.localProjectIds = [...(config.localProjectIds ?? []), id];
+    });
+    try {
+      return await create(id);
+    } catch (error) {
+      await this.update((config) => {
+        config.localProjectIds = config.localProjectIds?.filter(
+          (item) => item !== id,
+        );
+      });
+      throw error;
+    }
+  }
   async enrollNewProjects(projectId?: string) {
     const config = await this.configuration();
     if (!config.defaultConnectionId || !config.defaultSince) return;
@@ -1939,6 +1962,7 @@ export class SyncManager {
       if (
         (!projectId || project.id === projectId) &&
         project.createdAt >= config.defaultSince &&
+        !config.localProjectIds?.includes(project.id) &&
         !config.projects.some(
           (connection) => connection.projectId === project.id,
         )
@@ -1947,7 +1971,12 @@ export class SyncManager {
           (item) => item.id === config.defaultConnectionId,
         )!;
         await this.update((next) => {
-          if (!next.projects.some((item) => item.projectId === project.id))
+          // Re-checked under the settings lock: a local-only project may have
+          // been reserved after this cycle read the configuration.
+          if (
+            !next.projects.some((item) => item.projectId === project.id) &&
+            !next.localProjectIds?.includes(project.id)
+          )
             next.projects.push({
               projectId: project.id,
               remoteProjectId: project.id,

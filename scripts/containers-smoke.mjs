@@ -277,18 +277,18 @@ try {
         .fill(label);
     }
     const menu = page.getByRole("dialog", { name: "插入内容", exact: true });
-    if (label === "Board 白板" || label === "Page 页面")
+    if (label === "白板" || label === "页面")
       await page.screenshot({
         path: join(
           output,
-          label === "Board 白板" ? "document-slash.png" : "board-slash.png",
+          label === "白板" ? "document-slash.png" : "board-slash.png",
         ),
       });
     await menu.getByRole("option").filter({ hasText: label }).last().click();
     await menu.waitFor({ state: "detached" });
   };
 
-  await add(rootId, "Board 白板");
+  await add(rootId, "白板");
   let saved = await poll(
     read,
     (record) =>
@@ -346,7 +346,7 @@ try {
   await scene(boardId)
     .getByRole("button", { name: "解锁白板", exact: true })
     .click();
-  await add(boardId, "Page 页面");
+  await add(boardId, "页面");
   saved = await poll(
     read,
     (record) =>
@@ -462,7 +462,7 @@ try {
   result.checks.push(
     "component catalog inserts into the active nested container and returns to that container",
   );
-  await add(nestedPageId, "Board 白板");
+  await add(nestedPageId, "白板");
   saved = await poll(
     read,
     (record) =>
@@ -475,7 +475,7 @@ try {
     (node) => node.type === "surface",
   ).attrs.id;
   await object(sketchId)
-    .getByRole("button", { name: "展开 Board", exact: true })
+    .getByRole("button", { name: "展开 白板", exact: true })
     .click();
   await scene(sketchId)
     .locator('.page-surface[data-viewport-locked="false"]')
@@ -590,7 +590,7 @@ try {
     1,
   );
   await page.getByRole("button", { name: "页面操作", exact: true }).click();
-  await page.getByRole("menuitem", { name: "放入 Board", exact: true }).click();
+  await page.getByRole("menuitem", { name: "放入白板", exact: true }).click();
   saved = await poll(
     read,
     (record) => record.document.content.attrs.kind === "board",
@@ -700,7 +700,7 @@ try {
     await reader
       .locator(`[data-surface-id="${boardId}"]`)
       .locator(":scope > .surface-object-header")
-      .getByRole("button", { name: "展开 Board", exact: true })
+      .getByRole("button", { name: "展开 白板", exact: true })
       .click();
     await reader
       .locator(`[data-surface-id="${nestedPageId}"]`)
@@ -710,7 +710,7 @@ try {
     await reader
       .locator(`[data-surface-id="${sketchId}"]`)
       .locator(":scope > .surface-object-header")
-      .getByRole("button", { name: "展开 Board", exact: true })
+      .getByRole("button", { name: "展开 白板", exact: true })
       .click();
     await reader.locator(".board-drawing").waitFor();
     await reader.screenshot({ path: join(output, "expanded-drawing.png") });

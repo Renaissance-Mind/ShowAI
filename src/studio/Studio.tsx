@@ -240,6 +240,8 @@ import {
   describeError,
   bindProblemActions,
   configureProblemRedaction,
+  configureProblemPlatform,
+  revealLabel,
   labelProblem,
   useProblemQueue,
   useToasts,
@@ -765,6 +767,16 @@ export default function Studio() {
   );
   const handleRevealHandled = useCallback(() => setRevealNode(null), []);
   const shownSaveFailure = useRef("");
+  // A conflict the person dismissed stays closed (its banner remains) until a
+  // later save attempt fails again or another conflict appears.
+  const deferredSaveFailure = useRef("");
+  const saveFailureIdentity = () =>
+    JSON.stringify([
+      selectedProject,
+      page.draft?.id,
+      page.conflictId,
+      page.saveFailureAttempt,
+    ]);
   useEffect(() => {
     if (
       view !== "page" ||
@@ -782,7 +794,11 @@ export default function Studio() {
       page.error,
       page.saveFailureAttempt,
     ]);
-    if (shownSaveFailure.current === key) return;
+    if (
+      shownSaveFailure.current === key ||
+      deferredSaveFailure.current === saveFailureIdentity()
+    )
+      return;
     shownSaveFailure.current = key;
     if (page.conflictId)
       setDialog({
@@ -827,9 +843,19 @@ export default function Studio() {
     (error: unknown, options?: ReportOptions) => queueProblem(error, options),
     [queueProblem],
   );
+  // Dismissing a conflict dialog defers the decision: the unsaved edits stay
+  // in the local draft and the save-conflict banner reopens the dialog.
+  const deferConflict = () => {
+    deferredSaveFailure.current = saveFailureIdentity();
+    closeDialog();
+    void page.retainDraft().catch((error: unknown) =>
+      report(error, { safety: "windowOnly" }),
+    );
+  };
   useEffect(() => {
     configureProblemRedaction(info?.home ? { library: info.home } : {});
   }, [info?.home]);
+  useEffect(() => configureProblemPlatform(info?.platform), [info?.platform]);
   useEffect(() => {
     if (view !== "page") return;
     const refreshPage = () => {
@@ -1608,30 +1634,51 @@ export default function Studio() {
       setBusy(false);
     }
   }
-  /** Copies the open read-only page into a new project this device owns. */
+  /**
+   * Copies the open read-only page into a new project this device owns. The
+   * copy stays local even when new projects default to a server account, and
+   * a failed import removes the empty project it was going to fill.
+   */
   async function saveLocalCopy() {
     const draft = page.draft;
     if (!draft) return;
     const source = { ...draft, parentId: null };
     const name = ts("readOnly.copyName", { name: project?.name ?? draft.title });
-    const created = await desktop.invoke<ProjectSummary>("projects:create", {
-      name,
-      icon: project?.icon,
-    });
-    const imported = await desktop.invoke<LoadedPage>("pages:import", {
-      projectId: created.id,
-      parentId: null,
-      artifact: {
-        format: "showai",
-        version: artifactVersion(source),
-        document: source,
-        components: page.record?.components ?? [],
-      },
-    });
+    const created = await desktop.invoke<ProjectSummary>(
+      "sync:createLocalProject",
+      { name, icon: project?.icon },
+    );
+    let imported: LoadedPage;
+    try {
+      imported = await desktop.invoke<LoadedPage>("pages:import", {
+        projectId: created.id,
+        parentId: null,
+        artifact: {
+          format: "showai",
+          version: artifactVersion(source),
+          document: source,
+          components: page.record?.components ?? [],
+        },
+      });
+    } catch (reason) {
+      await desktop.invoke("projects:remove", { projectId: created.id });
+      await refresh();
+      throw reason;
+    }
+    resolveProblem("saveLocalCopy");
     await refresh();
     await openPage(imported.document.id, created.id);
     setNotice(ts("readOnly.copied", { name }));
   }
+  const runSaveLocalCopy = () =>
+    void saveLocalCopy().catch((reason: unknown) =>
+      report(reason, {
+        action: operation("op.saveLocalCopy"),
+        key: "saveLocalCopy",
+        safety: "saved",
+        retry: runSaveLocalCopy,
+      }),
+    );
   /** A blank page with the Agent panel open and its input focused. */
   async function createPageForAgent(directory: {
     projectId: string;
@@ -4513,7 +4560,7 @@ export default function Studio() {
                     )}
                   </p>
                   {view === "page" && page.draft && (
-                    <button onClick={action(saveLocalCopy)}>
+                    <button onClick={runSaveLocalCopy}>
                       {ts("readOnly.copy")}
                     </button>
                   )}
@@ -4540,11 +4587,7 @@ export default function Studio() {
                     tone="warning"
                     actions={[
                       {
-                        label: t(
-                          info?.platform === "darwin"
-                            ? "revealInFinder"
-                            : "revealLocation",
-                        ),
+                        label: revealLabel(info?.platform),
                         onSelect: () =>
                           void desktop
                             .invoke("library:reveal", { path: item.path })
@@ -5251,11 +5294,7 @@ export default function Studio() {
                   setExportReceipt(null);
                 })}
               >
-                {t(
-                  info?.platform === "darwin"
-                    ? "revealInFinder"
-                    : "revealInFileManager",
-                )}
+                {revealLabel(info?.platform)}
               </button>
             )}
             <button
@@ -5684,6 +5723,7 @@ export default function Studio() {
             {...dialog}
             pageId={dialog.document.id}
             onClose={closeDialog}
+            onDismiss={deferConflict}
             onEdit={page.prepareResolution}
             onDiscard={page.acceptResolution}
             onMerged={async () => {
@@ -5734,6 +5774,7 @@ export default function Studio() {
               setNotice(t("externalKeptAsDraft"), { kind: "warning" });
             }}
             onClose={closeDialog}
+            onDismiss={deferConflict}
             onResolved={async () => {
               await page.acceptResolution();
               await refresh();

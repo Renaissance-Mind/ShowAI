@@ -22,9 +22,10 @@ import {
   symlink,
   writeFile,
 } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { release, tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { startBrowserServer } from "./server";
+import { pageToken } from "./bridge";
 import { AgentService } from "../agent/service";
 import { ContentLibrary as GitLibrary } from "../core/content-library";
 import type { LibraryStorage } from "../core/library-maintenance";
@@ -479,6 +480,9 @@ test("browser workbench, standalone CLI and a second client share real files and
   const info = await invoke<DesktopInfo>("app:info");
   expect(info.mode).toBe("browser");
   expect(info.cli.args).toEqual([cli]);
+  // The browser host reports the macOS product version, as the desktop app does.
+  if (process.platform === "darwin")
+    expect(info.osVersion).not.toBe(release());
   const registration = JSON.parse(
     await readFile(join(home, "agent-runtime.json"), "utf8"),
   );
@@ -787,11 +791,24 @@ test("persisted browser content location survives restart and CLI remains usable
     settingsPath: configPath,
   });
   expect(server.home).toBe(savedHome);
-  token = JSON.parse(
-    (await (await fetch(server.url)).text()).match(
-      /window\.__SHOWAI_LOCAL__=(\{[^<]+\})<\/script>/,
-    )![1],
-  ).token;
+  // The restarted service rejects the old token and serves a new one in its
+  // page, which the workbench bridge reads without a full refresh.
+  const previous = token;
+  token = pageToken(await (await fetch(server.url)).text())!;
+  expect(token).toMatch(/^[a-f0-9]{64}$/);
+  expect(token).not.toBe(previous);
+  expect(
+    (
+      await fetch(server.url + "api/invoke", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${previous}`,
+        },
+        body: JSON.stringify({ action: "app:info", args: {} }),
+      })
+    ).status,
+  ).toBe(401);
   const nextHome = join(home, "new-library");
   await mkdir(nextHome);
   const next = await invoke<DesktopInfo>("settings:chooseHome", {

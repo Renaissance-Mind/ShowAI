@@ -173,7 +173,7 @@ try {
     await page.locator(".component-card-preview img").count(),
     builtinCount + 2,
   );
-  for (const name of ["Page 页面", "Board 白板"]) {
+  for (const name of ["页面", "白板"]) {
     await page
       .locator(".studio-component-card")
       .filter({

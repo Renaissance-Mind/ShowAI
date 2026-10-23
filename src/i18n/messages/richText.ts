@@ -5,7 +5,7 @@ import { defineMessages } from "../index";
 export default defineMessages("richText", {
   "zh-CN": {
     region: "富文本",
-    opening: "正在打开富文本…",
+    opening: "正在打开内容…",
     openingDocument: "正在打开文档",
     documentContent: "文档内容",
     placeholder: "输入 / 添加内容",
@@ -34,6 +34,7 @@ export default defineMessages("richText", {
     "block.orderedKeywords": "有序 编号 列表",
     "block.todo": "待办事项",
     "block.todoKeywords": "待办 任务 清单",
+    "block.todoDone": "任务已完成",
     "block.quote": "引用",
     "block.quoteKeywords": "引用",
     "block.callout": "提示块",
@@ -110,12 +111,12 @@ export default defineMessages("richText", {
     "block.detach": "移出区域",
     "block.moveUp": "向上移动",
     "block.moveDown": "向下移动",
-    "block.duplicate": "复制内容块",
+    "block.duplicate": "创建副本",
     "assistant.ask": "让 Agent 处理…",
     "assistant.askBlock": "让 Agent 处理…",
     "assistant.referenceSelection":
-      "复制引用（{count} 个块），可粘贴到 Claude Code 或 Codex",
-    "assistant.referenceBlock": "复制此块的引用",
+      "复制引用（{count} 个内容块），可粘贴到 Claude Code 或 Codex",
+    "assistant.referenceBlock": "复制此内容块的引用",
     "block.delete": "删除",
 
     "dialog.addLink": "添加链接",
@@ -176,12 +177,12 @@ export default defineMessages("richText", {
   },
   en: {
     region: "Rich text",
-    opening: "Opening rich text…",
+    opening: "Opening content…",
     openingDocument: "Opening document",
     documentContent: "Document content",
     placeholder: "Type / to add content",
     placeholderPage:
-      "Type / to add content, or ask the agent on the right to write this page",
+      "Type / to add content, or ask the Agent on the right to write this page",
     placeholderDefault: "Write something, or type / to add content…",
     placeholderHeading: "Heading",
     readOnlyNote: "Interactive reading mode",
@@ -207,6 +208,7 @@ export default defineMessages("richText", {
     "block.orderedKeywords": "number",
     "block.todo": "To-do list",
     "block.todoKeywords": "checklist checkbox",
+    "block.todoDone": "Task completed",
     "block.quote": "Quote",
     "block.quoteKeywords": "citation",
     "block.callout": "Callout",

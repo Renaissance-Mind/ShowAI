@@ -62,8 +62,6 @@ export default defineMessages("pageSession", {
     "save.cause.capacity":
       "页面内容超过了单页的大小上限。删减或拆分占用最多的组件后再重试保存。",
     "save.librarySpace": "查看内容库空间",
-    "save.revealFinder": "在访达中显示",
-    "save.reveal": "显示所在位置",
     "save.locateLargest": "定位最大的组件",
     "save.statusLabel": "保存状态：{status}",
     "save.showProblem": "查看保存问题",
@@ -142,8 +140,6 @@ export default defineMessages("pageSession", {
     "save.cause.capacity":
       "The page is larger than a single page may be. Shorten or split the largest component, then save again.",
     "save.librarySpace": "View library storage",
-    "save.revealFinder": "Show in Finder",
-    "save.reveal": "Show location",
     "save.locateLargest": "Find the largest component",
     "save.statusLabel": "Save status: {status}",
     "save.showProblem": "Show the save problem",

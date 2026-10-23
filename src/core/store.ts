@@ -929,8 +929,11 @@ export class FileStore {
     name: string;
     icon?: string;
     binding?: ProjectBinding;
+    /** A caller-reserved id (e.g. recorded as local-only before creation). */
+    id?: string;
   }): Promise<ProjectSummary> {
     const name = validateName(input.name);
+    if (input.id !== undefined) assertId(input.id);
     const icon =
       input.icon === undefined
         ? undefined
@@ -949,7 +952,14 @@ export class FileStore {
         );
         if (existing) return existing;
       }
-      return this.writeNewProject(name, binding, undefined, icon);
+      if (
+        input.id &&
+        (await this.listProjects({ includeArchived: true })).some(
+          (project) => project.id === input.id,
+        )
+      )
+        throw new CoreError("CONFLICT", "A project with this id already exists.");
+      return this.writeNewProject(name, binding, undefined, icon, input.id);
     });
   }
 
@@ -994,6 +1004,7 @@ export class FileStore {
     binding?: ProjectBinding,
     sourceDirectory?: string,
     icon?: string,
+    id: string = randomUUID(),
   ): Promise<ProjectSummary> {
     // Freeze all existing ranks before publishing the new project, including
     // legacy and archived projects. New projects always append to this order.
@@ -1005,7 +1016,7 @@ export class FileStore {
     const project: ProjectMetadata = {
       format: "showai-project",
       version: 1,
-      id: randomUUID(),
+      id,
       name,
       ...(icon !== undefined ? { icon } : {}),
       createdAt: now,

@@ -184,7 +184,7 @@ export function markdownToRichText(
               typeof attrs.data !== "object" ||
               Array.isArray(attrs.data)
             )
-              throw Error("showai-block 区块格式不正确");
+              throw Error("showai-block 内容块格式不正确");
             return [{ type: "widget", attrs }];
           }
           return [

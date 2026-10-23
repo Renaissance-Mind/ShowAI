@@ -165,6 +165,8 @@ if (process.isMainFrame) {
         command: MenuCommand,
       ) => listener(command);
       ipcRenderer.on("showai:menu-command", receive);
+      // Commands chosen while this window was starting are delivered now.
+      ipcRenderer.send("showai:menu-ready");
       return () => ipcRenderer.removeListener("showai:menu-command", receive);
     },
     logPath() {

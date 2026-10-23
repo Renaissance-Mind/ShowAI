@@ -56,7 +56,7 @@ export default defineMessages("customComponents", {
     editData: "Edit component data",
     data: "Component data",
     noManualEditing:
-      "This component’s parameters can’t be edited by hand yet. Ask an agent to change it, or edit the component data directly under Advanced.",
+      "This component’s parameters can’t be edited by hand yet. Ask an Agent to change it, or edit the component data directly under Advanced.",
     askAgentToEdit: "Ask Agent to change this component…",
     advancedJson: "Advanced · Edit component data (JSON)",
     propsJson: "Component properties JSON",

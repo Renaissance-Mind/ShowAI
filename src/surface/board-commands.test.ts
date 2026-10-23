@@ -20,7 +20,14 @@ import { findSurfaceNode } from "./document.mjs";
 import { arrowPath, pickShape, smoothPath } from "./drawing-geometry.mjs";
 import { validateDocument } from "../portable/validation.mjs";
 import { gridSpacing } from "./useSurfaceViewport";
-import { boardToolForKey, boardToolShortcut } from "./board-tools";
+import {
+  boardEditDescription,
+  boardToolForKey,
+  boardToolShortcut,
+  boardTools,
+} from "./board-tools";
+import { setLocale, translator } from "../i18n";
+import surfaceMessages from "../i18n/messages/surface";
 
 const rectangle = (id: string) => ({
   type: "drawing",
@@ -283,5 +290,20 @@ describe("Board geometry helpers", () => {
     expect(boardToolForKey("m")?.tool).toBe("pan");
     expect(boardToolForKey("2")?.tool).toBe("pen");
     expect(boardToolShortcut("ellipse")).toBe("E / O / 5");
+    expect(boardToolShortcut(null)).toBe("V / 1");
+    expect(boardToolShortcut("lasso")).toBe("L");
+  });
+  it("describes exactly the keys the board handles", () => {
+    const t = translator(surfaceMessages);
+    for (const locale of ["zh-CN", "en"] as const) {
+      setLocale(locale);
+      const text = boardEditDescription(t);
+      for (const entry of boardTools)
+        expect(text, locale).toContain(
+          `${boardToolShortcut(entry.tool)} ${t(entry.label)}`,
+        );
+      expect(text).not.toMatch(/\bF\b|抓手|\bHand\b|\{/);
+    }
+    setLocale("zh-CN");
   });
 });

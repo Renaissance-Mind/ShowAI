@@ -1,5 +1,5 @@
 import type { BoardTool } from "./types";
-import type { MessageKey } from "../i18n";
+import type { MessageKey, Translator } from "../i18n";
 import type messages from "../i18n/messages/surface";
 
 export const boardTools: {
@@ -27,12 +27,37 @@ export function boardToolForKey(key: string) {
   );
 }
 
-/** Tooltip shortcut text, e.g. "P / 2". */
-export function boardToolShortcut(tool: BoardTool | null) {
+/** Every key that picks the tool, letters first, e.g. ["E", "O", "5"]. */
+export function boardToolKeys(tool: BoardTool | null) {
   const entry = boardTools.find((item) => item.tool === tool);
   return entry
-    ? [...entry.aliases.map((alias) => alias.toUpperCase()), entry.key].join(
-        " / ",
+    ? [...entry.aliases.map((alias) => alias.toUpperCase()), entry.key].filter(
+        (key, index, all) => all.indexOf(key) === index,
       )
-    : "";
+    : [];
+}
+
+/** Tooltip shortcut text, e.g. "P / 2". */
+export function boardToolShortcut(tool: BoardTool | null) {
+  return boardToolKeys(tool).join(" / ");
+}
+
+/**
+ * The board's keyboard help, built from the same table the key handler reads
+ * so the description cannot name keys that do nothing.
+ */
+export function boardEditDescription(
+  t: Translator<(typeof messages)["catalogs"]["zh-CN"]>,
+) {
+  return t("board.descriptionEdit", {
+    pan: boardToolShortcut("pan"),
+    tools: boardTools
+      .map((entry) =>
+        t("board.toolKeys", {
+          keys: boardToolShortcut(entry.tool),
+          label: t(entry.label),
+        }),
+      )
+      .join(t("board.toolKeysSeparator")),
+  });
 }

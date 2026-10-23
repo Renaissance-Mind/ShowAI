@@ -1,4 +1,11 @@
-import { useContext, useMemo, lazy, Suspense } from "react";
+import {
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+  lazy,
+  Suspense,
+} from "react";
 import type { JSONContent } from "@tiptap/core";
 import type { BlockProps } from "../blocks/types";
 import type { RichTextEditorProps } from "./RichTextEditor";
@@ -55,7 +62,9 @@ export function RichText({
       style={style}
     >
       {editable ? (
-        <Suspense fallback={<div role="status">{t("opening")}</div>}>
+        <Suspense
+          fallback={<OpeningEditor label={t("opening")} />}
+        >
           <RichTextEditor
             {...host}
             trailingNode={!host?.continuousPage}
@@ -78,5 +87,25 @@ export function RichText({
         </div>
       )}
     </section>
+  );
+}
+
+/**
+ * Shown while the editor code loads; it stays silent for the first 180 ms so
+ * fast loads do not flash. (This package cannot import ui/PendingNotice.)
+ */
+function OpeningEditor({ label }: { label: string }) {
+  const [visible, setVisible] = useState(false);
+  useEffect(() => {
+    const timer = setTimeout(() => setVisible(true), 180);
+    return () => clearTimeout(timer);
+  }, []);
+  return (
+    <div
+      role="status"
+      style={{ minHeight: 120, color: "var(--muted, #6b6b6b)", fontSize: 13 }}
+    >
+      {visible && label}
+    </div>
   );
 }

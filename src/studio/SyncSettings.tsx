@@ -33,6 +33,7 @@ import { getLocale, type MessageKey } from "../i18n";
 import { useTranslator } from "../i18n/react";
 import messages from "../i18n/messages/sync";
 import common from "../i18n/messages/common";
+import { PendingNotice } from "../ui/PendingNotice";
 import flowMessages from "../i18n/messages/accountFlow";
 import navigationMessages from "../i18n/messages/navigation";
 import { syncListedProjects } from "./sync-project-list";
@@ -476,7 +477,9 @@ export default function SyncSettings({
         })
       : "";
   if (!status)
-    return <p className="settings-help">{t("readingConnections")}</p>;
+    return (
+      <PendingNotice label={t("readingConnections")} lines={3} minHeight={240} />
+    );
   const hidden = new Set(status.hiddenProjectIds ?? []);
   const bindingFor = (projectId: string) =>
     status.projects.find((item) => item.projectId === projectId);

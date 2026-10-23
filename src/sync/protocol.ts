@@ -286,6 +286,8 @@ export interface SyncConfiguration {
   projects: ProjectConnection[];
   defaultConnectionId: string | null;
   defaultSince?: string;
+  /** Projects created to stay on this device; never enrolled by the default account. */
+  localProjectIds?: string[];
   /** Display choices belong to this device and are never part of project sync. */
   hiddenProjectIds?: string[];
 }

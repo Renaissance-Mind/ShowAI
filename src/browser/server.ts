@@ -15,7 +15,7 @@ import {
   rename,
 } from "node:fs/promises";
 import { dirname, extname, isAbsolute, join, resolve, sep } from "node:path";
-import { arch, homedir, release } from "node:os";
+import { arch, homedir } from "node:os";
 import { randomBytes, randomUUID, timingSafeEqual } from "node:crypto";
 import { watch } from "chokidar";
 import { version } from "../../package.json";
@@ -44,7 +44,7 @@ import {
   text,
 } from "../workbench/actions";
 import type { DesktopChange, DesktopInfo } from "../desktop/bridge";
-import { openLocalPath } from "./system";
+import { openLocalPath, systemVersion } from "./system";
 import { localMediaResponse } from "../workbench/local-media";
 import { windowQuery } from "../workbench/window-target";
 
@@ -57,7 +57,7 @@ export interface BrowserServerOptions {
   /** Verification hosts may leave the shared Agent launch registration untouched. */
   registerAgentRuntime?: boolean;
   /** Only the source development launcher supplies this loopback frontend. */
-  development?: { origin: string; token: string };
+  development?: { origin: string; token: string; sourceCommit?: string };
 }
 
 /** Loopback-only host for the exact same workbench actions used by Electron. */
@@ -94,7 +94,8 @@ export async function startBrowserServer(options: BrowserServerOptions) {
   let service = new AgentService({ root: store.root });
   const token = options.development?.token ?? randomBytes(32).toString("hex");
   const webRoot = await realpath(options.webRoot);
-  // The built frontend records the commit it came from; report it in App info.
+  // The built frontend records the commit it came from; the development
+  // launcher passes the checkout commit it started this backend from.
   const sourceCommit =
     /<meta name="showai-source" content="([^"]+)"/.exec(
       await readFile(join(webRoot, "index.html"), "utf8").catch(
@@ -103,7 +104,10 @@ export async function startBrowserServer(options: BrowserServerOptions) {
           throw error;
         },
       ),
-    )?.[1] ?? "unknown";
+    )?.[1] ??
+    options.development?.sourceCommit ??
+    "unknown";
+  const osVersion = await systemVersion();
   const clients = new Map<ServerResponse, string>();
   // A browser tab already holds the record of its own save; skip that echo for it.
   const ownWrites = new OwnWrites();
@@ -122,7 +126,7 @@ export async function startBrowserServer(options: BrowserServerOptions) {
     mode: "browser",
     sourceCommit,
     arch: arch(),
-    osVersion: release(),
+    osVersion,
     versions: { node: process.versions.node },
     cli: {
       command: process.execPath,

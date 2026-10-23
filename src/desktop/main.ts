@@ -50,6 +50,7 @@ import { Readable } from "node:stream";
 import { localMediaResponse } from "../workbench/local-media";
 import { LOCAL_MEDIA_SCHEME } from "../components/custom/local-media-link";
 import { tabShortcut } from "../workbench/tab-shortcuts";
+import { MenuCommandQueue } from "./menu-queue";
 import { windowQuery, type WindowTarget } from "../workbench/window-target";
 import { AgentService, errorResult } from "../agent/service";
 import { MaintenanceScheduler } from "../core/maintenance-scheduler";
@@ -100,6 +101,12 @@ const t = translator(desktopMessages);
 const directory = dirname(fileURLToPath(import.meta.url));
 const repository = resolve(directory, "..");
 const windows = new Set<BrowserWindow>();
+const menuCommands = new MenuCommandQueue<BrowserWindow, MenuCommand>(
+  (window, command) => {
+    if (!window.isDestroyed())
+      window.webContents.send("showai:menu-command", command);
+  },
+);
 const windowAppearances = new WeakMap<BrowserWindow, DesktopAppearance>();
 const appearanceIcons = new Map<DesktopAppearance, NativeImage>();
 let store: FileStore;
@@ -421,7 +428,7 @@ async function menuWindow(target?: unknown): Promise<BrowserWindow> {
   if (focused && windows.has(focused)) return focused;
   const first = [...windows].find((window) => !window.isDestroyed());
   if (first) return first;
-  // A window that is still starting may miss the command; it opens either way.
+  // The command waits in menuCommands until the new window's renderer listens.
   return createWindow();
 }
 
@@ -430,7 +437,7 @@ function sendMenuCommand(command: MenuCommand) {
     void menuWindow(target)
       .then((window) => {
         window.show();
-        window.webContents.send("showai:menu-command", command);
+        menuCommands.send(window, command);
       })
       .catch((error) => console.error("ShowAI menu command:", error));
   };
@@ -1069,6 +1076,11 @@ async function createWindow(page?: WindowTarget): Promise<BrowserWindow> {
     },
   });
   windows.add(window);
+  // A reload or navigation replaces the renderer's menu listener.
+  window.webContents.on("did-start-navigation", (details) => {
+    if (details.isMainFrame && !details.isSameDocument)
+      menuCommands.reset(window);
+  });
   preparePreviewWindows(window);
   watchWindowHealth(window);
   applyWindowAppearance(
@@ -1216,7 +1228,7 @@ async function handleDeepLink(source: string): Promise<void> {
     const label = buttons[choice.response];
     if (label === t("deepLink.copyLink")) clipboard.writeText(source);
     if (label === t("deepLink.openProjects") && !window.isDestroyed())
-      window.webContents.send("showai:menu-command", "projects");
+      menuCommands.send(window, "projects");
   }
 }
 
@@ -1650,6 +1662,15 @@ else {
             ? [`\n${shortText(report.stack, 8000)}`]
             : []),
         );
+      });
+      ipcMain.on("showai:menu-ready", (event) => {
+        let window: BrowserWindow;
+        try {
+          window = trustedSender(event);
+        } catch {
+          return;
+        }
+        menuCommands.markReady(window);
       });
       ipcMain.on("showai:close-result", (event, payload: unknown) => {
         let window: BrowserWindow;

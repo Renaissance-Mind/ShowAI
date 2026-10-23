@@ -15,7 +15,7 @@ export default defineMessages("syncEngine", {
       "服务器地址发生重定向，请使用最终服务器基址重新连接。",
     "url.invalidBase":
       "填写服务器基址，例如 https://showai.example.com/cloud。",
-    "server.incompatible": "该地址不是兼容的 ShowAI Server。",
+    "server.incompatible": "该地址不是兼容的 ShowAI 服务器。",
     "server.invalidCapabilities": "服务器能力说明无效。",
     "server.invalidIdentity": "服务器身份或能力说明无效。",
     "server.identityChanged": "服务器身份发生变化，请重新连接。",

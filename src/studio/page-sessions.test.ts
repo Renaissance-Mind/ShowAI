@@ -415,6 +415,20 @@ describe("workspace sessions against the real loopback workbench", () => {
     expect(await invoke("workspace:conflicts",{projectId:project})).toEqual([]);
     expect(view.getSnapshot()).toMatchObject({status:"saved",reviewingConflict:false,conflictId:undefined});
   });
+  it("leaves a page blocked by an external conflict with its edits kept in the local draft",async()=>{
+    const view=await warm();
+    await writeFile(first.path,serializeArtifact({...first.document,title:"External file edit"}));
+    view.edit({title:"Local edit kept while away"});
+    expect(await view.flush()).toBe(false);
+    expect(view.getSnapshot().status).toBe("conflict");
+    // The workbench may leave a conflicted page; leaving retains the draft.
+    expect(await sessions.open(project,second.document.id,"b")).toBe(true);
+    expect(sessions.getSnapshot().active?.getSnapshot().draft?.id).toBe(second.document.id);
+    const drafts=await invoke<{title:string}[]>("drafts:list",{kind:"page",projectId:project,resourceId:first.document.id});
+    expect(drafts.map(draft=>draft.title)).toContain("Local edit kept while away");
+    expect(await sessions.open(project,first.document.id,"a")).toBe(true);
+    expect(sessions.getSnapshot().active?.getSnapshot()).toMatchObject({status:"conflict",draft:{title:"Local edit kept while away"}});
+  });
   it("keeps every open tab resident, including duplicate pages beyond the history budget", async () => {
     await warm();
     calls.length = 0;

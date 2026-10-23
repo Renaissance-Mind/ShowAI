@@ -215,7 +215,7 @@ export function RichTextNode({
             type="checkbox"
             checked={!!attrs.checked}
             disabled
-            aria-label="Task completion"
+            aria-label={t("block.todoDone")}
           />
           <div>{children}</div>
         </li>

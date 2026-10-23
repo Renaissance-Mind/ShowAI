@@ -33,7 +33,7 @@ describe("content-first component presentation", () => {
     const tools = renderToStaticMarkup(
       createElement(BlockHeader, { title: "数据图表", editable: true }),
     );
-    expect(tools).toContain('aria-label="编辑区块"');
+    expect(tools).toContain('aria-label="编辑组件"');
     expect(tools).not.toContain("sb-heading");
   });
 

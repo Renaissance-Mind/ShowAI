@@ -262,7 +262,23 @@ export function safetyText(safety: ProblemSafety): string {
   return t(`safety.${safety}`);
 }
 
+// The workbench sets the platform of the machine holding its files (the
+// browser workbench's server, not the browser), so 显示所在位置 names the
+// file manager the person will actually see, as the save banners do.
+let problemPlatform: string | undefined;
+
+export function configureProblemPlatform(platform: string | undefined) {
+  problemPlatform = platform;
+}
+
+/** Label for revealing a path in the platform's file manager. */
+export function revealLabel(platform = problemPlatform): string {
+  return platform === "darwin" || platform === "win32" || platform === "linux"
+    ? t(`action.reveal.${platform}`)
+    : t("action.reveal");
+}
+
 /** Label for a suggested action. */
 export function actionLabel(action: ProblemActionId): string {
-  return t(`action.${action}`);
+  return action === "reveal" ? revealLabel() : t(`action.${action}`);
 }

@@ -5,7 +5,7 @@ export const builtinEnglish: BuiltinDisplayText = {
   text: {
     name: "Rich text",
     description:
-      "One rich text component for both app input and AI writing: headings, lists, tables, formulas, fonts, sizes, colors, underline, highlight and paragraph alignment, with built-in selection, hover and table menus. Imports Markdown and plain text.",
+      "One rich text component for both app input and Agent writing: headings, lists, tables, formulas, fonts, sizes, colors, underline, highlight and paragraph alignment, with built-in selection, hover and table menus. Imports Markdown and plain text.",
   },
   image: {
     name: "Image",

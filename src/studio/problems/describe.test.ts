@@ -6,7 +6,13 @@ import { errorResult } from "../../agent/service";
 import { CoreError } from "../../core/model";
 import { CapacityError } from "../../portable/capacity.mjs";
 import { setLocale } from "../../i18n";
-import { describeError, problemCode, problemFacts } from "./describe";
+import {
+  actionLabel,
+  configureProblemPlatform,
+  describeError,
+  problemCode,
+  problemFacts,
+} from "./describe";
 import { arrangeProblemActions } from "./ProblemNotice";
 
 describe("describeError", () => {
@@ -161,5 +167,26 @@ describe("arrangeProblemActions", () => {
     ]);
     expect(arranged.map((item) => item.label)).toEqual(["b", "a", "discard"]);
     expect(arranged.map((item) => !!item.primary)).toEqual([true, false, false]);
+  });
+});
+
+describe("reveal label", () => {
+  afterEach(() => {
+    configureProblemPlatform(undefined);
+    setLocale("zh-CN");
+  });
+
+  it("names the file manager of the platform holding the files", () => {
+    setLocale("zh-CN");
+    expect(actionLabel("reveal")).toBe("显示所在位置");
+    configureProblemPlatform("darwin");
+    expect(actionLabel("reveal")).toBe("在访达中显示");
+    configureProblemPlatform("win32");
+    expect(actionLabel("reveal")).toBe("在资源管理器中显示");
+    configureProblemPlatform("linux");
+    expect(actionLabel("reveal")).toBe("在文件管理器中显示");
+    setLocale("en");
+    expect(actionLabel("reveal")).toBe("Show in file manager");
+    expect(actionLabel("retry")).toBe("Try again");
   });
 });

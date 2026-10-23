@@ -87,7 +87,7 @@ describe("Markdown math and research resources", () => {
     expect(video).toContain("<video");
     expect(video).toContain("controls");
     expect(video).toContain("实验录像");
-    expect(video).not.toContain("编辑区块");
+    expect(video).not.toContain("编辑组件");
     const refs = renderToStaticMarkup(
       createElement(Widget, {
         kind: "references",

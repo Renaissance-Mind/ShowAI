@@ -23,6 +23,7 @@ import ServerResources from "./ServerResources";
 import { useTranslator } from "../i18n/react";
 import strings from "../i18n/messages/agentSettings";
 import common from "../i18n/messages/common";
+import { PendingNotice } from "../ui/PendingNotice";
 import { downloadAgentFile, messageLinks } from "./assistant/message-links";
 import "./agent-settings.css";
 import {
@@ -328,7 +329,7 @@ export default function AgentSettings() {
     return (
       <div className="agent-settings">
         <AgentExecutionPicker onChange={executionChanged} disabled={busy} />
-        <p role="status">{t("reading")}</p>
+        <PendingNotice label={t("reading")} lines={4} minHeight={320} />
         {error && (
           <p role="alert" className="agent-error">
             {error}
