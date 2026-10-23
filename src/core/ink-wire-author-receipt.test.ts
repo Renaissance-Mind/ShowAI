@@ -8,6 +8,7 @@ import { InkOperationReplica, canonicalInkJSON, inkOperationDigest } from "../su
 import { inkCheckpointFromDocument, inkWireHydrateAuthorBaseline, inkWireAuthorReceipt, inkWireEditPlans, inkWireImportCheckpoints, inkWireDocumentFromCheckpoint, stampInkDocument } from "../surface/ink-wire.mjs";
 import { createResource } from "../surface/containers.mjs";
 import { addNode } from "../surface/editing";
+import { mergePageContent } from "./page-merge-model";
 import { createPortableInk } from "../surface/portable-ink.mjs";
 import type { ShowDocument } from "../types";
 const roots:string[]=[],journals:InkOperationJournal[]=[];
@@ -114,8 +115,9 @@ it("hydrates an acknowledged placement predecessor after a separately stamped na
   journal.appendLocal({...scope,parents:journal.read(scope).checkpoint!.frontier,changes:[{kind:"create",strokeId:"native-next",node:node("native-next"),layout:{...frame,x:500},placement:{parentId:scope.boardId,after:"rectangle",before:null}}]});
   const mixed=inkWireDocumentFromCheckpoint(raw,scope.boardId,journal.read(scope).checkpoint!);
   mixed.content.attrs!.inkState.strokes.base.fields.placement=structuredClone(base.content.attrs!.inkState.strokes.base.fields.placement);
+  mixed.content.attrs!.inkState.strokes.base.variants.placement=structuredClone(base.content.attrs!.inkState.strokes.base.variants.placement);
   const before=structuredClone(mixed);
-  expect(()=>inkWireEditPlans(mixed,mixed)).toThrow("unstamped");
+  expect(inkWireEditPlans(mixed,mixed)).toEqual([]);
   const restored=inkWireHydrateAuthorBaseline(mixed,{[scope.boardId]:receipt.content.attrs!.inkState});
   expect(mixed).toEqual(before);
   expect(restored.layout).toEqual(mixed.layout);
@@ -137,4 +139,25 @@ it("rejects a predecessor receipt that cannot account for an unstamped visible e
 it("leaves Boards with no stamped predecessor state unchanged",()=>{
   const base=source();
   expect(inkWireHydrateAuthorBaseline(base,{[base.content.attrs!.id as string]:null})).toEqual(base);
+});
+
+it("retains authored placement bounds when another generic shape enters the interval, while detecting a real move",async()=>{
+  const initial=source(),scope=scopeOf(initial);
+  const raw=structuredClone(initial),ink=raw.content.content![0];
+  const shape=(id:string)=>({type:"drawing",attrs:{id,tool:"rectangle",color:"#111111",strokeWidth:2,points:[{x:0,y:0},{x:50,y:50}]}});
+  raw.content.content=[shape("left"),ink,shape("right")];raw.layout!.left={...frame,x:100};raw.layout!.right={...frame,x:200};
+  const base=stampInkDocument(raw,initial,{actor:"ordering",sequence:1}),journal=await open();
+  journal.importCheckpoint(scope,inkCheckpointFromDocument(base,scope.boardId));
+  const projected=inkWireDocumentFromCheckpoint(base,scope.boardId,journal.read(scope).checkpoint!);
+  const inserted=structuredClone(projected);inserted.content.content!.splice(2,0,shape("concurrent"));inserted.layout!.concurrent={...frame,x:300};
+  expect(inkWireEditPlans(inserted,inserted)).toEqual([]);
+  const imported=inkCheckpointFromDocument(inserted,scope.boardId);
+  expect(imported.strokes.find(stroke=>stroke.id==="base")!.registers.placement[0].value).toEqual({parentId:scope.boardId,after:"left",before:"right"});
+  const merged=mergePageContent(projected,inserted,projected).document;
+  expect(Object.keys(merged.content.attrs!.inkState.contexts).some(dot=>dot.startsWith("legacy-"))).toBe(false);
+  const moved=structuredClone(inserted),children=moved.content.content!;children.splice(children.findIndex(node=>node.attrs!.id==="base"),1);children.push(ink);
+  expect(inkWireEditPlans(inserted,moved)[0].changes).toContainEqual({kind:"edit",strokeId:"base",patch:{placement:{parentId:scope.boardId,after:"right",before:null}}});
+  const stamped=stampInkDocument(moved,inserted,{actor:"explicit-move",sequence:1});
+  expect(inkWireEditPlans(stamped,stamped)).toEqual([]);
+  expect(stamped.content.attrs!.inkState.strokes.base.fields.placement[0][0]).toBe("explicit-move:1");
 });
