@@ -6,7 +6,6 @@ import { remoteExecution } from "./AgentExecution";
 import { useTranslator } from "../i18n/react";
 import messages from "../i18n/messages/onboarding";
 import assistantMessages from "../i18n/messages/assistant";
-import agentHostMessages from "../i18n/messages/agentHost";
 import { ExternalLink, Flag, Loader2, RefreshCw, Settings2 } from "../ui/icons";
 import feedbackMessages from "../i18n/messages/feedback";
 import { redact } from "../core/redact";
@@ -68,38 +67,45 @@ export function agentReadiness(status: AgentHostStatus): AgentReadiness {
   return { kind: "ready" };
 }
 
-const errorKinds: [AgentStepKind, (keyof (typeof agentHostMessages)["catalogs"]["zh-CN"])[]][] =
-  [
-    ["agentMissing", ["task.agentMissing", "agent.notFound"]],
-    ["signIn", ["task.signInRequired", "agent.signInExpired", "agent.codexSignIn"]],
-    [
-      "credentials",
-      [
-        "source.saveApiKey",
-        "source.select",
-        "conversation.sourceMissing",
-        "chatgpt.connectFirst",
-        "chatgpt.expired",
-        "chatgpt.reauthorizePlan",
-        "chatgpt.disconnected",
-      ],
-    ],
-    ["model", ["task.chooseModel"]],
-    ["runtime", ["runtime.installFirst"]],
-  ];
+/** What the Agent settings page should open with, set by a next-step action. */
+export type AgentSetupIntent = "chatgpt" | "apiKey";
+export const AGENT_SETUP_EVENT = "showai:agent-setup";
+let pendingSetup: AgentSetupIntent | null = null;
+/** Asks Agent settings to start connecting ChatGPT or adding an API key. */
+export function requestAgentSetup(intent: AgentSetupIntent) {
+  pendingSetup = intent;
+  window.dispatchEvent(new CustomEvent(AGENT_SETUP_EVENT, { detail: intent }));
+}
+/** Agent settings consumes the pending intent once, when it is ready to act. */
+export function takeAgentSetup(): AgentSetupIntent | null {
+  const intent = pendingSetup;
+  pendingSetup = null;
+  return intent;
+}
 
-/** Setup errors from the Agent host, recognized in either UI language. */
-export function agentErrorKind(message: string): AgentStepKind | null {
-  for (const [kind, keys] of errorKinds)
-    for (const catalog of Object.values(agentHostMessages.catalogs))
-      if (
-        keys.some((key) => {
-          const text = (catalog as Record<string, unknown>)[key];
-          return typeof text === "string" && message.includes(text);
-        })
-      )
-        return kind;
-  return null;
+/** Whether Codex was found on this computer, so switching to it can work. */
+export function localCodexAvailable(status: AgentHostStatus | null) {
+  return (
+    !!status &&
+    !status.executionKind &&
+    !!status.agents.find((item) => item.id === "codex")?.path
+  );
+}
+
+/** Handlers behind next-step buttons, shared by readiness and error notices. */
+export interface AgentSetupHandlers {
+  checking: boolean;
+  onOpenSettings: () => void;
+  onRecheck: () => void;
+  /** Present when the local Codex can take over; switches execution to it. */
+  onUseLocalCodex?: () => void;
+}
+
+/** Switches the built-in Agent to the local Codex and checks again. */
+export async function switchToLocalCodex(status: AgentHostStatus) {
+  return desktop.invoke<AgentHostStatus>("agent:settings", {
+    settings: { ...status.settings, mode: "local", localAgent: "codex" },
+  });
 }
 
 /** Maps an MCP clientInfo name to the plugin host it belongs to. */
@@ -196,7 +202,9 @@ export function readinessText(
     case "noSource":
       return t("status.noSource");
     case "credentials":
-      return t("status.apiKey", { name: readiness.name });
+      return readiness.chatgpt
+        ? t("status.chatgpt", { name: readiness.name })
+        : t("status.apiKey", { name: readiness.name });
     case "model":
       return t("status.model", { name: readiness.name });
     case "runtime":
@@ -204,67 +212,111 @@ export function readinessText(
   }
 }
 
-/** Next-step actions for a setup problem: docs, Agent settings and a fresh check. */
+export type AgentStepId =
+  | "guide"
+  | "chatgpt"
+  | "apiKey"
+  | "localCodex"
+  | "settings"
+  | "recheck";
+/** Next steps for a readiness kind, most useful first. */
+export function agentSteps(
+  kind: AgentStepKind,
+  options: { chatgpt?: boolean; localCodex?: boolean } = {},
+): AgentStepId[] {
+  switch (kind) {
+    case "noSource":
+      return [
+        "chatgpt",
+        "apiKey",
+        ...(options.localCodex ? (["localCodex"] as const) : []),
+      ];
+    case "credentials":
+      return [options.chatgpt ? "chatgpt" : "apiKey", "recheck"];
+    case "agentMissing":
+      return ["guide", "apiKey", "recheck"];
+    case "signIn":
+      return ["guide", "recheck"];
+    case "model":
+      return ["settings"];
+    case "runtime":
+      return ["settings", "recheck"];
+  }
+}
+
+/** Next-step actions for a setup problem: connect, add a key, docs, settings. */
 export function AgentNextSteps({
   kind,
   chatgpt = false,
-  checking,
-  onOpenSettings,
-  onRecheck,
+  setup,
 }: {
   kind: AgentStepKind;
   chatgpt?: boolean;
-  checking: boolean;
-  onOpenSettings: () => void;
-  onRecheck: () => void;
+  setup: AgentSetupHandlers;
 }) {
   const t = useTranslator(messages);
-  const guide = kind === "agentMissing" || kind === "signIn";
-  const apiKey =
-    kind === "agentMissing" ||
-    kind === "noSource" ||
-    (kind === "credentials" && !chatgpt);
-  const settings = (kind === "credentials" && chatgpt) || kind === "model" || kind === "runtime";
+  const steps = agentSteps(kind, {
+    chatgpt,
+    localCodex: !!setup.onUseLocalCodex,
+  });
+  const open = (intent: AgentSetupIntent) => () => {
+    requestAgentSetup(intent);
+    setup.onOpenSettings();
+  };
   return (
     <div className="onboarding-steps" role="group" aria-label={t("steps.label")}>
-      {guide && (
-        <a
-          className="onboarding-step"
-          href={AGENT_HOSTS_GUIDE}
-          target="_blank"
-          rel="noreferrer"
-        >
-          <ExternalLink size={12} aria-hidden="true" />
-          {t("steps.guide")}
-        </a>
-      )}
-      {apiKey && (
-        <button type="button" className="onboarding-step" onClick={onOpenSettings}>
-          <Settings2 size={12} aria-hidden="true" />
-          {t("steps.apiKey")}
-        </button>
-      )}
-      {settings && (
-        <button type="button" className="onboarding-step" onClick={onOpenSettings}>
-          <Settings2 size={12} aria-hidden="true" />
-          {t("steps.settings")}
-        </button>
-      )}
-      {kind !== "model" && (
-        <button
-          type="button"
-          className="onboarding-step"
-          disabled={checking}
-          onClick={onRecheck}
-        >
-          {checking ? (
-            <Loader2 size={12} className="studio-spin" aria-hidden="true" />
-          ) : (
-            <RefreshCw size={12} aria-hidden="true" />
-          )}
-          {t("steps.recheck")}
-        </button>
-      )}
+      {steps.map((step, index) => {
+        const className = `onboarding-step${index === 0 ? " is-primary" : ""}`;
+        if (step === "guide")
+          return (
+            <a
+              key={step}
+              className={className}
+              href={AGENT_HOSTS_GUIDE}
+              target="_blank"
+              rel="noreferrer"
+            >
+              <ExternalLink size={12} aria-hidden="true" />
+              {t("steps.guide")}
+            </a>
+          );
+        if (step === "recheck")
+          return (
+            <button
+              key={step}
+              type="button"
+              className={className}
+              disabled={setup.checking}
+              onClick={setup.onRecheck}
+            >
+              {setup.checking ? (
+                <Loader2 size={12} className="studio-spin" aria-hidden="true" />
+              ) : (
+                <RefreshCw size={12} aria-hidden="true" />
+              )}
+              {t("steps.recheck")}
+            </button>
+          );
+        const [label, onClick] =
+          step === "chatgpt"
+            ? [t("steps.chatgpt"), open("chatgpt")]
+            : step === "apiKey"
+              ? [t("steps.apiKey"), open("apiKey")]
+              : step === "localCodex"
+                ? [t("steps.localCodex"), setup.onUseLocalCodex!]
+                : [t("steps.settings"), setup.onOpenSettings];
+        return (
+          <button
+            key={step}
+            type="button"
+            className={className}
+            onClick={onClick}
+          >
+            {step !== "localCodex" && <Settings2 size={12} aria-hidden="true" />}
+            {label}
+          </button>
+        );
+      })}
     </div>
   );
 }
@@ -315,15 +367,14 @@ export function AgentHelpSteps({ message }: { message: string }) {
 export function AgentStatusRow({
   status,
   error,
-  checking,
-  onOpenSettings,
-  onRecheck,
+  setup,
+  hideSteps = false,
 }: {
   status: AgentHostStatus | null;
   error: string;
-  checking: boolean;
-  onOpenSettings: () => void;
-  onRecheck: () => void;
+  setup: AgentSetupHandlers;
+  /** Another notice in the panel already offers these steps. */
+  hideSteps?: boolean;
 }) {
   const t = useTranslator(messages);
   const label = useExecutionLabel(status);
@@ -351,7 +402,7 @@ export function AgentStatusRow({
         <button
           type="button"
           className="onboarding-status-change"
-          onClick={onOpenSettings}
+          onClick={setup.onOpenSettings}
         >
           {t("status.change")}
         </button>
@@ -361,22 +412,15 @@ export function AgentStatusRow({
           ? t("status.unavailable", { error })
           : readinessText(t, readiness)}
       </p>
-      {error ? (
-        <AgentNextSteps
-          kind="runtime"
-          checking={checking}
-          onOpenSettings={onOpenSettings}
-          onRecheck={onRecheck}
-        />
+      {hideSteps ? null : error ? (
+        <AgentNextSteps kind="runtime" setup={setup} />
       ) : (
         readiness.kind !== "ready" &&
         readiness.kind !== "checking" && (
           <AgentNextSteps
             kind={readiness.kind}
             chatgpt={readiness.kind === "credentials" && readiness.chatgpt}
-            checking={checking}
-            onOpenSettings={onOpenSettings}
-            onRecheck={onRecheck}
+            setup={setup}
           />
         )
       )}

@@ -298,6 +298,15 @@
   cursor: default;
   opacity: 0.6;
 }
+.onboarding-step.is-primary {
+  border-color: var(--text);
+  background: var(--text);
+  color: var(--paper);
+}
+.onboarding-step.is-primary:hover:not(:disabled) {
+  background: var(--text);
+  opacity: 0.88;
+}
 .studio-welcome-prompt-text {
   margin: 8px 0 0;
   padding: 8px 10px;

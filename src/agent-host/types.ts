@@ -36,12 +36,70 @@ export interface LocalAgent {
   callable: boolean | null;
   testedAt?: string;
 }
+/** Install step the UI localizes; `progress` keeps the host-language text. */
+export type RuntimeStage =
+  | "absent"
+  | "fetching"
+  | "downloading"
+  | "verifying"
+  | "installed"
+  | "upToDate"
+  | "failed";
+/** Why an SDK install failed, for a localized reason and the right advice. */
+export type RuntimeFailureCode =
+  | "network"
+  | "registry"
+  | "integrity"
+  | "disk"
+  | "verify"
+  | "unknown";
 export interface RuntimeStatus {
   state: "absent" | "installing" | "ready" | "failed";
   version?: string;
   progress: string;
   root: string;
   error?: string;
+  stage?: RuntimeStage;
+  /** Bytes received / expected while downloading both packages. */
+  received?: number;
+  total?: number;
+  failure?: RuntimeFailureCode;
+}
+/**
+ * Classified reason a built-in Agent run (or a send) failed. The UI chooses
+ * its summary and actions by `code`; `detail` keeps the redacted original
+ * text (stderr, provider message) for the collapsed technical details.
+ */
+export type AgentProblemCode =
+  | "no_model_source"
+  | "source_removed"
+  | "credentials_missing"
+  | "invalid_credentials"
+  | "rate_limited"
+  | "model_missing"
+  | "model_not_found"
+  | "runtime_missing"
+  | "agent_missing"
+  | "sign_in_required"
+  | "network"
+  | "sandbox"
+  | "process_exited"
+  | "timeout"
+  | "provider_error"
+  | "unknown";
+export interface AgentProblem {
+  code: AgentProblemCode;
+  /** One sentence in the host language; the UI prefers its own text for `code`. */
+  summary: string;
+  /** Original text, redacted and truncated. */
+  detail?: string;
+  exitCode?: number;
+  /** Provider HTTP status for gateway failures. */
+  status?: number;
+  /** The source signs in with a ChatGPT plan rather than an API key. */
+  chatgpt?: boolean;
+  /** Display name of the source or local Agent involved. */
+  name?: string;
 }
 export interface AgentEvent {
   sequence: number;
@@ -69,7 +127,9 @@ export interface AgentTask {
     title: string;
     options: { id: string; name: string; kind: string }[];
   }[];
+  /** Summary text kept for older readers; `problem` carries the classification. */
   error?: string;
+  problem?: AgentProblem;
 }
 /** What the user pointed at when sending a turn. Ids are stable page block ids. */
 export interface AgentTarget {

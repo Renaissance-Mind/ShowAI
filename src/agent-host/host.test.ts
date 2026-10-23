@@ -242,6 +242,27 @@ test("task downloads cannot expose credentials outside the task workspace", asyn
   ).rejects.toThrow("任务工作区");
   reader.close();
 });
+test("sending without any model source explains that no model is available", async () => {
+  const root = join(directory, "no-source-host");
+  const fresh = new AgentHost({ ...host.options, root });
+  await fresh.save({
+    mode: "api",
+    localAgent: "codex",
+    sourceId: "",
+    sources: [],
+  });
+  const project = await host.options
+    .library()
+    .createProject({ name: "No source" });
+  const failure = await fresh
+    .send({ projectId: project.id, prompt: "帮我修复这个图表" })
+    .catch((error) => error);
+  expect(failure.problem).toMatchObject({ code: "no_model_source" });
+  expect(failure.message).not.toContain("移除");
+  // Nothing was recorded, so the request stays only in the person's input.
+  expect(await fresh.conversations.list(project.id)).toEqual([]);
+  fresh.close();
+});
 test("server-owned credentials never fall back to local OAuth refresh", async () => {
   const id = randomUUID(),
     root = join(directory, "hosted-reference");
@@ -332,15 +353,9 @@ test.skipIf(!live)(
         }
         if (
           result.state === "failed" &&
-          /Authentication required|login_required|需要登录/.test(
-            result.error ?? "",
-          )
-        ) {
-          expect(result.error).toMatch(
-            /Authentication required|login_required|需要登录/,
-          );
+          result.problem?.code === "sign_in_required"
+        )
           return;
-        }
       }
       const completed = await finish(task.id);
       expect(

@@ -1,6 +1,7 @@
 import { createServer } from "node:http";
 import { randomBytes, randomUUID, timingSafeEqual } from "node:crypto";
 import type { ModelSource } from "./types";
+import type { GatewayFailure } from "./problems";
 import { translator } from "../i18n";
 import agentHostMessages from "../i18n/messages/agentHost";
 
@@ -307,6 +308,9 @@ export async function startModelGateway(
   credential: (force?: boolean) => Promise<string>,
 ) {
   const secret = randomBytes(32).toString("hex");
+  // The latest provider failure, so the host can classify the run by status
+  // instead of parsing the text Codex reports for it.
+  let lastFailure: GatewayFailure | undefined;
   const server = createServer((request, response) => {
     const run = async () => {
       const token = Buffer.from(request.headers.authorization ?? ""),
@@ -411,6 +415,13 @@ export async function startModelGateway(
             if (token) text = text.replaceAll(token, "[redacted]");
           return text.replace(/Bearer\s+[^\s"']+/gi, "Bearer [redacted]");
         };
+        lastFailure = {
+          status: upstream.status,
+          ...(detail.code ? { code: detail.code } : {}),
+          message:
+            `HTTP ${upstream.status}` +
+            (detail.message ? ": " + redact(detail.message) : ""),
+        };
         response.writeHead(upstream.status, {
           "content-type": "application/json",
           "cache-control": "no-store",
@@ -427,6 +438,7 @@ export async function startModelGateway(
         );
         return;
       }
+      lastFailure = undefined;
       if (!upstream.body) throw new Error("Missing provider response body.");
       response.writeHead(200, {
         "content-type": "text/event-stream",
@@ -445,6 +457,18 @@ export async function startModelGateway(
       response.end();
     };
     void run().catch((error: Error) => {
+      const cause = (error as { cause?: { code?: unknown; message?: unknown } })
+        .cause;
+      if (error.name !== "AbortError")
+        lastFailure = {
+          message:
+            error.message +
+            (typeof cause?.code === "string" ? ` (${cause.code})` : "") +
+            (typeof cause?.message === "string" ? `: ${cause.message}` : ""),
+          ...(error instanceof TypeError || error.name === "TimeoutError"
+            ? { network: true }
+            : {}),
+        };
       if (response.destroyed) return;
       if (!response.headersSent) {
         response.writeHead(502, { "content-type": "application/json" });
@@ -465,6 +489,7 @@ export async function startModelGateway(
   return {
     url: `http://127.0.0.1:${address.port}/v1`,
     secret,
+    failure: () => lastFailure,
     close: () => {
       server.closeAllConnections();
       server.close();

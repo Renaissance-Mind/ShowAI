@@ -263,6 +263,32 @@
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
+.assistant-problem {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 6px;
+}
+.assistant-problem .problem-notice {
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+.assistant-problem-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 10px;
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+.assistant-problem-meta a {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  color: inherit;
+}
 .assistant-result {
   display: flex;
   flex-wrap: wrap;

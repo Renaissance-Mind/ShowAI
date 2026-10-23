@@ -52,13 +52,21 @@ import {
 } from "../../surface/reference-availability";
 import { AgentMarkdown } from "./AgentMarkdown";
 import {
-  AgentHelpSteps,
-  AgentNextSteps,
   AgentStatusRow,
-  agentErrorKind,
+  agentReadiness,
   localAgentNames,
+  localCodexAvailable,
+  switchToLocalCodex,
   useAgentStatus,
+  type AgentSetupHandlers,
 } from "../AgentReadiness";
+import {
+  AgentProblemNotice,
+  agentProblemOf,
+  readinessKindOf,
+  unclassifiedProblem,
+} from "./AgentProblemNotice";
+import type { AgentProblem } from "../../agent-host/types";
 import onboardingStrings from "../../i18n/messages/onboarding";
 import {
   referenceRequest,
@@ -110,7 +118,9 @@ function TurnView({
   onUndo,
   onPermission,
   onFile,
+  onRetry,
   setup,
+  agent,
 }: {
   turn: AgentTurn;
   latest: boolean;
@@ -119,7 +129,9 @@ function TurnView({
   onUndo: () => void;
   onPermission: (id: string, option: string | null) => void;
   onFile: (path: string) => void;
-  setup: SetupActions;
+  onRetry: () => void;
+  setup: AgentSetupHandlers;
+  agent: string;
 }) {
   const t = useTranslator(strings);
   const groups: {
@@ -234,14 +246,22 @@ function TurnView({
             </button>
           </p>
         )}
-        {turn.error && turn.state !== "running" && (
-          <>
+        {turn.error &&
+          turn.state !== "running" &&
+          (turn.state === "failed" && latest ? (
+            <AgentProblemNotice
+              problem={turn.problem ?? unclassifiedProblem(turn.error)}
+              safety={pageChanged ? undefined : "page"}
+              setup={setup}
+              agent={agent}
+              at={turn.finishedAt}
+              onRetry={onRetry}
+            />
+          ) : (
             <p className="assistant-error" role="alert">
               {turn.error}
             </p>
-            {latest && <SetupSteps message={turn.error} setup={setup} />}
-          </>
-        )}
+          ))}
         {turn.state !== "running" && pageChanged && turn.pageId && (
           <div className="assistant-result">
             <span>
@@ -275,38 +295,13 @@ function TurnView({
   );
 }
 
-interface SetupActions {
-  checking: boolean;
-  onOpenSettings: () => void;
-  onRecheck: () => void;
-}
-/** Next steps under an Agent setup error (missing agent, sign-in, API key, SDK). */
-function SetupSteps({
-  message,
-  setup,
-}: {
-  message: string;
-  setup: SetupActions;
-}) {
-  const kind = agentErrorKind(message);
-  return kind ? (
-    <AgentNextSteps
-      kind={kind}
-      checking={setup.checking}
-      onOpenSettings={setup.onOpenSettings}
-      onRecheck={setup.onRecheck}
-    />
-  ) : (
-    <AgentHelpSteps message={message} />
-  );
-}
-
 /** Floating request box opened from selection, block, board and page menus. */
 function Composer({
   target,
   pageTitle,
   busy,
   error,
+  notice,
   destination,
   onSend,
   onClose,
@@ -315,6 +310,8 @@ function Composer({
   pageTitle?: string;
   busy: boolean;
   error: string;
+  /** A failed send, shown with its next steps. */
+  notice?: ReactNode;
   destination: ReactNode;
   onSend: (prompt: string) => void;
   onClose: () => void;
@@ -442,6 +439,7 @@ function Composer({
           {error}
         </p>
       )}
+      {notice}
     </div>,
     document.body,
   );
@@ -514,6 +512,12 @@ export default function AssistantWorkbench({
   const sending = useRef(new Set<string>());
   const busy = sendingKeys.includes(composerKey);
   const [error, setError] = useState("");
+  // A request that failed before a turn existed; the input keeps the text.
+  const [sendProblem, setSendProblem] = useState<{
+    problem: AgentProblem;
+    at: string;
+    retry: () => void;
+  } | null>(null);
   const to = useTranslator(onboardingStrings);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [executionRevision, setExecutionRevision] = useState(0);
@@ -599,6 +603,7 @@ export default function AssistantWorkbench({
     setFresh(true);
     setConfirmDelete(false);
     setError("");
+    setSendProblem(null);
   }, []);
   const select = useCallback(async (projectKey: string, id: string) => {
     const selection = ++selectionGeneration.current;
@@ -607,6 +612,7 @@ export default function AssistantWorkbench({
     setFresh(false);
     setConfirmDelete(false);
     setError("");
+    setSendProblem(null);
     setConversation(conversationCache.current.get(id) ?? null);
     const generation = executionGeneration.current;
     const next = await desktop.invoke<AgentConversation>("agent:conversation", {
@@ -679,10 +685,18 @@ export default function AssistantWorkbench({
     executionRevision,
   );
   const status = agent.status;
-  const setup = {
+  const setup: AgentSetupHandlers = {
     checking: agent.checking,
     onOpenSettings,
     onRecheck: () => void agent.recheck(),
+    // Offered only while a model API is configured and Codex is installed here.
+    onUseLocalCodex:
+      status && status.settings.mode === "api" && localCodexAvailable(status)
+        ? () =>
+            void switchToLocalCodex(status)
+              .then(() => agent.recheck())
+              .catch((reason) => setError(errorMessage(reason)))
+        : undefined,
   };
 
   const running = conversation?.turns.find((turn) => turn.state === "running");
@@ -796,6 +810,7 @@ export default function AssistantWorkbench({
     sending.current.add(composerKey);
     setSendingKeys([...sending.current]);
     setError("");
+    setSendProblem(null);
     const sentDraftKey = composerKey,
       selection = selectionGeneration.current;
     try {
@@ -827,7 +842,14 @@ export default function AssistantWorkbench({
         selectionGeneration.current === selection &&
         project.current === projectId
       )
-        setError(errorMessage(reason));
+        setSendProblem({
+          problem: agentProblemOf(reason) ?? unclassifiedProblem(reason),
+          at: new Date().toISOString(),
+          retry: () =>
+            void send(prompt, target, clearDraft).then((sent) => {
+              if (sent && !clearDraft) setComposer(null);
+            }),
+        });
       return false;
     } finally {
       sending.current.delete(sentDraftKey);
@@ -836,6 +858,29 @@ export default function AssistantWorkbench({
   };
   const act = (work: () => Promise<unknown>) => () =>
     void work().catch((reason) => setError(errorMessage(reason)));
+  /** Sends a failed turn's request again in the same conversation. */
+  const retryTurn = async (turn: AgentTurn) => {
+    setError("");
+    setSendProblem(null);
+    try {
+      const next = await desktop.invoke<AgentConversation>("agent:send", {
+        projectId: turn.projectId,
+        conversationId: turn.conversationId,
+        prompt: turn.prompt,
+        target: turn.target,
+      });
+      if (project.current !== turn.projectId) return;
+      conversationCache.current.set(next.id, next);
+      setConversation(next);
+      refreshSummaries(turn.projectId);
+    } catch (reason) {
+      setSendProblem({
+        problem: agentProblemOf(reason) ?? unclassifiedProblem(reason),
+        at: new Date().toISOString(),
+        retry: () => void retryTurn(turn),
+      });
+    }
+  };
 
   // The bridge stays stable for page content; its actions read the latest draft.
   const live = useRef({
@@ -965,6 +1010,33 @@ export default function AssistantWorkbench({
   };
 
   const turns = conversation?.turns ?? [];
+  const startVisible = !!projectId && (fresh || !turns.length);
+  const readiness = status ? agentReadiness(status) : null;
+  // The status card already offers the steps for its own setup problem.
+  const sendCompact =
+    !!sendProblem &&
+    startVisible &&
+    !!readiness &&
+    readinessKindOf(sendProblem.problem.code) === readiness.kind;
+  // A setup problem disappears once the status shows the Agent is ready.
+  const sendResolved =
+    !!sendProblem &&
+    !!readinessKindOf(sendProblem.problem.code) &&
+    readiness?.kind === "ready";
+  const sendNotice = (compact: boolean) =>
+    sendProblem &&
+    !sendResolved && (
+      <AgentProblemNotice
+        problem={sendProblem.problem}
+        safety="input"
+        setup={setup}
+        agent={agentLabel}
+        at={sendProblem.at}
+        compact={compact}
+        onRetry={sendProblem.retry}
+        onNewConversation={startNew}
+      />
+    );
   return (
     <AssistantContext.Provider value={bridge}>
       {children}
@@ -975,6 +1047,7 @@ export default function AssistantWorkbench({
           pageTitle={pageTitle}
           busy={busy || (!fresh && !!running)}
           error={error}
+          notice={sendNotice(false)}
           destination={destination}
           onClose={closeComposer}
           onSend={(prompt) =>
@@ -1110,9 +1183,8 @@ export default function AssistantWorkbench({
                 <AgentStatusRow
                   status={status}
                   error={agent.error}
-                  checking={agent.checking}
-                  onOpenSettings={onOpenSettings}
-                  onRecheck={setup.onRecheck}
+                  setup={setup}
+                  hideSteps={!!sendProblem && !sendResolved && !sendCompact}
                 />
                 {pageId && (
                   <div
@@ -1172,6 +1244,8 @@ export default function AssistantWorkbench({
                     ),
                   )}
                   setup={setup}
+                  agent={agentLabel}
+                  onRetry={() => void retryTurn(turn)}
                   onPermission={(id, option) =>
                     act(() =>
                       desktop.invoke("agent:permission", {
@@ -1314,13 +1388,11 @@ export default function AssistantWorkbench({
               </button>
             </footer>
             {(error || messageDraft.persistenceError) && !composer && (
-              <>
-                <p className="assistant-error" role="alert">
-                  {error || messageDraft.persistenceError}
-                </p>
-                {error && <SetupSteps message={error} setup={setup} />}
-              </>
+              <p className="assistant-error" role="alert">
+                {error || messageDraft.persistenceError}
+              </p>
             )}
+            {!composer && sendNotice(sendCompact)}
           </form>
         </aside>
       )}

@@ -1,12 +1,18 @@
 import { describe, expect, it } from "vitest";
 import type { AgentHostStatus, LocalAgent } from "../agent-host/types";
 import type { PluginInstallation } from "../plugin/desktop-install";
-import agentHostMessages from "../i18n/messages/agentHost";
 import {
-  agentErrorKind,
   agentReadiness,
+  agentSteps,
   connectionHost,
+  localCodexAvailable,
 } from "./AgentReadiness";
+import {
+  agentProblemOf,
+  problemActions,
+  readinessKindOf,
+  unclassifiedProblem,
+} from "./assistant/AgentProblemNotice";
 import {
   pluginActionLabel,
   pluginHostState,
@@ -113,15 +119,57 @@ describe("built-in Agent readiness", () => {
     ).toBe("runtime");
   });
 
-  it("recognizes setup errors from the Agent host in both languages", () => {
-    for (const catalog of Object.values(agentHostMessages.catalogs)) {
-      const text = (key: keyof typeof catalog) => String(catalog[key]);
-      expect(agentErrorKind(text("task.agentMissing"))).toBe("agentMissing");
-      expect(agentErrorKind(text("task.signInRequired"))).toBe("signIn");
-      expect(agentErrorKind(text("runtime.installFirst"))).toBe("runtime");
-      expect(agentErrorKind(text("source.saveApiKey"))).toBe("credentials");
-      expect(agentErrorKind(text("task.timeout"))).toBeNull();
-    }
+  it("offers ChatGPT and an API key side by side when no source exists", () => {
+    expect(agentSteps("noSource")).toEqual(["chatgpt", "apiKey"]);
+    expect(agentSteps("noSource", { localCodex: true })).toEqual([
+      "chatgpt",
+      "apiKey",
+      "localCodex",
+    ]);
+    expect(agentSteps("credentials", { chatgpt: true })[0]).toBe("chatgpt");
+    expect(agentSteps("credentials")[0]).toBe("apiKey");
+    expect(localCodexAvailable(status({ mode: "api" }))).toBe(true);
+    expect(
+      localCodexAvailable(
+        status({ mode: "api" }, { agents: [agent("codex", false, "missing")] }),
+      ),
+    ).toBe(false);
+  });
+});
+
+describe("built-in Agent problems", () => {
+  it("reads the host classification from an IPC error, not its text", () => {
+    const problem = {
+      code: "no_model_source" as const,
+      summary: "还没有可用的模型",
+    };
+    expect(
+      agentProblemOf({ code: "ERROR", message: "任意文字", problem }),
+    ).toEqual(problem);
+    expect(agentProblemOf({ code: "ERROR", message: "还没有可用的模型" })).toBeNull();
+    expect(agentProblemOf({ problem: { code: "made_up", summary: "" } })).toBeNull();
+    expect(unclassifiedProblem(new Error("boom"))).toMatchObject({
+      code: "unknown",
+      detail: "boom",
+    });
+  });
+
+  it("chooses actions by code", () => {
+    expect(problemActions({ code: "no_model_source" }, { localCodex: true })).toEqual([
+      "connectChatgpt",
+      "apiKey",
+      "useLocalCodex",
+    ]);
+    expect(problemActions({ code: "invalid_credentials", chatgpt: true })).toEqual([
+      "connectChatgpt",
+      "retry",
+    ]);
+    expect(problemActions({ code: "invalid_credentials" })[0]).toBe("apiKey");
+    expect(problemActions({ code: "rate_limited" })).toContain("retry");
+    expect(problemActions({ code: "process_exited" })).toEqual(["retry", "viewLog"]);
+    expect(problemActions({ code: "unknown" })).toEqual(["retry", "report"]);
+    expect(readinessKindOf("no_model_source")).toBe("noSource");
+    expect(readinessKindOf("rate_limited")).toBeNull();
   });
 });
 

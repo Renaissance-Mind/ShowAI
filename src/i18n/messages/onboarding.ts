@@ -59,14 +59,18 @@ export default defineMessages("onboarding", {
     "status.agentMissing":
       "未找到本机 {name}。安装并登录后重新检测，或填写模型 API Key 使用内置 Agent。",
     "status.signIn": "本机 {name} 尚未登录，请先在 {name} 中登录后重新检测。",
-    "status.noSource": "尚未选择模型来源，请先填写 API Key。",
+    "status.noSource":
+      "还没有可用的模型。内置 Agent 需要一个模型来源：用 ChatGPT 套餐登录，或填写 API Key；也可以改用本机已安装的 Codex。",
     "status.apiKey": "「{name}」还没有可用的凭据，请先填写 API Key。",
+    "status.chatgpt": "「{name}」还没有连接 ChatGPT 账号，请先连接 ChatGPT。",
     "status.model": "「{name}」还没有选择模型。",
     "status.runtime": "使用模型 API Key 前，需要先在 Agent 设置中安装 Codex SDK。",
     "status.unavailable": "无法读取 Agent 状态：{error}",
     "steps.label": "下一步",
     "steps.guide": "安装说明",
     "steps.apiKey": "填写 API Key",
+    "steps.chatgpt": "连接 ChatGPT",
+    "steps.localCodex": "改用本机 Codex",
     "steps.settings": "打开 Agent 设置",
     "steps.recheck": "重新检测",
     "chips.label": "可以这样开始",
@@ -157,8 +161,10 @@ export default defineMessages("onboarding", {
       "{name} wasn't found on this computer. Install it and sign in, then check again, or add a model API key to use the built-in agent.",
     "status.signIn":
       "{name} on this computer isn't signed in. Sign in to {name}, then check again.",
-    "status.noSource": "No model source is selected yet. Add an API key first.",
+    "status.noSource":
+      "No model is available yet. The built-in agent needs a model source: sign in with a ChatGPT plan or add an API key. You can also switch to Codex installed on this Mac.",
     "status.apiKey": "“{name}” has no usable credential yet. Add an API key first.",
+    "status.chatgpt": "“{name}” isn’t connected to a ChatGPT account yet. Connect ChatGPT first.",
     "status.model": "“{name}” has no model selected yet.",
     "status.runtime":
       "Install the Codex SDK in Agent settings before using a model API key.",
@@ -166,6 +172,8 @@ export default defineMessages("onboarding", {
     "steps.label": "Next steps",
     "steps.guide": "Setup guide",
     "steps.apiKey": "Add API key",
+    "steps.chatgpt": "Connect ChatGPT",
+    "steps.localCodex": "Use local Codex",
     "steps.settings": "Open Agent settings",
     "steps.recheck": "Check again",
     "chips.label": "Start with",

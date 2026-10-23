@@ -5,6 +5,7 @@ import { homedir } from "node:os";
 import { delimiter, join } from "node:path";
 import { translator } from "../i18n";
 import agentHostMessages from "../i18n/messages/agentHost";
+import { AgentFailure } from "./problems";
 
 const t = translator(agentHostMessages);
 
@@ -155,7 +156,21 @@ export function execute(
           return;
         }
       }
-      if (timedOut) reject(new Error(t("task.timeout")));
+      if (timedOut)
+        reject(
+          new AgentFailure({
+            code: "timeout",
+            summary: t("task.timeout"),
+            detail: stderr,
+          }),
+        );
+      else if (signal && !options.signal?.aborted)
+        reject(
+          new AgentFailure({
+            code: "process_exited",
+            detail: `Agent exited with ${signal}.\n${stderr}`,
+          }),
+        );
       else if (signal) reject(new Error(`Agent exited with ${signal}.`));
       else resolve({ code: code ?? 1, stdout, stderr });
     });
@@ -240,7 +255,13 @@ export class RpcProcess {
     };
     this.child.once("error", fail);
     this.child.once("close", (code) =>
-      fail(new Error(`Agent connection closed (${code}): ${this.stderr}`)),
+      fail(
+        new AgentFailure({
+          code: "process_exited",
+          ...(code !== null ? { exitCode: code } : {}),
+          detail: `Agent connection closed (${code}).\n${this.stderr}`,
+        }),
+      ),
     );
   }
   send(value: unknown) {

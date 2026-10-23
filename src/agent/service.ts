@@ -1295,6 +1295,13 @@ export function errorResult(error: unknown) {
     ...(error instanceof CoreError && error.details
       ? { details: error.details }
       : {}),
+    // Built-in Agent failures carry their classification across IPC.
+    ...(error instanceof Error &&
+    "problem" in error &&
+    error.problem &&
+    typeof error.problem === "object"
+      ? { problem: error.problem }
+      : {}),
   };
 }
 

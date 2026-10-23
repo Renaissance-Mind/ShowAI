@@ -35,6 +35,12 @@ import {
 import { SdkInstaller } from "./installer";
 import { ChatGptConnection } from "./chatgpt";
 import { startModelGateway } from "./gateway";
+import {
+  AgentFailure,
+  classifyFailure,
+  gatewayProblem,
+  matchProblem,
+} from "./problems";
 import type { ModelResources } from "../sync/model-resources";
 import type { ResolvedResource } from "../sync/accounts";
 import { withLibraryLock } from "../core/library-lock";
@@ -949,21 +955,22 @@ export class AgentHost {
       })
       .catch((error: Error) => {
         task.state = controller.signal.aborted ? "cancelled" : "failed";
-        task.error = controller.signal.aborted
-          ? t("task.stopped")
-          : error.message;
-        if (
-          settings.mode === "local" &&
-          /Authentication required|login_required/i.test(task.error)
-        ) {
+        if (controller.signal.aborted) task.error = t("task.stopped");
+        else {
+          task.problem = this.problem(error, task, settings.mode, {
+            localAgent,
+            source,
+          });
+          task.error = task.problem.summary;
+        }
+        if (task.problem?.code === "sign_in_required") {
           const agent = this.agents.find((item) => item.id === localAgent);
           if (agent) {
             agent.auth = "missing";
             agent.detail = t("agent.signInExpired");
           }
-          task.error = t("task.signInRequired");
         }
-        this.emit(task, "error", task.error);
+        this.emit(task, "error", task.error!);
         if (test && settings.mode === "local") this.markTest(localAgent, false);
       })
       .finally(() => {
@@ -1028,9 +1035,7 @@ export class AgentHost {
     }
     const source =
       conversation.mode === "api"
-        ? await this.source(conversation.sourceId ?? "").catch(() => {
-            throw new Error(t("conversation.sourceMissing"));
-          })
+        ? await this.conversationSource(conversation, !args.conversationId)
         : undefined;
     const page = target.pageId
       ? await library.readPage(projectId, target.pageId, { checkpoint: false })
@@ -1159,16 +1164,14 @@ export class AgentHost {
           this.emit(turn, "status", t("task.completed"));
           turn.state = "completed";
         } else {
-          turn.error = controller.signal.aborted
-            ? t("task.stopped")
-            : failure.message;
-          if (
-            conversation.mode === "local" &&
-            /Authentication required|login_required|Failed to authenticate|OAuth session expired/i.test(
-              `${turn.error}\n${turn.events.map((event) => event.text).join("\n")}`,
-            )
-          )
-            turn.error = t("task.signInRequired");
+          if (controller.signal.aborted) turn.error = t("task.stopped");
+          else {
+            turn.problem = this.problem(failure, turn, conversation.mode, {
+              localAgent: conversation.localAgent ?? "codex",
+              source,
+            });
+            turn.error = turn.problem.summary;
+          }
           this.emit(turn, "error", turn.error);
           turn.state = controller.signal.aborted ? "cancelled" : "failed";
         }
@@ -1179,6 +1182,47 @@ export class AgentHost {
         console.error("ShowAI Agent conversation persistence:", error.message),
       );
     return conversation;
+  }
+  /**
+   * The source an API conversation runs with. A new conversation without one
+   * means no model source was ever chosen; an existing conversation whose
+   * source is gone keeps its own explanation.
+   */
+  private async conversationSource(
+    conversation: AgentConversation,
+    fresh: boolean,
+  ) {
+    const settings = await this.settings();
+    const source = settings.sources.find(
+      (item) => item.id === conversation.sourceId,
+    );
+    if (source) return source;
+    throw new AgentFailure({
+      code:
+        fresh || !conversation.sourceId ? "no_model_source" : "source_removed",
+    });
+  }
+  /** Classifies a failed run; the original text stays in `problem.detail`. */
+  private problem(
+    error: Error,
+    task: AgentTask,
+    mode: AgentSettings["mode"],
+    context: { localAgent: AgentId; source?: ModelSource },
+  ) {
+    const name =
+      mode === "api"
+        ? context.source?.name
+        : definitions.find((item) => item.id === context.localAgent)?.name;
+    return classifyFailure(error, {
+      ...(name ? { name } : {}),
+      ...(mode === "api" && context.source
+        ? { chatgpt: context.source.credential === "chatgpt" }
+        : {}),
+      output: task.events
+        .filter((event) => event.type === "error")
+        .map((event) => event.text)
+        .join("\n"),
+    });
   }
   /** Restore the focused page to its state before this turn, if nothing changed since. */
   async undoTurn(projectId: string, conversationId: string, turnId: string) {
@@ -1271,78 +1315,125 @@ export class AgentHost {
     test = false,
     source?: ModelSource,
   ) {
+    if (!source) throw new AgentFailure({ code: "no_model_source" });
+    const chatgpt = source.credential === "chatgpt";
+    if (!source.model)
+      throw new AgentFailure({ code: "model_missing", name: source.name });
+    await this.installer.paths().catch((error: Error) => {
+      throw new AgentFailure({
+        code: "runtime_missing",
+        detail: error.message,
+      });
+    });
     await this.prepareIsolation();
-    if (!source) throw new Error(t("source.select"));
-    if (!source.model) throw new Error(t("task.chooseModel"));
+    await this.token(source).catch((error: Error) => {
+      throw new AgentFailure({
+        code:
+          matchProblem(error.message) === "network"
+            ? "network"
+            : "credentials_missing",
+        name: source.name,
+        chatgpt,
+        detail: error.message,
+      });
+    });
     const gateway = await startModelGateway(source, (force) =>
       this.token(source, force),
     );
     try {
-      const paths = await this.installer.paths(),
-        env = isolatedEnvironment(
-          join(this.options.root, "embedded"),
-          task.workspace,
-        );
-      env.SHOWAI_MODEL_TOKEN = gateway.secret;
-      const url = pathToFileURL(paths.sdk).href;
-      const sdk = await import(/* @vite-ignore */ url);
-      const codex = new sdk.Codex({
-        codexPathOverride: paths.binary,
-        env,
-        config: {
-          model_provider: "showai",
-          model_providers: {
-            showai: {
-              name: source.name,
-              base_url: gateway.url,
-              env_key: "SHOWAI_MODEL_TOKEN",
-              wire_api: "responses",
-              requires_openai_auth: false,
-              supports_websockets: false,
-            },
-          },
-          cli_auth_credentials_store: "file",
-          project_root_markers: [],
-          project_doc_max_bytes: 0,
-          web_search: "disabled",
-          features: { apps: false, tool_search: false, hooks: false },
-          memories: { generate_memories: false },
-          ...(test
-            ? {}
-            : { mcp_servers: { showai: this.mcp(cli, task.projectId, task) } }),
-        },
-      });
-      const options = {
-        model: source.model,
-        sandboxMode: "workspace-write",
-        workingDirectory: task.workspace,
-        skipGitRepoCheck: true,
-        approvalPolicy: "never",
-        networkAccessEnabled: true,
-        webSearchMode: "disabled",
-      };
-      const thread = threadId
-        ? codex.resumeThread(threadId, options)
-        : codex.startThread(options);
-      let complete = false;
-      const turn = await thread.runStreamed(prompt, { signal });
-      for await (const event of turn.events) {
-        if (event.type === "thread.started") {
-          task.threadId = event.thread_id;
-          await this.persist(task);
-        }
-        if (event.type === "turn.completed") complete = true;
-        if (event.type === "error" || event.type === "turn.failed")
-          throw new Error(
-            event.message ?? event.error?.message ?? t("task.agentFailed"),
-          );
-        if (event.type === "item.completed" || event.type === "item.updated")
-          this.codexEvent(task, event.item, event.type === "item.completed");
-      }
-      if (!complete) throw new Error(t("task.turnIncomplete"));
+      await this.runCodexSdk(
+        task,
+        prompt,
+        cli,
+        signal,
+        gateway,
+        source,
+        threadId,
+        test,
+      );
+    } catch (error) {
+      // Provider statuses seen by the gateway explain the run better than
+      // the text Codex reports after its own retries.
+      const failure = gateway.failure();
+      if (failure && !signal.aborted && !(error instanceof AgentFailure))
+        throw gatewayProblem(failure, { chatgpt, name: source.name });
+      throw error;
     } finally {
       gateway.close();
     }
+  }
+  private async runCodexSdk(
+    task: AgentTask,
+    prompt: string,
+    cli: ReturnType<AgentHostOptions["cli"]>,
+    signal: AbortSignal,
+    gateway: Awaited<ReturnType<typeof startModelGateway>>,
+    source: ModelSource,
+    threadId: string | undefined,
+    test: boolean,
+  ) {
+    const paths = await this.installer.paths(),
+      env = isolatedEnvironment(
+        join(this.options.root, "embedded"),
+        task.workspace,
+      );
+    env.SHOWAI_MODEL_TOKEN = gateway.secret;
+    const url = pathToFileURL(paths.sdk).href;
+    const sdk = await import(/* @vite-ignore */ url);
+    const codex = new sdk.Codex({
+      codexPathOverride: paths.binary,
+      env,
+      config: {
+        model_provider: "showai",
+        model_providers: {
+          showai: {
+            name: source.name,
+            base_url: gateway.url,
+            env_key: "SHOWAI_MODEL_TOKEN",
+            wire_api: "responses",
+            requires_openai_auth: false,
+            supports_websockets: false,
+          },
+        },
+        cli_auth_credentials_store: "file",
+        project_root_markers: [],
+        project_doc_max_bytes: 0,
+        web_search: "disabled",
+        features: { apps: false, tool_search: false, hooks: false },
+        memories: { generate_memories: false },
+        ...(test
+          ? {}
+          : { mcp_servers: { showai: this.mcp(cli, task.projectId, task) } }),
+      },
+    });
+    const options = {
+      model: source.model,
+      sandboxMode: "workspace-write",
+      workingDirectory: task.workspace,
+      skipGitRepoCheck: true,
+      approvalPolicy: "never",
+      networkAccessEnabled: true,
+      webSearchMode: "disabled",
+    };
+    const thread = threadId
+      ? codex.resumeThread(threadId, options)
+      : codex.startThread(options);
+    let complete = false;
+    const turn = await thread.runStreamed(prompt, { signal });
+    for await (const event of turn.events) {
+      if (event.type === "thread.started") {
+        task.threadId = event.thread_id;
+        await this.persist(task);
+      }
+      if (event.type === "turn.completed") complete = true;
+      if (event.type === "error" || event.type === "turn.failed")
+        throw new Error(
+          event.message ?? event.error?.message ?? t("task.agentFailed"),
+        );
+      if (event.type === "item.completed" || event.type === "item.updated")
+        this.codexEvent(task, event.item, event.type === "item.completed");
+    }
+    if (!complete) throw new Error(t("task.turnIncomplete"));
   }
   private codexEvent(task: AgentTask, item: any, completed = true) {
     const event = (type: AgentEvent["type"], text: string) => {
@@ -1444,7 +1535,7 @@ export class AgentHost {
         },
       });
       if (result.code !== 0 || !complete)
-        throw new Error(result.stderr || t("task.codexIncomplete"));
+        throw exitFailure(result, "Codex", t("task.codexIncomplete"));
       return;
     }
     if (agentId === "claude") {
@@ -1533,7 +1624,7 @@ export class AgentHost {
         },
       });
       if (result.code !== 0 || !complete)
-        throw new Error(result.stderr || t("task.claudeIncomplete"));
+        throw exitFailure(result, "Claude Code", t("task.claudeIncomplete"));
       return;
     }
     const definition = definitions.find((item) => item.id === agentId)!;
@@ -1728,6 +1819,8 @@ export class AgentHost {
             this.installer.state = {
               ...this.installer.state,
               state: "failed",
+              stage: "failed",
+              failure: this.installer.state.failure ?? "unknown",
               error: error.message,
               progress: t("isolation.configFailed"),
             };
@@ -1836,6 +1929,23 @@ export const agentActions = new Set([
   "agent:readFile",
   "agent:permission",
 ]);
+/** A local Agent that exited non-zero, or quit without finishing the turn. */
+function exitFailure(
+  result: { code: number; stderr: string },
+  name: string,
+  incomplete: string,
+) {
+  return new AgentFailure(
+    result.code !== 0
+      ? {
+          code: "process_exited",
+          exitCode: result.code,
+          name,
+          detail: result.stderr,
+        }
+      : { code: "unknown", summary: incomplete, name, detail: result.stderr },
+  );
+}
 /** `mcp__showai__page_apply` reads as `showai · page_apply`. */
 function toolLabel(name: string) {
   const match = /^mcp__([^_]+(?:_[^_]+)*?)__(.+)$/.exec(name);
