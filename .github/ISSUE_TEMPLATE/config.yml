@@ -1,5 +1,8 @@
 blank_issues_enabled: true
 contact_links:
-  - name: Documentation
+  - name: Documentation / 文档
     url: https://github.com/Renaissance-Mind/ShowAI/tree/main/docs
-    about: Guides for the workbench, agent integration, components, and sync.
+    about: Guides for the workbench, agent integration, components, and sync. / 工作台、Agent 接入、组件与同步的使用说明。
+  - name: Troubleshooting / 常见问题
+    url: https://showai.renaissancemind.ai/doc/agent-troubleshooting
+    about: Fix Agent connection, plugin and runtime problems before filing an issue. / 提交问题前，先按步骤排查 Agent 连接、插件与运行时。

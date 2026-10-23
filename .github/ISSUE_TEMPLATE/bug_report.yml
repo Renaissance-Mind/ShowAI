@@ -1,52 +1,63 @@
-name: Bug report
-description: Report something that does not work as expected
+name: Bug report / 报告问题
+description: Report something that does not work as expected / 报告不能正常工作的地方
 labels: [bug]
 body:
+  - type: markdown
+    attributes:
+      value: |
+        In the ShowAI App, **Settings → About & feedback → Copy Diagnostic Information** copies redacted versions, platform and recent errors. Paste it into the logs field below.
+        在 ShowAI App 中打开 **设置 → 关于与反馈 → 复制诊断信息**，可以复制已脱敏的版本、平台和最近的错误，粘贴到下方的日志一栏。
+
+        No GitHub account? Use **Copy Full Report** in the same place and paste it into any channel the ShowAI team announces.
+        没有 GitHub 账号时，可以在同一页面使用 **复制全文**，粘贴到 ShowAI 团队公布的任意渠道。
   - type: textarea
     id: summary
     attributes:
-      label: What happened
-      description: Describe the problem and what you expected instead.
+      label: What happened / 发生了什么
+      description: Describe the problem and what you expected instead. / 描述看到的情况，以及原本期望的结果。
     validations:
       required: true
   - type: textarea
     id: steps
     attributes:
-      label: Steps to reproduce
+      label: Steps to reproduce / 复现步骤
       placeholder: |
-        1. Open ...
-        2. Click ...
-        3. See ...
+        1. Open ... / 打开…
+        2. Click ... / 点击…
+        3. See ... / 出现…
     validations:
       required: true
   - type: dropdown
     id: edition
     attributes:
-      label: Edition
+      label: Edition / 使用的版本
       options:
-        - Desktop app
-        - Local browser workbench
-        - Agent plugin / CLI / MCP
-        - Exported HTML or site
-        - Sync server
+        - Desktop app / 桌面 App
+        - Local browser workbench / 本地浏览器版
+        - Agent plugin / CLI / MCP / Agent 插件、CLI 或 MCP
+        - Exported HTML or site / 导出的 HTML 或网站
+        - Sync server / 同步服务
     validations:
       required: true
   - type: input
     id: version
     attributes:
-      label: ShowAI version or commit
-      placeholder: 0.9.0 or a commit hash
+      label: ShowAI version or commit / ShowAI 版本或提交号
+      description: Shown in Settings → About & feedback. / 在「设置 → 关于与反馈」中查看。
+      placeholder: 0.10.0 (6d8d3b9)
     validations:
       required: true
   - type: input
     id: platform
     attributes:
-      label: Platform
+      label: Platform / 运行平台
       placeholder: macOS 15 arm64, Windows 11 x64, Ubuntu 24.04 ...
     validations:
       required: true
   - type: textarea
     id: logs
     attributes:
-      label: Logs or screenshots
-      description: Remove personal content before attaching files.
+      label: Logs or screenshots / 日志或截图
+      description: |
+        Paste the diagnostic information from Settings → About & feedback → Copy Diagnostic Information. Remove personal content before attaching files.
+        粘贴「设置 → 关于与反馈 → 复制诊断信息」得到的内容。附加文件前请先删除个人内容。
