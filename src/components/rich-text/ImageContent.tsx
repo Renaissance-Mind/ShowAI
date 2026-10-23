@@ -3,9 +3,9 @@ import { useState } from "react";
 import { NativeInkPreview } from "../../surface/NativeInkPreview";
 import { safeImageUrl } from "../blocks/helpers";
 import { richTextStyle } from "./model.mjs";
-import { ImageOff } from "../../ui/icons";
 import { useTranslator } from "../../i18n/react";
 import messages from "../../i18n/messages/media";
+import commonMessages from "../../i18n/messages/common";
 import "../blocks/research-media.css";
 
 /**
@@ -21,10 +21,10 @@ function ImageUnavailable({
   blocked: boolean;
 }) {
   const t = useTranslator(messages);
+  const tc = useTranslator(commonMessages);
   const [copy, setCopy] = useState<"" | "copied" | "failed">("");
   return (
     <div className="sb-image-unavailable" role="img" aria-label={src}>
-      <ImageOff size={22} aria-hidden />
       <p>{blocked ? t("imageBlocked") : t("imageFailed")}</p>
       <span className="sb-image-unavailable-actions">
         {!blocked && (
@@ -43,7 +43,7 @@ function ImageUnavailable({
           }
         >
           {copy === "copied"
-            ? t("addressCopied")
+            ? tc("copied")
             : copy === "failed"
               ? t("copyAddressFailed")
               : t("copyAddress")}

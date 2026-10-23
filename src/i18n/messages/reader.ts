@@ -14,8 +14,7 @@ export default defineMessages("reader", {
       "无法加载组件 {component}：{reason}。请检查网络和发布服务器的 CORS 设置。",
     networkFailed: "网络请求失败",
     contentUnavailable: "此部分内容暂时无法加载，请检查网络后刷新。",
-    contentUnverified: "此部分内容未通过完整性校验，为安全起见没有加载。",
-    technicalDetails: "技术详情",
+    contentUnverified: "此部分内容未通过完整性校验，没有加载。",
     componentChecksumFailed:
       "组件 {component} 的文件校验失败（SHA-256 或字节数不一致）。",
     lockedComponentMissing: "缺少页面锁定的组件 {component}，原页面未被替换。",
@@ -53,9 +52,7 @@ export default defineMessages("reader", {
     networkFailed: "Network request failed",
     contentUnavailable:
       "Part of this page can't be loaded right now. Check your network and refresh.",
-    contentUnverified:
-      "Part of this page failed verification and wasn't loaded, for your safety.",
-    technicalDetails: "Technical details",
+    contentUnverified: "Part of this page failed verification and wasn't loaded.",
     componentChecksumFailed:
       "Component {component} failed verification (SHA-256 or size mismatch).",
     lockedComponentMissing:

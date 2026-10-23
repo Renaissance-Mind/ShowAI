@@ -355,34 +355,23 @@
 
 /* An image that failed to load or whose address is not allowed. */
 .sb-image-unavailable {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 6px;
-  padding: 22px 16px;
-  border: 1px dashed var(--line, #e9ece5);
+  padding: 18px 16px;
+  border: 1px dashed var(--line);
   border-radius: 8px;
-  background: var(--surface, #f7f8f5);
-  color: var(--muted, #92968f);
+  color: var(--muted);
   font-size: 12px;
   text-align: center;
 }
 .sb-image-unavailable p {
-  margin: 0;
-  color: var(--text, #343a35);
+  margin: 0 0 6px;
+  color: var(--text);
 }
-.sb-image-unavailable-actions {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 12px;
-}
-.sb-image-unavailable-actions a,
-.sb-image-unavailable-actions button {
+.sb-image-unavailable-actions > * {
+  margin: 0 6px;
   border: 0;
   padding: 0;
   background: none;
-  color: var(--accent, #50745e);
+  color: var(--accent);
   font: inherit;
   cursor: pointer;
 }

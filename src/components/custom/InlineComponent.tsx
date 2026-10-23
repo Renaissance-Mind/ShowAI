@@ -8,7 +8,7 @@ import { useEffect, useRef, useState } from "react";
 import type { CompiledComponent } from "./types";
 import type { PageOutlineComponentProps } from "../../surface/page-outline.mjs";
 import { ComponentStatus } from "../blocks/ComponentStatus";
-import { isValidationMessage, readableValidation } from "./frame-errors";
+import { isValidationMessage, readableValidation } from "./validation-messages";
 import { useTranslator } from "../../i18n/react";
 import messages from "../../i18n/messages/customComponents";
 import {
@@ -178,7 +178,7 @@ export function InlineComponent({
           error={error}
           issues={
             isValidationMessage(error)
-              ? readableValidation(error, t as never)
+              ? readableValidation(error)
               : []
           }
           readOnly

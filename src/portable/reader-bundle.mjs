@@ -353,6 +353,50 @@ async function compileReader(archivePath, archive, kinds, omits = []) {
         () => ({ contents: vendorCore, loader: "js" }),
       );
       builder.onLoad({ filter: /.*/, namespace: "reader" }, (args) => {
+        // Readers never show editing actions or technical details, so the
+        // workbench status card (actions, details, error catalogue) is
+        // replaced by one calm line naming the component.
+        if (args.path === "src/components/blocks/ComponentStatus.tsx")
+          return {
+            contents: [
+              'import { createElement as h } from "react";',
+              'import { translator } from "../../i18n";',
+              'import messages from "../../i18n/messages/widget";',
+              "const t = translator(messages);",
+              'export const FIND_COMPONENT_EVENT = "showai:find-component";',
+              "export function ComponentStatus({ name, reference }) {",
+              '  return h("p", { role: "status", className: "sb-image-unavailable" }, t("status.unavailable", { name: name || reference }));',
+              "}",
+            ].join("\n"),
+            loader: "js",
+            resolveDir: join(dirname(archivePath), ".."),
+          };
+        // Only sandboxed custom blocks report frame errors; without one on the
+        // page the reporter would only add weight.
+        if (
+          !selected.has("custom") &&
+          args.path === "src/components/custom/frame-errors.ts"
+        )
+          return {
+            contents: [
+              'export const FRAME_RUNTIME_ERROR = "showai:runtime-error";',
+              "export function installFrameErrorReporter() {}",
+              "export const readFrameRuntimeError = () => null;",
+              "export const repeatsRuntimeError = () => false;",
+            ].join("\n"),
+            loader: "js",
+          };
+        // Readers show no technical details, so validation text stays as is.
+        if (args.path === "src/components/custom/validation-messages.ts")
+          return {
+            contents: [
+              "export const parseValidationMessage = () => [];",
+              "export const isValidationMessage = () => false;",
+              'export const readablePath = () => "";',
+              "export const readableValidation = (text) => [String(text)];",
+            ].join("\n"),
+            loader: "js",
+          };
         if (omitMath && args.path === "src/components/blocks/katex.css")
           return { contents: "", loader: "css" };
         // Never reached without code blocks; the stub keeps code as plain text if it is.

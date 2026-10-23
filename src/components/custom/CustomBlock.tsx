@@ -42,10 +42,10 @@ import widgetMessages from "../../i18n/messages/widget";
 import {
   installFrameErrorReporter,
   readFrameRuntimeError,
-  readableValidation,
   repeatsRuntimeError,
   type FrameRuntimeError,
 } from "./frame-errors";
+import { readableValidation } from "./validation-messages";
 import "./custom.css";
 
 const ComponentsContext = createContext<ReadonlyMap<string, CompiledComponent>>(
@@ -501,7 +501,7 @@ function SandboxComponent({
           const message = String(event.data.message || "");
           setDraftError(
             message
-              ? readableValidation(message, t as never).join("\n")
+              ? readableValidation(message).join("\n")
               : t("invalidProps"),
           );
         } else if (JSON.stringify(current.parsed.props) !== draftBase.current) {
@@ -691,7 +691,7 @@ function SandboxComponent({
           cause={
             crash?.kind === "rejection" ? tw("status.rejectionCause") : undefined
           }
-          issues={crash ? [] : readableValidation(error, t as never)}
+          issues={crash ? [] : readableValidation(error)}
           data={parsed.props}
           readOnly={!editable}
           assistant={editable ? assistant : null}

@@ -16,7 +16,6 @@ export default defineMessages("media", {
     imageBlocked: "图片地址不受支持，只能显示 http、https 或内嵌的图片。",
     openAddress: "打开原地址",
     copyAddress: "复制地址",
-    addressCopied: "已复制",
     copyAddressFailed: "无法复制",
   },
   en: {
@@ -36,7 +35,6 @@ export default defineMessages("media", {
       "This image address isn't supported. Only http, https and embedded images can be shown.",
     openAddress: "Open original address",
     copyAddress: "Copy address",
-    addressCopied: "Copied",
     copyAddressFailed: "Couldn't copy",
   },
 });

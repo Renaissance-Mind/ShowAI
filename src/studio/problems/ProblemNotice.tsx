@@ -14,7 +14,7 @@ import {
   type ReactElement,
   type ReactNode,
 } from "react";
-import { redact } from "../../core/redact";
+import { problemReportText } from "./report-text";
 import { useTranslator } from "../../i18n/react";
 import messages from "../../i18n/messages/errors";
 import {
@@ -33,7 +33,6 @@ import {
   type ProblemActionId,
   type ProblemDescription,
 } from "./describe";
-import { problemRedaction } from "./redaction";
 import { dispatchReportProblem } from "./report-event";
 import "./problems.css";
 
@@ -89,12 +88,7 @@ async function writeClipboard(text: string) {
   else await navigator.clipboard.writeText(text);
 }
 
-export function problemReportText(problem: ProblemDescription) {
-  return redact(
-    [problem.title, problem.cause, problem.details].filter(Boolean).join("\n"),
-    problemRedaction(),
-  );
-}
+export { problemReportText };
 
 function ToneIcon({ tone, size = 16 }: { tone: ProblemTone | "success"; size?: number }) {
   if (tone === "success") return <CircleCheck size={size} aria-hidden />;

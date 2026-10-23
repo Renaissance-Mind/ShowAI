@@ -298,7 +298,7 @@ function ArtifactReader({
                   <p>{remoteError.summary}</p>
                   {remoteError.detail && (
                     <details>
-                      <summary>{t("technicalDetails")}</summary>
+                      <summary>{tc("details")}</summary>
                       <p>{remoteError.detail}</p>
                     </details>
                   )}

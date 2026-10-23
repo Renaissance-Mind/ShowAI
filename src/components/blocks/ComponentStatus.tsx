@@ -15,13 +15,13 @@ import {
   TriangleAlert,
 } from "../../ui/icons";
 import { useTranslator } from "../../i18n/react";
-import messages from "../../i18n/messages/widget";
+import type { ProblemDescription } from "../../studio/problems/describe";
+import messages from "../../i18n/messages/componentStatus";
+import widgetMessages from "../../i18n/messages/widget";
 import type { AssistantBridge } from "../assistant-context";
-import {
-  describeError,
-  dispatchReportProblem,
-  problemReportText,
-} from "../../studio/problems";
+// Direct module imports keep the reader bundle free of the workbench notice UI.
+import { dispatchReportProblem } from "../../studio/problems/report-event";
+import { problemReportText } from "../../studio/problems/report-text";
 import { downloadFile } from "./helpers";
 import "./component-status.css";
 
@@ -81,9 +81,11 @@ export function ComponentStatus({
   assistant,
   attached = false,
 }: ComponentStatusProps) {
+  const tw = useTranslator(widgetMessages);
   const t = useTranslator(messages);
   const card = useRef<HTMLElement>(null);
   const [copy, setCopy] = useState<"" | "copied" | "failed">("");
+  const [renderedAt] = useState(() => new Date().toISOString());
   useEffect(() => {
     if (copy !== "copied") return;
     const timer = setTimeout(() => setCopy(""), 2000);
@@ -113,8 +115,19 @@ export function ComponentStatus({
   ]
     .filter(Boolean)
     .join("\n");
-  const problem = {
-    ...describeError(error ?? title, { object: label, source: "component" }),
+  // Built here rather than through describeError so readers don't bundle the
+  // workbench error catalogue.
+  const problem: ProblemDescription = {
+    code:
+      state === "crashed"
+        ? "COMPONENT_CRASHED"
+        : state === "invalid"
+          ? "COMPONENT_INVALID"
+          : "COMPONENT_MISSING",
+    source: "component",
+    at: renderedAt,
+    message: error ?? title,
+    actions: [],
     title,
     cause: [reason, ...issues].filter(Boolean).join("\n"),
     details: technical,
@@ -244,7 +257,7 @@ export function ComponentStatus({
             <pre>{technical}</pre>
             {data !== undefined && (
               <details className="component-status-data">
-                <summary>{t("viewData")}</summary>
+                <summary>{tw("viewData")}</summary>
                 <pre>{JSON.stringify(data, null, 2)}</pre>
               </details>
             )}
@@ -261,7 +274,7 @@ export function ComponentStatus({
                   }
                 >
                   <FileJson size={13} />
-                  {t("downloadData")}
+                  {tw("downloadData")}
                 </button>
               )}
               <button

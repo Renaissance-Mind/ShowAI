@@ -1,14 +1,13 @@
 import { afterEach, describe, expect, it } from "vitest";
 import Ajv from "ajv";
 import { setLocale, translator } from "../../i18n";
-import messages from "../../i18n/messages/customComponents";
+import messages from "../../i18n/messages/componentValidation";
+import { readFrameRuntimeError, repeatsRuntimeError } from "./frame-errors";
 import {
   isValidationMessage,
   parseValidationMessage,
-  readFrameRuntimeError,
   readableValidation,
-  repeatsRuntimeError,
-} from "./frame-errors";
+} from "./validation-messages";
 
 const t = translator(messages) as never;
 
