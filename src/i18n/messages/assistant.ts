@@ -55,8 +55,6 @@ export default defineMessages("assistant", {
     "panel.saveFirst": "页面有未保存或冲突的修改，请先处理后再发送。",
     "panel.startedNew": "新对话",
     "panel.sendTo": "发送到「{title}」",
-    "panel.persistFailed":
-      "这段对话没有写入磁盘，刷新或重启后最近的内容可能丢失。原因：{error}",
     "panel.sendToNew": "将开始新对话",
     "panel.useNew": "改为新对话",
     "panel.useCurrent": "继续当前对话",
@@ -152,8 +150,6 @@ export default defineMessages("assistant", {
       "The page has unsaved or conflicting changes. Resolve them before sending.",
     "panel.startedNew": "New conversation",
     "panel.sendTo": "Sends to “{title}”",
-    "panel.persistFailed":
-      "This conversation could not be written to disk; its latest part may be lost after a refresh or restart. Reason: {error}",
     "panel.sendToNew": "Starts a new conversation",
     "panel.useNew": "Use a new conversation",
     "panel.useCurrent": "Continue the current conversation",

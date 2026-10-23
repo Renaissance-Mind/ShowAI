@@ -13,7 +13,7 @@ import { PageWidthSwitch } from "./PageWidthSwitch";
 import {
   LibraryContextMenu,
   type LibraryContextMenuItem,
-} from "../studio/LibraryNavigation";
+} from "../studio/LibraryContextMenu";
 import { translator } from "../i18n";
 import { useTranslator } from "../i18n/react";
 import messages from "../i18n/messages/surface";

@@ -2011,3 +2011,23 @@ button.studio-save-state.is-failed:hover {
   flex: none;
   max-width: none;
 }
+
+/* Sync state after a sidebar row title; workbench only, so not in library-row.css. */
+.studio-tree-marker {
+  flex: 0 1 auto;
+  min-width: 2.5em;
+  max-width: 6.5em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 0 5px;
+  border-radius: 4px;
+  font-size: 11px;
+  line-height: 17px;
+  color: var(--muted);
+  background: color-mix(in srgb, var(--muted) 10%, transparent);
+}
+.studio-tree-marker.is-warning {
+  color: var(--warning);
+  background: color-mix(in srgb, var(--warning) 12%, transparent);
+}

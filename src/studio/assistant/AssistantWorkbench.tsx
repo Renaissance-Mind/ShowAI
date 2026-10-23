@@ -30,6 +30,7 @@ import { AgentExecutionPicker, remoteExecution } from "../AgentExecution";
 import type { Translator } from "../../i18n";
 import { useTranslator } from "../../i18n/react";
 import strings from "../../i18n/messages/assistant";
+import persistStrings from "../../i18n/messages/assistantPersist";
 import {
   ArrowUp,
   Blocks,
@@ -482,6 +483,7 @@ export default function AssistantWorkbench({
   children: ReactNode;
 }) {
   const t = useTranslator(strings);
+  const tpersist = useTranslator(persistStrings);
   const [summaries, setSummaries] = useState<AgentConversationSummary[]>([]);
   const canPickReference = useSyncExternalStore(
     subscribeReferenceAvailability,
@@ -1220,7 +1222,7 @@ export default function AssistantWorkbench({
               <>
               {conversation?.persistError && (
                 <p className="assistant-error" role="alert">
-                  {t("panel.persistFailed", { error: conversation.persistError })}
+                  {tpersist("persistFailed", { error: conversation.persistError })}
                 </p>
               )}
               {turns.map((turn, index) => (

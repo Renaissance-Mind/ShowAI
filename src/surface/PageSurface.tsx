@@ -1,8 +1,8 @@
 import type {NativeBoardControlHandle} from "./native-board-control";
 import {PortableCubicDrawingInput,PortableCubicPreview} from "./PortableCubicDrawingInput";
 import { isEditableDrawing } from "./portable-ink.mjs";
-import { LibraryContextMenu } from "../studio/LibraryNavigation";
-import type { LibraryContextMenuItem } from "../studio/LibraryNavigation";
+import { LibraryContextMenu } from "../studio/LibraryContextMenu";
+import type { LibraryContextMenuItem } from "../studio/LibraryContextMenu";
 import type { SurfaceGeometryStore } from "./geometry-store";
 import type { ShowDocument } from "../types";
 import { useBoardInteraction } from "./useBoardInteraction";
