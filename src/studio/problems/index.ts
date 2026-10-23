@@ -6,6 +6,8 @@ export {
   problemCode,
   safetyText,
   actionLabel,
+  configureProblemPlatform,
+  revealLabel,
   type ProblemActionId,
   type ProblemContext,
   type ProblemDescription,

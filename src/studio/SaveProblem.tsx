@@ -8,7 +8,7 @@ import commonMessages from "../i18n/messages/common";
 import type { PageSessions } from "./page-sessions";
 import type { SaveStatus } from "./page-session";
 import Dialog from "./Dialog";
-import { ProblemNotice, type ProblemAction } from "./problems";
+import { ProblemNotice, revealLabel, type ProblemAction } from "./problems";
 import { describeSaveFailure, type SaveFailureState } from "./save-problem";
 
 export const SAVE_BANNER_ID = "studio-save-problem";
@@ -48,7 +48,7 @@ export function SaveFailureBanner({
     reveal:
       onReveal && failure.path
         ? {
-            label: t(platform === "darwin" ? "save.revealFinder" : "save.reveal"),
+            label: revealLabel(platform),
             onSelect: () => onReveal(failure.path!),
           }
         : undefined,

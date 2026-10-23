@@ -239,6 +239,8 @@ import {
   describeError,
   bindProblemActions,
   configureProblemRedaction,
+  configureProblemPlatform,
+  revealLabel,
   labelProblem,
   useProblemQueue,
   useToasts,
@@ -826,6 +828,7 @@ export default function Studio() {
   useEffect(() => {
     configureProblemRedaction(info?.home ? { library: info.home } : {});
   }, [info?.home]);
+  useEffect(() => configureProblemPlatform(info?.platform), [info?.platform]);
   useEffect(() => {
     if (view !== "page") return;
     const refreshPage = () => {
@@ -4536,11 +4539,7 @@ export default function Studio() {
                     tone="warning"
                     actions={[
                       {
-                        label: t(
-                          info?.platform === "darwin"
-                            ? "revealInFinder"
-                            : "revealLocation",
-                        ),
+                        label: revealLabel(info?.platform),
                         onSelect: () =>
                           void desktop
                             .invoke("library:reveal", { path: item.path })
@@ -5247,11 +5246,7 @@ export default function Studio() {
                   setExportReceipt(null);
                 })}
               >
-                {t(
-                  info?.platform === "darwin"
-                    ? "revealInFinder"
-                    : "revealInFileManager",
-                )}
+                {revealLabel(info?.platform)}
               </button>
             )}
             <button

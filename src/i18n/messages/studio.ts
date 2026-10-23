@@ -102,8 +102,6 @@ export default defineMessages("studio", {
     unreadableProjectCause:
       "这个项目的信息文件损坏或无法访问，其他项目不受影响。修复或移走这个文件夹后会自动恢复。",
     readProject: "读取项目",
-    revealInFinder: "在访达中显示",
-    revealLocation: "显示所在位置",
     exportPage: "导出页面",
     pageActions: "页面操作",
     dismissError: "关闭错误提示",
@@ -174,7 +172,6 @@ export default defineMessages("studio", {
     exportOnlinePageDetail: "文件更小，打开时联网加载阅读器",
     exportWithPublishedDetail: "组件按固定发布版本联网加载，需要组件已经发布",
     downloadSourceDetail: "ShowAI 页面源文件，可导入到其他内容库",
-    revealInFileManager: "在文件管理器中显示",
     iconKeptInDraft: "图标保留在本机草稿中，请处理页面保存错误或冲突。",
     libraryUpgraded: "内容库已升级，原始文件已保留",
     mergeSaved: "合并版本已保存",
@@ -331,8 +328,6 @@ export default defineMessages("studio", {
     unreadableProjectCause:
       "This project's information file is damaged or cannot be accessed. Other projects are not affected; it reappears once the folder is repaired or moved away.",
     readProject: "Read project",
-    revealInFinder: "Show in Finder",
-    revealLocation: "Show location",
     exportPage: "Export page",
     pageActions: "Page actions",
     dismissError: "Dismiss error",
@@ -406,7 +401,6 @@ export default defineMessages("studio", {
     exportOnlinePageDetail: "A smaller file that loads the reader online when opened",
     exportWithPublishedDetail: "Components load online from their pinned published versions; they must be published",
     downloadSourceDetail: "The ShowAI page source, which another library can import",
-    revealInFileManager: "Show in file manager",
     iconKeptInDraft:
       "The icon is kept in the local draft. Resolve the page's save error or conflict.",
     libraryUpgraded: "Library upgraded. Original files are kept.",
