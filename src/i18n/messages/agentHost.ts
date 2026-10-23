@@ -97,6 +97,7 @@ export default defineMessages("agentHost", {
     "chatgpt.inProgress": "已有 ChatGPT 授权正在进行，请完成或取消后重试。",
     "chatgpt.serverManaged": "这份授权由服务器管理，请在服务器连接中重新授权。",
     "chatgpt.cancelled": "已取消 ChatGPT 授权。",
+    "chatgpt.authorizationFailed": "ChatGPT 授权失败（{error}）。",
     "chatgpt.accountMismatch": "授权账号与已选择的连接不一致。",
     "chatgpt.connectedTitle": "已连接 ChatGPT",
     "chatgpt.connectedBody": "可以关闭此页面，返回 ShowAI。",
@@ -234,6 +235,7 @@ export default defineMessages("agentHost", {
     "chatgpt.serverManaged":
       "This authorization is managed by a server. Reauthorize it from the server connection.",
     "chatgpt.cancelled": "ChatGPT authorization was cancelled.",
+    "chatgpt.authorizationFailed": "ChatGPT authorization failed ({error}).",
     "chatgpt.accountMismatch":
       "The authorized account doesn't match the selected connection.",
     "chatgpt.connectedTitle": "Connected to ChatGPT",

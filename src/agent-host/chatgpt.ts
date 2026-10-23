@@ -171,7 +171,7 @@ export class ChatGptConnection {
           throw new Error(
             error === "access_denied"
               ? t("chatgpt.cancelled")
-              : `ChatGPT authorization failed: ${error}`,
+              : t("chatgpt.authorizationFailed", { error }),
           );
         const code = callback.searchParams.get("code"),
           clientId = callback.searchParams.get("client_id") ?? saved?.clientId;

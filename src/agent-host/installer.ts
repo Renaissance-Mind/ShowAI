@@ -12,7 +12,7 @@ import {
 import { join, resolve, sep } from "node:path";
 import { execute } from "./process";
 import { readOptional, writeProtected } from "./storage";
-import type { RuntimeStatus } from "./types";
+import type { RuntimeFailureCode, RuntimeStatus } from "./types";
 import { translator } from "../i18n";
 import agentHostMessages from "../i18n/messages/agentHost";
 
@@ -29,7 +29,10 @@ export async function npmMetadata(name: string, version: string) {
     { signal: AbortSignal.timeout(30000) },
   );
   if (!response.ok)
-    throw new Error(`Cannot retrieve ${name}: HTTP ${response.status}`);
+    throw Object.assign(
+      new Error(`Cannot retrieve ${name}: HTTP ${response.status}`),
+      { status: response.status },
+    );
   return (await response.json()) as PackageMetadata;
 }
 export function verifyArchive(bytes: Buffer, integrity: string) {
@@ -107,10 +110,59 @@ export async function extractPackage(archive: Buffer, root: string) {
     } else throw new Error(`Unsupported package entry type ${type}.`);
   }
 }
+/** Reads a response body, reporting received bytes and the declared length. */
+async function readBody(
+  response: Response,
+  progress?: (received: number, total?: number) => void,
+) {
+  const length = Number(response.headers.get("content-length"));
+  const total = Number.isFinite(length) && length > 0 ? length : undefined;
+  if (!response.body) return Buffer.from(await response.arrayBuffer());
+  const chunks: Uint8Array[] = [];
+  let received = 0;
+  for await (const chunk of response.body) {
+    chunks.push(chunk);
+    received += chunk.byteLength;
+    progress?.(received, total);
+  }
+  return Buffer.concat(chunks);
+}
+/** Classifies an install failure so the UI can explain it in its language. */
+export function installFailure(error: unknown): RuntimeFailureCode {
+  const value = error as {
+    name?: string;
+    code?: unknown;
+    status?: unknown;
+    message?: unknown;
+    cause?: { code?: unknown };
+  };
+  const errno =
+    typeof value?.code === "string"
+      ? value.code
+      : typeof value?.cause?.code === "string"
+        ? value.cause.code
+        : "";
+  const message = typeof value?.message === "string" ? value.message : "";
+  if (errno === "ENOSPC" || errno === "EDQUOT") return "disk";
+  if (typeof value?.status === "number" || /HTTP \d{3}/.test(message))
+    return "registry";
+  if (
+    error instanceof TypeError ||
+    value?.name === "TimeoutError" ||
+    /^(?:E(?:NOTFOUND|CONNREFUSED|CONNRESET|TIMEDOUT|AI_AGAIN|NETUNREACH|HOSTUNREACH)|UND_ERR_|CERT_|SELF_SIGNED|UNABLE_TO)/.test(
+      errno,
+    )
+  )
+    return "network";
+  if (/integrity/i.test(message)) return "integrity";
+  if (/verification failed/i.test(message)) return "verify";
+  return "unknown";
+}
 async function download(
   metadata: PackageMetadata,
   root: string,
   cacheRoot?: string,
+  progress?: (received: number, total?: number) => void,
 ) {
   const url = new URL(metadata.dist.tarball);
   if (url.protocol !== "https:" || url.hostname !== "registry.npmjs.org")
@@ -135,8 +187,11 @@ async function download(
           signal: AbortSignal.timeout(600000),
         });
         if (!response.ok)
-          throw new Error(`Package download failed: HTTP ${response.status}`);
-        bytes = Buffer.from(await response.arrayBuffer());
+          throw Object.assign(
+            new Error(`Package download failed: HTTP ${response.status}`),
+            { status: response.status },
+          );
+        bytes = await readBody(response, progress);
         break;
       } catch (error) {
         const transient =
@@ -184,7 +239,12 @@ export class SdkInstaller {
     readonly root: string,
     readonly options: { cacheRoot?: string; version?: string } = {},
   ) {
-    this.state = { state: "absent", progress: t("runtime.notInstalled"), root };
+    this.state = {
+      state: "absent",
+      stage: "absent",
+      progress: t("runtime.notInstalled"),
+      root,
+    };
   }
   async status() {
     if (this.state.state === "installing" || this.state.state === "failed")
@@ -196,6 +256,7 @@ export class SdkInstaller {
       await stat(this.binary(receipt.directory));
       this.state = {
         state: "ready",
+        stage: "installed",
         progress: t("runtime.installed"),
         root: this.root,
         version: receipt.version,
@@ -228,15 +289,21 @@ export class SdkInstaller {
     if (this.active) return;
     this.state = {
       state: "installing",
+      stage: "fetching",
       progress: t("runtime.fetching"),
       root: this.root,
     };
     this.active = this.install()
       .catch((error: Error) => {
+        const cause = (error as { cause?: { code?: unknown } }).cause;
         this.state = {
           state: "failed",
+          stage: "failed",
+          failure: installFailure(error),
           progress: t("runtime.installFailed"),
-          error: error.message,
+          error:
+            error.message +
+            (typeof cause?.code === "string" ? ` (${cause.code})` : ""),
           root: this.root,
         };
       })
@@ -286,6 +353,7 @@ export class SdkInstaller {
       if (intact) {
         this.state = {
           state: "ready",
+          stage: "upToDate",
           progress: t("runtime.upToDate"),
           version,
           root: this.root,
@@ -297,12 +365,35 @@ export class SdkInstaller {
     await mkdir(staging, { recursive: true, mode: 0o700 });
     try {
       this.state.progress = t("runtime.downloading", { version });
+      this.state.stage = "downloading";
+      // Both archives download together; the UI shows their combined bytes.
+      const parts = new Map<string, { received: number; total?: number }>();
+      const progress = (name: string) => (received: number, total?: number) => {
+        parts.set(name, { received, total });
+        const values = [...parts.values()];
+        this.state.received = values.reduce((sum, v) => sum + v.received, 0);
+        this.state.total =
+          values.length === 2 && values.every((v) => v.total)
+            ? values.reduce((sum, v) => sum + v.total!, 0)
+            : undefined;
+      };
       await Promise.all([
-        download(sdk, join(staging, "sdk"), this.options.cacheRoot),
-        download(native, join(staging, "native"), this.options.cacheRoot),
+        download(
+          sdk,
+          join(staging, "sdk"),
+          this.options.cacheRoot,
+          progress("sdk"),
+        ),
+        download(
+          native,
+          join(staging, "native"),
+          this.options.cacheRoot,
+          progress("native"),
+        ),
       ]);
       await chmod(this.binary(staging), 0o755);
       this.state.progress = t("runtime.verifying");
+      this.state.stage = "verifying";
       const test = await execute(this.binary(staging), ["--version"], {
         timeout: 10000,
       });
@@ -324,6 +415,7 @@ export class SdkInstaller {
       });
       this.state = {
         state: "ready",
+        stage: "installed",
         progress: t("runtime.installed"),
         version,
         root: this.root,

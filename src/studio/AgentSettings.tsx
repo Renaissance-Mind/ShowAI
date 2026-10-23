@@ -30,6 +30,13 @@ import {
   RemoteDeviceSettings,
   remoteExecution,
 } from "./AgentExecution";
+import { AGENT_SETUP_EVENT, takeAgentSetup } from "./AgentReadiness";
+
+function formatBytes(bytes: number) {
+  return bytes >= 1024 * 1024
+    ? `${(bytes / 1024 / 1024).toFixed(1)} MiB`
+    : `${Math.max(1, Math.round(bytes / 1024))} KiB`;
+}
 
 function TaskResult({
   task,
@@ -241,6 +248,38 @@ export default function AgentSettings() {
     setModels([]);
     setAdding(false);
   };
+  // Next-step buttons elsewhere ask to connect ChatGPT or add an API key.
+  const setupIntent = useRef<(() => void) | null>(null);
+  setupIntent.current = () => {
+    if (!status || remoteExecution()) return;
+    const intent = takeAgentSetup();
+    if (!intent) return;
+    void action(async () => {
+      if (status.settings.mode !== "api") await change({ mode: "api" });
+      if (intent === "chatgpt") {
+        const existing = status.settings.sources.find(
+          (source) => source.credential === "chatgpt",
+        );
+        if (existing) {
+          setEditing({ ...existing });
+          setKey("");
+          setModels([]);
+        } else add("chatgpt");
+      }
+      requestAnimationFrame(() =>
+        document
+          .getElementById("agent-sources-title")
+          ?.scrollIntoView({ block: "start" }),
+      );
+    })();
+  };
+  const ready = !!status;
+  useEffect(() => {
+    if (ready) setupIntent.current?.();
+    const listen = () => setupIntent.current?.();
+    window.addEventListener(AGENT_SETUP_EVENT, listen);
+    return () => window.removeEventListener(AGENT_SETUP_EVENT, listen);
+  }, [ready]);
   const saveSource = async () => {
     if (!editing) return;
     const next = await desktop.invoke<AgentHostStatus>("agent:source", {
@@ -920,9 +959,13 @@ export default function AgentSettings() {
               </p>
             )}
             {status.authorization.error && (
-              <p className="agent-error" role="alert">
-                {status.authorization.error}
-              </p>
+              <div className="agent-error" role="alert">
+                <p>{t("authorizationIncomplete")}</p>
+                <details className="agent-events">
+                  <summary>{t("runtime.failureDetail")}</summary>
+                  <pre>{status.authorization.error}</pre>
+                </details>
+              </div>
             )}
           </section>
           {!remoteExecution() && (
@@ -941,7 +984,35 @@ export default function AgentSettings() {
                       </span>
                     )}
                   </h3>
-                  <p>{status.runtime.progress}</p>
+                  <p>
+                    {status.runtime.stage
+                      ? t(`runtime.stage.${status.runtime.stage}`)
+                      : status.runtime.progress}
+                    {status.runtime.state === "installing" &&
+                      !!status.runtime.received &&
+                      ` · ${
+                        status.runtime.total
+                          ? t("runtime.bytes", {
+                              received: formatBytes(status.runtime.received),
+                              total: formatBytes(status.runtime.total),
+                            })
+                          : t("runtime.bytesUnknown", {
+                              received: formatBytes(status.runtime.received),
+                            })
+                      }`}
+                  </p>
+                  {status.runtime.state === "installing" && (
+                    <progress
+                      className="agent-runtime-progress"
+                      aria-label={t("runtime.installing")}
+                      {...(status.runtime.total && status.runtime.received
+                        ? {
+                            max: status.runtime.total,
+                            value: status.runtime.received,
+                          }
+                        : {})}
+                    />
+                  )}
                 </div>
                 <button
                   className="settings-button"
@@ -961,14 +1032,27 @@ export default function AgentSettings() {
                     ? t("runtime.update")
                     : status.runtime.state === "installing"
                       ? t("runtime.installing")
-                      : t("runtime.install")}
+                      : status.runtime.state === "failed"
+                        ? t("runtime.retry")
+                        : t("runtime.install")}
                 </button>
               </div>
-              <p className="settings-help">{t("runtimeHelp")}</p>
-              {status.runtime.error && (
-                <p className="agent-error" role="alert">
-                  {status.runtime.error}
-                </p>
+              <p className="settings-help">
+                {t("runtimeHelp")}
+                {status.runtime.state !== "ready" && ` ${t("runtime.size")}`}
+              </p>
+              {status.runtime.state === "failed" && (
+                <div className="agent-error" role="alert">
+                  <p>
+                    {t(`runtime.failure.${status.runtime.failure ?? "unknown"}`)}
+                  </p>
+                  {status.runtime.error && (
+                    <details className="agent-events">
+                      <summary>{t("runtime.failureDetail")}</summary>
+                      <pre>{status.runtime.error}</pre>
+                    </details>
+                  )}
+                </div>
               )}
             </section>
           )}

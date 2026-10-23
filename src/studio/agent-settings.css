@@ -702,3 +702,10 @@ details.agent-device-settings[open] > summary::before {
 .studio-settings .agent-settings details.agent-device-settings > summary > h2 {
   margin: 0;
 }
+.agent-runtime-progress {
+  display: block;
+  width: 100%;
+  height: 4px;
+  margin-top: 6px;
+  accent-color: var(--text);
+}

@@ -74,11 +74,34 @@ export default defineMessages("agentSettings", {
     removeSource: "移除来源",
     authPending: "正在等待浏览器授权…",
     cancelAuth: "取消授权",
+    authorizationIncomplete: "ChatGPT 授权没有完成，可以重新连接。",
     runtime: "内置执行能力",
     runtimeName: "独立 Codex SDK",
     "runtime.update": "检查并安装新版",
     "runtime.installing": "正在安装",
     "runtime.install": "一键安装 Codex SDK",
+    "runtime.retry": "重试安装",
+    "runtime.stage.absent": "尚未安装",
+    "runtime.stage.fetching": "正在获取官方安装包信息…",
+    "runtime.stage.downloading": "正在下载 Codex SDK 与独立运行时…",
+    "runtime.stage.verifying": "正在验证安装…",
+    "runtime.stage.installed": "已安装",
+    "runtime.stage.upToDate": "已是当前版本",
+    "runtime.stage.failed": "安装失败",
+    "runtime.size":
+      "安装后约占 350–450 MiB 磁盘空间（含独立运行时，因平台而异），下载时间取决于网络。",
+    "runtime.bytes": "已下载 {received} / {total}",
+    "runtime.bytesUnknown": "已下载 {received}",
+    "runtime.failure.network":
+      "无法连接 registry.npmjs.org。检查网络连接；如果使用代理，确认代理对 ShowAI 生效后重试。",
+    "runtime.failure.registry":
+      "npm 官方源暂时无法提供安装包。稍后重试。",
+    "runtime.failure.integrity":
+      "下载的安装包校验未通过，可能被网络或代理改动。已丢弃这次下载，请重试。",
+    "runtime.failure.disk": "磁盘空间不足。至少留出 1 GiB 可用空间后重试。",
+    "runtime.failure.verify": "安装包已下载，但运行时无法在本机启动。请重试或报告问题。",
+    "runtime.failure.unknown": "安装没有完成。请重试；仍然失败时查看技术详情并报告问题。",
+    "runtime.failureDetail": "技术详情",
     runtimeHelp:
       "按需下载官方 SDK 与运行时，使用独立账号、会话和 ShowAI 插件。",
     runInShowAI: "在页面中使用",
@@ -187,11 +210,36 @@ export default defineMessages("agentSettings", {
     removeSource: "Remove source",
     authPending: "Waiting for browser authorization…",
     cancelAuth: "Cancel authorization",
+    authorizationIncomplete: "ChatGPT authorization didn’t finish. You can connect again.",
     runtime: "Built-in runtime",
     runtimeName: "Standalone Codex SDK",
     "runtime.update": "Check for updates",
     "runtime.installing": "Installing",
     "runtime.install": "Install Codex SDK",
+    "runtime.retry": "Retry install",
+    "runtime.stage.absent": "Not installed",
+    "runtime.stage.fetching": "Fetching the official package information…",
+    "runtime.stage.downloading": "Downloading the Codex SDK and its runtime…",
+    "runtime.stage.verifying": "Verifying the installation…",
+    "runtime.stage.installed": "Installed",
+    "runtime.stage.upToDate": "Up to date",
+    "runtime.stage.failed": "Installation failed",
+    "runtime.size":
+      "Takes about 350–450 MiB of disk space once installed, including the runtime (varies by platform); download time depends on the network.",
+    "runtime.bytes": "Downloaded {received} of {total}",
+    "runtime.bytesUnknown": "Downloaded {received}",
+    "runtime.failure.network":
+      "Couldn’t reach registry.npmjs.org. Check the network connection; if you use a proxy, make sure it applies to ShowAI, then retry.",
+    "runtime.failure.registry":
+      "The official npm registry can’t provide the package right now. Retry later.",
+    "runtime.failure.integrity":
+      "The downloaded package failed verification and may have been altered by the network or a proxy. The download was discarded; retry.",
+    "runtime.failure.disk": "Not enough disk space. Free at least 1 GiB and retry.",
+    "runtime.failure.verify":
+      "The package downloaded, but its runtime can’t start on this computer. Retry or report the problem.",
+    "runtime.failure.unknown":
+      "The installation didn’t finish. Retry; if it still fails, check the technical details and report the problem.",
+    "runtime.failureDetail": "Technical details",
     runtimeHelp:
       "Downloads the official SDK and runtime when needed, with its own account, sessions and ShowAI plugin.",
     runInShowAI: "Use in pages",
