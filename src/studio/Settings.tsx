@@ -32,6 +32,7 @@ import SyncSettings, { type ProjectSyncRequest } from "./SyncSettings";
 import AgentSettings from "./AgentSettings";
 import PluginInstallSettings, { LaunchConfigCopy } from "./PluginInstallSettings";
 import { workbenchCapabilities } from "./capabilities";
+import { AboutFeedback, type FeedbackRequest } from "./feedback/AboutFeedback";
 
 const sections = [
   {
@@ -158,6 +159,9 @@ export function SettingsPanel({
   onOpenShortcuts,
   docsVisible,
   onDocsVisibleChange,
+  feedbackRequest,
+  onOpenDocs,
+  onOpenFaq,
 }: {
   syncRequest?: ProjectSyncRequest;
   onOpenProject?: (projectId: string) => Promise<void>;
@@ -175,6 +179,11 @@ export function SettingsPanel({
   /** Absent where the host publishes its own documentation. */
   docsVisible?: boolean;
   onDocsVisibleChange?: (visible: boolean) => void;
+  /** Opens 关于与反馈 on its report form or diagnostics preview. */
+  feedbackRequest?: FeedbackRequest;
+  /** Opens the built-in documentation; absent where it is unavailable. */
+  onOpenDocs?: () => void;
+  onOpenFaq?: () => void;
 }) {
   const t = useTranslator(messages);
   const language = useLanguagePreference();
@@ -360,47 +369,12 @@ export function SettingsPanel({
       )}
       {section === "about" && (
         <>
-          <div className="settings-product">
-            <span className="settings-product-symbol" aria-hidden="true">
-              ✳
-            </span>
-            <div>
-              <h2>ShowAI</h2>
-            </div>
-          </div>
-          <section
-            className="settings-group settings-about"
-            aria-label={t("appInfo")}
-          >
-            <dl>
-              <div className="settings-row">
-                <dt>{t("version")}</dt>
-                <dd>{info?.version ?? "—"}</dd>
-              </div>
-              <div className="settings-row">
-                <dt>{t("platform")}</dt>
-                <dd>
-                  {info
-                    ? ({ darwin: "macOS", win32: "Windows", linux: "Linux" }[
-                        info.platform
-                      ] ?? info.platform)
-                    : "—"}
-                </dd>
-              </div>
-              <div className="settings-row">
-                <dt>{t("environment")}</dt>
-                <dd>
-                  {info
-                    ? info.mode === "browser"
-                      ? t("environmentBrowser")
-                      : info.packaged
-                        ? t("environmentPackaged")
-                        : t("environmentDevelopment")
-                    : "—"}
-                </dd>
-              </div>
-            </dl>
-          </section>
+          <AboutFeedback
+            info={info}
+            request={feedbackRequest}
+            onOpenDocs={onOpenDocs}
+            onOpenFaq={onOpenFaq}
+          />
           <section
             className="settings-group"
             aria-labelledby="settings-shortcuts-title"

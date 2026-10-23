@@ -9,6 +9,8 @@
  * `message` is already redacted (home → ~, library → <library>, tokens
  * removed); listeners may show it to the person and include it in a report.
  */
+import { recordProblem } from "./problem-log";
+
 export const REPORT_PROBLEM_EVENT = "showai:report-problem";
 
 export interface ReportProblemDetail {
@@ -30,9 +32,17 @@ declare global {
   }
 }
 
+/**
+ * Asks the feedback surface to open a prefilled report. Returns false when a
+ * listener took it over (called preventDefault), true when nobody did.
+ */
 export function dispatchReportProblem(detail: ReportProblemDetail): boolean {
+  recordProblem(detail);
   return window.dispatchEvent(
-    new CustomEvent<ReportProblemDetail>(REPORT_PROBLEM_EVENT, { detail }),
+    new CustomEvent<ReportProblemDetail>(REPORT_PROBLEM_EVENT, {
+      detail,
+      cancelable: true,
+    }),
   );
 }
 

@@ -1,0 +1,232 @@
+.feedback-about .settings-about > h2,
+.feedback-about .settings-group > h2 {
+  margin-bottom: 4px;
+}
+.feedback-info-row dd {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  text-align: right;
+}
+.feedback-info-row dd > span {
+  overflow-wrap: anywhere;
+}
+.feedback-info-row dt {
+  flex-shrink: 0;
+}
+.feedback-muted {
+  margin: 8px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.6;
+}
+.feedback-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: 10px;
+  margin-top: 14px;
+}
+.feedback-card {
+  display: grid;
+  gap: 4px;
+  align-content: start;
+  padding: 13px 14px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--surface);
+  color: var(--text);
+  text-align: left;
+  text-decoration: none;
+  font-size: 13px;
+}
+.feedback-card:hover {
+  border-color: var(--accent, var(--line));
+}
+.feedback-card > svg {
+  color: var(--muted);
+  margin-bottom: 4px;
+}
+.feedback-card > span {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+.feedback-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 14px;
+}
+.settings-button.feedback-primary {
+  background: var(--text);
+  color: var(--paper);
+  border-color: var(--text);
+}
+.settings-button.feedback-primary:hover:not(:disabled) {
+  background: var(--text);
+  opacity: 0.88;
+}
+.settings-button:disabled {
+  opacity: 0.5;
+}
+.feedback-diagnostics-preview {
+  margin-top: 14px;
+}
+.feedback-diagnostics-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 18px;
+  font-size: 13px;
+}
+.feedback-diagnostics-options label,
+.feedback-attach label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.feedback-diagnostics-text {
+  display: block;
+  width: 100%;
+  margin-top: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 11.5px;
+  line-height: 1.55;
+  resize: vertical;
+  white-space: pre;
+}
+.feedback-collecting {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 12px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+.feedback-status,
+.feedback-error {
+  margin: 10px 0 0;
+  font-size: 12px;
+  line-height: 1.6;
+}
+.feedback-status {
+  color: var(--muted);
+}
+.feedback-error {
+  color: var(--danger, #c0392b);
+}
+.feedback-report {
+  display: grid;
+  gap: 6px;
+}
+.feedback-back,
+.feedback-link {
+  justify-self: start;
+  padding: 0;
+  color: var(--muted);
+  font-size: 12px;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.feedback-report-title {
+  margin: 10px 0 0;
+  font-size: 18px;
+  font-weight: 600;
+}
+.feedback-kind {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 12px 0 4px;
+  padding: 0;
+  border: 0;
+}
+.feedback-kind legend {
+  margin-bottom: 6px;
+  font-size: 13px;
+  font-weight: 500;
+}
+.feedback-kind label {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 12px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  font-size: 12px;
+  cursor: pointer;
+}
+.feedback-kind label.selected {
+  background: var(--accent-soft);
+  border-color: transparent;
+  font-weight: 500;
+}
+.feedback-kind input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+.feedback-kind label:has(input:focus-visible) {
+  outline: 2px solid var(--accent, currentColor);
+  outline-offset: 2px;
+}
+.feedback-field {
+  margin-top: 10px;
+  font-size: 13px;
+  font-weight: 500;
+}
+.feedback-input {
+  width: 100%;
+  padding: 9px 11px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  line-height: 1.55;
+  resize: vertical;
+}
+.feedback-context {
+  display: inline-flex;
+  justify-self: start;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+  margin-top: 10px;
+  padding: 4px 6px 4px 11px;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  font-size: 12px;
+}
+.feedback-context > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.feedback-context button {
+  display: inline-flex;
+  padding: 2px;
+  border-radius: 50%;
+  color: var(--muted);
+}
+.feedback-attach {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  margin-top: 12px;
+  font-size: 13px;
+}
+.app-crash-report {
+  width: min(100%, 620px);
+  padding: 18px 20px;
+  border: 1px solid var(--line, #ddd);
+  border-radius: 10px;
+  background: var(--surface, #fff);
+  text-align: left;
+}

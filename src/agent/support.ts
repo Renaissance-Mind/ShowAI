@@ -2,11 +2,9 @@ import { readFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { version } from "../../package.json";
+import { SUPPORT_DOCS_URL, SUPPORT_REPORT_URL } from "../core/support-channels";
 
-export const SUPPORT_REPORT_URL =
-  "https://github.com/Renaissance-Mind/ShowAI/issues/new";
-export const SUPPORT_DOCS_URL =
-  "https://showai.renaissancemind.ai/doc/agent-troubleshooting";
+export { SUPPORT_DOCS_URL, SUPPORT_REPORT_URL };
 
 /** The packaged runtime records its source commit in assets/build.json next to scripts/. */
 async function sourceCommit() {

@@ -41,3 +41,9 @@ export {
   type ReportProblemDetail,
 } from "./report-event";
 export { configureProblemRedaction, problemRedaction } from "./redaction";
+export {
+  clearProblemLog,
+  recentProblems,
+  recordProblem,
+  type LoggedProblem,
+} from "./problem-log";

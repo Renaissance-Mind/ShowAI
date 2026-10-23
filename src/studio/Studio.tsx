@@ -77,6 +77,7 @@ import {
   EyeOff,
   FileDiff,
   Keyboard,
+  LifeBuoy,
   Presentation,
 } from "../ui/icons";
 import type {
@@ -230,7 +231,11 @@ import {
   useToasts,
   type ReportOptions,
   type ToastOptions,
+  REPORT_PROBLEM_EVENT,
+  type ReportProblemDetail,
 } from "./problems";
+import type { FeedbackRequest } from "./feedback/AboutFeedback";
+import feedbackMessages from "../i18n/messages/feedback";
 import errorMessages from "../i18n/messages/errors";
 import { translator } from "../i18n";
 import {
@@ -376,6 +381,10 @@ export default function Studio() {
   const ta = useTranslator(assistantMessages);
   const tn = useTranslator(navigationMessages);
   const tshell = useTranslator(shellMessages);
+  const tfeedback = useTranslator(feedbackMessages);
+  // 关于与反馈 opens on its report form or diagnostics preview on request.
+  const [feedbackRequest, setFeedbackRequest] = useState<FeedbackRequest>();
+  const feedbackRequestId = useRef(0);
   useEffect(() => {
     const wake = () => {
       if (document.visibilityState === "visible" && navigator.onLine)
@@ -3195,15 +3204,49 @@ export default function Studio() {
   }, [workspace, workspaceReady, report, capabilities.tabs, info?.mode]);
   // Native menu items carry out the same actions as the workbench controls.
   const menuCommand = useRef<(command: MenuCommand) => void>(() => {});
-  menuCommand.current = (command) => {
-    const doc = (slug: string) => {
-      const url = `https://showai.renaissancemind.ai/doc${slug ? `/${slug}` : ""}`;
-      const link = builtinDocLink(url);
-      if (showDocs && link) return openDoc(link.pageId, link.hash);
-      window.open(url, "_blank");
-      return Promise.resolve(true);
+  const helpDoc = (slug: string) => {
+    const url = `https://showai.renaissancemind.ai/doc${slug ? `/${slug}` : ""}`;
+    const link = builtinDocLink(url);
+    if (showDocs && link) return openDoc(link.pageId, link.hash);
+    window.open(url, "_blank");
+    return Promise.resolve(true);
+  };
+  const openFeedback = useRef<
+    (view: FeedbackRequest["view"], context?: ReportProblemDetail) => void
+  >(() => {});
+  openFeedback.current = (view, context) => {
+    setFeedbackRequest({ id: ++feedbackRequestId.current, view, context });
+    setSettingsSection("about");
+    void navigate("settings").catch(report);
+  };
+  // 报告问题 from notices, the Agent and the Help menu all end in 关于与反馈.
+  useEffect(() => {
+    const reportProblem = (event: CustomEvent<ReportProblemDetail>) => {
+      event.preventDefault();
+      openFeedback.current("report", event.detail);
     };
-    // Later feedback features take over these events; until then use the About page.
+    const feedback = (event: Event) => {
+      event.preventDefault();
+      const detail = (event as CustomEvent<{ view?: string } | undefined>)
+        .detail;
+      openFeedback.current(detail?.view === "about" ? "about" : "report");
+    };
+    const diagnostics = (event: Event) => {
+      event.preventDefault();
+      openFeedback.current("diagnostics");
+    };
+    window.addEventListener(REPORT_PROBLEM_EVENT, reportProblem);
+    window.addEventListener("showai:open-feedback", feedback);
+    window.addEventListener("showai:copy-diagnostics", diagnostics);
+    return () => {
+      window.removeEventListener(REPORT_PROBLEM_EVENT, reportProblem);
+      window.removeEventListener("showai:open-feedback", feedback);
+      window.removeEventListener("showai:copy-diagnostics", diagnostics);
+    };
+  }, []);
+  menuCommand.current = (command) => {
+    const doc = helpDoc;
+    // The feedback listeners above take these events; otherwise use the About page.
     const unhandled = (name: string, detail?: unknown) =>
       window.dispatchEvent(new CustomEvent(name, { cancelable: true, detail }));
     const about = () => {
@@ -4158,6 +4201,7 @@ export default function Studio() {
               onClose={(id) => void workspace.close(id).catch(report)}
               onAdd={() => void workspace.add().catch(report)}
               onMove={workspace.move}
+              shortcutHint={info?.mode !== "browser"}
             />
           }
         >
@@ -4430,6 +4474,11 @@ export default function Studio() {
                   onAppearanceChange={appearance.setPreference}
                   onMigrate={() => setDialog({ type: "migration" })}
                   onOpenShortcuts={() => setDialog({ type: "shortcuts" })}
+                  feedbackRequest={feedbackRequest}
+                  onOpenDocs={() => void helpDoc("").catch(report)}
+                  onOpenFaq={() =>
+                    void helpDoc("agent-troubleshooting").catch(report)
+                  }
                   docsVisible={docsVisible}
                   onDocsVisibleChange={
                     docsAvailable ? changeDocsVisible : undefined
@@ -4944,6 +4993,11 @@ export default function Studio() {
                 icon: <Keyboard size={15} />,
                 onSelect: () => setDialog({ type: "shortcuts" }),
               },
+              {
+                label: tfeedback("helpAndFeedback"),
+                icon: <LifeBuoy size={15} />,
+                onSelect: () => openFeedback.current("about"),
+              },
             ]}
           />
         )}
@@ -5451,6 +5505,7 @@ export default function Studio() {
         )}
         {dialog?.type === "shortcuts" && (
           <ShortcutsDialog
+            browser={info?.mode === "browser"}
             tabs={capabilities.tabs}
             windows={capabilities.windows}
             onClose={closeDialog}

@@ -6,6 +6,7 @@ import {
   type ProblemDescription,
 } from "./describe";
 import type { ToastItem, ToastKind } from "./ProblemNotice";
+import { recordProblem } from "./problem-log";
 
 export interface ReportOptions extends ProblemContext {
   /**
@@ -65,6 +66,12 @@ export function useProblemQueue() {
       ...options,
     };
     const problem = describeError(error, context);
+    recordProblem({
+      at: problem.at,
+      source: problem.source,
+      code: problem.code,
+      message: [problem.action, problem.message].filter(Boolean).join(": "),
+    });
     const key = explicit ?? context.action ?? GENERAL;
     setProblems((current) => {
       const same = current.find(

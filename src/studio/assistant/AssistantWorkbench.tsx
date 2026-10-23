@@ -52,6 +52,7 @@ import {
 } from "../../surface/reference-availability";
 import { AgentMarkdown } from "./AgentMarkdown";
 import {
+  AgentHelpSteps,
   AgentNextSteps,
   AgentStatusRow,
   agentErrorKind,
@@ -295,7 +296,9 @@ function SetupSteps({
       onOpenSettings={setup.onOpenSettings}
       onRecheck={setup.onRecheck}
     />
-  ) : null;
+  ) : (
+    <AgentHelpSteps message={message} />
+  );
 }
 
 /** Floating request box opened from selection, block, board and page menus. */

@@ -89,6 +89,7 @@ export {
   Italic,
   Keyboard,
   Layers,
+  LifeBuoy,
   Laptop,
   LayoutDashboard,
   LayoutGrid,

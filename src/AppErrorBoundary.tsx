@@ -1,9 +1,14 @@
 import { Component, type ErrorInfo, type ReactNode } from "react";
 import { translator } from "./i18n";
 import messages from "./i18n/messages/appShell";
+import { redact } from "./core/redact";
+import { ReportProblemForm } from "./studio/feedback/ReportProblemForm";
+import {
+  dispatchReportProblem,
+  type ReportProblemDetail,
+} from "./studio/problems/report-event";
 
 const t = translator(messages);
-const ISSUES_URL = "https://github.com/Renaissance-Mind/ShowAI/issues/new";
 
 /** A lazily loaded interface file failed to arrive (update, restart, offline). */
 export function isChunkLoadError(error: unknown): boolean {
@@ -51,6 +56,8 @@ interface State {
   componentStack: string;
   at: string;
   copied: boolean;
+  /** The workbench is gone, so the report form opens on this page. */
+  report?: ReportProblemDetail;
 }
 
 /** Keeps an uncaught interface error from leaving a blank window. */
@@ -80,12 +87,14 @@ export class AppErrorBoundary extends Component<
         ? error.name
         : "RENDER_ERROR";
     const report = () => {
-      const event = new CustomEvent("showai:report-problem", {
-        cancelable: true,
-        detail: { source: "app", code, message, at },
-      });
-      // The feedback dialog takes over when it is mounted; otherwise open the issue form.
-      if (window.dispatchEvent(event)) window.open(ISSUES_URL, "_blank");
+      const detail: ReportProblemDetail = {
+        source: "app",
+        code,
+        message: redact(message, { truncateIds: true }),
+        at,
+      };
+      // 关于与反馈 takes over when the workbench still runs; otherwise report here.
+      if (dispatchReportProblem(detail)) this.setState({ report: detail });
     };
     return (
       <main
@@ -99,7 +108,7 @@ export class AppErrorBoundary extends Component<
           color: "var(--ink, #222)",
         }}
       >
-        <div style={{ maxWidth: 520, display: "grid", gap: 14 }}>
+        <div style={{ maxWidth: 620, display: "grid", gap: 14 }}>
           <h1 style={{ fontSize: 20, margin: 0, fontWeight: 600 }}>
             {chunk ? t("crash.chunkTitle") : t("crash.title")}
           </h1>
@@ -138,6 +147,11 @@ export class AppErrorBoundary extends Component<
               {t("crash.report")}
             </button>
           </div>
+          {this.state.report && (
+            <div className="app-crash-report">
+              <ReportProblemForm context={this.state.report} />
+            </div>
+          )}
         </div>
       </main>
     );

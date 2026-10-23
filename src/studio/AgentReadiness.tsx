@@ -7,7 +7,11 @@ import { useTranslator } from "../i18n/react";
 import messages from "../i18n/messages/onboarding";
 import assistantMessages from "../i18n/messages/assistant";
 import agentHostMessages from "../i18n/messages/agentHost";
-import { ExternalLink, Loader2, RefreshCw, Settings2 } from "../ui/icons";
+import { ExternalLink, Flag, Loader2, RefreshCw, Settings2 } from "../ui/icons";
+import feedbackMessages from "../i18n/messages/feedback";
+import { redact } from "../core/redact";
+import { dispatchReportProblem } from "./problems/report-event";
+import { problemRedaction } from "./problems/redaction";
 import "./onboarding.css";
 
 export const AGENT_HOSTS_GUIDE = "https://showai.renaissancemind.ai/doc/agent-hosts";
@@ -261,6 +265,48 @@ export function AgentNextSteps({
           {t("steps.recheck")}
         </button>
       )}
+    </div>
+  );
+}
+
+/** Leading CODE of an Agent error ("INVALID_DATA: …", "ENOSPC …"), if any. */
+export function agentErrorCode(message: string): string {
+  return /^\s*([A-Z][A-Z0-9_]{2,})\b/.exec(message)?.[1] ?? "AGENT_ERROR";
+}
+
+/**
+ * Next steps under an Agent error ShowAI does not recognize: the
+ * troubleshooting page, and 报告问题 with the error prefilled.
+ */
+export function AgentHelpSteps({ message }: { message: string }) {
+  const t = useTranslator(feedbackMessages);
+  const tr = useTranslator(messages);
+  return (
+    <div className="onboarding-steps" role="group" aria-label={tr("steps.label")}>
+      <a
+        className="onboarding-step"
+        href={AGENT_TROUBLESHOOTING}
+        target="_blank"
+        rel="noreferrer"
+      >
+        <ExternalLink size={12} aria-hidden="true" />
+        {t("agent.faq")}
+      </a>
+      <button
+        type="button"
+        className="onboarding-step"
+        onClick={() =>
+          dispatchReportProblem({
+            source: "agent",
+            code: agentErrorCode(message),
+            message: redact(message, problemRedaction()),
+            at: new Date().toISOString(),
+          })
+        }
+      >
+        <Flag size={12} aria-hidden="true" />
+        {t("agent.report")}
+      </button>
     </div>
   );
 }
