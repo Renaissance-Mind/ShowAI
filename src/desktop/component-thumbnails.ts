@@ -17,11 +17,20 @@ import { fileURLToPath } from "node:url";
 import { createHash, randomUUID } from "node:crypto";
 import { CoreError } from "../core/store";
 import { errorResult } from "../agent/service";
-import type { DesktopResponse, PagePreviewCapture } from "./bridge";
+import type {
+  DesktopChange,
+  DesktopResponse,
+  PagePreviewCapture,
+} from "./bridge";
 import { translator } from "../i18n";
 import messages from "../i18n/messages/desktop";
 import type { LoadedPage } from "../studio/usePage";
 import { CaptureQueue } from "./preview-queue";
+import {
+  PagePreviewCache,
+  pagePreviewSize,
+  type PreviewReference,
+} from "./page-preview-cache";
 
 const t = translator(messages);
 
@@ -34,6 +43,10 @@ interface PageCapture {
 }
 interface PageThumbnailSource {
   authorize: (event: Electron.IpcMainInvokeEvent) => unknown;
+  home: () => string;
+  candidates: () => Promise<
+    { projectId: string; pageId: string; hash: string; updatedAt: string }[]
+  >;
   identity: (
     reference: Record<string, string>,
   ) => Promise<{ home: string; revision: string | null }>;
@@ -60,6 +73,30 @@ const requests = new Map<string, PreviewLease>();
 const previewWindows = new Set<BrowserWindow>();
 const workbenchOwners = new Set<BrowserWindow>();
 const busyPreviews = new Set<BrowserWindow>();
+const pageShells = new WeakSet<BrowserWindow>();
+const readyCaptures = new Map<
+  number,
+  {
+    id: string;
+    preview: BrowserWindow;
+    page: boolean;
+    resolve: () => void;
+    reject: (error: Error) => void;
+  }
+>();
+ipcMain.on("showai:preview-ready", (event, value) => {
+  const waiting = readyCaptures.get(event.sender.id);
+  if (
+    !waiting ||
+    event.senderFrame !== event.sender.mainFrame ||
+    value?.id !== waiting.id
+  )
+    return;
+  if (waiting.page) pageShells.add(waiting.preview);
+  if (typeof value.error === "string" && value.error)
+    waiting.reject(new Error(value.error.slice(0, 2000)));
+  else waiting.resolve();
+});
 const observedOwners = new WeakSet<WebContents>();
 let developmentRenderer:
   { identity: string; bytes: Promise<Buffer> } | undefined;
@@ -87,6 +124,14 @@ function createPreviewWindow() {
   });
   preview.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
   preview.webContents.on("will-navigate", (event) => event.preventDefault());
+  preview.webContents.on("render-process-gone", (_event, details) => {
+    pageShells.delete(preview);
+    readyCaptures
+      .get(preview.webContents.id)
+      ?.reject(new Error(`Preview renderer stopped: ${details.reason}`));
+    console.warn("Preview renderer stopped", details.reason, details.exitCode);
+    closePreview(preview);
+  });
   previewWindows.add(preview);
   preview.once("closed", () => {
     previewWindows.delete(preview);
@@ -100,9 +145,14 @@ export function preparePreviewWindows(owner: BrowserWindow) {
   workbenchOwners.add(owner);
   owner.once("closed", () => {
     workbenchOwners.delete(owner);
-    if (!workbenchOwners.size) closePreview();
+    if (!workbenchOwners.size) {
+      warmGeneration++;
+      clearTimeout(warmTimer);
+      closePreview();
+    }
   });
   while (previewWindows.size < 2) createPreviewWindow();
+  if (workbenchOwners.size === 1) schedulePageWarmup(2000);
 }
 function trustedOwner(event: Electron.IpcMainInvokeEvent) {
   const sender = event.senderFrame;
@@ -189,7 +239,7 @@ async function cachedPreview(
 
 async function capture(
   reference: Record<string, string>,
-  cache: string,
+  cache: string | undefined,
   owner: WebContents,
   page?: PageCapture,
   started?: (window: BrowserWindow) => void,
@@ -233,6 +283,24 @@ async function capture(
   );
   const captureId = preview.webContents.id;
   previewData.set(captureId, component);
+  let readyTimer: ReturnType<typeof setTimeout>;
+  const ready = new Promise<void>((resolve, reject) => {
+    readyCaptures.set(captureId, {
+      id: captureToken,
+      preview,
+      page: !!page,
+      resolve,
+      reject,
+    });
+    readyTimer = setTimeout(() => {
+      pageShells.delete(preview);
+      reject(new Error(t("previewTimeout")));
+    }, 20000);
+  });
+  const failedNavigation = (error: Error) => {
+    if (readyCaptures.get(captureId)?.id === captureToken)
+      readyCaptures.get(captureId)!.reject(error);
+  };
   try {
     const query = {
       [page ? "pagePreview" : "componentPreview"]: JSON.stringify({
@@ -240,63 +308,53 @@ async function capture(
         padding: page?.padding,
       }),
       thumbnailCapture: "1",
+      previewToken: captureToken,
     };
-    if (
-      page &&
-      new URL(preview.webContents.getURL() || "about:blank").searchParams.has(
-        "pagePreview",
-      )
-    ) {
-      await preview.webContents.executeJavaScript(
-        `window.dispatchEvent(new Event("showai:page-preview"))`,
-      );
+    if (page && pageShells.has(preview)) {
+      preview.webContents.send("showai:preview-control", "load");
     } else if (process.env.SHOWAI_DEV_URL) {
       const url = new URL(process.env.SHOWAI_DEV_URL);
       for (const [key, value] of Object.entries(query))
         url.searchParams.set(key, value);
-      url.searchParams.set("thumbnailCapture", "1");
-      await preview.loadURL(url.href);
-    } else await preview.loadFile(join(directory, "index.html"), { query });
+      void preview.loadURL(url.href).catch(failedNavigation);
+    } else
+      void preview
+        .loadFile(join(directory, "index.html"), { query })
+        .catch(failedNavigation);
+    // Renderer IPC works while sandboxed subframes/resources are still loading.
+    // executeJavaScript/loadFile completion can otherwise wait indefinitely on them.
+    await ready;
+    clearTimeout(readyTimer!);
     if (preview.webContents.getOSProcessId() === owner.getOSProcessId())
       throw new Error("Preview capture must use a separate renderer process.");
-    await preview.webContents
-      .executeJavaScript(`new Promise((resolve, reject) => {
-      const deadline = Date.now() + 12000;
-      const poll = () => {
-        const stage = document.querySelector('[data-preview-ready]');
-        if (${!!page} && stage?.dataset.previewId !== ${JSON.stringify(captureToken)}) {
-          if (Date.now() > deadline) return reject(new Error(${JSON.stringify(t("previewTimeout"))}));
-          return setTimeout(poll, 20);
-        }
-        if (stage?.dataset.previewError) return reject(new Error(stage.dataset.previewError));
-        if (stage?.dataset.previewReady === 'true') return requestAnimationFrame(() => resolve(true));
-        if (Date.now() > deadline) return reject(new Error(${JSON.stringify(t("previewTimeout"))}));
-        setTimeout(poll, 30);
-      }; poll();
-    })`);
-    const png = (
-      await preview.webContents.capturePage({
-        x: 0,
-        y: 0,
-        width,
-        height,
-      })
-    ).toPNG();
-    await writeFile(cache, png);
-    await prunePreviews(dirname(cache));
+    let paintTimer: ReturnType<typeof setTimeout>;
+    const image = await Promise.race([
+      preview.webContents.capturePage({ x: 0, y: 0, width, height }),
+      new Promise<never>((_resolve, reject) => {
+        paintTimer = setTimeout(
+          () => reject(new Error(t("previewTimeout"))),
+          5000,
+        );
+      }),
+    ]).finally(() => clearTimeout(paintTimer!));
+    const png = image.toPNG();
+    if (cache) {
+      await writeFile(cache, png);
+      await prunePreviews(dirname(cache));
+    }
     return `data:image/png;base64,${png.toString("base64")}`;
   } finally {
+    clearTimeout(readyTimer!);
+    readyCaptures.delete(captureId);
     previewData.delete(captureId);
     try {
       if (!preview.isDestroyed()) {
-        // Unmount content (including iframe renderers and timers), but keep the
-        // capture shell warm so the next page does not reload the application.
-        if (page)
-          await preview.webContents.executeJavaScript(`
-          window.dispatchEvent(new Event("showai:page-preview-clear"));
-          new Promise(resolve => requestAnimationFrame(() => resolve()));
-        `);
-        else await preview.loadURL("about:blank");
+        if (page && pageShells.has(preview))
+          preview.webContents.send("showai:preview-control", "clear");
+        else {
+          pageShells.delete(preview);
+          await preview.loadURL("about:blank");
+        }
       }
     } finally {
       busyPreviews.delete(preview);
@@ -406,10 +464,332 @@ ipcMain.handle(
   },
 );
 
+let persistentPages: PagePreviewCache | undefined;
+const pageCache = () =>
+  (persistentPages ??= new PagePreviewCache(
+    join(app.getPath("userData"), "page-previews-v2"),
+  ));
+const epochs = new Map<string, number>();
+const epoch = (reference: PreviewReference) =>
+  [
+    reference.home,
+    `${reference.home}:${reference.projectId}`,
+    `${reference.home}:${reference.pageId}`,
+  ]
+    .map((key) => epochs.get(key) ?? 0)
+    .join(":");
+const bump = (key: string) => epochs.set(key, (epochs.get(key) ?? 0) + 1);
+let rendererHash: Promise<string> | undefined;
+async function pageRendererIdentity() {
+  if (!process.env.SHOWAI_DEV_URL)
+    return (rendererHash ??= readFile(join(directory, "index.html")).then(
+      (bytes) => createHash("sha256").update(bytes).digest("hex"),
+    ));
+  const hash = createHash("sha256");
+  for (const path of [
+    "src/studio/PagePreviewPage.tsx",
+    "src/studio/PageThumbnailContent.tsx",
+    "src/studio/CatalogPreview.tsx",
+    "src/studio/studio.css",
+    "src/studio/catalog-workspace.css",
+    "scripts/dev-client.mjs",
+  ])
+    hash.update(await readFile(join(process.cwd(), path)));
+  const info = await stat(
+    join(process.env.SHOWAI_DEV_RUNTIME!, "assets/reader-source.json"),
+  );
+  return hash.update(`${info.size}:${info.mtimeMs}`).digest("hex");
+}
+interface PageRequest {
+  projectId: string;
+  pageId: string;
+  hash: string;
+  theme: string;
+  requestId: string;
+  priority?: number;
+  refresh?: boolean;
+  cachedOnly?: boolean;
+}
+async function pageThumbnail(
+  owner: WebContents,
+  args: PageRequest,
+  background = false,
+): Promise<string | null> {
+  const lease: PreviewLease = {
+    owner,
+    cancelled: false,
+    priority: background ? 100000 : (args.priority ?? 0),
+  };
+  const requestKey = `${owner.id}:${args.requestId}`;
+  if (!args.cachedOnly) requests.set(requestKey, lease);
+  try {
+    const home = pageSource!.home();
+    const reference: PreviewReference = {
+      home,
+      projectId: args.projectId,
+      pageId: args.pageId,
+      theme: args.theme,
+    };
+    const cached = await pageCache().latest(reference);
+    if (args.cachedOnly) return cached?.image ?? null;
+    const identity = await pageSource!.identity(
+      args as unknown as Record<string, string>,
+    );
+    const stamp = epoch(reference);
+    const fingerprint = createHash("sha256")
+      .update(await pageRendererIdentity())
+      .update(
+        JSON.stringify({
+          ...reference,
+          revision: identity.revision,
+          hash: identity.revision === null ? args.hash : undefined,
+          version: 2,
+        }),
+      )
+      .digest("hex");
+    if (!args.refresh && cached?.fingerprint === fingerprint)
+      return cached.image;
+    const pendingKey = `${home}:${args.projectId}:${args.pageId}:${args.theme}:${fingerprint}`;
+    let entry = pending.get(pendingKey);
+    if (!entry) {
+      const leases = new Set<PreviewLease>();
+      let capturing: BrowserWindow | undefined;
+      const stop = () => {
+        if (
+          !capturing ||
+          [...leases].some(
+            (item) => !item.cancelled && !item.owner.isDestroyed(),
+          )
+        )
+          return;
+        const preview = capturing;
+        capturing = undefined;
+        pageShells.delete(preview);
+        // A quick scroll back must create a new job instead of joining an aborted capture.
+        if (pending.get(pendingKey)?.leases === leases)
+          pending.delete(pendingKey);
+        void preview
+          .loadURL("about:blank")
+          .catch((error) =>
+            console.warn("Couldn't stop the preview capture", error),
+          );
+      };
+      const task = captures.enqueue(
+        async () => {
+          const active = [...leases].find(
+            (item) => !item.cancelled && !item.owner.isDestroyed(),
+          );
+          if (!active || pageSource!.home() !== home)
+            throw new CoreError("NOT_FOUND", "Preview request was cancelled.");
+          if (background) warmPhase = "reading-inputs";
+          const record = await pageSource!.load(
+            active.owner,
+            args as unknown as Record<string, string>,
+          );
+          const currentOwner = [...leases].find(
+            (item) => !item.cancelled && !item.owner.isDestroyed(),
+          )?.owner;
+          if (!currentOwner || pageSource!.home() !== home)
+            throw new CoreError("NOT_FOUND", "Preview request was cancelled.");
+          try {
+            if (background) warmPhase = "capturing";
+            const image = await capture(
+              {
+                projectId: args.projectId,
+                pageId: args.pageId,
+                theme: args.theme,
+              },
+              undefined,
+              currentOwner,
+              { ...pagePreviewSize, record },
+              (window) => {
+                capturing = window;
+              },
+            );
+            if (background) warmPhase = "validating";
+            const latest = await pageSource!.identity(
+              args as unknown as Record<string, string>,
+            );
+            const valid = () =>
+              pageSource!.home() === home && epoch(reference) === stamp;
+            if (!valid() || latest.revision !== identity.revision)
+              throw new CoreError(
+                "CONFLICT",
+                "The page changed while generating its preview.",
+              );
+            if (background) warmPhase = "publishing";
+            if (
+              !(await pageCache().publish(reference, fingerprint, image, valid))
+            )
+              throw new CoreError(
+                "CONFLICT",
+                "The page preview was invalidated.",
+              );
+            publishedPreviews++;
+            for (const window of workbenchOwners)
+              if (!window.isDestroyed())
+                window.webContents.send("showai:page-thumbnail-updated", {
+                  projectId: args.projectId,
+                  pageId: args.pageId,
+                  theme: args.theme,
+                });
+            return image;
+          } finally {
+            capturing = undefined;
+          }
+        },
+        () =>
+          Math.min(
+            ...[...leases]
+              .filter((item) => !item.cancelled && !item.owner.isDestroyed())
+              .map((item) => item.priority ?? 0),
+          ),
+      );
+      entry = { task, leases, stop };
+      pending.set(pendingKey, entry);
+      const cleanup = () => {
+        if (pending.get(pendingKey) === entry) pending.delete(pendingKey);
+      };
+      task.then(cleanup, cleanup);
+    }
+    entry.leases.add(lease);
+    lease.stop = entry.stop;
+    return await entry.task;
+  } finally {
+    if (requests.get(requestKey) === lease) requests.delete(requestKey);
+  }
+}
+
+let warmTimer: ReturnType<typeof setTimeout>;
+let warmRunning = false,
+  warmGeneration = 0,
+  warmShutdown = false;
+let warmPhase = "idle",
+  warmCandidates = 0,
+  publishedPreviews = 0;
+export function pagePreviewStatus() {
+  return {
+    windows: workbenchOwners.size,
+    activeInput: activeOwners.size,
+    pending: pending.size,
+    warming: warmRunning,
+    phase: warmPhase,
+    candidates: warmCandidates,
+    published: publishedPreviews,
+  };
+}
+let warmTheme = "light";
+const warmFailures = new Map<string, number>();
+app.on("will-quit", () => {
+  warmShutdown = true;
+  warmGeneration++;
+  clearTimeout(warmTimer);
+});
+function schedulePageWarmup(delay = 500) {
+  if (warmShutdown || !workbenchOwners.size) return;
+  clearTimeout(warmTimer);
+  warmTimer = setTimeout(() => {
+    void warmPages().catch((error) => {
+      if (!warmShutdown && workbenchOwners.size)
+        console.warn("Page preview cache warmup failed", error);
+    });
+  }, delay);
+  warmTimer.unref();
+}
+async function warmPages() {
+  if (warmRunning || !pageSource || warmShutdown || !workbenchOwners.size)
+    return;
+  warmRunning = true;
+  const generation = warmGeneration,
+    home = pageSource.home(),
+    theme = warmTheme;
+  try {
+    warmPhase = "enumerating";
+    const candidates = await pageSource.candidates();
+    warmCandidates = candidates.length;
+    warmPhase = "rendering";
+    for (const candidate of candidates) {
+      if (
+        warmShutdown ||
+        generation !== warmGeneration ||
+        pageSource.home() !== home ||
+        !workbenchOwners.size
+      )
+        break;
+      const owner = [...workbenchOwners].find(
+        (window) => !window.isDestroyed(),
+      )?.webContents;
+      if (!owner) break;
+      const failureKey = `${home}:${candidate.pageId}:${candidate.hash}:${theme}`;
+      if (Date.now() - (warmFailures.get(failureKey) ?? 0) < 60000) continue;
+      try {
+        await pageThumbnail(
+          owner,
+          { ...candidate, theme, requestId: randomUUID() },
+          true,
+        );
+        warmFailures.delete(failureKey);
+      } catch (error) {
+        if (
+          !warmShutdown &&
+          generation === warmGeneration &&
+          workbenchOwners.size
+        ) {
+          warmFailures.set(failureKey, Date.now());
+          if (warmFailures.size > 512)
+            warmFailures.delete(warmFailures.keys().next().value!);
+          console.warn(
+            "Couldn't warm page preview",
+            candidate.projectId,
+            candidate.pageId,
+            error,
+          );
+        }
+      }
+    }
+    await pageCache().prune();
+  } finally {
+    warmPhase = "idle";
+    warmRunning = false;
+    schedulePageWarmup(generation === warmGeneration ? 30000 : 500);
+  }
+}
+
+/** File notifications invalidate freshness, while the last good image remains readable. */
+export function invalidatePageThumbnails(change: DesktopChange) {
+  warmGeneration++;
+  const projects = new Set(change.projectIds ?? []);
+  const pages = new Set(change.pageIds ?? []);
+  const datasetProjects = new Set(
+    (change.datasets ?? []).map((value) => value.split("/")[0]),
+  );
+  const all =
+    change.type !== "home" &&
+    (change.all || ((change.catalog || change.allPages) && !projects.size));
+  const affected = (reference: PreviewReference) =>
+    reference.home === change.home &&
+    !!(
+      all ||
+      pages.has(reference.pageId) ||
+      datasetProjects.has(reference.projectId) ||
+      ((change.catalog || change.allPages) && projects.has(reference.projectId))
+    );
+  if (all) bump(change.home);
+  for (const id of pages) bump(`${change.home}:${id}`);
+  for (const id of datasetProjects) bump(`${change.home}:${id}`);
+  if (change.catalog || change.allPages)
+    for (const id of projects) bump(`${change.home}:${id}`);
+  void pageCache()
+    .invalidate(affected)
+    .then(() => schedulePageWarmup())
+    .catch((error) =>
+      console.warn("Couldn't invalidate page preview cache", error),
+    );
+}
+
 ipcMain.handle(
   "showai:pages:thumbnail",
-  async (event, args): Promise<DesktopResponse<string>> => {
-    const requestKey = `${event.sender.id}:${String(args?.requestId ?? "")}`;
+  async (event, args): Promise<DesktopResponse<string | null>> => {
     try {
       if (!pageSource)
         throw new CoreError("INVALID_DATA", "Page previews are unavailable.");
@@ -429,6 +809,8 @@ ipcMain.handle(
       if (
         !["light", "dark"].includes(args.theme) ||
         (args.refresh !== undefined && typeof args.refresh !== "boolean") ||
+        (args.cachedOnly !== undefined &&
+          typeof args.cachedOnly !== "boolean") ||
         !Number.isInteger(args.width) ||
         args.width < 64 ||
         args.width > 1024 ||
@@ -444,143 +826,24 @@ ipcMain.handle(
             args.priority > 100000))
       )
         throw new CoreError("INVALID_DATA", "Invalid page preview dimensions.");
-      const lease: PreviewLease = {
-        owner: event.sender,
-        cancelled: false,
-        priority: args.priority ?? 0,
-      };
-      requests.set(requestKey, lease);
-      const reference = {
-        projectId: args.projectId,
-        pageId: args.pageId,
-        theme: args.theme,
-      };
-      const identity = await pageSource.identity(reference);
-      const renderer = process.env.SHOWAI_DEV_URL
-        ? await stat(
-            join(process.env.SHOWAI_DEV_RUNTIME!, "assets/reader-source.json"),
-          ).then((info) => `${info.size}:${info.mtimeMs}`)
-        : await readFile(join(directory, "index.html"));
-      const keySource = createHash("sha256")
-        .update(renderer)
-        .update(
-          JSON.stringify({
-            ...identity,
-            ...reference,
-            hash: args.hash,
-            width: args.width,
-            height: args.height,
-            padding: args.padding,
-            version: 1,
-          }),
-        );
-      if (process.env.SHOWAI_DEV_URL)
-        for (const path of [
-          "src/studio/PagePreviewPage.tsx",
-          "src/studio/PageThumbnailContent.tsx",
-          "src/studio/CatalogPreview.tsx",
-          "src/studio/studio.css",
-          "src/studio/catalog-workspace.css",
-          "scripts/dev-client.mjs",
-        ])
-          keySource.update(await readFile(join(process.cwd(), path)));
-      const key = keySource.digest("hex");
-      const cacheDirectory = join(app.getPath("userData"), "page-previews");
-      await mkdir(cacheDirectory, { recursive: true });
-      const cache = join(cacheDirectory, `${key}.png`);
-      // A live dataset/file notification may not change the stored page hash.
-      // Refresh overwrites the usual cache entry so later visits see that data.
-      const image = args.refresh
-        ? undefined
-        : await cachedPreview(cache, args.width, args.height);
-      if (image) return { ok: true, data: image };
-      const pendingKey = args.refresh ? `${key}:${args.requestId}` : key;
-      let entry = pending.get(pendingKey);
-      if (!entry) {
-        const leases = new Set<PreviewLease>();
-        let capturing: BrowserWindow | undefined;
-        const stop = () => {
-          if (
-            capturing &&
-            ![...leases].some(
-              (lease) => !lease.cancelled && !lease.owner.isDestroyed(),
-            )
-          ) {
-            const preview = capturing;
-            capturing = undefined;
-            // Discard the renderer's work without recreating a native window
-            // during the user's next gesture.
-            void preview
-              .loadURL("about:blank")
-              .catch((error) =>
-                console.warn("Couldn't stop the preview capture", error),
-              );
-          }
-        };
-        const task = captures.enqueue(
-          async () => {
-            const active = [...leases].find(
-              (lease) => !lease.cancelled && !lease.owner.isDestroyed(),
-            );
-            if (!active)
-              throw new CoreError(
-                "NOT_FOUND",
-                "Preview request was cancelled.",
-              );
-            const record = await pageSource!.load(active.owner, reference);
-            const owner = [...leases].find(
-              (lease) => !lease.cancelled && !lease.owner.isDestroyed(),
-            )?.owner;
-            if (
-              (await pageSource!.identity(reference)).home !== identity.home ||
-              !owner
-            )
-              throw new CoreError(
-                "NOT_FOUND",
-                "Preview request was cancelled.",
-              );
-            try {
-              return await capture(
-                reference,
-                cache,
-                owner,
-                {
-                  width: args.width,
-                  height: args.height,
-                  padding: args.padding,
-                  record,
-                },
-                (window) => {
-                  capturing = window;
-                },
-              );
-            } finally {
-              capturing = undefined;
-            }
-          },
-          () =>
-            Math.min(
-              ...[...leases]
-                .filter(
-                  (lease) => !lease.cancelled && !lease.owner.isDestroyed(),
-                )
-                .map((lease) => lease.priority ?? 0),
-            ),
-        );
-        entry = { task, leases, stop };
-        pending.set(pendingKey, entry);
-        const cleanup = () => {
-          if (pending.get(pendingKey) === entry) pending.delete(pendingKey);
-        };
-        task.then(cleanup, cleanup);
+      if (!args.cachedOnly && warmTheme !== args.theme) {
+        warmTheme = args.theme;
+        warmGeneration++;
+        schedulePageWarmup();
       }
-      entry.leases.add(lease);
-      lease.stop = entry.stop;
-      return { ok: true, data: await entry.task };
+      try {
+        return { ok: true, data: await pageThumbnail(event.sender, args) };
+      } catch (error) {
+        if (
+          error instanceof CoreError &&
+          error.code === "CONFLICT" &&
+          !args.cachedOnly
+        )
+          return { ok: true, data: await pageThumbnail(event.sender, args) };
+        throw error;
+      }
     } catch (error) {
       return { ok: false, error: errorResult(error) };
-    } finally {
-      requests.delete(requestKey);
     }
   },
 );

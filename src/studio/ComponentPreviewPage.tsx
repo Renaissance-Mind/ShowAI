@@ -22,6 +22,11 @@ export default function ComponentPreviewPage() {
   const [ready, setReady] = useState(false);
   const native = useRef<HTMLDivElement>(null);
   useEffect(() => {
+    const token = new URLSearchParams(location.search).get("previewToken");
+    if (token && (ready || error))
+      window.showai?.previewReady?.(token, error || undefined);
+  }, [ready, error]);
+  useEffect(() => {
     if (window.parent === window) return;
     window.parent.postMessage(
       {

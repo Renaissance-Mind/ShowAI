@@ -249,7 +249,7 @@ export function validateProjectMetadata(
   };
 }
 
-function folderVisible(folders: FolderMetadata[], id: string): boolean {
+export function folderVisible(folders: FolderMetadata[], id: string): boolean {
   const byId = new Map(folders.map((folder) => [folder.id, folder]));
   let folder = byId.get(id);
   if (!folder) return false;

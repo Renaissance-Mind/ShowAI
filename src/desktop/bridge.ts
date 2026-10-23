@@ -102,8 +102,18 @@ export interface PagePreviewCapture {
 export type DesktopAppearance = "light" | "dark";
 
 export interface ShowAIBridge {
+  /** Private to native capture frames. */
+  onPreviewCapture?(listener: (action: "load" | "clear") => void): () => void;
+  previewReady?(id: string, error?: string): void;
   /** Desktop can rasterize directory pages in a separate renderer process. */
   pageThumbnails?: boolean;
+  onPageThumbnail?(
+    listener: (reference: {
+      projectId: string;
+      pageId: string;
+      theme: string;
+    }) => void,
+  ): () => void;
   inlineInk?: import("../surface/inline-ink").InlineInkBridge;
   openWindow?(
     args: Record<string, unknown>,

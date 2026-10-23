@@ -36,11 +36,15 @@ export default function PagePreviewPage() {
     };
     window.addEventListener("showai:page-preview", load);
     window.addEventListener("showai:page-preview-clear", clear);
+    const release = window.showai?.onPreviewCapture?.((action) =>
+      action === "load" ? load() : clear(),
+    );
     load();
     return () => {
       generation++;
       window.removeEventListener("showai:page-preview", load);
       window.removeEventListener("showai:page-preview-clear", clear);
+      release?.();
     };
   }, []);
   useEffect(() => {
@@ -53,7 +57,10 @@ export default function PagePreviewPage() {
     };
     window.addEventListener("message", receive);
     void (async () => {
-      await document.fonts.ready;
+      await Promise.race([
+        document.fonts.ready,
+        new Promise((resolve) => setTimeout(resolve, 750)),
+      ]);
       const deadline = Date.now() + 11000;
       let stable = 0;
       let previous = "";
@@ -89,6 +96,10 @@ export default function PagePreviewPage() {
       window.removeEventListener("message", receive);
     };
   }, [capture]);
+  useEffect(() => {
+    if (capture && (ready || error))
+      window.showai?.previewReady?.(capture.id, error || undefined);
+  }, [capture, ready, error]);
   return (
     <span
       ref={stage}

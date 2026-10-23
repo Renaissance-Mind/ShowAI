@@ -139,6 +139,20 @@ export function onPreviewActivity(listener: (paused: boolean) => void) {
   };
 }
 
+let desktopActivityRegistered = false;
+/** Track all workbench input, including Recent/list views while caches warm offscreen. */
+export function trackDesktopPreviewActivity() {
+  if (!window.showai?.pageThumbnails || desktopActivityRegistered) return;
+  desktopActivityRegistered = true;
+  onPreviewActivity((paused) => {
+    void window
+      .showai!.invoke("pages:thumbnailActivity", { paused })
+      .catch((reason) =>
+        console.warn("Couldn't update preview input priority", reason),
+      );
+  });
+}
+
 export function previewWork<T>(run: () => Promise<T>, signal: AbortSignal) {
   return previewQueue().enqueue(run, signal);
 }

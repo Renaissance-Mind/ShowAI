@@ -8,7 +8,16 @@ import type {
 import type { Locale } from "../i18n";
 import type { TabCommand } from "../workbench/tab-shortcuts";
 export interface DesktopBridge {
+  onPreviewCapture?(listener: (action: "load" | "clear") => void): () => void;
+  previewReady?(id: string, error?: string): void;
   pageThumbnails?: boolean;
+  onPageThumbnail?(
+    listener: (reference: {
+      projectId: string;
+      pageId: string;
+      theme: string;
+    }) => void,
+  ): () => void;
   inlineInk?: import("../surface/inline-ink").InlineInkBridge;
   openWindow?(
     args: Record<string, unknown>,

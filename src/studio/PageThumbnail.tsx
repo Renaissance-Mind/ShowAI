@@ -7,11 +7,10 @@ import "./component-catalog.css";
 import type { LoadedPage } from "./usePage";
 import PageThumbnailContent from "./PageThumbnailContent";
 import { ThumbnailRetention } from "./thumbnail-retention";
-import { onPreviewActivity, previewWork } from "./preview-work";
+import { previewWork } from "./preview-work";
 import { useAppearanceTheme } from "../design/useAppearanceTheme";
 
 const retainedPreviews = new ThumbnailRetention(32);
-let rasterActivityRegistered = false;
 interface ThumbnailProps {
   projectId: string;
   pageId: string;
@@ -114,17 +113,6 @@ function RasterPageThumbnail({
   padding = 10,
 }: ThumbnailProps) {
   const t = useTranslator(messages);
-  useEffect(() => {
-    if (rasterActivityRegistered) return;
-    rasterActivityRegistered = true;
-    onPreviewActivity((paused) => {
-      void desktop
-        .invoke("pages:thumbnailActivity", { paused })
-        .catch((reason) =>
-          console.warn("Couldn't update preview input priority", reason),
-        );
-    });
-  }, []);
   const host = useRef<HTMLSpanElement>(null);
   const theme = useAppearanceTheme();
   const [visible, setVisible] = useState(false);
@@ -141,6 +129,39 @@ function RasterPageThumbnail({
     ...size,
     generation,
   });
+  useEffect(() => {
+    let current = true;
+    const release = window.showai?.onPageThumbnail?.((reference) => {
+      if (
+        !visible ||
+        !size.width ||
+        reference.projectId !== projectId ||
+        reference.pageId !== pageId ||
+        reference.theme !== theme
+      )
+        return;
+      void desktop
+        .invoke<string | null>("pages:thumbnail", {
+          projectId,
+          pageId,
+          hash: hash ?? updatedAt,
+          theme,
+          ...size,
+          requestId: crypto.randomUUID(),
+          cachedOnly: true,
+        })
+        .then((value) => {
+          if (current && value) startTransition(() => setImage(value));
+        })
+        .catch((reason) => {
+          if (current) setError(errorMessage(reason));
+        });
+    });
+    return () => {
+      current = false;
+      release?.();
+    };
+  }, [projectId, pageId, hash, updatedAt, theme, size, visible]);
   useEffect(() => {
     const element = host.current!;
     const observer = new IntersectionObserver(
@@ -177,17 +198,22 @@ function RasterPageThumbnail({
   useEffect(
     () =>
       desktop.onChange((change) => {
+        if (change.type === "home") {
+          loadedKey.current = "";
+          setImage("");
+        }
+        const projectChanged =
+          !change.projectIds?.length || change.projectIds.includes(projectId);
         if (
           change.type === "home" ||
           change.all ||
-          change.allPages ||
-          change.catalog ||
-          change.datasets?.length ||
+          ((change.allPages || change.catalog) && projectChanged) ||
+          change.datasets?.some((value) => value.startsWith(`${projectId}/`)) ||
           change.pageIds?.includes(pageId)
         )
           setGeneration((value) => value + 1);
       }),
-    [pageId],
+    [pageId, projectId],
   );
   useEffect(() => {
     if (!visible || !size.width || loadedKey.current === key) return;
@@ -202,19 +228,26 @@ function RasterPageThumbnail({
         if (controller.signal.aborted) return "";
         submitted = true;
         const bounds = host.current!.getBoundingClientRect();
-        return desktop.invoke<string>("pages:thumbnail", {
+        const args = {
           projectId,
           pageId,
           hash: hash ?? updatedAt,
           theme,
           ...size,
-          refresh: generation > 0,
           requestId,
           priority: Math.min(
             100000,
             Math.max(0, bounds.top - innerHeight, -bounds.bottom),
           ),
+        };
+        // Show the last good snapshot first, including after a page edit/build change.
+        const cached = await desktop.invoke<string | null>("pages:thumbnail", {
+          ...args,
+          cachedOnly: true,
         });
+        if (controller.signal.aborted) return "";
+        if (cached) startTransition(() => setImage(cached));
+        return desktop.invoke<string>("pages:thumbnail", args);
       })
       .then(
         (value) => {

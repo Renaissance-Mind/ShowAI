@@ -4,6 +4,8 @@ import { OwnWrites } from "../core/own-writes";
 import { ModelResourceClient } from "../sync/model-resources";
 import {
   configurePageThumbnails,
+  invalidatePageThumbnails,
+  pagePreviewStatus,
   preparePreviewWindows,
 } from "./component-thumbnails";
 import {
@@ -247,12 +249,14 @@ function diagnostics(extra: string[] = []): string {
     `Language: ${getLocale()}`,
     `Library: ${store ? store.root : "(not open)"}`,
     `Log: ${mainLog.path}`,
+    `Page previews: ${JSON.stringify(pagePreviewStatus())}`,
     ...extra,
   ];
   return redactLogText(lines.join("\n"), homedir());
 }
 
 function broadcast(type: DesktopChange["type"], change?: DesktopChange): void {
+  invalidatePageThumbnails({ type, home: store.root, ...change });
   for (const window of windows)
     if (!window.isDestroyed())
       window.webContents.send("showai:changed", {
@@ -277,6 +281,13 @@ async function deliverFiles(root: string, batch: string[]): Promise<void> {
       } satisfies DesktopChange);
   }
   const change = changedResources(root, batch);
+  const previewPaths = batch.filter((path) =>
+    /^(projects|packages|assets|imports|publications)\//.test(
+      relative(root, path).split(sep).join("/").replace(/^workspace\//, ""),
+    ),
+  );
+  if (previewPaths.length)
+    invalidatePageThumbnails(changedResources(root, previewPaths));
   if (change.projectIds?.length || change.catalog || change.all)
     syncManager(root).wake(
       change.catalog || change.all ? undefined : change.projectIds,
@@ -724,6 +735,16 @@ app.on("will-quit", () => {
 });
 configurePageThumbnails({
   authorize: trustedSender,
+  home: () => store.root,
+  candidates: async () => {
+    const pages = await pagePreviewWorker.invoke<
+      { projectId: string; pageId: string; hash: string; updatedAt: string }[]
+    >(store.root, "pages:previewCandidates", {});
+    const hidden = new Set(
+      (await syncManager(store.root).configuration()).hiddenProjectIds ?? [],
+    );
+    return pages.filter((page) => !hidden.has(page.projectId));
+  },
   identity: async ({ projectId, pageId }) => {
     const library = versionedLibrary(store.root);
     // Page hashes already cover page edits. Unrelated projects/pages must not
@@ -731,7 +752,7 @@ configurePageThumbnails({
     const dependencies =
       library &&
       (await library.resourceRevisions([
-        `projects/${projectId}/pages/${pageId}`,
+        `projects/${projectId}/pages/${pageId}.json`,
         `projects/${projectId}/datasets`,
         `projects/${projectId}/packages`,
         `projects/${projectId}/assets`,

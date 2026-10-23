@@ -12,6 +12,12 @@ import {
 } from "./bridge";
 
 if (process.isMainFrame) {
+  const thumbnailListeners = new Set<
+    (reference: { projectId: string; pageId: string; theme: string }) => void
+  >();
+  ipcRenderer.on("showai:page-thumbnail-updated", (_event, reference) => {
+    for (const listener of thumbnailListeners) listener(reference);
+  });
   const closeListeners = new Set<() => Promise<CloseResult>>();
   const reloadListeners = new Set<() => Promise<boolean>>();
   ipcRenderer.on("showai:before-close", async (_event, requestId: string) => {
@@ -29,7 +35,12 @@ if (process.isMainFrame) {
       allow = false;
       reason = error instanceof Error ? error.message : String(error);
     }
-    ipcRenderer.send("showai:close-result", { requestId, allow, pages, reason });
+    ipcRenderer.send("showai:close-result", {
+      requestId,
+      allow,
+      pages,
+      reason,
+    });
   });
   // Uncaught renderer failures reach the main-process log for problem reports.
   const forward = (kind: string, value: unknown, fallback: string) => {
@@ -52,7 +63,29 @@ if (process.isMainFrame) {
     forward("unhandledrejection", event.reason, ""),
   );
   const bridge: ShowAIBridge = {
+    ...(new URLSearchParams(location.search).get("thumbnailCapture") === "1"
+      ? {
+          onPreviewCapture(listener: (action: "load" | "clear") => void) {
+            const receive = (
+              _event: Electron.IpcRendererEvent,
+              action: "load" | "clear",
+            ) => listener(action);
+            ipcRenderer.on("showai:preview-control", receive);
+            return () =>
+              ipcRenderer.removeListener("showai:preview-control", receive);
+          },
+          previewReady(id: string, error?: string) {
+            ipcRenderer.send("showai:preview-ready", { id, error });
+          },
+        }
+      : {}),
     pageThumbnails: true,
+    onPageThumbnail(listener) {
+      thumbnailListeners.add(listener);
+      return () => {
+        thumbnailListeners.delete(listener);
+      };
+    },
     setAppearance(appearance) {
       return ipcRenderer.invoke("showai:set-appearance", appearance);
     },

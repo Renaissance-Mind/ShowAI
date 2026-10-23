@@ -1,4 +1,5 @@
 import MergeDialog from "./MergeDialog";
+import { trackDesktopPreviewActivity } from "./preview-work";
 import type { ProjectSyncRequest } from "./SyncSettings";
 import accountFlowMessages from "../i18n/messages/accountFlow";
 import { coalescedTask } from "../lib/coalesced-task";
@@ -397,6 +398,9 @@ function Scope({ value }: { value: string }) {
 }
 
 export default function Studio() {
+  useEffect(() => {
+    trackDesktopPreviewActivity();
+  }, []);
   const receivingInvite = useRef(false);
   const [syncNavigationKey, setSyncNavigationKey] = useState(0);
   const accountFlow = useTranslator(accountFlowMessages);
