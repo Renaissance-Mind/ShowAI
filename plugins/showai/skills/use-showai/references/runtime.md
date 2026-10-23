@@ -31,9 +31,46 @@
 
 不修改系统 HOME，也不直接编辑库里的正式文件。运行期间库位置保持固定；要换库，宿主停止并重连另一个配置，再查 capabilities/context。
 
+## 连接中断或没有工具
+
+宿主报告 ShowAI 连接已关闭（例如 `Connection closed`），或会话中没有任何 ShowAI 工具（连 `showai_connection_problem` 也没有）时，说明 MCP 进程没有启动或已经退出，这次操作没有写入 ShowAI。
+
+1. 告诉用户连接失败、哪一步没有完成，并把要保存的内容留在对话中，便于重试。
+2. 请用户打开 ShowAI「设置 → 插件」：查看「当前登记的运行时」、各插件连接的内容库和「最近一次连接失败」；按页面提示点「修复登记」或「更新并启用」。
+3. 修复后需要重启 Agent 会话或刷新宿主连接，才会重新启动 MCP；协调用户完成，不自行退出宿主。
+4. 判断安装方式：App 安装的 `mcp.json` 以 ShowAI App 的可执行文件启动 launcher；`command` 为 `node` 时是源码或插件市场安装，需要 Node.js 22.12+，缺少或版本过旧也会导致连接关闭。
+5. 具体原因记录在宿主的 MCP 日志（launcher 的 stderr）中；仍无法解决时，请用户在 ShowAI「设置 → 关于与反馈」报告问题（这一入口不依赖 Agent 连接）。
+
+## 错误码与下一步
+
+工具错误都带 `code`、`message`，常见错误还带 `nextStep`（下一步做什么）和 `userMessage`（可直接转述的一句话）。先按 `nextStep` 处理：
+
+| 错误码                              | 含义                                             | Agent 怎么做                                                                                                                                                                               |
+| ----------------------------------- | ------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| CONFLICT                            | 读取后内容已变化，没有覆盖                       | 重新读取，把修改应用到当前版本后用新的 baseHash/baseRevision 重试；不重发原请求                                                                                                            |
+| NOT_FOUND                           | 内容库中没有这个项目或页面                       | 列出现有内容，用返回的 ID 重试                                                                                                                                                             |
+| INVALID_DATA                        | 请求的数据不符合格式或组件参数，没有保存任何内容 | 按 `message` 和 `details` 指出的位置修正自己的输入（组件参数用 `catalog_describe` 的 parameters 视图核对），重新读取后再提交一次；数据来自页面原有内容而无法修正时，作为无法恢复的失败处理 |
+| INVALID_PATH                        | 路径不可用                                       | 改用本机绝对路径或 ShowAI 返回的 ID                                                                                                                                                        |
+| LOCKED                              | 内容库正被其他操作占用                           | 等几秒后重试同一调用一次                                                                                                                                                                   |
+| SNAPSHOT_EXPIRED / MISSING_BASELINE | 之前的读取结果或比较基线已失效                   | 重新读取后继续                                                                                                                                                                             |
+| SOURCE_UNAVAILABLE                  | 共享数据链接的外部文件在本机不可读               | 请用户恢复该文件，或使用已存储的副本                                                                                                                                                       |
+| CONFIRMATION_REQUIRED               | 需要用户先做决定                                 | 按 `details` 询问用户，再带上决定重试                                                                                                                                                      |
+| ERROR 或其他                        | 未归类的失败                                     | 按下一节处理                                                                                                                                                                               |
+
+同一错误按 `nextStep` 处理一次后仍出现，也按下一节处理。
+
+## 组件显示异常
+
+用户说页面里的组件报错或显示不出来时，ShowAI 会在该位置显示组件状态卡片：「运行出错」「参数不符」或「缺少组件」，并提供「让 Agent 修复」「报告问题」等操作。
+
+1. 确认是哪个页面、哪个组件；用户没有提供引用时先询问。
+2. 用 `page_read`（必要时 `view:"html"` 或 `"image"`）读取页面，查看 warnings 中的组件状态，并记录组件引用（id、version、integrity）。
+3. 用 `catalog_describe` 判断组件来源：项目自有或由 Agent 编写的自定义组件，按 [create-component](../../create-component/SKILL.md) 修复或重建；参数不符时按 parameters 视图修正页面数据。
+4. 内置组件出错属于 ShowAI 本身的问题：请用户在组件卡片或「设置 → 关于与反馈」中「报告问题」，诊断信息会自动附带；不要代替用户提交。
+
 ## 无法恢复的失败与反馈
 
-工具返回 CONFLICT、NOT_FOUND、LOCKED 等可恢复错误时，按回执的 `nextStep` 处理，不当作故障上报。工具失败且无法恢复时（错误码为 ERROR、连接问题工具报告的启动失败，或按 `nextStep` 处理后仍失败），告诉用户哪一步失败，并给出错误码与 message；`userMessage` 是可直接转述的一句话。再提示用户在 ShowAI「设置 → 关于与反馈」点「复制诊断信息」，或打开 `showai_capabilities` / `runtime info` 返回的 `support.reportUrl` 提交反馈，排障说明见 `support.docsUrl`。不要代替用户提交反馈，不要转述 Token、密钥或本机路径。
+工具返回 CONFLICT、NOT_FOUND、LOCKED 等可恢复错误时，按回执的 `nextStep` 处理，不当作故障上报。工具失败且无法恢复时（错误码为 ERROR、连接问题工具报告的启动失败，或按 `nextStep` 处理后仍失败），告诉用户哪一步失败，并给出错误码与 message；`userMessage` 是可直接转述的一句话。再提示用户在 ShowAI「设置 → 关于与反馈」点「复制诊断信息」或「报告问题」，或打开 `showai_capabilities` / `runtime info` 返回的 `support.reportUrl` 提交反馈，排障说明见 `support.docsUrl`。连接不可用、拿不到 `support` 时，「设置 → 关于与反馈」仍然可用。不要代替用户提交反馈，不要转述 Token、密钥或本机路径。
 
 ## 自定义 Agent / 服务器 runner
 

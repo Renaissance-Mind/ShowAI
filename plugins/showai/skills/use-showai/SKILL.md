@@ -1,6 +1,6 @@
 ---
 name: use-showai
-description: 通过 ShowAI MCP 连接、查找与阅读内容，处理用户粘贴或对话附带的 ShowAI 引用与组件状态，管理项目、文件夹、侧栏、页面迁移与草稿，让多个页面的组件共用并同时修改一份共享数据（也可直接读写内容库以外的 JSON/CSV 文件，处理其他设备上「还没有链接」的外部文件），查询组件模板及引用，处理保存冲突。先按用户要的结果选择讨论、对话展示或文档路径，保存前核实连接和项目归属；对话中直接展示组件、页面创作、组件开发、模板创建分别进入专门技能。
+description: 通过 ShowAI MCP 连接、查找与阅读内容，处理用户粘贴或对话附带的 ShowAI 引用与组件状态，管理项目、文件夹、侧栏、页面迁移与草稿，让多个页面的组件共用并同时修改一份共享数据（也可直接读写内容库以外的 JSON/CSV 文件，处理其他设备上「还没有链接」的外部文件），查询组件模板及引用，处理保存冲突；连接失败、工具报错或页面组件显示异常时说明原因、保留用户内容并指向「设置 → 关于与反馈」。先按用户要的结果选择讨论、对话展示或文档路径，保存前核实连接和项目归属；对话中直接展示组件、页面创作、组件开发、模板创建分别进入专门技能。
 ---
 
 # 使用 ShowAI
@@ -24,13 +24,13 @@ Agent 通过 MCP 操作 ShowAI。App、网页、CLI 和 MCP 共用内容核心�
 
 首次实际操作调用当前 ShowAI 连接的 `showai_capabilities`。工具可能带宿主前缀，使用实际暴露的名称。检查 `agentProtocol`、`transport`、`projects.access`、`projects.available` 和展示能力；调用 `project_context` 或 `projects_list` 核对目标。不能仅凭“Codex”“ChatGPT”判断连接或显示能力。
 
-- **library 本机连接**：`project_context` 返回固定内容库。纯查询用 `projects_list`、`pages_list`、`library_search`，不创建项目。新正式内容未指定项目时，`project_resolve({sourceDirectory})` 使用宿主提供的绝对项目目录；首次映射可创建项目。不要使用插件、预览或临时输出目录。没有可信目录时询问归属。用户要求独立命名项目时才用 `project_create`。
+- **library 本机连接**：`project_context` 返回固定内容库。纯查询用 `projects_list`、`pages_list`、`library_search`，不创建项目。新正式内容未指定项目时，`project_resolve({sourceDirectory})` 使用宿主提供的绝对项目目录；首次映射可创建项目。不要使用插件、预览或临时输出目录。宿主当前工作目录是用户的项目或代码仓库、且内容与之相关时可以作为可信目录；对话整理、与当前目录无关的内容或没有可信目录时询问归属。用户要求独立命名项目时才用 `project_create`。
 - **project 绑定连接**：`project_context` 返回固定项目。沿用它，不能用另一个 projectId 越过绑定。
 - **authorized 远程连接**：`projects_list` 返回授权项目与当前权限。所有私有操作使用返回的 projectId；不要查询本机内容库或向远程传本机路径。用户明确要求新项目时用 `project_create`，授权、重试、登录和本机项目可见性见 [连接配置的远程部分](references/runtime.md#远程)。
 
 项目操作显式传 `projectId`。进入页面制作或组件制作任务时，用 `project_context({projectId})` 取得 `componentCatalog`：完整内置＋项目索引、目录 revision 和两条工作流说明。项目解析回执也包含该索引；内置 Agent 由宿主在启动时注入。已持有当前连接、当前项目的完整索引时可传 knownCatalogRevision；回执 unchanged=true 时沿用已持有索引，不将省略的 items 当作空目录。没有完整索引时不传该参数。目录变化或切换项目后更新。页面身份来自真实结果中的 `document.id` 或页面列表；会话 ID 用于来源记录，不代替项目或页面身份。远程与本机 ID 不可自行互换。
 
-连接错误、项目不匹配或工具缺失时，先报告缺项并按 [连接配置](references/runtime.md) 核实宿主配置；只看到 `showai_connection_problem` 时调用它并转述原因与修复步骤。工具失败且无法恢复时，按 [无法恢复的失败与反馈](references/runtime.md#无法恢复的失败与反馈) 告诉用户失败的步骤和错误码，并指向「设置 → 关于与反馈」。禁止默默换连接、换内容库、改用创作 CLI 或把正式任务降为未保存 HTML。库切换由宿主重新连接明确的 home，不通过文档工具修改全局库配置。已有可信连接、项目和页面身份时直接继续，不重复发现。
+连接错误、项目不匹配或工具缺失时，先报告缺项并按 [连接配置](references/runtime.md) 核实宿主配置；只看到 `showai_connection_problem` 时调用它并转述原因与修复步骤。完全没有 ShowAI 工具（宿主报 Connection closed 等）时按 [连接中断或没有工具](references/runtime.md#连接中断或没有工具) 处理。工具报错时按 [错误码与下一步](references/runtime.md#错误码与下一步) 判断能否自行修正；无法恢复时，按 [无法恢复的失败与反馈](references/runtime.md#无法恢复的失败与反馈) 告诉用户失败的步骤和错误码，并指向「设置 → 关于与反馈」。保存或创作失败时，把用户要保存的内容留在对话中，便于修复后重试。用户说页面里的组件报错、显示不出来时，按 [组件显示异常](references/runtime.md#组件显示异常) 处理。禁止默默换连接、换内容库、改用创作 CLI 或把正式任务降为未保存 HTML。库切换由宿主重新连接明确的 home，不通过文档工具修改全局库配置。已有可信连接、项目和页面身份时直接继续，不重复发现。
 
 明确要求边写边画、多端配对、运行位置、会话隔离或位置参考时，继续读 [collaborate-canvas](../collaborate-canvas/SKILL.md)。
 
