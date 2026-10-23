@@ -32,6 +32,7 @@ for (const path of [
   "src",
   "resources",
   "plugins/showai",
+  "plugins/dsh-showai",
   "scripts",
   "public",
   "index.html",
@@ -592,7 +593,11 @@ try {
       { projectId: project.id, resourceId: created.document.id },
     );
     await page
-      .getByRole("button", { name: "放弃我的修改，采用文件版本", exact: true })
+      .getByRole("dialog")
+      .getByRole("button", {
+        name: "放弃你的修改，采用另一处的修改",
+        exact: true,
+      })
       .click();
   } else
     await page.getByRole("button", { name: "保留为副本", exact: true }).click();
