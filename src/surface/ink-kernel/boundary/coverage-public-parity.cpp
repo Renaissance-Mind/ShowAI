@@ -50,5 +50,16 @@ int main(int argc,char**argv){require(argc==3||argc==4,"output, actual command d
  // rejects the latter, proving old NONEMPTY data is readable under failure.
  auto bounded=limits;bounded.maximum_limb_operations=512;require(a.init(53,bounded)==0&&sa_coverage_prepare(a.data(),nine.data(),nine.size(),generation,&r9)==0,"real nonempty arithmetic baseline");before=capture(a,r9);out=sentinel;result=sa_coverage_prepare(a.data(),three.data(),three.size(),generation+1,&out);require(result==2&&!std::memcmp(&out,&sentinel,16),"actual arithmetic rejection after nonempty source");same(before,capture(a,r9));tape.event(80,result);snapshot(tape,81,a,r9);require(sa_coverage_destroy(a.data())==0,"failed nonempty arithmetic destroy");
  if(argc==4){require(a.init(60,limits)==0,"actual worker workspace");for(uint32_t i=0;i<3;i++){char name[64];std::snprintf(name,sizeof name,"worker321-block-%u.commands",i);auto worker=load_file(argv[3],name);auto originalWorker=worker;SACoverageReceipt r{};result=sa_coverage_prepare(a.data(),worker.data(),worker.size(),generation,&r);require(result==0&&!std::memcmp(worker.data(),originalWorker.data(),worker.size()*56),"actual 321 worker block source unchanged");tape.event(90+i*2,result);snapshot(tape,91+i*2,a,r);}require(sa_coverage_destroy(a.data())==0,"worker workspace destroy");}
+ // Reduced original fan from a real low-zoom worker failure. Keep the
+ // physical budget and editable commands; only the derived origin may move.
+ require(a.init(61,limits)==0,"long fan workspace");
+ const double x=832.4666733671628,y=-1.9522499459803397,end=2925.8100312617403,top=1.499999967398167;
+ std::vector<SAInkPathCommand>fan={{0,0,{x,y}},{1,0,{end,y}},{1,0,{end,top}},{1,0,{x,top}},{4,0,{}}};auto originalFan=fan;
+ SACoverageReceipt fanReceipt{};result=sa_coverage_prepare(a.data(),fan.data(),fan.size(),generation,&fanReceipt);
+ require(result==0&&!std::memcmp(fan.data(),originalFan.data(),fan.size()*56),"long original fan source unchanged");
+ auto rebased=capture(a,fanReceipt);const auto&certificate=rebased.summary.certificate;
+ require(certificate.maximum_forward_norm==256&&certificate.maximum_geometry_error_pixels==.02&&256*(certificate.actual_position_error_source+certificate.actual_regularization_error_source)<=.02,"long fan original physical precision");
+ bool moved=false;for(const auto&draw:rebased.draws)if(draw.origin[0]!=x||draw.origin[1]!=y)moved=true;require(moved,"actual derived triangle origin changed");
+ tape.event(100,result);snapshot(tape,101,a,fanReceipt);require(sa_coverage_destroy(a.data())==0,"long fan workspace destroy");
  std::puts("COVERAGE_PUBLIC_ACTUAL_NATIVE_PARITY_OK contacts=3/9/37");
 }
