@@ -150,30 +150,33 @@ try {
   });
   const scroll = page.locator(".studio-scroll");
   const bounds = await scroll.boundingBox();
-  // Selection stays usable while the first background captures are being generated.
-  await page.mouse.move(bounds.x + 18, bounds.y + 12);
-  await page.mouse.down();
-  await page.mouse.move(
-    bounds.x + bounds.width * 0.65,
-    bounds.y + bounds.height * 0.7,
-    { steps: 40 },
-  );
-  await page.mouse.up();
-  assert.ok(await page.locator(".studio-page-list .selected").count());
-  await page.keyboard.press("Escape");
-  assert.equal(await page.locator(".studio-page-list .selected").count(), 0);
-  // Cancel while the pointer is still down: transient DOM highlights must clear.
-  await page.mouse.move(bounds.x + 18, bounds.y + 12);
-  await page.mouse.down();
-  await page.mouse.move(
-    bounds.x + bounds.width * 0.65,
-    bounds.y + bounds.height * 0.7,
-    { steps: 20 },
-  );
-  await page.keyboard.press("Escape");
-  await page.mouse.up();
-  assert.equal(await page.locator(".studio-page-list .selected").count(), 0);
-  for (const delta of [450, 450, -450, -450]) await page.mouse.wheel(0, delta);
+  if (!process.env.SHOWAI_TEST_LOAD_ONLY) {
+    // Selection stays usable while the first background captures are being generated.
+    await page.mouse.move(bounds.x + 18, bounds.y + 12);
+    await page.mouse.down();
+    await page.mouse.move(
+      bounds.x + bounds.width * 0.65,
+      bounds.y + bounds.height * 0.7,
+      { steps: 40 },
+    );
+    await page.mouse.up();
+    assert.ok(await page.locator(".studio-page-list .selected").count());
+    await page.keyboard.press("Escape");
+    assert.equal(await page.locator(".studio-page-list .selected").count(), 0);
+    // Cancel while the pointer is still down: transient DOM highlights must clear.
+    await page.mouse.move(bounds.x + 18, bounds.y + 12);
+    await page.mouse.down();
+    await page.mouse.move(
+      bounds.x + bounds.width * 0.65,
+      bounds.y + bounds.height * 0.7,
+      { steps: 20 },
+    );
+    await page.keyboard.press("Escape");
+    await page.mouse.up();
+    assert.equal(await page.locator(".studio-page-list .selected").count(), 0);
+    for (const delta of [450, 450, -450, -450])
+      await page.mouse.wheel(0, delta);
+  }
   console.log("Input gestures completed; waiting for background previews");
   await page.waitForFunction(
     () => {
@@ -299,6 +302,18 @@ try {
     );
     result.checks.push(
       "Unrelated library edits keep existing page snapshots cached",
+    );
+    await invoke("pages:thumbnailActivity", { paused: true });
+    assert.equal(
+      await invoke("pages:thumbnail", {
+        ...reference,
+        requestId: crypto.randomUUID(),
+      }),
+      first,
+    );
+    await invoke("pages:thumbnailActivity", { paused: false });
+    result.checks.push(
+      "Input pauses capture admission without blocking cached images",
     );
   }
   const dark = await invoke("pages:thumbnail", {

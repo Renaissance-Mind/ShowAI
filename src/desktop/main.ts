@@ -2,7 +2,10 @@ import { changedResources } from "../core/change-notification";
 import { watchDatasetSources } from "../core/dataset-sources";
 import { OwnWrites } from "../core/own-writes";
 import { ModelResourceClient } from "../sync/model-resources";
-import { configurePageThumbnails } from "./component-thumbnails";
+import {
+  configurePageThumbnails,
+  preparePreviewWindows,
+} from "./component-thumbnails";
 import {
   app,
   BrowserWindow,
@@ -610,6 +613,7 @@ async function createWindow(page?: WindowTarget): Promise<BrowserWindow> {
     },
   });
   windows.add(window);
+  preparePreviewWindows(window);
   applyWindowAppearance(
     window,
     nativeTheme.shouldUseDarkColors ? "dark" : "light",

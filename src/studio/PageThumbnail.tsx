@@ -3,11 +3,12 @@ import { desktop, errorMessage } from "./bridge";
 import type { LoadedPage } from "./usePage";
 import PageThumbnailContent from "./PageThumbnailContent";
 import { ThumbnailRetention } from "./thumbnail-retention";
-import { previewWork } from "./preview-work";
+import { onPreviewActivity, previewWork } from "./preview-work";
 import { useAppearanceTheme } from "../design/useAppearanceTheme";
 import { ImageOff } from "../ui/icons";
 
 const retainedPreviews = new ThumbnailRetention(32);
+let rasterActivityRegistered = false;
 interface ThumbnailProps {
   projectId: string;
   pageId: string;
@@ -105,6 +106,17 @@ function RasterPageThumbnail({
   updatedAt,
   padding = 10,
 }: ThumbnailProps) {
+  useEffect(() => {
+    if (rasterActivityRegistered) return;
+    rasterActivityRegistered = true;
+    onPreviewActivity((paused) => {
+      void desktop
+        .invoke("pages:thumbnailActivity", { paused })
+        .catch((reason) =>
+          console.warn("Couldn't update preview input priority", reason),
+        );
+    });
+  }, []);
   const host = useRef<HTMLSpanElement>(null);
   const theme = useAppearanceTheme();
   const [visible, setVisible] = useState(false);

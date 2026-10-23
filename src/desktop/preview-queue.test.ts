@@ -1,6 +1,20 @@
 import { expect, it } from "vitest";
 import { CaptureQueue } from "./preview-queue";
 
+it("holds captures during input, including jobs already scheduled for admission", async () => {
+  const queue = new CaptureQueue(2);
+  let ran = false;
+  const job = queue.enqueue(async () => {
+    ran = true;
+  });
+  queue.pause(true);
+  await new Promise((resolve) => setTimeout(resolve, 10));
+  expect(ran).toBe(false);
+  queue.pause(false);
+  await job;
+  expect(ran).toBe(true);
+});
+
 it("fills the capture pool without exceeding its capacity", async () => {
   const queue = new CaptureQueue(2);
   let running = 0,

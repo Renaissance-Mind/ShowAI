@@ -4,8 +4,14 @@ export class CaptureQueue {
     [];
   private scheduled = false;
   private running = 0;
+  private paused = false;
 
   constructor(private readonly concurrency = 1) {}
+
+  pause(paused: boolean) {
+    this.paused = paused;
+    this.pump();
+  }
 
   enqueue<T>(
     run: () => Promise<T>,
@@ -25,6 +31,7 @@ export class CaptureQueue {
   private pump() {
     if (
       this.running >= this.concurrency ||
+      this.paused ||
       this.scheduled ||
       !this.pending.length
     )
@@ -32,6 +39,7 @@ export class CaptureQueue {
     this.scheduled = true;
     setTimeout(() => {
       this.scheduled = false;
+      if (this.paused) return;
       let first = 0;
       for (let index = 1; index < this.pending.length; index++)
         if (this.pending[index].priority() < this.pending[first].priority())

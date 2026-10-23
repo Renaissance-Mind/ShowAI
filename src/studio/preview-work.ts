@@ -57,18 +57,26 @@ export class PreviewQueue {
 }
 
 let queue: PreviewQueue | undefined;
-export function previewWork<T>(run: () => Promise<T>, signal: AbortSignal) {
+let inputPaused = false;
+const activityListeners = new Set<(paused: boolean) => void>();
+function previewQueue() {
   if (!queue) {
     queue = new PreviewQueue((run) =>
       window.requestIdleCallback(run, { timeout: 1000 }),
     );
     const pointers = new Set<number>();
     let idle: ReturnType<typeof setTimeout>;
+    const pause = (value: boolean) => {
+      queue!.pause(value);
+      if (inputPaused === value) return;
+      inputPaused = value;
+      for (const listener of activityListeners) listener(value);
+    };
     const defer = () => {
-      queue!.pause(true);
+      pause(true);
       clearTimeout(idle);
       idle = setTimeout(() => {
-        if (!pointers.size) queue!.pause(false);
+        if (!pointers.size) pause(false);
       }, 160);
     };
     window.addEventListener(
@@ -116,6 +124,21 @@ export function previewWork<T>(run: () => Promise<T>, signal: AbortSignal) {
       pointers.clear();
       defer();
     });
+    defer();
   }
-  return queue.enqueue(run, signal);
+  return queue;
+}
+
+/** Desktop sends input priority to its capture queue; cached image I/O stays free. */
+export function onPreviewActivity(listener: (paused: boolean) => void) {
+  previewQueue();
+  activityListeners.add(listener);
+  listener(inputPaused);
+  return () => {
+    activityListeners.delete(listener);
+  };
+}
+
+export function previewWork<T>(run: () => Promise<T>, signal: AbortSignal) {
+  return previewQueue().enqueue(run, signal);
 }

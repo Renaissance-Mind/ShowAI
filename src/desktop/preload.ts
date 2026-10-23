@@ -47,6 +47,7 @@ if (process.isMainFrame) {
     ): Promise<T> {
       const result = (
         action === "pages:thumbnail" ||
+        action === "pages:thumbnailActivity" ||
         action === "pages:thumbnailCancel" ||
         action === "pages:previewData" ||
         action === "components:thumbnail" ||
@@ -54,11 +55,13 @@ if (process.isMainFrame) {
         action === "components:previewData"
           ? await ipcRenderer.invoke(
               action.startsWith("pages:")
-                ? action === "pages:thumbnailCancel"
-                  ? "showai:thumbnail-cancel"
-                  : action === "pages:previewData"
-                    ? "showai:previewData"
-                    : "showai:pages:thumbnail"
+                ? action === "pages:thumbnailActivity"
+                  ? "showai:pages:thumbnail-activity"
+                  : action === "pages:thumbnailCancel"
+                    ? "showai:thumbnail-cancel"
+                    : action === "pages:previewData"
+                      ? "showai:previewData"
+                      : "showai:pages:thumbnail"
                 : action === "components:thumbnail"
                   ? "showai:thumbnail"
                   : action === "components:thumbnailCancel"

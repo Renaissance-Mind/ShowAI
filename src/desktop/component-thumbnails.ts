@@ -58,20 +58,52 @@ const pending = new Map<
 >();
 const requests = new Map<string, PreviewLease>();
 const previewWindows = new Set<BrowserWindow>();
+const workbenchOwners = new Set<BrowserWindow>();
 const busyPreviews = new Set<BrowserWindow>();
-const previewIdle = new WeakMap<BrowserWindow, ReturnType<typeof setTimeout>>();
 const observedOwners = new WeakSet<WebContents>();
 let developmentRenderer:
   { identity: string; bytes: Promise<Buffer> } | undefined;
 function closePreview(window?: BrowserWindow) {
   for (const preview of window ? [window] : [...previewWindows]) {
-    clearTimeout(previewIdle.get(preview));
     previewWindows.delete(preview);
     busyPreviews.delete(preview);
     if (!preview.isDestroyed()) preview.destroy();
   }
 }
 app.on("before-quit", () => closePreview());
+function createPreviewWindow() {
+  const preview = new BrowserWindow({
+    width: 720,
+    height: 420,
+    useContentSize: true,
+    show: false,
+    webPreferences: {
+      preload: join(directory, "preload.cjs"),
+      sandbox: true,
+      contextIsolation: true,
+      nodeIntegration: false,
+      backgroundThrottling: false,
+    },
+  });
+  preview.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
+  preview.webContents.on("will-navigate", (event) => event.preventDefault());
+  previewWindows.add(preview);
+  preview.once("closed", () => {
+    previewWindows.delete(preview);
+    busyPreviews.delete(preview);
+  });
+  return preview;
+}
+
+/** Allocate native windows before the workbench accepts input. */
+export function preparePreviewWindows(owner: BrowserWindow) {
+  workbenchOwners.add(owner);
+  owner.once("closed", () => {
+    workbenchOwners.delete(owner);
+    if (!workbenchOwners.size) closePreview();
+  });
+  while (previewWindows.size < 2) createPreviewWindow();
+}
 function trustedOwner(event: Electron.IpcMainInvokeEvent) {
   const sender = event.senderFrame;
   const location = new URL(sender?.url ?? "about:blank");
@@ -88,6 +120,32 @@ const previewData = new Map<
   BuiltinComponentMetadata | CompiledComponent | PagePreviewCapture
 >();
 const captures = new CaptureQueue(2);
+const activeOwners = new Set<WebContents>();
+const activityObservedOwners = new WeakSet<WebContents>();
+ipcMain.handle(
+  "showai:pages:thumbnail-activity",
+  (event, args): DesktopResponse<boolean> => {
+    try {
+      trustedOwner(event);
+      if (typeof args?.paused !== "boolean")
+        throw new CoreError("INVALID_DATA", "Invalid preview activity.");
+      if (args.paused) {
+        activeOwners.add(event.sender);
+        if (!activityObservedOwners.has(event.sender)) {
+          activityObservedOwners.add(event.sender);
+          event.sender.once("destroyed", () => {
+            activeOwners.delete(event.sender);
+            captures.pause(activeOwners.size > 0);
+          });
+        }
+      } else activeOwners.delete(event.sender);
+      captures.pause(activeOwners.size > 0);
+      return { ok: true, data: true };
+    } catch (error) {
+      return { ok: false, error: errorResult(error) };
+    }
+  },
+);
 const lastPruned = new Map<string, number>();
 async function prunePreviews(directory: string) {
   if (Date.now() - (lastPruned.get(directory) ?? 0) < 60000) return;
@@ -152,34 +210,9 @@ async function capture(
   const available = [...previewWindows].find(
     (window) => !window.isDestroyed() && !busyPreviews.has(window),
   );
-  const preview = available
-    ? available
-    : new BrowserWindow({
-        width: 720,
-        height: 420,
-        useContentSize: true,
-        show: false,
-        backgroundColor: reference.theme === "dark" ? "#222222" : "#f7f7f7",
-        webPreferences: {
-          preload: join(directory, "preload.cjs"),
-          sandbox: true,
-          contextIsolation: true,
-          nodeIntegration: false,
-          backgroundThrottling: false,
-        },
-      });
-  clearTimeout(previewIdle.get(preview));
+  const preview = available ?? createPreviewWindow();
   busyPreviews.add(preview);
   started?.(preview);
-  if (!previewWindows.has(preview)) {
-    preview.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
-    preview.webContents.on("will-navigate", (event) => event.preventDefault());
-    previewWindows.add(preview);
-    preview.once("closed", () => {
-      previewWindows.delete(preview);
-      busyPreviews.delete(preview);
-    });
-  }
   const width = page?.width ?? 720;
   const height = page?.height ?? 420;
   preview.setContentSize(width, height);
@@ -193,12 +226,6 @@ async function capture(
     owner.once("destroyed", () => {
       for (const lease of requests.values())
         if (lease.owner === owner) lease.cancelled = true;
-      if (
-        BrowserWindow.getAllWindows().every(
-          (window) => previewWindows.has(window) || !window.isVisible(),
-        )
-      )
-        closePreview();
     });
   }
   preview.setBackgroundColor(
@@ -270,9 +297,6 @@ async function capture(
           new Promise(resolve => requestAnimationFrame(() => resolve()));
         `);
         else await preview.loadURL("about:blank");
-        const idle = setTimeout(() => closePreview(preview), 10000);
-        previewIdle.set(preview, idle);
-        idle.unref();
       }
     } finally {
       busyPreviews.delete(preview);
@@ -481,8 +505,17 @@ ipcMain.handle(
             ![...leases].some(
               (lease) => !lease.cancelled && !lease.owner.isDestroyed(),
             )
-          )
-            closePreview(capturing);
+          ) {
+            const preview = capturing;
+            capturing = undefined;
+            // Discard the renderer's work without recreating a native window
+            // during the user's next gesture.
+            void preview
+              .loadURL("about:blank")
+              .catch((error) =>
+                console.warn("Couldn't stop the preview capture", error),
+              );
+          }
         };
         const task = captures.enqueue(
           async () => {
