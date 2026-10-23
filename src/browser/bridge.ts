@@ -21,10 +21,21 @@ export function connectionState() {
 }
 function announce(state: ConnectionState) {
   if (state === connection) return;
-  // A new access token only comes with a page refresh; reconnecting can't recover it.
+  // Once the new access token could not be read, only a refresh recovers.
   if (connection === "restarted") return;
   connection = state;
   window.dispatchEvent(new CustomEvent("showai:connection", { detail: state }));
+}
+
+/** Reads the access token from the workbench page the local service serves. */
+export function pageToken(html: string): string | undefined {
+  const config = /window\.__SHOWAI_LOCAL__=(\{[^<]*?\})\s*<\/script>/.exec(
+    html,
+  )?.[1];
+  const token = config && (JSON.parse(config) as { token?: unknown }).token;
+  return typeof token === "string" && /^[a-f0-9]{64}$/.test(token)
+    ? token
+    : undefined;
 }
 const failure = (code: string, message: string) =>
   Object.assign(new Error(message), { code });
@@ -44,9 +55,27 @@ export function installBrowserBridge() {
   let dirty = false;
   // Lets the server skip echoing this tab's own saves back to it.
   const client = crypto.randomUUID();
+  // A restarted local service issues a new access token in the page it
+  // serves. Reading it from the same origin is what a refresh would do, but
+  // keeps edits that so far exist only in this window, so 重试 can save them.
+  let renewing: Promise<boolean> | undefined;
+  function renewToken() {
+    renewing ??= fetch("/", { cache: "no-store" })
+      .then(async (response) => {
+        const token = response.ok ? pageToken(await response.text()) : undefined;
+        if (!token || token === config!.token) return false;
+        config!.token = token;
+        return true;
+      })
+      .finally(() => {
+        renewing = undefined;
+      });
+    return renewing;
+  }
   async function request<T>(
     route: string,
     args: Record<string, unknown>,
+    renewed = false,
   ): Promise<T> {
     let response: Response;
     try {
@@ -66,6 +95,8 @@ export function installBrowserBridge() {
       throw failure("SERVICE_UNREACHABLE", shell("connection.unreachable"));
     }
     if (response.status === 401) {
+      if (!renewed && (await renewToken().catch(() => false)))
+        return request<T>(route, args, true);
       announce("restarted");
       throw failure("SERVICE_RESTARTED", shell("connection.restarted"));
     }
