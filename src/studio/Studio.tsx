@@ -1630,30 +1630,51 @@ export default function Studio() {
       setBusy(false);
     }
   }
-  /** Copies the open read-only page into a new project this device owns. */
+  /**
+   * Copies the open read-only page into a new project this device owns. The
+   * copy stays local even when new projects default to a server account, and
+   * a failed import removes the empty project it was going to fill.
+   */
   async function saveLocalCopy() {
     const draft = page.draft;
     if (!draft) return;
     const source = { ...draft, parentId: null };
     const name = ts("readOnly.copyName", { name: project?.name ?? draft.title });
-    const created = await desktop.invoke<ProjectSummary>("projects:create", {
-      name,
-      icon: project?.icon,
-    });
-    const imported = await desktop.invoke<LoadedPage>("pages:import", {
-      projectId: created.id,
-      parentId: null,
-      artifact: {
-        format: "showai",
-        version: artifactVersion(source),
-        document: source,
-        components: page.record?.components ?? [],
-      },
-    });
+    const created = await desktop.invoke<ProjectSummary>(
+      "sync:createLocalProject",
+      { name, icon: project?.icon },
+    );
+    let imported: LoadedPage;
+    try {
+      imported = await desktop.invoke<LoadedPage>("pages:import", {
+        projectId: created.id,
+        parentId: null,
+        artifact: {
+          format: "showai",
+          version: artifactVersion(source),
+          document: source,
+          components: page.record?.components ?? [],
+        },
+      });
+    } catch (reason) {
+      await desktop.invoke("projects:remove", { projectId: created.id });
+      await refresh();
+      throw reason;
+    }
+    resolveProblem("saveLocalCopy");
     await refresh();
     await openPage(imported.document.id, created.id);
     setNotice(ts("readOnly.copied", { name }));
   }
+  const runSaveLocalCopy = () =>
+    void saveLocalCopy().catch((reason: unknown) =>
+      report(reason, {
+        action: operation("op.saveLocalCopy"),
+        key: "saveLocalCopy",
+        safety: "saved",
+        retry: runSaveLocalCopy,
+      }),
+    );
   /** A blank page with the Agent panel open and its input focused. */
   async function createPageForAgent(directory: {
     projectId: string;
@@ -4535,7 +4556,7 @@ export default function Studio() {
                     )}
                   </p>
                   {view === "page" && page.draft && (
-                    <button onClick={action(saveLocalCopy)}>
+                    <button onClick={runSaveLocalCopy}>
                       {ts("readOnly.copy")}
                     </button>
                   )}

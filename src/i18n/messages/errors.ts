@@ -82,6 +82,7 @@ export default defineMessages("errors", {
     "op.delete": "删除",
     "op.loadLibrary": "读取内容库",
     "op.copyReference": "复制引用",
+    "op.saveLocalCopy": "另存为本地副本",
   },
   en: {
     actionFailed: "{action} failed",
@@ -165,5 +166,6 @@ export default defineMessages("errors", {
     "op.delete": "Delete",
     "op.loadLibrary": "Load library",
     "op.copyReference": "Copy reference",
+    "op.saveLocalCopy": "Save as a local copy",
   },
 });

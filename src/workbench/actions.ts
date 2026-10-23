@@ -134,6 +134,7 @@ export const workbenchActions = new Set([
   "sync:revokeAllTokens",
   "sync:changePassword",
   "sync:createProject",
+  "sync:createLocalProject",
   "sync:changeAccount",
   "sync:bindAccounts",
   "sync:unbindAccount",
@@ -666,6 +667,17 @@ export function createWorkbench(
             required(args, "connectionId"),
             required(args, "currentPassword"),
             required(args, "newPassword"),
+          );
+        case "sync:createLocalProject":
+          return sync.createLocalProject((id) =>
+            store.createProject({
+              id,
+              name: required(args, "name"),
+              icon:
+                args.icon === undefined
+                  ? undefined
+                  : validatePageIcon(args.icon, "project.icon"),
+            }),
           );
         case "sync:createProject": {
           const project = await store.createProject({
