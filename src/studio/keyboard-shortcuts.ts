@@ -101,7 +101,15 @@ export function shortcutGroups(options: {
   mac: boolean;
   tabs: boolean;
   windows: boolean;
+  /**
+   * The browser keeps ⌘N, ⌘T, ⌘W and Ctrl+Tab for its own windows and tabs,
+   * so the browser workbench does not list them.
+   */
+  browser?: boolean;
 }): ShortcutGroup[] {
+  const own = (keys: string[]) =>
+    !options.browser ||
+    !keys.some((key) => ["Mod+N", "Mod+T", "Mod+W", "Ctrl+Tab"].includes(key));
   const n = (key: MessageKey<typeof navigationMessages>) => ({
     navigation: key,
   });
@@ -110,7 +118,9 @@ export function shortcutGroups(options: {
       id: "general",
       entries: [
         { keys: ["Mod+K"], label: n("shortcut.search") },
-        { keys: ["Mod+N"], label: n("shortcut.newPage") },
+        ...(own(["Mod+N"])
+          ? [{ keys: ["Mod+N"], label: n("shortcut.newPage") }]
+          : []),
         { keys: ["Mod+\\"], label: n("shortcut.sidebar") },
         { keys: ["Mod+R"], label: n("shortcut.reload") },
         { keys: ["Escape"], label: n("shortcut.escape") },
@@ -121,12 +131,16 @@ export function shortcutGroups(options: {
           {
             id: "tabs" as const,
             entries: [
-              { keys: ["Mod+T"], label: n("shortcut.newTab") },
-              { keys: ["Mod+W"], label: n("shortcut.closeTab") },
-              {
-                keys: ["Ctrl+Tab", "Ctrl+Shift+Tab"],
-                label: n("shortcut.switchTab"),
-              },
+              ...(own(["Mod+T", "Mod+W", "Ctrl+Tab"])
+                ? [
+                    { keys: ["Mod+T"], label: n("shortcut.newTab") },
+                    { keys: ["Mod+W"], label: n("shortcut.closeTab") },
+                    {
+                      keys: ["Ctrl+Tab", "Ctrl+Shift+Tab"],
+                      label: n("shortcut.switchTab"),
+                    },
+                  ]
+                : []),
               {
                 keys: ["Alt+Shift+Left", "Alt+Shift+Right"],
                 label: n("shortcut.moveTab"),

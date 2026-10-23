@@ -61,8 +61,11 @@ export default function WorkspaceTabs({
   onClose,
   onAdd,
   onMove,
+  shortcutHint = true,
 }: WorkspaceTabsState & {
   busy: boolean;
+  /** False in the browser, which keeps ⌘T / Ctrl+T for its own tabs. */
+  shortcutHint?: boolean;
   onSelect: (id: string) => void;
   onClose: (id: string) => void;
   onAdd: () => void;
@@ -381,7 +384,7 @@ export default function WorkspaceTabs({
         className="studio-tab-add"
         disabled={busy}
         aria-label={t("newTab")}
-        title={t("newTabShortcut")}
+        title={shortcutHint ? t("newTabShortcut") : t("newTab")}
         onClick={() => {
           restoreFocus.current = true;
           onAdd();

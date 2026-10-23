@@ -77,4 +77,17 @@ describe("keyboard shortcuts", () => {
       ),
     ).toContain("tabs");
   });
+
+  it("leaves out shortcuts the browser keeps for itself", () => {
+    const keys = shortcutGroups({
+      mac: true,
+      tabs: true,
+      windows: true,
+      browser: true,
+    }).flatMap((group) => group.entries.flatMap((entry) => entry.keys));
+    for (const key of ["Mod+N", "Mod+T", "Mod+W", "Ctrl+Tab"])
+      expect(keys).not.toContain(key);
+    expect(keys).toContain("Mod+K");
+    expect(keys).toContain("Alt+Shift+Left");
+  });
 });

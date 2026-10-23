@@ -297,10 +297,13 @@ export function HiddenProjectsDialog({
 }
 
 export function ShortcutsDialog({
+  browser = false,
   tabs,
   windows,
   onClose,
 }: {
+  /** The browser workbench: shortcuts the browser keeps for itself are left out. */
+  browser?: boolean;
   tabs: boolean;
   windows: boolean;
   onClose: () => void;
@@ -317,7 +320,7 @@ export function ShortcutsDialog({
   return (
     <Dialog title={t("shortcuts.title")} onClose={onClose} wide>
       <div className="navigation-shortcuts">
-        {shortcutGroups({ mac, tabs, windows }).map((group) => (
+        {shortcutGroups({ mac, tabs, windows, browser }).map((group) => (
           <section key={group.id} aria-labelledby={`shortcuts-${group.id}`}>
             <h3 id={`shortcuts-${group.id}`}>
               {t(`shortcuts.${group.id}`)}
