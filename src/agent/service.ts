@@ -20,6 +20,11 @@ import {
 } from "../core/history-context";
 import { openLibrary } from "../core/open-library";
 import {
+  agentAuthored,
+  agentLabel,
+  markAgentCreated,
+} from "../core/agent-created";
+import {
   LibraryOperations,
   type HistoryQuery,
 } from "../core/library-operations";
@@ -1159,9 +1164,20 @@ export class AgentService extends CatalogService {
   async createPage(
     ...args: Parameters<AgentService["createPageImpl"]>
   ): ReturnType<AgentService["createPageImpl"]> {
-    return this.mutation("Create page", args, () =>
-      this.createPageImpl(...args),
-    );
+    return this.mutation("Create page", args, async () => {
+      const created = await this.createPageImpl(...args);
+      // Marked inside the mutation so the workbench sees it with the change
+      // notification; a rolled-back page leaves a mark nothing lists.
+      const context = changeContext();
+      if (agentAuthored(context))
+        await markAgentCreated(
+          this.store.root,
+          this.requireProject(args[0]),
+          created.document.id,
+          { label: agentLabel(context), at: new Date().toISOString() },
+        );
+      return created;
+    });
   }
   async savePage(
     ...args: Parameters<AgentService["savePageImpl"]>

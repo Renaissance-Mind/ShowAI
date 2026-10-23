@@ -62,6 +62,7 @@ import { WorkspaceService } from "./workspace-service";
 import { registerOrganizationTools } from "./mcp-organization";
 import { registerDatasetTools } from "./mcp-datasets";
 import { recordConnections } from "./mcp-connections";
+import { mcpChangeContext } from "./mcp-actor";
 
 const scopeSchema = z.enum([
   "builtin",
@@ -151,8 +152,7 @@ export function createMcpServer(options: {
       .then(() =>
         withChangeContext(
           {
-            ...inherited,
-            channel: "mcp",
+            ...mcpChangeContext(inherited, server.server.getClientVersion()),
             operationId: metadata.operationId ?? randomUUID(),
             requestFingerprint: undefined,
             message: metadata.message ?? inherited.message,

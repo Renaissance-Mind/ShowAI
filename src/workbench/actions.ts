@@ -10,6 +10,13 @@ import { PROJECT_SCOPE_LIMIT } from "../desktop/bridge";
 import { syncManager } from "../sync/manager";
 import { remoteSaveOrigin } from "../core/remote-save-conflict";
 import {
+  changeAuthor,
+  dismissExternalChange,
+  listExternalChanges,
+  recordExternalChange,
+} from "../core/external-changes";
+import { clearAgentCreated, readAgentCreated } from "../core/agent-created";
+import {
   upgradeResource,
   createResource,
   wrapSurface,
@@ -188,6 +195,10 @@ export const workbenchActions = new Set([
   "pages:list",
   "pages:get",
   "pages:reference",
+  "pages:recordExternalChange",
+  "pages:externalChanges",
+  "pages:dismissExternalChange",
+  "pages:markSeen",
   "pages:create",
   "pages:insertTemplate",
   "pages:save",
@@ -389,7 +400,13 @@ export function createWorkbench(
   }
 
   async function activePages(id: string) {
-    return store.listPages(id, { includeArchived: false });
+    const [pages, marks] = await Promise.all([
+      store.listPages(id, { includeArchived: false }),
+      readAgentCreated(store.root, id),
+    ]);
+    return pages.map((page) =>
+      marks[page.id] ? { ...page, agentCreated: marks[page.id] } : page,
+    );
   }
 
   async function pageRecord(
@@ -447,8 +464,13 @@ export function createWorkbench(
             ref && typeof ref === "object" && key(ref) === key(component),
         ),
       );
+    const library = record.revision ? versionedLibrary(store.root) : null;
     return {
       ...record,
+      // Names the writer of this version for external-write notices and conflicts.
+      ...(library
+        ? { changedBy: changeAuthor(await library.entryAt(record.revision!)) }
+        : {}),
       incomingCrossDevice: !!(await remoteSaveOrigin(store.root, id, record)),
       retainedSyncConflicts: (
         await syncManager(store.root).retainedConflicts(id)
@@ -980,6 +1002,40 @@ export function createWorkbench(
         return activePages(projectId(args));
       case "pages:get":
         return pageRecord(projectId(args), pageId(args), args);
+      case "pages:recordExternalChange": {
+        const id = projectId(args),
+          page = pageId(args);
+        const author =
+          args.revision === undefined
+            ? undefined
+            : versionedLibrary(store.root)
+              ? changeAuthor(
+                  await versionedLibrary(store.root)!.entryAt(
+                    required(args, "revision"),
+                  ),
+                )
+              : undefined;
+        return recordExternalChange(store.root, {
+          projectId: id,
+          pageId: page,
+          before: validateDocument(args.before),
+          after: validateDocument(args.after),
+          revision: text(args, "revision", true),
+          hash: required(args, "hash"),
+          author,
+        });
+      }
+      case "pages:externalChanges":
+        return listExternalChanges(store.root, projectId(args), pageId(args));
+      case "pages:dismissExternalChange":
+        return dismissExternalChange(
+          store.root,
+          projectId(args),
+          pageId(args),
+          required(args, "id"),
+        );
+      case "pages:markSeen":
+        return clearAgentCreated(store.root, projectId(args), pageId(args));
       case "pages:reference": {
         // The editor saved first; pin the version the person is looking at.
         const id = projectId(args);

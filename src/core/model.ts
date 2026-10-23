@@ -99,6 +99,8 @@ export interface PageSummary {
   icon: string;
   hash: string;
   blockCount: number;
+  /** Created by an Agent and not opened in the workbench since (local state). */
+  agentCreated?: import("./agent-created").AgentCreatedMark;
   parentId: string | null;
   favorite: boolean;
   archived: boolean;

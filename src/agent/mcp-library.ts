@@ -16,6 +16,7 @@ import { mcpFailure, mcpSuccess } from "./presentation-tools";
 import { withChangeContext, changeContext } from "../core/history-context";
 import { openLibrary } from "../core/open-library";
 import { recordConnections } from "./mcp-connections";
+import { mcpChangeContext } from "./mcp-actor";
 
 /** Explicit project identities, no mutable connection-wide "current project". */
 export function createLibraryMcpServer(options: {
@@ -27,7 +28,10 @@ export function createLibraryMcpServer(options: {
   const call = async (action: () => Promise<unknown>) => {
     try {
       return mcpSuccess(
-        await withChangeContext({ ...inherited, channel: "mcp" }, action),
+        await withChangeContext(
+          mcpChangeContext(inherited, server.server.getClientVersion()),
+          action,
+        ),
       );
     } catch (error) {
       return mcpFailure(error);
@@ -79,6 +83,11 @@ export function createLibraryMcpServer(options: {
               ...options,
               projectId,
               projectAccess: "library",
+              // The per-call server is never connected; it writes as this connection's client.
+              sourceContext: mcpChangeContext(
+                inherited,
+                server.server.getClientVersion(),
+              ),
               decorateTool: (key, value) => {
                 if (key === name) operation = value;
               },

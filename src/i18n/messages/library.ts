@@ -74,7 +74,7 @@ export default defineMessages("library", {
     "upgrade.templates": "模板版本",
     "upgrade.snapshots": "旧快照",
     "upgrade.snapshotNote":
-      "旧快照缺少可靠的修改时间、作者和顺序，会单独显示。启用后，新修改开始记录时间、修改内容和人工／Agent 会话来源。",
+      "旧快照缺少可靠的修改时间、作者和顺序，会单独显示。启用后，每个页面记录最近一次保存的时间和来源（本人、Agent 或其他工具），不保留完整的修改历史。",
     "upgrade.issues": "{count} 项内容需要留意",
     "upgrade.issuesNote": "原始字节已保留；以下旧快照无法直接预览或恢复。",
   },
@@ -159,7 +159,7 @@ export default defineMessages("library", {
     "upgrade.templates": "Template versions",
     "upgrade.snapshots": "Old snapshots",
     "upgrade.snapshotNote":
-      "Old snapshots lack reliable edit times, authors and order, so they're shown separately. After the upgrade, new changes record the time, what changed, and whether a person or an Agent session made them.",
+      "Old snapshots lack reliable edit times, authors and order, so they're shown separately. After the upgrade, each page records when it was last saved and by whom (you, an Agent or another tool); a full edit history is not kept.",
     "upgrade.issues": {
       one: "{count} item needs attention",
       other: "{count} items need attention",
