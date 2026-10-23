@@ -192,7 +192,19 @@ async function probe(config, text, env) {
       error.code === "ENOENT" || error.code === "EACCES"
         ? "RUNTIME_UNAVAILABLE"
         : "RUNTIME_PROBE_FAILED",
-      (error.stderr || error.message || String(error)).trim().slice(-2000),
+      [
+        error.killed
+          ? `stopped after ${error.signal ?? "timeout"}`
+          : error.signal
+            ? `signal ${error.signal}`
+            : typeof error.code === "number"
+              ? `exit ${error.code}`
+              : "",
+        (error.stderr || error.message || String(error)).trim(),
+      ]
+        .filter(Boolean)
+        .join(": ")
+        .slice(-2000),
     );
   });
   let info;

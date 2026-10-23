@@ -142,3 +142,23 @@ test("a moved runtime is reported as unavailable", async () => {
   );
   expect((await connect(home)).error.code).toBe("RUNTIME_UNAVAILABLE");
 });
+
+test("a runtime whose probe exits silently reports the exit code", async () => {
+  const { root, home } = await library();
+  // A probe that dies without stderr used to surface only "Command failed".
+  const broken = join(root, "broken-runtime.mjs");
+  await writeFile(broken, "process.exit(3);");
+  await writeFile(
+    join(home, "agent-runtime.json"),
+    JSON.stringify({
+      format: "showai-agent-runtime",
+      protocol: 1,
+      version: "0.1.0",
+      home,
+      launch: { command: process.execPath, args: [broken], env: {} },
+    }),
+  );
+  const { error } = await connect(home);
+  expect(error.code).toBe("RUNTIME_PROBE_FAILED");
+  expect(error.detail).toContain("exit 3");
+});
