@@ -11,6 +11,10 @@ import {
 } from "./remote-protocol";
 import type { AgentHost } from "./host";
 import { LanPeerServer } from "./lan-peer";
+import { translator } from "../i18n";
+import lanMessages from "../i18n/messages/lanPairing";
+
+const tl = translator(lanMessages);
 import { FileStore } from "../core/store";
 
 export interface ConnectorSettings {
@@ -107,7 +111,10 @@ export class RemoteMacConnector {
       name =
         this.pendingClients.get(id) ??
         settings.trustedClients?.find((c) => c.id === id)?.name;
-    if (!name) throw new Error("The pairing request has expired.");
+    if (!name)
+      throw Object.assign(new Error(tl("error.expired")), {
+        code: "PAIRING_EXPIRED",
+      });
     settings.trustedClients = [
       ...(settings.trustedClients ?? []).filter((c) => c.id !== id),
       ...(approve ? [{ id, name }] : []),

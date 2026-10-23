@@ -21,7 +21,49 @@ interface Nearby {
   peers: Device[];
   error?: string;
 }
-type Pair = { id: string; state: string; code: string; expiresAt: number };
+type Pair = {
+  id: string;
+  state: string;
+  code: string;
+  expiresAt: number;
+  /** Set by the Mac when a request ends: "declined" or "cancelled". */
+  reason?: string;
+};
+const pairingErrors: Record<string, Parameters<typeof t>[0]> = {
+  PAIRING_EXPIRED: "error.expired",
+  PAIRING_QUEUE_FULL: "error.queueFull",
+  PAIRING_RATE_LIMITED: "error.rateLimited",
+  UNAUTHORIZED: "error.pairAgain",
+};
+/** Pairing failures by code in the UI language; anything else keeps its text. */
+export function pairingErrorText(reason: unknown) {
+  const key = pairingErrors[errorCode(reason) ?? ""];
+  return key ? t(key) : errorMessage(reason);
+}
+/** Why a finished request ended, for its title and hint. */
+export function pairingEnd(pair: Pick<Pair, "state" | "reason">) {
+  if (pair.state === "expired") return "expired" as const;
+  if (pair.state === "rejected")
+    return pair.reason === "cancelled"
+      ? ("cancelled" as const)
+      : ("declined" as const);
+  return null;
+}
+/** m:ss until a request expires. */
+export function countdown(expiresAt: number, now: number) {
+  const seconds = Math.max(0, Math.ceil((expiresAt - now) / 1000));
+  return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
+}
+/** Re-renders every second while a request waits, for its countdown. */
+function useNow(active: boolean) {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    if (!active) return;
+    const timer = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, [active]);
+  return now;
+}
 export function NearbyMacs({
   onClose,
   onPaired,
@@ -33,11 +75,12 @@ export function NearbyMacs({
   const [pair, setPair] = useState<Pair | null>(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState("");
+  const now = useNow(pair?.state === "pending");
   const load = () =>
     desktop
       .invoke<Nearby>("agent:nearby")
       .then(setState)
-      .catch((reason) => setError(errorMessage(reason)));
+      .catch((reason) => setError(pairingErrorText(reason)));
   const begin = async (id: string) => {
     setBusy(id);
     setError("");
@@ -48,7 +91,7 @@ export function NearbyMacs({
       setPair({ ...result, id });
       if (result.state === "approved") await useMac(id);
     } catch (reason) {
-      setError(errorMessage(reason));
+      setError(pairingErrorText(reason));
     } finally {
       setBusy("");
     }
@@ -63,7 +106,7 @@ export function NearbyMacs({
         ["UNAUTHORIZED", "PAIRING_REQUIRED"].includes(errorCode(reason) ?? "")
       )
         await begin(id);
-      else setError(errorMessage(reason));
+      else setError(pairingErrorText(reason));
     } finally {
       setBusy("");
     }
@@ -92,7 +135,7 @@ export function NearbyMacs({
           if (value.state === "approved") await useMac(pair.id);
         })
         .catch((reason) => {
-          if (!stopped) setError(errorMessage(reason));
+          if (!stopped) setError(pairingErrorText(reason));
         })
         .finally(() => {
           pending = false;
@@ -137,12 +180,28 @@ export function NearbyMacs({
               ? t("confirmOnMac")
               : busy
                 ? t("connecting")
-                : t("requestEnded")}
+                : pairingEnd(pair)
+                  ? t(`ended.${pairingEnd(pair)!}`)
+                  : t("requestEnded")}
           </h3>
-          <p>{pair.state === "pending" ? t("matchCode") : t("retryHint")}</p>
+          <p>
+            {pair.state === "pending"
+              ? t("matchCode")
+              : pairingEnd(pair)
+                ? t(`ended.${pairingEnd(pair)!}Hint`)
+                : t("retryHint")}
+          </p>
           <div className="lan-pair-code" role="status">
             <strong>{pair.code}</strong>
           </div>
+          {pair.state === "pending" && (
+            <p className="lan-footnote" aria-live="off">
+              {t("expiresIn", { time: countdown(pair.expiresAt, now) })}
+            </p>
+          )}
+          {(pair.state === "pending" || pairingEnd(pair) === "expired") && (
+            <p className="lan-footnote">{t("keepAwake")}</p>
+          )}
           {pair.state === "pending" || busy ? (
             <span className="lan-waiting">
               <Loader2 size={15} />
@@ -211,6 +270,7 @@ export function NearbyMacs({
                 </span>
                 <b>{t("searching")}</b>
                 <p>{t("openShowAI")}</p>
+                <p>{t("keepAwake")}</p>
                 <button className="lan-text-button" onClick={() => void load()}>
                   <RefreshCw size={14} />
                   {t("searchAgain")}
@@ -273,6 +333,7 @@ export function MacPairingPrompt() {
     };
   }, []);
   const request = requests[0];
+  const now = useNow(!!request?.expiresAt);
   if (!request) return null;
   const decide = async (approve: boolean) => {
     setBusy(true);
@@ -284,7 +345,7 @@ export function MacPairingPrompt() {
       });
       setRequests((items) => items.filter((item) => item.id !== request.id));
     } catch (reason) {
-      setError(errorMessage(reason));
+      setError(pairingErrorText(reason));
     } finally {
       setBusy(false);
     }
@@ -307,6 +368,11 @@ export function MacPairingPrompt() {
           <strong>{request.code}</strong>
         </div>
         <p className="lan-footnote">{t("confirmSameCode")}</p>
+        {!!request.expiresAt && (
+          <p className="lan-footnote">
+            {t("expiresIn", { time: countdown(request.expiresAt, now) })}
+          </p>
+        )}
       </div>
       <div className="lan-pair-actions">
         <button

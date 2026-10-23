@@ -8,6 +8,8 @@ import { promisify } from "node:util";
 import { WebSocketServer, WebSocket } from "ws";
 import { watch, type FSWatcher } from "chokidar";
 import { readOptional, writeProtected } from "./storage";
+import { translator } from "../i18n";
+import lanMessages from "../i18n/messages/lanPairing";
 import type { AgentHost } from "./host";
 import type { ConnectorSettings } from "./remote-connector";
 import { remoteTaskActions, remoteReadActions } from "./remote-protocol";
@@ -54,7 +56,15 @@ interface PairRequest {
   code: string;
   expiresAt: number;
   state: "pending" | "approved" | "rejected";
+  /** Why a rejected request ended: the Mac declined it or the iPad withdrew it. */
+  reason?: "declined" | "cancelled";
 }
+const t = translator(lanMessages);
+/** Pairing failures carry a code the iPad and the Mac localize. */
+const pairingError = (
+  code: "PAIRING_EXPIRED" | "PAIRING_QUEUE_FULL" | "PAIRING_RATE_LIMITED",
+  message: string,
+) => Object.assign(new Error(message), { code });
 const digest = (text: string) =>
   createHash("sha256").update(text).digest("hex");
 const equal = (a: string, b: string) =>
@@ -129,13 +139,12 @@ export class LanPeerServer {
     const request = this.pending.get(id),
       existing = this.trusted.find((p) => p.id === id);
     if (!request && !existing)
-      throw new Error(
-        "Pairing request expired. Start pairing again on the iPad.",
-      );
+      throw pairingError("PAIRING_EXPIRED", t("error.expired"));
     const peerId = request?.clientId ?? id;
     this.trusted = this.trusted.filter((p) => p.id !== peerId);
     if (request) {
       request.state = approve ? "approved" : "rejected";
+      if (!approve) request.reason = "declined";
       if (approve)
         this.trusted.push({
           id: peerId,
@@ -212,7 +221,10 @@ export class LanPeerServer {
                 ? 403
                 : error.code === "CONFLICT"
                   ? 409
-                  : 400,
+                  : error.code === "PAIRING_QUEUE_FULL" ||
+                      error.code === "PAIRING_RATE_LIMITED"
+                    ? 429
+                    : 400,
             { "content-type": "application/json", "cache-control": "no-store" },
           );
           res.end(
@@ -371,17 +383,18 @@ export class LanPeerServer {
           pending.clientId !== body.clientId ||
           !equal(pending.digest, digest(body.secret))
         )
-          throw denied("Pairing identity changed.");
+          throw denied(t("error.identityChanged"));
       } else {
         const ip = req.socket.remoteAddress ?? "",
           rate = this.rates.get(ip);
         if (rate && Date.now() - rate.at < 60000 && rate.count >= 5)
-          throw new Error("Too many pairing requests. Wait a minute.");
+          throw pairingError("PAIRING_RATE_LIMITED", t("error.rateLimited"));
         this.rates.set(ip, {
           at: rate && Date.now() - rate.at < 60000 ? rate.at : Date.now(),
           count: rate && Date.now() - rate.at < 60000 ? rate.count + 1 : 1,
         });
-        if (this.pending.size >= 20) throw new Error("Pairing queue is full.");
+        if (this.pending.size >= 20)
+          throw pairingError("PAIRING_QUEUE_FULL", t("error.queueFull"));
         const code = (
           parseInt(
             digest(`${this.pin}:${body.clientId}:${body.secret}`).slice(0, 12),
@@ -401,10 +414,13 @@ export class LanPeerServer {
         };
         this.pending.set(body.id, pending);
       }
-      if (body.cancel === true && pending.state === "pending")
+      if (body.cancel === true && pending.state === "pending") {
         pending.state = "rejected";
+        pending.reason = "cancelled";
+      }
       return reply({
         state: pending.state,
+        ...(pending.reason ? { reason: pending.reason } : {}),
         code: pending.code,
         expiresAt: pending.expiresAt,
         id: this.settings()!.deviceId,
@@ -416,7 +432,7 @@ export class LanPeerServer {
     }
     const peer = this.authenticate(req);
     if (!peer)
-      throw Object.assign(new Error("Pair this iPad again on the Mac."), {
+      throw Object.assign(new Error(t("error.pairAgain")), {
         code: "UNAUTHORIZED",
       });
     if (
