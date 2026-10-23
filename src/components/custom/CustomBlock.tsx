@@ -37,6 +37,15 @@ import common from "../../i18n/messages/common";
 import { AssistantContext } from "../assistant-context";
 import { componentContextIssue } from "./component-context.mjs";
 import { BindingBasisContext } from "../../datasets/basis";
+import { ComponentStatus } from "../blocks/ComponentStatus";
+import widgetMessages from "../../i18n/messages/widget";
+import {
+  installFrameErrorReporter,
+  readFrameRuntimeError,
+  readableValidation,
+  repeatsRuntimeError,
+  type FrameRuntimeError,
+} from "./frame-errors";
 import "./custom.css";
 
 const ComponentsContext = createContext<ReadonlyMap<string, CompiledComponent>>(
@@ -128,7 +137,7 @@ export function CustomBlock({ data, onChange, readOnly }: BlockProps) {
   const components = useContext(ComponentsContext);
   const inlineHost = useContext(InlineHostContext);
   const component = findComponent(components, parsed);
-  const t = useTranslator(messages);
+  const assistant = useContext(AssistantContext);
   const reference = `${parsed.componentId}@${parsed.version}`;
   return component && inlineHost ? (
     <InlineComponent
@@ -146,19 +155,16 @@ export function CustomBlock({ data, onChange, readOnly }: BlockProps) {
       readOnly={readOnly}
     />
   ) : (
-    <section className="sb-block sb-unavailable" aria-label={t("notInstalled")}>
-      <div style={{ padding: 18 }}>
-        <strong>{parsed.componentId}</strong>
-        <p>
-          {parsed.integrity
-            ? t("installRequiredIntegrity", {
-                component: reference,
-                integrity: parsed.integrity.slice(7, 19),
-              })
-            : t("installRequired", { component: reference })}
-        </p>
-      </div>
-    </section>
+    <ComponentStatus
+      state="missing"
+      name={parsed.componentId}
+      reference={reference}
+      query={parsed.componentId}
+      integrity={parsed.integrity}
+      data={parsed.props}
+      readOnly={!!readOnly || !onChange}
+      assistant={readOnly || !onChange ? null : assistant}
+    />
   );
 }
 
@@ -173,12 +179,22 @@ function SandboxComponent({
   const theme = useAppearanceTheme();
   const t = useTranslator(messages);
   const tc = useTranslator(common);
+  const tw = useTranslator(widgetMessages);
   const locale = useLocale();
   const initialTheme = useRef(theme);
   const [channel] = useState(() => crypto.randomUUID());
   useSelectionFrame(iframe, channel);
   const [height, setHeight] = useState(180);
+  // The last height the frame measured; an empty root reports about 2px.
+  const [measured, setMeasured] = useState<number | null>(null);
+  // Parameter validation text from the runtime (参数不符), cleared once props apply.
   const [error, setError] = useState("");
+  // A render, handler or promise failure inside the frame (运行出错).
+  const [crash, setCrash] = useState<FrameRuntimeError | null>(null);
+  const crashRef = useRef<FrameRuntimeError | null>(null);
+  crashRef.current = crash;
+  // Retrying mounts a fresh frame; the old React root does not recover.
+  const [attempt, setAttempt] = useState(0);
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState("");
   const [draftError, setDraftError] = useState("");
@@ -285,11 +301,13 @@ function SandboxComponent({
       injectComponentBootstrap(
         component.html,
         // Built-in blocks compiled into the package start in the workbench language.
-        `<style>body{color:var(--text)}</style><script>document.documentElement.lang=document.documentElement.dataset.showaiLocale=${safeJson(locale)};(${installComponentActivity.toString()})(${safeJson(channel)});(${installSandboxTheme.toString()})(${safeJson(channel)},${safeJson(initialTheme.current)},${safeJson(appearanceTokens())});</script><script id="showai-component-data" type="application/json">${safeJson({ channel, ...initial.current })}</script>`,
+        `<style>body{color:var(--text)}</style><script>(${installFrameErrorReporter.toString()})(${safeJson(channel)});</script><script>document.documentElement.lang=document.documentElement.dataset.showaiLocale=${safeJson(locale)};(${installComponentActivity.toString()})(${safeJson(channel)});(${installSandboxTheme.toString()})(${safeJson(channel)},${safeJson(initialTheme.current)},${safeJson(appearanceTokens())});</script><script id="showai-component-data" type="application/json">${safeJson({ channel, ...initial.current })}</script>`,
       ) +
-      `<script>${componentSelectionScript(channel)}(${installIconTooltips.toString()})(document);(${installComponentLinks.toString()})(${safeJson(channel)});</script>`
+      `<script>${componentSelectionScript(channel)}(${installIconTooltips.toString()})(document);(${installComponentLinks.toString()})(${safeJson(channel)});</script>` +
+      // A changed document reloads the same frame element after 重试.
+      (attempt ? `<!--retry ${attempt}-->` : "")
     );
-  }, [component.html, channel, locale]);
+  }, [component.html, channel, locale, attempt]);
 
   const sendProps = () => {
     const current = latest.current;
@@ -379,11 +397,29 @@ function SandboxComponent({
         event.data.type === "showai:height" &&
         typeof event.data.height === "number" &&
         Number.isFinite(event.data.height)
-      )
+      ) {
         setHeight(Math.min(4000, Math.max(48, Math.ceil(event.data.height))));
-      if (event.data.type === "showai:error")
+        setMeasured(event.data.height);
+      }
+      const runtime = readFrameRuntimeError(
+        event,
+        iframe.current?.contentWindow,
+        channel,
+      );
+      if (runtime) {
+        // Keep the first failure: later ones usually follow from it.
+        setCrash((current) => current ?? runtime);
+        setError((current) =>
+          repeatsRuntimeError(current, runtime) ? "" : current,
+        );
+        return;
+      }
+      if (
+        event.data.type === "showai:error" &&
+        !repeatsRuntimeError(String(event.data.message), crashRef.current)
+      )
         setError(
-          String(event.data.message || t("cannotDisplay")).slice(0, 500),
+          String(event.data.message || t("cannotDisplay")).slice(0, 2000),
         );
       if (event.data.type === "showai:valid") {
         setError("");
@@ -462,8 +498,11 @@ function SandboxComponent({
       ) {
         cancelValidation();
         if (event.data.valid !== true) {
+          const message = String(event.data.message || "");
           setDraftError(
-            String(event.data.message || t("invalidProps")).slice(0, 1000),
+            message
+              ? readableValidation(message, t as never).join("\n")
+              : t("invalidProps"),
           );
         } else if (JSON.stringify(current.parsed.props) !== draftBase.current) {
           setDraftError(t("dataChanged"));
@@ -503,6 +542,22 @@ function SandboxComponent({
         window.clearTimeout(pendingValidation.current.timeout);
     };
   }, [channel]);
+  const retry = () => {
+    setCrash(null);
+    setError("");
+    setMeasured(null);
+    setAttempt((value) => value + 1);
+  };
+  // New data after a crash gets a fresh frame, like a built-in block's boundary.
+  const crashedProps = useRef<unknown>(null);
+  useEffect(() => {
+    if (!crash) {
+      crashedProps.current = null;
+      return;
+    }
+    if (crashedProps.current === null) crashedProps.current = parsed.props;
+    else if (crashedProps.current !== parsed.props) retry();
+  }, [crash, parsed.props]);
   // Callback identity is host plumbing; only data and edit permission cross the sandbox.
   useEffect(sendProps, [
     parsed.props,
@@ -523,6 +578,8 @@ function SandboxComponent({
     return () => frame?.removeEventListener("load", sendTheme);
   }, [theme, channel]);
 
+  // No height since the (re)load counts as empty: a failed first render may never resize.
+  const blank = !!(crash || error) && (measured === null || measured <= 4);
   return (
     <section
       className="showai-custom-block"
@@ -624,6 +681,24 @@ function SandboxComponent({
           {draftError}
         </p>
       )}
+      {(crash || error) && (
+        <ComponentStatus
+          state={crash ? "crashed" : "invalid"}
+          name={component.name}
+          reference={`${component.id}@${component.version}`}
+          error={crash?.message ?? error}
+          stack={crash?.stack}
+          cause={
+            crash?.kind === "rejection" ? tw("status.rejectionCause") : undefined
+          }
+          issues={crash ? [] : readableValidation(error, t as never)}
+          data={parsed.props}
+          readOnly={!editable}
+          assistant={editable ? assistant : null}
+          onRetry={retry}
+          attached={!blank}
+        />
+      )}
       <iframe
         ref={iframe}
         title={component.name}
@@ -636,15 +711,11 @@ function SandboxComponent({
           width: "100%",
           height,
           border: 0,
-          display: "block",
+          // An empty frame after a failure would only leave a blank area.
+          display: blank ? "none" : "block",
           background: "transparent",
         }}
       />
-      {error && (
-        <p role="alert" style={{ color: "#ae3c3c", fontSize: 12 }}>
-          {error}
-        </p>
-      )}
     </section>
   );
 }

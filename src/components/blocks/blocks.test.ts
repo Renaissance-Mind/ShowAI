@@ -109,13 +109,12 @@ describe("interactive block data", () => {
       createElement(Widget, {
         kind: "unregistered-widget",
         data,
-        readOnly: true,
       }),
     );
-    expect(html).toContain("尚未注册");
+    expect(html).toContain("缺少组件「unregistered-widget」");
     expect(html).toContain("&lt;script&gt;");
     expect(html).not.toContain("<script>");
-    expect(html).toContain("下载区块数据");
+    expect(html).toContain("下载组件数据");
     expect(data.nested.value).toBe(7);
   });
 
@@ -167,11 +166,30 @@ describe("interactive block data", () => {
       createElement(Widget, {
         kind: "playground",
         data: { inputs: [null] },
+      }),
+    );
+    expect(html).toContain("参数不符合要求");
+    expect(html).toContain("页面其他内容不受影响，组件数据已保留。");
+    expect(html).toContain("null");
+    expect(html).toContain("下载组件数据");
+    // Readers get the same card without the data dump and download.
+    const reader = renderToStaticMarkup(
+      createElement(Widget, {
+        kind: "playground",
+        data: { inputs: [null] },
         readOnly: true,
       }),
     );
-    expect(html).toContain("区块数据需要检查");
-    expect(html).toContain("null");
+    expect(reader).toContain("参数不符合要求");
+    expect(reader).not.toContain("下载组件数据");
+  });
+
+  it("shows an unknown built-in kind as a missing component", () => {
+    const html = renderToStaticMarkup(
+      createElement(Widget, { kind: "no-such-kind", data: {}, readOnly: true }),
+    );
+    expect(html).toContain("缺少组件「no-such-kind」");
+    expect(html).toContain("复制组件标识");
   });
 
   it("validates chart data lengths, finite numbers and color strings", () => {

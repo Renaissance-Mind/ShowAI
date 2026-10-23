@@ -13,7 +13,7 @@ export type AssistantTarget = (
       surfaceId?: string;
       anchor: AssistantAnchor;
     }
-  | { kind: "page"; anchor?: AssistantAnchor }
+  | { kind: "page"; anchor?: AssistantAnchor; prompt?: string }
 ) & { reference?: import("../surface/agent-reference").CanvasReference };
 /** A component's onContext snapshot, located on the page it was handed from. */
 export interface ComponentContextItem extends ComponentContextSnapshot {

@@ -7,6 +7,8 @@ import * as JsxDevRuntime from "react/jsx-dev-runtime";
 import { useEffect, useRef, useState } from "react";
 import type { CompiledComponent } from "./types";
 import type { PageOutlineComponentProps } from "../../surface/page-outline.mjs";
+import { ComponentStatus } from "../blocks/ComponentStatus";
+import { isValidationMessage, readableValidation } from "./frame-errors";
 import { useTranslator } from "../../i18n/react";
 import messages from "../../i18n/messages/customComponents";
 import {
@@ -169,9 +171,18 @@ export function InlineComponent({
     <section aria-label={component.name} style={{ margin: "18px 0" }}>
       <div ref={container} />
       {error && (
-        <p role="alert" className="custom-props-error">
-          {error}
-        </p>
+        <ComponentStatus
+          state={isValidationMessage(error) ? "invalid" : "crashed"}
+          name={component.name}
+          reference={`${component.id}@${component.version}`}
+          error={error}
+          issues={
+            isValidationMessage(error)
+              ? readableValidation(error, t as never)
+              : []
+          }
+          readOnly
+        />
       )}
     </section>
   );

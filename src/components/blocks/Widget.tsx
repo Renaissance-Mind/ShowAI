@@ -14,13 +14,12 @@ import {
   useSyncExternalStore,
   type ReactNode,
 } from "react";
-import { FileJson, Puzzle } from "../../ui/icons";
+import { ComponentStatus, type ComponentStatusState } from "./ComponentStatus";
 import {
   getBlockDefinition,
   getRegistryRevision,
   subscribeToBlocks,
 } from "./registry";
-import { downloadFile } from "./helpers";
 import type { BlockProps } from "./types";
 import "./block.css";
 import { BoundWidgetHost, hasBinding } from "../../datasets/widget-host";
@@ -30,52 +29,73 @@ import messages from "../../i18n/messages/widget";
 
 const widgetMessages = translator(messages);
 
+/** A built-in block that cannot show its content, as a component status card. */
 function UnavailableBlock({
   kind,
   data,
+  readOnly,
+  state,
   error,
-}: BlockProps & { kind: string; error?: string }) {
+  stack,
+  onRetry,
+  unavailable,
+}: BlockProps & {
+  kind: string;
+  state: ComponentStatusState;
+  /** The data cannot be read here; nothing is wrong with the component. */
+  unavailable?: boolean;
+  error?: string;
+  stack?: string;
+  onRetry?: () => void;
+}) {
   const t = useTranslator(messages);
+  const assistant = useContext(AssistantContext);
+  const definition = getBlockDefinition(kind);
   return (
-    <section className="sb-block sb-unavailable" aria-label={t("unavailable")}>
-      <div className="sb-unavailable-heading">
-        <Puzzle size={20} />
-        <div>
-          <strong>
-            {error ? t("needsCheck") : t("notRegistered", { kind })}
-          </strong>
-          <p>{error || t("dataKept")}</p>
-        </div>
-      </div>
-      <details className="sb-data-details">
-        <summary>{t("viewData")}</summary>
-        <pre>{JSON.stringify(data, null, 2)}</pre>
-      </details>
-      <button
-        type="button"
-        className="sb-button"
-        onClick={() =>
-          downloadFile(
-            JSON.stringify({ kind, data }, null, 2),
-            `${kind}.json`,
-            "application/json",
-          )
-        }
-      >
-        <FileJson size={14} />
-        {t("downloadData")}
-      </button>
-    </section>
+    <ComponentStatus
+      state={state}
+      name={definition?.title ?? kind}
+      title={
+        unavailable
+          ? t("status.unavailable", { name: definition?.title ?? kind })
+          : undefined
+      }
+      reference={kind}
+      query={kind}
+      error={error}
+      stack={stack}
+      cause={
+        state === "missing"
+          ? t("status.missingBuiltinCause", { kind })
+          : state === "invalid"
+            ? error
+            : undefined
+      }
+      data={data}
+      readOnly={readOnly}
+      assistant={readOnly ? null : assistant}
+      onRetry={onRetry}
+    />
   );
 }
 
 class BlockBoundary extends Component<
-  { children: ReactNode; kind: string; data: BlockProps["data"] },
-  { error: string | null }
+  {
+    children: ReactNode;
+    kind: string;
+    data: BlockProps["data"];
+    readOnly?: boolean;
+  },
+  { error: { message: string; stack?: string } | null }
 > {
-  state = { error: null as string | null };
+  state = { error: null as { message: string; stack?: string } | null };
   static getDerivedStateFromError(error: Error) {
-    return { error: error.message || widgetMessages("renderFailed") };
+    return {
+      error: {
+        message: error?.message || widgetMessages("renderFailed"),
+        ...(typeof error?.stack === "string" ? { stack: error.stack } : {}),
+      },
+    };
   }
   componentDidUpdate(previous: { data: BlockProps["data"]; kind: string }) {
     if (
@@ -89,7 +109,11 @@ class BlockBoundary extends Component<
       <UnavailableBlock
         kind={this.props.kind}
         data={this.props.data}
-        error={this.state.error}
+        readOnly={this.props.readOnly}
+        state="crashed"
+        error={this.state.error.message}
+        stack={this.state.error.stack}
+        onRetry={() => this.setState({ error: null })}
       />
     ) : (
       this.props.children
@@ -119,6 +143,9 @@ export const Widget = memo(function Widget(props: BlockProps & { kind: string })
     <UnavailableBlock
       kind={props.kind}
       data={props.data}
+      readOnly={props.readOnly}
+      state="invalid"
+      unavailable
       error={widgetMessages("sharedDataUnavailable")}
     />
   );
@@ -157,7 +184,15 @@ const WidgetBody = memo(function WidgetBody({
   );
   const t = useTranslator(messages);
   const definition = getBlockDefinition(kind);
-  if (!definition) return <UnavailableBlock kind={kind} data={data} />;
+  if (!definition)
+    return (
+      <UnavailableBlock
+        kind={kind}
+        data={data}
+        readOnly={readOnly}
+        state="missing"
+      />
+    );
   if (definition.validate) {
     try {
       definition.validate(draft);
@@ -166,6 +201,8 @@ const WidgetBody = memo(function WidgetBody({
         <UnavailableBlock
           kind={kind}
           data={data}
+          readOnly={readOnly}
+          state="invalid"
           error={error instanceof Error ? error.message : t("invalidData")}
         />
       );
@@ -173,7 +210,7 @@ const WidgetBody = memo(function WidgetBody({
   }
   const Renderer = definition.renderer;
   return (
-    <BlockBoundary key={kind} kind={kind} data={data}>
+    <BlockBoundary key={kind} kind={kind} data={data} readOnly={readOnly}>
       <Suspense
         fallback={
           <section

@@ -12,6 +12,8 @@ export interface AssistantRequest {
   blockIds: string[];
   text?: string;
   anchor: { left: number; top: number; bottom: number };
+  /** Text placed in the request input, e.g. a component error to fix. */
+  prompt?: string;
 }
 /** The host supplies project resources; all writing tools belong to the component. */
 export const RichTextEnvironment = createContext<{

@@ -116,6 +116,7 @@ import {
   importedArtifact,
   isImportablePageFile,
 } from "./page-import";
+import { FIND_COMPONENT_EVENT } from "../components/blocks/ComponentStatus";
 import { desktop, errorMessage } from "./bridge";
 import { workbenchCapabilities } from "./capabilities";
 import { usePage, type LoadedPage } from "./usePage";
@@ -566,6 +567,17 @@ export default function Studio() {
     };
     window.addEventListener("showai:open-page", open);
     return () => window.removeEventListener("showai:open-page", open);
+  });
+  useEffect(() => {
+    // A missing component's status card searches the component library for it.
+    const find = (event: Event) => {
+      const query = (event as CustomEvent<{ query?: string }>).detail?.query;
+      if (typeof query !== "string") return;
+      setCatalogQueries((current) => ({ ...current, components: query }));
+      void navigate("components").catch(report);
+    };
+    window.addEventListener(FIND_COMPONENT_EVENT, find);
+    return () => window.removeEventListener(FIND_COMPONENT_EVENT, find);
   });
   const [templates, setTemplates] = useState<TemplateMetadata[]>([]);
   const [showTemplateVersions, setShowTemplateVersions] = useState(false);

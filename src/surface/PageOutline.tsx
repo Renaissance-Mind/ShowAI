@@ -441,9 +441,13 @@ function ActivePageOutline({
           data-custom={component && !error ? true : undefined}
         >
           {config.renderer && (!component || error) && (
-            <p className="page-outline-error" role="status">
+            // The original error is for diagnosis; readers see the fallback.
+            <p
+              className="page-outline-error"
+              role="status"
+              title={error || undefined}
+            >
               {t("unavailable")}
-              {error && <span>{error}</span>}
             </p>
           )}
           {component && !error ? (

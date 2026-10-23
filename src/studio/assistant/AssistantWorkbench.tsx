@@ -317,7 +317,12 @@ function Composer({
   onClose: () => void;
 }) {
   const t = useTranslator(strings);
-  const [text, setText] = useState("");
+  // A component status card hands over its error as the starting request.
+  const prompt = "prompt" in target ? (target.prompt ?? "") : "";
+  const [text, setText] = useState(prompt);
+  useEffect(() => {
+    if (prompt) setText(prompt);
+  }, [prompt]);
   const box = useRef<HTMLDivElement>(null);
   const input = useRef<HTMLTextAreaElement>(null);
   const anchor: AssistantAnchor = target.anchor ?? {

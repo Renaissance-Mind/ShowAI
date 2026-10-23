@@ -59,7 +59,8 @@
     monospace;
 }
 .custom-props-error {
-  color: #ae3c3c;
+  color: var(--danger, #c13515);
+  white-space: pre-line;
   margin: 9px 0 0;
   font-size: 12px;
   overflow-wrap: anywhere;

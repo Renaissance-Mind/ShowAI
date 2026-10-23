@@ -347,7 +347,7 @@ describe("Page outline in the real workbench and standalone reader", () => {
     );
     const page = await browser.newPage();
     await page.goto("file://" + path);
-    await page.getByText("目录组件不可用，已显示基础目录。").waitFor();
+    await page.getByText("自定义目录组件未能加载，已使用默认目录").waitFor();
     await page.getByRole("button", { name: "Methods", exact: true }).waitFor();
     await page.close();
     const component = compiled[0];
@@ -368,7 +368,7 @@ describe("Page outline in the real workbench and standalone reader", () => {
     const recovery = await browser.newPage();
     await recovery.goto("file://" + brokenPath);
     await recovery
-      .getByText("目录组件不可用，已显示基础目录。", { exact: false })
+      .getByText("自定义目录组件未能加载，已使用默认目录", { exact: false })
       .waitFor();
     await recovery
       .getByRole("button", { name: "Methods", exact: true })
