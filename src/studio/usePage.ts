@@ -175,18 +175,29 @@ export function usePage(home?: string) {
     await window.showai?.inlineInk?.flush();
     return sessions.getSnapshot().active?.flush() ?? true;
   }, [sessions]);
+  // A page waiting on a save conflict cannot save, but leaving it is safe:
+  // the session's leave keeps its edits in the local draft, and the conflict
+  // banner is still there when the person comes back to resolve it.
+  const flushOrDefer = useCallback(
+    async () =>
+      (await flush()) ||
+      sessions.getSnapshot().active?.getSnapshot().status === "conflict",
+    [sessions, flush],
+  );
   const open = useCallback(
     async (
       projectId: string,
       pageId: string,
       tabId?: string,
       initial?: LoadedPage,
-    ) => (await flush()) && sessions.open(projectId, pageId, tabId, initial),
-    [sessions, flush],
+    ) =>
+      (await flushOrDefer()) &&
+      sessions.open(projectId, pageId, tabId, initial),
+    [sessions, flushOrDefer],
   );
   const leave = useCallback(
-    async () => (await flush()) && sessions.leave(),
-    [sessions, flush],
+    async () => (await flushOrDefer()) && sessions.leave(),
+    [sessions, flushOrDefer],
   );
   const clear = useCallback(
     async () => (await flush()) && sessions.clear(),

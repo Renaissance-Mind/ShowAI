@@ -418,6 +418,7 @@ export function LibrarySearchResults({
 export function ExternalConflictDialog({
   id,
   onClose,
+  onDismiss = onClose,
   onResolved,
   projectId,
   onPackageRecovered,
@@ -427,6 +428,8 @@ export function ExternalConflictDialog({
 }: {
   id: string;
   onClose: () => void;
+  /** Closing without a decision (Escape, ×, 稍后); the draft stays. */
+  onDismiss?: () => void;
   onResolved: () => Promise<void>;
   projectId?: string;
   onPackageRecovered: (result: PackageRecoveryResult) => Promise<void>;
@@ -527,8 +530,8 @@ export function ExternalConflictDialog({
   return (
     <Dialog
       title={saveFailure ? t("saveFailedExternal") : t("resolveExternalTitle")}
-      dismissible={!saveFailure}
-      onClose={onClose}
+      dismissible={!busy}
+      onClose={onDismiss}
       wide
       className="history-external-dialog"
     >
@@ -634,11 +637,13 @@ export function ExternalConflictDialog({
           >
             {t("useSavedVersion")}
           </button>
-          {!saveFailure && (
-            <button className="studio-text-button" onClick={onClose}>
-              {t("later")}
-            </button>
-          )}
+          <button
+            className="studio-text-button"
+            disabled={busy}
+            onClick={onDismiss}
+          >
+            {t("later")}
+          </button>
         </footer>
       )}
     </Dialog>

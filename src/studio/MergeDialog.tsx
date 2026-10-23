@@ -32,6 +32,7 @@ export default function MergeDialog({
   baseRevision,
   document,
   onClose,
+  onDismiss = onClose,
   onMerged,
   saveFailure = false,
   onEdit,
@@ -42,6 +43,8 @@ export default function MergeDialog({
   baseRevision: string;
   document: ShowDocument;
   onClose: () => void;
+  /** Closing without a decision (Escape, ×, 保留草稿并返回); the draft stays. */
+  onDismiss?: () => void;
   onMerged: () => Promise<void>;
   saveFailure?: boolean;
   onEdit?: (
@@ -216,8 +219,8 @@ export default function MergeDialog({
   return (
     <Dialog
       title={t("resolveChanges")}
-      dismissible={!saveFailure && !busy}
-      onClose={onClose}
+      dismissible={!busy}
+      onClose={onDismiss}
       wide
       className="history-merge-dialog conflict-workspace"
       initialFocus="container"
@@ -394,15 +397,13 @@ export default function MergeDialog({
           </div>
           <footer className="conflict-footer">
             <div className="conflict-footer-secondary">
-              {!saveFailure && (
-                <button
-                  className="studio-button"
-                  disabled={busy}
-                  onClick={onClose}
-                >
-                  {t("keepDraftAndReturn")}
-                </button>
-              )}
+              <button
+                className="studio-button"
+                disabled={busy}
+                onClick={onDismiss}
+              >
+                {t("keepDraftAndReturn")}
+              </button>
               {saveFailure && onDiscard && (
                 <button
                   className="studio-text-button"
