@@ -299,7 +299,8 @@ try {
   await renderer(
     "window.__closeCount=0;window.__release=window.showai.onBeforeClose(async()=>{window.__closeCount++;return false});'registered'",
   );
-  await main(`${native}.BrowserWindow.getAllWindows()[0].close(); 'requested'`);
+  const workbench = `${native}.BrowserWindow.getAllWindows().find(window => window.webContents.getURL().startsWith('file:') && !window.webContents.getURL().includes('thumbnailCapture='))`;
+  await main(`${workbench}.close(); 'requested'`);
   await new Promise((done) => setTimeout(done, 300));
   const refusal = await renderer(
     "({count:window.__closeCount,bridge:!!window.showai})",
@@ -315,7 +316,7 @@ try {
   // Reply before closing the last window. Windows quits the event loop at that
   // point, so another inspector evaluation can wait forever for a response.
   await main(
-    `setTimeout(()=>{const window=${native}.BrowserWindow.getAllWindows()[0];window.once('closed',()=>${native}.app.quit());window.close();},50); 'requested'`,
+    `setTimeout(()=>{const window=${workbench};window.once('closed',()=>${native}.app.quit());window.close();},50); 'requested'`,
   );
   const exited = new Promise((resolve, reject) => {
     const timeout = setTimeout(
