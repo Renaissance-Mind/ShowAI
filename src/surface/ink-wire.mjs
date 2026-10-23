@@ -76,7 +76,7 @@ function boards(document) {
               return null;
             };
             records.set(child.attrs.id, { node: child, layout: document.layout?.[child.attrs.id] ?? null,
-              placement: { parentId: parent.attrs.id, after: anchor(-1), before: anchor(1) }, index: index++ });
+              placement: { parentId: parent.attrs.id, after: anchor(-1), before: anchor(1) }, siblings: children, siblingIndex: i, index: index++ });
           } else visit(child);
         }
       };
@@ -115,11 +115,34 @@ function prune(state) {
   return state;
 }
 function compactDeleted(stroke) { stroke.fields = { alive: stroke.fields.alive }; delete stroke.variants; delete stroke.unplaced; }
+// Placement registers describe authored ordering bounds. A concurrent generic
+// object may enter that interval without changing the stroke's authored value.
+// Retain the real anchor values so import can verify those bounds explicitly.
+function fieldMatches(record, stroke, field) {
+  const heads = stroke.fields[field] ?? [];
+  if (heads.some(([, digest]) => digest === hash(fieldValue(record, field)))) return true;
+  if (field !== "placement" || !record) return false;
+  return heads.some(([, digest]) => {
+    const placement = stroke.variants?.placement?.[digest];
+    if (!placement || placement.parentId !== record.placement.parentId) return false;
+    const index = id => record.siblings.findIndex(node => node.attrs?.id === id);
+    const after = placement.after === null ? -1 : index(placement.after);
+    const before = placement.before === null ? record.siblings.length : index(placement.before);
+    return (placement.after === null || after >= 0) && before >= 0 && after < record.siblingIndex && record.siblingIndex < before;
+  });
+}
+function placementMoved(before, after) {
+  if (!before || !after) return false;
+  if (before.placement.parentId !== after.placement.parentId) return true;
+  const positions = new Map(after.siblings.map((node, index) => [node.attrs?.id, index]));
+  return before.siblings.some((node, index) => !isInkNode(node) && positions.has(node.attrs?.id) &&
+    (index < before.siblingIndex) !== (positions.get(node.attrs.id) < after.siblingIndex));
+}
 function metadataMatches(record, state) {
   for (const [id, stroke] of Object.entries(state.strokes)) {
     const current = record?.records.get(id);
     if (isDeleted(stroke) !== !current) return false;
-    if (current && fields.some(field => !stroke.fields[field]?.some(([, digest]) => digest === hash(fieldValue(current, field))))) return false;
+    if (current && fields.some(field => !fieldMatches(current, stroke, field))) return false;
   }
   return [...record.records.keys()].every(id => own(state.strokes, id));
 }
@@ -181,7 +204,7 @@ function reconcile(record, baseline, identity, conflicts) {
     const placementMatches = stroke.fields.placement?.some(([, digest]) => digest === hash(fieldValue(current, "placement")));
     if (stroke.unplaced && !identity && !placementMatches) conflicts.push({ strokeId: id, field: "placement", retained: false, reason: "Ink placement still requires structural resolution." });
     if (placementMatches) delete stroke.unplaced;
-    const values = Object.fromEntries(fields.filter(field => !(field === "placement" && stroke.unplaced && !identity) && (authored.get(id)?.includes(field) || forced.get(id)?.includes(field) || !stroke.fields[field]?.some(([, digest]) => digest === hash(fieldValue(current, field))))).map(field => [field, fieldValue(current, field)]));
+    const values = Object.fromEntries(fields.filter(field => !(field === "placement" && stroke.unplaced && !identity) && (authored.get(id)?.includes(field) || forced.get(id)?.includes(field) || field === "placement" && !placementMatches && placementMoved(baseline?.records.get(id), current) || !fieldMatches(current, stroke, field))).map(field => [field, fieldValue(current, field)]));
     if (own(values, "ink") || own(values, "inkFragments")) { values.ink = fieldValue(current, "ink"); values.inkFragments = fieldValue(current, "inkFragments"); }
     if (Object.keys(values).length) changed.push({ id, values, current });
   }
@@ -199,7 +222,7 @@ function reconcile(record, baseline, identity, conflicts) {
   if (identity?.format === "showai-ink-operation-v1") { state.digests ??= {}; state.digests[dot] = hash(identity); }
   for (const { id, values, current } of changed) {
     const stroke = state.strokes[id] ?? { born: [state.level, dot, current.index], fields: {} };
-    for (const [field, value] of Object.entries(values)) { stroke.fields[field] = [[dot, hash(value)]]; if (stroke.variants) delete stroke.variants[field]; }
+    for (const [field, value] of Object.entries(values)) { stroke.fields[field] = [[dot, hash(value)]]; if (field === "placement") { (stroke.variants ??= {}).placement = { [hash(value)]: clone(value) }; } else if (stroke.variants) delete stroke.variants[field]; }
     if (own(values, "placement")) delete stroke.unplaced;
     if (values.alive === false) compactDeleted(stroke);
     state.strokes[id] = stroke;
@@ -331,7 +354,7 @@ function joinBoard(id, base, left, right, conflicts) {
         const values = {};
         for (const [, digest] of heads) {
           const resolved = valueLookup(strokeId, field, digest, sources);
-          if (resolved.found && (deleted || digest !== hash(selected[field]))) values[digest] = clone(resolved.value);
+          if (resolved.found && (field === "placement" || deleted || digest !== hash(selected[field]))) values[digest] = clone(resolved.value);
           else if (!resolved.found) local.push({ boardId: id, strokeId, field, retained: false, reason: "A referenced ink value is unavailable; source copies are retained." });
         }
         if (Object.keys(values).length) variants[field] = values;
@@ -559,7 +582,7 @@ function wireProjection(checkpoint, materialized, placementFor, metadata) {
       });
       if (field !== "alive") {
         const values = {};
-        for (const entry of heads) if (current?.deleted || !current || hash(entry.value) !== hash(field === "placement" ? current.placement ?? registers.placement?.[0]?.value : fieldValue({ node: current.node, layout: current.layout }, field))) values[hash(entry.value)] = clone(entry.value);
+        for (const entry of heads) if (field === "placement" || current?.deleted || !current || hash(entry.value) !== hash(field === "placement" ? current.placement ?? registers.placement?.[0]?.value : fieldValue({ node: current.node, layout: current.layout }, field))) values[hash(entry.value)] = clone(entry.value);
         if (Object.keys(values).length) variants[field] = values;
       }
     }
