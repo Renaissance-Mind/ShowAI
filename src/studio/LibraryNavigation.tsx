@@ -11,6 +11,7 @@ import {
 } from "../ui/icons";
 import "./library-row.css";
 import PageIcon from "../components/PageIcon";
+import ProjectIcon from "./ProjectIcon";
 import type { LibraryMenuPoint } from "./LibraryContextMenu";
 import { useLibraryDrag } from "./LibraryDrag";
 import { useTranslator } from "../i18n/react";
@@ -54,6 +55,8 @@ export interface LibraryRowProps {
   onCommand?: (target: LibraryTarget, command: "rename" | "delete") => void;
   /** Short status after the title, e.g. a project's sync state. */
   marker?: { label: string; title?: string; tone?: "warning" | "muted" };
+  /** Project is connected to cloud sync, independently of transient sync errors. */
+  cloud?: boolean;
 }
 
 function LibraryRowView({
@@ -65,6 +68,7 @@ function LibraryRowView({
   onMenu,
   onCommand,
   marker,
+  cloud,
 }: LibraryRowProps) {
   const t = useTranslator(sidebarMessages);
   const tc = useTranslator(commonMessages);
@@ -143,7 +147,9 @@ function LibraryRowView({
           }
         }}
       >
-        {target.kind === "page" || target.icon ? (
+        {target.kind === "project" ? (
+          <ProjectIcon value={target.icon} expanded={expanded} cloud={cloud} />
+        ) : target.kind === "page" || target.icon ? (
           <PageIcon value={target.icon} size={15} />
         ) : (
           <Icon size={15} aria-hidden="true" />

@@ -1,0 +1,43 @@
+.studio-project-icon {
+  --project-icon-backdrop: var(--surface);
+  display: inline-flex;
+  position: relative;
+  flex-shrink: 0;
+  vertical-align: middle;
+  color: var(--muted);
+}
+.studio-tree-row:hover .studio-project-icon {
+  --project-icon-backdrop: var(--hover);
+}
+.studio-tree-row.active .studio-project-icon {
+  --project-icon-backdrop: var(--accent-soft);
+}
+.studio-breadcrumb button > .studio-project-icon {
+  --project-icon-backdrop: var(--paper);
+  overflow: visible;
+}
+.studio-project-icon-cloud {
+  position: absolute;
+  right: -2px;
+  bottom: -1px;
+  width: 62%;
+  height: 62%;
+  pointer-events: none;
+}
+.studio-project-icon .studio-project-icon-cloud > svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+.studio-project-icon .studio-project-icon-knockout {
+  color: var(--project-icon-backdrop);
+  fill: var(--project-icon-backdrop);
+}
+.studio-project-icon .studio-project-icon-mark {
+  color: #287fff;
+}
+:root[data-theme="dark"] .studio-project-icon .studio-project-icon-mark {
+  color: #5c9eff;
+}

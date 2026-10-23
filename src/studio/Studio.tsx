@@ -146,6 +146,7 @@ import {
   type PageDestination,
 } from "./DirectoryPageSelection";
 import PageIcon from "../components/PageIcon";
+import ProjectIcon from "./ProjectIcon";
 import PageIconDialog from "./PageIconDialog";
 import ExpandableSearch from "../components/ExpandableSearch";
 import ProjectSidebar from "./ProjectSidebar";
@@ -3825,6 +3826,7 @@ export default function Studio() {
               <LibraryRow
                 target={projectTarget(item)}
                 marker={projectSyncMarker(item.id)}
+                cloud={syncOverview.bindings.has(item.id)}
                 active={
                   selectedProject === item.id &&
                   view === "project" &&
@@ -3891,10 +3893,10 @@ export default function Studio() {
                 project && openTargetClick(projectTarget(project), event)
               }
             >
-              <PageIcon
+              <ProjectIcon
                 value={project?.icon}
                 size={17}
-                fallback={<Folder size={17} />}
+                cloud={syncOverview.bindings.has(selectedProject)}
               />
               <span>{project?.name ?? t("heading.project")}</span>
               {selectedMarker && (
