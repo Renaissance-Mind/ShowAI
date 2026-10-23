@@ -10,6 +10,7 @@ import type { PageRecord } from "../core/model";
 import type { CompiledComponent } from "../components/custom/types";
 import type { ShowDocument } from "../types";
 import type { EditorDraftRecord } from "../core/editor-drafts";
+import {pageContentKey,pageDraftNeedsRecovery,type RetainedPageDraft} from "./page-draft-recovery";
 import { errorCode, errorMessage } from "./bridge";
 import { translator } from "../i18n";
 import commonMessages from "../i18n/messages/common";
@@ -119,21 +120,6 @@ export interface PageSessionOptions {
   onSaved?(projectId: string, record: LoadedPage): void;
 }
 
-function pageContentKey(document: ShowDocument): string {
-  const { createdAt: _created, updatedAt: _updated, ...content } = document;
-  const normalize = (value: unknown): unknown =>
-    Array.isArray(value)
-      ? value.map(normalize)
-      : value && typeof value === "object"
-        ? Object.fromEntries(
-            Object.entries(value)
-              .filter(([, item]) => item !== undefined)
-              .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
-              .map(([key, item]) => [key, normalize(item)]),
-          )
-        : value;
-  return JSON.stringify(normalize(content));
-}
 const ref = <T>(current: T) => ({ current });
 
 /** A page owns its drafts and save queue independently of the displayed tab. */
@@ -392,6 +378,23 @@ export function createPageSession(options: PageSessionOptions): PageSession {
       availableDrafts = value;
     },
   );
+  let recoveryScan=0;
+  const refreshAvailableDrafts=async (records:EditorDraftRecord[],page:LoadedPage,valid:()=>boolean)=>{
+    const scan=++recoveryScan,available:EditorDraftRecord[]=[];
+    for(const item of records){
+      if(!valid() || recoveryScan!==scan)return;
+      try{
+        const retained=await options.invoke<RetainedPageDraft>("drafts:read",{id:item.id});
+        if(!valid() || recoveryScan!==scan)return;
+        if(retained.record.projectId!==projectRef.current || retained.record.resourceId!==page.document.id || pageDraftNeedsRecovery(page.document,retained))available.push(retained.record);
+      }catch(reason){
+        if(!valid() || recoveryScan!==scan)return;
+        // Inconclusive I/O/validation is recoverable, never proof of redundancy.
+        available.push(item);setError(errorMessage(reason));
+      }
+    }
+    if(valid() && recoveryScan===scan)setAvailableDrafts(available);
+  };
   let externalChange: ExternalChangeNotice | undefined = undefined;
   const setExternalChange = setter<ExternalChangeNotice | undefined>(
     () => externalChange,
@@ -682,6 +685,10 @@ export function createPageSession(options: PageSessionOptions): PageSession {
             savedRevision.current = sequence;
             setRecord(saved);
             if (projectRef.current) options.onSaved?.(projectRef.current, saved);
+            if(availableDrafts.length){
+              const project=projectRef.current,ticket=opening.current;
+              void refreshAvailableDrafts(availableDrafts,saved,()=>!disposed && opening.current===ticket && projectRef.current===project && recordRef.current?.revision===saved.revision);
+            }
             if (revision.current === sequence) {
               let installed:ShowDocument;
               if(response.sourceSnapshot&&capturedOwner){
@@ -846,6 +853,7 @@ export function createPageSession(options: PageSessionOptions): PageSession {
     recordRef.current = page;
     retained.current = null;
     recoveredFrom.current = null;
+    recoveryScan++;
     setAvailableDrafts([]);
     setDraftNotice("");
     if (
@@ -901,7 +909,9 @@ export function createPageSession(options: PageSessionOptions): PageSession {
     )
       return true;
     const candidate = drafts.find((item) => item.clientId === clientId.current);
-    setAvailableDrafts(drafts.filter((item) => item.id !== candidate?.id));
+    // Restore this session first: scanning unrelated large drafts must not
+    // delay its own recovery while newly typed edits can already be retained.
+    await (async()=>{
     if (candidate) {
       const restored = await options.invoke<{
         record: EditorDraftRecord;
@@ -980,6 +990,9 @@ export function createPageSession(options: PageSessionOptions): PageSession {
         scheduleSave();
       }
     }
+    })();
+    await refreshAvailableDrafts(drafts.filter(item=>item.id!==candidate?.id),recordRef.current ?? loaded,
+      ()=>!disposed && opening.current===ticket && projectRef.current===projectId && current.current?.id===pageId);
     return true;
   };
 

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, rm, writeFile, readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { startBrowserServer } from "../browser/server";
@@ -10,7 +10,7 @@ import {createResource} from "../surface/containers.mjs";
 import {addNode} from "../surface/editing";
 import {createPortableInk} from "../surface/portable-ink.mjs";
 import {findSurfaceNode,reconcileSurface} from "../surface/document.mjs";
-import type { LoadedPage } from "./page-session";
+import {createPageSession,type LoadedPage} from "./page-session";
 import type { ContainerDocument } from "../types";
 import type { JSONContent } from "@tiptap/core";
 import {HistoryTravelQueue} from "../surface/history-travel-queue";
@@ -229,6 +229,76 @@ describe("workspace sessions against the real loopback workbench", () => {
       resourceId: first.document.id,
     });
     expect(remaining.some((item) => item.id === retained.id)).toBe(false);
+  });
+  async function saveForeignDraft(content:ContainerDocument,clientId="previous-window",baseContent:ContainerDocument|null=first.document,sequence=2){
+    return invoke<import("../core/editor-drafts").EditorDraftRecord>("drafts:save",{input:{kind:"page",clientId,projectId:project,resourceId:first.document.id,
+      ...(baseContent?{baseRevision:first.revision,baseContent}:{}),content,sequence}});
+  }
+  async function expectRetained(id:string,content:ContainerDocument){
+    const stored=await invoke<{content:ContainerDocument}>("drafts:read",{id});expect(stored.content).toEqual(content);
+  }
+  it("hides another window's saved copy while retaining its exact original body",async()=>{
+    const body={...first.document,createdAt:"2000-01-01T00:00:00.000Z",updatedAt:"2001-01-01T00:00:00.000Z"};
+    const retained=await saveForeignDraft(body);await sessions.open(project,first.document.id,"a");
+    const view=sessions.getSnapshot().active!;expect(view.getSnapshot().availableDrafts).toEqual([]);expect(view.getSnapshot().draft).toEqual(first.document);
+    await expectRetained(retained.id,body);expect(view.getSnapshot().status).toBe("saved");
+  });
+  it("hides an unedited old baseline without replacing a newer formal page",async()=>{
+    const retained=await saveForeignDraft(first.document);
+    const remote=await invoke<LoadedPage>("pages:save",{projectId:project,pageId:first.document.id,document:{...first.document,title:"Newer formal page"},baseHash:first.hash,baseRevision:first.revision});
+    await sessions.open(project,first.document.id,"a");const view=sessions.getSnapshot().active!;
+    expect(view.getSnapshot().availableDrafts).toEqual([]);expect(view.getSnapshot().draft).toEqual(remote.document);await expectRetained(retained.id,first.document);
+  });
+  it("hides edits already present alongside later independent formal additions",async()=>{
+    const body=structuredClone(first.document);body.content.content!.push({type:"paragraph",attrs:{id:crypto.randomUUID()},content:[{type:"text",text:"Retained human text"}]});
+    const retained=await saveForeignDraft(body);const remote=structuredClone(body);remote.content.content!.push({type:"paragraph",attrs:{id:crypto.randomUUID()},content:[{type:"text",text:"Later Agent text"}]});
+    const saved=await invoke<LoadedPage>("pages:save",{projectId:project,pageId:first.document.id,document:remote,baseHash:first.hash,baseRevision:first.revision});
+    await sessions.open(project,first.document.id,"a");const view=sessions.getSnapshot().active!;
+    expect(view.getSnapshot().availableDrafts).toEqual([]);expect(view.getSnapshot().draft).toEqual(saved.document);
+    await expectRetained(retained.id,body);expect((await invoke<LoadedPage>("pages:get",{projectId:project,pageId:first.document.id})).revision).toBe(saved.revision);
+  });
+  it("offers genuine unsaved drafts and conflicts without changing any source",async()=>{
+    const body={...first.document,title:"Unsaved human title"},legacy={...first.document,title:"Uncertain draft without a baseline"};
+    const one=await saveForeignDraft(body),two=await saveForeignDraft(legacy,"older-version",null);
+    const remote=await invoke<LoadedPage>("pages:save",{projectId:project,pageId:first.document.id,document:{...first.document,title:"Concurrent formal title"},baseHash:first.hash,baseRevision:first.revision});
+    await sessions.open(project,first.document.id,"a");const view=sessions.getSnapshot().active!;expect(new Set(view.getSnapshot().availableDrafts.map(x=>x.id))).toEqual(new Set([one.id,two.id]));
+    expect(view.getSnapshot().draft).toEqual(remote.document);await expectRetained(one.id,body);await expectRetained(two.id,legacy);
+  });
+  it("checks the generation actually read when another window updates during inspection",async()=>{
+    const retained=await saveForeignDraft(first.document),entered=deferred(),gate=deferred(),backend=invoke;
+    const observer=new PageSessions({clientId:"checking-window",saveDelayMs:50,draftDelayMs:20,invoke:async<T>(action:string,args?:Record<string,unknown>)=>{
+      if(action==="drafts:read"&&args?.id===retained.id){entered.release();await gate.promise;}return backend<T>(action,args);
+    }});observer.setHome(home);
+    try{
+      const opening=observer.open(project,first.document.id,"a");await entered.promise;const body={...first.document,title:"Actually newer unsaved text"};const newer=await saveForeignDraft(body,"previous-window",first.document,3);gate.release();await opening;
+      expect(observer.getSnapshot().active!.getSnapshot().availableDrafts.map(x=>[x.id,x.generation])).toEqual([[newer.id,newer.generation]]);await expectRetained(newer.id,body);
+    }finally{gate.release();await observer.shutdown();}
+  });
+  it("retains the hint and original files when the actual stored body cannot be read",async()=>{
+    const body={...first.document,title:"Intact source before a disk error"},retained=await saveForeignDraft(body);
+    const file=join(home,"local","editor-drafts",retained.id,retained.generation,retained.path),original=await readFile(file),broken=Buffer.from("{incomplete disk write");
+    await writeFile(file,broken);await sessions.open(project,first.document.id,"a");const view=sessions.getSnapshot().active!;
+    expect(view.getSnapshot().availableDrafts.map(x=>x.id)).toContain(retained.id);expect(view.getSnapshot().error).not.toBe("");expect(await readFile(file)).toEqual(broken);
+    expect(view.getSnapshot().draft).toEqual(first.document);await writeFile(file,original);await expectRetained(retained.id,body);
+  });
+  it("keeps edits typed while foreign drafts are being checked",async()=>{
+    const retained=await saveForeignDraft(first.document),entered=deferred(),gate=deferred(),backend=invoke;
+    const view=createPageSession({clientId:"typing-during-check",sourceHomeId:home,saveDelayMs:50,draftDelayMs:20,invoke:async<T>(action:string,args?:Record<string,unknown>)=>{
+      if(action==="drafts:read"&&args?.id===retained.id){entered.release();await gate.promise;}return backend<T>(action,args);
+    }});
+    try{const opening=view.open(project,first.document.id);await entered.promise;view.edit({title:"Typed during comparison"});expect(await view.flush()).toBe(true);gate.release();await opening;
+      expect(view.getSnapshot().draft?.title).toBe("Typed during comparison");expect((await invoke<LoadedPage>("pages:get",{projectId:project,pageId:first.document.id})).document.title).toBe("Typed during comparison");await expectRetained(retained.id,first.document);
+    }finally{gate.release();await view.dispose();}
+  });
+  it("does not erase empty arrays inside actual custom or future data",async()=>{
+    const body={...first.document,futureData:{content:[]}},retained=await saveForeignDraft(body);
+    await sessions.open(project,first.document.id,"a");expect(sessions.getSnapshot().active!.getSnapshot().availableDrafts.map(x=>x.id)).toContain(retained.id);await expectRetained(retained.id,body);
+  });
+  it("rechecks recovery hints after a later save includes the retained edit",async()=>{
+    const body={...first.document,title:"Previously unsaved text"},retained=await saveForeignDraft(body);
+    await sessions.open(project,first.document.id,"a");const view=sessions.getSnapshot().active!;expect(view.getSnapshot().availableDrafts.map(x=>x.id)).toContain(retained.id);
+    view.edit({title:body.title});expect(await view.flush()).toBe(true);
+    await expect.poll(()=>view.getSnapshot().availableDrafts.length).toBe(0);await expectRetained(retained.id,body);
   });
   it.each([false, true])(
     "rebases a retained typing draft on Agent additions when reopening (already synced: %s)",
