@@ -202,6 +202,9 @@ a {
   color: var(--accent);
   text-decoration: underline;
 }
+.canvas-blocked {
+  background: color-mix(in srgb, var(--warning) 10%, var(--paper));
+}
 .canvas-toast {
   position: fixed;
   bottom: 28px;

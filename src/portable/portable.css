@@ -276,15 +276,25 @@ html {
 }
 .portable-network-error {
   padding: 12px 14px;
-  color: #b8463c;
-  border: 1px solid currentColor;
+  color: var(--text);
+  border: 1px solid color-mix(in srgb, var(--danger) 35%, var(--line));
+  background: color-mix(in srgb, var(--danger) 6%, var(--paper));
   border-radius: 6px;
   font-size: 14px;
   line-height: 1.6;
   overflow-wrap: anywhere;
 }
-:root[data-theme="dark"] .portable-network-error {
-  color: #f18c80;
+.portable-network-error p {
+  margin: 0;
+}
+.portable-network-error details {
+  margin-top: 6px;
+  color: var(--muted);
+  font-size: 12px;
+}
+.portable-network-error summary {
+  cursor: pointer;
+  width: fit-content;
 }
 @keyframes menu-appear {
   from {

@@ -1,11 +1,14 @@
 import { memo, startTransition, useEffect, useRef, useState } from "react";
 import { desktop, errorMessage } from "./bridge";
+import { ImageOff } from "../ui/icons";
+import { useTranslator } from "../i18n/react";
+import messages from "../i18n/messages/catalog";
+import "./component-catalog.css";
 import type { LoadedPage } from "./usePage";
 import PageThumbnailContent from "./PageThumbnailContent";
 import { ThumbnailRetention } from "./thumbnail-retention";
 import { onPreviewActivity, previewWork } from "./preview-work";
 import { useAppearanceTheme } from "../design/useAppearanceTheme";
-import { ImageOff } from "../ui/icons";
 
 const retainedPreviews = new ThumbnailRetention(32);
 let rasterActivityRegistered = false;
@@ -28,6 +31,7 @@ export const LivePageThumbnail = memo(function LivePageThumbnail({
   updatedAt,
   padding,
 }: ThumbnailProps) {
+  const t = useTranslator(messages);
   const host = useRef<HTMLSpanElement>(null);
   const retentionKey = useRef(Symbol());
   const [visible, setVisible] = useState(false);
@@ -84,7 +88,10 @@ export const LivePageThumbnail = memo(function LivePageThumbnail({
   return (
     <span ref={host} className="studio-page-thumbnail" aria-hidden="true" inert>
       {error ? (
-        <span>{error}</span>
+        <span className="component-preview-error" title={error}>
+          <ImageOff size={18} aria-hidden />
+          {t("previewUnavailable")}
+        </span>
       ) : (
         record &&
         visible && (
@@ -106,6 +113,7 @@ function RasterPageThumbnail({
   updatedAt,
   padding = 10,
 }: ThumbnailProps) {
+  const t = useTranslator(messages);
   useEffect(() => {
     if (rasterActivityRegistered) return;
     rasterActivityRegistered = true;
@@ -241,8 +249,10 @@ function RasterPageThumbnail({
       {image ? (
         <img src={image} alt="" decoding="async" draggable={false} />
       ) : error ? (
-        <span title={error}>
-          <ImageOff size={18} />
+        // Readers of the library see a calm placeholder; the reason is the tooltip.
+        <span className="component-preview-error" title={error}>
+          <ImageOff size={18} aria-hidden />
+          {t("previewUnavailable")}
         </span>
       ) : null}
     </span>

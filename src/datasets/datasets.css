@@ -254,3 +254,9 @@
   align-items: center;
   justify-content: center;
 }
+
+/* Missing or unreadable shared data: the problem notice inside the block. */
+.dataset-problem.problem-notice {
+  padding: 12px 14px;
+  border-top: 1px solid var(--line);
+}

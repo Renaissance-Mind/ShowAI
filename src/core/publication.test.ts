@@ -518,7 +518,7 @@ describe("publication and component delivery", () => {
       corrupt[corrupt.length - 3] ^= 1;
       await writeFile(file, corrupt);
       await page.reload();
-      await page.getByRole("alert").filter({ hasText: "校验失败" }).waitFor();
+      await page.getByRole("alert").filter({ hasText: "未通过完整性校验" }).waitFor();
       expect(await page.locator("iframe").count()).toBe(0);
       await page.screenshot({
         path: join(output, "integrity-error.png"),
@@ -527,14 +527,19 @@ describe("publication and component delivery", () => {
       await writeFile(file, original);
       server.state.cors = false;
       await page.reload();
-      await page.getByRole("alert").filter({ hasText: "CORS" }).waitFor();
+      // Readers see what to do; the CORS reason stays in the technical details.
+      const cors = page
+        .getByRole("alert")
+        .filter({ hasText: "此部分内容暂时无法加载" });
+      await cors.waitFor();
+      expect(await cors.locator("details").textContent()).toContain("CORS");
       expect(await page.locator("iframe").count()).toBe(0);
       server.state.cors = true;
       await context.setOffline(true);
       await page.reload();
       await page
         .getByRole("alert")
-        .filter({ hasText: "无法加载组件" })
+        .filter({ hasText: "此部分内容暂时无法加载" })
         .waitFor();
       await page.goto(pathToFileURL(bundled.path).href);
       const offlineButton = page

@@ -133,6 +133,8 @@ const sourceOwner = useRef<OwnedSourceSession | undefined>(undefined);
     };
   }, [page.id]);
   const blocked = useRef(!!initial.error);
+  // While blocked, autosave is off; the notice stays until another page opens.
+  const [saveBlocked, setSaveBlocked] = useState(!!initial.error);
   const importGeneration = useRef(0);
   current.current = page;
   currentComponents.current = components;
@@ -353,6 +355,7 @@ const sourceOwner = useRef<OwnedSourceSession | undefined>(undefined);
         components: incomingComponents,
       });
       blocked.current = false;
+      setSaveBlocked(false);
       setPage(incoming);
       setComponents(incomingComponents);
       setError("");
@@ -473,7 +476,17 @@ const sourceOwner = useRef<OwnedSourceSession | undefined>(undefined);
           )}
         </div>
       </div>
-      {error && (
+      {saveBlocked && (
+        <div className="canvas-error canvas-blocked" role="alert">
+          <span>
+            {t("readFailed")} {t("blockedNotice")}
+          </span>
+          <button disabled={busy} onClick={() => void exportPage("json")}>
+            {t("downloadCurrent")}
+          </button>
+        </div>
+      )}
+      {error && !(saveBlocked && error === initial.error) && (
         <div className="canvas-error" role="alert">
           <span>{error}</span>
           <button onClick={() => void exportPage("json")}>

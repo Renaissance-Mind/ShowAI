@@ -126,7 +126,7 @@ export default defineMessages("catalog", {
     exampleTimeout: "组件示例加载超时。",
     cannotDisplay: "组件无法显示。",
     thumbnailTitle: "{name}缩略预览",
-    previewUnavailable: "预览暂不可用",
+    previewUnavailable: "预览失败",
     "authoring.title": "原版制作指南",
     "authoring.intro": "查看原项目的制作流程、类型规范、输入示例和原版工具。",
     "authoring.loading": "正在读取指南…",
@@ -270,7 +270,7 @@ export default defineMessages("catalog", {
     exampleTimeout: "The component example took too long to load.",
     cannotDisplay: "This component can't be displayed.",
     thumbnailTitle: "{name} thumbnail",
-    previewUnavailable: "Preview unavailable",
+    previewUnavailable: "Preview failed",
     "authoring.title": "Original authoring guides",
     "authoring.intro":
       "Read the original project's process, type specifications, input examples and tools.",

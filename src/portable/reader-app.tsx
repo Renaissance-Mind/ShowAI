@@ -40,23 +40,40 @@ export interface ReaderHost {
 
 const translate = translator(messages);
 
-/** Remote loader errors carry a code so the reader can explain them in its own language. */
-function remoteErrorMessage(error: unknown): string {
+/**
+ * Remote loader errors carry a code so the reader can explain them in its own
+ * language. Readers see what they can do; the publisher-facing reason (CORS,
+ * checksums) stays in the collapsed technical details.
+ */
+function remoteErrorMessage(error: unknown): { summary: string; detail: string } {
   const { code, params } = (error ?? {}) as {
     code?: string;
     params?: { component?: string; reason?: string };
   };
   const component = params?.component ?? "";
   if (code === "INTEGRITY_UNAVAILABLE")
-    return translate("integrityUnavailable");
+    return {
+      summary: translate("contentUnavailable"),
+      detail: translate("integrityUnavailable"),
+    };
   if (code === "COMPONENT_FETCH_FAILED")
-    return translate("componentFetchFailed", {
-      component,
-      reason: params?.reason || translate("networkFailed"),
-    });
+    return {
+      summary: translate("contentUnavailable"),
+      detail: translate("componentFetchFailed", {
+        component,
+        reason: params?.reason || translate("networkFailed"),
+      }),
+    };
   if (code === "COMPONENT_CHECKSUM_FAILED")
-    return translate("componentChecksumFailed", { component });
-  return error instanceof Error ? error.message : translate("remoteLoadFailed");
+    return {
+      summary: translate("contentUnverified"),
+      detail: translate("componentChecksumFailed", { component }),
+    };
+  return {
+    summary: translate("contentUnavailable"),
+    detail:
+      error instanceof Error ? error.message : translate("remoteLoadFailed"),
+  };
 }
 
 function downloadSource(
@@ -121,14 +138,17 @@ function ArtifactReader({
   const references = useConversationReference(appRef, document, conversation);
   const menuButtonRef = useRef<HTMLButtonElement>(null);
   const [remote, setRemote] = useState<CompiledComponent[]>([]);
-  const [remoteError, setRemoteError] = useState("");
+  const [remoteError, setRemoteError] = useState<{
+    summary: string;
+    detail?: string;
+  } | null>(null);
   const [remoteLoading, setRemoteLoading] = useState(
     !!artifact.remoteComponents?.length,
   );
   useEffect(() => {
     if (!artifact.remoteComponents?.length) return;
     if (inlineHost) {
-      setRemoteError(t("remoteInlineBlocked"));
+      setRemoteError({ summary: t("remoteInlineBlocked") });
       setRemoteLoading(false);
       return;
     }
@@ -141,7 +161,7 @@ function ArtifactReader({
       .then((components) => {
         if (active) {
           setRemote(components);
-          setRemoteError("");
+          setRemoteError(null);
         }
       })
       .catch((error) => {
@@ -274,9 +294,15 @@ function ArtifactReader({
                 </p>
               )}
               {remoteError && (
-                <p role="alert" className="portable-network-error">
-                  {remoteError}
-                </p>
+                <div role="alert" className="portable-network-error">
+                  <p>{remoteError.summary}</p>
+                  {remoteError.detail && (
+                    <details>
+                      <summary>{t("technicalDetails")}</summary>
+                      <p>{remoteError.detail}</p>
+                    </details>
+                  )}
+                </div>
               )}
             </>
           }

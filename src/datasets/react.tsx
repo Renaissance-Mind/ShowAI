@@ -45,6 +45,11 @@ import {
   type DatasetSnapshot,
 } from "./client";
 import { DatasetDialog, type DatasetDialogRequest } from "./DatasetDialog";
+import {
+  ProblemNotice,
+  bindProblemActions,
+  describeError,
+} from "../studio/problems";
 import { BoundWidgetHost } from "./widget-host";
 import "./datasets.css";
 
@@ -415,13 +420,60 @@ export function BoundWidget({
         )}
       </div>
     );
-  else if (snapshot.status === "missing" || snapshot.status === "error")
+  else if (snapshot.status === "missing") {
+    const id = compiled?.dataset ?? "";
+    // Without the dataset, the block keeps only its own (local) props.
+    const unbound = () =>
+      withComponentProps(kind, data, componentProps(kind, data), null);
     body = (
-      <p className="dataset-message" role="alert">
-        {snapshot.status === "missing"
-          ? t("missing", { id: compiled?.dataset ?? "" })
-          : snapshot.error}
-      </p>
+      <ProblemNotice
+        className="dataset-problem"
+        level="dialog"
+        tone="warning"
+        reportable={false}
+        problem={{
+          ...describeError(
+            { message: `${id}`, code: "NOT_FOUND" },
+            { source: "dataset" },
+          ),
+          title: t("missingTitle", { id }),
+          cause: t("missingCause"),
+        }}
+        actions={
+          scope && !scope.readOnly && onChange
+            ? [
+                {
+                  label: t("chooseOther"),
+                  primary: true,
+                  onSelect: () =>
+                    scope.openDialog({ kind, data: unbound(), apply: onChange }),
+                },
+                { label: t("unbind"), onSelect: () => onChange(unbound()) },
+              ]
+            : []
+        }
+      />
+    );
+  } else if (snapshot.status === "error")
+    body = (
+      <ProblemNotice
+        className="dataset-problem"
+        level="dialog"
+        tone="warning"
+        problem={{
+          ...describeError(
+            { message: snapshot.error ?? "", code: snapshot.errorCode },
+            { source: "dataset" },
+          ),
+          title: t("errorTitle", {
+            name: snapshot.name ?? compiled?.dataset ?? "",
+          }),
+          cause: t("errorCause"),
+        }}
+        actions={bindProblemActions(["retry"], {
+          retry: () => void session.refresh(),
+        })}
+      />
     );
   else if (resolved && "error" in resolved)
     body = (

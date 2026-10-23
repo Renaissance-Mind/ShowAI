@@ -11,8 +11,13 @@ export default defineMessages("datasets", {
     saving: "正在保存",
     unsaved: "尚未保存",
     saveFailed: "共享数据未保存：{error}",
-    missing:
-      "共享数据「{id}」不存在或无法读取。组件当前不显示内容，块内只保留了它自己的设置。",
+    missingTitle: "找不到共享数据「{id}」",
+    missingCause:
+      "它可能已被删除，或还没有同步到这台设备。组件自己的设置仍保留在页面中。",
+    chooseOther: "选择其他共享数据",
+    unbind: "解除绑定",
+    errorTitle: "共享数据「{name}」暂时无法读取",
+    errorCause: "共享数据和页面都没有被修改，问题解决后重试即可恢复显示。",
     unavailableHere: "此组件的数据来自共享数据「{id}」，在当前位置无法读取。",
     invalidBinding: "共享数据绑定需要检查：{error}",
     conflicts: {
@@ -112,8 +117,14 @@ export default defineMessages("datasets", {
     saving: "Saving",
     unsaved: "Not saved yet",
     saveFailed: "Shared data not saved: {error}",
-    missing:
-      "Shared data “{id}” is missing or can't be read. The component shows nothing; the block keeps only its own settings.",
+    missingTitle: "Shared data “{id}” can't be found",
+    missingCause:
+      "It may have been deleted, or it hasn't synced to this device yet. The component's own settings are still kept on the page.",
+    chooseOther: "Choose other shared data",
+    unbind: "Remove binding",
+    errorTitle: "Shared data “{name}” can't be read right now",
+    errorCause:
+      "Neither the shared data nor the page was changed. Try again once the problem is resolved.",
     unavailableHere:
       "This component's data comes from shared data “{id}”, which can't be read here.",
     invalidBinding: "The shared data binding needs checking: {error}",
