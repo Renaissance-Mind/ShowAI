@@ -704,6 +704,21 @@ function mergeImportWireStates(one, two) {
   return validateInkWireState(state);
 }
 
+/** Hydrate only causal metadata from an authenticated predecessor receipt.
+ * Native updates may have added other stamped strokes while the editor still
+ * carries this predecessor's raw placement hashes. Join real observed heads;
+ * never rewrite visible values or invent events to make a baseline pass. */
+export function inkWireHydrateAuthorBaseline(document, confirmedStates) {
+  const result = clone(document);
+  for (const [id, record] of boards(result)) {
+    if (!own(confirmedStates, id) || confirmedStates[id] == null) continue;
+    const state = mergeImportWireStates(bootstrap(record), validateInkWireState(confirmedStates[id]));
+    if (!metadataMatches(record, state)) fail("author baseline differs from its confirmed predecessor");
+    record.board.attrs.inkState = state;
+  }
+  return result;
+}
+
 /** Return the latest editor-visible author branch using exact committed source
  * operations. Causal parents may cover unseen native edits, but their stroke
  * registers are never imported into this receipt or attributed to the UI. */

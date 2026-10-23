@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { blankDocument } from "./catalog";
 import { InkOperationJournal } from "./ink-operation-journal";
 import { InkOperationReplica, canonicalInkJSON, inkOperationDigest } from "../surface/ink-operations.mjs";
-import { inkCheckpointFromDocument, inkWireAuthorReceipt, inkWireEditPlans, inkWireImportCheckpoints, inkWireDocumentFromCheckpoint, stampInkDocument } from "../surface/ink-wire.mjs";
+import { inkCheckpointFromDocument, inkWireHydrateAuthorBaseline, inkWireAuthorReceipt, inkWireEditPlans, inkWireImportCheckpoints, inkWireDocumentFromCheckpoint, stampInkDocument } from "../surface/ink-wire.mjs";
 import { createResource } from "../surface/containers.mjs";
 import { addNode } from "../surface/editing";
 import { createPortableInk } from "../surface/portable-ink.mjs";
@@ -102,4 +102,39 @@ it("imports a field not covered by the author branch even when its dot is inheri
   const projected=inkWireDocumentFromCheckpoint(raw,scope.boardId,journal.read(scope).checkpoint!);
   expect(projected.content.content![0].attrs!.color).toBe("#ff0000");
   expect(inkWireEditPlans(receipt,projected)).toEqual([]);
+});
+
+it("hydrates an acknowledged placement predecessor after a separately stamped native stroke, without rewriting source",async()=>{
+  const base=source(),scope=scopeOf(base),journal=await open();journal.importCheckpoint(scope,inkCheckpointFromDocument(base,scope.boardId));
+  const raw=structuredClone(base);
+  raw.content.content!.push({type:"drawing",attrs:{id:"rectangle",tool:"rectangle",color:"#111111",strokeWidth:2,points:[{x:0,y:0},{x:80,y:60}]}});
+  raw.layout!.rectangle={x:120,y:80,width:80,height:60};
+  const plan=inkWireEditPlans(base,raw)[0],op=journal.appendLocal({pageId:base.id,...plan});
+  const receipt=inkWireAuthorReceipt(base,raw,[op],journal.read(scope).checkpoint!);
+  journal.appendLocal({...scope,parents:journal.read(scope).checkpoint!.frontier,changes:[{kind:"create",strokeId:"native-next",node:node("native-next"),layout:{...frame,x:500},placement:{parentId:scope.boardId,after:"rectangle",before:null}}]});
+  const mixed=inkWireDocumentFromCheckpoint(raw,scope.boardId,journal.read(scope).checkpoint!);
+  mixed.content.attrs!.inkState.strokes.base.fields.placement=structuredClone(base.content.attrs!.inkState.strokes.base.fields.placement);
+  const before=structuredClone(mixed);
+  expect(()=>inkWireEditPlans(mixed,mixed)).toThrow("unstamped");
+  const restored=inkWireHydrateAuthorBaseline(mixed,{[scope.boardId]:receipt.content.attrs!.inkState});
+  expect(mixed).toEqual(before);
+  expect(restored.layout).toEqual(mixed.layout);
+  expect(restored.content.content).toEqual(mixed.content.content);
+  expect(inkWireEditPlans(restored,restored)).toEqual([]);
+  expect(restored.content.attrs!.inkState.strokes["native-next"]).toEqual(mixed.content.attrs!.inkState.strokes["native-next"]);
+  const shapeOnly=structuredClone(mixed);shapeOnly.content.content!.find(value=>value.attrs!.id==="rectangle")!.attrs!.color="#ff0000";
+  expect(inkWireEditPlans(restored,shapeOnly)).toEqual([]);
+  const carried=inkWireAuthorReceipt(restored,shapeOnly,[],journal.read(scope).checkpoint!);
+  expect(inkWireEditPlans(carried,carried)).toEqual([]);
+});
+it("rejects a predecessor receipt that cannot account for an unstamped visible edit",()=>{
+  const base=source(),changed=structuredClone(base);changed.content.content![0].attrs!.color="#ff0000";
+  const before=structuredClone(changed);
+  expect(()=>inkWireHydrateAuthorBaseline(changed,{[base.content.attrs!.id as string]:base.content.attrs!.inkState})).toThrow("confirmed predecessor");
+  expect(changed).toEqual(before);
+});
+
+it("leaves Boards with no stamped predecessor state unchanged",()=>{
+  const base=source();
+  expect(inkWireHydrateAuthorBaseline(base,{[base.content.attrs!.id as string]:null})).toEqual(base);
 });
