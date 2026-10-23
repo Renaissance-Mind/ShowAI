@@ -764,8 +764,8 @@ export default function PageSurface({
     navigationFrames.current.first = requestAnimationFrame(
       () =>
         (navigationFrames.current.second = requestAnimationFrame(() => {
-          if (single && ids?.[0]) controls.current.focus(ids[0], immediate);
-          else controls.current.fit(ids, immediate);
+          if (single && ids?.[0]) controls.current.focus(ids[0], immediate || !!nativeScene);
+          else controls.current.fit(ids, immediate || !!nativeScene);
         })),
     );
   };
@@ -2196,7 +2196,7 @@ export default function PageSurface({
                     type="button"
                     onClick={() => duplicateSelection(selectedIds)}
                     aria-label={t("board.duplicateSelected")}
-                    title={t("board.duplicateSelectedTitle")}
+                    title={mobile ? t("board.duplicateSelected") : t("board.duplicateSelectedTitle")}
                   >
                     {t("board.duplicate")}
                   </button>
@@ -2204,7 +2204,7 @@ export default function PageSurface({
                     type="button"
                     onClick={() => reorder(selectedIds, "front")}
                     aria-label={t("order.front")}
-                    title={t("tool.withShortcut", {
+                    title={mobile ? t("order.front") : t("tool.withShortcut", {
                       label: t("order.front"),
                       key: "⇧]",
                     })}
@@ -2215,7 +2215,7 @@ export default function PageSurface({
                     type="button"
                     onClick={() => reorder(selectedIds, "back")}
                     aria-label={t("order.back")}
-                    title={t("tool.withShortcut", {
+                    title={mobile ? t("order.back") : t("tool.withShortcut", {
                       label: t("order.back"),
                       key: "⇧[",
                     })}
@@ -2236,7 +2236,7 @@ export default function PageSurface({
                             type="button"
                             key={mode}
                             aria-label={label}
-                            title={t("tool.withShortcut", {
+                            title={mobile ? label : t("tool.withShortcut", {
                               label,
                               key: shortcut,
                             })}
@@ -2281,7 +2281,7 @@ export default function PageSurface({
                     <button
                       type="button"
                       aria-label={t("region.ungroup")}
-                      title={t("tool.withShortcut", {
+                      title={mobile ? t("region.ungroup") : t("tool.withShortcut", {
                         label: t("region.ungroup"),
                         key: "⇧⌘G",
                       })}
@@ -2294,7 +2294,7 @@ export default function PageSurface({
                     type="button"
                     aria-label={allLocked ? t("lock.unlock") : t("lock.lock")}
                     aria-pressed={allLocked}
-                    title={t("tool.withShortcut", {
+                    title={mobile ? (allLocked ? t("lock.unlock") : t("lock.lock")) : t("tool.withShortcut", {
                       label: allLocked ? t("lock.unlock") : t("lock.lock"),
                       key: "⇧⌘L",
                     })}
@@ -2313,7 +2313,7 @@ export default function PageSurface({
                       board.select(null);
                     }}
                     aria-label={tc("delete")}
-                    title={t("tool.withShortcut", {
+                    title={mobile ? tc("delete") : t("tool.withShortcut", {
                       label: tc("delete"),
                       key: "Delete",
                     })}
@@ -2402,7 +2402,7 @@ export default function PageSurface({
                     type="button"
                     aria-label={t("board.fit")}
                     disabled={locked}
-                    title={t("board.fitTitle")}
+                    title={mobile ? t("board.fit") : t("board.fitTitle")}
                     onClick={() => focusAfterMount()}
                   >
                     <Maximize2 size={15} />
@@ -2410,7 +2410,7 @@ export default function PageSurface({
                   <button
                     type="button"
                     aria-label={t("board.locate")}
-                    title={t("board.locateTitle")}
+                    title={mobile ? t("board.locate") : t("board.locateTitle")}
                     disabled={locked || !selectedIds.length}
                     onClick={focusSelection}
                   >
@@ -2589,13 +2589,14 @@ function ZoomControls({
   locked: boolean;
 }) {
   const scale = useViewportScale(store);
+  const mobile = typeof document !== "undefined" && document.documentElement.dataset.native === "ios";
   const t = useTranslator(messages);
   return (
     <>
       <button
         type="button"
         aria-label={t("board.zoomOut")}
-        title={t("tool.withShortcut", { label: t("board.zoomOut"), key: "-" })}
+        title={mobile ? t("board.zoomOut") : t("tool.withShortcut", { label: t("board.zoomOut"), key: "-" })}
         disabled={locked || scale <= MIN_ZOOM}
         onClick={() => controls.current.zoom(scale / 1.2)}
       >
@@ -2605,7 +2606,7 @@ function ZoomControls({
         type="button"
         className="surface-zoom"
         aria-label={t("board.resetZoom")}
-        title={t("board.resetZoomTitle")}
+        title={mobile ? t("board.resetZoom") : t("board.resetZoomTitle")}
         disabled={locked}
         onClick={() => controls.current.zoom(1)}
       >
@@ -2614,7 +2615,7 @@ function ZoomControls({
       <button
         type="button"
         aria-label={t("board.zoomIn")}
-        title={t("tool.withShortcut", { label: t("board.zoomIn"), key: "+" })}
+        title={mobile ? t("board.zoomIn") : t("tool.withShortcut", { label: t("board.zoomIn"), key: "+" })}
         disabled={locked || scale >= MAX_ZOOM}
         onClick={() => controls.current.zoom(scale * 1.2)}
       >

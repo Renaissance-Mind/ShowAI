@@ -85,7 +85,7 @@ export function BoardTools({
               key={key}
               aria-label={t(label)}
               aria-keyshortcuts={boardToolKeys(value).join(" ")}
-              title={t("tool.withShortcut", {
+              title={mobile ? t(label) : t("tool.withShortcut", {
                 label: t(label),
                 key: boardToolShortcut(value),
               })}

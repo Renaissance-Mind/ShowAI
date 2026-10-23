@@ -1432,7 +1432,10 @@ export default function Studio() {
         window.setTimeout(flash, 160);
         return;
       }
-      found[0]?.scrollIntoView({ block: "center" });
+      // Board reveal already moves its camera. DOM scrolling would move the
+      // native overlay independently of that camera and can blank the canvas.
+      if (!found[0]?.closest(".page-surface"))
+        found[0]?.scrollIntoView({ block: "center" });
       for (const element of found) {
         const rect = element.getBoundingClientRect();
         const box = document.createElement("div");
