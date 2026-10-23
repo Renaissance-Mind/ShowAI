@@ -143,6 +143,12 @@ if (process.isMainFrame) {
     diagnostics() {
       return ipcRenderer.invoke("showai:diagnostics");
     },
+    logTail(lines?: number) {
+      return ipcRenderer.invoke("logs:tail", lines);
+    },
+    exportDiagnostics(text: string) {
+      return ipcRenderer.invoke("showai:export-diagnostics", { text });
+    },
     onRefreshPage(listener) {
       const receive = () => listener();
       ipcRenderer.on("showai:refresh-page", receive);

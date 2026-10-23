@@ -33,7 +33,13 @@ import {
 import { readFileSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import { homedir } from "node:os";
-import { captureConsole, createMainLog, redactLogText } from "./main-log";
+import {
+  captureConsole,
+  createMainLog,
+  readLogTail,
+  redactLogText,
+} from "./main-log";
+import { redact } from "../core/redact";
 import { atomicRename } from "../core/atomic-rename";
 import { dirname, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -1562,6 +1568,43 @@ else {
         trustedSender(event);
         return diagnostics();
       });
+      ipcMain.handle("logs:tail", (event, lines: unknown) => {
+        trustedSender(event);
+        const count =
+          typeof lines === "number" && Number.isInteger(lines)
+            ? Math.min(Math.max(lines, 1), 1000)
+            : 200;
+        return readLogTail(mainLog.directory, count, homedir());
+      });
+      ipcMain.handle(
+        "showai:export-diagnostics",
+        async (event, payload: unknown) => {
+          const window = trustedSender(event);
+          const text = (payload as { text?: unknown } | null)?.text;
+          if (typeof text !== "string" || text.length > 4 * 1024 * 1024)
+            throw new CoreError(
+              "INVALID_DATA",
+              "Diagnostics must be text of at most 4 MB.",
+            );
+          const stamp = new Date().toISOString().slice(0, 10);
+          const selection = await dialog.showSaveDialog(window, {
+            title: t("diagnostics.exportTitle"),
+            defaultPath: join(
+              app.getPath("downloads"),
+              `showai-diagnostics-${stamp}.txt`,
+            ),
+            filters: [{ name: t("diagnostics.exportFilter"), extensions: ["txt"] }],
+          });
+          if (selection.canceled || !selection.filePath) return null;
+          // The renderer already redacted it; the main process knows the home directory.
+          await writeFile(
+            selection.filePath,
+            redact(text, { home: homedir(), library: store.root }),
+            { encoding: "utf8", mode: 0o600 },
+          );
+          return { path: redactLogText(selection.filePath, homedir()) };
+        },
+      );
       const rendererReports = new Map<number, { minute: number; count: number }>();
       ipcMain.on("showai:renderer-error", (event, payload: unknown) => {
         let window: BrowserWindow;

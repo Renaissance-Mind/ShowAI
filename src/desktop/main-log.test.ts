@@ -2,7 +2,12 @@ import { mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { captureConsole, createMainLog, redactLogText } from "./main-log";
+import {
+  captureConsole,
+  createMainLog,
+  readLogTail,
+  redactLogText,
+} from "./main-log";
 
 const directories: string[] = [];
 async function directory() {
@@ -24,7 +29,7 @@ describe("main log", () => {
         "/Users/someone",
       ),
     ).toBe(
-      "open ~/.showai failed; Authorization: [redacted] [redacted] token=[redacted] https://x/cb?code=[redacted]&flow=a sk-[redacted]",
+      "open ~/.showai failed; Authorization: Bearer [redacted] token=[redacted] https://x/cb?code=[redacted]&flow=a [redacted]",
     );
     expect(redactLogText("code: 'ENOENT'", "/Users/someone")).toBe(
       "code: 'ENOENT'",
@@ -91,5 +96,20 @@ describe("main log", () => {
     expect(console.error).not.toBe(error);
     const contents = await readFile(log.path, "utf8");
     expect(contents).toContain("[error] [main] ShowAI file watcher: Error: boom");
+  });
+
+  it("reads the last lines across a rotation, redacted", async () => {
+    const root = await directory();
+    const logs = join(root, "logs");
+    expect(await readLogTail(logs, 5, root)).toBe("");
+    const log = createMainLog({ directory: logs, home: root, maxBytes: 300 });
+    for (let index = 0; index < 8; index++)
+      log.write("info", "main", `line ${index} ${root}/x`);
+    const tail = await readLogTail(logs, 5, root);
+    const lines = tail.split("\n");
+    expect(lines).toHaveLength(5);
+    expect(lines.at(-1)).toContain("line 7 ~/x");
+    expect(lines[0]).toContain("line 3 ");
+    expect(tail).not.toContain(root);
   });
 });

@@ -129,6 +129,10 @@ export interface ShowAIBridge {
   openLogFolder?(): Promise<void>;
   /** Plain-text diagnostics (versions, platform, library, log path), redacted. */
   diagnostics?(): Promise<string>;
+  /** The last lines of the main-process log, redacted. */
+  logTail?(lines?: number): Promise<string>;
+  /** Saves redacted diagnostics where the person chooses; null when cancelled. */
+  exportDiagnostics?(text: string): Promise<{ path: string } | null>;
   onBeforeClose(listener: () => Promise<CloseResult>): () => void;
   onBeforeReload?(listener: () => Promise<boolean>): () => void;
   prepareReload?(): Promise<boolean>;

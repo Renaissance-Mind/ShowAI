@@ -63,4 +63,15 @@ describe("redact", () => {
     const text = "Another library operation is still running.";
     expect(redact(text)).toBe(text);
   });
+
+  it("masks secret query parameters and authorization values", () => {
+    expect(redact("https://x/cb?code=123456&flow=a&key=abc")).toBe(
+      "https://x/cb?code=[redacted]&flow=a&key=[redacted]",
+    );
+    expect(redact("authorization=abcdef123")).toBe("authorization=[redacted]");
+    expect(redact("Authorization: Bearer abcdef123456")).toBe(
+      "Authorization: Bearer [redacted]",
+    );
+    expect(redact("code: 'ENOENT'")).toBe("code: 'ENOENT'");
+  });
 });

@@ -31,6 +31,8 @@ export interface DesktopBridge {
   logPath?(): Promise<string>;
   openLogFolder?(): Promise<void>;
   diagnostics?(): Promise<string>;
+  logTail?(lines?: number): Promise<string>;
+  exportDiagnostics?(text: string): Promise<{ path: string } | null>;
   onBeforeClose(listener: () => Promise<CloseResult>): () => void;
   onBeforeReload?(listener: () => Promise<boolean>): () => void;
   setDirty?(dirty: boolean): void;

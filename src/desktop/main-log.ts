@@ -5,9 +5,11 @@ import {
   rmSync,
   statSync,
 } from "node:fs";
+import { readFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { formatWithOptions } from "node:util";
+import { redact } from "../core/redact";
 
 /** The main-process log users can attach to a problem report. */
 export const MAIN_LOG_NAME = "showai-main.log";
@@ -18,22 +20,11 @@ const LINE_LIMIT = 16 * 1024;
 export type LogLevel = "error" | "warn" | "info";
 
 /**
- * Local, dependency-free redaction for log lines: the home directory becomes
- * `~` and obvious credentials are masked. Kept here until a shared redaction
- * helper exists for both the log and the feedback report.
+ * Log lines use the shared redaction of problem reports: the home directory
+ * becomes `~` and credentials are masked.
  */
 export function redactLogText(text: string, home = homedir()): string {
-  let result = text;
-  if (home && home.length > 1)
-    result = result.split(home).join("~");
-  return result
-    .replace(/\b(Bearer|Basic)\s+[\w.~+/=-]{8,}/gi, "$1 [redacted]")
-    .replace(/([?&](?:token|code|key|secret)=)[^\s"'&#]+/gi, "$1[redacted]")
-    .replace(
-      /\b(token|password|secret|authorization|apikey|api_key|access_token|refresh_token)(["']?\s*[=:]\s*["']?)[^\s"'&,;]{4,}/gi,
-      "$1$2[redacted]",
-    )
-    .replace(/\bsk-[A-Za-z0-9_-]{12,}/g, "sk-[redacted]");
+  return redact(text, { home });
 }
 
 export interface MainLog {
@@ -114,4 +105,31 @@ export function captureConsole(log: MainLog, source = "main"): () => void {
     console.error = original.error;
     console.warn = original.warn;
   };
+}
+
+async function readOptional(path: string) {
+  return readFile(path, "utf8").catch((error: NodeJS.ErrnoException) => {
+    if (error.code === "ENOENT") return "";
+    throw error;
+  });
+}
+
+/**
+ * The last `count` lines of the log, continuing into the previous rotated
+ * file when the current one is short. Lines were redacted when written and
+ * are redacted again for the report.
+ */
+export async function readLogTail(
+  directory: string,
+  count = 200,
+  home = homedir(),
+): Promise<string> {
+  const lines = (text: string) => text.split("\n").filter(Boolean);
+  let tail = lines(await readOptional(join(directory, MAIN_LOG_NAME)));
+  if (tail.length < count)
+    tail = [
+      ...lines(await readOptional(join(directory, "showai-main.1.log"))),
+      ...tail,
+    ];
+  return redactLogText(tail.slice(-count).join("\n"), home);
 }

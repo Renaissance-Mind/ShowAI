@@ -47,9 +47,14 @@ const SECRET_PATTERNS: [RegExp, string][] = [
   [/\b(?:AKIA|ASIA)[0-9A-Z]{16}\b/g, REDACTED],
   // JSON Web Tokens.
   [/\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}/g, REDACTED],
+  // Secret URL query parameters, e.g. an OAuth callback ?code=….
+  [
+    /([?&](?:token|code|key|secret|access_token|refresh_token|api_key|apikey|signature|sig)=)[^\s"'&#]+/gi,
+    `$1${REDACTED}`,
+  ],
   // key=value / "key": "value" pairs whose name says they are secret.
   [
-    /\b((?:api[_-]?key|access[_-]?token|refresh[_-]?token|token|secret|password|passwd|client[_-]?secret)["']?\s*[:=]\s*["']?)[^\s"'&,;}]{4,}/gi,
+    /\b((?:api[_-]?key|apikey|access[_-]?token|refresh[_-]?token|token|secret|password|passwd|client[_-]?secret|authorization)["']?\s*[:=]\s*["']?)(?!(?:Bearer|Basic)\s|\[redacted\])[^\s"'&,;}]{4,}/gi,
     `$1${REDACTED}`,
   ],
 ];
