@@ -143,6 +143,31 @@ extern "C" uint32_t checked_stroke_contract() {
       showai_private_stroke_plan_counts(state, &actual) != SA_INK_INVALID ||
       showai_private_stroke_plan_destroy(state) != SA_INK_INVALID)
     return 22;
+  for (uint32_t fixture = 0; fixture < 3; ++fixture) {
+    auto input = source;
+    if (fixture == 1) input.radius[1] = .25;
+    if (fixture == 2) {
+      input = {}; input.radius[0] = input.radius[1] = 2;
+    }
+    SAInkStrokeResult baseline{}, cached{};
+    if (sa_stroke_path_build(&input, 1, &options, expected, 16384, &baseline))
+      return 23;
+    reset_walk_work();
+    if (showai_private_stroke_prepare_scratch(&input, 1, &options,
+                                             commands, 16384, &cached) ||
+        !same(&cached, &baseline, sizeof baseline) ||
+        !same(expected, commands, baseline.commands * sizeof(*commands)) ||
+        walk_work().counts != 0 || walk_work().emissions != 1)
+      return 24;
+    cached = sentinel;
+    if (showai_private_stroke_prepare_scratch(&input, 1, &options, commands,
+                       baseline.commands - 1, &cached) != SA_INK_CAPACITY ||
+        !same(&cached, &sentinel, sizeof sentinel))
+      return 25;
+    if (showai_private_stroke_prepare_scratch(&input, 1, &options,
+                       (SAInkPathCommand *)&input, 1, &cached) != SA_INK_INVALID)
+      return 26;
+  }
 #endif
   return 0;
 }

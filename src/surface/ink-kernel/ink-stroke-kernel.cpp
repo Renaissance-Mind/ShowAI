@@ -1261,6 +1261,25 @@ bool valid_stroke_plan(const void *p) {
 }
 } // namespace
 extern "C" {
+SAInkStatus showai_private_stroke_prepare_scratch(
+    const SAInkStrokeSegment *source, uint32_t count,
+    const SAInkStrokeOptions *options, SAInkPathCommand *scratch,
+    uint32_t capacity, SAInkStrokeResult *out) {
+  const uint64_t bytes = uint64_t(capacity) * sizeof(*scratch);
+  if (!span(out, sizeof(*out)) || !aligned(out) ||
+      !span(scratch, bytes) || !aligned(scratch) ||
+      overlap(scratch, bytes, source, uint64_t(count) * sizeof(*source)) ||
+      overlap(scratch, bytes, options, sizeof(*options)) ||
+      overlap(scratch, bytes, out, sizeof(*out)) ||
+      overlap(out, sizeof(*out), source, uint64_t(count) * sizeof(*source)) ||
+      overlap(out, sizeof(*out), options, sizeof(*options)))
+    return SA_INK_INVALID;
+  SAInkStrokeResult actual{};
+  const auto status = prepare(source, count, options, scratch, actual, capacity);
+  if (status == SA_INK_OK)
+    *out = actual;
+  return status;
+}
 uint32_t showai_private_stroke_plan_bytes() { return sizeof(NativeStrokePlan); }
 SAInkStatus showai_private_stroke_plan_initialize(void *p, uint32_t bytes,
                                                   const SAInkStrokeSegment *s,

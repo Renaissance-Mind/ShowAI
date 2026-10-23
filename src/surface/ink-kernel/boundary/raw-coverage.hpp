@@ -154,13 +154,32 @@ inline bool finite_fields(BoundaryCoverageVertex v[3],uint32_t kind,const RawCov
  }
  return false;
 }
+inline bool position_cast_error(const double*positions,uint32_t count,double ox,double oy,double&error){
+ error=0;for(uint32_t i=0;i<count;i++){
+  float x=float(positions[2*i]-ox),y=float(positions[2*i+1]-oy);if(!finite_double(x)||!finite_double(y))return false;
+  error=max(error,sum(difference_error(positions[2*i],ox,x),difference_error(positions[2*i+1],oy,y)));
+ }return true;
+}
+/* Keep the original representation whenever its actual cast meets the physical
+ * budget. A long fan may need a nearer binary64 origin even though its source
+ * is valid. Preflight and emission select the same origin for each triangle;
+ * rebasing changes no authoritative command, KLM value or geometric budget. */
+inline bool position_origin(const double*positions,const RawCoverageOptions&o,double&ox,double&oy,double&error){
+ if(!position_cast_error(positions,3,ox,oy,error))return false;
+ if(mul(o.maximum_forward_norm,error)<=o.maximum_geometry_error_pixels)return true;
+ double low[2]={positions[0],positions[1]},high[2]={positions[0],positions[1]};
+ for(uint32_t i=1;i<3;i++)for(uint32_t axis=0;axis<2;axis++){double v=positions[i*2+axis];if(v<low[axis])low[axis]=v;if(v>high[axis])high[axis]=v;}
+ double x=low[0]*.5+high[0]*.5,y=low[1]*.5+high[1]*.5,candidate=0;
+ if(position_cast_error(positions,3,x,y,candidate)&&candidate<error){ox=x;oy=y;error=candidate;}
+ return true;
+}
 inline bool emit(PolynomialContext&c,RawCoverageMesh&out,const double*positions,BoundaryCoverageVertex v[3],int winding,
  double ox,double oy,uint32_t command,uint32_t kind,const RawCoverageOptions&o,BoundaryKLMReason&reason){
  if(out.mesh.vertices.size()>o.maximum_vertices-3||out.mesh.draws.size()>=o.maximum_draws){reason=boundary_klm_capacity;return false;}
- double error=0;for(uint32_t i=0;i<3;i++){
+ double error=0;if(!position_origin(positions,o,ox,oy,error)){reason=boundary_klm_invalid;return false;}
+ for(uint32_t i=0;i<3;i++){
   v[i].x=float(positions[2*i]-ox);v[i].y=float(positions[2*i+1]-oy);
   if(!finite_double(v[i].x)||!finite_double(v[i].y)||!finite_double(v[i].k)||!finite_double(v[i].l)||!finite_double(v[i].m)){reason=boundary_klm_invalid;return false;}
-  error=max(error,sum(difference_error(positions[2*i],ox,v[i].x),difference_error(positions[2*i+1],oy,v[i].y)));
  }
  auto&cert=out.certificate;cert.actual_position_error_source=max(cert.actual_position_error_source,error);
  if(mul(o.maximum_forward_norm,sum(error,cert.actual_regularization_error_source))>o.maximum_geometry_error_pixels){reason=boundary_klm_error_budget;return false;}
@@ -213,7 +232,7 @@ inline bool chord(PolynomialContext&c,const SAInkPathCommand&command,const Comma
  * polyline interval cannot consume headroom needed by a later original fan.
  * This is the same position-cast calculation as emit, not a larger tolerance. */
 inline bool original_cast_error(const Vector<SAAnalyticPatch>&patches,const Vector<Command>&metadata,
- const SAInkPathCommand*commands,double&error){
+ const SAInkPathCommand*commands,const RawCoverageOptions&o,double&error){
  error=0;
  for(const auto&p:patches){
   if(p.mode==SA_ANALYTIC_RAY)continue;const auto&meta=metadata[p.command_index];
@@ -222,9 +241,10 @@ inline bool original_cast_error(const Vector<SAAnalyticPatch>&patches,const Vect
   else if(p.mode==SA_ANALYTIC_QUADRATIC){count=3;positions[0]=meta.start[0];positions[1]=meta.start[1];for(uint32_t j=0;j<4;j++)positions[j+2]=commands[p.command_index].values[j];}
   else if(p.mode==SA_ANALYTIC_CUBIC){uint32_t indices[4]{};count=hull(p.controls,indices);if(count<3)return false;for(uint32_t j=0;j<count;j++){positions[j*2]=p.controls[indices[j]*2];positions[j*2+1]=p.controls[indices[j]*2+1];}}
   else return false;
-  for(uint32_t j=0;j<count;j++){
-   float x=float(positions[j*2]-meta.origin[0]),y=float(positions[j*2+1]-meta.origin[1]);if(!finite_double(x)||!finite_double(y))return false;
-   error=max(error,sum(difference_error(positions[j*2],meta.origin[0],x),difference_error(positions[j*2+1],meta.origin[1],y)));
+  for(uint32_t j=1;j+1<count;j++){
+   double triangle[6]={positions[0],positions[1],positions[j*2],positions[j*2+1],positions[(j+1)*2],positions[(j+1)*2+1]};
+   double ox=meta.origin[0],oy=meta.origin[1],cast=0;if(!position_origin(triangle,o,ox,oy,cast))return false;
+   error=max(error,cast);
   }
  }
  return true;
@@ -321,7 +341,7 @@ inline uint32_t build_raw_coverage_mesh(PolynomialContext&c,const SAInkPathComma
  for(uint32_t i=0;i<count;i++){auto&meta=metadata[i];for(uint32_t axis=0;axis<2;axis++){meta.start[axis]=current[axis];if(commands[i].operation==0)origin[axis]=commands[i].values[axis];meta.origin[axis]=origin[axis];if(commands[i].operation<4)current[axis]=commands[i].values[2*commands[i].operation+axis-(commands[i].operation?2:0)];else current[axis]=origin[axis];}}
  RawCoverageMesh staged(ctx);staged.source_generation=generation;bool hasBounds=false;
  for(uint32_t i=0;i<count;i++)if(commands[i].operation<4){uint32_t points=commands[i].operation?commands[i].operation:1;for(uint32_t j=0;j<points;j++){double x=commands[i].values[2*j],y=commands[i].values[2*j+1];auto&b=staged.source_control_bounds;if(!hasBounds){b[0]=b[2]=x;b[1]=b[3]=y;hasBounds=true;}else{if(x<b[0])b[0]=x;if(y<b[1])b[1]=y;if(x>b[2])b[2]=x;if(y>b[3])b[3]=y;}}}
- double originalCast=0;if(counts.ray_patches&&!original_cast_error(patches,metadata,commands,originalCast)){reason=boundary_klm_invalid;return SA_INK_INVALID;}
+ double originalCast=0;if(counts.ray_patches&&!original_cast_error(patches,metadata,commands,o,originalCast)){reason=boundary_klm_invalid;return SA_INK_INVALID;}
  auto&cert=staged.certificate;cert.maximum_forward_norm=o.maximum_forward_norm;cert.maximum_inverse_norm=o.maximum_inverse_norm;cert.maximum_geometry_error_pixels=o.maximum_geometry_error_pixels;
  for(const auto&p:patches){if(!ctx.step())return ctx.status;if(p.command_index>=count){reason=boundary_klm_invalid;return SA_INK_INVALID;}const auto&meta=metadata[p.command_index];
   if(p.mode==SA_ANALYTIC_RAY){double error=0;if(!chord(c,commands[p.command_index],meta,p,error)){reason=boundary_klm_ray;return ctx.status?ctx.status:SA_INK_RANGE;}

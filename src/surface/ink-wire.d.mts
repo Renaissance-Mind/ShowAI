@@ -34,6 +34,7 @@ export function inkWireResolutionCandidates(document: ShowDocument): {boardId: s
 export function inkWireResolutionPlan(document: ShowDocument, choices: InkWireChoice[]): {boardId: string; changes: InkOperationChange[]};
 export function inkWireEditPlans(baseline: ShowDocument, next: ShowDocument): {boardId: string; parents: string[]; changes: InkOperationChange[]}[];
 export function inkWireImportCheckpoints(baseline: ShowDocument, next: ShowDocument): {boardId: string; checkpoint: InkOperationCheckpoint}[];
+export function inkWireHydrateAuthorBaseline(document:ShowDocument,confirmedStates:Record<string,InkWireState|null>):ShowDocument;
 export function inkWireAuthorReceipt(authorBaseline: ShowDocument, rawDraft: ShowDocument, actualOperations: InkOperation[], actualJournalCheckpoint: InkOperationCheckpoint): ShowDocument;
 
 export interface InkWireDelta {
