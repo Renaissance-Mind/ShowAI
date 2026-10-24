@@ -107,3 +107,17 @@ it('replaces approximate imported levels with actual descriptor levels without a
  const prepared=retained.prepareImport(actual);retained.commit(prepared.token);
  expect(retained.sparseCheckpoint([]).level).toBe(2);parity(document,boardId,retained,['old']);
 });
+
+it('keeps authored reading order independent of paint placement through projection and deletion',()=>{
+ const {document,boardId,replica}=begin();
+ document.surfaceViews![boardId].readingOrder=['other','old'];
+ const newNode=node('front');
+ append(replica,'ipad',[{kind:'create',strokeId:'front',node:newNode,layout:frame,placement:{parentId:boardId,after:null,before:'old'}}]);
+ const projected=inkWireDocumentFromCheckpoint(document,boardId,replica.checkpoint());
+ expect(projected.content.content!.map(n=>n.attrs!.id)).toEqual(['other','front','old']);
+ expect(projected.surfaceViews![boardId].readingOrder).toEqual(['other','old','front']);
+ append(replica,'ipad',[{kind:'delete',strokeId:'old'},{kind:'delete',strokeId:'other'},{kind:'delete',strokeId:'front'}]);
+ const deleted=inkWireDocumentFromCheckpoint(projected,boardId,replica.checkpoint());
+ expect(deleted.content.content).toEqual([]);
+ expect(deleted.surfaceViews![boardId].readingOrder).toEqual([]);
+});
