@@ -435,7 +435,14 @@ export function finishInkPageMerge(document, prepared) {
         parent.content = [...existing, ...ink.map(stroke => stroke.node)];
       }
       else parent.content = ordered.map(id => byId.get(id));
-      if (parent.type === "surface" && result.surfaceViews?.[parent.attrs.id]) result.surfaceViews[parent.attrs.id].readingOrder = parent.content.map(node => node.attrs.id);
+    }
+    // Reading order is authored independently of paint order. Reconcile the
+    // membership even when the final ink stroke was deleted; projection must
+    // never invent a semantic reorder while updating ink state.
+    const view = result.surfaceViews?.[board.attrs.id];
+    if (view) {
+      const ids = (board.content ?? []).map(node => node.attrs.id), valid = new Set(ids), seen = new Set();
+      view.readingOrder = [...(view.readingOrder ?? []), ...ids].filter(id => valid.has(id) && !seen.has(id) && seen.add(id));
     }
   }
   return { document: result, conflicts };
