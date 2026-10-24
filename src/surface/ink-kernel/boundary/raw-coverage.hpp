@@ -1,6 +1,7 @@
 #ifndef SHOWAI_RAW_COVERAGE_HPP
 #define SHOWAI_RAW_COVERAGE_HPP
 #include "coverage-mesh.hpp"
+#include "mesh-pages.hpp"
 #include "../analytic-path-checked.hpp"
 namespace showai_boundary {
 /* Factory-local const input/options/count binding. No source or caller count
@@ -39,8 +40,13 @@ struct RawCoverageCertificate {
     uint64_t absolute_contribution_bound=0; // actual emitted triangle count, NOT winding
     uint32_t regularized_rays=0,degenerate_triangles=0;
 };
+struct RawCoverageStorage {
+    double common_origin[2]{};MeshPages<BoundaryCoverageVertex>vertices;MeshPages<BoundaryCoverageDraw>draws;
+    uint32_t source_edges=0;uint64_t vertex_bytes=0;
+    explicit RawCoverageStorage(Context&c):vertices(c),draws(c){}
+};
 struct RawCoverageMesh {
-    BoundaryCoverageMesh mesh; RawCoverageCertificate certificate{};
+    RawCoverageStorage mesh; RawCoverageCertificate certificate{};
     uint64_t source_generation=0;
     uint32_t regularized_curves=0; // regular analytic intervals proved flat, never labelled RAY
     uint32_t regularization_segments=0; // bounded exact source-restricted chord leaves
@@ -411,7 +417,10 @@ inline uint32_t build_raw_coverage_mesh(PolynomialContext&c,const SAInkPathComma
  auto stream=[&](auto&&consume)->uint32_t{
   for(uint32_t first=0;first<count;){
    uint32_t end=first+1;
-   while(end<count){if(end-first>=512&&commands[end].operation==SA_INK_MOVE&&commands[end-1].operation==SA_INK_CLOSE)break;++end;}
+   // Every closed source contour has an independent analytic anchor. Consume
+   // its patches before preparing the next contour; command count alone does
+   // not bound subdivision output near a degenerate cubic.
+   while(end<count){if(commands[end].operation==SA_INK_MOVE&&commands[end-1].operation==SA_INK_CLOSE)break;++end;}
    const RawAnalyticCapture part(commands+first,end-first,identity,&budget);if(part.status())return part.status();
    SAAnalyticCounts required=part.counts();Vector<SAAnalyticPatch>patches(ctx);Vector<SAAnalyticVertex>vertices(ctx);
    patches.resize(required.patches);vertices.resize(required.vertices);if(ctx.status)return ctx.status;

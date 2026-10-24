@@ -60,5 +60,19 @@ int main(int argc,char**argv){require(argc==3||argc==4,"output, actual command d
  require(certificate.maximum_forward_norm==256&&certificate.maximum_geometry_error_pixels==.02&&256*(certificate.actual_position_error_source+certificate.actual_regularization_error_source)<=.02,"long fan original physical precision");
  bool moved=false;for(const auto&draw:rebased.draws)if(draw.origin[0]!=x||draw.origin[1]!=y)moved=true;require(moved,"actual derived triangle origin changed");
  tape.event(100,result);snapshot(tape,101,a,fanReceipt);require(sa_coverage_destroy(a.data())==0,"long fan workspace destroy");
+ // A complete 72,000-vertex source fits the default retained budget by
+ // actual payload size. Contiguous buddy vectors used to round its vertex
+ // buffer alone to four MiB and retain another one MiB of draws.
+ a.arena.resize(8*1024*1024/8);auto compact=limits;compact.retained_bytes=compact.workspace_bytes=4*1024*1024;
+ require(a.init(62,compact)==0,"paged mesh default budget");
+ std::vector<SAInkPathCommand>circles;const double k=.5522847498307936;
+ for(uint32_t i=0;i<2400;i++){double x=(i%50)*4,y=(i/50)*4;
+  SAInkPathCommand contour[]={{0,0,{x+1,y}},{3,0,{x+1,y+k,x+k,y+1,x,y+1}},{3,0,{x-k,y+1,x-1,y+k,x-1,y}},{3,0,{x-1,y-k,x-k,y-1,x,y-1}},{3,0,{x+k,y-1,x+1,y-k,x+1,y}},{4,0,{}}};circles.insert(circles.end(),contour,contour+6);
+ }
+ auto originalCircles=circles;SACoverageReceipt paged{};result=sa_coverage_prepare(a.data(),circles.data(),circles.size(),generation,&paged);
+ require(result==0&&!std::memcmp(circles.data(),originalCircles.data(),circles.size()*56),"large source fits original default budget unchanged");
+ auto complete=capture(a,paged);SACoverageDiagnostics pagedDiagnostics{};require(sa_coverage_diagnostics(a.data(),&pagedDiagnostics)==0,"paged allocation accounting");
+ require(complete.summary.vertices==72000&&complete.summary.draws==24000&&pagedDiagnostics.live_bytes<=compact.retained_bytes&&pagedDiagnostics.peak_bytes<=8*1024*1024,"complete bounded mesh, no discarded geometry");
+ tape.event(110,result);snapshot(tape,111,a,paged);require(sa_coverage_destroy(a.data())==0,"paged mesh workspace destroy");
  std::puts("COVERAGE_PUBLIC_ACTUAL_NATIVE_PARITY_OK contacts=3/9/37");
 }
