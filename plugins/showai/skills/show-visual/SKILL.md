@@ -25,12 +25,14 @@ description: 在对话中直接展示 1–5 个 ShowAI 组件（图表、示意�
 
 `delivery` 默认 auto，跟随插件声明的宿主显示方式；结果里的 `delivery.mode` 是实际采用的方式：
 
-- `mcp-app`：宿主显示附带的组件视图，无需额外操作。
-- `fragment-file`：Codex 在最终回复单独一行写 `visualize{"path":"返回的 delivery.inline"}`；其他读取文件的宿主按自己的显示方式使用这个文件。
+- `mcp-app`：宿主显示附带的组件视图，最终回复只补充必要解释。
+- `fragment-file`：Codex 先读 [宿主显示中的完整引用契约](../use-showai/references/host-display.md#codex-文件引用)，把其中的 path 换成实际返回的 delivery.inline，保留全部专用定界符并单独占一行；其他读取文件的宿主按自己的显示方式使用这个文件。
 - `compact`：把 `delivery.compact` 原样交给宿主中由模型写 HTML 的可视化工具（如 Claude 的 show_widget），按该工具自己的说明调用；片段从公共 CDN 加载阅读器。
 - `image`：结果附带 PNG，用于没有交互显示的宿主。
 
 工具成功不等于已经显示。warnings 说明宿主未声明显示能力或片段超出预算时，按宿主实际能力换一种 delivery 重试；各宿主规则见 [宿主显示](../use-showai/references/host-display.md)。读者在组件视图里调整的控件取值，在接受模型上下文的 MCP Apps 宿主中会以 `showai.readerState` 进入上下文；其他宿主没有这项，以用户的描述为准。展示没有页面身份，组件的“交给对话”和“引用到对话”不可用。
+
+用户看到原样的展示指令或路径时，核对完整引用和宿主契约。已确认组件视图在当前宿主可见、且支持 MCP Apps 时，可以显式用 `delivery:"mcp-app"` 重发，最终回复不再追加文件引用。`display.resourceAttached=true` 只说明工具附带了资源，不能单凭它宣称用户已看到。
 
 `model-html` 宿主的 compact 被改成图片时，仍需要交互就减少数据或组件后重试 compact，或建议存成 Page 后用 page_present 交付完整文件。
 

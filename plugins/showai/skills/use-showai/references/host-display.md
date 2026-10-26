@@ -36,11 +36,17 @@ delivery.inline 优先携带压缩后的本地阅读器与本页组件，多数�
 
 显式 page_export 的 reader:"cdn" 写在线页，reader:"bundled" 强制离线。加载错误可能来自网络、宿主策略或阅读器异常；没有控制台证据时不直接断言来源被拦截，改为交付 delivery.html。安装插件只更新连接与技能，不更新软件运行时，也不能预热对话宿主的浏览器缓存。
 
-Codex当前引用契约（page_present 与 show_component 都使用 delivery.inline）：
+## Codex 文件引用
+
+Codex 本机文件式展示使用下面的完整引用（page_present 与 show_component 都使用 delivery.inline）。仅替换 path 的值，保留 ``、``、`` 专用定界符；实际交付时单独占一行，放在代码块外：
 
 ```text
 visualize{"path":"实际返回的绝对inline文件路径"}
 ```
+
+普通文本 `visualize{"path":"…"}` 不包含完整定界符，会被当作正文。用户看到原样指令时，先核对这一写法；Markdown 符号原样显示还需核对宿主的正文渲染，不能仅据此认定为 ShowAI 组件故障。
+
+已确认当前宿主能显示 MCP Apps 组件视图时，show_component 可以显式使用 `delivery:"mcp-app"`；返回该模式后，最终回复只补充必要解释。资源已附带、文件已生成与用户实际看到是三个不同的状态。
 
 MCP Apps阅读器会把读者在预览里调整的控件（滑块、选项、标签页等）的最新取值作为模型上下文提供，结构为`showai.readerState`，含blockId、控件标签和取值。它只表示用户当前在预览中的探索，未写入页面；用于理解“按这个继续”这类追问。用户要求保留该状态时，再按正常流程读取并保存页面。
 
