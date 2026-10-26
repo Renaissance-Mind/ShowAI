@@ -13,11 +13,5 @@
       "displayName": "ShowAI",
       "description": "Read, save and present ShowAI pages and components in the selected library"
     }
-  },
-  "skillOverrides": {
-    "showai": {
-      "displayName": "ShowAI",
-      "description": "Create ShowAI pages and present them inline in Kimi conversations"
-    }
   }
 }

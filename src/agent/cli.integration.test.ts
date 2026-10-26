@@ -2720,7 +2720,10 @@ test("plugin launcher starts library MCP with explicit host delivery and refuses
     });
     expect(
       JSON.parse(
-        await readFile(join(isolated, "local/agent-runtime-probe.json"), "utf8"),
+        await readFile(
+          join(isolated, "local/agent-runtime-probe.json"),
+          "utf8",
+        ),
       ).info.ok,
     ).toBe(true);
     const capabilities = await call("showai_capabilities");
@@ -2744,9 +2747,9 @@ test("plugin launcher starts library MCP with explicit host delivery and refuses
       }),
     );
     try {
-      expect((await mismatch.listTools()).tools.map((tool) => tool.name)).toEqual(
-        ["showai_connection_problem"],
-      );
+      expect(
+        (await mismatch.listTools()).tools.map((tool) => tool.name),
+      ).toEqual(["showai_connection_problem"]);
       const problem = await mismatch.callTool({
         name: "showai_connection_problem",
         arguments: {},
@@ -2854,17 +2857,37 @@ test("Kimi installed package discovers tools, delivers offline previews and reje
     expect(await readFile(presentation.delivery.html, "utf8")).toContain(
       "Kimi launch verified",
     );
-    await expect(
-      execute(server.command, server.args, {
-        cwd: resolve(plugin, server.cwd ?? "."),
-        env: {
-          ...environment(),
-          SHOWAI_HOME: join(isolated, "other"),
-          SHOWAI_RUNTIME_CONFIG: join(isolated, "agent-runtime.json"),
-        },
-        timeout: 10000,
-      }),
-    ).rejects.toThrow(/library mismatch/);
+    const mismatch = new Client({
+      name: "kimi-mismatched-library",
+      version: "1",
+    });
+    try {
+      await mismatch.connect(
+        new StdioClientTransport({
+          command: server.command,
+          args: server.args,
+          cwd: resolve(plugin, server.cwd ?? "."),
+          env: {
+            ...environment(),
+            SHOWAI_HOME: join(isolated, "other"),
+            SHOWAI_RUNTIME_CONFIG: join(isolated, "agent-runtime.json"),
+          } as Record<string, string>,
+        }),
+      );
+      expect(
+        (await mismatch.listTools()).tools.map((tool) => tool.name),
+      ).toEqual(["showai_connection_problem"]);
+      const problem = await mismatch.callTool({
+        name: "showai_connection_problem",
+        arguments: {},
+      });
+      expect(problem.isError).toBe(true);
+      expect((problem.structuredContent as any).error.code).toBe(
+        "LIBRARY_MISMATCH",
+      );
+    } finally {
+      await mismatch.close();
+    }
   } finally {
     await client.close();
     await rm(isolated, { recursive: true, force: true });

@@ -1,11 +1,13 @@
 {
   "name": "renaissance-mind",
-  "owner": { "name": "Renaissance Mind" },
+  "owner": {
+    "name": "Renaissance Mind"
+  },
   "description": "ShowAI plugins for building interactive pages, components and templates.",
   "plugins": [
     {
       "name": "showai",
-      "source": "./plugins/showai",
+      "source": "./plugins/showai-claude",
       "description": "Build interactive pages and sites with reusable components and templates."
     }
   ]

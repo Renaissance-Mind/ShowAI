@@ -1,12 +1,12 @@
 # ShowAI Agent 插件
 
-**语言：** [English](README.md) | 简体中文 · [文档目录](../../docs/i18n/index.zh-CN.md)
+**语言：** [English](README.md) | 简体中文 · [文档目录](https://github.com/Renaissance-Mind/ShowAI/blob/main/docs/i18n/README.zh-CN.md)
 
 ShowAI 让 Agent 用界面回答——可以交互、可以归档、在使用中不断进化。它由两部分组成：本插件为 Agent 提供 ShowAI 的工具（stdio MCP launcher）和九个 Skill；ShowAI App 保存页面，并提供插件连接的运行时。兼容性以运行时报告的实际能力为准。
 
 ## 安装
 
-**推荐从 ShowAI App 安装。** 从 [GitHub Releases](https://github.com/Renaissance-Mind/ShowAI/releases/latest) 下载并打开 App，在欢迎页或「设置 → 插件」中为 Claude Code 或 Codex 安装插件。先安装 Agent，并确保其命令行工具可用。App 提供插件和运行时，无需源码，也无需单独安装 Node.js。安装后 Claude Code 重启会话，Codex 刷新插件或重启，然后新开对话。连接使用 App 当前的内容库；切换内容库或移动 App 后点「更新并启用」。已有其他来源的 ShowAI 插件时，先在 Agent 中停用原插件，再安装 App 版本。详见[在 Claude Code 与 Codex 中使用](../../docs/i18n/codex.zh-CN.md)。
+**推荐从 ShowAI App 安装。** 从 [GitHub Releases](https://github.com/Renaissance-Mind/ShowAI/releases/latest) 下载并打开 App，在欢迎页或「设置 → 插件」中为 Claude Code 或 Codex 安装插件。先安装 Agent，并确保其命令行工具可用。App 提供插件和运行时，无需源码，也无需单独安装 Node.js。安装后 Claude Code 重启会话，Codex 刷新插件或重启，然后新开对话。连接使用 App 当前的内容库；切换内容库或移动 App 后点「更新并启用」。已有其他来源的 ShowAI 插件时，先在 Agent 中停用原插件，再安装 App 版本。详见[在 Claude Code 与 Codex 中使用](https://github.com/Renaissance-Mind/ShowAI/blob/main/docs/i18n/codex.zh-CN.md)。
 
 ### 从源码安装
 
@@ -23,13 +23,12 @@ npm run plugin:update -- --json
 Claude Code 在仓库根目录执行：
 
 ```sh
-claude plugin marketplace add ./
-claude plugin install showai@renaissance-mind
+npm run plugin:claude -- --json
 ```
 
 ### DeepSeek Harness
 
-DeepSeek Harness 由自己安装插件，因此 ShowAI 准备一个完整 bundle（[dsh-showai](../dsh-showai/README.md)），包含绑定当前运行时和内容库的 MCP 工具、上述 Skill 与对话内页面预览。App 中打开「设置 → 插件 → DeepSeek Harness → 准备插件」。源码方式在已登记运行时后执行：
+DeepSeek Harness 由自己安装插件，因此 ShowAI 准备一个完整 bundle（[dsh-showai](https://github.com/Renaissance-Mind/ShowAI/blob/main/plugins/dsh-showai/README.md)），包含绑定当前运行时和内容库的 MCP 工具、上述 Skill 与对话内页面预览。App 中打开「设置 → 插件 → DeepSeek Harness → 准备插件」。源码方式在已登记运行时后执行：
 
 ```sh
 npm run plugin:dsh
@@ -79,7 +78,7 @@ page_present 返回完整离线 HTML/source 与聊天预览。预览容纳时使
 
 ## 网页 ChatGPT 与远程包
 
-普通 ChatGPT 网页使用托管 MCP 连接并通过 guide 获取工作流，无需本机 Skill 或 ZIP。见 [ChatGPT 接入](../../docs/i18n/chatgpt.zh-CN.md)。
+普通 ChatGPT 网页使用托管 MCP 连接并通过 guide 获取工作流，无需本机 Skill 或 ZIP。见 [ChatGPT 接入](https://github.com/Renaissance-Mind/ShowAI/blob/main/docs/i18n/chatgpt.zh-CN.md)。
 
 运营者可以从相同 Skill 生成 HTTP/OAuth 包：
 
@@ -93,6 +92,12 @@ npm run package:plugin -- --mcp-url HTTPS_MCP_URL --out NEW_DIRECTORY
 node scripts/install-codex-plugin.mjs --remote-url HTTPS_MCP_URL --marketplace-root DIRECTORY
 ```
 
-安装器使用独立 marketplace 并核验文件，包内不包含凭据。部署与公开提交是独立发行操作。参见 [Agent 接入](../../docs/i18n/agent-integration.zh-CN.md)。
+安装器使用独立 marketplace 并核验文件，包内不包含凭据。部署与公开提交是独立发行操作。参见 [Agent 接入](https://github.com/Renaissance-Mind/ShowAI/blob/main/docs/i18n/agent-integration.zh-CN.md)。
 
 边写边画、位置参考和 iPad/Mac 配对见 [collaborate-canvas](skills/collaborate-canvas/SKILL.md)。
+
+## 宿主包与公共源码
+
+公共工作流只维护 `plugins/showai/skills`，宿主展示契约分别维护在 `plugins/showai/host-adapters`。运行 `npm run package:plugin` 自动生成 Codex、Claude Code 和 Kimi 的安装内容；DeepSeek 准备插件时绑定自己的适配，远程 MCP Apps 使用原生视图指南。
+
+Codex 市场指向 `plugins/showai-codex`，Claude Code 市场指向 `plugins/showai-claude`，插件身份沿用 showai@renaissance-mind。两份生成目录随仓库提交，供全新克隆直接安装；修改公共内容后重新生成，不手工修改生成副本。各包只替换当前宿主的 host-adapter.md；host-profile.json 记录适配身份、显示声明和公共文件指纹。App 安装入口使用同一套绑定逻辑，各宿主加载与 MCP 重连分别核验。

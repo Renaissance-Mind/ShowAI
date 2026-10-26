@@ -114,7 +114,7 @@ async function install() {
     : root;
   const pluginRoot = remoteUrl
     ? join(marketplaceRoot, "plugins/showai-cloud")
-    : join(root, "plugins/showai");
+    : join(root, "plugins/showai-codex");
   if (remoteUrl) {
     // Regenerate the remote package; only a previously generated copy is replaced.
     const previous = await readFile(
@@ -170,7 +170,7 @@ async function install() {
     resolve(marketplaceRoot, entry.source.path) !== pluginRoot
   )
     throw new Error(
-      `This installer requires the marketplace to point at ./plugins/${pluginName}.`,
+      `The marketplace must point at the generated ${pluginName} package (${pluginRoot}).`,
     );
   const identity = `${pluginName}@${marketplace.name}`;
   const canonicalRoot = await realpath(marketplaceRoot);

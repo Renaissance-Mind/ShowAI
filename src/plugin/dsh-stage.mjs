@@ -14,6 +14,7 @@ import {
 } from "node:fs/promises";
 import { homedir } from "node:os";
 import { dirname, isAbsolute, join, resolve } from "node:path";
+import { bindHostSkills } from "./host-package.mjs";
 
 export const DSH_BUNDLE = "@showai/dsh-showai";
 /** Bundle names of earlier ShowAI previews that the full bundle replaces. */
@@ -134,8 +135,10 @@ export async function stageDshBundle({
     await mkdir(staging);
     for (const file of BUNDLE_FILES)
       await cp(join(bundleRoot, file), join(staging, file));
-    await cp(join(pluginRoot, "skills"), join(staging, "skills"), {
-      recursive: true,
+    await bindHostSkills({
+      source: pluginRoot,
+      target: staging,
+      profile: "deepseek",
     });
     await mkdir(join(staging, "mcp"));
     await cp(

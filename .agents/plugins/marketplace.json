@@ -1,11 +1,19 @@
 {
   "name": "renaissance-mind",
-  "interface": { "displayName": "Renaissance Mind" },
+  "interface": {
+    "displayName": "Renaissance Mind"
+  },
   "plugins": [
     {
       "name": "showai",
-      "source": { "source": "local", "path": "./plugins/showai" },
-      "policy": { "installation": "AVAILABLE", "authentication": "ON_INSTALL" },
+      "source": {
+        "source": "local",
+        "path": "./plugins/showai-codex"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
       "category": "Productivity"
     }
   ]

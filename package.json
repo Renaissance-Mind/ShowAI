@@ -64,7 +64,8 @@
     "test:whiteboard:desktop": "npm run test:containers:desktop",
     "test:containers": "node scripts/containers-smoke.mjs",
     "test:page-outline": "npm run build:browser && vitest run src/surface/page-outline.test.ts src/surface/page-outline.integration.test.ts --maxWorkers=2 --testTimeout=60000 --hookTimeout=60000",
-    "test:containers:desktop": "node scripts/containers-smoke.mjs --desktop"
+    "test:containers:desktop": "node scripts/containers-smoke.mjs --desktop",
+    "plugin:claude": "node scripts/install-claude-plugin.mjs"
   },
   "dependencies": {
     "@antv/g-svg": "2.1.1",

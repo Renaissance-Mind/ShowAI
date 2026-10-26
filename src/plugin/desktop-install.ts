@@ -26,6 +26,7 @@ import {
   type RuntimeLaunch,
 } from "../agent/runtime";
 import { PluginInstallError, VERIFIED_HOST_VERSIONS } from "./plugin-errors";
+import { bindHostSkills } from "./host-package.mjs";
 import {
   inspectDshProfile,
   stageDshBundle,
@@ -645,6 +646,12 @@ export class DesktopPluginInstaller {
         "PLUGIN_BUNDLE_CHANGED",
         "The bundled plugin changed while being copied. Retry after the build finishes.",
       );
+    await bindHostSkills({
+      source: this.options.pluginRoot(),
+      target: source,
+      profile: host,
+    });
+    await rm(join(source, "host-adapters"), { recursive: true, force: true });
     const json = async (path: string, value: unknown) => {
       await writeFile(path, JSON.stringify(value, null, 2) + "\n");
     };
@@ -681,6 +688,13 @@ export class DesktopPluginInstaller {
         },
       },
     });
+    if (host === "codex") {
+      await rm(join(source, ".claude-plugin"), {
+        recursive: true,
+        force: true,
+      });
+      await rm(join(source, ".mcp.json"), { force: true });
+    } else await rm(join(source, "mcp.json"), { force: true });
     await mkdir(join(marketplace, ".agents/plugins"), { recursive: true });
     await mkdir(join(marketplace, ".claude-plugin"), { recursive: true });
     await json(join(marketplace, ".agents/plugins/marketplace.json"), {

@@ -35,8 +35,8 @@ Skills and would shadow them. The installer lists whichever of these it finds.
 The preview row renders a presented ShowAI page **inside the conversation**
 instead of collapsing it into the generic JSON tool card.
 
-The plugin takes over the Tool call view of the two ShowAI presentation tools
-(`mcp__showai__page_present` and `mcp__showai__render_document`) and frames the
+The plugin takes over the Tool call view of the three ShowAI presentation tools
+(`mcp__showai__show_component`, `mcp__showai__page_present` and `mcp__showai__render_document`) and frames the
 delivered page under a status row with reload, expand, open-in-a-new-tab and
 open-the-full-HTML actions.
 
@@ -72,7 +72,7 @@ Host half (`index.js`):
 
 Client half (`client.js`):
 
-5. Registers the keyed `tool.call.toolview` views for the two ShowAI tools and
+5. Registers the keyed `tool.call.toolview` views for the three ShowAI tools and
    renders the row plus a sandboxed `<iframe>`. The availability probe retries
    briefly because the Host caches the file asynchronously after the result.
 6. Uses `delivery.inline` for the framed preview and `delivery.html` for the
@@ -121,3 +121,7 @@ ShowAI 返回 delivery.inline/html 文件路径与 MCP _meta.showai.inline。Har
 delivery.html 已是完整文件，按原字节保存；delivery.inline 通常是供宿主嵌入的阅读器片段，缓存会补上 doctype、head 与 body 外壳。直接以片段作为文档加载会进入 quirks mode，导致 KaTeX 停用并改变布局；旧缓存片段在读取时也会补外壳。client.js 为两个工具注册 tool.call.toolview，使用 sandbox iframe 显示；可用性探测会短暂重试，因为宿主在结果之后异步写入缓存。预览用 delivery.inline，而“打开完整 HTML”使用 delivery.html；“局部”标签只在调用确实带 blockIds 选择时出现。缓存保留最近 40 页，进程重启后旧对话仍可读取。
 
 bundle 无需构建或额外依赖；Harness 内的 Agent 也可用 `plugin_manager install_bundle target=<路径>` 安装准备好的目录。准备时 MCP 行绑定一个 ShowAI 内容库与运行时命令，切换内容库、移动 App 或登记的运行时变化后需重新准备。预览需要 profile 的 webServer；超过 12 MiB 的预览不缓存，退回文件操作。Host 代码更新需新进程，client.js 可由 HMR 更新。
+
+## Shared workflow source
+
+Preparing the bundle copies the canonical ShowAI Skills and binds only the DeepSeek Harness delivery guide from `plugins/showai/host-adapters/deepseek.md`. `host-profile.json` records the shared workflow fingerprints and the selected display contract. The preview adapter automatically displays presentation tool results; the Agent only adds an explanation. Refreshing the bundle requires a Harness reload to activate the new files.

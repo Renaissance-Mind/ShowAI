@@ -1,0 +1,32 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "showai",
+  "version": "0.24.2",
+  "description": "Four-stage presentation workflow (intent, material, logic, design), template method folders with optional component libraries, and unified MCP presentation for local and web agents.",
+  "keywords": [
+    "research",
+    "interactive-pages",
+    "templates",
+    "components",
+    "html"
+  ],
+  "extensions": {
+    "com.openai": {
+      "interface": {
+        "displayName": "ShowAI",
+        "shortDescription": "Read, create and present ShowAI pages",
+        "longDescription": "Operate ShowAI through MCP. Local installation connects the selected ShowAI runtime; remote packages use their authorized endpoint. Formal work is saved to a project before presentation.",
+        "category": "Productivity",
+        "defaultPrompt": [
+          "Use ShowAI to present this research as an interactive page."
+        ],
+        "brandColor": "#06A5FA",
+        "composerIcon": "./assets/logo.svg",
+        "composerIconDark": "./assets/logo-dark.svg",
+        "logo": "./assets/logo.svg",
+        "logoDark": "./assets/logo-dark.svg"
+      },
+      "onboardingSkill": "./skills/use-showai/SKILL.md"
+    }
+  }
+}

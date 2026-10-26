@@ -1,5 +1,5 @@
 import { execFile } from "node:child_process";
-import { copyFile, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { copyFile, cp, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -27,14 +27,42 @@ async function packageSkill(
       "scripts",
       "src/desktop/assets",
       "src/portable",
+      "src/plugin",
+      "plugins-kimi/showai",
       "resources/templates/system-presentation",
       "plugins/showai/skills/show-document",
       "plugins/showai/skills/example",
+      "plugins/showai/skills/use-showai/references",
+      "plugins/showai/mcp",
     ].map((path) => mkdir(join(fixture, path), { recursive: true })),
   );
   await copyFile(
     join(root, "scripts/package-plugin.mjs"),
     join(fixture, "scripts/package-plugin.mjs"),
+  );
+  await cp(
+    join(root, "plugins/showai/host-adapters"),
+    join(fixture, "plugins/showai/host-adapters"),
+    { recursive: true },
+  );
+  await copyFile(
+    join(root, "plugins-kimi/showai/kimi.plugin.json"),
+    join(fixture, "plugins-kimi/showai/kimi.plugin.json"),
+  );
+  await copyFile(
+    join(root, "src/plugin/host-package.mjs"),
+    join(fixture, "src/plugin/host-package.mjs"),
+  );
+  await copyFile(
+    join(root, "plugins/showai/mcp/launch.mjs"),
+    join(fixture, "plugins/showai/mcp/launch.mjs"),
+  );
+  await copyFile(
+    join(root, "plugins/showai/skills/use-showai/references/host-adapter.md"),
+    join(
+      fixture,
+      "plugins/showai/skills/use-showai/references/host-adapter.md",
+    ),
   );
   await copyFile(
     join(root, "src/portable/template-bundle.mjs"),
@@ -45,6 +73,10 @@ async function packageSkill(
     join(fixture, "resources/templates/system-presentation/README.md"),
   );
   await Promise.all([
+    writeFile(
+      join(fixture, "plugins/showai/skills/use-showai/SKILL.md"),
+      "---\nname: use-showai\ndescription: Connection instructions.\n---\nRead [host](references/host-adapter.md).\n",
+    ),
     writeFile(
       join(fixture, "plugins/showai/skills/show-document/SKILL.md"),
       "---\nname: show-document\ndescription: Foundational presentation instructions.\n---\n<!-- showai-system-baseline:start -->\n<!-- showai-system-baseline:end -->\n",
@@ -81,7 +113,7 @@ describe("plugin packaging", () => {
         ].join(eol),
       );
       expect(result.stdout).toContain(
-        "Prepared ShowAI MCP plugin 0.8.0: example, show-document",
+        "Prepared ShowAI MCP plugin 0.8.0: example, show-document, use-showai",
       );
     },
   );

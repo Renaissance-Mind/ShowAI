@@ -43,6 +43,18 @@ test("stages the bundle with Skills, the launcher and a literal MCP row", async 
   const skills = (await readdir(resolve("plugins/showai/skills"))).sort();
   expect((await readdir(join(target, "skills"))).sort()).toEqual(skills);
   await stat(join(target, "mcp/launch.mjs"));
+  expect(
+    JSON.parse(await readFile(join(target, "host-profile.json"), "utf8"))
+      .profile,
+  ).toBe("deepseek");
+  expect(
+    await readFile(
+      join(target, "skills/use-showai/references/host-adapter.md"),
+      "utf8",
+    ),
+  ).toBe(
+    await readFile(resolve("plugins/showai/host-adapters/deepseek.md"), "utf8"),
+  );
   expect(await readdir(target)).not.toContain("test");
   const manifest = JSON.parse(
     await readFile(join(target, "package.json"), "utf8"),

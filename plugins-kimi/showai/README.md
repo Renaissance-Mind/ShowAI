@@ -4,7 +4,7 @@
 
 ## English
 
-This plugin includes a Skill and a local MCP launcher. It connects Kimi Work to the ShowAI runtime registered for the selected content library, shows components in conversation, and creates saved interactive pages through four stages: intent, material, logic and design.
+This plugin includes nine shared Skills and a local MCP launcher. It connects Kimi Work to the ShowAI runtime registered for the selected content library, shows components in conversation, and creates saved interactive pages through four stages: intent, material, logic and design.
 
 ### Install and update
 
@@ -29,7 +29,7 @@ See [Agent integration](https://github.com/Renaissance-Mind/ShowAI/blob/main/doc
 
 ## 简体中文
 
-本插件包含 Skill 和本机 MCP 启动器，连接所选内容库已注册的 ShowAI 运行时。支持在对话里直接展示组件，以及按理解意图、收集材料、呈现逻辑、设计稿四阶段创建可保存的交互页面。
+本插件包含九个公共 Skill 和本机 MCP 启动器，连接所选内容库已注册的 ShowAI 运行时。支持在对话里直接展示组件，以及按理解意图、收集材料、呈现逻辑、设计稿四阶段创建可保存的交互页面。
 
 ### 安装与更新
 
@@ -51,3 +51,9 @@ Widget 使用返回的离线 inline 文件：原样复制到 Widget 工作区，
 找不到工具时，先检查插件的 MCP 部分及启动错误，再核对安装版本、注册的内容库与运行时。重装仅含 Skill 的旧版本不会补上 MCP 工具；连接失败时不通过另建页面或更换内容库绕过。
 
 其他连接方式见 [Agent 接入](https://github.com/Renaissance-Mind/ShowAI/blob/main/docs/i18n/agent-integration.zh-CN.md)。
+
+## Shared workflow source / 公共源码
+
+The workflows and launcher are generated from `plugins/showai`; Kimi keeps its manifest, shell entry, icon and Widget adapter. Run `npm run package:plugin` after changing common instructions or `plugins/showai/host-adapters/kimi.md`. Do not edit this package’s generated Skills or MCP launcher. `host-profile.json` records the common version and file fingerprints.
+
+工作流和 MCP 启动器自动从公共源码生成，Kimi 独立维护 manifest、shell 入口、图标与 Widget 适配。修改公共内容或 Kimi 适配后运行 `npm run package:plugin`，不手改生成副本。原先单独维护的 showai Skill 已由同一套九个公共 Skill 取代。

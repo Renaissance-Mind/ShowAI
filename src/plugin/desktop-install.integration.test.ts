@@ -83,6 +83,29 @@ describe.skipIf(!output || !config)(
           ),
         );
         const server = manifest.mcpServers.showai;
+        const profile = JSON.parse(
+          await readFile(
+            join(changed.installedPath, "host-profile.json"),
+            "utf8",
+          ),
+        );
+        expect(profile.profile).toBe(host);
+        expect(profile.declaredHostDisplay).toBe(
+          server.env.SHOWAI_HOST_DISPLAY,
+        );
+        const guide = await readFile(
+          join(
+            changed.installedPath,
+            "skills/use-showai/references/host-adapter.md",
+          ),
+          "utf8",
+        );
+        expect(guide).toBe(
+          await readFile(
+            resolve("plugins/showai/host-adapters", `${host}.md`),
+            "utf8",
+          ),
+        );
         expect(server.command).not.toBe("node");
         expect(server.env.SHOWAI_HOME).toBe(home);
         const client = new Client({
@@ -105,6 +128,52 @@ describe.skipIf(!output || !config)(
             arguments: {},
           });
           expect(projects.isError).not.toBe(true);
+          const capabilities = await client.callTool({
+            name: "showai_capabilities",
+            arguments: {},
+          });
+          expect(
+            (capabilities.structuredContent as any).data.presentation
+              .declaredHostDisplay,
+          ).toBe(profile.declaredHostDisplay);
+          const shown = await client.callTool({
+            name: "show_component",
+            arguments: {
+              kind: "flowchart",
+              data: {
+                flows: [
+                  {
+                    id: "connection",
+                    label: "连接",
+                    nodes: [
+                      { id: "agent", label: "Agent" },
+                      { id: "library", label: "隔离内容库" },
+                    ],
+                    edges: [
+                      { id: "write", source: "agent", target: "library" },
+                    ],
+                  },
+                ],
+              },
+            },
+          });
+          expect(shown.isError).not.toBe(true);
+          const delivery = (shown.structuredContent as any).data.delivery;
+          if (host === "codex") expect(delivery.mode).toBe("fragment-file");
+          else if (delivery.mode === "compact")
+            expect(delivery.compact).toContain("<");
+          else {
+            expect(delivery.mode).toBe("image");
+            expect(
+              Array.isArray(shown.content) &&
+                shown.content.some(
+                  (item: { type?: string }) => item.type === "image",
+                ),
+            ).toBe(true);
+            expect(
+              (shown.structuredContent as any).data.warnings.join(" "),
+            ).toMatch(/compact fragment|CDN reader/);
+          }
           await writeFile(
             join(output!, `${host}-result.json`),
             JSON.stringify(
@@ -113,6 +182,8 @@ describe.skipIf(!output || !config)(
                 repeated,
                 changed,
                 mcpWithoutNode: true,
+                declaredHostDisplay: profile.declaredHostDisplay,
+                deliveryMode: delivery.mode,
                 tools: tools.tools.length,
               },
               null,

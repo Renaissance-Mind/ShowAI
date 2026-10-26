@@ -12,6 +12,10 @@ import { dirname, resolve, join, relative, sep, isAbsolute } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createHash } from "node:crypto";
 import { parseTemplateReadme } from "../src/portable/template-bundle.mjs";
+import {
+  bindHostSkills,
+  stageHostPlugin,
+} from "../src/plugin/host-package.mjs";
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const plugin = join(root, "plugins/showai");
 const args = process.argv.slice(2);
@@ -46,6 +50,11 @@ for (const path of [
   await rm(join(plugin, path), { recursive: true, force: true });
 const manifest = JSON.parse(
   await readFile(join(plugin, "plugin.json"), "utf8"),
+);
+// The bundled/native entry is generated too; MCP Apps has one editable adapter source.
+await copyFile(
+  join(plugin, "host-adapters/mcp-app.md"),
+  join(plugin, "skills/use-showai/references/host-adapter.md"),
 );
 const baseline = parseTemplateReadme(
   await readFile(
@@ -138,10 +147,10 @@ for (const skill of skills) {
     throw new Error(`Invalid skill: ${skill}`);
 }
 // Relative guidance must ship with the skill, including links across skills.
-async function validateGuidanceLinks(directory) {
+async function validateGuidanceLinks(directory, packageRoot = plugin) {
   for (const entry of await readdir(directory, { withFileTypes: true })) {
     const path = join(directory, entry.name);
-    if (entry.isDirectory()) await validateGuidanceLinks(path);
+    if (entry.isDirectory()) await validateGuidanceLinks(path, packageRoot);
     else if (entry.name.endsWith(".md")) {
       const source = await readFile(path, "utf8");
       for (const match of source.matchAll(/\[[^\]]*\]\(([^)]+)\)/g)) {
@@ -151,7 +160,7 @@ async function validateGuidanceLinks(directory) {
           dirname(path),
           decodeURIComponent(link.split("#")[0]),
         );
-        const location = relative(plugin, target);
+        const location = relative(packageRoot, target);
         if (
           isAbsolute(location) ||
           location === ".." ||
@@ -174,6 +183,25 @@ await validateGuidanceLinks(join(plugin, "skills"));
 console.log(
   `Prepared ShowAI MCP plugin ${manifest.version}: ${skills.join(", ")}`,
 );
+// Git-backed marketplaces need real distributable directories, including fresh clones.
+for (const profile of ["codex", "claude"]) {
+  const target = join(root, "plugins", `showai-${profile}`);
+  await stageHostPlugin({ source: plugin, target, profile });
+  await validateGuidanceLinks(join(target, "skills"), target);
+}
+// Kimi's manifest and shell entry are host-owned; all workflows and launcher stay shared.
+const kimi = join(root, "plugins-kimi/showai");
+const kimiManifestPath = join(kimi, "kimi.plugin.json");
+const kimiManifest = JSON.parse(await readFile(kimiManifestPath, "utf8"));
+await writeFile(
+  kimiManifestPath,
+  JSON.stringify({ ...kimiManifest, version: manifest.version }, null, 2) +
+    "\n",
+);
+await bindHostSkills({ source: plugin, target: kimi, profile: "kimi" });
+await mkdir(join(kimi, "mcp"), { recursive: true });
+await copyFile(join(plugin, "mcp/launch.mjs"), join(kimi, "mcp/launch.mjs"));
+await validateGuidanceLinks(join(kimi, "skills"), kimi);
 if (settings["--mcp-url"] || settings["--out"]) {
   if (!settings["--mcp-url"] || !settings["--out"])
     throw new Error("Remote packaging requires both --mcp-url and --out.");
@@ -210,7 +238,15 @@ if (settings["--mcp-url"] || settings["--out"]) {
   await cp(plugin, destination, {
     recursive: true,
     errorOnExist: true,
-    filter: (source) => relative(plugin, source).split(sep)[0] !== "mcp",
+    filter: (source) =>
+      !["mcp", "host-adapters"].includes(
+        relative(plugin, source).split(sep)[0],
+      ),
+  });
+  await bindHostSkills({
+    source: plugin,
+    target: destination,
+    profile: "mcp-app",
   });
   // A distinct name lets the remote package sit beside the local plugin.
   const remote = structuredClone(manifest);
