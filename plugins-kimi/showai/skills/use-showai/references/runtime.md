@@ -50,14 +50,18 @@
 | CONFLICT                            | 读取后内容已变化，没有覆盖                       | 重新读取，把修改应用到当前版本后用新的 baseHash/baseRevision 重试；不重发原请求                                                                                                            |
 | NOT_FOUND                           | 内容库中没有这个项目或页面                       | 列出现有内容，用返回的 ID 重试                                                                                                                                                             |
 | INVALID_DATA                        | 请求的数据不符合格式或组件参数，没有保存任何内容 | 按 `message` 和 `details` 指出的位置修正自己的输入（组件参数用 `catalog_describe` 的 parameters 视图核对），重新读取后再提交一次；数据来自页面原有内容而无法修正时，作为无法恢复的失败处理 |
+| INVALID_ARGUMENTS                   | 参数不符合这个工具当前的 inputSchema，没有执行   | 按 `unexpected`、`issues`、`expected`（动作工具另有 `actions`）改成当前写法再调用；工具形状的近期变化见 `guide({topic:"migrations"})`                                                      |
+| UNKNOWN_TOOL                        | 连接上没有这个工具名                             | 改用 `similar` 或 migrations 指南中的当前工具；只用这个连接列出的工具                                                                                                                      |
 | INVALID_PATH                        | 路径不可用                                       | 改用本机绝对路径或 ShowAI 返回的 ID                                                                                                                                                        |
 | LOCKED                              | 内容库正被其他操作占用                           | 等几秒后重试同一调用一次                                                                                                                                                                   |
-| SNAPSHOT_EXPIRED / MISSING_BASELINE | 之前的读取结果或比较基线已失效                   | 重新读取后继续                                                                                                                                                                             |
+| SNAPSHOT_EXPIRED / MISSING_BASELINE | 之前的读取结果或比较基线已失效                   | 重新读取后继续；写共享数据时返回的 MISSING_BASELINE 带 `details.datasetBases`，说明要传哪个共享数据的读取 hash，见 [共享数据](shared-data.md#读写)                                         |
 | SOURCE_UNAVAILABLE                  | 共享数据链接的外部文件在本机不可读               | 请用户恢复该文件，或使用已存储的副本                                                                                                                                                       |
 | CONFIRMATION_REQUIRED               | 需要用户先做决定                                 | 按 `details` 询问用户，再带上决定重试                                                                                                                                                      |
 | ERROR 或其他                        | 未归类的失败                                     | 按下一节处理                                                                                                                                                                               |
 
 修正输入后的请求是新的请求，使用新的 `operationId`；只有原样重试同一请求时才沿用原来的 `operationId`。同一错误按 `nextStep` 处理一次后仍出现，也按下一节处理。
+
+工具名称和参数会随版本调整。按旧写法发出的近期调用（例如 `dataset_create`、不带 `action` 的 `dataset_read`）仍会执行，回执带 `migration`：`from` 是旧写法，`use` 是对应的当前工具与参数，`changes` 说明改了什么；之后改用 `use` 的写法。以连接实际暴露的 inputSchema 为准，不以记忆或旧笔记为准。
 
 ## 组件显示异常
 

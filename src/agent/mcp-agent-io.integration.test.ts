@@ -775,6 +775,14 @@ test("bound data changes are compared by dataset_read sinceHash", async () => {
     response: "receipt",
   });
   const sinceHash = read.datasetBases[shared.dataset.id];
+  // A read written to a file still names the datasets it saw.
+  const filed = await ok(client, "page_read", {
+    pageId: page.document.id,
+    rendered: false,
+    out: join(files, "bound-page.json"),
+  });
+  expect(filed.datasetBases).toEqual(read.datasetBases);
+  expect(filed.document).toBeUndefined();
   await ok(client, "dataset_write", {
     action: "apply",
     datasetId: shared.dataset.id,

@@ -215,7 +215,7 @@ test("builtin catalog ships only the system baseline, the paper explainer and bl
     const parsed = parseTemplateBundle(current.bundle);
     expect(parsed.metadata.schemaVersion).toBe(3);
     expect(parsed.metadata.version).toBe(
-      id === "paper-explainer" ? "2.3.0" : "2.2.0",
+      id === "paper-explainer" ? "2.3.0" : "2.2.1",
     );
     expect(Object.keys(parsed.guides)).toEqual([...TEMPLATE_STAGES]);
     expect(current.document.content.content ?? []).toHaveLength(0);

@@ -25,6 +25,6 @@ MiB 为 1,048,576 bytes。除与宿主和同步对象对齐的边界外，这些
 
 大视频有三种放法，按读者在哪里看来选：需要随页面分发时，用内置 Video 组件嵌入（受上表单个资源和页面资源预算，对话预览会超限，用 blockIds 选其他区域）；可以联网时，内置 Video 组件填在线地址；只需在本机查看时（如视频原片），自定义组件用 `file:` 链接指向原文件，读者点击后由 ShowAI 工作台播放器打开，不占页面或组件预算，但导出的 HTML 和对话预览中不能播放。`file:` 链接只在自定义组件中有效，写法见 create-component 技能的组件设计「本机文件」。
 
-正式页面先保存，再调用 `page_present`。其完整 HTML 和 source 按文件预算生成，`blockIds` 仅控制 inline。聊天超限不会降低页面保存或完整文件预算；根据真实节点 ID 选择独立可读的区域。单个选中节点仍超限时交付完整文件；当前 blockIds 仅选择节点，不提供替换素材的专用预览参数。文件自身超限时减少嵌入依赖；明确导出文件时可用 `page_export` 的 `reader:"cdn"` 写出从 CDN 加载阅读器的在线页（打开需联网），或 `components:"remote"`（需要已验证的组件地址）；本机连接也可按用户要求导出网站，远程 page_export 只支持 html/inline；不能用局部源内容覆盖完整 Page。
+正式页面先保存，需要展示时再调用 `page_present`。其完整 HTML 和 source 按文件预算生成，`blockIds` 仅控制 inline。聊天超限不会降低页面保存或完整文件预算；根据真实节点 ID 选择独立可读的区域。单个选中节点仍超限时交付完整文件；当前 blockIds 仅选择节点，不提供替换素材的专用预览参数。文件自身超限时减少嵌入依赖；明确导出文件时可用 `page_export` 的 `reader:"cdn"` 写出从 CDN 加载阅读器的在线页（打开需联网），或 `components:"remote"`（需要已验证的组件地址）；本机连接也可按用户要求导出网站，远程 page_export 只支持 html/inline；不能用局部源内容覆盖完整 Page。
 
-stdio 服务端同样接受 256 MiB 创作请求。客户端与宿主还可能有独立的消息缓冲预算（MCP SDK 默认 10 MiB）；返回的文本与 structuredContent 也会占用消息空间。读取大量资源时优先使用 outline、blockIds、单文件源码与完整交付路径；完整大消息需要客户端相应配置 maxBufferSize 或使用 HTTP MCP。运行时预算不代表宿主已放宽自己的消息预算。
+本机连接中，大参数可以改从文件读取（page_apply 的 operationsFile、dataset_write 的 valueFile/operationsFile、component_save 的 directory），大结果可以写入文件（page_read、page_diff 的 out，catalog_describe view:"source" 的 out），文件按上表的同一预算检查，避免整段数据经过对话和宿主消息。stdio 服务端同样接受 256 MiB 创作请求。客户端与宿主还可能有独立的消息缓冲预算（MCP SDK 默认 10 MiB）；返回的文本与 structuredContent 也会占用消息空间。读取大量资源时优先使用 outline、blockIds、单文件源码与完整交付路径；完整大消息需要客户端相应配置 maxBufferSize 或使用 HTTP MCP。运行时预算不代表宿主已放宽自己的消息预算。

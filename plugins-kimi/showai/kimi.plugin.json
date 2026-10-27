@@ -1,7 +1,7 @@
 {
   "$schema": "https://catalog.msh.team/misc/kimi.plugin.schema.json",
   "name": "showai",
-  "version": "0.24.2",
+  "version": "0.25.0",
   "description": "通过本机 ShowAI MCP 在 Kimi Work 对话中展示组件，按四阶段流程创建和续改可保存的交互页面，并使用 Widget 或离线 HTML 交付。",
   "keywords": [
     "showai",

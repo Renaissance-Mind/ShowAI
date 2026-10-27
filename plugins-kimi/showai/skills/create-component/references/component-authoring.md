@@ -90,4 +90,4 @@ export default function Explorer({ data, onContext, context }) {
 
 目录组件声明 manifest.role="page-outline"、pageOutlineProtocol=1、category="outline"，通过 Page 的 attrs.outline.renderer 关联精确版本。React 入口接收 props 和 outline（protocol、pageId、items 树、activeItemId、expandedItemIds、container 的 placement/width/height、theme、locale），以及 navigate(itemId)、setBranchExpanded(itemId,expanded)、collapse()。组件负责呈现、分支和可访问性，Page 宿主负责位置、整体收起和目标校验。只读页面仍提供导航动作。作者 props 遵循包自己的 schema；阅读状态使用上述协议，普通 onChange 不参与。
 
-创建或修改后，在 Page 中实际关联并验证导航、当前章节、窗口宽度变化和收起展开；完整契约见 docs/page-surface.md，两个独立示例位于 examples/page-outline-index 和 examples/page-outline-path。
+创建或修改后，在 Page 中实际关联并验证导航、当前章节、窗口宽度变化和收起展开；完整契约见 ShowAI 源码仓库的 docs/page-surface.md，两个独立示例位于仓库的 examples/page-outline-index 和 examples/page-outline-path（不随插件安装；没有仓库时以 guide containers 为准）。

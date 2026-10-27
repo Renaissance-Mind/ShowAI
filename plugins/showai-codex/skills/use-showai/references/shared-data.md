@@ -6,7 +6,7 @@
 
 ## 模型
 
-- 共享数据是项目里的一个独立资源，保存一份 JSON 值，有自己的 hash 和 revision；写入只需传读到的 `baseHash`。读写用 `dataset_read`（list / read）、`dataset_write`（create / apply / link）与 `dataset_delete`。`dataset_read({projectId, action:"list"})` 列出共享数据；`dataset_read({projectId, action:"read", datasetId, path?})` 读取一份的值与 hash，同时返回本项目中使用它的页面与块（`references`）。值也可以放在内容库以外的文件里，见下文「外部文件中的数据」。
+- 共享数据是项目里的一个独立资源，保存一份 JSON 值，有自己的 hash 和 revision。新建一份：`dataset_write({projectId, action:"create", name, value})`，值很大时在本机连接改用 `valueFile:"/绝对路径/值.json"`（文件内容就是这个 JSON 值）；从页面上已有的组件生成见下文 fromBlock，让值留在外部文件里见「外部文件中的数据」。写入只需传读到的 `baseHash`。读写用 `dataset_read`（list / read）、`dataset_write`（create / apply / link）与 `dataset_delete`。`dataset_read({projectId, action:"list"})` 列出共享数据；`dataset_read({projectId, action:"read", datasetId, path?})` 读取一份的值与 hash，同时返回本项目中使用它的页面与块（`references`）；本机连接加 `out:"/绝对路径/文件.json"` 时值写入该文件（已有文件需 overwrite:true），回执只含共享数据的名称、schema、hash/revision 与 out（path、bytes、sha256）。值也可以放在内容库以外的文件里，见下文「外部文件中的数据」。
 - 组件块通过 `data.$binding` 绑定共享数据。页面只保存绑定设置和这个块自己的值；共享数据变化不会改变页面的 hash，页面的保存冲突也不涉及共享数据。
 - 组件照常收到 `{data, onChange, readOnly}`，不需要任何新接口。宿主从共享数据生成组件参数，把 `onChange` 交回的整份参数按记录 id 拆成对共享数据的修改。组件要满足两点：列表条目有稳定 `id`，收到新的 `data` 时以它为准，见 [组件设计](../../create-component/references/component-authoring.md)。
 
@@ -18,7 +18,7 @@
 dataset_write({projectId, action:"create", name:"全景 OKR", fromBlock:{pageId, blockId, baseHash, baseRevision, local:["title"]}})
 ```
 
-它在同一次保存里创建共享数据并把该块改为绑定；当时那个组件版本的参数 schema 会随之约束此后对共享数据的每次写入。组件升级后参数结构有变化时，用 `dataset_write` apply 的 `schema` 换成新版本的约束（`null` 取消约束）。已有数据的列表缺 id 时，先在源组件里补上 id 再共享。另一个块要显示同一份数据时，用 `page_apply` 的 `{type:"component.binding.set", blockId, binding:{dataset:ID, props:{local:[...]}}}`。
+它在同一次保存里创建共享数据并把该块改为绑定；当时那个组件版本的参数 schema 会随之约束此后对共享数据的每次写入。组件升级用 `page_apply` 的 `component.ref.set`：共享数据的 schema 若由旧版本派生，会在同一次保存中换成新版本的约束（回执 `datasetSchemas`），不需要另外改；它不写共享数据的值，所以不需要 `datasetBases`。回执 `warnings` 中的 DATASET_SHARED 列出还绑定这份数据的其他页面和块，它们之后的写入也按新 schema 检查，要告诉用户并按用户意思一起升级；DATASET_SCHEMA_KEPT 表示共享数据有自己定的 schema，需要时才用 `dataset_write` apply 的 `schema` 手动更换（`null` 取消约束）。已有数据的列表缺 id 时，先在源组件里补上 id 再共享。另一个块要显示同一份数据时，用 `page_apply` 的 `{type:"component.binding.set", blockId, binding:{dataset:ID, props:{local:[...]}}}`。
 
 **collections**：把共享数据里沿某条路径找到的记录，作为某个数组参数（如表格的 `rows`）的条目，排在块自己的条目之后，按来源中的顺序排列（表格排序和日历按各自规则显示）。下面是 `component.binding.set` 的 `binding` 参数。下面的字段名（`objectives`、`due`、`done`、`areas`、表格的列 id）只是示例，要换成实际的组件参数和表格列；写回的值必须符合来源字段的类型与格式（例如日期是 `YYYY-MM-DD` 文本）：
 
@@ -60,9 +60,11 @@ dataset_write({projectId, action:"create", name:"全景 OKR", fromBlock:{pageId,
 ## 读写
 
 - `page_read` 的结构化、markdown 和大纲结果都带 `bindings`（`response:"source"` 也保留，`"receipt"` 省略）：每个绑定块的共享数据 id、hash、解析后的参数 `props`、映射条目数 `mapped`、每个映射条目对应的来源路径 `sources` 和提示 `issues`。图像、html 视图按共享数据显示。
-- 每次 `page_read` 或 `dataset_read` 都会记住本会话读到的版本；之后带 baseHash 的写入以它为起点，与期间别处的修改合并。写入和读取不在同一个 Agent 会话（不同的对话或连接）时，给 `page_apply` 传 `datasetBases:{共享数据id: 读到的hash}`。
+- 每次 `page_read` 或 `dataset_read` 都会记住这个读者读到的版本；之后对绑定块的写入以它为起点，与期间别处的修改合并。读者按连接区分：每个新的 MCP 连接（宿主重启或重新连接、另一个 Agent、脚本或单独启动的客户端）都是另一个读者，看不到之前连接的读取；有固定 Agent 会话标识的宿主在同一会话内共用。
+- 读取和写入不在同一个连接时，写共享数据必须带上读取时的 hash，否则没有合并基线：`page_read` 的结果直接带 `datasetBases`（`{共享数据id: hash}`，其他项目的共享数据写作 `项目id/共享数据id`），原样传给 `page_apply` 的 `datasetBases`；`dataset_read` 返回的 `hash` 用作 `dataset_write` apply 的 `baseHash`。缺少基线时 `page_apply` 返回 `MISSING_BASELINE`，`details.datasetBases` 写明要传的键；不要拿 `currentHash` 顶替，除非你改的正是这个版本的内容，否则会把期间别人的修改当成你的修改覆盖。
 - 选择写法：修改页面上看到的一行（包括只属于这个块的字段，如开始准备），对绑定块用 `component.props.set`，按读取到的形式传参数（例如包含映射行的完整 `rows`）：映射字段写入共享数据，其他字段写入块，二者在同一次保存中完成。直接改来源记录（尤其是多条、嵌套或不在页面上显示的字段）用 `dataset_write({projectId, action:"apply", datasetId, baseHash, operations})`：`{op:"set",path,value}`、`{op:"remove",path}`、`{op:"insert",path:列表,value,after?}`、`{op:"move",path:条目,after}`。路径按 id 选记录，例如 `objectives[id=o1].keyResults[id=k1].tasks[id=t1].due`，或 `["objectives",{"id":"o1"},…]`；映射条目的完整路径取自 `bindings[].sources`。
 - 两种写法遇到同一字段的新修改都返回 CONFLICT 并且什么都不写，见下文。`page_apply` 返回的 CONFLICT 带 `details.datasetId` 与 `details.conflicts` 时是共享数据冲突：重新 `page_read` 后逐项决定，不走 `page_diff` 和整页合并；没有这些字段时是页面本身的保存冲突。
+- 查看共享数据自某次读取以来的变化（比较用的历史值是此前读取时按 hash 保存的版本，全库保留最近约 128 份；不可用时返回 MISSING_BASELINE，重新读取后以新 hash 为准）：`dataset_read({projectId, action:"read", datasetId, sinceHash})`，sinceHash 取之前 `page_read` 的 `datasetBases` 或 `dataset_read` 的 `hash`；返回按记录的 changes（path、op、before/after，长值摘要），按 offset/limit 分页，`path` 可只看一部分，本机连接的 `out` 写入文件。绑定块的数据变化不在 `page_diff` 中（页面 hash 不变），`page_diff` 的 `boundDatasets` 会列出相关共享数据。
 - `page_save` 不能把共享参数写进绑定块；要改这些参数用上面两种方式。
 - 解除绑定：`{type:"component.binding.remove", blockId, keep:"snapshot"}` 把当前显示的参数存为块的副本。
 - 删除：先用 `dataset_read` 的 `references` 查看本项目里使用它的页面，向用户确认（删除不能在应用中撤销）。`dataset_delete({projectId, datasetId, baseHash})` 只删除没有块使用的共享数据，已移到其他项目、仍指向它的页面也算在内；仍有使用时返回 `details.references`（每项带 projectId、pageId、blockIds）而不删除，由用户决定是否先在这些块上解除绑定：读取对应项目的页面后用 `component.binding.remove`。
@@ -90,6 +92,7 @@ dataset_write({projectId, action:"create", name:"全景 OKR", fromBlock:{pageId,
 - 文件格式按扩展名：`.json` 保存任意 JSON 值；`.csv`、`.tsv` 读成 `{columns, rows}`，第一行是列名，单元格读成文字、数字或 true/false。CSV/TSV 只能保存这种表格结构，嵌套值会被拒绝。文件必须是 UTF-8 文本；中文版 Excel 默认的「CSV」是 GBK，会以 INVALID_DATA 拒绝读取，请用户另存为「CSV UTF-8」。Excel 打开期间保存的文件会在下次读取时出现；它可能改写日期和数字格式，写回的值以文件中实际的文字为准。
 - 表格要有 `id` 列，表格组件中的修改才能写回对应行；绑定表格时用 collections 的 `from:"rows[*]"`。读取后 `columns` 没有 `id` 时告诉用户：没有 id 的行在组件里只读，只能在原文件中修改。用户同意由 Agent 补上时，读出 rows，为每行加上稳定的 id，用 `dataset_write({projectId, action:"apply", datasetId, baseHash, operations:[{op:"set", path:"rows", value:新rows}]})` 一次写回（这会改写整个文件，先确认文件没有其他程序正在编辑）；或者请用户在原工具里加一列 id。
 - 从已有文件新建：`dataset_write({projectId, action:"link", name, path:"/绝对路径/schedule.csv"})`。把项目里已有的共享数据移到新文件：`dataset_write({projectId, action:"link", datasetId, path, use:"dataset"})`，目标文件必须还不存在；已存在时返回 CONFLICT、什么都不写，请用户换一个文件名，或在确认要以该文件内容替换共享数据后改用 `use:"file"`。用一个已有文件替换共享数据的值：`use:"file"`（两边都有数据时必须写明，替换前与用户确认）。已链接的外部数据在另一台设备上只需 `dataset_write({projectId, action:"link", datasetId, path})` 链接本机的那份文件。链接永远不会覆盖已有文件。路径必须是绝对路径，`~` 要展开成实际的主目录。
+- 选择 link 还是复制：用户希望数据继续留在那个文件里、由其他工具一起维护时用 link，ShowAI 会把修改直接写回这个文件，文件内容也不随项目同步；用户只想把数据存进项目时用 create 的 `valueFile` 复制一份，原文件之后不再关联。说法不明确（如“存成共享数据”）时把两种结果告诉用户，按其选择做。用户没给名称时按文件名或内容拟一个，并在回复中说明。JSON 文件里的列表同样需要稳定 `id`，否则只能整体替换（见上文「读写」）。
 - 只链接用户指明的文件，不猜路径，也不链接内容库内部的文件。路径只记录在这台设备上，文件内容也不随项目同步。项目在其他设备打开时，那里会返回 `SOURCE_UNAVAILABLE`（`details.source` 带格式和文件名），`dataset_read` 的 list 标出 `source.available:false`，绑定块显示「共享数据「名称」读取外部文件「文件名」，这台设备还没有链接它。」和「链接文件…」按钮；链接过但文件读不到时显示「……现在无法读取」并给出路径。向用户说明：先把文件放到这台设备上（同步盘、拷贝等），再由用户点「链接文件…」选择它，或告诉 Agent 文件的绝对路径后用 `dataset_write({projectId, action:"link", datasetId, path})` 链接。文件格式必须与原来相同。没有这份文件时数据无法恢复，`path:null` 也需要能读到文件。
 - 读写与项目内的共享数据相同：每次读取都读文件，每次写入都原子地写回文件并保留原来的缩进、换行和引号；文件在别处被修改后，打开的窗口会更新，基于旧读取的写入按记录和字段合并。文件读取后又被改动时写入返回 CONFLICT，重新读取后再写。文件不可读或内容不符合 schema 时返回 `SOURCE_UNAVAILABLE` 并说明原因。
 - `dataset_write({projectId, action:"link", datasetId, path:null})` 把文件当前内容复制回内容库并停止读写该文件；`dataset_delete` 只删除共享数据和链接。两者都保留文件本身。
