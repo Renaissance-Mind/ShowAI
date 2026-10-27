@@ -38,6 +38,11 @@ plugins/showai/scripts/cli.mjs
 /evidence/
 /screenshots/
 /research/
+
+# Local design work and internal workflow illustrations.
+/design/
+/examples/icon-tuner/
+/examples/skills-routing.showai.json
 /.local/
 /presentations/promo-video/
 /presentations/showai-introduction/
