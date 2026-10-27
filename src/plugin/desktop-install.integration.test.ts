@@ -45,7 +45,7 @@ describe.skipIf(!output || !config)(
         pluginRoot: () => bundle,
         dshBundleRoot: () => resolve("plugins/dsh-showai"),
         runtime: () => ({ home, cli }),
-        channel: "development",
+        channel: "packaged",
       });
     });
     afterAll(async () => {
@@ -108,6 +108,14 @@ describe.skipIf(!output || !config)(
         );
         expect(server.command).not.toBe("node");
         expect(server.env.SHOWAI_HOME).toBe(home);
+        // Pinned to this App's runtime, not to whichever App last registered in the library.
+        const record = JSON.parse(
+          await readFile(server.env.SHOWAI_RUNTIME_CONFIG, "utf8"),
+        );
+        expect(record).toMatchObject({ home, launch: cli, channel: "packaged" });
+        expect(server.env.SHOWAI_RUNTIME_CONFIG).not.toBe(
+          join(home, "agent-runtime.json"),
+        );
         const client = new Client({
           name: "desktop-plugin-acceptance",
           version: "1",
@@ -196,6 +204,18 @@ describe.skipIf(!output || !config)(
       },
       120000,
     );
+    test("a development build does not install the user-scope Claude Code plugin", async () => {
+      const development = new DesktopPluginInstaller({
+        root: join(root, "profile/development-plugins"),
+        pluginRoot: () => bundle,
+        dshBundleRoot: () => resolve("plugins/dsh-showai"),
+        runtime: () => ({ home, cli }),
+        channel: "development",
+      });
+      await expect(development.install("claude")).rejects.toMatchObject({
+        code: "PLUGIN_DEVELOPMENT_BUILD",
+      });
+    });
     test("deepseek stages a bundle whose MCP row starts without Node on PATH", async () => {
       // Harness installs the bundle itself; a profile linking the staged path counts as installed.
       const profile = join(root, "dsh/profiles/desktop");

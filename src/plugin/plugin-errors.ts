@@ -11,7 +11,8 @@ export type PluginErrorCode =
   | "PLUGIN_BUNDLE_CHANGED"
   | "PLUGIN_NOT_CONFIRMED"
   | "PLUGIN_FILES_MISMATCH"
-  | "PLUGIN_PATH_INVALID";
+  | "PLUGIN_PATH_INVALID"
+  | "PLUGIN_DEVELOPMENT_BUILD";
 
 /** Host versions the App's plugin commands were verified with (`plugin list --json`). */
 export const VERIFIED_HOST_VERSIONS = {

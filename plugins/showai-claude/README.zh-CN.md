@@ -20,11 +20,13 @@ npm run plugin:update -- --json
 
 安装器使用官方 Codex 插件命令，核验启用状态、版本与文件指纹，回执位于 artifacts/codex-plugin-install.json。安装完成、宿主能力刷新和会话加载是三个环节。按宿主支持的方式刷新，并在新对话确认当前工具与 Skill。
 
-Claude Code 在仓库根目录执行：
+Claude Code 的日常插件从 App 安装，连接稳定版。开发时先启动一个开发实例（`npm run dev:open -- --port <端口> --home <内容库>`），再在该源码目录（主目录或 worktree）执行：
 
 ```sh
-npm run plugin:claude -- --json
+npm run plugin:claude -- --port <端口> --json
 ```
+
+主目录安装 `showai-dev`，worktree 安装 `showai-dev-<目录名>`，固定连接这个开发实例的运行时与内容库。插件只在这个目录的 `.claude/settings.json` 中启用，并在这里停用 App 安装的 `showai`，所以一个会话只看到一个 ShowAI 插件。`--remove` 卸载本目录的开发插件；worktree 删除后用 `--prune` 清理。回执位于 artifacts/claude-plugin-install.json。
 
 ### DeepSeek Harness
 

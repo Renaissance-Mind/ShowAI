@@ -41,14 +41,31 @@ function validLaunch(launch: RuntimeLaunch) {
 }
 
 /** Explicit registration: `runtime register` and 修复登记 always replace the file. */
-export async function registerRuntime(
+export function registerRuntime(
+  home: string,
+  launch: RuntimeLaunch,
+  channel?: RuntimeChannel,
+) {
+  return writeRuntimeRecord(
+    join(resolve(home), "agent-runtime.json"),
+    home,
+    launch,
+    channel,
+  );
+}
+
+/**
+ * Writes a registration at any path. A plugin bound to one runtime passes this path as
+ * SHOWAI_RUNTIME_CONFIG, so another App registering in the library cannot rebind it.
+ */
+export async function writeRuntimeRecord(
+  path: string,
   home: string,
   launch: RuntimeLaunch,
   channel?: RuntimeChannel,
 ) {
   validLaunch(launch);
   await access(launch.args[0]);
-  const path = join(resolve(home), "agent-runtime.json");
   await mkdir(dirname(path), { recursive: true });
   const temporary = join(dirname(path), `.agent-runtime-${randomUUID()}.tmp`);
   const registration: RuntimeRegistration = {

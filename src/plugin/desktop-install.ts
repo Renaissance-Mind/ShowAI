@@ -22,6 +22,7 @@ import {
 import {
   registerRuntime,
   runtimeRegistrationStatus,
+  writeRuntimeRecord,
   type RuntimeChannel,
   type RuntimeLaunch,
 } from "../agent/runtime";
@@ -593,6 +594,13 @@ export class DesktopPluginInstaller {
   private async installHost(
     host: "codex" | "claude",
   ): Promise<PluginInstallReceipt> {
+    // The user-scope Claude plugin follows the stable App; a development build would rebind it.
+    if (host === "claude" && this.options.channel === "development")
+      throw new PluginInstallError(
+        "PLUGIN_DEVELOPMENT_BUILD",
+        "Development builds connect Claude Code per checkout: run npm run plugin:claude -- --port <port> in the source directory.",
+        { host },
+      );
     await mkdir(this.options.root, { recursive: true });
     const executable = await this.hostExecutable(host);
     if (!executable)
@@ -656,11 +664,23 @@ export class DesktopPluginInstaller {
       await writeFile(path, JSON.stringify(value, null, 2) + "\n");
     };
     // Use the App's executable instead of requiring Node on the user's PATH.
-    // Pin this connection to the selected library; launch.mjs still verifies its registered runtime.
+    // Pin this connection to the selected library and to this App's runtime: the record lives
+    // outside the library, so another App registering there does not rebind the plugin.
+    const record = join(this.options.root, `${host}-runtime.json`);
+    await writeRuntimeRecord(
+      record,
+      runtime.home,
+      runtime.cli,
+      this.options.channel,
+    );
     const server = {
       command: runtime.cli.command,
       args: [join(source, "mcp/launch.mjs")],
-      env: { ...runtime.cli.env, SHOWAI_HOME: runtime.home },
+      env: {
+        ...runtime.cli.env,
+        SHOWAI_HOME: runtime.home,
+        SHOWAI_RUNTIME_CONFIG: record,
+      },
     };
     await json(join(source, "plugin.json"), { ...manifest, version });
     const claudeManifest = JSON.parse(

@@ -20,11 +20,13 @@ npm run plugin:update -- --json
 
 The installer uses official Codex plugin commands and verifies enabled state, version and file fingerprints. It records artifacts/codex-plugin-install.json. Installation, host capability refresh and a conversation loading current tools/Skills are separate steps. Use the host's supported refresh procedure and confirm the current tools in a new conversation.
 
-For Claude Code, from the repository root:
+For everyday use, install the Claude Code plugin from the App; it connects the stable runtime. For development, start an instance (`npm run dev:open -- --port <port> --home <library>`), then in that checkout (the main directory or a worktree) run:
 
 ```sh
-npm run plugin:claude -- --json
+npm run plugin:claude -- --port <port> --json
 ```
+
+The main directory gets `showai-dev` and a worktree gets `showai-dev-<directory>`, pinned to that instance's runtime and library. The plugin is enabled only in this checkout's `.claude/settings.json`, which also turns off the App-installed `showai` here, so a session sees one ShowAI plugin. `--remove` uninstalls this checkout's plugin; `--prune` cleans up after deleted worktrees. The receipt is artifacts/claude-plugin-install.json.
 
 ### DeepSeek Harness
 
