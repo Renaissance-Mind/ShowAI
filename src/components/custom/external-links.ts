@@ -26,7 +26,9 @@ export function installComponentLinks(channel: string): void {
       parent.postMessage({ channel, type: "showai:open-media", url }, "*");
       return;
     }
-    if (!/^https?:\/\//i.test(url)) return;
+    // ShowAI page links are followed by the page around the frame.
+    if (!/^https?:\/\//i.test(url) && !url.startsWith("showai://project/"))
+      return;
     event.preventDefault();
     parent.postMessage({ channel, type: "showai:open-url", url }, "*");
   });

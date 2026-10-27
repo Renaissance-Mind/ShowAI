@@ -52,6 +52,7 @@ import { LOCAL_MEDIA_SCHEME } from "../components/custom/local-media-link";
 import { tabShortcut } from "../workbench/tab-shortcuts";
 import { MenuCommandQueue } from "./menu-queue";
 import { windowQuery, type WindowTarget } from "../workbench/window-target";
+import { parsePageLink } from "../portable/page-link.mjs";
 import { AgentService, errorResult } from "../agent/service";
 import { MaintenanceScheduler } from "../core/maintenance-scheduler";
 import { syncManager } from "../sync/manager";
@@ -1369,7 +1370,9 @@ async function createWindow(page?: WindowTarget): Promise<BrowserWindow> {
       );
       return { action: "deny" };
     }
-    if (/^https?:\/\//i.test(url)) void shell.openExternal(url);
+    // The workbench follows page links itself; any other opener gets a window.
+    if (parsePageLink(url)) void handleDeepLink(url);
+    else if (/^https?:\/\//i.test(url)) void shell.openExternal(url);
     return { action: "deny" };
   });
   window.webContents.on("will-attach-webview", (event) =>
@@ -1378,7 +1381,8 @@ async function createWindow(page?: WindowTarget): Promise<BrowserWindow> {
   window.webContents.on("will-navigate", (event) => {
     if (isWorkbenchLocation(event.url)) return;
     event.preventDefault();
-    if (/^https?:\/\//i.test(event.url)) void shell.openExternal(event.url);
+    if (parsePageLink(event.url)) void handleDeepLink(event.url);
+    else if (/^https?:\/\//i.test(event.url)) void shell.openExternal(event.url);
   });
   window.webContents.on("will-frame-navigate", (event) => {
     if (!event.isMainFrame && !event.url.startsWith("about:"))

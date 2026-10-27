@@ -45,7 +45,7 @@ function inlineLinks(value, label) {
   const [unsafe] = unsafeInlineLinks(value);
   if (unsafe !== undefined)
     fail(
-      `${label} links to ${unsafe}; only http(s), mailto, # anchors and relative paths are allowed.`,
+      `${label} links to ${unsafe}; only http(s), mailto, # anchors, ShowAI page links and relative paths are allowed.`,
     );
 }
 
@@ -188,7 +188,7 @@ function validateCards(data) {
       text(card.href, `${at}.href`, 2000);
       if (!isSafeHref(card.href))
         fail(
-          `${at}.href must be an http(s), mailto, # anchor or relative link.`,
+          `${at}.href must be an http(s), mailto, # anchor, ShowAI page or relative link.`,
         );
       // The whole card is the link, so its body cannot hold another one.
       if (parseInline(card.body).some((segment) => segment.type === "link"))

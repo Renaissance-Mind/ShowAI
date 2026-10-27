@@ -6,6 +6,7 @@ import {
   invalidNoteMark,
   noteMarkdownExtension,
 } from "../blocks/note-markup.mjs";
+import { parsePageLink } from "../../portable/page-link.mjs";
 
 // ==text== is the common Markdown highlight syntax (Obsidian, Typora, many AI
 // outputs). Its content must not start or end with a space, so `a == b` stays text.
@@ -355,7 +356,8 @@ export function validateRichTextData(data) {
         throw Error("文字字号需要 CSS 长度，例如 20px。");
       if (
         mark.type === "link" &&
-        !/^(https?:\/\/|mailto:|tel:|#)/i.test(mark.attrs?.href ?? "")
+        !/^(https?:\/\/|mailto:|tel:|#)/i.test(mark.attrs?.href ?? "") &&
+        !parsePageLink(mark.attrs?.href)
       )
         throw Error("无效的文字链接。");
       if (invalidNoteMark(mark))

@@ -435,6 +435,19 @@ describe("persistent project, folder, and page organization", () => {
       templatePath: resolve("dist-portable/portable.html"),
     };
     expect((await exportPage(options)).pageIds).toContain(hidden.document.id);
+    // Page links between exported pages resolve through this list.
+    const routes =
+      /<script type="application\/json" id="showai-site">(.*?)<\/script>/.exec(
+        await readFile(join(out, "index.html"), "utf8"),
+      );
+    const site = JSON.parse(routes![1]);
+    expect(site.projectId).toBe(project.id);
+    expect(Object.keys(site.pages).sort()).toEqual(
+      [visible.document.id, hidden.document.id].sort(),
+    );
+    expect(Object.values(site.pages)).toContain("index.html");
+    for (const [id, file] of Object.entries(site.pages))
+      if (file !== "index.html") expect(file).toBe(`${id}.html`);
     await store.updateFolder(project.id, parent.id, { archived: true });
     const result = await exportPage({ ...options, overwrite: true });
     expect(result.pageIds).toEqual([visible.document.id]);

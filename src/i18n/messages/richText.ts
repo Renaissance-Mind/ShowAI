@@ -125,6 +125,9 @@ export default defineMessages("richText", {
     "dialog.imageFormats": "PNG、JPEG、GIF、WebP、AVIF · 原始文件最大 64 MiB",
     "dialog.imageUrl": "或使用图片链接",
     "dialog.linkUrl": "链接地址",
+    "dialog.linkOrPage": "https:// 或页面名称",
+    "dialog.linkPages": "本项目的页面",
+    "dialog.untitledPage": "未命名页面",
     "dialog.imageAlt": "图片描述",
     "dialog.optional": "可选",
     "dialog.imageAltPlaceholder": "用一句话描述图片",
@@ -132,7 +135,7 @@ export default defineMessages("richText", {
     "dialog.cancel": "取消",
     "dialog.confirm": "确认",
     "dialog.invalidImageUrl": "请输入有效的 http 或 https 图片链接。",
-    "dialog.invalidLinkUrl": "请输入 https://、mailto:、tel: 或 # 开头的链接。",
+    "dialog.invalidLinkUrl": "请输入有效的链接，或输入页面名称后选择页面。",
 
     "callout.changeIcon": "更换图标",
     "callout.changeIconLabel": "更换提示图标",
@@ -303,6 +306,9 @@ export default defineMessages("richText", {
       "PNG, JPEG, GIF, WebP, AVIF · Original file up to 64 MiB",
     "dialog.imageUrl": "Or use an image URL",
     "dialog.linkUrl": "Link URL",
+    "dialog.linkOrPage": "https:// or a page name",
+    "dialog.linkPages": "Pages in this project",
+    "dialog.untitledPage": "Untitled page",
     "dialog.imageAlt": "Image description",
     "dialog.optional": "Optional",
     "dialog.imageAltPlaceholder": "Describe the image in one sentence",
@@ -311,7 +317,7 @@ export default defineMessages("richText", {
     "dialog.confirm": "Confirm",
     "dialog.invalidImageUrl": "Enter a valid http or https image URL.",
     "dialog.invalidLinkUrl":
-      "Enter a link that starts with https://, mailto:, tel: or #.",
+      "Enter a valid link, or type a page name and choose a page.",
 
     "callout.changeIcon": "Change icon",
     "callout.changeIconLabel": "Change callout icon",

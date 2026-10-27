@@ -36,6 +36,7 @@ import {
   ArrowDown,
   ArrowUpRight,
   AtSign,
+  Link2,
   AppWindow,
   Blocks,
   Settings2,
@@ -288,6 +289,14 @@ import {
   referenceVersion,
   type PageReference,
 } from "../core/page-reference";
+import {
+  NAVIGATE_EVENT,
+  pageLink,
+  parsePageLink,
+  type NavigationDetail,
+  type NavigationModifiers,
+  type NavigationTarget,
+} from "../portable/page-link.mjs";
 import { useSlidingIndicator } from "./useSlidingIndicator";
 import {
   componentDisplayDescription,
@@ -599,6 +608,38 @@ export default function Studio() {
     };
     window.addEventListener("showai:open-page", open);
     return () => window.removeEventListener("showai:open-page", open);
+  });
+  useEffect(() => {
+    // Page links in content and the Agent panel, and navigation requests from components.
+    const request = (event: Event) => {
+      const detail = (event as CustomEvent<NavigationDetail>).detail;
+      if (!detail?.target) return;
+      event.preventDefault();
+      void followPageLink(detail.target, detail.modifiers).catch(report);
+    };
+    const click = (event: MouseEvent) => {
+      if (event.defaultPrevented || event.button > 1) return;
+      const anchor = event
+        .composedPath()
+        .find(
+          (entry): entry is HTMLAnchorElement =>
+            entry instanceof HTMLAnchorElement && entry.hasAttribute("href"),
+        );
+      const target = anchor && parsePageLink(anchor.getAttribute("href"));
+      if (!target) return;
+      event.preventDefault();
+      // A plain click inside an editor places the caret; the editor follows its links on ⌘-click.
+      if (anchor.isContentEditable) return;
+      void followPageLink(target, event).catch(report);
+    };
+    window.addEventListener(NAVIGATE_EVENT, request);
+    document.addEventListener("click", click, true);
+    document.addEventListener("auxclick", click, true);
+    return () => {
+      window.removeEventListener(NAVIGATE_EVENT, request);
+      document.removeEventListener("click", click, true);
+      document.removeEventListener("auxclick", click, true);
+    };
   });
   useEffect(() => {
     // A missing component's status card searches the component library for it.
@@ -1411,9 +1452,67 @@ export default function Studio() {
       ta("pageReference.copied", { version: referenceVersion(reference) }),
     );
   }
-  async function locateAssistantTarget(pageId: string, ids: string[]) {
-    const projectId = page.projectId ?? selectedProject;
-    if (page.draft?.id !== pageId && !(await openPage(pageId, projectId)))
+  /** Open a linked page here, in a tab or a window, and show the linked content. */
+  async function followPageLink(
+    target: NavigationTarget,
+    modifiers?: NavigationModifiers,
+  ) {
+    const projectId = target.projectId ?? page.projectId ?? selectedProject;
+    const pageId = target.pageId ?? page.draft?.id;
+    if (!projectId || !pageId) return;
+    const ids = target.blockIds;
+    const disposition = modifiers
+      ? clickDisposition(modifiers, info?.platform === "darwin")
+      : "current";
+    if (disposition === "window" && capabilities.windows) {
+      await desktop.openWindow(
+        {
+          projectId,
+          pageId,
+          ...(ids.length ? { blocks: ids.join(",") } : {}),
+        },
+        page.flush,
+      );
+      return;
+    }
+    if (disposition !== "current" && disposition !== "window") {
+      const summary = contents[projectId]?.pages.find(
+        (item) => item.id === pageId,
+      );
+      const opened = await openTarget(
+        summary
+          ? pageTarget(summary, projectId)
+          : {
+              kind: "page",
+              projectId,
+              id: pageId,
+              title: tc("untitled"),
+              pinned: false,
+              parentId: null,
+            },
+        disposition,
+      );
+      if (!opened) return;
+    }
+    await locateAssistantTarget(pageId, ids, projectId);
+  }
+  async function copyPageLink(target: {
+    projectId: string;
+    pageId: string;
+    blockIds: string[];
+  }) {
+    await desktop.invoke("clipboard:write", { text: pageLink(target) });
+    setNotice(t("linkCopied"));
+  }
+  async function locateAssistantTarget(
+    pageId: string,
+    ids: string[],
+    projectId = page.projectId ?? selectedProject,
+  ) {
+    if (
+      (page.draft?.id !== pageId || page.projectId !== projectId) &&
+      !(await openPage(pageId, projectId))
+    )
       return;
     if (ids[0]) setRevealNode(ids[0]);
     // Editors own their DOM attributes, so the highlight is a separate overlay.
@@ -1959,6 +2058,23 @@ export default function Studio() {
               icon: <CodeXml size={15} />,
               disabled: busy,
               onSelect: () => void exportPage("inline"),
+            },
+          ]
+        : []),
+      ...(target
+        ? [
+            {
+              group: common,
+              label: tc("copyLink"),
+              description: t("copyPageLinkDetail"),
+              icon: <Link2 size={15} />,
+              onSelect: action(() =>
+                copyPageLink({
+                  projectId: target.projectId,
+                  pageId: target.id,
+                  blockIds: [],
+                }),
+              ),
             },
           ]
         : []),
@@ -4844,6 +4960,8 @@ export default function Studio() {
                 onControlsChange={setEditorControls}
                 onActiveSurfaceChange={handleActiveSurfaceChange}
                 onRevealHandled={handleRevealHandled}
+                linkablePages={contents}
+                onCopyLink={(target) => void copyPageLink(target).catch(report)}
                 onEditIcon={action(async () => {
                   const target = activePageTarget();
                   if (target) await beginPageIcon(target);
@@ -5501,6 +5619,17 @@ export default function Studio() {
                               copyPageReference(contextMenu.target.projectId, {
                                 kind: "page",
                                 pageId: contextMenu.target.id,
+                              }),
+                            ),
+                          },
+                          {
+                            label: tc("copyLink"),
+                            icon: <Link2 size={15} />,
+                            onSelect: action(() =>
+                              copyPageLink({
+                                projectId: contextMenu.target.projectId,
+                                pageId: contextMenu.target.id,
+                                blockIds: [],
                               }),
                             ),
                           },

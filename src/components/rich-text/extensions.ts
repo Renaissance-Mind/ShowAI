@@ -1,4 +1,5 @@
 import { richTextStyle } from "./model.mjs";
+import { parsePageLink } from "../../portable/page-link.mjs";
 import { translator } from "../../i18n";
 import messages from "../../i18n/messages/richText";
 import { Extension, mergeAttributes, Node, Mark } from "@tiptap/core";
@@ -372,6 +373,9 @@ export function createExtensions(
       link: {
         openOnClick: options.readOnly ?? false,
         HTMLAttributes: { rel: "noopener noreferrer", target: "_blank" },
+        // ShowAI page links are kept; the page around the editor follows them.
+        isAllowedUri: (url, context) =>
+          !!parsePageLink(url) || context.defaultValidate(url),
       },
       codeBlock: false,
     }),

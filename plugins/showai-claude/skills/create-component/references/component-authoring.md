@@ -4,7 +4,7 @@
 
 新组件使用 documentation.version=2；按 [参数契约](parameter-contract.md) 同步 schema、字段语义、遗漏行为、示例及关系约束。结构检查与实际交互分别验证，不把例子中的初始值称为自动默认值。
 
-定义数据契约：输入字段、必填条件、数组上限、单位、默认值以及空数据状态。schema 与 defaultData、examples、React 入口一致。界面需要的计算与状态说明保持在组件内；正式数据通过 `onChange(nextData)` 返回，读取态保持页面源数据。每个组件接收 `{data, onChange, readOnly}`；有对话的宿主还会传入 `onContext` 与 `context`，见下方「交给对话」。
+定义数据契约：输入字段、必填条件、数组上限、单位、默认值以及空数据状态。schema 与 defaultData、examples、React 入口一致。界面需要的计算与状态说明保持在组件内；正式数据通过 `onChange(nextData)` 返回，读取态保持页面源数据。每个组件接收 `{data, onChange, readOnly, goTo}`，`goTo` 见下方「跳转到页面或组件」；有对话的宿主还会传入 `onContext` 与 `context`，见下方「交给对话」。
 
 包包含 `manifest.json`、`props.schema.json` 和 manifest.entry 指定的本地文件。manifest 记录 id、name、version、description、scenarios、entry、defaultData、examples。输入与示例保留可用的最小实例；参考本次真实内容验证较复杂情况，不为未知事实生成示例测量。
 
@@ -65,6 +65,24 @@ export default function Explorer({ data, onContext, context }) {
 交出的是读者此刻看到的状态，不是页面数据：不要为它新增 schema 字段，也不要用 `onChange` 保存它；用户要求保留时由页面编辑流程修改 data。`model` 用稳定字段名和单位写出 Agent 需要的参数、派生量与相对已保存数据的变化，不放整张图或长数组。不要在拖动的每一帧调用，在明确的操作或交互结束时调用一次。在 `usage.interactions` 中把这个操作记为 `persistence: "none"`，effect 写清交出的字段。
 
 验证时在工作台真实页面操作后检查对话输入框出现标签、移除后不随消息发送、刷新页面后 `context` 恢复，并确认页面数据未变；检查导出 HTML 不出现该控件；能接入 MCP Apps 对话预览时检查宿主收到的模型上下文，不能时说明未验证。
+
+## 跳转到页面或组件
+
+每个组件都会收到 `goTo(target)`，用于让读者点击后跳到另一页、本页的某个块，或另一页上的某个组件或 Board 对象。`target` 可以是页面链接 `showai://project/项目ID/page/页面ID`（要定位到块时加 `?blocks=块ID`，最多 100 个），可以是 `"#块ID"`（本页），也可以是 `{pageId?, blockId?, projectId?}`，省略的 ID 指组件所在的页面和项目。编辑和阅读时都可以调用，调用必须紧随读者的点击或按键，否则返回 false；格式错误时抛出错误。目标可以是页面中的段落、标题、组件、容器里的块或 Board 对象，组件内部的条目不能作为目标。组件里的普通 `<a href="showai://project/…">` 链接效果相同：目标固定、元素本身就是链接时用 `<a href>`，读者可以用键盘聚焦并按回车跳转；目标需要计算，或可点击的元素不是链接（如卡片按钮、图表节点）时用 `goTo`，可点击元素用 `<button type="button">`。
+
+目标的项目、页面和块 ID 由页面作者写进组件 data（取自 pages_list 与 page_read），schema 中按普通字符串字段描述，组件不要猜测或拼接页面标题。宿主行为：工作台在当前标签页打开目标页面并滚动、高亮目标块，目标页面不存在时提示错误并停留原页，目标块不存在时只打开页面；导出为网站时，跳转打开导出的对应页面并定位到目标块；单页导出、对话预览以及网站中指向未导出页面的跳转交给 ShowAI App，只有装了 ShowAI 且有这个项目的读者能打开。跳转不修改页面数据，在 `usage.interactions` 中记为 `persistence: "none"`。
+
+```jsx
+export default function Chapters({ data, goTo }) {
+  return data.chapters.map((chapter) => (
+    <button key={chapter.id} type="button" onClick={() => goTo({ pageId: chapter.pageId, blockId: chapter.blockId })}>
+      {chapter.title}
+    </button>
+  ));
+}
+```
+
+验证时在工作台点击后确认打开了正确页面并高亮目标块，再用后退回到原页；导出网站时确认页间跳转打开对应文件。
 
 ## 菜单与交互入口
 

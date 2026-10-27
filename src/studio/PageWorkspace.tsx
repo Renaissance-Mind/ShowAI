@@ -3,10 +3,16 @@ import {
   useContext,
   useEffect,
   useLayoutEffect,
+  useMemo,
   useRef,
   useState,
   useSyncExternalStore,
 } from "react";
+import {
+  PageLinkContext,
+  type LinkablePage,
+  type PageLinkBridge,
+} from "../components/page-links";
 import { CustomComponentsProvider } from "../components/custom/CustomBlock";
 import {
   WorkspaceEditorContext,
@@ -27,6 +33,8 @@ function PageContent({
   onActiveSurfaceChange,
   onRevealHandled,
   onEditIcon,
+  linkablePages,
+  onCopyLink,
 }: {
   view: PageViewSession;
   readOnly?: boolean;
@@ -35,11 +43,36 @@ function PageContent({
   onActiveSurfaceChange: (id: string) => void;
   onRevealHandled: () => void;
   onEditIcon: () => void;
+  /** Loaded pages of each project, offered as link targets. */
+  linkablePages: Record<string, { pages: LinkablePage[] } | undefined>;
+  onCopyLink: (target: {
+    projectId: string;
+    pageId: string;
+    blockIds: string[];
+  }) => void;
 }) {
   const state = useSyncExternalStore(
     view.session.subscribe,
     view.session.getSnapshot,
     view.session.getSnapshot,
+  );
+  const projectId = state.projectId;
+  const pageId = state.draft?.id;
+  const pages = projectId ? linkablePages[projectId]?.pages : undefined;
+  const latestCopy = useRef(onCopyLink);
+  latestCopy.current = onCopyLink;
+  const pageLinks = useMemo<PageLinkBridge | null>(
+    () =>
+      projectId && pageId
+        ? {
+            projectId,
+            pageId,
+            pages: pages ?? [],
+            copyLink: (blockIds) =>
+              latestCopy.current({ projectId, pageId, blockIds }),
+          }
+        : null,
+    [projectId, pageId, pages],
   );
   const editors = useContext(WorkspaceEditorContext);
   useLayoutEffect(() => {
@@ -50,39 +83,41 @@ function PageContent({
   if (!state.draft) return null;
   const locked = !!readOnly || !!state.record?.readOnly;
   return (
-    <CustomComponentsProvider components={state.record?.components ?? []}>
-      <DatasetScope
-        projectId={state.projectId}
-        pageId={state.draft.id}
-        readOnly={locked}
-      >
-        <SurfaceEditor
-          key={`${state.draft.id}:${state.renderVersion}`}
-          document={state.draft}
+    <PageLinkContext.Provider value={pageLinks}>
+      <CustomComponentsProvider components={state.record?.components ?? []}>
+        <DatasetScope
+          projectId={state.projectId}
+          pageId={state.draft.id}
           readOnly={locked}
-          onChange={view.session.edit}
-          header={
-            state.draft.content.attrs?.kind === "board" ? undefined : (
-              <PageHeading
-                title={state.draft.title}
-                icon={state.draft.icon}
-                readOnly={locked}
-                onTitleChange={(title) => view.session.edit({ title })}
-                onEditIcon={onEditIcon}
-              />
-            )
-          }
-          revealId={revealId}
-          onControlsChange={onControlsChange}
-          onActiveSurfaceChange={onActiveSurfaceChange}
-          onRevealHandled={onRevealHandled}
-          retainedState={view.surface}
-          inlineInkProjectId={state.projectId ?? undefined}
-          onInkSave={view.session.flush}
-          onPublishedInkSave={view.session.flushPublishedSource}
-        />
-      </DatasetScope>
-    </CustomComponentsProvider>
+        >
+          <SurfaceEditor
+            key={`${state.draft.id}:${state.renderVersion}`}
+            document={state.draft}
+            readOnly={locked}
+            onChange={view.session.edit}
+            header={
+              state.draft.content.attrs?.kind === "board" ? undefined : (
+                <PageHeading
+                  title={state.draft.title}
+                  icon={state.draft.icon}
+                  readOnly={locked}
+                  onTitleChange={(title) => view.session.edit({ title })}
+                  onEditIcon={onEditIcon}
+                />
+              )
+            }
+            revealId={revealId}
+            onControlsChange={onControlsChange}
+            onActiveSurfaceChange={onActiveSurfaceChange}
+            onRevealHandled={onRevealHandled}
+            retainedState={view.surface}
+            inlineInkProjectId={state.projectId ?? undefined}
+            onInkSave={view.session.flush}
+            onPublishedInkSave={view.session.flushPublishedSource}
+          />
+        </DatasetScope>
+      </CustomComponentsProvider>
+    </PageLinkContext.Provider>
   );
 }
 

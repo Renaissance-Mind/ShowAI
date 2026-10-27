@@ -3,6 +3,12 @@ import { registerSelectionEditor } from "../../surface/text-selection";
 import { ContentNodeActions } from "./ContentNodeActions";
 import { primitiveNodeTypes, primitiveContentNode } from "./model.mjs";
 import { CAPACITY, formatBytes } from "../../portable/capacity.mjs";
+import {
+  navigationTarget,
+  pageLink,
+  parsePageLink,
+  requestNavigation,
+} from "../../portable/page-link.mjs";
 import { translator } from "../../i18n";
 import { useTranslator } from "../../i18n/react";
 import commonMessages from "../../i18n/messages/common";
@@ -63,6 +69,7 @@ import {
   Copy,
   ExternalLink,
   Expand,
+  FileText,
   GripVertical,
   Heading1,
   Heading2,
@@ -211,7 +218,7 @@ function safeImageUrl(value: string) {
 }
 
 function safeLinkUrl(value: string) {
-  return /^(https?:\/\/|mailto:|tel:|#)/i.test(value);
+  return /^(https?:\/\/|mailto:|tel:|#)/i.test(value) || !!parsePageLink(value);
 }
 
 /** Page editors append a synthetic tail paragraph that is not stored in the document. */
@@ -256,8 +263,10 @@ export default function RichTextEditor({
   const selectedRef = useRef(0);
   const dragPosition = useRef<number | null>(null);
   const [slash, setSlash] = useState<SlashState | null>(null);
-  const { useCatalog, registerComponent, assistant } =
+  const { useCatalog, registerComponent, assistant, pageLinks } =
     useContext(RichTextEnvironment);
+  const pageLinksRef = useRef(pageLinks);
+  pageLinksRef.current = pageLinks;
   const catalog = useCatalog(!!slash);
   const [inserting, setInserting] = useState(false);
   const insertionTicket = useRef(0);
@@ -417,13 +426,34 @@ export default function RichTextEditor({
           return false;
         const href = link.getAttribute("href") ?? "";
         if (!safeLinkUrl(href)) return true;
+        const target = navigationTarget(href);
+        // The modifier that follows a link while editing is not a tab request.
+        if (target && requestNavigation(link, target, readOnly ? event : undefined))
+          return true;
         if (href.startsWith("#")) {
           const target = document.getElementById(href.slice(1));
           target?.scrollIntoView({ behavior: "smooth", block: "start" });
-        } else window.open(href, "_blank", "noopener,noreferrer");
+        } else if (!target) window.open(href, "_blank", "noopener,noreferrer");
         return true;
       },
-      handlePaste: (_view, event) => {
+      handlePaste: (view, event) => {
+        const pasted = event.clipboardData?.getData("text/plain").trim() ?? "";
+        const linked = parsePageLink(pasted);
+        if (linked) {
+          // A copied page link links the selected text, or inserts the page title.
+          event.preventDefault();
+          const { empty, from, to } = view.state.selection;
+          const mark = view.state.schema.marks.link.create({ href: pasted });
+          view.dispatch(
+            empty
+              ? view.state.tr.insert(
+                  from,
+                  view.state.schema.text(linkLabel(pasted), [mark]),
+                )
+              : view.state.tr.addMark(from, to, mark),
+          );
+          return true;
+        }
         const files = [...(event.clipboardData?.files ?? [])].filter((file) =>
           file.type.startsWith("image/"),
         );
@@ -783,6 +813,67 @@ export default function RichTextEditor({
     setSlash(null);
   }
 
+  /** Text for a link inserted without a selection: the page title for page links. */
+  function linkLabel(href: string) {
+    const target = parsePageLink(href);
+    const bridge = pageLinksRef.current;
+    const title =
+      target &&
+      bridge?.projectId === target.projectId &&
+      bridge.pages.find((page) => page.id === target.pageId)?.title;
+    return title || href;
+  }
+  function applyLink(value: string) {
+    if (!editor) return;
+    if (selectionBeforeDialog.current)
+      editor.commands.setTextSelection(selectionBeforeDialog.current);
+    if (!value)
+      editor.chain().focus().extendMarkRange("link").unsetLink().run();
+    else if (editor.state.selection.empty && !editor.isActive("link"))
+      editor
+        .chain()
+        .focus()
+        .insertContent({
+          type: "text",
+          text: linkLabel(value),
+          marks: [{ type: "link", attrs: { href: value } }],
+        })
+        .run();
+    else
+      editor
+        .chain()
+        .focus()
+        .extendMarkRange("link")
+        .setLink({ href: value })
+        .run();
+    setDialog(null);
+  }
+  const linkQuery =
+    dialog?.type === "link" && pageLinks && !/^[a-z][a-z0-9+.-]*:|^#/i.test(dialog.value.trim())
+      ? dialog.value.trim().toLocaleLowerCase()
+      : null;
+  // Typing a page name instead of an address offers the project's pages.
+  const linkSuggestions = useMemo(
+    () =>
+      linkQuery === null || !pageLinks
+        ? []
+        : pageLinks.pages
+            .filter(
+              (page) =>
+                page.id !== pageLinks.pageId &&
+                (page.title || t("dialog.untitledPage"))
+                  .toLocaleLowerCase()
+                  .includes(linkQuery),
+            )
+            .slice(0, 6)
+            .map((page) => ({
+              ...page,
+              href: pageLink({ projectId: pageLinks.projectId, pageId: page.id }),
+            })),
+    [linkQuery, pageLinks, t],
+  );
+  const [linkChoice, setLinkChoice] = useState(-1);
+  useEffect(() => setLinkChoice(linkQuery ? 0 : -1), [linkQuery]);
   const openDialog = useCallback(
     (type: "image" | "link" | "note") => {
       if (!editor) return;
@@ -1830,6 +1921,19 @@ export default function RichTextEditor({
                       {tc("copyReference")}
                     </button>
                   )}
+                  {pageLinks && (
+                    <button
+                      onClick={() => {
+                        const id = editor.state.doc.nodeAt(hover.pos)?.attrs.id;
+                        setBlockMenu(false);
+                        if (typeof id === "string" && !isSyntheticId(id))
+                          pageLinks.copyLink([id]);
+                      }}
+                    >
+                      <Link2 size={15} />
+                      {tc("copyLink")}
+                    </button>
+                  )}
                   <div className="menu-rule" />
                   <button
                     className="danger"
@@ -2134,7 +2238,11 @@ export default function RichTextEditor({
                   setDialogError(t("dialog.invalidImageUrl"));
                   return;
                 }
-                if (dialog.type === "link" && value && !safeLinkUrl(value)) {
+                const link =
+                  dialog.type === "link"
+                    ? (linkSuggestions[linkChoice]?.href ?? value)
+                    : value;
+                if (dialog.type === "link" && link && !safeLinkUrl(link)) {
                   setDialogError(t("dialog.invalidLinkUrl"));
                   return;
                 }
@@ -2143,43 +2251,19 @@ export default function RichTextEditor({
                   setDialog(null);
                   return;
                 }
+                if (dialog.type === "link") {
+                  applyLink(link);
+                  return;
+                }
                 if (selectionBeforeDialog.current)
                   editor.commands.setTextSelection(
                     selectionBeforeDialog.current,
                   );
-                if (dialog.type === "image")
-                  editor
-                    .chain()
-                    .focus()
-                    .setImage({ src: value, alt: dialog.alt })
-                    .run();
-                else if (!value)
-                  editor
-                    .chain()
-                    .focus()
-                    .extendMarkRange("link")
-                    .unsetLink()
-                    .run();
-                else if (
-                  editor.state.selection.empty &&
-                  !editor.isActive("link")
-                )
-                  editor
-                    .chain()
-                    .focus()
-                    .insertContent({
-                      type: "text",
-                      text: value,
-                      marks: [{ type: "link", attrs: { href: value } }],
-                    })
-                    .run();
-                else
-                  editor
-                    .chain()
-                    .focus()
-                    .extendMarkRange("link")
-                    .setLink({ href: value })
-                    .run();
+                editor
+                  .chain()
+                  .focus()
+                  .setImage({ src: value, alt: dialog.alt })
+                  .run();
                 setDialog(null);
               }}
             >
@@ -2262,14 +2346,67 @@ export default function RichTextEditor({
                   <input
                     autoFocus
                     type="text"
-                    placeholder="https://"
+                    placeholder={
+                      dialog.type === "link" && pageLinks
+                        ? t("dialog.linkOrPage")
+                        : "https://"
+                    }
                     value={dialog.value}
+                    role={linkSuggestions.length ? "combobox" : undefined}
+                    aria-expanded={
+                      linkSuggestions.length ? true : undefined
+                    }
+                    aria-controls={
+                      linkSuggestions.length ? "editor-link-pages" : undefined
+                    }
+                    aria-activedescendant={
+                      linkSuggestions[linkChoice]
+                        ? `editor-link-page-${linkChoice}`
+                        : undefined
+                    }
                     onChange={(event) => {
                       setDialog({ ...dialog, value: event.target.value });
                       setDialogError("");
                     }}
+                    onKeyDown={(event) => {
+                      if (
+                        !linkSuggestions.length ||
+                        !["ArrowDown", "ArrowUp"].includes(event.key)
+                      )
+                        return;
+                      event.preventDefault();
+                      const step = event.key === "ArrowDown" ? 1 : -1;
+                      setLinkChoice(
+                        (current) =>
+                          (current + step + linkSuggestions.length) %
+                          linkSuggestions.length,
+                      );
+                    }}
                   />
                 </label>
+              )}
+              {linkSuggestions.length > 0 && (
+                <ul
+                  className="editor-link-pages"
+                  id="editor-link-pages"
+                  role="listbox"
+                  aria-label={t("dialog.linkPages")}
+                >
+                  {linkSuggestions.map((page, index) => (
+                    <li
+                      key={page.id}
+                      id={`editor-link-page-${index}`}
+                      role="option"
+                      aria-selected={index === linkChoice}
+                      onMouseEnter={() => setLinkChoice(index)}
+                      onMouseDown={(event) => event.preventDefault()}
+                      onClick={() => applyLink(page.href)}
+                    >
+                      <FileText size={14} />
+                      <span>{page.title || t("dialog.untitledPage")}</span>
+                    </li>
+                  ))}
+                </ul>
               )}
               {dialog.type === "image" && (
                 <label className="editor-field">

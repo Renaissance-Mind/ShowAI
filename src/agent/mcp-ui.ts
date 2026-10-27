@@ -154,8 +154,8 @@ a{color:inherit}
  root.addEventListener('showai:conversation-context',event=>{const detail=event.detail;if(!conversational()||!detail?.blockId||!detail.snapshot)return;handed.delete(detail.blockId);handed.set(detail.blockId,{blockId:detail.blockId,componentId:detail.componentId||undefined,name:String(detail.name||''),label:detail.snapshot.label,model:detail.snapshot.model});while(handed.size>6)handed.delete(handed.keys().next().value);clearTimeout(stateTimer);stateTimer=setTimeout(publishState,300);});
  for(const type of ['input','click'])root.addEventListener(type,track,true);
 
- // External links go through the host so its sandbox and confirmation rules apply.
- root.addEventListener('click',event=>{if(event.defaultPrevented)return;const link=event.composedPath().find(node=>node instanceof HTMLAnchorElement&&node.href);if(!link||link.hasAttribute('download')||!/^https?:$/.test(link.protocol)||link.origin===location.origin)return;event.preventDefault();openLink(link.href);});
+ // External links and ShowAI page links go through the host so its sandbox and confirmation rules apply.
+ root.addEventListener('click',event=>{if(event.defaultPrevented)return;const link=event.composedPath().find(node=>node instanceof HTMLAnchorElement&&node.href);if(!link||link.hasAttribute('download'))return;const app=link.protocol==='showai:';if(!app&&(!/^https?:$/.test(link.protocol)||link.origin===location.origin))return;event.preventDefault();openLink(link.href);});
 
  window.addEventListener('message',event=>{if(event.source!==parent||event.data?.jsonrpc!=='2.0')return;const msg=event.data;if(pending.has(msg.id)){const waiter=pending.get(msg.id);pending.delete(msg.id);msg.error?waiter.reject(new Error(msg.error.message)):waiter.resolve(msg.result);return;}
   if(msg.method==='ui/notifications/tool-input')waiting(msg.params?.arguments);

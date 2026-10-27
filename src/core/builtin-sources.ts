@@ -60,6 +60,7 @@ import objectContext from "../surface/object-context.ts?raw";
 import nativeInkCss from "../surface/native-ink.css?raw";
 import capacity from "../portable/capacity.mjs?raw";
 import ownedJson from "../portable/owned-json.mjs?raw";
+import pageLinkSource from "../portable/page-link.mjs?raw";
 import sdk from "../components/blocks/sdk.tsx?raw";
 import actionHost from "../components/blocks/action-host.tsx?raw";
 import manualEditing from "../components/blocks/manual-editing.ts?raw";
@@ -260,6 +261,7 @@ const sources: Record<string, string> = {
   "native-ink.css": nativeInkCss,
   "capacity.mjs": capacity,
   "owned-json.mjs": ownedJson,
+  "page-link.mjs": pageLinkSource,
   "sdk.tsx": sdk,
   "action-host.tsx": actionHost,
   "manual-editing.ts": manualEditing,
@@ -396,6 +398,12 @@ export const builtinSources: Record<string, string> = Object.fromEntries(
       )
       .replaceAll('"../portable/capacity.mjs"', '"./capacity.mjs"')
       .replaceAll('"../portable/owned-json.mjs"', '"./owned-json.mjs"')
+      .replaceAll(
+        '"../../portable/page-link.mjs"',
+        name.startsWith("rich-text/")
+          ? '"../page-link.mjs"'
+          : '"./page-link.mjs"',
+      )
       .replaceAll(
         '"../../portable/capacity.mjs"',
         name.startsWith("rich-text/")

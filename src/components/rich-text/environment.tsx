@@ -15,6 +15,20 @@ export interface AssistantRequest {
   /** Text placed in the request input, e.g. a component error to fix. */
   prompt?: string;
 }
+export interface LinkablePage {
+  id: string;
+  title: string;
+  icon?: string;
+}
+/** Links between saved pages, offered by the workbench around an editable page. */
+export interface PageLinkBridge {
+  projectId: string;
+  pageId: string;
+  /** Pages of the same project the link dialog can offer. */
+  pages: LinkablePage[];
+  /** Copy a link to the page, or to these blocks on it. */
+  copyLink(blockIds: string[]): void;
+}
 /** The host supplies project resources; all writing tools belong to the component. */
 export const RichTextEnvironment = createContext<{
   useCatalog: typeof useComponentCatalog;
@@ -26,6 +40,7 @@ export const RichTextEnvironment = createContext<{
     /** Copies a reference to the request's blocks for an external Agent. */
     reference: (request: AssistantRequest) => void;
   } | null;
+  pageLinks?: PageLinkBridge | null;
 }>({
   useCatalog: () => ({
     items: [],

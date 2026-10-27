@@ -475,6 +475,25 @@ async function compileReader(archivePath, archive, kinds, omits = []) {
             contents: "export function OutlineSettings() { return null; }",
             loader: "tsx",
           };
+        // Readers never insert components: the slash menu and the catalog
+        // behind it (with its strings) would only add weight.
+        if (args.path === "src/components/ComponentSlashMenu.tsx")
+          return {
+            contents: "export function ComponentSlashMenu() { return null; }",
+            loader: "tsx",
+          };
+        if (args.path === "src/components/useComponentCatalog.ts")
+          return {
+            contents: [
+              'import { createContext } from "react";',
+              "export const RegisterComponentContext = createContext(() => {});",
+              "export function useComponentCatalog() {",
+              '  throw new Error("Readers never insert components.");',
+              "}",
+            ].join("\n"),
+            loader: "ts",
+            resolveDir: join(dirname(archivePath), ".."),
+          };
         // Parameter documentation serves Agents and the catalog, never the reader.
         if (
           args.path === "resources/catalog/component-documentation.json" ||

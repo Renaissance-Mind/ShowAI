@@ -3,10 +3,11 @@
 // the CLI and the portable reader agree on what counts as a link or a note;
 // rendering never uses raw HTML.
 import { findNote, plainNotes } from "./note-markup.mjs";
+import { parsePageLink } from "../../portable/page-link.mjs";
 
 const INLINE = /\*\*(.+?)\*\*|`([^`]+)`|\[([^\]]+)\]\(([^)\s]+)\)/g;
 
-/** Links may only reach http(s), mailto, in-page anchors or relative paths. */
+/** Links may only reach http(s), mailto, in-page anchors, ShowAI pages or relative paths. */
 export function isSafeHref(href) {
   if (
     typeof href !== "string" ||
@@ -14,7 +15,8 @@ export function isSafeHref(href) {
     /[\s\u0000-\u001f]/.test(href)
   )
     return false;
-  if (/^(https?:\/\/[^/]|mailto:)/i.test(href)) return true;
+  if (/^(https?:\/\/[^/]|mailto:)/i.test(href) || parsePageLink(href))
+    return true;
   // Anything else with a scheme (javascript:, data:, file:…) or a protocol-relative host is refused.
   return !/^[a-z][a-z0-9+.-]*:/i.test(href) && !href.startsWith("//");
 }

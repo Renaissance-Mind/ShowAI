@@ -671,6 +671,16 @@ export async function exportPage(
       await writeFile(join(out, "assets/viewer.css"), css);
       bytes += Buffer.byteLength(code) + Buffer.byteLength(css);
     }
+    // Page links between exported pages open the page files.
+    const siteRoutes = JSON.stringify({
+      projectId: options.projectId,
+      pages: Object.fromEntries(routes.map((route) => [route.id, route.file])),
+    }).replaceAll("<", "\\u003c");
+    html = html.replace(
+      /<body\b[^>]*>/i,
+      (tag) =>
+        `${tag}<script type="application/json" id="showai-site">${siteRoutes}</script>`,
+    );
     if (documents.length > 1) {
       const navigation = `<nav class="showai-site-nav" aria-label="Site pages">${routes.map((route, routeIndex) => `<a href="./${escapeHtml(route.file)}"${index === routeIndex ? ' aria-current="page"' : ""}>${escapeHtml(route.title)}</a>`).join("")}</nav>`;
       html = html.replace(/<body\b[^>]*>/i, (tag) => tag + navigation);

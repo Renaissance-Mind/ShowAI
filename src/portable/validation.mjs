@@ -3,6 +3,7 @@ import {shareNativeSource} from "../surface/native-source-delta.mjs";
 import { validateInkArchiveGroup } from "../surface/ink-archive-group.mjs";
 import { isResource } from "../surface/containers.mjs";
 import { validatePageIcon } from "../lib/page-icon.mjs";
+import { parsePageLink } from "./page-link.mjs";
 import { artifactVersion, assignSurfaceIds } from "../surface/document.mjs";
 import { validateSurface } from "../surface/validation.mjs";
 import {
@@ -162,7 +163,7 @@ export function isSafeUrl(value, image = false) {
     /^data:image\/(?:png|jpeg|gif|webp|avif);base64,[a-z\d+/=\s]+$/i.test(value)
   )
     return true;
-  if (!image && value.startsWith("#")) return true;
+  if (!image && (value.startsWith("#") || parsePageLink(value))) return true;
   if (/^[\u0000-\u0020]|[\u0000-\u001f]/.test(value)) return false;
   try {
     const parsed = new URL(value);
@@ -227,7 +228,7 @@ function validateAttrs(attrs, path, permitted, surfaceIcon = false) {
       throw new Error(`Unsupported attribute ${path}.${key}.`);
     if (value === null || value === undefined) continue;
     if (key === "href" && !isSafeUrl(value))
-      throw new Error(`${path}.href must be a safe web, email, or anchor URL.`);
+      throw new Error(`${path}.href must be a safe web, email, anchor or ShowAI page URL.`);
     if (key === "src" && value !== "" && !isSafeUrl(value, true))
       throw new Error(
         `${path}.src must be a web URL or embedded raster image.`,

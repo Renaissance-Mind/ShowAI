@@ -15,6 +15,10 @@ import {
   componentContextIssue,
   type ComponentContextSnapshot,
 } from "./component-context.mjs";
+import {
+  navigationTarget,
+  requestNavigation,
+} from "../../portable/page-link.mjs";
 
 interface MountedComponent {
   update(
@@ -32,6 +36,7 @@ interface InlineModule {
       onContext?: (snapshot: ComponentContextSnapshot) => boolean;
       context?: ComponentContextSnapshot;
       outline?: PageOutlineComponentProps;
+      goTo: (target: unknown) => boolean;
     },
   ): MountedComponent;
 }
@@ -136,11 +141,23 @@ export function InlineComponent({
       );
       return true;
     };
+    // The reader around the component follows page links and in-page targets.
+    const goTo = (value: unknown) => {
+      const target = navigationTarget(value);
+      if (!target)
+        throw new Error(
+          'goTo needs a ShowAI page link, "#blockId" or {pageId, blockId, projectId}.',
+        );
+      if (navigator.userActivation && !navigator.userActivation.isActive)
+        return false;
+      return requestNavigation(container.current ?? host, target);
+    };
     globals[callbackKey] = (module: InlineModule) => {
       mounted.current = module.mount(root, {
         data: currentData.current,
         outline: currentOutline.current,
         onError: setError,
+        goTo,
         ...(conversation
           ? { onContext, context: handedOver.get(blockId!) }
           : {}),

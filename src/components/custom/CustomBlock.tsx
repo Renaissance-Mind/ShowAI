@@ -36,6 +36,11 @@ import messages from "../../i18n/messages/customComponents";
 import common from "../../i18n/messages/common";
 import { AssistantContext } from "../assistant-context";
 import { componentContextIssue } from "./component-context.mjs";
+import {
+  navigationTarget,
+  parsePageLink,
+  requestNavigation,
+} from "../../portable/page-link.mjs";
 import { BindingBasisContext } from "../../datasets/basis";
 import { ComponentStatus } from "../blocks/ComponentStatus";
 import widgetMessages from "../../i18n/messages/widget";
@@ -377,6 +382,26 @@ function SandboxComponent({
           componentId: latest.current.parsed.componentId,
           name: component.name,
         });
+        return;
+      }
+      if (
+        event.data.type === "showai:navigate" ||
+        (event.data.type === "showai:open-url" && parsePageLink(event.data.url))
+      ) {
+        const target = navigationTarget(
+          event.data.type === "showai:navigate"
+            ? event.data.target
+            : event.data.url,
+        );
+        if (!target) {
+          console.warn(
+            `${component.name}: goTo needs a ShowAI page link, "#blockId" or {pageId, blockId, projectId}.`,
+          );
+          return;
+        }
+        if (navigator.userActivation && !navigator.userActivation.isActive)
+          return;
+        requestNavigation(iframe.current!, target);
         return;
       }
       if (event.data.type === "showai:open-url") {

@@ -9,6 +9,7 @@ import { mathHtml } from "../blocks/markdown-math.mjs";
 import { noteProps } from "../blocks/NoteText";
 import { installNoteBubbles } from "../blocks/note-bubble";
 import { safeUrl } from "../blocks/helpers";
+import { parsePageLink } from "../../portable/page-link.mjs";
 import { StepperReader, stepTitle } from "./Stepper";
 import { translator } from "../../i18n";
 import messages from "../../i18n/messages/richText";
@@ -83,28 +84,23 @@ function markedText(node: JSONContent): ReactNode {
           </span>
         );
         break;
-      case "link":
+      case "link": {
+        const href = String(mark.attrs?.href ?? "");
+        // In-page anchors and ShowAI page links are followed by the reading host.
+        const local = href.startsWith("#") || !!parsePageLink(href);
         content = (
           <a
             {...props}
-            href={
-              safeUrl(mark.attrs?.href) ||
-              (String(mark.attrs?.href ?? "").startsWith("#")
-                ? mark.attrs?.href
-                : undefined)
-            }
+            href={safeUrl(href) || (local ? href : undefined)}
             title={mark.attrs?.title}
-            target={
-              String(mark.attrs?.href ?? "").startsWith("#")
-                ? undefined
-                : "_blank"
-            }
+            target={local ? undefined : "_blank"}
             rel="noopener noreferrer"
           >
             {content}
           </a>
         );
         break;
+      }
       default:
         throw new Error(`Unsupported text format: ${mark.type}`);
     }

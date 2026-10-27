@@ -372,3 +372,16 @@ html {
     break-inside: avoid;
   }
 }
+.portable-link-target {
+  animation: portable-link-target 1.6s ease-out;
+  border-radius: 6px;
+}
+@keyframes portable-link-target {
+  0%,
+  40% {
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent, #50745e) 45%, transparent);
+  }
+  100% {
+    box-shadow: 0 0 0 3px transparent;
+  }
+}

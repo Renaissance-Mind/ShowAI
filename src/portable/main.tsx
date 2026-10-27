@@ -9,6 +9,7 @@ mountReader(root, {
     window.document.getElementById("showai-data")?.textContent,
   readOptions: () =>
     window.document.getElementById("showai-read-options")?.textContent,
+  readSite: () => window.document.getElementById("showai-site")?.textContent,
   setTheme: (theme) => {
     window.document.documentElement.dataset.theme = theme;
   },

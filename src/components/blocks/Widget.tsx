@@ -1,6 +1,7 @@
 import { cloneSourceValue, ownSourceValue } from "../../surface/source-runtime";
 import { RichTextEnvironment } from "../rich-text/environment";
 import { AssistantContext } from "../assistant-context";
+import { PageLinkContext } from "../page-links";
 import {
   useComponentCatalog,
   RegisterComponentContext,
@@ -167,6 +168,7 @@ const WidgetBody = memo(function WidgetBody({
     : undefined;
   const registerComponent = useContext(RegisterComponentContext);
   const assistant = useContext(AssistantContext);
+  const pageLinks = useContext(PageLinkContext);
   const environment = useMemo(
     () => ({
       useCatalog: useComponentCatalog,
@@ -175,8 +177,9 @@ const WidgetBody = memo(function WidgetBody({
         <Widget {...props} />
       ),
       assistant: readOnly ? null : assistant,
+      pageLinks: readOnly ? null : pageLinks,
     }),
-    [registerComponent, assistant, readOnly],
+    [registerComponent, assistant, pageLinks, readOnly],
   );
   useSyncExternalStore(
     subscribeToBlocks,

@@ -20,6 +20,11 @@ import {
   conversationPage,
   useConversationReference,
 } from "./ConversationReference";
+import {
+  installReaderLinks,
+  parseSiteRoutes,
+  revealLinkedBlock,
+} from "./reader-links";
 import { resolveLocale, setLocale, translator } from "../i18n";
 import { useTranslator } from "../i18n/react";
 import messages from "../i18n/messages/reader";
@@ -35,6 +40,8 @@ export interface ReaderHost {
   inlineHost: HTMLElement | null;
   readArtifact: () => string | null | undefined;
   readOptions: () => string | null | undefined;
+  /** Site exports list their pages so page links open the exported files. */
+  readSite?: () => string | null | undefined;
   setTheme: (theme: "dark" | "light") => void;
 }
 
@@ -136,6 +143,17 @@ function ArtifactReader({
     [host],
   );
   const references = useConversationReference(appRef, document, conversation);
+  const site = useMemo(() => parseSiteRoutes(host.readSite?.()), [host]);
+  useEffect(
+    () =>
+      installReaderLinks(
+        appRef.current!,
+        { pageId: document.id, projectId: conversation?.projectId },
+        site,
+      ),
+    [document.id, conversation, site],
+  );
+  useEffect(() => revealLinkedBlock(appRef.current!), []);
   const menuButtonRef = useRef<HTMLButtonElement>(null);
   const [remote, setRemote] = useState<CompiledComponent[]>([]);
   const [remoteError, setRemoteError] = useState<{

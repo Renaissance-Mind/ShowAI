@@ -22,6 +22,10 @@ import {
 } from "../ui/icons";
 import { errorMessage } from "./bridge";
 import {
+  NAVIGATE_EVENT,
+  type NavigationDetail,
+} from "../portable/page-link.mjs";
+import {
   builtinDocLink,
   builtinDocPath,
   builtinDocs,
@@ -267,13 +271,27 @@ export function BuiltinDocPage({
       event.preventDefault();
       latest.current(target.pageId, target.hash, false);
     };
+    // In-page targets from components stay in this document, not the library page behind it.
+    const navigate = (event: Event) => {
+      const target = (event as CustomEvent<NavigationDetail>).detail?.target;
+      if (!target || target.pageId) return;
+      event.preventDefault();
+      event.stopPropagation();
+      element
+        .querySelector(
+          `[data-block-id="${CSS.escape(target.blockIds[0] ?? "")}"]`,
+        )
+        ?.scrollIntoView({ block: "start", behavior: "smooth" });
+    };
     element.addEventListener("click", click, true);
     element.addEventListener("auxclick", click, true);
     element.addEventListener("showai:component-link", component);
+    element.addEventListener(NAVIGATE_EVENT, navigate);
     return () => {
       element.removeEventListener("click", click, true);
       element.removeEventListener("auxclick", click, true);
       element.removeEventListener("showai:component-link", component);
+      element.removeEventListener(NAVIGATE_EVENT, navigate);
     };
   }, []);
   const loaded = state && "document" in state ? state : null;

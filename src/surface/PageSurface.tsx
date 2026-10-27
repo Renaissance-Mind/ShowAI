@@ -36,6 +36,7 @@ import { useTranslator } from "../i18n/react";
 import commonMessages from "../i18n/messages/common";
 import messages from "../i18n/messages/surface";
 import { AssistantContext } from "../components/assistant-context";
+import { PageLinkContext } from "../components/page-links";
 import {
   useContext,
   useCallback,
@@ -86,6 +87,7 @@ import {
   CheckSquare,
   Sparkles,
   AtSign,
+  Link2,
 } from "../ui/icons";
 import {
   useSurfaceViewport,
@@ -281,6 +283,7 @@ export default function PageSurface({
   const t = useTranslator(messages);
   const tc = useTranslator(commonMessages);
   const assistant = useContext(AssistantContext);
+  const pageLinks = useContext(PageLinkContext);
   const mobile =
     typeof document !== "undefined" &&
     document.documentElement.dataset.native === "ios";
@@ -978,11 +981,20 @@ export default function PageSurface({
             },
           ]
         : []),
+      ...(pageLinks
+        ? [
+            {
+              label: tc("copyLink"),
+              icon: <Link2 size={14} />,
+              onSelect: () => pageLinks.copyLink(ids),
+            },
+          ]
+        : []),
       {
         label: many
           ? t("menu.duplicateMany", { count: ids.length })
           : t("menu.duplicate"),
-        separatorBefore: !!assistant,
+        separatorBefore: !!assistant || !!pageLinks,
         icon: <Copy size={14} />,
         shortcut: "⌘D",
         onSelect: () => duplicateSelection(ids),
