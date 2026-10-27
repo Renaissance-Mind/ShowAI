@@ -683,6 +683,16 @@ describe("workspace sessions against the real loopback workbench", () => {
       await held;
     }
     expect(await sessions.flushAll()).toBe(false);
+    // A development reload names the page whose formal save is held, and why.
+    const reload = await sessions.reloadResult();
+    expect(reload).toMatchObject({ allow: false });
+    const holding = (
+      reload as { blockers: { pageId?: string; code: string }[] }
+    ).blockers;
+    expect(holding.map((blocker) => blocker.pageId)).toEqual([
+      first.document.id,
+    ]);
+    expect(["PAGE_CONFLICT", "PAGE_NOT_SAVED"]).toContain(holding[0].code);
     expect(
       sessions
         .getSnapshot()
@@ -692,6 +702,8 @@ describe("workspace sessions against the real loopback workbench", () => {
       "Second",
     );
     expect(await sessions.prepareClose()).toBe(true);
+    // The draft is retained, so closing the window is allowed.
+    expect(await sessions.closeResult()).toBe(true);
     await sessions.shutdown();
     sessions = new PageSessions({ clientId: "workspace-test-client", invoke });
     sessions.setHome(home);

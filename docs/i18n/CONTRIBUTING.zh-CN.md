@@ -39,6 +39,18 @@ npm run dev:status -- --port 5180 --home /absolute/showai-dev-a/library
 
 会写数据的开发验证使用独立库。右下角开发标记显示源码、分支与启动提交。清理前停止本任务进程，保留源材料和必要证据，不把其他活跃实例当作缓存。
 
+### 读懂 dev:status
+
+dev:status 只读取，不改动运行中的实例。端口上的实例就绪时退出码为 0，否则为 1，JSON 说明原因：
+
+- reason（ready 为 false 时出现）：code 与 message。NOT_LISTENING（附 lastSession，即该端口最近的启动记录）、NO_RESPONSE、PORT_IN_USE、OTHER_SOURCE_ROOT、PREPARING、STARTING_BACKEND、BUILDING、RESTARTING、WAITING_FOR_APP_QUIT（桌面版正在关闭窗口；同意退出后 step 为正在停止的服务）、BACKEND_EXITED（附 exitCode）、BACKEND_NOT_READY、BUILD_FAILED（附 error）或 STOPPING。phase 与之相同，就绪时为 RUNNING。
+- pendingRestart：本地服务已就绪，但仍运行启动时的代码（startedCommit），因为重启在等待。code 为 BUILDING、WAITING_FOR_PAGES、RESTART_PAUSED（打开的页面没有确认保存；blockers 列出每个页面或共享数据、窗口地址与原因）、QUIT_BLOCKED（桌面版拒绝退出；附 windows 与 record）或 BUILD_FAILED。since 是第一个未生效改动的请求时间。处理原因后点击开发标记重试。
+- stopBlocked：桌面版拒绝退出，Ctrl+C 没有停止实例。
+- quitRecord（桌面版）：应用的 quit-blocked.json 路径，列出每个拒绝关闭的窗口及原因。
+- instances：正在使用所查询内容库的全部应用。来源包括应用写入的 <home>/local/instances/<pid>.json、本源码目录的开发启动记录（.showai-dev/*/session.json），以及命令与 <home>/agent-runtime.json 登记启动方式一致的进程（尚未写入实例记录的旧版应用）。每项包含 pid、mode、channel、appVersion 或 sourceCommit、evidence、self（本端口的服务）和 registered。
+- registered：<home>/agent-runtime.json 登记的内容，即 Agent 使用的 CLI/MCP 启动方式，并列出与之匹配的应用 pids。
+- warnings：MULTIPLE_INSTANCES、REGISTERED_ELSEWHERE、REGISTERED_NOT_RUNNING、REGISTRATION_MISSING、REGISTRATION_INVALID、HOME_MISMATCH、PENDING_RESTART、STOP_BLOCKED 和 QUIT_BLOCKED，各附 message。
+
 ## 验证
 
 代码变更按以下顺序完成基础检查：

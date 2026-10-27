@@ -30,6 +30,10 @@ import { syncManager } from "../sync/manager";
 import { openLibrary } from "../core/open-library";
 import { registerRuntimeOnStartup } from "../agent/runtime";
 import {
+  publishInstance,
+  type InstanceHandle,
+} from "../core/instance-presence.mjs";
+import {
   DesktopPluginInstaller,
   desktopPluginActions,
   pluginInstallerAction,
@@ -158,6 +162,22 @@ export async function startBrowserServer(options: BrowserServerOptions) {
         !!(change.catalog || change.all),
       );
   }
+  let presence: InstanceHandle | undefined;
+  /** Lets dev:status and Agents see every App serving this library. */
+  async function announce() {
+    await presence?.remove();
+    presence = await publishInstance(store.root, {
+      mode: "browser",
+      channel: options.development ? "development" : "packaged",
+      appVersion: version,
+      sourceCommit,
+      cli: info().cli,
+      ...(origin ? { url: origin + "/" } : {}),
+      ...(options.development
+        ? { developmentUrl: options.development.origin }
+        : {}),
+    });
+  }
   async function useHome(home: string) {
     await syncManager(store.root).stop();
     await maintenance?.stop();
@@ -182,6 +202,7 @@ export async function startBrowserServer(options: BrowserServerOptions) {
         info().cli,
         options.development ? "development" : "packaged",
       );
+    await announce();
     maintenance = new MaintenanceScheduler(store.root).start();
     syncManager(store.root).start();
     watcher = watchLibrary(store.root, (path) =>
@@ -657,6 +678,7 @@ export async function startBrowserServer(options: BrowserServerOptions) {
     clearInterval(heartbeat);
     await watcher.close();
     await sources?.close();
+    await presence?.remove();
     throw error;
   }
   async function close() {
@@ -665,6 +687,7 @@ export async function startBrowserServer(options: BrowserServerOptions) {
     await syncManager(store.root).stop();
     if (closed) return;
     closed = true;
+    await presence?.remove();
     clearInterval(heartbeat);
     clearTimeout(timer);
     await watcher.close();
@@ -679,7 +702,11 @@ export async function startBrowserServer(options: BrowserServerOptions) {
   const address = server.address();
   if (!address || typeof address === "string")
     throw new Error("Missing local server address.");
-  origin ||= `http://127.0.0.1:${address.port}`;
+  if (!origin) {
+    origin = `http://127.0.0.1:${address.port}`;
+    // The address is known only now; the record names it for dev:status.
+    await announce();
+  }
   return {
     url: origin + "/",
     home: store.root,

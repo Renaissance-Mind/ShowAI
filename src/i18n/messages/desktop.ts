@@ -104,7 +104,6 @@ export default defineMessages("desktop", {
       one: "有 1 个页面的修改还没有写入磁盘",
       other: "有 {count} 个页面的修改还没有写入磁盘",
     },
-    "close.blockedUnknownTitle": "部分修改还没有写入磁盘",
     "close.blockedDetail":
       "修改仍保留在当前窗口中。可以重试保存，先导出这些页面的源文件，或放弃这些修改并关闭窗口。",
     "close.retry": "重试",
@@ -112,6 +111,31 @@ export default defineMessages("desktop", {
     "close.exportTitle": "选择导出位置",
     "close.exported": "已导出 {count} 个页面源文件到 {path}",
     "close.unknownReason": "原因未知",
+    "close.blockedReasonsTitle": {
+      one: "有 1 项内容还不能安全关闭",
+      other: "有 {count} 项内容还不能安全关闭",
+    },
+    "close.quitContext":
+      "ShowAI 退出前需要关闭窗口「{window}」，但它还没有确认修改已经安全保存：",
+    "close.windowContext": "窗口「{window}」还没有确认修改已经安全保存：",
+    "close.pageNotice":
+      "窗口中会为受影响的页面显示提示，可以从提示打开对应页面查看。",
+    "close.blockedDetailPlain":
+      "修改仍保留在当前窗口中。可以重试，或放弃这些修改并关闭窗口。",
+    "close.source.pages": "打开的页面",
+    "close.source.datasets": "共享数据",
+    "close.source.assistant": "Agent 消息框",
+    "close.source.sidebar": "侧栏排序",
+    "close.source.workbench": "工作台",
+    "close.source.window": "窗口",
+    "close.subject.page": "页面「{title}」",
+    "close.subject.dataset": "共享数据「{title}」",
+    "close.code.LISTENER_TIMEOUT":
+      "{seconds} 秒内没有完成，可能仍在保存或在等待其他操作",
+    "close.code.NO_REPLY":
+      "窗口在 {seconds} 秒内没有回应关闭请求，可能正忙或已停止响应，无法确认修改是否已经保存",
+    "close.code.LISTENER_FAILED": "准备关闭时出错：{error}",
+    "close.code.LISTENER_REFUSED": "没有确认可以关闭",
   },
   en: {
     "login.libraryClosed": "Open a ShowAI library before finishing sign-in.",
@@ -216,7 +240,6 @@ export default defineMessages("desktop", {
       one: "Changes to 1 page haven't been written to disk",
       other: "Changes to {count} pages haven't been written to disk",
     },
-    "close.blockedUnknownTitle": "Some changes haven't been written to disk",
     "close.blockedDetail":
       "The changes are still in this window. Try saving again, export the source files of these pages first, or discard the changes and close the window.",
     "close.retry": "Try Again",
@@ -224,5 +247,31 @@ export default defineMessages("desktop", {
     "close.exportTitle": "Choose where to export",
     "close.exported": "Exported {count} page source files to {path}",
     "close.unknownReason": "Unknown reason",
+    "close.blockedReasonsTitle": {
+      one: "1 item can't close safely yet",
+      other: "{count} items can't close safely yet",
+    },
+    "close.quitContext":
+      "To quit, ShowAI needs to close the window “{window}”, but it hasn't confirmed that its changes are safely saved:",
+    "close.windowContext":
+      "The window “{window}” hasn't confirmed that its changes are safely saved:",
+    "close.pageNotice":
+      "The window shows a notice for each affected page; open the page from that notice to review it.",
+    "close.blockedDetailPlain":
+      "The changes are still in this window. Try again, or discard the changes and close the window.",
+    "close.source.pages": "Open pages",
+    "close.source.datasets": "Shared data",
+    "close.source.assistant": "Agent message box",
+    "close.source.sidebar": "Sidebar reordering",
+    "close.source.workbench": "Workbench",
+    "close.source.window": "Window",
+    "close.subject.page": "Page “{title}”",
+    "close.subject.dataset": "Shared data “{title}”",
+    "close.code.LISTENER_TIMEOUT":
+      "Didn't finish within {seconds} seconds; it may still be saving or waiting for another operation",
+    "close.code.NO_REPLY":
+      "The window didn't answer the close request within {seconds} seconds; it may be busy or not responding, so its changes can't be confirmed as saved",
+    "close.code.LISTENER_FAILED": "Failed while preparing to close: {error}",
+    "close.code.LISTENER_REFUSED": "Didn't confirm that it can close",
   },
 });

@@ -1,5 +1,7 @@
 import type {
+  CloseReport,
   CloseResult,
+  CloseSource,
   DesktopAppearance,
   DesktopChange,
   DesktopWindowState,
@@ -42,10 +44,17 @@ export interface DesktopBridge {
   diagnostics?(): Promise<string>;
   logTail?(lines?: number): Promise<string>;
   exportDiagnostics?(text: string): Promise<{ path: string } | null>;
-  onBeforeClose(listener: () => Promise<CloseResult>): () => void;
-  onBeforeReload?(listener: () => Promise<boolean>): () => void;
+  onBeforeClose(
+    listener: () => Promise<CloseResult>,
+    source?: CloseSource,
+  ): () => void;
+  onBeforeReload?(
+    listener: () => Promise<CloseResult>,
+    source?: CloseSource,
+  ): () => void;
   setDirty?(dirty: boolean): void;
   prepareReload?(): Promise<boolean>;
+  prepareReloadReport?(): Promise<CloseReport>;
 }
 
 declare global {
@@ -85,11 +94,12 @@ export const desktop = {
   onMenuCommand(listener: (command: MenuCommand) => void) {
     return window.showai?.onMenuCommand?.(listener) ?? (() => {});
   },
-  onBeforeClose(listener: () => Promise<CloseResult>) {
-    return window.showai?.onBeforeClose(listener) ?? (() => {});
+  /** `source` names this part of the window when it refuses to close. */
+  onBeforeClose(listener: () => Promise<CloseResult>, source?: CloseSource) {
+    return window.showai?.onBeforeClose(listener, source) ?? (() => {});
   },
-  onBeforeReload(listener: () => Promise<boolean>) {
-    return window.showai?.onBeforeReload?.(listener) ?? (() => {});
+  onBeforeReload(listener: () => Promise<CloseResult>, source?: CloseSource) {
+    return window.showai?.onBeforeReload?.(listener, source) ?? (() => {});
   },
 };
 

@@ -62,6 +62,12 @@ import type { LoadedPage } from "../studio/usePage";
 import { BackgroundWorker } from "../core/background-worker";
 import { registerRuntimeOnStartup } from "../agent/runtime";
 import {
+  publishInstance,
+  type InstanceHandle,
+} from "../core/instance-presence.mjs";
+import { closeBlockers, describeBlocker } from "./close-report";
+import { QuitRecord, type CloseTrigger } from "./quit-record";
+import {
   DesktopPluginInstaller,
   desktopPluginActions,
   pluginInstallerAction,
@@ -89,6 +95,7 @@ import {
 } from "../i18n";
 import desktopMessages from "../i18n/messages/desktop";
 import type {
+  CloseBlocker,
   DesktopAppearance,
   DesktopChange,
   DesktopInfo,
@@ -126,19 +133,32 @@ let pendingDeepLink = process.argv.find((argument) =>
 interface CloseReply {
   allow: boolean;
   pages: UnsavedPage[];
+  blockers: CloseBlocker[];
   reason: string;
 }
+/** How a close request ended, with what held the window open. */
+interface CloseOutcome {
+  allow: boolean;
+  windowId: number;
+  title: string;
+  blockers: CloseBlocker[];
+  /** keep: the person kept editing; discard: closed despite the blockers. */
+  decision?: "keep" | "discard";
+}
+/** A window that does not answer a close request in this time is reported as NO_REPLY. */
+const CLOSE_REPLY_TIMEOUT_MS = 20000;
 const closeRequests = new Map<
   number,
   {
     requestId: string;
     resolve: (reply: CloseReply | null) => void;
     timer: ReturnType<typeof setTimeout>;
-    promise: Promise<boolean>;
+    promise: Promise<CloseOutcome>;
   }
 >();
 let checkingQuit = false;
 let allowedQuit = false;
+let presence: InstanceHandle | undefined;
 
 app.setName("ShowAI");
 // Chromium reports this to the renderer as the system language.
@@ -188,6 +208,21 @@ const sourceCommit = (() => {
     return "unknown";
   }
 })();
+
+// Scripts and Agents read why a quit was refused from <logs>/quit-blocked.json.
+const quitRecord = new QuitRecord(
+  mainLog.directory,
+  () => ({
+    pid: process.pid,
+    appVersion: app.getVersion(),
+    packaged: app.isPackaged,
+    mode: "desktop",
+    sourceCommit,
+    home: store ? store.root : "",
+    log: mainLog.path,
+  }),
+  (error) => mainLog.write("error", "main", "Quit record could not be written:", error),
+);
 
 function iconForAppearance(appearance: DesktopAppearance): NativeImage {
   const cached = appearanceIcons.get(appearance);
@@ -326,6 +361,20 @@ async function useHome(home?: string): Promise<void> {
     info().cli,
     app.isPackaged ? "packaged" : "development",
   );
+  // Lets dev:status and Agents see every App serving this library.
+  await presence?.remove();
+  presence = await publishInstance(store.root, {
+    mode: "desktop",
+    channel: app.isPackaged ? "packaged" : "development",
+    appVersion: app.getVersion(),
+    sourceCommit,
+    cli: info().cli,
+    logs: mainLog.directory,
+    userData: app.getPath("userData"),
+    ...(process.env.SHOWAI_DEV_URL
+      ? { developmentUrl: process.env.SHOWAI_DEV_URL }
+      : {}),
+  });
   maintenance = new MaintenanceScheduler(store.root).start();
   syncManager(store.root).start();
   watcher = watchLibrary(store.root, (path) =>
@@ -870,22 +919,151 @@ async function exportUnsavedPages(
   return t("close.exported", { count: written, path: folder });
 }
 
+/** The window's title as the person sees it ("Page — ShowAI"). */
+function windowTitle(window: BrowserWindow): string {
+  return window.isDestroyed() ? "" : window.getTitle() || "ShowAI";
+}
+
+/**
+ * A refused close or quit may come from outside the App (Dock, AppleScript,
+ * logout), so the window that explains it is restored and brought to the front.
+ */
+function revealWindow(window: BrowserWindow): void {
+  if (window.isDestroyed()) return;
+  if (window.isMinimized()) window.restore();
+  if (process.platform === "darwin") {
+    app.show();
+    app.focus({ steal: true });
+  } else app.focus();
+  window.show();
+  window.moveTop();
+  window.focus();
+}
+
+const blockerSources: Record<CloseBlocker["source"], Parameters<typeof t>[0]> = {
+  pages: "close.source.pages",
+  datasets: "close.source.datasets",
+  assistant: "close.source.assistant",
+  sidebar: "close.source.sidebar",
+  workbench: "close.source.workbench",
+  window: "close.source.window",
+};
+
+/** One dialog line: what holds the window open, and why. */
+function blockerLine(blocker: CloseBlocker): string {
+  const subject =
+    blocker.source === "datasets" && (blocker.title || blocker.datasetId)
+      ? t("close.subject.dataset", {
+          title: blocker.title || blocker.datasetId!,
+        })
+      : blocker.title || blocker.pageId
+        ? t("close.subject.page", { title: blocker.title || blocker.pageId! })
+        : t(blockerSources[blocker.source]);
+  const seconds = blocker.seconds ?? 0;
+  const message =
+    blocker.code === "LISTENER_TIMEOUT"
+      ? t("close.code.LISTENER_TIMEOUT", { seconds })
+      : blocker.code === "NO_REPLY"
+        ? t("close.code.NO_REPLY", { seconds })
+        : blocker.code === "LISTENER_FAILED"
+          ? t("close.code.LISTENER_FAILED", {
+              error: blocker.message || t("close.unknownReason"),
+            })
+          : blocker.message ||
+            (blocker.code === "LISTENER_REFUSED"
+              ? t("close.code.LISTENER_REFUSED")
+              : t("close.unknownReason"));
+  return `• ${subject} — ${message}`;
+}
+
+/** What the renderer said holds the window open; never an empty list. */
+function replyBlockers(reply: CloseReply): CloseBlocker[] {
+  if (reply.blockers.length) return reply.blockers;
+  if (reply.pages.length)
+    return reply.pages.map((page) => ({
+      code: "PAGE_NOT_RETAINED",
+      source: "pages",
+      projectId: page.projectId,
+      pageId: page.pageId,
+      title: page.title,
+      ...(page.reason ? { message: page.reason } : {}),
+    }));
+  return [
+    {
+      code: "LISTENER_REFUSED",
+      source: "workbench",
+      ...(reply.reason ? { message: reply.reason } : {}),
+    },
+  ];
+}
+
+/** Log lines name pages and datasets by id; titles stay in the dialog and the record. */
+function loggedBlockers(blockers: CloseBlocker[]): string[] {
+  return blockers.map((blocker) =>
+    describeBlocker({ ...blocker, title: undefined }),
+  );
+}
+
+/** Logs and records a refusal; `state` says whether the person is still deciding. */
+function noteRefusal(
+  window: BrowserWindow,
+  trigger: CloseTrigger,
+  blockers: CloseBlocker[],
+  state: "awaiting-decision" | "kept-open",
+): void {
+  mainLog.write(
+    "warn",
+    "main",
+    state === "awaiting-decision"
+      ? `Close refused (${trigger}) for window ${window.id}; asking the person:`
+      : `Window ${window.id} stays open (${trigger}): the person kept editing.`,
+    loggedBlockers(blockers),
+  );
+  void quitRecord.set(window.id, {
+    title: windowTitle(window),
+    trigger,
+    state,
+    blockers,
+  });
+}
+
+/** One step of an allowed quit; a step still running after 5 s is logged by name. */
+async function shutdownStep(name: string, run: () => unknown): Promise<void> {
+  const started = Date.now();
+  if (!app.isPackaged && process.env.SHOWAI_DEV_URL)
+    process.send?.({ type: "quit-progress", step: name });
+  const slow = setTimeout(
+    () =>
+      mainLog.write(
+        "warn",
+        "main",
+        `Quit is still waiting for ${name} after 5 s; it finishes its current work first.`,
+      ),
+    5000,
+  );
+  try {
+    await run();
+  } finally {
+    clearTimeout(slow);
+  }
+  const elapsed = Date.now() - started;
+  if (elapsed >= 1000)
+    mainLog.write("info", "main", `Quit: ${name} stopped after ${elapsed} ms.`);
+}
+
 /** Explains why a window cannot close yet; never refuses silently. */
 async function blockedClose(
   window: BrowserWindow,
   reply: CloseReply,
+  blockers: CloseBlocker[],
+  trigger: CloseTrigger,
 ): Promise<"retry" | "discard" | "keep"> {
   let notice = "";
   for (;;) {
     const pages = reply.pages;
     const exportable = pages.some((page) => page.source);
-    const list = pages
-      .slice(0, 10)
-      .map(
-        (page) =>
-          `• ${page.title || page.pageId} — ${page.reason || t("close.unknownReason")}`,
-      );
-    if (pages.length > 10) list.push(`…`);
+    const list = blockers.slice(0, 10).map(blockerLine);
+    if (blockers.length > 10) list.push(`…`);
     const buttons = [
       t("close.retry"),
       ...(exportable ? [t("close.export")] : []),
@@ -896,11 +1074,16 @@ async function blockedClose(
       type: "warning",
       message: pages.length
         ? t("close.blockedTitle", { count: pages.length })
-        : t("close.blockedUnknownTitle"),
+        : t("close.blockedReasonsTitle", { count: blockers.length }),
       detail: [
-        ...(list.length ? [list.join("\n")] : []),
-        ...(!pages.length && reply.reason ? [reply.reason] : []),
-        t("close.blockedDetail"),
+        t(trigger === "quit" ? "close.quitContext" : "close.windowContext", {
+          window: windowTitle(window),
+        }),
+        list.join("\n"),
+        ...(blockers.some((blocker) => blocker.pageId)
+          ? [t("close.pageNotice")]
+          : []),
+        exportable ? t("close.blockedDetail") : t("close.blockedDetailPlain"),
         ...(notice ? [notice] : []),
       ].join("\n\n"),
       buttons,
@@ -918,8 +1101,27 @@ async function blockedClose(
   }
 }
 
-function requestClose(window: BrowserWindow): Promise<boolean> {
-  if (window.isDestroyed()) return Promise.resolve(true);
+function requestClose(
+  window: BrowserWindow,
+  trigger: CloseTrigger = "close",
+): Promise<CloseOutcome> {
+  const windowId = window.id;
+  const requestedTitle = windowTitle(window);
+  const outcome = (
+    allow: boolean,
+    blockers: CloseBlocker[] = [],
+    decision?: CloseOutcome["decision"],
+  ): CloseOutcome => {
+    if (allow) void quitRecord.delete(windowId);
+    return {
+      allow,
+      windowId,
+      title: windowTitle(window) || requestedTitle,
+      blockers,
+      ...(decision ? { decision } : {}),
+    };
+  };
+  if (window.isDestroyed()) return Promise.resolve(outcome(true));
   const pending = closeRequests.get(window.id);
   if (pending) return pending.promise;
   const requestId = randomUUID();
@@ -927,40 +1129,62 @@ function requestClose(window: BrowserWindow): Promise<boolean> {
   const received = new Promise<CloseReply | null>((resolve) => {
     resolveResult = resolve;
   });
-  const timer = setTimeout(() => resolveResult(null), 20000);
+  const timer = setTimeout(() => resolveResult(null), CLOSE_REPLY_TIMEOUT_MS);
   // A window that goes away settles its close request, even while a dialog is open.
-  const closed = new Promise<boolean>((resolve) =>
-    window.once("closed", () => resolve(true)),
+  const closed = new Promise<CloseOutcome>((resolve) =>
+    window.once("closed", () => resolve(outcome(true))),
   );
-  const decided = received.then(async (reply): Promise<boolean> => {
-      if (window.isDestroyed()) return true;
-      if (reply?.allow) return true;
-      if (reply) {
-        mainLog.write(
-          "warn",
-          "main",
-          `Close blocked: ${reply.pages.length} unsaved page(s)`,
-          reply.pages.map((page) => `${page.pageId}: ${page.reason}`),
-          reply.reason,
-        );
-        const decision = await blockedClose(window, reply);
-        if (decision === "discard") return true;
-        if (decision === "keep") return false;
-        clearTimeout(timer);
-        closeRequests.delete(window.id);
-        return requestClose(window);
-      }
+  const decided = received.then(async (reply): Promise<CloseOutcome> => {
+    if (window.isDestroyed()) return outcome(true);
+    if (reply?.allow) return outcome(true);
+    const blockers: CloseBlocker[] = reply
+      ? replyBlockers(reply)
+      : [
+          {
+            code: "NO_REPLY",
+            source: "window",
+            seconds: CLOSE_REPLY_TIMEOUT_MS / 1000,
+          },
+        ];
+    noteRefusal(window, trigger, blockers, "awaiting-decision");
+    revealWindow(window);
+    let decision: "retry" | "discard" | "keep";
+    if (reply) decision = await blockedClose(window, reply, blockers, trigger);
+    else {
       const choice = await dialog.showMessageBox(window, {
         type: "warning",
         message: t("unsavedMessage"),
-        detail: t("unsavedDetail"),
+        detail: [
+          t(trigger === "quit" ? "close.quitContext" : "close.windowContext", {
+            window: windowTitle(window),
+          }),
+          blockers.map(blockerLine).join("\n"),
+          t("unsavedDetail"),
+        ].join("\n\n"),
         buttons: [t("keepEditing"), t("discardAndClose")],
         defaultId: 0,
         cancelId: 0,
         noLink: true,
       });
-      return choice.response === 1;
-    });
+      decision = window.isDestroyed() || choice.response === 1 ? "discard" : "keep";
+    }
+    if (decision === "discard") {
+      mainLog.write(
+        "warn",
+        "main",
+        `Window ${windowId} closes (${trigger}) without the changes listed above: the person chose to discard them.`,
+      );
+      return outcome(true, blockers, "discard");
+    }
+    if (decision === "keep") {
+      if (!window.isDestroyed())
+        noteRefusal(window, trigger, blockers, "kept-open");
+      return outcome(false, blockers, "keep");
+    }
+    clearTimeout(timer);
+    closeRequests.delete(window.id);
+    return requestClose(window, trigger);
+  });
   const promise = Promise.race([decided, closed]).finally(() => {
     clearTimeout(timer);
     if (closeRequests.get(window.id)?.requestId === requestId)
@@ -1110,15 +1334,19 @@ async function createWindow(page?: WindowTarget): Promise<BrowserWindow> {
   window.on("close", (event) => {
     if (allowedQuit) return;
     event.preventDefault();
-    void requestClose(window).then((allow) => {
-      if (allow && !window.isDestroyed()) {
+    void requestClose(window, "close").then((outcome) => {
+      if (outcome.allow && !window.isDestroyed()) {
         window.destroy();
       }
     });
   });
+  const windowId = window.id;
   window.on("closed", () => {
-    closeRequests.get(window.id)?.resolve({ allow: true, pages: [], reason: "" });
+    closeRequests
+      .get(windowId)
+      ?.resolve({ allow: true, pages: [], blockers: [], reason: "" });
     windows.delete(window);
+    void quitRecord.delete(windowId);
   });
   window.webContents.setWindowOpenHandler(({ url }) => {
     if (isWorkbenchLocation(url)) {
@@ -1680,6 +1908,7 @@ else {
           requestId?: unknown;
           allow?: unknown;
           pages?: unknown;
+          blockers?: unknown;
           reason?: unknown;
         };
         const pending = closeRequests.get(window.id);
@@ -1691,6 +1920,7 @@ else {
           pending.resolve({
             allow: result.allow,
             pages: unsavedPages(result.pages),
+            blockers: closeBlockers(result.blockers),
             reason:
               typeof result.reason === "string"
                 ? result.reason.slice(0, 2000)
@@ -1750,24 +1980,74 @@ else {
   app.on("before-quit", (event) => {
     if (allowedQuit) return;
     event.preventDefault();
-    if (checkingQuit) return;
+    if (checkingQuit) {
+      // Asked again while a dialog waits: show that dialog instead of hiding the request.
+      mainLog.write(
+        "info",
+        "main",
+        "Quit requested again while windows are still answering the previous request.",
+      );
+      for (const entry of quitRecord.windows()) {
+        const waiting = BrowserWindow.fromId(entry.windowId);
+        if (waiting && entry.state === "awaiting-decision") revealWindow(waiting);
+      }
+      return;
+    }
     checkingQuit = true;
-    void Promise.all([...windows].map(requestClose)).then(async (results) => {
+    const open = [...windows];
+    mainLog.write(
+      "info",
+      "main",
+      `Quit requested; asking ${open.length} window(s) to close.`,
+    );
+    void Promise.all(
+      open.map((window) => requestClose(window, "quit")),
+    ).then(async (outcomes) => {
       checkingQuit = false;
-      if (!results.every(Boolean)) {
+      const refused = outcomes.filter((outcome) => !outcome.allow);
+      if (refused.length) {
+        mainLog.write(
+          "warn",
+          "main",
+          `Quit blocked: ${refused.length} of ${outcomes.length} window(s) stay open. Details: ${quitRecord.path}`,
+          refused.map(
+            (outcome) =>
+              `window ${outcome.windowId} (${outcome.decision ?? "refused"}): ${loggedBlockers(outcome.blockers).join("; ")}`,
+          ),
+        );
         if (!app.isPackaged && process.env.SHOWAI_DEV_URL)
-          process.send?.({ type: "quit-blocked" });
+          process.send?.({
+            type: "quit-blocked",
+            at: new Date().toISOString(),
+            record: quitRecord.path,
+            windows: refused.map((outcome) => ({
+              windowId: outcome.windowId,
+              title: outcome.title,
+              decision: outcome.decision ?? "refused",
+              blockers: outcome.blockers,
+            })),
+          });
         return;
       }
+      mainLog.write(
+        "info",
+        "main",
+        `Quit allowed: ${outcomes.length} window(s) closed; stopping services.`,
+      );
       allowedQuit = true;
+      await quitRecord.clear();
+      await presence?.remove();
       remoteConnector?.close();
       agentHost?.close();
       clearTimeout(notification);
-      await watcher?.close();
-      await sources?.close();
-      await maintenance?.stop();
-      if (store) await syncManager(store.root).stop();
+      // Stopping waits for running work (maintenance, sync); a slow step is named.
+      await shutdownStep("library watcher", () => watcher?.close());
+      await shutdownStep("dataset sources", () => sources?.close());
+      await shutdownStep("library maintenance", () => maintenance?.stop());
+      if (store)
+        await shutdownStep("project sync", () => syncManager(store.root).stop());
       for (const window of windows) if (!window.isDestroyed()) window.destroy();
+      mainLog.write("info", "main", "Quit: services stopped.");
       app.quit();
     });
   });

@@ -5,6 +5,10 @@ import type {
   ComponentContextItem,
 } from "../../components/assistant-context";
 import type { CanvasReference } from "../../surface/agent-reference";
+import { translator } from "../../i18n";
+import persistMessages from "../../i18n/messages/assistantPersist";
+
+const t = translator(persistMessages);
 
 interface ComposerDraft {
   text: string;
@@ -46,6 +50,7 @@ export function useAssistantDrafts(key: string) {
   const [persistenceError, setPersistenceError] = useState("");
   const latest = useRef(drafts);
   latest.current = drafts;
+  /** Writes the drafts; returns why that failed, or undefined when written. */
   const persist = () => {
     const entries = Object.entries(latest.current).sort(
       ([, a], [, b]) => b.updatedAt - a.updatedAt,
@@ -56,10 +61,10 @@ export function useAssistantDrafts(key: string) {
         JSON.stringify(Object.fromEntries(entries)),
       );
       setPersistenceError("");
-      return true;
+      return undefined;
     } catch (error) {
       setPersistenceError(String(error));
-      return false;
+      return String(error);
     }
   };
   useEffect(() => {
@@ -68,8 +73,20 @@ export function useAssistantDrafts(key: string) {
   }, [drafts]);
   useEffect(() => {
     const stop = desktop.onBeforeClose(async () => {
-      return persist();
-    });
+      const error = persist();
+      return error === undefined
+        ? true
+        : {
+            allow: false,
+            blockers: [
+              {
+                code: "ASSISTANT_DRAFT_NOT_SAVED",
+                source: "assistant",
+                message: t("draftCloseBlocked", { error }),
+              },
+            ],
+          };
+    }, "assistant");
     const pagehide = () => persist();
     window.addEventListener("pagehide", pagehide);
     return () => {

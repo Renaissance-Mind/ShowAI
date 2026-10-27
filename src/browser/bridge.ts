@@ -1,10 +1,11 @@
 import { chooseLocalPath, type FileDialogOptions } from "./FileDialog";
-import {
-  closeAllowed,
-  type CloseResult,
-  type DesktopChange,
-  type DesktopResponse,
+import type {
+  CloseResult,
+  CloseSource,
+  DesktopChange,
+  DesktopResponse,
 } from "../desktop/bridge";
+import { closeReporter, type CloseListenerEntry } from "../desktop/close-report";
 import type { LoadedPage } from "../studio/usePage";
 import { translator } from "../i18n";
 import messages from "../i18n/messages/files";
@@ -50,8 +51,9 @@ export function installBrowserBridge() {
   const config = window.__SHOWAI_LOCAL__;
   if (!config || window.showai) return;
   const listeners = new Set<(change: DesktopChange) => void>();
-  const closeListeners = new Set<() => Promise<CloseResult>>();
-  const reloadListeners = new Set<() => Promise<boolean>>();
+  const closeListeners = new Set<CloseListenerEntry>();
+  const reloadListeners = new Set<CloseListenerEntry>();
+  const report = closeReporter();
   let dirty = false;
   // Lets the server skip echoing this tab's own saves back to it.
   const client = crypto.randomUUID();
@@ -255,7 +257,7 @@ export function installBrowserBridge() {
     }
   });
   const flush = () => {
-    for (const listener of closeListeners) void listener();
+    for (const entry of closeListeners) void entry.listener();
   };
   document.addEventListener("visibilitychange", () => {
     if (document.visibilityState === "hidden") flush();
@@ -275,10 +277,11 @@ export function installBrowserBridge() {
         listeners.delete(listener);
       };
     },
-    onBeforeClose(listener) {
-      closeListeners.add(listener);
+    onBeforeClose(listener, source = "workbench") {
+      const entry = { listener, source };
+      closeListeners.add(entry);
       return () => {
-        closeListeners.delete(listener);
+        closeListeners.delete(entry);
       };
     },
     setDirty(value) {
@@ -286,20 +289,22 @@ export function installBrowserBridge() {
     },
     ...(import.meta.env.DEV
       ? {
-          onBeforeReload(listener: () => Promise<boolean>) {
-            reloadListeners.add(listener);
+          onBeforeReload(
+            listener: () => Promise<CloseResult>,
+            source: CloseSource = "workbench",
+          ) {
+            const entry = { listener, source };
+            reloadListeners.add(entry);
             return () => {
-              reloadListeners.delete(listener);
+              reloadListeners.delete(entry);
             };
           },
           async prepareReload() {
-            return (
-              await Promise.all(
-                [...closeListeners, ...reloadListeners].map((listener) =>
-                  listener(),
-                ),
-              )
-            ).every(closeAllowed);
+            return (await report([...closeListeners, ...reloadListeners]))
+              .allow;
+          },
+          prepareReloadReport() {
+            return report([...closeListeners, ...reloadListeners]);
           },
         }
       : {}),

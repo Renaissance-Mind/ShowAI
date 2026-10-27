@@ -123,6 +123,12 @@ showai mcp --public
 
 插件已有本机 launcher；手工添加 MCP 时避免重复连接。安装、宿主刷新与会话加载分别检查。Claude Code 安装见 [插件说明](../../plugins/showai/README.zh-CN.md)。HTTP MCP、OAuth 与同步见 [Agent 接入](agent-integration.zh-CN.md)。
 
+### 桌面版没有退出时
+
+窗口无法安全关闭时，应用保持打开：页面或共享数据的修改既不能保存也不能保留为本机草稿、Agent 消息框的草稿无法存储、窗口中的某部分 15 秒内没有完成、窗口 20 秒内没有回应，或用户选择了继续编辑。应用会恢复该窗口并置于最前，在对话框中写明原因，并记录到 `showai-main.log`。同时在同一日志文件夹写入 `quit-blocked.json`（macOS：`~/Library/Logs/ShowAI/`；以 `SHOWAI_USER_DATA` 启动的实例：其 `logs/` 文件夹）。
+
+该文件只在有窗口保持打开时存在，之后退出成功即删除；其中 `pid` 已不在运行时忽略。文件写明应用（`pid`、`appVersion`、`sourceCommit`、`home`、`log`），并列出每个保持打开的窗口：`title`、`trigger`（`quit` 或 `close`）、`state`（对话框打开时为 `awaiting-decision`，选择继续编辑后为 `kept-open`）和 `blockers`。每项原因包含稳定的 `code`（`PAGE_NOT_RETAINED`、`DATASET_NOT_RETAINED`、`ASSISTANT_DRAFT_NOT_SAVED`、`LISTENER_TIMEOUT`、`LISTENER_FAILED`、`LISTENER_REFUSED` 或 `NO_REPLY`）、所在部分 `source`、已知的页面或共享数据 ID 与标题，以及 `message`。窗口中也会为受影响的页面显示提示，可从提示打开页面。请在该窗口中处理原因，不要用其他方式退出或结束应用来绕过。
+
 旧内容库可通过经过检查的 library import/activate 或 migrate 迁移，原始记录保留。`workspace merge` 比较活动草稿与当前内容；`workspace conflicts` 查询外部冲突；`workspace recover-package CONFLICT_ID --project PROJECT` 将外部包修改恢复为可编辑草稿，修复后保存新版本。
 
 `library stats/compact/cleanup-plan/cleanup/rebuild-index/archive/verify-archive/policy` 提供容量统计、维护与核验。清理保留当前内容、原始档案和恢复材料。详见 [内容库](versioned-library.zh-CN.md)。

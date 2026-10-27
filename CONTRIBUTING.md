@@ -44,6 +44,18 @@ npm run dev:status -- --port 5180 --home /absolute/showai-dev-a/library
 - Build output and launcher records for each instance live in `.showai-dev/<mode>-<port>/`. Do not move or delete them while the instance is running.
 - Do not point a development instance at your everyday content library (`~/.showai`) when testing changes that write data.
 
+### Reading `dev:status`
+
+`dev:status` only reads; it never changes a running instance. It exits with 0 when the instance on the port is ready and 1 otherwise, and its JSON explains why:
+
+- `reason` (present whenever `ready` is false): a `code` and `message`. `NOT_LISTENING` (with `lastSession`, the last launcher record of that port), `NO_RESPONSE`, `PORT_IN_USE`, `OTHER_SOURCE_ROOT`, `PREPARING`, `STARTING_BACKEND`, `BUILDING`, `RESTARTING`, `WAITING_FOR_APP_QUIT` (the desktop app is closing its windows; once it agreed to quit, `step` names the service it is stopping), `BACKEND_EXITED` (with `exitCode`), `BACKEND_NOT_READY`, `BUILD_FAILED` (with `error`) or `STOPPING`. `phase` repeats the code, or is `RUNNING`.
+- `pendingRestart`: the backend is ready but still serves the code it started with (`startedCommit`) because a restart is waiting. `code` is `BUILDING`, `WAITING_FOR_PAGES`, `RESTART_PAUSED` (open pages did not confirm saving; `blockers` name each page or shared dataset, the window URL and why), `QUIT_BLOCKED` (the desktop app refused to quit; `windows` and `record`) or `BUILD_FAILED`. `since` is when the first unapplied change was requested. Fix the cause, then click the development badge to retry.
+- `stopBlocked`: Ctrl+C did not stop the instance because the desktop app refused to quit.
+- `quitRecord` (desktop): the path of the app's `quit-blocked.json`, which lists every window that refused to close and why.
+- `instances`: every running app that serves the requested library. They come from the presence records apps write to `<home>/local/instances/<pid>.json`, from development launchers of this checkout (`.showai-dev/*/session.json`), and from processes whose command matches the launch in `<home>/agent-runtime.json` (apps built before presence records existed). Each entry has `pid`, `mode`, `channel`, `appVersion` or `sourceCommit`, `evidence`, `self` (the service on this port) and `registered`.
+- `registered`: what `<home>/agent-runtime.json` registers, which is the CLI/MCP launch Agents use, with the `pids` of the apps that match it.
+- `warnings`: `MULTIPLE_INSTANCES`, `REGISTERED_ELSEWHERE`, `REGISTERED_NOT_RUNNING`, `REGISTRATION_MISSING`, `REGISTRATION_INVALID`, `HOME_MISMATCH`, `PENDING_RESTART`, `STOP_BLOCKED` and `QUIT_BLOCKED`, each with a `message`.
+
 Stop task-owned processes before deleting temporary libraries/profiles. Retain needed source material and verification evidence; never treat another running instance as a cache.
 
 The development badge in the bottom-right corner shows the source directory, branch, and commit the instance was started from.

@@ -66,8 +66,67 @@ export interface UnsavedPage {
   source?: string;
 }
 
-/** A close listener either allows closing or explains which pages hold it open. */
-export type CloseResult = boolean | { allow: boolean; pages?: UnsavedPage[] };
+/**
+ * Stable codes for why a window refuses to close, quit or reload. Scripts and
+ * Agents read them from quit-blocked.json and `npm run dev:status`.
+ */
+export type CloseBlockerCode =
+  /** Page changes could not be written to a local draft. */
+  | "PAGE_NOT_RETAINED"
+  /** Reload only: the page is kept in a draft but not formally saved yet. */
+  | "PAGE_NOT_SAVED"
+  /** Reload only: the page save is held by a conflict with another writer. */
+  | "PAGE_CONFLICT"
+  /** Shared data writes could neither be saved nor kept in a draft. */
+  | "DATASET_NOT_RETAINED"
+  /** The assistant message draft could not be written to local storage. */
+  | "ASSISTANT_DRAFT_NOT_SAVED"
+  /** A close listener answered false without saying why. */
+  | "LISTENER_REFUSED"
+  /** A close listener threw. */
+  | "LISTENER_FAILED"
+  /** A close listener did not finish in time (still saving or waiting). */
+  | "LISTENER_TIMEOUT"
+  /** Main process: the window did not answer the close request at all. */
+  | "NO_REPLY";
+
+/** Which part of a window a blocker comes from. */
+export type CloseSource =
+  | "pages"
+  | "datasets"
+  | "assistant"
+  | "sidebar"
+  | "workbench"
+  | "window";
+
+/** One reason a window cannot close yet. */
+export interface CloseBlocker {
+  code: CloseBlockerCode;
+  source: CloseSource;
+  /** Human-readable explanation in the workbench language, when the listener has one. */
+  message?: string;
+  projectId?: string;
+  pageId?: string;
+  datasetId?: string;
+  /** Page title or dataset name. */
+  title?: string;
+  /** LISTENER_TIMEOUT / NO_REPLY: how long was waited. */
+  seconds?: number;
+}
+
+/** A close listener either allows closing or explains what holds it open. */
+export type CloseResult =
+  | boolean
+  | { allow: boolean; pages?: UnsavedPage[]; blockers?: CloseBlocker[] };
+
+/** Every close listener of one window, aggregated. */
+export interface CloseReport {
+  allow: boolean;
+  pages: UnsavedPage[];
+  blockers: CloseBlocker[];
+  /** Plain-text summary of the blockers, for logs and older readers. */
+  reason: string;
+}
 
 export function closeAllowed(result: CloseResult): boolean {
   return typeof result === "boolean" ? result : result.allow === true;
@@ -143,9 +202,18 @@ export interface ShowAIBridge {
   logTail?(lines?: number): Promise<string>;
   /** Saves redacted diagnostics where the person chooses; null when cancelled. */
   exportDiagnostics?(text: string): Promise<{ path: string } | null>;
-  onBeforeClose(listener: () => Promise<CloseResult>): () => void;
-  onBeforeReload?(listener: () => Promise<boolean>): () => void;
+  /** `source` names the part of the window in refusal reports. */
+  onBeforeClose(
+    listener: () => Promise<CloseResult>,
+    source?: CloseSource,
+  ): () => void;
+  onBeforeReload?(
+    listener: () => Promise<CloseResult>,
+    source?: CloseSource,
+  ): () => void;
   prepareReload?(): Promise<boolean>;
+  /** Development: like prepareReload, with the reasons a reload is refused. */
+  prepareReloadReport?(): Promise<CloseReport>;
 }
 
 export type DesktopResponse<T = unknown> =

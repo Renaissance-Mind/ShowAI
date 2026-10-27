@@ -11,6 +11,12 @@ export default defineMessages("datasets", {
     saving: "正在保存",
     unsaved: "尚未保存",
     saveFailed: "共享数据未保存：{error}",
+    closeBlocked:
+      "修改没有保存（{save}），也无法保留为本机草稿（{draft}）。",
+    closeBlockedConflicts: {
+      one: "另有 1 处冲突等待选择。",
+      other: "另有 {count} 处冲突等待选择。",
+    },
     missingTitle: "找不到共享数据「{id}」",
     missingCause:
       "它可能已被删除，或还没有同步到这台设备。组件自己的设置仍保留在页面中。",
@@ -117,6 +123,12 @@ export default defineMessages("datasets", {
     saving: "Saving",
     unsaved: "Not saved yet",
     saveFailed: "Shared data not saved: {error}",
+    closeBlocked:
+      "The changes weren't saved ({save}) and couldn't be kept as a local draft ({draft}).",
+    closeBlockedConflicts: {
+      one: "1 conflict is also waiting for your choice.",
+      other: "{count} conflicts are also waiting for your choice.",
+    },
     missingTitle: "Shared data “{id}” can't be found",
     missingCause:
       "It may have been deleted, or it hasn't synced to this device yet. The component's own settings are still kept on the page.",

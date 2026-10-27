@@ -214,3 +214,44 @@ test("undo writes back the previous value and does not override newer edits else
     ),
   ).toBe("2026-12-01");
 });
+
+test("closing names shared data whose writes can be neither saved nor kept", async () => {
+  // The library refuses writes (for example a read-only or full disk).
+  let refuse = false;
+  const failing = {
+    invoke: <T>(action: string, args: Record<string, unknown> = {}) => {
+      if (
+        refuse &&
+        (action === "datasets:apply" || action === "datasets:draftSave")
+      )
+        return Promise.reject(
+          Object.assign(new Error(`${action} refused: EROFS`), {
+            code: "INVALID_DATA",
+          }),
+        );
+      return transport.invoke<T>(action, args);
+    },
+  };
+  const client = new DatasetClient(failing, "window-close");
+  const session = await ready(client.session(projectId, datasetId));
+  expect(await client.closeProblems()).toEqual([]);
+  refuse = true;
+  const before = valueAt(session.getSnapshot().value, task("t2", "title"));
+  session.edit([
+    { op: "set", path: task("t2", "title"), value: "终稿", before },
+  ]);
+  const problems = await client.closeProblems();
+  expect(problems).toEqual([
+    {
+      projectId,
+      datasetId,
+      name: "OKR",
+      draftError: "datasets:draftSave refused: EROFS",
+      saveError: "datasets:apply refused: EROFS",
+      conflicts: 0,
+    },
+  ]);
+  expect(await client.prepareClose()).toBe(false);
+  refuse = false;
+  expect(await client.closeProblems()).toEqual([]);
+});

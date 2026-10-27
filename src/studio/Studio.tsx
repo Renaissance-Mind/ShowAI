@@ -486,7 +486,7 @@ export default function Studio() {
       desktop.onBeforeClose(async () => {
         await reorderQueue.current;
         return true;
-      }),
+      }, "sidebar"),
     [],
   );
   const [groupMenu, setGroupMenu] = useState<{

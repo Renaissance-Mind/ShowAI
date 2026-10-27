@@ -111,16 +111,11 @@ export function usePage(home?: string) {
     [sessions],
   );
   useEffect(
-    () =>
-      desktop.onBeforeClose(async () =>
-        (await sessions.prepareClose())
-          ? true
-          : { allow: false, pages: sessions.unsavedPages() },
-      ),
+    () => desktop.onBeforeClose(() => sessions.closeResult(), "pages"),
     [sessions],
   );
   useEffect(
-    () => desktop.onBeforeReload(() => sessions.flushAll()),
+    () => desktop.onBeforeReload(() => sessions.reloadResult(), "pages"),
     [sessions],
   );
   useEffect(() => {

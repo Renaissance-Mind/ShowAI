@@ -30,6 +30,9 @@ export default defineMessages("pageSession", {
     conflictNotForPage: "冲突不属于当前页面。",
     draftSaveFailed: "本机草稿保存失败：{error}",
     keepDraftsBeforeSwitch: "切换内容库前需要可靠保留所有页面草稿。",
+    closeRefusedUnlisted:
+      "打开的页面没有确认修改已写入本机草稿（页面没有报告具体原因）。",
+    reloadRefusedUnlisted: "打开的页面还没有完成正式保存。",
     fileChangedBy:
       "{name} 修改了这个文件。请选择保留本地草稿，或载入文件版本。",
     "external.title": "{name} 刚更新了这个页面的 {count} 处",
@@ -104,6 +107,9 @@ export default defineMessages("pageSession", {
     draftSaveFailed: "Couldn't save the local draft: {error}",
     keepDraftsBeforeSwitch:
       "All page drafts must be safely kept before switching libraries.",
+    closeRefusedUnlisted:
+      "An open page didn't confirm that its changes are in a local draft (it gave no specific reason).",
+    reloadRefusedUnlisted: "An open page hasn't finished saving.",
     fileChangedBy:
       "{name} changed this file. Keep your local draft, or load the file version.",
     "external.title": {

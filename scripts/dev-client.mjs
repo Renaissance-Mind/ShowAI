@@ -47,18 +47,36 @@ if (
   import.meta.hot.on("showai:prepare-restart", async ({ id }) => {
     if (!window.showai?.prepareReload) return;
     freeze(true);
-    let allow = false;
+    // The report names what refused (page, shared data, listener) for dev:status.
+    let result = { allow: false, blockers: [] };
     try {
-      allow = (await window.showai?.prepareReload?.()) === true;
+      result = window.showai.prepareReloadReport
+        ? await window.showai.prepareReloadReport()
+        : { allow: (await window.showai.prepareReload()) === true, blockers: [] };
     } catch (error) {
       console.error("ShowAI 开发更新保存失败", error);
+      result = {
+        allow: false,
+        blockers: [
+          {
+            code: "LISTENER_FAILED",
+            source: "workbench",
+            message: String(error?.message ?? error),
+          },
+        ],
+      };
     }
-    import.meta.hot.send("showai:restart-result", { id, allow });
+    import.meta.hot.send("showai:restart-result", {
+      id,
+      allow: result.allow === true,
+      blockers: result.blockers,
+    });
   });
-  import.meta.hot.on("showai:restart-cancelled", () => {
+  import.meta.hot.on("showai:restart-cancelled", (data) => {
     freeze(false);
     message = "更新已暂停，请处理保存问题后点击重试";
     badge.textContent = `${label} · ${message}`;
+    if (data?.reason) badge.title = `${badge.title.split("\n更新已暂停：")[0]}\n更新已暂停：${data.reason}`;
   });
   badge.addEventListener("click", () => {
     if (!frozen) import.meta.hot.send("showai:retry");

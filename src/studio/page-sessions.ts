@@ -1,4 +1,9 @@
-import type { DesktopChange, UnsavedPage } from "../desktop/bridge";
+import type {
+  CloseBlocker,
+  CloseResult,
+  DesktopChange,
+  UnsavedPage,
+} from "../desktop/bridge";
 import { serializeArtifact } from "../portable/validation.mjs";
 import {
   createPageSession,
@@ -378,6 +383,67 @@ export class PageSessions {
         },
       ];
     });
+  }
+  /** The window close answer: allowed, or which pages hold it open and why. */
+  async closeResult(): Promise<CloseResult> {
+    if (await this.prepareClose()) return true;
+    const pages = this.unsavedPages();
+    return {
+      allow: false,
+      pages,
+      ...(pages.length
+        ? {}
+        : {
+            blockers: [
+              {
+                code: "PAGE_NOT_RETAINED",
+                source: "pages",
+                message: t("closeRefusedUnlisted"),
+              },
+            ],
+          }),
+    };
+  }
+  /** Development reload: every page must be formally saved, not only kept in a draft. */
+  async reloadResult(): Promise<CloseResult> {
+    if (await this.flushAll()) return true;
+    const blockers = [...new Set(this.pages.values())].flatMap(
+      (session): CloseBlocker[] => {
+        const state = session.getSnapshot();
+        if (
+          !session.isDirty() &&
+          state.status !== "conflict" &&
+          state.status !== "error"
+        )
+          return [];
+        return [
+          {
+            code: state.status === "conflict" ? "PAGE_CONFLICT" : "PAGE_NOT_SAVED",
+            source: "pages",
+            ...(state.projectId ? { projectId: state.projectId } : {}),
+            ...(state.draft
+              ? {
+                  pageId: state.draft.id,
+                  title: state.draft.title || common("untitled"),
+                }
+              : {}),
+            ...(state.error ? { message: state.error } : {}),
+          },
+        ];
+      },
+    );
+    return {
+      allow: false,
+      blockers: blockers.length
+        ? blockers
+        : [
+            {
+              code: "PAGE_NOT_SAVED",
+              source: "pages",
+              message: t("reloadRefusedUnlisted"),
+            },
+          ],
+    };
   }
   hasUnretainedChanges() {
     return [...new Set(this.pages.values())].some(

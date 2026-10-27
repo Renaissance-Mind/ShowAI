@@ -12,7 +12,9 @@ import {
 import { createPortal } from "react-dom";
 import { desktop, errorMessage } from "../studio/bridge";
 import { useTranslator } from "../i18n/react";
+import { translator } from "../i18n";
 import messages from "../i18n/messages/datasets";
+import type { CloseResult } from "../desktop/bridge";
 import { Database } from "../ui/icons";
 import {
   BlockActionHost,
@@ -53,6 +55,32 @@ import {
 import { BoundWidgetHost } from "./widget-host";
 import "./datasets.css";
 
+const closeText = translator(messages);
+/** The window close answer: allowed, or which shared data would lose writes and why. */
+async function datasetCloseResult(client: DatasetClient): Promise<CloseResult> {
+  const problems = await client.closeProblems();
+  if (!problems.length) return true;
+  return {
+    allow: false,
+    blockers: problems.map((problem) => ({
+      code: "DATASET_NOT_RETAINED",
+      source: "datasets",
+      projectId: problem.projectId,
+      datasetId: problem.datasetId,
+      ...(problem.name ? { title: problem.name } : {}),
+      message: [
+        closeText("closeBlocked", {
+          save: problem.saveError ?? closeText("unsaved"),
+          draft: problem.draftError,
+        }),
+        ...(problem.conflicts
+          ? [closeText("closeBlockedConflicts", { count: problem.conflicts })]
+          : []),
+      ].join(" "),
+    })),
+  };
+}
+
 let shared: DatasetClient | undefined;
 /** The window's dataset client, connected to the host and its change events. */
 export function workbenchDatasetClient(): DatasetClient | undefined {
@@ -68,8 +96,8 @@ export function workbenchDatasetClient(): DatasetClient | undefined {
       clientId,
     );
     desktop.onChange((change) => client.invalidate(change));
-    desktop.onBeforeClose(() => client.prepareClose());
-    desktop.onBeforeReload(() => client.prepareClose());
+    desktop.onBeforeClose(() => datasetCloseResult(client), "datasets");
+    desktop.onBeforeReload(() => datasetCloseResult(client), "datasets");
     window.addEventListener("focus", () => client.refreshAll());
     shared = client;
   }

@@ -198,6 +198,35 @@ try {
       ],
       { cwd: fixture },
     ).then((response) => JSON.parse(response.stdout));
+  const developmentStatus = () =>
+    fetch(original.url + "__showai-dev/status").then((response) =>
+      response.json(),
+    );
+  // dev:status lists this backend through its presence record.
+  const statusReport = await promisify(execFile)(
+    process.execPath,
+    [
+      join(fixture, "scripts/dev-open.mjs"),
+      "--status",
+      "--port",
+      String(port),
+      "--home",
+      home,
+    ],
+    { cwd: fixture },
+  ).then((response) => JSON.parse(response.stdout));
+  assert.equal(statusReport.ready, true);
+  assert.equal(statusReport.phase, "RUNNING");
+  assert.ok(
+    statusReport.instances.some(
+      (instance) =>
+        instance.pid === original.backendPid &&
+        instance.self &&
+        instance.evidence.includes("presence"),
+    ),
+    JSON.stringify(statusReport.instances),
+  );
+  record("dev:status reports the running backend and its presence record");
   const [first, second] = await Promise.all([reuse(), reuse()]);
   assert.equal(first.backendPid, original.backendPid);
   assert.equal(second.backendPid, original.backendPid);
@@ -521,6 +550,16 @@ try {
       .document.id,
     created.document.id,
   );
+  assert.equal(
+    (
+      await poll(
+        developmentStatus,
+        (value) => value.pendingRestart?.code === "BUILD_FAILED",
+        "pending build failure",
+      )
+    ).ready,
+    true,
+  );
   record("compilation failure preserves the last working backend and CLI");
 
   // Race the real autosave with an independent atomic file write.
@@ -557,8 +596,23 @@ try {
     false,
   );
   assert.match(await editor.innerText(), /Local draft retained/);
+  const paused = await poll(
+    developmentStatus,
+    (value) => value.pendingRestart?.code === "RESTART_PAUSED",
+    "paused restart in dev:status",
+  );
+  assert.equal(paused.ready, true);
+  assert.ok(
+    paused.pendingRestart.blockers.some(
+      (blocker) =>
+        blocker.pageId === created.document.id &&
+        ["PAGE_CONFLICT", "PAGE_NOT_SAVED"].includes(blocker.code),
+    ),
+    JSON.stringify(paused.pendingRestart),
+  );
   record(
     "a real file conflict blocks automatic restart and keeps the draft editable",
+    "dev:status names the page that paused the restart and why",
   );
   if (mode === "desktop") {
     assert.equal(
@@ -613,6 +667,11 @@ try {
     receipt,
     (value) => value?.backendPid !== original.backendPid,
     "successful guarded restart",
+  );
+  assert.equal(
+    (await poll(developmentStatus, (value) => value.ready, "ready after restart"))
+      .pendingRestart,
+    undefined,
   );
   if (mode === "desktop") {
     // Electron creates a new window after its ordinary save-aware quit.
@@ -690,6 +749,9 @@ try {
       .locator("[data-showai-development]")
       .filter({ hasText: "更新失败" })
       .waitFor({ timeout: 40000 });
+    const failed = await developmentStatus();
+    assert.equal(failed.ready, false);
+    assert.equal(failed.reason?.code, "BACKEND_EXITED", JSON.stringify(failed));
     assert.equal(child.exitCode, null);
     await writeFile(backend, source + "\n// recovered runtime\n");
     await poll(

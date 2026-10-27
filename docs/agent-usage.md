@@ -299,6 +299,12 @@ result = subprocess.run(
 guide = json.loads(result.stdout)["data"]
 ```
 
+### When the desktop App does not quit
+
+A window that cannot close safely keeps the App open: a page or shared data whose changes can be neither saved nor kept in a local draft, an Agent message draft that cannot be stored, a part of the window that does not finish within 15 seconds, a window that does not answer within 20 seconds, or the person choosing Keep Editing. The App restores that window, brings it to the front, names the reasons in a dialog and logs them in `showai-main.log`. It also writes `quit-blocked.json` next to that log (macOS: `~/Library/Logs/ShowAI/`; an instance started with `SHOWAI_USER_DATA`: its `logs/` folder).
+
+The file exists only while a window is held open and is removed when a later quit succeeds; ignore it when its `pid` no longer runs. It names the App (`pid`, `appVersion`, `sourceCommit`, `home`, `log`) and lists each held window with `title`, `trigger` (`quit` or `close`), `state` (`awaiting-decision` while the dialog is open, `kept-open` after Keep Editing) and `blockers`. A blocker has a stable `code` (`PAGE_NOT_RETAINED`, `DATASET_NOT_RETAINED`, `ASSISTANT_DRAFT_NOT_SAVED`, `LISTENER_TIMEOUT`, `LISTENER_FAILED`, `LISTENER_REFUSED` or `NO_REPLY`), its `source` in the window, the page or dataset IDs and title when known, and a `message`. The window also shows a notice for each affected page with a button to open it. Resolve the cause in that window; do not quit or end the App another way to get past it.
+
 ## Versioned libraries and recovery
 
 New empty homes initialize versioned storage automatically. Existing file libraries require a reviewed `library import` and `library activate`, or `library migrate` in place; original files and old checkpoints remain retained. Old checkpoints have unknown original edit times, actors and order.

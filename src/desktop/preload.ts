@@ -1,15 +1,15 @@
 import { contextBridge, ipcRenderer } from "electron";
 import type { TabCommand } from "../workbench/tab-shortcuts";
 import {
-  closeAllowed,
   type CloseResult,
+  type CloseSource,
   type DesktopChange,
   type DesktopResponse,
   type DesktopWindowState,
   type MenuCommand,
   type ShowAIBridge,
-  type UnsavedPage,
 } from "./bridge";
+import { closeReporter, type CloseListenerEntry } from "./close-report";
 
 if (process.isMainFrame) {
   const thumbnailListeners = new Set<
@@ -18,29 +18,13 @@ if (process.isMainFrame) {
   ipcRenderer.on("showai:page-thumbnail-updated", (_event, reference) => {
     for (const listener of thumbnailListeners) listener(reference);
   });
-  const closeListeners = new Set<() => Promise<CloseResult>>();
-  const reloadListeners = new Set<() => Promise<boolean>>();
+  const closeListeners = new Set<CloseListenerEntry>();
+  const reloadListeners = new Set<CloseListenerEntry>();
+  // Each listener answers with its own reason; a slow one is named, not waited on forever.
+  const report = closeReporter();
   ipcRenderer.on("showai:before-close", async (_event, requestId: string) => {
-    let allow = false;
-    const pages: UnsavedPage[] = [];
-    let reason = "";
-    try {
-      const results = await Promise.all(
-        [...closeListeners].map((listener) => listener()),
-      );
-      allow = results.every(closeAllowed);
-      for (const result of results)
-        if (typeof result === "object") pages.push(...(result.pages ?? []));
-    } catch (error) {
-      allow = false;
-      reason = error instanceof Error ? error.message : String(error);
-    }
-    ipcRenderer.send("showai:close-result", {
-      requestId,
-      allow,
-      pages,
-      reason,
-    });
+    const result = await report([...closeListeners]);
+    ipcRenderer.send("showai:close-result", { requestId, ...result });
   });
   // Uncaught renderer failures reach the main-process log for problem reports.
   const forward = (kind: string, value: unknown, fallback: string) => {
@@ -145,10 +129,11 @@ if (process.isMainFrame) {
       ipcRenderer.on("showai:changed", receive);
       return () => ipcRenderer.removeListener("showai:changed", receive);
     },
-    onBeforeClose(listener) {
-      closeListeners.add(listener);
+    onBeforeClose(listener, source = "workbench") {
+      const entry = { listener, source };
+      closeListeners.add(entry);
       return () => {
-        closeListeners.delete(listener);
+        closeListeners.delete(entry);
       };
     },
     onTabCommand(listener) {
@@ -191,20 +176,22 @@ if (process.isMainFrame) {
     },
     ...(process.env.SHOWAI_DEV_URL
       ? {
-          onBeforeReload(listener: () => Promise<boolean>) {
-            reloadListeners.add(listener);
+          onBeforeReload(
+            listener: () => Promise<CloseResult>,
+            source: CloseSource = "workbench",
+          ) {
+            const entry = { listener, source };
+            reloadListeners.add(entry);
             return () => {
-              reloadListeners.delete(listener);
+              reloadListeners.delete(entry);
             };
           },
           async prepareReload() {
-            return (
-              await Promise.all(
-                [...closeListeners, ...reloadListeners].map((listener) =>
-                  listener(),
-                ),
-              )
-            ).every(closeAllowed);
+            return (await report([...closeListeners, ...reloadListeners]))
+              .allow;
+          },
+          prepareReloadReport() {
+            return report([...closeListeners, ...reloadListeners]);
           },
         }
       : {}),

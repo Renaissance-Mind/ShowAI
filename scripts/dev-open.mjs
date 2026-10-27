@@ -4,6 +4,7 @@ import { mkdir, open, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
+import { canonicalPath, libraryInstances } from "./dev-instances.mjs";
 
 const root = resolve(fileURLToPath(new URL("../", import.meta.url)));
 const { values, positionals } = parseArgs({
@@ -72,20 +73,179 @@ async function status() {
     );
   return result;
 }
-if (values.status) {
-  const current = await status();
-  console.log(
-    JSON.stringify(
-      current ?? {
-        protocol: "showai-development-v1",
-        ready: false,
-        root,
-        url: origin,
-        home,
+/** The most recent launcher record of this port, for a service that is gone. */
+async function lastSession() {
+  const records = [];
+  for (const kind of ["desktop", "browser"]) {
+    const folder = join(root, ".showai-dev", `${kind}-${port}`);
+    const session = await readJson(join(folder, "session.json")).catch(
+      (error) => {
+        // A record being replaced is reported as unreadable, not fatal.
+        if (error instanceof SyntaxError) return null;
+        throw error;
       },
-    ),
+    );
+    if (session === undefined) continue;
+    const log = join(folder, "development.log");
+    records.push({
+      path: join(folder, "session.json"),
+      mode: kind,
+      ...(session
+        ? {
+            pid: session.pid,
+            running: Number.isInteger(session.pid) && alive(session.pid),
+            backendPid: session.backendPid,
+            home: session.home,
+            startedAt: session.startedAt,
+          }
+        : { unreadable: true }),
+      logPath: (await stat(log).catch(() => undefined)) ? log : undefined,
+    });
+  }
+  return records.sort((a, b) =>
+    String(b.startedAt ?? "").localeCompare(String(a.startedAt ?? "")),
+  )[0];
+}
+
+/** A launcher started before it reported reasons: infer what is visible. */
+async function legacyReason(current) {
+  const folder = join(root, ".showai-dev", `${current.mode}-${port}`);
+  const session = await readJson(join(folder, "session.json")).catch(
+    (error) => {
+      if (error instanceof SyntaxError) return undefined;
+      throw error;
+    },
   );
-  process.exit(current?.ready ? 0 : 1);
+  const previous = session?.backendPid;
+  const base = {
+    legacyLauncher: true,
+    logPath: join(folder, "development.log"),
+  };
+  if (current.backendPid)
+    return {
+      code: "BACKEND_NOT_READY",
+      message: "本地服务进程已启动但还没有就绪",
+      ...base,
+    };
+  if (Number.isInteger(previous) && alive(previous))
+    return {
+      code: "WAITING_FOR_APP_QUIT",
+      message: `上一个本地服务进程 ${previous} 仍在运行，开发服务正在等待它退出后再启动新版本：窗口可能正显示保存提示，或它正在停止后台任务（如内容库维护）`,
+      pid: previous,
+      ...base,
+    };
+  return {
+    code: "BACKEND_NOT_RUNNING",
+    message:
+      "开发服务在运行，但本地服务进程不存在：可能正在重启，或已意外退出并等待修复源码。查看启动日志了解详情",
+    ...base,
+  };
+}
+
+/**
+ * dev:status: the service on this port, why it is not ready, what keeps a
+ * restart waiting, and every App instance serving the requested library.
+ * Read-only; exit code 0 only when the service is ready.
+ */
+async function statusReport() {
+  let problem;
+  const response = await fetch(origin + "/__showai-dev/status", {
+    signal: AbortSignal.timeout(2000),
+  }).catch((error) => {
+    if (["ECONNREFUSED", "ECONNRESET"].includes(error.cause?.code)) {
+      problem = {
+        code: "NOT_LISTENING",
+        message: `${origin} 上没有开发服务在监听（没有启动、已停止或启动失败）`,
+      };
+      return undefined;
+    }
+    if (error.name === "TimeoutError") {
+      problem = {
+        code: "NO_RESPONSE",
+        message: `${origin} 在 2 秒内没有回应状态请求，开发服务可能正忙或已卡住`,
+      };
+      return undefined;
+    }
+    throw error;
+  });
+  let current;
+  if (response) {
+    const body =
+      response.ok &&
+      response.headers.get("content-type")?.includes("application/json")
+        ? await response.json().catch(() => undefined)
+        : undefined;
+    if (body?.protocol !== "showai-development-v1")
+      problem = {
+        code: "PORT_IN_USE",
+        message: `${origin} 被其他服务占用（HTTP ${response.status}），不是 ShowAI 开发服务`,
+      };
+    else if (resolve(body.root) !== root)
+      problem = {
+        code: "OTHER_SOURCE_ROOT",
+        message: `${origin} 是另一份源码目录的 ShowAI 开发服务：${body.root}`,
+        service: {
+          root: body.root,
+          mode: body.mode,
+          home: body.home,
+          ready: body.ready,
+          pid: body.pid,
+        },
+      };
+    else current = body;
+  }
+  if (current && !current.ready)
+    problem = current.reason ?? (await legacyReason(current));
+  if (problem && !current) {
+    const session = await lastSession();
+    if (session) problem.lastSession = session;
+  }
+  const instances = await libraryInstances({
+    root,
+    home,
+    self: current?.backendPid,
+    selfLauncher: current?.pid,
+    selfQuitRecord: current?.quitRecord,
+  });
+  const warnings = [...instances.warnings];
+  if (current && (await canonicalPath(current.home)) !== instances.home)
+    warnings.unshift({
+      code: "HOME_MISMATCH",
+      message: `${origin} 的开发服务使用内容库 ${current.home}，不是 ${home}；instances 列出的是 ${home} 的实例。`,
+    });
+  if (current?.pendingRestart)
+    warnings.unshift({
+      code: "PENDING_RESTART",
+      message: `本地服务仍在运行启动时的代码（${String(current.startedCommit ?? "").slice(0, 7)}）：${current.pendingRestart.message ?? current.pendingRestart.code}`,
+    });
+  if (current?.stopBlocked)
+    warnings.unshift({
+      code: "STOP_BLOCKED",
+      message: current.stopBlocked.message ?? current.stopBlocked.code,
+    });
+  return {
+    ...(current ?? {
+      protocol: "showai-development-v1",
+      ready: false,
+      root,
+      url: origin,
+      home,
+    }),
+    ready: !!current?.ready,
+    ...(problem ? { reason: problem } : {}),
+    instances: instances.instances,
+    registered: instances.registered,
+    warnings,
+    ...(instances.ignoredPresence
+      ? { ignoredPresence: instances.ignoredPresence }
+      : {}),
+  };
+}
+
+if (values.status) {
+  const report = await statusReport();
+  console.log(JSON.stringify(report));
+  process.exit(report.ready ? 0 : 1);
 }
 await mkdir(directory, { recursive: true });
 const lock = join(directory, "launch.lock");

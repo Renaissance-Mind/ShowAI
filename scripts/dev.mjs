@@ -11,7 +11,7 @@ import { watch } from "chokidar";
 import { context as createBundleContext } from "esbuild";
 import { createServer } from "vite";
 import { rawSourcePlugin } from "./raw-source-plugin.mjs";
-import { developmentSessions } from "./dev-session.mjs";
+import { developmentSessions, describeBlockers } from "./dev-session.mjs";
 import { developmentControl } from "./dev-control.mjs";
 import { developmentCache } from "./dev-cache.mjs";
 import { identityRefresher } from "./dev-identity.mjs";
@@ -191,6 +191,7 @@ frontendServer.on(
       pid: process.pid,
       backendPid: child?.pid,
       ready: !!child && !!readyReceipt,
+      ...statusDetails(),
       cli: {
         command: process.execPath,
         args: [join(runtime, "scripts/cli.mjs")],
@@ -218,6 +219,90 @@ let child,
   timer;
 let dependencies = new Set();
 let readyReceipt;
+// What dev:status explains: why the backend is not serving (phase) and what
+// keeps a source change from reaching a backend that still serves (pendingRestart).
+let phase = { code: "PREPARING", since: new Date().toISOString() };
+let pendingRestart;
+let stopBlocked;
+let lastExit;
+function setPhase(code, details = {}) {
+  phase = { code, since: new Date().toISOString(), ...details };
+}
+function setPending(code, details = {}) {
+  const now = new Date().toISOString();
+  pendingRestart = {
+    code,
+    message: pendingMessages[code],
+    since: pendingRestart?.since ?? now,
+    updatedAt: now,
+    ...details,
+  };
+}
+const phaseMessages = {
+  PREPARING: "正在准备本地运行环境（编译或校验构建缓存）",
+  BUILDING: "正在构建本地服务",
+  STARTING_BACKEND: "本地服务正在启动",
+  WAITING_FOR_APP_QUIT:
+    "正在等待桌面版退出：窗口可能正显示保存提示需要处理；已同意退出时 step 为正在停止的服务",
+  RESTARTING: "正在启动更新后的本地服务",
+  BACKEND_EXITED: "本地服务意外退出，修复源码后会自动重新启动",
+  BACKEND_NOT_READY: "本地服务没有就绪",
+  BUILD_FAILED: "本地服务构建失败，修复源码后会自动重试",
+  STOPPING: "开发服务正在停止",
+};
+const pendingMessages = {
+  BUILDING: "正在构建新的本地服务；当前仍由旧版本提供服务",
+  WAITING_FOR_PAGES: "正在请打开的页面确认保存，之后重启本地服务",
+  RESTART_PAUSED:
+    "打开的页面没有确认保存，重启已暂停；当前仍由旧版本提供服务。处理后点击开发标记重试",
+  QUIT_BLOCKED:
+    "桌面版拒绝退出，重启已暂停；当前仍由旧版本提供服务。处理后点击开发标记重试",
+  BUILD_FAILED: "新的本地服务构建失败；当前仍由旧版本提供服务",
+};
+function statusDetails() {
+  const ready = !!child && !!readyReceipt;
+  return {
+    phase: ready ? "RUNNING" : phase.code,
+    ...(ready
+      ? {}
+      : {
+          reason: {
+            code: phase.code,
+            message: phaseMessages[phase.code] ?? phase.code,
+            since: phase.since,
+            ...Object.fromEntries(
+              Object.entries(phase).filter(
+                ([key]) => key !== "code" && key !== "since",
+              ),
+            ),
+          },
+        }),
+    ...(pendingRestart ? { pendingRestart } : {}),
+    ...(stopBlocked ? { stopBlocked } : {}),
+    ...(!ready && lastExit ? { lastExit } : {}),
+    ...(mode === "desktop"
+      ? {
+          quitRecord: join(
+            environment.SHOWAI_USER_DATA,
+            "logs",
+            "quit-blocked.json",
+          ),
+        }
+      : {}),
+  };
+}
+/** Console text for a refused desktop quit, one line per window and reason. */
+function describeQuitBlocked(message) {
+  const windows = Array.isArray(message?.windows) ? message.windows : [];
+  return [
+    `桌面版没有退出：${windows.length} 个窗口仍然打开。`,
+    ...windows.map(
+      (window) =>
+        `  窗口 ${window.windowId}「${window.title}」（${window.decision === "keep" ? "选择了继续编辑" : window.decision}）：${describeBlockers(window.blockers ?? [])}`,
+    ),
+    ...(message?.record ? [`  记录：${message.record}`] : []),
+  ].join("\n");
+}
 const environment = {
   ...process.env,
   SHOWAI_INDEX_WORKER: join(runtime, "scripts/index-worker.mjs"),
@@ -431,6 +516,7 @@ function writeSession() {
 }
 async function launch() {
   readyReceipt = undefined;
+  setPhase(startup ? "RESTARTING" : "STARTING_BACKEND");
   const args =
     mode === "desktop"
       ? [join(directory, "desktop")]
@@ -469,12 +555,19 @@ async function launch() {
       reject(new Error(`Development backend exited before ready (${code}).`));
     });
   });
-  next.once("exit", (code) => {
+  next.once("exit", (code, signal) => {
+    lastExit = {
+      pid: next.pid,
+      exitCode: code,
+      signal,
+      at: new Date().toISOString(),
+    };
     if (child === next) {
       child = undefined;
       if (!stopping && !rebuilding) {
         if (code === 0) void stop();
         else {
+          setPhase("BACKEND_EXITED", { exitCode: code, signal });
           console.error(`本地服务意外退出（${code}），修复源码后会重新启动。`);
           vite.ws.send("showai:status", {
             message: "本地服务已退出，等待修复",
@@ -484,27 +577,42 @@ async function launch() {
     }
   });
   await ready;
+  setPhase("RUNNING");
   launchedAt = new Date().toISOString();
   startedCommit = identity.commit;
   await writeSession();
 }
+/** Resolves { stopped: true }, or { stopped: false, blocked } with the App's reasons. */
 async function stopChild() {
   const previous = child;
-  if (!previous) return true;
+  if (!previous) return { stopped: true };
   child = undefined;
+  const before = phase;
+  setPhase("WAITING_FOR_APP_QUIT", { pid: previous.pid });
   const exited = new Promise((done, reject) => {
     const blocked = (message) => {
+      if (message?.type === "quit-progress" && typeof message.step === "string") {
+        // The App agreed to quit and is stopping this service.
+        phase = {
+          ...phase,
+          step: message.step.slice(0, 100),
+          stepSince: new Date().toISOString(),
+        };
+        return;
+      }
       if (message?.type !== "quit-blocked") return;
       previous.off("exit", complete);
       previous.off("error", reject);
       previous.off("message", blocked);
       child = previous;
-      done(false);
+      phase = before;
+      done({ stopped: false, blocked: message });
     };
     const complete = () => {
       previous.off("message", blocked);
       previous.off("error", reject);
-      done(true);
+      stopBlocked = undefined;
+      done({ stopped: true });
     };
     previous.on("message", blocked);
     previous.once("exit", complete);
@@ -514,18 +622,32 @@ async function stopChild() {
   // The desktop's normal close path waits for page saves. Never force-kill drafts.
   return await exited;
 }
+/** The refused quit as dev:status reports it. */
+function quitBlockedDetails(message) {
+  return {
+    record: typeof message?.record === "string" ? message.record : undefined,
+    at: typeof message?.at === "string" ? message.at : new Date().toISOString(),
+    windows: Array.isArray(message?.windows) ? message.windows.slice(0, 20) : [],
+  };
+}
 async function rebuild(backend = true) {
   requested = true;
   backendRequested ||= backend;
   if (rebuilding || stopping) return;
   rebuilding = true;
   let attemptedBackend = false;
+  let step = "compile";
   try {
     while (requested && !stopping) {
       requested = false;
       const restartBackend = backendRequested;
       attemptedBackend = restartBackend;
       backendRequested = false;
+      step = "compile";
+      if (restartBackend) {
+        if (child && readyReceipt) setPending("BUILDING");
+        else setPhase("BUILDING");
+      }
       vite.ws.send("showai:status", {
         message: restartBackend ? "正在构建本地服务" : "正在更新阅读器",
       });
@@ -544,24 +666,48 @@ async function rebuild(backend = true) {
         vite.ws.send("showai:status", { message: "阅读器已更新" });
         continue;
       }
-      if (!(await sessions.prepare())) {
+      step = "prepare";
+      if (child && readyReceipt) setPending("WAITING_FOR_PAGES");
+      const prepared = await sessions.prepare();
+      if (!prepared.allow) {
+        setPending("RESTART_PAUSED", { blockers: prepared.blockers });
         console.log(
-          "更新已暂停：打开的页面未确认保存。处理保存问题后，点击开发标记重试。",
+          `更新已暂停：打开的页面未确认保存。处理保存问题后，点击开发标记重试。\n  原因：${describeBlockers(prepared.blockers)}`,
         );
         break;
       }
-      if (!(await stopChild())) {
-        vite.ws.send("showai:restart-cancelled", {});
+      step = "stop";
+      const stopped = await stopChild();
+      if (!stopped.stopped) {
+        setPending("QUIT_BLOCKED", quitBlockedDetails(stopped.blocked));
+        console.log(describeQuitBlocked(stopped.blocked));
+        vite.ws.send("showai:restart-cancelled", {
+          reason: "桌面版拒绝退出，请在窗口中处理保存提示",
+        });
         break;
       }
+      pendingRestart = undefined;
       if (stopping) break;
+      step = "publish";
+      setPhase("RESTARTING");
       await publish(outputs);
+      step = "launch";
       await launch();
       vite.ws.send("showai:restart-complete", {});
       vite.ws.send("showai:status", { message: "已更新" });
     }
   } catch (error) {
     if (requested) backendRequested ||= attemptedBackend;
+    const failure = String(error?.message ?? error).slice(0, 2000);
+    if (step === "compile" && child && readyReceipt)
+      setPending("BUILD_FAILED", { error: failure });
+    else if (step === "launch" && !child)
+      setPhase("BACKEND_EXITED", {
+        error: failure,
+        ...(lastExit ? { exitCode: lastExit.exitCode, signal: lastExit.signal } : {}),
+      });
+    else if (step === "launch") setPhase("BACKEND_NOT_READY", { error: failure });
+    else if (!child || !readyReceipt) setPhase("BUILD_FAILED", { error: failure });
     console.error("ShowAI 开发更新失败：", error);
     vite.ws.send("showai:restart-cancelled", {});
     vite.ws.send("showai:status", {
@@ -577,14 +723,24 @@ async function stop() {
   if (stopping) return;
   stopping = true;
   clearTimeout(timer);
-  if (!(await stopChild())) {
+  const stopped = await stopChild();
+  if (!stopped.stopped) {
     stopping = false;
+    // The development service keeps running; status says why it did not stop.
+    stopBlocked = {
+      code: "QUIT_BLOCKED",
+      message: "桌面版拒绝退出，开发服务继续运行。处理窗口中的保存提示后再停止",
+      ...quitBlockedDetails(stopped.blocked),
+    };
     console.log(
-      "页面尚未保存，开发服务继续运行。处理保存问题后再次按 Ctrl+C。",
+      `页面尚未保存，开发服务继续运行。处理保存问题后再次按 Ctrl+C。\n${describeQuitBlocked(stopped.blocked)}`,
     );
-    vite.ws.send("showai:restart-cancelled", {});
+    vite.ws.send("showai:restart-cancelled", {
+      reason: "桌面版拒绝退出，请在窗口中处理保存提示",
+    });
     return;
   }
+  setPhase("STOPPING");
   vite.ws.send("showai:stopped", {});
   await watcher?.close();
   identityRefresh?.close();

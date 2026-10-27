@@ -617,15 +617,47 @@ export class DatasetSession {
 
   /** Before a window closes: save what can be saved; anything else stays in the draft. */
   async prepareClose(): Promise<boolean> {
-    await this.flush().catch(() => false);
+    return !(await this.closeProblem());
+  }
+
+  /** Like prepareClose, but says why unsaved writes could not be kept. */
+  async closeProblem(): Promise<DatasetCloseProblem | undefined> {
+    let saveError: unknown;
+    await this.flush().catch((error) => {
+      saveError = error;
+      return false;
+    });
     clearTimeout(this.draftTimer);
     try {
       await this.persistDraft();
-      return true;
-    } catch {
-      return !this.hasUnsaved();
+      return undefined;
+    } catch (error) {
+      if (!this.hasUnsaved()) return undefined;
+      return {
+        projectId: this.projectId,
+        datasetId: this.datasetId,
+        ...(this.snapshot.name ? { name: this.snapshot.name } : {}),
+        draftError: errorText(error),
+        ...(saveError || this.snapshot.error
+          ? { saveError: saveError ? errorText(saveError) : this.snapshot.error }
+          : {}),
+        conflicts: this.held.length,
+      };
     }
   }
+}
+
+/** Shared data whose unsaved writes are neither saved nor kept in a draft. */
+export interface DatasetCloseProblem {
+  projectId: string;
+  datasetId: string;
+  name?: string;
+  /** Why the local draft could not be written. */
+  draftError: string;
+  /** Why the formal save failed, when it did. */
+  saveError?: string;
+  /** Held conflicts that are waiting for the person's choice. */
+  conflicts: number;
 }
 
 export class DatasetClient {
@@ -693,10 +725,15 @@ export class DatasetClient {
   }
 
   async prepareClose(): Promise<boolean> {
-    const results = await Promise.all(
-      [...this.sessions.values()].map((session) => session.prepareClose()),
+    return !(await this.closeProblems()).length;
+  }
+
+  /** Every open dataset whose unsaved writes would be lost by closing now. */
+  async closeProblems(): Promise<DatasetCloseProblem[]> {
+    const problems = await Promise.all(
+      [...this.sessions.values()].map((session) => session.closeProblem()),
     );
-    return results.every(Boolean);
+    return problems.filter((problem) => problem !== undefined);
   }
 
   hasUnsaved() {
