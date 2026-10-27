@@ -26,7 +26,7 @@ For everyday use, install the Claude Code plugin from the App; it connects the s
 npm run plugin:claude -- --port <port> --json
 ```
 
-The main directory gets `showai-dev` and a worktree gets `showai-dev-<directory>`, pinned to that instance's runtime and library. The plugin is enabled only in this checkout's `.claude/settings.json`, which also turns off the App-installed `showai` here, so a session sees one ShowAI plugin. `--remove` uninstalls this checkout's plugin; `--prune` cleans up after deleted worktrees. The receipt is artifacts/claude-plugin-install.json.
+The main directory gets `showai-dev` and a worktree gets `showai-dev-<worktree name>` (its name under `.git/worktrees/`), pinned to that instance's runtime and library. The plugin is enabled only in this checkout's `.claude/settings.json`, which also turns off the App-installed `showai` here, so a session sees one ShowAI plugin. `--remove` uninstalls this checkout's plugin; `--prune` cleans up after deleted worktrees. The receipt is artifacts/claude-plugin-install.json.
 
 ### DeepSeek Harness
 

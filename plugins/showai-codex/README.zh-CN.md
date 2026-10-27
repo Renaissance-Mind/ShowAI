@@ -26,7 +26,7 @@ Claude Code 的日常插件从 App 安装，连接稳定版。开发时先启动
 npm run plugin:claude -- --port <端口> --json
 ```
 
-主目录安装 `showai-dev`，worktree 安装 `showai-dev-<目录名>`，固定连接这个开发实例的运行时与内容库。插件只在这个目录的 `.claude/settings.json` 中启用，并在这里停用 App 安装的 `showai`，所以一个会话只看到一个 ShowAI 插件。`--remove` 卸载本目录的开发插件；worktree 删除后用 `--prune` 清理。回执位于 artifacts/claude-plugin-install.json。
+主目录安装 `showai-dev`，worktree 安装 `showai-dev-<worktree 名>`（即 `.git/worktrees/` 下的名称），固定连接这个开发实例的运行时与内容库。插件只在这个目录的 `.claude/settings.json` 中启用，并在这里停用 App 安装的 `showai`，所以一个会话只看到一个 ShowAI 插件。`--remove` 卸载本目录的开发插件；worktree 删除后用 `--prune` 清理。回执位于 artifacts/claude-plugin-install.json。
 
 ### DeepSeek Harness
 

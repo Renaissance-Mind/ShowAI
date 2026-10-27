@@ -1,5 +1,5 @@
 // Connects Claude Code in this checkout to one development instance. The main checkout gets
-// showai-dev, each worktree showai-dev-<name>. Both are enabled in this checkout's own
+// showai-dev, each worktree showai-dev-<git worktree name>. Both are enabled in this checkout's own
 // .claude/settings.json (project scope; Claude Code shares local settings between the worktrees
 // of a repository), and the stable showai@showai-desktop is turned off there, so a session
 // sees one ShowAI plugin. The plugin is pinned to the instance's library and runtime.
@@ -71,12 +71,14 @@ async function checkout() {
     throw new Error(`Run from the checkout root ${top}.`);
   if ((await realpath(gitDir)) === (await realpath(commonDir)))
     return { worktree: false, name: "showai-dev" };
-  const slug = basename(top)
+  // Git's worktree name (.git/worktrees/<name>) is unique in the repository; directory names
+  // are not (every Codex worktree checks out into …/<id>/ShowAI).
+  const slug = basename(gitDir)
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "")
     .slice(0, 40);
-  if (!slug) throw new Error(`Cannot name a plugin after worktree ${top}.`);
+  if (!slug) throw new Error(`Cannot name a plugin after worktree ${gitDir}.`);
   return { worktree: true, name: `showai-dev-${slug}` };
 }
 
