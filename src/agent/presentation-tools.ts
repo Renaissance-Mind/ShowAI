@@ -276,6 +276,33 @@ export function registerPresentationTools(
           baseline: { tool: "guide", arguments: { topic: "presentation" } },
         },
         componentParameters: COMPONENT_PARAMETER_CAPABILITIES,
+        authoring: {
+          available: options.privateProjects !== false,
+          pageOperations: [
+            "component.insert",
+            "component.props.set",
+            "component.ref.set",
+          ],
+          // Large arguments and results through files on the device running ShowAI.
+          localFiles: {
+            available:
+              options.privateProjects !== false && options.transport !== "http",
+            inputs: {
+              page_apply: ["operationsFile"],
+              dataset_write: ["valueFile", "operationsFile"],
+              component_save: ["directory"],
+            },
+            outputs: {
+              page_read: ["out"],
+              page_diff: ["out"],
+              dataset_read: ["out"],
+              catalog_describe: ["out"],
+            },
+            paths: "absolute",
+          },
+          pageDiff: { entries: "record", paged: true },
+          migrations: { guide: "migrations" },
+        },
         boardReading: {
           protocol: "showai-board-reading-v1",
           available: options.privateProjects !== false,

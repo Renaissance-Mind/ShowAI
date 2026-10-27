@@ -1769,6 +1769,19 @@ export class FileStore {
     pageId: string,
     sinceHash: string,
   ): Promise<PageDiff> {
+    return (await this.diffPageDocuments(projectId, pageId, sinceHash)).diff;
+  }
+
+  /** The comparison plus both documents, for record-level views of it. */
+  async diffPageDocuments(
+    projectId: string,
+    pageId: string,
+    sinceHash: string,
+  ): Promise<{
+    diff: PageDiff;
+    baseline: ShowDocument;
+    current: ShowDocument;
+  }> {
     const current = await this.readPage(projectId, pageId);
     const baseline =
       sinceHash === current.hash || sinceHash === current.revision
@@ -1791,14 +1804,18 @@ export class FileStore {
       );
     const baseHash = documentHash(baseline);
     return {
-      projectId,
-      pageId,
-      baseHash,
-      currentHash: current.hash,
-      baseRevision: sinceHash,
-      currentRevision: current.revision,
-      changed: baseHash !== current.hash,
-      changes: diffDocuments(baseline, current.document),
+      diff: {
+        projectId,
+        pageId,
+        baseHash,
+        currentHash: current.hash,
+        baseRevision: sinceHash,
+        currentRevision: current.revision,
+        changed: baseHash !== current.hash,
+        changes: diffDocuments(baseline, current.document),
+      },
+      baseline,
+      current: current.document,
     };
   }
 }

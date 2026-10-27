@@ -97,29 +97,43 @@ test("action tools validate each call against exactly its action's fields", asyn
     arguments: { action: "create", name: null },
   });
   expect(nullName.isError).toBe(true);
-  expect(failure(nullName)).toContain("create accepts {name,icon}");
+  // Structured: the action's own fields, not the advertised union.
+  const nullError = (nullName.structuredContent as any).error;
+  expect(nullError.code).toBe("INVALID_ARGUMENTS");
+  expect(nullError.issues).toEqual([
+    { path: "name", message: expect.stringContaining("expected string") },
+  ]);
+  expect(nullError.expected).toEqual({
+    required: ["action", "name"],
+    optional: ["icon"],
+  });
 
   const crossField = await client.callTool({
     name: "sample",
     arguments: { action: "create", name: "A", id: "x" },
   });
   expect(crossField.isError).toBe(true);
-  expect(failure(crossField)).toContain("INVALID_DATA");
-  expect(failure(crossField)).toContain("Unrecognized key");
-  expect(failure(crossField)).toContain("id");
+  expect((crossField.structuredContent as any).error).toMatchObject({
+    code: "INVALID_ARGUMENTS",
+    unexpected: ["id"],
+  });
 
   const missing = await client.callTool({
     name: "sample",
     arguments: { action: "rename", name: "B" },
   });
   expect(missing.isError).toBe(true);
-  expect(failure(missing)).toContain("id:");
+  expect((missing.structuredContent as any).error.issues[0].path).toBe("id");
 
   const unknown = await client.callTool({
     name: "sample",
     arguments: { action: "delete" },
   });
   expect(unknown.isError).toBe(true);
+  expect((unknown.structuredContent as any).error.actions).toEqual({
+    create: { required: ["name"], optional: ["icon"] },
+    rename: { required: ["id", "name"], optional: [] },
+  });
 
   const undeclared = await client.callTool({
     name: "sample",
@@ -189,13 +203,20 @@ test("library connections reject removed and cross-action arguments", async () =
     },
   });
   expect(sortWithName.isError).toBe(true);
-  expect(failure(sortWithName)).toContain("sort accepts");
+  expect((sortWithName.structuredContent as any).error).toMatchObject({
+    code: "INVALID_ARGUMENTS",
+    unexpected: ["name"],
+    expected: { required: ["action", "parentId", "sortBy"] },
+  });
+  // Removed capture knobs are ignored and reported, not silently dropped.
   const knob = await client.callTool({
     name: "board_read",
     arguments: { projectId: project.id, pageId: "p", maxImages: 1 },
   });
   expect(knob.isError).toBe(true);
-  expect(failure(knob)).toContain("maxImages");
+  expect((knob.structuredContent as any).migration.changes).toEqual([
+    "board_read no longer takes maxImages; it was ignored",
+  ]);
 });
 
 // codex-rs/core/src/mcp_tool_exposure.rs: plugin MCP tools share 64,000 bytes

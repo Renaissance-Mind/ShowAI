@@ -17,8 +17,9 @@ import {
 } from "../surface/containers.mjs";
 import { createHash } from "node:crypto";
 import { compileBinding, readBinding } from "../datasets/binding.mjs";
+import { readCustomBlockData } from "../components/custom/contract";
 import { validateDocument } from "../portable/validation.mjs";
-import { CoreError } from "./model";
+import { CoreError, PAGE_OPERATION_FIELDS } from "./model";
 import {
   isSurface,
   reconcileSurface,
@@ -735,6 +736,54 @@ export function applyOperations(
         };
         break;
       }
+      case "component.ref.set": {
+        const node = locate(operation.blockId).node;
+        const data = node.attrs?.data;
+        if (
+          node.type !== "widget" ||
+          node.attrs?.kind !== "custom" ||
+          !data ||
+          typeof data !== "object" ||
+          Array.isArray(data)
+        )
+          throw new CoreError(
+            "INVALID_DATA",
+            `component.ref.set requires a custom component block; ${operation.blockId} is ${node.type === "widget" ? `a ${String(node.attrs?.kind)} component` : `a ${String(node.type)} block`}.`,
+          );
+        for (const key of ["version", "integrity"] as const)
+          if (typeof operation[key] !== "string" || !operation[key].trim())
+            throw new CoreError(
+              "INVALID_DATA",
+              `component.ref.set requires ${key} from the component_save or catalog receipt.`,
+            );
+        if (
+          operation.componentId !== undefined &&
+          (typeof operation.componentId !== "string" ||
+            !operation.componentId.trim())
+        )
+          throw new CoreError(
+            "INVALID_DATA",
+            "component.ref.set componentId must be non-empty text when given.",
+          );
+        // Only the reference changes; props and $binding are kept as stored.
+        const { scope: _scope, ...rest } = data as Record<string, unknown>;
+        const next = {
+          ...rest,
+          componentId: operation.componentId ?? rest.componentId,
+          version: operation.version,
+          integrity: operation.integrity,
+        };
+        try {
+          readCustomBlockData(next);
+        } catch (error) {
+          throw new CoreError(
+            "INVALID_DATA",
+            `component.ref.set on ${operation.blockId}: ${error instanceof Error ? error.message : String(error)} Use componentId, version and integrity exactly as a component_save or catalog receipt returns them.`,
+          );
+        }
+        node.attrs = { ...node.attrs, data: next };
+        break;
+      }
       case "block.text.set": {
         const node = locate(operation.blockId).node;
         if (node.type === "richText" && typeof operation.text === "string") {
@@ -766,7 +815,7 @@ export function applyOperations(
       default:
         throw new CoreError(
           "INVALID_DATA",
-          `Unsupported operation: ${String((operation as { type?: unknown }).type)}`,
+          `Unsupported operation: ${String((operation as { type?: unknown }).type)}. Page operations: ${Object.keys(PAGE_OPERATION_FIELDS).join(", ")} (guide authoring).`,
         );
     }
   }

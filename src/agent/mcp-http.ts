@@ -222,6 +222,8 @@ export async function createMcpHttpApp(options: McpHttpOptions) {
       sourceContext: {
         actor: { kind: "external", label: "MCP client" },
         channel: "mcp",
+        // Requests are stateless; one authorized client is one dataset reader.
+        ...(grant ? { readerId: `grant:${grant.id}` } : {}),
       },
       instructions: remoteSkillInstructions,
       presentation: {

@@ -129,6 +129,27 @@ export interface ReadIdentity {
   componentRefs: { id: string; version: string; integrity?: string }[];
   /** Blocks whose props come from a project dataset, with the resolved props. */
   bindings?: BindingRead[];
+  /**
+   * The dataset hashes this read saw, ready to pass as page_apply datasetBases
+   * from any later connection ("projectId/datasetId" for other projects).
+   */
+  datasetBases?: Record<string, string>;
+}
+
+/** datasetBases for page_apply from the bindings of a read. */
+export function datasetBasesFor(
+  projectId: string,
+  bindings: BindingRead[],
+): Record<string, string> | undefined {
+  const bases: Record<string, string> = {};
+  for (const binding of bindings)
+    if (binding.hash)
+      bases[
+        binding.projectId === projectId
+          ? binding.datasetId
+          : `${binding.projectId}/${binding.datasetId}`
+      ] = binding.hash;
+  return Object.keys(bases).length ? bases : undefined;
 }
 export interface StructuredRead extends ReadIdentity {
   view: "structured";
@@ -278,7 +299,14 @@ export async function readPageView(
     hash: record.hash,
     ...(record.revision ? { revision: record.revision } : {}),
     view: options.view,
-    ...(shared.bindings.length ? { bindings: shared.bindings } : {}),
+    ...(shared.bindings.length
+      ? {
+          bindings: shared.bindings,
+          ...(datasetBasesFor(projectId, shared.bindings)
+            ? { datasetBases: datasetBasesFor(projectId, shared.bindings) }
+            : {}),
+        }
+      : {}),
     partial: !!options.blockIds,
     ...(options.blockIds ? { blockIds: options.blockIds } : {}),
     componentRefs: sourceOnly

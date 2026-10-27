@@ -44,6 +44,11 @@ export function compactMcpResult(
     "currentSourceChanged",
     "expiresAt",
     "origin",
+    "datasetSchemas",
+    "datasetBases",
+    "warnings",
+    "migration",
+    "out",
   ];
   const selected = Object.fromEntries(
     fields.filter((key) => key in record).map((key) => [key, record[key]]),

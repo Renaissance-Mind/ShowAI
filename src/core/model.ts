@@ -182,6 +182,18 @@ export type PageOperation =
       props: Record<string, unknown>;
     }
   | { type: "block.text.set"; blockId: string; text: string }
+  /**
+   * Point a custom component block at another exact revision. The block id,
+   * props and dataset binding stay; the props are checked against the new
+   * revision's schema (resolved props for bound blocks).
+   */
+  | {
+      type: "component.ref.set";
+      blockId: string;
+      componentId?: string;
+      version: string;
+      integrity: string;
+    }
   /** Bind a component block to a project dataset; see the datasets guide. */
   | {
       type: "component.binding.set";
@@ -198,6 +210,47 @@ export type PageOperation =
   | ({ type: "diagram.insert" } & DiagramInsertInput)
   /** Lay out existing connected objects along their arrows, as the editor's arrange command does. */
   | { type: "diagram.arrange"; nodeIds: string[]; direction?: DiagramDirection };
+
+/**
+ * Fields of each page operation, for argument checks, error messages and the
+ * test that keeps documented examples current. The type ties every entry to
+ * PageOperation.
+ */
+export const PAGE_OPERATION_FIELDS = {
+  "component.insert": ["kind", "data", "parentId", "afterId"],
+  "surface.upgrade": [],
+  "surface.create": ["kind", "name", "nodeId", "parentId"],
+  "surface.wrap": ["nodeId", "kind"],
+  "surface.layout.set": ["nodeId", "layout"],
+  "surface.view.save": ["surfaceId", "view", "initial"],
+  "surface.view.remove": ["surfaceId", "viewId"],
+  "surface.reading-order.set": ["surfaceId", "nodeIds"],
+  "page.set": ["fields"],
+  "block.insert": ["node", "parentId", "afterId"],
+  "block.remove": ["blockId"],
+  "block.replace": ["blockId", "node"],
+  "block.move": ["blockId", "parentId", "afterId"],
+  "block.attrs.set": ["blockId", "attrs"],
+  "component.props.set": ["blockId", "props"],
+  "block.text.set": ["blockId", "text"],
+  "component.ref.set": ["blockId", "componentId", "version", "integrity"],
+  "component.binding.set": ["blockId", "binding"],
+  "component.binding.remove": ["blockId", "keep"],
+  "diagram.insert": [
+    "parentId",
+    "direction",
+    "origin",
+    "spacing",
+    "nodes",
+    "edges",
+  ],
+  "diagram.arrange": ["nodeIds", "direction"],
+} as const satisfies {
+  [K in PageOperation["type"]]: readonly Exclude<
+    keyof Extract<PageOperation, { type: K }>,
+    "type"
+  >[];
+};
 
 export interface ApplyPageInput {
   baseRevision?: string;
@@ -270,6 +323,8 @@ export class CoreError extends Error {
   readonly conflictId?: string;
   /** Structured facts for the caller, e.g. the conflicting fields of a dataset write. */
   details?: Record<string, unknown>;
+  /** A specific next step that replaces the generic guidance for this code. */
+  nextStep?: string;
   saveFailed?: boolean;
   recovery?: {
     action: "read-compare-save";

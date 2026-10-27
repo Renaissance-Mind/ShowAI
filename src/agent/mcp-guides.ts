@@ -89,13 +89,14 @@ const tools: Record<GuideTopic, string[]> = {
   sync: ["project_context", "project_sync_status", "project_sync"],
   export: ["page_present", "page_export"],
   publish: ["publication_list", "publication_prepare"],
+  migrations: ["guide"],
 };
 const rules: Partial<Record<GuideTopic, string[]>> = {
   presentation: [],
   integration: [
     "Agent document operations use MCP. CLI remains a host setup, service launch, diagnostics and scripting interface, not an alternative authoring workflow.",
     "Confirm capabilities and connection identity. A library connection requires explicit projectId; bound connections reject another projectId; remote projects are restricted by OAuth and current membership.",
-    "Route by what the user wants to keep. A visualization to see now uses show_component: one to five components, no project, nothing saved. Documents to keep, edit or share are saved in the selected project before page_present; saving a shown component reuses the same {kind,data}. render_document is for a complete standalone document. Never change library or persistence mode because a connection or export failed.",
+    "Route by what the user wants to keep. A visualization to see now uses show_component: one to five components, no project, nothing saved. Documents to keep, edit or share are saved in the selected project; a new work is then shown with page_present, while a revision of an existing page stays in that page and is reported with its project and openUrl, not presented again unless the user asks. Saving a shown component reuses the same {kind,data}. render_document is for a complete standalone document. Never change library or persistence mode because a connection or export failed.",
     "show_component delivery follows the plugin's SHOWAI_HOST_DISPLAY (mcp-app, codex-visualize, model-html, image, native). Without a declaration it attaches the MCP Apps view; choose image, compact or fragment-file explicitly when the host's actual display is different.",
   ],
   workspace: [
@@ -107,7 +108,7 @@ const rules: Partial<Record<GuideTopic, string[]>> = {
   authoring: [
     "Read the full Page and keep hash, revision and stable node IDs. page_save/page_apply take projectId, pageId, baseHash and baseRevision. Never use a partial view as a full replacement.",
     "CONFLICT with saveFailed means no successful save: compare original base, current Page and your changes; resolve deliberately or abandon the attempted edit. Never retry by merely refreshing version fields.",
-    "After saving, page_present returns host delivery references without another save. Inspect the actual returned document.id after cross-device conflict retention.",
+    "After saving a new page, page_present returns host delivery references without another save. Revisions of an existing page are reported with projectName and openUrl; present them only when the user asks. Inspect the actual returned document.id after cross-device conflict retention.",
   ],
   export: [
     "page_present({projectId,pageId,blockIds?}) renders a saved revision. Complete HTML/source include the whole Page; optional blockIds restrict only its inline preview. Selected containers include their subtree.",
@@ -120,7 +121,7 @@ const rules: Partial<Record<GuideTopic, string[]>> = {
     "page_export remains for an explicitly requested file/site export. Its local out path and remote availability are transport-specific; check the exposed tool schema. No fallback to authoring CLI.",
   ],
   component: [
-    "component_save takes source:{manifest,schema,source,files?,assets?}. Use the same editable package contract on local and remote MCP. Compilation creates an immutable revision; reference its exact componentId/version/integrity in attrs.data, with attrs.kind=custom.",
+    "component_save takes source:{manifest,schema,source,files?,assets?}, or on a local connection directory (absolute path of the package folder) so large sources and assets are not copied into the call. Same editable package contract everywhere. Compilation creates an immutable revision; reference its exact componentId/version/integrity in attrs.data, with attrs.kind=custom. Existing blocks move to the new revision with page_apply component.ref.set {blockId, version, integrity}; catalog_references lists them.",
     "Custom components receive data, onChange and readOnly. onChange sends valid edits to the host; reading state never saves by itself. Import into the chosen project, use a real Page, inspect rendering and verify interaction.",
     "Conversation hosts also pass onContext({model, private?, label?}) and context; guide component describes the limits. Show the hand-over control only when onContext exists, call it from a reader action, and verify the chip or model context in a conversation host. Without such a host, state that this path was not verified.",
   ],

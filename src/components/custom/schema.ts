@@ -22,6 +22,63 @@ const ajv = new Ajv({
 });
 const validators = new Map<string, ValidateFunction>();
 
+function validator(schema: JsonSchema) {
+  const key = JSON.stringify(schema);
+  let validate = validators.get(key);
+  if (!validate) {
+    validate = ajv.compile(schema);
+    if (validators.size >= 100) validators.clear();
+    validators.set(key, validate);
+  }
+  return validate;
+}
+
+export interface PropsIssue {
+  /** JSON pointer inside props, e.g. /objectives/0/title ("" for props itself). */
+  path: string;
+  message: string;
+  kind: "schema" | "relation";
+}
+
+/**
+ * Schema and relation problems of props without throwing, so callers can
+ * report every field (component.ref.set checks props against a new revision).
+ * Structural limits (JSON values, size) still throw like assertProps.
+ */
+export function propsIssues(
+  schema: JsonSchema,
+  props: unknown,
+  documentation?: ComponentDocumentation,
+): PropsIssue[] {
+  assertJsonValue(props);
+  assertContent(props, "Component instance data", CAPACITY.componentPropsBytes);
+  if (!props || typeof props !== "object" || Array.isArray(props))
+    return [{ path: "", message: "must be an object", kind: "schema" }];
+  const validate = validator(schema);
+  if (!validate(props))
+    return (validate.errors ?? []).map((error) => ({
+      path:
+        error.instancePath +
+        (error.keyword === "required" &&
+        typeof error.params?.missingProperty === "string"
+          ? `/${error.params.missingProperty}`
+          : error.keyword === "additionalProperties" &&
+              typeof error.params?.additionalProperty === "string"
+            ? `/${error.params.additionalProperty}`
+            : ""),
+      message: error.message ?? error.keyword,
+      kind: "schema" as const,
+    }));
+  return parameterRuleIssues(
+    props,
+    documentation?.version === 2 ? documentation.usage.rules : [],
+  ).map((issue: { path: string; message: string }) => ({
+    path: issue.path,
+    message: issue.message,
+    kind: "relation" as const,
+  }));
+}
+
 export function assertProps(
   schema: JsonSchema,
   props: unknown,
@@ -31,13 +88,7 @@ export function assertProps(
   assertContent(props, "Component instance data", CAPACITY.componentPropsBytes);
   if (!props || typeof props !== "object" || Array.isArray(props))
     throw new Error("Component props must be an object.");
-  const key = JSON.stringify(schema);
-  let validate = validators.get(key);
-  if (!validate) {
-    validate = ajv.compile(schema);
-    if (validators.size >= 100) validators.clear();
-    validators.set(key, validate);
-  }
+  const validate = validator(schema);
   if (!validate(props))
     throw new Error(
       `Invalid component props: ${ajv.errorsText(validate.errors)}.`,

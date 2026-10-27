@@ -44,6 +44,21 @@ import type { TemplateSelection } from "./template-workflow";
 import { compactMcpResult } from "./mcp-response";
 import { boardReadSchema, type BoardReadResult } from "./board-reading";
 import { actionTool, strictToolInputs } from "./mcp-actions";
+import {
+  assertLocalPath,
+  fileReceipt,
+  inlineOrFile,
+} from "./local-files";
+import {
+  DIFF_DEFAULT_LIMIT,
+  DIFF_MAX_LIMIT,
+  pageDiffView,
+} from "./page-diff-view";
+import {
+  inspectComponentDirectory,
+  writeComponentDirectory,
+} from "./component-directory";
+import { writeFile } from "node:fs/promises";
 
 // Capture tuning stays available to the service; agents use the defaults.
 const boardTuning = {
@@ -139,6 +154,8 @@ export function createMcpServer(options: {
     return tool;
   };
   const inherited = options.sourceContext ?? changeContext();
+  // Library connections pass their own reader; a bound connection is one.
+  const readerId = inherited.readerId ?? randomUUID();
   const changeSchema = {
     operationId: z.string().max(1000).optional(),
     message: z.string().max(4000).optional(),
@@ -153,6 +170,7 @@ export function createMcpServer(options: {
         withChangeContext(
           {
             ...mcpChangeContext(inherited, server.server.getClientVersion()),
+            readerId,
             operationId: metadata.operationId ?? randomUUID(),
             requestFingerprint: undefined,
             message: metadata.message ?? inherited.message,
@@ -216,6 +234,8 @@ export function createMcpServer(options: {
     } as T;
   };
 
+  // Device paths are only meaningful where ShowAI runs on the same machine.
+  const localFiles = options.presentation?.transport !== "http";
   registerDatasetTools(
     register,
     service,
@@ -223,7 +243,7 @@ export function createMcpServer(options: {
     call,
     { readOnly, write },
     changeSchema,
-    options.presentation?.transport !== "http",
+    localFiles,
   );
   registerOrganizationTools(
     register,
@@ -359,23 +379,58 @@ export function createMcpServer(options: {
     ({ includeArchived }) =>
       call(() => service.store.listPages(projectId, { includeArchived })),
   );
+  const pageReadShape = localFiles
+    ? pageReadSchema.shape
+    : pageReadSchema.omit({ out: true, overwrite: true }).shape;
   register(
     "page_read",
     {
-      description:
-        'Read a Page as structured JSON/Markdown (default), a PNG image, or html (DOM, accessibility tree and an interactive file; actions run interactions). detail:"outline" lists block IDs; blockIds selects blocks.',
+      description: `Read a Page as structured JSON/Markdown (default), a PNG image, or html (DOM, accessibility tree and an interactive file; actions run interactions). detail:"outline" lists block IDs; blockIds selects blocks.${
+        localFiles
+          ? " out (absolute path) writes the source, markdown, image or html to a file and returns only its path, sha256, hash and revision."
+          : ""
+      }`,
       inputSchema: {
         pageId: z.string().min(1),
-        ...pageReadSchema.omit({ out: true, overwrite: true }).shape,
+        ...pageReadShape,
         response: z.enum(["full", "source", "receipt"]).default("full"),
       },
       annotations: readOnly,
     },
     ({ pageId, response, ...readOptions }) =>
-      call(() => service.readPage(projectId, pageId, readOptions)).then(
+      call(async () => {
+        const out = (readOptions as { out?: string }).out;
+        if (out !== undefined) assertLocalPath(out, "out");
+        return service.readPage(projectId, pageId, readOptions);
+      }).then(
         async (result) => {
           if (!("data" in result.structuredContent)) return result;
           const data = result.structuredContent.data as PageReadResult;
+          const out = (readOptions as { out?: string }).out;
+          if (out !== undefined) {
+            // The file holds the read; the conversation only gets its identity.
+            const written =
+              data.view === "structured" ? out : (data.path ?? out);
+            const receipt: Record<string, unknown> = {
+              ...(compactMcpResult(result, "receipt").structuredContent!
+                .data as Record<string, unknown>),
+              out: await fileReceipt(written),
+              ...("metadataPath" in data && data.metadataPath
+                ? { metadataPath: data.metadataPath }
+                : {}),
+            };
+            delete receipt.path;
+            return {
+              ...result,
+              content: [
+                {
+                  type: "text" as const,
+                  text: JSON.stringify({ ok: true, data: receipt }),
+                },
+              ],
+              structuredContent: { ok: true, data: receipt },
+            };
+          }
           if (data.view !== "image" || !data.path)
             return compactMcpResult(result, response);
           const png = await readFile(data.path);
@@ -539,20 +594,28 @@ export function createMcpServer(options: {
         metadata,
       ).then((result) => compactMcpResult(result, response)),
   );
+  const operationsSchema = z.array(jsonObject).max(1000);
+  const applyShape = {
+    ...changeSchema,
+    pageId: z.string(),
+    baseHash: z.string().min(1),
+    baseRevision: z.string().optional(),
+    operations: operationsSchema.optional(),
+    operationsFile: z.string().min(1).optional(),
+    datasetBases: z.record(z.string(), z.string()).optional(),
+    response: z.enum(["full", "source", "receipt"]).default("full"),
+  };
+  const { operationsFile: _operationsFile, ...remoteApplyShape } = applyShape;
   register(
     "page_apply",
     {
-      description:
-        'Apply operations by stable block id with the Page\'s baseHash. Insert components with {type:"component.insert",kind,data,parentId?,afterId?} and change their data with {type:"component.props.set",blockId,props}. Other operations: guide authoring.',
-      inputSchema: {
-        ...changeSchema,
-        pageId: z.string(),
-        baseHash: z.string().min(1),
-        baseRevision: z.string().optional(),
-        operations: z.array(jsonObject).max(1000),
-        datasetBases: z.record(z.string(), z.string()).optional(),
-        response: z.enum(["full", "source", "receipt"]).default("full"),
-      },
+      description: `Apply operations by stable block id with the Page's baseHash. Insert components with {type:"component.insert",kind,data,parentId?,afterId?}, change their data with {type:"component.props.set",blockId,props} and switch a custom component to another revision with {type:"component.ref.set",blockId,version,integrity,componentId?} (keeps id and props). Other operations: guide authoring.${
+        localFiles ? " operationsFile reads the operations array from a JSON file." : ""
+      }`,
+      // Hosted connections keep operations required and accept no device path.
+      inputSchema: (localFiles
+        ? applyShape
+        : { ...remoteApplyShape, operations: operationsSchema }) as typeof applyShape,
       annotations: write,
     },
     ({
@@ -560,30 +623,100 @@ export function createMcpServer(options: {
       baseHash,
       baseRevision,
       operations,
+      operationsFile,
       datasetBases,
       response,
       ...metadata
     }) =>
-      call(
-        () =>
-          service.applyPage(projectId, pageId, {
-            baseHash,
-            baseRevision,
-            operations: operations as PageOperation[],
-            datasetBases,
-          }),
-        metadata,
-      ).then((result) => compactMcpResult(result, response)),
+      call(async () => {
+        const list = await inlineOrFile({
+          inline: operations as Record<string, unknown>[] | undefined,
+          inlineName: "operations",
+          file: operationsFile,
+          fileName: "operationsFile",
+          limitBytes: CAPACITY.authoringRequestBytes,
+          required: true,
+          localFiles,
+        });
+        const parsed = operationsSchema.safeParse(list);
+        if (!parsed.success)
+          throw new CoreError(
+            "INVALID_DATA",
+            `${operationsFile ? `operationsFile ${String(operationsFile)}` : "operations"} must be an array of at most 1000 operation objects: ${parsed.error.issues
+              .slice(0, 5)
+              .map(
+                (issue) =>
+                  `${issue.path.length ? `[${issue.path.join("].[")}]` : "value"} ${issue.message}`,
+              )
+              .join("; ")}`,
+          );
+        return service.applyPage(projectId, pageId, {
+          baseHash,
+          baseRevision,
+          operations: parsed.data as PageOperation[],
+          datasetBases,
+        });
+      }, metadata).then((result) => compactMcpResult(result, response)),
   );
   register(
     "page_diff",
     {
-      description: "Compare a Page with an earlier read hash.",
-      inputSchema: { pageId: z.string(), sinceHash: z.string().min(1) },
+      description: `Compare a Page with an earlier read hash or revision: one entry per record-level change (lists of records by id), long values summarized, paged with offset/nextOffset; blockIds narrows it.${
+        localFiles ? " out writes every entry unabridged to a JSON file." : ""
+      }`,
+      inputSchema: {
+        pageId: z.string(),
+        sinceHash: z.string().min(1),
+        blockIds: z.array(z.string().min(1)).min(1).max(200).optional(),
+        offset: z.number().int().nonnegative().optional(),
+        limit: z.number().int().min(1).max(DIFF_MAX_LIMIT).optional(),
+        ...(localFiles
+          ? {
+              out: z.string().min(1).optional(),
+              overwrite: z.boolean().optional(),
+            }
+          : {}),
+      },
       annotations: readOnly,
     },
-    ({ pageId, sinceHash }) =>
-      call(() => service.diffPage(projectId, pageId, sinceHash)),
+    ({ pageId, sinceHash, blockIds, offset, limit, out, overwrite }) =>
+      call(async () => {
+        if (out !== undefined) assertLocalPath(out, "out");
+        const { diff, entries, current } = await service.diffPageEntries(
+          projectId,
+          pageId,
+          sinceHash,
+        );
+        if (out === undefined)
+          return pageDiffView(diff, entries, {
+            blockIds,
+            offset,
+            limit: limit ?? DIFF_DEFAULT_LIMIT,
+            current,
+          });
+        const full = pageDiffView(diff, entries, {
+          blockIds,
+          limit: Number.MAX_SAFE_INTEGER,
+          full: true,
+          current,
+        });
+        await writeFile(String(out), JSON.stringify(full, null, 2), {
+          flag: overwrite ? "w" : "wx",
+        }).catch((error: NodeJS.ErrnoException) => {
+          if (error.code === "EEXIST")
+            throw new CoreError(
+              "INVALID_PATH",
+              `out ${String(out)} already exists. Choose another path or pass overwrite:true.`,
+            );
+          throw error;
+        });
+        const { changes: _changes, ...receipt } = full;
+        return {
+          ...receipt,
+          nextOffset: null,
+          out: await fileReceipt(String(out)),
+        };
+      }),
   );
   register(
     "page_export",
@@ -651,7 +784,11 @@ export function createMcpServer(options: {
     "catalog_describe",
     {
       description:
-        "Describe a component or template. view: summary (default), guide (use contract, schema, example), parameters (paged by parameterPath/offset/limit), development, examples, dependencies, source or full.",
+        `Describe a component or template. view: summary (default), guide (use contract, schema, example), parameters (paged by parameterPath/offset/limit), development, examples, dependencies, source or full.${
+          localFiles
+            ? " With view source, out (absolute folder) writes the component's whole package there for editing and component_save directory."
+            : ""
+        }`,
       inputSchema: {
         id: z.string(),
         kind: z.enum(["component", "template"]).optional(),
@@ -667,41 +804,97 @@ export function createMcpServer(options: {
           .regex(/^[a-f0-9]{64}$/)
           .optional(),
         file: z.string().optional(),
+        ...(localFiles
+          ? {
+              out: z.string().min(1).optional(),
+              overwrite: z.boolean().optional(),
+            }
+          : {}),
       },
       annotations: readOnly,
     },
-    ({ id, ...input }) =>
-      call(() => service.catalogDescribe(id, { projectId, ...input })),
+    ({ id, out, overwrite, ...input }) =>
+      call(async () => {
+        if (out === undefined)
+          return service.catalogDescribe(id, { projectId, ...input });
+        if (
+          (input.view !== undefined && input.view !== "source") ||
+          input.kind === "template" ||
+          input.file !== undefined
+        )
+          throw new CoreError(
+            "INVALID_DATA",
+            'out writes a component package: use it with view:"source" (or no view) and without file.',
+          );
+        const described = (await service.catalogDescribe(id, {
+          projectId,
+          ...input,
+          kind: "component",
+          view: "source",
+          file: "*",
+        })) as unknown as Record<string, unknown> & {
+          source: Parameters<typeof writeComponentDirectory>[1];
+        };
+        const { source, next: _next, ...summary } = described;
+        return {
+          ...summary,
+          out: await writeComponentDirectory(
+            String(out),
+            source,
+            overwrite === true,
+          ),
+          next: "Edit the files, raise manifest.version, then component_save {directory} with this folder.",
+        };
+      }),
   );
-  const localFiles = options.presentation?.transport !== "http";
   register(
     "component_save",
     {
       description: localFiles
-        ? "Save component source as a new immutable revision in this project, or import and compile a local package directory. Pass exactly one of source or directory."
+        ? "Save component source as a new immutable revision in this project: source inline, or directory, the absolute path of a package folder on this device (manifest.json, props.schema.json, entry and files), read without copying it into the call. Same contract for both; legacy:true imports an old package without manifest.documentation."
         : "Save component source as a new immutable revision in this project.",
       inputSchema: {
         ...changeSchema,
         source: jsonObject.optional(),
-        ...(localFiles ? { directory: z.string().min(1).optional() } : {}),
+        ...(localFiles
+          ? {
+              directory: z.string().min(1).optional(),
+              legacy: z.boolean().optional(),
+            }
+          : {}),
       },
       annotations: write,
     },
-    ({ source, directory, ...metadata }) =>
-      call(() => {
+    ({ source, directory, legacy, ...metadata }) =>
+      call(async () => {
         if (!source === !directory)
           throw new CoreError(
             "INVALID_DATA",
-            "Pass exactly one of source or directory.",
+            localFiles
+              ? "Pass exactly one of source or directory."
+              : "Pass source.",
           );
-        if (directory)
-          return service.importComponent(directory as string, projectId);
+        if (directory) {
+          const manifest = await inspectComponentDirectory(String(directory));
+          if (!manifest.documentation && legacy !== true)
+            throw new CoreError(
+              "INVALID_DATA",
+              `${String(directory)}/manifest.json has no documentation. New components need manifest.documentation version 2 (guide component); pass legacy:true only to import an existing package that predates it.`,
+            );
+          return service.importComponent(String(directory), projectId);
+        }
+        if (legacy !== undefined)
+          throw new CoreError(
+            "INVALID_DATA",
+            "legacy applies to directory imports only.",
+          );
         if (
           !(source!.manifest as Record<string, unknown> | undefined)
             ?.documentation
         )
-          throw new Error(
-            "New component authoring requires manifest.documentation. Read guide component for the contract; import an existing legacy package with directory.",
+          throw new CoreError(
+            "INVALID_DATA",
+            `New component authoring requires manifest.documentation. Read guide component for the contract${localFiles ? "; an existing package that predates it is imported with directory and legacy:true" : ""}.`,
           );
         return service.saveComponent(
           projectId,

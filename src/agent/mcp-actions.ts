@@ -7,17 +7,24 @@ import { getObjectShape } from "@modelcontextprotocol/sdk/server/zod-compat.js";
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import { CoreError } from "../core/model";
 import { mcpFailure } from "./presentation-tools";
+import { actionRegistry, installToolCompatibility } from "./mcp-compat";
 
 /**
  * Every tool rejects arguments outside its schema instead of the SDK's silent
- * stripping, including after decorators replace the parameters.
+ * stripping, including after decorators replace the parameters. Calls in a
+ * recent earlier tool shape are translated and receive the current form, and
+ * argument errors are structured (see mcp-compat).
  */
 export function strictToolInputs<T extends McpServer>(server: T): T {
+  const tools = new Map<string, RegisteredTool>();
+  installToolCompatibility(server, tools);
   const register = server.registerTool.bind(server) as (
     ...args: unknown[]
   ) => RegisteredTool;
   server.registerTool = ((...args: unknown[]) => {
     const tool = register(...args);
+    let name = args[0] as string;
+    tools.set(name, tool);
     const enforce = () => {
       const shape = getObjectShape(tool.inputSchema);
       if (shape) tool.inputSchema = z.object(shape as z.ZodRawShape).strict();
@@ -25,6 +32,12 @@ export function strictToolInputs<T extends McpServer>(server: T): T {
     const update = tool.update.bind(tool);
     tool.update = (updates) => {
       update(updates);
+      // remove() renames to null; keep the compatibility layer's view current.
+      if (updates.name !== undefined && updates.name !== name) {
+        tools.delete(name);
+        if (updates.name) tools.set(updates.name, tool);
+        name = updates.name ?? name;
+      }
       if (updates.paramsSchema !== undefined) enforce();
     };
     enforce();
@@ -87,6 +100,12 @@ export function actionTool(
   const inputSchema: Record<string, z.ZodType> = {
     action: z.enum(names as [string, ...string[]]),
   };
+  actionRegistry.set(
+    inputSchema.action,
+    Object.fromEntries(
+      Object.entries(actions).map(([name, { fields }]) => [name, fields]),
+    ),
+  );
   for (const [key, list] of variants)
     inputSchema[key] = (
       list.length === 1

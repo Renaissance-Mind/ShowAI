@@ -216,14 +216,47 @@ export class WorkspaceService {
         ),
     );
   }
-  references(
+  async references(
     kind: string,
     id: string,
     input: { version?: string; integrity?: string },
   ) {
-    return new LibraryOperations(this.store.root, this.project())
-      .references(kind, id, input)
-      .then((items) => ({ items }));
+    const items = await new LibraryOperations(
+      this.store.root,
+      this.project(),
+    ).references(kind, id, input);
+    // Page references grouped per page, so each page takes one page_apply.
+    const pages = new Map<
+      string,
+      { pageId: string; blockIds: string[]; versions: string[] }
+    >();
+    for (const item of items) {
+      const page = /^projects\/[^/]+\/pages\/([^/]+)\.json$/.exec(item.source);
+      if (!page) continue;
+      const entry = pages.get(page[1]) ?? {
+        pageId: page[1],
+        blockIds: [],
+        versions: [],
+      };
+      if (item.blockId && !entry.blockIds.includes(item.blockId))
+        entry.blockIds.push(item.blockId);
+      const version = `${item.version ?? "?"}${item.integrity ? ` ${item.integrity}` : ""}`;
+      if (!entry.versions.includes(version)) entry.versions.push(version);
+      pages.set(page[1], entry);
+    }
+    return {
+      items,
+      ...(pages.size
+        ? {
+            pages: [...pages.values()],
+            ...(kind === "component"
+              ? {
+                  next: 'To move these blocks to another revision: for each page, page_read it (response:"receipt") and page_apply its baseHash/baseRevision with one {type:"component.ref.set",blockId,version,integrity} per blockId.',
+                }
+              : {}),
+          }
+        : {}),
+    };
   }
   drafts(input: { clientId?: string; kind?: string; resourceId?: string }) {
     return new EditorDrafts(this.store.root).list({

@@ -28,8 +28,29 @@ import type { FileStore } from "../core/store";
 import type { PageOperation, ShowDocument, JSONContent } from "../core/model";
 import { getComponent, lockDocumentComponents } from "../core/catalog";
 import { readCustomBlockData } from "../components/custom/contract";
+import { propsIssues, type PropsIssue } from "../components/custom/schema";
+import { canonicalJson } from "../core/canonical";
 import { visitNodes } from "../surface/document.mjs";
+import { pageEntries, valueDiffEntries } from "./page-diff-view";
 import type { JsonSchema } from "../components/custom/types";
+
+/** Side effects of component.ref.set that the save receipt reports. */
+export interface ComponentRefNotes {
+  datasetSchemas?: {
+    datasetId: string;
+    projectId?: string;
+    schema: "updated";
+    from: string;
+    to: string;
+  }[];
+  warnings?: {
+    code: string;
+    message: string;
+    datasetId?: string;
+    blockId?: string;
+    references?: unknown[];
+  }[];
+}
 
 type BindingOperation = Extract<
   PageOperation,
@@ -75,15 +96,65 @@ export class DatasetService {
   async read(
     projectId: string,
     datasetId: string,
-    options: { path?: unknown } = {},
+    options: {
+      path?: unknown;
+      sinceHash?: string;
+      offset?: number;
+      limit?: number;
+      full?: boolean;
+    } = {},
   ) {
     const record = await this.datasets.read(projectId, datasetId);
-    await new DatasetBaselines(this.store.root).remember(projectId, record);
+    const baselines = new DatasetBaselines(this.store.root);
+    // The earlier version is looked up before this read is remembered.
+    const before =
+      options.sinceHash === undefined
+        ? undefined
+        : options.sinceHash === record.hash
+          ? record.dataset.value
+          : await baselines.read(projectId, datasetId, options.sinceHash);
+    await baselines.remember(projectId, record);
     const references = await this.datasets.references(
       projectId,
       datasetId,
       "project",
     );
+    if (options.sinceHash !== undefined) {
+      if (before === undefined) {
+        const error = new CoreError(
+          "MISSING_BASELINE",
+          `Dataset ${datasetId} at ${options.sinceHash} is no longer kept, so it cannot be compared. This read is remembered; compare later reads with the hash it returns.`,
+          { currentHash: record.hash, currentRevision: record.revision },
+        );
+        error.nextStep = `Use the current value (dataset_read without sinceHash) and pass hash ${record.hash} as sinceHash next time.`;
+        throw error;
+      }
+      const path =
+        options.path === undefined ? [] : parsePath(options.path);
+      const entries = valueDiffEntries(
+        valueAt(before, path),
+        valueAt(record.dataset.value, path),
+        path,
+      );
+      const { value: _value, ...dataset } = record.dataset;
+      const counts = { set: 0, insert: 0, remove: 0, move: 0 };
+      for (const entry of entries) counts[entry.op]++;
+      return {
+        dataset,
+        hash: record.hash,
+        ...(record.revision ? { revision: record.revision } : {}),
+        sinceHash: options.sinceHash,
+        changed: entries.length > 0,
+        ...(path.length ? { path } : {}),
+        summary: { entries: entries.length, recordChanges: counts },
+        ...pageEntries(entries, {
+          offset: options.offset,
+          limit: options.limit,
+          full: options.full,
+        }),
+        references,
+      };
+    }
     if (options.path === undefined) return { ...record, references };
     const path = parsePath(options.path);
     return {
@@ -245,11 +316,26 @@ export class DatasetService {
           ? record.dataset.value
           : latest.value;
     }
-    throw new CoreError(
+    // Each MCP connection (and CLI run) is its own reader, so a read made in
+    // another connection only counts when its hash is passed explicitly.
+    const name = bases && Object.hasOwn(bases, key) ? key : record.dataset.id;
+    const error = new CoreError(
       "MISSING_BASELINE",
-      `Read the page (page_read) or dataset ${record.dataset.id} (dataset_read) before writing its bound block, so changes made since are merged rather than overwritten.`,
+      hash
+        ? `datasetBases names ${hash} for dataset ${record.dataset.id}, which is neither its current version nor a version still kept for merging. Read the page or dataset again and write with the new hash.`
+        : `This connection has not read dataset ${record.dataset.id}, so ShowAI cannot tell which changes are yours and which were made since your read. Pass page_apply datasetBases {"${name}": hash} with the hash you read (page_read returns datasetBases; dataset_read returns hash), or read the page or dataset in this connection first.`,
       { currentHash: record.hash, currentRevision: record.revision },
     );
+    error.details = {
+      datasetId: record.dataset.id,
+      projectId,
+      ...(hash ? { unknownBase: hash } : {}),
+      datasetBases: { [name]: "HASH_FROM_YOUR_READ" },
+    };
+    error.nextStep = hash
+      ? `Call page_read (or dataset_read) again, then retry page_apply with the datasetBases it returns.`
+      : `Retry page_apply with datasetBases {"${name}": "<hash from your earlier page_read datasetBases or dataset_read>"}; if you no longer have it, read the page again in this connection and redo the change on what it returns. Do not pass currentHash unless the value you edited was read at that hash.`;
+    throw error;
   }
 
   /**
@@ -262,16 +348,31 @@ export class DatasetService {
     document: ShowDocument,
     operations: PageOperation[],
     bases?: Record<string, string>,
-  ): Promise<{ document: ShowDocument; commit: () => Promise<void> }> {
+  ): Promise<{
+    document: ShowDocument;
+    commit: () => Promise<void>;
+    notes: ComponentRefNotes;
+  }> {
     const bindingOps = (operation: PageOperation) =>
       operation.type === "component.binding.set" ||
       operation.type === "component.binding.remove" ||
       (operation.type === "component.props.set" &&
         !!this.boundIn(document, operation.blockId));
-    if (!operations.some(bindingOps))
+    const refOps = Array.isArray(operations)
+      ? operations.filter(
+          (
+            operation,
+          ): operation is Extract<
+            PageOperation,
+            { type: "component.ref.set" }
+          > => operation?.type === "component.ref.set",
+        )
+      : [];
+    if (!operations.some(bindingOps) && !refOps.length)
       return {
         document: applyOperations(document, operations),
         commit: async () => {},
+        notes: {},
       };
     let working = document;
     let batch: PageOperation[] = [];
@@ -283,7 +384,12 @@ export class DatasetService {
     const values = new Map<string, unknown>();
     const writes = new Map<
       string,
-      { projectId: string; datasetId: string; operations: DatasetOperation[] }
+      {
+        projectId: string;
+        datasetId: string;
+        operations: DatasetOperation[];
+        schema?: JsonSchema;
+      }
     >();
     const load = async (project: string, datasetId: string) => {
       const key = `${project}/${datasetId}`;
@@ -430,17 +536,220 @@ export class DatasetService {
       } else batch.push(operation);
     }
     flush();
+    const notes = refOps.length
+      ? await this.checkComponentRefs(projectId, document, working, refOps, {
+          load,
+          values,
+          writes,
+        })
+      : {};
     return {
       document: working,
+      notes,
       commit: async () => {
         for (const [key, write] of writes)
           await this.datasets.apply(
             write.projectId,
             write.datasetId,
-            { baseHash: records.get(key)!.hash, operations: write.operations },
+            {
+              baseHash: records.get(key)!.hash,
+              operations: write.operations,
+              ...(write.schema ? { schema: write.schema } : {}),
+            },
             { throwOnConflict: true },
           );
       },
+    };
+  }
+
+  /**
+   * component.ref.set keeps props and bindings, so the props a block shows
+   * (resolved from its dataset when bound) must satisfy the new revision.
+   * A props dataset whose schema was derived from the previous revision
+   * follows the block to the new revision in the same save.
+   */
+  private async checkComponentRefs(
+    projectId: string,
+    before: ShowDocument,
+    after: ShowDocument,
+    operations: Extract<PageOperation, { type: "component.ref.set" }>[],
+    state: {
+      load: (
+        project: string,
+        datasetId: string,
+      ) => Promise<{ key: string; record: DatasetRecord }>;
+      values: Map<string, unknown>;
+      writes: Map<
+        string,
+        {
+          projectId: string;
+          datasetId: string;
+          operations: DatasetOperation[];
+          schema?: JsonSchema;
+        }
+      >;
+    },
+  ): Promise<ComponentRefNotes> {
+    const failures: {
+      blockId: string;
+      componentId: string;
+      version: string;
+      bound: boolean;
+      issues: PropsIssue[];
+    }[] = [];
+    const datasetSchemas: NonNullable<ComponentRefNotes["datasetSchemas"]> = [];
+    const warnings: NonNullable<ComponentRefNotes["warnings"]> = [];
+    const seen = new Set<string>();
+    for (const operation of operations) {
+      if (seen.has(operation.blockId)) continue;
+      seen.add(operation.blockId);
+      const node = findWidget(after, operation.blockId);
+      const ref = readCustomBlockData(node.attrs!.data);
+      let component;
+      try {
+        component = await getComponent(
+          this.store.root,
+          ref.componentId,
+          ref.version,
+          projectId,
+          { integrity: ref.integrity },
+        );
+      } catch (error) {
+        throw new CoreError(
+          "NOT_FOUND",
+          `component.ref.set on ${operation.blockId}: ${ref.componentId}@${ref.version} (${ref.integrity}) is not available in this project: ${error instanceof Error ? error.message : String(error)} Use the exact componentId/version/integrity of a component_save or catalog_list receipt.`,
+        );
+      }
+      if (component.integrity !== ref.integrity)
+        invalidData(
+          `component.ref.set on ${operation.blockId}: integrity ${ref.integrity} does not match ${component.id}@${component.version} (${component.integrity}).`,
+        );
+      const data = node.attrs!.data as Record<string, unknown>;
+      const binding = readBinding(data);
+      let props: unknown = readCustomBlockData(data).props ?? {};
+      if (binding) {
+        const project = binding.project ?? projectId;
+        const { key, record } = await state.load(project, binding.dataset);
+        const value = state.values.get(key);
+        props = resolveBinding("custom", data, value).props;
+        const compiled = compileBinding(binding);
+        if (compiled.props && compiled.props.path.length === 0) {
+          const local = [...compiled.props.local];
+          const target = sharedPropsSchema(component.schema, local);
+          const current = record.dataset.schema;
+          if (current && canonicalJson(current) !== canonicalJson(target)) {
+            const previous = readCustomBlockData(
+              findWidget(before, operation.blockId).attrs!.data,
+            );
+            const old = await getComponent(
+              this.store.root,
+              previous.componentId,
+              previous.version,
+              projectId,
+              { integrity: previous.integrity, scope: previous.scope },
+            ).catch(() => undefined);
+            const derived =
+              !!old &&
+              canonicalJson(current) ===
+                canonicalJson(sharedPropsSchema(old.schema, local));
+            if (derived) {
+              const issues = propsIssues(target, value);
+              if (issues.length)
+                failures.push({
+                  blockId: operation.blockId,
+                  componentId: component.id,
+                  version: component.version,
+                  bound: true,
+                  issues: issues.map((issue) => ({
+                    ...issue,
+                    path: `dataset ${binding.dataset}${issue.path}`,
+                  })),
+                });
+              const write = state.writes.get(key) ?? {
+                projectId: project,
+                datasetId: binding.dataset,
+                operations: [],
+              };
+              write.schema = target;
+              state.writes.set(key, write);
+              if (
+                !datasetSchemas.some(
+                  (item) => item.datasetId === binding.dataset,
+                )
+              ) {
+                datasetSchemas.push({
+                  datasetId: binding.dataset,
+                  ...(binding.project ? { projectId: binding.project } : {}),
+                  schema: "updated",
+                  from: `${previous.componentId}@${previous.version}`,
+                  to: `${component.id}@${component.version}`,
+                });
+                // Other blocks bound to the same data are now checked against
+                // the new schema too; the person decides whether to upgrade them.
+                const upgraded = new Set(operations.map((item) => item.blockId));
+                const others = (
+                  await this.datasets.references(project, binding.dataset)
+                )
+                  .map((reference) => ({
+                    ...reference,
+                    blockIds: reference.blockIds.filter(
+                      (id) => !upgraded.has(id),
+                    ),
+                  }))
+                  .filter((reference) => reference.blockIds.length);
+                if (others.length)
+                  warnings.push({
+                    code: "DATASET_SHARED",
+                    datasetId: binding.dataset,
+                    blockId: operation.blockId,
+                    message: `Dataset ${binding.dataset} now follows ${component.id}@${component.version}'s schema and is also shown by ${others
+                      .map(
+                        (reference) =>
+                          `${reference.title || reference.pageId} (${reference.blockIds.join(", ")})`,
+                      )
+                      .join("; ")}. Writes from those blocks are checked against the new schema; tell the person and upgrade them with component.ref.set if they use this component.`,
+                    references: others,
+                  });
+              }
+            } else
+              warnings.push({
+                code: "DATASET_SCHEMA_KEPT",
+                datasetId: binding.dataset,
+                blockId: operation.blockId,
+                message: `Dataset ${binding.dataset} keeps its own schema, which differs from ${component.id}@${component.version}'s props schema. Writes stay checked against the dataset schema; change it with dataset_write {action:"apply", schema} if the new revision needs other fields.`,
+              });
+          }
+        }
+      }
+      const issues = propsIssues(
+        component.schema,
+        props,
+        component.documentation,
+      );
+      if (issues.length)
+        failures.push({
+          blockId: operation.blockId,
+          componentId: component.id,
+          version: component.version,
+          bound: !!binding,
+          issues,
+        });
+    }
+    if (failures.length) {
+      const lines = failures.flatMap((failure) =>
+        failure.issues.map(
+          (issue) =>
+            `${failure.blockId}${failure.bound ? " (resolved from its dataset)" : ""}: ${issue.path || "props"} ${issue.message}`,
+        ),
+      );
+      invalidData(
+        `component.ref.set was not saved: the props do not satisfy the new revision. ${lines.slice(0, 12).join("; ")}${lines.length > 12 ? `; … ${lines.length - 12} more` : ""}. Adjust the data first (component.props.set or dataset_write apply), or choose a compatible revision.`,
+        { blocks: failures },
+      );
+    }
+    return {
+      ...(datasetSchemas.length ? { datasetSchemas } : {}),
+      ...(warnings.length ? { warnings } : {}),
     };
   }
 

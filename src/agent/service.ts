@@ -81,6 +81,7 @@ import { pageOf, shellToken, summarizeCatalog } from "./disclosure";
 
 import { getGuide } from "./guides";
 import { DatasetService } from "./dataset-service";
+import { pageDiffEntries } from "./page-diff-view";
 import {
   readPageView,
   type PageReadOptions,
@@ -170,7 +171,7 @@ export class AgentService extends CatalogService {
   datasetRead(
     projectId: string,
     datasetId: string,
-    options: { path?: unknown } = {},
+    options: Parameters<DatasetService["read"]>[2] = {},
   ) {
     return this.datasets.read(
       this.requireProject(projectId),
@@ -797,7 +798,7 @@ export class AgentService extends CatalogService {
         );
         if (preserved) {
           await routed.commit();
-          return preserved;
+          return { ...preserved, ...routed.notes };
         }
       }
       throw new CoreError(
@@ -827,7 +828,7 @@ export class AgentService extends CatalogService {
     );
     // The same library transaction commits the page and its dataset writes.
     await routed.commit();
-    return saved;
+    return { ...saved, ...routed.notes };
   }
   async diffPage(projectId: string, pageId: string, sinceHash: string) {
     return this.store.diffPage(
@@ -835,6 +836,15 @@ export class AgentService extends CatalogService {
       pageId,
       sinceHash,
     );
+  }
+  /** The comparison with one entry per record-level change (see page-diff-view). */
+  async diffPageEntries(projectId: string, pageId: string, sinceHash: string) {
+    const { diff, baseline, current } = await this.store.diffPageDocuments(
+      this.requireProject(projectId),
+      pageId,
+      sinceHash,
+    );
+    return { diff, entries: pageDiffEntries(baseline, current), current };
   }
   async export(input: {
     projectId: string;
@@ -1310,6 +1320,9 @@ export function errorResult(error: unknown) {
       : {}),
     ...(error instanceof CoreError && error.details
       ? { details: error.details }
+      : {}),
+    ...(error instanceof CoreError && error.nextStep && !error.saveFailed
+      ? { nextStep: error.nextStep }
       : {}),
     // Built-in Agent failures carry their classification across IPC.
     ...(error instanceof Error &&

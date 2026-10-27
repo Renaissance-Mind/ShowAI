@@ -10,6 +10,7 @@ import {
 } from "@modelcontextprotocol/sdk/server/zod-compat.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { isAbsolute } from "node:path";
+import { randomUUID } from "node:crypto";
 import { createMcpServer } from "./mcp";
 import { AgentService } from "./service";
 import { mcpFailure, mcpSuccess } from "./presentation-tools";
@@ -24,7 +25,8 @@ export function createLibraryMcpServer(options: {
   presentationDirectory?: string;
 }) {
   const service = new AgentService({ root: options.root });
-  const inherited = changeContext();
+  // One dataset reader for the whole connection, across its per-call servers.
+  const inherited = { ...changeContext(), readerId: randomUUID() };
   const call = async (action: () => Promise<unknown>) => {
     try {
       return mcpSuccess(
@@ -41,6 +43,7 @@ export function createLibraryMcpServer(options: {
     ...options,
     projectId: "unselected",
     projectAccess: "library",
+    sourceContext: inherited,
     instructions:
       "Call ShowAI guide first; pass projectId to project tools.",
     decorateTool(name, tool) {

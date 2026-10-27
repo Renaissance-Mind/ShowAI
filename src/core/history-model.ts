@@ -9,6 +9,12 @@ export interface ChangeActor {
 export interface ChangeContext {
   actor: ChangeActor;
   channel: "desktop" | "browser" | "cli" | "mcp" | "external" | "system";
+  /**
+   * One MCP connection whose actor has no Agent session of its own. Dataset
+   * reads are remembered per reader, so two clients never mistake each
+   * other's read for their own merge baseline.
+   */
+  readerId?: string;
   message?: string;
   operationId?: string;
   groupId?: string;

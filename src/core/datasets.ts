@@ -1048,20 +1048,19 @@ export class DatasetBaselines {
       .digest("hex");
   }
   private slot(projectId: string, datasetId: string) {
-    const actor = changeContext().actor;
+    const context = changeContext();
+    const actor = context.actor;
+    // A real Agent session is one reader across its connections; anything
+    // else is one reader per MCP connection (or per actor outside MCP).
+    const reader =
+      actor.sessionId || !context.readerId
+        ? [actor.kind, actor.harness, actor.sessionId]
+        : ["connection", context.readerId];
     return join(
       this.directory(),
       "readers",
       `${createHash("sha256")
-        .update(
-          JSON.stringify([
-            actor.kind,
-            actor.harness,
-            actor.sessionId,
-            projectId,
-            datasetId,
-          ]),
-        )
+        .update(JSON.stringify([...reader, projectId, datasetId]))
         .digest("hex")}.json`,
     );
   }
