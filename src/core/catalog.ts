@@ -1570,7 +1570,9 @@ function combined(data){if(!structural(data)){combined.errors=structural.errors;
   );
 }
 
-async function compilePackage(
+// Exported only for scripts/check-sdk-boundary.mjs, which compiles a probe
+// against showai:components; saving still goes through importComponent.
+export async function compilePackage(
   directory: string,
   manifest: ComponentManifest,
   schema: JsonSchema,
@@ -1857,6 +1859,16 @@ export default function Nested({data=defaults,onChange,readOnly=true}){check(dat
         )
           return { path: require.resolve(args.path) };
         const sdkImport = args.namespace === "showai-builtin";
+        // A shipped SDK module may only load other shipped SDK modules or the
+        // runtimes below. Anything else is a ShowAI build defect, so name the
+        // SDK file and its import instead of blaming the component package.
+        const sdkBoundary = (reason: string) => ({
+          errors: [
+            {
+              text: `Built-in SDK file ${args.importer} imports "${args.path}", ${reason}`,
+            },
+          ],
+        });
         if (
           sdkImport &&
           args.kind === "url-token" &&
@@ -1935,13 +1947,15 @@ export default function Nested({data=defaults,onChange,readOnly=true}){check(dat
           };
         }
         if (!args.path.startsWith("."))
-          return {
-            errors: [
-              {
-                text: `Only React, ShowAI SDK and package-local imports are allowed: ${args.path}`,
-              },
-            ],
-          };
+          return sdkImport
+            ? sdkBoundary("a package the component compiler does not provide.")
+            : {
+                errors: [
+                  {
+                    text: `Only React, ShowAI SDK and package-local imports are allowed: ${args.path}`,
+                  },
+                ],
+              };
         const { key, file } =
           args.namespace === "showai-package"
             ? splitModule(args.importer)
@@ -1956,9 +1970,13 @@ export default function Nested({data=defaults,onChange,readOnly=true}){check(dat
           .split(sep)
           .join("/");
         if (candidate.startsWith("../") || candidate === "..")
-          return {
-            errors: [{ text: "Component imports cannot leave the package." }],
-          };
+          return sdkImport
+            ? sdkBoundary("which resolves outside the shipped SDK sources.")
+            : {
+                errors: [
+                  { text: "Component imports cannot leave the package." },
+                ],
+              };
         const selected = locate(
           sdkImport ? builtinSources : packages.get(key)!.files,
           candidate,
@@ -1969,7 +1987,9 @@ export default function Nested({data=defaults,onChange,readOnly=true}){check(dat
               namespace: sdkImport ? "showai-builtin" : "showai-package",
               ...(sdkImport ? { sideEffects: selected.endsWith(".css") } : {}),
             }
-          : { errors: [{ text: `Missing package file: ${args.path}` }] };
+          : sdkImport
+            ? sdkBoundary("which is not one of the shipped SDK sources.")
+            : { errors: [{ text: `Missing package file: ${args.path}` }] };
       });
     },
   };
