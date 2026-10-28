@@ -1,6 +1,6 @@
 import { expect, it } from "vitest";
 import { createServer } from "node:http";
-import { chromium, type Browser } from "playwright";
+import { chromium, type Browser } from "playwright-core";
 import { buildPageHtml } from "../agent/exporter";
 import { blankDocument } from "../core/catalog";
 import { toInlineFragment } from "./inline.mjs";

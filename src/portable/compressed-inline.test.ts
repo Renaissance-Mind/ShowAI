@@ -3,7 +3,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { createServer } from "node:http";
-import { chromium } from "playwright";
+import { chromium } from "playwright-core";
 import { gunzipSync } from "node:zlib";
 import { FileStore } from "../core/store";
 import {

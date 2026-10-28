@@ -17,7 +17,7 @@ jobs:
           node-version: "22"
           cache: npm
       - run: npm ci
-      - run: npx playwright install --with-deps chromium
+      - run: npx playwright-core install --with-deps chromium
       - run: npm run check
       - run: npm test
       - run: npm run build
@@ -32,7 +32,7 @@ jobs:
           node-version: "22"
           cache: npm
       - run: npm ci
-      - run: npx playwright install chromium
+      - run: npx playwright-core install chromium
       - run: npm run check
       - run: npm run build:portable
       - run: npx vitest run --maxWorkers=2 --testTimeout=30000 --hookTimeout=30000

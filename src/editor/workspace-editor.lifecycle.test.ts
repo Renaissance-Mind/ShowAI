@@ -1,6 +1,6 @@
 import { expect, it } from "vitest";
 import { build } from "esbuild";
-import { chromium } from "playwright";
+import { chromium } from "playwright-core";
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { createServer } from "node:http";
 import { tmpdir } from "node:os";

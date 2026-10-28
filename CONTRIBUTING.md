@@ -8,7 +8,7 @@ For a new built-in component or template, or a feature that adds an entry point 
 
 ## Setup
 
-You need Node.js 22.12 or newer with npm, and Git. Install Chromium for the browser-based tests with `npx playwright install chromium`. To test the Agent plugin you also need [Codex](https://github.com/openai/codex) or Claude Code.
+You need Node.js 22.12 or newer with npm, and Git. Install Chromium for the browser-based tests with `npx playwright-core install chromium`. To test the Agent plugin you also need [Codex](https://github.com/openai/codex) or Claude Code.
 
 ```sh
 git clone https://github.com/Renaissance-Mind/ShowAI.git

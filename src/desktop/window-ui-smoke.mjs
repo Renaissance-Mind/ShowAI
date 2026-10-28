@@ -5,7 +5,7 @@ import { mkdir, mkdtemp, writeFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import electron from "electron";
-import { _electron } from "playwright";
+import { _electron } from "playwright-core";
 
 const repository = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const parent = join(repository, "output/playwright");

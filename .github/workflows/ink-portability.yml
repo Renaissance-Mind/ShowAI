@@ -18,7 +18,7 @@ jobs:
           cache: npm
       - run: npm ci
       - run: clang++ --version
-      - run: npx playwright install chromium
+      - run: npx playwright-core install chromium
       - run: npm run check
       - name: Native and WASM geometry, editable source and concurrent merge
         run: >-

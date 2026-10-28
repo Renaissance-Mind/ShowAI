@@ -13,7 +13,7 @@ import { createHash } from "node:crypto";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import electron from "electron";
-import { _electron } from "playwright";
+import { _electron } from "playwright-core";
 
 // The smoke checks select controls by their Chinese labels.
 process.env.SHOWAI_LANGUAGE ??= "zh-CN";

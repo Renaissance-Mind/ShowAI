@@ -3,7 +3,7 @@ import { createServer, type Server } from "node:http";
 import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { chromium, type Browser } from "playwright";
+import { chromium, type Browser } from "playwright-core";
 import g2 from "../../resources/catalog/g2.json";
 import components from "../../resources/catalog/components.json";
 import diagrams from "../../resources/catalog/diagrams.json";

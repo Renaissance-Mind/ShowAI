@@ -78,7 +78,7 @@ To run one file: `npx vitest run src/path/to/file.test.ts`.
 
 ### Smoke tests
 
-Smoke tests drive the real desktop app or browser workbench and write their output under `output/playwright/`. Install Chromium once with `npx playwright install chromium`.
+Smoke tests drive the real desktop app or browser workbench and write their output under `output/playwright/`. Install Chromium once with `npx playwright-core install chromium`.
 
 | Command                                                      | What it covers                                                                              |
 | ------------------------------------------------------------ | ------------------------------------------------------------------------------------------- |

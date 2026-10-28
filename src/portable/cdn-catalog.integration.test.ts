@@ -3,7 +3,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { appendFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { chromium, type Browser, type Frame, type Page } from "playwright";
+import { chromium, type Browser, type Frame, type Page } from "playwright-core";
 import { blankDocument } from "../core/catalog";
 import { createResource } from "../surface/containers.mjs";
 import { buildPageHtml } from "../agent/exporter";

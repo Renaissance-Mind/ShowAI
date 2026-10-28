@@ -7,7 +7,7 @@ import { createHash } from "node:crypto";
 import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { promisify } from "node:util";
-import { chromium, _electron } from "playwright";
+import { chromium, _electron } from "playwright-core";
 
 // The smoke checks select controls by their Chinese labels.
 process.env.SHOWAI_LANGUAGE ??= "zh-CN";

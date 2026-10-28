@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, expect, test } from "vitest";
 import { createServer, type Server } from "node:http";
-import { chromium, type Browser, type Frame } from "playwright";
+import { chromium, type Browser, type Frame } from "playwright-core";
 import { blankDocument } from "../core/catalog";
 import { createResource, createSurface } from "../surface/containers.mjs";
 import { addNode } from "../surface/editing";

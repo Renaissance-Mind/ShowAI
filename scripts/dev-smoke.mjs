@@ -14,7 +14,7 @@ import {
 } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { promisify } from "node:util";
-import { chromium } from "playwright";
+import { chromium } from "playwright-core";
 import { releaseTestFixtures } from "./test-fixtures.mjs";
 
 // The smoke checks select controls by their Chinese labels.

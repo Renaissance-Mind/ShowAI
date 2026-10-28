@@ -78,7 +78,7 @@ Vitest 配置位于 `vite.config.ts` 的 `test` 部分。测试文件为 `src/**
 
 ### 冒烟测试
 
-冒烟测试驱动真实的桌面应用或浏览器工作台，输出写入 `output/playwright/`。先运行一次 `npx playwright install chromium` 安装 Chromium。
+冒烟测试驱动真实的桌面应用或浏览器工作台，输出写入 `output/playwright/`。先运行一次 `npx playwright-core install chromium` 安装 Chromium。
 
 | 命令                                                         | 覆盖范围                                                               |
 | ------------------------------------------------------------ | ---------------------------------------------------------------------- |

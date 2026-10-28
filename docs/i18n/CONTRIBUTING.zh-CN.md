@@ -8,7 +8,7 @@ ShowAI 接受内置组件、内置模板、功能与修复、文档，以及 Age
 
 ## 准备环境
 
-需要 Node.js 22.12 或更高版本、npm 和 Git。浏览器相关测试需要先运行 `npx playwright install chromium` 安装 Chromium。测试 Agent 插件还需要 [Codex](https://github.com/openai/codex) 或 Claude Code。
+需要 Node.js 22.12 或更高版本、npm 和 Git。浏览器相关测试需要先运行 `npx playwright-core install chromium` 安装 Chromium。测试 Agent 插件还需要 [Codex](https://github.com/openai/codex) 或 Claude Code。
 
 ```sh
 git clone https://github.com/Renaissance-Mind/ShowAI.git

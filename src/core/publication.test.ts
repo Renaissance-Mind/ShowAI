@@ -11,7 +11,7 @@ import {
 import { tmpdir } from "node:os";
 import { join, resolve, sep } from "node:path";
 import { pathToFileURL } from "node:url";
-import { chromium } from "playwright";
+import { chromium } from "playwright-core";
 import { createServer as createViteServer } from "vite";
 import { FileStore } from "./store";
 import { ContentLibrary as GitLibrary } from "./content-library";

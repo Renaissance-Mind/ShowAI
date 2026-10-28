@@ -18,7 +18,7 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 import electron from "electron";
-import { _electron } from "playwright";
+import { _electron } from "playwright-core";
 import { stopTestProcess } from "../../scripts/stop-test-process.mjs";
 
 // The smoke checks select controls by their Chinese labels.

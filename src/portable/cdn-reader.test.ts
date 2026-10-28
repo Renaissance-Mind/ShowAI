@@ -2,7 +2,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { chromium, type Browser } from "playwright";
+import { chromium, type Browser } from "playwright-core";
 import { FileStore } from "../core/store";
 import {
   blankDocument,
