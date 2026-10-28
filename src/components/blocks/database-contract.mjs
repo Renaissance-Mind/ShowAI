@@ -281,6 +281,16 @@ export function validateDatabaseData(data) {
         !ID.test(column.folder))
     )
       fail(`${path}.folder is a folder id and only belongs to page columns.`);
+    if (
+      column.titleColumn !== undefined &&
+      (column.type !== "page" ||
+        !columns.some(
+          (item) => item.id === column.titleColumn && item.type === "text",
+        ))
+    )
+      fail(
+        `${path}.titleColumn only belongs to page columns and names a text column.`,
+      );
   }
   const dateColumns = columns.filter((column) => column.type === "date");
   const pageColumns = columns.filter((column) => column.type === "page");

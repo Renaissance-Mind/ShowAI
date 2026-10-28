@@ -11,6 +11,7 @@ import {
   moveColumnTo,
   newViewId,
   pruneViews,
+  titleSyncActions,
   withViews,
 } from "./database-views";
 import type { DatabaseColumn, DatabaseView, DatabaseViewType } from "./types";
@@ -51,6 +52,20 @@ describe("database page cells and views contract", () => {
         typeof value === "number" ? /rows\[0\]\.doc/ : /showai:\/\/project/,
       );
     }
+  });
+  it("names a text column as the title of linked pages", () => {
+    const data: any = records();
+    data.columns[2].titleColumn = "title";
+    expect(() => validateDatabaseData(data)).not.toThrow();
+    data.columns[2].titleColumn = "status";
+    expect(() => validateDatabaseData(data)).toThrow(
+      /columns\[2\]\.titleColumn/,
+    );
+    data.columns[2].titleColumn = undefined;
+    data.columns[0].titleColumn = "title";
+    expect(() => validateDatabaseData(data)).toThrow(
+      /columns\[0\]\.titleColumn/,
+    );
   });
   it("keeps a folder only on page columns", () => {
     const data: any = records();
@@ -214,6 +229,57 @@ describe("database views", () => {
       filter: { column: "status", value: "完成" },
       columnWidths: { title: 200 },
     });
+  });
+});
+
+describe("record name and page title", () => {
+  it("copies whichever side changed since they last matched", () => {
+    const synced = new Map<string, string>();
+    // Matching pairs are remembered; on first sight the page title wins.
+    expect(
+      titleSyncActions(
+        [
+          { key: "a", stored: "BERT", live: "BERT" },
+          { key: "b", stored: "旧名", live: "新标题" },
+        ],
+        synced,
+        new Set(),
+      ),
+    ).toEqual({ write: new Map([["b", "新标题"]]), rename: new Map() });
+    expect([...synced]).toEqual([
+      ["a", "BERT"],
+      ["b", "新标题"],
+    ]);
+    // The record changed: rename the page. The page changed: update the record.
+    expect(
+      titleSyncActions(
+        [
+          { key: "a", stored: "BERT-base", live: "BERT" },
+          { key: "b", stored: "新标题", live: "又改了" },
+        ],
+        synced,
+        new Set(),
+      ),
+    ).toEqual({
+      write: new Map([["b", "又改了"]]),
+      rename: new Map([["a", "BERT-base"]]),
+    });
+  });
+  it("waits for pending renames and never renames to an empty title", () => {
+    const synced = new Map([
+      ["a", "BERT"],
+      ["b", "ViT"],
+    ]);
+    expect(
+      titleSyncActions(
+        [
+          { key: "a", stored: "BERT-large", live: "BERT" },
+          { key: "b", stored: " ", live: "ViT" },
+        ],
+        synced,
+        new Set(["a"]),
+      ),
+    ).toEqual({ write: new Map(), rename: new Map() });
   });
 });
 

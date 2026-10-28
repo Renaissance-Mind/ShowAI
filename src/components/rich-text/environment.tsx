@@ -37,6 +37,8 @@ export interface PageLinkBridge {
     folderId?: string;
     folderName: string;
   }): Promise<{ pageId: string; folderId: string }>;
+  /** Rename a page of this project. Absent where pages cannot be renamed. */
+  renamePage?(pageId: string, title: string): Promise<void>;
 }
 /** The host supplies project resources; all writing tools belong to the component. */
 export const RichTextEnvironment = createContext<{

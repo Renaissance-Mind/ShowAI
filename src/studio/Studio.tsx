@@ -1776,6 +1776,31 @@ export default function Studio() {
     await refresh();
     return { pageId: created.document.id, folderId: folder.id };
   }
+  /** Renames a page a component on another page links to, as the sidebar does. */
+  async function renameLinkedPage(input: {
+    projectId: string;
+    pageId: string;
+    title: string;
+  }) {
+    if (page.draft?.id === input.pageId && page.projectId === input.projectId) {
+      page.edit({ title: input.title });
+      if (!(await page.flush()))
+        throw new Error(t("linkedPageRenameBlocked"));
+    } else {
+      const record = await desktop.invoke<LoadedPage>("pages:get", {
+        projectId: input.projectId,
+        pageId: input.pageId,
+      });
+      await desktop.invoke("pages:rename", {
+        projectId: input.projectId,
+        pageId: input.pageId,
+        baseHash: record.hash,
+        baseRevision: record.revision,
+        title: input.title,
+      });
+    }
+    await refresh();
+  }
   /**
    * Copies the open read-only page into a new project this device owns. The
    * copy stays local even when new projects default to a server account, and
@@ -5050,6 +5075,7 @@ export default function Studio() {
                 linkablePages={contents}
                 onCopyLink={(target) => void copyPageLink(target).catch(report)}
                 onCreateLinkedPage={createLinkedPage}
+                onRenameLinkedPage={renameLinkedPage}
                 onEditIcon={action(async () => {
                   const target = activePageTarget();
                   if (target) await beginPageIcon(target);

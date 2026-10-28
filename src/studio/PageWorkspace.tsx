@@ -42,6 +42,7 @@ function PageContent({
   linkablePages,
   onCopyLink,
   onCreateLinkedPage,
+  onRenameLinkedPage,
 }: {
   view: PageViewSession;
   readOnly?: boolean;
@@ -65,6 +66,12 @@ function PageContent({
     folderId?: string;
     folderName: string;
   }) => Promise<{ pageId: string; folderId: string }>;
+  /** Renames a page for a component on this page, such as a database record. */
+  onRenameLinkedPage?: (input: {
+    projectId: string;
+    pageId: string;
+    title: string;
+  }) => Promise<void>;
 }) {
   const state = useSyncExternalStore(
     view.session.subscribe,
@@ -78,6 +85,8 @@ function PageContent({
   latestCopy.current = onCopyLink;
   const latestCreate = useRef(onCreateLinkedPage);
   latestCreate.current = onCreateLinkedPage;
+  const latestRename = useRef(onRenameLinkedPage);
+  latestRename.current = onRenameLinkedPage;
   const pageLinks = useMemo<PageLinkBridge | null>(
     () =>
       projectId && pageId
@@ -98,6 +107,16 @@ function PageContent({
                       ...input,
                       projectId,
                       hostPageId: pageId,
+                    }),
+                }
+              : {}),
+            ...(latestRename.current
+              ? {
+                  renamePage: (target: string, title: string) =>
+                    latestRename.current!({
+                      projectId,
+                      pageId: target,
+                      title,
                     }),
                 }
               : {}),
@@ -242,6 +261,15 @@ export function PageWorkspace({
       if (!latest.current.onCreateLinkedPage)
         throw new Error("This workbench cannot create pages.");
       return latest.current.onCreateLinkedPage(input);
+    },
+    onRenameLinkedPage: (input: {
+      projectId: string;
+      pageId: string;
+      title: string;
+    }) => {
+      if (!latest.current.onRenameLinkedPage)
+        throw new Error("This workbench cannot rename pages.");
+      return latest.current.onRenameLinkedPage(input);
     },
   }));
   return workspace.views.map((view) => {

@@ -52,6 +52,8 @@ export interface DatabaseColumn {
   options?: string[];
   /** Page columns: the folder that new linked pages go into. */
   folder?: string;
+  /** Page columns: the text column kept equal to the linked page's title. */
+  titleColumn?: string;
 }
 export interface DatabaseRow {
   id: string;

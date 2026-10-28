@@ -1,6 +1,6 @@
 import { BlockItemSources, BlockSettings } from "./action-host";
 import ExpandableSearch from "../ExpandableSearch";
-import { useContext, useMemo, useRef, useState } from "react";
+import { useContext, useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowDown,
   ArrowUp,
@@ -41,6 +41,7 @@ import {
   moveColumnTo,
   newViewId,
   pruneViews,
+  titleSyncActions,
   withViews,
   type ViewOverride,
 } from "./database-views";
@@ -404,6 +405,10 @@ export function DatabaseBlock({ data, onChange, readOnly }: BlockProps) {
               ...(column.type === "page" && typeof column.folder === "string"
                 ? { folder: column.folder }
                 : {}),
+              ...(column.type === "page" &&
+              typeof column.titleColumn === "string"
+                ? { titleColumn: column.titleColumn }
+                : {}),
             }))
         : [],
     [data.columns, t],
@@ -590,10 +595,12 @@ export function DatabaseBlock({ data, onChange, readOnly }: BlockProps) {
         (item) => item.id === rowId,
       );
       if (!savedColumn || !record) return;
-      const name =
-        columns[0] && columns[0].type !== "page"
-          ? text(record[columns[0].id]).trim()
-          : "";
+      // The first page names the record column it stays in step with.
+      const titleColumn =
+        savedColumn.titleColumn ??
+        (base.columns as DatabaseColumn[]).find((item) => item.type === "text")
+          ?.id;
+      const name = titleColumn ? text(record[titleColumn]).trim() : "";
       try {
         const created = await bridge.createPage!({
           ...(name ? { title: name } : {}),
@@ -605,7 +612,11 @@ export function DatabaseBlock({ data, onChange, readOnly }: BlockProps) {
           ...latest,
           columns: (latest.columns as DatabaseColumn[]).map((item) =>
             item.id === column.id
-              ? { ...item, folder: created.folderId }
+              ? {
+                  ...item,
+                  folder: created.folderId,
+                  ...(titleColumn ? { titleColumn } : {}),
+                }
               : item,
           ),
           rows: (latest.rows as DatabaseRow[]).map((item) =>
@@ -629,6 +640,149 @@ export function DatabaseBlock({ data, onChange, readOnly }: BlockProps) {
       }
     });
   };
+  // A record name and its page title stay equal: whichever changed since
+  // they last matched is copied to the other.
+  const titlePageColumn = pageColumns.find((column) =>
+    columns.some(
+      (item) => item.id === column.titleColumn && item.type === "text",
+    ),
+  );
+  const syncedTitles = useRef(new Map<string, string>());
+  const renames = useRef(
+    new Map<
+      string,
+      {
+        title: string;
+        timer?: ReturnType<typeof setTimeout>;
+        saving: boolean;
+        listed?: unknown;
+      }
+    >(),
+  );
+  const latestPages = useRef(pages);
+  latestPages.current = pages;
+  useEffect(
+    () => () => {
+      for (const rename of renames.current.values()) clearTimeout(rename.timer);
+    },
+    [],
+  );
+  useEffect(() => {
+    const bridge = pages;
+    if (!editable || !bridge?.renamePage || !titlePageColumn) return;
+    const nameId = titlePageColumn.titleColumn!;
+    const pairs: {
+      key: string;
+      rowId: string;
+      pageId: string;
+      stored: string;
+      live: string;
+    }[] = [];
+    for (const row of rows) {
+      if (sources?.get(row.id)?.readOnly.includes(nameId)) continue;
+      const target = parsePageCell(row[titlePageColumn.id]);
+      if (!target || target.projectId !== bridge.projectId) continue;
+      const linked = bridge.pages.find((item) => item.id === target.pageId);
+      if (!linked) continue;
+      pairs.push({
+        key: `${row.id}\0${target.pageId}`,
+        rowId: row.id,
+        pageId: target.pageId,
+        stored: text(row[nameId]),
+        live: linked.title,
+      });
+    }
+    const storedName = (rowId: string) =>
+      text(
+        (latestData.current.rows as DatabaseRow[]).find(
+          (item) => item.id === rowId,
+        )?.[nameId],
+      );
+    const schedule = (
+      key: string,
+      rowId: string,
+      pageId: string,
+      title: string,
+    ) => {
+      const previous = renames.current.get(key);
+      clearTimeout(previous?.timer);
+      const rename: {
+        title: string;
+        timer?: ReturnType<typeof setTimeout>;
+        saving: boolean;
+        listed?: unknown;
+      } = { title, saving: false };
+      rename.timer = setTimeout(() => {
+        rename.timer = undefined;
+        rename.saving = true;
+        bridge.renamePage!(pageId, rename.title).then(
+          () => {
+            rename.saving = false;
+            const latest = storedName(rowId);
+            // Typing went on while the page saved: rename again.
+            if (latest.trim() && latest !== rename.title)
+              schedule(key, rowId, pageId, latest);
+            else rename.listed = latestPages.current?.pages;
+          },
+          (reason) => {
+            renames.current.delete(key);
+            setPageError(
+              t("error.renamePage", {
+                message:
+                  reason instanceof Error ? reason.message : String(reason),
+              }),
+            );
+          },
+        );
+      }, 600);
+      renames.current.set(key, rename);
+    };
+    for (const pair of pairs) {
+      const rename = renames.current.get(pair.key);
+      if (!rename) continue;
+      if (pair.stored === pair.live) {
+        clearTimeout(rename.timer);
+        renames.current.delete(pair.key);
+      }
+      // A finished rename waits until the host lists pages again.
+      else if (
+        !rename.saving &&
+        !rename.timer &&
+        rename.listed !== bridge.pages
+      )
+        renames.current.delete(pair.key);
+      else if (
+        !rename.saving &&
+        rename.timer &&
+        pair.stored.trim() &&
+        pair.stored !== rename.title
+      )
+        schedule(pair.key, pair.rowId, pair.pageId, pair.stored);
+    }
+    const { write, rename } = titleSyncActions(
+      pairs,
+      syncedTitles.current,
+      new Set(renames.current.keys()),
+    );
+    for (const pair of pairs)
+      if (rename.has(pair.key))
+        schedule(pair.key, pair.rowId, pair.pageId, rename.get(pair.key)!);
+    if (!write.size) return;
+    const titles = new Map(
+      pairs
+        .filter((pair) => write.has(pair.key))
+        .map((pair) => [pair.rowId, write.get(pair.key)!]),
+    );
+    const latest = latestData.current;
+    onChange?.({
+      ...latest,
+      rows: (latest.rows as DatabaseRow[]).map((item) =>
+        titles.has(item.id)
+          ? { ...item, [nameId]: titles.get(item.id)! }
+          : item,
+      ),
+    });
+  });
   const removeRow = (id: string) => {
     if (sources?.get(id)?.removable === false) return;
     onChange?.({ ...data, rows: rows.filter((row) => row.id !== id) });
@@ -749,9 +903,17 @@ export function DatabaseBlock({ data, onChange, readOnly }: BlockProps) {
       setError(t("error.nameEveryProperty"));
       return;
     }
-    const cleaned = draftColumns.map(({ folder, ...column }) => ({
+    const textIds = new Set(
+      draftColumns
+        .filter((column) => column.type === "text")
+        .map((column) => column.id),
+    );
+    const cleaned = draftColumns.map(({ folder, titleColumn, ...column }) => ({
       ...column,
       ...(column.type === "page" && folder ? { folder } : {}),
+      ...(column.type === "page" && titleColumn && textIds.has(titleColumn)
+        ? { titleColumn }
+        : {}),
       name: column.name.trim(),
       options: [
         ...new Set(
@@ -1111,6 +1273,27 @@ export function DatabaseBlock({ data, onChange, readOnly }: BlockProps) {
                       </option>
                     ))}
                   </select>
+                  {column.type === "page" && (
+                    <select
+                      className="sb-options-input"
+                      aria-label={t("titleColumn", { name: column.name })}
+                      value={column.titleColumn ?? ""}
+                      onChange={(event) =>
+                        updateDraftColumn(column.id, {
+                          titleColumn: event.target.value || undefined,
+                        })
+                      }
+                    >
+                      <option value="">{t("titleColumnNone")}</option>
+                      {draftColumns
+                        .filter((item) => item.type === "text")
+                        .map((item) => (
+                          <option key={item.id} value={item.id}>
+                            {t("titleColumnFrom", { name: item.name })}
+                          </option>
+                        ))}
+                    </select>
+                  )}
                   {column.type === "select" && (
                     <input
                       className="sb-options-input"

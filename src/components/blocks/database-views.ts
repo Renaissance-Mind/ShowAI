@@ -148,3 +148,40 @@ export function pruneViews(
     return next;
   });
 }
+
+export interface TitlePair {
+  key: string;
+  /** The record's name. */
+  stored: string;
+  /** The linked page's title. */
+  live: string;
+}
+
+/**
+ * Compare each record name with its page title against the value they last
+ * shared: a changed name renames the page, a changed title updates the record.
+ * When nothing is known yet, the page title wins.
+ */
+export function titleSyncActions(
+  pairs: TitlePair[],
+  synced: Map<string, string>,
+  pending: Set<string>,
+): { write: Map<string, string>; rename: Map<string, string> } {
+  const write = new Map<string, string>();
+  const rename = new Map<string, string>();
+  for (const { key, stored, live } of pairs) {
+    if (stored === live) {
+      synced.set(key, live);
+      continue;
+    }
+    if (pending.has(key)) continue;
+    const previous = synced.get(key);
+    if (previous !== undefined && live === previous) {
+      if (stored.trim()) rename.set(key, stored);
+      continue;
+    }
+    write.set(key, live);
+    synced.set(key, live);
+  }
+  return { write, rename };
+}
