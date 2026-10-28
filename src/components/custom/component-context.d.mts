@@ -22,3 +22,8 @@ export function componentContextIssue(
     depth: number;
   },
 ): string;
+export const componentViewStateLimits: Readonly<{ bytes: number; depth: number }>;
+export function componentViewStateIssue(
+  value: unknown,
+  limits?: { bytes: number; depth: number },
+): string;

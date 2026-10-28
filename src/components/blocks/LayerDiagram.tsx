@@ -12,6 +12,7 @@ import { blockLabel } from "./shared";
 import { useTranslator } from "../../i18n/react";
 import messages from "../../i18n/messages/layerDiagram";
 import { NoteText } from "./NoteText";
+import { useReaderState } from "../../surface/reader-state";
 
 type Module = { id: string; name: string; path?: string; detail?: string };
 type Layer = {
@@ -70,7 +71,17 @@ export function LayerDiagramBlock({ data }: BlockProps) {
   )
     ? (model.initial as string)
     : null;
-  const [selected, setSelected] = useState<string | null>(initial);
+  const [selected, setSelected] = useReaderState<string | null>(
+    "selected",
+    initial,
+    {
+      accept: (value) =>
+        value === null ||
+        layers.some((layer) =>
+          layer.modules.some((module) => module.id === value),
+        ),
+    },
+  );
   // A changed initial module in the data resets the reader's selection.
   const [seenInitial, setSeenInitial] = useState(initial);
   if (seenInitial !== initial) {

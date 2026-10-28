@@ -25,6 +25,7 @@ import type { EditorControls } from "../surface/EditorControls";
 import type { PageSessions, PageViewSession } from "./page-sessions";
 import PageHeading from "./PageHeading";
 import { DatasetScope } from "../datasets/react";
+import { ReaderStateContext, readerStateStore } from "../surface/reader-state";
 
 function PageContent({
   view,
@@ -75,6 +76,13 @@ function PageContent({
         : null,
     [projectId, pageId, pages],
   );
+  const readerState = useMemo(
+    () =>
+      projectId && pageId
+        ? { page: `${projectId}/${pageId}`, store: readerStateStore() }
+        : null,
+    [projectId, pageId],
+  );
   const editors = useContext(WorkspaceEditorContext);
   useLayoutEffect(() => {
     editors?.restoreFocus();
@@ -91,31 +99,33 @@ function PageContent({
           pageId={state.draft.id}
           readOnly={locked}
         >
-          <SurfaceEditor
-            key={`${state.draft.id}:${state.renderVersion}`}
-            document={state.draft}
-            readOnly={locked}
-            onChange={view.session.edit}
-            header={
-              state.draft.content.attrs?.kind === "board" ? undefined : (
-                <PageHeading
-                  title={state.draft.title}
-                  icon={state.draft.icon}
-                  readOnly={locked}
-                  onTitleChange={(title) => view.session.edit({ title })}
-                  onEditIcon={onEditIcon}
-                />
-              )
-            }
-            revealId={revealId}
-            onControlsChange={onControlsChange}
-            onActiveSurfaceChange={onActiveSurfaceChange}
-            onRevealHandled={onRevealHandled}
-            retainedState={view.surface}
-            inlineInkProjectId={state.projectId ?? undefined}
-            onInkSave={view.session.flush}
-            onPublishedInkSave={view.session.flushPublishedSource}
-          />
+          <ReaderStateContext.Provider value={readerState}>
+            <SurfaceEditor
+              key={`${state.draft.id}:${state.renderVersion}`}
+              document={state.draft}
+              readOnly={locked}
+              onChange={view.session.edit}
+              header={
+                state.draft.content.attrs?.kind === "board" ? undefined : (
+                  <PageHeading
+                    title={state.draft.title}
+                    icon={state.draft.icon}
+                    readOnly={locked}
+                    onTitleChange={(title) => view.session.edit({ title })}
+                    onEditIcon={onEditIcon}
+                  />
+                )
+              }
+              revealId={revealId}
+              onControlsChange={onControlsChange}
+              onActiveSurfaceChange={onActiveSurfaceChange}
+              onRevealHandled={onRevealHandled}
+              retainedState={view.surface}
+              inlineInkProjectId={state.projectId ?? undefined}
+              onInkSave={view.session.flush}
+              onPublishedInkSave={view.session.flushPublishedSource}
+            />
+          </ReaderStateContext.Provider>
         </DatasetScope>
       </CustomComponentsProvider>
     </PageLinkContext.Provider>

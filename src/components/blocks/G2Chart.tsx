@@ -13,6 +13,11 @@ import type { MessageKey } from "../../i18n";
 import { useTranslator } from "../../i18n/react";
 import messages from "../../i18n/messages/g2";
 import "./g2-chart.css";
+import {
+  isText,
+  useReaderState,
+  useResetOnChange,
+} from "../../surface/reader-state";
 
 const interactions: [string, MessageKey<typeof messages>][] = [
   ["tooltip", "interaction.tooltip"],
@@ -40,7 +45,11 @@ export function G2ChartBlock({
   const [draft, setDraft] = useState("");
   const [draftError, setDraftError] = useState("");
   const baseline = useRef("");
-  const [exploreTheme, setExploreTheme] = useState<string | null>(null);
+  const [exploreTheme, setExploreTheme] = useReaderState<string | null>(
+    "theme",
+    null,
+    { accept: (value) => value === null || isText(value) },
+  );
   const editable = Boolean(onChange && !readOnly);
   const theme = exploreTheme ?? String(data.theme ?? "indigo");
   const draftValue = (() => {
@@ -71,9 +80,7 @@ export function G2ChartBlock({
     setDraft(JSON.stringify({ ...draftValue, ...next }, null, 2));
     setDraftError("");
   };
-  useEffect(() => {
-    setExploreTheme(null);
-  }, [data.theme]);
+  useResetOnChange(String(data.theme ?? ""), () => setExploreTheme(null));
   useEffect(() => {
     const target = plot.current;
     if (!target) return;

@@ -4,9 +4,9 @@ import {
   type KeyboardEvent,
   type ReactNode,
   useRef,
-  useState,
 } from "react";
 import { translator } from "../../i18n";
+import { useReaderState } from "../../surface/reader-state";
 import messages from "../../i18n/messages/richText";
 
 const t = translator(messages);
@@ -114,7 +114,10 @@ export function StepperReader({
   titles: string[];
   steps: ReactNode[];
 }) {
-  const [active, setActive] = useState(0);
+  const [active, setActive] = useReaderState("step", 0, {
+    block: id ?? null,
+    accept: Number.isInteger,
+  });
   const current = Math.min(active, steps.length - 1);
   return (
     <section

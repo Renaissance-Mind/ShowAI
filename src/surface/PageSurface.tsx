@@ -102,6 +102,7 @@ import { ObjectContext, type ObjectActions } from "./SurfaceObject";
 import type { NodeLayout, PageViews, SavedView } from "./types";
 import "./surface.css";
 import { CanvasReferencePicker } from "./CanvasReferencePicker";
+import { useReaderStateScope } from "./reader-state";
 
 export interface SurfaceHandle {
   insertPosition: () => NodeLayout;
@@ -310,10 +311,12 @@ export default function PageSurface({
     drawTool === "pan" ? "hand" : drawTool === "text" ? "text" : null;
   const panMode = useRef(false);
   panMode.current = boardMode === "hand";
+  const readerScope = useReaderStateScope();
   const { rootRef, scrollRef, worldRef, camera, controls, scale } =
     useSurfaceViewport(
       layoutKey,
-      onMove ? `showai.viewport.v3:${pageId}` : undefined,
+      // App pages keep the camera even when read-only; exports do not.
+      onMove || readerScope ? `showai.viewport.v3:${pageId}` : undefined,
       enabled && !locked,
       { reading: !onMove, anchorScreen: !embedded, panMode },
     );

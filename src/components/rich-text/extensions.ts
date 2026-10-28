@@ -212,7 +212,7 @@ export const ToggleNode = Node.create({
   addNodeView: () => ReactNodeViewRenderer(ToggleView),
 });
 
-/** Ordered steps shown one at a time; which step is open is reading state, never saved. */
+/** Ordered steps shown one at a time; which step is open is reading state, kept per reader and never saved to the page. */
 export const StepperNode = Node.create({
   name: "stepper",
   group: "block",

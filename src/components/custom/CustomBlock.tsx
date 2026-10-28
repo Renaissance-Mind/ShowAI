@@ -35,7 +35,11 @@ import { useLocale, useTranslator } from "../../i18n/react";
 import messages from "../../i18n/messages/customComponents";
 import common from "../../i18n/messages/common";
 import { AssistantContext } from "../assistant-context";
-import { componentContextIssue } from "./component-context.mjs";
+import {
+  componentContextIssue,
+  componentViewStateIssue,
+} from "./component-context.mjs";
+import { useReaderStateScope } from "../../surface/reader-state";
 import {
   navigationTarget,
   parsePageLink,
@@ -221,6 +225,16 @@ function SandboxComponent({
     props: parsed.props,
     readOnly: !!readOnly || !onChange,
   });
+  // A page block in the App keeps the reader's view of it on this device.
+  const readerScope = useReaderStateScope();
+  const readerView = useRef({
+    scope: readerScope,
+    slot: `component:${parsed.componentId}`,
+  });
+  readerView.current = {
+    scope: readerScope,
+    slot: `component:${parsed.componentId}`,
+  };
   latest.current = { data, parsed, onChange, readOnly, assistant };
   // A bound block asks which props each change started from. The frame posts
   // showai:valid after applying each props message, in order.
@@ -307,7 +321,7 @@ function SandboxComponent({
       injectComponentBootstrap(
         component.html,
         // Built-in blocks compiled into the package start in the workbench language.
-        `<style>body{color:var(--text)}</style><script>(${installFrameErrorReporter.toString()})(${safeJson(channel)});</script><script>document.documentElement.lang=document.documentElement.dataset.showaiLocale=${safeJson(locale)};(${installComponentActivity.toString()})(${safeJson(channel)});(${installSandboxTheme.toString()})(${safeJson(channel)},${safeJson(initialTheme.current)},${safeJson(appearanceTokens())});</script><script id="showai-component-data" type="application/json">${safeJson({ channel, ...initial.current })}</script>`,
+        `<style>body{color:var(--text)}</style><script>(${installFrameErrorReporter.toString()})(${safeJson(channel)});</script><script>document.documentElement.lang=document.documentElement.dataset.showaiLocale=${safeJson(locale)};(${installComponentActivity.toString()})(${safeJson(channel)});(${installSandboxTheme.toString()})(${safeJson(channel)},${safeJson(initialTheme.current)},${safeJson(appearanceTokens())});</script><script id="showai-component-data" type="application/json">${safeJson({ channel, ...initial.current, ...savedView() })}</script>`,
       ) +
       `<script>${componentSelectionScript(channel)}(${installIconTooltips.toString()})(document);(${installComponentLinks.toString()})(${safeJson(channel)});</script>` +
       // A changed document reloads the same frame element after 重试.
@@ -315,6 +329,16 @@ function SandboxComponent({
     );
   }, [component.html, channel, locale, attempt]);
 
+  /** Read when the frame is built, so 重试 starts from the latest view. */
+  function savedView() {
+    const { scope, slot } = readerView.current;
+    if (!scope?.block) return {};
+    const value = scope.store.read(scope.page, scope.block, slot);
+    return {
+      view: true,
+      viewState: componentViewStateIssue(value) ? undefined : value,
+    };
+  }
   const sendProps = () => {
     const current = latest.current;
     unconfirmed.current.push(current.parsed.props);
@@ -370,6 +394,14 @@ function SandboxComponent({
             { channel, type: "showai:context-restore", snapshot: pending },
             "*",
           );
+      }
+      if (event.data.type === "showai:view-state") {
+        const { scope, slot } = readerView.current;
+        const value = event.data.clear === true ? undefined : event.data.state;
+        // The runtime checks this too; the host never trusts the frame.
+        if (!scope?.block || componentViewStateIssue(value)) return;
+        scope.store.write(scope.page, scope.block, slot, value);
+        return;
       }
       if (event.data.type === "showai:context") {
         const snapshot = event.data.snapshot;

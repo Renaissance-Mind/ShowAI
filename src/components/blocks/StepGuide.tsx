@@ -19,6 +19,7 @@ import type { Translator } from "../../i18n";
 import { useTranslator } from "../../i18n/react";
 import messages from "../../i18n/messages/stepGuide";
 import { NoteText } from "./NoteText";
+import { isIndex, useReaderSet, useReaderState } from "../../surface/reader-state";
 
 type Variant = { label: string; code: string; lang?: string };
 type Segment = { start: number; minutes: number; kind: "active" | "wait" };
@@ -468,11 +469,13 @@ export function StepGuideBlock({ data }: BlockProps) {
   const baseId = useId();
   const stepId = (index: number) => `${baseId}-step${index}`;
 
-  const [current, setCurrent] = useState(() =>
-    Math.min(Math.max(guide.initialStep ?? 0, 0), steps.length - 1),
+  const [current, setCurrent] = useReaderState(
+    "step",
+    () => Math.min(Math.max(guide.initialStep ?? 0, 0), steps.length - 1),
+    { accept: isIndex },
   );
   const index = Math.min(current, steps.length - 1);
-  const [done, setDone] = useState<Set<string>>(() => new Set());
+  const [done, setDone] = useReaderSet("done");
   const [timers, setTimers] = useState<Record<string, Timer>>({});
   const [now, setNow] = useState(() => Date.now());
   const [announcement, setAnnouncement] = useState("");

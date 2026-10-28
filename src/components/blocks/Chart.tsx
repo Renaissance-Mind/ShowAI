@@ -22,6 +22,7 @@ import { useTranslator } from "../../i18n/react";
 import messages from "../../i18n/messages/chart";
 import { NoteSvgText, NoteText, noteProps } from "./NoteText";
 import { plainNotes, textNotes } from "./note-markup.mjs";
+import { isIndexList, useReaderState } from "../../surface/reader-state";
 
 /** Axis label: [label]{note} keeps its note; a shortened label shows the full text on hover. */
 function AxisLabel({ label }: { label: string }) {
@@ -50,7 +51,9 @@ const prettyNumber = (value: number) =>
 export function ChartBlock({ data, onChange, readOnly }: BlockProps) {
   const t = useTranslator(messages);
   const [editing, setEditing] = useState(false);
-  const [hidden, setHidden] = useState<number[]>([]);
+  const [hidden, setHidden] = useReaderState<number[]>("hiddenSeries", [], {
+    accept: isIndexList,
+  });
   const [hover, setHover] = useState<number | null>(null);
   const [draft, setDraft] = useState("");
   const [draftTitle, setDraftTitle] = useState("");

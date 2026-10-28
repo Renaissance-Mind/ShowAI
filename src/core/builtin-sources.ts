@@ -10,6 +10,7 @@ import textSelectionModel from "../surface/text-selection-model.ts?raw";
 import selectionBridge from "../components/custom/selection-bridge.ts?raw";
 import selectionFrame from "../components/custom/useSelectionFrame.ts?raw";
 import textSelection from "../surface/text-selection.ts?raw";
+import readerState from "../surface/reader-state.ts?raw";
 import richTextDropCursor from "../components/rich-text/drop-cursor-cleanup.ts?raw";
 import richTextInsertion from "../components/rich-text/component-insertion.ts?raw";
 import richTextNodeViews from "../components/rich-text/NodeViews.tsx?raw";
@@ -212,6 +213,7 @@ const sources: Record<string, string> = {
   "custom/selection-bridge.ts": selectionBridge,
   "custom/useSelectionFrame.ts": selectionFrame,
   "surface/text-selection.ts": textSelection,
+  "surface/reader-state.ts": readerState,
   "rich-text/drop-cursor-cleanup.ts": richTextDropCursor,
   "rich-text/component-insertion.ts": richTextInsertion,
   "rich-text/NodeViews.tsx": richTextNodeViews,
@@ -427,6 +429,12 @@ export const builtinSources: Record<string, string> = Object.fromEntries(
       .replaceAll(
         '"../components/rich-text/text-range-edit"',
         '"../rich-text/text-range-edit"',
+      )
+      .replaceAll(
+        '"../../surface/reader-state"',
+        name.includes("/")
+          ? '"../surface/reader-state"'
+          : '"./surface/reader-state"',
       )
       .replaceAll(
         '"../../surface/text-selection"',

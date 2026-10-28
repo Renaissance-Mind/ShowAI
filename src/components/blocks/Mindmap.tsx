@@ -37,6 +37,11 @@ import {
   type MindmapData,
 } from "./mindmap-contract.mjs";
 import "./mindmap.css";
+import {
+  isRecord,
+  isStringList,
+  useReaderState,
+} from "../../surface/reader-state";
 
 export function MindmapBlock({
   data: raw,
@@ -54,13 +59,27 @@ export function MindmapBlock({
   );
   const editingId = useRef<string | null>(null);
   const selectName = useRef(true);
-  const [readingCollapsed, setReadingCollapsed] = useState<Set<string> | null>(
+  const [collapsedList, setCollapsedList] = useReaderState<string[] | null>(
+    "collapsed",
     null,
+    { accept: (value) => value === null || isStringList(value) },
   );
-  const [readingView, setReadingView] = useState<{
+  const readingCollapsed = useMemo(
+    () => (collapsedList ? new Set(collapsedList) : null),
+    [collapsedList],
+  );
+  const setReadingCollapsed = (next: Set<string>) =>
+    setCollapsedList([...next]);
+  const [readingView, setReadingView] = useReaderState<{
     layout: "radial" | "tree";
     direction: "right" | "left";
-  } | null>(null);
+  } | null>("layout", null, {
+    accept: (value) =>
+      value === null ||
+      (isRecord(value) &&
+        ["radial", "tree"].includes(value.layout as string) &&
+        ["right", "left"].includes(value.direction as string)),
+  });
   const layout = (!editable && readingView?.layout) || data.layout || "radial";
   const direction =
     (!editable && readingView?.direction) || data.direction || "right";

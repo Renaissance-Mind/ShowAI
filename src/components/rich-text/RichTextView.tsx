@@ -1,3 +1,4 @@
+import { ReaderBlock, useReaderState } from "../../surface/reader-state";
 import "../blocks/katex.css";
 import { ImageContent } from "./ImageContent";
 import { HighlightedCode } from "./HighlightedCode";
@@ -127,6 +128,34 @@ function tableColumns(node: JSONContent): ReactNode {
 }
 
 /** Renders only validated page JSON. The exported reader includes no editor runtime. */
+/** A toggle the reader opens and closes; App pages keep that per reader. */
+function ReadingToggle({
+  id,
+  open,
+  props,
+  children,
+}: {
+  id?: string;
+  open: boolean;
+  props: Record<string, unknown>;
+  children: ReactNode;
+}) {
+  const [expanded, setExpanded] = useReaderState("open", open, {
+    block: id ?? null,
+    accept: (value) => typeof value === "boolean",
+  });
+  return (
+    <details
+      {...props}
+      className="portable-toggle"
+      open={expanded}
+      onToggle={(event) => setExpanded(event.currentTarget.open)}
+    >
+      {children}
+    </details>
+  );
+}
+
 export function RichTextNode({
   node,
   renderWidget,
@@ -298,12 +327,12 @@ export function RichTextNode({
       );
     case "toggle":
       return (
-        <details {...props} className="portable-toggle" open={!!attrs.open}>
+        <ReadingToggle id={attrs.id} open={!!attrs.open} props={props}>
           <summary>
             {attrs.title || attrs.summary || t("toggle.expand")}
           </summary>
           <div className="portable-toggle-body">{children}</div>
-        </details>
+        </ReadingToggle>
       );
     case "stepper":
       return (
@@ -342,7 +371,9 @@ export function RichTextNode({
           className="portable-widget"
           data-widget-kind={attrs.kind}
         >
-          {renderWidget?.(attrs.kind, attrs.data ?? {})}
+          <ReaderBlock id={attrs.id}>
+            {renderWidget?.(attrs.kind, attrs.data ?? {})}
+          </ReaderBlock>
         </div>
       );
     default:

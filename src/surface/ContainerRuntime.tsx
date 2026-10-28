@@ -90,6 +90,12 @@ import { BoardTools } from "./BoardTools";
 import { useTranslator } from "../i18n/react";
 import commonMessages from "../i18n/messages/common";
 import messages from "../i18n/messages/surface";
+import {
+  isFlag,
+  isRecord,
+  isStringList,
+  useReaderStateScope,
+} from "./reader-state";
 
 // Attribute commands replace nested values explicitly, retaining source ink and
 // children. Structural commands below perform their own reconciliation.
@@ -1051,9 +1057,17 @@ function ContainerView({
   };
   const enabled = root || runtime.active === id;
   const viewScope = useContext(EditorViewScope);
-  const persistKey = `showai.page-scroll.v3:${runtime.document.id}:${id}:${root ? "expanded" : "embedded"}${viewScope ? `:${viewScope}` : ""}`;
-  if (!runtime.outlines.has(persistKey)) runtime.outlines.set(persistKey, {});
+  const sharedScrollKey = `showai.page-scroll.v3:${runtime.document.id}:${id}:${root ? "expanded" : "embedded"}`;
+  const persistKey = `${sharedScrollKey}${viewScope ? `:${viewScope}` : ""}`;
+  const reader = useReaderStateScope();
+  const outlineSlot = `outline:${root ? "expanded" : "embedded"}`;
+  if (!runtime.outlines.has(persistKey))
+    runtime.outlines.set(
+      persistKey,
+      readOutlineView(reader?.store.read(reader.page, id, outlineSlot)),
+    );
   const outlineView = runtime.outlines.get(persistKey)!;
+  const scrollTarget = useRef<number | undefined>(undefined);
   useLayoutEffect(() => {
     const element = page.current;
     if (!element) return;
@@ -1063,11 +1077,60 @@ function ContainerView({
       element.scrollTop = captured.y;
       return;
     }
-    const saved = runtime.scrolls.get(persistKey) ?? readScroll(persistKey);
-    if (Number.isFinite(saved)) element.scrollTop = saved;
+    // Another tab, or a tab opened after a restart, starts where this page was last read.
+    const saved =
+      runtime.scrolls.get(persistKey) ??
+      readScroll(persistKey) ??
+      readScroll(sharedScrollKey);
+    // Content that is still loading cannot reach the saved position yet: keep
+    // restoring as it grows, until the reader scrolls or something is revealed.
+    scrollTarget.current = saved;
+    let restored = element.scrollTop;
+    const restore = () => {
+      const target = scrollTarget.current;
+      if (target === undefined) return;
+      element.scrollTop = target;
+      restored = element.scrollTop;
+      if (Math.abs(restored - target) < 2) scrollTarget.current = undefined;
+    };
+    restore();
+    const growth = new ResizeObserver(restore);
+    for (const child of element.children) growth.observe(child);
+    const settle = window.setTimeout(
+      () => (scrollTarget.current = undefined),
+      4000,
+    );
+    const reading = () => (scrollTarget.current = undefined);
+    const inputs = ["wheel", "touchstart", "pointerdown", "keydown"] as const;
+    for (const type of inputs)
+      element.addEventListener(type, reading, { passive: true });
+    let timer = 0;
+    const remember = () => {
+      clearTimeout(timer);
+      timer = 0;
+      const top = scrollTarget.current ?? element.scrollTop;
+      runtime.scrolls.set(persistKey, top);
+      writeScroll(persistKey, top);
+      writeScroll(sharedScrollKey, top);
+    };
+    // Written after scrolling pauses, so quitting the App keeps the position.
+    const scrolled = () => {
+      // A scroll the restore did not make, such as following a link, wins.
+      if (Math.abs(element.scrollTop - restored) > 2)
+        scrollTarget.current = undefined;
+      clearTimeout(timer);
+      timer = window.setTimeout(remember, 500);
+    };
+    element.addEventListener("scroll", scrolled, { passive: true });
+    window.addEventListener("pagehide", remember);
     return () => {
-      runtime.scrolls.set(persistKey, element.scrollTop);
-      writeScroll(persistKey, element.scrollTop);
+      growth.disconnect();
+      clearTimeout(settle);
+      for (const type of inputs) element.removeEventListener(type, reading);
+      element.removeEventListener("scroll", scrolled);
+      window.removeEventListener("pagehide", remember);
+      remember();
+      scrollTarget.current = undefined;
     };
   }, [persistKey]);
   useLayoutEffect(() => {
@@ -1086,6 +1149,7 @@ function ContainerView({
           "surface",
       );
     if (owner !== id) return;
+    scrollTarget.current = undefined;
     if (kind === "board" && !reading) viewport.current?.reveal(target);
     else
       requestAnimationFrame(() =>
@@ -1276,6 +1340,11 @@ function ContainerView({
               scroll={page}
               shell={pageShell}
               view={outlineView}
+              onViewChange={(view) =>
+                reader?.store.write(reader.page, id, outlineSlot, {
+                  ...view,
+                })
+              }
               onSettings={
                 readOnly ? undefined : () => runtime.outlineSettings(id)
               }
@@ -1654,11 +1723,22 @@ function ContainerView({
   );
 }
 
+/** A saved outline view, keeping only the fields it still understands. */
+function readOutlineView(value: unknown): OutlineViewState {
+  if (!isRecord(value)) return {};
+  return {
+    ...(isFlag(value.expanded) ? { expanded: value.expanded } : {}),
+    ...(isFlag(value.pinned) ? { pinned: value.pinned } : {}),
+    ...(isStringList(value.branches) ? { branches: value.branches } : {}),
+  };
+}
 function readScroll(key: string) {
   try {
-    return Number(localStorage.getItem(key) || 0);
+    const saved = localStorage.getItem(key);
+    const value = saved === null ? NaN : Number(saved);
+    return Number.isFinite(value) ? value : undefined;
   } catch {
-    return 0;
+    return undefined;
   }
 }
 function writeScroll(key: string, value: number) {

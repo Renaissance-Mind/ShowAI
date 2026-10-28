@@ -135,6 +135,8 @@ React 默认导出接收 `{data,onChange?,readOnly}`，编辑通过 onChange 回
 
 有对话的宿主还会传入 `onContext` 与 `context`。读者点击「交给对话」等操作时，组件调用 `onContext({model, private?, label?})` 交出当前探索状态：`model`（JSON，不超过 8 KiB）随下一条消息让 Agent 看到，`private` 只返回给同一组件实例，`label`（不超过 80 字）显示在标签上，整份快照不超过 16 KiB。交出成功返回 `true`，没有刚发生的用户操作时返回 `false`，快照无效时抛出错误。工作台把它作为可删标签放进内置 Agent 输入框，MCP Apps 宿主经 `ui/update-model-context` 收到；都不会保存页面、发送消息或启动 Agent。等待发送期间，重新挂载的实例会从 `context` 取回它。导出 HTML、预览和没有对话的宿主不提供 `onContext`，组件只在它存在时显示该控件。探索状态不属于 props schema。
 
+ShowAI App 里页面上的组件块还会传入 `viewState` 与 `onViewState`，让组件回到读者上次离开的位置。视图状态变化时（切换标签、移动滑块、展开分支）调用 `onViewState(value)`：`value` 是不超过 16 KiB 的 JSON，传 `undefined` 表示回到默认。App 在这台设备上为当前读者保存最新的值，变化停下片刻后写入，组件块再次挂载时（包括重启 App 后）作为 `viewState` 传回，组件换成新版本后仍然沿用。它不写入页面，不同步，Agent 也看不到。保存的值可能对应已经修改过的数据，页面打开期间 data 也可能变化，每次渲染都要对照当前 `data` 检查。导出 HTML、预览、缩略图、对话预览和行内渲染不提供这两个属性。用较早 ShowAI 保存的组件版本要重新保存为新版本才会收到它们。
+
 支持 React、包内模块、`showai:components` 与声明了精确依赖的 `showai:component/ID`。不开放任意 npm 包。父组件运行代码包含子组件；目录注册与发布同时保留精确源码依赖闭包。
 
 普通 HTML 与桌面通过 `sandbox="allow-scripts"` iframe 渲染组件，无法使用桌面桥、文件系统或外部网络。导出组件包含 id/version/schema/html/integrity 和可选 inline script/styles；这些是编译产物，不应手写。仅编译包可导入渲染，源码编辑需要补回已验证原始包。

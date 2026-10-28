@@ -4,7 +4,7 @@
 
 新组件使用 documentation.version=2；按 [参数契约](parameter-contract.md) 同步 schema、字段语义、遗漏行为、示例及关系约束。结构检查与实际交互分别验证，不把例子中的初始值称为自动默认值。
 
-定义数据契约：输入字段、必填条件、数组上限、单位、默认值以及空数据状态。schema 与 defaultData、examples、React 入口一致。界面需要的计算与状态说明保持在组件内；正式数据通过 `onChange(nextData)` 返回，读取态保持页面源数据。每个组件接收 `{data, onChange, readOnly, goTo}`，`goTo` 见下方「跳转到页面或组件」；有对话的宿主还会传入 `onContext` 与 `context`，见下方「交给对话」。
+定义数据契约：输入字段、必填条件、数组上限、单位、默认值以及空数据状态。schema 与 defaultData、examples、React 入口一致。界面需要的计算与状态说明保持在组件内；正式数据通过 `onChange(nextData)` 返回，读取态保持页面源数据。每个组件接收 `{data, onChange, readOnly, goTo}`，`goTo` 见下方「跳转到页面或组件」；有对话的宿主还会传入 `onContext` 与 `context`，见下方「交给对话」；App 页面中的组件块还会收到 `viewState` 与 `onViewState`，见下方「记住读者的位置」。
 
 包包含 `manifest.json`、`props.schema.json` 和 manifest.entry 指定的本地文件。manifest 记录 id、name、version、description、scenarios、entry、defaultData、examples。输入与示例保留可用的最小实例；参考本次真实内容验证较复杂情况，不为未知事实生成示例测量。
 
@@ -65,6 +65,31 @@ export default function Explorer({ data, onContext, context }) {
 交出的是读者此刻看到的状态，不是页面数据：不要为它新增 schema 字段，也不要用 `onChange` 保存它；用户要求保留时由页面编辑流程修改 data。`model` 用稳定字段名和单位写出 Agent 需要的参数、派生量与相对已保存数据的变化，不放整张图或长数组。不要在拖动的每一帧调用，在明确的操作或交互结束时调用一次。在 `usage.interactions` 中把这个操作记为 `persistence: "none"`，effect 写清交出的字段。
 
 验证时在工作台真实页面操作后检查对话输入框出现标签、移除后不随消息发送、刷新页面后 `context` 恢复，并确认页面数据未变；检查导出 HTML 不出现该控件；能接入 MCP Apps 对话预览时检查宿主收到的模型上下文，不能时说明未验证。
+
+## 记住读者的位置
+
+ShowAI App 里页面上的组件块还会收到 `viewState` 与 `onViewState`，让读者下次打开页面时回到上次离开的位置。视图状态变化时（切换标签、移动滑块、展开分支、翻到某一步）调用 `onViewState(value)`：`value` 是不超过 16 KiB 的 JSON，传 `undefined` 表示回到默认。App 在这台设备上为当前读者保存最新的值，变化停下片刻后写入，组件块下次挂载时（包括重启 App 后）作为 `viewState` 传回。它按页面、块和组件 ID 保存，组件换成新版本后仍然沿用，所以新版本改变保存的结构时要能识别旧结构，识别不了就当作没有保存。它不写入页面，不同步到其他设备，Agent 也看不到；与 `onContext` 交给对话的快照、对话预览交回的控件取值（`showai.readerState`）都是不同的东西。拖动时可以每次变化都调用，宿主会合并写入。
+
+`viewState` 只在挂载时提供，可能对应旧的数据：作者或 Agent 修改 data 后，保存的标签、条目 ID 或步骤可能已经不存在，页面打开期间 data 也可能变化。每次渲染都对照当前 `data` 检查所选的条目，不存在时显示默认值；读者下一次操作会用新值覆盖保存的旧值，不需要专门清除。导出 HTML、组件目录预览、缩略图、对话预览与行内渲染不提供这两个属性，组件此时使用默认值。用较早 ShowAI 保存的组件版本收不到它们，重新保存为新版本即可。视图状态不是参数：不写入 schema、defaultData 或例子，在 `usage.interactions` 中记为 `persistence: "view"`。
+
+```jsx
+export default function Tabs({ data, viewState, onViewState }) {
+  const first = data.tabs[0]?.id;
+  const [chosen, setChosen] = useState(viewState?.tab ?? first);
+  const tab = data.tabs.some((item) => item.id === chosen) ? chosen : first;
+  const choose = (id) => {
+    setChosen(id);
+    onViewState?.(id === first ? undefined : { tab: id });
+  };
+  return data.tabs.map((item) => (
+    <button key={item.id} type="button" aria-pressed={item.id === tab} onClick={() => choose(item.id)}>
+      {item.title}
+    </button>
+  ));
+}
+```
+
+验证时在 ShowAI App 的页面中操作组件，切到其他页面再回来、重启 App 后确认回到原状态；修改 data 删掉保存的条目后确认组件回到默认值；检查页面数据没有变化，导出 HTML 从默认值开始。
 
 ## 跳转到页面或组件
 

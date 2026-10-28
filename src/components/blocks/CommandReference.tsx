@@ -20,6 +20,7 @@ import { blockLabel } from "./shared";
 import { useTranslator } from "../../i18n/react";
 import messages from "../../i18n/messages/commandReference";
 import { NoteText } from "./NoteText";
+import { useReaderSet, useReaderState } from "../../surface/reader-state";
 
 type Param = { name: string; meaning: string };
 type Command = {
@@ -189,9 +190,12 @@ export function CommandReferenceBlock({ data }: BlockProps) {
     [reference.commands],
   );
   const [query, setQuery] = useState("");
-  const [group, setGroup] = useState(ALL);
-  const [open, setOpen] = useState<Set<string>>(() => new Set());
-  const [more, setMore] = useState<Set<string>>(() => new Set());
+  const [group, setGroup] = useReaderState("group", ALL, {
+    accept: (value) =>
+      value === ALL || reference.groups.some((entry) => entry.id === value),
+  });
+  const [open, setOpen] = useReaderSet("open");
+  const [more, setMore] = useReaderSet("more");
   const deferred = useDeferredValue(query);
   const terms = useMemo(() => searchTerms(deferred), [deferred]);
   const mark = highlighter(terms);

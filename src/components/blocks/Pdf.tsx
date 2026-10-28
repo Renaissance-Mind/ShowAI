@@ -16,6 +16,7 @@ import type { BlockProps } from "./types";
 import { useTranslator } from "../../i18n/react";
 import messages from "../../i18n/messages/pdf";
 import "./research-media.css";
+import { isIndex, useReaderState } from "../../surface/reader-state";
 
 function PdfReader({
   src,
@@ -30,8 +31,12 @@ function PdfReader({
 }) {
   const t = useTranslator(messages);
   const [pdf, setPdf] = useState<PDFDocumentProxy>();
-  const [page, setPage] = useState(initialPage);
-  const [zoom, setZoom] = useState(1);
+  const [page, setPage] = useReaderState("page", initialPage, {
+    accept: (value) => isIndex(value) && value >= 1,
+  });
+  const [zoom, setZoom] = useReaderState("zoom", 1, {
+    accept: (value) => typeof value === "number" && value >= 0.5 && value <= 3,
+  });
   const [width, setWidth] = useState(600);
   const [error, setError] = useState("");
   const [pending, setPending] = useState(true);
@@ -49,7 +54,7 @@ function PdfReader({
         return task.promise.then((document) => {
           if (!active) return;
           setPdf(document);
-          setPage(Math.min(initialPage, document.numPages));
+          setPage((current) => Math.min(current, document.numPages));
         });
       })
       .catch((failure) => {

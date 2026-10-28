@@ -7,6 +7,7 @@ import type { MessageKey } from "../../i18n";
 import { useTranslator } from "../../i18n/react";
 import messages from "../../i18n/messages/analysis";
 import { NoteText } from "./NoteText";
+import { useReaderState } from "../../surface/reader-state";
 
 type Tone = "done" | "failed" | "active" | "todo" | "paused";
 type Status = { id: string; label: string; tone: Tone; color?: string };
@@ -131,14 +132,18 @@ export function StatusTreeBlock({ data }: BlockProps) {
   const all = model.groups.flatMap((group) => group.items);
   const counts = statusCounts(model) as Record<string, number>;
   const [layoutRef, width] = useWidth();
-  const [selected, setSelected] = useState(
+  const [selected, setSelected] = useReaderState(
+    "selected",
     () =>
       (
         all.find((item) => statusOf.get(item.status)?.tone === "active") ??
         all[0]
       )?.id ?? "",
+    { accept: (value) => all.some((item) => item.id === value) },
   );
-  const [focus, setFocus] = useState<string | null>(null);
+  const [focus, setFocus] = useReaderState<string | null>("focus", null, {
+    accept: (value) => value === null || statusOf.has(value as string),
+  });
 
   const narrow = width < 980;
   const treeWidth = narrow ? width : width - 316;

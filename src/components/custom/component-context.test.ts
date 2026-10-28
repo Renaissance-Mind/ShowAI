@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import {
   componentContextIssue,
   componentContextLimits,
+  componentViewStateIssue,
+  componentViewStateLimits,
 } from "./component-context.mjs";
 
 describe("component context snapshots", () => {
@@ -51,5 +53,26 @@ describe("component context snapshots", () => {
     )() as typeof componentContextIssue;
     expect(embedded({ model: { ok: true } })).toBe("");
     expect(embedded({ model: 1, other: 2 })).toMatch(/Unknown/);
+  });
+});
+
+describe("component view state", () => {
+  it("keeps any bounded JSON value and lets undefined forget it", () => {
+    expect(componentViewStateIssue({ tab: "b", values: [1, 2] })).toBe("");
+    expect(componentViewStateIssue(3)).toBe("");
+    expect(componentViewStateIssue(undefined)).toBe("");
+    expect(componentViewStateIssue({ at: new Date() })).toMatch(/JSON/);
+    expect(componentViewStateIssue(Number.POSITIVE_INFINITY)).toMatch(/JSON/);
+    expect(
+      componentViewStateIssue("字".repeat(componentViewStateLimits.bytes / 3)),
+    ).toMatch(/exceeds/);
+  });
+
+  it("stays self-contained so the component runtime can embed its source", () => {
+    const embedded = new Function(
+      `return ${componentViewStateIssue.toString()}`,
+    )() as typeof componentViewStateIssue;
+    expect(embedded({ tab: "a" })).toBe("");
+    expect(embedded({ run: () => 1 })).toMatch(/JSON/);
   });
 });

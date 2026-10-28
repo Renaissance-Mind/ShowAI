@@ -47,6 +47,11 @@ import { Play, RotateCcw, Square } from "../../ui/icons";
 import { useTranslator } from "../../i18n/react";
 import messages from "../../i18n/messages/scene3d";
 import "./scene3d.css";
+import {
+  isNumberRecord,
+  useReaderState,
+  useResetOnChange,
+} from "../../surface/reader-state";
 
 // Objects without a color take one from this palette, chosen to read on light and dark grounds.
 const PALETTE = [
@@ -400,7 +405,11 @@ export function Scene3DBlock({ data: raw }: BlockProps) {
   const labelElements = useRef<(HTMLSpanElement | null)[]>([]);
   const engine = useRef<Engine | null>(null);
   const placed = useRef("");
-  const [values, setValues] = useState(() => initialValues(parameters));
+  const [values, setValues] = useReaderState(
+    "values",
+    () => initialValues(parameters),
+    { accept: isNumberRecord },
+  );
   const valuesRef = useRef(values);
   valuesRef.current = values;
   const [ready, setReady] = useState(false);
@@ -421,10 +430,10 @@ export function Scene3DBlock({ data: raw }: BlockProps) {
   const cameraKey = JSON.stringify(data.camera ?? null);
 
   // New parameter definitions restart from their declared values.
-  useEffect(() => {
+  useResetOnChange(parametersKey, () => {
     setValues(initialValues(parameters));
     setDemo(null);
-  }, [parametersKey]);
+  });
 
   useEffect(() => {
     const query = matchMedia("(prefers-reduced-motion: reduce)");

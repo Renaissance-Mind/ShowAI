@@ -20,6 +20,7 @@ import { blockLabel } from "./shared";
 import type { MessageKey } from "../../i18n";
 import { useLocale, useTranslator } from "../../i18n/react";
 import messages from "../../i18n/messages/roadmap";
+import { useReaderState } from "../../surface/reader-state";
 
 type Tone = "done" | "active" | "todo" | "blocked";
 type Status = { id: string; label: string; tone: Tone };
@@ -162,16 +163,27 @@ export function RoadmapBlock({ data }: BlockProps) {
   const hasUnassigned = model.items.some((item) => !item.owner);
 
   const [layoutRef, width] = useWidth();
-  const [groupBy, setGroupBy] = useState<"lane" | "owner">(
+  const [groupBy, setGroupBy] = useReaderState<"lane" | "owner">(
+    "groupBy",
     owners.length ? (model.groupBy ?? "lane") : "lane",
+    {
+      accept: (value) =>
+        value === "lane" || (value === "owner" && owners.length > 0),
+    },
   );
-  const [ownerFocus, setOwnerFocus] = useState<string | null>(null);
-  const [selectedId, setSelected] = useState<string | null>(
+  const [ownerFocus, setOwnerFocus] = useReaderState<string | null>(
+    "ownerFocus",
+    null,
+    { accept: (value) => value === null || ownerOf.has(value as string) },
+  );
+  const [selectedId, setSelected] = useReaderState<string | null>(
+    "selected",
     () =>
       model.initialItem ??
       model.items.find((item) => statusOf.get(item.status)?.tone === "active")
         ?.id ??
       null,
+    { accept: (value) => value === null || itemOf.has(value as string) },
   );
   const detailsRef = useRef<HTMLDetailsElement>(null);
   // Printing shows every task, not only the one selected on screen.

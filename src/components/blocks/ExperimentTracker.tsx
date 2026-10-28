@@ -6,6 +6,7 @@ import { blockLabel } from "./shared";
 import { getLocale, type MessageKey } from "../../i18n";
 import { useTranslator } from "../../i18n/react";
 import messages from "../../i18n/messages/analysis";
+import { useReaderSet, useReaderState } from "../../surface/reader-state";
 
 type Status = "kept" | "discarded" | "failed" | "running" | "stopped";
 type Experiment = {
@@ -576,9 +577,18 @@ function Stat({
 export function ExperimentTrackerBlock({ data }: BlockProps) {
   const t = useTranslator(messages);
   const model = data as unknown as Tracker;
-  const [filter, setFilter] = useState<"all" | Status>("all");
-  const [selected, setSelected] = useState<string | null>(null);
-  const [hidden, setHidden] = useState<Set<string>>(new Set());
+  const [filter, setFilter] = useReaderState<"all" | Status>("filter", "all", {
+    accept: (value) =>
+      ["all", "kept", "discarded", "failed", "running", "stopped"].includes(
+        value as string,
+      ),
+  });
+  const [selected, setSelected] = useReaderState<string | null>(
+    "selected",
+    null,
+    { accept: (value) => value === null || typeof value === "string" },
+  );
+  const [hidden, setHidden] = useReaderSet("hiddenRuns");
   const [hoverStep, setHoverStep] = useState<number | null>(null);
   const frontier = useMemo(
     () => experimentFrontier(model) as string[],

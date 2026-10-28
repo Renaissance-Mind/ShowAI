@@ -18,6 +18,7 @@ import { blockLabel } from "./shared";
 import { useTranslator } from "../../i18n/react";
 import messages from "../../i18n/messages/sequenceDiagram";
 import { NoteText } from "./NoteText";
+import { isIndex, useReaderState } from "../../surface/reader-state";
 
 type Kind = "call" | "reply" | "note";
 type Actor = {
@@ -492,7 +493,7 @@ export function SequenceDiagramBlock({ data }: BlockProps) {
   // Server rendering and export start wide; the observer corrects it on mount.
   const [width, setWidth] = useState(800);
   const [font, setFont] = useState(FALLBACK_FONT);
-  const [current, setCurrent] = useState(0);
+  const [current, setCurrent] = useReaderState("step", 0, { accept: isIndex });
   const [playing, setPlaying] = useState(false);
   const total = steps.length;
   const at = Math.min(current, Math.max(0, total - 1));
