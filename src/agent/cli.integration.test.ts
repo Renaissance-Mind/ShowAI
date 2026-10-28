@@ -8,6 +8,7 @@ import {
   mkdtemp,
   mkdir,
   readFile,
+  realpath,
   rm,
   writeFile,
   symlink,
@@ -552,7 +553,9 @@ test("external runtime records an executable launch and exposes only relevant gu
   const info = await run(["runtime", "info"]);
   expect(info.protocol).toBe(1);
   expect(info.projectResolution.mode).toBe("directory");
-  expect(info.launch.args).toEqual([cli]);
+  // Node runs the entry through symlinks, such as a worktree's linked
+  // node_modules, so the runtime records the real path of the bundle.
+  expect(info.launch.args).toEqual([await realpath(cli)]);
   expect(info.guideTopics).toContain("template-extraction");
   expect(info.support).toMatchObject({
     reportUrl: "https://github.com/Renaissance-Mind/ShowAI/issues/new",

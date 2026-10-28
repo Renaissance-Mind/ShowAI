@@ -14,7 +14,10 @@ import type {ShowDocument} from '../types';
 function source(){let document=createResource(blankDocument(),'board') as ShowDocument;document=addNode(document,{type:'drawing',attrs:{id:'stroke',tool:'pen',color:'#111111',strokeWidth:2,extent:[100,60],points:[{x:0,y:0},{x:80,y:40}],ink:createPortableInk(Array.from({length:2000},(_,i)=>({x:i%100,y:i%60,pressure:.5})),2,[100,60])}},
  {x:0,y:0,width:100,height:60},document.content.attrs!.id) as ShowDocument;return stampInkDocument(document,undefined,{actor:'seed',sequence:1});}
 const ink=(document:ShowDocument)=>document.content.content![0].attrs!.ink;
-function counted(){const inputs:string[]=[];installInkDigestProvider(source=>{inputs.push(source);return createHash('sha256').update(source,'utf8').digest('hex')});inputs.length=0;return inputs;}
+// Validation verifies every stored placement variant, a small ordering anchor
+// rather than geometry or DOM, so only the other hashed sources are counted.
+const placementVariant=(source:string)=>/^\{"after":(?:null|"[^"]*"),"before":(?:null|"[^"]*"),"parentId":"[^"]*"\}$/.test(source);
+function counted(){const inputs:string[]=[];installInkDigestProvider(source=>{if(!placementVariant(source))inputs.push(source);return createHash('sha256').update(source,'utf8').digest('hex')});inputs.length=0;return inputs;}
 afterEach(()=>installInkDigestProvider(null));
 it('does not hash uncontested canonical geometry for an empty conflict inspector',()=>{
  const document=source(),inputs=counted();expect(inkWireConflicts(document)).toEqual([]);expect(inkWireResolutionCandidates(document)).toEqual([]);expect(inputs).toEqual([]);

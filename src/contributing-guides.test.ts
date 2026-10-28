@@ -20,6 +20,9 @@ const guides = [
   "docs/i18n/development.zh-CN.md",
 ];
 const files = [...skills, ...guides];
+// Paths the guides describe that a command writes into each checkout, such as
+// the project settings `npm run plugin:claude` creates.
+const generated = new Set([".claude/settings.json"]);
 const read = (path: string) => readFileSync(path, "utf8");
 
 // GitHub heading anchors: lower case, punctuation removed, spaces to hyphens.
@@ -69,7 +72,7 @@ describe("contributing guides and Skill", () => {
               token,
             ) && !/[<*]|TOPIC/.test(token),
         )
-        .filter((token) => !existsSync(token))
+        .filter((token) => !generated.has(token) && !existsSync(token))
         .map((token) => `${path}: ${token}`),
     );
     expect(missing).toEqual([]);

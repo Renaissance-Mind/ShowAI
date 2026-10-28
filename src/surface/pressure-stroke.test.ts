@@ -29,20 +29,15 @@ it("preserves pressure in saved strokes and renders fixed and pressure widths di
 });
 
 it.each([["pen",12],["highlighter",20],["eraser",64]] as const)("limits %s controls while exposing its actual stroke mode",(tool,max)=>{
-  const render=()=>renderToStaticMarkup(createElement(BoardStyleControls,{tool,style:{color:"#252629",fillColor:"none",strokeWidth:6,pressure:false},nodes:[],onChange:()=>{}}));
-  const markup=render();
+  const markup=renderToStaticMarkup(createElement(BoardStyleControls,{tool,style:{color:"#252629",fillColor:"none",strokeWidth:6,pressure:false},nodes:[],onChange:()=>{}}));
   expect(markup).toContain(`max="${max}"`);
-  // Pressure only exists on the iOS app's pencil input; desktop never offers it.
-  expect(markup).not.toContain('class="board-pressure-toggle"');
-  if(tool!=="eraser") expect(markup).toContain('class="board-color-presets"');
-  else expect(markup).not.toContain('class="board-color-presets"');
-  const previous=globalThis.document;
-  globalThis.document={documentElement:{dataset:{native:"ios"}}} as unknown as Document;
-  try {
-    const ios=render();
-    if(tool!=="eraser") expect(ios).toContain('class="board-pressure-toggle"');
-    else expect(ios).not.toContain('class="board-pressure-toggle"');
-  } finally {
-    globalThis.document=previous;
+  // Browser, Electron and iOS pens all record pressure, so every pen and
+  // highlighter offers the toggle; the eraser never varies with pressure.
+  if(tool!=="eraser") {
+    expect(markup).toContain('class="board-pressure-toggle"');
+    expect(markup).toContain('class="board-color-presets"');
+  } else {
+    expect(markup).not.toContain('class="board-pressure-toggle"');
+    expect(markup).not.toContain('class="board-color-presets"');
   }
 });
