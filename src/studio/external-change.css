@@ -28,6 +28,76 @@
   }
 }
 
+/* 「<名称> 刚更新了这个页面的 N 处」: one line floating below the top bar. */
+.external-change-notice {
+  position: absolute;
+  top: 44px;
+  left: 50%;
+  translate: -50% 0;
+  z-index: 110;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  max-width: min(640px, calc(100% - 32px));
+  height: 34px;
+  padding: 0 4px 0 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--paper);
+  color: var(--text);
+  box-shadow: var(--shadow);
+  font-size: 13px;
+  animation: external-change-notice-in var(--duration-slow) var(--ease-out);
+}
+@keyframes external-change-notice-in {
+  from {
+    opacity: 0;
+    translate: -50% -6px;
+  }
+}
+.external-change-notice-icon {
+  flex: none;
+  margin-right: 4px;
+  color: var(--info);
+}
+.external-change-notice-title {
+  min-width: 0;
+  margin-right: 6px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.external-change-notice-action,
+.external-change-notice-close {
+  flex: none;
+  display: flex;
+  align-items: center;
+  height: 26px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  font: inherit;
+  cursor: pointer;
+}
+.external-change-notice-action {
+  padding: 0 8px;
+  color: var(--accent);
+  font-weight: 600;
+  white-space: nowrap;
+}
+.external-change-notice-close {
+  padding: 0 6px;
+  color: var(--muted);
+}
+.external-change-notice-action:hover,
+.external-change-notice-close:hover {
+  background: var(--hover);
+}
+.external-change-notice-close:hover {
+  color: var(--text);
+}
+
 /* 「Agent 新建」 on sidebar rows and in 最近, cleared when the page is opened. */
 .agent-created-mark {
   flex: none;

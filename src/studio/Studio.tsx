@@ -4768,27 +4768,6 @@ export default function Studio() {
                 ))}
               </div>
             )}
-            {externalChange && (
-              <ExternalChangeNotice
-                key={`external-${externalChange.id}`}
-                data-priority={2}
-                change={externalChange}
-                onLocate={() =>
-                  locateBlocks(catalogScrollRef.current, externalChange.blockIds)
-                }
-                onUndo={action(async () => {
-                  const name = authorName(externalChange.author);
-                  const outcome = await page.undoExternalChange();
-                  if (outcome === "merged")
-                    setNotice(tps("external.undone", { name }), {
-                      kind: "success",
-                    });
-                  else if (outcome === "conflict")
-                    setNotice(tps("external.undoConflict"), { kind: "warning" });
-                })}
-                onDismiss={action(page.dismissExternalChange)}
-              />
-            )}
             {view === "page" && page.draftNotice && !page.error && (
               <div className="studio-conflict" role="status" data-priority={1}>
                 <p>{page.draftNotice}</p>
@@ -4921,6 +4900,26 @@ export default function Studio() {
               </div>
             )}
             </NoticeStack>
+            {externalChange && (
+              <ExternalChangeNotice
+                key={`external-${externalChange.id}`}
+                change={externalChange}
+                onLocate={() =>
+                  locateBlocks(catalogScrollRef.current, externalChange.blockIds)
+                }
+                onUndo={action(async () => {
+                  const name = authorName(externalChange.author);
+                  const outcome = await page.undoExternalChange();
+                  if (outcome === "merged")
+                    setNotice(tps("external.undone", { name }), {
+                      kind: "success",
+                    });
+                  else if (outcome === "conflict")
+                    setNotice(tps("external.undoConflict"), { kind: "warning" });
+                })}
+                onDismiss={action(page.dismissExternalChange)}
+              />
+            )}
             <div
               ref={catalogScrollRef}
               tabIndex={view === "project" ? -1 : undefined}

@@ -1,4 +1,5 @@
-import { ProblemNotice, type ProblemDescription } from "./problems";
+import { useEffect, useRef, useState } from "react";
+import { Info, X } from "../ui/icons";
 import { useTranslator } from "../i18n/react";
 import { getLocale } from "../i18n";
 import pageSessionMessages from "../i18n/messages/pageSession";
@@ -76,7 +77,13 @@ const channelKey = {
   system: "System",
 } as const;
 
-/** 「<名称> 刚更新了这个页面的 N 处」 at the page's notice position. */
+/** Hovering or focusing the banner pauses this; leaving restarts it. */
+const AUTO_DISMISS_MS = 8000;
+
+/**
+ * 「<名称> 刚更新了这个页面的 N 处」: a one-line banner floating over the top
+ * of the page that dismisses itself unless the pointer or focus is on it.
+ */
 export function ExternalChangeNotice({
   change,
   onLocate,
@@ -87,38 +94,56 @@ export function ExternalChangeNotice({
   onLocate: () => void;
   onUndo: () => void;
   onDismiss: () => void;
-  "data-priority"?: number;
 }) {
   const t = useTranslator(pageSessionMessages);
+  const [hovered, setHovered] = useState(false);
+  const [focused, setFocused] = useState(false);
+  const dismiss = useRef(onDismiss);
+  dismiss.current = onDismiss;
+  const held = hovered || focused;
+  useEffect(() => {
+    if (held) return;
+    const timer = setTimeout(() => dismiss.current(), AUTO_DISMISS_MS);
+    return () => clearTimeout(timer);
+  }, [held]);
   const name = authorName(change.author);
   const title = t("external.title", { name, count: change.count });
-  const problem: ProblemDescription = {
-    title,
-    cause: t(change.fresh ? "external.cause" : "external.restoredCause"),
-    actions: [],
-    details: t("external.details", {
-      name,
-      channel: change.author ? channelKey[change.author.channel] : "-",
-      time: new Date(change.author?.at ?? change.at).toLocaleString(getLocale()),
-    }),
-    code: "EXTERNAL_WRITE",
-    message: title,
-    source: "page",
-    at: change.at,
-  };
+  const details = t("external.details", {
+    name,
+    channel: change.author ? channelKey[change.author.channel] : "-",
+    time: new Date(change.author?.at ?? change.at).toLocaleString(getLocale()),
+  });
   return (
-    <ProblemNotice
-      problem={problem}
-      tone="info"
-      reportable={false}
+    <div
       className="external-change-notice"
-      actions={[
-        ...(change.blockIds.length
-          ? [{ label: t("external.locate"), onSelect: onLocate, primary: true }]
-          : []),
-        { label: t("external.undo"), onSelect: onUndo },
-        { label: t("external.dismiss"), onSelect: onDismiss },
-      ]}
-    />
+      role="status"
+      onPointerEnter={() => setHovered(true)}
+      onPointerLeave={() => setHovered(false)}
+      onFocus={() => setFocused(true)}
+      onBlur={(event) => {
+        if (!event.currentTarget.contains(event.relatedTarget as Node | null))
+          setFocused(false);
+      }}
+    >
+      <Info size={14} aria-hidden className="external-change-notice-icon" />
+      <span className="external-change-notice-title" title={details}>
+        {title}
+      </span>
+      {!!change.blockIds.length && (
+        <button className="external-change-notice-action" onClick={onLocate}>
+          {t("external.locate")}
+        </button>
+      )}
+      <button className="external-change-notice-action" onClick={onUndo}>
+        {t("external.undo")}
+      </button>
+      <button
+        className="external-change-notice-close"
+        aria-label={t("external.dismiss")}
+        onClick={onDismiss}
+      >
+        <X size={13} />
+      </button>
+    </div>
   );
 }

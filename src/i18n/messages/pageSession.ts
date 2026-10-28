@@ -36,14 +36,10 @@ export default defineMessages("pageSession", {
     fileChangedBy:
       "{name} 修改了这个文件。请选择保留本地草稿，或载入文件版本。",
     "external.title": "{name} 刚更新了这个页面的 {count} 处",
-    "external.cause":
-      "修改处已短暂高亮。撤销只恢复这次写入前的内容，你的编辑会保留。",
-    "external.restoredCause":
-      "这是页面上次打开时收到的修改。撤销只恢复这次写入前的内容，你的编辑会保留。",
     "external.details": "修改者：{name}\n来源：{channel}\n写入时间：{time}",
     "external.locate": "定位修改",
-    "external.undo": "撤销此次修改",
-    "external.dismiss": "知道了",
+    "external.undo": "撤销",
+    "external.dismiss": "关闭",
     "external.undone": "已撤销 {name} 的修改",
     "external.undoConflict":
       "无法自动撤销：你也修改了同样的内容。页面保持不变，可以手动调整。",
@@ -116,14 +112,10 @@ export default defineMessages("pageSession", {
       one: "{name} just updated {count} place on this page",
       other: "{name} just updated {count} places on this page",
     },
-    "external.cause":
-      "The changes are briefly highlighted. Undo restores only what this write replaced; your own edits are kept.",
-    "external.restoredCause":
-      "This change arrived while the page was last open. Undo restores only what this write replaced; your own edits are kept.",
     "external.details": "Changed by: {name}\nSource: {channel}\nWritten at: {time}",
     "external.locate": "Show changes",
-    "external.undo": "Undo this change",
-    "external.dismiss": "Got it",
+    "external.undo": "Undo",
+    "external.dismiss": "Dismiss",
     "external.undone": "Undid the change by {name}",
     "external.undoConflict":
       "Couldn't undo automatically: you also edited the same content. The page is unchanged; adjust it by hand.",
