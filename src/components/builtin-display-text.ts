@@ -47,7 +47,7 @@ export const builtinEnglish: BuiltinDisplayText = {
   database: {
     name: "Database",
     description:
-      "Table with filters and sorting, plus board and calendar (month, week, heatmap) views.",
+      "Records with filters and sorting in saved table, board, list and calendar (month, week, heatmap) views; cells can link to pages.",
   },
   metrics: {
     name: "Key metrics",

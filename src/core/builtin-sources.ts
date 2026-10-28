@@ -144,6 +144,8 @@ import src_inline_markup_mjs from "../components/blocks/inline-markup.mjs?raw";
 import src_database_contract_mjs from "../components/blocks/database-contract.mjs?raw";
 import src_database_calendar_css from "../components/blocks/database-calendar.css?raw";
 import src_DatabaseCalendar_tsx from "../components/blocks/DatabaseCalendar.tsx?raw";
+import src_database_views_ts from "../components/blocks/database-views.ts?raw";
+import src_page_links_ts from "../components/page-links.ts?raw";
 import src_playground_contract_mjs from "../components/blocks/playground-contract.mjs?raw";
 import src_playground_css from "../components/blocks/playground.css?raw";
 import src_i18n_messages_eventTimeline_ts from "../i18n/messages/eventTimeline.ts?raw";
@@ -346,6 +348,8 @@ const sources: Record<string, string> = {
   "database-contract.mjs": src_database_contract_mjs,
   "database-calendar.css": src_database_calendar_css,
   "DatabaseCalendar.tsx": src_DatabaseCalendar_tsx,
+  "database-views.ts": src_database_views_ts,
+  "page-links.ts": src_page_links_ts,
   "playground-contract.mjs": src_playground_contract_mjs,
   "playground.css": src_playground_css,
   "i18n/messages/eventTimeline.ts": src_i18n_messages_eventTimeline_ts,
@@ -413,6 +417,7 @@ export const builtinSources: Record<string, string> = Object.fromEntries(
           : '"./capacity.mjs"',
       )
       .replaceAll('"../rich-text/', '"./rich-text/')
+      .replaceAll('"../page-links"', '"./page-links"')
       .replaceAll('"../custom/selection-bridge"', '"./custom/selection-bridge"')
       .replaceAll(
         '"../custom/useSelectionFrame"',

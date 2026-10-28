@@ -44,7 +44,7 @@ export interface ChartData extends BlockData {
   unit?: string;
 }
 export type ColumnType =
-  "text" | "number" | "select" | "checkbox" | "url" | "date";
+  "text" | "number" | "select" | "checkbox" | "url" | "date" | "page";
 export interface DatabaseColumn {
   id: string;
   name: string;
@@ -60,8 +60,21 @@ export interface DatabaseData extends BlockData {
   columns: DatabaseColumn[];
   rows: DatabaseRow[];
   groupBy?: string;
-  view?: "table" | "board" | "calendar";
+  view?: DatabaseViewType;
   calendar?: DatabaseCalendarConfig;
+  /** Named views; without them the component shows one view built from view and groupBy. */
+  views?: DatabaseView[];
+}
+export type DatabaseViewType = "table" | "board" | "list" | "calendar";
+export interface DatabaseView {
+  id: string;
+  name: string;
+  type: DatabaseViewType;
+  groupBy?: string;
+  sort?: { column: string; direction: "asc" | "desc" } | null;
+  filter?: { column: string; value: string };
+  /** Table widths in pixels by column id. */
+  columnWidths?: Record<string, number>;
 }
 /** Calendar view settings; every column id is optional and resolved against columns. */
 export interface DatabaseCalendarConfig {

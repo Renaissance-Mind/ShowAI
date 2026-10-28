@@ -814,7 +814,8 @@ export function shareBlock(kind, data, datasetId, local = []) {
 
 /** Keys that usually stay per view when a built-in block is shared. */
 export function defaultLocalKeys(kind) {
-  if (kind === "database") return ["title", "view", "groupBy", "calendar"];
+  if (kind === "database")
+    return ["title", "view", "groupBy", "calendar", "views"];
   return [];
 }
 

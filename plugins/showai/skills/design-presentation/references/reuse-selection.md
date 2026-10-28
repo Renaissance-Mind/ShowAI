@@ -20,6 +20,7 @@
 - 时间与计划：roadmap 按日期阅读泳道、负责人、依赖和里程碑（只读）；event-timeline 事件、阶段与指标曲线同轴回放；database 的 calendar 视图展示带日期的记录、打卡热力与连续天数；roadmap 只负责阅读，需要持续编辑的排期用 database 等可编辑数据。
 - 逐步展示的过程与机制：stepper 是逐步切换的外壳，步骤条一次显示一步，每一步放这一步需要的画面——一句说明加一张图、一个表格或其他组件；变化用具体的值或画面表达，不靠外壳排版。先插入 stepper（steps 里写各步标题与一句说明），再用 page_read 结构化读取（outline 中 type 为 step 的条目，或 markdown 里步骤标题后方括号内的 ID）找到各 step 的 id，以 component.insert 或 block.insert 的 parentId 指向该 step，把表格、图片或组件放进这一步。step-walkthrough 只为已有页面保留，新内容不再使用；只需按阶段给节点着色时用 flowchart stages；读者要照着执行的操作步骤用 step-guide。
 - 对照与证据：waterfall 从期初到期末的逐项增减；table、database、comparison-matrix、chart 与适配数据类型的 G2 图表；references 和 bookmark。
+- 记录集合：database 用 views 为同一组记录保存表格、看板、列表等命名视图；page 列把每条记录链接到项目里已有的页面，适合管理论文笔记、会议纪要等一组页面。几个组件要读写同一组记录时绑定共享数据，视图仍留在各自组件。
 - 补充说明：text、toggle；关键条件进入主线。
 - 参数探索：playground 用声明式公式、预设、目标差距、分项构成和加权排名，只做它公开的有限运算；专题模型按各自假设使用。
 - 空间与三维：scene-3d 用基本形体、坐标箭头、标注和参数绑定解释姿态、结构与转动；平面图能讲清时优先平面图。

@@ -3,6 +3,9 @@ export declare const DATABASE_VIEWS: readonly string[];
 export declare const CALENDAR_MODES: readonly string[];
 export declare const MAX_HEATMAP_WEEKS: number;
 export declare const MAX_SPAN_DAYS: number;
+export declare const MAX_DATABASE_VIEWS: number;
+export declare const MIN_COLUMN_WIDTH: number;
+export declare const MAX_COLUMN_WIDTH: number;
 
 export interface CalendarSettings {
   dateColumn: string;
@@ -42,6 +45,9 @@ export declare function weekdayOf(day: number): number;
 export declare function startOfWeek(day: number, weekStartsOn?: number): number;
 export declare function normalizeDate(value: unknown): string;
 export declare function parseTime(value: unknown): number | null;
+export declare function parsePageCell(
+  value: unknown,
+): { projectId: string; pageId: string } | null;
 export declare function validateDatabaseData(
   data: unknown,
 ): Record<string, unknown>;

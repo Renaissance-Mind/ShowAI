@@ -86,10 +86,11 @@
   {
     "kind": "database",
     "name": "数据库",
-    "description": "带筛选、排序和表格/看板/日历视图的数据库。单元格支持文字、数字、选择、复选框、链接和日期；日历可按月、按周（含时间轴）或以热力图查看。",
+    "description": "带筛选、排序和表格/看板/列表/日历视图的数据库，可保存多个命名视图。单元格支持文字、数字、选择、复选框、链接、日期和页面链接；日历可按月、按周（含时间轴）或以热力图查看。",
     "scenarios": [
       "整理可按字段比较的记录，例如论文的任务、方法、数据集与来源链接。",
       "跟踪有阶段状态的事项，例如待阅读、已阅读、已复现的论文清单。",
+      "把一组页面当作记录管理，例如论文笔记、会议纪要或方案文档：每行用页面属性链接到对应页面，再用状态、日期等属性筛选和分组。",
       "把带日期的事项排进月历或周历，例如一周的时间安排、会议与截止日期。",
       "用热力图统计每天的打卡或记录次数，查看连续天数，例如习惯打卡、训练记录。"
     ],
@@ -122,7 +123,15 @@
                 "type": "string"
               },
               "type": {
-                "enum": ["text", "number", "select", "checkbox", "url", "date"]
+                "enum": [
+                  "text",
+                  "number",
+                  "select",
+                  "checkbox",
+                  "url",
+                  "date",
+                  "page"
+                ]
               },
               "options": {
                 "type": "array",
@@ -150,11 +159,84 @@
           }
         },
         "groupBy": {
-          "type": "string"
+          "type": "string",
+          "description": "没有 views 时看板分组使用的 select 列。"
         },
         "view": {
-          "enum": ["table", "board", "calendar"],
-          "description": "初始视图；calendar 需要至少一个 date 列。"
+          "enum": ["table", "board", "list", "calendar"],
+          "description": "没有 views 时的初始视图；calendar 需要至少一个 date 列。"
+        },
+        "views": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 20,
+          "description": "命名视图，按顺序显示为视图标签；每个视图保存自己的类型、分组、排序、筛选与列宽。省略时由 view 和 groupBy 组成一个视图。",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$"
+              },
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 200
+              },
+              "type": {
+                "enum": ["table", "board", "list", "calendar"]
+              },
+              "groupBy": {
+                "type": "string",
+                "description": "看板分组的 select 列 id。"
+              },
+              "sort": {
+                "oneOf": [
+                  {
+                    "type": "null"
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "column": {
+                        "type": "string"
+                      },
+                      "direction": {
+                        "enum": ["asc", "desc"]
+                      }
+                    },
+                    "required": ["column", "direction"],
+                    "additionalProperties": false
+                  }
+                ]
+              },
+              "filter": {
+                "type": "object",
+                "properties": {
+                  "column": {
+                    "type": "string"
+                  },
+                  "value": {
+                    "type": "string"
+                  }
+                },
+                "required": ["column", "value"],
+                "additionalProperties": false,
+                "description": "只显示该列等于 value 的记录。"
+              },
+              "columnWidths": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "integer",
+                  "minimum": 80,
+                  "maximum": 1200
+                },
+                "description": "表格列宽（像素），键是列 id。"
+              }
+            },
+            "required": ["id", "name", "type"],
+            "additionalProperties": false
+          }
         },
         "calendar": {
           "type": "object",
@@ -1145,14 +1227,97 @@
             "initialDate": "2026-10-14"
           }
         }
+      },
+      {
+        "name": "论文阅读清单",
+        "request": "整理正在读的论文：表格里对比方法和数据集，另建一个按阅读状态分组的看板。",
+        "data": {
+          "title": "论文阅读清单",
+          "columns": [
+            {
+              "id": "name",
+              "name": "论文",
+              "type": "text"
+            },
+            {
+              "id": "status",
+              "name": "状态",
+              "type": "select",
+              "options": ["待读", "在读", "已读"]
+            },
+            {
+              "id": "method",
+              "name": "方法",
+              "type": "text"
+            },
+            {
+              "id": "dataset",
+              "name": "数据集",
+              "type": "text"
+            },
+            {
+              "id": "source",
+              "name": "来源",
+              "type": "url"
+            }
+          ],
+          "rows": [
+            {
+              "id": "attention",
+              "name": "Attention Is All You Need",
+              "status": "已读",
+              "method": "Transformer",
+              "dataset": "WMT 2014",
+              "source": "https://arxiv.org/abs/1706.03762"
+            },
+            {
+              "id": "bert",
+              "name": "BERT",
+              "status": "在读",
+              "method": "掩码语言模型预训练",
+              "dataset": "GLUE",
+              "source": "https://arxiv.org/abs/1810.04805"
+            },
+            {
+              "id": "vit",
+              "name": "An Image Is Worth 16x16 Words",
+              "status": "待读",
+              "method": "Vision Transformer",
+              "dataset": "ImageNet",
+              "source": "https://arxiv.org/abs/2010.11929"
+            }
+          ],
+          "views": [
+            {
+              "id": "compare",
+              "name": "方法对比",
+              "type": "table",
+              "sort": {
+                "column": "status",
+                "direction": "asc"
+              },
+              "columnWidths": {
+                "name": 240,
+                "method": 200
+              }
+            },
+            {
+              "id": "progress",
+              "name": "阅读进度",
+              "type": "board",
+              "groupBy": "status"
+            }
+          ]
+        }
       }
     ],
-    "version": "1.1.0",
+    "version": "1.2.0",
     "effects": [
       "让读者筛选、排序和搜索一组记录，检查具体证据。",
-      "同一份数据可切换表格或看板，分别呈现属性对比和状态分组。",
+      "同一份数据可保存多个命名视图，在表格、看板与列表间切换，分别呈现属性对比、状态分组和简洁清单。",
       "日期记录可在月历、周时间轴和热力图之间切换，按类别着色，标出今天，点开记录查看与编辑。",
-      "热力图统计每天的记录或已完成数，给出当前连续、最长连续与活跃天数。"
+      "热力图统计每天的记录或已完成数，给出当前连续、最长连续与活跃天数。",
+      "页面属性把记录链接到项目里的页面，点击即可打开对应页面。"
     ]
   },
   {

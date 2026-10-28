@@ -1140,10 +1140,11 @@
       "boundaries": ["可用于不同主题；替换内容必须符合公开数据关系与输入约束。"]
     },
     "usage": {
-      "purpose": "带筛选、排序和表格/看板/日历视图的数据库。单元格支持文字、数字、选择、复选框、链接和日期；日历可按月、按周（含时间轴）或以热力图查看。",
+      "purpose": "带筛选、排序和表格/看板/列表/日历视图的数据库，可保存多个命名视图。单元格支持文字、数字、选择、复选框、链接、日期和页面链接；日历可按月、按周（含时间轴）或以热力图查看。",
       "structure": [
         "columns.id 对应 rows 中的字段键，rows[].id 稳定标识记录；groupBy 选择看板分组的选择列。",
-        "日历读取 date 列（YYYY-MM-DD）；calendar 指定开始/结束日期、时间、颜色和完成标记列，view 决定初始视图。"
+        "日历读取 date 列（YYYY-MM-DD）；calendar 指定开始/结束日期、时间、颜色和完成标记列，view 决定初始视图。",
+        "views 保存命名视图，每个视图有自己的类型、分组、排序、筛选与表格列宽；省略 views 时由 view 和 groupBy 组成唯一视图。"
       ],
       "inputs": [
         {
@@ -1152,7 +1153,7 @@
         },
         {
           "path": "columns",
-          "meaning": "列定义：唯一 id、显示 name、type=text/number/select/checkbox/url/date。select 列用 options 给出候选值；date 列的值是 YYYY-MM-DD 或空字符串。"
+          "meaning": "列定义：唯一 id、显示 name、type=text/number/select/checkbox/url/date/page。select 列用 options 给出候选值；date 列的值是 YYYY-MM-DD 或空字符串；page 列的值是 showai://project/PROJECT/page/PAGE 页面链接或空字符串。"
         },
         {
           "path": "rows",
@@ -1160,11 +1161,23 @@
         },
         {
           "path": "groupBy",
-          "meaning": "看板分组列的 id，必须对应 select 列；未指定或无效时使用第一列 select。"
+          "meaning": "没有 views 时看板分组列的 id，必须对应 select 列；未指定或无效时使用第一列 select。"
         },
         {
           "path": "view",
-          "meaning": "可选初始视图 table/board/calendar；calendar 需要至少一个 date 列。读者仍可切换视图。"
+          "meaning": "没有 views 时的初始视图 table/board/list/calendar；calendar 需要至少一个 date 列。读者仍可切换视图。"
+        },
+        {
+          "path": "views",
+          "meaning": "1–20 个命名视图，按顺序显示为视图标签；只有一个视图时不显示标签。每项有唯一 id（字母、数字、_、-）、name 和 type。写入 views 后 view 与 groupBy 不再使用。"
+        },
+        {
+          "path": "views[].groupBy / sort / filter",
+          "meaning": "看板分组的 select 列；排序 {column, direction: asc|desc}；筛选 {column, value}，只显示该列等于 value 的记录。引用已删除的列时忽略该设置。"
+        },
+        {
+          "path": "views[].columnWidths",
+          "meaning": "表格列宽，键为列 id，值为 80–1200 的整数像素；未列出的列自动宽度。"
         },
         {
           "path": "calendar.dateColumn / endDateColumn",
@@ -1197,6 +1210,21 @@
           "exampleIndex": 0
         },
         {
+          "title": "多个视图",
+          "steps": [
+            "在 views 中为同一组记录建立不同视图，例如按状态排序的表格和按状态分组的看板；视图名称写读者能理解的用途。",
+            "需要固定较宽的列时在 columnWidths 中给出像素宽度，其余列保持自动。"
+          ],
+          "exampleIndex": 3
+        },
+        {
+          "title": "管理一组页面",
+          "steps": [
+            "先确认页面已存在并取得 projectId 与 pageId，添加 type=page 的列，单元格写 showai://project/PROJECT/page/PAGE。",
+            "其余属性记录状态、日期、负责人等；读者点击页面单元格打开对应页面。组件不会创建页面，也不会随页面删除而改动记录。"
+          ]
+        },
+        {
           "title": "周历或月历",
           "steps": [
             "添加 date 列并填 YYYY-MM-DD；需要时间轴时添加两个 text 列写 HH:MM，在 calendar 中指向它们。",
@@ -1222,8 +1250,23 @@
       ],
       "interactions": [
         {
-          "action": "切换视图、日历模式与翻页",
-          "effect": "在表格、看板、日历（月/周/热力图）之间切换，前后翻月、翻周或翻区间，回到今天。",
+          "action": "切换视图标签、视图类型、日历模式与翻页",
+          "effect": "在命名视图之间切换；在视图与筛选菜单中把当前视图切换为表格、看板、列表或日历，前后翻页、翻月或翻周。",
+          "persistence": "view"
+        },
+        {
+          "action": "排序、筛选、分组与调整列宽",
+          "effect": "可编辑时写入当前视图并随页面保存；只读阅读时只改变读者自己的显示。",
+          "persistence": "content"
+        },
+        {
+          "action": "管理视图与属性（可编辑时）",
+          "effect": "在视图与筛选菜单新建、重命名或删除视图；在表头末尾的加号添加属性；拖动表头或按 Alt+Shift+左右方向键调整属性顺序；拖动表头右缘调整列宽，双击恢复自动宽度。",
+          "persistence": "content"
+        },
+        {
+          "action": "点击页面单元格",
+          "effect": "打开链接的页面；可编辑时从当前项目的页面中选择链接目标。",
           "persistence": "view"
         },
         {
@@ -1252,7 +1295,9 @@
         "仅使用数字列的示例不会产生有意义的状态看板；分组需要选择列。",
         "date 单元格只接受合法的 YYYY-MM-DD 或空字符串；calendar 引用的列必须存在且类型匹配。",
         "搜索与筛选同样作用于日历和热力图；没有日期的记录不进入日历，会在下方提示数量。",
-        "容器宽度不足 560px 时月历和周历改为按天的日程列表；打印时附带完整日程列表。"
+        "容器宽度不足 560px 时月历和周历改为按天的日程列表；打印时附带完整日程列表。",
+        "page 单元格只接受 showai://project/PROJECT/page/PAGE 或空字符串；页面标题在工作台中读取，离线导出中显示为链接的页面。",
+        "几个组件共享同一份数据时，views、view、groupBy、calendar 和 title 留在各自组件里，记录与属性共享。"
       ],
       "editing": {
         "data": [
@@ -1274,6 +1319,10 @@
           "purpose": "日历视图：月历、周列表/时间轴、热力图与记录详情。"
         },
         {
+          "path": "src/components/blocks/database-views.ts",
+          "purpose": "命名视图：旧数据的单视图、视图修改、列顺序、列宽和删除属性后的视图清理。"
+        },
+        {
           "path": "src/components/blocks/database-contract.mjs",
           "purpose": "数据库校验与日期计算（记录展开、时间分道、热力图与连续天数），工作台、CLI 与离线阅读共用。"
         },
@@ -1283,24 +1332,26 @@
         }
       ],
       "architecture": [
-        "DatabaseBlock 以稳定列/行 ID 组织数据；过滤、排序与看板视图使用本地阅读状态。",
+        "DatabaseBlock 以稳定列/行 ID 组织数据；视图设置保存在 views，可编辑时写入当前视图，只读时作为读者自己的阅读状态。",
         "页面实例保存源数据；阅读状态与正式编辑回传分别维护。",
         "日历只接收已搜索、筛选后的行；日期按 UTC 日序号计算，今天取读者本地日期。日历列选择与模式是阅读状态，初始值来自 calendar。"
       ],
       "extensionPoints": [
-        "增加列类型需更新编辑控件、校验（database-contract.mjs）、排序与导出；分组依赖 select 列。",
+        "增加列类型需更新编辑控件、校验（database-contract.mjs）、排序与导出；分组依赖 select 列，页面列的搜索、筛选和排序按页面标题进行。",
         "新增日历模式时在 CALENDAR_MODES 与 i18n 中登记，并保留窄屏日程列表和打印输出。"
       ],
       "invariants": [
         "保留原始输入与稳定 ID，明确区分源数据、派生值和阅读状态。",
         "保持只读模式不写入源内容，沿用宿主的菜单与交互边界。",
-        "修改属性时同步清理 calendar 中失效的列引用；把列改为 date 时无法识别的旧值清空。"
+        "修改属性时同步清理 calendar 中失效的列引用；把列改为 date 时无法识别的旧值清空。",
+        "修改属性时同步清理 views 中失效的分组、排序、筛选和列宽引用。"
       ],
       "verification": [
         "把最小示例放入真实 Page，核对内容、图像与关键交互。",
         "替换一组任务数据，核对边界、空数据、单位与派生结果。",
         "核对编辑保存、只读阅读与离线导出；升级时保留旧版本和引用。",
-        "日历：检查月/周/热力图、跨月翻页、今天标记、窄屏日程列表、深色主题与只读模式不写入。"
+        "日历：检查月/周/热力图、跨月翻页、今天标记、窄屏日程列表、深色主题与只读模式不写入。",
+        "视图：检查多个视图切换、列表视图、拖动排序和列宽、只读模式下的排序不写入，以及页面单元格在工作台和离线导出中的打开行为。"
       ]
     }
   },

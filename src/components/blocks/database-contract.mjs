@@ -16,14 +16,28 @@ export const DATABASE_COLUMN_TYPES = [
   "checkbox",
   "url",
   "date",
+  "page",
 ];
-export const DATABASE_VIEWS = ["table", "board", "calendar"];
+export const DATABASE_VIEWS = ["table", "board", "list", "calendar"];
+export const MAX_DATABASE_VIEWS = 20;
+export const MIN_COLUMN_WIDTH = 80;
+export const MAX_COLUMN_WIDTH = 1200;
 export const CALENDAR_MODES = ["month", "week", "heatmap"];
 export const MAX_HEATMAP_WEEKS = 53;
 // A record spanning longer than this is drawn on its first day only.
 export const MAX_SPAN_DAYS = 366;
 
 const DAY_MS = 86400000;
+const ID = /^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/;
+// The same form as portable/page-link.mjs, without block targets.
+const PAGE_LINK =
+  /^showai:\/\/project\/([A-Za-z0-9][A-Za-z0-9_-]{0,127})\/page\/([A-Za-z0-9][A-Za-z0-9_-]{0,127})$/;
+
+/** The project and page a page cell links to, or null for empty or invalid values. */
+export function parsePageCell(value) {
+  const match = typeof value === "string" ? PAGE_LINK.exec(value) : null;
+  return match ? { projectId: match[1], pageId: match[2] } : null;
+}
 
 /** ISO calendar day (YYYY-MM-DD) to a whole day number, or null when invalid. */
 export function parseDay(value) {
@@ -138,7 +152,90 @@ function validateCalendar(calendar, columns) {
       fail(`calendar.${key} is not a supported setting.`);
 }
 
-/** Validate database data; old data without date columns or calendar settings stays valid. */
+function validateViews(views) {
+  if (
+    !Array.isArray(views) ||
+    views.length < 1 ||
+    views.length > MAX_DATABASE_VIEWS
+  )
+    fail(`views must be an array of 1 to ${MAX_DATABASE_VIEWS} views.`);
+  const seen = new Set();
+  const reference = (value, path) => {
+    if (typeof value !== "string" || value.length > 200)
+      fail(`${path} must be a column id, at most 200 characters.`);
+  };
+  for (const [index, view] of views.entries()) {
+    const path = `views[${index}]`;
+    if (!isObject(view)) fail(`${path} must be an object.`);
+    for (const key of Object.keys(view))
+      if (
+        ![
+          "id",
+          "name",
+          "type",
+          "groupBy",
+          "sort",
+          "filter",
+          "columnWidths",
+        ].includes(key)
+      )
+        fail(`${path}.${key} is not a supported setting.`);
+    if (typeof view.id !== "string" || !ID.test(view.id))
+      fail(`${path}.id must be letters, digits, _ or -, at most 128.`);
+    if (seen.has(view.id)) fail(`views contains duplicate id ${view.id}.`);
+    seen.add(view.id);
+    if (
+      typeof view.name !== "string" ||
+      !view.name.trim() ||
+      view.name.length > 200
+    )
+      fail(`${path}.name must be non-empty text, at most 200 characters.`);
+    if (!DATABASE_VIEWS.includes(view.type))
+      fail(`${path}.type must be one of ${DATABASE_VIEWS.join(", ")}.`);
+    if (view.groupBy !== undefined) reference(view.groupBy, `${path}.groupBy`);
+    if (view.sort !== undefined && view.sort !== null) {
+      if (
+        !isObject(view.sort) ||
+        Object.keys(view.sort).some(
+          (key) => key !== "column" && key !== "direction",
+        ) ||
+        !["asc", "desc"].includes(view.sort.direction)
+      )
+        fail(`${path}.sort must be {column, direction: asc|desc} or null.`);
+      reference(view.sort.column, `${path}.sort.column`);
+    }
+    if (view.filter !== undefined) {
+      if (
+        !isObject(view.filter) ||
+        Object.keys(view.filter).some(
+          (key) => key !== "column" && key !== "value",
+        ) ||
+        typeof view.filter.value !== "string" ||
+        view.filter.value.length > 10000
+      )
+        fail(`${path}.filter must be {column, value} with text values.`);
+      reference(view.filter.column, `${path}.filter.column`);
+    }
+    if (view.columnWidths !== undefined) {
+      if (!isObject(view.columnWidths))
+        fail(`${path}.columnWidths must map column ids to widths.`);
+      const entries = Object.entries(view.columnWidths);
+      if (entries.length > 50)
+        fail(`${path}.columnWidths names at most 50 columns.`);
+      for (const [column, width] of entries)
+        if (
+          !Number.isInteger(width) ||
+          width < MIN_COLUMN_WIDTH ||
+          width > MAX_COLUMN_WIDTH
+        )
+          fail(
+            `${path}.columnWidths.${column} must be an integer from ${MIN_COLUMN_WIDTH} to ${MAX_COLUMN_WIDTH}.`,
+          );
+    }
+  }
+}
+
+/** Validate database data; old data without date columns, page columns or views stays valid. */
 export function validateDatabaseData(data) {
   if (!isObject(data)) fail("Component data must be an object.");
   for (const key of ["title", "description", "groupBy"])
@@ -179,6 +276,7 @@ export function validateDatabaseData(data) {
       fail(`${path}.options must be an array of at most 200 texts.`);
   }
   const dateColumns = columns.filter((column) => column.type === "date");
+  const pageColumns = columns.filter((column) => column.type === "page");
   for (const [index, row] of list("rows", 5000).entries()) {
     for (const [key, value] of Object.entries(row))
       if (!["string", "number", "boolean"].includes(typeof value))
@@ -188,7 +286,15 @@ export function validateDatabaseData(data) {
       if (value !== undefined && value !== "" && parseDay(value) === null)
         fail(`rows[${index}].${column.id} must be a YYYY-MM-DD date or empty.`);
     }
+    for (const column of pageColumns) {
+      const value = row[column.id];
+      if (value !== undefined && value !== "" && !parsePageCell(value))
+        fail(
+          `rows[${index}].${column.id} must be a showai://project/PROJECT/page/PAGE link or empty.`,
+        );
+    }
   }
+  if (data.views !== undefined) validateViews(data.views);
   if (data.view !== undefined && !DATABASE_VIEWS.includes(data.view))
     fail(`view must be one of ${DATABASE_VIEWS.join(", ")}.`);
   if (data.calendar !== undefined) validateCalendar(data.calendar, columns);
