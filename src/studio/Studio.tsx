@@ -177,6 +177,8 @@ import TemplateThumbnail from "./TemplateThumbnail";
 import RecentPages, { recentPages } from "./RecentPages";
 import Welcome from "./Welcome";
 import PluginUpdateNotice from "./PluginUpdateNotice";
+import AppUpdateNotice from "./AppUpdateNotice";
+import { useAppUpdate } from "./useAppUpdate";
 import {
   BuiltinDocPage,
   DocsNavigation,
@@ -562,6 +564,7 @@ export default function Studio() {
       ? "settings"
       : "projects",
   );
+  const appUpdate = useAppUpdate();
   const [settingsSection, setSettingsSection] = useState<SettingsSection>(() =>
     new URLSearchParams(location.search).has("invite") || !capabilities.manageLibrary
       ? "sync" : "general",
@@ -5432,6 +5435,11 @@ export default function Studio() {
           </main>
           </AssistantWorkbench>
         </AutoHideSidebar>
+        <AppUpdateNotice
+          state={appUpdate.state}
+          run={appUpdate.run}
+          hidden={view === "settings" && settingsSection === "about"}
+        />
         <PluginUpdateNotice
           home={
             info && info.mode !== "browser" && capabilities.localPlugins
@@ -5439,7 +5447,9 @@ export default function Studio() {
               : null
           }
           // Settings → Plugins and the welcome list the same hosts with their own actions.
+          // A downloaded App update brings its own plugin, so it is offered after the restart.
           hidden={
+            appUpdate.state?.phase === "ready" ||
             (view === "settings" && settingsSection === "plugins") ||
             (view === "docs" && docPage?.id === WELCOME_DOC) ||
             (view === "projects" && workspaceReady && welcoming && !showDocs)

@@ -1,4 +1,5 @@
 import type {
+  AppUpdateState,
   CloseReport,
   CloseResult,
   CloseSource,
@@ -39,6 +40,7 @@ export interface DesktopBridge {
   onTabCommand?(listener: (command: TabCommand) => void): () => void;
   onRefreshPage?(listener: () => void): () => void;
   onMenuCommand?(listener: (command: MenuCommand) => void): () => void;
+  onAppUpdate?(listener: (state: AppUpdateState) => void): () => void;
   logPath?(): Promise<string>;
   openLogFolder?(): Promise<void>;
   diagnostics?(): Promise<string>;
@@ -93,6 +95,9 @@ export const desktop = {
   },
   onMenuCommand(listener: (command: MenuCommand) => void) {
     return window.showai?.onMenuCommand?.(listener) ?? (() => {});
+  },
+  onAppUpdate(listener: (state: AppUpdateState) => void) {
+    return window.showai?.onAppUpdate?.(listener) ?? (() => {});
   },
   /** `source` names this part of the window when it refuses to close. */
   onBeforeClose(listener: () => Promise<CloseResult>, source?: CloseSource) {

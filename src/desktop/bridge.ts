@@ -40,6 +40,27 @@ export interface DesktopInfo {
   versions?: { node: string; electron?: string; chrome?: string };
 }
 
+/** In-app updates of release builds; development and source builds are unsupported. */
+export interface AppUpdateState {
+  supported: boolean;
+  /** Check and download in the background; off leaves checking to the person. */
+  automatic: boolean;
+  currentVersion: string;
+  phase:
+    | "idle"
+    | "checking"
+    | "current"
+    | "available"
+    | "downloading"
+    | "ready"
+    | "failed";
+  /** The newer version being offered, downloaded or ready to install. */
+  version?: string;
+  percent?: number;
+  checkedAt?: string;
+  error?: string;
+}
+
 /** Native menu items the workbench carries out with its existing actions. */
 export type MenuCommand =
   | "newProject"
@@ -193,6 +214,8 @@ export interface ShowAIBridge {
   onTabCommand?(listener: (command: TabCommand) => void): () => void;
   onRefreshPage?(listener: () => void): () => void;
   onMenuCommand?(listener: (command: MenuCommand) => void): () => void;
+  /** Desktop: state changes of in-app updates, pushed to every window. */
+  onAppUpdate?(listener: (state: AppUpdateState) => void): () => void;
   /** Desktop only: the main-process log and its folder. */
   logPath?(): Promise<string>;
   openLogFolder?(): Promise<void>;

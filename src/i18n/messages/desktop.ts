@@ -5,6 +5,7 @@ export default defineMessages("desktop", {
   "zh-CN": {
     "login.libraryClosed": "请先打开 ShowAI 内容库，再完成登录。",
     "menu.about": "关于 ShowAI",
+    "menu.checkForUpdates": "检查更新…",
     "menu.services": "服务",
     "menu.hide": "隐藏 ShowAI",
     "menu.hideOthers": "隐藏其他",
@@ -140,6 +141,7 @@ export default defineMessages("desktop", {
   en: {
     "login.libraryClosed": "Open a ShowAI library before finishing sign-in.",
     "menu.about": "About ShowAI",
+    "menu.checkForUpdates": "Check for Updates…",
     "menu.services": "Services",
     "menu.hide": "Hide ShowAI",
     "menu.hideOthers": "Hide Others",

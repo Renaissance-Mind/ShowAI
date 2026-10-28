@@ -17,12 +17,14 @@ import {
   Flag,
   FolderOpen,
   Info,
+  Loader2,
 } from "../../ui/icons";
 import { desktop, errorMessage } from "../bridge";
 import { workbenchCapabilities } from "../capabilities";
 import { verifyState } from "../PluginInstallSettings";
 import type { ReportProblemDetail } from "../problems/report-event";
 import { pluginHostNames, usePluginHosts } from "../usePluginHosts";
+import { useAppUpdate } from "../useAppUpdate";
 import { AGENT_TROUBLESHOOTING } from "../AgentReadiness";
 import {
   modeLine,
@@ -99,6 +101,89 @@ function InfoRow({ label, value }: { label: string; value: string }) {
         </button>
       </dd>
     </div>
+  );
+}
+
+/** Release builds: the update state with its next step, and automatic updates. */
+function UpdateRows() {
+  const t = useTranslator(messages);
+  const { state, run } = useAppUpdate();
+  const [failure, setFailure] = useState<string>();
+  if (!state?.supported) return null;
+  const act = (...args: Parameters<typeof run>) => {
+    setFailure(undefined);
+    void run(...args).catch((reason: unknown) =>
+      setFailure(errorMessage(reason)),
+    );
+  };
+  const busy = state.phase === "checking" || state.phase === "downloading";
+  const text =
+    state.phase === "checking"
+      ? t("update.checking")
+      : state.phase === "current"
+        ? t("update.current", { time: timeText(state.checkedAt!) })
+        : state.phase === "available"
+          ? t("update.available", { version: state.version! })
+          : state.phase === "downloading"
+            ? t("update.downloading", {
+                version: state.version!,
+                percent: String(state.percent ?? 0),
+              })
+            : state.phase === "ready"
+              ? t("update.ready", { version: state.version! })
+              : state.phase === "failed"
+                ? t("update.failed", { message: state.error! })
+                : t("update.idle");
+  const button =
+    state.phase === "available"
+      ? { label: t("update.download"), action: "appUpdate:download" as const }
+      : state.phase === "ready"
+        ? { label: t("update.restart"), action: "appUpdate:install" as const }
+        : { label: t("update.check"), action: "appUpdate:check" as const };
+  return (
+    <>
+      <div className="settings-row feedback-info-row feedback-update-row">
+        <dt>{t("update.title")}</dt>
+        <dd>
+          <span
+            className={state.phase === "failed" ? "feedback-error" : undefined}
+            role={state.phase === "failed" ? "alert" : "status"}
+          >
+            {failure ? t("update.failed", { message: failure }) : text}
+          </span>
+          {!busy ? (
+            <button
+              type="button"
+              className={`settings-button${state.phase === "ready" ? " feedback-primary" : ""}`}
+              onClick={() => act(button.action)}
+            >
+              {button.label}
+            </button>
+          ) : (
+            <Loader2 size={14} className="studio-spin" aria-hidden="true" />
+          )}
+        </dd>
+      </div>
+      <div className="settings-row feedback-info-row">
+        <dt>
+          <label htmlFor="feedback-auto-update">{t("update.automatic")}</label>
+        </dt>
+        <dd>
+          <input
+            id="feedback-auto-update"
+            type="checkbox"
+            role="switch"
+            className="settings-switch"
+            checked={state.automatic}
+            onChange={(event) =>
+              act("appUpdate:setAutomatic", {
+                automatic: event.target.checked,
+              })
+            }
+          />
+        </dd>
+      </div>
+    </>
   );
 }
 
@@ -281,6 +366,7 @@ export function AboutFeedback({
         <h2 id="feedback-info-title">{t("info.title")}</h2>
         <dl>
           <InfoRow label={t("info.version")} value={versionLine(info)} />
+          {info?.mode !== "browser" && <UpdateRows />}
           <InfoRow label={t("info.platform")} value={platformLine(info)} />
           <InfoRow label={t("info.runtime")} value={runtimeLine(info)} />
           <InfoRow

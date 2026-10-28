@@ -1,6 +1,7 @@
 import { contextBridge, ipcRenderer } from "electron";
 import type { TabCommand } from "../workbench/tab-shortcuts";
 import {
+  type AppUpdateState,
   type CloseResult,
   type CloseSource,
   type DesktopChange,
@@ -153,6 +154,14 @@ if (process.isMainFrame) {
       // Commands chosen while this window was starting are delivered now.
       ipcRenderer.send("showai:menu-ready");
       return () => ipcRenderer.removeListener("showai:menu-command", receive);
+    },
+    onAppUpdate(listener) {
+      const receive = (
+        _event: Electron.IpcRendererEvent,
+        state: AppUpdateState,
+      ) => listener(state);
+      ipcRenderer.on("showai:app-update", receive);
+      return () => ipcRenderer.removeListener("showai:app-update", receive);
     },
     logPath() {
       return ipcRenderer.invoke("logs:path");

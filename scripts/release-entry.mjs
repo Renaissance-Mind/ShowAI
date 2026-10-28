@@ -2,7 +2,9 @@
 // Release notes and public-entry consistency for README, docs, the app welcome copy and the homepage.
 //   node scripts/release-entry.mjs notes --headline TEXT [--changes FILE.json] [--notarized] [--media URL] [--source SHA] [--out FILE]
 //   node scripts/release-entry.mjs check [--online] [--homepage DIR]
+//   node scripts/release-entry.mjs assets DIR [--version X.Y.Z]
 import { execFileSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import { existsSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -85,6 +87,58 @@ function filesUnder(dir, pattern) {
     .filter((path) => pattern.test(path) && !/node_modules|\/dist\//.test(path) && statSync(path).isFile());
 }
 
+// Files a macOS release uploads. The App's in-app updater reads latest-mac.yml and downloads the ZIP,
+// using the blockmap for differential downloads; a release without them leaves installed Apps behind.
+export function releaseAssetNames(version) {
+  const base = `ShowAI-${version}-arm64`;
+  return [`${base}.dmg`, `${base}.zip`, `${base}.zip.blockmap`, "latest-mac.yml", "SHA256SUMS.txt"];
+}
+
+// Versions before 0.10.1 shipped without the in-app updater, so their releases carry no update feed.
+const updaterSince = [0, 10, 1];
+function hasUpdater(version) {
+  const parts = version.split(/[.-]/).slice(0, 3).map(Number);
+  for (let index = 0; index < 3; index++)
+    if (parts[index] !== updaterSince[index]) return parts[index] > updaterSince[index];
+  return true;
+}
+
+// The files electron-builder lists in latest-mac.yml: url, base64 sha512 and size.
+export function parseUpdateFeed(text) {
+  const version = text.match(/^version:\s*['"]?([^'"\s]+)/m)?.[1];
+  const files = [...text.matchAll(/^\s*- url:\s*(\S+)\n\s+sha512:\s*(\S+)\n\s+size:\s*(\d+)/gm)].map(
+    ([, url, sha512, size]) => ({ url, sha512, size: Number(size) }),
+  );
+  return { version, path: text.match(/^path:\s*(\S+)/m)?.[1], files };
+}
+
+// Checks a release folder before upload; writes SHA256SUMS.txt when it is missing.
+export function checkReleaseAssets(dir, version) {
+  const errors = [];
+  const [dmg, zip, blockmap, feedName, sumsName] = releaseAssetNames(version);
+  for (const name of [dmg, zip, blockmap, feedName])
+    if (!existsSync(join(dir, name))) errors.push(`${name} is missing from ${dir}`);
+  if (errors.length) return { errors, files: [] };
+  const digest = (name, algorithm, encoding) =>
+    createHash(algorithm).update(readFileSync(join(dir, name))).digest(encoding);
+  const feed = parseUpdateFeed(readFileSync(join(dir, feedName), "utf8"));
+  if (feed.version !== version) errors.push(`${feedName} names version ${feed.version}, expected ${version}`);
+  if (feed.path !== zip) errors.push(`${feedName} points the updater at ${feed.path}, expected ${zip}`);
+  if (!feed.files.some((file) => file.url === zip)) errors.push(`${feedName} does not list ${zip}`);
+  for (const file of feed.files) {
+    if (!existsSync(join(dir, file.url))) {
+      errors.push(`${feedName} lists ${file.url}, which is not in ${dir}`);
+      continue;
+    }
+    if (statSync(join(dir, file.url)).size !== file.size) errors.push(`${file.url}: size differs from ${feedName}`);
+    if (digest(file.url, "sha512", "base64") !== file.sha512) errors.push(`${file.url}: sha512 differs from ${feedName}; rebuild instead of re-signing the ZIP`);
+  }
+  const sums = [dmg, zip].map((name) => `${digest(name, "sha256", "hex")}  ${name}`).join("\n") + "\n";
+  if (!existsSync(join(dir, sumsName))) writeFileSync(join(dir, sumsName), sums);
+  else if (readFileSync(join(dir, sumsName), "utf8") !== sums) errors.push(`${sumsName} does not match ${dmg} and ${zip}`);
+  return { errors, files: releaseAssetNames(version).map((name) => join(dir, name)) };
+}
+
 // Returns { errors, warnings } for the files in this repository (and an optional homepage checkout).
 export function checkLocalEntries(root, { homepage } = {}) {
   const errors = [];
@@ -135,7 +189,8 @@ export async function checkOnlineEntries(version) {
     if (newest.prerelease) warnings.push(`${newest.tag_name} is a pre-release, so ${LATEST} opens the release list instead of this release`);
     const assets = new Set(newest.assets.map((asset) => asset.name));
     const tagVersion = newest.tag_name.replace(/^v/, "");
-    for (const name of [`ShowAI-${tagVersion}-arm64.dmg`, "SHA256SUMS.txt"])
+    const required = hasUpdater(tagVersion) ? releaseAssetNames(tagVersion) : [`ShowAI-${tagVersion}-arm64.dmg`, "SHA256SUMS.txt"];
+    for (const name of required)
       if (!assets.has(name)) errors.push(`${newest.tag_name}: missing asset ${name}`);
     for (const wanted of [ENTRY_COPY.en.tagline, "docs/quick-start.md"])
       if (!newest.body?.includes(wanted)) errors.push(`${newest.tag_name} notes: missing “${wanted}”`);
@@ -197,7 +252,16 @@ async function main(args) {
     console.log(errors.length ? `${errors.length} public-entry problem(s)` : "Public entries are consistent.");
     return errors.length ? 1 : 0;
   }
-  console.error("Usage: release-entry.mjs notes --headline TEXT [--changes FILE.json] [--notarized] [--media URL] [--source SHA] [--out FILE]\n       release-entry.mjs check [--online] [--homepage DIR]");
+  if (command === "assets") {
+    const dir = args[1];
+    if (!dir || dir.startsWith("--")) throw new Error("assets needs the release folder");
+    const { errors, files } = checkReleaseAssets(resolve(dir), option(args, "--version") ?? version);
+    for (const error of errors) console.error(`error: ${error}`);
+    if (errors.length) return 1;
+    console.log(`Upload all of these to the GitHub release:\n${files.join("\n")}`);
+    return 0;
+  }
+  console.error("Usage: release-entry.mjs notes --headline TEXT [--changes FILE.json] [--notarized] [--media URL] [--source SHA] [--out FILE]\n       release-entry.mjs check [--online] [--homepage DIR]\n       release-entry.mjs assets DIR [--version X.Y.Z]");
   return 2;
 }
 

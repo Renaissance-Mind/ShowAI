@@ -51,6 +51,7 @@ import { localMediaResponse } from "../workbench/local-media";
 import { LOCAL_MEDIA_SCHEME } from "../components/custom/local-media-link";
 import { tabShortcut } from "../workbench/tab-shortcuts";
 import { MenuCommandQueue } from "./menu-queue";
+import { AppUpdates } from "./app-updates";
 import { windowQuery, type WindowTarget } from "../workbench/window-target";
 import { parsePageLink } from "../portable/page-link.mjs";
 import { AgentService, errorResult } from "../agent/service";
@@ -121,6 +122,7 @@ let store: FileStore;
 let service: AgentService;
 let agentHost: AgentHost;
 let pluginInstaller: DesktopPluginInstaller;
+let appUpdates: AppUpdates | undefined;
 let remoteConnector: RemoteMacConnector;
 let watcher: LibraryWatcher | undefined;
 let sources: ReturnType<typeof watchDatasetSources> | undefined;
@@ -282,6 +284,20 @@ function info(): DesktopInfo {
   };
 }
 
+function updateLine(): string {
+  const state = appUpdates?.status();
+  if (!state?.supported) return "unavailable in this build";
+  return [
+    state.automatic ? "automatic" : "manual",
+    state.phase,
+    state.version,
+    state.checkedAt && `checked ${state.checkedAt}`,
+    state.error,
+  ]
+    .filter(Boolean)
+    .join(" · ");
+}
+
 /** Plain-text environment summary for problem reports; paths are redacted. */
 function diagnostics(extra: string[] = []): string {
   const lines = [
@@ -293,6 +309,7 @@ function diagnostics(extra: string[] = []): string {
     `Library: ${store ? store.root : "(not open)"}`,
     `Log: ${mainLog.path}`,
     `Page previews: ${JSON.stringify(pagePreviewStatus())}`,
+    `Updates: ${updateLine()}`,
     ...extra,
   ];
   return redactLogText(lines.join("\n"), homedir());
@@ -419,6 +436,8 @@ interface DesktopSettings {
   home?: string;
   /** Last workbench language, so native menus match it before a window loads. */
   locale?: Locale;
+  /** In-app updates check and download in the background unless turned off. */
+  autoUpdate?: boolean;
 }
 
 class InvalidSettings extends Error {}
@@ -433,7 +452,7 @@ async function readSettings(): Promise<DesktopSettings> {
     if ((error as NodeJS.ErrnoException).code === "ENOENT") return {};
     throw error;
   }
-  let settings: { home?: unknown; locale?: unknown };
+  let settings: { home?: unknown; locale?: unknown; autoUpdate?: unknown };
   try {
     settings = JSON.parse(contents);
   } catch (error) {
@@ -452,6 +471,8 @@ async function readSettings(): Promise<DesktopSettings> {
       isLanguagePreference(settings.locale) && settings.locale !== "system"
         ? settings.locale
         : undefined,
+    autoUpdate:
+      typeof settings.autoUpdate === "boolean" ? settings.autoUpdate : undefined,
   };
 }
 
@@ -502,6 +523,18 @@ function buildApplicationMenu() {
     accelerator: "CommandOrControl+,",
     click: sendMenuCommand("settings"),
   };
+  // Release builds only; the About page shows the result of the check.
+  const checkForUpdates = appUpdates?.status().supported
+    ? [
+        {
+          label: t("menu.checkForUpdates"),
+          click: (item: unknown, target: unknown) => {
+            void appUpdates!.check();
+            sendMenuCommand("about")(item, target);
+          },
+        },
+      ]
+    : [];
   Menu.setApplicationMenu(
     Menu.buildFromTemplate([
       ...(darwin
@@ -510,6 +543,7 @@ function buildApplicationMenu() {
               role: "appMenu" as const,
               submenu: [
                 { role: "about" as const, label: t("menu.about") },
+                ...checkForUpdates,
                 { type: "separator" as const },
                 settings,
                 { type: "separator" as const },
@@ -657,6 +691,7 @@ function buildApplicationMenu() {
             ? []
             : [
                 { type: "separator" as const },
+                ...checkForUpdates,
                 { label: t("menu.about"), click: sendMenuCommand("about") },
               ]),
         ],
@@ -754,6 +789,8 @@ async function handle(
       args.settings as Parameters<RemoteMacConnector["save"]>[0],
     );
   if (agentActions.has(action)) return agentHost!.action(action, args);
+  if (action.startsWith("appUpdate:"))
+    return appUpdates!.action(action, args, () => app.quit());
   const result = await createWorkbench(store, service, {
     preferencesChanged: () =>
       broadcast("files", {
@@ -1719,6 +1756,17 @@ else {
         pinnedLocale ?? resolveLocale(app.getPreferredSystemLanguages()),
       );
       const settings = await startupSettings();
+      appUpdates = new AppUpdates({
+        automatic: settings.autoUpdate ?? true,
+        log: (level, ...values) => mainLog.write(level, "update", ...values),
+        publish: (state) => {
+          for (const window of windows)
+            if (!window.isDestroyed())
+              window.webContents.send("showai:app-update", state);
+        },
+        saveAutomatic: (autoUpdate) => saveSettings({ autoUpdate }),
+      });
+      appUpdates.start();
       setLocale(
         pinnedLocale ??
           settings.locale ??
@@ -2010,6 +2058,7 @@ else {
       checkingQuit = false;
       const refused = outcomes.filter((outcome) => !outcome.allow);
       if (refused.length) {
+        appUpdates?.cancelInstall();
         mainLog.write(
           "warn",
           "main",
@@ -2052,7 +2101,8 @@ else {
         await shutdownStep("project sync", () => syncManager(store.root).stop());
       for (const window of windows) if (!window.isDestroyed()) window.destroy();
       mainLog.write("info", "main", "Quit: services stopped.");
-      app.quit();
+      appUpdates?.dispose();
+      if (!appUpdates?.finishQuit(() => app.quit())) app.quit();
     });
   });
 }

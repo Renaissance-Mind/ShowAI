@@ -230,3 +230,6 @@
   background: var(--surface, #fff);
   text-align: left;
 }
+.feedback-update-row dd .settings-button {
+  flex-shrink: 0;
+}

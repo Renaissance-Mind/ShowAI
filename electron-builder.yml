@@ -27,6 +27,12 @@ extraResources:
       - "**/*"
       - "!**/*.map"
       - "!**/.DS_Store"
+# In-app updates read latest-mac.yml / latest.yml from the GitHub release.
+# Upload them with the ZIP and its .blockmap: npm run release:assets -- <dir>
+publish:
+  provider: github
+  owner: Renaissance-Mind
+  repo: ShowAI
 protocols:
   - name: ShowAI Page
     schemes:
