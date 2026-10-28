@@ -13,6 +13,7 @@ import { blockLabel } from "./shared";
 import type { MessageKey, MessageParams } from "../../i18n";
 import { useTranslator } from "../../i18n/react";
 import messages from "../../i18n/messages/stepWalkthrough";
+import { isFlag, isIndex, useReaderState } from "../../surface/reader-state";
 
 type Part = WalkthroughPart & { tone: NonNullable<WalkthroughPart["tone"]> };
 type Translate = (
@@ -283,7 +284,9 @@ export function StepWalkthroughBlock({ data }: BlockProps) {
     0,
     steps.findIndex((step) => step.id === model.initialStep),
   );
-  const [current, setCurrent] = useState(initial);
+  const [current, setCurrent] = useReaderState("step", initial, {
+    accept: isIndex,
+  });
   // A changed initial step in the data resets the reader's position.
   const [seenInitial, setSeenInitial] = useState(initial);
   if (seenInitial !== initial) {
@@ -291,7 +294,9 @@ export function StepWalkthroughBlock({ data }: BlockProps) {
     setCurrent(initial);
   }
   const [hidden, setHidden] = useState(false);
-  const [showDetails, setShowDetails] = useState(false);
+  const [showDetails, setShowDetails] = useReaderState("details", false, {
+    accept: isFlag,
+  });
   const tabs = useRef(new Map<number, HTMLButtonElement>());
   const label = blockLabel(model.title, t("title"));
 

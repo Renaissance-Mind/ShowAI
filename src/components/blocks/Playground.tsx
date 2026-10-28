@@ -42,6 +42,7 @@ import { getLocale, type MessageKey, type Translator } from "../../i18n";
 import { useTranslator } from "../../i18n/react";
 import messages from "../../i18n/messages/playground";
 import common from "../../i18n/messages/common";
+import { isNumberRecord, useReaderState } from "../../surface/reader-state";
 
 interface Parameter {
   id: string;
@@ -90,7 +91,11 @@ export function PlaygroundBlock({ data, onChange, readOnly }: BlockProps) {
   const t = useTranslator(messages);
   const tc = useTranslator(common);
   const inputs: Parameter[] = Array.isArray(data.inputs) ? data.inputs : [];
-  const [values, setValues] = useState<Record<string, number>>({});
+  const [values, setValues] = useReaderState<Record<string, number>>(
+    "values",
+    {},
+    { accept: isNumberRecord },
+  );
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState({
     title: "",

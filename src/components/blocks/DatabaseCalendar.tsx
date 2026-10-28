@@ -33,6 +33,7 @@ import type {
   DatabaseRow,
 } from "./types";
 import "./database-calendar.css";
+import { isIndex, useReaderState } from "../../surface/reader-state";
 
 type Mode = "month" | "week" | "heatmap";
 type Entry = CalendarEntry<DatabaseRow>;
@@ -198,8 +199,14 @@ export function DatabaseCalendar({
   const movable = (id: string) =>
     !sources?.get(id)?.readOnly.includes(settings.dateColumn?.id ?? "");
   const today = localDay();
-  const [mode, setMode] = useState<Mode>(settings.mode);
-  const [anchor, setAnchor] = useState(settings.initialDay ?? today);
+  const [mode, setMode] = useReaderState<Mode>("calendarMode", settings.mode, {
+    accept: (value) => ["month", "week", "heatmap"].includes(value as string),
+  });
+  const [anchor, setAnchor] = useReaderState(
+    "calendarDay",
+    settings.initialDay ?? today,
+    { accept: isIndex },
+  );
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [focus, setFocus] = useState<string | null>(null);
   const [expandedDay, setExpandedDay] = useState<number | null>(null);

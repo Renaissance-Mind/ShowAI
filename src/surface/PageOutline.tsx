@@ -84,6 +84,8 @@ export interface PageOutlineHostProps {
   scroll: RefObject<HTMLDivElement | null>;
   shell: RefObject<HTMLDivElement | null>;
   view: OutlineViewState;
+  /** Called after the reader opens, pins or folds part of the outline. */
+  onViewChange?: (view: OutlineViewState) => void;
   onSettings?: () => void;
 }
 export function PageOutline(props: PageOutlineHostProps) {
@@ -98,6 +100,7 @@ function ActivePageOutline({
   scroll,
   shell,
   view,
+  onViewChange,
   onSettings,
   config,
 }: PageOutlineHostProps & { config: NativePageOutline }) {
@@ -137,7 +140,12 @@ function ActivePageOutline({
     (placement === "margin" || placement === "docked");
   const latest = useRef({ placement, expanded });
   latest.current = { placement, expanded };
-  const update = useCallback(() => refresh((v) => v + 1), []);
+  const viewChanged = useRef(onViewChange);
+  viewChanged.current = onViewChange;
+  const update = useCallback(() => {
+    refresh((v) => v + 1);
+    viewChanged.current?.(view);
+  }, [view]);
   const collapse = useCallback(() => {
     view.expanded = false;
     update();

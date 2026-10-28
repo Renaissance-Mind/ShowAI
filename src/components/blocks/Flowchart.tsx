@@ -49,6 +49,7 @@ import { useTranslator } from "../../i18n/react";
 import messages from "../../i18n/messages/flowchart";
 import "@xyflow/react/dist/style.css";
 import "./flowchart.css";
+import { isRecord, isText, useReaderState } from "../../surface/reader-state";
 
 type Kind = "request" | "skill" | "decision" | "reference" | "query" | "result";
 interface FlowNode extends Record<string, unknown> {
@@ -1007,7 +1008,9 @@ export function FlowchartBlock({
   const t = useTranslator(messages);
   const lock = useViewportLock("flowchart");
   const data = validateFlowchartData(raw) as FlowData;
-  const [flowId, setFlowId] = useState(data.flows[0]?.id ?? "");
+  const [flowId, setFlowId] = useReaderState("flow", data.flows[0]?.id ?? "", {
+    accept: isText,
+  });
   const flow = data.flows.find((item) => item.id === flowId) ?? data.flows[0];
   const [selected, setSelected] = useState("");
   useEffect(() => {
@@ -1016,8 +1019,18 @@ export function FlowchartBlock({
   }, [flow, selected]);
   const node = flow?.nodes.find((item) => item.id === selected);
   // Playback is reading state: it is reset per flow and never reaches onChange.
-  const [rawMode, setMode] = useState<PlaybackMode>(() =>
-    flow ? initialPlayback(flow) : { kind: "none" },
+  const [rawMode, setMode] = useReaderState<PlaybackMode>(
+    "playback",
+    () => (flow ? initialPlayback(flow) : { kind: "none" }),
+    {
+      accept: (value) =>
+        isRecord(value) &&
+        (value.kind === "none" ||
+          (value.kind === "journey" &&
+            isText(value.id) &&
+            Number.isInteger(value.step)) ||
+          (value.kind === "stage" && Number.isInteger(value.index))),
+    },
   );
   const [playing, setPlaying] = useState(false);
   const mode = flow ? resolvePlayback(flow, rawMode) : rawMode;

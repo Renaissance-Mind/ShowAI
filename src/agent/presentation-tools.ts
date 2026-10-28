@@ -3,6 +3,7 @@ import { cdnReaderOrigins, cdnReaderUrls } from "../core/cdn-reader";
 import { CAPACITY } from "../portable/capacity.mjs";
 import { TEMPLATE_WORKFLOW_CAPABILITIES } from "../portable/template-bundle.mjs";
 import { TEMPLATE_STAGES } from "../portable/template-bundle.mjs";
+import { INLINE_READER_OVERRIDES } from "../portable/inline-style.mjs";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { CATALOG_VIEWS } from "./disclosure";
@@ -142,7 +143,17 @@ async function captureComponents(html: string, theme: "light" | "dark") {
   const directory = await mkdtemp(join(tmpdir(), "showai-show-image-"));
   try {
     const path = join(directory, "component.html");
-    await writeFile(path, html, "utf8");
+    // The image shows what the conversation fragment shows. Without these
+    // overrides the root Page is viewport-high and scrolls its components
+    // inside it, so the capture would end at the viewport.
+    await writeFile(
+      path,
+      html.replace(
+        /<head\b[^>]*>/i,
+        (open) => `${open}<style>${INLINE_READER_OVERRIDES}</style>`,
+      ),
+      "utf8",
+    );
     return await renderReading(path, {
       // A short viewport lets the full-page capture end where the components end.
       viewport: { width: 760, height: 240 },

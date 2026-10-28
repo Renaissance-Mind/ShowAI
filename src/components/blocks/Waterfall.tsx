@@ -11,6 +11,7 @@ import "./waterfall.css";
 import { blockLabel } from "./shared";
 import { useLocale, useTranslator } from "../../i18n/react";
 import messages from "../../i18n/messages/waterfall";
+import { useReaderState } from "../../surface/reader-state";
 
 type Kind = "total" | "up" | "down";
 type Format = {
@@ -136,8 +137,10 @@ export function WaterfallBlock({ data }: BlockProps) {
         : span[1],
   );
   const mismatches = waterfallMismatches(model);
-  const [selectedId, setSelected] = useState(
+  const [selectedId, setSelected] = useReaderState(
+    "selected",
     () => model.initialStep ?? steps[1]?.id ?? steps[0].id,
+    { accept: (value) => steps.some((step) => step.id === value) },
   );
   const current = steps.find((step) => step.id === selectedId) ?? steps[0];
   const [chartRef, chartWidth] = useWidth();

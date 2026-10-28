@@ -24,6 +24,12 @@ import { blockLabel } from "./shared";
 import { useTranslator } from "../../i18n/react";
 import messages from "../../i18n/messages/structureBrowser";
 import { NoteText } from "./NoteText";
+import {
+  isRecord,
+  isStringList,
+  useReaderState,
+  useResetOnChange,
+} from "../../surface/reader-state";
 
 type Structure = {
   title?: string;
@@ -244,11 +250,43 @@ export function StructureBrowserBlock({ data }: BlockProps) {
     [model.nodes],
   );
   const { items, roots } = outline;
-  const [view, setView] = useState(() => initialView(outline, model.initial));
+  const [saved, setSaved] = useReaderState<{
+    selected: string | null;
+    open: string[];
+  }>(
+    "view",
+    () => {
+      const view = initialView(outline, model.initial);
+      return { selected: view.selected, open: [...view.open] };
+    },
+    {
+      accept: (value) =>
+        isRecord(value) &&
+        (value.selected === null || items.has(value.selected as string)) &&
+        isStringList(value.open),
+    },
+  );
+  const view = useMemo(
+    () => ({ selected: saved.selected as string, open: new Set(saved.open) }),
+    [saved],
+  );
+  const setView = (
+    action: (current: ReturnType<typeof initialView>) => ReturnType<
+      typeof initialView
+    >,
+  ) =>
+    setSaved((current) => {
+      // initialView types its selection as present; an empty outline has none.
+      const next = action({
+        selected: current.selected as string,
+        open: new Set(current.open),
+      });
+      return { selected: next.selected, open: [...next.open] };
+    });
   // Reading state restarts when the instance's structure or initial path changes.
-  useEffect(
-    () => setView(initialView(outline, model.initial)),
-    [outline, model.initial],
+  useResetOnChange(
+    JSON.stringify([[...items.keys()], model.initial ?? null]),
+    () => setView(() => initialView(outline, model.initial)),
   );
   const { selected, open } = view;
 

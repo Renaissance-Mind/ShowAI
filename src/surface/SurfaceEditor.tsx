@@ -39,6 +39,7 @@ import {nativeContentHistoryStages} from "./native-content-history";
 import {nativeDocumentContentKey,nativeDocumentBodiesEqual,mergeNativeDocumentReceipt,mergeNativeProjectionReceipt} from "./native-document-content";
 
 import {appendNativeInkHistoryGroups,nativeInkHistoryGroups,unregisteredNativeInkHistoryAction,type NativeInkHistoryAction,type NativeInkHistoryGroup} from "./native-ink-history";
+import { ReaderBlock } from "./reader-state";
 
 const contentKey = (document: ShowDocument) =>
   JSON.stringify([
@@ -702,12 +703,14 @@ reservePortable.current = (options) => {
         widgetChanges.current.set(parentId, onWidgetChange);
       }
       return (
-        <Widget
-          kind={single.attrs!.kind}
-          data={single.attrs!.data}
-          readOnly={readOnly}
-          onChange={onWidgetChange}
-        />
+        <ReaderBlock id={single.attrs!.id ?? parentId}>
+          <Widget
+            kind={single.attrs!.kind}
+            data={single.attrs!.data}
+            readOnly={readOnly}
+            onChange={onWidgetChange}
+          />
+        </ReaderBlock>
       );
     }
     if (single?.type === "image")

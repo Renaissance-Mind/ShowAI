@@ -1,4 +1,4 @@
-import { Fragment, useMemo, useState } from "react";
+import { Fragment, useMemo } from "react";
 import type { BlockProps } from "./types";
 import { differingRows } from "./analysis-contract.mjs";
 import "./analysis.css";
@@ -7,6 +7,7 @@ import type { MessageKey } from "../../i18n";
 import { useTranslator } from "../../i18n/react";
 import messages from "../../i18n/messages/analysis";
 import { NoteText } from "./NoteText";
+import { isFlag, useReaderState } from "../../surface/reader-state";
 
 type Tone = "yes" | "no" | "partial" | "neutral" | "na";
 type Row = { id: string; label: string; hint?: string; group?: string };
@@ -51,8 +52,14 @@ const LEGEND: Record<Tone, MessageKey<typeof messages>> = {
 export function ComparisonMatrixBlock({ data }: BlockProps) {
   const t = useTranslator(messages);
   const model = data as unknown as Matrix;
-  const [focus, setFocus] = useState<string | null>(null);
-  const [diffOnly, setDiffOnly] = useState(false);
+  const [focus, setFocus] = useReaderState<string | null>("focus", null, {
+    accept: (value) =>
+      typeof value === "string" &&
+      model.columns.some((column) => column.id === value),
+  });
+  const [diffOnly, setDiffOnly] = useReaderState("diffOnly", false, {
+    accept: isFlag,
+  });
   const cellMap = useMemo(
     () =>
       new Map(

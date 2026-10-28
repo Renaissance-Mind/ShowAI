@@ -21,6 +21,11 @@ import "./event-timeline.css";
 import { blockLabel } from "./shared";
 import { useLocale, useTranslator } from "../../i18n/react";
 import messages from "../../i18n/messages/eventTimeline";
+import {
+  isIndex,
+  useReaderState,
+  useResetOnChange,
+} from "../../surface/reader-state";
 
 // Colors come from tone tokens so lines, bands and badges follow light and dark themes.
 const tone = (value: EventTimelineTone = "neutral") => `var(--et-${value})`;
@@ -106,13 +111,15 @@ export function EventTimelineBlock({ data }: BlockProps) {
   };
 
   const start = initialPoint(model);
-  const [point, setPoint] = useState(start);
+  const [point, setPoint] = useReaderState("point", start, { accept: isIndex });
   // Clicking one of several events on the same point pins it; scrubbing releases the pin.
-  const [pinned, setPinned] = useState<number | null>(null);
-  useEffect(() => {
+  const [pinned, setPinned] = useReaderState<number | null>("pinned", null, {
+    accept: (value) => value === null || isIndex(value),
+  });
+  useResetOnChange(`${start}:${count}`, () => {
     setPoint(start);
     setPinned(null);
-  }, [start, count]);
+  });
   const cursor = Math.min(point, count - 1);
   const active =
     pinned !== null && events[pinned]?.at === cursor

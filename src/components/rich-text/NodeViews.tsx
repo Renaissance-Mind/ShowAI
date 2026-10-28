@@ -1,3 +1,4 @@
+import { ReaderBlock, useReaderState } from "../../surface/reader-state";
 import { ownSourceValue } from "../../surface/source-runtime";
 import { isTextPointerTarget } from "../../surface/text-selection";
 import { clearWidgetSelection } from "./widget-selection";
@@ -93,14 +94,16 @@ export function WidgetView({
         event.stopPropagation();
       }}
     >
-      {renderWidget({
-        kind: node.attrs.kind,
-        data: node.attrs.data,
-        onChange: (data) => {
-          if (editor.isEditable) updateAttributes({ data: ownSourceValue(data) });
-        },
-        readOnly: !editable,
-      })}
+      <ReaderBlock id={node.attrs.id}>
+        {renderWidget({
+          kind: node.attrs.kind,
+          data: node.attrs.data,
+          onChange: (data) => {
+            if (editor.isEditable) updateAttributes({ data: ownSourceValue(data) });
+          },
+          readOnly: !editable,
+        })}
+      </ReaderBlock>
     </NodeViewWrapper>
   );
 }
@@ -163,8 +166,15 @@ export function ToggleView({ node, updateAttributes, editor }: NodeViewProps) {
     editor,
     selector: ({ editor: current }) => current.isEditable,
   });
-  const [open, setOpen] = useState(Boolean(node.attrs.open));
+  // Editing saves the open state into the page; reading keeps it for this reader.
+  const [editingOpen, setOpen] = useState(Boolean(node.attrs.open));
   useEffect(() => setOpen(Boolean(node.attrs.open)), [node.attrs.open]);
+  const [readingOpen, setReadingOpen] = useReaderState(
+    "open",
+    Boolean(node.attrs.open),
+    { block: node.attrs.id ?? null, accept: (value) => typeof value === "boolean" },
+  );
+  const open = editable ? editingOpen : readingOpen;
   return (
     <NodeViewWrapper
       style={richTextStyle(node.attrs.componentStyle)}
@@ -176,8 +186,9 @@ export function ToggleView({ node, updateAttributes, editor }: NodeViewProps) {
           aria-label={open ? t("toggle.collapse") : t("toggle.expand")}
           aria-expanded={open}
           onClick={() => {
+            if (!editor.isEditable) return setReadingOpen(!open);
             setOpen(!open);
-            if (editor.isEditable) updateAttributes({ open: !open });
+            updateAttributes({ open: !open });
           }}
         >
           <ChevronRight size={16} />
@@ -208,7 +219,10 @@ export function StepperView({ node, editor, getPos }: NodeViewProps) {
     editor,
     selector: ({ editor: current }) => current.isEditable,
   });
-  const [active, setActive] = useState(0);
+  const [active, setActive] = useReaderState("step", 0, {
+    block: node.attrs.id ?? null,
+    accept: Number.isInteger,
+  });
   const count = node.childCount;
   const current = Math.min(active, count - 1);
   const titles = Array.from({ length: count }, (_, index) =>

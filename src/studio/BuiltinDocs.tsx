@@ -34,6 +34,7 @@ import {
   type DocsEntry,
 } from "./builtin-docs";
 import PageHeading from "./PageHeading";
+import { ReaderStateContext, readerStateStore } from "../surface/reader-state";
 import "./builtin-docs.css";
 
 const EXPANDED_KEY = "showai:builtin-docs-expanded";
@@ -309,25 +310,31 @@ export function BuiltinDocPage({
     return () => clearInterval(timer);
   }, [loaded, hash]);
   const ignore = useMemo(() => () => {}, []);
+  const readerState = useMemo(
+    () => ({ page: `docs/${id}`, store: readerStateStore() }),
+    [id],
+  );
   return (
     <div ref={root} className="studio-builtin-doc" data-builtin-doc={id}>
       {loaded ? (
         <CustomComponentsProvider components={loaded.components}>
-          <SurfaceEditor
-            key={loaded.document.id}
-            document={loaded.document}
-            readOnly
-            onChange={ignore}
-            header={
-              <PageHeading
-                title={loaded.document.title}
-                icon={loaded.document.icon}
-                readOnly
-                onTitleChange={ignore}
-                onEditIcon={ignore}
-              />
-            }
-          />
+          <ReaderStateContext.Provider value={readerState}>
+            <SurfaceEditor
+              key={loaded.document.id}
+              document={loaded.document}
+              readOnly
+              onChange={ignore}
+              header={
+                <PageHeading
+                  title={loaded.document.title}
+                  icon={loaded.document.icon}
+                  readOnly
+                  onTitleChange={ignore}
+                  onEditIcon={ignore}
+                />
+              }
+            />
+          </ReaderStateContext.Provider>
         </CustomComponentsProvider>
       ) : state && "error" in state ? (
         <p className="studio-builtin-doc-error" role="alert">

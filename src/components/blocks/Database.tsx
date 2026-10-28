@@ -40,6 +40,12 @@ import type {
   DatabaseColumn,
   DatabaseRow,
 } from "./types";
+import {
+  isIndex,
+  isRecord,
+  isText,
+  useReaderState,
+} from "../../surface/reader-state";
 
 const TYPES: { value: ColumnType; label: MessageKey<typeof messages> }[] = [
   { value: "text", label: "type.text" },
@@ -189,26 +195,46 @@ export function DatabaseBlock({ data, onChange, readOnly }: BlockProps) {
   const rows: DatabaseRow[] = Array.isArray(data.rows)
     ? data.rows.filter((row) => row && typeof row.id === "string")
     : [];
-  const [view, setView] = useState<View>(
+  const [view, setView] = useReaderState<View>(
+    "view",
     VIEWS.includes(data.view as View) ? (data.view as View) : "table",
+    { accept: (value) => VIEWS.includes(value as View) },
   );
   // Calendar column choices are reading state seeded from the saved settings, like board grouping.
-  const [calendarChoice, setCalendarChoice] = useState<DatabaseCalendarConfig>(
-    {},
-  );
+  const [calendarChoice, setCalendarChoice] =
+    useReaderState<DatabaseCalendarConfig>("calendar", {}, { accept: isRecord });
   const [query, setQuery] = useState("");
-  const [sort, setSort] = useState<{
+  const [sort, setSort] = useReaderState<{
     column: string;
     direction: "asc" | "desc";
-  } | null>(null);
+  } | null>("sort", null, {
+    accept: (value) =>
+      value === null ||
+      (isRecord(value) &&
+        typeof value.column === "string" &&
+        ["asc", "desc"].includes(value.direction as string)),
+  });
   const [showFilter, setShowFilter] = useState(false);
-  const [filter, setFilter] = useState({ column: "", value: "" });
+  const [filter, setFilter] = useReaderState(
+    "filter",
+    { column: "", value: "" },
+    {
+      accept: (value) =>
+        isRecord(value) &&
+        typeof value.column === "string" &&
+        typeof value.value === "string",
+    },
+  );
   const [editing, setEditing] = useState(false);
   const [draftTitle, setDraftTitle] = useState("");
   const [draftColumns, setDraftColumns] = useState<DatabaseColumn[]>([]);
   const [error, setError] = useState("");
-  const [grouping, setGrouping] = useState(text(data.groupBy));
-  const [page, setPage] = useState(0);
+  const [grouping, setGrouping] = useReaderState(
+    "groupBy",
+    text(data.groupBy),
+    { accept: isText },
+  );
+  const [page, setPage] = useReaderState("page", 0, { accept: isIndex });
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const editable = Boolean(onChange && !readOnly);
   // Rows mapped from shared data keep their source fields and stay in the source.
