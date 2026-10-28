@@ -189,7 +189,32 @@ function dshSteps(path: string, state: DshProfileState): DshPendingSteps {
   };
 }
 
-async function hostExecutable(host: PluginHost) {
+/** Writes a script that starts the runtime with the plugin's arguments; returns its file name. */
+async function writeLauncher(
+  directory: string,
+  server: { command: string; args: string[] },
+) {
+  const words = [server.command, ...server.args];
+  if (process.platform === "win32") {
+    const line = words.map((word) => `"${word}"`).join(" ");
+    await writeFile(
+      join(directory, "showai-mcp.cmd"),
+      `@echo off\r\n${line} %*\r\n`,
+    );
+    return "showai-mcp.cmd";
+  }
+  const line = words
+    .map((word) => `'${word.replaceAll("'", `'\\''`)}'`)
+    .join(" ");
+  await writeFile(
+    join(directory, "showai-mcp"),
+    `#!/bin/sh\nexec ${line} "$@"\n`,
+    { mode: 0o755 },
+  );
+  return "showai-mcp";
+}
+
+export async function hostExecutable(host: PluginHost) {
   if (host === "deepseek") return dshApplication();
   const executable = await findExecutable(host);
   if (executable || host !== "codex" || process.platform !== "darwin")
@@ -691,30 +716,37 @@ export class DesktopPluginInstaller {
       version,
     });
     // Each host declares how show_component reaches its conversation.
-    await json(join(source, "mcp.json"), {
-      mcpServers: {
-        showai: {
-          type: "stdio",
-          ...server,
-          env: { ...server.env, SHOWAI_HOST_DISPLAY: "codex-visualize" },
-        },
-      },
-    });
-    await json(join(source, ".mcp.json"), {
-      mcpServers: {
-        showai: {
-          ...server,
-          env: { ...server.env, SHOWAI_HOST_DISPLAY: "model-html" },
-        },
-      },
-    });
     if (host === "codex") {
+      // Codex reads the Agent Plugins mcp.json and silently drops a server whose file lacks
+      // $schema or whose command is an absolute path; it accepts a `./` launcher in the plugin.
+      const launcher = await writeLauncher(join(source, "mcp"), server);
+      await json(join(source, "mcp.json"), {
+        $schema: "https://agent-plugins.org/schemas/1.0.0/mcp.schema.json",
+        mcpServers: {
+          showai: {
+            type: "stdio",
+            command: `./mcp/${launcher}`,
+            args: [],
+            env: { ...server.env, SHOWAI_HOST_DISPLAY: "codex-visualize" },
+          },
+        },
+      });
       await rm(join(source, ".claude-plugin"), {
         recursive: true,
         force: true,
       });
       await rm(join(source, ".mcp.json"), { force: true });
-    } else await rm(join(source, "mcp.json"), { force: true });
+    } else {
+      await json(join(source, ".mcp.json"), {
+        mcpServers: {
+          showai: {
+            ...server,
+            env: { ...server.env, SHOWAI_HOST_DISPLAY: "model-html" },
+          },
+        },
+      });
+      await rm(join(source, "mcp.json"), { force: true });
+    }
     await mkdir(join(marketplace, ".agents/plugins"), { recursive: true });
     await mkdir(join(marketplace, ".claude-plugin"), { recursive: true });
     await json(join(marketplace, ".agents/plugins/marketplace.json"), {

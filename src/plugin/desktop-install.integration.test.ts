@@ -3,8 +3,43 @@ import { cp, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
-import { DesktopPluginInstaller } from "./desktop-install";
+import { spawn } from "node:child_process";
+import { createInterface } from "node:readline";
+import { DesktopPluginInstaller, hostExecutable } from "./desktop-install";
 import { registerRuntime, type RuntimeLaunch } from "../agent/runtime";
+
+/** Asks a Codex app-server on the disposable CODEX_HOME how many ShowAI tools it loaded. */
+async function codexServerTools() {
+  const codex = await hostExecutable("codex");
+  expect(codex).toBeTruthy();
+  const child = spawn(codex!, ["app-server", "--listen", "stdio://"], {
+    stdio: ["pipe", "pipe", "ignore"],
+  });
+  const send = (message: object) =>
+    child.stdin.write(JSON.stringify({ jsonrpc: "2.0", ...message }) + "\n");
+  try {
+    send({
+      id: 1,
+      method: "initialize",
+      params: { clientInfo: { name: "desktop-plugin-acceptance", version: "1" } },
+    });
+    for await (const line of createInterface({ input: child.stdout })) {
+      const message = JSON.parse(line);
+      if (message.id === 1) {
+        send({ method: "initialized" });
+        send({ id: 2, method: "mcpServerStatus/list", params: {} });
+      } else if (message.id === 2) {
+        const showai = message.result.data.find(
+          (item: { name: string }) => item.name === "showai",
+        );
+        return showai ? Object.keys(showai.tools).length : 0;
+      }
+    }
+    throw new Error("Codex app-server exited before listing MCP servers.");
+  } finally {
+    child.kill();
+  }
+}
 
 // Opt in with a task-owned output directory and a real registered runtime.
 // Runs the installed official CLIs with disposable user configuration; no mocks.
@@ -83,6 +118,10 @@ describe.skipIf(!output || !config)(
           ),
         );
         const server = manifest.mcpServers.showai;
+        if (host === "codex")
+          expect(manifest.$schema).toBe(
+            "https://agent-plugins.org/schemas/1.0.0/mcp.schema.json",
+          );
         const profile = JSON.parse(
           await readFile(
             join(changed.installedPath, "host-profile.json"),
@@ -122,6 +161,10 @@ describe.skipIf(!output || !config)(
         });
         const transport = new StdioClientTransport({
           ...server,
+          command:
+            host === "codex"
+              ? join(changed.installedPath, server.command)
+              : server.command,
           env: { ...server.env, PATH: "/usr/bin:/bin" },
           stderr: "pipe",
         });
@@ -182,6 +225,10 @@ describe.skipIf(!output || !config)(
               (shown.structuredContent as any).data.warnings.join(" "),
             ).toMatch(/compact fragment|CDN reader/);
           }
+          // Codex itself must load the server, not only a client that reads mcp.json directly.
+          const loaded =
+            host === "codex" ? await codexServerTools() : undefined;
+          if (host === "codex") expect(loaded).toBe(tools.tools.length);
           await writeFile(
             join(output!, `${host}-result.json`),
             JSON.stringify(
@@ -193,6 +240,7 @@ describe.skipIf(!output || !config)(
                 declaredHostDisplay: profile.declaredHostDisplay,
                 deliveryMode: delivery.mode,
                 tools: tools.tools.length,
+                codexLoadedTools: loaded,
               },
               null,
               2,
