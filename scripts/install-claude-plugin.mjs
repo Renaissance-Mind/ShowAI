@@ -1,8 +1,8 @@
 // Connects Claude Code in this checkout to one development instance. The main checkout gets
 // showai-dev, each worktree showai-dev-<git worktree name>. Both are enabled in this checkout's own
 // .claude/settings.json (project scope; Claude Code shares local settings between the worktrees
-// of a repository), and the stable showai@showai-desktop is turned off there, so a session
-// sees one ShowAI plugin. The plugin is pinned to the instance's library and runtime.
+// of a repository). The stable showai@showai-desktop keeps its global setting, so a session here
+// sees both. The plugin is pinned to the instance's library and runtime.
 import { execFile, spawn } from "node:child_process";
 import { createHash } from "node:crypto";
 import { access, cp, mkdir, readFile, realpath, rename, rm, writeFile } from "node:fs/promises";
@@ -14,6 +14,7 @@ import { skillFiles } from "../src/plugin/host-package.mjs";
 
 const execute = promisify(execFile);
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+// Earlier installs turned the stable plugin off per checkout; install and remove clear that override.
 const STABLE = "showai@showai-desktop";
 const usage =
   "Usage: npm run plugin:claude -- --port PORT [--mode desktop|browser] [--json]\n" +
@@ -251,15 +252,17 @@ async function install(identity) {
     );
   await excludeProjectSettings();
   await claude([(await find()) ? "update" : "install", id, "--scope", "project"]);
-  await setProjectPlugins({ [STABLE]: false });
+  await setProjectPlugins({ [STABLE]: undefined });
   const installed = await find();
   if (!installed?.enabled || installed.version !== version)
     throw new Error(`Claude Code did not confirm ${id} ${version} enabled here: ${JSON.stringify(installed)}`);
   const expected = JSON.stringify(await skillFiles(plugin));
-  if (JSON.stringify(await skillFiles(installed.installPath)) !== expected)
+  // Claude Code records each running session that loaded a cached plugin under .in_use/.
+  const copied = Object.fromEntries(
+    Object.entries(await skillFiles(installed.installPath)).filter(([name]) => !name.startsWith(".in_use/")),
+  );
+  if (JSON.stringify(copied) !== expected)
     throw new Error(`Installed files at ${installed.installPath} differ from ${plugin}.`);
-  const stable = (await claudeJson(["list"])).find((item) => item.id === STABLE && item.enabled);
-  if (stable) throw new Error(`${STABLE} is still enabled in ${root}.`);
   const connection = await handshake(server, installed.installPath);
   // A launcher that cannot reach its runtime serves only showai_connection_problem.
   if (connection.capabilities.version !== probe.data.version || connection.tools < 2)
@@ -281,7 +284,6 @@ async function install(identity) {
     runtimeVersion: probe.data.version,
     runtimeRecord: record,
     mcp: { server: connection.server, tools: connection.tools },
-    stableDisabledHere: STABLE,
     hostRefresh: "Start a new Claude Code session in this directory to use the plugin.",
   };
 }
