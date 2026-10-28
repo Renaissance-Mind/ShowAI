@@ -8,6 +8,7 @@ import {
   moveWorkspaceTab,
   parseWorkspaceTabs,
   recentEntry,
+  sameEntry,
   setWorkspaceAssistantOpen,
   visitWorkspace,
   type WorkspaceEntry,
@@ -23,6 +24,19 @@ const page = (id: string, projectId = "project-a"): WorkspaceEntry => ({
 });
 
 describe("workspace tabs", () => {
+  it("treats an entry as unchanged only when nothing the tab shows differs", () => {
+    const entry = page("page-a");
+    expect(sameEntry(entry, { ...entry })).toBe(true);
+    expect(sameEntry(entry, { ...entry, title: "Renamed" })).toBe(false);
+    expect(sameEntry(entry, { ...entry, icon: "✦" })).toBe(false);
+    expect(sameEntry(entry, { ...entry, scrollTop: 0 })).toBe(false);
+    expect(
+      sameEntry(entry, {
+        ...entry,
+        location: { ...entry.location, folderId: "folder" },
+      }),
+    ).toBe(false);
+  });
   it("moves tabs in either direction while preserving selection, history and Agent state", () => {
     const first = createWorkspace(page("page-a"));
     const visited = visitWorkspace(first, page("page-b"));

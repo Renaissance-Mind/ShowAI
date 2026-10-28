@@ -544,6 +544,31 @@ describe("workspace sessions against the real loopback workbench", () => {
         .history!.past,
     ).toHaveLength(1);
   });
+  it("loads a tab's page before showing it and in one publication", async () => {
+    await warm();
+    let publications = 0;
+    const unsubscribe = sessions.subscribe(() => publications++);
+    const show = await sessions.prepare(project, second.document.id);
+    expect(sessions.getSnapshot().active?.getSnapshot().draft?.id).toBe(
+      first.document.id,
+    );
+    publications = 0;
+    expect(show!("b")).toBe(true);
+    expect(publications).toBe(1);
+    expect(sessions.getSnapshot().active?.getSnapshot().draft?.id).toBe(
+      second.document.id,
+    );
+    expect(sessions.getSnapshot().activeView).toContain('"b"');
+    const superseded = await sessions.prepare(project, first.document.id);
+    const clear = await sessions.prepareClear();
+    expect(superseded!("a")).toBe(false);
+    expect(sessions.getSnapshot().active?.getSnapshot().draft?.id).toBe(
+      second.document.id,
+    );
+    expect(clear!()).toBe(true);
+    expect(sessions.getSnapshot().active).toBeNull();
+    unsubscribe();
+  });
   it("evicts navigation history before a tab's current page, even over the byte budget", async () => {
     await sessions.shutdown();
     sessions = new PageSessions({

@@ -253,6 +253,20 @@ export class PageSessions {
     tabId = "primary",
     initial?: LoadedPage,
   ) {
+    const show = await this.prepare(projectId, pageId, initial);
+    return !!show && show(tabId);
+  }
+  /**
+   * Leaves the active page and loads the target without showing it. The
+   * returned function shows it, so a caller can switch the page and its other
+   * navigation state in one render; it returns false once a later navigation
+   * has started.
+   */
+  async prepare(
+    projectId: string,
+    pageId: string,
+    initial?: LoadedPage,
+  ): Promise<((tabId: string) => boolean) | null> {
     if (!this.home) {
       const info = await this.options.invoke<{ home: string }>("app:info");
       this.setHome(info.home);
@@ -263,8 +277,8 @@ export class PageSessions {
       (issue) => issue.pageId !== pageId || issue.projectId !== projectId,
     );
     const previous = this.snapshot.active;
-    if (previous && !(await previous.leave())) return false;
-    if (ticket !== this.ticket) return false;
+    if (previous && !(await previous.leave())) return null;
+    if (ticket !== this.ticket) return null;
     const key = this.pageKey(projectId, pageId);
     let session = this.pages.get(key);
     if (session && session.getSnapshot().draft?.id !== pageId) {
@@ -306,21 +320,33 @@ export class PageSessions {
           this.publish();
         this.trimDocuments();
       });
-      if (!(await created.open(projectId, pageId, initial))) return false;
+      if (!(await created.open(projectId, pageId, initial))) return null;
     }
-    if (ticket !== this.ticket) return false;
-    this.retainView(session, tabId);
-    if (this.stale.has(session)) void this.refresh(session);
-    return true;
+    if (ticket !== this.ticket) return null;
+    const target = session;
+    return (tabId) => {
+      if (ticket !== this.ticket) return false;
+      this.retainView(target, tabId);
+      if (this.stale.has(target)) void this.refresh(target);
+      return true;
+    };
   }
   async leave() {
     return this.snapshot.active ? this.snapshot.active.leave() : true;
   }
   async clear() {
+    const show = await this.prepareClear();
+    return !!show && show();
+  }
+  /** Leaves the active page; the returned function hides it, like `prepare`. */
+  async prepareClear(): Promise<(() => boolean) | null> {
     const ticket = ++this.ticket;
-    if (!(await this.leave()) || ticket !== this.ticket) return false;
-    this.publish({ active: null, activeView: null });
-    return true;
+    if (!(await this.leave()) || ticket !== this.ticket) return null;
+    return () => {
+      if (ticket !== this.ticket) return false;
+      this.publish({ active: null, activeView: null });
+      return true;
+    };
   }
   /** Retire clean editors after a library operation changes their location or archives them. */
   forgetPage(projectId: string, pageId: string) {

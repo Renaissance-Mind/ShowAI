@@ -190,12 +190,21 @@ export function usePage(home?: string) {
       sessions.open(projectId, pageId, tabId, initial),
     [sessions, flushOrDefer],
   );
+  const prepare = useCallback(
+    async (projectId: string, pageId: string) =>
+      (await flushOrDefer()) ? sessions.prepare(projectId, pageId) : null,
+    [sessions, flushOrDefer],
+  );
   const leave = useCallback(
     async () => (await flushOrDefer()) && sessions.leave(),
     [sessions, flushOrDefer],
   );
   const clear = useCallback(
     async () => (await flush()) && sessions.clear(),
+    [sessions, flush],
+  );
+  const prepareClear = useCallback(
+    async () => ((await flush()) ? sessions.prepareClear() : null),
     [sessions, flush],
   );
   const reload = useCallback(
@@ -274,9 +283,11 @@ export function usePage(home?: string) {
     edit,
     editContent,
     open,
+    prepare,
     flush,
     leave,
     clear,
+    prepareClear,
     reload,
     refresh,
     reloadCurrent,

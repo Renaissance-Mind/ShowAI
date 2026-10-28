@@ -1,4 +1,5 @@
 import { useLayoutEffect, useRef, useState } from "react";
+import { flushSync } from "react-dom";
 import {
   addWorkspaceTab,
   closeWorkspaceTab,
@@ -6,6 +7,7 @@ import {
   currentEntry,
   moveWorkspaceTab,
   parseWorkspaceTabs,
+  sameEntry,
   sameLocation,
   setWorkspaceAssistantOpen,
   visitWorkspace,
@@ -25,7 +27,15 @@ export function useWorkspaceTabs({
   home?: string;
   ready: boolean;
   entry: WorkspaceEntry;
-  restore: (entry: WorkspaceEntry, tabId: string) => Promise<boolean>;
+  /**
+   * Prepares the entry's content without showing it and returns a function
+   * that shows it, or null when the entry cannot be opened. The function runs
+   * in the same render as the tab change and returns false if it was superseded.
+   */
+  restore: (
+    entry: WorkspaceEntry,
+    tabId: string,
+  ) => Promise<(() => boolean) | null>;
   getScroll: () => number;
   onError: (error: unknown) => void;
   beforeClose?: (tabId: string) => Promise<boolean>;
@@ -68,16 +78,29 @@ export function useWorkspaceTabs({
   const activate = async (next: WorkspaceTabsState) => {
     if (pending.current || closing.current || !ready) return false;
     pending.current = true;
-    setSwitching(true);
+    // A quick switch renders once; only a slow one shows its busy state.
+    const busy = setTimeout(() => setSwitching(true), 150);
+    let shown = false;
     try {
       const target = next.tabs.find((tab) => tab.id === next.activeId)!;
-      if (!(await latest.current.restore(currentEntry(target), target.id)))
-        return false;
-      publish(next);
-      return true;
-    } finally {
+      const show = await latest.current.restore(
+        currentEntry(target),
+        target.id,
+      );
+      if (!show) return false;
+      clearTimeout(busy);
       pending.current = false;
-      setSwitching(false);
+      // The page, the workbench location and the tab strip change in one commit.
+      flushSync(() => {
+        shown = show();
+        if (shown) publish(next);
+        setSwitching(false);
+      });
+      return shown;
+    } finally {
+      clearTimeout(busy);
+      pending.current = false;
+      if (!shown) setSwitching(false);
     }
   };
 
@@ -131,13 +154,14 @@ export function useWorkspaceTabs({
       (tab) => tab.id === current.current.activeId,
     )!;
     const previous = currentEntry(active);
-    const next = visitWorkspace(current.current, {
+    const visited = {
       ...entry,
       scrollTop: sameLocation(previous.location, entry.location)
         ? previous.scrollTop
         : 0,
-    });
-    publish(next);
+    };
+    if (sameEntry(previous, visited)) return;
+    publish(visitWorkspace(current.current, visited));
   }, [home, ready, entry, switching]);
 
   const select = async (id: string) => {
@@ -196,6 +220,8 @@ export function useWorkspaceTabs({
   return {
     ...state,
     switching,
+    /** Event handlers read this; `switching` is only shown once a switch is slow. */
+    isSwitching: () => pending.current || closing.current,
     select,
     add,
     open,

@@ -76,6 +76,16 @@ export function sameLocation(a: WorkspaceLocation, b: WorkspaceLocation) {
   );
 }
 
+export function sameEntry(a: WorkspaceEntry, b: WorkspaceEntry) {
+  return (
+    sameLocation(a.location, b.location) &&
+    a.location.folderId === b.location.folderId &&
+    a.title === b.title &&
+    a.icon === b.icon &&
+    a.scrollTop === b.scrollTop
+  );
+}
+
 /** Navigation belongs to the selected tab; branching discards only its forward history. */
 export function visitWorkspace(
   state: WorkspaceTabsState,

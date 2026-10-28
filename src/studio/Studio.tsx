@@ -1587,7 +1587,7 @@ export default function Studio() {
     target: LibraryTarget,
     disposition: OpenDisposition = "current",
   ) {
-    if (!workspaceReady || routingRef.current || workspace.switching)
+    if (!workspaceReady || routingRef.current || workspace.isSwitching())
       return false;
     if ((!capabilities.tabs && disposition !== "window") ||
         (!capabilities.windows && disposition === "window")) disposition = "current";
@@ -1628,7 +1628,7 @@ export default function Studio() {
     hash = "",
     disposition: OpenDisposition = "current",
   ) {
-    if (!workspaceReady || routingRef.current || workspace.switching)
+    if (!workspaceReady || routingRef.current || workspace.isSwitching())
       return false;
     const meta = docTitle(id);
     if (
@@ -3348,47 +3348,52 @@ export default function Studio() {
     beforeClose: (tabId) => page.sessions.closeTab(tabId),
     restore: async (entry, tabId) => {
       const target = entry.location;
-      const loaded = target.projectId ? contents[target.projectId] : null;
-      if (target.view === "page" && target.projectId && target.pageId) {
-        if (!(await page.open(target.projectId, target.pageId, tabId)))
-          return false;
-      } else if (!(await page.clear())) return false;
-      selectedRef.current = target.projectId;
-      setSelectedProject(target.projectId);
-      const folderId =
-        target.view === "page"
-          ? (page.sessions.getSnapshot().active?.getSnapshot().draft
-              ?.parentId ??
-            loaded?.pages.find((item) => item.id === target.pageId)?.parentId ??
-            null)
-          : target.folderId;
-      setSelectedFolder(folderId);
-      if (target.projectId) {
-        setExpandedProjects((current) => ({
-          ...current,
-          [target.projectId!]: true,
-        }));
-        expandFolderPath(loaded?.folders ?? [], folderId);
-      }
-      setContextMenu(null);
-      setProjectsMenu(null);
-      setGroupMenu(null);
-      setExportMenu(null);
-      setQuery("");
-      setSearchLibrary(false);
-      setRevealNode(null);
-      if (target.view !== "page") setEditorControls(null);
-      if (target.view === "docs" && target.pageId)
-        setDocPage({ id: target.pageId, hash: "" });
-      setView(target.view);
-      if (target.projectId && !loaded)
-        void loadProjectContents(target.projectId).catch(report);
-      if (target.view === "templates" || target.view === "components")
-        void loadCatalog().catch(report);
-      requestAnimationFrame(() => {
-        catalogScrollRef.current?.scrollTo({ top: entry.scrollTop });
-      });
-      return true;
+      const show =
+        target.view === "page" && target.projectId && target.pageId
+          ? await page.prepare(target.projectId, target.pageId)
+          : await page.prepareClear();
+      if (!show) return null;
+      return () => {
+        if (!show(tabId)) return false;
+        const loaded = target.projectId ? contents[target.projectId] : null;
+        selectedRef.current = target.projectId;
+        setSelectedProject(target.projectId);
+        const folderId =
+          target.view === "page"
+            ? (page.sessions.getSnapshot().active?.getSnapshot().draft
+                ?.parentId ??
+              loaded?.pages.find((item) => item.id === target.pageId)
+                ?.parentId ??
+              null)
+            : target.folderId;
+        setSelectedFolder(folderId);
+        if (target.projectId) {
+          setExpandedProjects((current) => ({
+            ...current,
+            [target.projectId!]: true,
+          }));
+          expandFolderPath(loaded?.folders ?? [], folderId);
+        }
+        setContextMenu(null);
+        setProjectsMenu(null);
+        setGroupMenu(null);
+        setExportMenu(null);
+        setQuery("");
+        setSearchLibrary(false);
+        setRevealNode(null);
+        if (target.view !== "page") setEditorControls(null);
+        if (target.view === "docs" && target.pageId)
+          setDocPage({ id: target.pageId, hash: "" });
+        setView(target.view);
+        if (target.projectId && !loaded)
+          void loadProjectContents(target.projectId).catch(report);
+        if (target.view === "templates" || target.view === "components")
+          void loadCatalog().catch(report);
+        requestAnimationFrame(() => {
+          catalogScrollRef.current?.scrollTo({ top: entry.scrollTop });
+        });
+        return true;
+      };
     },
   });
   const studioRoot = useRef<HTMLDivElement>(null);

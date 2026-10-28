@@ -1,5 +1,6 @@
 import {
   Activity,
+  memo,
   useContext,
   useEffect,
   useLayoutEffect,
@@ -121,7 +122,7 @@ function PageContent({
   );
 }
 
-function PageView({
+const PageView = memo(function PageView({
   view,
   active,
   ...props
@@ -145,13 +146,19 @@ function PageView({
       </WorkspaceEditorContext.Provider>
     </EditorViewScope.Provider>
   );
-}
+});
 
-/** Hidden views keep their state and disconnect global effects and observers. */
+/**
+ * Hidden views keep their state and disconnect global effects and observers.
+ * Views render only when their own data changes, not with every workbench render.
+ */
 export function PageWorkspace({
   sessions,
   visible,
-  ...props
+  readOnly,
+  revealId,
+  linkablePages,
+  ...callbacks
 }: {
   sessions: PageSessions;
   visible: boolean;
@@ -161,12 +168,33 @@ export function PageWorkspace({
     sessions.getSnapshot,
     sessions.getSnapshot,
   );
-  return workspace.views.map((view) => (
-    <PageView
-      key={`${view.key}:${view.session.id}:${view.session.getSnapshot().renderVersion}:${view.session.getSnapshot().draft?.id}`}
-      view={view}
-      active={visible && view.key === workspace.activeView}
-      {...props}
-    />
-  ));
+  const latest = useRef(callbacks);
+  latest.current = callbacks;
+  const [stable] = useState(() => ({
+    onControlsChange: (controls: EditorControls | null) =>
+      latest.current.onControlsChange(controls),
+    onActiveSurfaceChange: (id: string) =>
+      latest.current.onActiveSurfaceChange(id),
+    onRevealHandled: () => latest.current.onRevealHandled(),
+    onEditIcon: () => latest.current.onEditIcon(),
+    onCopyLink: (target: {
+      projectId: string;
+      pageId: string;
+      blockIds: string[];
+    }) => latest.current.onCopyLink(target),
+  }));
+  return workspace.views.map((view) => {
+    const active = visible && view.key === workspace.activeView;
+    return (
+      <PageView
+        key={`${view.key}:${view.session.id}:${view.session.getSnapshot().renderVersion}:${view.session.getSnapshot().draft?.id}`}
+        view={view}
+        active={active}
+        readOnly={readOnly}
+        revealId={active ? revealId : null}
+        linkablePages={linkablePages}
+        {...stable}
+      />
+    );
+  });
 }
