@@ -12,7 +12,6 @@ import {
   Moon,
   Settings2,
   Sun,
-  Terminal,
 } from "../ui/icons";
 import type { DesktopInfo } from "../desktop/bridge";
 import type { AppearancePreference } from "../design/appearance-preference";
@@ -350,22 +349,10 @@ export function SettingsPanel({
       )}
       {section === "agent" && <AgentSettings />}
       {section === "plugins" && (
-        <section
-          className="settings-group"
-          aria-labelledby="settings-plugins-title"
-        >
-          <h2 id="settings-plugins-title">{t("localConnection")}</h2>
+        <>
           {info && <PluginInstallSettings home={info.home} />}
-          <div className="settings-row">
-            <div className="settings-row-text">
-              <h3>
-                <Terminal size={15} aria-hidden="true" /> {t("launchConfig")}
-              </h3>
-              {!info && <p>{t("readingLaunchConfig")}</p>}
-            </div>
-          </div>
           <LaunchConfigCopy info={info} />
-        </section>
+        </>
       )}
       {section === "about" && (
         <>

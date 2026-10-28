@@ -13,17 +13,17 @@ import {
   type LaunchSnippetKind,
   type McpLaunch,
 } from "../plugin/launch-snippets";
-import { getLocale } from "../i18n";
+import { getLocale, type Translator } from "../i18n";
 import { useTranslator } from "../i18n/react";
 import messages from "../i18n/messages/pluginInstall";
 import onboardingMessages from "../i18n/messages/onboarding";
+import settingsMessages from "../i18n/messages/settings";
 import { PendingNotice } from "../ui/PendingNotice";
-import { Copy, ExternalLink } from "../ui/icons";
+import { ChevronRight, Copy, ExternalLink, RefreshCw } from "../ui/icons";
 import { desktop, errorMessage } from "./bridge";
 import {
   pluginActionBlocked,
   pluginActionLabel,
-  pluginHostList,
   pluginHostNames,
   pluginLibraryMismatch,
   pluginNeedsUpdate,
@@ -31,7 +31,9 @@ import {
   type PluginBatchResult,
 } from "./usePluginHosts";
 import { AGENT_TROUBLESHOOTING, connectionHost } from "./AgentReadiness";
+import AgentBrandIcon from "./AgentBrandIcon";
 import type { Onboarding } from "./sample-project";
+import "./agent-settings.css";
 
 /** Harness installs bundles itself, so the App lists the steps left in Harness. */
 function DshSteps({ steps }: { steps: DshPendingSteps }) {
@@ -169,26 +171,16 @@ export function verifyState(
  * and pinned to this library; the stdio MCP records it in the library, and the plugin
  * launcher records failures that happen before the MCP handshake.
  */
-export function VerifyConnection({
-  hosts,
-  busy,
-  onRepair,
-}: {
-  hosts: PluginInstallation[];
-  busy: boolean;
-  /** Repairs the registration and reinstalls the plugin for one host. */
-  onRepair: (host: PluginHost, failure: string) => Promise<boolean>;
-}) {
-  const t = useTranslator(onboardingMessages);
+function useVerifyStates(hosts: PluginInstallation[]) {
   const [records, setRecords] = useState<AgentConnectionRecord[]>([]);
-  const [copied, setCopied] = useState(false);
   const [error, setError] = useState("");
-  const [repaired, setRepaired] = useState<PluginHost[]>([]);
   const states = new Map(
     hosts.map((host) => [host.host, verifyState(host, records)]),
   );
+  const active = hosts.length > 0;
   const waiting = [...states.values()].some((state) => state.kind !== "called");
   useEffect(() => {
+    if (!active) return;
     let stopped = false;
     const read = () =>
       desktop
@@ -209,31 +201,76 @@ export function VerifyConnection({
       stopped = true;
       clearInterval(timer);
     };
-  }, [waiting]);
-  const reason = (code: string) => {
+  }, [active, waiting]);
+  return { states, error };
+}
+
+/** The launcher failure code in the person's words. */
+function useFailureReason() {
+  const t = useTranslator(onboardingMessages);
+  return (code: string) => {
     const key = `failure.${code}` as Parameters<typeof t>[0];
     const text = t(key);
     return text.startsWith("onboarding.") ? t("failure.unknown", { code }) : text;
   };
+}
+
+/** The prompt that makes an agent call ShowAI, with the troubleshooting link. */
+function VerifyPrompt({ label }: { label: string }) {
+  const t = useTranslator(onboardingMessages);
+  const [copied, setCopied] = useState(false);
+  const [error, setError] = useState("");
+  return (
+    <div className="plugin-verify-prompt">
+      <div className="plugin-install-path">
+        <span>{label}</span>
+        <code>{t("verify.prompt")}</code>
+        <button
+          className="settings-button"
+          onClick={() =>
+            void desktop
+              .invoke("clipboard:write", { text: t("verify.prompt") })
+              .then(() => setCopied(true))
+              .catch((reason) => setError(errorMessage(reason)))
+          }
+        >
+          <Copy size={14} aria-hidden="true" />
+          {copied ? t("verify.copied") : t("verify.copy")}
+        </button>
+      </div>
+      <a href={AGENT_TROUBLESHOOTING} target="_blank" rel="noreferrer">
+        <ExternalLink size={12} aria-hidden="true" />
+        {t("verify.help")}
+      </a>
+      {error && (
+        <p role="alert" className="plugin-install-error">
+          {error}
+        </p>
+      )}
+    </div>
+  );
+}
+
+/** The welcome's check after an installation: the prompt, then each host's first call. */
+export function VerifyConnection({
+  hosts,
+  busy,
+  onRepair,
+}: {
+  hosts: PluginInstallation[];
+  busy: boolean;
+  /** Repairs the registration and reinstalls the plugin for one host. */
+  onRepair: (host: PluginHost, failure: string) => Promise<boolean>;
+}) {
+  const t = useTranslator(onboardingMessages);
+  const { states, error } = useVerifyStates(hosts);
+  const reason = useFailureReason();
+  const [repaired, setRepaired] = useState<PluginHost[]>([]);
   return (
     <div className="settings-row plugin-verify">
       <div className="settings-row-text">
         <h3>{t("verify.title")}</h3>
-        <p>{t("verify.detail")}</p>
-        <div className="plugin-install-path">
-          <code>{t("verify.prompt")}</code>
-          <button
-            className="settings-button"
-            onClick={() =>
-              void desktop
-                .invoke("clipboard:write", { text: t("verify.prompt") })
-                .then(() => setCopied(true))
-                .catch((reason) => setError(errorMessage(reason)))
-            }
-          >
-            {copied ? t("verify.copied") : t("verify.copy")}
-          </button>
-        </div>
+        <VerifyPrompt label={t("verify.detail")} />
         <ul className="plugin-verify-hosts">
           {hosts.map((host) => {
             const state = states.get(host.host)!;
@@ -251,11 +288,7 @@ export function VerifyConnection({
                             reason: reason(state.code),
                           })
                         : state.kind === "notSinceInstall"
-                          ? state.at
-                            ? t("verify.notSinceInstallBefore", {
-                                time: formatTime(state.at),
-                              })
-                            : t("verify.notSinceInstall")
+                          ? t("verify.notSinceInstall")
                           : t("verify.waiting")}
                 </span>
                 {state.kind === "failed" && (
@@ -292,10 +325,6 @@ export function VerifyConnection({
             <RestartHints hosts={repaired} />
           </div>
         )}
-        <a href={AGENT_TROUBLESHOOTING} target="_blank" rel="noreferrer">
-          <ExternalLink size={12} aria-hidden="true" />
-          {t("verify.help")}
-        </a>
         {error && (
           <p role="alert" className="plugin-install-error">
             {error}
@@ -316,7 +345,10 @@ export const RUNTIME_FAILURES = new Set([
   "RUNTIME_START_FAILED",
 ]);
 
-/** 当前登记的运行时: which ShowAI the plugin launcher starts for this library. */
+/**
+ * Shown only when the registered runtime is not this App: the plugin launcher would
+ * start another ShowAI for this library, or none.
+ */
 function RuntimeRegistration({
   runtime,
   busy,
@@ -327,43 +359,32 @@ function RuntimeRegistration({
   onRepair: () => void;
 }) {
   const t = useTranslator(messages);
+  if (runtime.state === "current") return null;
   const registered = runtime.registered;
   const state =
     runtime.state === "other" ? runtime.reason! : runtime.state;
   return (
-    <div className="settings-row" data-runtime-state={state}>
+    <div className="settings-row plugin-runtime" data-runtime-state={state}>
       <div className="settings-row-text">
         <h3>{t("runtime.title")}</h3>
-        <p>{t("runtime.detail")}</p>
+        <p role="status">
+          {t(`runtime.${state}`, {
+            channel: t(
+              registered?.channel
+                ? `channel.${registered.channel}`
+                : "channel.unknown",
+            ),
+          })}
+        </p>
         {registered && (
-          <>
-            <p>
-              {t("runtime.version", {
-                version: registered.version,
-                protocol: String(registered.protocol),
-              })}
-              {runtime.state === "current" && ` · ${t("runtime.current")}`}
-            </p>
-            <code className="plugin-install-code">{registered.entry}</code>
-          </>
-        )}
-        {runtime.state !== "current" && (
-          <p role="status">
-            {t(`runtime.${state}`, {
-              channel: t(
-                registered?.channel
-                  ? `channel.${registered.channel}`
-                  : "channel.unknown",
-              ),
-            })}
-          </p>
+          <code className="plugin-install-code">
+            {registered.version} · {registered.entry}
+          </code>
         )}
       </div>
-      {runtime.state !== "current" && (
-        <button className="settings-button" disabled={busy} onClick={onRepair}>
-          {busy ? t("runtime.repairing") : t("runtime.repair")}
-        </button>
-      )}
+      <button className="settings-button" disabled={busy} onClick={onRepair}>
+        {busy ? t("runtime.repairing") : t("runtime.repair")}
+      </button>
     </div>
   );
 }
@@ -463,48 +484,110 @@ export function LaunchConfigCopy({ info }: { info: DesktopInfo | null }) {
   const server = launcher ?? runtimeMcpLaunch(info.cli);
   const kinds: LaunchSnippetKind[] = ["claude", "codex", "json"];
   return (
-    <div className="settings-row plugin-launch-config">
-      <div className="settings-row-text">
-        <p>{t("launch.detail")}</p>
-        {kinds.map((kind) => {
-          const text = launchSnippet(kind, server, info.platform);
-          return (
-            <details key={kind} className="settings-config">
-              <summary>
-                <span>{t(`launch.${kind}Hint`)}</span>
-                <button
-                  className="settings-button"
-                  onClick={(event) => {
-                    event.preventDefault();
-                    setError("");
-                    void desktop
-                      .invoke("clipboard:write", { text })
-                      .then(() => setCopied(kind))
-                      .catch((reason) => setError(errorMessage(reason)));
-                  }}
-                >
-                  <Copy size={14} aria-hidden="true" />
-                  {copied === kind ? t("copied") : t(`launch.${kind}`)}
-                </button>
-              </summary>
-              <pre>
-                <code>{text}</code>
-              </pre>
-            </details>
-          );
-        })}
-        {error && (
-          <p role="alert" className="plugin-install-error">
-            {error}
-          </p>
-        )}
-      </div>
-    </div>
+    <section
+      className="settings-group plugin-launch-config"
+      aria-labelledby="settings-launch-title"
+    >
+      <h2 id="settings-launch-title">{t("launch.title")}</h2>
+      {kinds.map((kind) => {
+        const text = launchSnippet(kind, server, info.platform);
+        return (
+          <details key={kind} className="settings-config">
+            <summary>
+              <ChevronRight size={14} aria-hidden="true" />
+              <span>{t(`launch.${kind}Hint`)}</span>
+              <button
+                className="settings-button"
+                onClick={(event) => {
+                  event.preventDefault();
+                  setError("");
+                  void desktop
+                    .invoke("clipboard:write", { text })
+                    .then(() => setCopied(kind))
+                    .catch((reason) => setError(errorMessage(reason)));
+                }}
+              >
+                <Copy size={14} aria-hidden="true" />
+                {copied === kind ? t("copied") : t(`launch.${kind}`)}
+              </button>
+            </summary>
+            <pre>
+              <code>{text}</code>
+            </pre>
+          </details>
+        );
+      })}
+      {error && (
+        <p role="alert" className="plugin-install-error">
+          {error}
+        </p>
+      )}
+    </section>
   );
+}
+
+/** One host's state in a single line: detection, plugin, then the latest connection. */
+function hostStatus(
+  t: Translator<(typeof messages.catalogs)["zh-CN"]>,
+  host: PluginInstallation,
+  home: string,
+  verify: VerifyState | undefined,
+  reason: (code: string) => string,
+): { text: string; tone: "muted" | "ok" | "warn" | "error" } {
+  const name = pluginHostNames[host.host];
+  if (!host.executable)
+    return {
+      text: t(host.host === "deepseek" ? "dshMissing" : "missing"),
+      tone: "muted",
+    };
+  if (host.error) return { text: t("scanFailed"), tone: "error" };
+  if (host.otherSources.length)
+    return {
+      text: t("otherSource", {
+        source: host.otherSources.join(", "),
+        host: name,
+      }),
+      tone: "muted",
+    };
+  if (!host.installed)
+    return {
+      text: t(
+        host.host === "deepseek" && host.installedPath ? "dshStaged" : "ready",
+      ),
+      tone: "muted",
+    };
+  if (!host.enabled) return { text: t("disabled"), tone: "warn" };
+  if (pluginLibraryMismatch(host, home))
+    return {
+      text: t("libraryMismatch", { library: host.boundHome! }),
+      tone: "warn",
+    };
+  if (host.current === false) return { text: t("outdated"), tone: "warn" };
+  if (verify?.kind === "failed")
+    return {
+      text: t("state.failed", {
+        time: formatTime(verify.at),
+        reason: reason(verify.code),
+      }),
+      tone: "error",
+    };
+  if (verify?.kind === "called")
+    return {
+      text: t("state.called", { time: formatTime(verify.at) }),
+      tone: "ok",
+    };
+  if (verify?.kind === "connected")
+    return {
+      text: t("state.connected", { time: formatTime(verify.at) }),
+      tone: "ok",
+    };
+  return { text: t("state.waiting"), tone: "ok" };
 }
 
 export default function PluginInstallSettings({ home }: { home: string }) {
   const t = useTranslator(messages);
+  const ts = useTranslator(settingsMessages);
+  const tv = useTranslator(onboardingMessages);
   const {
     hosts,
     scanned,
@@ -520,15 +603,31 @@ export default function PluginInstallSettings({ home }: { home: string }) {
     setPath,
   } = usePluginHosts(home);
   const [batch, setBatch] = useState<PluginBatchResult | null>(null);
-  const installed = hosts.filter((host) => host.installed && host.enabled);
+  const installed = hosts.filter(
+    (host) =>
+      host.installed &&
+      host.enabled &&
+      host.current !== false &&
+      !pluginLibraryMismatch(host, home),
+  );
   const outdated = hosts.filter(pluginNeedsUpdate);
+  const verify = useVerifyStates(installed);
+  const reason = useFailureReason();
+  // Hosts installed or updated just now need a restart before the first call.
+  const restart = new Set<PluginHost>(
+    receipt && !receipt.dsh ? [receipt.host] : (batch?.updated ?? []),
+  );
+  const uncalled = installed.some(
+    (host) => verify.states.get(host.host)?.kind !== "called",
+  );
   return (
-    <div className="plugin-install-settings" aria-busy={!!busy}>
-      <div className="settings-row">
-        <div className="settings-row-text">
-          <h3>{t("title")}</h3>
-          <p>{t("detail")}</p>
-        </div>
+    <section
+      className="settings-group plugin-install-settings"
+      aria-labelledby="settings-plugins-title"
+      aria-busy={!!busy}
+    >
+      <div className="settings-group-heading">
+        <h2 id="settings-plugins-title">{ts("localConnection")}</h2>
         {outdated.length > 1 && (
           <button
             className="settings-button"
@@ -546,6 +645,7 @@ export default function PluginInstallSettings({ home }: { home: string }) {
           disabled={!!busy}
           onClick={() => void refresh()}
         >
+          <RefreshCw size={13} aria-hidden="true" />
           {busy === "scan" ? t("scanning") : t("refresh")}
         </button>
       </div>
@@ -559,44 +659,50 @@ export default function PluginInstallSettings({ home }: { home: string }) {
       <PendingNotice
         active={!scanned && !hosts.length}
         label={t("scanningHosts")}
-        lines={4}
-        minHeight={320}
+        lines={3}
+        minHeight={200}
       />
       {hosts.map((host) => {
-        const mismatch = pluginLibraryMismatch(host, home);
+        const state = verify.states.get(host.host);
+        const status = hostStatus(t, host, home, state, reason);
+        const failed = state?.kind === "failed" ? state : undefined;
+        const dsh =
+          receipt?.host === host.host && receipt.dsh
+            ? receipt.dsh
+            : host.dsh && host.installedPath
+              ? host.dsh
+              : undefined;
         return (
-          <div className="settings-row" key={host.host} data-host={host.host}>
+          <div
+            className="settings-row plugin-host"
+            key={host.host}
+            data-host={host.host}
+          >
+            <AgentBrandIcon brand={host.host} />
             <div className="settings-row-text">
-              <h3>{pluginHostNames[host.host]}</h3>
-              <p>
-                {!host.executable
-                  ? host.host === "deepseek"
-                    ? t("dshMissing")
-                    : t("missing")
-                  : host.error
-                    ? t("scanFailed")
-                    : host.otherSources.length
-                      ? t("otherSource")
-                      : host.installed
-                        ? host.enabled
-                          ? mismatch
-                            ? t("libraryMismatch")
-                            : host.current === false
-                              ? t("outdated")
-                              : t("installed")
-                          : t("disabled")
-                        : host.host === "deepseek" && host.installedPath
-                          ? t("dshStaged")
-                          : t("ready")}
+              <h3>
+                {pluginHostNames[host.host]}
+                {host.version && (
+                  <span className="plugin-host-version">
+                    {host.version.split("+")[0]}
+                  </span>
+                )}
+              </h3>
+              <p className="plugin-host-state" data-tone={status.tone}>
+                {status.text}
               </p>
-              {host.otherSources.length > 0 && (
-                <p>{host.otherSources.join(", ")}</p>
-              )}
-              {host.version && <p>{host.version.split("+")[0]}</p>}
-              {host.boundHome && (
-                <p className="plugin-install-note">
-                  {t("boundLibrary")} <span>{host.boundHome}</span>
+              {restart.has(host.host) && (
+                <p className="plugin-host-next" role="status">
+                  {t(`next.${host.host}`)}
                 </p>
+              )}
+              {failed?.detail && (
+                <details className="plugin-verify-detail">
+                  <summary>{tv("verify.details")}</summary>
+                  <pre className="plugin-install-details">
+                    {failed.code}: {failed.detail}
+                  </pre>
+                </details>
               )}
               {host.manualPath && host.executable === host.manualPath && (
                 <p className="plugin-install-note">
@@ -624,78 +730,55 @@ export default function PluginInstallSettings({ home }: { home: string }) {
                   onSave={(path) => void setPath(host.host, path)}
                 />
               )}
-              {host.dsh && host.installedPath && !receipt?.dsh && (
-                <DshSteps steps={host.dsh} />
-              )}
+              {dsh && <DshSteps steps={dsh} />}
             </div>
-            <button
-              className="settings-button"
-              disabled={!!busy || pluginActionBlocked(host)}
-              onClick={() => {
-                setBatch(null);
-                void install(host.host);
-              }}
-            >
-              {busy === host.host
-                ? t("installing")
-                : t(pluginActionLabel(host, home))}
-            </button>
+            {failed ? (
+              <button
+                className="settings-button"
+                disabled={!!busy}
+                onClick={() => {
+                  setBatch(null);
+                  void install(host.host, {
+                    repairRuntime: RUNTIME_FAILURES.has(failed.code),
+                  });
+                }}
+              >
+                {busy === host.host ? tv("verify.repairing") : tv("verify.repair")}
+              </button>
+            ) : (
+              !pluginActionBlocked(host) && (
+                <button
+                  className="settings-button"
+                  disabled={!!busy}
+                  onClick={() => {
+                    setBatch(null);
+                    void install(host.host);
+                  }}
+                >
+                  {busy === host.host
+                    ? t("installing")
+                    : t(pluginActionLabel(host, home))}
+                </button>
+              )
+            )}
           </div>
         );
       })}
+      {uncalled && <VerifyPrompt label={t("verifyHint")} />}
       <PluginError message={error} details={errorDetails} />
-      {batch && (
-        <div role="status" className="plugin-install-result">
-          {batch.updated.length > 0 && (
-            <>
-              <p>
-                {t("batchUpdated", {
-                  hosts: pluginHostList(batch.updated),
-                })}
-              </p>
-              <RestartHints hosts={batch.updated} />
-            </>
-          )}
-          {batch.failed.map((item) => (
-            <p key={item.host} role="alert" className="plugin-install-error">
-              {t("batchFailed", {
-                host: pluginHostNames[item.host],
-                message: item.message,
-              })}
-            </p>
-          ))}
-        </div>
+      {verify.error && (
+        <p role="alert" className="plugin-install-error">
+          {verify.error}
+        </p>
       )}
-      {receipt && (
-        <div role="status" className="plugin-install-result">
-          <p>{receipt.dsh ? t("dshStagedDone") : t("success")}</p>
-          {receipt.dsh ? (
-            <DshSteps steps={receipt.dsh} />
-          ) : (
-            <RestartHints hosts={[receipt.host]} />
-          )}
-          <details>
-            <summary>{t("details")}</summary>
-            <p>{receipt.installedPath}</p>
-            <p>{receipt.home}</p>
-            <p>
-              {receipt.verifiedFiles} {t("verifiedFiles")}
-            </p>
-          </details>
-        </div>
-      )}
-      {installed.length > 0 && (
-        <VerifyConnection
-          hosts={installed}
-          busy={!!busy}
-          onRepair={(host, failure) =>
-            install(host, { repairRuntime: RUNTIME_FAILURES.has(failure) })
-          }
-        />
-      )}
-      <p className="plugin-install-note">
-        {t("library")} <span>{home}</span>
-      </p>
-    </div>
+      {batch?.failed.map((item) => (
+        <p key={item.host} role="alert" className="plugin-install-error">
+          {t("batchFailed", {
+            host: pluginHostNames[item.host],
+            message: item.message,
+          })}
+        </p>
+      ))}
+    </section>
   );
 }
