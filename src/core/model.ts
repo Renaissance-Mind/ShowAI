@@ -1,6 +1,7 @@
 import type { JSONContent } from "@tiptap/core";
 import type { ShowDocument } from "../types";
 import type { NodeLayout, SavedView } from "../surface/types";
+import type { ProjectDatabase } from "./project-database";
 import type {
   DiagramDirection,
   DiagramInsertInput,
@@ -38,6 +39,8 @@ export interface ProjectMetadata extends DirectoryPreferences {
   pinned?: boolean;
   archived?: boolean;
   folders?: FolderMetadata[];
+  /** Project pages are records whose properties live in this shared dataset. */
+  database?: ProjectDatabase;
 }
 
 export interface FolderMetadata extends DirectoryPreferences {

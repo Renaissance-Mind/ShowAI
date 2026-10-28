@@ -4,6 +4,7 @@ import { isAbsolute, join, relative, resolve, sep } from "node:path";
 import { gzipSync, gunzipSync } from "node:zlib";
 import { ContentLibrary as GitLibrary } from "./content-library";
 import { FileStore, assertId } from "./store";
+import { DatasetStore, validateDataset } from "./datasets";
 import { CoreError } from "./model";
 import { documentHash, normalizeDocument, canonicalJson } from "./diff";
 import { upgradeResource } from "../surface/containers.mjs";
@@ -189,7 +190,7 @@ function canonicalContent(path: string) {
     path === "sidebar.json" ||
     path.startsWith("packages/") ||
     path.startsWith("publications/") ||
-    /^projects\/[^/]+\/(?:project\.json$|pages\/[^/]+\.json$|packages\/)/.test(
+    /^projects\/[^/]+\/(?:project\.json$|pages\/[^/]+\.json$|datasets\/[^/]+\.json$|packages\/)/.test(
       path,
     )
   );
@@ -520,6 +521,25 @@ export class LibraryImport {
           const store = new FileStore(stage),
             projectList = await store.listProjects();
           projects = projectList.length;
+          for (const [path, bytes] of changes) {
+            const dataset = path.match(
+              /^projects\/[^/]+\/datasets\/([^/]+)\.json$/,
+            );
+            if (dataset && bytes)
+              validateDataset(JSON.parse(bytes.toString("utf8")), dataset[1]);
+          }
+          for (const project of projectList) {
+            if (!project.database) continue;
+            const record = await new DatasetStore(store).read(
+              project.id,
+              project.database.datasetId,
+            );
+            if (record.dataset.origin?.kind !== "project-database")
+              throw new CoreError(
+                "INVALID_DATA",
+                "Project database properties are invalid.",
+              );
+          }
           // Validate raw package integrity and all current page dependency closures.
           for (const projectId of [
             undefined,

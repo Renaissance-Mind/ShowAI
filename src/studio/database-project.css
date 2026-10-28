@@ -1,0 +1,1043 @@
+.project-database {
+  flex: 1;
+  min-width: 0;
+  overflow: auto;
+  padding: 54px 48px 36px;
+  color: var(--text);
+  background: var(--paper);
+}
+.project-db-header {
+  margin-bottom: 30px;
+}
+.project-db-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 12px;
+  color: var(--muted);
+  font-size: 12px;
+}
+.project-db-header h1 {
+  margin: 0;
+  font-size: 32px;
+  font-weight: 650;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+.project-db-header p {
+  margin: 12px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+.project-database button,
+.project-database input,
+.project-database select {
+  font: inherit;
+  color: inherit;
+}
+.project-database button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 28px;
+  padding: 4px 8px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.project-database button:hover {
+  background: var(--hover);
+}
+.project-database button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.project-database :is(button, a, input, select):focus-visible {
+  outline: 2px solid var(--brand-accent);
+  outline-offset: 1px;
+}
+.project-database .project-db-icon-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 26px;
+  height: 26px;
+  min-height: 26px;
+  padding: 0;
+  color: var(--muted);
+  border-radius: 4px;
+}
+.project-database a.project-db-icon-button:hover {
+  background: var(--hover);
+}
+.project-db-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  min-height: 45px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--line);
+  font-size: 12px;
+}
+.project-db-view {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-weight: 550;
+  white-space: nowrap;
+}
+.project-db-save-state {
+  color: var(--muted);
+  font-size: 11px;
+  white-space: nowrap;
+}
+.project-db-tools {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 3px;
+  margin-left: auto;
+}
+.project-db-search {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  width: 195px;
+  padding: 4px 7px;
+  color: var(--muted);
+  border-radius: 4px;
+}
+.project-db-search:focus-within {
+  background: var(--surface);
+  color: var(--brand-accent);
+}
+.project-db-search input {
+  width: 100%;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  outline: none;
+  font-size: 12px;
+}
+.project-db-search input::placeholder {
+  color: var(--muted);
+}
+.project-db-tools .is-active {
+  background: var(--accent-soft);
+}
+.project-db-filter-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--brand-accent);
+}
+.project-database .project-db-primary {
+  margin-left: 5px;
+  background: var(--brand-accent);
+  color: var(--paper);
+  padding: 5px 10px;
+}
+.project-database .project-db-primary:hover {
+  filter: brightness(1.08);
+  background: var(--brand-accent);
+}
+.project-db-filter-panel {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  flex-wrap: wrap;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 12px;
+}
+.project-db-filter-panel :is(select, input),
+.project-db-property-row > select {
+  min-height: 30px;
+  padding: 4px 8px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: var(--paper);
+}
+.project-db-filter-panel input {
+  max-width: 230px;
+}
+.project-db-properties {
+  padding: 16px;
+  margin: 14px 0;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--surface);
+  font-size: 12px;
+}
+.project-db-property-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.project-db-properties p {
+  margin: 5px 0 14px;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.6;
+}
+.project-db-fixed-property {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-height: 34px;
+  padding: 5px 8px;
+  border-bottom: 1px solid var(--line);
+}
+.project-db-fixed-property > span:last-child {
+  margin-left: auto;
+  color: var(--muted);
+  font-size: 11px;
+}
+.project-db-property-row {
+  position: relative;
+  display: grid;
+  grid-template-columns: 26px minmax(100px, 1fr) 110px minmax(120px, 1.8fr) 26px;
+  gap: 8px;
+  align-items: center;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--line);
+}
+.project-db-property-row .project-db-input {
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: var(--paper);
+  padding: 6px 8px;
+}
+.project-db-properties > button:last-child {
+  margin-top: 10px;
+  color: var(--muted);
+}
+.project-database .project-db-danger:hover {
+  color: var(--danger);
+}
+.project-db-notice {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 11px 12px;
+  margin: 12px 0;
+  border: 1px solid color-mix(in srgb, var(--danger) 30%, var(--line));
+  border-radius: 5px;
+  background: color-mix(in srgb, var(--danger) 5%, var(--paper));
+  font-size: 12px;
+}
+.project-db-notice > span {
+  flex: 1;
+  overflow-wrap: anywhere;
+}
+.project-db-notice button {
+  border: 1px solid var(--line);
+  background: var(--paper);
+}
+.project-db-conflicts {
+  margin: 12px 0;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  background: var(--surface);
+  font-size: 12px;
+}
+.project-db-conflicts > p {
+  color: var(--muted);
+  margin: 5px 0;
+}
+.project-db-conflict {
+  display: grid;
+  gap: 5px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+  overflow-wrap: anywhere;
+}
+.project-db-conflict > div {
+  display: flex;
+  gap: 8px;
+}
+.project-db-conflict button {
+  border: 1px solid var(--line);
+  background: var(--paper);
+}
+.project-db-state {
+  padding: 30px 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+.project-db-table-wrap {
+  container-type: inline-size;
+  width: 100%;
+  overflow-x: auto;
+}
+.project-db-table {
+  width: 100%;
+  table-layout: fixed;
+  border-spacing: 0;
+  border-collapse: separate;
+  font-size: 13px;
+}
+.project-db-table :is(th, td) {
+  min-width: 0;
+  height: 40px;
+  padding: 0;
+  border-right: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+  vertical-align: middle;
+}
+.project-db-table th {
+  position: relative;
+  font-weight: 400;
+  color: var(--muted);
+  height: 38px;
+}
+.project-db-table th > button {
+  justify-content: flex-start;
+  width: 100%;
+  height: 37px;
+  padding: 7px 14px 7px 10px;
+  border-radius: 0;
+  overflow: hidden;
+}
+.project-db-column-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.project-db-table th > button > :not(.project-db-column-name) {
+  flex-shrink: 0;
+}
+.project-db-column-resize {
+  position: absolute;
+  top: 0;
+  right: -4px;
+  z-index: 4;
+  width: 9px;
+  height: 100%;
+  cursor: col-resize;
+  touch-action: none;
+  outline: none;
+}
+.project-db-column-resize::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 3px;
+  width: 2px;
+  height: 100%;
+  background: var(--brand-accent);
+  opacity: 0;
+  pointer-events: none;
+}
+.project-db-column-resize:is(:hover, :focus-visible, [data-resizing])::after {
+  opacity: 1;
+}
+.project-db-column-resize[data-resizing]::after {
+  height: var(--db-resize-guide-height, 100%);
+}
+.project-db-resizing,
+.project-db-resizing * {
+  cursor: col-resize !important;
+  user-select: none !important;
+}
+.project-db-resizing [role="tooltip"] {
+  display: none;
+}
+.project-db-table td {
+  overflow: hidden;
+}
+.project-db-table .project-db-input {
+  box-sizing: border-box;
+}
+.project-db-table .project-db-input[type="date"] {
+  min-width: 0;
+}
+.project-db-table .project-db-select {
+  min-width: 0;
+  max-width: calc(100% - 16px);
+}
+.project-db-table .project-db-cell-input {
+  min-width: 0;
+}
+.project-db-table .project-db-cell-input > .project-db-input {
+  flex: 1;
+}
+.project-database [data-reorderable="true"] {
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+.project-database [data-dragging="true"] {
+  background: color-mix(in srgb, var(--hover) 55%, var(--paper));
+}
+.project-database [data-dragging="true"] > * {
+  opacity: 0;
+}
+.project-db-property-row:not([data-dragging="true"]) {
+  z-index: 1;
+  background: var(--surface);
+}
+.project-db-reordering,
+.project-db-reordering * {
+  cursor: grabbing !important;
+  user-select: none !important;
+}
+.project-db-reordering [role="tooltip"] {
+  visibility: hidden;
+}
+.project-database.project-db-drag-layer {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 10000;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  pointer-events: none;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  box-sizing: border-box;
+  box-shadow:
+    0 4px 14px #0002,
+    0 0 0 1px #00000005;
+  opacity: 0.96;
+  will-change: transform;
+}
+.project-db-drag-layer .project-db-table {
+  width: 100%;
+  table-layout: fixed;
+}
+.project-db-drag-layer .project-db-table :is(th, td) {
+  min-width: 0;
+  border-right: 0;
+}
+.project-db-drag-layer .project-db-property-row {
+  box-sizing: border-box;
+  border-bottom: 0;
+}
+.project-db-type-symbol {
+  display: inline-block;
+  flex: 0 0 auto;
+  min-width: 18px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 450;
+  text-align: center;
+}
+.project-db-table .project-db-title-column {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  background: var(--paper);
+}
+.project-db-table[data-wide-title] .project-db-title-column {
+  position: static;
+}
+.project-db-table thead .project-db-title-column {
+  z-index: 2;
+}
+/* A narrow peek leaves too little room beside a pinned name column. */
+@container (max-width: 560px) {
+  .project-db-table .project-db-title-column {
+    position: static;
+  }
+}
+.project-db-table tbody tr:hover > td {
+  background: color-mix(in srgb, var(--hover) 45%, var(--paper));
+}
+.project-db-document {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  padding: 2px 6px;
+}
+.project-db-document .project-db-open {
+  justify-content: flex-start;
+  flex: 1;
+  min-width: 0;
+  padding: 6px 4px;
+  font-weight: 500;
+  text-align: left;
+}
+.project-db-open > span:last-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 400px;
+}
+.project-db-open > svg {
+  color: var(--muted);
+  flex-shrink: 0;
+}
+.project-db-page-icon {
+  flex-shrink: 0;
+  width: 17px;
+  font-size: 15px;
+  overflow: hidden;
+}
+.project-db-document .project-db-rename-button,
+.project-db-row-archive {
+  opacity: 0;
+}
+.project-db-table tr:hover .project-db-rename-button,
+.project-db-table tr:focus-within .project-db-rename-button,
+.project-db-table tr:hover .project-db-row-archive,
+.project-db-table tr:focus-within .project-db-row-archive {
+  opacity: 1;
+}
+.project-db-rename {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  padding: 4px 5px;
+}
+.project-db-rename input {
+  flex: 1;
+  width: 100px;
+  min-width: 0;
+  padding: 4px 6px;
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  background: var(--paper);
+}
+.project-db-cell-input {
+  display: flex;
+  align-items: center;
+  padding-right: 3px;
+}
+.project-db-input {
+  width: 100%;
+  min-width: 0;
+  height: 34px;
+  padding: 7px 10px;
+  border: 0;
+  background: transparent;
+  outline: none;
+}
+.project-db-input:disabled {
+  color: inherit;
+  opacity: 1;
+}
+.project-db-input::placeholder {
+  color: color-mix(in srgb, var(--muted) 60%, transparent);
+}
+.project-db-input:focus {
+  background: var(--paper);
+  box-shadow: inset 0 0 0 1px var(--brand-accent);
+}
+.project-db-input[type="date"] {
+  min-width: 145px;
+}
+.project-db-select {
+  max-width: 180px;
+  min-width: 90px;
+  margin: 5px 8px;
+  padding: 3px 6px;
+  border: 0;
+  border-radius: 3px;
+  background: var(--accent-soft);
+  font-size: 12px;
+  cursor: pointer;
+}
+.project-db-select:disabled {
+  opacity: 1;
+  cursor: default;
+  appearance: none;
+}
+.project-db-select[value=""] {
+  color: var(--muted);
+}
+.project-db-tag-0 {
+  background: color-mix(in srgb, #b29b72 17%, var(--paper));
+}
+.project-db-tag-1 {
+  background: color-mix(in srgb, #6493bf 17%, var(--paper));
+}
+.project-db-tag-2 {
+  background: color-mix(in srgb, #70a77d 17%, var(--paper));
+}
+.project-db-tag-3 {
+  background: color-mix(in srgb, #ac80b8 17%, var(--paper));
+}
+.project-db-tag-4 {
+  background: color-mix(in srgb, #c37c70 17%, var(--paper));
+}
+.project-db-checkbox-cell input {
+  width: 14px;
+  height: 14px;
+  margin: 8px 13px;
+  vertical-align: middle;
+  accent-color: var(--brand-accent);
+}
+.project-db-table .project-db-actions-column {
+  min-width: 38px;
+  width: 38px;
+  padding: 0 5px;
+  border-right: 0;
+}
+.project-db-table .project-db-add-column {
+  min-width: 135px;
+  width: 135px;
+  border-right: 0;
+}
+.project-db-table .project-db-add-column > .project-db-add-property {
+  justify-content: flex-start;
+  width: 100%;
+  height: 37px;
+  padding: 7px 10px;
+  border-radius: 0;
+  color: var(--muted);
+}
+.project-db-property-popover {
+  position: fixed;
+  inset: auto;
+  box-sizing: border-box;
+  width: min(300px, calc(100vw - 16px));
+  max-height: calc(100dvh - 16px);
+  margin: 0;
+  padding: 18px;
+  overflow-y: auto;
+  color: var(--text);
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  box-shadow:
+    0 8px 30px #0002,
+    0 2px 6px #0001;
+  font-size: 13px;
+}
+.project-db-property-popover .studio-form {
+  padding: 0;
+}
+.project-db-property-popover .studio-form > strong {
+  font-weight: 550;
+}
+.project-db-property-popover select {
+  min-height: 36px;
+  padding: 6px 8px;
+  color: var(--text);
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  font: inherit;
+}
+.project-db-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 60px 18px;
+  text-align: center;
+  color: var(--muted);
+}
+.project-db-empty > svg {
+  opacity: 0.6;
+}
+.project-db-empty > strong {
+  color: var(--text);
+  font-size: 15px;
+  font-weight: 550;
+}
+.project-db-empty p {
+  margin: 0 0 4px;
+  max-width: 400px;
+  font-size: 12px;
+  line-height: 1.6;
+}
+.project-db-empty button {
+  border: 1px solid var(--line);
+  color: var(--text);
+}
+.project-db-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 40px;
+  color: var(--muted);
+  font-size: 11px;
+}
+.project-db-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+.project-db-view-strip {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+.project-db-tabs {
+  position: relative;
+  isolation: isolate;
+  display: flex;
+  flex: 0 1 auto;
+  min-width: 0;
+  gap: 4px;
+  padding: 3px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.project-db-tabs::-webkit-scrollbar {
+  display: none;
+}
+.project-db-tab-indicator {
+  position: absolute;
+  left: 0;
+  top: 0;
+  z-index: -1;
+  opacity: 0;
+  pointer-events: none;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--text) 6%, var(--paper));
+  transform-origin: top left;
+}
+.project-db-tabs > button {
+  flex-shrink: 0;
+  min-height: 36px;
+  gap: 8px;
+  padding: 7px 14px;
+  border-radius: 999px;
+  color: var(--muted);
+  font-size: 14px;
+  font-weight: 550;
+  line-height: 22px;
+}
+.project-db-tabs > button > svg {
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+  stroke-width: 1.8;
+}
+.project-db-tabs > button:hover {
+  background: color-mix(in srgb, var(--text) 3%, transparent);
+}
+.project-db-tabs > button[aria-selected="true"] {
+  color: var(--text);
+  font-weight: 600;
+}
+.project-db-tabs > button[aria-selected="true"]:hover {
+  background: transparent;
+}
+.project-db-tabs > button:not(:disabled):active {
+  transform: none;
+}
+.project-db-view-panel {
+  position: relative;
+  min-width: 0;
+}
+.project-db-view-content {
+  min-width: 0;
+}
+.project-db-view-exit {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+  background: var(--paper);
+}
+.project-db-view-actions {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  margin-left: auto;
+  gap: 2px;
+  color: var(--muted);
+  font-size: 12px;
+}
+.project-db-group-control,
+.project-db-sort-control {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 12px;
+}
+.project-db-group-control select {
+  max-width: 180px;
+  min-height: 28px;
+  padding: 3px 6px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: var(--paper);
+}
+.project-db-filter-divider {
+  width: 1px;
+  height: 20px;
+  margin: 0 3px;
+  background: var(--line);
+}
+.project-db-table tbody tr[data-active="true"] > td {
+  background: var(--accent-soft);
+}
+.project-db-board-hint {
+  margin: 14px 0 0;
+  padding: 10px 12px;
+  border-radius: 5px;
+  background: var(--surface);
+  color: var(--muted);
+  font-size: 12px;
+}
+.project-db-board {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(240px, 280px);
+  align-items: start;
+  gap: 14px;
+  padding: 16px 0 12px;
+  overflow-x: auto;
+}
+.project-db-board-group {
+  min-width: 0;
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+}
+.project-db-board-group > header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 4px 12px;
+  font-size: 12px;
+}
+.project-db-board-group > header strong {
+  font-weight: 550;
+  overflow-wrap: anywhere;
+}
+.project-db-board-group > header span {
+  color: var(--muted);
+  font-size: 11px;
+}
+.project-db-board-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.project-db-card {
+  min-width: 0;
+  padding: 5px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--paper);
+}
+.project-db-card:hover {
+  border-color: color-mix(in srgb, var(--muted) 40%, var(--line));
+}
+.project-db-card[data-active="true"] {
+  border-color: var(--brand-accent);
+  box-shadow: 0 0 0 1px var(--brand-accent);
+}
+.project-db-card .project-db-document {
+  padding: 0;
+}
+.project-db-card .project-db-open {
+  white-space: normal;
+  align-items: flex-start;
+  line-height: 1.5;
+}
+.project-db-card .project-db-open > span:last-child {
+  overflow-wrap: anywhere;
+}
+.project-db-card .project-db-property-summary {
+  padding: 3px 4px;
+}
+.project-db-card-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 3px 0;
+}
+.project-db-card-footer .project-db-select {
+  margin: 0;
+}
+.project-db-empty-group {
+  margin: 0;
+  padding: 18px 4px;
+  color: var(--muted);
+  font-size: 11px;
+  text-align: center;
+}
+.project-db-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.project-db-list-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 48px;
+  padding: 4px 5px;
+  border-bottom: 1px solid var(--line);
+}
+.project-db-list-row:hover {
+  background: var(--surface);
+}
+.project-db-list-row[data-active="true"] {
+  background: var(--accent-soft);
+}
+.project-db-list-row > .project-db-document,
+.project-db-list-row > .project-db-rename {
+  flex: 1;
+  min-width: 0;
+}
+.project-db-list-row > .project-db-property-summary {
+  max-width: 48%;
+  justify-content: flex-end;
+}
+.project-db-property-summary {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 5px 9px;
+  min-width: 0;
+  color: var(--muted);
+  font-size: 11px;
+}
+.project-db-property-summary > span {
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.project-db-summary-tag {
+  padding: 2px 5px;
+  border-radius: 3px;
+  color: var(--text);
+}
+:is(.project-db-card, .project-db-list-row):is(:hover, :focus-within)
+  :is(.project-db-rename-button, .project-db-row-archive) {
+  opacity: 1;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .project-database button,
+  .project-database a.project-db-icon-button {
+    transition:
+      background-color var(--duration-fast) var(--ease-out),
+      color var(--duration-fast) var(--ease-out),
+      border-color var(--duration-fast) var(--ease-out),
+      opacity var(--duration-fast) var(--ease-out),
+      filter var(--duration-fast) var(--ease-out),
+      transform var(--duration-fast) var(--ease-out);
+  }
+  .project-database button:not(:disabled):active,
+  .project-database a.project-db-icon-button:active {
+    transform: scale(0.98);
+  }
+  .project-db-table tbody tr > td {
+    transition: background-color var(--duration-fast) var(--ease-out);
+  }
+  .project-db-card,
+  .project-db-list-row {
+    transition:
+      background-color var(--duration-fast) var(--ease-out),
+      border-color var(--duration-fast) var(--ease-out),
+      box-shadow var(--duration-fast) var(--ease-out);
+  }
+  .project-db-search {
+    transition:
+      background-color var(--duration-fast) var(--ease-out),
+      color var(--duration-fast) var(--ease-out);
+  }
+  .project-db-input,
+  .project-db-select,
+  .project-db-rename input,
+  .project-db-filter-panel :is(input, select),
+  .project-db-property-row > select {
+    transition:
+      background-color var(--duration-fast) var(--ease-out),
+      border-color var(--duration-fast) var(--ease-out),
+      box-shadow var(--duration-fast) var(--ease-out);
+  }
+  /* These panels mount only when opened; editing cells never replays entry. */
+  .project-db-filter-panel,
+  .project-db-properties {
+    animation: showai-rise-in var(--duration-base) var(--ease-out) backwards;
+  }
+  .project-db-property-popover:popover-open {
+    animation: showai-rise-in var(--duration-fast) var(--ease-out) backwards;
+  }
+}
+@media (hover: none) {
+  .project-db-document .project-db-rename-button,
+  .project-db-row-archive {
+    opacity: 1;
+  }
+}
+@media (max-width: 900px) {
+  .project-database {
+    padding: 32px 24px;
+  }
+  .project-db-toolbar {
+    gap: 10px;
+  }
+  .project-db-tools {
+    flex-basis: 100%;
+    justify-content: flex-start;
+    margin-left: 0;
+  }
+  .project-db-search {
+    flex: 1;
+    min-width: 160px;
+  }
+}
+@media (max-width: 600px) {
+  .project-database {
+    padding: 24px 16px;
+  }
+  .project-db-header h1 {
+    font-size: 26px;
+  }
+  .project-db-property-row {
+    grid-template-columns: 24px minmax(80px, 1fr) 95px 26px;
+  }
+  .project-db-property-row > :nth-child(4) {
+    grid-column: 2 / 4;
+    grid-row: 2;
+  }
+  .project-db-property-row > :nth-child(5) {
+    grid-column: 4;
+    grid-row: 1;
+  }
+  .project-db-open > span:last-child {
+    max-width: 180px;
+  }
+  .project-db-search {
+    flex-basis: 100%;
+  }
+  .project-db-fixed-property > span:last-child {
+    max-width: 130px;
+    text-align: right;
+  }
+  .project-db-view-strip {
+    gap: 4px;
+  }
+  .project-db-view-actions > button > span {
+    display: none;
+  }
+  .project-db-list-row {
+    gap: 6px;
+  }
+  .project-db-property-summary > span {
+    max-width: 105px;
+  }
+}

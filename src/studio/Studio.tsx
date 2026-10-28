@@ -68,6 +68,7 @@ import {
   LayoutList,
   LayoutGrid,
   Grid2X2,
+  Table2,
   Undo2,
   Redo2,
   Plus,
@@ -151,6 +152,11 @@ import ProjectIcon from "./ProjectIcon";
 import PageIconDialog from "./PageIconDialog";
 import ExpandableSearch from "../components/ExpandableSearch";
 import ProjectSidebar from "./ProjectSidebar";
+import DatabaseProject from "./DatabaseProject";
+import DatabasePeekToolbar from "./DatabasePeekToolbar";
+import DatabaseRecordProperties from "./DatabaseRecordProperties";
+import { workbenchDatasetClient } from "../datasets/react";
+import databasePeekMessages from "../i18n/messages/databasePeek";
 import {
   LibraryDragContext,
   useLibraryDragController,
@@ -205,6 +211,7 @@ import syncMessages from "../i18n/messages/sync";
 import WorkspaceTabs, { WorkspaceHistory } from "./WorkspaceTabs";
 import { WorkspaceSwipeNavigation } from "./WorkspaceSwipeNavigation";
 import { useWorkspaceTabs } from "./useWorkspaceTabs";
+import { useNavigationMotion } from "./useNavigationMotion";
 import {
   clickDisposition,
   libraryEntry,
@@ -324,7 +331,12 @@ type DialogState =
     }
   | { type: "externalConflict"; id: string; saveFailure?: boolean }
   | { type: "discardDraft" }
-  | { type: "project"; project?: ProjectSummary; groupId?: string }
+  | {
+      type: "project";
+      project?: ProjectSummary;
+      groupId?: string;
+      database?: boolean;
+    }
   | { type: "group"; group?: ProjectGroup; projectId?: string }
   | { type: "moveProject"; projectId: string }
   | {
@@ -427,6 +439,7 @@ export default function Studio() {
   const [feedbackRequest, setFeedbackRequest] = useState<FeedbackRequest>();
   const feedbackRequestId = useRef(0);
   const tps = useTranslator(pageSessionMessages);
+  const tp = useTranslator(databasePeekMessages);
   useEffect(() => {
     const wake = () => {
       if (document.visibilityState === "visible" && navigator.onLine)
@@ -503,6 +516,20 @@ export default function Studio() {
     anchor: HTMLElement;
   } | null>(null);
   const [selectedProject, setSelectedProject] = useState<string | null>(null);
+  const [databasePeek, setDatabasePeek] = useState<{
+    projectId: string;
+    tabId: string;
+    returnFocus: HTMLElement | null;
+  } | null>(null);
+  const [databasePageIds, setDatabasePageIds] = useState<string[]>([]);
+  const databaseVisiblePagesChanged = useCallback((ids: string[]) => {
+    setDatabasePageIds((previous) =>
+      previous.length === ids.length &&
+      previous.every((id, index) => id === ids[index])
+        ? previous
+        : ids,
+    );
+  }, []);
   // Sync state for project rows, the page header and workbench banners.
   const syncOverview = useSyncOverview(info?.home);
   const syncReadOnly = syncOverview.loaded
@@ -563,8 +590,10 @@ export default function Studio() {
       : "projects",
   );
   const [settingsSection, setSettingsSection] = useState<SettingsSection>(() =>
-    new URLSearchParams(location.search).has("invite") || !capabilities.manageLibrary
-      ? "sync" : "general",
+    new URLSearchParams(location.search).has("invite") ||
+    !capabilities.manageLibrary
+      ? "sync"
+      : "general",
   );
   useEffect(() => {
     const host = window as Window & { showaiPendingInvite?: string };
@@ -798,6 +827,10 @@ export default function Studio() {
     [catalog, componentFilter, catalogQueries.components],
   );
   const catalogScrollRef = useRef<HTMLDivElement>(null);
+  const workspaceScrollElement = () =>
+    catalogScrollRef.current?.querySelector<HTMLElement>(
+      ":scope > .studio-database-library",
+    ) ?? catalogScrollRef.current;
   const page = usePage(info?.home);
   const activePageId = page.draft?.id;
   const handleActiveSurfaceChange = useCallback(
@@ -890,9 +923,9 @@ export default function Studio() {
   const deferConflict = () => {
     deferredSaveFailure.current = saveFailureIdentity();
     closeDialog();
-    void page.retainDraft().catch((error: unknown) =>
-      report(error, { safety: "windowOnly" }),
-    );
+    void page
+      .retainDraft()
+      .catch((error: unknown) => report(error, { safety: "windowOnly" }));
   };
   useEffect(() => {
     configureProblemRedaction(info?.home ? { library: info.home } : {});
@@ -950,7 +983,10 @@ export default function Studio() {
                   ...scope,
                   ...(full ? {} : { projectIds: [...requested.ids] }),
                 })
-              : Promise.resolve({ projects: [], unreadable: [] } as ProjectScan),
+              : Promise.resolve({
+                  projects: [],
+                  unreadable: [],
+                } as ProjectScan),
             full || requested.sidebar
               ? desktop.invoke<SidebarOrganization>("sidebar:get", scope)
               : Promise.resolve(navigationState.current.organization),
@@ -1071,8 +1107,7 @@ export default function Studio() {
     refresh,
     report,
   );
-  const loadCatalog = useMemo(
-    () => {
+  const loadCatalog = useMemo(() => {
       const load = coalescedTask(async () => {
         const id = selectedRef.current;
         const requestedScope = catalogScopeRef.current;
@@ -1157,9 +1192,7 @@ export default function Studio() {
           setCatalogLoading(false);
         }
       };
-    },
-    [],
-  );
+  }, []);
 
   useEffect(() => {
     if (initialized.current) return;
@@ -1583,14 +1616,74 @@ export default function Studio() {
       setRouting(false);
     }
   }
+  async function openDatabasePeek(id: string, projectId: string) {
+    if (routingRef.current || workspace.switching) return false;
+    const returnFocus =
+      document.activeElement instanceof HTMLElement
+        ? document.activeElement
+        : null;
+    routingRef.current = true;
+    setRouting(true);
+    try {
+      const database = projects.find((item) => item.id === projectId)?.database;
+      if (database)
+        await workbenchDatasetClient()
+          ?.session(projectId, database.datasetId)
+          .refresh();
+      if (!(await page.open(projectId, id, workspace.activeId))) {
+        throw new Error(
+          page.sessions.getSnapshot().active?.getSnapshot().error ||
+            t("resolveDraftFirst"),
+        );
+      }
+      setDatabasePeek((previous) =>
+        previous?.projectId === projectId &&
+        previous.tabId === workspace.activeId
+          ? previous
+          : { projectId, tabId: workspace.activeId, returnFocus },
+      );
+      setContextMenu(null);
+      return true;
+    } finally {
+      routingRef.current = false;
+      setRouting(false);
+    }
+  }
+  async function closeDatabasePeek() {
+    if (routingRef.current || busy) return;
+    routingRef.current = true;
+    setRouting(true);
+    try {
+      if (!(await page.clear())) return;
+      const previousFocus = databasePeek?.returnFocus;
+      setDatabasePeek(null);
+      requestAnimationFrame(() => {
+        if (previousFocus?.isConnected)
+          previousFocus.focus({ preventScroll: true });
+      });
+    } finally {
+      routingRef.current = false;
+      setRouting(false);
+    }
+  }
+  function expandDatabasePeek() {
+    if (routingRef.current || !page.draft) return;
+    workspace.rememberScroll();
+    setSelectedFolder(page.draft.parentId ?? null);
+    setDatabasePeek(null);
+    setView("page");
+  }
   async function openTarget(
     target: LibraryTarget,
     disposition: OpenDisposition = "current",
   ) {
     if (!workspaceReady || routingRef.current || workspace.isSwitching())
       return false;
-    if ((!capabilities.tabs && disposition !== "window") ||
-        (!capabilities.windows && disposition === "window")) disposition = "current";
+    if (
+      (!capabilities.tabs && disposition !== "window") ||
+      (!capabilities.windows && disposition === "window")
+    )
+      disposition = "current";
     if (disposition === "window") {
       return desktop.openWindow(
         {
@@ -1601,8 +1694,7 @@ export default function Studio() {
         page.flush,
       );
     }
-    if (disposition !== "current")
-      return workspace.open(libraryEntry(target));
+    if (disposition !== "current") return workspace.open(libraryEntry(target));
     return target.kind === "page"
       ? openPage(target.id, target.projectId)
       : openProject(
@@ -1635,8 +1727,7 @@ export default function Studio() {
       capabilities.tabs &&
       (disposition === "tab" || disposition === "foreground-tab")
     )
-      return workspace.open(
-        {
+      return workspace.open({
           location: {
             view: "docs",
             projectId: null,
@@ -1646,8 +1737,7 @@ export default function Studio() {
           title: meta.title,
           icon: meta.icon,
           scrollTop: 0,
-        },
-      );
+      });
     workspace.rememberScroll();
     routingRef.current = true;
     setRouting(true);
@@ -1716,18 +1806,47 @@ export default function Studio() {
         templateScope: template?.scope,
         templateIntegrity: template?.integrity,
       });
-      await page.open(
+      // Confirm the newly committed page in the canonical list before showing
+      // its peek; a later navigation refresh failure must not look like deletion.
+      await loadProjectContents(projectId);
+      const database = projects.find((item) => item.id === projectId)?.database;
+      if (database)
+        await workbenchDatasetClient()
+          ?.session(projectId, database.datasetId)
+          .refresh();
+      const opened = await page.open(
         projectId,
         created.document.id,
         workspace.activeId,
         created,
       );
+      if (!opened) {
+        await refresh();
+        throw new Error(tp("createdNotOpened"));
+      }
       selectedRef.current = projectId;
       setSelectedProject(projectId);
       setSelectedFolder(parentId);
       setExpandedProjects((current) => ({ ...current, [projectId]: true }));
       setDialog(null);
+      if (
+        view === "project" &&
+        !parentId &&
+        kind !== "board" &&
+        projects.find((item) => item.id === projectId)?.database
+      ) {
+        setDatabasePeek({
+          projectId,
+          tabId: workspace.activeId,
+          returnFocus:
+            document.activeElement instanceof HTMLElement
+              ? document.activeElement
+              : null,
+        });
+        setView("project");
+      } else {
       setView("page");
+      }
       await refresh();
       return created.document.id;
     } catch (reason) {
@@ -1746,7 +1865,9 @@ export default function Studio() {
     const draft = page.draft;
     if (!draft) return;
     const source = { ...draft, parentId: null };
-    const name = ts("readOnly.copyName", { name: project?.name ?? draft.title });
+    const name = ts("readOnly.copyName", {
+      name: project?.name ?? draft.title,
+    });
     const created = await desktop.invoke<ProjectSummary>(
       "sync:createLocalProject",
       { name, icon: project?.icon },
@@ -1793,8 +1914,10 @@ export default function Studio() {
   }
   /** One import path for the toolbar, the 「添加内容」 menu and files dropped on the directory. */
   async function importPage(
-    directory: { projectId: string; parentId: string | null } | null =
-      selectedProject
+    directory: {
+      projectId: string;
+      parentId: string | null;
+    } | null = selectedProject
         ? { projectId: selectedProject, parentId: selectedFolder }
         : null,
     dropped?: { name: string; content: string }[],
@@ -2024,6 +2147,12 @@ export default function Studio() {
         icon: <Upload size={15} />,
         onSelect: action(() => importPage(directory)),
       },
+      {
+        label: t("newDatabaseProject"),
+        icon: <Table2 size={15} />,
+        separatorBefore: true,
+        onSelect: () => setDialog({ type: "project", database: true }),
+      },
     ];
   }
   /** The grouped export menu shared by the top-bar ↗ button and the page 「…」 menu. */
@@ -2169,7 +2298,10 @@ export default function Studio() {
     );
   }
   /** F2 and Delete on a focused sidebar or folder row. */
-  function libraryKeyCommand(target: LibraryTarget, command: "rename" | "delete") {
+  function libraryKeyCommand(
+    target: LibraryTarget,
+    command: "rename" | "delete",
+  ) {
     if (dialogRef.current) return;
     setContextMenu(null);
     if (command === "rename") beginRename(target);
@@ -2690,7 +2822,9 @@ export default function Studio() {
                 action: {
                   label: operation("toast.undo"),
                   onSelect: () =>
-                    void replayLibraryRef.current(false).catch((error) =>
+                    void replayLibraryRef
+                      .current(false)
+                      .catch((error) =>
                       report(error, { action: operation("op.undoMove") }),
                     ),
                 },
@@ -3128,7 +3262,9 @@ export default function Studio() {
         return;
       }
       const folderIds = new Set(
-        targets.filter((target) => target.kind === "folder").map((target) => target.id),
+        targets
+          .filter((target) => target.kind === "folder")
+          .map((target) => target.id),
       );
       const insideSelectedFolder = (
         projectId: string | null,
@@ -3343,7 +3479,7 @@ export default function Studio() {
     home: info?.home,
     ready: workspaceReady && !routing,
     entry: workspaceEntry,
-    getScroll: () => catalogScrollRef.current?.scrollTop ?? 0,
+    getScroll: () => workspaceScrollElement()?.scrollTop ?? 0,
     onError: report,
     beforeClose: (tabId) => page.sessions.closeTab(tabId),
     restore: async (entry, tabId) => {
@@ -3397,6 +3533,91 @@ export default function Studio() {
     },
   });
   const studioRoot = useRef<HTMLDivElement>(null);
+  const databasePeekOpen = !!(
+    databasePeek &&
+    view === "project" &&
+    project?.database &&
+    !selectedFolder &&
+    databasePeek.projectId === selectedProject &&
+    databasePeek.tabId === workspace.activeId &&
+    page.draft &&
+    page.projectId === selectedProject
+  );
+  const peekSession = databasePeekOpen
+    ? page.sessions.getSnapshot().active
+    : null;
+  const peekDataset =
+    databasePeekOpen && project?.database
+      ? workbenchDatasetClient()?.session(
+          project.id,
+          project.database.datasetId,
+        )
+      : undefined;
+  const peekIndex = databasePageIds.indexOf(page.draft?.id ?? "");
+  useEffect(() => {
+    if (databasePeek && !databasePeekOpen) setDatabasePeek(null);
+  }, [databasePeek, databasePeekOpen]);
+  useEffect(() => {
+    if (
+      !databasePeekOpen ||
+      busy ||
+      routing ||
+      !selectedProject ||
+      !contents[selectedProject]
+    )
+      return;
+    if (
+      contents[selectedProject].pages.some(
+        (item) => item.id === page.draft?.id && !item.archived,
+      )
+    )
+      return;
+    // An external archive can block a formal save. Retain a durable draft before
+    // retiring its view, using the same boundary as closing a workspace tab.
+    void page.sessions
+      .clear()
+      .then((closed) => {
+        if (closed) setDatabasePeek(null);
+      })
+      .catch(report);
+  }, [
+    databasePeekOpen,
+    busy,
+    routing,
+    selectedProject,
+    contents,
+    page.draft?.id,
+    page.sessions,
+    report,
+  ]);
+  useEffect(() => {
+    if (!databasePeekOpen) return;
+    const escape = (event: KeyboardEvent) => {
+      if (
+        event.key !== "Escape" ||
+        event.defaultPrevented ||
+        event.isComposing ||
+        dialogRef.current ||
+        document.querySelector('[role="dialog"],[role="menu"]')
+      )
+        return;
+      event.preventDefault();
+      void closeDatabasePeek().catch(report);
+    };
+    window.addEventListener("keydown", escape);
+    return () => window.removeEventListener("keydown", escape);
+  }, [databasePeekOpen, databasePeek, routing, busy]);
+  useNavigationMotion(
+    catalogScrollRef,
+    workspaceEntry.location,
+    workspace.activeId,
+    view === "page"
+      ? breadcrumbFolders.length + 2
+      : view === "project"
+        ? breadcrumbFolders.length + 1
+        : 0,
+    workspaceReady && !routing && !workspace.switching,
+  );
   const assistantOpen = workspace.assistantOpen;
   const changeAssistantOpen = (open: boolean) =>
     workspace.setAssistantOpen(open, workspace.activeId);
@@ -3538,10 +3759,14 @@ export default function Studio() {
       faq: () => doc("agent-troubleshooting"),
       about,
       reportProblem: () => {
-        if (unhandled("showai:open-feedback", { source: "menu" })) return about();
+        if (unhandled("showai:open-feedback", { source: "menu" }))
+          return about();
       },
       copyDiagnostics: async () => {
-        if (!unhandled("showai:copy-diagnostics") || !window.showai?.diagnostics)
+        if (
+          !unhandled("showai:copy-diagnostics") ||
+          !window.showai?.diagnostics
+        )
           return;
         await desktop.invoke("clipboard:write", {
           text: await window.showai.diagnostics(),
@@ -3626,7 +3851,8 @@ export default function Studio() {
   ) {
     const target = searchTarget(result);
     const disposition = capabilities.tabs
-      ? clickDisposition(event, info?.platform === "darwin") : "current";
+      ? clickDisposition(event, info?.platform === "darwin")
+      : "current";
     if (target && disposition !== "current") {
       event.preventDefault();
       if (!(await openTarget(target, disposition)))
@@ -3697,7 +3923,8 @@ export default function Studio() {
   async function importDroppedFiles(files: File[]) {
     if (!project) return;
     const accepted = files.filter(
-      (file) => isImportablePageFile(file.name) && file.size <= IMPORT_SIZE_LIMIT,
+      (file) =>
+        isImportablePageFile(file.name) && file.size <= IMPORT_SIZE_LIMIT,
     );
     const skipped = files.filter((file) => !accepted.includes(file));
     if (skipped.length)
@@ -3842,9 +4069,7 @@ export default function Studio() {
       current={
         view === "projects"
           ? "recent"
-          : view === "templates" ||
-              view === "components" ||
-              view === "settings"
+          : view === "templates" || view === "components" || view === "settings"
             ? view
             : null
       }
@@ -3904,6 +4129,9 @@ export default function Studio() {
           onCreate={(groupId) => setDialog({ type: "project", groupId })}
           onNew={(anchor) =>
             setNewMenu((current) => (current === anchor ? null : anchor))
+          }
+          onCreateDatabase={() =>
+            setDialog({ type: "project", database: true })
           }
           onMenu={(anchor) =>
             setProjectsMenu((current) => (current === anchor ? null : anchor))
@@ -4092,7 +4320,10 @@ export default function Studio() {
                   onShowProblem={() => {
                     if (focusSaveBanner()) return;
                     if (page.conflictId)
-                      setDialog({ type: "externalConflict", id: page.conflictId });
+                      setDialog({
+                        type: "externalConflict",
+                        id: page.conflictId,
+                      });
                   }}
                 />
               )}
@@ -4288,33 +4519,53 @@ export default function Studio() {
             </ExpandableSearch>
           )}
         <div className="studio-section-actions studio-topbar-view-actions">
-          {document.documentElement.dataset.native === "ios" && (view === "project" || view === "projects") && (
+          {document.documentElement.dataset.native === "ios" &&
+            (view === "project" || view === "projects") && (
             <>
-              <button className="studio-icon" aria-label={t("libraryUndo")} title={t("libraryUndo")}
+                <button
+                  className="studio-icon"
+                  aria-label={t("libraryUndo")}
+                  title={t("libraryUndo")}
                 disabled={historyBusy.current || !libraryUndo.current.length}
-                onClick={() => void replayLibraryMove(false).catch((error) =>
+                  onClick={() =>
+                    void replayLibraryMove(false).catch((error) =>
                   report(error, { action: operation("op.undoMove") }),
-                )}><Undo2 size={16} /></button>
-              <button className="studio-icon" aria-label={t("libraryRedo")} title={t("libraryRedo")}
+                    )
+                  }
+                >
+                  <Undo2 size={16} />
+                </button>
+                <button
+                  className="studio-icon"
+                  aria-label={t("libraryRedo")}
+                  title={t("libraryRedo")}
                 disabled={historyBusy.current || !libraryRedo.current.length}
-                onClick={() => void replayLibraryMove(true).catch((error) =>
+                  onClick={() =>
+                    void replayLibraryMove(true).catch((error) =>
                   report(error, { action: operation("op.redoMove") }),
-                )}><Redo2 size={16} /></button>
+                    )
+                  }
+                >
+                  <Redo2 size={16} />
+                </button>
             </>
           )}
-          {view === "project" && (
+          {view === "project" && !(project?.database && !selectedFolder) && (
             <button
               className="studio-button"
               disabled={!visibleEntries.length}
               aria-pressed={pageSelection.active}
               onClick={() =>
-                pageSelection.active ? pageSelection.clear() : pageSelection.start()
+                pageSelection.active
+                  ? pageSelection.clear()
+                  : pageSelection.start()
               }
             >
-              <Check size={15} />{t("selectPages")}
+              <Check size={15} />
+              {t("selectPages")}
             </button>
           )}
-          {view === "project" && (
+          {view === "project" && !(project?.database && !selectedFolder) && (
             <button
               className="studio-icon"
               aria-label={t("directoryView")}
@@ -4337,7 +4588,8 @@ export default function Studio() {
           )}
           {view === "project" && project && (
             <>
-              {capabilities.revealFiles && <button
+              {capabilities.revealFiles && (
+                <button
                 className="studio-icon"
                 aria-label={t("revealProjectFolder")}
                 title={t("revealProjectFolder")}
@@ -4348,7 +4600,8 @@ export default function Studio() {
                 )}
               >
                 <FolderOpen size={16} />
-              </button>}
+                </button>
+              )}
               <button
                 className="studio-icon"
                 onClick={() =>
@@ -4361,7 +4614,8 @@ export default function Studio() {
               >
                 <Upload size={15} />
               </button>
-              {capabilities.exportSite && <button
+              {capabilities.exportSite && (
+                <button
                 ref={exportSiteButton}
                 className="studio-icon"
                 disabled={!pages.length || busy}
@@ -4376,7 +4630,8 @@ export default function Studio() {
                 title={t("exportSite")}
               >
                 <ArrowUpRight size={15} />
-              </button>}
+                </button>
+              )}
               <button
                 className="studio-icon"
                 aria-label={t("folderActions")}
@@ -4435,7 +4690,8 @@ export default function Studio() {
                   : null
               }
             />
-            {capabilities.revealFiles && <button
+            {capabilities.revealFiles && (
+              <button
               className="studio-icon"
               aria-label={t("revealPageFile")}
               title={t("revealPageFile")}
@@ -4447,7 +4703,8 @@ export default function Studio() {
               )}
             >
               <FolderOpen size={16} />
-            </button>}
+              </button>
+            )}
             <button
               className="studio-icon"
               aria-label={tc("export")}
@@ -4518,7 +4775,10 @@ export default function Studio() {
           onStep={(offset) => void workspace.step(offset).catch(report)}
         />
         <AutoHideSidebar
-          enabled={view === "page" && !!page.draft}
+          enabled={
+            view === "page" ||
+            (view === "project" && !!project?.database && !selectedFolder)
+          }
           mobileBoardKey={
             view === "page" && page.draft?.content.attrs?.kind === "board"
               ? page.draft.id
@@ -4616,7 +4876,10 @@ export default function Studio() {
                 actions={bindProblemActions(entry.problem.actions, {
                   // Repeating the operation replaces this notice.
                   ...Object.fromEntries(
-                    Object.entries({ ...entry.handlers, retry: entry.retry })
+                        Object.entries({
+                          ...entry.handlers,
+                          retry: entry.retry,
+                        })
                       .filter(([, handler]) => handler)
                       .map(([id, handler]) => [
                         id,
@@ -4675,7 +4938,11 @@ export default function Studio() {
             {(view === "page" || view === "project") &&
               selectedProject &&
               syncReadOnly && (
-                <div className="studio-conflict" role="status" data-priority={2}>
+                    <div
+                      className="studio-conflict"
+                      role="status"
+                      data-priority={2}
+                    >
                   <p>
                     {ts(
                       syncOverview.bindings.get(selectedProject)?.status ===
@@ -4693,7 +4960,9 @@ export default function Studio() {
                 </div>
               )}
             {unreadableProjects
-              .filter((item) => !dismissedUnreadable.includes(item.directory))
+                  .filter(
+                    (item) => !dismissedUnreadable.includes(item.directory),
+                  )
               .map((item) => (
                 <div
                   key={`unreadable-${item.directory}`}
@@ -4707,7 +4976,9 @@ export default function Studio() {
                         action: t("readProject"),
                         object: item.directory,
                       }),
-                      title: t("unreadableProject", { name: item.directory }),
+                          title: t("unreadableProject", {
+                            name: item.directory,
+                          }),
                       cause: t("unreadableProjectCause"),
                     }}
                     tone="warning"
@@ -4739,7 +5010,9 @@ export default function Studio() {
                   data-priority={3}
                 >
                   <div>
-                    <strong>{t("retireIssueTitle", { title: issue.title })}</strong>
+                        <strong>
+                          {t("retireIssueTitle", { title: issue.title })}
+                        </strong>
                     <p>{t("retireIssueBody", { error: issue.error })}</p>
                   </div>
                   <button
@@ -4751,8 +5024,14 @@ export default function Studio() {
                   </button>
                 </div>
               ))}
-            {page.backgroundIssues.some((issue) => issue.kind !== "retire") && (
-              <div className="studio-conflict" role="alert" data-priority={3}>
+                {page.backgroundIssues.some(
+                  (issue) => issue.kind !== "retire",
+                ) && (
+                  <div
+                    className="studio-conflict"
+                    role="alert"
+                    data-priority={3}
+                  >
                 <p>{t("backgroundSaveIssue")}</p>
                 {page.backgroundIssues
                   .filter((issue) => issue.kind !== "retire")
@@ -4769,13 +5048,21 @@ export default function Studio() {
               </div>
             )}
             {view === "page" && page.draftNotice && !page.error && (
-              <div className="studio-conflict" role="status" data-priority={1}>
+                  <div
+                    className="studio-conflict"
+                    role="status"
+                    data-priority={1}
+                  >
                 <p>{page.draftNotice}</p>
               </div>
             )}
             {view === "page" &&
               !!page.record?.retainedSyncConflicts?.length && (
-                <div className="studio-conflict" role="status" data-priority={2}>
+                    <div
+                      className="studio-conflict"
+                      role="status"
+                      data-priority={2}
+                    >
                   <p>{t("retainedSyncConflict")}</p>
                   {page.record.retainedSyncConflicts
                     .flatMap((item) => item.variants)
@@ -4793,7 +5080,9 @@ export default function Studio() {
                     ))}
                 </div>
               )}
-            {view === "page" && page.error && page.status !== "conflict" && (
+                {view === "page" &&
+                  page.error &&
+                  page.status !== "conflict" && (
               <SaveFailureBanner
                 data-priority={4}
                 state={{
@@ -4821,15 +5110,20 @@ export default function Studio() {
                     : undefined
                 }
                 onReveal={(path) =>
-                  void desktop.invoke("library:reveal", { path }).catch(report)
+                        void desktop
+                          .invoke("library:reveal", { path })
+                          .catch(report)
                 }
                 onLocateLargest={() => {
                   const id = largestBlock(page.draft?.content);
-                  if (id && page.draft) void locateAssistantTarget(page.draft.id, [id]);
+                        if (id && page.draft)
+                          void locateAssistantTarget(page.draft.id, [id]);
                 }}
               />
             )}
-            {view === "page" && page.error && page.status === "conflict" && (
+                {view === "page" &&
+                  page.error &&
+                  page.status === "conflict" && (
               <div
                 className="studio-conflict studio-save-conflict"
                 role="alert"
@@ -4883,7 +5177,11 @@ export default function Studio() {
               </div>
             )}
             {view === "page" && !!page.availableDrafts.length && (
-              <div className="studio-conflict" role="status" data-priority={2}>
+                  <div
+                    className="studio-conflict"
+                    role="status"
+                    data-priority={2}
+                  >
                 <p>{t("draftsAvailable")}</p>
                 {page.availableDrafts.map((item) => (
                   <button
@@ -4905,7 +5203,10 @@ export default function Studio() {
                 key={`external-${externalChange.id}`}
                 change={externalChange}
                 onLocate={() =>
-                  locateBlocks(catalogScrollRef.current, externalChange.blockIds)
+                    locateBlocks(
+                      catalogScrollRef.current,
+                      externalChange.blockIds,
+                    )
                 }
                 onUndo={action(async () => {
                   const name = authorName(externalChange.author);
@@ -4915,7 +5216,9 @@ export default function Studio() {
                       kind: "success",
                     });
                   else if (outcome === "conflict")
-                    setNotice(tps("external.undoConflict"), { kind: "warning" });
+                      setNotice(tps("external.undoConflict"), {
+                        kind: "warning",
+                      });
                 })}
                 onDismiss={action(page.dismissExternalChange)}
               />
@@ -4925,11 +5228,13 @@ export default function Studio() {
               tabIndex={view === "project" ? -1 : undefined}
               onKeyDown={(event) => {
                 if (
-                  view !== "project" || dialog ||
+                    view !== "project" ||
+                    dialog ||
                   (event.target as HTMLElement).closest(
                     "input,textarea,[contenteditable=true]",
                   )
-                ) return;
+                  )
+                    return;
                 if (
                   (event.metaKey || event.ctrlKey) &&
                   event.key.toLowerCase() === "a"
@@ -4940,11 +5245,15 @@ export default function Studio() {
               }}
               onPointerDown={directoryMarquee.onPointerDown}
               onClickCapture={directoryMarquee.onClickCapture}
-              className={`studio-scroll${(view === "page" && page.draft) || (view === "docs" && docPage && docPage.id !== WELCOME_DOC) ? " has-page-surface" : ""}`}
+                className={`studio-scroll${(view === "page" && page.draft) || (view === "docs" && docPage && docPage.id !== WELCOME_DOC) ? " has-page-surface" : ""}${databasePeekOpen ? " has-database-peek" : ""}`}
                 onContextMenu={(event) => {
                   if (event.defaultPrevented || view !== "project" || !project)
                     return;
-                  if ((event.target as HTMLElement).closest("button,input,a"))
+                  if (
+                    (event.target as HTMLElement).closest(
+                      "button,input,a,.studio-page-pane",
+                    )
+                  )
                     return;
                   event.preventDefault();
                   showMenu(
@@ -4956,21 +5265,67 @@ export default function Studio() {
                   );
                 }}
             >
+                <section
+                  className={`studio-page-pane${databasePeekOpen ? " is-database-peek" : ""}`}
+                  hidden={view !== "page" && !databasePeekOpen}
+                  role={databasePeekOpen ? "region" : undefined}
+                  aria-label={databasePeekOpen ? tp("preview") : undefined}
+                >
+                  {peekSession && (
+                    <DatabasePeekToolbar
+                      session={peekSession}
+                      dataset={peekDataset}
+                      index={peekIndex}
+                      count={databasePageIds.length}
+                      busy={busy || routing}
+                      readOnly={!!syncReadOnly}
+                      onClose={() => void closeDatabasePeek().catch(report)}
+                      onFullPage={expandDatabasePeek}
+                      onStep={(offset) => {
+                        const id = databasePageIds[peekIndex + offset];
+                        if (id && selectedProject)
+                          void openDatabasePeek(id, selectedProject).catch(
+                            report,
+                          );
+                      }}
+                      onRetry={() => void page.retry().catch(report)}
+                      onRestore={(id) =>
+                        void page.recoverDraft(id).catch(report)
+                      }
+                    />
+                  )}
+                  <div className="studio-page-pane-content" key="editor">
               <PageWorkspace
                 sessions={page.sessions}
-                visible={view === "page" && !!page.draft}
+                      visible={
+                        (view === "page" || databasePeekOpen) && !!page.draft
+                      }
                 readOnly={syncReadOnly}
                 revealId={revealNode}
                 onControlsChange={setEditorControls}
                 onActiveSurfaceChange={handleActiveSurfaceChange}
                 onRevealHandled={handleRevealHandled}
                 linkablePages={contents}
-                onCopyLink={(target) => void copyPageLink(target).catch(report)}
+                      onCopyLink={(target) =>
+                        void copyPageLink(target).catch(report)
+                      }
                 onEditIcon={action(async () => {
                   const target = activePageTarget();
                   if (target) await beginPageIcon(target);
                 })}
+                      headerAddon={
+                        databasePeekOpen && project && page.draft ? (
+                          <DatabaseRecordProperties
+                            key={page.draft.id}
+                            project={project}
+                            pageId={page.draft.id}
+                            readOnly={!!syncReadOnly || !!page.record?.readOnly}
+                          />
+                        ) : undefined
+                      }
               />
+                  </div>
+                </section>
               {loading && (
                 <div className="studio-loading">
                   <Loader2 size={24} className="studio-spin" />
@@ -5042,15 +5397,17 @@ export default function Studio() {
                     id={docPage.id}
                     hash={docPage.hash}
                     onOpenDoc={(id, hash, newTab) =>
-                      void openDoc(id, hash, newTab ? "tab" : "current").catch(
-                        report,
-                      )
+                        void openDoc(
+                          id,
+                          hash,
+                          newTab ? "tab" : "current",
+                        ).catch(report)
                     }
                   />
                 )
               ) : view === "page" && page.draft ? null : (
                 <div
-                  className={`studio-library${view === "components" ? " studio-component-library" : ""}`}
+                    className={`studio-library${view === "components" ? " studio-component-library" : ""}${view === "project" && project?.database && !selectedFolder ? " studio-database-library" : ""}`}
                   {...directoryFileDrop}
                 >
                   {fileDrop && view === "project" && project && (
@@ -5087,7 +5444,56 @@ export default function Studio() {
                       }
                     />
                   )}
-                  {view === "project" && (
+                    {view === "project" &&
+                      project?.database &&
+                      !selectedFolder && (
+                        <DatabaseProject
+                          key={project.id}
+                          project={project}
+                          libraryHome={info?.home}
+                          pages={pages}
+                          readOnly={!!syncReadOnly}
+                          interactionBusy={busy || routing}
+                          query={query}
+                          activePageId={
+                            databasePeekOpen ? page.draft?.id : undefined
+                          }
+                          onVisiblePagesChange={databaseVisiblePagesChanged}
+                          onOpen={(id) =>
+                            void openDatabasePeek(id, project.id).catch(report)
+                          }
+                          onCreate={async () => {
+                            await createPage("blank", undefined, "page", {
+                              projectId: project.id,
+                              parentId: null,
+                            });
+                          }}
+                          onRename={async (id, title) => {
+                            const item = pages.find((entry) => entry.id === id);
+                            if (!item)
+                              throw new Error(t("databaseDocumentMissing"));
+                            if (
+                              !(await updateTarget(
+                                pageTarget(item, project.id),
+                                {
+                                  name: title,
+                                },
+                              ))
+                            )
+                              throw new Error(t("resolveDraftFirst"));
+                          }}
+                          onRemove={async (id) => {
+                            const item = pages.find((entry) => entry.id === id);
+                            if (item)
+                              setDialog({
+                                type: "delete",
+                                target: pageTarget(item, project.id),
+                              });
+                          }}
+                        />
+                      )}
+                    {view === "project" &&
+                      !(project?.database && !selectedFolder) && (
                     <>
                       {visibleEntries.length || !query ? (
                           <div
@@ -5095,10 +5501,13 @@ export default function Studio() {
                             data-view={directoryView}
                             data-selecting={pageSelection.active || undefined}
                           >
-                          {visibleEntries.map(({ target, updatedAt, hash }) => (
+                              {visibleEntries.map(
+                                ({ target, updatedAt, hash }) => (
                             <div
                               key={target.id}
-                                {...(!pageSelection.active ? libraryDrag.bindings.row(target, false) : {})}
+                                    {...(!pageSelection.active
+                                      ? libraryDrag.bindings.row(target, false)
+                                      : {})}
                                 data-library-id={target.id}
                                 data-selectable
                               className={`studio-page-list-row${pageSelection.ids.includes(target.id) ? " selected" : ""}`}
@@ -5122,7 +5531,9 @@ export default function Studio() {
                                   event.preventDefault();
                                   libraryKeyCommand(
                                     target,
-                                    event.key === "F2" ? "rename" : "delete",
+                                          event.key === "F2"
+                                            ? "rename"
+                                            : "delete",
                                   );
                                   return;
                                 }
@@ -5142,11 +5553,22 @@ export default function Studio() {
                               <button
                                 type="button"
                                 role="checkbox"
-                                aria-checked={pageSelection.ids.includes(target.id)}
-                                aria-label={t("selectPage", { title: target.title })}
+                                      aria-checked={pageSelection.ids.includes(
+                                        target.id,
+                                      )}
+                                      aria-label={t("selectPage", {
+                                        title: target.title,
+                                      })}
                                 className="studio-page-checkbox"
-                                onPointerDown={(event) => event.stopPropagation()}
-                                onClick={(event) => pageSelection.toggle(target.id, event.shiftKey)}
+                                      onPointerDown={(event) =>
+                                        event.stopPropagation()
+                                      }
+                                      onClick={(event) =>
+                                        pageSelection.toggle(
+                                          target.id,
+                                          event.shiftKey,
+                                        )
+                                      }
                               >
                                 <Check size={12} strokeWidth={3} />
                               </button>
@@ -5161,14 +5583,19 @@ export default function Studio() {
                                   ) : (
                                     <FolderThumbnail
                                       projectId={target.projectId}
-                                      entries={folderThumbnailEntries(target.id)}
+                                          entries={folderThumbnailEntries(
+                                            target.id,
+                                          )}
                                     />
                                   ))}
                               <button
                                 className="studio-page-list-open"
                                 onClick={(event) => {
                                   if (pageSelection.active)
-                                    pageSelection.toggle(target.id, event.shiftKey);
+                                          pageSelection.toggle(
+                                            target.id,
+                                            event.shiftKey,
+                                          );
                                   else openTargetClick(target, event);
                                 }}
                                 onAuxClick={(event) => {
@@ -5199,7 +5626,10 @@ export default function Studio() {
                                 </span>
                                 <strong>{target.title}</strong>
                                 {target.pinned && (
-                                  <Pin size={12} aria-label={t("pinned")} />
+                                        <Pin
+                                          size={12}
+                                          aria-label={t("pinned")}
+                                        />
                                 )}
                                 <time>{shortDate(updatedAt)}</time>
                               </button>
@@ -5216,7 +5646,8 @@ export default function Studio() {
                                 <MoreHorizontal size={17} />
                               </button>
                             </div>
-                          ))}
+                                ),
+                              )}
                           {!query && !pageSelection.active && (
                             <div className="studio-page-list-row studio-page-list-add">
                               <button
@@ -5230,7 +5661,10 @@ export default function Studio() {
                                   showDirectoryCreationMenu(
                                     event.currentTarget,
                                     event.detail
-                                      ? { x: event.clientX, y: event.clientY }
+                                          ? {
+                                              x: event.clientX,
+                                              y: event.clientY,
+                                            }
                                       : undefined,
                                   )
                                 }
@@ -5298,7 +5732,10 @@ export default function Studio() {
                                   beginNewPage(project.id, selectedFolder),
                                 )}
                               >
-                                <LayoutTemplate size={15} aria-hidden="true" />
+                                    <LayoutTemplate
+                                      size={15}
+                                      aria-hidden="true"
+                                    />
                                 {tn("newFromTemplate")}
                               </button>
                             </div>
@@ -5473,6 +5910,11 @@ export default function Studio() {
                 onSelect: () => setDialog({ type: "project" }),
               },
               {
+                label: t("newDatabase"),
+                icon: <Table2 size={15} />,
+                onSelect: () => setDialog({ type: "project", database: true }),
+              },
+              {
                 label: t("newGroup"),
                 icon: <FolderPlus size={15} />,
                 onSelect: () => setDialog({ type: "group" }),
@@ -5535,6 +5977,16 @@ export default function Studio() {
                   setDialog({ type: "project", groupId: groupMenu.group.id }),
               },
               {
+                label: t("newDatabase"),
+                icon: <Table2 size={15} />,
+                onSelect: () =>
+                  setDialog({
+                    type: "project",
+                    groupId: groupMenu.group.id,
+                    database: true,
+                  }),
+              },
+              {
                 label: t("renameGroup"),
                 icon: <Pencil size={15} />,
                 onSelect: () =>
@@ -5586,7 +6038,8 @@ export default function Studio() {
               contextMenu.creationOnly
                 ? creationMenuItems(contextMenu.target)
                 : [
-                    ...(capabilities.tabs && !contextMenu.pageTools ? [
+                    ...(capabilities.tabs && !contextMenu.pageTools
+                      ? [
                     {
                       label: t("openInNewTab"),
                       icon: <PanelsTopLeft size={15} />,
@@ -5600,8 +6053,10 @@ export default function Studio() {
                         openTarget(contextMenu.target, "tab"),
                       ),
                     },
-                    ] : []),
-                    ...(capabilities.windows ? [
+                        ]
+                      : []),
+                    ...(capabilities.windows
+                      ? [
                     {
                       label: t("openInNewWindow"),
                       icon: <AppWindow size={15} />,
@@ -5612,7 +6067,8 @@ export default function Studio() {
                         openTarget(contextMenu.target, "window"),
                       ),
                     },
-                    ] : []),
+                        ]
+                      : []),
                     ...(contextMenu.target.kind === "page"
                       ? [
                           {
@@ -5920,7 +6376,8 @@ export default function Studio() {
             }}
           />
         )}
-        {capabilities.externalChanges && dialog?.type === "workspaceConflicts" && (
+        {capabilities.externalChanges &&
+          dialog?.type === "workspaceConflicts" && (
           <WorkspaceConflictsDialog
             onClose={closeDialog}
             onSelect={(id) => setDialog({ type: "externalConflict", id })}
@@ -6054,8 +6511,9 @@ export default function Studio() {
         {dialog?.type === "project" && (
           <ProjectDialog
             project={dialog.project}
+            initialDatabase={dialog.database}
             onClose={closeDialog}
-            onSave={async (name, icon) => {
+            onSave={async (name, icon, database) => {
               const result = dialog.project
                 ? await desktop.invoke<ProjectSummary>("projects:rename", {
                     projectId: dialog.project.id,
@@ -6064,7 +6522,8 @@ export default function Studio() {
                   })
                 : await desktop.invoke<ProjectSummary>("projects:create", {
                     name,
-                    icon,
+                    icon: icon || (database ? "🗃️" : ""),
+                    database,
                   });
               if (dialog.groupId) await moveProject(result.id, dialog.groupId);
               await refresh();
@@ -6147,7 +6606,9 @@ export default function Studio() {
             }
             builtin={dialog.builtin}
             custom={dialog.custom}
-            loadSource={capabilities.componentSource ? () =>
+            loadSource={
+              capabilities.componentSource
+                ? () =>
               desktop.invoke<ComponentSource>(
                 "components:source",
                 dialog.builtin
@@ -6159,7 +6620,8 @@ export default function Studio() {
                       integrity: dialog.custom!.integrity,
                       projectId: dialog.projectId,
                     },
-              ) : undefined
+                    )
+                : undefined
             }
             canInsert={
               dialog.custom?.role !== "page-outline" &&
@@ -6373,18 +6835,21 @@ function DeleteDialog({
 
 function ProjectDialog({
   project,
+  initialDatabase = false,
   onClose,
   onSave,
 }: {
   project?: ProjectSummary;
+  initialDatabase?: boolean;
   onClose: () => void;
-  onSave: (name: string, icon: string) => Promise<void>;
+  onSave: (name: string, icon: string, database: boolean) => Promise<void>;
 }) {
   const t = useTranslator(studioMessages);
   const tc = useTranslator(commonMessages);
   const f = useTranslator(accountFlowMessages);
   const [locationName, setLocationName] = useState("");
   const [locationError, setLocationError] = useState("");
+  const [database, setDatabase] = useState(initialDatabase);
   useEffect(() => {
     if (project) return;
     void desktop
@@ -6406,17 +6871,61 @@ function ProjectDialog({
   }, [project]);
   return (
     <DirectoryDialog
-      title={project ? t("projectSettings") : t("newProjectTitle")}
+      title={
+        project
+          ? t("projectSettings")
+          : database
+            ? t("newDatabase")
+            : t("newProjectTitle")
+      }
       inputLabel={t("projectName")}
       placeholder={t("projectNamePlaceholder")}
       iconButtonLabel={t("setProjectIcon")}
       iconDialogTitle={t("projectIcon")}
-      submitLabel={project ? tc("save") : t("createProject")}
+      submitLabel={
+        project
+          ? tc("save")
+          : database
+            ? t("createDatabase")
+            : t("createProject")
+      }
       initialName={project?.name}
       initialIcon={project?.icon}
       onClose={onClose}
-      onSave={onSave}
+      onSave={(name, icon) => onSave(name, icon, database)}
     >
+      {!project && (
+        <div
+          className="studio-project-types"
+          role="group"
+          aria-label={t("projectType")}
+    >
+          <button
+            type="button"
+            aria-pressed={!database}
+            onClick={() => setDatabase(false)}
+          >
+            <Folder size={20} aria-hidden="true" />
+            <span>
+              <strong>{t("normalProject")}</strong>
+              <small>{t("normalProjectDescription")}</small>
+            </span>
+            {!database && <Check size={16} aria-hidden="true" />}
+          </button>
+          <button
+            type="button"
+            aria-pressed={database}
+            onClick={() => setDatabase(true)}
+          >
+            <Table2 size={20} aria-hidden="true" />
+            <span>
+              <strong>{t("databaseProject")}</strong>
+              <small>{t("databaseProjectDescription")}</small>
+            </span>
+            {database && <Check size={16} aria-hidden="true" />}
+          </button>
+        </div>
+      )}
       {!project && (
         <p className={locationError ? "studio-form-error" : "settings-help"}>
           {locationError ||

@@ -3,7 +3,7 @@
   position: relative;
   flex: 0 0 auto;
   width: var(--navigation-width);
-  transition: width 200ms ease;
+  transition: width 240ms var(--ease-out);
 }
 .studio-sidebar-shell > .studio-sidebar {
   position: absolute;
@@ -12,8 +12,8 @@
   width: var(--navigation-width);
   z-index: 100;
   transition:
-    transform 200ms ease,
-    visibility 200ms;
+    transform 240ms var(--ease-out),
+    visibility 240ms;
 }
 .studio-sidebar-shell[data-sidebar-mode="hidden"],
 .studio-sidebar-shell[data-sidebar-mode="overlay"] {

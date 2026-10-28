@@ -16,6 +16,7 @@ import {
   type DatasetConflict,
   type DatasetOperation,
 } from "./operations.mjs";
+import { coalescedTask } from "../lib/coalesced-task";
 
 export interface DatasetTransport {
   invoke<T = unknown>(
@@ -130,7 +131,7 @@ export class DatasetSession {
   private saveTimer?: ReturnType<typeof setTimeout>;
   private draftTimer?: ReturnType<typeof setTimeout>;
   private firstPending = 0;
-  private refreshQueued = false;
+  private refreshTask = coalescedTask(() => this.refreshNow());
   private past: HistoryEntry[] = [];
   private future: HistoryEntry[] = [];
   private draftWritten = false;
@@ -547,11 +548,15 @@ export class DatasetSession {
   }
 
   /** Reads the saved dataset again after a change elsewhere and merges pending writes. */
-  async refresh(): Promise<void> {
-    if (this.loading) return this.loading;
-    if (!this.base) return this.load();
-    if (this.refreshQueued) return;
-    this.refreshQueued = true;
+  refresh(): Promise<void> {
+    return this.refreshTask();
+  }
+
+  private async refreshNow(): Promise<void> {
+    // Loading may have read before the change that requested this refresh.
+    if (this.loading) await this.loading;
+    else if (!this.base) await this.load();
+    if (!this.base) return;
     try {
       if (this.saving) await this.saving;
       const result = await this.client.transport.invoke<
@@ -587,8 +592,6 @@ export class DatasetSession {
               }
             : { error: errorText(error) },
       );
-    } finally {
-      this.refreshQueued = false;
     }
   }
 

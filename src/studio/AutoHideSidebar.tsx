@@ -54,6 +54,7 @@ export default function AutoHideSidebar({
   const [hint, setHint] = useState(false);
   const appIcon = appIconForTheme(useAppearanceTheme());
   const nativeTouch = document.documentElement.dataset.native === "ios";
+  const nativeBoardKey = nativeTouch ? mobileBoardKey : undefined;
   const [nativeOpen, setNativeOpen] = useState(false);
   const [locked, setLocked] = useState(
     () => localStorage.getItem("showai:sidebar-locked") === "true",
@@ -167,7 +168,7 @@ export default function AutoHideSidebar({
   useEffect(() => {
     setPosition("docked");
     if (nativeTouch) setNativeOpen(false);
-  }, [enabled, locked, mobileBoardKey]);
+  }, [enabled, locked, nativeBoardKey]);
 
   const toggleLocked = () =>
     setLocked((current) => {

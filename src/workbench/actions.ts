@@ -28,6 +28,7 @@ import { join, sep, resolve, dirname, relative, isAbsolute } from "node:path";
 import { randomUUID, createHash } from "node:crypto";
 import { changeContext, withChangeContext } from "../core/history-context";
 import { pageReference } from "../core/page-reference";
+import { initializeProjectDatabase } from "../core/create-database-project";
 import { ReadBaselines } from "../core/read-baselines";
 import { parseTarget } from "../agent-host/conversations";
 import { mutateLibrary, versionedLibrary, withLibrarySnapshot } from "../core/library-runtime";
@@ -929,14 +930,20 @@ export function createWorkbench(
           projectId(args),
           args.groupId === null ? null : required(args, "groupId"),
         );
-      case "projects:create":
-        return service.createProject(
+      case "projects:create": {
+        if (args.database !== undefined && typeof args.database !== "boolean")
+          throw new CoreError("INVALID_DATA", "database must be boolean.");
+        const project = await service.createProject(
           required(args, "name"),
           args.binding as ProjectBinding | undefined,
           args.icon === undefined
             ? undefined
             : validatePageIcon(args.icon, "project.icon"),
         );
+        return args.database
+          ? initializeProjectDatabase(store, project.id)
+          : project;
+      }
       case "projects:rename":
         return store.updateProject(projectId(args), {
           name: required(args, "name"),

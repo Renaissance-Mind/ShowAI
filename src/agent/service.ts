@@ -98,6 +98,7 @@ const projectSummary = (project: {
   icon?: string;
   pinned?: boolean;
   archived?: boolean;
+  database?: import("../core/project-database").ProjectDatabase;
 }) => ({
   id: project.id,
   name: project.name,
@@ -105,6 +106,7 @@ const projectSummary = (project: {
   icon: project.icon,
   pinned: !!project.pinned,
   archived: !!project.archived,
+  ...(project.database ? { database: project.database } : {}),
   ...(project.binding ? { binding: project.binding } : {}),
   ...(project.sourceDirectory
     ? { sourceDirectory: project.sourceDirectory }

@@ -12,6 +12,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileSymlink } from "../test/file-symlink";
 import { FileStore } from "./store";
+import { DatasetStore } from "./datasets";
+import { initializeProjectDatabase } from "./create-database-project";
 import { LibraryImport } from "./library-import";
 import { ContentLibrary as GitLibrary } from "./content-library";
 import { versionedLibrary } from "./library-runtime";
@@ -103,6 +105,73 @@ describe("one-time file library import", () => {
   });
   afterEach(async () => {
     await rm(directory, { recursive: true, force: true });
+  });
+  it("preserves project database properties and their exact originals during legacy import", async () => {
+    const project = await initializeProjectDatabase(store, projectId);
+    const datasets = new DatasetStore(store);
+    const initial = await datasets.read(projectId, project.database!.datasetId);
+    const saved = await datasets.apply(projectId, initial.dataset.id, {
+      baseHash: initial.hash,
+      operations: [
+        {
+          op: "insert",
+          path: ["rows"],
+        value: { id: page.document.id, status: "进行中", date: "2026-10-22" },
+        },
+      ],
+    });
+    const original = await readFile(saved.record.path);
+    const importer = new LibraryImport(destination);
+    const report = await importer.prepare(source);
+    expect(
+      await importer.original(
+        report.id,
+        `projects/${projectId}/datasets/${initial.dataset.id}.json`,
+      ),
+    ).toEqual(original);
+    await importer.activate(report.id);
+    const reopened = new FileStore(destination);
+    expect((await reopened.readProject(projectId)).database).toEqual(
+      project.database,
+    );
+    expect(
+      (await new DatasetStore(reopened).read(projectId, initial.dataset.id))
+        .dataset.value,
+    ).toEqual(saved.record.dataset.value);
+    expect(
+      (await reopened.readPage(projectId, page.document.id)).document.title,
+    ).toBe(page.document.title);
+  });
+  it("rejects malformed dataset values before activating a legacy import", async () => {
+    const project = await initializeProjectDatabase(store, projectId);
+    const dataset = await new DatasetStore(store).read(
+      projectId,
+      project.database!.datasetId,
+    );
+    await writeFile(
+      dataset.path,
+      JSON.stringify({
+        ...dataset.dataset,
+        value: { columns: [], rows: "invalid" },
+      }),
+    );
+    await expect(
+      new LibraryImport(destination).prepare(source),
+    ).rejects.toMatchObject({ code: "INVALID_DATA" });
+    expect(versionedLibrary(destination)).toBeUndefined();
+  });
+  it("rejects a project whose database properties are missing from a legacy import", async () => {
+    await writeFile(
+      join(store.projectPath(projectId), "project.json"),
+      JSON.stringify({
+        ...(await store.readProject(projectId)),
+        database: { datasetId: "missing" },
+      }),
+    );
+    await expect(
+      new LibraryImport(destination).prepare(source),
+    ).rejects.toMatchObject({ code: "NOT_FOUND" });
+    expect(versionedLibrary(destination)).toBeUndefined();
   });
   it("verifies pages, packages, editable sources and unknown old snapshots while preserving exact source bytes", async () => {
     const original = await readFile(page.path),

@@ -42,7 +42,7 @@ html[data-native="ios"]
 html[data-native="ios"] .studio-sidebar-shell,
 html[data-native="ios"] .studio-sidebar-shell > .studio-sidebar {
   transition:
-    transform 180ms ease,
+    transform 180ms var(--ease-out),
     visibility 180ms;
 }
 html[data-native="ios"] .studio-sidebar-shell > .studio-sidebar {

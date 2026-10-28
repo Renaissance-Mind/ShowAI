@@ -8,6 +8,7 @@ import {
   useRef,
   useState,
   useSyncExternalStore,
+  type ReactNode,
 } from "react";
 import {
   PageLinkContext,
@@ -34,6 +35,7 @@ function PageContent({
   onActiveSurfaceChange,
   onRevealHandled,
   onEditIcon,
+  headerAddon,
   linkablePages,
   onCopyLink,
 }: {
@@ -44,6 +46,7 @@ function PageContent({
   onActiveSurfaceChange: (id: string) => void;
   onRevealHandled: () => void;
   onEditIcon: () => void;
+  headerAddon?: ReactNode;
   /** Loaded pages of each project, offered as link targets. */
   linkablePages: Record<string, { pages: LinkablePage[] } | undefined>;
   onCopyLink: (target: {
@@ -98,13 +101,16 @@ function PageContent({
             onChange={view.session.edit}
             header={
               state.draft.content.attrs?.kind === "board" ? undefined : (
-                <PageHeading
-                  title={state.draft.title}
-                  icon={state.draft.icon}
-                  readOnly={locked}
-                  onTitleChange={(title) => view.session.edit({ title })}
-                  onEditIcon={onEditIcon}
-                />
+                <>
+                  <PageHeading
+                    title={state.draft.title}
+                    icon={state.draft.icon}
+                    readOnly={locked}
+                    onTitleChange={(title) => view.session.edit({ title })}
+                    onEditIcon={onEditIcon}
+                  />
+                  {headerAddon}
+                </>
               )
             }
             revealId={revealId}
@@ -158,6 +164,7 @@ export function PageWorkspace({
   readOnly,
   revealId,
   linkablePages,
+  headerAddon,
   ...callbacks
 }: {
   sessions: PageSessions;
@@ -193,6 +200,7 @@ export function PageWorkspace({
         readOnly={readOnly}
         revealId={active ? revealId : null}
         linkablePages={linkablePages}
+        headerAddon={active ? headerAddon : undefined}
         {...stable}
       />
     );

@@ -4,6 +4,18 @@
 
 A **Page** arranges content in reading order. A **Board** provides a spatial workspace with pan, zoom, drawing and free placement. New content defaults to Page. Both are native containers that can nest recursively; expanding a container edits the same node.
 
+## Database projects
+
+Click **New database** at the top of the sidebar, or choose **New database project** from the **Add** menu. You can also select **Database** when creating a project. A database is always created as a separate project; every record is a real Page. Clicking a document name or **New document** opens an editor on the right while the database remains interactive on the left. Edit the title, properties and body, navigate through the current view with previous/next, close the peek with its close button or Escape, or choose **Open as full page**. Renaming the Page updates its database entry.
+
+Switch between table, board and list tabs, or add, rename and delete views. Each view retains its own filter, sort and board grouping settings. The selected view is remembered locally for its content library and database. Boards group documents by a select property; changing that property on a card moves it between groups. Deleting a view retains documents and properties, and at least one view must remain. Older databases receive compatible default views.
+
+Database projects include a content area between their title and view tabs. Click **Add text, headings, or lists…** to write an introduction in the native editor, or use `/` for common content. It saves automatically and is shared by the table, board and list views. Existing databases start empty; ordinary projects do not show this entry point. Introduction changes and document properties save independently, with the existing conflict controls available for concurrent edits to the same introduction.
+
+Database properties support text, numbers, select options, dates, checkboxes and URLs. Click **Add property** after the last column heading, enter a name and choose a type in the popover, then create the column. Canceling leaves the schema unchanged. The same form is available in **Properties**, where you can also manage existing columns. Drag a property heading or a row's handle in **Properties** to reorder it. The entire column or row follows the drag while its neighbors make room; dropping settles and saves the order, while Escape cancels the preview. The table, other views and document peek share this order; document names remain first. Ordering supports undo/redo, as well as Alt+Shift with the corresponding arrow keys. Edit cells in the table, click a column heading to sort, and use search or an equality filter to narrow the records. Properties save automatically; a concurrent edit to the same value asks which value to retain. Removing a record uses the existing Page deletion confirmation and retains its property data with the archived Page.
+
+Database records can be organized within their project. Moving records or their containing folders to another project is blocked until property migration is supported.
+
 ## Insert and organize
 
 Search the common component catalog from `/` in a Page or on a blank Board. Page/Board insert at the current position while preserving surrounding text and nesting. Existing flow/grid/free regions remain editable.

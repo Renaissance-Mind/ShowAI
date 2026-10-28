@@ -1,0 +1,157 @@
+.studio-page-pane {
+  position: relative;
+  height: 100%;
+  min-height: 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.studio-page-pane[hidden] {
+  display: none;
+}
+.studio-page-pane-content {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+}
+.studio-page-pane-content > .surface-editor-shell {
+  position: absolute;
+  inset: 0;
+}
+.studio-scroll:has(> .studio-database-library) {
+  position: relative;
+  display: flex;
+  overflow: hidden;
+  min-height: 0;
+}
+.studio-scroll > .studio-database-library {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  overflow: auto;
+  isolation: isolate;
+}
+.studio-page-pane.is-database-peek {
+  order: 2;
+  flex: 0 0 52%;
+  width: 52%;
+  min-width: min(380px, 65%);
+  max-width: 820px;
+  border-left: 1px solid var(--line);
+  background: var(--paper);
+  box-shadow: -6px 0 24px #00000006;
+  z-index: 2;
+  animation: database-peek-enter 240ms var(--ease-out);
+}
+.database-peek-toolbar {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 44px;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--line);
+}
+.database-peek-title {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  flex: 1;
+  padding: 0 6px;
+  font-size: 12px;
+}
+.database-peek-title > span {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.database-peek-title > *:first-child {
+  flex-shrink: 0;
+}
+.database-peek-save-state,
+.database-peek-position {
+  color: var(--muted);
+  font-size: 11px;
+  white-space: nowrap;
+}
+.database-peek-position {
+  margin: 0 4px;
+}
+.database-peek-notice {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  padding: 10px 16px;
+  background: var(--surface);
+  font-size: 12px;
+}
+.database-peek-notice > span {
+  flex: 1;
+  overflow-wrap: anywhere;
+}
+.database-peek-notice button {
+  padding: 4px 7px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: var(--paper);
+}
+.database-record-properties.project-database {
+  padding: 8px 0 24px;
+  margin: 0 0 20px;
+  border-bottom: 1px solid var(--line);
+  overflow: visible;
+}
+.database-record-property {
+  display: grid;
+  grid-template-columns: 110px minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+  min-height: 38px;
+  font-size: 13px;
+}
+.database-record-property > span {
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+.database-record-property > div {
+  min-width: 0;
+}
+.database-record-property .project-db-select {
+  margin-left: 0;
+}
+.database-peek-property-error {
+  color: var(--danger);
+  font-size: 12px;
+}
+@keyframes database-peek-enter {
+  from {
+    opacity: 0.65;
+    translate: 24px 0;
+  }
+}
+@media (max-width: 680px) {
+  .database-peek-save-state {
+    display: none;
+  }
+  .database-record-property {
+    grid-template-columns: 90px minmax(0, 1fr);
+    gap: 6px;
+  }
+}
+@media (max-width: 480px) {
+  .studio-page-pane.is-database-peek {
+    position: absolute;
+    inset: 0 0 0 auto;
+    width: calc(100% - 40px);
+    min-width: 0;
+    max-width: none;
+    box-shadow: -10px 0 30px #00000018;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .studio-page-pane.is-database-peek {
+    animation: none;
+  }
+}

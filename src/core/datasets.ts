@@ -41,6 +41,7 @@ import {
   type ExternalRead,
   type SourceFormat,
 } from "./dataset-sources";
+import { validateProjectDatabaseData } from "./project-database";
 
 /** A project's shared data: one JSON value that several page blocks read and write. */
 export interface DatasetDocument {
@@ -244,6 +245,8 @@ export function validateDataset(
   try {
     assertJsonTree(dataset.value);
     assertContent(dataset.value, "Dataset value", CAPACITY.datasetBytes);
+    if (dataset.origin?.kind === "project-database")
+      validateProjectDatabaseData(dataset.value);
     if (dataset.schema) assertProps(dataset.schema, dataset.value);
   } catch (error) {
     invalid(error);
@@ -988,6 +991,14 @@ export class DatasetStore {
     datasetId: string,
     input: { baseHash: string },
   ): Promise<{ removed: true; id: string }> {
+    if (
+      (await this.store.readProject(projectId)).database?.datasetId ===
+      datasetId
+    )
+      throw new CoreError(
+        "CONFLICT",
+        "The dataset contains this project's database properties and cannot be deleted.",
+      );
     const references = await this.references(projectId, datasetId);
     if (references.length) {
       const error = new CoreError(

@@ -5,7 +5,13 @@ import {
   type SetStateAction,
   type ReactNode,
 } from "react";
-import { ChevronDown, ChevronRight, MoreHorizontal, Plus } from "../ui/icons";
+import {
+  ChevronDown,
+  ChevronRight,
+  MoreHorizontal,
+  Plus,
+  Table2,
+} from "../ui/icons";
 import type {
   ProjectGroup,
   ProjectSummary,
@@ -26,6 +32,7 @@ export default function ProjectSidebar({
   renderProject,
   onCreate,
   onNew,
+  onCreateDatabase,
   onMenu,
   onGroupMenu,
   unreadable,
@@ -40,6 +47,7 @@ export default function ProjectSidebar({
   onCreate: (groupId?: string) => void;
   /** Opens the New menu: content for the current project, and a new project. */
   onNew: (anchor: HTMLButtonElement) => void;
+  onCreateDatabase?: () => void;
   onMenu: (anchor: HTMLElement) => void;
   onGroupMenu: (group: ProjectGroup, anchor: HTMLElement) => void;
   /** Rows for project folders that could not be read. */
@@ -156,17 +164,30 @@ export default function ProjectSidebar({
   );
   return (
     <div className="studio-sidebar-projects">
-      <button
-        className="studio-new-project"
-        type="button"
-        aria-label={tn("newHint")}
-        aria-haspopup="menu"
-        title={tn("newHint")}
-        onClick={(event) => onNew(event.currentTarget)}
-      >
-        <Plus size={17} aria-hidden="true" />
-        <span>{tn("new")}</span>
-      </button>
+      <div className="studio-sidebar-create-actions">
+        <button
+          className="studio-new-project"
+          type="button"
+          aria-label={tn("newHint")}
+          aria-haspopup="menu"
+          title={tn("newHint")}
+          onClick={(event) => onNew(event.currentTarget)}
+        >
+          <Plus size={17} aria-hidden="true" />
+          <span>{tn("new")}</span>
+        </button>
+        {onCreateDatabase && (
+          <button
+            className="studio-new-database"
+            type="button"
+            title={t("newDatabaseHint")}
+            onClick={onCreateDatabase}
+          >
+            <Table2 size={17} aria-hidden="true" />
+            <span>{t("newDatabase")}</span>
+          </button>
+        )}
+      </div>
       {docs}
       {!!pinned.length && section("pinned", t("section.pinned"), pinned)}
       {section("projects", t("section.projects"), ungrouped)}

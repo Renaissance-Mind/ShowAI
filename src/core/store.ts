@@ -27,6 +27,9 @@ import {
   normalizeDocument,
 } from "./diff";
 import { CoreError } from "./model";
+import { validateProjectDatabase, type ProjectDatabase } from "./project-database";
+import { translator } from "../i18n";
+import workbenchMessages from "../i18n/messages/workbench";
 import { atomicRename } from "./atomic-rename";
 import { libraryMutations, legacyMutations } from "./history-context";
 import { pageWriteCapture } from "./page-write-capture";
@@ -176,6 +179,7 @@ export function validateProjectMetadata(
     );
   validateName(project.name);
   validateDirectoryPreferences(project);
+  if (project.database !== undefined) validateProjectDatabase(project.database);
   if (project.icon !== undefined)
     validatePageIcon(project.icon, "project.icon");
   if (
@@ -612,6 +616,11 @@ export class FileStore {
       throw new CoreError("INVALID_DATA", "Invalid sidebar move.");
     return this.withLock("sidebar", async () => {
       const source = await this.readProject(projectId);
+      if (source.database && projectId !== destinationProjectId)
+        throw new CoreError(
+          "INVALID_DATA",
+          translator(workbenchMessages)("databaseRecordsStayInProject"),
+        );
       const destination = await this.readProject(destinationProjectId);
       if (source.archived || destination.archived)
         throw new CoreError(
@@ -1086,11 +1095,28 @@ export class FileStore {
       icon?: string;
       pinned?: boolean;
       archived?: boolean;
+      database?: ProjectDatabase;
     },
   ): Promise<ProjectSummary> {
     assertId(projectId);
     return this.withLock(`project-${projectId}`, async () => {
       const current = await this.readProject(projectId);
+      const database =
+        input.database === undefined
+          ? undefined
+          : validateProjectDatabase(input.database);
+      if (database) {
+        const { DatasetStore } = await import("./datasets");
+        const record = await new DatasetStore(this).read(
+          projectId,
+          database.datasetId,
+        );
+        if (record.dataset.origin?.kind !== "project-database")
+          throw new CoreError(
+            "INVALID_DATA",
+            "Project database properties are invalid.",
+          );
+      }
       for (const key of ["pinned", "archived"] as const)
         if (input[key] !== undefined && typeof input[key] !== "boolean")
           throw new CoreError("INVALID_DATA", `${key} must be boolean.`);
@@ -1102,6 +1128,7 @@ export class FileStore {
           : {}),
         ...(input.pinned !== undefined ? { pinned: input.pinned } : {}),
         ...(input.archived !== undefined ? { archived: input.archived } : {}),
+        ...(database ? { database } : {}),
         updatedAt: new Date().toISOString(),
       };
       await this.atomicWrite(
@@ -1602,6 +1629,23 @@ export class FileStore {
         };
         await this.checkpoint(projectId, record);
         await this.atomicWrite(record.path, serializeArtifact(document));
+        if (project.database) {
+          const { DatasetStore } = await import("./datasets");
+          const datasets = new DatasetStore(this);
+          const properties = await datasets.read(
+            projectId,
+            project.database.datasetId,
+          );
+          await datasets.apply(
+            projectId,
+            properties.dataset.id,
+            {
+              baseHash: properties.hash,
+              operations: [{ op: "insert", path: ["rows"], value: { id } }],
+            },
+            { throwOnConflict: true },
+          );
+        }
         return record;
       });
     });

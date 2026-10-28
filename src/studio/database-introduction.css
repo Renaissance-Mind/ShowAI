@@ -1,0 +1,35 @@
+.database-introduction {
+  margin: -12px 0 24px;
+  min-width: 0;
+  font-size: 14px;
+  line-height: 1.7;
+}
+.project-database .database-introduction-add {
+  justify-content: flex-start;
+  padding: 5px 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+.project-database .database-introduction-add:hover {
+  color: var(--text);
+  background: transparent;
+}
+.database-introduction .document-content {
+  min-height: 48px;
+  padding: 5px 0;
+}
+.database-introduction .document-content > :last-child {
+  margin-bottom: 0;
+}
+.database-introduction .document-content > p.is-empty::before {
+  content: var(--database-introduction-placeholder);
+}
+.database-introduction-loading {
+  color: var(--muted);
+  font-size: 13px;
+}
+.database-introduction-error {
+  margin: 8px 0 0;
+  color: var(--danger, #b94343);
+  font-size: 12px;
+}
