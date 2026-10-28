@@ -18,7 +18,7 @@
 dataset_write({projectId, action:"create", name:"全景 OKR", fromBlock:{pageId, blockId, baseHash, local:["title"]}})
 ```
 
-`baseHash` 必填，取最近一次 `page_read` 的 hash。`baseRevision` 可以不传；传了就必须是页面当前的 revision，否则返回 CONFLICT，共享数据也不会创建。省略 `local` 时，database 的 title、view、groupBy、calendar 和 views 留在各块，其他组件不保留本地参数；给出 `local` 就只按给出的列表。它在同一次保存里创建共享数据并把该块改为绑定。回执带共享数据本身及其 `hash`、`revision`，不需要再 `dataset_read`；`page` 给出该页新的 hash 与 revision，下一次 `page_apply` 用它们作 baseHash/baseRevision。用 `value` 新建时回执同样带 `hash`。绑定后的块只保存 `local` 中的参数和 `$binding`；往里写其他参数会以 INVALID_DATA 拒绝。
+`baseHash` 必填，取最近一次 `page_read` 的 hash。`baseRevision` 可以不传；传了就必须是页面当前的 revision，否则返回 CONFLICT，共享数据也不会创建。省略 `local` 时，database 的 title、view、groupBy、calendar 和 views 留在各块，其他组件不保留本地参数；给出 `local` 就只按给出的列表。它在同一次保存里创建共享数据并把该块改为绑定。回执带共享数据本身及其 `hash`、`revision`，不需要再 `dataset_read`；`page` 给出该页新的 hash 与 revision，下一次 `page_apply` 用它们作 baseHash/baseRevision。用 `value` 新建时回执同样带 `hash`。绑定后的块只保存 `local` 中的参数和 `$binding`。把其他参数直接存进块（`component.insert` 的 data、`block.attrs.set`、`page_save`）会以 INVALID_DATA 拒绝；`component.props.set` 则把 `local` 以外的参数写进共享数据，所有绑定它的块都会跟着变。要让某个参数只属于这个块，用 `component.binding.set` 换成包含它的 `local` 列表。
 
 自定义组件共享后，当时那个组件版本的参数 schema 会约束此后对共享数据的每次写入。组件升级用 `page_apply` 的 `component.ref.set`：共享数据的 schema 若由旧版本派生，会在同一次保存中换成新版本的约束（回执 `datasetSchemas`），不需要另外改；它不写共享数据的值，所以不需要 `datasetBases`。回执 `warnings` 中的 DATASET_SHARED 列出还绑定这份数据的其他页面和块，它们之后的写入也按新 schema 检查，要告诉用户并按用户意思一起升级；DATASET_SCHEMA_KEPT 表示共享数据有自己定的 schema，需要时才用 `dataset_write` apply 的 `schema` 手动更换（`null` 取消约束）。已有数据的列表缺 id 时，先在源组件里补上 id 再共享。
 
@@ -42,7 +42,7 @@ dataset_write({projectId, action:"create", name:"全景 OKR", fromBlock:{pageId,
   }
   ```
 
-- 绑定页面上已有的块：`{type:"component.binding.set", blockId, binding:{dataset:ID, props:{local:[...]}}}`。`component.insert` 不返回块 id，也不能在同一次调用里引用新块；要绑定先前插入的块时，从 `page_apply` 结果的 `document`（默认 `response:"full"`）或 `page_read` 中找到它的 id。props 绑定会保留块里 `local` 列出的参数，丢弃块原有的其他参数（例如原来的 columns、rows），所以块事先不需要任何列或行；要保留的原有值先写进共享数据或列入 `local`。
+- 绑定页面上已有的块：`{type:"component.binding.set", blockId, binding:{dataset:ID, props:{local:[...]}}}`。`component.insert` 不返回块 id，也不能在同一次调用里引用新块；要绑定先前插入的块时，从 `page_apply` 结果的 `document`（默认的 `response:"full"` 和 `"source"` 都带，`"receipt"` 不带）或 `page_read` 中找到它的 id。props 绑定会保留块里 `local` 列出的参数，丢弃块原有的其他参数（例如原来的 columns、rows），所以块事先不需要任何列或行；要保留的原有值先写进共享数据或列入 `local`。
 
 两种做法都不检查 `local` 参数与块自身数据是否匹配：database 的 calendar、groupBy、views 可以引用只存在于共享数据里的列，保存时原样保留，由组件按解析后的列显示。两种做法也都不检查共享数据是否存在；之后 `page_read` 的 `bindings[].error` 会指出找不到的共享数据，`issues` 列出读不到的路径。
 
@@ -89,7 +89,7 @@ dataset_write({projectId, action:"create", name:"全景 OKR", fromBlock:{pageId,
 - `page_read` 的结构化、markdown 和大纲结果都带 `bindings`（`response:"source"` 也保留，`"receipt"` 省略）：每个绑定块的共享数据 id、hash、解析后的参数 `props`、映射条目数 `mapped`、每个映射条目对应的来源路径 `sources` 和提示 `issues`。图像、html 视图按共享数据显示。
 - 每次 `page_read` 或 `dataset_read` 都会记住这个读者读到的版本；之后对绑定块的写入以它为起点，与期间别处的修改合并。读者按连接区分：每个新的 MCP 连接（宿主重启或重新连接、另一个 Agent、脚本或单独启动的客户端）都是另一个读者，看不到之前连接的读取；有固定 Agent 会话标识的宿主在同一会话内共用。
 - 读取和写入不在同一个连接时，写共享数据必须带上读取时的 hash，否则没有合并基线：`page_read` 的结果直接带 `datasetBases`（`{共享数据id: hash}`，其他项目的共享数据写作 `项目id/共享数据id`），原样传给 `page_apply` 的 `datasetBases`；`dataset_read` 返回的 `hash` 用作 `dataset_write` apply 的 `baseHash`。缺少基线时 `page_apply` 返回 `MISSING_BASELINE`，`details.datasetBases` 写明要传的键；不要拿 `currentHash` 顶替，除非你改的正是这个版本的内容，否则会把期间别人的修改当成你的修改覆盖。
-- 对绑定块的每次 `component.props.set` 都需要这个基线，只改块自己的 `local` 参数（标题、视图、calendar）也一样：本连接没读过该共享数据时，要传 `datasetBases`，否则返回 `MISSING_BASELINE`。`dataset_write` 的 create（包括 fromBlock）不算读取；新建后要修改绑定它的块，把 create 回执的 `hash` 放进 `datasetBases`。`component.binding.set` 和 `component.binding.remove` 不需要基线。
+- 对绑定块的每次 `component.props.set` 都需要这个基线，只改块自己的 `local` 参数（标题、视图、calendar）也一样：本连接没读过该共享数据时，要传 `datasetBases`，否则返回 `MISSING_BASELINE`。`dataset_write` 的 create（包括 fromBlock）不算读取；新建后要修改绑定它的块，把 create 回执的 `hash` 放进 `datasetBases`。带 `$binding` 的 `component.insert`、`component.binding.set` 和 `component.binding.remove` 不需要基线。
 - 选择写法：修改页面上看到的一行（包括只属于这个块的字段，如开始准备），对绑定块用 `component.props.set`，按读取到的形式传参数（例如包含映射行的完整 `rows`）：映射字段写入共享数据，其他字段写入块，二者在同一次保存中完成。直接改来源记录（尤其是多条、嵌套或不在页面上显示的字段）用 `dataset_write({projectId, action:"apply", datasetId, baseHash, operations})`：`{op:"set",path,value}`、`{op:"remove",path}`、`{op:"insert",path:列表,value,after?}`、`{op:"move",path:条目,after}`。路径按 id 选记录，例如 `objectives[id=o1].keyResults[id=k1].tasks[id=t1].due`，或 `["objectives",{"id":"o1"},…]`；映射条目的完整路径取自 `bindings[].sources`。
 - 两种写法遇到同一字段的新修改都返回 CONFLICT 并且什么都不写，见下文。`page_apply` 返回的 CONFLICT 带 `details.datasetId` 与 `details.conflicts` 时是共享数据冲突：重新 `page_read` 后逐项决定，不走 `page_diff` 和整页合并；没有这些字段时是页面本身的保存冲突。
 - 查看共享数据自某次读取以来的变化（比较用的历史值是此前读取时按 hash 保存的版本，全库保留最近约 128 份；不可用时返回 MISSING_BASELINE，重新读取后以新 hash 为准）：`dataset_read({projectId, action:"read", datasetId, sinceHash})`，sinceHash 取之前 `page_read` 的 `datasetBases` 或 `dataset_read` 的 `hash`；返回按记录的 changes（path、op、before/after，长值摘要），按 offset/limit 分页，`path` 可只看一部分，本机连接的 `out` 写入文件。绑定块的数据变化不在 `page_diff` 中（页面 hash 不变），`page_diff` 的 `boundDatasets` 会列出相关共享数据。

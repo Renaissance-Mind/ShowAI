@@ -663,6 +663,30 @@ test("a database bound with props keeps only its local settings, inserted or bou
     pageId: page.document.id,
     rendered: false,
   });
+  // A key outside local goes to the dataset; rebinding makes it block-only.
+  const rebound = await ok("page_apply", {
+    pageId: page.document.id,
+    baseHash: read.hash,
+    baseRevision: read.revision,
+    operations: [
+      {
+        type: "component.props.set",
+        blockId,
+        props: { description: "共享说明" },
+      },
+      {
+        type: "component.binding.set",
+        blockId,
+        binding: { dataset: datasetId, props: { local: ["title"] } },
+      },
+    ],
+  });
+  expect(widget(rebound.document, "database").attrs.data).toEqual({
+    title: "旧",
+    $binding: { dataset: datasetId, props: { local: ["title"] } },
+  });
+  const value = await ok("dataset_read", { action: "read", datasetId });
+  expect(value.dataset.value.description).toBe("共享说明");
   expect(read.bindings).toHaveLength(2);
   for (const binding of read.bindings) {
     expect(binding.issues).toEqual([]);
