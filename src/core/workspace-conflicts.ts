@@ -9,6 +9,7 @@ import {
   safeLibraryPath,
 } from "./library-files";
 import type { ContentLibrary as GitLibrary } from "./content-library";
+import { holdsLibraryLock, withLibraryLock } from "./library-lock";
 
 export interface WorkspaceConflict {
   format: "showai-workspace-conflict";
@@ -40,6 +41,42 @@ export function workspaceHash(
     }
   }
   return createHash("sha256").update(normalized).digest("hex");
+}
+
+/**
+ * Records external edits among workspace files. Comparing reads one committed
+ * state without the writer lease; files that match it, or that a save is still
+ * writing, need nothing more. Only the rest are confirmed and recorded under the
+ * lease, after any save in progress finishes.
+ */
+export async function recordWorkspaceChanges(
+  library: Pick<
+    GitLibrary,
+    "root" | "workspace" | "tree" | "readFiles" | "head" | "readSnapshot"
+  >,
+  paths: string[],
+): Promise<WorkspaceConflict[]> {
+  const protection = new WorkspaceProtection(library);
+  if (holdsLibraryLock(library.root))
+    return protection.inspect(paths, await library.head());
+  let suspects = paths.length
+    ? await library.readSnapshot((head) => protection.changed(paths, head))
+    : [];
+  if (suspects.length) {
+    const writing = await protection.writing();
+    suspects = suspects.filter((path) => !writing.has(path));
+  }
+  const conflicts: WorkspaceConflict[] = [];
+  for (let offset = 0; offset < suspects.length; offset += 16)
+    conflicts.push(
+      ...(await withLibraryLock(library.root, async () =>
+        protection.inspect(
+          suspects.slice(offset, offset + 16),
+          await library.head(),
+        ),
+      )),
+    );
+  return conflicts;
 }
 
 /** External content stays in place and is independently retained before resolution. */
@@ -124,10 +161,52 @@ export class WorkspaceProtection {
     return record;
   }
 
+  /**
+   * Paths of saves that committed but may still be writing workspace files. A
+   * save writes its journal before committing, compares each file with its
+   * prior fingerprint while writing, and removes the journal afterwards.
+   */
+  async writing(): Promise<Set<string>> {
+    const root = join(this.library.root, "local", "transactions");
+    const names = await readdir(root).catch((error: NodeJS.ErrnoException) => {
+      if (error.code === "ENOENT") return [];
+      throw error;
+    });
+    const paths = new Set<string>();
+    for (const name of names) {
+      const bytes = await readLibraryBytes(
+        this.library.root,
+        join(root, name, "journal.json"),
+      );
+      if (!bytes) continue;
+      const journal = JSON.parse(bytes.toString("utf8")) as {
+        paths?: unknown;
+      };
+      if (Array.isArray(journal.paths))
+        for (const path of journal.paths)
+          if (typeof path === "string") paths.add(path);
+    }
+    return paths;
+  }
+
+  /** Paths whose workspace file differs from the revision. Reads only. */
+  async changed(paths: string[], revision: string | null): Promise<string[]> {
+    return (await this.compare(paths, revision)).map((item) => item.path);
+  }
+
   async inspect(
     paths: string[],
     revision: string | null,
   ): Promise<WorkspaceConflict[]> {
+    const conflicts: WorkspaceConflict[] = [];
+    for (const item of await this.compare(paths, revision))
+      conflicts.push(
+        await this.capture(item.path, revision, item.actual, item.tracked),
+      );
+    return conflicts;
+  }
+
+  private async compare(paths: string[], revision: string | null) {
     if (!this.inspectedTree || this.inspectedTree.revision !== revision)
       this.inspectedTree = {
         revision,
@@ -143,7 +222,11 @@ export class WorkspaceProtection {
       revision && present.length
         ? await this.library.readFiles(present, revision)
         : new Map<string, Buffer>();
-    const conflicts: WorkspaceConflict[] = [];
+    const differences: {
+      path: string;
+      actual: Buffer | null;
+      tracked: boolean;
+    }[] = [];
     for (const path of paths) {
       const actual = await readLibraryBytes(
         this.library.root,
@@ -151,11 +234,9 @@ export class WorkspaceProtection {
       );
       const expected = committed.get(path) ?? null;
       if (workspaceHash(path, actual) !== workspaceHash(path, expected))
-        conflicts.push(
-          await this.capture(path, revision, actual, tree.has(path)),
-        );
+        differences.push({ path, actual, tracked: tree.has(path) });
     }
-    return conflicts;
+    return differences;
   }
 
   async baseline(

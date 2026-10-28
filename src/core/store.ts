@@ -34,7 +34,11 @@ import { stampSavedInk } from "./ink-wire-writer";
 import { withLibraryLock } from "./library-lock";
 const projectionReads = new AsyncLocalStorage<string>();
 import { pageSummaries } from "./page-summaries";
-import { WorkspaceProtection } from "./workspace-conflicts";
+import {
+  WorkspaceProtection,
+  recordWorkspaceChanges,
+} from "./workspace-conflicts";
+import { ContentLibrary } from "./content-library";
 import { orderSidebarProjects, placeSidebarItem } from "./sidebar-order";
 import {
   directoryEntries,
@@ -1367,16 +1371,21 @@ export class FileStore {
     projectId: string,
     pageId: string,
   ): Promise<PageRecord> {
-    if (
-      projectionReads.getStore() !== this.root &&
-      libraryMutations.getStore()?.root !== this.root &&
-      legacyMutations.getStore() !== this.root
-    )
-      return withLibraryLock(this.root, () =>
-        projectionReads.run(this.root, () =>
+    const state = libraryMutations.getStore();
+    const library = versionedLibrary(this.root);
+    if (state?.root !== this.root && legacyMutations.getStore() !== this.root) {
+      // Versioned libraries read one committed state without the writer lease.
+      if (library && libraryReadSnapshot.getStore()?.root !== this.root)
+        return withLibrarySnapshot(this.root, () =>
           this.readRecord(projectId, pageId),
-        ),
-      );
+        );
+      if (!library && projectionReads.getStore() !== this.root)
+        return withLibraryLock(this.root, () =>
+          projectionReads.run(this.root, () =>
+            this.readRecord(projectId, pageId),
+          ),
+        );
+    }
     const path = this.pagePath(projectId, pageId);
     const value = await this.readJson(path);
     let document: ShowDocument;
@@ -1396,28 +1405,25 @@ export class FileStore {
         "INVALID_DATA",
         `Page id does not match its filename: ${pageId}`,
       );
-    const library = versionedLibrary(this.root);
-    const state = libraryMutations.getStore();
+    const snapshot = libraryReadSnapshot.getStore();
+    const pinned =
+      state?.root === this.root
+        ? state.head
+        : snapshot?.root === this.root
+          ? snapshot.revision
+          : null;
     const revision = library
       ? await library.resourceRevision(
           logicalPath(this.root, path)!,
-          state?.root === this.root ? (state.head ?? undefined) : undefined,
+          pinned ?? undefined,
         )
       : undefined;
     const workspaceConflicts =
       library && state?.root !== this.root
-        ? [
-            ...(await new WorkspaceProtection(library).inspect(
-              [logicalPath(this.root, path)!],
-              await library.head(),
-            )),
-            ...(await new WorkspaceProtection(library).list(
-              logicalPath(this.root, path)!,
-            )),
-          ].filter(
-            (item, index, all) =>
-              item.state === "unresolved" &&
-              all.findIndex((candidate) => candidate.id === item.id) === index,
+        ? await this.workspaceConflicts(
+            library,
+            logicalPath(this.root, path)!,
+            pinned,
           )
         : [];
     return {
@@ -1427,6 +1433,33 @@ export class FileStore {
       ...(revision ? { revision } : {}),
       ...(workspaceConflicts.length ? { workspaceConflicts } : {}),
     };
+  }
+
+  /**
+   * Compares the workspace file with the pinned state, reading only. A file that
+   * differs is then checked against the current state and recorded only when it
+   * is an external edit.
+   */
+  private async workspaceConflicts(
+    library: ContentLibrary,
+    path: string,
+    revision: string | null,
+  ) {
+    const changed = await new WorkspaceProtection(library).changed(
+      [path],
+      revision,
+    );
+    const confirmed = changed.length
+      ? await recordWorkspaceChanges(new ContentLibrary(this.root), changed)
+      : [];
+    return [
+      ...confirmed,
+      ...(await new WorkspaceProtection(library).list(path)),
+    ].filter(
+      (item, index, all) =>
+        item.state === "unresolved" &&
+        all.findIndex((candidate) => candidate.id === item.id) === index,
+    );
   }
 
   async listPages(

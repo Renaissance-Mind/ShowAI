@@ -65,6 +65,17 @@ export class ContentLibrary {
   async head() {
     return (await this.backend()).head();
   }
+  /**
+   * Run reads against one committed state. SQLite holds a read transaction, so
+   * saves from any process proceed meanwhile; legacy Git storage keeps the lease.
+   */
+  async readSnapshot<T>(
+    action: (revision: string | null) => Promise<T>,
+  ): Promise<T> {
+    const backend = await this.backend();
+    if (backend instanceof SqliteLibrary) return backend.readSnapshot(action);
+    return withLibraryLock(this.root, async () => action(await backend.head()));
+  }
   async tree(revision?: string) {
     return (await this.backend()).tree(revision);
   }

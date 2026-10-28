@@ -207,196 +207,202 @@ export class LibraryIndex {
 
   async synchronize(force = false): Promise<string | null> {
     await this.library.manifest();
-    return withLibraryLock(this.library.root, async () => {
-      const revision = await this.library.head();
-      const db = this.database();
-      try {
-        const indexed = db
-          .prepare("SELECT value FROM metadata WHERE key='revision'")
-          .get()?.value;
-        const signaturesReady =
-          db
-            .prepare("SELECT value FROM metadata WHERE key='signature_version'")
-            .get()?.value === EXTRACTION_VERSION;
-        if (!force && signaturesReady && indexed === (revision ?? ""))
-          return revision;
-        const incremental = !force && signaturesReady;
-        const history: HistoryEntry[] = [];
-        const tree = revision ? await this.library.tree(revision) : [];
-        const eligible = (path: string) =>
-          !path.startsWith("assets/") &&
-          !path.startsWith("runtimes/") &&
-          !path.startsWith("imports/") &&
-          !path.includes("/history/") &&
-          !/\/reader\.json$|\.reader\.json$/.test(path) &&
-          !/\/pages\/[^/]+\/nodes\//.test(path) &&
-          (path.endsWith(".json") || /\.(tsx?|jsx?|md)$/.test(path));
-        const allPaths = tree.map((entry) => entry.path).filter(eligible);
-        const signatures = new Map<string, string[]>();
-        for (const entry of tree) {
-          const node = entry.path.match(
-            /^(projects\/[^/]+\/pages\/[^/]+)\/nodes\//,
-          );
-          const path = node ? node[1] + ".json" : entry.path;
-          if (!eligible(path)) continue;
-          if (!signatures.has(path)) signatures.set(path, []);
-          signatures.get(path)!.push(`${entry.path}:${entry.oid}`);
-        }
-        const current = new Map(
-          allPaths.map((path) => [
-            path,
-            createHash("sha256")
-              .update(JSON.stringify(signatures.get(path)))
-              .digest("hex"),
-          ]),
-        );
-        const previous = new Map(
-          (
-            db.prepare("SELECT path,signature FROM index_state").all() as {
-              path: string;
-              signature: string;
-            }[]
-          ).map((row) => [row.path, row.signature]),
-        );
-        const changed = incremental
-          ? [...new Set([...allPaths, ...previous.keys()])].filter(
-              (path) => current.get(path) !== previous.get(path),
-            )
-          : allPaths;
-        const reload = new Set(changed);
-        for (const path of changed) {
-          const resource = resourceForPath(path);
-          if (resource.kind === "component" || resource.kind === "template")
-            for (const related of new Set([...allPaths, ...previous.keys()]))
-              if (related.startsWith(resource.path + "/")) reload.add(related);
-        }
-        const paths = allPaths.filter((path) => reload.has(path));
-        const rows: SearchRow[] = [],
-          edges: ReferenceEdge[] = [];
-        // Read bounded batches; the resulting index always names this exact revision.
-        for (let offset = 0; offset < paths.length; offset += 32) {
-          const batch = await this.library.readFiles(
-            paths.slice(offset, offset + 32),
-            revision!,
-          );
-          for (const [path, bytes] of batch)
-            this.extract(path, bytes, rows, edges);
-        }
-        db.exec("BEGIN IMMEDIATE");
-        try {
-          if (!incremental)
-            db.exec(
-              "DELETE FROM resources; DELETE FROM search; DELETE FROM refs; DELETE FROM history; DELETE FROM history_resources; DELETE FROM index_state;",
-            );
-          else {
-            const deleteSearch = db.prepare(
-              "DELETE FROM search WHERE id IN(SELECT id FROM resources WHERE path=?)",
-            );
-            const deleteRows = db.prepare("DELETE FROM resources WHERE path=?");
-            const deleteRefs = db.prepare("DELETE FROM refs WHERE source=?");
-            for (const path of reload) {
-              deleteSearch.run(path);
-              deleteRows.run(path);
-              const resource = resourceForPath(path);
-              deleteRefs.run(
-                resource.kind === "component" || resource.kind === "template"
-                  ? resource.path
-                  : path,
-              );
-            }
-          }
-          const rowStatement = db.prepare(
-            "INSERT INTO resources VALUES(?,?,?,?,?,?,?,?,?)",
-          );
-          const searchStatement = db.prepare(
-            "INSERT INTO search VALUES(?,?,?,?)",
-          );
-          for (const row of rows) {
-            rowStatement.run(
-              row.id,
-              row.kind,
-              row.projectId,
-              row.resourceId,
-              row.blockId,
-              row.title,
-              row.body,
-              row.path,
-              JSON.stringify(row.location),
-            );
-            searchStatement.run(
-              row.id,
-              row.title,
-              row.body,
-              cjkTokens(row.title + " " + row.body).join(" "),
-            );
-          }
-          const refStatement = db.prepare(
-            "INSERT INTO refs VALUES(?,?,?,?,?,?)",
-          );
-          for (const ref of edges)
-            refStatement.run(
-              ref.source,
-              ref.targetKind,
-              ref.targetId,
-              ref.version ?? null,
-              ref.integrity ?? null,
-              ref.blockId ?? null,
-            );
-          const removeSignature = db.prepare(
-            "DELETE FROM index_state WHERE path=?",
-          );
-          const saveSignature = db.prepare(
-            "INSERT INTO index_state VALUES(?,?) ON CONFLICT(path) DO UPDATE SET signature=excluded.signature",
-          );
-          for (const path of reload) {
-            const signature = current.get(path);
-            if (signature === undefined) removeSignature.run(path);
-            else saveSignature.run(path, signature);
-          }
-          const historyStatement = db.prepare(
-            "INSERT INTO history VALUES(?,?,?,?,?,?,?)",
-          );
-          const scopeStatement = db.prepare(
-            "INSERT INTO history_resources VALUES(?,?,?,?,?)",
-          );
-          for (const entry of [...history].reverse()) {
-            historyStatement.run(
-              entry.revision,
-              entry.at,
-              entry.actor.kind,
-              entry.actor.harness ?? null,
-              entry.actor.sessionId ?? null,
-              entry.message ?? "",
-              JSON.stringify(entry),
-            );
-            for (const resource of entry.resources)
-              scopeStatement.run(
-                entry.revision,
-                resource.kind,
-                resource.id,
-                resource.projectId ?? null,
-                resource.path,
-              );
-          }
-          db.prepare(
-            "INSERT INTO metadata(key,value) VALUES('revision',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",
-          ).run(revision ?? "");
-          db.prepare(
-            "INSERT INTO metadata VALUES('signature_version',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",
-          ).run(EXTRACTION_VERSION);
-          db.prepare(
-            "INSERT INTO metadata VALUES('last_path_count',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",
-          ).run(String(paths.length));
-          db.exec("COMMIT");
-        } catch (error) {
-          db.exec("ROLLBACK");
-          throw error;
-        }
+    // The index has its own lease and reads one committed library state, so
+    // rebuilding it never holds back saves or reads of the library itself.
+    return withLibraryLock(
+      this.library.root,
+      () =>
+        this.library.readSnapshot((revision) => this.update(revision, force)),
+      "index",
+    );
+  }
+
+  private async update(revision: string | null, force: boolean) {
+    const db = this.database();
+    try {
+      const indexed = db
+        .prepare("SELECT value FROM metadata WHERE key='revision'")
+        .get()?.value;
+      const signaturesReady =
+        db
+          .prepare("SELECT value FROM metadata WHERE key='signature_version'")
+          .get()?.value === EXTRACTION_VERSION;
+      if (!force && signaturesReady && indexed === (revision ?? ""))
         return revision;
-      } finally {
-        db.close();
+      const incremental = !force && signaturesReady;
+      const history: HistoryEntry[] = [];
+      const tree = revision ? await this.library.tree(revision) : [];
+      const eligible = (path: string) =>
+        !path.startsWith("assets/") &&
+        !path.startsWith("runtimes/") &&
+        !path.startsWith("imports/") &&
+        !path.includes("/history/") &&
+        !/\/reader\.json$|\.reader\.json$/.test(path) &&
+        !/\/pages\/[^/]+\/nodes\//.test(path) &&
+        (path.endsWith(".json") || /\.(tsx?|jsx?|md)$/.test(path));
+      const allPaths = tree.map((entry) => entry.path).filter(eligible);
+      const signatures = new Map<string, string[]>();
+      for (const entry of tree) {
+        const node = entry.path.match(
+          /^(projects\/[^/]+\/pages\/[^/]+)\/nodes\//,
+        );
+        const path = node ? node[1] + ".json" : entry.path;
+        if (!eligible(path)) continue;
+        if (!signatures.has(path)) signatures.set(path, []);
+        signatures.get(path)!.push(`${entry.path}:${entry.oid}`);
       }
-    });
+      const current = new Map(
+        allPaths.map((path) => [
+          path,
+          createHash("sha256")
+            .update(JSON.stringify(signatures.get(path)))
+            .digest("hex"),
+        ]),
+      );
+      const previous = new Map(
+        (
+          db.prepare("SELECT path,signature FROM index_state").all() as {
+            path: string;
+            signature: string;
+          }[]
+        ).map((row) => [row.path, row.signature]),
+      );
+      const changed = incremental
+        ? [...new Set([...allPaths, ...previous.keys()])].filter(
+            (path) => current.get(path) !== previous.get(path),
+          )
+        : allPaths;
+      const reload = new Set(changed);
+      for (const path of changed) {
+        const resource = resourceForPath(path);
+        if (resource.kind === "component" || resource.kind === "template")
+          for (const related of new Set([...allPaths, ...previous.keys()]))
+            if (related.startsWith(resource.path + "/")) reload.add(related);
+      }
+      const paths = allPaths.filter((path) => reload.has(path));
+      const rows: SearchRow[] = [],
+        edges: ReferenceEdge[] = [];
+      // Read bounded batches; the resulting index always names this exact revision.
+      for (let offset = 0; offset < paths.length; offset += 32) {
+        const batch = await this.library.readFiles(
+          paths.slice(offset, offset + 32),
+          revision!,
+        );
+        for (const [path, bytes] of batch)
+          this.extract(path, bytes, rows, edges);
+      }
+      db.exec("BEGIN IMMEDIATE");
+      try {
+        if (!incremental)
+          db.exec(
+            "DELETE FROM resources; DELETE FROM search; DELETE FROM refs; DELETE FROM history; DELETE FROM history_resources; DELETE FROM index_state;",
+          );
+        else {
+          const deleteSearch = db.prepare(
+            "DELETE FROM search WHERE id IN(SELECT id FROM resources WHERE path=?)",
+          );
+          const deleteRows = db.prepare("DELETE FROM resources WHERE path=?");
+          const deleteRefs = db.prepare("DELETE FROM refs WHERE source=?");
+          for (const path of reload) {
+            deleteSearch.run(path);
+            deleteRows.run(path);
+            const resource = resourceForPath(path);
+            deleteRefs.run(
+              resource.kind === "component" || resource.kind === "template"
+                ? resource.path
+                : path,
+            );
+          }
+        }
+        const rowStatement = db.prepare(
+          "INSERT INTO resources VALUES(?,?,?,?,?,?,?,?,?)",
+        );
+        const searchStatement = db.prepare(
+          "INSERT INTO search VALUES(?,?,?,?)",
+        );
+        for (const row of rows) {
+          rowStatement.run(
+            row.id,
+            row.kind,
+            row.projectId,
+            row.resourceId,
+            row.blockId,
+            row.title,
+            row.body,
+            row.path,
+            JSON.stringify(row.location),
+          );
+          searchStatement.run(
+            row.id,
+            row.title,
+            row.body,
+            cjkTokens(row.title + " " + row.body).join(" "),
+          );
+        }
+        const refStatement = db.prepare("INSERT INTO refs VALUES(?,?,?,?,?,?)");
+        for (const ref of edges)
+          refStatement.run(
+            ref.source,
+            ref.targetKind,
+            ref.targetId,
+            ref.version ?? null,
+            ref.integrity ?? null,
+            ref.blockId ?? null,
+          );
+        const removeSignature = db.prepare(
+          "DELETE FROM index_state WHERE path=?",
+        );
+        const saveSignature = db.prepare(
+          "INSERT INTO index_state VALUES(?,?) ON CONFLICT(path) DO UPDATE SET signature=excluded.signature",
+        );
+        for (const path of reload) {
+          const signature = current.get(path);
+          if (signature === undefined) removeSignature.run(path);
+          else saveSignature.run(path, signature);
+        }
+        const historyStatement = db.prepare(
+          "INSERT INTO history VALUES(?,?,?,?,?,?,?)",
+        );
+        const scopeStatement = db.prepare(
+          "INSERT INTO history_resources VALUES(?,?,?,?,?)",
+        );
+        for (const entry of [...history].reverse()) {
+          historyStatement.run(
+            entry.revision,
+            entry.at,
+            entry.actor.kind,
+            entry.actor.harness ?? null,
+            entry.actor.sessionId ?? null,
+            entry.message ?? "",
+            JSON.stringify(entry),
+          );
+          for (const resource of entry.resources)
+            scopeStatement.run(
+              entry.revision,
+              resource.kind,
+              resource.id,
+              resource.projectId ?? null,
+              resource.path,
+            );
+        }
+        db.prepare(
+          "INSERT INTO metadata(key,value) VALUES('revision',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",
+        ).run(revision ?? "");
+        db.prepare(
+          "INSERT INTO metadata VALUES('signature_version',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",
+        ).run(EXTRACTION_VERSION);
+        db.prepare(
+          "INSERT INTO metadata VALUES('last_path_count',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",
+        ).run(String(paths.length));
+        db.exec("COMMIT");
+      } catch (error) {
+        db.exec("ROLLBACK");
+        throw error;
+      }
+      return revision;
+    } finally {
+      db.close();
+    }
   }
 
   private extract(

@@ -556,45 +556,46 @@ export class LibraryOperations {
     this.project(projectId);
     assertId(projectId);
     if (pageId) assertId(pageId);
-    const head = await this.library.head();
-    if (!head) return [];
-    const manifests = (await this.library.tree(head)).filter(
-      (entry) =>
-        /^imports\/[a-f0-9-]{36}\/manifest\.json$/.test(entry.path) ||
-        (entry.path.startsWith(`projects/${projectId}/history/imports/`) &&
-          entry.path.endsWith("/manifest.json")),
-    );
-    const result = [];
-    for (const entry of manifests) {
-      const descriptor = JSON.parse(
-        (await this.library.readFile(entry.path, head)).toString("utf8"),
-      ) as Omit<LibraryImportReport, "revision">;
-      if (
-        descriptor.format !== "showai-library-import" ||
-        descriptor.version !== 1 ||
-        !Array.isArray(descriptor.snapshots)
-      )
-        throw new CoreError(
-          "INVALID_DATA",
-          "Invalid imported snapshot manifest.",
-        );
-      const sourceRevision = await this.library.resourceRevision(
-        entry.path,
-        head,
+    return this.library.readSnapshot(async (head) => {
+      if (!head) return [];
+      const manifests = (await this.library.tree(head)).filter(
+        (entry) =>
+          /^imports\/[a-f0-9-]{36}\/manifest\.json$/.test(entry.path) ||
+          (entry.path.startsWith(`projects/${projectId}/history/imports/`) &&
+            entry.path.endsWith("/manifest.json")),
       );
-      for (const snapshot of descriptor.snapshots)
+      const result = [];
+      for (const entry of manifests) {
+        const descriptor = JSON.parse(
+          (await this.library.readFile(entry.path, head)).toString("utf8"),
+        ) as Omit<LibraryImportReport, "revision">;
         if (
-          snapshot.projectId === projectId &&
-          (!pageId || snapshot.pageId === pageId)
+          descriptor.format !== "showai-library-import" ||
+          descriptor.version !== 1 ||
+          !Array.isArray(descriptor.snapshots)
         )
-          result.push({
-            ...snapshot,
-            importId: descriptor.id,
-            importedAt: descriptor.preparedAt,
-            sourceRevision: sourceRevision!,
-          });
-    }
-    return result;
+          throw new CoreError(
+            "INVALID_DATA",
+            "Invalid imported snapshot manifest.",
+          );
+        const sourceRevision = await this.library.resourceRevision(
+          entry.path,
+          head,
+        );
+        for (const snapshot of descriptor.snapshots)
+          if (
+            snapshot.projectId === projectId &&
+            (!pageId || snapshot.pageId === pageId)
+          )
+            result.push({
+              ...snapshot,
+              importId: descriptor.id,
+              importedAt: descriptor.preparedAt,
+              sourceRevision: sourceRevision!,
+            });
+      }
+      return result;
+    });
   }
   async importedPage(
     projectId: string,
@@ -624,35 +625,36 @@ export class LibraryOperations {
       throw new CoreError("INVALID_DATA", "Invalid imported snapshot path.");
     // Imported snapshots are immutable files in the current state; the import
     // revision itself is superseded by later saves and no longer readable.
-    const current = await this.library.head();
-    if (!current)
-      throw new CoreError("NOT_FOUND", "The content library is empty.");
-    const document = normalizeDocument(
-      parseArtifact(
-        JSON.parse(
-          (await this.library.readFile(path, current)).toString("utf8"),
-        ),
-      ).document,
-    );
-    if (
-      document.id !== pageId ||
-      documentHash(document) !== snapshot.contentHash
-    )
-      throw new CoreError(
-        "INVALID_DATA",
-        "Imported page content differs from its manifest.",
+    return this.library.readSnapshot(async (current) => {
+      if (!current)
+        throw new CoreError("NOT_FOUND", "The content library is empty.");
+      const document = normalizeDocument(
+        parseArtifact(
+          JSON.parse(
+            (await this.library.readFile(path, current)).toString("utf8"),
+          ),
+        ).document,
       );
-    const closure = await this.dependencies(document, projectId, current);
-    const reader = await this.readerAt(path, current);
-    return {
-      document,
-      components: closure.components,
-      hash: documentHash(document),
-      path: join(this.library.workspace, path),
-      revision: snapshot.sourceRevision,
-      sourceRevision: current,
-      ...(reader ? { reader: reader.ref } : {}),
-    };
+      if (
+        document.id !== pageId ||
+        documentHash(document) !== snapshot.contentHash
+      )
+        throw new CoreError(
+          "INVALID_DATA",
+          "Imported page content differs from its manifest.",
+        );
+      const closure = await this.dependencies(document, projectId, current);
+      const reader = await this.readerAt(path, current);
+      return {
+        document,
+        components: closure.components,
+        hash: documentHash(document),
+        path: join(this.library.workspace, path),
+        revision: snapshot.sourceRevision,
+        sourceRevision: current,
+        ...(reader ? { reader: reader.ref } : {}),
+      };
+    });
   }
   async importedHtml(
     projectId: string,
@@ -804,28 +806,29 @@ export class LibraryOperations {
   async conflict(id: string) {
     const item = await new WorkspaceProtection(this.library).input(id);
     this.path(item.conflict.path);
-    const revision = await this.library.head();
-    const tree = revision ? await this.library.tree(revision) : [];
-    const current =
-      revision && tree.some((entry) => entry.path === item.conflict.path)
-        ? await this.library.readFile(item.conflict.path, revision)
+    return this.library.readSnapshot(async (revision) => {
+      const tree = revision ? await this.library.tree(revision) : [];
+      const current =
+        revision && tree.some((entry) => entry.path === item.conflict.path)
+          ? await this.library.readFile(item.conflict.path, revision)
+          : null;
+      const baseline = item.conflict.baseRevision
+        ? await this.library
+            .readFile(item.conflict.path, item.conflict.baseRevision)
+            .catch((error) => {
+              if (error instanceof CoreError && error.code === "NOT_FOUND")
+                return null;
+              throw error;
+            })
         : null;
-    const baseline = item.conflict.baseRevision
-      ? await this.library
-          .readFile(item.conflict.path, item.conflict.baseRevision)
-          .catch((error) => {
-            if (error instanceof CoreError && error.code === "NOT_FOUND")
-              return null;
-            throw error;
-          })
-      : null;
-    return {
-      ...item.conflict,
-      currentRevision: revision,
-      current: current?.toString("utf8") ?? null,
-      baseline: baseline?.toString("utf8") ?? null,
-      external: item.bytes?.toString("utf8") ?? null,
-    };
+      return {
+        ...item.conflict,
+        currentRevision: revision,
+        current: current?.toString("utf8") ?? null,
+        baseline: baseline?.toString("utf8") ?? null,
+        external: item.bytes?.toString("utf8") ?? null,
+      };
+    });
   }
   async resolveConflict(input: {
     id: string;

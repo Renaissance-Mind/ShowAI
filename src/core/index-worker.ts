@@ -1,6 +1,6 @@
 import { parentPort } from "node:worker_threads";
 import { CoreError } from "./model";
-import { runSqliteRead } from "./sqlite-reader";
+import { runSqliteRead, runSqliteSnapshot } from "./sqlite-reader";
 const port = parentPort;
 if (!port) throw new Error("Index worker requires a parent channel.");
 let queue = Promise.resolve();
@@ -8,13 +8,16 @@ port.on("message", ({ id, home, action, args }) => {
   queue = queue.then(async () => {
     try {
       const index =
-        action === "library:read"
+        action === "library:read" || action === "library:snapshot"
           ? undefined
           : new (await import("./library-index")).LibraryIndex(home);
       let data;
       switch (action) {
         case "library:read":
           data = await runSqliteRead(home, args);
+          break;
+        case "library:snapshot":
+          data = await runSqliteSnapshot(home, args);
           break;
         case "search":
           data = await index!.search(args);

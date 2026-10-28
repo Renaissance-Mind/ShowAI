@@ -1,7 +1,11 @@
 import { extname, join } from "node:path";
 import { lstat, readdir, rm } from "node:fs/promises";
 import { ContentLibrary as GitLibrary } from "./content-library";
-import { WorkspaceProtection, workspaceHash } from "./workspace-conflicts";
+import {
+  WorkspaceProtection,
+  recordWorkspaceChanges,
+  workspaceHash,
+} from "./workspace-conflicts";
 import { withLibraryLock } from "./library-lock";
 import {
   atomicLibraryFile,
@@ -110,7 +114,16 @@ async function inspectWorkspaceResources(
   library: GitLibrary,
   projectId?: string,
 ) {
-  const head = await library.head();
+  const paths = await library.readSnapshot((head) =>
+    workspaceResourcePaths(library, head, projectId),
+  );
+  return recordWorkspaceChanges(library, paths);
+}
+async function workspaceResourcePaths(
+  library: GitLibrary,
+  head: string | null,
+  projectId?: string,
+) {
   if (!head) return [];
   const paths = new Set(
     (await library.tree(head))
@@ -157,17 +170,7 @@ async function inspectWorkspaceResources(
     else if (info.isFile() && isPackagePath(path)) paths.add(path);
   }
   for (const root of roots) await visit(root);
-  const protection = new WorkspaceProtection(library),
-    conflicts = [],
-    all = [...paths];
-  for (let offset = 0; offset < all.length; offset += 16) {
-    const found = await withLibraryLock(library.root, async () => {
-      const current = await library.head();
-      return protection.inspect(all.slice(offset, offset + 16), current);
-    });
-    conflicts.push(...found);
-  }
-  return conflicts;
+  return [...paths];
 }
 export async function scanWorkspaceResources(
   library: GitLibrary,

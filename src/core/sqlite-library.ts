@@ -14,14 +14,17 @@ import { isAbsolute, join, relative, resolve, sep } from "node:path";
 import { deflateRaw, inflateRawSync } from "node:zlib";
 import { promisify } from "node:util";
 import {
+  activeSqliteSnapshot,
   readSqlite,
+  selectEntry,
   sqliteResourcePath as resourcePath,
+  withSqliteSnapshot,
   type SqliteTreeEntry,
 } from "./sqlite-reader";
 const compress = promisify(deflateRaw);
 import { CoreError } from "./model";
 import { encodeFile, nodePrefix } from "./history-codec";
-import { withLibraryLock } from "./library-lock";
+import { holdsLibraryLock, withLibraryLock } from "./library-lock";
 import { libraryMutations } from "./history-context";
 import {
   WorkspaceProtection,
@@ -373,6 +376,10 @@ export class SqliteLibrary {
     });
   }
   async head(): Promise<string | null> {
+    // Reads in a snapshot see its state; an operation holding the writer lease
+    // always works on the latest one.
+    const snapshot = activeSqliteSnapshot(this.root);
+    if (snapshot && !holdsLibraryLock(this.root)) return snapshot.revision;
     return this.query(
       (db) =>
         (db.prepare("SELECT value FROM metadata WHERE key='head'").get()
@@ -400,6 +407,10 @@ export class SqliteLibrary {
         "The requested library revision is missing.",
       );
     return Number(row.sequence);
+  }
+  /** Reads in the action see one committed state while saves keep committing. */
+  readSnapshot<T>(action: (revision: string | null) => Promise<T>) {
+    return withSqliteSnapshot(this.root, action);
   }
   async tree(revision?: string): Promise<SqliteTreeEntry[]> {
     return readSqlite(this.root, { kind: "tree", revision });
@@ -462,28 +473,16 @@ export class SqliteLibrary {
     return entry;
   }
   async entryAt(revision: string) {
-    return this.query((db) => {
-      const current = db
-        .prepare("SELECT * FROM current_state WHERE revision=?")
-        .get(revision);
-      if (current) return this.entry(current as unknown as RevisionRow);
-      const resource = db
-        .prepare(
-          "SELECT revision,entry FROM current_resources WHERE revision=? LIMIT 1",
-        )
-        .get(revision);
-      if (resource)
-        return this.entry({
-          ...resource,
-          checksum: sha(String(resource.entry)),
-        } as unknown as RevisionRow);
-      this.sequence(db, revision);
-      return this.entry(
-        db
-          .prepare("SELECT * FROM revisions WHERE revision=?")
-          .get(revision) as unknown as RevisionRow,
-      );
-    });
+    // Inside a read snapshot the record comes from that same committed state.
+    const snapshot = activeSqliteSnapshot(this.root);
+    const row = snapshot
+      ? await readSqlite<RevisionRow>(this.root, {
+          kind: "entry",
+          revision,
+          session: snapshot.id,
+        })
+      : await this.query((db) => selectEntry(db, revision) as RevisionRow);
+    return this.entry(row);
   }
   async history(
     input: {
@@ -1384,6 +1383,15 @@ export class SqliteLibrary {
   }
   async recover() {
     await this.manifest();
+    // Recovery only acts on journals already in this directory. A journal that
+    // appears after this check belongs to a live writer holding the lease.
+    const pending = await readdir(
+      join(this.root, "local", "transactions"),
+    ).catch((error: NodeJS.ErrnoException) => {
+      if (error.code === "ENOENT") return [];
+      throw error;
+    });
+    if (!pending.length) return;
     await withLibraryLock(this.root, () => this.recoverUnlocked());
   }
   async compact() {

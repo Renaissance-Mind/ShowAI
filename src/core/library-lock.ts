@@ -83,6 +83,13 @@ async function ownerAt(
   });
 }
 
+/** Whether the calling operation already holds this lease. */
+export function holdsLibraryLock(root: string, name = "writer"): boolean {
+  const key = `${root}:${name}`;
+  const token = lockContext.getStore()?.get(key);
+  return !!token && activeLocks.get(key) === token;
+}
+
 /** Publish a fully written owner with an atomic hard link; no reader sees a partial owner. */
 export async function withLibraryLock<T>(
   root: string,

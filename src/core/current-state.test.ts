@@ -160,7 +160,7 @@ it("merges an active draft with its retained baseline without reading content hi
   expect(preview.document.icon).toBe("📄");
   expect(await library.history()).toEqual([]);
 });
-it("pins a current read while a cooperating writer waits, then publishes the next state", async () => {
+it("pins a current read while a save commits, then publishes the next state", async () => {
   const { root, store } = await fixture();
   const project = await store.createProject({ name: "Read isolation" });
   const first = await store.createPage(project.id, { title: "Before" });
@@ -187,9 +187,10 @@ it("pins a current read while a cooperating writer waits, then publishes the nex
     first.hash,
     first.revision,
   );
+  // The save commits while the read still holds its snapshot.
+  await writing;
   release();
   await reading;
-  await writing;
   expect(
     (await store.readPage(project.id, first.document.id)).document.title,
   ).toBe("After");

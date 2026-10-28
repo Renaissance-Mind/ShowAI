@@ -28,11 +28,8 @@ export async function withLibrarySnapshot<T>(
     return action();
   const library = versionedLibrary(root);
   if (!library) return action();
-  return withLibraryLock(root, async () =>
-    libraryReadSnapshot.run(
-      { root, library, revision: await library.head() },
-      action,
-    ),
+  return library.readSnapshot((revision) =>
+    libraryReadSnapshot.run({ root, library, revision }, action),
   );
 }
 
