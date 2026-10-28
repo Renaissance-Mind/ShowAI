@@ -684,9 +684,6 @@
 .settings-theme-preview {
   border-radius: 12px;
 }
-.settings-product-symbol {
-  color: var(--brand);
-}
 @media (max-width: 1100px) {
   .studio-sidebar {
     width: 208px;

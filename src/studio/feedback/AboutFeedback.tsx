@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
 import type { AgentConnectionRecord } from "../../agent/mcp-connections";
+import { appIconForTheme } from "../../design/app-icon";
+import { useAppearanceTheme } from "../../design/useAppearanceTheme";
 import { supportChannels } from "../../core/support-channels";
 import type { DesktopInfo } from "../../desktop/bridge";
 import type { PluginInstallation } from "../../plugin/desktop-install";
@@ -198,6 +200,7 @@ export function AboutFeedback({
   onOpenFaq?: () => void;
 }) {
   const t = useTranslator(messages);
+  const appIcon = appIconForTheme(useAppearanceTheme());
   const [view, setView] = useState<"about" | "report">(
     request?.view === "report" ? "report" : "about",
   );
@@ -261,9 +264,12 @@ export function AboutFeedback({
   return (
     <div className="feedback-about">
       <div className="settings-product">
-        <span className="settings-product-symbol" aria-hidden="true">
-          ✳
-        </span>
+        <img
+          className="settings-product-symbol"
+          src={appIcon}
+          alt=""
+          draggable={false}
+        />
         <div>
           <h2>ShowAI</h2>
         </div>

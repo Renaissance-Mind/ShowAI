@@ -393,16 +393,9 @@
   padding: 10px 0;
 }
 .settings-product-symbol {
-  display: flex;
-  align-items: center;
-  justify-content: center;
   width: 58px;
   height: 58px;
-  border: 1px solid var(--line);
-  border-radius: 14px;
-  background: var(--surface);
-  font-size: 38px;
-  line-height: 1;
+  flex-shrink: 0;
 }
 .studio-settings .settings-product h2 {
   margin: 0;
