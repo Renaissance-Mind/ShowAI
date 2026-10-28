@@ -1,12 +1,6 @@
 import { BlockItemSources, BlockSettings } from "./action-host";
 import ExpandableSearch from "../ExpandableSearch";
-import {
-  useContext,
-  useMemo,
-  useRef,
-  useState,
-  type PointerEvent as ReactPointerEvent,
-} from "react";
+import { useContext, useMemo, useRef, useState } from "react";
 import {
   ArrowDown,
   ArrowUp,
@@ -16,6 +10,7 @@ import {
   ExternalLink,
   FileText,
   Filter,
+  GripVertical,
   LayoutDashboard,
   LayoutList,
   List,
@@ -39,15 +34,18 @@ import {
 } from "./DatabaseCalendar";
 import { normalizeDate, parsePageCell } from "./database-contract.mjs";
 import {
+  ROW_ACTION_WIDTH,
   changeView,
-  clampColumnWidth,
+  columnWidth,
   databaseViews,
-  moveColumn,
+  moveColumnTo,
   newViewId,
   pruneViews,
   withViews,
   type ViewOverride,
 } from "./database-views";
+import { usePropertyReorder } from "./database-reorder";
+import { useColumnResize } from "./database-column-resize";
 import { pageLink } from "../../portable/page-link.mjs";
 import { PageLinkContext, type PageLinkBridge } from "../page-links";
 import type { MessageKey } from "../../i18n";
@@ -97,8 +95,8 @@ const TYPE_SYMBOL: Record<ColumnType, string> = {
   date: "◫",
   page: "▤",
 };
-const DEFAULT_COLUMN_WIDTH = 160;
-const ROW_ACTION_WIDTH = 33;
+// A select value standing for "create a page"; page links never take this form.
+const NEW_PAGE = "showai:new-page";
 
 /** The title of the page a cell links to, when the host lists it. */
 function pageTitle(
@@ -115,11 +113,13 @@ function PageCell({
   column,
   editable,
   update,
+  createPage,
 }: {
   value: unknown;
   column: DatabaseColumn;
   editable: boolean;
   update: (value: string) => void;
+  createPage?: () => void;
 }) {
   const t = useTranslator(messages);
   const pages = useContext(PageLinkContext);
@@ -151,9 +151,14 @@ function PageCell({
         aria-label={column.name}
         className="sb-cell-page"
         value={text(value)}
-        onChange={(event) => update(event.target.value)}
+        onChange={(event) =>
+          event.target.value === NEW_PAGE
+            ? createPage?.()
+            : update(event.target.value)
+        }
       >
         <option value="">{t("notSet")}</option>
+        {createPage && <option value={NEW_PAGE}>{t("newPage")}</option>}
         {pages.pages
           .filter((page) => page.id !== pages.pageId)
           .map((page) => (
@@ -176,11 +181,14 @@ function Cell({
   column,
   editable,
   update,
+  createPage,
 }: {
   row: DatabaseRow;
   column: DatabaseColumn;
   editable: boolean;
   update: (value: string | number | boolean) => void;
+  /** Page cells: create a page for this record and link it. */
+  createPage?: () => void;
 }) {
   const t = useTranslator(messages);
   const value = row[column.id];
@@ -191,6 +199,7 @@ function Cell({
         column={column}
         editable={editable}
         update={update}
+        createPage={createPage}
       />
     );
   if (column.type === "checkbox")
@@ -392,6 +401,9 @@ export function DatabaseBlock({ data, onChange, readOnly }: BlockProps) {
               options: Array.isArray(column.options)
                 ? column.options.map((option: unknown) => text(option))
                 : [],
+              ...(column.type === "page" && typeof column.folder === "string"
+                ? { folder: column.folder }
+                : {}),
             }))
         : [],
     [data.columns, t],
@@ -451,12 +463,11 @@ export function DatabaseBlock({ data, onChange, readOnly }: BlockProps) {
   const [error, setError] = useState("");
   const [page, setPage] = useReaderState("page", 0, { accept: isIndex });
   const [draggingId, setDraggingId] = useState<string | null>(null);
-  const [movingColumn, setMovingColumn] = useState<string | null>(null);
-  const [dropBefore, setDropBefore] = useState<number | null>(null);
-  const [resizing, setResizing] = useState<{
-    id: string;
-    width: number;
-  } | null>(null);
+  const [pageError, setPageError] = useState("");
+  // Page creation is asynchronous; it edits the data current when it finishes.
+  const latestData = useRef(data);
+  latestData.current = data;
+  const pageQueue = useRef<Promise<unknown>>(Promise.resolve());
   // Rows mapped from shared data keep their source fields and stay in the source.
   const sources = useContext(BlockItemSources);
   const cellEditable = (row: DatabaseRow, column: DatabaseColumn) =>
@@ -530,9 +541,6 @@ export function DatabaseBlock({ data, onChange, readOnly }: BlockProps) {
       )
     : [""];
   const widths = current.columnWidths ?? {};
-  const columnWidth = (id: string) =>
-    resizing?.id === id ? resizing.width : widths[id];
-  const sized = columns.some((column) => columnWidth(column.id));
   const updateFields = (
     id: string,
     values: Record<string, string | number | boolean>,
@@ -562,7 +570,64 @@ export function DatabaseBlock({ data, onChange, readOnly }: BlockProps) {
     setPage(Math.floor(rows.length / pageSize));
     setQuery("");
     if (filter.column) changeCurrent({ filter: undefined });
+    // A database of pages gives every new record its own page.
+    if (canCreatePages && pageColumns[0])
+      createLinkedPage(row.id, pageColumns[0]);
     return row.id;
+  };
+  const canCreatePages = editable && !!pages?.createPage;
+  /** Create a page in the column's folder and link it from the record. */
+  const createLinkedPage = (rowId: string, column: DatabaseColumn) => {
+    const bridge = pages;
+    if (!bridge?.createPage) return;
+    setPageError("");
+    pageQueue.current = pageQueue.current.then(async () => {
+      const base = latestData.current;
+      const savedColumn = (base.columns as DatabaseColumn[]).find(
+        (item) => item.id === column.id,
+      );
+      const record = (base.rows as DatabaseRow[]).find(
+        (item) => item.id === rowId,
+      );
+      if (!savedColumn || !record) return;
+      const name =
+        columns[0] && columns[0].type !== "page"
+          ? text(record[columns[0].id]).trim()
+          : "";
+      try {
+        const created = await bridge.createPage!({
+          ...(name ? { title: name } : {}),
+          ...(savedColumn.folder ? { folderId: savedColumn.folder } : {}),
+          folderName: text(base.title).trim() || t("database"),
+        });
+        const latest = latestData.current;
+        onChange?.({
+          ...latest,
+          columns: (latest.columns as DatabaseColumn[]).map((item) =>
+            item.id === column.id
+              ? { ...item, folder: created.folderId }
+              : item,
+          ),
+          rows: (latest.rows as DatabaseRow[]).map((item) =>
+            item.id === rowId
+              ? {
+                  ...item,
+                  [column.id]: pageLink({
+                    projectId: bridge.projectId,
+                    pageId: created.pageId,
+                  }),
+                }
+              : item,
+          ),
+        });
+      } catch (reason) {
+        setPageError(
+          t("error.createPage", {
+            message: reason instanceof Error ? reason.message : String(reason),
+          }),
+        );
+      }
+    });
   };
   const removeRow = (id: string) => {
     if (sources?.get(id)?.removable === false) return;
@@ -593,45 +658,54 @@ export function DatabaseBlock({ data, onChange, readOnly }: BlockProps) {
           : { ...row, [column.id]: column.type === "checkbox" ? false : "" },
       ),
     });
-  const placeColumn = (id: string, to: number) => {
-    const next = moveColumn(columns, id, to);
-    if (next.every((column, index) => column.id === columns[index].id)) return;
-    onChange?.({ ...data, columns: next });
-  };
-  const resizeColumn = (
+  const placeColumn = (
     id: string,
-    event: ReactPointerEvent<HTMLSpanElement>,
-  ) => {
-    event.preventDefault();
-    event.stopPropagation();
-    const handle = event.currentTarget;
-    const cell = handle.closest("th");
-    const start = event.clientX;
-    const initial = widths[id] ?? cell?.getBoundingClientRect().width ?? 0;
-    let width = clampColumnWidth(initial);
-    handle.setPointerCapture(event.pointerId);
-    setResizing({ id, width });
-    const move = (moved: PointerEvent) => {
-      width = clampColumnWidth(initial + moved.clientX - start);
-      setResizing({ id, width });
-    };
-    const end = () => {
-      handle.removeEventListener("pointermove", move);
-      handle.removeEventListener("pointerup", end);
-      handle.removeEventListener("pointercancel", end);
-      setResizing(null);
-      if (width !== widths[id])
-        changeCurrent({ columnWidths: { ...widths, [id]: width } });
-    };
-    handle.addEventListener("pointermove", move);
-    handle.addEventListener("pointerup", end);
-    handle.addEventListener("pointercancel", end);
-  };
-  const resetWidth = (id: string) => {
-    if (widths[id] === undefined) return;
-    const { [id]: _removed, ...rest } = widths;
-    changeCurrent({ columnWidths: rest });
-  };
+    target: string,
+    placement: "before" | "after",
+  ) =>
+    onChange?.({
+      ...data,
+      columns: moveColumnTo(columns, id, target, placement),
+    });
+  const columnResize = useColumnResize({
+    viewId: savedView.id,
+    columns: columns.map((column, index) => ({
+      id: column.id,
+      width: columnWidth(current, column.id, index),
+      savedWidth: widths[column.id],
+    })),
+    trailing: editable ? ROW_ACTION_WIDTH : 0,
+    disabled: !editable,
+    onCommit: (id, width) => {
+      const { [id]: _previous, ...rest } = widths;
+      changeCurrent({
+        columnWidths: width === undefined ? rest : { ...rest, [id]: width },
+      });
+    },
+  });
+  const tableReorder = usePropertyReorder({
+    ids: columns.map((column) => column.id),
+    disabled: !editable || !!columnResize.resizing,
+    axis: "horizontal",
+    onMove: placeColumn,
+  });
+  const settingsReorder = usePropertyReorder({
+    ids: draftColumns.map((column) => column.id),
+    disabled: false,
+    axis: "vertical",
+    onMove: (id, target, placement) =>
+      setDraftColumns((current) =>
+        moveColumnTo(current, id, target, placement),
+      ),
+  });
+  const columnById = new Map(columns.map((column) => [column.id, column]));
+  const tableColumns = tableReorder.orderedIds
+    .map((id) => columnById.get(id))
+    .filter((column): column is DatabaseColumn => !!column);
+  const draftById = new Map(draftColumns.map((column) => [column.id, column]));
+  const settingsColumns = settingsReorder.orderedIds
+    .map((id) => draftById.get(id))
+    .filter((column): column is DatabaseColumn => !!column);
   const addView = () => {
     const created: DatabaseView = {
       id: newViewId(views),
@@ -675,8 +749,9 @@ export function DatabaseBlock({ data, onChange, readOnly }: BlockProps) {
       setError(t("error.nameEveryProperty"));
       return;
     }
-    const cleaned = draftColumns.map((column) => ({
+    const cleaned = draftColumns.map(({ folder, ...column }) => ({
       ...column,
+      ...(column.type === "page" && folder ? { folder } : {}),
       name: column.name.trim(),
       options: [
         ...new Set(
@@ -759,6 +834,11 @@ export function DatabaseBlock({ data, onChange, readOnly }: BlockProps) {
       column={column}
       editable={cellEditable(row, column)}
       update={(value) => updateRow(row.id, column.id, value)}
+      createPage={
+        canCreatePages && cellEditable(row, column)
+          ? () => createLinkedPage(row.id, column)
+          : undefined
+      }
     />
   );
   const rowName = (row: DatabaseRow) => text(readable(row)[columns[0]?.id]);
@@ -988,9 +1068,27 @@ export function DatabaseBlock({ data, onChange, readOnly }: BlockProps) {
                 onChange={(event) => setDraftTitle(event.target.value)}
               />
             </Field>
-            <div className="sb-property-list">
-              {draftColumns.map((column) => (
-                <div className="sb-property-row" key={column.id}>
+            <div
+              className="sb-property-list"
+              ref={settingsReorder.container}
+              {...settingsReorder.containerProps}
+            >
+              {settingsColumns.map((column) => (
+                <div
+                  className="sb-property-row"
+                  key={column.id}
+                  {...settingsReorder.itemProps(column.id)}
+                >
+                  <button
+                    type="button"
+                    className="sb-icon-button sb-property-grip"
+                    aria-label={t("moveProperty", { name: column.name })}
+                    title={t("propertyDragVerticalHint")}
+                    disabled={draftColumns.length < 2}
+                    {...settingsReorder.handleProps(column.id)}
+                  >
+                    <GripVertical size={14} />
+                  </button>
                   <input
                     aria-label={t("propertyName")}
                     value={column.name}
@@ -1155,106 +1253,59 @@ export function DatabaseBlock({ data, onChange, readOnly }: BlockProps) {
         />
       ) : view === "table" ? (
         <>
-          <div className="sb-table-scroll">
+          <div
+            className="sb-table-scroll"
+            ref={tableReorder.container}
+            {...tableReorder.containerProps}
+          >
             <table
-              className={`sb-database-table${sized ? " is-sized" : ""}`}
-              style={
-                sized
-                  ? {
-                      width:
-                        columns.reduce(
-                          (sum, column) =>
-                            sum +
-                            (columnWidth(column.id) ?? DEFAULT_COLUMN_WIDTH),
-                          0,
-                        ) + (editable ? ROW_ACTION_WIDTH : 0),
-                    }
-                  : undefined
-              }
+              className="sb-database-table"
+              ref={columnResize.table}
+              style={{
+                width:
+                  columns.reduce(
+                    (sum, column, index) =>
+                      sum + columnWidth(current, column.id, index),
+                    0,
+                  ) + (editable ? ROW_ACTION_WIDTH : 0),
+              }}
             >
-              {sized && (
-                <colgroup>
-                  {columns.map((column) => (
-                    <col
-                      key={column.id}
-                      style={{
-                        width: columnWidth(column.id) ?? DEFAULT_COLUMN_WIDTH,
-                      }}
-                    />
-                  ))}
-                  {editable && <col style={{ width: ROW_ACTION_WIDTH }} />}
-                </colgroup>
-              )}
+              <colgroup>
+                {tableColumns.map((column) => (
+                  <col
+                    key={column.id}
+                    data-column-width-id={column.id}
+                    style={{
+                      width: columnWidth(
+                        current,
+                        column.id,
+                        columns.indexOf(column),
+                      ),
+                    }}
+                  />
+                ))}
+                {editable && <col />}
+              </colgroup>
               <thead>
                 <tr>
-                  {columns.map((column, index) => (
+                  {tableColumns.map((column) => (
                     <th
                       key={column.id}
-                      className={[
-                        movingColumn === column.id ? "is-moving" : "",
-                        dropBefore === index ? "is-drop-before" : "",
-                        dropBefore === columns.length &&
-                        index === columns.length - 1
-                          ? "is-drop-after"
-                          : "",
-                      ]
-                        .filter(Boolean)
-                        .join(" ")}
-                      draggable={editable && columns.length > 1}
-                      onDragStart={(event) => {
-                        event.dataTransfer.effectAllowed = "move";
-                        // Not text: the page editor around the component would insert it on drop.
-                        event.dataTransfer.setData(
-                          "application/x-showai-database-property",
-                          column.id,
-                        );
-                        setMovingColumn(column.id);
-                      }}
-                      onDragOver={(event) => {
-                        if (!movingColumn) return;
-                        event.preventDefault();
-                        const box = event.currentTarget.getBoundingClientRect();
-                        setDropBefore(
-                          event.clientX < box.left + box.width / 2
-                            ? index
-                            : index + 1,
-                        );
-                      }}
-                      onDrop={(event) => {
-                        if (!movingColumn || dropBefore === null) return;
-                        event.preventDefault();
-                        const from = columns.findIndex(
-                          (item) => item.id === movingColumn,
-                        );
-                        placeColumn(
-                          movingColumn,
-                          dropBefore > from ? dropBefore - 1 : dropBefore,
-                        );
-                      }}
-                      onDragEnd={() => {
-                        setMovingColumn(null);
-                        setDropBefore(null);
-                      }}
+                      scope="col"
+                      {...tableReorder.itemProps(column.id)}
+                      aria-sort={
+                        sort?.column === column.id
+                          ? sort.direction === "asc"
+                            ? "ascending"
+                            : "descending"
+                          : "none"
+                      }
                     >
                       <button
                         type="button"
                         onClick={() => toggleSort(column.id)}
-                        onKeyDown={(event) => {
-                          if (
-                            !editable ||
-                            !event.altKey ||
-                            !event.shiftKey ||
-                            (event.key !== "ArrowLeft" &&
-                              event.key !== "ArrowRight")
-                          )
-                            return;
-                          event.preventDefault();
-                          placeColumn(
-                            column.id,
-                            index + (event.key === "ArrowLeft" ? -1 : 1),
-                          );
-                        }}
                         title={editable ? t("propertyHeaderHint") : undefined}
+                        {...tableReorder.handleProps(column.id)}
                       >
                         <span className="sb-type-symbol">
                           {TYPE_SYMBOL[column.type]}
@@ -1268,17 +1319,16 @@ export function DatabaseBlock({ data, onChange, readOnly }: BlockProps) {
                           ))}
                       </button>
                       {editable && (
-                        <span
+                        <div
+                          {...columnResize.handleProps(column.id)}
                           className="sb-column-resize"
-                          role="separator"
-                          aria-orientation="vertical"
+                          data-resizing={
+                            columnResize.resizing === column.id || undefined
+                          }
                           aria-label={t("resizeProperty", {
                             name: column.name,
                           })}
-                          onPointerDown={(event) =>
-                            resizeColumn(column.id, event)
-                          }
-                          onDoubleClick={() => resetWidth(column.id)}
+                          title={t("columnResizeHint")}
                         />
                       )}
                     </th>
@@ -1303,8 +1353,13 @@ export function DatabaseBlock({ data, onChange, readOnly }: BlockProps) {
               <tbody>
                 {pagedRows.map((row) => (
                   <tr key={row.id} title={sources?.get(row.id)?.label}>
-                    {columns.map((column) => (
-                      <td key={column.id}>{cell(row, column)}</td>
+                    {tableColumns.map((column) => (
+                      <td
+                        key={column.id}
+                        {...tableReorder.cellProps(column.id)}
+                      >
+                        {cell(row, column)}
+                      </td>
                     ))}
                     {editable && (
                       <td className="sb-row-action">
@@ -1482,6 +1537,11 @@ export function DatabaseBlock({ data, onChange, readOnly }: BlockProps) {
             })}
           </div>
         </>
+      )}
+      {pageError && (
+        <p role="alert" className="sb-error sb-database-error">
+          {pageError}
+        </p>
       )}
       <div className="sb-database-footer">
         <span>

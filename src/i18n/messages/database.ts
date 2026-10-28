@@ -17,8 +17,16 @@ export default defineMessages("database", {
     deleteView: "删除视图",
     openPage: "打开页面{title}",
     linkedPage: "链接的页面",
-    resizeProperty: "调整{name}的宽度",
-    propertyHeaderHint: "点击排序，拖动调整顺序",
+    resizeProperty: "调整{name}列宽",
+    propertyHeaderHint:
+      "拖动调整属性顺序；点击排序。也可按 Alt+Shift+左右方向键移动。",
+    propertyDragVerticalHint:
+      "拖动调整属性顺序，也可按 Alt+Shift+上下方向键移动。",
+    moveProperty: "调整{name}的顺序",
+    columnResizeHint:
+      "拖动调整列宽；双击恢复默认宽度。也可用左右方向键调整，Home 恢复默认。",
+    newPage: "新建页面",
+    "error.createPage": "没有创建页面：{message}",
     cancel: "取消",
     notSet: "未设置",
     openLink: "打开{name}",
@@ -120,8 +128,16 @@ export default defineMessages("database", {
     deleteView: "Delete view",
     openPage: "Open page {title}",
     linkedPage: "Linked page",
-    resizeProperty: "Resize {name}",
-    propertyHeaderHint: "Click to sort, drag to reorder",
+    resizeProperty: "Resize {name} column",
+    propertyHeaderHint:
+      "Drag to reorder properties; click to sort. Or use Alt+Shift+Left/Right.",
+    propertyDragVerticalHint:
+      "Drag to reorder properties, or use Alt+Shift+Up/Down.",
+    moveProperty: "Reorder {name}",
+    columnResizeHint:
+      "Drag to resize; double-click to reset. Use Left/Right to resize or Home to reset.",
+    newPage: "New page",
+    "error.createPage": "The page was not created: {message}",
     cancel: "Cancel",
     notSet: "Not set",
     openLink: "Open {name}",

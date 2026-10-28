@@ -41,6 +41,7 @@ function PageContent({
   onEditIcon,
   linkablePages,
   onCopyLink,
+  onCreateLinkedPage,
 }: {
   view: PageViewSession;
   readOnly?: boolean;
@@ -56,6 +57,14 @@ function PageContent({
     pageId: string;
     blockIds: string[];
   }) => void;
+  /** Creates a page for a component on this page, such as a database record. */
+  onCreateLinkedPage?: (input: {
+    projectId: string;
+    hostPageId: string;
+    title?: string;
+    folderId?: string;
+    folderName: string;
+  }) => Promise<{ pageId: string; folderId: string }>;
 }) {
   const state = useSyncExternalStore(
     view.session.subscribe,
@@ -67,6 +76,8 @@ function PageContent({
   const pages = projectId ? linkablePages[projectId]?.pages : undefined;
   const latestCopy = useRef(onCopyLink);
   latestCopy.current = onCopyLink;
+  const latestCreate = useRef(onCreateLinkedPage);
+  latestCreate.current = onCreateLinkedPage;
   const pageLinks = useMemo<PageLinkBridge | null>(
     () =>
       projectId && pageId
@@ -76,6 +87,20 @@ function PageContent({
             pages: pages ?? [],
             copyLink: (blockIds) =>
               latestCopy.current({ projectId, pageId, blockIds }),
+            ...(latestCreate.current
+              ? {
+                  createPage: (input: {
+                    title?: string;
+                    folderId?: string;
+                    folderName: string;
+                  }) =>
+                    latestCreate.current!({
+                      ...input,
+                      projectId,
+                      hostPageId: pageId,
+                    }),
+                }
+              : {}),
           }
         : null,
     [projectId, pageId, pages],
@@ -207,6 +232,17 @@ export function PageWorkspace({
       pageId: string;
       blockIds: string[];
     }) => latest.current.onCopyLink(target),
+    onCreateLinkedPage: (input: {
+      projectId: string;
+      hostPageId: string;
+      title?: string;
+      folderId?: string;
+      folderName: string;
+    }) => {
+      if (!latest.current.onCreateLinkedPage)
+        throw new Error("This workbench cannot create pages.");
+      return latest.current.onCreateLinkedPage(input);
+    },
   }));
   return workspace.views.map((view) => {
     const active = visible && view.key === workspace.activeView;

@@ -6,9 +6,9 @@ import { PageLinkContext, type PageLinkBridge } from "../page-links";
 import { parsePageCell, validateDatabaseData } from "./database-contract.mjs";
 import {
   changeView,
-  clampColumnWidth,
+  columnWidth,
   databaseViews,
-  moveColumn,
+  moveColumnTo,
   newViewId,
   pruneViews,
   withViews,
@@ -25,7 +25,7 @@ const columns: DatabaseColumn[] = [
 const link = "showai://project/research/page/notes-1";
 const records = () => ({
   title: "文档",
-  columns,
+  columns: columns.map((column) => ({ ...column })),
   rows: [
     { id: "a", title: "实验记录", status: "进行中", doc: link },
     { id: "b", title: "周报", status: "完成", doc: "" },
@@ -51,6 +51,16 @@ describe("database page cells and views contract", () => {
         typeof value === "number" ? /rows\[0\]\.doc/ : /showai:\/\/project/,
       );
     }
+  });
+  it("keeps a folder only on page columns", () => {
+    const data: any = records();
+    data.columns[2].folder = "notes-folder";
+    expect(() => validateDatabaseData(data)).not.toThrow();
+    data.columns[0].folder = "notes-folder";
+    expect(() => validateDatabaseData(data)).toThrow(/columns\[0\]\.folder/);
+    data.columns[0] = { ...data.columns[0], folder: undefined };
+    data.columns[2].folder = "../up";
+    expect(() => validateDatabaseData(data)).toThrow(/columns\[2\]\.folder/);
   });
   it("accepts named views and names the invalid field", () => {
     const views: DatabaseView[] = [
@@ -148,27 +158,36 @@ describe("database views", () => {
     );
     expect(cleared).toEqual({ id: "a", name: "表格", type: "table" });
   });
-  it("creates unused view ids, clamps widths and moves columns", () => {
+  it("creates unused view ids, reads widths and moves columns", () => {
     expect(
       newViewId([
         { id: "view-2", name: "2", type: "table" },
         { id: "default", name: "1", type: "table" },
       ]),
     ).toBe("view-3");
-    expect(clampColumnWidth(20)).toBe(80);
-    expect(clampColumnWidth(5000)).toBe(1200);
-    expect(clampColumnWidth(150.6)).toBe(151);
-    expect(moveColumn(columns, "doc", 0).map((column) => column.id)).toEqual([
+    const view: DatabaseView = {
+      id: "v",
+      name: "V",
+      type: "table",
+      columnWidths: { status: 200, doc: 40 },
+    };
+    expect(columnWidth(view, "title", 0)).toBe(280);
+    expect(columnWidth(view, "status", 1)).toBe(200);
+    // Widths outside the contract fall back to the default.
+    expect(columnWidth(view, "doc", 2)).toBe(165);
+    const ids = (list: DatabaseColumn[]) => list.map((column) => column.id);
+    expect(ids(moveColumnTo(columns, "doc", "title", "before"))).toEqual([
       "doc",
       "title",
       "status",
     ]);
-    expect(moveColumn(columns, "title", 9).map((column) => column.id)).toEqual([
+    expect(ids(moveColumnTo(columns, "title", "doc", "after"))).toEqual([
       "status",
       "doc",
       "title",
     ]);
-    expect(moveColumn(columns, "missing", 0)).toBe(columns);
+    expect(moveColumnTo(columns, "missing", "title", "before")).toBe(columns);
+    expect(moveColumnTo(columns, "title", "title", "after")).toBe(columns);
   });
   it("drops view settings that refer to removed or retyped columns", () => {
     const [view] = pruneViews(
@@ -275,8 +294,12 @@ describe("database rendering", () => {
       false,
     );
     expect(html).not.toContain('role="tablist"');
-    expect(html).toContain("sb-database-table is-sized");
-    expect(html).toContain('<col style="width:300px"/>');
+    expect(html).toContain(
+      '<col data-column-width-id="title" style="width:300px"/>',
+    );
+    expect(html).toContain(
+      '<col data-column-width-id="status" style="width:165px"/>',
+    );
     expect(html).toContain("sb-add-property");
     expect(html).toContain('role="separator"');
   });

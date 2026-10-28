@@ -9,6 +9,10 @@ import {
 import type { DatabaseColumn, DatabaseView, DatabaseViewType } from "./types";
 
 export const DEFAULT_VIEW_ID = "default";
+/** Default table widths: the first property names the record. */
+export const FIRST_COLUMN_WIDTH = 280;
+export const COLUMN_WIDTH = 165;
+export const ROW_ACTION_WIDTH = 33;
 
 /** Settings a reader may change for a view without editing the page. */
 export type ViewOverride = Partial<
@@ -86,23 +90,35 @@ export function newViewId(views: DatabaseView[]): string {
     if (!used.has(`view-${index}`)) return `view-${index}`;
 }
 
-export function clampColumnWidth(width: number): number {
-  return Math.round(
-    Math.min(MAX_COLUMN_WIDTH, Math.max(MIN_COLUMN_WIDTH, width)),
-  );
+/** The saved width of a table column in this view, or its default. */
+export function columnWidth(
+  view: DatabaseView,
+  id: string,
+  index: number,
+): number {
+  const width = view.columnWidths?.[id];
+  return Number.isInteger(width) &&
+    width! >= MIN_COLUMN_WIDTH &&
+    width! <= MAX_COLUMN_WIDTH
+    ? width!
+    : index === 0
+      ? FIRST_COLUMN_WIDTH
+      : COLUMN_WIDTH;
 }
 
-/** Columns with one moved to another position. */
-export function moveColumn(
-  columns: DatabaseColumn[],
+/** Columns with one moved before or after another. */
+export function moveColumnTo<T extends { id: string }>(
+  columns: T[],
   id: string,
-  to: number,
-): DatabaseColumn[] {
-  const from = columns.findIndex((column) => column.id === id);
-  if (from < 0) return columns;
-  const next = [...columns];
-  const [moved] = next.splice(from, 1);
-  next.splice(Math.max(0, Math.min(to, next.length)), 0, moved);
+  target: string,
+  placement: "before" | "after",
+): T[] {
+  const moved = columns.find((column) => column.id === id);
+  if (!moved || id === target) return columns;
+  const next = columns.filter((column) => column.id !== id);
+  const index = next.findIndex((column) => column.id === target);
+  if (index < 0) return columns;
+  next.splice(placement === "before" ? index : index + 1, 0, moved);
   return next;
 }
 

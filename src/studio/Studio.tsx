@@ -1741,6 +1741,42 @@ export default function Studio() {
     }
   }
   /**
+   * A page a component on another page asked for, such as a database record.
+   * It goes into the given folder; a missing folder is made beside the asking page.
+   */
+  async function createLinkedPage(input: {
+    projectId: string;
+    hostPageId: string;
+    title?: string;
+    folderId?: string;
+    folderName: string;
+  }) {
+    const folders = await desktop.invoke<FolderMetadata[]>("folders:list", {
+      projectId: input.projectId,
+    });
+    let folder = folders.find(
+      (item) => item.id === input.folderId && !item.archived,
+    );
+    if (!folder) {
+      const host = contents[input.projectId]?.pages.find(
+        (item) => item.id === input.hostPageId,
+      );
+      folder = await desktop.invoke<FolderMetadata>("folders:create", {
+        projectId: input.projectId,
+        parentId: host?.parentId ?? null,
+        name: input.folderName,
+      });
+    }
+    const created = await desktop.invoke<LoadedPage>("pages:create", {
+      projectId: input.projectId,
+      parentId: folder.id,
+      kind: "page",
+      ...(input.title ? { title: input.title } : {}),
+    });
+    await refresh();
+    return { pageId: created.document.id, folderId: folder.id };
+  }
+  /**
    * Copies the open read-only page into a new project this device owns. The
    * copy stays local even when new projects default to a server account, and
    * a failed import removes the empty project it was going to fill.
@@ -5013,6 +5049,7 @@ export default function Studio() {
                 onRevealHandled={handleRevealHandled}
                 linkablePages={contents}
                 onCopyLink={(target) => void copyPageLink(target).catch(report)}
+                onCreateLinkedPage={createLinkedPage}
                 onEditIcon={action(async () => {
                   const target = activePageTarget();
                   if (target) await beginPageIcon(target);

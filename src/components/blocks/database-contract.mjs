@@ -274,6 +274,13 @@ export function validateDatabaseData(data) {
         !column.options.every((value) => typeof value === "string"))
     )
       fail(`${path}.options must be an array of at most 200 texts.`);
+    if (
+      column.folder !== undefined &&
+      (column.type !== "page" ||
+        typeof column.folder !== "string" ||
+        !ID.test(column.folder))
+    )
+      fail(`${path}.folder is a folder id and only belongs to page columns.`);
   }
   const dateColumns = columns.filter((column) => column.type === "date");
   const pageColumns = columns.filter((column) => column.type === "page");

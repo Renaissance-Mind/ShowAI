@@ -50,6 +50,8 @@ export interface DatabaseColumn {
   name: string;
   type: ColumnType;
   options?: string[];
+  /** Page columns: the folder that new linked pages go into. */
+  folder?: string;
 }
 export interface DatabaseRow {
   id: string;

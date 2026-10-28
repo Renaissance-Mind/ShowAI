@@ -1153,7 +1153,7 @@
         },
         {
           "path": "columns",
-          "meaning": "列定义：唯一 id、显示 name、type=text/number/select/checkbox/url/date/page。select 列用 options 给出候选值；date 列的值是 YYYY-MM-DD 或空字符串；page 列的值是 showai://project/PROJECT/page/PAGE 页面链接或空字符串。"
+          "meaning": "列定义：唯一 id、显示 name、type=text/number/select/checkbox/url/date/page。select 列用 options 给出候选值；date 列的值是 YYYY-MM-DD 或空字符串；page 列的值是 showai://project/PROJECT/page/PAGE 页面链接或空字符串。 page 列可带 folder（文件夹 id），工作台为新记录建的页面放在那里；省略时第一次建页面会在本页所在位置新建一个以数据库标题命名的文件夹并写回 folder。"
         },
         {
           "path": "rows",
@@ -1221,7 +1221,7 @@
           "title": "管理一组页面",
           "steps": [
             "先用 pages_list 取得已有页面的 pageId，添加 type=page 的列，单元格写 showai://project/PROJECT/page/PAGE（示例中的 PROJECT_ID 和页面 ID 要换成真实值），没有对应页面的记录留空字符串。",
-            "其余属性记录状态、日期、负责人等；读者点击页面单元格打开对应页面。组件不会创建页面，也不会随页面删除而改动记录。"
+            "其余属性记录状态、日期、负责人等；读者点击页面单元格打开对应页面。在工作台里新建记录，或在页面单元格选「新建页面」，会在 folder 指向的文件夹里新建页面并链接；Agent 写入时不会自动建页面，要先建好页面再写链接。删除记录不会删除页面。"
           ],
           "exampleIndex": 3
         },
@@ -1262,12 +1262,12 @@
         },
         {
           "action": "管理视图与属性（可编辑时）",
-          "effect": "在视图与筛选菜单新建、重命名或删除视图；在表头末尾的加号添加属性；拖动表头或按 Alt+Shift+左右方向键调整属性顺序；拖动表头右缘调整列宽，双击恢复自动宽度。",
+          "effect": "在视图与筛选菜单新建、重命名或删除视图；在表头末尾的加号添加属性；按住表头拖动或按 Alt+Shift+左右方向键调整属性顺序（属性设置面板里拖动把手或按 Alt+Shift+上下方向键）；拖动表头右缘调整列宽，双击恢复默认，聚焦后左右方向键每次 10px（Shift 50px），Home 恢复默认，Esc 取消拖动。",
           "persistence": "content"
         },
         {
           "action": "点击页面单元格",
-          "effect": "打开链接的页面；可编辑时从当前项目的页面中选择链接目标。",
+          "effect": "打开链接的页面；可编辑时从当前项目的页面中选择链接目标，或选「新建页面」在数据库文件夹里新建并链接。",
           "persistence": "view"
         },
         {
@@ -1297,7 +1297,7 @@
         "date 单元格只接受合法的 YYYY-MM-DD 或空字符串；calendar 引用的列必须存在且类型匹配。",
         "搜索与筛选同样作用于日历和热力图；没有日期的记录不进入日历，会在下方提示数量。",
         "容器宽度不足 560px 时月历和周历改为按天的日程列表；打印时附带完整日程列表。",
-        "page 单元格只接受 showai://project/PROJECT/page/PAGE 或空字符串；页面标题在工作台中读取，离线导出中显示为链接的页面。",
+        "page 单元格只接受 showai://project/PROJECT/page/PAGE 或空字符串；folder 只能写在 page 列上。页面标题在工作台中读取，离线导出中显示为链接的页面。",
         "几个组件共享同一份数据时，views、view、groupBy、calendar 和 title 留在各自组件里，记录与属性共享。"
       ],
       "editing": {

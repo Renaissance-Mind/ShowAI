@@ -28,6 +28,15 @@ export interface PageLinkBridge {
   pages: LinkablePage[];
   /** Copy a link to the page, or to these blocks on it. */
   copyLink(blockIds: string[]): void;
+  /**
+   * Create a page in a folder of this project, making the folder beside this
+   * page when it no longer exists. Absent where pages cannot be created.
+   */
+  createPage?(input: {
+    title?: string;
+    folderId?: string;
+    folderName: string;
+  }): Promise<{ pageId: string; folderId: string }>;
 }
 /** The host supplies project resources; all writing tools belong to the component. */
 export const RichTextEnvironment = createContext<{
