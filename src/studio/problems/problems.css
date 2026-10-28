@@ -129,11 +129,47 @@
   background: var(--hover);
   color: var(--text);
 }
-/* L2: attached banner. */
+/* L2: attached banner. One line of text with the actions on its right; in a
+   narrow container the actions move under the text. The first text line, the
+   icon and the close button centre on the 31px action buttons. */
 .problem-notice.is-banner {
-  padding: 10px 18px;
+  container-type: inline-size;
+  flex-wrap: wrap;
+  gap: 8px 10px;
+  padding: 8px 12px 8px 18px;
   border-bottom: 1px solid var(--line);
   background: color-mix(in srgb, var(--tone) 8%, var(--paper));
+}
+.problem-notice.is-banner .problem-notice-icon {
+  padding-top: 7px;
+}
+.problem-notice.is-banner .problem-notice-body {
+  flex: 1 1 0;
+  padding-top: 5px;
+}
+.problem-notice-text {
+  line-height: 21px;
+}
+.problem-notice-text > span {
+  margin-left: 10px;
+}
+.problem-notice.is-banner .problem-notice-actions {
+  flex: none;
+  margin-top: 0;
+}
+.problem-notice.is-banner .problem-notice-close {
+  margin-top: 2px;
+}
+@container (max-width: 560px) {
+  .problem-notice.is-banner .problem-notice-actions {
+    order: 1;
+    flex-basis: 100%;
+    padding-left: 26px;
+  }
+  .problem-notice-text > span {
+    display: block;
+    margin-left: 0;
+  }
 }
 /* L3: inside a dialog the caller owns. */
 .problem-notice.is-dialog {

@@ -16,6 +16,7 @@ export const SAVE_BANNER_ID = "studio-save-problem";
 /**
  * Banner for a failed page save (not a conflict): cause-specific title,
  * the fixed content-safety line and only the follow-ups that can work.
+ * The cause already says what the details would, so they are left out.
  */
 export function SaveFailureBanner({
   state,
@@ -25,6 +26,7 @@ export function SaveFailureBanner({
   onLibrarySpace,
   onReveal,
   onLocateLargest,
+  onDiscard,
 }: {
   state: SaveFailureState;
   platform?: string;
@@ -33,6 +35,7 @@ export function SaveFailureBanner({
   onLibrarySpace?: () => void;
   onReveal?: (path: string) => void;
   onLocateLargest?: () => void;
+  onDiscard: () => void;
   "data-priority"?: number;
 }) {
   const t = useTranslator(pageSessionMessages);
@@ -56,12 +59,14 @@ export function SaveFailureBanner({
       label: t("save.locateLargest"),
       onSelect: onLocateLargest,
     },
+    discard: { label: t("save.discard"), onSelect: onDiscard, destructive: true },
   };
   return (
     <div id={SAVE_BANNER_ID} tabIndex={-1} className="studio-save-problem">
       <ProblemNotice
         problem={failure.problem}
         level="banner"
+        details={false}
         actions={failure.offers.flatMap((offer) =>
           handlers[offer] ? [handlers[offer]!] : [],
         )}

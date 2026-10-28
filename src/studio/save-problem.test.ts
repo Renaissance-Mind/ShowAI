@@ -30,7 +30,7 @@ it("offers only follow-ups that do not fail for the same reason", () => {
   );
   expect(full.kind).toBe("diskFull");
   expect(full.safety).toBe("windowOnly");
-  expect(full.offers).toEqual(["retry", "librarySpace"]);
+  expect(full.offers).toEqual(["retry", "librarySpace", "discard"]);
   expect(full.problem.title).toContain("周报");
   expect(full.problem.title).not.toContain("ENOSPC");
   expect(full.problem.details).toContain("ENOSPC: no space left on device");
@@ -45,7 +45,7 @@ it("offers only follow-ups that do not fail for the same reason", () => {
   });
   expect(denied.kind).toBe("permission");
   expect(denied.safety).toBe("draftKept");
-  expect(denied.offers).toEqual(["reveal", "retry"]);
+  expect(denied.offers).toEqual(["reveal", "retry", "discard"]);
   expect(denied.path).toBe("/library/projects/p/pages");
 
   const large = describeSaveFailure(
@@ -58,11 +58,12 @@ it("offers only follow-ups that do not fail for the same reason", () => {
     }),
   );
   expect(large.kind).toBe("capacity");
-  expect(large.offers).toEqual(["locateLargest", "retry"]);
+  expect(large.offers).toEqual(["locateLargest", "retry", "discard"]);
 
   const other = describeSaveFailure(page({ message: "Unexpected failure" }));
   expect(other.kind).toBe("other");
-  expect(other.offers).toEqual(["retry", "keepCopy"]);
+  expect(other.offers).toEqual(["retry", "keepCopy", "discard"]);
+  expect(other.problem.cause).toBe("Unexpected failure");
 });
 
 it("locates the block holding most of the page's bytes", () => {

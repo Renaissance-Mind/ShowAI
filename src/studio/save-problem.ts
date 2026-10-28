@@ -24,7 +24,8 @@ export type SaveFailureOffer =
   | "keepCopy"
   | "librarySpace"
   | "reveal"
-  | "locateLargest";
+  | "locateLargest"
+  | "discard";
 
 export interface SaveFailureState {
   error: string;
@@ -72,20 +73,24 @@ export function describeSaveFailure(state: SaveFailureState): SaveFailure {
   });
   const facts = problemFacts(state.failure ?? state.error);
   // Retrying or copying into the same full or unwritable library fails again.
-  const offers: SaveFailureOffer[] =
-    kind === "diskFull"
-      ? ["retry", "librarySpace"]
+  // Discarding loads the formal file and always ends the failure.
+  const offers: SaveFailureOffer[] = [
+    ...(kind === "diskFull"
+      ? (["retry", "librarySpace"] as const)
       : kind === "permission"
-        ? [...(facts.path ? (["reveal"] as const) : []), "retry"]
+        ? ([...(facts.path ? (["reveal"] as const) : []), "retry"] as const)
         : kind === "capacity"
-          ? ["locateLargest", "retry"]
-          : ["retry", "keepCopy"];
+          ? (["locateLargest", "retry"] as const)
+          : (["retry", "keepCopy"] as const)),
+    "discard",
+  ];
   const problem: ProblemDescription =
     kind === "other"
       ? {
           ...described,
-          // Session messages (e.g. a draft failure) are already sentences.
-          cause: described.cause ?? (state.failure ? undefined : state.error),
+          // The banner has no technical details, so an unknown cause shows
+          // the original text; session messages are already sentences.
+          cause: described.cause ?? (facts.message || state.error),
         }
       : {
           ...described,

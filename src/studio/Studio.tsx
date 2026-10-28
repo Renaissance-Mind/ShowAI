@@ -4868,6 +4868,12 @@ export default function Studio() {
                   const id = largestBlock(page.draft?.content);
                   if (id && page.draft) void locateAssistantTarget(page.draft.id, [id]);
                 }}
+                // Without unsaved edits, loading the file loses nothing.
+                onDiscard={
+                  page.dirty
+                    ? () => setDialog({ type: "discardDraft" })
+                    : action(page.acceptResolution)
+                }
               />
             )}
             {view === "page" && page.error && page.status === "conflict" && (

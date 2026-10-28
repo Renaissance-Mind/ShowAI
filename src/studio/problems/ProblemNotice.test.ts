@@ -31,6 +31,30 @@ describe("ProblemNotice", () => {
     expect(html).toContain('role="alert"');
   });
 
+  it("runs a banner's text together and can leave out the details", () => {
+    setLocale("zh-CN");
+    const problem = describeError(
+      { code: "LOCKED", message: "library is locked" },
+      { action: "保存", object: "周报", safety: "saved" },
+    );
+    const html = renderToStaticMarkup(
+      createElement(ProblemNotice, {
+        problem,
+        details: false,
+        actions: [
+          { label: "重试保存", onSelect: () => {} },
+          { label: "放弃保存", onSelect: () => {}, destructive: true },
+        ],
+      }),
+    );
+    expect(html).toMatch(
+      /<p class="problem-notice-text"><strong class="problem-notice-title">「周报」保存失败<\/strong><span class="problem-notice-safety is-saved">内容已保存，没有受到影响。<\/span><span class="problem-notice-cause">内容库正在进行另一项操作，完成后再试。<\/span><\/p>/,
+    );
+    expect(html).toMatch(/<\/div><div class="problem-notice-actions">/);
+    expect(html).toContain('class="is-destructive">放弃保存');
+    expect(html).not.toContain("技术详情");
+  });
+
   it("stacks notices by priority behind 还有 N 项", () => {
     setLocale("zh-CN");
     const html = renderToStaticMarkup(

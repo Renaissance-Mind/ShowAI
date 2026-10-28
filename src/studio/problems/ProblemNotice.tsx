@@ -108,6 +108,8 @@ export interface ProblemNoticeProps {
   count?: number;
   /** Hide 报告问题, e.g. for expected conditions such as a busy library. */
   reportable?: boolean;
+  /** Hide 技术详情 when the notice already says everything the details hold. */
+  details?: boolean;
   className?: string;
   /** Ordering inside a NoticeStack; higher shows first. */
   "data-priority"?: number;
@@ -121,6 +123,7 @@ export function ProblemNotice({
   onDismiss,
   count = 1,
   reportable = true,
+  details = true,
   className,
 }: ProblemNoticeProps) {
   const t = useTranslator(messages);
@@ -168,10 +171,88 @@ export function ProblemNotice({
         )}
       </div>
     );
+  const repeated = count > 1 && (
+    <span className="problem-notice-count">{t("repeated", { count })}</span>
+  );
+  const safety = problem.safety && (
+    <span className={`problem-notice-safety is-${problem.safety}`}>
+      {safetyText(problem.safety)}
+    </span>
+  );
+  const cause = problem.cause && (
+    <span className="problem-notice-cause">{problem.cause}</span>
+  );
+  const actionRow = !!arranged.length && (
+    <div className="problem-notice-actions">
+      {arranged.map((item) => (
+        <button
+          key={item.label}
+          className={
+            item.primary ? "is-primary" : item.destructive ? "is-destructive" : undefined
+          }
+          onClick={item.onSelect}
+        >
+          {item.label}
+        </button>
+      ))}
+    </div>
+  );
+  const detailBlock = details && (
+    <details className="problem-notice-details">
+      <summary>{t("technicalDetails")}</summary>
+      <pre>{problem.details}</pre>
+      <div className="problem-notice-detail-actions">
+        <button onClick={copy}>
+          {copied ? <Check size={13} /> : <Copy size={13} />}
+          {copied ? t("detailsCopied") : t("copyDetails")}
+        </button>
+        {reportable && (
+          <button onClick={report}>
+            <Flag size={13} />
+            {t("reportProblem")}
+          </button>
+        )}
+        {copyError && (
+          <span className="problem-notice-copy-error" title={copyError}>
+            {t("copyFailed")}
+          </span>
+        )}
+      </div>
+    </details>
+  );
+  // A banner runs the title, safety and cause together as one line of text
+  // with the actions beside it; the other levels stack them.
+  if (level === "banner")
+    return (
+      <div
+        className={`problem-notice is-banner tone-${tone}${className ? ` ${className}` : ""}`}
+        role={tone === "info" ? "status" : "alert"}
+      >
+        <span className="problem-notice-icon">
+          <ToneIcon tone={tone} size={16} />
+        </span>
+        <div className="problem-notice-body">
+          <p className="problem-notice-text">
+            <strong className="problem-notice-title">
+              {problem.title}
+              {repeated}
+            </strong>
+            {safety}
+            {cause}
+          </p>
+          {detailBlock}
+        </div>
+        {actionRow}
+        {onDismiss && (
+          <button className="problem-notice-close" aria-label={t("dismiss")} onClick={onDismiss}>
+            <X size={15} />
+          </button>
+        )}
+      </div>
+    );
   return (
     <div
       className={`problem-notice is-${level} tone-${tone}${className ? ` ${className}` : ""}`}
-      role={level === "banner" ? (tone === "info" ? "status" : "alert") : undefined}
     >
       <span className="problem-notice-icon">
         <ToneIcon tone={tone} size={level === "page" ? 28 : 16} />
@@ -179,58 +260,13 @@ export function ProblemNotice({
       <div className="problem-notice-body">
         <Title className="problem-notice-title">
           {problem.title}
-          {count > 1 && (
-            <span className="problem-notice-count">{t("repeated", { count })}</span>
-          )}
+          {repeated}
         </Title>
-        {problem.safety && (
-          <p className={`problem-notice-safety is-${problem.safety}`}>
-            {safetyText(problem.safety)}
-          </p>
-        )}
-        {problem.cause && <p className="problem-notice-cause">{problem.cause}</p>}
-        {!!arranged.length && (
-          <div className="problem-notice-actions">
-            {arranged.map((item) => (
-              <button
-                key={item.label}
-                className={
-                  item.primary ? "is-primary" : item.destructive ? "is-destructive" : undefined
-                }
-                onClick={item.onSelect}
-              >
-                {item.label}
-              </button>
-            ))}
-          </div>
-        )}
-        <details className="problem-notice-details">
-          <summary>{t("technicalDetails")}</summary>
-          <pre>{problem.details}</pre>
-          <div className="problem-notice-detail-actions">
-            <button onClick={copy}>
-              {copied ? <Check size={13} /> : <Copy size={13} />}
-              {copied ? t("detailsCopied") : t("copyDetails")}
-            </button>
-            {reportable && (
-              <button onClick={report}>
-                <Flag size={13} />
-                {t("reportProblem")}
-              </button>
-            )}
-            {copyError && (
-              <span className="problem-notice-copy-error" title={copyError}>
-                {t("copyFailed")}
-              </span>
-            )}
-          </div>
-        </details>
+        {safety && <p>{safety}</p>}
+        {cause && <p>{cause}</p>}
+        {actionRow}
+        {detailBlock}
       </div>
-      {onDismiss && level === "banner" && (
-        <button className="problem-notice-close" aria-label={t("dismiss")} onClick={onDismiss}>
-          <X size={15} />
-        </button>
-      )}
     </div>
   );
 }
