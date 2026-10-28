@@ -94,6 +94,38 @@ describe("workspace sessions against the real loopback workbench", () => {
       first.document.id,
     );
   });
+  it("opens a prefetched page with that read and still looks up recovery drafts", async () => {
+    sessions.prefetch(project, second.document.id);
+    sessions.prefetch(project, second.document.id);
+    expect(calls.filter((call) => call === "pages:get")).toHaveLength(1);
+    expect(await sessions.open(project, second.document.id, "a")).toBe(true);
+    expect(calls.filter((call) => call === "pages:get")).toHaveLength(1);
+    expect(calls).toContain("drafts:list");
+    expect(sessions.getSnapshot().active?.getSnapshot().draft?.title).toBe(
+      "Second",
+    );
+  });
+  it("reads a prefetched page again after the library reports a change to it", async () => {
+    sessions.prefetch(project, second.document.id);
+    await invoke<LoadedPage>("pages:save", {
+      projectId: project,
+      pageId: second.document.id,
+      document: { ...second.document, title: "Renamed elsewhere" },
+      baseHash: second.hash,
+      baseRevision: second.revision,
+    });
+    sessions.invalidate({
+      type: "files",
+      home,
+      projectIds: [project],
+      pageIds: [second.document.id],
+    });
+    expect(await sessions.open(project, second.document.id, "a")).toBe(true);
+    expect(calls.filter((call) => call === "pages:get")).toHaveLength(2);
+    expect(sessions.getSnapshot().active?.getSnapshot().draft?.title).toBe(
+      "Renamed elsewhere",
+    );
+  });
   afterEach(async () => {
     await sessions.shutdown();
     await server.close();

@@ -3397,6 +3397,44 @@ export default function Studio() {
     },
   });
   const studioRoot = useRef<HTMLDivElement>(null);
+  // A page starts loading when the pointer rests on a link to it or presses
+  // it, so opening it does not wait for the read.
+  useEffect(() => {
+    let timer = 0;
+    const link = (event: PointerEvent) => {
+      const element =
+        event.target instanceof Element
+          ? event.target.closest<HTMLElement>("[data-open-page]")
+          : null;
+      return element?.dataset.openProject && element.dataset.openPage
+        ? { projectId: element.dataset.openProject, pageId: element.dataset.openPage }
+        : null;
+    };
+    const over = (event: PointerEvent) => {
+      clearTimeout(timer);
+      const target = link(event);
+      if (target)
+        timer = window.setTimeout(
+          () => page.sessions.prefetch(target.projectId, target.pageId),
+          80,
+        );
+    };
+    const out = () => clearTimeout(timer);
+    const down = (event: PointerEvent) => {
+      clearTimeout(timer);
+      const target = link(event);
+      if (target) page.sessions.prefetch(target.projectId, target.pageId);
+    };
+    document.addEventListener("pointerover", over);
+    document.addEventListener("pointerout", out);
+    document.addEventListener("pointerdown", down);
+    return () => {
+      clearTimeout(timer);
+      document.removeEventListener("pointerover", over);
+      document.removeEventListener("pointerout", out);
+      document.removeEventListener("pointerdown", down);
+    };
+  }, [page.sessions]);
   const assistantOpen = workspace.assistantOpen;
   const changeAssistantOpen = (open: boolean) =>
     workspace.setAssistantOpen(open, workspace.activeId);
@@ -5166,6 +5204,14 @@ export default function Studio() {
                                   ))}
                               <button
                                 className="studio-page-list-open"
+                                data-open-page={
+                                  target.kind === "page" ? target.id : undefined
+                                }
+                                data-open-project={
+                                  target.kind === "page"
+                                    ? target.projectId
+                                    : undefined
+                                }
                                 onClick={(event) => {
                                   if (pageSelection.active)
                                     pageSelection.toggle(target.id, event.shiftKey);

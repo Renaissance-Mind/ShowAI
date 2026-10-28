@@ -18,6 +18,8 @@ import commonMessages from "../i18n/messages/common";
 import pageSessionMessages from "../i18n/messages/pageSession";
 
 const t = translator(pageSessionMessages);
+/** How long a page read ahead of an open stays usable. */
+const PREFETCH_TTL = 4000;
 const common = translator(commonMessages);
 
 export interface PageViewSession {
@@ -57,6 +59,11 @@ export class PageSessions {
   private stale = new Map<PageSession, number>();
   private changedComponents = new Set<PageSession>();
   private refreshTimer?: ReturnType<typeof setTimeout>;
+  /** Pages read ahead of an open, used once by the session that opens them. */
+  private prefetched = new Map<
+    string,
+    { projectId: string; read: Promise<LoadedPage>; until: number }
+  >();
   private ticket = 0;
   private disposed = false;
   private dirty = false;
@@ -131,6 +138,7 @@ export class PageSessions {
     this.tabViews.clear();
     this.stale.clear();
     this.changedComponents.clear();
+    this.prefetched.clear();
     clearTimeout(this.refreshTimer);
     this.ticket++;
     this.home = home;
@@ -247,6 +255,35 @@ export class PageSessions {
       this.retire(session);
     }
   }
+  /**
+   * Starts reading a page the person is about to open, such as one under the
+   * pointer. The open that follows within a few seconds uses this read; a
+   * library change to the page discards it first.
+   */
+  prefetch(projectId: string, pageId: string) {
+    const key = this.pageKey(projectId, pageId);
+    const now = performance.now();
+    for (const [stale, entry] of this.prefetched)
+      if (entry.until < now) this.prefetched.delete(stale);
+    if (!this.home || this.pages.has(key) || this.prefetched.has(key)) return;
+    const home = this.home;
+    const read = this.options.invoke<LoadedPage>("pages:get", {
+      projectId,
+      pageId,
+      expectedHome: home,
+    });
+    // An unused read that fails is dropped; the open reads again and reports.
+    read.catch(() => {
+      if (this.prefetched.get(key)?.read === read) this.prefetched.delete(key);
+    });
+    this.prefetched.set(key, { projectId, read, until: now + PREFETCH_TTL });
+  }
+  private takePrefetched(projectId: string, pageId: string) {
+    const key = this.pageKey(projectId, pageId);
+    const entry = this.prefetched.get(key);
+    this.prefetched.delete(key);
+    return entry && entry.until >= performance.now() ? entry.read : undefined;
+  }
   async open(
     projectId: string,
     pageId: string,
@@ -294,8 +331,18 @@ export class PageSessions {
           for (const listener of this.savedListeners)
             listener(projectId, record);
         },
-        invoke: (action, args) =>
-          this.options.invoke(action, { ...args, expectedHome: home }),
+        invoke: <T>(action: string, args?: Record<string, unknown>) => {
+          const prefetched =
+            action === "pages:get" &&
+            args?.projectId === projectId &&
+            args?.pageId === pageId
+              ? this.takePrefetched(projectId, pageId)
+              : undefined;
+          return (
+            (prefetched as Promise<T> | undefined) ??
+            this.options.invoke<T>(action, { ...args, expectedHome: home })
+          );
+        },
       });
       const created = session;
       this.pages.set(key, created);
@@ -488,6 +535,18 @@ export class PageSessions {
   }
   invalidate(change: DesktopChange) {
     if (change.home && this.home && change.home !== this.home) return;
+    for (const [key, entry] of this.prefetched) {
+      const [, pageId] = JSON.parse(key) as [string, string];
+      if (
+        change.all ||
+        change.type === "home" ||
+        change.catalog ||
+        (change.allPages && change.projectIds?.includes(entry.projectId)) ||
+        !change.pageIds ||
+        change.pageIds.includes(pageId)
+      )
+        this.prefetched.delete(key);
+    }
     for (const session of new Set(this.pages.values())) {
       const state = session.getSnapshot();
       if (

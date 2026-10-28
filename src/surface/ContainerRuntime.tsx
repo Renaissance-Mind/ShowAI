@@ -1068,6 +1068,15 @@ function ContainerView({
     );
   const outlineView = runtime.outlines.get(persistKey)!;
   const scrollTarget = useRef<number | undefined>(undefined);
+  // The page is marked while it restores, so components that mount above the
+  // view leave the scroll position to the restore (see mount-queue.ts).
+  const aimScroll = (target: number | undefined) => {
+    scrollTarget.current = target;
+    const element = page.current;
+    if (!element) return;
+    if (target === undefined) delete element.dataset.restoringScroll;
+    else element.dataset.restoringScroll = "true";
+  };
   useLayoutEffect(() => {
     const element = page.current;
     if (!element) return;
@@ -1084,23 +1093,23 @@ function ContainerView({
       readScroll(sharedScrollKey);
     // Content that is still loading cannot reach the saved position yet: keep
     // restoring as it grows, until the reader scrolls or something is revealed.
-    scrollTarget.current = saved;
+    aimScroll(saved);
     let restored = element.scrollTop;
     const restore = () => {
       const target = scrollTarget.current;
       if (target === undefined) return;
       element.scrollTop = target;
       restored = element.scrollTop;
-      if (Math.abs(restored - target) < 2) scrollTarget.current = undefined;
+      if (Math.abs(restored - target) < 2) aimScroll(undefined);
     };
     restore();
     const growth = new ResizeObserver(restore);
     for (const child of element.children) growth.observe(child);
     const settle = window.setTimeout(
-      () => (scrollTarget.current = undefined),
+      () => aimScroll(undefined),
       4000,
     );
-    const reading = () => (scrollTarget.current = undefined);
+    const reading = () => aimScroll(undefined);
     const inputs = ["wheel", "touchstart", "pointerdown", "keydown"] as const;
     for (const type of inputs)
       element.addEventListener(type, reading, { passive: true });
@@ -1117,7 +1126,7 @@ function ContainerView({
     const scrolled = () => {
       // A scroll the restore did not make, such as following a link, wins.
       if (Math.abs(element.scrollTop - restored) > 2)
-        scrollTarget.current = undefined;
+        aimScroll(undefined);
       clearTimeout(timer);
       timer = window.setTimeout(remember, 500);
     };
@@ -1130,7 +1139,7 @@ function ContainerView({
       element.removeEventListener("scroll", scrolled);
       window.removeEventListener("pagehide", remember);
       remember();
-      scrollTarget.current = undefined;
+      aimScroll(undefined);
     };
   }, [persistKey]);
   useLayoutEffect(() => {
@@ -1149,7 +1158,7 @@ function ContainerView({
           "surface",
       );
     if (owner !== id) return;
-    scrollTarget.current = undefined;
+    aimScroll(undefined);
     if (kind === "board" && !reading) viewport.current?.reveal(target);
     else
       requestAnimationFrame(() =>

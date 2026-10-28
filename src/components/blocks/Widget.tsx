@@ -28,6 +28,7 @@ import { translator } from "../../i18n";
 import { useTranslator } from "../../i18n/react";
 import messages from "../../i18n/messages/widget";
 import { PendingNotice } from "../../ui/PendingNotice";
+import { useQueuedMount } from "./mount-queue";
 
 const widgetMessages = translator(messages);
 
@@ -187,7 +188,26 @@ const WidgetBody = memo(function WidgetBody({
     getRegistryRevision,
   );
   const t = useTranslator(messages);
+  const queued = useQueuedMount();
   const definition = getBlockDefinition(kind);
+  const pending = (
+    <PendingNotice
+      ref={queued.placeholder}
+      className="sb-block"
+      data-preview-pending="true"
+      label={t("loading")}
+      lines={2}
+      minHeight={
+        queued.height ??
+        (typeof data.height === "number"
+          ? data.height
+          : kind.startsWith("g2-")
+            ? 320
+            : 180)
+      }
+    />
+  );
+  if (!queued.mounted) return pending;
   if (!definition)
     return (
       <UnavailableBlock
@@ -215,23 +235,7 @@ const WidgetBody = memo(function WidgetBody({
   const Renderer = definition.renderer;
   return (
     <BlockBoundary key={kind} kind={kind} data={data} readOnly={readOnly}>
-      <Suspense
-        fallback={
-          <PendingNotice
-            className="sb-block"
-            data-preview-pending="true"
-            label={t("loading")}
-            lines={2}
-            minHeight={
-              typeof data.height === "number"
-                ? data.height
-                : kind.startsWith("g2-")
-                  ? 320
-                  : 180
-            }
-          />
-        }
-      >
+      <Suspense fallback={pending}>
         <RichTextEnvironment.Provider value={environment}>
           <Renderer
             data={draft}

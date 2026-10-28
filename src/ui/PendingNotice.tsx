@@ -1,4 +1,4 @@
-import type { CSSProperties } from "react";
+import type { CSSProperties, Ref } from "react";
 import { useDelayedFlag } from "./delayed-flag";
 import "./pending.css";
 
@@ -30,6 +30,7 @@ export function PendingNotice({
   className?: string;
   style?: CSSProperties;
   "data-preview-pending"?: "true";
+  ref?: Ref<HTMLDivElement>;
 }) {
   const visible = useDelayedFlag(active);
   if (!active) return null;

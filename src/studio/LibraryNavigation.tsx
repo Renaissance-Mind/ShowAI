@@ -139,6 +139,8 @@ function LibraryRowView({
         className="studio-tree-main"
         aria-current={active ? "page" : undefined}
         title={title}
+        data-open-page={target.kind === "page" ? target.id : undefined}
+        data-open-project={target.kind === "page" ? target.projectId : undefined}
         onClick={(event) => onOpen(target, event)}
         onAuxClick={(event) => {
           if (event.button === 1) {

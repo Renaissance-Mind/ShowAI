@@ -26,6 +26,10 @@ import type { PageSessions, PageViewSession } from "./page-sessions";
 import PageHeading from "./PageHeading";
 import { DatasetScope } from "../datasets/react";
 import { ReaderStateContext, readerStateStore } from "../surface/reader-state";
+import {
+  MountQueue,
+  MountQueueContext,
+} from "../components/blocks/mount-queue";
 
 function PageContent({
   view,
@@ -138,21 +142,32 @@ const PageView = memo(function PageView({
   ...props
 }: React.ComponentProps<typeof PageContent> & { active: boolean }) {
   const [editors] = useState(() => new WorkspaceEditors(view.editors));
+  const [queue] = useState(() => new MountQueue());
   const mounts = useRef(0);
   useEffect(() => {
     const generation = ++mounts.current;
     return () => {
       queueMicrotask(() => {
-        if (mounts.current === generation) editors.dispose();
+        if (mounts.current === generation) {
+          editors.dispose();
+          queue.dispose();
+        }
       });
     };
-  }, [editors]);
+  }, [editors, queue]);
+  useEffect(() => {
+    const print = () => queue.flush();
+    window.addEventListener("beforeprint", print);
+    return () => window.removeEventListener("beforeprint", print);
+  }, [queue]);
   return (
     <EditorViewScope.Provider value={view.key}>
       <WorkspaceEditorContext.Provider value={editors}>
-        <Activity mode={active ? "visible" : "hidden"}>
-          <PageContent {...props} view={view} />
-        </Activity>
+        <MountQueueContext.Provider value={queue}>
+          <Activity mode={active ? "visible" : "hidden"}>
+            <PageContent {...props} view={view} />
+          </Activity>
+        </MountQueueContext.Provider>
       </WorkspaceEditorContext.Provider>
     </EditorViewScope.Provider>
   );

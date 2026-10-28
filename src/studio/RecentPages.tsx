@@ -133,6 +133,8 @@ export default function RecentPages({
         >
           <button
             className="studio-page-list-open"
+            data-open-page={page.id}
+            data-open-project={page.projectId}
             onClick={(event) => onOpen(page, event)}
             onAuxClick={(event) => {
               if (event.button === 1) {
