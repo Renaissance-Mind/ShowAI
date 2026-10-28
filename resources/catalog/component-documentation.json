@@ -1169,7 +1169,7 @@
         },
         {
           "path": "views",
-          "meaning": "1–20 个命名视图，按顺序显示为视图标签；只有一个视图时不显示标签。每项有唯一 id（字母、数字、_、-）、name 和 type。写入 views 后 view 与 groupBy 不再使用。"
+          "meaning": "1–20 个命名视图，按顺序显示为视图标签；只有一个视图时不显示标签。每项有唯一 id（字母、数字、_、-）、name 和 type。写入 views 后 view 与 groupBy 不再使用。 给没有 views 的旧数据增加视图时，先把当前 view 与 groupBy 写成第一个视图，再追加新视图。"
         },
         {
           "path": "views[].groupBy / sort / filter",
@@ -1220,9 +1220,10 @@
         {
           "title": "管理一组页面",
           "steps": [
-            "先确认页面已存在并取得 projectId 与 pageId，添加 type=page 的列，单元格写 showai://project/PROJECT/page/PAGE。",
+            "先用 pages_list 取得已有页面的 pageId，添加 type=page 的列，单元格写 showai://project/PROJECT/page/PAGE（示例中的 PROJECT_ID 和页面 ID 要换成真实值），没有对应页面的记录留空字符串。",
             "其余属性记录状态、日期、负责人等；读者点击页面单元格打开对应页面。组件不会创建页面，也不会随页面删除而改动记录。"
-          ]
+          ],
+          "exampleIndex": 3
         },
         {
           "title": "周历或月历",

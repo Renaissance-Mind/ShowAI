@@ -524,9 +524,8 @@ function BindChoices({
         ? (component?.name ?? String(request.data.componentId))
         : request.kind,
   );
-  const [local, setLocal] = useState<string[]>(
-    defaultLocalKeys(request.kind).filter((key) => keys.includes(key)),
-  );
+  // Default keys stay local even before the block has them, such as views added later.
+  const [local, setLocal] = useState<string[]>(defaultLocalKeys(request.kind));
   const [datasets, setDatasets] = useState<Summary[] | null>(null);
   const [chosen, setChosen] = useState<string>();
   const [mode, setMode] = useState<"props" | "rows" | "advanced">("props");

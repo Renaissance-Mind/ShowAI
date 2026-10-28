@@ -3,6 +3,7 @@ import {
   componentProps,
   readBinding,
   resolveBinding,
+  defaultLocalKeys,
   shareBlock,
   snapshotBinding,
   splitBindingChange,
@@ -212,7 +213,7 @@ export class DatasetService {
     if (readBinding(node.attrs?.data))
       invalidData(`Block ${blockId} already uses a dataset.`);
     const kind = String(node.attrs!.kind);
-    const local = input.fromBlock.local ?? [];
+    const local = input.fromBlock.local ?? defaultLocalKeys(kind);
     let schema = input.schema;
     let componentId: string | undefined;
     if (kind === "custom") {

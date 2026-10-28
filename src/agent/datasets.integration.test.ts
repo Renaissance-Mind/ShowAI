@@ -505,3 +505,56 @@ test("two pages share one dataset; both write, merge and conflict at the field",
   const guide = await ok("guide", { topic: "datasets" });
   expect(guide.tools).toContain("dataset_write");
 }, 240_000);
+
+test("sharing a database without a local list keeps its views with the block", async () => {
+  const views = [
+    { id: "all", name: "全部", type: "table" },
+    { id: "status", name: "按状态", type: "board", groupBy: "status" },
+  ];
+  const page = await ok("page_create", {
+    title: "论文",
+    blocks: [
+      {
+        kind: "database",
+        data: {
+          title: "论文",
+          columns: [
+            { id: "name", name: "论文", type: "text" },
+            {
+              id: "status",
+              name: "状态",
+              type: "select",
+              options: ["待读", "已读"],
+            },
+          ],
+          rows: [{ id: "p1", name: "BERT", status: "已读" }],
+          views,
+        },
+      },
+    ],
+  });
+  const block = widget(page.document, "database");
+  const shared = await ok("dataset_write", {
+    action: "create",
+    name: "论文记录",
+    fromBlock: {
+      pageId: page.document.id,
+      blockId: block.attrs.id,
+      baseHash: page.hash,
+    },
+  });
+  expect(Object.keys(shared.dataset.value).sort()).toEqual(["columns", "rows"]);
+  const read = await ok("page_read", {
+    pageId: page.document.id,
+    rendered: false,
+  });
+  const data = widget(read.document, "database").attrs.data;
+  expect(data.views).toEqual(views);
+  expect(data.$binding.props.local).toEqual([
+    "title",
+    "view",
+    "groupBy",
+    "calendar",
+    "views",
+  ]);
+}, 120_000);

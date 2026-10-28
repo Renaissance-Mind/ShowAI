@@ -18,7 +18,7 @@
 dataset_write({projectId, action:"create", name:"全景 OKR", fromBlock:{pageId, blockId, baseHash, baseRevision, local:["title"]}})
 ```
 
-它在同一次保存里创建共享数据并把该块改为绑定；当时那个组件版本的参数 schema 会随之约束此后对共享数据的每次写入。组件升级用 `page_apply` 的 `component.ref.set`：共享数据的 schema 若由旧版本派生，会在同一次保存中换成新版本的约束（回执 `datasetSchemas`），不需要另外改；它不写共享数据的值，所以不需要 `datasetBases`。回执 `warnings` 中的 DATASET_SHARED 列出还绑定这份数据的其他页面和块，它们之后的写入也按新 schema 检查，要告诉用户并按用户意思一起升级；DATASET_SCHEMA_KEPT 表示共享数据有自己定的 schema，需要时才用 `dataset_write` apply 的 `schema` 手动更换（`null` 取消约束）。已有数据的列表缺 id 时，先在源组件里补上 id 再共享。另一个块要显示同一份数据时，用 `page_apply` 的 `{type:"component.binding.set", blockId, binding:{dataset:ID, props:{local:[...]}}}`。
+省略 `local` 时，database 的 title、view、groupBy、calendar 和 views 留在各块，其他组件不保留本地参数；给出 `local` 就只按给出的列表。它在同一次保存里创建共享数据并把该块改为绑定；当时那个组件版本的参数 schema 会随之约束此后对共享数据的每次写入。组件升级用 `page_apply` 的 `component.ref.set`：共享数据的 schema 若由旧版本派生，会在同一次保存中换成新版本的约束（回执 `datasetSchemas`），不需要另外改；它不写共享数据的值，所以不需要 `datasetBases`。回执 `warnings` 中的 DATASET_SHARED 列出还绑定这份数据的其他页面和块，它们之后的写入也按新 schema 检查，要告诉用户并按用户意思一起升级；DATASET_SCHEMA_KEPT 表示共享数据有自己定的 schema，需要时才用 `dataset_write` apply 的 `schema` 手动更换（`null` 取消约束）。已有数据的列表缺 id 时，先在源组件里补上 id 再共享。另一个块要显示同一份数据时，用 `page_apply` 的 `{type:"component.binding.set", blockId, binding:{dataset:ID, props:{local:[...]}}}`；database 写 `local:["title","view","groupBy","calendar","views"]`，让这个块保留自己的视图。
 
 **collections**：把共享数据里沿某条路径找到的记录，作为某个数组参数（如表格的 `rows`）的条目，排在块自己的条目之后，按来源中的顺序排列（表格排序和日历按各自规则显示）。下面是 `component.binding.set` 的 `binding` 参数。下面的字段名（`objectives`、`due`、`done`、`areas`、表格的列 id）只是示例，要换成实际的组件参数和表格列；写回的值必须符合来源字段的类型与格式（例如日期是 `YYYY-MM-DD` 文本）：
 

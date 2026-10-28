@@ -1230,7 +1230,7 @@
       },
       {
         "name": "论文阅读清单",
-        "request": "整理正在读的论文：表格里对比方法和数据集，另建一个按阅读状态分组的看板。",
+        "request": "整理正在读的论文：每条链接到项目里的笔记页面，表格里对比方法和数据集，另建一个按阅读状态分组的看板。",
         "data": {
           "title": "论文阅读清单",
           "columns": [
@@ -1238,6 +1238,11 @@
               "id": "name",
               "name": "论文",
               "type": "text"
+            },
+            {
+              "id": "note",
+              "name": "笔记",
+              "type": "page"
             },
             {
               "id": "status",
@@ -1265,6 +1270,7 @@
             {
               "id": "attention",
               "name": "Attention Is All You Need",
+              "note": "showai://project/PROJECT_ID/page/attention-notes",
               "status": "已读",
               "method": "Transformer",
               "dataset": "WMT 2014",
@@ -1273,6 +1279,7 @@
             {
               "id": "bert",
               "name": "BERT",
+              "note": "showai://project/PROJECT_ID/page/bert-notes",
               "status": "在读",
               "method": "掩码语言模型预训练",
               "dataset": "GLUE",
@@ -1281,6 +1288,7 @@
             {
               "id": "vit",
               "name": "An Image Is Worth 16x16 Words",
+              "note": "",
               "status": "待读",
               "method": "Vision Transformer",
               "dataset": "ImageNet",
