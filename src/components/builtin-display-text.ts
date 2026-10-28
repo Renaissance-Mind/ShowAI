@@ -73,6 +73,21 @@ export const builtinEnglish: BuiltinDisplayText = {
     description:
       "Branches balance naturally around a central topic, or use a one-sided layout. Supports keyboard editing, collapsing and undo.",
   },
+  "comparison-matrix": {
+    name: "Comparison matrix",
+    description:
+      "Compares several options dimension by dimension, marking each as adopted, rejected or partial. Can highlight your own option and show only the differences.",
+  },
+  "status-tree": {
+    name: "Status tree",
+    description:
+      "Expands items by category into a tree. Color, icon and line style mark what worked, what failed, what is in progress, still to explore or shelved; click an item to see the evidence.",
+  },
+  "experiment-tracker": {
+    name: "Experiment tracker",
+    description:
+      "Tracks a set of experiments in one view: a scatter over time with the best frontier, a filterable run list, resources and cost, and small training curves.",
+  },
   "sequence-diagram": {
     name: "Sequence diagram",
     description:

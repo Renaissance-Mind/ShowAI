@@ -61,6 +61,9 @@ plugins/showai/scripts/cli.mjs
 !/docs/catalog-lifecycle.md
 !/docs/cloud.md
 !/docs/codex.md
+!/docs/contributing-components.md
+!/docs/contributing-templates.md
+!/docs/development.md
 !/docs/g2-components.md
 !/docs/i18n/README.zh-CN.md
 !/docs/icons.md
@@ -177,6 +180,9 @@ plugins/showai/scripts/cli.mjs
 !/docs/i18n/cloud.zh-CN.md
 !/docs/i18n/codex.zh-CN.md
 !/docs/i18n/component-parameters.zh-CN.md
+!/docs/i18n/contributing-components.zh-CN.md
+!/docs/i18n/contributing-templates.zh-CN.md
+!/docs/i18n/development.zh-CN.md
 !/docs/i18n/diagram-components.zh-CN.md
 !/docs/i18n/g2-components.zh-CN.md
 !/docs/i18n/icons.zh-CN.md
@@ -295,3 +301,7 @@ plugins/showai/scripts/cli.mjs
 !/plugins-kimi/showai/skills/use-showai/references/integration.md
 !/plugins-kimi/showai/skills/use-showai/references/runtime.md
 !/plugins-kimi/showai/skills/use-showai/references/shared-data.md
+
+# Repository Skill for Agents contributing to this checkout (Codex and Claude Code copies).
+!/.agents/skills/showai-contributing/SKILL.md
+!/.claude/skills/showai-contributing/SKILL.md

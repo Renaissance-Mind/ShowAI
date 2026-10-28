@@ -15,7 +15,7 @@ export const componentCategories = [
   { id: "other", label: "其他" },
 ] as const satisfies readonly { id: ComponentCategory; label: string }[];
 
-const builtinCategories: Record<string, ComponentCategory> = {
+export const builtinCategories: Record<string, ComponentCategory> = {
   text: "text",
   callout: "text",
   toggle: "text",
@@ -24,6 +24,9 @@ const builtinCategories: Record<string, ComponentCategory> = {
   code: "text",
   bookmark: "text",
   references: "text",
+  video: "other",
+  audio: "other",
+  pdf: "other",
   image: "image",
   gallery: "image",
   table: "table",

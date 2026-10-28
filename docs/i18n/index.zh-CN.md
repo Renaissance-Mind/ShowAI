@@ -42,14 +42,17 @@ ShowAI 是可进化的人机交互界面：Agent 的回答不再只是一段文�
 
 ## 集成与开发
 
-| 文档                                        | 内容                          |
-| ------------------------------------------- | ----------------------------- |
-| [Agent 接入](agent-integration.zh-CN.md)    | stdio/HTTP、OAuth、工具与展示 |
-| [CLI 脚本参考](agent-usage.zh-CN.md)        | 脚本、诊断、服务配置与运维    |
-| [页面数据格式 v3](artifact-format.zh-CN.md) | 节点、几何、组件、导出与限制  |
-| [品牌资源](branding.zh-CN.md)               | 标识来源、变体与生成          |
+| 文档                                             | 内容                                       |
+| ------------------------------------------------ | ------------------------------------------ |
+| [Agent 接入](agent-integration.zh-CN.md)         | stdio/HTTP、OAuth、工具与展示              |
+| [CLI 脚本参考](agent-usage.zh-CN.md)             | 脚本、诊断、服务配置与运维                 |
+| [页面数据格式 v3](artifact-format.zh-CN.md)      | 节点、几何、组件、导出与限制               |
+| [品牌资源](branding.zh-CN.md)                    | 标识来源、变体与生成                       |
+| [开发与测试](development.zh-CN.md)               | 开发实例、`dev:status`、测试套件与持续集成 |
+| [贡献内置组件](contributing-components.zh-CN.md) | 数据契约、注册点与验证                     |
+| [贡献内置模板](contributing-templates.zh-CN.md)  | 文件夹、注册、修订与系统呈现规则           |
 
-[插件说明](../../plugins/showai/README.zh-CN.md)介绍各个 Skill 与从源码安装。[贡献指南](CONTRIBUTING.zh-CN.md) 说明隔离开发与相关检查，参与项目须遵循[行为准则](CODE_OF_CONDUCT.zh-CN.md)。
+[插件说明](../../plugins/showai/README.zh-CN.md)介绍各个 Skill 与从源码安装。[参与开发](CONTRIBUTING.zh-CN.md)说明每类改动需要更新什么、如何验证，参与项目须遵循[行为准则](CODE_OF_CONDUCT.zh-CN.md)。
 
 ## 运行时提供的参考
 

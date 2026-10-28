@@ -22,7 +22,7 @@ Guides describe the current source. The released app, the plugin and hosted serv
 | Guide                                            | Contents                                                |
 | ------------------------------------------------ | ------------------------------------------------------- |
 | [Components and templates](catalog-lifecycle.md) | Scopes, immutable versions, composition and publication |
-| [Skills and workflows](skills.md)                | Eight Skills and task routing                           |
+| [Skills and workflows](skills.md)                | Nine Skills and task routing                            |
 | [Template folders](template-bundles.md)          | Metadata, four stages and component libraries           |
 | [Component parameters](component-parameters.md)  | Generated references, omission and relation checks      |
 | [G2 data charts](g2-components.md)               | 43 charts, datasets and field mapping                   |
@@ -42,14 +42,17 @@ Guides describe the current source. The released app, the plugin and hosted serv
 
 ## Integration and development
 
-| Guide                                     | Contents                                               |
-| ----------------------------------------- | ------------------------------------------------------ |
-| [Agent integration](agent-integration.md) | stdio/HTTP, OAuth, tools and presentation              |
-| [CLI reference](agent-usage.md)           | Scripts, diagnostics, service setup and administration |
-| [Artifact format v3](artifact-format.md)  | Nodes, geometry, components, export and limits         |
-| [Brand assets](branding.md)               | Logo source, variants and generation                   |
+| Guide                                                           | Contents                                               |
+| --------------------------------------------------------------- | ------------------------------------------------------ |
+| [Agent integration](agent-integration.md)                       | stdio/HTTP, OAuth, tools and presentation              |
+| [CLI reference](agent-usage.md)                                 | Scripts, diagnostics, service setup and administration |
+| [Artifact format v3](artifact-format.md)                        | Nodes, geometry, components, export and limits         |
+| [Brand assets](branding.md)                                     | Logo source, variants and generation                   |
+| [Development and testing](development.md)                       | Instances, `dev:status`, test suites and CI            |
+| [Contributing a built-in component](contributing-components.md) | Contract, registration points and verification         |
+| [Contributing a built-in template](contributing-templates.md)   | Folder, registration, revisions and the baseline       |
 
-[Plugin documentation](../plugins/showai/README.md) covers the Skills and installing from source. [Contributing](../CONTRIBUTING.md) explains isolated development and relevant tests; participation follows the [Code of Conduct](../CODE_OF_CONDUCT.md).
+[Plugin documentation](../plugins/showai/README.md) covers the Skills and installing from source. [Contributing](../CONTRIBUTING.md) explains what each kind of change updates and how to verify it; participation follows the [Code of Conduct](../CODE_OF_CONDUCT.md).
 
 ## Runtime-provided reference
 
