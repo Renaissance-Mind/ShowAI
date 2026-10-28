@@ -88,6 +88,39 @@ await writeFile(
   join(runtime, "index.html"),
   "<!-- Development assets are provided by Vite. -->\n",
 );
+// Conversation previews in hosts whose model writes the HTML (Claude Code)
+// import the reader from public CDNs, named by this manifest. A development
+// build is not published, so name the newest reader on npm; components added
+// since that release render as unknown there. Startup does not wait for it.
+async function publishCdnManifest() {
+  if (process.env.SHOWAI_READER_CDN?.trim() === "off") return;
+  const name = process.env.SHOWAI_CDN_PACKAGE ?? "showai-reader";
+  const read = async (url) => {
+    const response = await fetch(url, { signal: AbortSignal.timeout(20000) });
+    if (!response.ok) throw new Error(`${url} returned ${response.status}`);
+    return response.json();
+  };
+  const { version } = await read(`https://registry.npmjs.org/${name}/latest`);
+  const manifest = await read(
+    `https://cdn.jsdelivr.net/npm/${name}@${version}/manifest.json`,
+  );
+  if (
+    manifest.format !== "showai-cdn-reader" ||
+    manifest.name !== name ||
+    manifest.version !== version ||
+    typeof manifest.entry !== "string"
+  )
+    throw new Error(`${name}@${version} has no valid reader manifest.`);
+  const path = join(runtime, "assets/cdn-manifest.json");
+  await writeFile(path + ".tmp", JSON.stringify(manifest, null, 2) + "\n");
+  await rename(path + ".tmp", path);
+}
+publishCdnManifest().catch((error) =>
+  console.error(
+    "无法取得已发布的 CDN 阅读器，对话内 HTML 预览会退回为图片：",
+    error.message,
+  ),
+);
 
 async function freePort() {
   const socket = createNetServer();

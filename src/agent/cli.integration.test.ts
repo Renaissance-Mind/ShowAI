@@ -407,6 +407,45 @@ test("show_component shows conversation components without a project and saves t
       expect(
         (after.structuredContent as { data: unknown[] }).data,
       ).toHaveLength(1);
+      type Presented = {
+        data: {
+          display: { compactAvailable: boolean };
+          conversation?: { mode: string; fragment?: string; next: string };
+        };
+      };
+      const pageId = (
+        saved.structuredContent as { data: { document: { id: string } } }
+      ).data.document.id;
+      const codexPresented = await codex.callTool({
+        name: "page_present",
+        arguments: { projectId: project.id, pageId },
+      });
+      expect(codexPresented.isError).not.toBe(true);
+      // Hosts that read delivery files need no handoff.
+      expect(
+        (codexPresented.structuredContent as Presented).data.conversation,
+      ).toBeUndefined();
+      // A host whose model writes the HTML gets the fragment and the next step.
+      const claude = await connect([], { SHOWAI_HOST_DISPLAY: "model-html" });
+      try {
+        const presented = (
+          (
+            await claude.callTool({
+              name: "page_present",
+              arguments: { projectId: project.id, pageId },
+            })
+          ).structuredContent as Presented
+        ).data;
+        if (presented.display.compactAvailable) {
+          expect(presented.conversation?.mode).toBe("compact");
+          expect(presented.conversation?.fragment).toContain(
+            "data-showai-inline-root",
+          );
+          expect(presented.conversation?.next).toContain("unchanged");
+        } else expect(presented.conversation?.mode).toBe("unavailable");
+      } finally {
+        await claude.close();
+      }
     } finally {
       await codex.close();
     }

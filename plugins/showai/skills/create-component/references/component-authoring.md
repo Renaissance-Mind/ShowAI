@@ -66,6 +66,30 @@ export default function Explorer({ data, onContext, context }) {
 
 验证时在工作台真实页面操作后检查对话输入框出现标签、移除后不随消息发送、刷新页面后 `context` 恢复，并确认页面数据未变；检查导出 HTML 不出现该控件；能接入 MCP Apps 对话预览时检查宿主收到的模型上下文，不能时说明未验证。
 
+## 阅读状态
+
+ShowAI App 里页面上的组件块还会收到 `viewState` 与 `onViewState`，让读者下次打开页面时回到上次离开的位置。阅读状态变化时（切换标签、移动滑块、展开分支、翻到某一步）调用 `onViewState(value)`：`value` 是不超过 16 KiB 的 JSON，传 `undefined` 表示回到默认。App 在这台设备上为当前读者保存最新的值，变化停下片刻后写入，组件块下次挂载时（包括重启 App 后）作为 `viewState` 传回。它不写入页面，不同步到其他设备，Agent 也看不到；与 `onContext` 交给对话的快照互不影响。拖动时可以每次变化都调用，宿主会合并写入。
+
+`viewState` 可能来自旧的数据：作者或 Agent 修改 data 后，保存的标签、条目 ID 或步骤可能已经不存在。使用前对照当前 `data` 检查，不成立时回到默认值。导出 HTML、组件目录预览、缩略图、对话预览与行内渲染不提供这两个属性，组件此时使用默认值。只有用支持阅读状态的 ShowAI 版本保存的组件版本才会收到它们；旧版本重新保存为新版本即可。阅读状态不是参数：不写入 schema、defaultData 或例子，在 `usage.interactions` 中记为 `persistence: "none"`。
+
+```jsx
+export default function Tabs({ data, viewState, onViewState }) {
+  const saved = data.tabs.some((tab) => tab.id === viewState?.tab) ? viewState.tab : null;
+  const [tab, setTab] = useState(saved ?? data.tabs[0]?.id);
+  const choose = (id) => {
+    setTab(id);
+    onViewState?.(id === data.tabs[0]?.id ? undefined : { tab: id });
+  };
+  return data.tabs.map((item) => (
+    <button key={item.id} type="button" aria-pressed={item.id === tab} onClick={() => choose(item.id)}>
+      {item.title}
+    </button>
+  ));
+}
+```
+
+验证时在开发实例的页面中操作组件，切到其他页面再回来、重启 App 后确认回到原状态；修改 data 删掉保存的条目后确认组件回到默认值；检查页面数据没有变化，导出 HTML 从默认值开始。
+
 ## 跳转到页面或组件
 
 每个组件都会收到 `goTo(target)`，用于让读者点击后跳到另一页、本页的某个块，或另一页上的某个组件或 Board 对象。`target` 可以是页面链接 `showai://project/项目ID/page/页面ID`（要定位到块时加 `?blocks=块ID`，最多 100 个），可以是 `"#块ID"`（本页），也可以是 `{pageId?, blockId?, projectId?}`，省略的 ID 指组件所在的页面和项目。编辑和阅读时都可以调用，调用必须紧随读者的点击或按键，否则返回 false；格式错误时抛出错误。目标可以是页面中的段落、标题、组件、容器里的块或 Board 对象，组件内部的条目不能作为目标。组件里的普通 `<a href="showai://project/…">` 链接效果相同：目标固定、元素本身就是链接时用 `<a href>`，读者可以用键盘聚焦并按回车跳转；目标需要计算，或可点击的元素不是链接（如卡片按钮、图表节点）时用 `goTo`，可点击元素用 `<button type="button">`。

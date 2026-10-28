@@ -13,6 +13,9 @@ import {
   mcpData,
   mcpFailure,
   readerToolMeta,
+  conversationHandoff,
+  hostDisplay,
+  withConversation,
   type Presentation,
 } from "./presentation-tools";
 import { presentPage } from "./page-presentation";
@@ -1342,6 +1345,14 @@ export function createMcpServer(options: {
               ...(blockIds ? { blockIds } : {}),
             },
             ...(value.inlineError ? { inlineError: value.inlineError } : {}),
+            ...withConversation(
+              conversationHandoff(
+                value.compact,
+                blockIds,
+                options.presentation?.hostDisplay ?? hostDisplay(),
+                "page_present",
+              ),
+            ),
             ...(value.externalSnapshots
               ? { externalSnapshots: value.externalSnapshots }
               : {}),

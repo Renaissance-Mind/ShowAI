@@ -6,7 +6,7 @@
 
 展示前读取 [当前宿主适配](host-adapter.md)。安装包在构建时绑定这份文件，Agent 只执行该契约，不从其他 Harness 猜测展示语法。host-profile.json 记录适配身份、声明的显示能力、公共 Skill 指纹与适配指纹，供安装和诊断核验；普通创作无需读取它。
 
-showai_capabilities.presentation.declaredHostDisplay 回显连接声明，show_component 的 delivery:auto 按声明选择；以工具实际返回的 delivery.mode 交付。声明与插件指南不一致时，先核对所选连接、安装版本和宿主能力。配置更新后旧 MCP 进程可能仍沿用此前声明，重连与宿主加载分别验证。
+showai_capabilities.presentation.declaredHostDisplay 回显连接声明，show_component 的 delivery:auto 按声明选择；以工具实际返回的 delivery.mode 交付。需要模型自己写 HTML 的宿主中，page_present 与 render_document 另外返回 `conversation`（`mode`、`next`，可展示时带 `fragment`），按它完成展示。声明与插件指南不一致时，先核对所选连接、安装版本和宿主能力。配置更新后旧 MCP 进程可能仍沿用此前声明，重连与宿主加载分别验证。
 
 使用已绑定契约支持的交付方式。缺少契约或实际能力时说明缺项，保留源内容和可用文件；用户明确选择另一入口后再按其真实契约交付。工具成功、资源已附带、文件已生成、用户实际看到分别核对。
 
@@ -34,6 +34,6 @@ inline 优先携带压缩后的本地阅读器；超出预算时才切换到在�
 
 ## 局部预览
 
-用户未指定范围时先展示完整页面；明确要求局部时按真实 blockIds 选择。完整预览超限时先读完整源取得节点 ID，再选择独立可理解的区域。初始视口高度有限与只导出部分节点是两回事。
+用户未指定范围时先展示完整页面；明确要求局部时按真实 blockIds 选择。完整预览超限时用 page_read 的 `detail:"outline"` 取得节点 ID，再选择独立可理解的区域。初始视口高度有限与只导出部分节点是两回事。
 
 page_present 的 blockIds 只影响 inline 预览，完整 HTML/source 保留全页。page_export 的 blockIds 会使导出文件及同名 source 本身成为局部投影，不能用它覆盖完整源 Page。组件内部章节不一定是独立页面节点，选择前核实。

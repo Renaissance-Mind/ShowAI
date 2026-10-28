@@ -105,7 +105,7 @@ showai publish verify --project PROJECT --url MANIFEST_URL --json
 showai publish list --limit 20 --json
 ```
 
-整页默认 spatial；`--presentation reading` 按阅读顺序呈现 Board。`--blocks` 指页面节点实例及后代，局部导出的 HTML 与伴随源 JSON 都是局部内容，不能拿来覆盖整页；整站拒绝局部选择。`page_present` 则始终提供完整 HTML/source，blockIds 只控制聊天预览。
+整页默认 spatial；`--presentation reading` 按阅读顺序呈现 Board。`--blocks` 指页面节点实例及后代，局部导出的 HTML 与伴随源 JSON 都是局部内容，不能拿来覆盖整页；整站拒绝局部选择。`page_present` 则始终提供完整 HTML/source，blockIds 只控制聊天预览。在由模型自己写 HTML 的宿主（`SHOWAI_HOST_DISPLAY=model-html`，例如 Claude Code）中，`page_present` 与 `render_document` 另外返回 `conversation`：`mode: "compact"` 带 `fragment`，原样交给宿主的 HTML 工具；`too-large` 表示整页超限，应带一到三个关键块的 `blockIds` 再调用；`unavailable` 表示运行时没有 CDN 阅读器。
 
 内嵌组件与图片支持离线阅读。inline 最终 UTF-8 上限为 1,000,000 字节，会先无损压缩；超限时选择能独立理解的节点并保留完整页面。旧输出需要 `--overwrite`。导出禁止覆盖项目源与共享目录；项目的 exports 子目录可以使用。
 

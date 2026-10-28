@@ -23,7 +23,7 @@ description: 在对话中直接展示 1–5 个 ShowAI 组件（图表、示意�
 
 ## 交付
 
-先读 [宿主显示](../use-showai/references/host-display.md) 与其中绑定的当前宿主适配，再调用 show_component。默认 delivery:auto 跟随该连接声明；按实际返回的 delivery.mode 执行适配指南中的显示动作。
+先读 [当前宿主适配](../use-showai/references/host-adapter.md)，再调用 show_component；通用规则见 [宿主显示](../use-showai/references/host-display.md)。默认 delivery:auto 跟随该连接声明；按实际返回的 delivery.mode 执行适配指南中的显示动作，例如 `mode:"compact"` 时把 `delivery.compact` 原样交给宿主的 HTML 展示工具。
 
 宿主已经呈现原生组件视图时，最终回复只补充必要解释。文件、HTML 片段、图片等交付按当前适配指南处理，不向用户输出供其他 Harness 使用的展示指令。没有可执行的显示契约时，说明缺项并保留内容与可用文件。
 

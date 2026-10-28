@@ -75,6 +75,46 @@ export function hostDisplay(value = process.env.SHOWAI_HOST_DISPLAY) {
 }
 /** A model copies compact text into its reply; larger fragments are not passed this way. */
 const COMPACT_BYTES = 32 * 1024;
+
+/**
+ * What a host whose model writes the HTML itself should do with a presented
+ * page. Without this the model treats page_present as already displayed.
+ */
+export function conversationHandoff(
+  compact: string | undefined,
+  blockIds: string[] | undefined,
+  display: HostDisplay | undefined,
+  tool: "page_present" | "render_document",
+) {
+  const saved = tool === "page_present";
+  if (!display || HOST_DISPLAYS[display] !== "compact") return undefined;
+  if (!compact)
+    return {
+      mode: "unavailable",
+      next: `This runtime has no CDN reader, so the page cannot be shown in the conversation. Give the person ${saved ? "openUrl" : "the html file"} and say that the inline view is unavailable.`,
+    };
+  const bytes = Buffer.byteLength(compact);
+  if (bytes <= COMPACT_BYTES)
+    return {
+      mode: "compact",
+      fragment: compact,
+      next: `Pass fragment unchanged to the host's model-written HTML visualization tool now; the person has not seen the page until it is shown.${saved ? " Then give openUrl for the saved Page." : ""}`,
+    };
+  return {
+    mode: "too-large",
+    bytes,
+    limit: COMPACT_BYTES,
+    next: blockIds
+      ? `These blocks are still too large to show in the conversation. Call ${tool} again with fewer blockIds, or give the person ${saved ? "openUrl" : "the html file"}.`
+      : `The whole ${saved ? "page" : "document"} is too large to show in the conversation. Call ${tool} again with blockIds for the one to three blocks the person most needs to see${saved ? ' (page_read detail:"outline" lists them)' : ""}, show that fragment, and give ${saved ? "openUrl" : "the html file"} for the whole ${saved ? "page" : "document"}.`,
+  };
+}
+/** Spreads a handoff into a tool result only when the host needs one. */
+export function withConversation(
+  conversation: ReturnType<typeof conversationHandoff>,
+) {
+  return conversation ? { conversation } : {};
+}
 /** Fragment files are conversation previews, not deliverables; only recent ones are kept. */
 const KEPT_FRAGMENTS = 20;
 
@@ -483,6 +523,14 @@ export function registerPresentationTools(
             ...(presentation.inlineError
               ? { inlineError: presentation.inlineError }
               : {}),
+            ...withConversation(
+              conversationHandoff(
+                presentation.compact,
+                input.blockIds,
+                declaredDisplay,
+                "render_document",
+              ),
+            ),
             delivery: delivery ?? {
               mode: "mcp-resource",
               note: "Use the attached MCP Apps reader; use the delivery returned by the configured host adapter.",
