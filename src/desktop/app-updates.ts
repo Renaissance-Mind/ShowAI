@@ -1,14 +1,25 @@
 import { existsSync } from "node:fs";
 import { join } from "node:path";
-import { app } from "electron";
+import { app, autoUpdater as nativeUpdater } from "electron";
 import { autoUpdater, type ProgressInfo, type UpdateInfo } from "electron-updater";
 import type { AppUpdateState } from "./bridge";
 import type { LogLevel } from "./main-log";
 
 const FIRST_CHECK_DELAY_MS = 20_000;
 const CHECK_INTERVAL_MS = 6 * 60 * 60 * 1000;
-// Squirrel.Mac may still be copying the update when the person asks to restart.
-const INSTALL_FALLBACK_MS = 60_000;
+// Squirrel normally terminates ShowAI within a second. If it does not, a
+// normal quit still installs the update and relaunches, as Squirrel is armed.
+const INSTALL_FALLBACK_MS = 20_000;
+const EXIT_FALLBACK_MS = 10_000;
+
+/** Renderer actions handled by AppUpdates.action. */
+export const appUpdateActions = new Set([
+  "appUpdate:state",
+  "appUpdate:check",
+  "appUpdate:download",
+  "appUpdate:setAutomatic",
+  "appUpdate:install",
+]);
 
 /** First line of an updater error; GitHub failures append whole response bodies. */
 function shortError(error: unknown): string {
@@ -75,9 +86,19 @@ export class AppUpdates {
     autoUpdater.on("download-progress", (progress: ProgressInfo) =>
       this.set({ phase: "downloading", percent: Math.floor(progress.percent) }),
     );
+    // On macOS, Squirrel copies the download from electron-updater before it
+    // can install; restarting earlier quits without installing.
     autoUpdater.on("update-downloaded", (info: UpdateInfo) =>
-      this.set({ phase: "ready", version: info.version, error: undefined }),
+      this.set(
+        process.platform === "darwin"
+          ? { phase: "downloading", version: info.version, percent: 100 }
+          : { phase: "ready", version: info.version, error: undefined },
+      ),
     );
+    if (process.platform === "darwin")
+      nativeUpdater.on("update-downloaded", () =>
+        this.set({ phase: "ready", error: undefined }),
+      );
     autoUpdater.on("error", (error: Error) => {
       // A downloaded update stays installable even when a later check fails.
       if (this.state.phase === "ready") return;
@@ -154,14 +175,27 @@ export class AppUpdates {
    */
   finishQuit(quit: () => void): boolean {
     if (!this.installRequested || this.state.phase !== "ready") return false;
-    this.options.log("info", `Installing ShowAI ${this.state.version} and relaunching.`);
+    const log = this.options.log;
+    log("info", `Installing ShowAI ${this.state.version} and relaunching.`);
+    // Windows are closed and services stopped, so exiting cannot lose work.
+    const exit = () => {
+      quit();
+      setTimeout(() => {
+        log("warn", "ShowAI did not quit after the update was installed; exiting.");
+        app.exit(0);
+      }, EXIT_FALLBACK_MS);
+    };
     const fallback = setTimeout(() => {
-      this.options.log("warn", "The updater did not quit ShowAI; quitting normally.");
-      quit();
+      log("warn", "The updater did not quit ShowAI; quitting normally.");
+      exit();
     }, INSTALL_FALLBACK_MS);
-    autoUpdater.once("error", () => {
+    nativeUpdater.once("before-quit-for-update", () =>
+      log("info", "Squirrel is quitting ShowAI to install the update."),
+    );
+    autoUpdater.once("error", (error: Error) => {
+      log("error", `Installing the update failed: ${shortError(error)}`);
       clearTimeout(fallback);
-      quit();
+      exit();
     });
     autoUpdater.quitAndInstall(true, true);
     return true;

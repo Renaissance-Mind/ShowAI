@@ -51,7 +51,7 @@ import { localMediaResponse } from "../workbench/local-media";
 import { LOCAL_MEDIA_SCHEME } from "../components/custom/local-media-link";
 import { tabShortcut } from "../workbench/tab-shortcuts";
 import { MenuCommandQueue } from "./menu-queue";
-import { AppUpdates } from "./app-updates";
+import { AppUpdates, appUpdateActions } from "./app-updates";
 import { windowQuery, type WindowTarget } from "../workbench/window-target";
 import { parsePageLink } from "../portable/page-link.mjs";
 import { AgentService, errorResult } from "../agent/service";
@@ -789,7 +789,7 @@ async function handle(
       args.settings as Parameters<RemoteMacConnector["save"]>[0],
     );
   if (agentActions.has(action)) return agentHost!.action(action, args);
-  if (action.startsWith("appUpdate:"))
+  if (appUpdateActions.has(action))
     return appUpdates!.action(action, args, () => app.quit());
   const result = await createWorkbench(store, service, {
     preferencesChanged: () =>
@@ -1993,7 +1993,8 @@ else {
               (!actions.has(action) &&
                 !agentActions.has(action) &&
                 !desktopPluginActions.has(action) &&
-                !remoteDeviceActions.has(action))
+                !remoteDeviceActions.has(action) &&
+                !appUpdateActions.has(action))
             )
               throw new CoreError("INVALID_DATA", "Unknown desktop action.");
             if (!args || typeof args !== "object" || Array.isArray(args))
