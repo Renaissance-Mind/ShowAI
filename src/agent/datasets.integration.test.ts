@@ -558,3 +558,118 @@ test("sharing a database without a local list keeps its views with the block", a
     "views",
   ]);
 }, 120_000);
+
+test("a database bound with props keeps only its local settings, inserted or bound later", async () => {
+  const local = ["title", "view", "groupBy", "calendar", "views"];
+  const created = await ok("dataset_write", {
+    action: "create",
+    name: "日程",
+    value: {
+      columns: [
+        { id: "name", name: "名称", type: "text" },
+        { id: "due", name: "截止", type: "date" },
+      ],
+      rows: [{ id: "r1", name: "A", due: "2026-11-01" }],
+    },
+  });
+  expect(created.hash).toEqual(expect.any(String));
+  const datasetId = created.dataset.id;
+  const page = await ok("page_create", {
+    title: "日程视图",
+    blocks: [
+      {
+        kind: "database",
+        data: {
+          title: "旧",
+          columns: [{ id: "x", name: "X", type: "text" }],
+          rows: [{ id: "q", x: "own" }],
+        },
+      },
+    ],
+  });
+  const blockId = widget(page.document, "database").attrs.id;
+  const bound = await ok("page_apply", {
+    pageId: page.document.id,
+    baseHash: page.hash,
+    baseRevision: page.revision,
+    operations: [
+      {
+        type: "component.binding.set",
+        blockId,
+        binding: { dataset: datasetId, props: { local } },
+      },
+    ],
+  });
+  // binding.set drops the block's own columns and rows.
+  expect(widget(bound.document, "database").attrs.data).toEqual({
+    title: "旧",
+    $binding: { dataset: datasetId, props: { local } },
+  });
+  const calendar = {
+    type: "component.props.set",
+    blockId,
+    props: { view: "calendar", calendar: { dateColumn: "due" } },
+  };
+  // Creating the dataset is not a read: even local-only props need its hash.
+  const missing = await call("page_apply", {
+    pageId: page.document.id,
+    baseHash: bound.hash,
+    baseRevision: bound.revision,
+    operations: [calendar],
+  });
+  expect(missing.error.code).toBe("MISSING_BASELINE");
+  const local1 = await ok("page_apply", {
+    pageId: page.document.id,
+    baseHash: bound.hash,
+    baseRevision: bound.revision,
+    datasetBases: { [datasetId]: created.hash },
+    operations: [calendar],
+  });
+  const inserted = await ok("page_apply", {
+    pageId: page.document.id,
+    baseHash: local1.hash,
+    baseRevision: local1.revision,
+    operations: [
+      {
+        type: "component.insert",
+        kind: "database",
+        data: {
+          title: "直接插入",
+          view: "calendar",
+          calendar: { dateColumn: "due" },
+          $binding: { dataset: datasetId, props: { local } },
+        },
+      },
+    ],
+  });
+  const stale = await call("page_apply", {
+    pageId: page.document.id,
+    baseHash: inserted.hash,
+    baseRevision: inserted.revision,
+    operations: [
+      {
+        type: "component.insert",
+        kind: "database",
+        data: {
+          title: "带副本",
+          columns: [{ id: "z", name: "Z", type: "text" }],
+          $binding: { dataset: datasetId, props: { local } },
+        },
+      },
+    ],
+  });
+  expect(stale.error.code).toBe("INVALID_DATA");
+  const read = await ok("page_read", {
+    pageId: page.document.id,
+    rendered: false,
+  });
+  expect(read.bindings).toHaveLength(2);
+  for (const binding of read.bindings) {
+    expect(binding.issues).toEqual([]);
+    expect(binding.props.calendar).toEqual({ dateColumn: "due" });
+    expect(binding.props.columns.map((column: any) => column.id)).toEqual([
+      "name",
+      "due",
+    ]);
+  }
+}, 120_000);
