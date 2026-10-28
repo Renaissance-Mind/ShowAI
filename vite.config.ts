@@ -13,6 +13,7 @@ export default defineConfig({
     // Previews use the bundled reader unless a test opts into the CDN reader,
     // so the suite never depends on a public CDN.
     env: { SHOWAI_LANGUAGE: "zh-CN", SHOWAI_READER_CDN: "off" },
+    globalSetup: ["./scripts/vitest-temp.mjs"],
     css: { include: [/\.css(?:\?raw)?$/] },
   },
 } as Parameters<typeof defineConfig>[0]);
