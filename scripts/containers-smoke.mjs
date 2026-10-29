@@ -284,7 +284,12 @@ try {
           label === "白板" ? "document-slash.png" : "board-slash.png",
         ),
       });
-    await menu.getByRole("option").filter({ hasText: label }).last().click();
+    // Match the option title exactly: the 白板 option's category reads 页面与白板.
+    await menu
+      .getByRole("option")
+      .filter({ has: page.getByText(label, { exact: true }) })
+      .last()
+      .click();
     await menu.waitFor({ state: "detached" });
   };
 
@@ -415,7 +420,7 @@ try {
     await page.locator(`[data-container-root="${nestedPageId}"]`).count(),
     1,
   );
-  await page.getByRole("button", { name: "展开项目导航", exact: true }).click();
+  await page.getByRole("button", { name: "显示侧栏", exact: true }).click();
   await page
     .getByRole("navigation", { name: "主要导航" })
     .getByRole("button", { name: "组件", exact: true })
