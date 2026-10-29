@@ -79,8 +79,10 @@ export function useDatabaseViewMotion(viewId: string, ready: boolean) {
       '[role="tab"][aria-selected="true"]',
     );
     const reduced = matchMedia("(prefers-reduced-motion: reduce)");
-    const index = root && selected
-      ? [...root.querySelectorAll('[role="tab"]')].indexOf(selected) : 0;
+    const index =
+      root && selected
+        ? [...root.querySelectorAll('[role="tab"]')].indexOf(selected)
+        : 0;
     const from = previous.current;
     const changed = !!from && from.id !== viewId;
     let geometry = "";
@@ -115,10 +117,13 @@ export function useDatabaseViewMotion(viewId: string, ready: boolean) {
       }
       geometry = `${root.clientWidth}:${left}:${top}:${width}:${height}`;
     };
-    const observer = ready && root && selected ? new ResizeObserver(() => {
-      const next = `${root.clientWidth}:${selected.offsetLeft}:${selected.offsetTop}:${selected.offsetWidth}:${selected.offsetHeight}`;
-      if (next !== geometry) measure();
-    }) : null;
+    const observer =
+      ready && root && selected
+        ? new ResizeObserver(() => {
+            const next = `${root.clientWidth}:${selected.offsetLeft}:${selected.offsetTop}:${selected.offsetWidth}:${selected.offsetHeight}`;
+            if (next !== geometry) measure();
+          })
+        : null;
     if (ready && root && selected && plate) {
       measure(changed);
       root.dataset.motionReady = "true";

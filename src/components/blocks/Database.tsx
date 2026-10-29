@@ -1081,226 +1081,233 @@ export function DatabaseBlock({ data, onChange, readOnly }: BlockProps) {
   const rowName = (row: DatabaseRow) => text(readable(row)[columns[0]?.id]);
   return (
     <RecordOpenContext.Provider value={pages?.openRecord ? openRecord : null}>
-    <section
-      className="sb-block sb-database"
-      aria-label={blockLabel(data.title, t("database"))}
-    >
-      <BlockHeader
-        title={text(data.title)}
-        // i18n-exempt: matches the saved default title
-        defaultTitle="数据库"
-        icon={<Table2 size={17} />}
-        editable={editable}
-        editing={editing}
-        onEdit={openEditor}
+      <section
+        className="sb-block sb-database"
+        aria-label={blockLabel(data.title, t("database"))}
       >
-        <button
-          type="button"
-          className="sb-icon-button"
-          aria-label={t("exportDatabase")}
-          title={t("exportCsv")}
-          onClick={() =>
-            downloadFile(
-              toCsv(columns, shownRows),
-              `${text(data.title, t("database"))}.csv`,
-              "text/csv;charset=utf-8",
-            )
-          }
+        <BlockHeader
+          title={text(data.title)}
+          // i18n-exempt: matches the saved default title
+          defaultTitle="数据库"
+          icon={<Table2 size={17} />}
+          editable={editable}
+          editing={editing}
+          onEdit={openEditor}
         >
-          <Download size={15} />
-        </button>
-        <details className="sb-tools-menu">
-          <summary aria-label={t("viewAndFilterMenu")}>
-            <Filter size={14} aria-hidden="true" />
-            {t("viewAndFilter")}
-          </summary>
-          <div className="sb-database-toolbar">
-            <div className="sb-view-tabs">
-              {VIEWS.map(({ type, label, Icon }) => (
-                <button
-                  key={type}
-                  type="button"
-                  className={view === type ? "is-active" : ""}
-                  onClick={() => {
-                    changeCurrent({ type });
+          <button
+            type="button"
+            className="sb-icon-button"
+            aria-label={t("exportDatabase")}
+            title={t("exportCsv")}
+            onClick={() =>
+              downloadFile(
+                toCsv(columns, shownRows),
+                `${text(data.title, t("database"))}.csv`,
+                "text/csv;charset=utf-8",
+              )
+            }
+          >
+            <Download size={15} />
+          </button>
+          <details className="sb-tools-menu">
+            <summary aria-label={t("viewAndFilterMenu")}>
+              <Filter size={14} aria-hidden="true" />
+              {t("viewAndFilter")}
+            </summary>
+            <div className="sb-database-toolbar">
+              <div className="sb-view-tabs">
+                {VIEWS.map(({ type, label, Icon }) => (
+                  <button
+                    key={type}
+                    type="button"
+                    className={view === type ? "is-active" : ""}
+                    onClick={() => {
+                      changeCurrent({ type });
+                      setPage(0);
+                    }}
+                  >
+                    <Icon size={14} />
+                    {t(label)}
+                  </button>
+                ))}
+              </div>
+              <div className="sb-database-tools">
+                <ExpandableSearch
+                  label={t("searchDatabase")}
+                  value={query}
+                  onChange={(value) => {
+                    setQuery(value);
                     setPage(0);
                   }}
-                >
-                  <Icon size={14} />
-                  {t(label)}
-                </button>
-              ))}
-            </div>
-            <div className="sb-database-tools">
-              <ExpandableSearch
-                label={t("searchDatabase")}
-                value={query}
-                onChange={(value) => {
-                  setQuery(value);
-                  setPage(0);
-                }}
-              />
-              <button
-                type="button"
-                className={`sb-icon-button ${showFilter || filter.column ? "is-active" : ""}`}
-                aria-label={t("filterDatabase")}
-                onClick={() => setShowFilter(!showFilter)}
-              >
-                <Filter size={15} />
-              </button>
-              {editable && (
+                />
                 <button
                   type="button"
-                  className="sb-button sb-primary sb-small"
-                  onClick={() => addRow()}
+                  className={`sb-icon-button ${showFilter || filter.column ? "is-active" : ""}`}
+                  aria-label={t("filterDatabase")}
+                  onClick={() => setShowFilter(!showFilter)}
                 >
-                  <Plus size={14} />
-                  {t("newRecord")}
+                  <Filter size={15} />
                 </button>
-              )}
-            </div>
-            {editable && (
-              <div className="sb-board-grouping sb-view-settings">
-                {views.length > 1 && (
-                  <input
-                    aria-label={t("viewName")}
-                    value={draftViewName ?? savedView.name}
-                    maxLength={200}
-                    onChange={(event) => setDraftViewName(event.target.value)}
-                    onBlur={commitViewName}
-                    onKeyDown={(event) => {
-                      if (event.key === "Enter") commitViewName();
-                      if (event.key === "Escape") setDraftViewName(null);
-                    }}
-                  />
-                )}
-                <button
-                  type="button"
-                  className="sb-text-button"
-                  onClick={addView}
-                >
-                  <Plus size={13} aria-hidden="true" />
-                  {t("newView")}
-                </button>
-                {views.length > 1 && (
+                {editable && (
                   <button
                     type="button"
-                    className="sb-text-button sb-danger"
-                    onClick={removeView}
+                    className="sb-button sb-primary sb-small"
+                    onClick={() => addRow()}
                   >
-                    {t("deleteView")}
+                    <Plus size={14} />
+                    {t("newRecord")}
                   </button>
                 )}
               </div>
-            )}
-            {view === "board" && selectColumns.length > 0 && (
-              <div className="sb-board-grouping">
-                <span>{t("groupBy")}</span>
-                <select
-                  aria-label={t("boardGroupProperty")}
-                  value={groupColumn?.id ?? ""}
-                  onChange={(event) =>
-                    changeCurrent({ groupBy: event.target.value })
-                  }
-                >
-                  {selectColumns.map((column) => (
-                    <option key={column.id} value={column.id}>
-                      {column.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            )}
-            {view === "calendar" && calendar.dateColumn && (
-              <div className="sb-board-grouping sb-calendar-settings">
-                {(
-                  [
+              {editable && (
+                <div className="sb-board-grouping sb-view-settings">
+                  {views.length > 1 && (
+                    <input
+                      aria-label={t("viewName")}
+                      value={draftViewName ?? savedView.name}
+                      maxLength={200}
+                      onChange={(event) => setDraftViewName(event.target.value)}
+                      onBlur={commitViewName}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter") commitViewName();
+                        if (event.key === "Escape") setDraftViewName(null);
+                      }}
+                    />
+                  )}
+                  <button
+                    type="button"
+                    className="sb-text-button"
+                    onClick={addView}
+                  >
+                    <Plus size={13} aria-hidden="true" />
+                    {t("newView")}
+                  </button>
+                  {views.length > 1 && (
+                    <button
+                      type="button"
+                      className="sb-text-button sb-danger"
+                      onClick={removeView}
+                    >
+                      {t("deleteView")}
+                    </button>
+                  )}
+                </div>
+              )}
+              {view === "board" && selectColumns.length > 0 && (
+                <div className="sb-board-grouping">
+                  <span>{t("groupBy")}</span>
+                  <select
+                    aria-label={t("boardGroupProperty")}
+                    value={groupColumn?.id ?? ""}
+                    onChange={(event) =>
+                      changeCurrent({ groupBy: event.target.value })
+                    }
+                  >
+                    {selectColumns.map((column) => (
+                      <option key={column.id} value={column.id}>
+                        {column.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+              {view === "calendar" && calendar.dateColumn && (
+                <div className="sb-board-grouping sb-calendar-settings">
+                  {(
+                    [
                       [
                         "dateColumn",
                         "calendar.dateProperty",
                         dateColumns,
                         false,
                       ],
-                    [
-                      "endDateColumn",
-                      "calendar.endDateProperty",
-                      dateColumns.filter(
-                        (column) => column.id !== calendar.dateColumn?.id,
-                      ),
-                      true,
-                    ],
-                    [
-                      "colorColumn",
-                      "calendar.colorProperty",
-                      selectColumns,
-                      true,
-                    ],
-                    [
-                      "doneColumn",
-                      "calendar.doneProperty",
-                      columns.filter((column) => column.type === "checkbox"),
-                      true,
-                    ],
-                  ] as const
-                ).map(([key, label, choices, optional]) =>
-                  choices.length > (optional ? 0 : 1) ? (
-                    <label key={key}>
-                      <span>{t(label)}</span>
-                      <select
-                        value={calendar[key]?.id ?? ""}
-                        onChange={(event) =>
-                          setCalendarChoice((current) => ({
-                            ...current,
-                            [key]: event.target.value,
-                          }))
-                        }
-                      >
-                        {optional && (
-                          <option value="">{t("calendar.none")}</option>
-                        )}
-                        {choices.map((column) => (
-                          <option key={column.id} value={column.id}>
-                            {column.name}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                  ) : null,
-                )}
-              </div>
-            )}
-          </div>
-        </details>
-      </BlockHeader>
-      {views.length > 1 && (
-        <div
-          className="sb-database-views"
+                      [
+                        "endDateColumn",
+                        "calendar.endDateProperty",
+                        dateColumns.filter(
+                          (column) => column.id !== calendar.dateColumn?.id,
+                        ),
+                        true,
+                      ],
+                      [
+                        "colorColumn",
+                        "calendar.colorProperty",
+                        selectColumns,
+                        true,
+                      ],
+                      [
+                        "doneColumn",
+                        "calendar.doneProperty",
+                        columns.filter((column) => column.type === "checkbox"),
+                        true,
+                      ],
+                    ] as const
+                  ).map(([key, label, choices, optional]) =>
+                    choices.length > (optional ? 0 : 1) ? (
+                      <label key={key}>
+                        <span>{t(label)}</span>
+                        <select
+                          value={calendar[key]?.id ?? ""}
+                          onChange={(event) =>
+                            setCalendarChoice((current) => ({
+                              ...current,
+                              [key]: event.target.value,
+                            }))
+                          }
+                        >
+                          {optional && (
+                            <option value="">{t("calendar.none")}</option>
+                          )}
+                          {choices.map((column) => (
+                            <option key={column.id} value={column.id}>
+                              {column.name}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                    ) : null,
+                  )}
+                </div>
+              )}
+            </div>
+          </details>
+        </BlockHeader>
+        {views.length > 1 && (
+          <div
+            className="sb-database-views"
             ref={motion.tabs}
-          role="tablist"
-          aria-label={t("views")}
-        >
+            role="tablist"
+            aria-label={t("views")}
+          >
             <span
               ref={motion.indicator}
               className="sb-database-view-indicator"
               aria-hidden="true"
             />
-          {views.map((item) => {
-            const Icon =
-              VIEWS.find((entry) => entry.type === item.type)?.Icon ?? Table2;
-            const active = item.id === savedView.id;
-            return (
-              <button
-                key={item.id}
-                type="button"
-                role="tab"
+            {views.map((item) => {
+              const Icon =
+                VIEWS.find((entry) => entry.type === item.type)?.Icon ?? Table2;
+              const active = item.id === savedView.id;
+              return (
+                <button
+                  key={item.id}
+                  type="button"
+                  role="tab"
                   id={`${sourceId}-view-${item.id}`}
                   aria-controls={`${sourceId}-panel`}
-                aria-selected={active}
+                  aria-selected={active}
                   tabIndex={active ? 0 : -1}
-                className={active ? "is-active" : ""}
+                  className={active ? "is-active" : ""}
                   onClick={() => selectView(item.id)}
                   onKeyDown={(event) => {
-                    if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey || event.nativeEvent.isComposing) return;
+                    if (
+                      event.altKey ||
+                      event.ctrlKey ||
+                      event.metaKey ||
+                      event.shiftKey ||
+                      event.nativeEvent.isComposing
+                    )
+                      return;
                     const index = views.findIndex(
                       (entry) => entry.id === item.id,
                     );
@@ -1321,207 +1328,207 @@ export function DatabaseBlock({ data, onChange, readOnly }: BlockProps) {
                     motion.tabs.current
                       ?.querySelectorAll<HTMLButtonElement>('[role="tab"]')
                       [next]?.focus();
-                }}
-              >
-                <Icon size={13} aria-hidden="true" />
-                <span>{item.name}</span>
-              </button>
-            );
-          })}
-        </div>
-      )}
-      {editing && (
-        <BlockSettings>
-          <div className="sb-editor-panel">
-            <Field label={t("databaseName")}>
-              <input
-                value={draftTitle}
-                onChange={(event) => setDraftTitle(event.target.value)}
-              />
-            </Field>
-            <div
-              className="sb-property-list"
-              ref={settingsReorder.container}
-              {...settingsReorder.containerProps}
-            >
-              {settingsColumns.map((column) => (
-                <div
-                  className="sb-property-row"
-                  key={column.id}
-                  {...settingsReorder.itemProps(column.id)}
+                  }}
                 >
-                  <button
-                    type="button"
-                    className="sb-icon-button sb-property-grip"
-                    aria-label={t("moveProperty", { name: column.name })}
-                    title={t("propertyDragVerticalHint")}
-                    disabled={draftColumns.length < 2}
-                    {...settingsReorder.handleProps(column.id)}
+                  <Icon size={13} aria-hidden="true" />
+                  <span>{item.name}</span>
+                </button>
+              );
+            })}
+          </div>
+        )}
+        {editing && (
+          <BlockSettings>
+            <div className="sb-editor-panel">
+              <Field label={t("databaseName")}>
+                <input
+                  value={draftTitle}
+                  onChange={(event) => setDraftTitle(event.target.value)}
+                />
+              </Field>
+              <div
+                className="sb-property-list"
+                ref={settingsReorder.container}
+                {...settingsReorder.containerProps}
+              >
+                {settingsColumns.map((column) => (
+                  <div
+                    className="sb-property-row"
+                    key={column.id}
+                    {...settingsReorder.itemProps(column.id)}
                   >
-                    <GripVertical size={14} />
-                  </button>
-                  <input
-                    aria-label={t("propertyName")}
-                    value={column.name}
-                    onChange={(event) =>
+                    <button
+                      type="button"
+                      className="sb-icon-button sb-property-grip"
+                      aria-label={t("moveProperty", { name: column.name })}
+                      title={t("propertyDragVerticalHint")}
+                      disabled={draftColumns.length < 2}
+                      {...settingsReorder.handleProps(column.id)}
+                    >
+                      <GripVertical size={14} />
+                    </button>
+                    <input
+                      aria-label={t("propertyName")}
+                      value={column.name}
+                      onChange={(event) =>
                         updateDraftColumn(column.id, {
                           name: event.target.value,
                         })
-                    }
-                  />
-                  <select
-                    aria-label={t("propertyType", { name: column.name })}
-                    value={column.type}
-                    onChange={(event) =>
-                      updateDraftColumn(column.id, {
-                        type: event.target.value as ColumnType,
-                      })
-                    }
-                  >
-                    {TYPES.map((type) => (
-                      <option key={type.value} value={type.value}>
-                        {t(type.label)}
-                      </option>
-                    ))}
-                  </select>
-                  {column.type === "page" && (
+                      }
+                    />
                     <select
-                      className="sb-options-input"
-                      aria-label={t("titleColumn", { name: column.name })}
-                      value={column.titleColumn ?? ""}
+                      aria-label={t("propertyType", { name: column.name })}
+                      value={column.type}
                       onChange={(event) =>
                         updateDraftColumn(column.id, {
-                          titleColumn: event.target.value || undefined,
+                          type: event.target.value as ColumnType,
                         })
                       }
                     >
-                      <option value="">{t("titleColumnNone")}</option>
-                      {draftColumns
-                        .filter((item) => item.type === "text")
-                        .map((item) => (
-                          <option key={item.id} value={item.id}>
-                            {t("titleColumnFrom", { name: item.name })}
-                          </option>
-                        ))}
+                      {TYPES.map((type) => (
+                        <option key={type.value} value={type.value}>
+                          {t(type.label)}
+                        </option>
+                      ))}
                     </select>
-                  )}
-                  {column.type === "select" && (
-                    <input
-                      className="sb-options-input"
-                      aria-label={t("propertyOptions", { name: column.name })}
-                      placeholder={t("optionsPlaceholder")}
-                      value={column.options?.join(",")}
-                      onChange={(event) =>
-                        updateDraftColumn(column.id, {
-                          options: event.target.value.split(/[,，]/),
-                        })
+                    {column.type === "page" && (
+                      <select
+                        className="sb-options-input"
+                        aria-label={t("titleColumn", { name: column.name })}
+                        value={column.titleColumn ?? ""}
+                        onChange={(event) =>
+                          updateDraftColumn(column.id, {
+                            titleColumn: event.target.value || undefined,
+                          })
+                        }
+                      >
+                        <option value="">{t("titleColumnNone")}</option>
+                        {draftColumns
+                          .filter((item) => item.type === "text")
+                          .map((item) => (
+                            <option key={item.id} value={item.id}>
+                              {t("titleColumnFrom", { name: item.name })}
+                            </option>
+                          ))}
+                      </select>
+                    )}
+                    {column.type === "select" && (
+                      <input
+                        className="sb-options-input"
+                        aria-label={t("propertyOptions", { name: column.name })}
+                        placeholder={t("optionsPlaceholder")}
+                        value={column.options?.join(",")}
+                        onChange={(event) =>
+                          updateDraftColumn(column.id, {
+                            options: event.target.value.split(/[,，]/),
+                          })
+                        }
+                      />
+                    )}
+                    <button
+                      type="button"
+                      className="sb-icon-button sb-danger"
+                      aria-label={t("deleteProperty", { name: column.name })}
+                      onClick={() =>
+                        setDraftColumns((current) =>
+                          current.filter((item) => item.id !== column.id),
+                        )
                       }
-                    />
-                  )}
-                  <button
-                    type="button"
-                    className="sb-icon-button sb-danger"
-                    aria-label={t("deleteProperty", { name: column.name })}
-                    onClick={() =>
-                      setDraftColumns((current) =>
-                        current.filter((item) => item.id !== column.id),
-                      )
-                    }
-                  >
-                    <Trash2 size={14} />
-                  </button>
-                </div>
-              ))}
-            </div>
-            {error && (
-              <p role="alert" className="sb-error">
-                {error}
-              </p>
-            )}
-            <div className="sb-panel-footer">
-              <button
-                type="button"
-                className="sb-button"
-                onClick={() =>
-                  setDraftColumns((current) => [
-                    ...current,
-                    // i18n-exempt: default property name saved into the document
-                    { id: uid(), name: "新属性", type: "text" },
-                  ])
-                }
-              >
-                <Plus size={14} />
-                {t("addProperty")}
-              </button>
-              <button
-                type="button"
-                className="sb-button sb-primary"
-                onClick={saveColumns}
-              >
-                <Check size={14} />
-                {t("saveProperties")}
-              </button>
-            </div>
-          </div>
-        </BlockSettings>
-      )}
-      {showFilter && (
-        <div className="sb-filter-row">
-          <Filter size={13} />
-          <select
-            aria-label={t("filterProperty")}
-            value={filter.column}
-            onChange={(event) => {
-              const column = event.target.value;
-              setFilter({
-                column,
-                value: column ? String(readableRows[0]?.[column] ?? "") : "",
-              });
-            }}
-          >
-            <option value="">{t("allRecords")}</option>
-            {columns.map((column) => (
-              <option key={column.id} value={column.id}>
-                {column.name}
-              </option>
-            ))}
-          </select>
-          {filter.column && (
-            <>
-              <span>{t("equals")}</span>
-              <select
-                aria-label={t("filterValue")}
-                value={filter.value}
-                onChange={(event) =>
-                  setFilter({ ...filter, value: event.target.value })
-                }
-              >
-                {[...new Set([...options, filter.value])].map((option) => (
-                  <option key={option} value={option}>
-                    {option || t("notSet")}
-                  </option>
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
                 ))}
-              </select>
-              <button
-                type="button"
-                className="sb-text-button"
-                onClick={() => setFilter({ column: "", value: "" })}
-              >
-                {t("clear")}
-              </button>
-            </>
-          )}
-        </div>
-      )}
-      {addingProperty && editable && view === "table" && (
-        <AddProperty
-          onAdd={addProperty}
-          onClose={() => {
-            setAddingProperty(false);
-            addPropertyButton.current?.focus();
-          }}
-        />
-      )}
+              </div>
+              {error && (
+                <p role="alert" className="sb-error">
+                  {error}
+                </p>
+              )}
+              <div className="sb-panel-footer">
+                <button
+                  type="button"
+                  className="sb-button"
+                  onClick={() =>
+                    setDraftColumns((current) => [
+                      ...current,
+                      // i18n-exempt: default property name saved into the document
+                      { id: uid(), name: "新属性", type: "text" },
+                    ])
+                  }
+                >
+                  <Plus size={14} />
+                  {t("addProperty")}
+                </button>
+                <button
+                  type="button"
+                  className="sb-button sb-primary"
+                  onClick={saveColumns}
+                >
+                  <Check size={14} />
+                  {t("saveProperties")}
+                </button>
+              </div>
+            </div>
+          </BlockSettings>
+        )}
+        {showFilter && (
+          <div className="sb-filter-row">
+            <Filter size={13} />
+            <select
+              aria-label={t("filterProperty")}
+              value={filter.column}
+              onChange={(event) => {
+                const column = event.target.value;
+                setFilter({
+                  column,
+                  value: column ? String(readableRows[0]?.[column] ?? "") : "",
+                });
+              }}
+            >
+              <option value="">{t("allRecords")}</option>
+              {columns.map((column) => (
+                <option key={column.id} value={column.id}>
+                  {column.name}
+                </option>
+              ))}
+            </select>
+            {filter.column && (
+              <>
+                <span>{t("equals")}</span>
+                <select
+                  aria-label={t("filterValue")}
+                  value={filter.value}
+                  onChange={(event) =>
+                    setFilter({ ...filter, value: event.target.value })
+                  }
+                >
+                  {[...new Set([...options, filter.value])].map((option) => (
+                    <option key={option} value={option}>
+                      {option || t("notSet")}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  type="button"
+                  className="sb-text-button"
+                  onClick={() => setFilter({ column: "", value: "" })}
+                >
+                  {t("clear")}
+                </button>
+              </>
+            )}
+          </div>
+        )}
+        {addingProperty && editable && view === "table" && (
+          <AddProperty
+            onAdd={addProperty}
+            onClose={() => {
+              setAddingProperty(false);
+              addPropertyButton.current?.focus();
+            }}
+          />
+        )}
         <div className="sb-database-view-viewport" ref={motion.panel}>
           <div
             className="sb-database-view-content"
@@ -1532,380 +1539,380 @@ export function DatabaseBlock({ data, onChange, readOnly }: BlockProps) {
               views.length > 1 ? `${sourceId}-view-${savedView.id}` : undefined
             }
           >
-      {view === "calendar" ? (
-        <DatabaseCalendar
-          key={JSON.stringify(savedCalendar)}
-          columns={columns}
-          rows={shownRows}
-          settings={calendar}
-          editable={editable}
-          renderCell={cell}
-          onMove={(id, start, end) =>
-            updateFields(id, {
-              [calendar.dateColumn!.id]: start,
-              ...(end && calendar.endDateColumn
-                ? { [calendar.endDateColumn.id]: end }
-                : {}),
-            })
-          }
-          onAdd={
-            calendar.dateColumn
+            {view === "calendar" ? (
+              <DatabaseCalendar
+                key={JSON.stringify(savedCalendar)}
+                columns={columns}
+                rows={shownRows}
+                settings={calendar}
+                editable={editable}
+                renderCell={cell}
+                onMove={(id, start, end) =>
+                  updateFields(id, {
+                    [calendar.dateColumn!.id]: start,
+                    ...(end && calendar.endDateColumn
+                      ? { [calendar.endDateColumn.id]: end }
+                      : {}),
+                  })
+                }
+                onAdd={
+                  calendar.dateColumn
                     ? (date) =>
                         addRow(undefined, { [calendar.dateColumn!.id]: date })
-              : undefined
-          }
-          onRemove={removeRow}
-        />
-      ) : view === "table" ? (
-        <>
-          <div
-            className="sb-table-scroll"
-            ref={tableReorder.container}
-            {...tableReorder.containerProps}
-          >
-            <table
-              className="sb-database-table"
-              ref={columnResize.table}
-              style={{
-                width:
-                  columns.reduce(
-                    (sum, column, index) =>
-                      sum + columnWidth(current, column.id, index),
-                    0,
-                  ) + (editable ? ROW_ACTION_WIDTH : 0),
-              }}
-            >
-              <colgroup>
-                {tableColumns.map((column) => (
-                  <col
-                    key={column.id}
-                    data-column-width-id={column.id}
+                    : undefined
+                }
+                onRemove={removeRow}
+              />
+            ) : view === "table" ? (
+              <>
+                <div
+                  className="sb-table-scroll"
+                  ref={tableReorder.container}
+                  {...tableReorder.containerProps}
+                >
+                  <table
+                    className="sb-database-table"
+                    ref={columnResize.table}
                     style={{
-                      width: columnWidth(
-                        current,
-                        column.id,
-                        columns.indexOf(column),
-                      ),
+                      width:
+                        columns.reduce(
+                          (sum, column, index) =>
+                            sum + columnWidth(current, column.id, index),
+                          0,
+                        ) + (editable ? ROW_ACTION_WIDTH : 0),
                     }}
-                  />
-                ))}
-                {editable && <col />}
-              </colgroup>
-              <thead>
-                <tr>
-                  {tableColumns.map((column) => (
-                    <th
-                      key={column.id}
-                      scope="col"
-                      {...tableReorder.itemProps(column.id)}
-                      aria-sort={
-                        sort?.column === column.id
-                          ? sort.direction === "asc"
-                            ? "ascending"
-                            : "descending"
-                          : "none"
-                      }
-                    >
-                      <button
-                        type="button"
-                        onClick={() => toggleSort(column.id)}
+                  >
+                    <colgroup>
+                      {tableColumns.map((column) => (
+                        <col
+                          key={column.id}
+                          data-column-width-id={column.id}
+                          style={{
+                            width: columnWidth(
+                              current,
+                              column.id,
+                              columns.indexOf(column),
+                            ),
+                          }}
+                        />
+                      ))}
+                      {editable && <col />}
+                    </colgroup>
+                    <thead>
+                      <tr>
+                        {tableColumns.map((column) => (
+                          <th
+                            key={column.id}
+                            scope="col"
+                            {...tableReorder.itemProps(column.id)}
+                            aria-sort={
+                              sort?.column === column.id
+                                ? sort.direction === "asc"
+                                  ? "ascending"
+                                  : "descending"
+                                : "none"
+                            }
+                          >
+                            <button
+                              type="button"
+                              onClick={() => toggleSort(column.id)}
                               title={
                                 editable ? t("propertyHeaderHint") : undefined
                               }
-                        {...tableReorder.handleProps(column.id)}
-                      >
-                        <span className="sb-type-symbol">
-                          {TYPE_SYMBOL[column.type]}
-                        </span>
+                              {...tableReorder.handleProps(column.id)}
+                            >
+                              <span className="sb-type-symbol">
+                                {TYPE_SYMBOL[column.type]}
+                              </span>
                               <span className="sb-column-name">
                                 {column.name}
                               </span>
-                        {sort?.column === column.id &&
-                          (sort.direction === "asc" ? (
-                            <ArrowUp size={12} />
-                          ) : (
-                            <ArrowDown size={12} />
-                          ))}
-                      </button>
-                      {editable && (
-                        <div
-                          {...columnResize.handleProps(column.id)}
-                          className="sb-column-resize"
-                          data-resizing={
+                              {sort?.column === column.id &&
+                                (sort.direction === "asc" ? (
+                                  <ArrowUp size={12} />
+                                ) : (
+                                  <ArrowDown size={12} />
+                                ))}
+                            </button>
+                            {editable && (
+                              <div
+                                {...columnResize.handleProps(column.id)}
+                                className="sb-column-resize"
+                                data-resizing={
                                   columnResize.resizing === column.id ||
                                   undefined
-                          }
-                          aria-label={t("resizeProperty", {
-                            name: column.name,
-                          })}
-                          title={t("columnResizeHint")}
-                        />
-                      )}
-                    </th>
-                  ))}
-                  {editable && (
-                    <th className="sb-row-action">
-                      <button
-                        ref={addPropertyButton}
-                        type="button"
-                        className="sb-add-property"
-                        aria-label={t("addProperty")}
-                        title={t("addProperty")}
-                        aria-expanded={addingProperty}
-                        onClick={() => setAddingProperty(!addingProperty)}
-                      >
-                        <Plus size={14} aria-hidden="true" />
-                      </button>
-                    </th>
-                  )}
-                </tr>
-              </thead>
-              <tbody>
-                {pagedRows.map((row) => (
-                  <tr key={row.id} title={sources?.get(row.id)?.label}>
-                    {tableColumns.map((column) => (
-                      <td
-                        key={column.id}
-                        {...tableReorder.cellProps(column.id)}
-                      >
-                        {cell(row, column)}
-                      </td>
-                    ))}
-                    {editable && (
-                      <td className="sb-row-action">
-                        {deleteButton(
-                          row,
-                          t("deleteNamedRecord", { name: rowName(row) }),
+                                }
+                                aria-label={t("resizeProperty", {
+                                  name: column.name,
+                                })}
+                                title={t("columnResizeHint")}
+                              />
+                            )}
+                          </th>
+                        ))}
+                        {editable && (
+                          <th className="sb-row-action">
+                            <button
+                              ref={addPropertyButton}
+                              type="button"
+                              className="sb-add-property"
+                              aria-label={t("addProperty")}
+                              title={t("addProperty")}
+                              aria-expanded={addingProperty}
+                              onClick={() => setAddingProperty(!addingProperty)}
+                            >
+                              <Plus size={14} aria-hidden="true" />
+                            </button>
+                          </th>
                         )}
-                      </td>
-                    )}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          {shownRows.length === 0 && (
-            <EmptyState
-              icon={<LayoutList size={25} strokeWidth={1.4} />}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {pagedRows.map((row) => (
+                        <tr key={row.id} title={sources?.get(row.id)?.label}>
+                          {tableColumns.map((column) => (
+                            <td
+                              key={column.id}
+                              {...tableReorder.cellProps(column.id)}
+                            >
+                              {cell(row, column)}
+                            </td>
+                          ))}
+                          {editable && (
+                            <td className="sb-row-action">
+                              {deleteButton(
+                                row,
+                                t("deleteNamedRecord", { name: rowName(row) }),
+                              )}
+                            </td>
+                          )}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                {shownRows.length === 0 && (
+                  <EmptyState
+                    icon={<LayoutList size={25} strokeWidth={1.4} />}
                     title={
                       rows.length ? t("empty.noMatches") : t("empty.start")
                     }
-            />
-          )}
-        </>
-      ) : view === "list" ? (
-        <>
-          <ul className="sb-database-list">
-            {pagedRows.map((row) => (
-              <li key={row.id} title={sources?.get(row.id)?.label}>
-                {columns[0] && (
+                  />
+                )}
+              </>
+            ) : view === "list" ? (
+              <>
+                <ul className="sb-database-list">
+                  {pagedRows.map((row) => (
+                    <li key={row.id} title={sources?.get(row.id)?.label}>
+                      {columns[0] && (
                         <div className="sb-list-title">
                           {cell(row, columns[0])}
                         </div>
-                )}
-                <div className="sb-list-properties">
-                  {columns.slice(1).map((column) =>
-                    row[column.id] === "" ||
-                    row[column.id] === undefined ||
+                      )}
+                      <div className="sb-list-properties">
+                        {columns.slice(1).map((column) =>
+                          row[column.id] === "" ||
+                          row[column.id] === undefined ||
                           (column.type === "checkbox" &&
                             !row[column.id]) ? null : (
-                      <span className="sb-list-property" key={column.id}>
-                        <span>{column.name}</span>
-                        <Cell
-                          row={row}
-                          column={column}
-                          editable={false}
-                          update={() => undefined}
-                        />
-                      </span>
-                    ),
-                  )}
-                </div>
+                            <span className="sb-list-property" key={column.id}>
+                              <span>{column.name}</span>
+                              <Cell
+                                row={row}
+                                column={column}
+                                editable={false}
+                                update={() => undefined}
+                              />
+                            </span>
+                          ),
+                        )}
+                      </div>
+                      {editable && (
+                        <span className="sb-row-action">
+                          {deleteButton(
+                            row,
+                            t("deleteNamedRecord", { name: rowName(row) }),
+                          )}
+                        </span>
+                      )}
+                    </li>
+                  ))}
+                </ul>
                 {editable && (
-                  <span className="sb-row-action">
-                    {deleteButton(
-                      row,
-                      t("deleteNamedRecord", { name: rowName(row) }),
-                    )}
-                  </span>
+                  <button
+                    type="button"
+                    className="sb-add-row"
+                    onClick={() => addRow()}
+                  >
+                    <Plus size={13} />
+                    {t("addRecord")}
+                  </button>
                 )}
-              </li>
-            ))}
-          </ul>
-          {editable && (
-            <button
-              type="button"
-              className="sb-add-row"
-              onClick={() => addRow()}
-            >
-              <Plus size={13} />
-              {t("addRecord")}
-            </button>
-          )}
-          {shownRows.length === 0 && (
-            <EmptyState
-              icon={<List size={25} strokeWidth={1.4} />}
+                {shownRows.length === 0 && (
+                  <EmptyState
+                    icon={<List size={25} strokeWidth={1.4} />}
                     title={
                       rows.length ? t("empty.noMatches") : t("empty.start")
                     }
-            />
-          )}
-        </>
-      ) : (
-        <>
-          <div className="sb-board">
-            {groupNames.map((group, groupIndex) => {
-              const groupRows = groupColumn
+                  />
+                )}
+              </>
+            ) : (
+              <>
+                <div className="sb-board">
+                  {groupNames.map((group, groupIndex) => {
+                    const groupRows = groupColumn
                       ? shownRows.filter(
                           (row) => text(row[groupColumn.id]) === group,
                         )
-                : shownRows;
-              return (
-                <div
-                  className={`sb-board-column ${draggingId ? "is-droppable" : ""}`}
-                  key={group}
-                  onDragOver={(event) => {
-                    if (editable && groupColumn && draggingId)
-                      event.preventDefault();
-                  }}
-                  onDrop={(event) => {
-                    if (!editable || !groupColumn || !draggingId) return;
-                    event.preventDefault();
-                    updateRow(draggingId, groupColumn.id, group);
-                    setDraggingId(null);
-                  }}
-                >
-                  <div className="sb-board-column-header">
-                    <span className={`sb-tag sb-tag-${groupIndex % 5}`}>
+                      : shownRows;
+                    return (
+                      <div
+                        className={`sb-board-column ${draggingId ? "is-droppable" : ""}`}
+                        key={group}
+                        onDragOver={(event) => {
+                          if (editable && groupColumn && draggingId)
+                            event.preventDefault();
+                        }}
+                        onDrop={(event) => {
+                          if (!editable || !groupColumn || !draggingId) return;
+                          event.preventDefault();
+                          updateRow(draggingId, groupColumn.id, group);
+                          setDraggingId(null);
+                        }}
+                      >
+                        <div className="sb-board-column-header">
+                          <span className={`sb-tag sb-tag-${groupIndex % 5}`}>
                             {group ||
                               (groupColumn ? t("notSet") : t("allRecords"))}
-                    </span>
-                    <span>{groupRows.length}</span>
-                    {editable && (
-                      <button
-                        type="button"
-                        className="sb-icon-button"
-                        aria-label={t("newRecordIn", {
-                          group: group || t("notSet"),
-                        })}
-                        onClick={() => addRow(group)}
-                      >
-                        <Plus size={14} />
-                      </button>
-                    )}
-                  </div>
-                  {groupRows.map((row) => (
-                    <div
-                      className={`sb-board-card ${draggingId === row.id ? "is-dragging" : ""}`}
-                      key={row.id}
-                      draggable={editable && Boolean(groupColumn)}
-                      onDragStart={() => setDraggingId(row.id)}
-                      onDragEnd={() => setDraggingId(null)}
-                    >
-                      {columns
-                        .filter((column) => column.id !== groupColumn?.id)
-                        .map((column, index) => (
+                          </span>
+                          <span>{groupRows.length}</span>
+                          {editable && (
+                            <button
+                              type="button"
+                              className="sb-icon-button"
+                              aria-label={t("newRecordIn", {
+                                group: group || t("notSet"),
+                              })}
+                              onClick={() => addRow(group)}
+                            >
+                              <Plus size={14} />
+                            </button>
+                          )}
+                        </div>
+                        {groupRows.map((row) => (
                           <div
-                            key={column.id}
-                            className={
-                              index === 0
-                                ? "sb-board-card-title"
-                                : "sb-board-card-field"
-                            }
+                            className={`sb-board-card ${draggingId === row.id ? "is-dragging" : ""}`}
+                            key={row.id}
+                            draggable={editable && Boolean(groupColumn)}
+                            onDragStart={() => setDraggingId(row.id)}
+                            onDragEnd={() => setDraggingId(null)}
                           >
-                            {index > 0 && <span>{column.name}</span>}
-                            {cell(row, column)}
+                            {columns
+                              .filter((column) => column.id !== groupColumn?.id)
+                              .map((column, index) => (
+                                <div
+                                  key={column.id}
+                                  className={
+                                    index === 0
+                                      ? "sb-board-card-title"
+                                      : "sb-board-card-field"
+                                  }
+                                >
+                                  {index > 0 && <span>{column.name}</span>}
+                                  {cell(row, column)}
+                                </div>
+                              ))}
+                            {editable && (
+                              <div className="sb-board-card-footer">
+                                {groupColumn && (
+                                  <select
+                                    aria-label={t("moveToGroup")}
+                                    value={text(row[groupColumn.id])}
+                                    onChange={(event) =>
+                                      updateRow(
+                                        row.id,
+                                        groupColumn.id,
+                                        event.target.value,
+                                      )
+                                    }
+                                  >
+                                    <option value="">{t("notSet")}</option>
+                                    {groupNames.filter(Boolean).map((name) => (
+                                      <option key={name}>{name}</option>
+                                    ))}
+                                  </select>
+                                )}
+                                {deleteButton(row, t("deleteRecord"))}
+                              </div>
+                            )}
                           </div>
                         ))}
-                      {editable && (
-                        <div className="sb-board-card-footer">
-                          {groupColumn && (
-                            <select
-                              aria-label={t("moveToGroup")}
-                              value={text(row[groupColumn.id])}
-                              onChange={(event) =>
-                                updateRow(
-                                  row.id,
-                                  groupColumn.id,
-                                  event.target.value,
-                                )
-                              }
-                            >
-                              <option value="">{t("notSet")}</option>
-                              {groupNames.filter(Boolean).map((name) => (
-                                <option key={name}>{name}</option>
-                              ))}
-                            </select>
-                          )}
-                          {deleteButton(row, t("deleteRecord"))}
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                  {editable && (
-                    <button
-                      type="button"
-                      className="sb-add-row"
-                      onClick={() => addRow(group)}
-                    >
-                      <Plus size={13} />
-                      {t("addRecord")}
-                    </button>
-                  )}
+                        {editable && (
+                          <button
+                            type="button"
+                            className="sb-add-row"
+                            onClick={() => addRow(group)}
+                          >
+                            <Plus size={13} />
+                            {t("addRecord")}
+                          </button>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
-              );
-            })}
-          </div>
-        </>
-      )}
+              </>
+            )}
           </div>
         </div>
-      {pageError && (
-        <p role="alert" className="sb-error sb-database-error">
-          {pageError}
-        </p>
-      )}
-      <div className="sb-database-footer">
-        <span>
-          {shownRows.length === rows.length
-            ? t("recordCount", { count: rows.length })
-            : t("filteredRecordCount", {
-                shown: shownRows.length,
-                count: rows.length,
-              })}
-          {sort && (
-            <button
-              type="button"
-              className="sb-text-button"
-              onClick={() => changeCurrent({ sort: null })}
-            >
-              {t("clearSort")}
-            </button>
-          )}
-        </span>
-        {(view === "table" || view === "list") && totalPages > 1 && (
-          <div className="sb-pagination">
-            <button
-              type="button"
-              disabled={activePage === 0}
-              onClick={() => setPage(activePage - 1)}
-            >
-              {t("previousPage")}
-            </button>
-            <span>
-              {activePage + 1} / {totalPages}
-            </span>
-            <button
-              type="button"
-              disabled={activePage + 1 === totalPages}
-              onClick={() => setPage(activePage + 1)}
-            >
-              {t("nextPage")}
-            </button>
-          </div>
+        {pageError && (
+          <p role="alert" className="sb-error sb-database-error">
+            {pageError}
+          </p>
         )}
-      </div>
-    </section>
+        <div className="sb-database-footer">
+          <span>
+            {shownRows.length === rows.length
+              ? t("recordCount", { count: rows.length })
+              : t("filteredRecordCount", {
+                  shown: shownRows.length,
+                  count: rows.length,
+                })}
+            {sort && (
+              <button
+                type="button"
+                className="sb-text-button"
+                onClick={() => changeCurrent({ sort: null })}
+              >
+                {t("clearSort")}
+              </button>
+            )}
+          </span>
+          {(view === "table" || view === "list") && totalPages > 1 && (
+            <div className="sb-pagination">
+              <button
+                type="button"
+                disabled={activePage === 0}
+                onClick={() => setPage(activePage - 1)}
+              >
+                {t("previousPage")}
+              </button>
+              <span>
+                {activePage + 1} / {totalPages}
+              </span>
+              <button
+                type="button"
+                disabled={activePage + 1 === totalPages}
+                onClick={() => setPage(activePage + 1)}
+              >
+                {t("nextPage")}
+              </button>
+            </div>
+          )}
+        </div>
+      </section>
       {peekRow &&
         peek?.propertiesHost &&
         createPortal(

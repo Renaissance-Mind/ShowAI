@@ -424,6 +424,9 @@ export default function RichTextEditor({
         ) as HTMLAnchorElement | null;
         if (!link || (!readOnly && !event.metaKey && !event.ctrlKey))
           return false;
+        // Links inside components are not text being edited: the host follows
+        // them with their own click and modifiers.
+        if (!readOnly && !link.isContentEditable) return false;
         const href = link.getAttribute("href") ?? "";
         if (!safeLinkUrl(href)) return true;
         const target = navigationTarget(href);
