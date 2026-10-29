@@ -310,6 +310,12 @@ describe("database rendering", () => {
     expect(html).toContain(`href="${link}"`);
     expect(html).toContain('data-open-page="notes-1"');
     expect(html).toContain("实验笔记");
+    expect(html).not.toContain("data-database-record");
+  });
+  it("offers record preview only when the workbench supplies that capability", () => {
+    const html = render(records(), false, { ...bridge, openRecord: () => {} });
+    expect(html).toContain('data-database-record="true"');
+    expect(html).toContain(`href="${link}"`);
   });
   it("offers the project's other pages when editing a page cell", () => {
     const html = render(records(), false);
@@ -341,6 +347,8 @@ describe("database rendering", () => {
     expect(html).toContain('role="tablist"');
     expect(html).toContain("文档清单");
     expect(html).toContain('aria-selected="true"');
+    expect(html).toContain('tabindex="-1"');
+    expect(html).toContain('role="tabpanel"');
     expect(html).toContain("sb-database-list");
     expect(html).not.toContain("sb-database-table");
   });

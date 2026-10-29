@@ -131,6 +131,180 @@ describe("workspace sessions against the real loopback workbench", () => {
     await server.close();
     await rm(directory, { recursive: true, force: true });
   });
+  describe("database record previews", () => {
+    it("keeps the host view and its editor state while saving a separate record", async () => {
+      await sessions.open(project, first.document.id, "host");
+      const host = sessions.getSnapshot().active!;
+      const hostKey = sessions.getSnapshot().activeView;
+      const hostView = sessions.getSnapshot().views.find((view) => view.key === hostKey)!;
+      hostView.editors.focused = "host-editor";
+      const preview = await sessions.openPreview(project, second.document.id);
+      expect(preview).not.toBeNull();
+      expect(sessions.getSnapshot().active).toBe(host);
+      expect(sessions.getSnapshot().activeView).toBe(hostKey);
+      expect(sessions.getSnapshot().views.find((view) => view.key === hostKey)).toBe(hostView);
+      preview!.session.edit({ title: "Record edited in side peek" });
+      host.edit({ title: "Host can still be edited" });
+      expect(await sessions.flushAll()).toBe(true);
+      expect(await sessions.closePreview()).toBe(true);
+      expect(sessions.getSnapshot().previewView).toBeNull();
+      expect(sessions.getSnapshot().active).toBe(host);
+      expect(hostView.editors.focused).toBe("host-editor");
+      const disk = await invoke<LoadedPage>("pages:get", { projectId: project, pageId: second.document.id });
+      expect(disk.document.title).toBe("Record edited in side peek");
+      expect((await invoke<LoadedPage>("pages:get", { projectId: project, pageId: first.document.id })).document.title).toBe("Host can still be edited");
+    });
+    it("uses one document session for the preview and an existing normal tab", async () => {
+      await sessions.open(project, second.document.id, "record-tab");
+      const record = sessions.getSnapshot().active!;
+      await sessions.open(project, first.document.id, "host");
+      const reads = calls.filter((call) => call === "pages:get").length;
+      const preview = await sessions.openPreview(project, second.document.id);
+      expect(preview!.session).toBe(record);
+      expect(preview!.tabId).not.toBe("record-tab");
+      expect(calls.filter((call) => call === "pages:get")).toHaveLength(reads);
+      record.edit({ title: "One shared live source" });
+      expect(preview!.session.getSnapshot().draft?.title).toBe("One shared live source");
+      expect(await sessions.closePreview()).toBe(true);
+      expect(await sessions.open(project, second.document.id, "record-tab")).toBe(true);
+      expect(sessions.getSnapshot().active).toBe(record);
+      expect(await sessions.flushAll()).toBe(true);
+    });
+    it("can preview a link to the host itself without allocating a second source", async () => {
+      await sessions.open(project, first.document.id, "host");
+      const host = sessions.getSnapshot().active!;
+      const hostKey = sessions.getSnapshot().activeView;
+      const preview = await sessions.openPreview(project, first.document.id);
+      expect(preview!.session).toBe(host);
+      expect(preview!.key).not.toBe(hostKey);
+      expect(sessions.getSnapshot().activeView).toBe(hostKey);
+      preview!.session.edit({ title: "Same source, separate view" });
+      expect(host.getSnapshot().draft?.title).toBe("Same source, separate view");
+      expect(await sessions.closePreview()).toBe(true);
+      expect(await host.flush()).toBe(true);
+      expect(sessions.getSnapshot().active).toBe(host);
+    });
+    it("lets the latest record win when an earlier page read is delayed", async () => {
+      const third = await invoke<LoadedPage>("pages:create", { projectId: project, title: "Third" });
+      const entered = deferred(), gate = deferred(), backend = invoke;
+      await sessions.shutdown();
+      sessions = new PageSessions({ clientId: "record-read-race", invoke: async <T>(action: string, args?: Record<string, unknown>) => {
+        if (action === "pages:get" && args?.pageId === second.document.id) { entered.release(); await gate.promise; }
+        return backend<T>(action, args);
+      } });
+      sessions.setHome(home);
+      await sessions.open(project, first.document.id, "host");
+      const late = sessions.openPreview(project, second.document.id);
+      await entered.promise;
+      try {
+        const latest = await sessions.openPreview(project, third.document.id);
+        expect(latest!.session.getSnapshot().draft?.id).toBe(third.document.id);
+        gate.release();
+        expect(await late).toBeNull();
+        expect(sessions.getSnapshot().previewView).toBe(latest!.key);
+        expect(sessions.getSnapshot().active?.getSnapshot().draft?.id).toBe(first.document.id);
+      } finally { gate.release(); await late; }
+    });
+    it.each(["close", "navigate"] as const)("does not reopen a delayed record after %s", async (action) => {
+      const third = await invoke<LoadedPage>("pages:create", { projectId: project, title: "Destination" });
+      const entered = deferred(), gate = deferred(), backend = invoke;
+      await sessions.shutdown();
+      sessions = new PageSessions({ clientId: "cancel-record-read", invoke: async <T>(name: string, args?: Record<string, unknown>) => {
+        if (name === "pages:get" && args?.pageId === second.document.id) { entered.release(); await gate.promise; }
+        return backend<T>(name, args);
+      } });
+      sessions.setHome(home);
+      await sessions.open(project, first.document.id, "host");
+      const opening = sessions.openPreview(project, second.document.id);
+      await entered.promise;
+      try {
+        if (action === "close") expect(await sessions.closePreview()).toBe(true);
+        else expect(await sessions.open(project, third.document.id, "host")).toBe(true);
+        gate.release();
+        expect(await opening).toBeNull();
+        expect(sessions.getSnapshot().previewView).toBeNull();
+        expect(sessions.getSnapshot().active?.getSnapshot().draft?.id).toBe(action === "close" ? first.document.id : third.document.id);
+      } finally { gate.release(); await opening; }
+    });
+    it("refreshes a visible preview when the library changes without navigating the host", async () => {
+      await sessions.open(project, first.document.id, "host");
+      const host = sessions.getSnapshot().active!;
+      const preview = (await sessions.openPreview(project, second.document.id))!;
+      const remote = await invoke<LoadedPage>("pages:get", { projectId: project, pageId: second.document.id });
+      await invoke("pages:save", { projectId: project, pageId: second.document.id,
+        baseHash: remote.hash, baseRevision: remote.revision, document: { ...remote.document, title: "Record changed elsewhere" } });
+      sessions.invalidate({ type: "files", home, projectIds: [project], pageIds: [second.document.id] });
+      await expect.poll(() => preview.session.getSnapshot().draft?.title).toBe("Record changed elsewhere");
+      expect(sessions.getSnapshot().active).toBe(host);
+      expect(sessions.getSnapshot().previewView).toBe(preview.key);
+    });
+    it("retains preview edits before closing its host tab and includes them in window saves", async () => {
+      await sessions.open(project, first.document.id, "host");
+      const preview = (await sessions.openPreview(project, second.document.id))!;
+      preview.session.edit({ title: "Retained on host-tab close" });
+      expect(await sessions.closeTab("host")).toBe(true);
+      expect(sessions.getSnapshot().previewView).toBeNull();
+      expect(preview.session.isDurable()).toBe(true);
+      expect(await sessions.reloadResult()).toBe(true);
+      expect(await sessions.closeResult()).toBe(true);
+      expect((await invoke<LoadedPage>("pages:get", { projectId: project, pageId: second.document.id })).document.title).toBe("Retained on host-tab close");
+    });
+    it("keeps a failed save recoverable and refuses navigation when neither page nor draft can be written", async () => {
+      let failPage = false, failDraft = false;
+      const backend = invoke;
+      await sessions.shutdown();
+      sessions = new PageSessions({ clientId: "record-save-fault", saveDelayMs: 50, draftDelayMs: 20,
+        invoke: async <T>(action: string, args?: Record<string, unknown>) => {
+          if ((failPage && action === "pages:save" && args?.pageId === second.document.id) ||
+              (failDraft && action === "drafts:save" && (args?.input as { resourceId?: string })?.resourceId === second.document.id))
+            throw Object.assign(new Error("Injected record write failure"), { code: "EACCES" });
+          return backend<T>(action, args);
+        } });
+      sessions.setHome(home);
+      await sessions.open(project, first.document.id, "host");
+      const host = sessions.getSnapshot().active!;
+      const preview = (await sessions.openPreview(project, second.document.id))!;
+      try {
+        failPage = true; failDraft = true;
+        preview.session.edit({ title: "Important unsaved record" });
+        expect(await preview.session.flush()).toBe(false);
+        expect(preview.session.isDurable()).toBe(false);
+        expect(await sessions.closePreview()).toBe(false);
+        expect(await sessions.open(project, first.document.id, "host")).toBe(false);
+        expect(sessions.getSnapshot().previewView).toBe(preview.key);
+        expect(sessions.getSnapshot().active).toBe(host);
+        expect(await sessions.closeResult()).toMatchObject({ allow: false, pages: [{ pageId: second.document.id }] });
+        failDraft = false;
+        expect(await sessions.closePreview()).toBe(true);
+        expect(preview.session.isDurable()).toBe(true);
+        const drafts = await invoke<{ id: string }[]>("drafts:list", { kind: "page", projectId: project, resourceId: second.document.id });
+        const savedDraft = await invoke<{ content: LoadedPage["document"] }>("drafts:read", { id: drafts[0].id });
+        expect(savedDraft.content.title).toBe("Important unsaved record");
+        expect(await sessions.reloadResult()).toMatchObject({ allow: false });
+        expect(await sessions.closeResult()).toBe(true);
+      } finally {
+        failPage = false; failDraft = false;
+        await preview.session.retry();
+      }
+    });
+    it("reports a failed record read and can retry it without a poisoned cached source", async () => {
+      let fail = true;
+      const backend = invoke;
+      await sessions.shutdown();
+      sessions = new PageSessions({ clientId: "record-read-fault", invoke: async <T>(action: string, args?: Record<string, unknown>) => {
+        if (fail && action === "pages:get" && args?.pageId === second.document.id)
+          throw Object.assign(new Error("Record read denied"), { code: "EACCES" });
+        return backend<T>(action, args);
+      } });
+      sessions.setHome(home);
+      await sessions.open(project, first.document.id, "host");
+      await expect(sessions.openPreview(project, second.document.id)).rejects.toThrow("Record read denied");
+      expect(sessions.getSnapshot().previewView).toBeNull();
+      expect(sessions.getSnapshot().active?.getSnapshot().draft?.id).toBe(first.document.id);
+      fail = false;
+      expect((await sessions.openPreview(project, second.document.id))?.session.getSnapshot().draft?.id).toBe(second.document.id);
+    });
+  });
   async function warm() {
     await sessions.open(project, first.document.id, "a");
     const a = sessions.getSnapshot().active!;

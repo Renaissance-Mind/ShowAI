@@ -39,6 +39,7 @@ function sameStudioView(previous: StudioView, next: StudioView) {
   if (
     a.active !== b.active ||
     a.activeView !== b.activeView ||
+    a.previewView !== b.previewView ||
     a.views !== b.views ||
     a.issues.length !== b.issues.length ||
     a.issues.some(

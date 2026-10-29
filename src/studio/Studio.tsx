@@ -110,6 +110,8 @@ import type {
   ComponentSource,
 } from "../components/custom/types";
 import { PageWorkspace } from "./PageWorkspace";
+import DatabaseRecordPeek from "./DatabaseRecordPeek";
+import { useDatabaseRecordPeek } from "./useDatabaseRecordPeek";
 import {
   EditorHistoryButtons,
   containerMenuItems,
@@ -630,6 +632,10 @@ export default function Studio() {
         );
       const target = anchor && parsePageLink(anchor.getAttribute("href"));
       if (!target) return;
+      // Database records handle a plain click through their optional host bridge.
+      // Modified clicks keep the same tab/window behavior as other page links.
+      if (anchor.hasAttribute("data-database-record") && event.button === 0 &&
+          !event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey) return;
       event.preventDefault();
       // A plain click inside an editor places the caret; the editor follows its links on ⌘-click.
       if (anchor.isContentEditable) return;
@@ -1782,9 +1788,10 @@ export default function Studio() {
     pageId: string;
     title: string;
   }) {
-    if (page.draft?.id === input.pageId && page.projectId === input.projectId) {
-      page.edit({ title: input.title });
-      if (!(await page.flush()))
+    const retained = page.sessions.sessionFor(input.projectId, input.pageId);
+    if (retained) {
+      retained.edit({ title: input.title });
+      if (!(await retained.flush()))
         throw new Error(t("linkedPageRenameBlocked"));
     } else {
       const record = await desktop.invoke<LoadedPage>("pages:get", {
@@ -2283,7 +2290,8 @@ export default function Studio() {
     );
   }
   async function beginPageIcon(target: LibraryTarget) {
-    if (!(await page.flush())) return;
+    const retained = page.sessions.sessionFor(target.projectId, target.id);
+    if (!(await (retained ? retained.flush() : page.flush()))) return;
     const record = await desktop.invoke<LoadedPage>("pages:get", {
       projectId: target.projectId,
       pageId: target.id,
@@ -3499,6 +3507,17 @@ export default function Studio() {
       document.removeEventListener("pointerdown", down);
     };
   }, [page.sessions]);
+  const recordPeek = useDatabaseRecordPeek({
+    sessions: page.sessions,
+    home: info?.home,
+    tabId: workspace.activeId,
+    hostProjectId: page.projectId,
+    hostPageId: page.draft?.id,
+    visible: view === "page" && !!page.draft,
+    blocked: busy || routing || !!dialog,
+    report,
+    openFullPage: (pageId, projectId) => openPage(pageId, projectId),
+  });
   const assistantOpen = workspace.assistantOpen;
   const changeAssistantOpen = (open: boolean) =>
     workspace.setAssistantOpen(open, workspace.activeId);
@@ -4687,7 +4706,7 @@ export default function Studio() {
             onPrefillUsed={() => setAssistantPrefill(null)}
           >
           <main
-            className="studio-main"
+            className={`studio-main${recordPeek.view ? " has-record-peek" : ""}`}
             id="studio-tab-panel"
             role="tabpanel"
             aria-labelledby={`workspace-tab-${workspace.activeId}`}
@@ -5076,6 +5095,9 @@ export default function Studio() {
                 onCopyLink={(target) => void copyPageLink(target).catch(report)}
                 onCreateLinkedPage={createLinkedPage}
                 onRenameLinkedPage={renameLinkedPage}
+                onOpenRecord={recordPeek.open}
+                onCloseRecord={recordPeek.closeSource}
+                recordPeek={recordPeek.state}
                 onEditIcon={action(async () => {
                   const target = activePageTarget();
                   if (target) await beginPageIcon(target);
@@ -5501,6 +5523,23 @@ export default function Studio() {
                 </div>
               )}
             </div>
+            {recordPeek.view && <DatabaseRecordPeek
+              peek={recordPeek}
+              sessions={page.sessions}
+              linkablePages={contents}
+              readOnly={syncOverview.markers.get(recordPeek.request?.projectId ?? "") === "readOnly"}
+              report={report}
+              onCopyLink={(target) => void copyPageLink(target).catch(report)}
+              onCreateLinkedPage={createLinkedPage}
+              onRenameLinkedPage={renameLinkedPage}
+              onEditIcon={action(async () => {
+                const request = recordPeek.request;
+                const draft = recordPeek.view?.session.getSnapshot().draft;
+                if (!request || !draft) return;
+                await beginPageIcon({ kind: "page", projectId: request.projectId, id: draft.id,
+                  title: draft.title, icon: draft.icon, pinned: !!draft.favorite, parentId: draft.parentId ?? null });
+              })}
+            />}
           </main>
           </AssistantWorkbench>
         </AutoHideSidebar>
@@ -5947,12 +5986,10 @@ export default function Studio() {
             value={dialog.value}
             onClose={closeDialog}
             onSave={async (icon) => {
-              if (
-                page.draft?.id === dialog.target.id &&
-                page.projectId === dialog.target.projectId
-              ) {
-                page.edit({ icon });
-                if (!(await page.flush()))
+              const retained = page.sessions.sessionFor(dialog.target.projectId, dialog.target.id);
+              if (retained) {
+                retained.edit({ icon });
+                if (!(await retained.flush()))
                   throw new Error(t("iconKeptInDraft"));
               } else {
                 await desktop.invoke("pages:save", {
