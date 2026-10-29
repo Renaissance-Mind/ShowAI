@@ -25,6 +25,7 @@ let directory: string,
   store: FileStore,
   projectId: string,
   pageId: string;
+// Pages use zh-CN like the assertions below; the browser default differs between Chrome and the headless shell.
 let browser: Browser, server: Awaited<ReturnType<typeof startBrowserServer>>;
 const compiled: CompiledComponent[] = [];
 let cdnHost: Awaited<ReturnType<typeof startCdnHost>>;
@@ -100,6 +101,7 @@ afterAll(async () => {
 describe("Page outline in the real workbench and standalone reader", () => {
   it("enables and disables through native settings, saves and undoes without changing content order", async () => {
     const page = await browser.newPage({
+        locale: "zh-CN",
         viewport: { width: 2100, height: 1000 },
       }),
       errors: string[] = [];
@@ -228,6 +230,7 @@ describe("Page outline in the real workbench and standalone reader", () => {
         ),
       );
       const page = await browser.newPage({
+          locale: "zh-CN",
           viewport: { width: 1700, height: 950 },
         }),
         errors: string[] = [];
@@ -300,6 +303,7 @@ describe("Page outline in the real workbench and standalone reader", () => {
         await buildPageHtml(doc, resolve("dist-portable/portable.html")),
       );
       const page = await browser.newPage({
+        locale: "zh-CN",
         viewport: { width: 1800, height: 1000 },
       });
       await page.goto("file://" + path);
@@ -333,7 +337,7 @@ describe("Page outline in the real workbench and standalone reader", () => {
       path,
       await buildPageHtml(doc, resolve("dist-portable/portable.html")),
     );
-    const page = await browser.newPage();
+    const page = await browser.newPage({ locale: "zh-CN" });
     await page.goto("file://" + path);
     await page.getByText("自定义目录组件未能加载，已使用默认目录").waitFor();
     await page.getByRole("button", { name: "Methods", exact: true }).waitFor();
@@ -353,7 +357,7 @@ describe("Page outline in the real workbench and standalone reader", () => {
         broken,
       ]),
     );
-    const recovery = await browser.newPage();
+    const recovery = await browser.newPage({ locale: "zh-CN" });
     await recovery.goto("file://" + brokenPath);
     await recovery
       .getByText("自定义目录组件未能加载，已使用默认目录", { exact: false })
@@ -391,6 +395,7 @@ describe("Page outline in the real workbench and standalone reader", () => {
       await readFile(resolve("dist-cdn/manifest.json"), "utf8"),
     );
     const page = await browser.newPage({
+      locale: "zh-CN",
       viewport: { width: 1200, height: 1000 },
     });
     const errors: string[] = [];

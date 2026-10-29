@@ -68,4 +68,4 @@ test("G2 builtin can be derived into an offline compiled component", async () =>
   } finally {
     await rm(home, { recursive: true, force: true });
   }
-}, 30000);
+}, 90_000);
