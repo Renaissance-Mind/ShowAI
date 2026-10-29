@@ -5,6 +5,7 @@ import {
   WorkspaceProtection,
   recordWorkspaceChanges,
   workspaceHash,
+  type WorkspaceConflict,
 } from "./workspace-conflicts";
 import { withLibraryLock } from "./library-lock";
 import {
@@ -172,13 +173,37 @@ async function workspaceResourcePaths(
   for (const root of roots) await visit(root);
   return [...paths];
 }
-export async function scanWorkspaceResources(
+const queuedScans = new Map<string, Promise<WorkspaceConflict[]>>(),
+  runningScans = new Map<string, Promise<unknown>>();
+/**
+ * Window focus and every library change ask for a scan. One runs at a time per
+ * scope; requests arriving meanwhile share the next scan, which starts after
+ * them and therefore sees their changes.
+ */
+export function scanWorkspaceResources(
   library: GitLibrary,
   projectId?: string,
-) {
-  // Directory discovery and other batches must not monopolize the writer lease.
-  // Recovery transactions still retain their existing outer lease atomically.
-  return inspectWorkspaceResources(library, projectId);
+): Promise<WorkspaceConflict[]> {
+  const key = `${library.root}\0${projectId ?? ""}`;
+  const queued = queuedScans.get(key);
+  if (queued) return queued;
+  const start = () => {
+    queuedScans.delete(key);
+    // Directory discovery and other batches must not monopolize the writer lease.
+    // Recovery transactions still retain their existing outer lease atomically.
+    return inspectWorkspaceResources(library, projectId);
+  };
+  const scan = (runningScans.get(key) ?? Promise.resolve()).then(start, start);
+  queuedScans.set(key, scan);
+  const settled = scan.then(
+    () => undefined,
+    () => undefined,
+  );
+  runningScans.set(key, settled);
+  void settled.then(() => {
+    if (runningScans.get(key) === settled) runningScans.delete(key);
+  });
+  return scan;
 }
 export async function recoverExternalPackage(
   library: GitLibrary,

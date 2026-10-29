@@ -79,6 +79,8 @@ export async function recordWorkspaceChanges(
   return conflicts;
 }
 
+const COMPARE_BATCH = 16;
+
 /** External content stays in place and is independently retained before resolution. */
 export class WorkspaceProtection {
   private inspectedTree?: { revision: string | null; paths: Set<string> };
@@ -217,24 +219,29 @@ export class WorkspaceProtection {
         ),
       };
     const tree = this.inspectedTree.paths;
-    const present = paths.filter((path) => tree.has(path));
-    const committed =
-      revision && present.length
-        ? await this.library.readFiles(present, revision)
-        : new Map<string, Buffer>();
     const differences: {
       path: string;
       actual: Buffer | null;
       tracked: boolean;
     }[] = [];
-    for (const path of paths) {
-      const actual = await readLibraryBytes(
-        this.library.root,
-        join(this.library.workspace, path),
-      );
-      const expected = committed.get(path) ?? null;
-      if (workspaceHash(path, actual) !== workspaceHash(path, expected))
-        differences.push({ path, actual, tracked: tree.has(path) });
+    // A whole-library scan decodes every page and package; reading it in one
+    // request held gigabytes at once and exhausted the shared V8 heap.
+    for (let offset = 0; offset < paths.length; offset += COMPARE_BATCH) {
+      const batch = paths.slice(offset, offset + COMPARE_BATCH),
+        present = batch.filter((path) => tree.has(path));
+      const committed =
+        revision && present.length
+          ? await this.library.readFiles(present, revision)
+          : new Map<string, Buffer>();
+      for (const path of batch) {
+        const actual = await readLibraryBytes(
+          this.library.root,
+          join(this.library.workspace, path),
+        );
+        const expected = committed.get(path) ?? null;
+        if (workspaceHash(path, actual) !== workspaceHash(path, expected))
+          differences.push({ path, actual, tracked: tree.has(path) });
+      }
     }
     return differences;
   }
