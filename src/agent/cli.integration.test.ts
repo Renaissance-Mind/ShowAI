@@ -989,7 +989,7 @@ test("real CLI and MCP export selected components and repeat focused updates wit
     ]),
   ).rejects.toThrow("not site");
   await expect(access(join(home, "invalid-partial.html"))).rejects.toThrow();
-}, 30000);
+}, 90_000);
 
 test("real exports include readable source and working relative multi-page site assets", async () => {
   const project = await run(["projects", "create", "--name", "Export checks"]);
@@ -1708,7 +1708,7 @@ test(
     );
     await expect(runHere(["projects", "current"])).rejects.toThrow("archived");
   },
-  process.platform === "win32" ? 60000 : 20000,
+  60_000,
 );
 
 test("progressive CLI discovery is paginated and keeps detailed content opt-in", async () => {

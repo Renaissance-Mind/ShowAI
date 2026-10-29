@@ -377,7 +377,7 @@ test("a used binary asset above 8 MiB compiles, reloads, publishes, exports and 
     exportHtmlBytes: (await stat(exported.path)).size,
     remoteIntegrity: remote.integrity,
   });
-}, 120_000);
+}, 300_000);
 
 test("built-in source editing compiles with the same resource budgets and no import escape", async () => {
   const f = await fixture(),

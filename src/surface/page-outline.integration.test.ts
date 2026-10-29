@@ -106,22 +106,10 @@ describe("Page outline in the real workbench and standalone reader", () => {
     page.on("pageerror", (error) => errors.push(error.message));
     await page.goto(server.url + `?project=${projectId}&page=${pageId}`);
     page.setDefaultTimeout(10000);
-    if (
-      !(await page
-        .getByRole("button", { name: "页面操作", exact: true })
-        .count())
-    ) {
-      const expand = page.getByRole("button", {
-        name: "展开Outline acceptance",
-        exact: true,
-      });
-      if (await expand.count()) await expand.click();
-      await page
-        .getByText("Outline acceptance Page", { exact: true })
-        .first()
-        .click();
-    }
-    await page.getByRole("button", { name: "页面操作", exact: true }).click();
+    // The launch URL opens the page; opening it again from the sidebar while it loads mounts a second root.
+    await page
+      .getByRole("button", { name: "页面操作", exact: true })
+      .click({ timeout: 30000 });
     await page.getByRole("menuitem", { name: "目录设置", exact: true }).click();
     const dialog = page.getByRole("dialog", { name: "目录设置" });
     await dialog.waitFor();
