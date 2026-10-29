@@ -94,12 +94,9 @@ The launcher and container smoke tests delete their isolated source copies and l
 
 ### Continuous integration
 
-`.github/workflows/check.yml` runs on pushes to `main` and on pull requests:
+`.github/workflows/check.yml` runs on Linux for pushes to `main` and for pull requests: `npm run check`, `npm run build`, `npm test`, `npm run test:release`, `npm run test:whiteboard` and `npm audit --audit-level=high`. A release requires this run to pass.
 
-- **Linux:** `npm run check`, `npm test`, `npm run test:release`, `npm run build`, `npm run test:whiteboard` and `npm audit --audit-level=high`.
-- **Windows:** `npm run check`, the Vitest suite, `npm run build`, and the desktop and UI smoke tests.
-
-Other workflows (browser packages, ink portability) run manually before releases.
+Other workflows run manually: Windows (`npm run check`, `npm run build`, the Vitest suite, and the desktop and UI smoke tests), browser packages and ink portability.
 
 ### macOS release
 
