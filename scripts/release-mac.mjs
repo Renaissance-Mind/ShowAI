@@ -103,7 +103,7 @@ async function main(args) {
   capture("git", ["fetch", "--quiet", "origin", "main", "--tags"]);
   const sha = capture("git", ["rev-parse", "HEAD"]);
   if (sha !== capture("git", ["rev-parse", "origin/main"])) throw new Error(`HEAD ${sha.slice(0, 8)} is not origin/main; release a pushed main commit.`);
-  if (capture("git", ["tag", "--list", tag])) throw new Error(`${tag} already exists.`);
+  if (publish && capture("git", ["tag", "--list", tag])) throw new Error(`${tag} already exists; bump the version in package.json first.`);
   const identity = developerIdentity(option(args, "--identity"));
   await mkdir(join(work, "logs"), { recursive: true });
   const { bavail, bsize } = statfsSync(work);

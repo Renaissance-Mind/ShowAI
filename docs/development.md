@@ -100,7 +100,7 @@ Other workflows run manually: Windows (`npm run check`, `npm run build`, the Vit
 
 ### macOS release
 
-A release is cut from a commit on `main` whose Check run has passed. On an Apple silicon Mac with a Developer ID Application certificate in the keychain, run:
+A release is cut from a commit on `main` whose Check run has passed; bump `version` in `package.json` in that commit or before it. On an Apple silicon Mac with a Developer ID Application certificate in the keychain, run:
 
 ```bash
 npm run release:mac -- --headline "Most noticeable change" --changes changes.json --work <folder> --publish

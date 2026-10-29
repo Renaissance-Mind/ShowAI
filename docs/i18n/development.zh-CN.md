@@ -100,7 +100,7 @@ Vitest 配置位于 `vite.config.ts` 的 `test` 部分。测试文件为 `src/**
 
 ### macOS 发版
 
-发版使用 `main` 上 Check 已通过的提交。在钥匙串里有 Developer ID Application 证书的 Apple 芯片 Mac 上运行：
+发版使用 `main` 上 Check 已通过的提交，`package.json` 的 `version` 在此之前已经提升。在钥匙串里有 Developer ID Application 证书的 Apple 芯片 Mac 上运行：
 
 ```bash
 npm run release:mac -- --headline "最显著的变化" --changes changes.json --work <目录> --publish
