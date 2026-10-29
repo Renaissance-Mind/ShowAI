@@ -96,7 +96,19 @@ The launcher and container smoke tests delete their isolated source copies and l
 
 `.github/workflows/check.yml` runs on pushes to `main` and on pull requests:
 
-- **Linux:** `npm run check`, `npm test`, `npm run build`, `npm run test:whiteboard` and `npm audit --audit-level=high`.
+- **Linux:** `npm run check`, `npm test`, `npm run test:release`, `npm run build`, `npm run test:whiteboard` and `npm audit --audit-level=high`.
 - **Windows:** `npm run check`, the Vitest suite, `npm run build`, and the desktop and UI smoke tests.
 
 Other workflows (browser packages, ink portability) run manually before releases.
+
+### macOS release
+
+A release is cut from a commit on `main` whose Check run has passed. On an Apple silicon Mac with a Developer ID Application certificate in the keychain, run:
+
+```bash
+npm run release:mac -- --headline "Most noticeable change" --changes changes.json --work <folder> --publish
+```
+
+`changes.json` lists the `new`, `improved` and `fixed` items for the release notes. The script waits for Check, builds a clean copy of the commit, signs and packages the App, and verifies the signature, the packaged App (`src/desktop/smoke.mjs`), the DMG, the ZIP and the update feed (`latest-mac.yml`). With `--publish` it then tags the commit, uploads the five release files and confirms the uploaded copies. Without `--publish` it stops after verification. It records timings and file digests in `<folder>/release-receipt.json`.
+
+Signing covers Mach-O files only (`src/desktop/sign-mac.cjs`); the bundle's signature seals every other file. Each signature takes a timestamp from Apple, and a request that times out is retried.

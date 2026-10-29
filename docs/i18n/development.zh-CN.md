@@ -96,7 +96,19 @@ Vitest 配置位于 `vite.config.ts` 的 `test` 部分。测试文件为 `src/**
 
 `.github/workflows/check.yml` 在推送到 `main` 和提交拉取请求时运行：
 
-- **Linux：** `npm run check`、`npm test`、`npm run build`、`npm run test:whiteboard` 和 `npm audit --audit-level=high`。
+- **Linux：** `npm run check`、`npm test`、`npm run test:release`、`npm run build`、`npm run test:whiteboard` 和 `npm audit --audit-level=high`。
 - **Windows：** `npm run check`、Vitest 套件、`npm run build`，以及桌面和界面冒烟测试。
 
 其他工作流（浏览器安装包、墨迹可移植性）在发版前手动运行。
+
+### macOS 发版
+
+发版使用 `main` 上 Check 已通过的提交。在钥匙串里有 Developer ID Application 证书的 Apple 芯片 Mac 上运行：
+
+```bash
+npm run release:mac -- --headline "最显著的变化" --changes changes.json --work <目录> --publish
+```
+
+`changes.json` 列出发版说明中的 `new`、`improved` 和 `fixed` 条目。脚本等待 Check 通过，从该提交建立干净副本，签名并打包 App，然后验证签名、打包后的 App（`src/desktop/smoke.mjs`）、DMG、ZIP 和更新信息文件（`latest-mac.yml`）。加 `--publish` 时，脚本随后为提交打标签、上传五个发版文件并核对上传后的副本；不加时在验证后停止。各步骤耗时和文件摘要记录在 `<目录>/release-receipt.json`。
+
+签名只针对 Mach-O 文件（`src/desktop/sign-mac.cjs`），其余文件由 App 整体签名封存。每次签名都向 Apple 取时间戳，请求超时会重试。

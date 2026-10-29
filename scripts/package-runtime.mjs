@@ -1,4 +1,5 @@
 import { frontendManifest } from "./build-info.mjs";
+import { trimEmbeddedGit } from "./trim-embedded-git.mjs";
 // Prepare the canonical plugin before taking the copy shipped inside the App.
 import "./package-plugin.mjs";
 import { build } from "esbuild";
@@ -114,6 +115,9 @@ for (const name of [
   "three",
 ])
   await copyPackage(name);
+// Windows ships dugite's minGit layout, which keeps its own credential setup.
+if (process.platform !== "win32")
+  await trimEmbeddedGit(join(runtime, "node_modules/dugite/git"));
 const compilerPackages = await readdir(join(root, "node_modules/@esbuild"));
 for (const name of compilerPackages)
   await cp(

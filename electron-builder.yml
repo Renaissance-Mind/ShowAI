@@ -45,6 +45,12 @@ mac:
   notarize: false
   entitlements: src/desktop/assets/entitlements.mac.plist
   entitlementsInherit: src/desktop/assets/entitlements.mac.plist
+  # Signs Mach-O files only and retries when Apple's timestamp server does not answer.
+  sign: src/desktop/sign-mac.cjs
+  # The App's own languages; the other Electron .lproj folders are about 45 MB.
+  electronLanguages:
+    - en
+    - zh_CN
   target:
     - target: dmg
       arch:

@@ -52,7 +52,8 @@
     "release:notes": "node scripts/release-entry.mjs notes",
     "release:check": "node scripts/release-entry.mjs check",
     "release:assets": "node scripts/release-entry.mjs assets",
-    "test:release-entry": "node --test scripts/release-entry.test.mjs",
+    "release:mac": "node scripts/release-mac.mjs",
+    "test:release": "node --test scripts/release-entry.test.mjs scripts/trim-embedded-git.test.mjs",
     "docs:sync": "node scripts/sync-docs.mjs",
     "test:sync-docs": "node --test scripts/sync-docs.test.mjs",
     "runtime:register": "node dist-runtime/scripts/cli.mjs runtime register --json",
@@ -113,6 +114,7 @@
     "zod": "^4.6.5"
   },
   "devDependencies": {
+    "@electron/osx-sign": "^1.3.3",
     "@playwright/cli": "^0.1.22",
     "@types/katex": "^0.16.8",
     "@types/node": "^26.6.4",

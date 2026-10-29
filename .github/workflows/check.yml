@@ -25,6 +25,7 @@ jobs:
       - run: npx playwright-core install --with-deps chromium
       - run: npm run check
       - run: npm test
+      - run: npm run test:release
       - run: npm run build
       - run: npm run test:whiteboard
       - run: npm audit --audit-level=high
