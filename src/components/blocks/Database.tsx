@@ -1,6 +1,15 @@
 import { BlockItemSources, BlockSettings } from "./action-host";
 import ExpandableSearch from "../ExpandableSearch";
-import { useContext, useEffect, useMemo, useRef, useState } from "react";
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+import { createPortal } from "react-dom";
 import {
   ArrowDown,
   ArrowUp,
@@ -47,6 +56,8 @@ import {
 } from "./database-views";
 import { usePropertyReorder } from "./database-reorder";
 import { useColumnResize } from "./database-column-resize";
+import { useDatabaseViewMotion } from "./database-view-motion";
+import { databaseRecordTargets } from "./database-records";
 import { pageLink } from "../../portable/page-link.mjs";
 import { PageLinkContext, type PageLinkBridge } from "../page-links";
 import type { MessageKey } from "../../i18n";
@@ -98,6 +109,9 @@ const TYPE_SYMBOL: Record<ColumnType, string> = {
 };
 // A select value standing for "create a page"; page links never take this form.
 const NEW_PAGE = "showai:new-page";
+const RecordOpenContext = createContext<
+  ((row: DatabaseRow, column: DatabaseColumn) => void) | null
+>(null);
 
 /** The title of the page a cell links to, when the host lists it. */
 function pageTitle(
@@ -115,24 +129,42 @@ function PageCell({
   editable,
   update,
   createPage,
+  openRecord,
 }: {
   value: unknown;
   column: DatabaseColumn;
   editable: boolean;
   update: (value: string) => void;
   createPage?: () => void;
+  openRecord?: () => void;
 }) {
   const t = useTranslator(messages);
   const pages = useContext(PageLinkContext);
   const target = parsePageCell(value);
   const title = pageTitle(value, pages);
+  const canPeek = !!pages?.openRecord && !!openRecord;
   const link = target && (
     <a
       className="sb-cell-link sb-page-link"
       href={String(value)}
       data-open-project={target.projectId}
       data-open-page={target.pageId}
+      data-database-record={canPeek || undefined}
       aria-label={editable ? t("openPage", { title: title ?? "" }) : undefined}
+      onClick={(event) => {
+        if (
+          !canPeek ||
+          event.button !== 0 ||
+          event.metaKey ||
+          event.ctrlKey ||
+          event.shiftKey ||
+          event.altKey
+        )
+          return;
+        event.preventDefault();
+        event.stopPropagation();
+        openRecord?.();
+      }}
     >
       <FileText size={13} aria-hidden="true" />
       {editable ? null : title || t("linkedPage")}
@@ -192,6 +224,7 @@ function Cell({
   createPage?: () => void;
 }) {
   const t = useTranslator(messages);
+  const openRecord = useContext(RecordOpenContext);
   const value = row[column.id];
   if (column.type === "page")
     return (
@@ -201,6 +234,7 @@ function Cell({
         editable={editable}
         update={update}
         createPage={createPage}
+        openRecord={openRecord ? () => openRecord(row, column) : undefined}
       />
     );
   if (column.type === "checkbox")
@@ -388,6 +422,9 @@ function AddProperty({
 export function DatabaseBlock({ data, onChange, readOnly }: BlockProps) {
   const t = useTranslator(messages);
   const pages = useContext(PageLinkContext);
+  const sourceId = useId();
+  const closeRecord = pages?.closeRecord;
+  useEffect(() => () => closeRecord?.(sourceId), [sourceId, closeRecord]);
   const columns: DatabaseColumn[] = useMemo(
     () =>
       Array.isArray(data.columns)
@@ -433,11 +470,23 @@ export function DatabaseBlock({ data, onChange, readOnly }: BlockProps) {
     ...(editable ? {} : overrides[savedView.id]),
   };
   const view = current.type;
+  const motion = useDatabaseViewMotion(
+    `${savedView.id}:${view}`,
+    views.length > 1,
+  );
+  const selectView = (id: string) => {
+    if (id === savedView.id) return;
+    motion.capture();
+    setActiveView(id);
+    setDraftViewName(null);
+    setPage(0);
+  };
   const sort = current.sort ?? null;
   const filter = current.filter ?? { column: "", value: "" };
   const writeViews = (next: DatabaseView[], base = data) =>
     onChange?.(withViews(base, next));
   const changeCurrent = (changes: Partial<DatabaseView>) => {
+    if (changes.type && changes.type !== current.type) motion.capture();
     if (editable)
       writeViews(
         views.map((item) =>
@@ -531,6 +580,32 @@ export function DatabaseBlock({ data, onChange, readOnly }: BlockProps) {
     activePage * pageSize,
     (activePage + 1) * pageSize,
   );
+  const openRecord = (row: DatabaseRow, column: DatabaseColumn) => {
+    const target = parsePageCell(row[column.id]);
+    if (!target || !pages?.openRecord) return;
+    pages.openRecord({
+      ...target,
+      sourceId,
+      recordId: row.id,
+      title: text(data.title, t("database")),
+      records: databaseRecordTargets(shownRows, column.id),
+    });
+  };
+  const peek = pages?.recordPeek;
+  const peekRow =
+    peek?.sourceId === sourceId
+      ? rows.find((row) =>
+          peek.recordId
+            ? row.id === peek.recordId
+            : pageColumns.some((column) => {
+                const target = parsePageCell(row[column.id]);
+                return (
+                  target?.projectId === peek.projectId &&
+                  target.pageId === peek.pageId
+                );
+              }),
+        )
+      : undefined;
   const options = filter.column
     ? Array.from(
         new Set(readableRows.map((row) => String(row[filter.column] ?? ""))),
@@ -1005,6 +1080,7 @@ export function DatabaseBlock({ data, onChange, readOnly }: BlockProps) {
   );
   const rowName = (row: DatabaseRow) => text(readable(row)[columns[0]?.id]);
   return (
+    <RecordOpenContext.Provider value={pages?.openRecord ? openRecord : null}>
     <section
       className="sb-block sb-database"
       aria-label={blockLabel(data.title, t("database"))}
@@ -1139,7 +1215,12 @@ export function DatabaseBlock({ data, onChange, readOnly }: BlockProps) {
               <div className="sb-board-grouping sb-calendar-settings">
                 {(
                   [
-                    ["dateColumn", "calendar.dateProperty", dateColumns, false],
+                      [
+                        "dateColumn",
+                        "calendar.dateProperty",
+                        dateColumns,
+                        false,
+                      ],
                     [
                       "endDateColumn",
                       "calendar.endDateProperty",
@@ -1194,9 +1275,15 @@ export function DatabaseBlock({ data, onChange, readOnly }: BlockProps) {
       {views.length > 1 && (
         <div
           className="sb-database-views"
+            ref={motion.tabs}
           role="tablist"
           aria-label={t("views")}
         >
+            <span
+              ref={motion.indicator}
+              className="sb-database-view-indicator"
+              aria-hidden="true"
+            />
           {views.map((item) => {
             const Icon =
               VIEWS.find((entry) => entry.type === item.type)?.Icon ?? Table2;
@@ -1206,12 +1293,34 @@ export function DatabaseBlock({ data, onChange, readOnly }: BlockProps) {
                 key={item.id}
                 type="button"
                 role="tab"
+                  id={`${sourceId}-view-${item.id}`}
+                  aria-controls={`${sourceId}-panel`}
                 aria-selected={active}
+                  tabIndex={active ? 0 : -1}
                 className={active ? "is-active" : ""}
-                onClick={() => {
-                  setActiveView(item.id);
-                  setDraftViewName(null);
-                  setPage(0);
+                  onClick={() => selectView(item.id)}
+                  onKeyDown={(event) => {
+                    if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey || event.nativeEvent.isComposing) return;
+                    const index = views.findIndex(
+                      (entry) => entry.id === item.id,
+                    );
+                    const next =
+                      event.key === "ArrowRight"
+                        ? (index + 1) % views.length
+                        : event.key === "ArrowLeft"
+                          ? (index - 1 + views.length) % views.length
+                          : event.key === "Home"
+                            ? 0
+                            : event.key === "End"
+                              ? views.length - 1
+                              : -1;
+                    if (next < 0) return;
+                    event.preventDefault();
+                    event.stopPropagation();
+                    selectView(views[next].id);
+                    motion.tabs.current
+                      ?.querySelectorAll<HTMLButtonElement>('[role="tab"]')
+                      [next]?.focus();
                 }}
               >
                 <Icon size={13} aria-hidden="true" />
@@ -1255,7 +1364,9 @@ export function DatabaseBlock({ data, onChange, readOnly }: BlockProps) {
                     aria-label={t("propertyName")}
                     value={column.name}
                     onChange={(event) =>
-                      updateDraftColumn(column.id, { name: event.target.value })
+                        updateDraftColumn(column.id, {
+                          name: event.target.value,
+                        })
                     }
                   />
                   <select
@@ -1411,6 +1522,16 @@ export function DatabaseBlock({ data, onChange, readOnly }: BlockProps) {
           }}
         />
       )}
+        <div className="sb-database-view-viewport" ref={motion.panel}>
+          <div
+            className="sb-database-view-content"
+            ref={motion.content}
+            id={`${sourceId}-panel`}
+            role={views.length > 1 ? "tabpanel" : undefined}
+            aria-labelledby={
+              views.length > 1 ? `${sourceId}-view-${savedView.id}` : undefined
+            }
+          >
       {view === "calendar" ? (
         <DatabaseCalendar
           key={JSON.stringify(savedCalendar)}
@@ -1429,7 +1550,8 @@ export function DatabaseBlock({ data, onChange, readOnly }: BlockProps) {
           }
           onAdd={
             calendar.dateColumn
-              ? (date) => addRow(undefined, { [calendar.dateColumn!.id]: date })
+                    ? (date) =>
+                        addRow(undefined, { [calendar.dateColumn!.id]: date })
               : undefined
           }
           onRemove={removeRow}
@@ -1487,13 +1609,17 @@ export function DatabaseBlock({ data, onChange, readOnly }: BlockProps) {
                       <button
                         type="button"
                         onClick={() => toggleSort(column.id)}
-                        title={editable ? t("propertyHeaderHint") : undefined}
+                              title={
+                                editable ? t("propertyHeaderHint") : undefined
+                              }
                         {...tableReorder.handleProps(column.id)}
                       >
                         <span className="sb-type-symbol">
                           {TYPE_SYMBOL[column.type]}
                         </span>
-                        <span className="sb-column-name">{column.name}</span>
+                              <span className="sb-column-name">
+                                {column.name}
+                              </span>
                         {sort?.column === column.id &&
                           (sort.direction === "asc" ? (
                             <ArrowUp size={12} />
@@ -1506,7 +1632,8 @@ export function DatabaseBlock({ data, onChange, readOnly }: BlockProps) {
                           {...columnResize.handleProps(column.id)}
                           className="sb-column-resize"
                           data-resizing={
-                            columnResize.resizing === column.id || undefined
+                                  columnResize.resizing === column.id ||
+                                  undefined
                           }
                           aria-label={t("resizeProperty", {
                             name: column.name,
@@ -1560,7 +1687,9 @@ export function DatabaseBlock({ data, onChange, readOnly }: BlockProps) {
           {shownRows.length === 0 && (
             <EmptyState
               icon={<LayoutList size={25} strokeWidth={1.4} />}
-              title={rows.length ? t("empty.noMatches") : t("empty.start")}
+                    title={
+                      rows.length ? t("empty.noMatches") : t("empty.start")
+                    }
             />
           )}
         </>
@@ -1570,13 +1699,16 @@ export function DatabaseBlock({ data, onChange, readOnly }: BlockProps) {
             {pagedRows.map((row) => (
               <li key={row.id} title={sources?.get(row.id)?.label}>
                 {columns[0] && (
-                  <div className="sb-list-title">{cell(row, columns[0])}</div>
+                        <div className="sb-list-title">
+                          {cell(row, columns[0])}
+                        </div>
                 )}
                 <div className="sb-list-properties">
                   {columns.slice(1).map((column) =>
                     row[column.id] === "" ||
                     row[column.id] === undefined ||
-                    (column.type === "checkbox" && !row[column.id]) ? null : (
+                          (column.type === "checkbox" &&
+                            !row[column.id]) ? null : (
                       <span className="sb-list-property" key={column.id}>
                         <span>{column.name}</span>
                         <Cell
@@ -1613,7 +1745,9 @@ export function DatabaseBlock({ data, onChange, readOnly }: BlockProps) {
           {shownRows.length === 0 && (
             <EmptyState
               icon={<List size={25} strokeWidth={1.4} />}
-              title={rows.length ? t("empty.noMatches") : t("empty.start")}
+                    title={
+                      rows.length ? t("empty.noMatches") : t("empty.start")
+                    }
             />
           )}
         </>
@@ -1622,7 +1756,9 @@ export function DatabaseBlock({ data, onChange, readOnly }: BlockProps) {
           <div className="sb-board">
             {groupNames.map((group, groupIndex) => {
               const groupRows = groupColumn
-                ? shownRows.filter((row) => text(row[groupColumn.id]) === group)
+                      ? shownRows.filter(
+                          (row) => text(row[groupColumn.id]) === group,
+                        )
                 : shownRows;
               return (
                 <div
@@ -1641,7 +1777,8 @@ export function DatabaseBlock({ data, onChange, readOnly }: BlockProps) {
                 >
                   <div className="sb-board-column-header">
                     <span className={`sb-tag sb-tag-${groupIndex % 5}`}>
-                      {group || (groupColumn ? t("notSet") : t("allRecords"))}
+                            {group ||
+                              (groupColumn ? t("notSet") : t("allRecords"))}
                     </span>
                     <span>{groupRows.length}</span>
                     {editable && (
@@ -1721,6 +1858,8 @@ export function DatabaseBlock({ data, onChange, readOnly }: BlockProps) {
           </div>
         </>
       )}
+          </div>
+        </div>
       {pageError && (
         <p role="alert" className="sb-error sb-database-error">
           {pageError}
@@ -1767,5 +1906,25 @@ export function DatabaseBlock({ data, onChange, readOnly }: BlockProps) {
         )}
       </div>
     </section>
+      {peekRow &&
+        peek?.propertiesHost &&
+        createPortal(
+          <div
+            className="sb-block sb-database-record-properties"
+            aria-label={t("property")}
+          >
+            {columns.map((column) => (
+              <div className="sb-record-property" key={column.id}>
+                <span className="sb-record-property-name">
+                  <span aria-hidden="true">{TYPE_SYMBOL[column.type]}</span>
+                  {column.name}
+                </span>
+                <div>{cell(peekRow, column)}</div>
+              </div>
+            ))}
+          </div>,
+          peek.propertiesHost,
+        )}
+    </RecordOpenContext.Provider>
   );
 }

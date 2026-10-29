@@ -20,6 +20,22 @@ export interface LinkablePage {
   title: string;
   icon?: string;
 }
+export interface RecordPeekTarget {
+  projectId: string;
+  pageId: string;
+  /** Rows and pages have independent identities; a page may be linked twice. */
+  recordId?: string;
+}
+export interface RecordPeekRequest extends RecordPeekTarget {
+  sourceId: string;
+  records: RecordPeekTarget[];
+  title?: string;
+}
+export interface RecordPeekState extends RecordPeekTarget {
+  sourceId: string;
+  /** The database renders its own live property cells into this host. */
+  propertiesHost: HTMLElement | null;
+}
 /** Links between saved pages, offered by the workbench around an editable page. */
 export interface PageLinkBridge {
   projectId: string;
@@ -39,6 +55,11 @@ export interface PageLinkBridge {
   }): Promise<{ pageId: string; folderId: string }>;
   /** Rename a page of this project. Absent where pages cannot be renamed. */
   renamePage?(pageId: string, title: string): Promise<void>;
+  /** Optional workbench presentation; readers keep using the original link. */
+  openRecord?(request: RecordPeekRequest): void;
+  /** Release a preview when its source component is hidden or removed. */
+  closeRecord?(sourceId: string): void;
+  recordPeek?: RecordPeekState;
 }
 /** The host supplies project resources; all writing tools belong to the component. */
 export const RichTextEnvironment = createContext<{

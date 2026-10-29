@@ -3,7 +3,7 @@
   "profile": "kimi",
   "declaredHostDisplay": "fragment-file",
   "commonVersion": "0.27.0",
-  "commonSha256": "fe7e9ac07942bb2ede1a10d6f3b58a1fbb40caa6e6761cdf174ff77cc34404a5",
+  "commonSha256": "c6815645e602dd29941c7306c51fd052f1cf9fae10f8ad5064695a0b302b02a8",
   "commonFiles": {
     "collaborate-canvas/SKILL.md": "8c703a674ce962b723e42e4f45e194be2b3466cb6dc0774ab699751d22e3e020",
     "create-component/references/component-authoring.md": "9a2b1e9f8340d7213c444874ae4636838b4986e497618c5c9b1b56b466cebe47",
@@ -13,7 +13,7 @@
     "create-template/references/template-creation.md": "da962a84c97e12c4404daada2b0613b4ebe3bbd93d90dd801064b6bc5b1c34be",
     "create-template/SKILL.md": "ab2a8945c038f1543ddf2b007e1b5456074fb76fa322c18c61ff74ec7c3f6bfb",
     "design-presentation/references/design-draft.md": "5f483de571398cfbdc4e99d9c1dede30a8ed1a2d1f4c35373a08a0b394989d1c",
-    "design-presentation/references/reuse-selection.md": "a6e186107126e4eae08fe40cff688699982a0adabd1c8d1e5465c68aad8b13d0",
+    "design-presentation/references/reuse-selection.md": "9b8496ff654ed854987d482524cde2ae4c236a74900e4de1742061537e40b34a",
     "design-presentation/SKILL.md": "d23d5ea825d84d3038a7b04b9afd129d034575e274183a1603b8897f93c325af",
     "plan-presentation/references/presentation-contract.md": "0656693549a08e6d8be378607ae7bff1b54d9799109c6f98616e58ca19ea213e",
     "plan-presentation/references/presentation-logic.md": "5b1435d87dfbef80545cfdab360ac9b7b395a2c3f858be8238c68f4d37ab8651",

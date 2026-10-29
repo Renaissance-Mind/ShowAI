@@ -20,6 +20,8 @@ import pageSessionMessages from "../i18n/messages/pageSession";
 const t = translator(pageSessionMessages);
 /** How long a page read ahead of an open stays usable. */
 const PREFETCH_TTL = 4000;
+/** A retained view of a record; it never becomes the workbench active page. */
+export const PAGE_PREVIEW_TAB = "showai:record-preview";
 const common = translator(commonMessages);
 
 export interface PageViewSession {
@@ -41,6 +43,7 @@ export interface BackgroundPageIssue {
 interface WorkspaceSnapshot {
   active: PageSession | null;
   activeView: string | null;
+  previewView: string | null;
   views: readonly PageViewSession[];
   issues: readonly BackgroundPageIssue[];
   revision: number;
@@ -65,6 +68,8 @@ export class PageSessions {
     { projectId: string; read: Promise<LoadedPage>; until: number }
   >();
   private ticket = 0;
+  private previewTicket = 0;
+  private pendingPages = new Map<string, Promise<PageSession | null>>();
   private disposed = false;
   private dirty = false;
   /** Pages whose release failed after their session was closed. */
@@ -72,6 +77,7 @@ export class PageSessions {
   private snapshot: WorkspaceSnapshot = {
     active: null,
     activeView: null,
+    previewView: null,
     views: [],
     issues: [],
     revision: 0,
@@ -141,8 +147,10 @@ export class PageSessions {
     this.prefetched.clear();
     clearTimeout(this.refreshTimer);
     this.ticket++;
+    this.previewTicket++;
+    this.pendingPages.clear();
     this.home = home;
-    this.publish({ active: null, activeView: null, views: [] });
+    this.publish({ active: null, activeView: null, previewView: null, views: [] });
   }
   /**
    * Closes a page session. A release that cannot write ink or history is
@@ -186,7 +194,7 @@ export class PageSessions {
         ) ?? 0))
     );
   }
-  private retainView(session: PageSession, tabId: string) {
+  private retainView(session: PageSession, tabId: string, activate = true) {
     const state = session.getSnapshot();
     const key = JSON.stringify([tabId, state.projectId, state.draft?.id]);
     const existing = this.viewStates.get(key);
@@ -224,7 +232,9 @@ export class PageSessions {
       if (index < 0) break;
       views.splice(index, 1);
     }
-    this.publish({ active: session, activeView: key, views });
+    this.publish(activate
+      ? { active: session, activeView: key, views }
+      : { previewView: key, views });
     const retainedBytes = () =>
       [...this.viewStates.values()].reduce(
         (bytes, item) =>
@@ -241,6 +251,7 @@ export class PageSessions {
       this.viewStates.delete(key);
     }
     this.trimDocuments();
+    return view;
   }
   private trimDocuments() {
     const visible = new Set(this.snapshot.views.map((view) => view.session));
@@ -293,30 +304,20 @@ export class PageSessions {
     const show = await this.prepare(projectId, pageId, initial);
     return !!show && show(tabId);
   }
-  /**
-   * Leaves the active page and loads the target without showing it. The
-   * returned function shows it, so a caller can switch the page and its other
-   * navigation state in one render; it returns false once a later navigation
-   * has started.
-   */
-  async prepare(
-    projectId: string,
-    pageId: string,
-    initial?: LoadedPage,
-  ): Promise<((tabId: string) => boolean) | null> {
-    if (!this.home) {
-      const info = await this.options.invoke<{ home: string }>("app:info");
-      this.setHome(info.home);
-    }
-    const ticket = ++this.ticket;
-    // Opening the page again shows its recoverable drafts in place.
-    this.retirementIssues = this.retirementIssues.filter(
-      (issue) => issue.pageId !== pageId || issue.projectId !== projectId,
-    );
-    const previous = this.snapshot.active;
-    if (previous && !(await previous.leave())) return null;
-    if (ticket !== this.ticket) return null;
+  /** Read once even when a normal tab and a preview request the same source. */
+  private loadPage(projectId: string, pageId: string, initial?: LoadedPage) {
     const key = this.pageKey(projectId, pageId);
+    const pending = this.pendingPages.get(key);
+    if (pending) return pending;
+    const loading = this.readPage(projectId, pageId, key, initial);
+    this.pendingPages.set(key, loading);
+    const settled = () => {
+      if (this.pendingPages.get(key) === loading) this.pendingPages.delete(key);
+    };
+    void loading.then(settled, settled);
+    return loading;
+  }
+  private async readPage(projectId: string, pageId: string, key: string, initial?: LoadedPage): Promise<PageSession | null> {
     let session = this.pages.get(key);
     if (session && session.getSnapshot().draft?.id !== pageId) {
       this.pages.delete(key);
@@ -360,6 +361,8 @@ export class PageSessions {
         this.dirty = dirty;
         if (
           this.snapshot.active === created ||
+          this.snapshot.views.some((view) =>
+            view.key === this.snapshot.previewView && view.session === created) ||
           state.error ||
           changedDirty ||
           this.snapshot.issues.some((issue) => issue.pageId === state.draft?.id)
@@ -367,8 +370,76 @@ export class PageSessions {
           this.publish();
         this.trimDocuments();
       });
-      if (!(await created.open(projectId, pageId, initial))) return null;
+      let opened: boolean;
+      try {
+        opened = await created.open(projectId, pageId, initial);
+      } catch (error) {
+        if (this.pages.get(key) === created) this.pages.delete(key);
+        this.retire(created);
+        throw error;
+      }
+      if (!opened) {
+        const failure = created.getSnapshot();
+        if (this.pages.get(key) === created) this.pages.delete(key);
+        this.retire(created);
+        if (failure.failure) throw failure.failure;
+        if (failure.error) throw new Error(failure.error);
+        return null;
+      }
     }
+    return session;
+  }
+  /** Show a record alongside the current page without replacing its session. */
+  async openPreview(projectId: string, pageId: string): Promise<PageViewSession | null> {
+    if (!this.home || !this.snapshot.activeView) return null;
+    const ticket = ++this.previewTicket;
+    const home = this.home;
+    const host = this.snapshot.activeView;
+    const previous = this.snapshot.views.find((view) => view.key === this.snapshot.previewView);
+    if (previous && !(await previous.session.leave())) return null;
+    if (ticket !== this.previewTicket) return null;
+    const target = await this.loadPage(projectId, pageId);
+    if (!target || ticket !== this.previewTicket || home !== this.home || host !== this.snapshot.activeView) return null;
+    const view = this.retainView(target, PAGE_PREVIEW_TAB, false);
+    if (this.stale.has(target)) void this.refresh(target);
+    return view;
+  }
+  /** A failed save may close only after the draft has reached durable storage. */
+  async closePreview(): Promise<boolean> {
+    const ticket = ++this.previewTicket;
+    const previous = this.snapshot.views.find((view) => view.key === this.snapshot.previewView);
+    if (previous && !(await previous.session.leave())) return false;
+    if (ticket !== this.previewTicket) return false;
+    this.tabViews.delete(PAGE_PREVIEW_TAB);
+    if (this.snapshot.previewView) this.publish({ previewView: null });
+    return true;
+  }
+  /**
+   * Leaves the active page and loads the target without showing it. The
+   * returned function shows it, so a caller can switch the page and its other
+   * navigation state in one render; it returns false once a later navigation
+   * has started.
+   */
+  async prepare(
+    projectId: string,
+    pageId: string,
+    initial?: LoadedPage,
+  ): Promise<((tabId: string) => boolean) | null> {
+    if (!this.home) {
+      const info = await this.options.invoke<{ home: string }>("app:info");
+      this.setHome(info.home);
+    }
+    const ticket = ++this.ticket;
+    if (!(await this.closePreview()) || ticket !== this.ticket) return null;
+    // Opening the page again shows its recoverable drafts in place.
+    this.retirementIssues = this.retirementIssues.filter(
+      (issue) => issue.pageId !== pageId || issue.projectId !== projectId,
+    );
+    const previous = this.snapshot.active;
+    if (previous && !(await previous.leave())) return null;
+    if (ticket !== this.ticket) return null;
+    const session = await this.loadPage(projectId, pageId, initial);
+    if (!session) return null;
     if (ticket !== this.ticket) return null;
     const target = session;
     return (tabId) => {
@@ -379,7 +450,13 @@ export class PageSessions {
     };
   }
   async leave() {
+    if (!(await this.closePreview())) return false;
     return this.snapshot.active ? this.snapshot.active.leave() : true;
+  }
+  /** Share an already-open source with record naming and icon commands. */
+  sessionFor(projectId: string, pageId: string) {
+    const session = this.pages.get(this.pageKey(projectId, pageId));
+    return session?.getSnapshot().draft?.id === pageId ? session : undefined;
   }
   async clear() {
     const show = await this.prepareClear();
@@ -388,6 +465,7 @@ export class PageSessions {
   /** Leaves the active page; the returned function hides it, like `prepare`. */
   async prepareClear(): Promise<(() => boolean) | null> {
     const ticket = ++this.ticket;
+    if (!(await this.closePreview()) || ticket !== this.ticket) return null;
     if (!(await this.leave()) || ticket !== this.ticket) return null;
     return () => {
       if (ticket !== this.ticket) return false;
@@ -417,6 +495,8 @@ export class PageSessions {
       ...(this.snapshot.active === session
         ? { active: null, activeView: null }
         : {}),
+      ...(this.snapshot.views.some((view) => view.key === this.snapshot.previewView && view.session === session)
+        ? { previewView: null } : {}),
     });
   }
   async flushAll() {
@@ -566,11 +646,14 @@ export class PageSessions {
     if (this.refreshTimer) return;
     this.refreshTimer = setTimeout(() => {
       this.refreshTimer = undefined;
-      if (this.snapshot.active && this.stale.has(this.snapshot.active))
-        void this.refresh();
+      const visible = new Set([this.snapshot.active, this.snapshot.views.find((view) => view.key === this.snapshot.previewView)?.session]);
+      for (const session of visible)
+        if (session && this.stale.has(session)) void this.refresh(session);
     }, 40);
   }
   async closeTab(tabId: string) {
+    const host = this.snapshot.views.find((view) => view.key === this.snapshot.activeView);
+    if (host?.tabId === tabId && !(await this.closePreview())) return false;
     const closing = this.snapshot.views.filter((view) => view.tabId === tabId);
     if (
       !(await Promise.all(closing.map((view) => view.session.leave()))).every(

@@ -14,6 +14,14 @@ An embedded Board has a fixed-height viewport. A Page inside a Board normally ha
 
 The content breadcrumb tracks expansion. Moving, wrapping and deleting containers uses the same resource, save system and undo history at every level.
 
+## Database records in a Page
+
+Insert the built-in **Database** component from the same component menu. A Page can combine text, images and several databases; components may share records while retaining their own views. Add a page property to link records to documents. New records created in the workbench can create linked pages in the database's folder, with the configured record name and page title kept in sync.
+
+Click a page-cell link in the workbench to edit its document in a right-side preview while the source Page stays open. Use the previous/next controls to follow the opening view's record order, Escape to close, or **Open as full page** to continue in the normal editor. Record properties in the preview edit the same data as the database. Modified clicks retain normal page-link navigation. Readers without a preview host, including offline exports, keep ordinary page links.
+
+View tabs support Left/Right, Home and End. Transitions respect the system's reduced-motion preference. View management remains in **View and filters**; descriptions belong in the Page's normal text. Deleting a record removes its row and keeps the linked document.
+
 ## Native Page outline
 
 Enable an optional outline from **Page actions → Outline settings**. A Page without an enabled outline has no navigation rail or reserved space. The built-in reading index follows native headings, excludes nested container contents and supports depth, title overrides and hidden headings. Manual outlines organize groups and links to Page content using the entry editor's ordering and indent controls. Adjusting the outline does not move content.

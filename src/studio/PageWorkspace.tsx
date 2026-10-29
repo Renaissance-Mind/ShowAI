@@ -8,11 +8,14 @@ import {
   useRef,
   useState,
   useSyncExternalStore,
+  type ReactNode,
 } from "react";
 import {
   PageLinkContext,
   type LinkablePage,
   type PageLinkBridge,
+  type RecordPeekRequest,
+  type RecordPeekState,
 } from "../components/page-links";
 import { CustomComponentsProvider } from "../components/custom/CustomBlock";
 import {
@@ -23,6 +26,7 @@ import { EditorViewScope } from "../editor/view-scope";
 import SurfaceEditor from "../surface/SurfaceEditor";
 import type { EditorControls } from "../surface/EditorControls";
 import type { PageSessions, PageViewSession } from "./page-sessions";
+import { PAGE_PREVIEW_TAB } from "./page-sessions";
 import PageHeading from "./PageHeading";
 import { DatasetScope } from "../datasets/react";
 import { ReaderStateContext, readerStateStore } from "../surface/reader-state";
@@ -43,6 +47,10 @@ function PageContent({
   onCopyLink,
   onCreateLinkedPage,
   onRenameLinkedPage,
+  onOpenRecord,
+  onCloseRecord,
+  recordPeek,
+  headerAddon,
 }: {
   view: PageViewSession;
   readOnly?: boolean;
@@ -72,6 +80,15 @@ function PageContent({
     pageId: string;
     title: string;
   }) => Promise<void>;
+  onOpenRecord?: (
+    request: RecordPeekRequest & {
+      hostProjectId: string;
+      hostPageId: string;
+    },
+  ) => void;
+  onCloseRecord?: (sourceId: string) => void;
+  recordPeek?: RecordPeekState;
+  headerAddon?: ReactNode;
 }) {
   const state = useSyncExternalStore(
     view.session.subscribe,
@@ -87,13 +104,19 @@ function PageContent({
   latestCreate.current = onCreateLinkedPage;
   const latestRename = useRef(onRenameLinkedPage);
   latestRename.current = onRenameLinkedPage;
-  const pageLinks = useMemo<PageLinkBridge | null>(
+  const latestOpen = useRef(onOpenRecord);
+  latestOpen.current = onOpenRecord;
+  const latestClose = useRef(onCloseRecord);
+  latestClose.current = onCloseRecord;
+  const pageActions = useMemo<Omit<
+    PageLinkBridge,
+    "pages" | "recordPeek"
+  > | null>(
     () =>
       projectId && pageId
         ? {
             projectId,
             pageId,
-            pages: pages ?? [],
             copyLink: (blockIds) =>
               latestCopy.current({ projectId, pageId, blockIds }),
             ...(latestCreate.current
@@ -120,9 +143,32 @@ function PageContent({
                     }),
                 }
               : {}),
+            ...(latestOpen.current
+              ? {
+                  openRecord: (request: RecordPeekRequest) =>
+                    latestOpen.current!({
+                      ...request,
+                      hostProjectId: projectId,
+                      hostPageId: pageId,
+                    }),
+                  closeRecord: (sourceId: string) =>
+                    latestClose.current?.(sourceId),
+                }
+              : {}),
           }
         : null,
-    [projectId, pageId, pages],
+    [projectId, pageId],
+  );
+  const pageLinks = useMemo<PageLinkBridge | null>(
+    () =>
+      pageActions
+        ? {
+            ...pageActions,
+            pages: pages ?? [],
+            ...(recordPeek ? { recordPeek } : {}),
+          }
+        : null,
+    [pageActions, pages, recordPeek],
   );
   const readerState = useMemo(
     () =>
@@ -155,13 +201,16 @@ function PageContent({
               onChange={view.session.edit}
               header={
                 state.draft.content.attrs?.kind === "board" ? undefined : (
-                  <PageHeading
-                    title={state.draft.title}
-                    icon={state.draft.icon}
-                    readOnly={locked}
-                    onTitleChange={(title) => view.session.edit({ title })}
-                    onEditIcon={onEditIcon}
-                  />
+                  <>
+                    <PageHeading
+                      title={state.draft.title}
+                      icon={state.draft.icon}
+                      readOnly={locked}
+                      onTitleChange={(title) => view.session.edit({ title })}
+                      onEditIcon={onEditIcon}
+                    />
+                    {headerAddon}
+                  </>
                 )
               }
               revealId={revealId}
@@ -227,10 +276,14 @@ export function PageWorkspace({
   readOnly,
   revealId,
   linkablePages,
+  preview = false,
+  recordPeek,
+  headerAddon,
   ...callbacks
 }: {
   sessions: PageSessions;
   visible: boolean;
+  preview?: boolean;
 } & Omit<React.ComponentProps<typeof PageContent>, "view">) {
   const workspace = useSyncExternalStore(
     sessions.subscribe,
@@ -271,19 +324,39 @@ export function PageWorkspace({
         throw new Error("This workbench cannot rename pages.");
       return latest.current.onRenameLinkedPage(input);
     },
+    onCloseRecord: (sourceId: string) =>
+      latest.current.onCloseRecord?.(sourceId),
+    onOpenRecord: callbacks.onOpenRecord
+      ? (
+          request: RecordPeekRequest & {
+            hostProjectId: string;
+            hostPageId: string;
+          },
+        ) => latest.current.onOpenRecord?.(request)
+      : undefined,
   }));
-  return workspace.views.map((view) => {
-    const active = visible && view.key === workspace.activeView;
-    return (
-      <PageView
-        key={`${view.key}:${view.session.id}:${view.session.getSnapshot().renderVersion}:${view.session.getSnapshot().draft?.id}`}
-        view={view}
-        active={active}
-        readOnly={readOnly}
-        revealId={active ? revealId : null}
-        linkablePages={linkablePages}
-        {...stable}
-      />
-    );
-  });
+  return workspace.views
+    .filter((view) =>
+      preview
+        ? view.key === workspace.previewView
+        : view.tabId !== PAGE_PREVIEW_TAB,
+    )
+    .map((view) => {
+      const active =
+        visible &&
+        view.key === (preview ? workspace.previewView : workspace.activeView);
+      return (
+        <PageView
+          key={`${view.key}:${view.session.id}:${view.session.getSnapshot().renderVersion}:${view.session.getSnapshot().draft?.id}`}
+          view={view}
+          active={active}
+          readOnly={readOnly}
+          revealId={active ? revealId : null}
+          linkablePages={linkablePages}
+          recordPeek={recordPeek}
+          headerAddon={headerAddon}
+          {...stable}
+        />
+      );
+    });
 }

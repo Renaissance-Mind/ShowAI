@@ -147,6 +147,8 @@ import src_DatabaseCalendar_tsx from "../components/blocks/DatabaseCalendar.tsx?
 import src_database_views_ts from "../components/blocks/database-views.ts?raw";
 import src_database_reorder_ts from "../components/blocks/database-reorder.ts?raw";
 import src_database_column_resize_ts from "../components/blocks/database-column-resize.ts?raw";
+import src_database_view_motion_ts from "../components/blocks/database-view-motion.ts?raw";
+import src_database_records_ts from "../components/blocks/database-records.ts?raw";
 import src_page_links_ts from "../components/page-links.ts?raw";
 import src_playground_contract_mjs from "../components/blocks/playground-contract.mjs?raw";
 import src_playground_css from "../components/blocks/playground.css?raw";
@@ -353,6 +355,8 @@ const sources: Record<string, string> = {
   "database-views.ts": src_database_views_ts,
   "database-reorder.ts": src_database_reorder_ts,
   "database-column-resize.ts": src_database_column_resize_ts,
+  "database-view-motion.ts": src_database_view_motion_ts,
+  "database-records.ts": src_database_records_ts,
   "page-links.ts": src_page_links_ts,
   "playground-contract.mjs": src_playground_contract_mjs,
   "playground.css": src_playground_css,
