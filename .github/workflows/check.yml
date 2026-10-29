@@ -3,6 +3,11 @@ on:
   push:
     branches: [main]
   pull_request:
+  workflow_dispatch:
+# Pushes to main arrive often; only the newest commit of each ref needs a result.
+concurrency:
+  group: check-${{ github.ref }}
+  cancel-in-progress: true
 permissions:
   contents: read
 jobs:
