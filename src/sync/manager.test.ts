@@ -365,12 +365,12 @@ describe("project synchronization between independent real content libraries", (
     const artifact = JSON.parse(await readFile(file, "utf8"));
     artifact.document.title = "External same-device edit";
     await writeFile(file, JSON.stringify(artifact));
-    await alice.store.readPage(project.id, page.document.id);
+    const service = new AgentService({ root: alice.home });
+    await service.scanWorkspaceConflicts(project.id);
     await alice.manager.run();
     const blocked = (await alice.manager.status()).projects[0];
     expect(blocked.status).toBe("save-failed");
     expect(blocked.remoteHead).toBe(before);
-    const service = new AgentService({ root: alice.home });
     const conflicts = await service.workspaceConflicts(project.id);
     await service.resolveWorkspaceConflict({
       id: conflicts[0].id,

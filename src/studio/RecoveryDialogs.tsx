@@ -24,31 +24,69 @@ export type PackageRecoveryResult = Awaited<
   ReturnType<typeof recoverExternalPackage>
 >;
 export function WorkspaceConflictsDialog({
+  projectId,
   onClose,
   onSelect,
 }: {
+  projectId: string | null;
   onClose: () => void;
   onSelect: (id: string) => void;
 }) {
   const t = useTranslator(recoveryMessages);
   const [items, setItems] = useState<WorkspaceConflict[]>([]),
-    [error, setError] = useState("");
+    [error, setError] = useState(""),
+    [checking, setChecking] = useState(false);
+  const active = useRef(true);
+  const load = useCallback(
+    () =>
+      desktop
+        .invoke<WorkspaceConflict[]>("workspace:conflicts")
+        .then((values) => {
+          if (active.current) setItems(values);
+        }),
+    [],
+  );
   useEffect(() => {
-    let active = true;
-    void desktop.invoke<WorkspaceConflict[]>("workspace:conflicts").then(
-      (values) => {
-        if (active) setItems(values);
-      },
-      (reason) => {
-        if (active) setError(errorMessage(reason));
-      },
-    );
+    active.current = true;
+    void load().catch((reason) => {
+      if (active.current) setError(errorMessage(reason));
+    });
     return () => {
-      active = false;
+      active.current = false;
     };
-  }, []);
+  }, [load]);
+  // Saves record external edits before overwriting a file; this compares the
+  // rest of one project on request.
+  async function check() {
+    setChecking(true);
+    setError("");
+    try {
+      await desktop.invoke("workspace:scan", { projectId });
+      await load();
+    } catch (reason) {
+      if (active.current) setError(errorMessage(reason));
+    } finally {
+      if (active.current) setChecking(false);
+    }
+  }
   return (
-    <Dialog title={t("externalChangesTitle")} onClose={onClose} wide>
+    <Dialog
+      title={t("externalChangesTitle")}
+      onClose={onClose}
+      wide
+      headerActions={
+        projectId && (
+          <button
+            type="button"
+            className="studio-button"
+            disabled={checking}
+            onClick={() => void check()}
+          >
+            {checking ? t("checkingProject") : t("checkProject")}
+          </button>
+        )
+      }
+    >
       <div className="history-search-results">
         <p>{t("externalChangesIntro")}</p>
         {error && (

@@ -1022,6 +1022,9 @@ export class AgentService extends CatalogService {
   workspaceConflicts(projectId?: string) {
     return this.versioned().conflicts(projectId);
   }
+  scanWorkspaceConflicts(projectId: string) {
+    return this.versioned().scanConflicts(projectId);
+  }
   workspaceConflict(id: string) {
     return this.versioned().conflict(id);
   }

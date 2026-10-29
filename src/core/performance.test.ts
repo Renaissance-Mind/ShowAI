@@ -88,7 +88,7 @@ describe("revision-backed list projections", () => {
     expect((await prior)[0].title).toBe("Before");
     expect((await store.listPages(project.id))[0].title).toBe("After");
   });
-  it("retains external writes until actual page reads inspect and report conflicts", async () => {
+  it("retains external writes until a save that would overwrite them reports a conflict", async () => {
     const project = await store.createProject({ name: "External" });
     const page = await store.createPage(project.id, { title: "Official" });
     await store.listPages(project.id);
@@ -96,6 +96,17 @@ describe("revision-backed list projections", () => {
     bytes.document.title = "External";
     await writeFile(page.path, JSON.stringify(bytes));
     expect((await store.listPages(project.id))[0].title).toBe("Official");
+    const opened = await store.readPage(project.id, page.document.id);
+    expect(opened.workspaceConflicts).toBeUndefined();
+    await expect(
+      store.savePage(
+        project.id,
+        page.document.id,
+        { ...opened.document, title: "Edited" },
+        opened.hash,
+        opened.revision,
+      ),
+    ).rejects.toMatchObject({ code: "CONFLICT" });
     const checked = await store.readPage(project.id, page.document.id);
     expect(checked.workspaceConflicts?.length).toBeGreaterThan(0);
     expect(JSON.parse(await readFile(page.path, "utf8")).document.title).toBe(

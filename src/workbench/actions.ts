@@ -164,6 +164,7 @@ export const workbenchActions = new Set([
   "page:mergePreview",
   "page:mergeSave",
   "workspace:conflicts",
+  "workspace:scan",
   "workspace:recoverPackage",
   "workspace:conflict",
   "workspace:resolve",
@@ -762,6 +763,8 @@ export function createWorkbench(
         );
       case "workspace:conflicts":
         return service.workspaceConflicts(text(args, "projectId", true));
+      case "workspace:scan":
+        return service.scanWorkspaceConflicts(projectId(args));
       case "workspace:recoverPackage":
         return service.recoverPackageConflict({
           id: required(args, "id"),

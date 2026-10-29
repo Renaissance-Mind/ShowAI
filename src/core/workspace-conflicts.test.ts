@@ -46,13 +46,9 @@ describe("external workspace conflict protection", () => {
     await writeFile(join(library.workspace, path), bytes);
     return bytes;
   }
-
-  it("preserves external edits, blocks only their resource and permits other writes", async () => {
-    const before = await library.head();
-    const bytes = await external("External edit");
+  /** A save records the external edit instead of overwriting it. */
+  async function recordedBySave() {
     const formal = await store.readPage(projectId, pageId);
-    expect(formal.document.title).toBe("Original");
-    expect(formal.workspaceConflicts).toHaveLength(1);
     await expect(
       store.savePage(
         projectId,
@@ -62,6 +58,18 @@ describe("external workspace conflict protection", () => {
         formal.revision,
       ),
     ).rejects.toMatchObject({ code: "CONFLICT" });
+    return store.readPage(projectId, pageId);
+  }
+
+  it("preserves external edits, blocks only their resource and permits other writes", async () => {
+    const before = await library.head();
+    const bytes = await external("External edit");
+    // Opening a page compares no files; the save that would overwrite one does.
+    const opened = await store.readPage(projectId, pageId);
+    expect(opened.document.title).toBe("Original");
+    expect(opened.workspaceConflicts).toBeUndefined();
+    const formal = await recordedBySave();
+    expect(formal.workspaceConflicts).toHaveLength(1);
     expect(await library.head()).toBe(before);
     expect(await readFile(join(library.workspace, path))).toEqual(bytes);
     const saved = await new WorkspaceProtection(library).input(
@@ -75,7 +83,7 @@ describe("external workspace conflict protection", () => {
 
   it("imports a validated external page as a new version and keeps its original snapshot", async () => {
     const bytes = await external("Imported external");
-    const formal = await store.readPage(projectId, pageId);
+    const formal = await recordedBySave();
     const id = formal.workspaceConflicts![0].id;
     const imported = await library.resolveWorkspaceConflict(
       id,
@@ -106,7 +114,7 @@ describe("external workspace conflict protection", () => {
 
   it("discard restores the formal projection and refuses to discard newer external bytes", async () => {
     await external("First external");
-    const first = await store.readPage(projectId, pageId);
+    const first = await recordedBySave();
     const id = first.workspaceConflicts![0].id;
     await external("Newer external");
     await expect(

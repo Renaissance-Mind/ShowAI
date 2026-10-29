@@ -783,14 +783,19 @@ export class LibraryOperations {
       ),
     );
   }
+  /** External edits recorded so far; saves record them before writing a file. */
   async conflicts(projectId?: string) {
     const project = this.project(projectId);
-    await scanWorkspaceResources(this.library, project);
     return (await new WorkspaceProtection(this.library).list()).filter(
       (item) =>
         item.state === "unresolved" &&
         (!project || item.path.startsWith(`projects/${project}/`)),
     );
+  }
+  /** Compares one project's pages and packages with the workspace on request. */
+  async scanConflicts(projectId: string) {
+    await scanWorkspaceResources(this.library, this.project(projectId)!);
+    return this.conflicts(projectId);
   }
   recoverPackage(input: {
     id: string;

@@ -84,7 +84,7 @@ describe("external immutable package recovery", () => {
         before = await readFile(path, "utf8"),
         changed = before + "\n// retained external edit\n";
       await writeFile(path, changed);
-      const conflicts = await operations.conflicts(projectId);
+      const conflicts = await operations.scanConflicts(projectId);
       expect(conflicts).toHaveLength(1);
       const recovered = await operations.recoverPackage({
         id: conflicts[0].id,
@@ -95,7 +95,7 @@ describe("external immutable package recovery", () => {
       expect(form.code).toBe(changed);
       expect(form.version).toBe(nextPatch(original.version));
       expect(await readFile(path, "utf8")).toBe(before);
-      expect(await operations.conflicts(projectId)).toEqual([]);
+      expect(await operations.scanConflicts(projectId)).toEqual([]);
     },
     15000,
   );
@@ -117,7 +117,7 @@ describe("external immutable package recovery", () => {
     );
     await writeFile(path, "externally changed generated runtime");
     const ops = new LibraryOperations(root, other),
-      [conflict] = await ops.conflicts(other),
+      [conflict] = await ops.scanConflicts(other),
       recovered = await ops.recoverPackage({
         id: conflict.id,
         clientId: "portable-recovery",
@@ -151,14 +151,14 @@ describe("external immutable package recovery", () => {
       join(prefix, "extra.png"),
       Buffer.from("binary asset bytes"),
     );
-    const conflicts = await operations.conflicts(projectId);
+    const conflicts = await operations.scanConflicts(projectId);
     expect(conflicts.length).toBe(3);
     const recovered = await operations.recoverPackage({
       id: conflicts[0].id,
       clientId: "recover-window",
     });
     expect(await readFile(join(prefix, "index.tsx"), "utf8")).toBe(original);
-    expect(await operations.conflicts(projectId)).toEqual([]);
+    expect(await operations.scanConflicts(projectId)).toEqual([]);
     const draft = await new EditorDrafts(root).read(recovered.draft.id);
     const form = draft.content as {
       code: string;
@@ -213,7 +213,7 @@ describe("external immutable package recovery", () => {
       `packages/components/value-slider/${component.version}/manifest.json`,
     );
     await writeFile(path, "{incomplete manifest");
-    const [conflict] = await operations.conflicts(projectId);
+    const [conflict] = await operations.scanConflicts(projectId);
     await expect(
       new LibraryOperations(root, "foreign-project").recoverPackage({
         id: conflict.id,
@@ -254,7 +254,7 @@ describe("external immutable package recovery", () => {
       raw = JSON.parse(await readFile(path, "utf8"));
     raw.description = "external description";
     await writeFile(path, JSON.stringify(raw));
-    const [conflict] = await operations.conflicts(projectId),
+    const [conflict] = await operations.scanConflicts(projectId),
       recovered = await operations.recoverPackage({
         id: conflict.id,
         clientId: "template-editor",

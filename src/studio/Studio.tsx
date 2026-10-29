@@ -6047,6 +6047,7 @@ export default function Studio() {
         )}
         {capabilities.externalChanges && dialog?.type === "workspaceConflicts" && (
           <WorkspaceConflictsDialog
+            projectId={selectedProject}
             onClose={closeDialog}
             onSelect={(id) => setDialog({ type: "externalConflict", id })}
           />

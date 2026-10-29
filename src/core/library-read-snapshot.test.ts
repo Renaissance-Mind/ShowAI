@@ -115,32 +115,40 @@ it("confirms a workspace difference under the lease, so a save still writing its
   });
   await entered.closed;
   let settled = false;
-  const reading = store.readPage(project.id, page.document.id).finally(() => {
+  const scanning = scanWorkspaceResources(
+    new ContentLibrary(root),
+    project.id,
+  ).finally(() => {
     settled = true;
   });
   await new Promise((resolve) => setTimeout(resolve, 200));
-  // The difference sends the read to the lease, where the writer still works.
+  // The difference sends the scan to the lease, where the writer still works.
   expect(settled).toBe(false);
   held.open();
   await writer;
-  const opened = await reading;
-  expect(opened.document.title).toBe("Before");
-  expect(opened.workspaceConflicts).toBeUndefined();
+  expect(await scanning).toEqual([]);
+  expect(
+    (await store.readPage(project.id, page.document.id)).document.title,
+  ).toBe("Before");
   expect(
     await new WorkspaceProtection(new ContentLibrary(root)).list(),
   ).toEqual([]);
 });
 
-it("still records an external edit when a page is opened", async () => {
+it("opens a page without comparing workspace files and reports edits a scan recorded", async () => {
   const { root, store, project, page } = await fixture();
   const changed = JSON.parse(await readFile(page.path, "utf8"));
   changed.document.title = "External";
   await writeFile(page.path, JSON.stringify(changed));
   const opened = await store.readPage(project.id, page.document.id);
   expect(opened.document.title).toBe("Before");
-  expect(opened.workspaceConflicts?.map((item) => item.kind)).toEqual([
-    "modified",
-  ]);
+  expect(opened.workspaceConflicts).toBeUndefined();
+  await scanWorkspaceResources(new ContentLibrary(root), project.id);
+  expect(
+    (
+      await store.readPage(project.id, page.document.id)
+    ).workspaceConflicts?.map((item) => item.kind),
+  ).toEqual(["modified"]);
   expect(
     (await new WorkspaceProtection(new ContentLibrary(root)).list()).length,
   ).toBe(1);
@@ -168,7 +176,7 @@ it("releases the read transaction when the action fails", async () => {
 });
 
 it("leaves a file of a save still writing its workspace to that save, without the lease", async () => {
-  const { root, store, project, page } = await fixture();
+  const { root, project, page } = await fixture();
   const changed = JSON.parse(await readFile(page.path, "utf8"));
   changed.document.title = "Being written";
   await writeFile(page.path, JSON.stringify(changed));
@@ -190,19 +198,18 @@ it("leaves a file of a save still writing its workspace to that save, without th
     await held.closed;
   });
   await entered.closed;
+  const library = new ContentLibrary(root);
   try {
-    const opened = await promptly(store.readPage(project.id, page.document.id));
-    expect(opened.workspaceConflicts).toBeUndefined();
+    expect(await promptly(scanWorkspaceResources(library, project.id))).toEqual(
+      [],
+    );
   } finally {
     held.open();
     await holder;
   }
   // Once no save claims the file, the same difference is an external edit.
   await rm(journal, { recursive: true });
-  expect(
-    (await store.readPage(project.id, page.document.id)).workspaceConflicts
-      ?.length,
-  ).toBe(1);
+  expect(await scanWorkspaceResources(library, project.id)).toHaveLength(1);
 });
 
 it("scans for external edits while another operation holds the writer lease", async () => {

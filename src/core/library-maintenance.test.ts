@@ -18,6 +18,7 @@ import {
   verifyLibraryArchive,
 } from "./library-maintenance";
 import { LibraryIndex } from "./library-index";
+import { scanWorkspaceResources } from "./package-recovery";
 import {
   MaintenanceScheduler,
   setMaintenancePolicy,
@@ -194,7 +195,7 @@ describe("library space, cleanup and archival", () => {
         document: { ...saved.value.document, title: "external draft" },
       }),
     );
-    await store.readPage(projectId, page.document.id);
+    await scanWorkspaceResources(library, projectId);
     const plan = await maintenance.prepareCleanup({
       cache: false,
       importCopies: false,

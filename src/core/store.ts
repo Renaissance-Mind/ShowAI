@@ -34,10 +34,7 @@ import { stampSavedInk } from "./ink-wire-writer";
 import { withLibraryLock } from "./library-lock";
 const projectionReads = new AsyncLocalStorage<string>();
 import { pageSummaries } from "./page-summaries";
-import {
-  WorkspaceProtection,
-  recordWorkspaceChanges,
-} from "./workspace-conflicts";
+import { WorkspaceProtection } from "./workspace-conflicts";
 import { ContentLibrary } from "./content-library";
 import { orderSidebarProjects, placeSidebarItem } from "./sidebar-order";
 import {
@@ -1420,11 +1417,7 @@ export class FileStore {
       : undefined;
     const workspaceConflicts =
       library && state?.root !== this.root
-        ? await this.workspaceConflicts(
-            library,
-            logicalPath(this.root, path)!,
-            pinned,
-          )
+        ? await this.workspaceConflicts(library, logicalPath(this.root, path)!)
         : [];
     return {
       document,
@@ -1435,30 +1428,10 @@ export class FileStore {
     };
   }
 
-  /**
-   * Compares the workspace file with the pinned state, reading only. A file that
-   * differs is then checked against the current state and recorded only when it
-   * is an external edit.
-   */
-  private async workspaceConflicts(
-    library: ContentLibrary,
-    path: string,
-    revision: string | null,
-  ) {
-    const changed = await new WorkspaceProtection(library).changed(
-      [path],
-      revision,
-    );
-    const confirmed = changed.length
-      ? await recordWorkspaceChanges(new ContentLibrary(this.root), changed)
-      : [];
-    return [
-      ...confirmed,
-      ...(await new WorkspaceProtection(library).list(path)),
-    ].filter(
-      (item, index, all) =>
-        item.state === "unresolved" &&
-        all.findIndex((candidate) => candidate.id === item.id) === index,
+  /** External edits of this file that a save has recorded and nobody resolved. */
+  private async workspaceConflicts(library: ContentLibrary, path: string) {
+    return (await new WorkspaceProtection(library).list(path)).filter(
+      (item) => item.state === "unresolved",
     );
   }
 
