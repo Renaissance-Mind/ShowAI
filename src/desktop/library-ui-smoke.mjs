@@ -177,7 +177,7 @@ try {
     await page
       .getByRole("textbox", { name: "文档内容", exact: true })
       .fill(`${title}: persistent content.`);
-    await page.locator(".studio-save-state.saved").waitFor();
+    await page.locator(".studio-save-state.is-saved:not(.is-faded)").waitFor();
     return (
       await poll(
         () => projectPages(ownerProjectId),

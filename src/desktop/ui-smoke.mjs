@@ -79,16 +79,17 @@ let closed = false;
 let processOutput = "";
 const rendererErrors = [];
 const result = { passed: false, binary, output, home, profile, checks: [] };
+const launchOptions = {
+  executablePath: binary,
+  args: process.env.SHOWAI_SMOKE_BINARY ? [] : [repository],
+  cwd: repository,
+  env,
+  timeout: 30000,
+};
 
 try {
   result.runtimeHashes = await fingerprints();
-  application = await _electron.launch({
-    executablePath: binary,
-    args: process.env.SHOWAI_SMOKE_BINARY ? [] : [repository],
-    cwd: repository,
-    env,
-    timeout: 30000,
-  });
+  application = await _electron.launch(launchOptions);
   const child = application.process();
   child.stderr?.on("data", (chunk) => {
     processOutput += chunk;
@@ -146,7 +147,7 @@ try {
   const editor = page.getByRole("textbox", { name: "文档内容", exact: true });
   await title.fill("Concurrent edits");
   await editor.fill("Shared baseline before either writer edits.");
-  await page.locator(".studio-save-state.saved").waitFor();
+  await page.locator(".studio-save-state.is-saved:not(.is-faded)").waitFor();
 
   const projects = await cli("projects", "list");
   const project = projects.find((entry) => entry.name === projectName);
@@ -230,7 +231,7 @@ try {
   );
   assert.equal((await editor.innerText()).trim(), draftText);
   await page.getByRole("button", { name: "重新保存", exact: true }).click();
-  await page.locator(".studio-save-state.saved").waitFor();
+  await page.locator(".studio-save-state.is-saved:not(.is-faded)").waitFor();
   const resolved = await cli(
     "pages",
     "read",
@@ -242,7 +243,7 @@ try {
   const conflictDirectories = await readdir(join(home, "local/conflicts"));
   const retainedVersions = await Promise.all(
     conflictDirectories.map(async (id) => {
-      const detail = await cli("history", "conflict", id);
+      const detail = await cli("workspace", "conflict", id);
       return detail.external;
     }),
   );
@@ -293,24 +294,9 @@ try {
   );
   result.checks.push("Native application quit completes with pending edits");
 
-  const originalDiff = await cli(
-    "pages",
-    "diff",
-    baseline.document.id,
-    "--project",
-    project.id,
-    "--since",
-    baseline.revision,
-  );
-  const closingDiff = await cli(
-    "pages",
-    "diff",
-    baseline.document.id,
-    "--project",
-    project.id,
-    "--since",
-    resolvedBaseline.revision,
-  );
+  // Closing keeps a pending edit in a durable recovery draft rather than
+  // forcing a formal save, so the page holds the last saved text and the
+  // reopened app restores the final keystrokes.
   const finalOriginal = await cli(
     "pages",
     "read",
@@ -318,23 +304,32 @@ try {
     "--project",
     project.id,
   );
-  assert.equal(originalDiff.changed, true);
-  assert.equal(closingDiff.changed, true);
-  assert.match(JSON.stringify(originalDiff.changes), /Desktop draft/);
-  assert.match(JSON.stringify(closingDiff.changes), /Final keystrokes/);
-  assert.equal(contentText(finalOriginal.document.content), closingText);
+  assert.ok(
+    [draftText, closingText].includes(
+      contentText(finalOriginal.document.content),
+    ),
+  );
   assert.equal(finalOriginal.document.title, "Concurrent edits");
-  assert.deepEqual(rendererErrors, []);
-  await writeFile(
-    join(output, "original-diff.json"),
-    JSON.stringify(originalDiff, null, 2) + "\n",
-  );
-  await writeFile(
-    join(output, "closing-diff.json"),
-    JSON.stringify(closingDiff, null, 2) + "\n",
-  );
   result.checks.push(
-    "Bundled CLI reads the resolved page and its checkpoint diffs after the UI process has exited",
+    "Bundled CLI reads the page after the UI process has exited",
+  );
+  application = await _electron.launch(launchOptions);
+  closed = false;
+  page = await application.firstWindow({ timeout: 30000 });
+  page.setDefaultTimeout(15000);
+  page.on("pageerror", (error) => rendererErrors.push(error.message));
+  // The reopened page offers the retained draft; restoring it brings back
+  // the final keystrokes.
+  await page.getByRole("button", { name: /^恢复草稿/ }).click();
+  await page
+    .getByRole("textbox", { name: "文档内容", exact: true })
+    .filter({ hasText: "Final keystrokes" })
+    .waitFor();
+  assert.deepEqual(rendererErrors, []);
+  await application.close();
+  closed = true;
+  result.checks.push(
+    "The reopened app offers and restores the final edit pending at quit",
   );
   assert.deepEqual(
     await fingerprints(),

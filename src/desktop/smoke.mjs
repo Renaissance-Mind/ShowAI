@@ -356,7 +356,8 @@ try {
     {
       cwd: temporary,
       env: { ...environment, ...result.cli.env },
-      timeout: 20000,
+      // Usually ~2 s; one Windows CI run needed more than 20 s.
+      timeout: 60000,
     },
   );
   const artifact = JSON.parse(exported.stdout);

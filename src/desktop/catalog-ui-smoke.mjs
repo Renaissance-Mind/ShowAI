@@ -484,7 +484,7 @@ try {
     (value) => value === "8",
     "nested component interaction",
   );
-  await page.locator(".studio-save-state.saved").waitFor();
+  await page.locator(".studio-save-state.is-saved:not(.is-faded)").waitFor();
   await noAlerts();
   await page.screenshot({
     path: join(output, "expanded-template.png"),
@@ -585,7 +585,7 @@ try {
     (value) => value === "1",
     "composed child update",
   );
-  await page.locator(".studio-save-state.saved").waitFor();
+  await page.locator(".studio-save-state.is-saved:not(.is-faded)").waitFor();
   await poll(
     async () => {
       const edited = await api("pages:get", {
