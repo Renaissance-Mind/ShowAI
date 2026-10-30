@@ -10,6 +10,7 @@ export interface DiagramAuthoringOptions {
   python?: string;
   cwd?: string;
 }
+export function defaultPython(): string;
 export function generateDiagram(options: DiagramAuthoringOptions): Promise<{
   format: "showai-diagram-result";
   version: 1;

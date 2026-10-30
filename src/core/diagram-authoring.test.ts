@@ -6,7 +6,7 @@ import { createHash } from "node:crypto";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { readBuiltinComponentSource } from "./catalog";
-import { generateDiagram } from "./diagram-authoring-runner.js";
+import { defaultPython, generateDiagram } from "./diagram-authoring-runner.js";
 import {
   componentAuthoringIndex,
   componentAuthoringGuide,
@@ -158,14 +158,17 @@ test("all ten Archify types and eleven Fireworks generation styles match directl
           );
         else
           await execute(
-            process.env.SHOWAI_DIAGRAM_PYTHON ?? "python3",
+            defaultPython(),
             [
               join(reference, kit.root, "scripts/generate-from-template.py"),
               type,
               direct,
               JSON.stringify(inputData),
             ],
-            { maxBuffer: 8 * 1024 * 1024 },
+            {
+              maxBuffer: 8 * 1024 * 1024,
+              env: { ...process.env, PYTHONUTF8: "1" },
+            },
           );
         const result = await generateDiagram({
           kit: kitPath,

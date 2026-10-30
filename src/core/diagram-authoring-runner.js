@@ -2,10 +2,17 @@ import { readFile, writeFile, mkdir, realpath, lstat } from "node:fs/promises";
 import { dirname, resolve, join, relative, isAbsolute } from "node:path";
 import { createHash } from "node:crypto";
 import { spawn } from "node:child_process";
-import { pathToFileURL } from "node:url";
+import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
 import { offlineDiagramFonts } from "./diagram-authoring-fonts.js";
 
+/** Windows installs Python as `python`; `python3` there is usually a Store alias. */
+export function defaultPython() {
+  return (
+    process.env.SHOWAI_DIAGRAM_PYTHON ??
+    (process.platform === "win32" ? "python" : "python3")
+  );
+}
 function safeRelative(path) {
   if (
     typeof path !== "string" ||
@@ -26,8 +33,12 @@ async function absent(path) {
     throw error;
   }
 }
-async function execute(command, args, input, cwd) {
-  const child = spawn(command, args, { cwd, stdio: ["pipe", "pipe", "pipe"] });
+async function execute(command, args, input, cwd, env = process.env) {
+  const child = spawn(command, args, {
+    cwd,
+    env,
+    stdio: ["pipe", "pipe", "pipe"],
+  });
   let stdout = "",
     stderr = "";
   child.stdout.on("data", (data) => {
@@ -120,7 +131,7 @@ export async function generateDiagram(options) {
     if (!/^[a-z][a-z-]{0,40}$/.test(options.type))
       throw new Error("Choose a supported Fireworks mode.");
     execution = await execute(
-      options.python ?? process.env.SHOWAI_DIAGRAM_PYTHON ?? "python3",
+      options.python ?? defaultPython(),
       [
         join(root, "scripts/generate-from-template.py"),
         options.type,
@@ -130,6 +141,9 @@ export async function generateDiagram(options) {
       ],
       original,
       options.cwd ?? process.cwd(),
+      // The original script reads and writes UTF-8 with the locale's default
+      // encoding, which is a legacy code page on Windows.
+      { ...process.env, PYTHONUTF8: "1" },
     );
   } else {
     if (!/<svg\b/i.test(original))
@@ -229,11 +243,11 @@ async function main() {
     }) + "\n",
   );
 }
-// Node reports the module by its real path, so compare against the real
-// path of the invoked script (macOS temp and home folders are symlinked).
+// Compare real paths: macOS temp and home folders are symlinked, and Windows
+// may name the same folder by its short 8.3 name.
 if (
   process.argv[1] &&
-  pathToFileURL(await realpath(resolve(process.argv[1]))).href ===
-    import.meta.url
+  (await realpath(resolve(process.argv[1]))) ===
+    (await realpath(fileURLToPath(import.meta.url)))
 )
   await main();
