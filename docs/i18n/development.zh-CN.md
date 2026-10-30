@@ -94,7 +94,7 @@ Vitest 配置位于 `vite.config.ts` 的 `test` 部分。测试文件为 `src/**
 
 ### 持续集成
 
-`.github/workflows/check.yml` 在推送到 `main` 和提交拉取请求时运行，分为两个任务。Linux 任务运行 `npm run check`、`npm run build`、`npm test`、`npm run test:release`、`npm run test:whiteboard` 和 `npm audit --audit-level=high`。Windows 任务运行 `npm run check`、`npm run build`、用两个进程运行的 Vitest 套件，以及桌面和界面冒烟测试。发版要求两个任务都通过。
+`.github/workflows/check.yml` 在推送到 `main` 和提交拉取请求时运行，分为两个任务。Linux 任务运行 `npm run check`、`npm run build`、`npm test`、`npm run test:release`、`npm run test:whiteboard` 和 `npm audit --audit-level=high`。Windows 任务运行 `npm run check`、`npm run build`、用单个进程运行的 Vitest 套件，以及桌面和界面冒烟测试。发版要求两个任务都通过。
 
 其他工作流手动运行：浏览器安装包和墨迹可移植性。
 

@@ -94,7 +94,7 @@ The launcher and container smoke tests delete their isolated source copies and l
 
 ### Continuous integration
 
-`.github/workflows/check.yml` runs for pushes to `main` and for pull requests, in two jobs. The Linux job runs `npm run check`, `npm run build`, `npm test`, `npm run test:release`, `npm run test:whiteboard` and `npm audit --audit-level=high`. The Windows job runs `npm run check`, `npm run build`, the Vitest suite with two workers, and the desktop and UI smoke tests. A release requires both jobs to pass.
+`.github/workflows/check.yml` runs for pushes to `main` and for pull requests, in two jobs. The Linux job runs `npm run check`, `npm run build`, `npm test`, `npm run test:release`, `npm run test:whiteboard` and `npm audit --audit-level=high`. The Windows job runs `npm run check`, `npm run build`, the Vitest suite in one worker, and the desktop and UI smoke tests. A release requires both jobs to pass.
 
 Other workflows run manually: browser packages and ink portability.
 
