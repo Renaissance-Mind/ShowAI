@@ -86,17 +86,6 @@ export async function startSyncServer(
     );
     await chmod(keyPath, 0o600);
   }
-  const metadata = new SQLiteMetadata(join(home, "metadata.sqlite"));
-  const peers = new Set<EventPeer>();
-  const app = createSyncServer({
-    ...options,
-    vaultKey,
-    metadata,
-    objects: new DiskObjects(join(home, "objects")),
-    eventPeers: options.realtime === false ? undefined : () => peers,
-    metadataDriver: "sqlite",
-  });
-  await app.initialize();
   if (
     options.trustedProxyKey !== undefined &&
     !/^[a-f0-9]{64}$/.test(options.trustedProxyKey)
@@ -104,6 +93,24 @@ export async function startSyncServer(
     throw new Error(
       "The trusted proxy key requires 64 lowercase hexadecimal characters.",
     );
+  const metadata = new SQLiteMetadata(join(home, "metadata.sqlite"));
+  const peers = new Set<EventPeer>();
+  let app: ReturnType<typeof createSyncServer>;
+  try {
+    app = createSyncServer({
+      ...options,
+      vaultKey,
+      metadata,
+      objects: new DiskObjects(join(home, "objects")),
+      eventPeers: options.realtime === false ? undefined : () => peers,
+      metadataDriver: "sqlite",
+    });
+    await app.initialize();
+  } catch (error) {
+    // An open database keeps Windows from removing the server's folder.
+    metadata.close();
+    throw error;
+  }
   const proxyDigest =
     options.trustedProxyKey && (await hash(options.trustedProxyKey));
   async function clientSource(
@@ -129,18 +136,17 @@ export async function startSyncServer(
         if (value && name !== "x-showai-proxy-key")
           headers.set(name, Array.isArray(value) ? value.join(",") : value);
       const method = incoming.method ?? "GET";
+      const body =
+        method !== "GET" && method !== "HEAD"
+          ? (Readable.toWeb(incoming) as ReadableStream<Uint8Array>)
+          : undefined;
       const response = await app.fetch(
         new Request(
           `http://${incoming.headers.host ?? "localhost"}${incoming.url ?? "/"}`,
           {
             method,
             headers,
-            ...(method !== "GET" && method !== "HEAD"
-              ? {
-                  body: Readable.toWeb(incoming) as ReadableStream<Uint8Array>,
-                  duplex: "half" as const,
-                }
-              : {}),
+            ...(body ? { body, duplex: "half" as const } : {}),
           },
         ),
         { source: await clientSource(incoming.headers, incoming.socket.remoteAddress) },
@@ -150,7 +156,12 @@ export async function startSyncServer(
         for await (const chunk of response.body as unknown as AsyncIterable<Uint8Array>)
           if (!outgoing.write(chunk)) await once(outgoing, "drain");
       outgoing.end();
-      incoming.resume();
+      // Discard a body the handler left unread so the connection stays
+      // reusable. Its chunks must pass through the web stream: resuming the
+      // request directly would push them into a stream that may have closed.
+      if (!body) incoming.resume();
+      else if (!body.locked)
+        await body.pipeTo(new WritableStream()).catch(() => {});
     } catch (error) {
       console.error("ShowAI Server HTTP failure", error);
       if (!outgoing.headersSent) outgoing.writeHead(500);
@@ -269,6 +280,9 @@ export async function startSyncServer(
   await new Promise<void>((done, reject) => {
     server.once("error", reject);
     server.listen(options.port ?? 8788, options.host ?? "127.0.0.1", done);
+  }).catch((error) => {
+    metadata.close();
+    throw error;
   });
   const address = server.address();
   if (!address || typeof address === "string")
