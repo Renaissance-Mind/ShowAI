@@ -7,7 +7,7 @@ import {
 } from "../portable/capacity.mjs";
 import { createServer, type Server } from "node:http";
 import { mkdir, readFile, readdir, writeFile, rm } from "node:fs/promises";
-import { join, resolve } from "node:path";
+import { isAbsolute, join, resolve } from "node:path";
 import { randomBytes, randomUUID } from "node:crypto";
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
 import {
@@ -459,7 +459,7 @@ export async function createMcpHttpApp(options: McpHttpOptions) {
                           !(
                             name === "path" &&
                             typeof item === "string" &&
-                            item.startsWith("/")
+                            isAbsolute(item)
                           ),
                       )
                       .map(([name, item]) => [

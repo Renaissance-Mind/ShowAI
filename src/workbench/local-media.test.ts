@@ -22,7 +22,7 @@ describe("local media grants", () => {
   afterEach(() => rm(root, { recursive: true, force: true }));
 
   it("reads absolute paths, file URLs and paths under the home directory", () => {
-    expect(localMediaPath("/a/b.mp4")).toBe("/a/b.mp4");
+    expect(localMediaPath("/a/b.mp4")).toBe(join("/a", "b.mp4"));
     expect(localMediaPath(pathToFileURL(video).href)).toBe(video);
     expect(localMediaPath("file:~/clip.mp4")).toBe(join(homedir(), "clip.mp4"));
     expect(localMediaPath("~/clip.mp4")).toBe(join(homedir(), "clip.mp4"));

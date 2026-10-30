@@ -1,7 +1,7 @@
 import { createReadStream } from "node:fs";
 import { realpath, stat } from "node:fs/promises";
 import { homedir } from "node:os";
-import { basename, extname, isAbsolute, join } from "node:path";
+import { basename, extname, isAbsolute, join, normalize } from "node:path";
 import { randomUUID } from "node:crypto";
 import type { Readable } from "node:stream";
 import { CoreError } from "../core/model";
@@ -52,6 +52,8 @@ export function localMediaPath(value: unknown): string {
     } catch {
       throw new CoreError("INVALID_PATH", "The file link is not valid.");
     }
+    // file:///C:/dir names the drive path C:/dir on Windows.
+    if (process.platform === "win32" && /^\/[a-z]:\//i.test(path)) path = path.slice(1);
   }
   if (path === "~" || path.startsWith("~/")) path = join(homedir(), path.slice(1));
   if (!isAbsolute(path) || path.includes("\0"))
@@ -59,7 +61,7 @@ export function localMediaPath(value: unknown): string {
       "INVALID_PATH",
       "Local file links need an absolute path or a path under ~/.",
     );
-  return path;
+  return normalize(path);
 }
 
 /**

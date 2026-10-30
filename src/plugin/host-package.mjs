@@ -1,7 +1,7 @@
 // Common Skills have one authoring source; distribution packages bind one host guide.
 import { cp, mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { createHash } from "node:crypto";
-import { dirname, join, resolve, relative, sep } from "node:path";
+import { dirname, isAbsolute, join, resolve, relative, sep } from "node:path";
 
 export const HOST_PROFILES = {
   codex: "codex-visualize",
@@ -94,7 +94,8 @@ export async function stageHostPlugin({ source, target, profile }) {
   const path = relative(resolve(source), resolve(target));
   if (
     !path ||
-    (!path.startsWith(".." + sep) && path !== ".." && !path.startsWith(sep))
+    // A target on another Windows drive has no relative path at all.
+    (!path.startsWith(".." + sep) && path !== ".." && !isAbsolute(path))
   ) {
     throw new Error("Host packages must be outside the common plugin source.");
   }
