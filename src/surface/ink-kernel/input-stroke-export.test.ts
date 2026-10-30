@@ -11,7 +11,10 @@ import {
 let directory: string, executable: string;
 beforeAll(() => {
   directory = mkdtempSync(join(tmpdir(), "showai-input-stroke-"));
-  executable = join(directory, "export");
+  executable = join(
+    directory,
+    process.platform === "win32" ? "export.exe" : "export",
+  );
   execFileSync("clang++", [
     "-std=c++17",
     "-O3",

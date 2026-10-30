@@ -6,7 +6,7 @@ import {join} from 'node:path';
 import {CompiledInkInput,inkInputConfiguration,type InkInputConfiguration,type InkInputPoint} from './compiled-ink-input.mjs';
 import {validatePortableInk} from './reference-ink-v1.mjs';
 let folder:string,executable:string;
-beforeAll(()=>{folder=mkdtempSync(join(tmpdir(),'showai-input-parity-'));executable=join(folder,'input');execFileSync('clang++',['-std=c++17','-O3','-ffp-contract=off','-fno-exceptions','-fno-rtti','src/surface/ink-kernel/ink-input-kernel.cpp','src/surface/ink-kernel/input-native-parity.cpp','-o',executable]);});
+beforeAll(()=>{folder=mkdtempSync(join(tmpdir(),'showai-input-parity-'));executable=join(folder,process.platform==='win32'?'input.exe':'input');execFileSync('clang++',['-std=c++17','-O3','-ffp-contract=off','-fno-exceptions','-fno-rtti','src/surface/ink-kernel/ink-input-kernel.cpp','src/surface/ink-kernel/input-native-parity.cpp','-o',executable]);});
 afterAll(()=>rmSync(folder,{recursive:true,force:true}));
 const point=(id:number):InkInputPoint=>({id,x:id*.75,y:Math.sin(id*.11)*12,time:id/240,force:.1+(id%15)/8,azimuth:Math.sin(id/9),altitude:.8,expectedProperties:0,estimationIndex:id});
 function binaryPoint(buffer:Buffer,offset:number,p:InkInputPoint){[p.x,p.y,p.time,p.force??1,p.azimuth??0,p.altitude??Math.PI/2].forEach((v,i)=>buffer.writeDoubleLE(v,offset+i*8));[p.id??0,p.expectedProperties??0,p.estimationIndex??0,p.updatesTimedOut?1:0].forEach((v,i)=>buffer.writeUInt32LE(v,offset+48+i*4));}

@@ -7,7 +7,10 @@ import { CompiledInkInput } from "./compiled-ink-input.mjs";
 it("actually seeks a tiny interval suffix logarithmically without scanning retained fitted curves", () => {
   const directory = mkdtempSync(join(tmpdir(), "showai-input-lookup-"));
   try {
-    const executable = join(directory, "lookup");
+    const executable = join(
+      directory,
+      process.platform === "win32" ? "lookup.exe" : "lookup",
+    );
     execFileSync("clang++", [
       "-std=c++17",
       "-O3",

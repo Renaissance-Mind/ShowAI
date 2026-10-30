@@ -11,7 +11,10 @@ let directory: string, executable: string;
 const kernel = new CompiledInkStroke();
 beforeAll(() => {
   directory = mkdtempSync(join(tmpdir(), "showai-stroke-query-"));
-  executable = join(directory, "query");
+  executable = join(
+    directory,
+    process.platform === "win32" ? "query.exe" : "query",
+  );
   execFileSync("clang++", [
     "-std=c++17",
     "-O3",

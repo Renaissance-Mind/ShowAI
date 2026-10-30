@@ -17,7 +17,10 @@ const kernel = new CompiledInkStroke(),
 let folder: string, executable: string, progressExecutable: string;
 beforeAll(() => {
   folder = mkdtempSync(join(tmpdir(), "showai-circular-stroke-"));
-  executable = join(folder, "stroke");
+  executable = join(
+    folder,
+    process.platform === "win32" ? "stroke.exe" : "stroke",
+  );
   execFileSync("clang++", [
     "-std=c++17",
     "-O3",
@@ -33,7 +36,12 @@ beforeAll(() => {
     "-o",
     executable,
   ]);
-  progressExecutable = join(folder, "progress-contract");
+  progressExecutable = join(
+    folder,
+    process.platform === "win32"
+      ? "progress-contract.exe"
+      : "progress-contract",
+  );
   execFileSync("clang++", [
     "-std=c++17",
     "-O3",

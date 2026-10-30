@@ -14,7 +14,7 @@ const kernel = new CompiledInkKernel();
 let temporary: string, executable: string;
 beforeAll(() => {
   temporary = mkdtempSync(join(tmpdir(), 'showai-native-ink-'));
-  executable = join(temporary, 'parity');
+  executable = join(temporary, process.platform === 'win32' ? 'parity.exe' : 'parity');
   execFileSync(process.env.SHOWAI_INK_NATIVE_CLANG || 'clang++', ['-std=c++17', '-O2', '-ffp-contract=off', '-fno-exceptions', '-fno-rtti', 'src/surface/ink-kernel/showai_ink.cpp', 'src/surface/ink-kernel/native-parity.cpp', '-o', executable]);
 });
 afterAll(() => { rmSync(temporary, { recursive: true, force: true }); });

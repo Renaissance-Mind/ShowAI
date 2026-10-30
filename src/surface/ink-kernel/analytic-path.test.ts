@@ -10,7 +10,10 @@ const identity = [1, 0, 0, 1, 0, 0];
 let temporary: string, executable: string;
 beforeAll(() => {
   temporary = mkdtempSync(join(tmpdir(), "showai-analytic-"));
-  executable = join(temporary, "parity");
+  executable = join(
+    temporary,
+    process.platform === "win32" ? "parity.exe" : "parity",
+  );
   execFileSync("clang++", [
     "-std=c++17",
     "-O3",
@@ -394,7 +397,10 @@ describe("shared analytic Bezier path kernel", () => {
   });
 
   it("executes native atomic error and mathematical contracts", () => {
-    const contract = join(temporary, "contract");
+    const contract = join(
+      temporary,
+      process.platform === "win32" ? "contract.exe" : "contract",
+    );
     execFileSync("clang++", [
       "-std=c++17",
       "-O3",
