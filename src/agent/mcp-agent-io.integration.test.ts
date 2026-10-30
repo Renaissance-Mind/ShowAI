@@ -137,7 +137,7 @@ const revision = (
 
 beforeAll(async () => {
   root = await mkdtemp(join(tmpdir(), "showai-agent-io-"));
-  files = join(root, "..", `${root.split("/").pop()}-files`);
+  files = `${root}-files`;
   await mkdir(files, { recursive: true });
   await openLibrary(root);
   projectId = (await new AgentService({ root }).createProject("Agent IO")).id;

@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, sep } from "node:path";
 import {
   DatasetSourceLinks,
   externalPath,
@@ -84,7 +84,9 @@ describe("external dataset files", () => {
     expect(() => externalPath(home, join(home, "data.json"))).toThrow(
       /inside the content library/,
     );
-    expect(externalPath(home, "/tmp/x/../data.json")).toBe("/tmp/data.json");
+    expect(
+      externalPath(home, [tmpdir(), "x", "..", "data.json"].join(sep)),
+    ).toBe(join(tmpdir(), "data.json"));
     expect(sourceFormat("/a/B.CSV")).toBe("csv");
     expect(() => sourceFormat("/a/data.txt")).toThrow(/format/);
     expect(sourceFormat("/a/data.txt", "json")).toBe("json");

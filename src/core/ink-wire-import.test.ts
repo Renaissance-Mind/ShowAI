@@ -1,7 +1,7 @@
 import { afterEach, expect, it } from "vitest";
 import { mkdtemp, mkdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { blankDocument } from "./catalog";
 import { InkOperationJournal } from "./ink-operation-journal";
 import { InkOperationReplica, materializeInkOperations, replayInkJournalEvents } from "../surface/ink-operations.mjs";
@@ -76,7 +76,7 @@ it("an unseen compact tombstone rejects stale recreation without inventing sourc
 });
 it("another connection observes imports even when the raw local operation tail does not change", async () => {
   const base = source(), scope = scopeOf(base), first = await open(); first.importCheckpoint(scope, inkCheckpointFromDocument(base, scope.boardId));
-  const second = await open(first.path.replace(/\/local\/ink-operations\.sqlite$/, "")); second.warm(scope);
+  const second = await open(dirname(dirname(first.path))); second.warm(scope);
   const local = first.appendLocal({ ...scope, parents: ["seed:1"], changes: [{ kind: "edit", strokeId: "stroke", patch: { strokeWidth: 12 } }] });
   const remoteRaw = structuredClone(base); remoteRaw.content.content![0].attrs!.color = "#0000ff";
   first.importCheckpoint(scope, inkCheckpointFromDocument(stampInkDocument(remoteRaw, base, { actor: "browser", sequence: 1 }), scope.boardId));

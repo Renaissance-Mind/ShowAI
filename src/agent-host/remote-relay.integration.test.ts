@@ -2,8 +2,8 @@ import { beforeAll, afterAll, expect, test } from "vitest";
 import { mkdtemp, writeFile, rm } from "node:fs/promises";
 import { createServer } from "node:net";
 import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
-import { spawn, type ChildProcess } from "node:child_process";
+import { dirname, join, resolve } from "node:path";
+import { spawn, spawnSync, type ChildProcess } from "node:child_process";
 import { randomUUID, createHmac } from "node:crypto";
 import { CloudState } from "../agent/cloud-state";
 import { startSyncServer } from "../server/node";
@@ -81,9 +81,18 @@ beforeAll(async () => {
       r2_buckets: [{ binding: "STATE", bucket_name: "isolated-agent-state" }],
     }),
   );
+  // npx is a batch file on Windows; run npm's own npx script with this Node.
+  const npx =
+    process.platform === "win32"
+      ? [
+          process.execPath,
+          join(dirname(process.execPath), "node_modules/npm/bin/npx-cli.js"),
+        ]
+      : ["npx"];
   worker = spawn(
-    "npx",
+    npx[0],
     [
+      ...npx.slice(1),
       "--yes",
       "wrangler@4.148.0",
       "dev",
@@ -146,7 +155,11 @@ afterAll(async () => {
   connector?.close();
   host?.close();
   if (worker) {
-    worker.kill("SIGTERM");
+    // Windows ends only the npx process itself; wrangler and workerd would
+    // keep the worker state open.
+    if (process.platform === "win32")
+      spawnSync("taskkill", ["/pid", String(worker.pid), "/t", "/f"]);
+    else worker.kill("SIGTERM");
     await Promise.race([
       new Promise((r) => worker.once("exit", r)),
       new Promise((r) => setTimeout(r, 5000)),

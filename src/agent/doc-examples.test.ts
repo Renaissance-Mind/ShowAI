@@ -395,7 +395,7 @@ test("documented tool calls match the live tool schemas", async () => {
   expect(problems, problems.join("\n")).toEqual([]);
   // The scan must keep finding the documented calls it is meant to check.
   expect(examples).toBeGreaterThan(100);
-  expect(relative(repository, __dirname)).toBe("src/agent");
+  expect(relative(repository, __dirname)).toBe(join("src", "agent"));
 });
 
 test("the checker reports stale examples", () => {

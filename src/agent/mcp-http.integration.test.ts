@@ -1716,7 +1716,11 @@ test("a real browser completes provider start and password consent back to the c
       page.waitForURL((url) => url.href.startsWith(redirect)),
       page.getByRole("button", { name: "确认授权" }).click(),
     ]);
-    const returned = new URL(received.at(-1)!, redirect);
+    // The browser may also ask the callback origin for /favicon.ico.
+    const returned = new URL(
+      received.find((url) => url.startsWith("/callback"))!,
+      redirect,
+    );
     expect(returned.searchParams.get("state")).toBe("browser-state");
     expect(returned.searchParams.get("code")).toBeTruthy();
   } finally {
