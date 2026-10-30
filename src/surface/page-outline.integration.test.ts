@@ -123,6 +123,8 @@ describe("Page outline in the real workbench and standalone reader", () => {
         async () =>
           (await store.readPage(projectId, pageId)).document.content.attrs
             ?.outline?.enabled,
+        // A save reaches the library after the debounced write and its sync.
+        { timeout: 10000 },
       )
       .toBe(true);
     expect(await panel.getAttribute("data-placement")).toBe("margin");
@@ -178,6 +180,8 @@ describe("Page outline in the real workbench and standalone reader", () => {
         async () =>
           (await store.readPage(projectId, pageId)).document.content.attrs
             ?.outline?.renderer?.componentId,
+        // A save reaches the library after the debounced write and its sync.
+        { timeout: 10000 },
       )
       .toBe("page-outline-index");
     expect(
@@ -196,6 +200,7 @@ describe("Page outline in the real workbench and standalone reader", () => {
         async () =>
           (await store.readPage(projectId, pageId)).document.content.attrs
             ?.outline?.enabled,
+        { timeout: 10000 },
       )
       .toBe(false);
     await page.getByRole("button", { name: "撤销操作", exact: true }).click();

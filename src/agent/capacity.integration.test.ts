@@ -261,19 +261,23 @@ test("a used binary asset above 8 MiB compiles, reloads, publishes, exports and 
     (await getComponent(f.home, component.id, component.version, f.project.id))
       .integrity,
   ).toBe(component.integrity);
+  // Compare digests: deep equality walks all 8 MiB one byte at a time and
+  // exhausts a 2 GB heap (the default on the Windows runner).
   expect(
-    Buffer.from(
-      (
-        await readComponentSource(
-          f.home,
-          component.id,
-          component.version,
-          f.project.id,
-        )
-      ).assets!["large.png"],
-      "base64",
+    digest(
+      Buffer.from(
+        (
+          await readComponentSource(
+            f.home,
+            component.id,
+            component.version,
+            f.project.id,
+          )
+        ).assets!["large.png"],
+        "base64",
+      ),
     ),
-  ).toEqual(png);
+  ).toBe(digest(png));
   const page = await f.store.createPage(f.project.id, {
     document: validateDocument({
       id: "package-page",

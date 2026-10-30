@@ -135,23 +135,33 @@ describe("cross-process library leases", () => {
   it("hands the lease between holders in this process in order without overlap", async () => {
     const path = join(root, "local-queue");
     await mkdir(path);
+    // Each turn still creates and removes the shared lease, which takes far
+    // longer on Windows; measure that work for 20 uncontended turns first.
+    let started = performance.now();
+    for (let index = 0; index < 20; index++)
+      await withLibraryLock(path, async () => {
+        await new Promise((done) => setImmediate(done));
+      });
+    const uncontended = performance.now() - started;
     let inside = 0;
     const order: number[] = [];
-    const started = performance.now();
+    started = performance.now();
     await Promise.all(
       Array.from({ length: 20 }, (_, index) =>
         withLibraryLock(path, async () => {
           inside++;
           expect(inside).toBe(1);
-          await new Promise((done) => setTimeout(done, 1));
+          // Yield without a timer: Windows timers wait at least ~15 ms each.
+          await new Promise((done) => setImmediate(done));
           order.push(index);
           inside--;
         }),
       ),
     );
     expect(order).toEqual(Array.from({ length: 20 }, (_, index) => index));
-    // Polling for each waiter would take at least 20 × 25 ms.
-    expect(performance.now() - started).toBeLessThan(500);
+    // Polling every 25 ms would add about 12 ms per waiter to the same lease
+    // work; taking turns adds none.
+    expect(performance.now() - started - uncontended).toBeLessThan(20 * 10);
     expect(await readdir(join(path, "local"))).not.toContain("writer.lock");
   });
 

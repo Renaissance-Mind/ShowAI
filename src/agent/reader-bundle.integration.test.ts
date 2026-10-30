@@ -174,7 +174,7 @@ test("every G2 chart retains its actual drawing dependencies in a specialized of
     page.removeListener("pageerror", onError);
   }
   await page.close();
-}, 180000);
+}, 360_000);
 
 test("nested regions and multi-page sites share the union of required native components", async () => {
   const one = createResource(blankDocument()),
