@@ -1514,9 +1514,12 @@ export class AgentHost {
           `mcp_servers.showai=${tomlTable(this.mcp(cli, task.projectId, task))}`,
         );
       if (threadId) args.push(threadId);
-      args.push(prompt);
+      // The prompt goes through stdin: with the page context it can exceed
+      // the 32,767-character Windows command line.
+      args.push("-");
       let complete = false;
       const result = await execute(agent.path, args, {
+        input: prompt,
         cwd: task.workspace,
         signal,
         timeout: test ? 120000 : 15 * 60 * 1000,
@@ -1539,9 +1542,10 @@ export class AgentHost {
       return;
     }
     if (agentId === "claude") {
+      // Without a prompt argument, print mode reads the prompt from stdin;
+      // with the page context it can exceed the Windows command line.
       const args = [
         "-p",
-        prompt,
         "--output-format",
         "stream-json",
         "--verbose",
@@ -1569,6 +1573,7 @@ export class AgentHost {
       let opening = false;
       let streamed = false;
       const result = await execute(agent.path, args, {
+        input: prompt,
         cwd: task.workspace,
         signal,
         timeout: test ? 120000 : 15 * 60 * 1000,

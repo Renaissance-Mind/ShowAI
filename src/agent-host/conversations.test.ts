@@ -18,17 +18,23 @@ import { savePageWrites } from "./page-undo";
 
 let directory: string, library: FileStore, host: AgentHost, log: string;
 
-// A stand-in for `claude -p --output-format stream-json` that records its arguments.
+// A stand-in for `claude -p --output-format stream-json` that records its
+// arguments and the prompt it reads from stdin.
 const fakeClaude = `#!/usr/bin/env node
 const fs = require("node:fs");
-fs.appendFileSync(process.env.SHOWAI_FAKE_AGENT_LOG, JSON.stringify(process.argv.slice(2)) + "\\n");
-const out = (value) => process.stdout.write(JSON.stringify(value) + "\\n");
-out({ type: "system", subtype: "init", session_id: "ignored" });
-out({ type: "stream_event", event: { type: "content_block_start", content_block: { type: "text" } } });
-out({ type: "stream_event", event: { type: "content_block_delta", delta: { type: "text_delta", text: "Hello " } } });
-out({ type: "stream_event", event: { type: "content_block_delta", delta: { type: "text_delta", text: "world" } } });
-out({ type: "assistant", message: { content: [{ type: "text", text: "Hello world" }, { type: "tool_use", name: "mcp__showai__page_read" }] } });
-out({ type: "result", is_error: false, result: "Hello world" });
+let prompt = "";
+process.stdin.setEncoding("utf8");
+process.stdin.on("data", (chunk) => (prompt += chunk));
+process.stdin.on("end", () => {
+  fs.appendFileSync(process.env.SHOWAI_FAKE_AGENT_LOG, JSON.stringify({ args: process.argv.slice(2), prompt }) + "\\n");
+  const out = (value) => process.stdout.write(JSON.stringify(value) + "\\n");
+  out({ type: "system", subtype: "init", session_id: "ignored" });
+  out({ type: "stream_event", event: { type: "content_block_start", content_block: { type: "text" } } });
+  out({ type: "stream_event", event: { type: "content_block_delta", delta: { type: "text_delta", text: "Hello " } } });
+  out({ type: "stream_event", event: { type: "content_block_delta", delta: { type: "text_delta", text: "world" } } });
+  out({ type: "assistant", message: { content: [{ type: "text", text: "Hello world" }, { type: "tool_use", name: "mcp__showai__page_read" }] } });
+  out({ type: "result", is_error: false, result: "Hello world" });
+});
 `;
 
 const npmShim = (script: string) =>
@@ -205,7 +211,7 @@ test("a conversation streams, persists and resumes the same Claude session", asy
   });
   const done = await settled(project.id, first.id);
   const [turn] = done.turns;
-  expect(turn.state).toBe("completed");
+  expect(turn.state, JSON.stringify(turn.problem)).toBe("completed");
   expect(
     turn.events.filter((event) => event.type === "message").map((e) => e.text),
   ).toEqual(["Hello world"]);
@@ -226,12 +232,16 @@ test("a conversation streams, persists and resumes the same Claude session", asy
   const calls = (await readFile(log, "utf8"))
     .trim()
     .split("\n")
-    .map((line) => JSON.parse(line) as string[]);
-  const sessionId = calls[0][calls[0].indexOf("--session-id") + 1];
+    .map((line) => JSON.parse(line) as { args: string[]; prompt: string });
+  const sessionId = calls[0].args[calls[0].args.indexOf("--session-id") + 1];
   expect(sessionId).toBe(done.threadId);
-  expect(calls[1][calls[1].indexOf("--resume") + 1]).toBe(sessionId);
-  expect(calls[1][1]).toContain("Continue this ShowAI conversation");
-  expect(calls[1][1]).not.toContain("Component directory");
+  expect(calls[1].args[calls[1].args.indexOf("--resume") + 1]).toBe(sessionId);
+  // The prompt arrives on stdin; the page context exceeds the Windows
+  // command-line limit.
+  expect(calls[0].args).not.toContain(calls[0].prompt);
+  expect(calls[0].prompt.length).toBeGreaterThan(32_767);
+  expect(calls[1].prompt).toContain("Continue this ShowAI conversation");
+  expect(calls[1].prompt).not.toContain("Component directory");
 
   // A fresh store reads the same history from disk.
   const reloaded = await new ConversationStore(join(directory, "agent")).list(

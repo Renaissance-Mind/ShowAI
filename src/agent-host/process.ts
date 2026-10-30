@@ -125,6 +125,8 @@ export function execute(
     timeout?: number;
     signal?: AbortSignal;
     onLine?: (line: string) => void;
+    /** Written to stdin, which then closes. */
+    input?: string;
   } = {},
 ): Promise<ProcessResult> {
   return new Promise((resolve, reject) => {
@@ -143,7 +145,10 @@ export function execute(
       timedOut = true;
       child.kill("SIGTERM");
     }, options.timeout ?? 120000);
-    child.stdin.end();
+    // A process that exits without reading its input closes the pipe; the
+    // exit code reports that.
+    child.stdin.on("error", () => {});
+    child.stdin.end(options.input);
     child.stdout.setEncoding("utf8");
     child.stderr.setEncoding("utf8");
     child.stdout.on("data", (chunk: Buffer) => {
