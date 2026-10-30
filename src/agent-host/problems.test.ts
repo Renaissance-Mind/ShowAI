@@ -1,6 +1,6 @@
 import { afterAll, afterEach, beforeAll, expect, test } from "vitest";
 import { createServer } from "node:http";
-import { chmod, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { startModelGateway } from "./gateway";
@@ -26,12 +26,14 @@ afterAll(async () => {
   await rm(directory, { recursive: true, force: true });
 });
 
-/** A real executable that writes stderr and exits with the given code. */
+/** A real Node program that writes stderr and exits with the given code. */
 async function failingAgent(stderr: string, code: number) {
-  const path = join(directory, `agent-${code}-${Date.now()}.sh`);
-  await writeFile(path, `#!/bin/sh\nprintf '%s' "$1" >&2\nexit ${code}\n`);
-  await chmod(path, 0o755);
-  return (args: string[] = [stderr]) => execute(path, args, { timeout: 10000 });
+  const path = join(directory, `agent-${code}-${Date.now()}.mjs`);
+  await writeFile(
+    path,
+    `process.stderr.write(${JSON.stringify(stderr)});\nprocess.exitCode = ${code};\n`,
+  );
+  return () => execute(process.execPath, [path], { timeout: 10000 });
 }
 
 async function provider(status: number, body: unknown) {
@@ -167,12 +169,14 @@ test("stderr naming a known reason refines a process exit", async () => {
 });
 
 test("an ACP agent that closes its connection reports a process exit", async () => {
-  const path = join(directory, "acp.sh");
-  await writeFile(path, "#!/bin/sh\necho 'cannot start' >&2\nexit 7\n");
-  await chmod(path, 0o755);
-  const rpc = new RpcProcess(
+  const path = join(directory, "acp.mjs");
+  await writeFile(
     path,
-    [],
+    'process.stderr.write("cannot start\\n");\nprocess.exitCode = 7;\n',
+  );
+  const rpc = new RpcProcess(
+    process.execPath,
+    [path],
     directory,
     () => {},
     new AbortController().signal,

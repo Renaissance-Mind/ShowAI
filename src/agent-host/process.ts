@@ -1,8 +1,8 @@
 import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
 import { access } from "node:fs/promises";
-import { constants } from "node:fs";
+import { constants, existsSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
-import { delimiter, join } from "node:path";
+import { delimiter, dirname, join } from "node:path";
 import { translator } from "../i18n";
 import agentHostMessages from "../i18n/messages/agentHost";
 import { AgentFailure } from "./problems";
@@ -86,6 +86,31 @@ export async function findExecutable(name: string): Promise<string | null> {
   }
   return null;
 }
+/**
+ * Node cannot start a Windows batch file without a shell, and cmd.exe would
+ * rewrite quotes and drop newlines in prompts. An npm-installed Agent is a
+ * `.cmd` shim around one script, so run that script directly.
+ */
+export function launchCommand(
+  command: string,
+  args: string[],
+): [string, string[]] {
+  if (process.platform !== "win32" || !/\.(cmd|bat)$/i.test(command))
+    return [command, args];
+  // cmd-shim ends with: "%_prog%"  "%dp0%\node_modules\…\cli.js" %*
+  const target = /"%~?dp0%?\\([^"]+)"\s+%\*/i.exec(
+    readFileSync(command, "utf8"),
+  )?.[1];
+  if (!target)
+    throw new AgentFailure({
+      code: "unknown",
+      detail: `${command} is not an npm command shim, so ShowAI cannot start it safely.`,
+    });
+  const script = join(dirname(command), target);
+  if (/\.exe$/i.test(script)) return [script, args];
+  const node = join(dirname(command), "node.exe");
+  return [existsSync(node) ? node : "node", [script, ...args]];
+}
 export interface ProcessResult {
   code: number;
   stdout: string;
@@ -103,7 +128,7 @@ export function execute(
   } = {},
 ): Promise<ProcessResult> {
   return new Promise((resolve, reject) => {
-    const child = spawn(command, args, {
+    const child = spawn(...launchCommand(command, args), {
       cwd: options.cwd,
       env: options.env,
       signal: options.signal,
@@ -197,7 +222,7 @@ export class RpcProcess {
       onRequest?: (method: string, params: any) => Promise<unknown>;
     } = {},
   ) {
-    this.child = spawn(command, args, {
+    this.child = spawn(...launchCommand(command, args), {
       cwd,
       env: options.env,
       stdio: "pipe",
@@ -254,6 +279,9 @@ export class RpcProcess {
       this.pending.clear();
     };
     this.child.once("error", fail);
+    // An Agent that exits early breaks the pipe under a pending write; its
+    // close below reports the exit with the stderr that explains it.
+    this.child.stdin.on("error", () => {});
     this.child.once("close", (code) =>
       fail(
         new AgentFailure({

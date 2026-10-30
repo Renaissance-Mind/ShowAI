@@ -31,15 +31,44 @@ out({ type: "assistant", message: { content: [{ type: "text", text: "Hello world
 out({ type: "result", is_error: false, result: "Hello world" });
 `;
 
+const npmShim = (script: string) =>
+  [
+    "@ECHO off",
+    "GOTO start",
+    ":find_dp0",
+    "SET dp0=%~dp0",
+    "EXIT /b",
+    ":start",
+    "SETLOCAL",
+    "CALL :find_dp0",
+    "",
+    'IF EXIST "%dp0%\\node.exe" (',
+    '  SET "_prog=%dp0%\\node.exe"',
+    ") ELSE (",
+    '  SET "_prog=node"',
+    "  SET PATHEXT=%PATHEXT:;.JS;=;%",
+    ")",
+    "",
+    `endLocal & goto #_undefined_# 2>NUL || title %COMSPEC% & "%_prog%"  "%dp0%\\${script}" %*`,
+    "",
+  ].join("\r\n");
+
 beforeAll(async () => {
   directory = await mkdtemp(join(tmpdir(), "showai-conversations-test-"));
   library = new FileStore(join(directory, "library"));
   await openLibrary(library.root);
   log = join(directory, "agent-args.jsonl");
   process.env.SHOWAI_FAKE_AGENT_LOG = log;
-  const agentPath = join(directory, "claude");
-  await writeFile(agentPath, fakeClaude);
-  await chmod(agentPath, 0o755);
+  let agentPath = join(directory, "claude");
+  if (process.platform === "win32") {
+    // What `npm install -g` writes on Windows: a cmd-shim around the script.
+    await writeFile(join(directory, "claude.js"), fakeClaude);
+    agentPath += ".cmd";
+    await writeFile(agentPath, npmShim("claude.js"));
+  } else {
+    await writeFile(agentPath, fakeClaude);
+    await chmod(agentPath, 0o755);
+  }
   host = new AgentHost({
     root: join(directory, "agent"),
     workspaceRoot: join(directory, "workspaces"),
