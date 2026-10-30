@@ -3868,20 +3868,29 @@ export default function Studio() {
         }
       : {};
   // Stable row handlers let memoized LibraryRows skip unrelated Studio renders.
+  const unpinTarget = (target: LibraryTarget) => {
+    void updateTarget(target, { pinned: false }).catch(report);
+  };
   const rowHandlers = useRef({
     openTargetClick,
     showMenu,
     toggleProject,
     libraryKeyCommand,
+    unpinTarget,
   });
   rowHandlers.current = {
     openTargetClick,
     showMenu,
     toggleProject,
     libraryKeyCommand,
+    unpinTarget,
   };
   const rowCommand = useCallback<NonNullable<LibraryRowProps["onCommand"]>>(
     (target, command) => rowHandlers.current.libraryKeyCommand(target, command),
+    [],
+  );
+  const unpinRow = useCallback<NonNullable<LibraryRowProps["onUnpin"]>>(
+    (target) => rowHandlers.current.unpinTarget(target),
     [],
   );
   const openRow = useCallback<LibraryRowProps["onOpen"]>(
@@ -4082,6 +4091,7 @@ export default function Studio() {
                 onOpen={openRow}
                 onMenu={showRowMenu}
                 onCommand={rowCommand}
+                onUnpin={unpinRow}
               />
               {expandedProjects[item.id] && (
                 <div className="studio-tree-children">

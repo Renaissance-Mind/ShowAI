@@ -53,6 +53,7 @@ export interface LibraryRowProps {
   ) => void;
   /** F2 renames and Delete (⌘⌫ on macOS) deletes the focused row. */
   onCommand?: (target: LibraryTarget, command: "rename" | "delete") => void;
+  onUnpin?: (target: LibraryTarget) => void;
   /** Short status after the title, e.g. a project's sync state. */
   marker?: { label: string; title?: string; tone?: "warning" | "muted" };
   /** Project is connected to cloud sync, independently of transient sync errors. */
@@ -67,6 +68,7 @@ function LibraryRowView({
   onOpen,
   onMenu,
   onCommand,
+  onUnpin,
   marker,
   cloud,
 }: LibraryRowProps) {
@@ -140,7 +142,9 @@ function LibraryRowView({
         aria-current={active ? "page" : undefined}
         title={title}
         data-open-page={target.kind === "page" ? target.id : undefined}
-        data-open-project={target.kind === "page" ? target.projectId : undefined}
+        data-open-project={
+          target.kind === "page" ? target.projectId : undefined
+        }
         onClick={(event) => onOpen(target, event)}
         onAuxClick={(event) => {
           if (event.button === 1) {
@@ -177,15 +181,33 @@ function LibraryRowView({
         )}
         {target.pinned && (
           <span className="studio-tree-pin-slot">
-            <Pin
-              size={11}
-              className="studio-tree-pin"
-              aria-label={t("pinned")}
-              role="img"
-            />
+            {!onUnpin && (
+              <Pin
+                size={11}
+                className="studio-tree-pin"
+                aria-label={t("pinned")}
+                role="img"
+              />
+            )}
           </span>
         )}
       </button>
+      {target.pinned && onUnpin && (
+        <button
+          type="button"
+          className="studio-tree-unpin"
+          aria-label={t("unpinItem", { title })}
+          title={t("unpinItem", { title })}
+          onPointerDown={(event) => event.stopPropagation()}
+          onClick={(event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            onUnpin(target);
+          }}
+        >
+          <Pin size={11} aria-hidden="true" />
+        </button>
+      )}
       <button
         ref={menuButton}
         type="button"
@@ -229,6 +251,7 @@ export const LibraryRow = memo(
     previous.marker?.title === next.marker?.title &&
     previous.onOpen === next.onOpen &&
     previous.onMenu === next.onMenu &&
+    previous.onUnpin === next.onUnpin &&
     previous.onCommand === next.onCommand,
 );
 
