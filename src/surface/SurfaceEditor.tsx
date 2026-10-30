@@ -199,9 +199,9 @@ function SurfaceEditor({
   const travelQueue=useMemo(()=>new HistoryTravelQueue(sourceSessionFor(document)),[document.id,sourceSessionFor(document)]);
   useEffect(()=>{const owner=sourceSessionFor(document);if(owner)return observeHistoryTravels(owner,()=>refresh(value=>value+1))},[travelQueue]);
   const travelMount=useRef(0),travelActive=useRef(travelQueue);travelActive.current=travelQueue;
-  useEffect(()=>{const generation=++travelMount.current;return()=>{queueMicrotask(()=>{if(travelActive.current!==travelQueue||travelMount.current===generation)void travelQueue.close().catch(error=>{console.error("Source history could not retire",error)})})}},[travelQueue]);
+  useEffect(()=>{const generation=++travelMount.current;travelQueue.open();return()=>{queueMicrotask(()=>{if(travelActive.current!==travelQueue||travelMount.current===generation)void travelQueue.close().catch(error=>{console.error("Source history could not retire",error)})})}},[travelQueue]);
   const portableMount=useRef(0),portableActive=useRef(portableScope);portableActive.current=portableScope;
-  useEffect(()=>{const generation=++portableMount.current;return()=>{queueMicrotask(()=>{if(portableActive.current!==portableScope||portableMount.current===generation)void portableScope.close().catch(error=>{console.error("Retained cubic input could not retire",error)})})}},[portableScope]);
+  useEffect(()=>{const generation=++portableMount.current;portableScope.open();return()=>{queueMicrotask(()=>{if(portableActive.current!==portableScope||portableMount.current===generation)void portableScope.close().catch(error=>{console.error("Retained cubic input could not retire",error)})})}},[portableScope]);
   const widgetChanges = useRef(
     new Map<string, (data: Record<string, unknown>) => void>(),
   );

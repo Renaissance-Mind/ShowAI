@@ -26,8 +26,11 @@ export function portableInputsPending(owner: OwnedSourceSession | undefined) {
     !!owner && [...(owners.get(owner) ?? [])].some((scope) => scope.hasContacts)
   );
 }
+const stoppedOwners = new WeakSet<OwnedSourceSession>();
 export function stopPortableInputs(owner: OwnedSourceSession | undefined) {
-  if (owner) for (const scope of owners.get(owner) ?? []) scope.stop();
+  if (!owner) return;
+  stoppedOwners.add(owner);
+  for (const scope of owners.get(owner) ?? []) scope.stop();
 }
 export interface PortableInputAcceptance {
   complete(value: CubicSealedStroke): Promise<void>;
@@ -78,14 +81,29 @@ export class PortableInputScope {
     private reserve: PortableInputReservation,
     readonly owner?: OwnedSourceSession,
   ) {
-    if (owner) {
-      let scopes = owners.get(owner);
-      if (!scopes) {
-        scopes = new Set();
-        owners.set(owner, scopes);
-      }
-      scopes.add(this);
+    this.register();
+  }
+  private register() {
+    if (!this.owner) return;
+    let scopes = owners.get(this.owner);
+    if (!scopes) {
+      scopes = new Set();
+      owners.set(this.owner, scopes);
     }
+    scopes.add(this);
+  }
+  private lifecycle = 0;
+  /** A hidden Activity disconnects the editor's effects without unmounting
+   * it; reconnecting reopens this scope with a fresh Worker client. A source
+   * owner that was stopped for retirement stays closed. */
+  open() {
+    if (this.owner && (this.owner.disposed || stoppedOwners.has(this.owner)))
+      return;
+    this.lifecycle++;
+    this.accepting = true;
+    if (!this.retired) return;
+    this.retired = false;
+    this.register();
   }
   error(boardId: string) {
     return [...this.failures].find(
@@ -195,9 +213,12 @@ export class PortableInputScope {
   }
   async close() {
     this.stop();
+    const lifecycle = ++this.lifecycle;
     await this.flush(true);
+    if (lifecycle !== this.lifecycle) return;
     this.retired = true;
     this.clientValue?.close();
+    this.clientValue = undefined;
     if (this.owner) {
       const scopes = owners.get(this.owner);
       scopes?.delete(this);

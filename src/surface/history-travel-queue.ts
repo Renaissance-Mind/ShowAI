@@ -155,10 +155,23 @@ export class HistoryTravelQueue {
   stop() {
     this.accepting = false;
   }
+  private lifecycle = 0;
+  /** A hidden Activity disconnects the editor's effects without unmounting
+   * it; reconnecting reopens the same queue so its history stays usable. A
+   * stopped or disposed owner still rejects every request in enqueue. */
+  open() {
+    this.lifecycle++;
+    this.accepting = true;
+    if (this.owner && !state(this.owner).queues.has(this)) {
+      state(this.owner).queues.add(this);
+      this.changed();
+    }
+  }
   async close() {
     this.stop();
+    const lifecycle = ++this.lifecycle;
     await this.flush();
-    if (this.owner) {
+    if (this.owner && lifecycle === this.lifecycle) {
       state(this.owner).queues.delete(this);
       this.changed();
     }

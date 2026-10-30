@@ -134,3 +134,19 @@ it("preserves an uncertain failure and never starts a later inverse or retries i
   ).rejects.toBe(error);
   expect(started).toBe(1);
 });
+
+it("reopens after a hidden Activity disconnects the editor that owns the queue", async () => {
+  const queue = new HistoryTravelQueue();
+  let undone = 0;
+  await queue.close();
+  await expect(
+    queue.enqueue(async () => {
+      undone++;
+    }),
+  ).rejects.toThrow("History source is retiring");
+  queue.open();
+  await queue.enqueue(async () => {
+    undone++;
+  });
+  expect(undone).toBe(1);
+});
