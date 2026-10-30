@@ -1,13 +1,13 @@
 import { createHash, X509Certificate, timingSafeEqual } from "node:crypto";
 import { createServer, type Server } from "node:https";
 import type { IncomingMessage, ServerResponse } from "node:http";
-import { readFile, mkdir, chmod } from "node:fs/promises";
+import { readFile, mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { spawn, execFile, type ChildProcess } from "node:child_process";
-import { promisify } from "node:util";
+import { spawn, type ChildProcess } from "node:child_process";
 import { WebSocketServer, WebSocket } from "ws";
 import { watchLibrary, type LibraryWatcher } from "../core/library-watcher";
 import { readOptional, writeProtected } from "./storage";
+import { selfSignedIdentity } from "./tls-identity";
 import { translator } from "../i18n";
 import lanMessages from "../i18n/messages/lanPairing";
 import type { AgentHost } from "./host";
@@ -181,23 +181,13 @@ export class LanPeerServer {
     const keyPath = join(this.root, "identity.key"),
       certPath = join(this.root, "identity.crt");
     if (!(await readOptionalFile(keyPath))) {
-      await promisify(execFile)("/usr/bin/openssl", [
-        "req",
-        "-x509",
-        "-newkey",
-        "rsa:2048",
-        "-nodes",
-        "-keyout",
-        keyPath,
-        "-out",
-        certPath,
-        "-days",
-        "3650",
-        "-subj",
-        `/CN=ShowAI-${settings.deviceId}`,
-      ]);
-      await chmod(keyPath, 0o600);
-      await chmod(certPath, 0o600);
+      const identity = await selfSignedIdentity(
+        `ShowAI-${settings.deviceId}`,
+        3650,
+      );
+      // The key marks a complete identity, so it is written last.
+      await writeFile(certPath, identity.cert, { mode: 0o600 });
+      await writeFile(keyPath, identity.key, { mode: 0o600 });
     }
     const [key, cert] = await Promise.all([
       readFile(keyPath),
