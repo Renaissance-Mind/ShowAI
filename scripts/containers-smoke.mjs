@@ -547,6 +547,12 @@ try {
     /展开后继续编辑/,
   );
   await page.getByRole("button", { name: "返回上层", exact: true }).click();
+  // The pen stays chosen across Boards as a device preference; return to the
+  // selection tool before working with objects inside the embedded Board.
+  await scene(boardId)
+    .locator(":scope > .container-board-scene > .page-surface > .board-dockable-toolbar")
+    .getByRole("button", { name: "选择工具", exact: true })
+    .click();
   // Board object headers are replaced by selection controls. Open the actual
   // object's context menu; its enclosing Page editor must not claim this
   // contenteditable=false embedded Board as its own editable text.
@@ -611,13 +617,10 @@ try {
   assert.equal(saved.document.content.attrs.kind, "page");
   const latestHash = saved.hash;
   await page.reload();
+  // The workbench restores its open tab after a reload.
   await page
-    .getByRole("button", { name: "Page / Board 验收", exact: true })
-    .first()
-    .click();
-  await page
-    .getByRole("button", { name: "递归内容工作页", exact: true })
-    .click();
+    .getByRole("button", { name: "关闭标签页 递归内容工作页", exact: true })
+    .waitFor();
   await object(boardId).waitFor();
   await object(nestedPageId).locator(".tiptap").first().waitFor();
   assert.match(
@@ -710,7 +713,7 @@ try {
     await reader
       .locator(`[data-surface-id="${nestedPageId}"]`)
       .locator(":scope > .surface-object-header")
-      .getByRole("button", { name: "展开 Page", exact: true })
+      .getByRole("button", { name: "展开 页面", exact: true })
       .click();
     await reader
       .locator(`[data-surface-id="${sketchId}"]`)
