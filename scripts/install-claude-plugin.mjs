@@ -5,7 +5,8 @@
 // sees both. The plugin is pinned to the instance's library and runtime.
 import { execFile, spawn } from "node:child_process";
 import { createHash } from "node:crypto";
-import { access, cp, mkdir, readFile, realpath, rename, rm, writeFile } from "node:fs/promises";
+import { access, cp, mkdir, readdir, readFile, realpath, rename, rm, writeFile } from "node:fs/promises";
+import { homedir } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
 import { createInterface } from "node:readline";
 import { fileURLToPath } from "node:url";
@@ -191,6 +192,16 @@ async function install(identity) {
   const record = join(generated, "agent-runtime.json");
   await rm(plugin, { recursive: true, force: true });
   await cp(source, plugin, { recursive: true });
+  // A session here also loads the stable plugin, whose Skills share these names; the channel in
+  // each description tells an Agent which instance and library a Skill writes to.
+  const channel = `开发通道 ${identity.name}（${values.mode} ${values.port}，内容库 ${resolve(session.home).replace(homedir(), "~")}）`;
+  for (const entry of await readdir(join(plugin, "skills"), { withFileTypes: true })) {
+    if (!entry.isDirectory()) continue;
+    const file = join(plugin, "skills", entry.name, "SKILL.md");
+    const text = await readFile(file, "utf8");
+    if (!/^description: /m.test(text)) throw new Error(`${file} has no description line.`);
+    await writeFile(file, text.replace(/^description: /m, `description: ${channel}：`));
+  }
   const manifest = JSON.parse(await readFile(join(source, ".claude-plugin/plugin.json"), "utf8"));
   const binding = { home: resolve(session.home), launch };
   const version = `${manifest.version}+dev.${createHash("sha256")
