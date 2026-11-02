@@ -1990,6 +1990,12 @@ button.studio-save-state.is-failed:hover {
   padding: 8px 0;
   border-bottom: 1px solid var(--line);
 }
+.packaging-dialog li.is-focused {
+  margin: 0 -8px;
+  padding: 8px;
+  border-radius: 5px;
+  background: color-mix(in srgb, var(--action) 9%, transparent);
+}
 .packaging-item {
   display: grid;
   gap: 2px;

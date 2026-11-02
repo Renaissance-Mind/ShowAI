@@ -63,8 +63,13 @@ export function warningEntries(
 ): WarningEntry[] {
   const nameOf = (id: string) =>
     id === input.datasetId ? (input.name ?? id) : (input.names[id] ?? id);
-  const actions = (list: WarningAction[]) =>
-    list.filter((action) => input.available[action]);
+  const actions = (list: WarningAction[], datasetId: string) =>
+    list.filter(
+      (action) =>
+        input.available[action] &&
+        // Packaging choices exist for the block's own linked file only.
+        (action !== "packaging" || datasetId === input.datasetId),
+    );
   const entries: WarningEntry[] = input.warnings.map((warning, index) => ({
     key: `warning:${index}:${warning.datasetId}:${warning.code}`,
     level: warning.level,
@@ -74,7 +79,7 @@ export function warningEntries(
     dataset: nameOf(warning.datasetId),
     datasetId: warning.datasetId,
     stage: warning.stage,
-    actions: actions(warning.actions),
+    actions: actions(warning.actions, warning.datasetId),
   }));
   // A stale or empty read already says why nothing can be written.
   if (

@@ -75,6 +75,7 @@ import {
 } from "./DataWarnings";
 import { AssistantContext } from "../components/assistant-context";
 import type { WarningAction } from "./warnings.mjs";
+import { requestPackaging } from "./packaging-request";
 import "./datasets.css";
 
 const closeText = translator(messages);
@@ -480,7 +481,11 @@ export function BoundWidget({
               retry: !!session,
               "open-file": !!scope,
               "ask-agent": pageEditable,
-              packaging: !!openSettings,
+              // Synchronization carries copies of linked files only.
+              packaging:
+                !!openSettings &&
+                !!snapshot.source &&
+                snapshot.source.kind !== "url",
             },
           },
           translate,
@@ -536,8 +541,9 @@ export function BoundWidget({
         return "copied";
       }
       case "packaging":
-        // Packaging choices arrive with the packaging list; the dialog shows the source today.
-        openSettings?.();
+        // Without sync here, the block's dialog holds the file's choice.
+        if (!requestPackaging(projectId, datasetId) && onChange)
+          scope.openDialog({ kind, data, apply: onChange, focus: "bundle" });
         return;
     }
   };

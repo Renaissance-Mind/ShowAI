@@ -63,6 +63,7 @@
     "test:browser": "npm run build:portable && vitest run src/browser/server.test.ts",
     "test:browser:package": "node scripts/browser-package-smoke.mjs",
     "test:component-gallery": "npm run build && node src/desktop/component-gallery-ui-smoke.mjs",
+    "test:data-sources": "npm run build && node src/desktop/data-sources-ui-smoke.mjs",
     "test:whiteboard": "npm run test:containers",
     "test:whiteboard:desktop": "npm run test:containers:desktop",
     "test:containers": "node scripts/containers-smoke.mjs",

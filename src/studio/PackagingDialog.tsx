@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Dialog from "./Dialog";
 import { useTranslator } from "../i18n/react";
 import commonMessages from "../i18n/messages/common";
@@ -53,10 +53,13 @@ function choiceBytes(item: PackagingItem, choice: PackagingChoice) {
 export function PackagingDialog({
   plan,
   purpose,
+  focus,
   onDecide,
 }: {
   plan: PackagingPlan;
   purpose: "export" | "sync";
+  /** The id of an item to show and focus first. */
+  focus?: string;
   /** The choice of every item, or null when the person cancels. */
   onDecide: (decisions: PackagingDecisions | null) => void;
 }) {
@@ -74,6 +77,15 @@ export function PackagingDialog({
     [plan.items, choices],
   );
   const over = total > plan.limits.totalBytes;
+  const focused = useRef<HTMLSelectElement>(null);
+  useEffect(() => {
+    // After the dialog's own initial focus, move to the item asked for.
+    const frame = requestAnimationFrame(() => {
+      focused.current?.scrollIntoView({ block: "center" });
+      focused.current?.focus({ preventScroll: true });
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [focus]);
   const label = (choice: PackagingChoice) =>
     choice === "bundle"
       ? t(purpose === "sync" ? "choice.sync.bundle" : "choice.export.bundle")
@@ -114,9 +126,14 @@ export function PackagingDialog({
                     <li
                       key={item.id}
                       className={
-                        !item.available || item.tooLarge
-                          ? "is-unavailable"
-                          : undefined
+                        [
+                          !item.available || item.tooLarge
+                            ? "is-unavailable"
+                            : "",
+                          item.id === focus ? "is-focused" : "",
+                        ]
+                          .filter(Boolean)
+                          .join(" ") || undefined
                       }
                     >
                       <div className="packaging-item">
@@ -135,6 +152,7 @@ export function PackagingDialog({
                         )}
                       </div>
                       <select
+                        ref={item.id === focus ? focused : undefined}
                         aria-label={t("choiceFor", { name: item.name })}
                         value={choice}
                         disabled={item.choices.length < 2}

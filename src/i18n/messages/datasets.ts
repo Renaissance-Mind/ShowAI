@@ -104,6 +104,13 @@ export default defineMessages("datasets", {
     linkFileHere: "链接本机文件…",
     embedSource: "复制到内容库",
     embedHint: "复制到内容库后不再读写这个文件，文件本身保留。",
+    syncCopy: "随同步携带这个文件",
+    syncCopyUnknownSize: "大小未知",
+    syncCopyLimit: "单项上限 {limit}",
+    syncCopyTotal: "项目已携带 {size} / {limit}",
+    syncCopyTooLarge: "超过单项上限 {limit}，同步时不携带。",
+    syncCopyUnavailable: "此设备读不到这个文件，链接后才能携带。",
+    syncCopyOverTotal: "加入后超出项目总量上限 {limit}。",
     embedConfirm:
       "把「{name}」的当前数据复制到内容库，并停止读写 {path}？文件本身会保留。",
     createFromFile: "从外部文件创建…",
@@ -267,6 +274,13 @@ export default defineMessages("datasets", {
     embedSource: "Copy into the library",
     embedHint:
       "After copying into the library the file is no longer read or written; the file itself is kept.",
+    syncCopy: "Sync a copy of this file",
+    syncCopyUnknownSize: "Size unknown",
+    syncCopyLimit: "{limit} per file",
+    syncCopyTotal: "Project carries {size} of {limit}",
+    syncCopyTooLarge: "Over the {limit} limit per file; syncing leaves it out.",
+    syncCopyUnavailable: "This device can't read the file. Link it to carry a copy.",
+    syncCopyOverTotal: "Adding it goes over the project limit of {limit}.",
     embedConfirm:
       "Copy the current data of “{name}” into the library and stop reading and writing {path}? The file is kept.",
     createFromFile: "Create from an external file…",

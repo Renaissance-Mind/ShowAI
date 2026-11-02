@@ -77,16 +77,48 @@ export function resourceSlots(document, { components = false } = {}) {
   return slots;
 }
 
-/** Local file references among a custom component's props, by JSON path. */
-function propSlots(value, path, add, depth = 0) {
+/**
+ * Local file references among a custom component's props, by JSON path:
+ * those naming a supported file type, or every `file:` string with `any`.
+ */
+function propSlots(value, path, add, depth = 0, any = false) {
   if (depth > 40 || !value || typeof value !== "object") return;
   for (const [key, item] of Object.entries(value)) {
     const field = Array.isArray(value) ? `${path}[${key}]` : `${path}.${key}`;
     if (typeof item === "string") {
       const type = localRefType(item);
-      if (type && isLocalFileRef(item)) add(value, key, field, type.kind);
-    } else propSlots(item, field, add, depth + 1);
+      if ((type || any) && isLocalFileRef(item))
+        add(value, key, field, type?.kind);
+    } else propSlots(item, field, add, depth + 1, any);
   }
+}
+
+/**
+ * Every `file:` string inside custom component props, whatever file it
+ * names, with its block and JSON path. A copy for readers without this
+ * device rewrites each of them, so no location on this device leaves it.
+ */
+export function componentFileSlots(document) {
+  const slots = [];
+  const visit = (node, owner) => {
+    const blockId =
+      typeof node.attrs?.id === "string" ? node.attrs.id : owner;
+    const data = node.attrs?.data;
+    const widget = node.type === "widget" ? node.attrs?.kind : undefined;
+    if (widget === "custom" && data?.props)
+      propSlots(
+        data.props,
+        "props",
+        (object, key, field) => slots.push({ object, key, blockId, field }),
+        0,
+        true,
+      );
+    if (widget === "text" && data?.content && typeof data.content === "object")
+      visit(data.content, blockId);
+    node.content?.forEach((child) => visit(child, blockId));
+  };
+  visit(document.content);
+  return slots;
 }
 
 const imageSlots = (document) =>

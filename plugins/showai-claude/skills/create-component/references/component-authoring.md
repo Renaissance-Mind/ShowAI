@@ -40,7 +40,7 @@ Archify、Diagram Design 和 Fireworks 技术图带有固定上游提交的完�
 - 在组件里显示：用 `showai:components` 导出的 `useResource(ref, kind)`（kind 为 `"image"`、`"video"` 或 `"audio"`），它返回 `{url, status, name, retry, failed}`。`status` 为 `ready` 时把 `url` 交给 `<img>`、`<video>` 或 `<audio>`，元素加载失败时调用 `failed()`；`loading` 时显示占位；`missing` 表示这台设备找不到文件，`unavailable` 表示当前查看处没有本机文件（导出的 HTML、对话预览），这两种情况显示 `name` 并说明文件在本机。`https:` 地址和 data URI 原样返回为 `ready`，同一个字段可以混用三种来源。宿主只为组件当前 props 中出现的引用授权，props 本身保持 `file:` 字符串，`onChange` 写回的仍是引用。SDK 的 Image、Video、Audio 组件收到这类引用时会自己完成这些步骤。
 - 点击后用播放器打开：在组件里放一个普通链接，`href` 写同样的引用。读者在 ShowAI 桌面版或本机浏览器版（编辑和只读阅读都可以）点击后，工作台弹出播放器打开原文件：支持视频（mp4、m4v、mov、webm）、音频（mp3、m4a、aac、wav、ogg、flac）和图片（png、jpg、gif、webp、avif）；其他类型显示位置，并提供「在文件夹中显示」。只有 `<a href>` 链接的点击会被宿主接收：用链接本身打开，不用 `window.open`、`location` 或按钮脚本；链接上及其外层处理点击时让事件继续冒泡并保留默认行为（不调用 `stopPropagation`、`preventDefault`）；卡片自身的点击处理可先用 `event.target.closest("a")` 判断并跳过链接，与链接无关的点击不受影响。
 
-导出的 HTML 和对话预览中，组件 props 里的本机引用保持原样（位置里含本机用户名等信息，分享前留意）：`useResource` 返回 `unavailable`，链接点击只显示并可复制文件位置。需要随页面分发的媒体用内置 Video、Audio、Image 组件引用本机文件，导出时在资源预算内嵌入；或改用在线地址。
+导出、`page_present` 和图像阅读对组件 props 里的本机引用与内置资源字段一样处理：图片、视频、音频和 PDF 列入打包清单（`uses` 写明块和 prop 路径，如 `props.items[0].src`），选择嵌入时换成 data URI，`useResource(ref, kind)` 直接把它作为地址返回；不带时换成 `file:<文件名>`，组件按「不在这份页面中」显示。其他类型的 `file:` 链接只保留文件名。导出文件因此只含文件名，不含这台设备的路径。
 
 ## 交给对话
 

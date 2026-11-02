@@ -577,9 +577,7 @@ export async function exportPackagingPlan(
   const resources = new Map<string, (typeof drafts)[number]>();
   const projectIds = [input.projectId];
   for (const page of input.pages)
-    for (const item of await describeResources(page.shown, {
-      components: false,
-    })) {
+    for (const item of await describeResources(page.shown)) {
       const known = resources.get(item.id);
       if (known) {
         known.blocks.push(

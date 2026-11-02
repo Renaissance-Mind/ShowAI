@@ -82,8 +82,12 @@ const emptyForm = {
 };
 export type ProjectSyncRequest = {
   projectId: string;
-  /** signIn: the project's account must sign in again. */
-  intent: "share" | "sync" | "signIn";
+  /**
+   * signIn: the project's account must sign in again. packaging: choose
+   * what synchronization carries, starting at the item `focus`.
+   */
+  intent: "share" | "sync" | "signIn" | "packaging";
+  focus?: string;
   key: number;
 };
 const pendingInviteKey = "showai:pending-invitation";
@@ -129,6 +133,7 @@ export default function SyncSettings({
     projectId: string;
     name: string;
     plan: PackagingPlan;
+    focus?: string;
   } | null>(null);
   const [accountPanel, setAccountPanel] = useState("");
   const [expanded, setExpanded] = useState(""),
@@ -236,6 +241,24 @@ export default function SyncSettings({
       );
       if (connection)
         openConnect({ url: connection.url, account: connection.user.name });
+      return;
+    }
+    if (request.intent === "packaging") {
+      if (!binding) return;
+      setExpanded(request.projectId);
+      const name =
+        localProjects.find((item) => item.id === request.projectId)?.name ??
+        request.projectId;
+      void run(async () =>
+        setPackaging({
+          projectId: request.projectId,
+          name,
+          focus: request.focus,
+          plan: await desktop.invoke<PackagingPlan>("packaging:sync", {
+            projectId: request.projectId,
+          }),
+        }),
+      );
       return;
     }
     if (binding && request.intent === "share") {
@@ -1858,6 +1881,7 @@ export default function SyncSettings({
         <PackagingDialog
           plan={packaging.plan}
           purpose="sync"
+          focus={packaging.focus}
           onDecide={(decisions) => {
             const current = packaging;
             setPackaging(null);

@@ -21,3 +21,6 @@ export function resourceSlots(
   document: ShowDocument,
   options?: { components?: boolean },
 ): ResourceSlot[];
+export function componentFileSlots(
+  document: ShowDocument,
+): Omit<ResourceSlot, "kind">[];

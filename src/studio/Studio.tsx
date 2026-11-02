@@ -1,6 +1,10 @@
 import MergeDialog from "./MergeDialog";
 import { trackDesktopPreviewActivity } from "./preview-work";
 import type { ProjectSyncRequest } from "./SyncSettings";
+import {
+  PACKAGING_EVENT,
+  type PackagingRequest,
+} from "../datasets/packaging-request";
 import accountFlowMessages from "../i18n/messages/accountFlow";
 import { coalescedTask } from "../lib/coalesced-task";
 import {
@@ -614,6 +618,30 @@ export default function Studio() {
     };
     window.addEventListener("showai:open-page", open);
     return () => window.removeEventListener("showai:open-page", open);
+  });
+  useEffect(() => {
+    // A bound block's packaging action: a project that syncs lists what
+    // synchronization carries; without sync the block's dialog holds the choice.
+    const packaging = (event: Event) => {
+      const detail = (event as CustomEvent<PackagingRequest>).detail;
+      const binding = detail && syncOverview.bindings.get(detail.projectId);
+      if (!binding || binding.role === "viewer" || binding.status === "revoked")
+        return;
+      event.preventDefault();
+      void (async () => {
+        if (!(await page.flush())) return;
+        setSyncRequest({
+          projectId: detail.projectId,
+          intent: "packaging",
+          focus: detail.itemId,
+          key: Date.now(),
+        });
+        setSettingsSection("sync");
+        await navigate("settings");
+      })().catch(report);
+    };
+    window.addEventListener(PACKAGING_EVENT, packaging);
+    return () => window.removeEventListener(PACKAGING_EVENT, packaging);
   });
   useEffect(() => {
     // Page links in content and the Agent panel, and navigation requests from components.

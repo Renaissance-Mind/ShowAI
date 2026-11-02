@@ -8,7 +8,11 @@ import { homedir } from "node:os";
 import { isAbsolute, join, normalize } from "node:path";
 import { CoreError } from "./model";
 import { CAPACITY, CapacityError, measureContent } from "../portable/capacity.mjs";
-import { resourceSlots, type ResourceSlot } from "../portable/assets.mjs";
+import {
+  componentFileSlots,
+  resourceSlots,
+  type ResourceSlot,
+} from "../portable/assets.mjs";
 import {
   detachedRef,
   isDetachedRef,
@@ -173,10 +177,12 @@ export function defaultLocalResourceDecisions(
 
 /**
  * A copy of a document for a reader without this device: each local file in
- * a built-in resource field becomes embedded data or a name-only reference,
- * following `decisions` and the default for files they leave out. Custom
- * component props keep their references; those components show the file as
- * unavailable. Web addresses stay as they are.
+ * a resource field or custom component props becomes embedded data or a
+ * name-only reference, following `decisions` and the default for files they
+ * leave out. Components read embedded data through useResource like any
+ * address, and show a name-only reference as a file not in the page. Props
+ * naming other files (no image, video, audio or PDF type) keep the name
+ * only. Web addresses stay as they are.
  */
 export async function withLocalResources(
   document: ShowDocument,
@@ -190,7 +196,13 @@ export async function withLocalResources(
   } = {},
 ): Promise<{ document: ShowDocument; resources: LocalResourcePlanItem[] }> {
   const copy = structuredClone(document);
-  const resources = (await describeResources(copy, { components: false }))
+  // No location on this device leaves it, whatever file a prop names.
+  for (const slot of componentFileSlots(copy)) {
+    const ref = slot.object[slot.key] as string;
+    if (!localRefType(ref) && !isDetachedRef(ref))
+      slot.object[slot.key] = detachedRef(ref);
+  }
+  const resources = (await describeResources(copy))
     .filter((item) => item.source === "file")
     .map((item) => {
       const path = options.paths?.[item.id];
@@ -221,7 +233,9 @@ export async function withLocalResources(
       `data:${mime};base64,${(await readFile(item.path)).toString("base64")}`,
     );
   }
-  for (const slot of resourceSlots(copy) as ResourceSlot[]) {
+  for (const slot of resourceSlots(copy, {
+    components: true,
+  }) as ResourceSlot[]) {
     const ref = slot.object[slot.key];
     if (typeof ref !== "string" || !isLocalFileRef(ref)) continue;
     slot.object[slot.key] = embedded.get(ref) ?? detachedRef(ref);

@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Dialog from "../studio/Dialog";
+import { formatSize } from "../studio/PackagingDialog";
 import { errorMessage } from "../studio/bridge";
 import { useTranslator } from "../i18n/react";
 import messages from "../i18n/messages/datasets";
@@ -20,12 +21,16 @@ import { isPlainObject } from "./operations.mjs";
 import { useAvailableComponents } from "../components/custom/CustomBlock";
 import type { DatasetScopeValue } from "./react";
 import type { DatasetSnapshot } from "./client";
+import type { PackagingItem, PackagingPlan } from "../core/packaging";
+import { datasetPackagingItem } from "./packaging-request";
 
 export interface DatasetDialogRequest {
   kind: string;
   data: Record<string, unknown>;
   /** Stores new block data through the editor, as one undoable change. */
   apply: (data: Record<string, unknown>) => void;
+  /** A part of the dialog to show first: the linked file's synchronization choice. */
+  focus?: "bundle";
 }
 interface Summary {
   id: string;
@@ -42,11 +47,6 @@ interface Summary {
   transform?: { inputs: Record<string, unknown> };
 }
 
-function formatSize(bytes: number) {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / 1024 / 1024).toFixed(2)} MB`;
-}
 
 /** Asks the host for a data file; null when the person cancels. */
 async function chooseDataFile(
@@ -83,17 +83,136 @@ export async function linkDataFile(
   return true;
 }
 
+/** Bytes the item adds to synchronization when it carries a copy. */
+const carried = (item: PackagingItem, choice = item.choice) =>
+  choice === "bundle" ? (item.bytes ?? 0) : 0;
+
+/**
+ * Whether synchronization carries a copy of the linked file to the
+ * project's other devices (source.bundle.sync), with the file's size and
+ * the limits of one file and of the project.
+ */
+function SyncCopy({
+  scope,
+  projectId,
+  datasetId,
+  focused,
+}: {
+  scope: DatasetScopeValue;
+  projectId: string;
+  datasetId: string;
+  focused: boolean;
+}) {
+  const t = useTranslator(messages);
+  const [plan, setPlan] = useState<PackagingPlan | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const input = useRef<HTMLInputElement>(null);
+  const itemId = datasetPackagingItem(projectId, datasetId);
+  useEffect(() => {
+    let active = true;
+    scope.client.transport
+      .invoke<PackagingPlan>("packaging:sync", { projectId })
+      .then(
+        (next) => active && setPlan(next),
+        (caught) => active && setError(errorMessage(caught)),
+      );
+    return () => {
+      active = false;
+    };
+  }, [scope.client, projectId]);
+  const item = plan?.items.find((entry) => entry.id === itemId);
+  useEffect(() => {
+    if (!focused || !item) return;
+    input.current?.scrollIntoView({ block: "center" });
+    input.current?.focus({ preventScroll: true });
+  }, [focused, !!item]);
+  if (!plan || !item)
+    return error ? (
+      <p className="dataset-message" role="alert">
+        {error}
+      </p>
+    ) : null;
+  const on = item.choice === "bundle";
+  const limit = plan.limits.totalBytes;
+  // What the project would carry with this file added.
+  const withFile = plan.bytes - carried(item) + (item.bytes ?? 0);
+  const overTotal = !on && withFile > limit;
+  const problem = item.tooLarge
+    ? t("syncCopyTooLarge", { limit: formatSize(plan.limits.itemBytes) })
+    : !item.available
+      ? t("syncCopyUnavailable")
+      : overTotal
+        ? t("syncCopyOverTotal", { limit: formatSize(limit) })
+        : "";
+  const toggle = async () => {
+    setBusy(true);
+    setError("");
+    try {
+      setPlan(
+        await scope.client.transport.invoke<PackagingPlan>("packaging:sync", {
+          projectId,
+          packaging: { [itemId]: on ? "skip" : "bundle" },
+        }),
+      );
+    } catch (caught) {
+      setError(errorMessage(caught));
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <div
+      className={`dataset-sync-copy${focused ? " is-focused" : ""}`}
+      data-packaging-item={itemId}
+    >
+      <label>
+        <input
+          ref={input}
+          type="checkbox"
+          checked={on}
+          disabled={
+            busy ||
+            scope.readOnly ||
+            (!on && (!item.choices.includes("bundle") || overTotal))
+          }
+          onChange={() => void toggle()}
+        />
+        {t("syncCopy")}
+      </label>
+      <span className="dataset-muted">
+        {[
+          item.bytes === null ? t("syncCopyUnknownSize") : formatSize(item.bytes),
+          t("syncCopyLimit", { limit: formatSize(plan.limits.itemBytes) }),
+          t("syncCopyTotal", {
+            size: formatSize(plan.bytes),
+            limit: formatSize(limit),
+          }),
+        ].join(" · ")}
+      </span>
+      {problem && <span className="dataset-message">{problem}</span>}
+      {error && (
+        <span className="dataset-message" role="alert">
+          {error}
+        </span>
+      )}
+    </div>
+  );
+}
+
 /** Where a bound dataset keeps its value, and moving it to or from a file. */
 function SourceSection({
   scope,
   projectId,
   datasetId,
   snapshot,
+  focus,
 }: {
   scope: DatasetScopeValue;
   projectId: string;
   datasetId: string;
   snapshot: DatasetSnapshot | undefined;
+  focus?: DatasetDialogRequest["focus"];
 }) {
   const t = useTranslator(messages);
   const [busy, setBusy] = useState(false);
@@ -221,6 +340,14 @@ function SourceSection({
             </button>
           </div>
           <p className="dataset-muted">{t("embedHint")}</p>
+          {source.kind !== "url" && (
+            <SyncCopy
+              scope={scope}
+              projectId={projectId}
+              datasetId={datasetId}
+              focused={focus === "bundle"}
+            />
+          )}
         </>
       )}
       {error && (
@@ -474,6 +601,7 @@ function BoundSettings({
         projectId={projectId}
         datasetId={binding.dataset}
         snapshot={snapshot}
+        focus={request.focus}
       />
       <section>
         <h3>{t("references")}</h3>

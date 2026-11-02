@@ -103,8 +103,8 @@ describe("local resources of a page", () => {
       `data:image/png;base64,${Buffer.from("png").toString("base64")}`,
     );
     expect(video.attrs.data.src).toBe("file:large.mp4");
-    // Component props keep their references; the component shows them as unavailable.
-    expect(custom.attrs.data.props.src).toBe(smallRef);
+    // Component props follow the same choice; useResource reads the embedded data.
+    expect(custom.attrs.data.props.src).toBe(image.attrs.src);
     expect(copy.resources.map((item) => [item.name, item.choice])).toEqual([
       ["small.png", "embed"],
       ["large.mp4", "skip"],
@@ -116,6 +116,9 @@ describe("local resources of a page", () => {
     expect((skipped.document.content.content as any[])[0].attrs.src).toBe(
       "file:small.png",
     );
+    expect(
+      (skipped.document.content.content as any[])[2].attrs.data.props.src,
+    ).toBe("file:small.png");
     await expect(
       withLocalResources(document, { [largeRef]: "embed" }),
     ).rejects.toMatchObject({ code: "CAPACITY_EXCEEDED" });
