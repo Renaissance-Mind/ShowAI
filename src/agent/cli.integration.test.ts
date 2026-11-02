@@ -2935,3 +2935,66 @@ test("Kimi installed package discovers tools, delivers offline previews and reje
     await rm(isolated, { recursive: true, force: true });
   }
 }, 60000);
+
+test("real CLI tries, creates and changes a transform dataset", async () => {
+  const project = await run(["projects", "create", "--name", "Transforms"]);
+  const input = join(home, "transform-value.json");
+  await writeFile(input, JSON.stringify({ value: { list: [2, 3] } }));
+  const numbers = await run([
+    "datasets",
+    "create",
+    "--project",
+    project.id,
+    "--name",
+    "Numbers",
+    "--input",
+    input,
+  ]);
+  const inputs = join(home, "transform-inputs.json");
+  await writeFile(inputs, JSON.stringify({ numbers: numbers.dataset.id }));
+  const script = join(home, "transform.js");
+  await writeFile(
+    script,
+    "function transform({ numbers }) {\n  return { total: numbers.list.reduce((a, b) => a + b, 0) };\n}\n",
+  );
+  const args = ["--project", project.id, "--inputs", inputs, "--script", script];
+  expect(
+    await run(["datasets", "transform", ...args, "--dry-run"]),
+  ).toMatchObject({ dryRun: true, ok: true, value: { total: 5 } });
+  const created = await run([
+    "datasets",
+    "transform",
+    ...args,
+    "--name",
+    "Total",
+  ]);
+  expect(created.record).toMatchObject({
+    status: "ok",
+    editable: false,
+    dataset: { value: { total: 5 } },
+  });
+  await writeFile(
+    script,
+    "function transform({ numbers }) {\n  return { total: numbers.list.length };\n}\n",
+  );
+  const changed = await run([
+    "datasets",
+    "transform",
+    created.record.dataset.id,
+    "--project",
+    project.id,
+    "--script",
+    script,
+    "--base-hash",
+    created.record.hash,
+  ]);
+  expect(changed.record.dataset.value).toEqual({ total: 2 });
+  const read = await run([
+    "datasets",
+    "read",
+    created.record.dataset.id,
+    "--project",
+    project.id,
+  ]);
+  expect(read.transform.inputs.numbers.datasetId).toBe(numbers.dataset.id);
+}, 120_000);

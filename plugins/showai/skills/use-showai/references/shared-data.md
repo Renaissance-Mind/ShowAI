@@ -6,7 +6,7 @@
 
 ## 模型
 
-- 共享数据是项目里的一个独立资源，保存一份 JSON 值，有自己的 hash 和 revision。新建一份：`dataset_write({projectId, action:"create", name, value})`，值很大时在本机连接改用 `valueFile:"/绝对路径/值.json"`（文件内容就是这个 JSON 值）；从页面上已有的组件生成见下文 fromBlock，让值留在外部文件里见「外部文件中的数据」。写入只需传读到的 `baseHash`。读写用 `dataset_read`（list / read）、`dataset_write`（create / apply / link）与 `dataset_delete`。`dataset_read({projectId, action:"list"})` 列出共享数据；`dataset_read({projectId, action:"read", datasetId, path?})` 读取一份的值与 hash，同时返回本项目中使用它的页面与块（`references`）；本机连接加 `out:"/绝对路径/文件.json"` 时值写入该文件（已有文件需 overwrite:true），回执只含共享数据的名称、schema、hash/revision 与 out（path、bytes、sha256）。值也可以放在内容库以外的文件里，见下文「外部文件中的数据」。
+- 共享数据是项目里的一个独立资源，保存一份 JSON 值，有自己的 hash 和 revision。新建一份：`dataset_write({projectId, action:"create", name, value})`，值很大时在本机连接改用 `valueFile:"/绝对路径/值.json"`（文件内容就是这个 JSON 值）；从页面上已有的组件生成见下文 fromBlock，让值留在外部文件里见「外部文件中的数据」。写入只需传读到的 `baseHash`。读写用 `dataset_read`（list / read）、`dataset_write`（create / apply / link / transform）与 `dataset_delete`。`dataset_read({projectId, action:"list"})` 列出共享数据；`dataset_read({projectId, action:"read", datasetId, path?})` 读取一份的值与 hash，同时返回本项目中使用它的页面与块（`references`）；本机连接加 `out:"/绝对路径/文件.json"` 时值写入该文件（已有文件需 overwrite:true），回执只含共享数据的名称、schema、hash/revision 与 out（path、bytes、sha256）。值也可以放在内容库以外的文件里，见下文「外部文件中的数据」；由其他数据计算得到的值见「处理脚本」。
 - 组件块通过 `data.$binding` 绑定共享数据。页面只保存绑定设置和这个块自己的值；共享数据变化不会改变页面的 hash，页面的保存冲突也不涉及共享数据。
 - 组件照常收到 `{data, onChange, readOnly}`，不需要任何新接口。宿主从共享数据生成组件参数，把 `onChange` 交回的整份参数按记录 id 拆成对共享数据的修改。组件要满足两点：列表条目有稳定 `id`，收到新的 `data` 时以它为准，见 [组件设计](../../create-component/references/component-authoring.md)。
 
@@ -122,12 +122,42 @@ dataset_write({projectId, action:"create", name:"全景 OKR", fromBlock:{pageId,
 - 从已有文件新建：`dataset_write({projectId, action:"link", name, path:"/绝对路径/schedule.csv"})`。把项目里已有的共享数据移到新文件：`dataset_write({projectId, action:"link", datasetId, path, use:"dataset"})`，目标文件必须还不存在；已存在时返回 CONFLICT、什么都不写，请用户换一个文件名，或在确认要以该文件内容替换共享数据后改用 `use:"file"`。用一个已有文件替换共享数据的值：`use:"file"`（两边都有数据时必须写明，替换前与用户确认）。已链接的外部数据在另一台设备上只需 `dataset_write({projectId, action:"link", datasetId, path})` 链接本机的那份文件。链接永远不会覆盖已有文件。路径必须是绝对路径，`~` 要展开成实际的主目录。
 - 选择 link 还是复制：用户希望数据继续留在那个文件里、由其他工具一起维护时用 link，ShowAI 会把修改直接写回这个文件，文件内容也不随项目同步；用户只想把数据存进项目时用 create 的 `valueFile` 复制一份，原文件之后不再关联。说法不明确（如“存成共享数据”）时把两种结果告诉用户，按其选择做。用户没给名称时按文件名或内容拟一个，并在回复中说明。JSON 文件里的列表同样需要稳定 `id`，否则只能整体替换（见上文「读写」）。
 - 在线数据：`dataset_write({projectId, action:"link", name, url:"https://…/data.csv"})`，格式按网址的扩展名判断，判断不出时传 `format`。只接受 http/https，网址里不能带用户名和密码（网址会随项目同步）。在线数据只读，第一次链接时必须能读到。之后读取时，距上次读取超过 `refreshSeconds`（默认 300 秒，0 表示只在明确刷新时读取，最大 86400）才重新请求，并用 ETag/Last-Modified 判断是否有变化；要马上取最新数据用 `dataset_read({projectId, action:"read", datasetId, refresh:true})`。已有共享数据改为读取网址时要写 `use:"file"`，替换前与用户确认。只链接用户给出的网址，不猜地址。
-- 读取状态：`dataset_read`、list 和 `page_read` 的 `bindings[]` 都带 `status`、`editable` 和 `warnings`。`status:"ok"` 是当前数据；`"stale"` 表示数据源这次读不到（文件被删、内容解析失败、不再符合 schema、网址无法访问），返回的是这台设备上次成功读到的值，`cachedAt` 是那次读取的时间；`"empty"` 表示这台设备从没读到过，`dataset_read` 返回 `SOURCE_UNAVAILABLE`，绑定块没有数据。`editable` 为 false 时不能写入：在线数据、xlsx 和 stale 的值都是这样，项目内数据和 JSON/CSV/TSV 文件为 true。写只读数据返回 `READ_ONLY`，写 stale 的数据返回 `SOURCE_UNAVAILABLE`，都不改动任何内容；`page_read` 的 `datasetBases` 不包含 stale 的数据。`warnings` 每项为 `{code, level, stage, datasetId, message, actions}`：code 有 SOURCE_NOT_LINKED（本机未链接）、SOURCE_MISSING（文件不存在或打不开）、SOURCE_UNREACHABLE（网址无法访问）、PARSE_FAILED（内容无法解析）、SHAPE_CHANGED（内容不再符合 schema）、TOO_LARGE（超过 8 MiB）、READ_ONLY；actions 是可以采取的处理（link-file 链接文件、retry 重试、open-file 打开文件修正、ask-agent、packaging）。把 message 的意思告诉用户并提供这些处理，不要把 stale 的值写回数据源。
+- 读取状态：`dataset_read`、list 和 `page_read` 的 `bindings[]` 都带 `status`、`editable` 和 `warnings`。`status:"ok"` 是当前数据；`"stale"` 表示数据源这次读不到（文件被删、内容解析失败、不再符合 schema、网址无法访问），返回的是这台设备上次成功读到的值，`cachedAt` 是那次读取的时间；`"empty"` 表示这台设备从没读到过，`dataset_read` 返回 `SOURCE_UNAVAILABLE`，绑定块没有数据。`editable` 为 false 时不能写入：在线数据、xlsx 和 stale 的值都是这样，项目内数据和 JSON/CSV/TSV 文件为 true。写只读数据返回 `READ_ONLY`，写 stale 的数据返回 `SOURCE_UNAVAILABLE`，都不改动任何内容；`page_read` 的 `datasetBases` 不包含 stale 的数据。`warnings` 每项为 `{code, level, stage, datasetId, message, actions}`：code 有 SOURCE_NOT_LINKED（本机未链接）、SOURCE_MISSING（文件不存在或打不开）、SOURCE_UNREACHABLE（网址无法访问）、PARSE_FAILED（内容无法解析）、SHAPE_CHANGED（内容不再符合 schema）、TRANSFORM_FAILED（处理脚本出错）、OUTPUT_INVALID（脚本输出不是 JSON）、TOO_LARGE（超过 8 MiB）、READ_ONLY；stage 是出问题的环节（location、format、transform、writeback、capacity）；actions 是可以采取的处理（link-file 链接文件、retry 重试、open-file 打开文件修正、ask-agent、packaging）。把 message 的意思告诉用户并提供这些处理，不要把 stale 的值写回数据源。
 - 只链接用户指明的文件，不猜路径，也不链接内容库内部的文件。路径只记录在这台设备上，文件内容也不随项目同步。项目在其他设备打开时，那里会返回 `SOURCE_UNAVAILABLE`（`details.source` 带格式和文件名），`dataset_read` 的 list 标出 `source.available:false`，绑定块显示「共享数据「名称」读取外部文件「文件名」，这台设备还没有链接它。」和「链接文件…」按钮；链接过但文件读不到时显示「……现在无法读取」并给出路径。向用户说明：先把文件放到这台设备上（同步盘、拷贝等），再由用户点「链接文件…」选择它，或告诉 Agent 文件的绝对路径后用 `dataset_write({projectId, action:"link", datasetId, path})` 链接。文件格式必须与原来相同。没有这份文件时数据无法恢复，`path:null` 也需要能读到文件。
 - 读写与项目内的共享数据相同：每次读取都读文件，JSON/CSV/TSV 每次写入都原子地写回文件并保留原来的缩进、换行和引号；文件在别处被修改后，打开的窗口会更新，基于旧读取的写入按记录和字段合并。文件读取后又被改动时写入返回 CONFLICT，重新读取后再写。文件不可读或内容不符合 schema 时按上面的读取状态返回 stale 或 empty，并在 warnings 中说明原因。
 - `dataset_write({projectId, action:"link", datasetId, path:null})` 把文件当前内容复制回内容库并停止读写该文件；`dataset_delete` 只删除共享数据和链接。两者都保留文件本身。
 - 导出（html、inline、site 和工作台导出的页面源）会把外部数据作为快照写进导出文件。这样的导出先返回 `CONFIRMATION_REQUIRED`，什么也不写：`details.externalSnapshots` 列出每份外部数据的名称、文件、文件大小、写入导出的快照字节数（`snapshotBytes`）和使用它的块，以及合计。把这些告诉用户，说明快照不会随文件更新、收到导出文件的人能看到这些数据；用户同意后再用 `externalData:"embed"` 重新导出。`available:false` 表示数据源现在读不到：`status:"stale"` 时导出的是上次读到的值，否则这些块导出后不显示数据。在线数据同样列在其中（`url`）。用户不同意时不导出这些数据：可以用 `blockIds` 只导出不含这些块的部分（报告只统计选中的块），或不导出。
 - `page_present` 在对话里展示当前数据，不需要确认；但它的 delivery 文件（delivery.html 等）同样带着这些数据，结果中的 `externalSnapshots` 列出大小。只在对话中展示时无需询问；要把 delivery 文件交给别人或上传时，先按上一条告诉用户并取得同意；之前生成的 delivery 可能已过时，交付前重新 page_present 或改用 page_export 得到当前快照。
+
+## 处理脚本
+
+组件需要的形状和数据源不一致时（Excel 里位置不固定的表格、几份数据要合并或汇总、要换算成图表的 labels 和 series），写一个处理脚本生成一份新的共享数据（transform），让组件绑定它。数据源保持原样；任何一份输入变化后，输出重新计算，打开的页面随之更新。限制和可用的 helpers 见 `showai_capabilities.datasets.transforms`。
+
+- 脚本定义 `function transform(inputs, helpers) { … return 输出; }`。`inputs` 按名称给出每份输入的当前值（JSON 副本），同步返回的输出是普通对象、数组、字符串、有限数字、布尔或 null，最大 8 MiB。脚本在隔离环境中运行，可用 JavaScript 内置对象和 helpers，每次最多运行 2 秒、使用 64 MiB 内存。
+- 输入写成 `inputs:{名称: datasetId}`，其他项目的数据写 `{project, dataset}`，最多 16 份。输入可以是项目内数据、本机文件、在线数据或另一份处理结果；名称就是脚本中 `inputs` 的键，用 JavaScript 标识符。
+- helpers 处理 xlsx 读出的 `{sheets:[{name, rows}]}`。行列序号从 0 开始，单元格地址用 A1 写法：`helpers.sheet(book, 名称或序号)` 取工作表（省略时取第一张）；`helpers.cell(sheet, "B3")` 取单元格，空格和范围外为 null；`helpers.range(sheet, "A1:C10")` 取矩形区域的二维数组；`helpers.find(sheet, 值或函数)` 逐行找第一个匹配的单元格，返回 `{row, column, ref, value}` 或 null；`helpers.table(sheet或rows, {header: 行序号})` 把表头下方各行读成以表头文字为键的对象，读到第一个空行为止，没有表头文字的列用列字母命名；`helpers.columnName(序号)` 把列序号换成字母。
+- 例：预算表在工作表里的位置每月会变，先找到「月份」表头，再生成 `chart` 组件的 labels 和 series，并加上项目内目标数据：
+
+```js
+function transform({ budget, targets }, h) {
+  const sheet = h.sheet(budget, "预算");
+  const header = h.find(sheet, "月份");
+  const rows = h.table(sheet, { header: header.row });
+  return {
+    labels: rows.map((row) => String(row["月份"])),
+    series: [
+      { name: "预算", values: rows.map((row) => row["研发"] + row["市场"]) },
+      { name: "目标", values: rows.map(() => targets.monthly) },
+    ],
+  };
+}
+```
+
+- 先试运行：`dataset_write({projectId, action:"transform", dryRun:true, inputs, script})` 返回输出 `value` 和用时 `ms`（输出超过 64 KiB 时给出 `preview` 与 `bytes`），出错时返回 `code`、`message` 和 `line`，不保存任何内容。输出符合预期后创建：`dataset_write({projectId, action:"transform", name, inputs, script})`；本机连接可以用 `scriptFile:"/绝对路径/transform.js"` 传较长的脚本。修改脚本或输入：`dataset_write({projectId, action:"transform", datasetId, baseHash, script?, inputs?})`，`baseHash` 用 `dataset_read` 返回的 hash（结果为 stale 时也可以修改），脚本和输入的修改记入项目历史。
+- 绑定方式与其他共享数据相同。上例的图表用 props 绑定 `{dataset, props:{local:["title","type","unit"]}}`，输出提供 labels 和 series，标题与图表类型留在各块。
+- 处理结果只读：`editable` 为 false，绑定块显示数据、不能编辑，写入返回 `READ_ONLY`。要改变结果就改输入或脚本；需要一份可编辑的副本时，用 `dataset_write({projectId, action:"link", datasetId, path:null})` 把当前输出复制进内容库，此后它成为普通共享数据。
+- `dataset_read` 返回输出值、定义 `dataset.transform`（inputs 和 script 全文）以及运行信息 `transform`：`scriptHash`、每份输入的状态与 hash、`lastRunMs` 和 `ranAt`。输入和脚本都没变时沿用上次的结果。在线输入在读取处理结果时按它的 `refreshSeconds` 重新获取；本机文件或项目内的输入改变后，打开的页面会自动更新。
+- 出错时的表现：某份输入是 stale 时，输出照常计算并标为 stale，`warnings` 带上那份输入的警告（`datasetId` 指向那份输入）。输入读不到，或脚本出错（TRANSFORM_FAILED，message 含错误和行号）、输出不是 JSON（OUTPUT_INVALID）、超过 8 MiB（TOO_LARGE）时，显示上次成功的输出并标为 stale；从未成功过时 `dataset_read` 返回 `SOURCE_UNAVAILABLE`，`details.warnings` 说明原因。处理时用 `dataset_read` 读出脚本全文和各输入的当前值，按 message 修改脚本，用 dryRun 验证后再保存。TRANSFORM_FAILED、OUTPUT_INVALID 的 `datasetId` 是处理结果本身，actions 为 ask-agent。被处理脚本使用的数据要删除时，`dataset_delete` 返回 CONFLICT 并在 `details.transforms` 列出这些处理结果，先修改它们的输入。
 
 ## 其他
 

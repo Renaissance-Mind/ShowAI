@@ -41,6 +41,8 @@ interface DatasetFile {
     blockId?: string;
   };
   source?: { kind: "file" | "url"; format: string; name?: string; url?: string };
+  /** Computed by a script from other datasets (read-only). */
+  transform?: { inputs: Record<string, unknown>; script: string };
   updatedAt: string;
 }
 interface DatasetRecord {
@@ -100,6 +102,8 @@ export interface DatasetSnapshot {
   errorCode?: string;
   /** Present for a dataset whose value lives in a file outside the library. */
   source?: DatasetSourceState;
+  /** Names of the inputs of a dataset computed by a script. */
+  transform?: { inputs: string[] };
   /** Why the shown value is stale (see datasets/warnings). */
   warnings: DatasetWarning[];
   canUndo: boolean;
@@ -254,6 +258,9 @@ export class DatasetSession {
       // Online data, spreadsheets and stale values cannot be edited.
       readOnly: !!record.readOnly || record.editable === false,
       warnings: record.warnings ?? [],
+      transform: record.dataset.transform
+        ? { inputs: Object.keys(record.dataset.transform.inputs) }
+        : undefined,
       source: record.dataset.source
         ? {
             kind: record.dataset.source.kind,

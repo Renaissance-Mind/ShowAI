@@ -207,6 +207,23 @@ export class AgentService extends CatalogService {
       this.datasets.link(this.requireProject(projectId), input),
     );
   }
+  datasetTransform(
+    projectId: string,
+    input: Parameters<DatasetService["transform"]>[1],
+  ) {
+    return this.mutation(
+      input.datasetId ? "Change dataset transform" : "Create transform dataset",
+      [projectId, input],
+      () => this.datasets.transform(this.requireProject(projectId), input),
+    );
+  }
+  /** Runs a transform script on its inputs without saving anything. */
+  datasetTryTransform(
+    projectId: string,
+    input: Parameters<DatasetService["tryTransform"]>[1],
+  ) {
+    return this.datasets.tryTransform(this.requireProject(projectId), input);
+  }
   datasetEmbed(projectId: string, datasetId: string, baseHash?: string) {
     return this.mutation(
       "Copy dataset into library",

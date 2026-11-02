@@ -113,6 +113,8 @@ export default defineMessages("datasets", {
       "也可以直接读取内容库以外的 JSON、CSV 或 TSV 文件。组件中的修改会写回该文件，文件在别处被修改后组件会自动更新。",
     externalBadge: "外部文件 · {file}",
     externalUnavailable: "外部文件不可用",
+    sourceTransform: "由处理脚本根据 {inputs} 计算，只读。",
+    transformBadge: "处理脚本",
   },
   en: {
     shared: "Shared data",
@@ -237,5 +239,7 @@ export default defineMessages("datasets", {
       "Shared data can also read a JSON, CSV or TSV file outside the library. Edits in components are written back to the file, and changes made elsewhere update the components.",
     externalBadge: "External file · {file}",
     externalUnavailable: "External file unavailable",
+    sourceTransform: "Computed by a script from {inputs}; read-only.",
+    transformBadge: "Script",
   },
 });

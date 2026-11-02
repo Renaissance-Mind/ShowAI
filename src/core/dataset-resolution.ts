@@ -16,7 +16,7 @@ import type {
 import {
   DatasetBaselines,
   DatasetStore,
-  unavailableWarning,
+  unavailableWarnings,
   type DatasetRecord,
 } from "./datasets";
 import { CoreError } from "./model";
@@ -59,6 +59,11 @@ export interface BindingRead {
     /** False when the source cannot be read now (status stale or empty). */
     available: boolean;
   };
+  /**
+   * The dataset is computed by a transform script from these datasets
+   * ("projectId/datasetId" by input name); its values are read-only.
+   */
+  transform?: { inputs: Record<string, string> };
   /** Bytes the resolved snapshot adds to the block's stored data. */
   snapshotBytes?: number;
 }
@@ -201,11 +206,13 @@ export async function resolveDocumentDatasets(
           };
         };
         if (details.name) read.name = details.name;
-        const { refreshSeconds: _refresh, ...source } = details.source as {
-          refreshSeconds?: number;
-        } & NonNullable<typeof details.source>;
-        read.source = { ...source, available: false };
-        read.warnings = [unavailableWarning(error)];
+        if (details.source) {
+          const { refreshSeconds: _refresh, ...source } = details.source as {
+            refreshSeconds?: number;
+          } & NonNullable<typeof details.source>;
+          read.source = { ...source, available: false };
+        }
+        read.warnings = unavailableWarnings(error);
       }
       read.error =
         error instanceof CoreError && error.code === "NOT_FOUND"
@@ -227,6 +234,15 @@ export async function resolveDocumentDatasets(
         ...(record.remote ? { url: record.remote.url } : {}),
         bytes: origin.bytes,
         available: record.status === "ok",
+      };
+    if (record.transform)
+      read.transform = {
+        inputs: Object.fromEntries(
+          Object.entries(record.transform.inputs).map(([name, input]) => [
+            name,
+            `${input.projectId}/${input.datasetId}`,
+          ]),
+        ),
       };
     Object.assign(read, {
       name: record.dataset.name,

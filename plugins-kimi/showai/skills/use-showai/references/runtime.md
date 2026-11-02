@@ -55,8 +55,8 @@
 | INVALID_PATH                        | 路径不可用                                       | 改用本机绝对路径或 ShowAI 返回的 ID                                                                                                                                                        |
 | LOCKED                              | 内容库正被其他操作占用                           | 等几秒后重试同一调用一次                                                                                                                                                                   |
 | SNAPSHOT_EXPIRED / MISSING_BASELINE | 之前的读取结果或比较基线已失效                   | 重新读取后继续；写共享数据时返回的 MISSING_BASELINE 带 `details.datasetBases`，说明要传哪个共享数据的读取 hash，见 [共享数据](shared-data.md#读写)                                         |
-| SOURCE_UNAVAILABLE                  | 共享数据的外部文件或在线数据现在读不到           | 请用户恢复该文件或检查网址；本机读到过的值以 stale 返回，只能查看不能写入，见 [共享数据](shared-data.md#外部文件中的数据)                                                                    |
-| READ_ONLY                           | 数据只读（在线数据、xlsx 文件），没有改动        | 请用户在数据源中修改；用户要在 ShowAI 中编辑时，用 `dataset_write` 的 link `path:null` 复制进内容库                                                                                          |
+| SOURCE_UNAVAILABLE                  | 共享数据的外部文件或在线数据现在读不到，或处理脚本还没有成功的结果 | 请用户恢复该文件或检查网址；本机读到过的值以 stale 返回，只能查看不能写入，见 [共享数据](shared-data.md#外部文件中的数据)；处理脚本按 `details.warnings` 修正，见 [处理脚本](shared-data.md#处理脚本) |
+| READ_ONLY                           | 数据只读（在线数据、xlsx 文件、处理脚本的结果），没有改动 | 请用户在数据源中修改；用户要在 ShowAI 中编辑时，用 `dataset_write` 的 link `path:null` 复制进内容库                                                                                          |
 | CONFIRMATION_REQUIRED               | 需要用户先做决定                                 | 按 `details` 询问用户，再带上决定重试                                                                                                                                                      |
 | ERROR 或其他                        | 未归类的失败                                     | 按下一节处理                                                                                                                                                                               |
 
@@ -73,6 +73,8 @@
 3. 用 `catalog_describe` 读取组件，按返回的 `scope` 判断来源：`builtin` 是 ShowAI 内置组件；`project` 是项目自有的自定义组件，按 [create-component](../../create-component/SKILL.md) 修复或重建；`global` 或 `published` 来自共享目录或发布源，修复需要它的维护者，可以先在本项目 fork 一份再修改。参数不符时按 parameters 视图修正页面数据。
 4. 「缺少组件」表示页面引用的组件不在当前内容库：先用 `catalog_list` / `public_catalog_list` 查找同 id 的组件并导入或改用可用版本；找不到时按页面保留的数据用 create-component 重建兼容组件。
 5. 内置组件出错属于 ShowAI 本身的问题：请用户在组件卡片或「设置 → 关于与反馈」中「报告问题」，诊断信息会自动附带。用户请你代办时，不代替提交，但可以整理一段问题说明交给用户粘贴：页面标题、组件 id 与版本、卡片状态（运行出错 / 参数不符 / 缺少组件）、错误原文和复现步骤，不包含本机路径、Token 或页面正文。
+
+绑定共享数据的块显示旧数据或没有数据时，`page_read` 的 `bindings[]` 带 `status`（stale、empty）和 `warnings`，按 [共享数据](shared-data.md#外部文件中的数据) 的读取状态处理；warning 为 TRANSFORM_FAILED 或 OUTPUT_INVALID 时修改处理脚本，见 [处理脚本](shared-data.md#处理脚本)。
 
 ## 无法恢复的失败与反馈
 

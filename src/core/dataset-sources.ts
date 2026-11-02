@@ -17,6 +17,8 @@ import type { Agent } from "undici";
 import type { WarningCode } from "../datasets/warnings.mjs";
 import { atomicRename } from "./atomic-rename";
 import { atomicLibraryFile, readLibraryBytes } from "./library-files";
+import { datasetDependents } from "./dataset-dependents";
+import { FileStore } from "./store";
 import { CoreError } from "./model";
 
 // A dataset can keep its value outside the content library: in a local file
@@ -920,13 +922,15 @@ export async function fetchSource(
 
 /**
  * Reports changes of this device's linked files (and of the links
- * themselves) as dataset keys, so open windows refresh bound blocks.
+ * themselves) as dataset keys, together with the transforms computed from
+ * them, so open windows refresh bound blocks.
  */
 export function watchDatasetSources(
   home: string,
   onChange: (datasets: string[]) => void,
 ): { close: () => Promise<void> } {
   const links = new DatasetSourceLinks(home);
+  const store = new FileStore(home);
   let byPath = new Map<string, Set<string>>();
   let watched = new Map<string, string>();
   let closed = false;
@@ -937,7 +941,11 @@ export function watchDatasetSources(
     if (closed || !pending.size) return;
     const keys = [...pending];
     pending.clear();
-    onChange(keys);
+    void datasetDependents(store, keys)
+      .then((dependents) => {
+        if (!closed) onChange([...keys, ...dependents]);
+      })
+      .catch((error) => console.error("ShowAI dataset sources:", error));
   };
   const queue = (keys: Iterable<string>) => {
     for (const name of keys) pending.add(name);

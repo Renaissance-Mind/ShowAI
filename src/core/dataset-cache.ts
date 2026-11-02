@@ -10,7 +10,8 @@ import type { WarningCode } from "../datasets/warnings.mjs";
 // device, under local/dataset-cache/<project>/<dataset>.json. local/ is
 // outside history and synchronization. When the source cannot be read, a
 // read returns this value marked stale; online data is also served from
-// here until its refresh interval passes.
+// here until its refresh interval passes. A transform dataset keeps its last
+// good output here, with the hash of the inputs and script it came from.
 
 export interface CachedValue {
   format: "showai-dataset-cache";
@@ -33,6 +34,11 @@ export interface CachedValue {
    * until the refresh interval passes or an explicit refresh succeeds.
    */
   failure?: { at: string; reason: WarningCode; problem: string };
+  /**
+   * A transform's output: the inputs and script it was computed from (as
+   * one hash) and how long the run took.
+   */
+  transform?: { key: string; ms: number };
   value: unknown;
 }
 
@@ -116,6 +122,7 @@ export class DatasetValueCache {
       ...(input.etag ? { etag: input.etag } : {}),
       ...(input.lastModified ? { lastModified: input.lastModified } : {}),
       ...(input.failure ? { failure: input.failure } : {}),
+      ...(input.transform ? { transform: input.transform } : {}),
       value: input.value,
     };
     const path = this.path(input.projectId, input.datasetId);

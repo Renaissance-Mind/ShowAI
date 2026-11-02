@@ -82,13 +82,15 @@ const IMPLIED_ACTION: Record<string, (args: Args) => string | undefined> = {
         ? "resolve"
         : undefined,
   dataset_write: (args) =>
-    has(args, "path")
-      ? "link"
-      : has(args, "operations") || has(args, "operationsFile")
-        ? "apply"
-        : has(args, "name") || has(args, "fromBlock")
-          ? "create"
-          : undefined,
+    has(args, "script") || has(args, "scriptFile") || has(args, "inputs")
+      ? "transform"
+      : has(args, "path")
+        ? "link"
+        : has(args, "operations") || has(args, "operationsFile")
+          ? "apply"
+          : has(args, "name") || has(args, "fromBlock")
+            ? "create"
+            : undefined,
 };
 
 /** Arguments that were removed and are now ignored. */
@@ -110,7 +112,7 @@ const LOCAL_ONLY: Record<string, string[]> = {
   page_read: ["out", "overwrite"],
   page_diff: ["out", "overwrite"],
   page_apply: ["operationsFile"],
-  dataset_write: ["valueFile", "operationsFile"],
+  dataset_write: ["valueFile", "operationsFile", "scriptFile"],
   dataset_read: ["out", "overwrite"],
   component_save: ["directory", "legacy"],
   catalog_describe: ["out", "overwrite"],

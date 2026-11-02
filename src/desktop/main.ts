@@ -1,5 +1,6 @@
 import { changedResources } from "../core/change-notification";
 import { watchDatasetSources } from "../core/dataset-sources";
+import { datasetDependents } from "../core/dataset-dependents";
 import { OwnWrites } from "../core/own-writes";
 import { recordAppLanguage } from "../core/app-language";
 import { ModelResourceClient } from "../sync/model-resources";
@@ -330,18 +331,31 @@ function broadcast(type: DesktopChange["type"], change?: DesktopChange): void {
 async function deliverFiles(root: string, batch: string[]): Promise<void> {
   const echoes = await ownWrites.echoes(batch);
   if (root !== store.root) return;
+  const change = changedResources(root, batch);
+  // Transforms computed from changed datasets refresh in every window,
+  // including the one whose own write changed their input.
+  const dependents = change.datasets?.length
+    ? await datasetDependents(store, change.datasets)
+    : [];
   for (const window of windows) {
     if (window.isDestroyed()) continue;
     const own = echoes.get(String(window.webContents.id));
     const visible = own ? batch.filter((path) => !own.has(path)) : batch;
-    if (visible.length)
-      window.webContents.send("showai:changed", {
-        ...changedResources(root, visible),
-        type: "files",
-        home: root,
-      } satisfies DesktopChange);
+    if (!visible.length && !dependents.length) continue;
+    const resources = changedResources(root, visible);
+    window.webContents.send("showai:changed", {
+      ...resources,
+      ...(dependents.length
+        ? {
+            datasets: [
+              ...new Set([...(resources.datasets ?? []), ...dependents]),
+            ],
+          }
+        : {}),
+      type: "files",
+      home: root,
+    } satisfies DesktopChange);
   }
-  const change = changedResources(root, batch);
   const previewPaths = batch.filter((path) =>
     /^(projects|packages|assets|imports|publications)\//.test(
       relative(root, path).split(sep).join("/").replace(/^workspace\//, ""),

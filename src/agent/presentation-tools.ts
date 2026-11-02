@@ -1,6 +1,7 @@
 import { COMPONENT_PARAMETER_CAPABILITIES } from "../portable/component-parameters.mjs";
 import { cdnReaderOrigins, cdnReaderUrls } from "../core/cdn-reader";
 import { CAPACITY } from "../portable/capacity.mjs";
+import { TRANSFORM_LIMITS } from "../core/dataset-transform";
 import { TEMPLATE_WORKFLOW_CAPABILITIES } from "../portable/template-bundle.mjs";
 import { TEMPLATE_STAGES } from "../portable/template-bundle.mjs";
 import { INLINE_READER_OVERRIDES } from "../portable/inline-style.mjs";
@@ -348,7 +349,7 @@ export function registerPresentationTools(
               options.privateProjects !== false && options.transport !== "http",
             inputs: {
               page_apply: ["operationsFile"],
-              dataset_write: ["valueFile", "operationsFile"],
+              dataset_write: ["valueFile", "operationsFile", "scriptFile"],
               component_save: ["directory"],
             },
             outputs: {
@@ -406,6 +407,25 @@ export function registerPresentationTools(
               refresh: { tool: "dataset_read", parameter: "refresh" },
             },
             readStatus: ["ok", "stale", "empty"],
+          },
+          transforms: {
+            available: true,
+            tool: "dataset_write",
+            action: "transform",
+            dryRun: { parameter: "dryRun" },
+            script: "function transform(inputs, helpers) { return output; }",
+            inputs: {
+              max: TRANSFORM_LIMITS.maxInputs,
+              kinds: ["project", "file", "url", "transform"],
+            },
+            helpers: ["sheet", "cell", "range", "table", "find", "columnName"],
+            limits: {
+              timeoutMs: TRANSFORM_LIMITS.timeoutMs,
+              memoryBytes: TRANSFORM_LIMITS.memoryBytes,
+              scriptBytes: TRANSFORM_LIMITS.scriptBytes,
+              outputBytes: TRANSFORM_LIMITS.outputBytes,
+            },
+            readOnly: true,
           },
           pageOperations: [
             "component.binding.set",

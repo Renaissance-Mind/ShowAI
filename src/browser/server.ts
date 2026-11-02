@@ -1,6 +1,7 @@
 import { CAPACITY, formatBytes } from "../portable/capacity.mjs";
 import { changedResources } from "../core/change-notification";
 import { watchDatasetSources } from "../core/dataset-sources";
+import { datasetDependents } from "../core/dataset-dependents";
 import { OwnWrites } from "../core/own-writes";
 import { ModelResourceClient } from "../sync/model-resources";
 import { createServer, type ServerResponse } from "node:http";
@@ -150,15 +151,32 @@ export async function startBrowserServer(options: BrowserServerOptions) {
   async function deliverFiles(root: string, batch: string[]) {
     const echoes = await ownWrites.echoes(batch);
     if (root !== store.root) return;
+    const change = changedResources(root, batch);
+    // Transforms computed from changed datasets refresh in every tab,
+    // including the one whose own write changed their input.
+    const dependents = change.datasets?.length
+      ? await datasetDependents(store, change.datasets)
+      : [];
     for (const [client, id] of clients) {
       const own = id ? echoes.get(id) : undefined;
       const visible = own ? batch.filter((path) => !own.has(path)) : batch;
-      if (visible.length)
-        client.write(
-          `data: ${JSON.stringify({ ...changedResources(root, visible), type: "files", home: root })}\n\n`,
-        );
+      if (!visible.length && !dependents.length) continue;
+      const resources = changedResources(root, visible);
+      client.write(
+        `data: ${JSON.stringify({
+          ...resources,
+          ...(dependents.length
+            ? {
+                datasets: [
+                  ...new Set([...(resources.datasets ?? []), ...dependents]),
+                ],
+              }
+            : {}),
+          type: "files",
+          home: root,
+        })}\n\n`,
+      );
     }
-    const change = changedResources(root, batch);
     if (change.projectIds?.length || change.catalog || change.all)
       syncManager(root).wake(
         change.catalog || change.all ? undefined : change.projectIds,

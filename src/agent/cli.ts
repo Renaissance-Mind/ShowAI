@@ -85,6 +85,10 @@ Shared datasets (one value that blocks on several pages read and write; see guid
   datasets link DATASET --project PROJECT --embed [--base-hash HASH]
     Keeps the value in a file outside the library (linked on this device) or reads online data
     (read-only; .xlsx files too); --embed copies it back; read --refresh fetches online data now.
+  datasets transform [DATASET] --project PROJECT [--name NAME] [--inputs INPUTS.json] [--script transform.js] [--base-hash HASH] [--dry-run]
+    A read-only dataset computed by a script from other datasets; INPUTS.json is { name: DATASET_ID };
+    the script defines function transform(inputs, helpers). --base-hash changes DATASET's definition;
+    --dry-run runs the script and returns its output without saving.
   datasets delete DATASET --project PROJECT --base-hash HASH
 
 Discover only what you need:
@@ -142,6 +146,7 @@ function parseArguments(args: string[]): Arguments {
     "public",
     "embed",
     "refresh",
+    "dry-run",
   ]);
   const strings = new Set([
     "state",
@@ -228,6 +233,8 @@ function parseArguments(args: string[]): Arguments {
     "use",
     "external-data",
     "refresh-seconds",
+    "inputs",
+    "script",
   ]);
   for (let index = 0; index < args.length; index++) {
     const argument = args[index];
@@ -983,6 +990,39 @@ async function runCliCommand(argv: string[]): Promise<unknown> {
             : {}),
         });
       }
+      if (action === "transform") {
+        requireCount(args, 2, 3);
+        const dataset = args.positional[2];
+        const inputs = option(args, "inputs")
+          ? objectInput(await readJson(option(args, "inputs")!), "--inputs")
+          : undefined;
+        const scriptPath = option(args, "script");
+        const definition = {
+          ...(inputs ? { inputs: inputs as Record<string, string> } : {}),
+          ...(scriptPath
+            ? { script: await readFile(resolve(scriptPath), "utf8") }
+            : {}),
+        };
+        if (args.options["dry-run"])
+          return service.datasetTryTransform(await project(), {
+            ...(dataset ? { datasetId: dataset } : {}),
+            ...definition,
+          });
+        const baseHash = option(args, "base-hash");
+        return service.datasetTransform(await project(), {
+          ...(dataset
+            ? baseHash
+              ? { datasetId: dataset }
+              : { id: dataset }
+            : {}),
+          ...(baseHash ? { baseHash } : {}),
+          ...(option(args, "name") ? { name: option(args, "name") } : {}),
+          ...(option(args, "description")
+            ? { description: option(args, "description") }
+            : {}),
+          ...definition,
+        });
+      }
       if (action === "delete") {
         requireCount(args, 3);
         return service.datasetDelete(
@@ -1475,7 +1515,8 @@ export async function runCli(argv: string[]): Promise<unknown> {
       ["current", "create", "bind"].includes(action)) ||
     (command === "pages" && ["create", "save", "apply"].includes(action)) ||
     (command === "datasets" &&
-      ["create", "apply", "link", "delete"].includes(action)) ||
+      (["create", "apply", "link", "delete"].includes(action) ||
+        (action === "transform" && !args.options["dry-run"]))) ||
     (command === "template" &&
       ["apply", "instantiate", "save", "import"].includes(action)) ||
     (command === "catalog" &&

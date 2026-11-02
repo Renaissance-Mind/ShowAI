@@ -84,6 +84,9 @@ function invalidData(
   throw error;
 }
 
+/** Dry runs return outputs up to this size whole. */
+const DRY_RUN_PREVIEW_BYTES = 64 * 1024;
+
 /** Agent-facing dataset operations, and routing of page writes to bound blocks. */
 export class DatasetService {
   readonly datasets: DatasetStore;
@@ -291,6 +294,38 @@ export class DatasetService {
   /** Keeps a dataset's value in a file outside the library (see DatasetStore.link). */
   link(projectId: string, input: DatasetLinkInput) {
     return this.datasets.link(projectId, input);
+  }
+
+  /** Creates or changes a transform dataset (see DatasetStore.defineTransform). */
+  transform(
+    projectId: string,
+    input: Parameters<DatasetStore["defineTransform"]>[1],
+  ) {
+    return this.datasets.defineTransform(projectId, input);
+  }
+
+  /**
+   * Runs a transform script without saving it. Outputs larger than
+   * DRY_RUN_PREVIEW_BYTES return their first bytes as text.
+   */
+  async tryTransform(
+    projectId: string,
+    input: Parameters<DatasetStore["tryTransform"]>[1],
+  ) {
+    const result = await this.datasets.tryTransform(projectId, input);
+    if (!result.ok || !("value" in result)) return { dryRun: true, ...result };
+    const text = JSON.stringify(result.value);
+    const bytes = Buffer.byteLength(text);
+    if (bytes <= DRY_RUN_PREVIEW_BYTES)
+      return { dryRun: true, ...result, bytes };
+    const { value: _value, ...rest } = result;
+    return {
+      dryRun: true,
+      ...rest,
+      bytes,
+      truncated: true,
+      preview: Buffer.from(text).subarray(0, DRY_RUN_PREVIEW_BYTES).toString(),
+    };
   }
 
   /** Copies an external dataset's value into the library and stops reading its file. */

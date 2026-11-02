@@ -4,9 +4,10 @@ import { z } from "zod";
 import type { AgentService } from "./service";
 import { actionTool, type ToolAction } from "./mcp-actions";
 import { assertLocalPath, fileReceipt, inlineOrFile } from "./local-files";
-import { writeFile } from "node:fs/promises";
+import { readFile, writeFile } from "node:fs/promises";
 import { CAPACITY } from "../portable/capacity.mjs";
 import { CoreError } from "../core/model";
+import { TRANSFORM_LIMITS } from "../core/dataset-transform";
 
 export const datasetWriteTools = new Set<string>([
   "dataset_write",
@@ -321,10 +322,96 @@ export function registerDatasetTools(
         });
       }, metadata),
   };
+  const transformInputs = z
+    .record(
+      z.string().min(1).max(64),
+      z.union([
+        datasetId,
+        z.object({ project: datasetId, dataset: datasetId }).strict(),
+      ]),
+    )
+    .refine(
+      (inputs) =>
+        Object.keys(inputs).length >= 1 &&
+        Object.keys(inputs).length <= TRANSFORM_LIMITS.maxInputs,
+      `1–${TRANSFORM_LIMITS.maxInputs} inputs`,
+    );
+  actions.transform = {
+    fields: {
+      ...changeSchema,
+      datasetId: datasetId.optional(),
+      baseHash: baseHash.optional(),
+      name: datasetName.optional(),
+      description: description.nullable().optional(),
+      schema: jsonObject.nullable().optional(),
+      inputs: transformInputs.optional(),
+      script: z.string().min(1).max(TRANSFORM_LIMITS.scriptBytes).optional(),
+      ...(localFiles ? { scriptFile: filePath } : {}),
+      dryRun: z.boolean().optional(),
+    },
+    run: ({
+      datasetId,
+      baseHash,
+      name,
+      description,
+      schema,
+      inputs,
+      script: inlineScript,
+      scriptFile,
+      dryRun,
+      ...metadata
+    }) =>
+      call(async () => {
+        if (scriptFile !== undefined && inlineScript !== undefined)
+          throw new CoreError(
+            "INVALID_DATA",
+            "Pass script or scriptFile, not both.",
+          );
+        let script = inlineScript as string | undefined;
+        if (scriptFile !== undefined) {
+          const path = assertLocalPath(scriptFile, "scriptFile");
+          const bytes = await readFile(path);
+          if (bytes.length > TRANSFORM_LIMITS.scriptBytes)
+            throw new CoreError(
+              "INVALID_DATA",
+              `scriptFile ${path} has more than ${TRANSFORM_LIMITS.scriptBytes} bytes.`,
+            );
+          script = bytes.toString("utf8");
+        }
+        const definition = {
+          ...(inputs !== undefined
+            ? { inputs: inputs as Record<string, string> }
+            : {}),
+          ...(script !== undefined ? { script } : {}),
+        };
+        if (dryRun === true)
+          return service.datasetTryTransform(projectId, {
+            ...(datasetId ? { datasetId: datasetId as string } : {}),
+            ...definition,
+          });
+        // With baseHash, datasetId names the transform to change; otherwise the new one's id.
+        return service.datasetTransform(projectId, {
+          ...(datasetId
+            ? baseHash
+              ? { datasetId: datasetId as string }
+              : { id: datasetId as string }
+            : {}),
+          ...(baseHash ? { baseHash: baseHash as string } : {}),
+          ...(name !== undefined ? { name: name as string } : {}),
+          ...(description !== undefined
+            ? { description: description as string | null }
+            : {}),
+          ...(schema !== undefined
+            ? { schema: schema as Record<string, unknown> | null }
+            : {}),
+          ...definition,
+        });
+      }, metadata),
+  };
   const write = actionTool(
-    `Change shared datasets (guide datasets). create takes value, or fromBlock {pageId,blockId,baseHash} to move a block's props into the dataset and bind it. apply takes the read baseHash and operations {op:"set",path,value}, {op:"remove",path}, {op:"insert",path:list,value,after?}, {op:"move",path:item,after}; path segments select records by id ([id=t1]). link with url reads online .json/.csv/.tsv/.xlsx data (read-only, refreshSeconds default 300).${
+    `Change shared datasets (guide datasets). create: value, or fromBlock {pageId,blockId,baseHash} to share and bind a block's props. apply: read baseHash + operations {op:"set",path,value}, {op:"remove",path}, {op:"insert",path:list,value,after?}, {op:"move",path:item,after}; path selects records by id ([id=t1]). link url: online json/csv/tsv/xlsx, read-only. transform: read-only data from script "function transform(inputs, helpers)", inputs {name:datasetId}; dryRun:true runs it unsaved.${
       localFiles
-        ? " link with path keeps the value in a .json/.csv/.tsv file outside the library (.xlsx files are read-only); path:null copies it back. valueFile/operationsFile read value or operations from a JSON file."
+        ? " link path: value in a local json/csv/tsv file (xlsx read-only); path:null copies it back. *File fields read from a file."
         : ""
     }`,
     actions,

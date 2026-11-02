@@ -113,6 +113,9 @@ for (const name of [
   "d3-regression",
   "topojson-client",
   "three",
+  // Dataset transforms load the QuickJS WebAssembly file from here; the
+  // packaged desktop main process resolves it through this runtime too.
+  "@jitl/quickjs-wasmfile-release-sync",
 ])
   await copyPackage(name);
 // Windows ships dugite's minGit layout, which keeps its own credential setup.

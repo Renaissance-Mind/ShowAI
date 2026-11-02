@@ -53,6 +53,8 @@ import {
   cacheOrigin,
   type CachedValue,
 } from "./dataset-cache";
+import { TRANSFORM_LIMITS, runTransform } from "./dataset-transform";
+import { transformsReading } from "./dataset-dependents";
 import {
   datasetWarning,
   type DatasetReadStatus,
@@ -60,6 +62,38 @@ import {
   type Editable,
   type WarningCode,
 } from "../datasets/warnings.mjs";
+
+/** An input of a transform: a dataset of the same project, or of another one. */
+export type TransformInput = string | { project: string; dataset: string };
+/**
+ * A dataset computed by a script from other datasets. The script defines
+ * function transform(inputs, helpers) and returns the value; it runs in a
+ * sandbox (see dataset-transform) whenever an input or the script changes.
+ */
+export interface DatasetTransform {
+  /** Input name (the key of `inputs` in the script) → dataset. */
+  inputs: Record<string, TransformInput>;
+  script: string;
+}
+/** How the value of a transform dataset was computed. */
+export interface TransformReadInfo {
+  /** sha256 of the script. */
+  scriptHash: string;
+  inputs: Record<
+    string,
+    {
+      projectId: string;
+      datasetId: string;
+      name?: string;
+      hash?: string;
+      status: DatasetReadStatus;
+    }
+  >;
+  /** Milliseconds of the run that produced the value. */
+  lastRunMs?: number;
+  /** When that run happened. */
+  ranAt?: string;
+}
 
 /** A project's shared data: one JSON value that several page blocks read and write. */
 export interface DatasetDocument {
@@ -85,6 +119,8 @@ export interface DatasetDocument {
    * value.
    */
   source?: DatasetSource;
+  /** The value is computed from other datasets; the stored file has no value. */
+  transform?: DatasetTransform;
   value: unknown;
 }
 export interface DatasetRecord {
@@ -107,6 +143,8 @@ export interface DatasetRecord {
   /** Why the value is stale; empty when status is ok. */
   warnings: DatasetWarning[];
   cachedAt?: string;
+  /** A transform dataset: its inputs as read and its last run. */
+  transform?: TransformReadInfo;
 }
 /** An external source as listed: linked on this device and readable, or why not. */
 export type DatasetSourceSummary = DatasetSource & {
@@ -126,6 +164,8 @@ export interface DatasetSummary {
   bytes: number;
   origin?: DatasetDocument["origin"];
   source?: DatasetSourceSummary;
+  /** A transform dataset: the datasets it is computed from. */
+  transform?: { inputs: Record<string, TransformInput> };
   status: DatasetReadStatus;
   editable: Editable;
   warnings: DatasetWarning[];
@@ -224,6 +264,7 @@ export function validateDataset(
         "origin",
         "schema",
         "source",
+        "transform",
         "value",
       ].includes(key)
     )
@@ -273,8 +314,17 @@ export function validateDataset(
     );
   if (dataset.source !== undefined && !isDatasetSource(dataset.source))
     throw new CoreError("INVALID_DATA", "Invalid dataset source.");
-  // An external dataset's stored file has no value; its file supplies it.
-  if (dataset.source && dataset.value === undefined) return dataset;
+  if (dataset.transform !== undefined) {
+    if (dataset.source !== undefined)
+      throw new CoreError(
+        "INVALID_DATA",
+        "A dataset reads a source or is computed by a transform, not both.",
+      );
+    assertTransform(dataset.transform);
+  }
+  // An external or computed dataset's stored file has no value.
+  if ((dataset.source || dataset.transform) && dataset.value === undefined)
+    return dataset;
   if (!("value" in dataset))
     throw new CoreError("INVALID_DATA", "A dataset needs a value.");
   try {
@@ -286,6 +336,98 @@ export function validateDataset(
   }
   return dataset;
 }
+
+const INPUT_NAME = /^[A-Za-z_$][A-Za-z0-9_$]{0,63}$/;
+
+/** Checks the shape of a transform definition (inputs and script). */
+export function assertTransform(
+  value: unknown,
+): asserts value is DatasetTransform {
+  if (!isPlainObject(value))
+    throw new CoreError(
+      "INVALID_DATA",
+      "A transform is { inputs: { name: datasetId }, script }.",
+    );
+  for (const key of Object.keys(value))
+    if (!["inputs", "script"].includes(key))
+      throw new CoreError("INVALID_DATA", `Unknown transform field: ${key}.`);
+  const { inputs, script } = value as Record<string, unknown>;
+  if (!isPlainObject(inputs) || !Object.keys(inputs).length)
+    throw new CoreError(
+      "INVALID_DATA",
+      "A transform needs inputs: { name: datasetId or {project, dataset} }.",
+    );
+  if (Object.keys(inputs).length > TRANSFORM_LIMITS.maxInputs)
+    throw new CoreError(
+      "INVALID_DATA",
+      `A transform has at most ${TRANSFORM_LIMITS.maxInputs} inputs.`,
+    );
+  for (const [name, input] of Object.entries(inputs)) {
+    if (!INPUT_NAME.test(name))
+      throw new CoreError(
+        "INVALID_DATA",
+        `Input name ${JSON.stringify(name)} is not an identifier (letters, digits, _ or $; at most 64).`,
+      );
+    try {
+      if (typeof input === "string") assertId(input);
+      else if (
+        isPlainObject(input) &&
+        Object.keys(input).every((key) => ["project", "dataset"].includes(key))
+      ) {
+        assertId(input.project as string);
+        assertId(input.dataset as string);
+      } else throw new Error();
+    } catch {
+      throw new CoreError(
+        "INVALID_DATA",
+        `Input ${name} names a dataset id, or {project, dataset} for a dataset of another project.`,
+      );
+    }
+  }
+  if (typeof script !== "string" || !script.trim())
+    throw new CoreError(
+      "INVALID_DATA",
+      "A transform needs a script defining function transform(inputs, helpers).",
+    );
+  if (Buffer.byteLength(script) > TRANSFORM_LIMITS.scriptBytes)
+    throw new CoreError(
+      "INVALID_DATA",
+      `A transform script has at most ${TRANSFORM_LIMITS.scriptBytes} bytes.`,
+    );
+}
+
+/** The project and dataset an input of a transform in projectId reads. */
+export function transformInput(
+  input: TransformInput,
+  projectId: string,
+): { projectId: string; datasetId: string } {
+  return typeof input === "string"
+    ? { projectId, datasetId: input }
+    : { projectId: input.project, datasetId: input.dataset };
+}
+
+const sha256 = (text: string) =>
+  createHash("sha256").update(text).digest("hex");
+
+/** Origin of a transform's last good output in local/dataset-cache. */
+const TRANSFORM_ORIGIN = "transform";
+
+/**
+ * Outputs (or failures) of the last run of each transform in this process,
+ * keyed by library, project and dataset; a run is reused while its inputs
+ * and script are unchanged.
+ */
+const transformRuns = new Map<
+  string,
+  {
+    key: string;
+    ranAt: string;
+    result:
+      | { ok: true; value: unknown; ms: number }
+      | { ok: false; code: WarningCode; message: string; ms: number };
+  }
+>();
+const MAX_REMEMBERED_RUNS = 64;
 
 /** Blocks bound to a dataset, by page. */
 export function datasetReferencesIn(
@@ -315,7 +457,7 @@ function storedDataset(dataset: DatasetDocument): Omit<
 > & {
   value?: unknown;
 } {
-  if (!dataset.source) return dataset;
+  if (!dataset.source && !dataset.transform) return dataset;
   const { value: _value, ...stored } = dataset;
   return stored;
 }
@@ -406,8 +548,30 @@ export function unavailableWarning(
   );
 }
 
+/**
+ * The warnings of a dataset without a value: the source's, or for a
+ * transform every reason its inputs or script gave none.
+ */
+export function unavailableWarnings(error: CoreError): DatasetWarning[] {
+  const warnings = (error.details as { warnings?: DatasetWarning[] })?.warnings;
+  return warnings?.length ? warnings : [unavailableWarning(error)];
+}
+
 /** Rejects writes to read-only data before anything is changed. */
 function readOnly(dataset: DatasetDocument): CoreError {
+  if (dataset.transform) {
+    const message = `Dataset "${dataset.name}" is computed by a transform script from ${Object.keys(dataset.transform.inputs).join(", ")}; its value is read-only. Change the inputs, or the script with dataset_write(action:transform).`;
+    const error = new CoreError("READ_ONLY", message);
+    error.details = {
+      datasetId: dataset.id,
+      name: dataset.name,
+      reason: "READ_ONLY",
+      warning: datasetWarning("READ_ONLY", dataset.id, message, {
+        stage: "transform",
+      }),
+    };
+    return error;
+  }
   const source = dataset.source!;
   const message =
     source.kind === "url"
@@ -431,6 +595,7 @@ function readOnly(dataset: DatasetDocument): CoreError {
  * READ_ONLY, a stale value is SOURCE_UNAVAILABLE.
  */
 export function assertWritable(record: DatasetRecord): void {
+  if (record.dataset.transform) throw readOnly(record.dataset);
   if (record.status === "stale") {
     const warning = record.warnings[0];
     const error = new CoreError(
@@ -446,6 +611,26 @@ export function assertWritable(record: DatasetRecord): void {
     throw error;
   }
   if (record.editable === false) throw readOnly(record.dataset);
+}
+
+/** A transform dataset without a value: none of its inputs or runs gave one. */
+function transformUnavailable(
+  dataset: DatasetDocument,
+  warnings: DatasetWarning[],
+): CoreError {
+  const error = new CoreError(
+    "SOURCE_UNAVAILABLE",
+    `Dataset "${dataset.name}" has no value yet: ${warnings
+      .map((warning) => warning.message)
+      .join(" ")}`,
+  );
+  error.details = {
+    datasetId: dataset.id,
+    name: dataset.name,
+    reason: warnings[0]?.code ?? "TRANSFORM_FAILED",
+    warnings,
+  };
+  return error;
 }
 
 interface LoadedDataset {
@@ -664,11 +849,20 @@ export class DatasetStore {
   private async load(
     projectId: string,
     datasetId: string,
-    options: { fallback?: boolean; refresh?: boolean } = {},
+    options: {
+      fallback?: boolean;
+      refresh?: boolean;
+      /** Transforms being computed, as project/dataset; reaching one again is a cycle. */
+      visiting?: Set<string>;
+    } = {},
   ): Promise<LoadedDataset> {
     const { dataset: stored, path } = await this.stored(projectId, datasetId);
     const revision = await this.revision(path);
     const base = { path, ...(revision ? { revision } : {}) };
+    if (stored.transform)
+      return {
+        record: await this.compute(projectId, stored, base, options),
+      };
     const source = stored.source;
     if (!source)
       return {
@@ -774,6 +968,229 @@ export class DatasetStore {
     }
   }
 
+  /** The inputs of a transform as read now, and why any of them has no value. */
+  private async readInputs(
+    projectId: string,
+    datasetId: string,
+    transform: DatasetTransform,
+    options: { refresh?: boolean; visiting?: Set<string> },
+  ) {
+    const visiting = new Set(options.visiting);
+    visiting.add(`${projectId}/${datasetId}`);
+    const values: Record<string, unknown> = {};
+    const inputs: TransformReadInfo["inputs"] = {};
+    const warnings: DatasetWarning[] = [];
+    let stale = false;
+    let failure: DatasetWarning | undefined;
+    for (const [name, reference] of Object.entries(transform.inputs)) {
+      const input = transformInput(reference, projectId);
+      const key = `${input.projectId}/${input.datasetId}`;
+      inputs[name] = { ...input, status: "empty" };
+      if (visiting.has(key)) {
+        failure ??= datasetWarning(
+          "TRANSFORM_FAILED",
+          datasetId,
+          `Input ${name} (${key}) is computed from this dataset; transform inputs cannot form a cycle. Change the inputs with dataset_write(action:transform).`,
+        );
+        continue;
+      }
+      let record: DatasetRecord;
+      try {
+        if (input.projectId !== projectId)
+          await this.files.readProject(input.projectId);
+        record = (
+          await this.load(input.projectId, input.datasetId, {
+            fallback: true,
+            refresh: options.refresh,
+            visiting,
+          })
+        ).record;
+      } catch (error) {
+        if (error instanceof CoreError && error.code === "SOURCE_UNAVAILABLE") {
+          warnings.push(...unavailableWarnings(error));
+          continue;
+        }
+        if (error instanceof CoreError && error.code === "NOT_FOUND") {
+          failure ??= datasetWarning(
+            "TRANSFORM_FAILED",
+            datasetId,
+            `Input ${name}: dataset ${key} does not exist. Change the inputs with dataset_write(action:transform).`,
+          );
+          continue;
+        }
+        throw error;
+      }
+      values[name] = record.dataset.value;
+      inputs[name] = {
+        ...input,
+        name: record.dataset.name,
+        hash: record.hash,
+        status: record.status,
+      };
+      if (record.status === "stale") {
+        stale = true;
+        warnings.push(...record.warnings);
+      }
+    }
+    const empty = Object.values(inputs).some(
+      (input) => input.status === "empty",
+    );
+    return { values, inputs, warnings, stale, empty, failure };
+  }
+
+  /**
+   * The value of a transform dataset: its script run on its inputs, reused
+   * while neither changed. An input without a value, or a failing run, gives
+   * the last good output of this device marked stale (with `fallback`).
+   */
+  private async compute(
+    projectId: string,
+    stored: DatasetDocument,
+    base: { path: string; revision?: string },
+    options: { fallback?: boolean; refresh?: boolean; visiting?: Set<string> },
+  ): Promise<DatasetRecord> {
+    const transform = stored.transform!;
+    const read = await this.readInputs(
+      projectId,
+      stored.id,
+      transform,
+      options,
+    );
+    const scriptHash = sha256(transform.script);
+    const info = (run?: {
+      ms?: number;
+      ranAt?: string;
+    }): TransformReadInfo => ({
+      scriptHash,
+      inputs: read.inputs,
+      ...(run?.ms !== undefined ? { lastRunMs: run.ms } : {}),
+      ...(run?.ranAt ? { ranAt: run.ranAt } : {}),
+    });
+    const record = (
+      value: unknown,
+      status: "ok" | "stale",
+      warnings: DatasetWarning[],
+      run: { ms?: number; ranAt?: string },
+      cachedAt?: string,
+    ): DatasetRecord => {
+      const dataset = { ...stored, value };
+      return {
+        dataset,
+        hash: datasetHash(dataset),
+        ...base,
+        status,
+        editable: false,
+        warnings,
+        ...(cachedAt ? { cachedAt } : {}),
+        transform: info(run),
+      };
+    };
+    /** The last good output, stale, or no value at all. */
+    const lastGood = async (problems: DatasetWarning[]) => {
+      const cached = options.fallback
+        ? await this.cache.read(projectId, stored.id, TRANSFORM_ORIGIN)
+        : undefined;
+      if (!cached) throw transformUnavailable(stored, problems);
+      const warnings = problems.map((warning) =>
+        warning.datasetId === stored.id && warning.stage === "transform"
+          ? {
+              ...warning,
+              message: `${warning.message} Showing the output of its last successful run at ${cached.readAt}.`,
+            }
+          : warning,
+      );
+      return record(
+        cached.value,
+        "stale",
+        warnings,
+        { ms: cached.transform?.ms, ranAt: cached.readAt },
+        cached.readAt,
+      );
+    };
+    if (read.failure || read.empty)
+      return lastGood(
+        read.failure ? [read.failure, ...read.warnings] : read.warnings,
+      );
+    if (read.stale && !options.fallback)
+      throw transformUnavailable(stored, read.warnings);
+    const key = sha256(
+      canonicalJson({
+        script: scriptHash,
+        schema: stored.schema ?? null,
+        inputs: Object.fromEntries(
+          Object.entries(read.inputs).map(([name, input]) => [
+            name,
+            input.hash,
+          ]),
+        ),
+      }),
+    );
+    const memo = `${this.root}\0${projectId}/${stored.id}`;
+    let run = transformRuns.get(memo);
+    if (run?.key !== key) {
+      const cached = await this.cache.read(
+        projectId,
+        stored.id,
+        TRANSFORM_ORIGIN,
+      );
+      if (cached?.transform?.key === key)
+        run = {
+          key,
+          ranAt: cached.readAt,
+          result: { ok: true, value: cached.value, ms: cached.transform.ms },
+        };
+      else {
+        const ranAt = new Date().toISOString();
+        let result = await runTransform(transform.script, read.values);
+        if (result.ok)
+          try {
+            assertDatasetValue(result.value, stored.schema, "The output");
+          } catch (error) {
+            const { problem, reason } = problemOf(error);
+            result = {
+              ok: false,
+              code: reason === "TOO_LARGE" ? "TOO_LARGE" : "OUTPUT_INVALID",
+              message: problem,
+              ms: result.ms,
+            };
+          }
+        run = { key, ranAt, result };
+        if (result.ok)
+          await this.cache.write(
+            {
+              projectId,
+              datasetId: stored.id,
+              origin: TRANSFORM_ORIGIN,
+              readAt: ranAt,
+              bytes: Buffer.byteLength(JSON.stringify(result.value)),
+              transform: { key, ms: result.ms },
+              value: result.value,
+            },
+            { always: true },
+          );
+      }
+      transformRuns.delete(memo);
+      transformRuns.set(memo, run);
+      if (transformRuns.size > MAX_REMEMBERED_RUNS)
+        transformRuns.delete(transformRuns.keys().next().value!);
+    }
+    const { result, ranAt } = run;
+    if (!result.ok)
+      return lastGood([
+        datasetWarning(
+          result.code,
+          stored.id,
+          `Transform "${stored.name}" failed: ${result.message}`,
+          { stage: "transform", actions: ["ask-agent"] },
+        ),
+        ...read.warnings,
+      ]);
+    return record(result.value, read.stale ? "stale" : "ok", read.warnings, {
+      ms: result.ms,
+      ranAt,
+    });
+  }
+
   /**
    * The dataset with its current value; an unreadable external source gives
    * its last value read on this device (status stale). `refresh` fetches
@@ -836,6 +1253,9 @@ export class DatasetStore {
           };
         bytes = Buffer.byteLength(JSON.stringify(dataset.value));
         summary = {
+          ...(dataset.transform
+            ? { transform: { inputs: dataset.transform.inputs } }
+            : {}),
           name: dataset.name,
           ...(dataset.description ? { description: dataset.description } : {}),
           createdAt: dataset.createdAt,
@@ -852,14 +1272,18 @@ export class DatasetStore {
         const linked = (
           unavailable!.details?.source as { path?: string } | undefined
         )?.path;
-        source = {
-          ...dataset.source!,
-          ...(linked ? { path: linked } : {}),
-          available: false,
-          error: unavailable!.message,
-        };
+        if (dataset.source)
+          source = {
+            ...dataset.source,
+            ...(linked ? { path: linked } : {}),
+            available: false,
+            error: unavailable!.message,
+          };
         const revision = await this.revision(path);
         summary = {
+          ...(dataset.transform
+            ? { transform: { inputs: dataset.transform.inputs } }
+            : {}),
           name: dataset.name,
           ...(dataset.description ? { description: dataset.description } : {}),
           createdAt: dataset.createdAt,
@@ -869,7 +1293,7 @@ export class DatasetStore {
           ...(dataset.origin ? { origin: dataset.origin } : {}),
           status: "empty",
           editable: false,
-          warnings: [unavailableWarning(unavailable!)],
+          warnings: unavailableWarnings(unavailable!),
         };
       }
       summaries.push({
@@ -1075,6 +1499,11 @@ export class DatasetStore {
             "Linking an existing dataset takes its value from the source or the dataset; omit value and id.",
           );
         const stored = await this.stored(projectId, id);
+        if (stored.dataset.transform)
+          throw new CoreError(
+            "INVALID_DATA",
+            `Dataset "${stored.dataset.name}" is computed by a transform script. Copy its output into the library with dataset_write(action:link, path:null), or create another dataset for the file.`,
+          );
         const previous = stored.dataset.source;
         // Other devices link their own copy of the same file format.
         if (previous?.kind === "file" && !online && previous.format !== format)
@@ -1175,8 +1604,254 @@ export class DatasetStore {
   }
 
   /**
-   * Copies an external dataset's current value into the library and stops
-   * reading the file; the file itself is left as it is.
+   * Rejects inputs that are missing or that are computed from the dataset
+   * itself, directly or through other transforms.
+   */
+  private async assertInputs(
+    projectId: string,
+    datasetId: string,
+    transform: DatasetTransform,
+  ) {
+    const self = `${projectId}/${datasetId}`;
+    const seen = new Set<string>();
+    const walk = async (
+      inputs: Record<string, TransformInput>,
+      owner: string,
+      path: string[],
+    ): Promise<void> => {
+      for (const [name, reference] of Object.entries(inputs)) {
+        const input = transformInput(reference, owner.split("/")[0]);
+        const key = `${input.projectId}/${input.datasetId}`;
+        if (key === self)
+          throw new CoreError(
+            "INVALID_DATA",
+            `Transform inputs cannot form a cycle: ${[...path, key].join(" → ")}.`,
+          );
+        if (seen.has(key)) continue;
+        seen.add(key);
+        let stored: DatasetDocument;
+        try {
+          if (input.projectId !== projectId)
+            await this.files.readProject(input.projectId);
+          stored = (await this.stored(input.projectId, input.datasetId))
+            .dataset;
+        } catch (error) {
+          if (
+            owner === self &&
+            error instanceof CoreError &&
+            error.code === "NOT_FOUND"
+          )
+            throw new CoreError(
+              "INVALID_DATA",
+              `Input ${name}: dataset ${key} does not exist. Create or link it first, and name it by its id.`,
+            );
+          if (error instanceof CoreError && error.code === "NOT_FOUND")
+            continue;
+          throw error;
+        }
+        if (stored.transform)
+          await walk(stored.transform.inputs, key, [...path, key]);
+      }
+    };
+    await walk(transform.inputs, self, [self]);
+  }
+
+  /**
+   * Creates a transform dataset, or changes the script, inputs, name,
+   * description or schema of one (baseHash: its hash as read). The new
+   * definition is stored like any dataset change; the value is computed
+   * when it is read.
+   */
+  async defineTransform(
+    projectId: string,
+    input: {
+      datasetId?: string;
+      id?: string;
+      name?: string;
+      description?: string | null;
+      schema?: JsonSchema | null;
+      inputs?: Record<string, TransformInput>;
+      script?: string;
+      baseHash?: string;
+    },
+  ): Promise<{
+    record?: DatasetRecord;
+    created: boolean;
+    changed: boolean;
+    warnings?: DatasetWarning[];
+  }> {
+    const creating = input.datasetId === undefined;
+    const id = creating
+      ? input.id === undefined
+        ? randomUUID()
+        : assertId(input.id)
+      : assertId(input.datasetId!);
+    const result = await this.files.lock(
+      `dataset-${projectId}-${id}`,
+      async () => {
+        await this.files.readProject(projectId);
+        const now = new Date().toISOString();
+        let dataset: DatasetDocument;
+        let expected: string | null = null;
+        if (creating) {
+          await this.assertAbsent(projectId, id);
+          if (typeof input.name !== "string" || !input.name.trim())
+            throw new CoreError("INVALID_DATA", "A new dataset needs a name.");
+          if (input.inputs === undefined || input.script === undefined)
+            throw new CoreError(
+              "INVALID_DATA",
+              "A new transform needs inputs and a script.",
+            );
+          dataset = validateDataset({
+            format: "showai-dataset",
+            version: 1,
+            id,
+            name: input.name.trim(),
+            ...(input.description ? { description: input.description } : {}),
+            createdAt: now,
+            updatedAt: now,
+            ...(input.schema ? { schema: input.schema } : {}),
+            transform: { inputs: input.inputs, script: input.script },
+          });
+        } else {
+          if (input.id !== undefined)
+            throw new CoreError(
+              "INVALID_DATA",
+              "id names a new dataset; change an existing one by datasetId.",
+            );
+          const { dataset: stored, path } = await this.stored(projectId, id);
+          if (!stored.transform)
+            throw new CoreError(
+              "INVALID_DATA",
+              `Dataset "${stored.name}" holds its own data. Create a new transform dataset that reads it instead.`,
+            );
+          const current = await this.load(projectId, id, { fallback: true })
+            .then(({ record }) => record.hash)
+            .catch((error) => {
+              if (
+                error instanceof CoreError &&
+                error.code === "SOURCE_UNAVAILABLE"
+              )
+                return undefined;
+              throw error;
+            });
+          const storedHash = datasetHash(stored);
+          if (
+            input.baseHash === undefined ||
+            (input.baseHash !== current && input.baseHash !== storedHash)
+          )
+            throw new CoreError(
+              "CONFLICT",
+              input.baseHash === undefined
+                ? "Changing a transform needs the baseHash you read."
+                : "The dataset changed since it was read.",
+              { currentHash: current ?? storedHash },
+            );
+          expected = (await this.revision(path)) ?? null;
+          const {
+            description: _description,
+            schema: _schema,
+            ...rest
+          } = stored;
+          const description =
+            input.description === null
+              ? undefined
+              : (input.description ?? stored.description);
+          const schema =
+            input.schema === null ? undefined : (input.schema ?? stored.schema);
+          dataset = validateDataset({
+            ...rest,
+            name: input.name?.trim() ?? stored.name,
+            ...(description ? { description } : {}),
+            ...(schema ? { schema } : {}),
+            transform: {
+              inputs: input.inputs ?? stored.transform.inputs,
+              script: input.script ?? stored.transform.script,
+            },
+          });
+          if (canonicalJson(dataset) === canonicalJson(stored))
+            return { created: false, changed: false };
+          dataset.updatedAt = now;
+        }
+        await this.assertInputs(projectId, id, dataset.transform!);
+        await this.write(this.path(projectId, id), dataset, expected);
+        return { created: creating, changed: true };
+      },
+    );
+    // The value of the new definition, as any reader computes it.
+    const record = await this.load(projectId, id, { fallback: true })
+      .then((loaded) => loaded.record)
+      .catch((error) => {
+        if (error instanceof CoreError && error.code === "SOURCE_UNAVAILABLE")
+          return { warnings: unavailableWarnings(error) };
+        throw error;
+      });
+    return "dataset" in record
+      ? { ...result, record }
+      : { ...result, warnings: record.warnings };
+  }
+
+  /**
+   * Runs a script on inputs without saving anything: the inputs and script
+   * given, or the stored definition of datasetId for those omitted.
+   */
+  async tryTransform(
+    projectId: string,
+    input: {
+      datasetId?: string;
+      inputs?: Record<string, TransformInput>;
+      script?: string;
+    },
+  ) {
+    await this.files.readProject(projectId);
+    const stored = input.datasetId
+      ? (await this.stored(projectId, assertId(input.datasetId))).dataset
+      : undefined;
+    if (input.datasetId && !stored?.transform)
+      throw new CoreError(
+        "INVALID_DATA",
+        `Dataset ${input.datasetId} is not a transform.`,
+      );
+    const transform = {
+      inputs: input.inputs ?? stored?.transform?.inputs,
+      script: input.script ?? stored?.transform?.script,
+    };
+    assertTransform(transform);
+    const id = stored?.id ?? "dry-run";
+    const read = await this.readInputs(projectId, id, transform, {});
+    if (read.failure || read.empty)
+      return {
+        ok: false as const,
+        code: read.failure?.code ?? "SOURCE_UNAVAILABLE",
+        message: [read.failure, ...read.warnings]
+          .filter(Boolean)
+          .map((warning) => warning!.message)
+          .join(" "),
+        inputs: read.inputs,
+        warnings: read.warnings,
+      };
+    const result = await runTransform(transform.script, read.values);
+    if (result.ok)
+      try {
+        assertDatasetValue(result.value, stored?.schema, "The output");
+      } catch (error) {
+        const { problem, reason } = problemOf(error);
+        return {
+          ok: false as const,
+          code: reason === "TOO_LARGE" ? "TOO_LARGE" : "OUTPUT_INVALID",
+          message: problem,
+          ms: result.ms,
+          inputs: read.inputs,
+          warnings: read.warnings,
+        };
+      }
+    return { ...result, inputs: read.inputs, warnings: read.warnings };
+  }
+
+  /**
+   * Copies an external dataset's current value (or a transform's output)
+   * into the library and stops reading the file or running the script; the
+   * file itself is left as it is.
    */
   async embed(
     projectId: string,
@@ -1186,7 +1861,7 @@ export class DatasetStore {
     return this.files.lock(`dataset-${projectId}-${datasetId}`, async () => {
       await this.files.readProject(projectId);
       const { record } = await this.load(projectId, datasetId);
-      if (!record.dataset.source)
+      if (!record.dataset.source && !record.dataset.transform)
         throw new CoreError(
           "INVALID_DATA",
           "This dataset already keeps its value in the library.",
@@ -1197,7 +1872,11 @@ export class DatasetStore {
           "The dataset changed since it was read.",
           { currentHash: record.hash, currentRevision: record.revision },
         );
-      const { source: _source, ...rest } = record.dataset;
+      const {
+        source: _source,
+        transform: _transform,
+        ...rest
+      } = record.dataset;
       const dataset = validateDataset({
         ...rest,
         updatedAt: new Date().toISOString(),
@@ -1247,7 +1926,9 @@ export class DatasetStore {
       // Read-only data refuses value changes before its source is read;
       // renaming it (or changing its schema) still works from a stale read.
       const { dataset: stored } = await this.stored(projectId, datasetId);
-      const readOnlySource = !!stored.source && !sourceWritable(stored.source);
+      const readOnlySource =
+        !!stored.transform ||
+        (!!stored.source && !sourceWritable(stored.source));
       if (readOnlySource && operations.length) throw readOnly(stored);
       const loaded = await this.load(projectId, datasetId, {
         fallback: readOnlySource,
@@ -1353,6 +2034,7 @@ export class DatasetStore {
           path: current.path,
           ...(external ? { external } : {}),
           ...(current.remote ? { remote: current.remote } : {}),
+          ...(current.transform ? { transform: current.transform } : {}),
           status: current.status,
           editable: current.editable,
           warnings: current.warnings,
@@ -1414,6 +2096,18 @@ export class DatasetStore {
     datasetId: string,
     input: { baseHash: string },
   ): Promise<{ removed: true; id: string }> {
+    const transforms = await transformsReading(
+      this.store,
+      `${projectId}/${datasetId}`,
+    );
+    if (transforms.length) {
+      const error = new CoreError(
+        "CONFLICT",
+        `The dataset is an input of ${transforms.length} transform dataset(s): ${transforms.join(", ")}. Change their inputs (or delete them) before deleting it.`,
+      );
+      error.details = { transforms };
+      throw error;
+    }
     const references = await this.references(projectId, datasetId);
     if (references.length) {
       const error = new CoreError(
@@ -1750,7 +2444,9 @@ export function mergeDatasetVersions(
   const operations = diffValues(base.value, local.value);
   const result = applyOperations(remote.value, operations, { atomic: false });
   const conflicts = [...result.conflicts];
-  const pick = <K extends "name" | "description" | "schema">(key: K) => {
+  const pick = <K extends "name" | "description" | "schema" | "transform">(
+    key: K,
+  ) => {
     const original = canonicalJson(base[key] ?? null),
       ours = canonicalJson(local[key] ?? null),
       theirs = canonicalJson(remote[key] ?? null);
@@ -1768,13 +2464,16 @@ export function mergeDatasetVersions(
   };
   const name = pick("name"),
     description = pick("description"),
-    schema = pick("schema");
-  const { description: _d, schema: _s, ...rest } = remote;
+    schema = pick("schema"),
+    transform = pick("transform");
+  const { description: _d, schema: _s, transform: _t, ...rest } = remote;
   const dataset = {
     ...rest,
     name: name ?? remote.name,
     ...(description ? { description } : {}),
     ...(schema ? { schema } : {}),
+    // A script changed on two devices keeps the remote one and reports a conflict.
+    ...(transform ? { transform } : {}),
     updatedAt: [local.updatedAt, remote.updatedAt].sort().at(-1)!,
     value: result.value,
   } as DatasetDocument;

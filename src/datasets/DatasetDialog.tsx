@@ -39,6 +39,7 @@ interface Summary {
     path?: string;
     available: boolean;
   };
+  transform?: { inputs: Record<string, unknown> };
 }
 
 function formatSize(bytes: number) {
@@ -127,7 +128,13 @@ function SourceSection({
   return (
     <section>
       <h3>{t("sourceTitle")}</h3>
-      {!source ? (
+      {snapshot?.transform ? (
+        <p className="dataset-muted">
+          {t("sourceTransform", {
+            inputs: snapshot.transform.inputs.join(", "),
+          })}
+        </p>
+      ) : !source ? (
         <>
           <p className="dataset-muted">{t("sourceLibrary")}</p>
           <p className="dataset-muted">{t("moveToFileHint")}</p>
@@ -731,6 +738,9 @@ function BindChoices({
                     onChange={() => setChosen(summary.id)}
                   />
                   <span>{summary.name}</span>
+                  {summary.transform && (
+                    <span className="dataset-muted">{t("transformBadge")}</span>
+                  )}
                   {summary.source && (
                     <span
                       className="dataset-muted"

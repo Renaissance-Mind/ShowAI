@@ -373,12 +373,15 @@ test("anonymous clients discover and customize public resources without a projec
       tools.tools.find((t) => t.name === "dataset_write")?.inputSchema
         .properties?.action as { enum?: string[] }
     ).enum,
-  ).toEqual(["create", "apply", "link"]);
+  ).toEqual(["create", "apply", "link", "transform"]);
   // Hosted links take online data only, never a file of the server.
   const datasetWrite = tools.tools.find((t) => t.name === "dataset_write")
     ?.inputSchema.properties;
   expect(datasetWrite).toHaveProperty("url");
   expect(datasetWrite).not.toHaveProperty("path");
+  // Transform scripts are passed inline.
+  expect(datasetWrite).toHaveProperty("script");
+  expect(datasetWrite).not.toHaveProperty("scriptFile");
   expect(
     tools.tools.find((t) => t.name === "page_export")?.inputSchema.properties,
   ).not.toHaveProperty("out");
