@@ -21,7 +21,8 @@ import type { ShowDocument } from "../types";
 
 import { collectCustomComponentRefs } from "../components/custom/contract";
 import { loadBoardSnapshot } from "./board-reading";
-import { injectReadingOptions } from "./reading-preview";
+import { injectReadingOptions, readingLocale } from "./reading-preview";
+import { withHtmlLanguage, type Locale } from "../i18n";
 
 export const READ_VIEWS = ["structured", "image", "html"] as const;
 const roles = [
@@ -181,13 +182,18 @@ function previewHtml(
   html: string,
   state: ReadingOptions,
   identity: ReadIdentity,
+  locale: Locale,
 ): string {
-  return injectReadingOptions(html, {
-    draft: state.draft,
-    theme: state.theme,
-    identity,
-    state,
-  });
+  // The reader takes its language from <html lang>, ahead of the browser's.
+  return withHtmlLanguage(
+    injectReadingOptions(html, {
+      draft: state.draft,
+      theme: state.theme,
+      identity,
+      state,
+    }),
+    locale,
+  );
 }
 async function outputPath(
   store: FileStore,
@@ -365,6 +371,7 @@ export async function readPageView(
     `${pageId}-${record.hash.slice(0, 12)}-${randomUUID()}`,
   );
   if (render) {
+    const locale = await readingLocale(store.root);
     const html = previewHtml(
       await buildPageHtml(
         resolved,
@@ -377,6 +384,7 @@ export async function readPageView(
       ),
       options,
       identity,
+      locale,
     );
     path = await outputPath(
       store,
@@ -389,7 +397,7 @@ export async function readPageView(
     await writeFile(path, html, "utf8");
     if (!(options.view === "html" && options.out))
       await recordReadingCache(store.root, path, html);
-    capture = await renderReading(path, options);
+    capture = await renderReading(path, options, locale);
   }
   const computed = capture?.components ?? [];
   const markdown =

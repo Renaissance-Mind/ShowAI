@@ -22,7 +22,8 @@ import {
   reconcileSurface,
 } from "../surface/document.mjs";
 import { buildPageHtml } from "./exporter";
-import { injectReadingOptions } from "./reading-preview";
+import { injectReadingOptions, readingLocale } from "./reading-preview";
+import { withHtmlLanguage } from "../i18n";
 import {
   freezeBoard,
   renderFrozenBoard,
@@ -428,17 +429,22 @@ async function createSnapshot(
       [],
       "spatial",
     );
-    const preview = injectReadingOptions(inputHtml, {
-      theme: options.theme,
-      draft: false,
-      boardCapture: { boardId, ...options.state },
-    });
+    const locale = await readingLocale(store.root);
+    const preview = withHtmlLanguage(
+      injectReadingOptions(inputHtml, {
+        theme: options.theme,
+        draft: false,
+        boardCapture: { boardId, ...options.state },
+      }),
+      locale,
+    );
     await writeCache(store.root, id, "capture.html", Buffer.from(preview));
     const frozen = await freezeBoard(
       join(folder, "capture.html"),
       boardId,
       scoped.ids,
       options.theme,
+      locale,
     );
     const paths = nodePaths(document);
     const elements = frozen.elements.map((el) => {

@@ -1,6 +1,7 @@
 import { changedResources } from "../core/change-notification";
 import { watchDatasetSources } from "../core/dataset-sources";
 import { OwnWrites } from "../core/own-writes";
+import { recordAppLanguage } from "../core/app-language";
 import { ModelResourceClient } from "../sync/model-resources";
 import {
   configurePageThumbnails,
@@ -363,6 +364,8 @@ async function useHome(home?: string): Promise<void> {
   ownWrites.clear();
   store = new FileStore(home);
   await openLibrary(store.root);
+  // Agent reads of this library render in the language this App shows.
+  await recordAppLanguage(store.root, getLocale());
   // Linked external files of datasets refresh the blocks bound to them.
   sources = watchDatasetSources(store.root, (datasets) =>
     broadcast("files", {
@@ -1855,6 +1858,7 @@ else {
         setLocale(locale);
         buildApplicationMenu();
         await saveSettings({ locale });
+        await recordAppLanguage(store.root, locale);
       });
       ipcMain.handle("showai:window-state", (event) => ({
         fullScreen: trustedSender(event).isFullScreen(),

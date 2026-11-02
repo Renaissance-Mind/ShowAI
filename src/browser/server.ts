@@ -39,7 +39,8 @@ import {
   pluginInstallerAction,
 } from "../plugin/desktop-install";
 import { CoreError, FileStore, assertId } from "../core/store";
-import { setLocale } from "../i18n";
+import { setLocale, type Locale } from "../i18n";
+import { recordAppLanguage } from "../core/app-language";
 import {
   createWorkbench,
   workbenchActions,
@@ -96,6 +97,8 @@ export async function startBrowserServer(options: BrowserServerOptions) {
   }
   let store = new FileStore(fixedHome ?? savedHome);
   let service = new AgentService({ root: store.root });
+  // Known once a workbench reports its language; until then the server only has the system one.
+  let workbenchLocale: Locale | undefined;
   const token = options.development?.token ?? randomBytes(32).toString("hex");
   const webRoot = await realpath(options.webRoot);
   // The built frontend records the commit it came from; the development
@@ -184,6 +187,8 @@ export async function startBrowserServer(options: BrowserServerOptions) {
     store = new FileStore(home);
     ownWrites.clear();
     await openLibrary(store.root);
+    // Agent reads of this library render in the language the workbench shows.
+    if (workbenchLocale) await recordAppLanguage(store.root, workbenchLocale);
     await sources?.close();
     // Linked external files of datasets refresh the blocks bound to them.
     sources = watchDatasetSources(store.root, (datasets) =>
@@ -567,6 +572,8 @@ export async function startBrowserServer(options: BrowserServerOptions) {
           if (input.locale !== "zh-CN" && input.locale !== "en")
             throw new CoreError("INVALID_DATA", "Unknown language.");
           setLocale(input.locale);
+          workbenchLocale = input.locale;
+          await recordAppLanguage(store.root, input.locale);
           data = null;
         } else if (url.pathname === "/api/shutdown") {
           data = null;

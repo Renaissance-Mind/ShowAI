@@ -350,6 +350,96 @@ test("missing action targets and stale hashes fail instead of claiming a success
   );
 }, 30000);
 
+test("rendered reads show built-in controls in the App's language, not the Agent shell's", async () => {
+  const catalog = JSON.parse(
+    await readFile(join(root, "resources/catalog/components.json"), "utf8"),
+  ) as { kind: string; examples: { data: unknown }[] }[];
+  const input = join(home, "matrix-page.json");
+  await writeFile(
+    input,
+    JSON.stringify({
+      id: "matrix-reading",
+      title: "对比",
+      comments: [],
+      content: {
+        type: "doc",
+        content: [
+          {
+            type: "widget",
+            attrs: {
+              id: "matrix",
+              kind: "comparison-matrix",
+              data: catalog.find((item) => item.kind === "comparison-matrix")!
+                .examples[0].data,
+            },
+          },
+        ],
+      },
+    }),
+  );
+  const page = await run([
+    "pages",
+    "create",
+    "--project",
+    projectId,
+    "--input",
+    input,
+  ]);
+  // Claude Code and Codex usually start the runtime from an English shell.
+  const shell = {
+    ...Object.fromEntries(
+      Object.entries(environment()).filter(
+        ([key]) => key !== "SHOWAI_LANGUAGE",
+      ),
+    ),
+    LANG: "en_US.UTF-8",
+    LC_ALL: "",
+  };
+  const read = async () => {
+    const output = await execute(
+      process.execPath,
+      [
+        cli,
+        "pages",
+        "read",
+        page.document.id,
+        "--project",
+        projectId,
+        "--view",
+        "html",
+        "--json",
+      ],
+      { env: shell, maxBuffer: 12 * 1024 * 1024 },
+    );
+    const { data } = JSON.parse(output.stdout);
+    return {
+      root: (await readFile(data.path, "utf8")).match(/<html\b[^>]*>/)![0],
+      text: data.dom
+        .map((frame: { accessibility: string }) => frame.accessibility)
+        .join("\n"),
+    };
+  };
+  const record = (locale: string) =>
+    writeFile(
+      join(home, "local/app-language.json"),
+      JSON.stringify({
+        format: "showai-app-language",
+        version: 1,
+        locale,
+        recordedAt: new Date().toISOString(),
+      }),
+    );
+  await record("zh-CN");
+  const chinese = await read();
+  expect(chinese.root).toContain('lang="zh-CN"');
+  expect(chinese.text).toContain("只看差异");
+  expect(chinese.text).not.toContain("Differences only");
+  await record("en");
+  const english = await read();
+  expect(english.root).toContain('lang="en"');
+  expect(english.text).toContain("Differences only");
+}, 60000);
+
 test("MCP exposes the reading modes and returns native PNG content for image reads", async () => {
   const client = new Client({ name: "reading-test", version: "1.0.0" });
   const transport = new StdioClientTransport({

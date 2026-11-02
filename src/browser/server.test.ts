@@ -35,6 +35,8 @@ import { blankDocument } from "../core/catalog";
 import type { CompiledComponent } from "../components/custom/types";
 import type { ProjectMetadata } from "../core/model";
 import type { ConnectorSettings } from "../agent-host/remote-connector";
+import { readAppLanguage } from "../core/app-language";
+import { getLocale, setLocale } from "../i18n";
 
 test("remote device settings pass through the authenticated browser boundary", async () => {
   const status = await invoke<{
@@ -50,6 +52,19 @@ test("remote device settings pass through the authenticated browser boundary", a
       settings: { ...status.settings, enabled: true },
     }),
   ).rejects.toThrow("Choose a signed-in server account");
+});
+
+test("the workbench language is recorded for Agent reads of the library", async () => {
+  const runtime = getLocale();
+  try {
+    expect(await readAppLanguage(home)).toBeUndefined();
+    for (const locale of ["zh-CN", "en"] as const) {
+      expect((await request("locale", { locale })).ok).toBe(true);
+      expect(await readAppLanguage(home)).toBe(locale);
+    }
+  } finally {
+    setLocale(runtime);
+  }
 });
 
 test("project manual order survives workbench page and board saves and appends newly created projects", async () => {

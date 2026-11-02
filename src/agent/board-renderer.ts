@@ -2,6 +2,7 @@ import { createRequire } from "node:module";
 import { pathToFileURL } from "node:url";
 import { readingBrowserExecutable } from "./reading-renderer";
 import type { BoardRect } from "./board-reading-geometry";
+import type { Locale } from "../i18n";
 
 export interface CapturedElement {
   nodeId: string;
@@ -39,6 +40,7 @@ export async function freezeBoard(
   boardId: string,
   nodeIds: string[],
   theme: "light" | "dark",
+  locale: Locale,
 ): Promise<FrozenBoard> {
   const instance = await browser();
   try {
@@ -47,6 +49,7 @@ export async function freezeBoard(
       colorScheme: theme,
       reducedMotion: "reduce",
       acceptDownloads: false,
+      locale,
     });
     await context.route(/^https?:/, (route) => route.abort());
     const page = await context.newPage();

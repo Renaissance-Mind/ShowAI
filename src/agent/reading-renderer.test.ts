@@ -157,3 +157,32 @@ test("rendered reading reports components that never finish loading", async () =
     renderReading(html, pageReadSchema.parse({ view: "image" })),
   ).rejects.toThrow(/still loading after 10s: overview-flow\./);
 }, 25000);
+
+test("rendered reading reports the requested locale to the page and its component frames", async () => {
+  const root = await mkdtemp(join(tmpdir(), "showai-reading-locale-"));
+  fixtures.push(root);
+  const report = `<script>document.getElementById('component-root').textContent=
+  'locale '+navigator.language+' '+new Intl.NumberFormat().resolvedOptions().locale;
+window.__SHOWAI_COMPONENT_READING__={ready:true,status:"raw",props:{}};</script>`;
+  await writeFile(
+    join(root, "component.html"),
+    `<!doctype html><html><body><div id="component-root"></div>${report}</body></html>`,
+  );
+  const html = join(root, "reader.html");
+  // Like the portable reader without a recorded <html lang>: the browser decides.
+  await writeFile(
+    html,
+    `<!doctype html><html><body><main class="portable-app">
+<div id="component-root"></div>
+<div data-block-id="matrix"><iframe src="./component.html"></iframe></div>
+</main>${report}</body></html>`,
+  );
+  const options = pageReadSchema.parse({ view: "html" });
+  for (const locale of ["zh-CN", "en"] as const) {
+    const result = await renderReading(html, options, locale);
+    expect(result.dom.map((frame) => frame.accessibility)).toEqual([
+      expect.stringContaining(`locale ${locale} ${locale}`),
+      expect.stringContaining(`locale ${locale} ${locale}`),
+    ]);
+  }
+}, 30000);

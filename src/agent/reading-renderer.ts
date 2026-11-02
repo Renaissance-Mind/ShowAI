@@ -5,6 +5,7 @@ import { homedir } from "node:os";
 import { pathToFileURL } from "node:url";
 import type { Browser, Frame, Locator, Page } from "playwright-core";
 import type { ReadingAction, ReadingOptions } from "./page-reading";
+import type { Locale } from "../i18n";
 
 export interface ComponentReading {
   blockId: string;
@@ -238,6 +239,7 @@ function contentHeight() {
 export async function renderReading(
   htmlPath: string,
   options: ReadingOptions,
+  locale?: Locale,
 ): Promise<ReadingCapture> {
   const { chromium } =
     require("playwright-core") as typeof import("playwright-core");
@@ -253,6 +255,8 @@ export async function renderReading(
       colorScheme: options.theme,
       reducedMotion: "reduce",
       acceptDownloads: false,
+      // Without it Chromium reports the runtime's locale to the reader and its components.
+      ...(locale ? { locale } : {}),
     });
     // The preview is self-contained. Component code stays in its browser sandbox.
     await context.route(/^https?:/, (route) => route.abort());
