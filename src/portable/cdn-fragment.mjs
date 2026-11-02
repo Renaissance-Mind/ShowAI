@@ -41,7 +41,9 @@ function pageData(html) {
  * A classic script that imports the first reachable reader and mounts the
  * page. Classic scripts with import() run in hosts that accept only classic
  * inline scripts while still loading the reader's ES modules. A delayed
- * backup races a slow primary; only the winning module mounts the page.
+ * backup races a slow primary and starts at once when the source before it
+ * fails, e.g. one a host's script policy blocks; only the winning module
+ * mounts the page.
  * The total wait is bounded, and pending startup timers are cleared.
  */
 function loader(id, data, urls, lang, standalone) {
@@ -51,7 +53,7 @@ function loader(id, data, urls, lang, standalone) {
   const timeout = lang?.startsWith("zh")
     ? "加载超过 15 秒，请重试或打开完整离线页面。"
     : "Loading exceeded 15 seconds. Retry or open the complete offline page.";
-  return `(async()=>{const root=document.getElementById(${JSON.stringify(id)});const artifact=${data};const timers=[];const wait=(ms,start)=>new Promise((resolve,reject)=>{timers.push(setTimeout(()=>Promise.resolve().then(start).then(resolve,reject),ms))});try{const readers=${JSON.stringify(urls)}.map((url,index)=>index?wait(index*1500,()=>import(url)):import(url));const reader=await Promise.race([Promise.any(readers),wait(15000,()=>{throw new Error(${JSON.stringify(timeout)})})]);reader.mount(root,{artifact${standalone ? ",standalone:true" : ""}});}catch(error){const reason=error instanceof AggregateError?error.errors.map(e=>e&&e.message||String(e)).join("; "):error&&error.message||String(error);root.textContent=${JSON.stringify(failed)}+reason;}finally{timers.forEach(clearTimeout)}})();`;
+  return `(async()=>{const root=document.getElementById(${JSON.stringify(id)});const artifact=${data};const timers=[];const wait=(ms,start)=>new Promise((resolve,reject)=>{timers.push(setTimeout(()=>Promise.resolve().then(start).then(resolve,reject),ms))});try{const starts=[];const readers=${JSON.stringify(urls)}.map((url,index)=>new Promise((resolve,reject)=>{const start=starts[index]=()=>{if(start.done)return;start.done=true;import(url).then(resolve,error=>{reject(error);starts[index+1]?.()})};if(index)timers.push(setTimeout(start,index*1500))}));starts[0]();const reader=await Promise.race([Promise.any(readers),wait(15000,()=>{throw new Error(${JSON.stringify(timeout)})})]);reader.mount(root,{artifact${standalone ? ",standalone:true" : ""}});}catch(error){const reason=error instanceof AggregateError?error.errors.map(e=>e&&e.message||String(e)).join("; "):error&&error.message||String(error);root.textContent=${JSON.stringify(failed)}+reason;}finally{timers.forEach(clearTimeout)}})();`;
 }
 
 const placeholder = (lang) =>

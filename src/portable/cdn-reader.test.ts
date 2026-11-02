@@ -63,6 +63,38 @@ describe("CDN fragment", () => {
     expect(fragment).toContain("timers.forEach(clearTimeout)");
   });
 
+  it("starts the next reader source as soon as the one before it fails", async () => {
+    const urls = ["https://blocked.example/r.js", "https://cdn.example/r.js"];
+    const script = toCdnFragment(page(JSON.stringify(artifact)), {
+      readerUrls: urls,
+    })
+      .match(/<script>([\s\S]*)<\/script>/)![1]
+      .replaceAll("import(url)", "load(url)");
+    const started: Array<[string, number]> = [];
+    const begin = Date.now();
+    const mounted = new Promise<void>((resolve, reject) => {
+      const load = (url: string) => {
+        started.push([url, Date.now() - begin]);
+        return url === urls[0]
+          ? Promise.reject(new Error("blocked by the host"))
+          : Promise.resolve({ mount: () => resolve() });
+      };
+      const root = {
+        set textContent(value: string) {
+          reject(new Error(value));
+        },
+      };
+      new Function("document", "load", script)(
+        { getElementById: () => root },
+        load,
+      );
+    });
+    await mounted;
+    expect(started.map(([url]) => url)).toEqual(urls);
+    // Without the failure hand-off the backup would wait 1.5 seconds.
+    expect(started[1][1]).toBeLessThan(500);
+  });
+
   it("writes a complete online page that mounts as a standalone reader", () => {
     const html = toCdnPage(
       page(JSON.stringify(artifact)).replace(
