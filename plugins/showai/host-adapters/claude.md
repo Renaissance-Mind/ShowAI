@@ -7,8 +7,12 @@ show_component 使用 `delivery:"auto"`。返回 compact 时，将 `delivery.com
 page_present 与 render_document 在此宿主返回 `conversation`，按其 `mode` 与 `next` 执行：
 
 - `compact`：把 `conversation.fragment` 原样交给 HTML 展示工具，再给出 openUrl。
-- `too-large`：整页片段超出上限。用 page_read 的 `detail:"outline"` 取得块 ID，选读者最需要看的一到三个块，带 blockIds 再调用一次，展示返回的片段，并给出整页的 openUrl。所选的块仍超限时减少块数；单个块也超限时只给出 openUrl 或完整 HTML 文件。
+- `too-large`：整页片段超出上限。带 `bytes` 时是片段本身超过 32 KB；不带 `bytes` 时是页面数据（通常是嵌入图片）超过聊天预览预算，同时会有 `inlineError`。两种情况都用 page_read 的 `detail:"outline"` 取得块 ID，选读者最需要看的一到三个块（避开大图），带 blockIds 再调用一次，展示返回的片段，并给出整页的 openUrl。所选的块仍超限时减少块数；单个块也超限时只给出 openUrl 或完整 HTML 文件。
 - `unavailable`：运行时没有 CDN 阅读器。告诉用户这次无法在对话里展示，给出 openUrl 或完整 HTML 文件。
+
+会话有草稿目录（scratchpad）时，它就是任务工作目录，操作列表、自查截图等中间文件放在那里。
+
+交付完整 HTML 文件时，宿主有发送或展示文件的工具（例如 SendUserFile）就用它把 delivery.html 交给用户；没有这类工具时给出文件路径。
 
 show_widget 返回成功只说明片段已交给宿主；阅读器在用户端从公共 CDN 加载，Agent 无法确认它加载成功。用户反馈没有显示或显示「could not load」时，说明阅读器没有加载：保留源 Page，交付 page_present 返回的 delivery.html 完整离线文件并给出 openUrl；问题持续时指向「设置 → 关于与反馈」。只回复 openUrl 或文件路径不算展示，上文说明的超限或不可用情况除外。page_read 的截图用于自查，不能代替展示交给用户。delivery.inline 通常更大，不逐字重写。需要交互而图片不足时，说明缺少的宿主能力。
 
