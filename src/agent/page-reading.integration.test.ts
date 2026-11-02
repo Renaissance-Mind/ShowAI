@@ -15,6 +15,7 @@ import { promisify } from "node:util";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import { rawSourcePlugin } from "../../scripts/raw-source-plugin.mjs";
+import { recordAppLanguage } from "../core/app-language";
 
 const execute = promisify(execFile);
 const root = resolve(import.meta.dirname, "../..");
@@ -29,6 +30,17 @@ const environment = () => ({
   ...process.env,
   SHOWAI_HOME: home,
   SHOWAI_VIEWER: join(root, "dist-portable/portable.html"),
+});
+// Claude Code and Codex usually start the runtime from an English shell.
+const englishShell = (): Record<string, string> => ({
+  ...Object.fromEntries(
+    Object.entries(environment()).filter(
+      (entry): entry is [string, string] =>
+        entry[0] !== "SHOWAI_LANGUAGE" && typeof entry[1] === "string",
+    ),
+  ),
+  LANG: "en_US.UTF-8",
+  LC_ALL: "",
 });
 async function run(args: string[]) {
   const output = await execute(process.execPath, [cli, ...args, "--json"], {
@@ -385,16 +397,7 @@ test("rendered reads show built-in controls in the App's language, not the Agent
     "--input",
     input,
   ]);
-  // Claude Code and Codex usually start the runtime from an English shell.
-  const shell = {
-    ...Object.fromEntries(
-      Object.entries(environment()).filter(
-        ([key]) => key !== "SHOWAI_LANGUAGE",
-      ),
-    ),
-    LANG: "en_US.UTF-8",
-    LC_ALL: "",
-  };
+  const shell = englishShell();
   const read = async () => {
     const output = await execute(
       process.execPath,
@@ -419,25 +422,45 @@ test("rendered reads show built-in controls in the App's language, not the Agent
         .join("\n"),
     };
   };
-  const record = (locale: string) =>
-    writeFile(
-      join(home, "local/app-language.json"),
-      JSON.stringify({
-        format: "showai-app-language",
-        version: 1,
-        locale,
-        recordedAt: new Date().toISOString(),
-      }),
-    );
-  await record("zh-CN");
+  await recordAppLanguage(home, "zh-CN");
   const chinese = await read();
   expect(chinese.root).toContain('lang="zh-CN"');
   expect(chinese.text).toContain("只看差异");
   expect(chinese.text).not.toContain("Differences only");
-  await record("en");
+  await recordAppLanguage(home, "en");
   const english = await read();
   expect(english.root).toContain('lang="en"');
   expect(english.text).toContain("Differences only");
+}, 60000);
+
+test("page_present follows the App's language as it changes during one MCP session", async () => {
+  const client = new Client({ name: "language-test", version: "1.0.0" });
+  await client.connect(
+    new StdioClientTransport({
+      command: process.execPath,
+      args: [cli, "--home", home, "--project", projectId, "mcp"],
+      env: englishShell(),
+    }),
+  );
+  const present = async () => {
+    const result = await client.callTool({
+      name: "page_present",
+      arguments: { pageId },
+    });
+    expect(result.isError).not.toBe(true);
+    const { delivery } = (
+      result.structuredContent as { data: { delivery: { html: string } } }
+    ).data;
+    return (await readFile(delivery.html, "utf8")).match(/<html\b[^>]*>/)![0];
+  };
+  try {
+    await recordAppLanguage(home, "zh-CN");
+    expect(await present()).toContain('lang="zh-CN"');
+    await recordAppLanguage(home, "en");
+    expect(await present()).toContain('lang="en"');
+  } finally {
+    await client.close();
+  }
 }, 60000);
 
 test("MCP exposes the reading modes and returns native PNG content for image reads", async () => {

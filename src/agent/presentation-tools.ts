@@ -32,6 +32,7 @@ import { mkdir, mkdtemp, readdir, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { renderReading } from "./reading-renderer";
+import { getLocale } from "../i18n";
 import type { ReadingOptions } from "./page-reading";
 
 export type Presentation = Awaited<ReturnType<typeof renderPresentation>>;
@@ -157,12 +158,16 @@ async function captureComponents(html: string, theme: "light" | "dark") {
       ),
       "utf8",
     );
-    return await renderReading(path, {
-      // A short viewport lets the full-page capture end where the components end.
-      viewport: { width: 760, height: 240 },
-      theme,
-      actions: [],
-    } as unknown as ReadingOptions);
+    return await renderReading(
+      path,
+      {
+        // A short viewport lets the full-page capture end where the components end.
+        viewport: { width: 760, height: 240 },
+        theme,
+        actions: [],
+      } as unknown as ReadingOptions,
+      getLocale(),
+    );
   } finally {
     await rm(directory, { recursive: true, force: true });
   }

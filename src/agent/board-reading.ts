@@ -22,7 +22,8 @@ import {
   reconcileSurface,
 } from "../surface/document.mjs";
 import { buildPageHtml } from "./exporter";
-import { injectReadingOptions, readingLocale } from "./reading-preview";
+import { injectReadingOptions } from "./reading-preview";
+import { appLocale } from "../core/app-language";
 import { withHtmlLanguage } from "../i18n";
 import {
   freezeBoard,
@@ -429,7 +430,7 @@ async function createSnapshot(
       [],
       "spatial",
     );
-    const locale = await readingLocale(store.root);
+    const locale = await appLocale(store.root);
     const preview = withHtmlLanguage(
       injectReadingOptions(inputHtml, {
         theme: options.theme,

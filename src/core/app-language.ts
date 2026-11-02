@@ -2,12 +2,12 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { randomUUID } from "node:crypto";
 import { dirname, join } from "node:path";
 import { atomicRename } from "./atomic-rename";
-import type { Locale } from "../i18n";
+import { getLocale, languageOverride, setLocale, type Locale } from "../i18n";
 
 /**
  * The language the App last showed this library in. Agent runtimes start from
- * the Agent's environment, so rendered reads use this record to show the
- * interface the person sees.
+ * the Agent's shell, so they use this record to show the interface the person
+ * sees in the App.
  */
 export interface AppLanguageRecord {
   format: "showai-app-language";
@@ -52,4 +52,17 @@ export async function recordAppLanguage(root: string, locale: Locale) {
   };
   await writeFile(temporary, JSON.stringify(value, null, 2) + "\n");
   await atomicRename(temporary, path);
+}
+
+/** SHOWAI_LANGUAGE pins tests and headless runs; otherwise the App's record decides. */
+export async function appLocale(root: string): Promise<Locale> {
+  return languageOverride() ?? (await readAppLanguage(root)) ?? getLocale();
+}
+
+/**
+ * A standalone runtime's messages and generated pages follow the App's
+ * language. The App process owns its language and never calls this.
+ */
+export async function followAppLanguage(root: string) {
+  setLocale(await appLocale(root));
 }

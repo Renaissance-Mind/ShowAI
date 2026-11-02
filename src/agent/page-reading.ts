@@ -21,7 +21,8 @@ import type { ShowDocument } from "../types";
 
 import { collectCustomComponentRefs } from "../components/custom/contract";
 import { loadBoardSnapshot } from "./board-reading";
-import { injectReadingOptions, readingLocale } from "./reading-preview";
+import { injectReadingOptions } from "./reading-preview";
+import { appLocale } from "../core/app-language";
 import { withHtmlLanguage, type Locale } from "../i18n";
 
 export const READ_VIEWS = ["structured", "image", "html"] as const;
@@ -371,7 +372,7 @@ export async function readPageView(
     `${pageId}-${record.hash.slice(0, 12)}-${randomUUID()}`,
   );
   if (render) {
-    const locale = await readingLocale(store.root);
+    const locale = await appLocale(store.root);
     const html = previewHtml(
       await buildPageHtml(
         resolved,

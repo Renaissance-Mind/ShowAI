@@ -25,6 +25,7 @@ import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
 import packageMetadata from "../../package.json";
 import { AgentService, errorResult } from "./service";
+import { followAppLanguage } from "../core/app-language";
 import { validateDocument } from "../portable/validation.mjs";
 import type {
   CompiledComponent,
@@ -142,6 +143,8 @@ export function createMcpServer(options: {
             return mcpFailure(
               new Error("This MCP connection is bound to another project."),
             );
+          // Only runtimes serve MCP; their output follows the App's current language.
+          await followAppLanguage(service.store.root);
           if (!options.pageWriteDirectory) return original(args, extra);
           const writes: PageWrite[] = [];
           const result = await pageWriteCapture.run(writes, () =>

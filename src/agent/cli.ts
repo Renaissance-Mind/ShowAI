@@ -9,6 +9,7 @@ import { canonicalJson } from "../core/diff";
 import { ContentLibrary as GitLibrary } from "../core/content-library";
 import { syncManager, stopSyncManagers } from "../sync/manager";
 import { openLibrary } from "../core/open-library";
+import { followAppLanguage } from "../core/app-language";
 import { LibraryImport } from "../core/library-import";
 import {
   LibraryMaintenance,
@@ -1448,10 +1449,12 @@ export async function runCli(argv: string[]): Promise<unknown> {
     !["library", "render", "public"].includes(command) &&
     !(command === "mcp" && (action === "serve" || args.options.public)) &&
     !args.options.help
-  )
-    await openLibrary(
-      new AgentService({ root: option(args, "home") }).store.root,
-    );
+  ) {
+    const root = new AgentService({ root: option(args, "home") }).store.root;
+    await openLibrary(root);
+    // The browser workbench sets its own language; other commands speak the App's.
+    if (command !== "serve") await followAppLanguage(root);
+  }
   const mutation =
     (command === "projects" &&
       ["current", "create", "bind"].includes(action)) ||
