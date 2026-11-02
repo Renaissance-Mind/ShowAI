@@ -1,6 +1,6 @@
 # Claude Code 展示适配
 
-此插件声明 `SHOWAI_HOST_DISPLAY=model-html`：用户只能看到模型交给宿主 HTML 展示工具的内容。用户要图、示意图、流程图或其他可视化时，先用 ShowAI 组件（show_component）生成内容；宿主的 HTML 展示工具只用来显示 ShowAI 返回的片段，不手写 SVG 或 HTML 代替组件。目录里没有合适的组件时，按 show-visual「选组件」一步的做法处理。首次展示前核对当前会话实际暴露的 HTML 展示工具（例如 show_widget）及其契约，例如它要求先调用的 read_me；不因宿主名称就假设某个工具已经存在。
+此插件声明 `SHOWAI_HOST_DISPLAY=model-html`：用户只能看到模型交给宿主 HTML 展示工具的内容。用户要图、示意图、流程图或其他可视化时，用 show_component 生成，再把返回的片段交给宿主的 HTML 展示工具显示。目录里没有合适的组件时，按 show-visual「选组件」一步的做法处理。首次展示前核对当前会话实际暴露的 HTML 展示工具（例如 show_widget）及其契约，例如它要求先调用的 read_me；不因宿主名称就假设某个工具已经存在。
 
 show_component 使用 `delivery:"auto"`。返回 compact 时，将 `delivery.compact` 的完整片段原样交给 HTML 展示工具，不要把 HTML 当正文发送。片段从公共 CDN 加载阅读器。返回 image 时，图片只在工具结果里，用户不一定能看到：按 warnings 告诉用户这次无法在对话里交互展示及原因（例如运行时没有 CDN 阅读器），用户需要保留时转 show-document 保存后给出 openUrl。
 
