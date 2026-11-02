@@ -53,9 +53,16 @@ import { AgentService } from "../agent/service";
 import {
   analyzeExport,
   assertExportDestination,
-  assertExternalSnapshots,
   exportPage,
+  packagePage,
 } from "../agent/exporter";
+import {
+  PACKAGING_CHOICES,
+  bundledResource,
+  setSyncPackaging,
+  syncPackagingPlan,
+  type PackagingDecisions,
+} from "../core/packaging";
 import { assertId, CoreError, FileStore } from "../core/store";
 import type { PageRecord, ProjectBinding } from "../core/model";
 import { isDirectorySortBy } from "../core/directory-sort";
@@ -102,10 +109,6 @@ import type {
 } from "../components/custom/types";
 import type { ComponentManifest, JsonSchema } from "../components/custom/types";
 import type { DesktopInfo } from "../desktop/bridge";
-import {
-  externalSnapshotReport,
-  resolveDocumentDatasets,
-} from "../core/dataset-resolution";
 import { DatasetSourceLinks } from "../core/dataset-sources";
 import {
   datasetActions,
@@ -238,6 +241,7 @@ export const workbenchActions = new Set([
   "export:analyze",
   "export:page",
   "export:site",
+  "packaging:sync",
   "datasets:chooseFile",
   "fs:reveal",
   "settings:chooseHome",
@@ -360,12 +364,32 @@ function readerDelivery(
     throw new CoreError("INVALID_DATA", "Choose the bundled or cdn reader.");
   return args.reader;
 }
-/** "embed" confirms embedding snapshots of datasets read from external files. */
-function externalData(args: Record<string, unknown>): "embed" | undefined {
-  if (args.externalData === undefined) return undefined;
-  if (args.externalData !== "embed")
+/**
+ * The person's packaging decisions {itemId: choice}; "embed" in
+ * externalData carries everything that fits.
+ */
+function packaging(args: Record<string, unknown>): {
+  packaging?: PackagingDecisions;
+  externalData?: "embed";
+} {
+  if (args.externalData !== undefined && args.externalData !== "embed")
     throw new CoreError("INVALID_DATA", 'externalData must be "embed".');
-  return "embed";
+  const decisions = args.packaging;
+  if (decisions === undefined)
+    return args.externalData ? { externalData: "embed" } : {};
+  if (
+    !decisions ||
+    typeof decisions !== "object" ||
+    Array.isArray(decisions) ||
+    Object.values(decisions).some(
+      (choice) => !PACKAGING_CHOICES.includes(choice as never),
+    )
+  )
+    throw new CoreError(
+      "INVALID_DATA",
+      `packaging maps item ids to ${PACKAGING_CHOICES.join(", ")}.`,
+    );
+  return { packaging: decisions as PackagingDecisions };
 }
 
 export interface OpenDialogOptions {
@@ -1593,13 +1617,29 @@ export function createWorkbench(
         };
       }
       case "export:analyze": {
+        // The packaging plan an export would carry, with sizes and the last choices.
         const id = projectId(args);
         const page = text(args, "pageId", true);
+        const format = text(args, "format", true);
+        if (format && !["html", "inline", "site", "json"].includes(format))
+          throw new CoreError("INVALID_DATA", "Unsupported export format.");
         return analyzeExport({
           root: store.root,
           projectId: id,
           ...(page ? { pageId: assertId(page) } : {}),
+          ...(format
+            ? { format: format as "html" | "inline" | "site" | "json" }
+            : {}),
         });
+      }
+      case "packaging:sync": {
+        // What synchronization carries to the project's other devices.
+        const id = projectId(args);
+        const decisions = packaging(args).packaging;
+        if (!decisions) return syncPackagingPlan(store, id);
+        const plan = await setSyncPackaging(store, id, decisions);
+        syncManager(store.root).wake([id]);
+        return plan;
       }
       case "datasets:chooseFile": {
         const id = projectId(args);
@@ -1659,18 +1699,14 @@ export function createWorkbench(
         if (selection.canceled || !selection.filePath) return null;
         await assertExportDestination(store.root, id, selection.filePath);
         if (format === "json") {
-          // Like HTML exports, the file carries the shared data its blocks show.
-          const resolved = await resolveDocumentDatasets(
-            store,
-            id,
-            record.document,
-          );
-          assertExternalSnapshots(
-            externalSnapshotReport([{ pageId: page, bindings: resolved.bindings }]),
-            externalData(args),
-          );
-          const document = resolved.document;
-          const source = serializeArtifact(document, record.components);
+          // Like HTML exports, the file carries what the packaging plan chose.
+          const { packaged } = await packagePage(store, {
+            projectId: id,
+            pageId: page,
+            format: "json",
+            ...packaging(args),
+          });
+          const source = serializeArtifact(packaged.document, record.components);
           await writeFile(selection.filePath, source, "utf8");
           return rememberExport({
             format,
@@ -1687,7 +1723,7 @@ export function createWorkbench(
           presentation: text(args, "presentation", true) as
             "spatial" | "reading" | undefined,
           reader: readerDelivery(args),
-          externalData: externalData(args),
+          ...packaging(args),
           out: selection.filePath,
           overwrite: true,
         }));
@@ -1705,7 +1741,7 @@ export function createWorkbench(
           projectId: id,
           format: "site",
           components: componentDelivery(args),
-          externalData: externalData(args),
+          ...packaging(args),
           out: selection.filePaths[0],
           overwrite: true,
         }));
@@ -1732,7 +1768,16 @@ export function createWorkbench(
         const kind = resourceKind(args);
         if (!isLocalFileRef(ref))
           throw new CoreError("INVALID_DATA", "ref must be a file: reference.");
-        const grant = await localMediaGrants.grant(ref, { reuse: true });
+        // Another device's file shows its synchronized copy (read-only).
+        const grant = await localMediaGrants
+          .grant(ref, { reuse: true })
+          .catch(async (error) => {
+            if (!(error instanceof CoreError && error.code === "NOT_FOUND"))
+              throw error;
+            const copy = await bundledResource(store, ref);
+            if (!copy) throw error;
+            return localMediaGrants.grantCopy(copy.path, ref);
+          });
         if (grant.kind !== kind)
           throw new CoreError(
             "INVALID_DATA",

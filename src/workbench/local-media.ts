@@ -7,6 +7,7 @@ import { CoreError } from "../core/model";
 import { localFilePath } from "../core/local-resources";
 import {
   LOCAL_FILE_TYPES,
+  localRefName,
   type LocalResourceKind,
 } from "../portable/local-files.mjs";
 
@@ -69,6 +70,26 @@ export class LocalMediaGrants {
     const info = await stat(path);
     if (!info.isFile())
       throw new CoreError("INVALID_PATH", `Not a file: ${requested}`);
+    return this.issue(path, basename(path), extname(path), info.size, options);
+  }
+
+  /**
+   * A grant for the synchronized copy of another device's file (see
+   * dataset-bundles), named and typed by the reference the page stores.
+   */
+  async grantCopy(path: string, ref: string): Promise<LocalMediaGrant> {
+    const info = await stat(path);
+    const name = localRefName(ref);
+    return this.issue(path, name, extname(name), info.size, { reuse: true });
+  }
+
+  private issue(
+    path: string,
+    name: string,
+    extension: string,
+    size: number,
+    options: { reuse?: boolean },
+  ): LocalMediaGrant {
     this.prune();
     const expiresAt = this.now() + LIFETIME;
     if (options.reuse) {
@@ -77,17 +98,17 @@ export class LocalMediaGrants {
       if (live) {
         // Refresh its order too, so the oldest unused grants leave first.
         this.grants.delete(live.token);
-        const renewed = { ...live, size: info.size, expiresAt };
+        const renewed = { ...live, size, expiresAt };
         this.grants.set(live.token, renewed);
         return renewed;
       }
     }
-    const type = MEDIA_TYPES[extname(path).toLowerCase()];
+    const type = MEDIA_TYPES[extension.toLowerCase()];
     const grant: LocalMediaGrant = {
       token: randomUUID(),
       path,
-      name: basename(path),
-      size: info.size,
+      name,
+      size,
       expiresAt,
       ...(type ? { kind: type.kind, mime: type.mime } : {}),
     };

@@ -38,6 +38,10 @@ import flowMessages from "../i18n/messages/accountFlow";
 import navigationMessages from "../i18n/messages/navigation";
 import { syncListedProjects } from "./sync-project-list";
 import "./sync-settings.css";
+import {
+  PackagingDialog,
+  type PackagingPlan,
+} from "./PackagingDialog";
 type Status = Omit<SyncConfiguration, "connections"> & {
   connections: Omit<SyncConfiguration["connections"][number], "token">[];
   running: boolean;
@@ -121,6 +125,11 @@ export default function SyncSettings({
   const [showConnect, setShowConnect] = useState(false),
     [server, setServer] = useState("");
   const [issuedToken, setIssuedToken] = useState("");
+  const [packaging, setPackaging] = useState<{
+    projectId: string;
+    name: string;
+    plan: PackagingPlan;
+  } | null>(null);
   const [accountPanel, setAccountPanel] = useState("");
   const [expanded, setExpanded] = useState(""),
     [confirmDetach, setConfirmDetach] = useState(""),
@@ -1185,6 +1194,31 @@ export default function SyncSettings({
                               </button>
                             )}
                           </div>
+                          {binding.role !== "viewer" && (
+                            <div className="sync-detail-row">
+                              <div>
+                                <strong>{t("packagedFiles")}</strong>
+                              </div>
+                              <button
+                                className="settings-button"
+                                disabled={busy}
+                                onClick={() =>
+                                  void run(async () =>
+                                    setPackaging({
+                                      projectId: project.id,
+                                      name: project.name,
+                                      plan: await desktop.invoke<PackagingPlan>(
+                                        "packaging:sync",
+                                        { projectId: project.id },
+                                      ),
+                                    }),
+                                  )
+                                }
+                              >
+                                {t("choosePackagedFiles")}
+                              </button>
+                            </div>
+                          )}
                         </>
                       ) : (
                         <form
@@ -1819,6 +1853,24 @@ export default function SyncSettings({
             )}
           </div>
         </Dialog>
+      )}
+      {packaging && (
+        <PackagingDialog
+          plan={packaging.plan}
+          purpose="sync"
+          onDecide={(decisions) => {
+            const current = packaging;
+            setPackaging(null);
+            if (!decisions) return;
+            void run(async () => {
+              await desktop.invoke("packaging:sync", {
+                projectId: current.projectId,
+                packaging: decisions,
+              });
+              setMessage(t("toast.packaging", { name: current.name }));
+            });
+          }}
+        />
       )}
     </div>
   );

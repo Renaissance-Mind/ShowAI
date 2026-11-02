@@ -136,9 +136,10 @@ import {
 } from "./LibraryNavigation";
 import Dialog from "./Dialog";
 import {
-  ExternalSnapshotDialog,
-  type ExternalSnapshotReport,
-} from "./ExternalSnapshotDialog";
+  PackagingDialog,
+  type PackagingDecisions,
+  type PackagingPlan,
+} from "./PackagingDialog";
 import PageThumbnail from "./PageThumbnail";
 import FolderThumbnail, { type FolderThumbnailEntry } from "./FolderThumbnail";
 import {
@@ -677,9 +678,9 @@ export default function Studio() {
     setQuery("");
   }, [view]);
   const [dialog, setDialog] = useState<DialogState>(null);
-  const [snapshotDecision, setSnapshotDecision] = useState<{
-    report: ExternalSnapshotReport;
-    decide: (embed: boolean) => void;
+  const [packagingDecision, setPackagingDecision] = useState<{
+    plan: PackagingPlan;
+    decide: (decisions: PackagingDecisions | null) => void;
   } | null>(null);
   const dialogRef = useRef(dialog);
   dialogRef.current = dialog;
@@ -1897,23 +1898,27 @@ export default function Studio() {
     );
   }
   /**
-   * Data read from files outside the library is embedded as a snapshot only
-   * after the person sees its size: "embed", undefined (none) or null (cancel).
+   * Files of this device, and data computed from them, leave with an export
+   * only as the person chooses after seeing the list with sizes (starting
+   * from their last choices): the decisions, undefined when nothing needs
+   * choosing, or null when they cancel.
    */
-  async function externalDataChoice(
+  async function packagingChoice(
     projectId: string,
     pageId?: string,
-  ): Promise<"embed" | undefined | null> {
-    const report = await desktop.invoke<ExternalSnapshotReport>(
-      "export:analyze",
-      { projectId, ...(pageId ? { pageId } : {}) },
+    format?: "html" | "json" | "inline" | "site",
+  ): Promise<PackagingDecisions | undefined | null> {
+    const plan = await desktop.invoke<PackagingPlan>("export:analyze", {
+      projectId,
+      ...(pageId ? { pageId } : {}),
+      ...(format ? { format } : {}),
+    });
+    if (!plan.confirm) return undefined;
+    const decisions = await new Promise<PackagingDecisions | null>((decide) =>
+      setPackagingDecision({ plan, decide }),
     );
-    if (!report.datasets.length) return undefined;
-    const embed = await new Promise<boolean>((decide) =>
-      setSnapshotDecision({ report, decide }),
-    );
-    setSnapshotDecision(null);
-    return embed ? "embed" : null;
+    setPackagingDecision(null);
+    return decisions;
   }
   async function exportPage(
     format: "html" | "json" | "inline",
@@ -1925,11 +1930,12 @@ export default function Studio() {
     setBusy(true);
     setContextMenu(null);
     try {
-      const externalData = await externalDataChoice(
+      const packaging = await packagingChoice(
         selectedProject,
         page.draft.id,
+        format,
       );
-      if (externalData === null) return;
+      if (packaging === null) return;
       const result = await desktop.invoke<{ path: string } | null>(
         "export:page",
         {
@@ -1939,7 +1945,7 @@ export default function Studio() {
           components,
           presentation,
           reader,
-          ...(externalData ? { externalData } : {}),
+          ...(packaging ? { packaging } : {}),
         },
       );
       resolveProblem(operation("op.exportPage"));
@@ -1962,14 +1968,14 @@ export default function Studio() {
     if (!selectedProject || !(await page.flush())) return;
     setBusy(true);
     try {
-      const externalData = await externalDataChoice(selectedProject);
-      if (externalData === null) return;
+      const packaging = await packagingChoice(selectedProject, undefined, "site");
+      if (packaging === null) return;
       const result = await desktop.invoke<{ path: string } | null>(
         "export:site",
         {
           projectId: selectedProject,
           components,
-          ...(externalData ? { externalData } : {}),
+          ...(packaging ? { packaging } : {}),
         },
       );
       resolveProblem(operation("op.exportSite"));
@@ -5985,10 +5991,11 @@ export default function Studio() {
             }
           />
         )}
-        {snapshotDecision && (
-          <ExternalSnapshotDialog
-            report={snapshotDecision.report}
-            onDecide={snapshotDecision.decide}
+        {packagingDecision && (
+          <PackagingDialog
+            plan={packagingDecision.plan}
+            purpose="export"
+            onDecide={packagingDecision.decide}
           />
         )}
         {dialog?.type === "pageIcon" && (

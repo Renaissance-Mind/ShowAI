@@ -390,7 +390,16 @@ export function registerPresentationTools(
             action: "link",
             formats: ["json", "csv", "tsv", "xlsx"],
             readOnlyFormats: ["xlsx"],
-            exportConfirmation: { parameter: "externalData", value: "embed" },
+            exportConfirmation: {
+              parameter: "packaging",
+              details: "packaging",
+              everything: { parameter: "externalData", value: "embed" },
+            },
+            sync: {
+              bundled: true,
+              tool: "project_sync",
+              parameter: "packaging",
+            },
           },
           sources: {
             kinds: ["file", "url"],

@@ -129,7 +129,8 @@ export function assertOfflineImages(document) {
     );
 }
 
-async function resourceDataUrl(url, kind = "image") {
+/** Downloads a web resource of a kind into a data: address (at most one resource budget). */
+export async function resourceDataUrl(url, kind = "image") {
   if (!isSafeUrl(url, kind === "image"))
     throw new Error(`Unsupported resource URL: ${url}`);
   const response = await fetch(url, {

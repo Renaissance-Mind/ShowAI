@@ -181,10 +181,21 @@ export function defaultLocalResourceDecisions(
 export async function withLocalResources(
   document: ShowDocument,
   decisions: LocalResourceDecisions = {},
+  options: {
+    /**
+     * Files read from elsewhere than their reference: the synchronized copy
+     * of a file another device shared (see dataset-bundles).
+     */
+    paths?: Record<string, string>;
+  } = {},
 ): Promise<{ document: ShowDocument; resources: LocalResourcePlanItem[] }> {
   const copy = structuredClone(document);
   const resources = (await describeResources(copy, { components: false }))
-    .filter((item) => item.source === "file");
+    .filter((item) => item.source === "file")
+    .map((item) => {
+      const path = options.paths?.[item.id];
+      return path ? { ...item, path, available: true } : item;
+    });
   if (!resources.length) return { document: copy, resources: [] };
   const choices = {
     ...defaultLocalResourceDecisions(copy, resources),

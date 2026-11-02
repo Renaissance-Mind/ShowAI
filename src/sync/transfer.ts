@@ -21,6 +21,7 @@ import type { FolderMetadata } from "../core/model";
 import { parseArtifact, serializeArtifact } from "../portable/validation.mjs";
 import { validatePackageBundle } from "../core/catalog";
 import { validateReaderClosure } from "./dependency-validation";
+import { readBundle, referencedBundles } from "../core/dataset-bundles";
 import {
   syncProtocol,
   legacySyncProtocol,
@@ -115,6 +116,13 @@ export async function captureProject(
       files[name] = id;
       objects.set(id, content);
     }
+  // Copies of linked files travel by content beside the versioned files.
+  for (const hash of referencedBundles(logical)) {
+    const bytes = await readBundle(home, hash);
+    if (!bytes) continue;
+    files[`bundles/${hash}`] = hash;
+    objects.set(hash, bytes);
+  }
   const prefix = `projects/${projectId}/`;
   const snapshot: ProjectSnapshot = {
     format: syncProtocol,
@@ -170,7 +178,11 @@ export async function decodeSnapshot(
   };
   const files = new Map<string, Buffer>();
   for (const path of Object.keys(record.snapshot.files)) {
-    if (/\/pages\/[^/]+\/nodes\//.test(path) || path.startsWith("assets/"))
+    if (
+      /\/pages\/[^/]+\/nodes\//.test(path) ||
+      path.startsWith("assets/") ||
+      path.startsWith("bundles/")
+    )
       continue;
     files.set(path, await decodeFile(path, read));
   }
@@ -781,4 +793,14 @@ export function sameFiles(one: Map<string, Buffer>, two: Map<string, Buffer>) {
     one.size === two.size &&
     [...one].every(([path, bytes]) => two.get(path)?.equals(bytes))
   );
+}
+
+/** Copies of linked files a snapshot carries, by hash (see dataset-bundles). */
+export function snapshotBundles(record: SnapshotRecord): string[] {
+  return Object.entries(record.snapshot.files)
+    .filter(
+      ([path, id]) =>
+        /^bundles\/[a-f0-9]{64}$/.test(path) && path.slice(8) === id,
+    )
+    .map(([, id]) => id);
 }

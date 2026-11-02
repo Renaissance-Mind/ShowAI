@@ -1,3 +1,4 @@
+import { setSyncPackaging, syncPackagingPlan } from "../core/packaging";
 import { CAPACITY, CapacityError } from "../portable/capacity.mjs";
 import { randomUUID } from "node:crypto";
 import { changeContext, withChangeContext } from "../core/history-context";
@@ -728,7 +729,7 @@ export function createMcpServer(options: {
     "page_export",
     {
       description:
-        'Export a Page as HTML, an inline conversation fragment or a static site at out; blockIds exports part of it. Data from files outside the library returns CONFIRMATION_REQUIRED with sizes; repeat with externalData:"embed" after the person agrees.',
+        "Export a Page as HTML, an inline conversation fragment or a static site at out; blockIds exports part of it. Files of this device (or data computed from them) return CONFIRMATION_REQUIRED with details.packaging (items, sizes, choices); repeat with packaging {itemId: choice} after the person decides.",
       inputSchema: {
         pageId: z.string().optional(),
         blockIds: z.array(z.string().min(1)).min(1).optional(),
@@ -738,6 +739,12 @@ export function createMcpServer(options: {
         reader: z.enum(["bundled", "cdn"]).optional(),
         out: z.string().min(1),
         overwrite: z.boolean().optional(),
+        packaging: z
+          .record(
+            z.string(),
+            z.enum(["bundle", "skip", "keep-url", "result", "inputs", "both", "embed"]),
+          )
+          .optional(),
         externalData: z.literal("embed").optional(),
       },
       annotations: write,
@@ -751,6 +758,7 @@ export function createMcpServer(options: {
       out,
       overwrite,
       presentation,
+      packaging,
       externalData,
     }) =>
       call(() =>
@@ -764,6 +772,7 @@ export function createMcpServer(options: {
           out,
           overwrite,
           presentation,
+          packaging,
           externalData,
         }),
       ),
@@ -1254,6 +1263,8 @@ export function createMcpServer(options: {
         projectId,
         connected: !!project,
         ...(project ? { synchronization: project } : { mode: "local" }),
+        // Copies of this device's files that travel to the other devices.
+        packaging: await syncPackagingPlan(service.store, projectId),
       };
     };
     register(
@@ -1269,12 +1280,16 @@ export function createMcpServer(options: {
       "project_sync",
       {
         description:
-          "Synchronize this connected project and return status, error and remoteHead.",
-        inputSchema: {},
+          "Synchronize this connected project and return status, error and remoteHead. packaging {itemId: bundle|skip} first stores the person's choice of which files of this device travel with it.",
+        inputSchema: {
+          packaging: z.record(z.string(), z.enum(["bundle", "skip"])).optional(),
+        },
         annotations: write,
       },
-      () =>
+      ({ packaging }) =>
         call(async () => {
+          if (packaging)
+            await setSyncPackaging(service.store, projectId, packaging);
           const before = await syncState();
           if (!before.connected) return before;
           await syncManager(service.store.root).run(projectId);

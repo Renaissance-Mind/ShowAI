@@ -1001,37 +1001,6 @@ button.studio-tree-chevron:hover {
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
-.external-snapshots table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 13px;
-}
-.external-snapshots th,
-.external-snapshots td {
-  padding: 6px 8px;
-  border-bottom: 1px solid var(--line);
-  text-align: left;
-  vertical-align: top;
-}
-.external-snapshots td:nth-child(3),
-.external-snapshots td:nth-child(4),
-.external-snapshots tfoot td {
-  white-space: nowrap;
-}
-.external-snapshots tfoot th {
-  text-align: right;
-}
-.external-snapshots-path {
-  overflow-wrap: anywhere;
-}
-.external-snapshots-muted {
-  color: var(--muted);
-  font-size: 12px;
-}
-.external-snapshots-warning {
-  color: #b85842;
-  font-size: 12px;
-}
 .studio-template-picker {
   padding: 6px;
 }
@@ -1998,4 +1967,72 @@ button.studio-save-state.is-failed:hover {
 .studio-tree-marker.is-warning {
   color: var(--warning);
   background: color-mix(in srgb, var(--warning) 12%, transparent);
+}
+.packaging-dialog section {
+  display: grid;
+  gap: 4px;
+}
+.packaging-dialog h3 {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+}
+.packaging-dialog ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.packaging-dialog li {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--line);
+}
+.packaging-item {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+.packaging-item strong {
+  font-size: 13px;
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.packaging-meta {
+  color: var(--muted);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+.packaging-warning {
+  color: #b85842;
+  font-size: 12px;
+}
+.packaging-dialog select {
+  flex: none;
+  border: 1px solid var(--line);
+  background: var(--paper);
+  color: var(--text);
+  border-radius: 5px;
+  padding: 5px 8px;
+  font-size: 13px;
+}
+.packaging-total {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 12px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.packaging-total progress {
+  flex: 1;
+  height: 4px;
+}
+.packaging-total.is-over {
+  color: #b85842;
 }

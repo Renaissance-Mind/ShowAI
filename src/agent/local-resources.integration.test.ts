@@ -139,7 +139,32 @@ test("pages keep linked local files, report them, and exports embed them next to
   expect(resources[online]).toMatchObject({ source: "url", kind: "image" });
 
   const out = join(root, "exports", "linked.html");
-  const exported = await ok("page_export", { pageId, format: "html", out });
+  // Local files leave the device only after the person sees the list.
+  const unconfirmed = (
+    await client.callTool({
+      name: "page_export",
+      arguments: { pageId, format: "html", out },
+    })
+  ).structuredContent as any;
+  expect(unconfirmed.error.code).toBe("CONFIRMATION_REQUIRED");
+  const planned = Object.fromEntries(
+    (unconfirmed.error.details.packaging.items as any[]).map((item) => [
+      item.name,
+      [item.kind, item.choice],
+    ]),
+  );
+  expect(planned).toMatchObject({
+    "图 1#草稿.png": ["file-resource", "embed"],
+    "clip.mp4": ["file-resource", "embed"],
+    "gone.png": ["file-resource", "skip"],
+    "online.png": ["url-resource", "keep-url"],
+  });
+  const exported = await ok("page_export", {
+    pageId,
+    format: "html",
+    out,
+    packaging: {},
+  });
   expect(exported.onlineResources).toEqual([online]);
   expect(
     Object.fromEntries(

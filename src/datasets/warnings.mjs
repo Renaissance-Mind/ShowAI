@@ -47,8 +47,15 @@ export const WARNING_CODES = {
     stage: "transform",
     actions: ["ask-agent"],
   },
-  /** The source changed while it was being written. */
-  WRITE_CONFLICT: { level: "warning", stage: "writeback", actions: ["retry"] },
+  /**
+   * The source changed while it was being written, or a linked file and its
+   * synchronized copy were both changed on different devices.
+   */
+  WRITE_CONFLICT: {
+    level: "warning",
+    stage: "writeback",
+    actions: ["retry", "open-file"],
+  },
   /** The source is read-only (online data, spreadsheets, stale copies). */
   READ_ONLY: { level: "info", stage: "writeback", actions: [] },
   /** The source is larger than a dataset may hold. */

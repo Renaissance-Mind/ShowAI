@@ -4,7 +4,6 @@ import {
   type BindingRead,
   type ExternalSnapshotReport,
 } from "../core/dataset-resolution";
-import { CoreError } from "../core/model";
 import { visitNodes } from "../surface/document.mjs";
 import { CAPACITY, assertBytes } from "../portable/capacity.mjs";
 import {
@@ -28,7 +27,6 @@ import {
   sep,
 } from "node:path";
 import { FileStore } from "../core/store";
-import { LibraryOperations } from "../core/library-operations";
 import { resolveDocumentComponents } from "../core/catalog";
 import { resolvePublishedComponents } from "../core/publication";
 import { publicationRefKey } from "../portable/remote.mjs";
@@ -40,6 +38,19 @@ import {
   type LocalResourceDecisions,
   type LocalResourcePlanItem,
 } from "../core/local-resources";
+import {
+  applyPackaging,
+  assertPackagingConfirmed,
+  exportPackagingPlan,
+  exportReceipt,
+  previousChoices,
+  rememberChoices,
+  type ExportPagePlanInput,
+  type PackagedDocument,
+  type PackagingDecisions,
+  type PackagingFormat,
+  type PackagingPlan,
+} from "../core/packaging";
 import { toCdnPage } from "../portable/cdn-fragment.mjs";
 import { conversationPreview } from "../core/conversation-preview";
 import {
@@ -77,15 +88,18 @@ export interface ExportOptions {
   /** Inline prefers the compressed local reader, with CDN as a size fallback. */
   reader?: ReaderMode;
   /**
-   * "embed" confirms embedding snapshots of datasets read from files outside
-   * the library. Without it such an export stops with CONFIRMATION_REQUIRED
-   * and the sizes, and writes nothing.
+   * What the export carries, by packaging item id (see core/packaging):
+   * the person's decisions after seeing the plan. An export with files of
+   * this device (or data computed from them) and no decisions stops with
+   * CONFIRMATION_REQUIRED and details.packaging, and writes nothing. Items
+   * left out take the choice the plan shows.
    */
+  packaging?: PackagingDecisions;
+  /** "embed" confirms carrying everything that fits (the plan's defaults). */
   externalData?: "embed";
   /**
-   * Per local file (by its file: reference): "embed" its bytes or "skip" it,
-   * keeping only its name. Files left out embed when they fit the resource
-   * budget and are skipped otherwise.
+   * Per local file (by its file: reference): "embed" or "skip"; the same
+   * as packaging decisions for those items.
    */
   resources?: LocalResourceDecisions;
 }
@@ -104,6 +118,10 @@ export interface ExportResult {
   externalSnapshots?: ExternalSnapshotReport;
   /** Local files of resource fields and what the export carries for each. */
   localResources?: LocalResourcePlanItem[];
+  /** Every packaging item and its choice, without paths of this device. */
+  packaging?: ReturnType<typeof exportReceipt>;
+  /** Snapshots of transform inputs written beside the export ("inputs" or "both"). */
+  inputFiles?: string[];
   /** Web addresses of resource fields, kept as they are; readers load them online. */
   onlineResources?: string[];
 }
@@ -138,52 +156,137 @@ function blockIdsOf(document: ShowDocument): string[] {
   return ids;
 }
 
-/**
- * Stops an export that would embed external data the person has not
- * agreed to, reporting what it would embed.
- */
-export function assertExternalSnapshots(
-  report: ExternalSnapshotReport,
-  externalData: "embed" | undefined,
-): void {
-  if (!report.datasets.length || externalData === "embed") return;
-  const listed = report.datasets
-    .map(
-      (item) =>
-        `"${item.name ?? item.datasetId}" ${
-          item.available
-            ? formatBytes(item.snapshotBytes)
-            : "(file unavailable; its blocks would be exported without data)"
-        }`,
-    )
-    .join(", ");
-  const error = new CoreError(
-    "CONFIRMATION_REQUIRED",
-    `This export embeds snapshots of ${report.datasets.length} dataset(s) read from files outside the library: ${listed}; ${formatBytes(report.snapshotBytes)} in all. Nothing was written. Show these sizes to the person and export again with externalData "embed" only if they agree.`,
+/** Bindings whose data an export carries, for the externalSnapshots report. */
+function carried(bindings: BindingRead[], plan: PackagingPlan): BindingRead[] {
+  const left = new Set(
+    plan.items
+      .filter((item) => item.datasetId && !["bundle", "result", "both"].includes(item.choice))
+      .map((item) => `${item.projectId}/${item.datasetId}`),
   );
-  error.details = { externalSnapshots: report };
-  throw error;
+  return bindings.filter(
+    (binding) => !left.has(`${binding.projectId}/${binding.datasetId}`),
+  );
+}
+
+/** Whether the person confirmed what an export carries. */
+const confirmedPackaging = (options: {
+  packaging?: PackagingDecisions;
+  externalData?: "embed";
+  resources?: LocalResourceDecisions;
+}) =>
+  options.packaging !== undefined ||
+  options.externalData === "embed" ||
+  options.resources !== undefined;
+
+/**
+ * The packaging plan of exported pages: the person's previous choices apply
+ * unless externalData "embed" asks for everything that fits.
+ */
+async function packagingPlan(
+  store: FileStore,
+  options: {
+    projectId: string;
+    packaging?: PackagingDecisions;
+    externalData?: "embed";
+    resources?: LocalResourceDecisions;
+  },
+  pages: ExportPagePlanInput[],
+  format: PackagingFormat,
+): Promise<PackagingPlan> {
+  const decisions = { ...options.resources, ...options.packaging };
+  return exportPackagingPlan(store, {
+    projectId: options.projectId,
+    pages,
+    format,
+    previous:
+      options.externalData === "embed"
+        ? {}
+        : await previousChoices(store, options.projectId),
+    ...(Object.keys(decisions).length ? { decisions } : {}),
+  });
 }
 
 /**
- * What an export of these pages or blocks would embed from external
- * datasets, without building it.
+ * Resolves a page for export, plans and checks what it carries, and
+ * applies the plan: the document as exported, with its plan.
+ */
+export async function packagePage(
+  store: FileStore,
+  options: {
+    projectId: string;
+    pageId: string;
+    blockIds?: string[];
+    format: PackagingFormat;
+    packaging?: PackagingDecisions;
+    externalData?: "embed";
+    resources?: LocalResourceDecisions;
+  },
+): Promise<{
+  plan: PackagingPlan;
+  packaged: PackagedDocument;
+  bindings: BindingRead[];
+  blockIds?: string[];
+}> {
+  const record = await store.readPage(options.projectId, options.pageId, {
+    checkpoint: false,
+  });
+  // Shared data is resolved into the exported copy; the reader has no library.
+  const resolved = await resolveDocumentDatasets(
+    store,
+    options.projectId,
+    record.document,
+  );
+  const shown = options.blockIds
+    ? selectDocumentBlocks(resolved.document, options.blockIds)
+    : resolved.document;
+  const blockIds = options.blockIds ? blockIdsOf(shown) : undefined;
+  const plan = await packagingPlan(
+    store,
+    options,
+    [
+      {
+        pageId: options.pageId,
+        document: record.document,
+        bindings: resolved.bindings,
+        ...(blockIds ? { blockIds } : {}),
+        shown,
+      },
+    ],
+    options.format,
+  );
+  assertPackagingConfirmed(plan, confirmedPackaging(options));
+  const packaged = await applyPackaging(store, plan, {
+    pageId: options.pageId,
+    original: options.blockIds
+      ? selectDocumentBlocks(record.document, options.blockIds)
+      : record.document,
+    resolved: shown,
+  });
+  if (options.packaging !== undefined) await rememberChoices(store, plan);
+  return {
+    plan,
+    packaged,
+    bindings: resolved.bindings,
+    ...(blockIds ? { blockIds } : {}),
+  };
+}
+
+/**
+ * What an export of a page (or every active page) would carry, without
+ * building it: the packaging plan with sizes and the choices in effect.
  */
 export async function analyzeExport(options: {
   root?: string;
   projectId: string;
   pageId?: string;
   blockIds?: string[];
-}): Promise<ExternalSnapshotReport> {
+  format?: PackagingFormat;
+}): Promise<PackagingPlan> {
   const store = new FileStore(options.root);
   const pages = options.pageId
     ? [{ id: options.pageId }]
     : await store.listPages(options.projectId, { includeArchived: false });
-  const resolved: {
-    pageId: string;
-    bindings: BindingRead[];
-    blockIds?: string[];
-  }[] = [];
+  const planned: ExportPagePlanInput[] = [];
   for (const page of pages) {
     const record = await store.readPage(options.projectId, page.id, {
       checkpoint: false,
@@ -194,19 +297,55 @@ export async function analyzeExport(options: {
       options.projectId,
       record.document,
     );
-    resolved.push({
+    const shown = options.blockIds
+      ? selectDocumentBlocks(document, options.blockIds)
+      : document;
+    planned.push({
       pageId: page.id,
+      document: record.document,
       bindings,
-      ...(options.blockIds
-        ? {
-            blockIds: blockIdsOf(
-              selectDocumentBlocks(document, options.blockIds),
-            ),
-          }
-        : {}),
+      ...(options.blockIds ? { blockIds: blockIdsOf(shown) } : {}),
+      shown,
     });
   }
-  return externalSnapshotReport(resolved);
+  return packagingPlan(
+    store,
+    options,
+    planned,
+    options.format ?? (options.pageId ? "html" : "site"),
+  );
+}
+
+/** Writes the input snapshots of transforms beside an export. */
+async function writeInputSnapshots(
+  store: FileStore,
+  projectId: string,
+  directory: string,
+  inputs: PackagedDocument["inputs"],
+  overwrite: boolean,
+): Promise<string[]> {
+  const written = new Map<string, PackagedDocument["inputs"][number]>();
+  for (const input of inputs)
+    written.set(`${input.projectId}/${input.datasetId}`, input);
+  if (!written.size) return [];
+  const paths: string[] = [];
+  for (const input of written.values()) {
+    const path = join(
+      directory,
+      `${encodeURIComponent(input.projectId === projectId ? input.datasetId : `${input.projectId}-${input.datasetId}`)}.json`,
+    );
+    await assertExportDestination(store.root, projectId, path);
+    await assertDestination(path, overwrite);
+    paths.push(path);
+  }
+  await mkdir(directory, { recursive: true });
+  for (const [index, input] of [...written.values()].entries())
+    await writeFile(
+      paths[index],
+      `${JSON.stringify({ format: "showai-dataset-snapshot", version: 1, name: input.name, value: input.value }, null, 2)}\n`,
+      { flag: overwrite ? "w" : "wx" },
+    );
+  return paths;
 }
 
 async function exists(path: string): Promise<boolean> {
@@ -410,51 +549,30 @@ export async function exportPage(
   if (options.format !== "site") {
     if (!options.pageId)
       throw new Error("A page id is required for html or inline export.");
-    const historical = options.importedSnapshot
-      ? await new LibraryOperations(store.root).importedPage(
-          options.projectId,
-          options.pageId,
-          options.importedSnapshot,
-        )
-      : options.revision
-        ? await new LibraryOperations(store.root).pageAt(
-            options.projectId,
-            options.pageId,
-            options.revision,
-          )
-        : null;
-    const record =
-      historical ??
-      (await store.readPage(options.projectId, options.pageId, {
-        checkpoint: false,
-      }));
-    // Shared data is resolved into the exported copy; the reader has no library.
-    const resolved = await resolveDocumentDatasets(
-      store,
-      options.projectId,
-      record.document,
-    );
-    const fullDocument = resolved.document;
-    const selected = selection
-      ? selectDocumentBlocks(fullDocument, selection.blockIds)
-      : fullDocument;
-    const local = await withLocalResources(selected, options.resources);
-    const sourceDocument = local.document;
+    const { plan, packaged, bindings } = await packagePage(store, {
+      projectId: options.projectId,
+      pageId: options.pageId,
+      ...(selection ? { blockIds: selection.blockIds } : {}),
+      format: options.format,
+      ...(options.packaging !== undefined
+        ? { packaging: options.packaging }
+        : {}),
+      ...(options.externalData ? { externalData: options.externalData } : {}),
+      ...(options.resources ? { resources: options.resources } : {}),
+    });
+    const sourceDocument = packaged.document;
     const externalSnapshots = externalSnapshotReport([
       {
         pageId: options.pageId,
-        bindings: resolved.bindings,
+        bindings: carried(bindings, plan),
         ...(selection ? { blockIds: blockIdsOf(sourceDocument) } : {}),
       },
     ]);
-    assertExternalSnapshots(externalSnapshots, options.externalData);
-    const components =
-      historical?.components ??
-      (await resolveDocumentComponents(
-        store.root,
-        sourceDocument,
-        options.projectId,
-      ));
+    const components = await resolveDocumentComponents(
+      store.root,
+      sourceDocument,
+      options.projectId,
+    );
     const document = lockedDocument(sourceDocument, components);
     const remoteComponents =
       componentMode === "remote"
@@ -508,6 +626,13 @@ export async function exportPage(
       },
     );
     await writeFile(out, result, { flag: options.overwrite ? "w" : "wx" });
+    const inputFiles = await writeInputSnapshots(
+      store,
+      options.projectId,
+      `${out.slice(0, out.length - extname(out).length)}.inputs`,
+      packaged.inputs,
+      !!options.overwrite,
+    );
     return {
       format: options.format,
       projectId: options.projectId,
@@ -520,7 +645,9 @@ export async function exportPage(
       reader: deliveredReader,
       requiresNetwork: deliveredReader === "cdn" || remoteComponents.length > 0,
       ...(externalSnapshots.datasets.length ? { externalSnapshots } : {}),
-      ...resourceReport([document], local.resources),
+      ...resourceReport([document], packaged.resources),
+      ...(plan.items.length ? { packaging: exportReceipt(plan) } : {}),
+      ...(inputFiles.length ? { inputFiles } : {}),
     };
   }
 
@@ -545,20 +672,39 @@ export async function exportPage(
       ),
     )
   ).filter(({ document }) => options.pageId || !document.archived);
+  if (!resolvedPages.length)
+    throw new Error("This project has no active pages to export.");
+  const originals = new Map(
+    records.map((record) => [record.document.id, record.document]),
+  );
+  const plan = await packagingPlan(
+    store,
+    options,
+    resolvedPages.map(({ document, bindings }) => ({
+      pageId: document.id,
+      document: originals.get(document.id)!,
+      bindings,
+      shown: document,
+    })),
+    "site",
+  );
+  assertPackagingConfirmed(plan, confirmedPackaging(options));
   const externalSnapshots = externalSnapshotReport(
     resolvedPages.map(({ document, bindings }) => ({
       pageId: document.id,
-      bindings,
+      bindings: carried(bindings, plan),
     })),
   );
-  assertExternalSnapshots(externalSnapshots, options.externalData);
-  if (!resolvedPages.length)
-    throw new Error("This project has no active pages to export.");
-  const localPages = await Promise.all(
-    resolvedPages.map(({ document }) =>
-      withLocalResources(document, options.resources),
-    ),
-  );
+  const localPages: PackagedDocument[] = [];
+  for (const { document } of resolvedPages)
+    localPages.push(
+      await applyPackaging(store, plan, {
+        pageId: document.id,
+        original: originals.get(document.id)!,
+        resolved: document,
+      }),
+    );
+  if (options.packaging !== undefined) await rememberChoices(store, plan);
   let documents = localPages.map(({ document }) => document);
   const pageComponents = await Promise.all(
     documents.map((document) =>
@@ -756,6 +902,14 @@ export async function exportPage(
         { force: true },
       );
   }
+  // A site written again keeps its input snapshots in step with its pages.
+  const inputFiles = await writeInputSnapshots(
+    store,
+    options.projectId,
+    join(out, "inputs"),
+    localPages.flatMap((page) => page.inputs),
+    true,
+  );
   await writeFile(
     join(out, "showai-site.json"),
     JSON.stringify(
@@ -786,5 +940,7 @@ export async function exportPage(
       documents,
       localPages.flatMap(({ resources }) => resources),
     ),
+    ...(plan.items.length ? { packaging: exportReceipt(plan) } : {}),
+    ...(inputFiles.length ? { inputFiles } : {}),
   };
 }

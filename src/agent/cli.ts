@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import type { PackagingChoice } from "../core/packaging";
 import { CAPACITY, assertBytes } from "../portable/capacity.mjs";
 import { mkdir, readFile, writeFile, stat } from "node:fs/promises";
 import { dirname, resolve, join } from "node:path";
@@ -104,7 +105,8 @@ Discover only what you need:
 Display a full page or selected blocks:
   export --project PROJECT --page PAGE [--blocks ID,ID] --format html|inline --out PATH [--reader bundled|cdn]
     html defaults to an offline page; --reader cdn writes a small online page. inline uses the CDN reader when available.
-    Pages showing data from files outside the library stop with the snapshot sizes; add --external-data embed once agreed.
+    Pages with files of this device stop with the packaging plan (items, sizes, choices); pass the person's
+    choices with --packaging DECISIONS.json ({itemId: choice}), or --external-data embed for everything that fits.
 
 Read one Page through structured data, an image or interactive HTML:
   boards read PAGE --project PROJECT [--board BOARD_NODE] [--state OPTIONS.json]
@@ -232,6 +234,7 @@ function parseArguments(args: string[]): Arguments {
     "invite",
     "use",
     "external-data",
+    "packaging",
     "refresh-seconds",
     "inputs",
     "script",
@@ -1064,6 +1067,13 @@ async function runCliCommand(argv: string[]): Promise<unknown> {
           : {}),
         presentation: option(args, "presentation") as
           "spatial" | "reading" | undefined,
+        ...(option(args, "packaging")
+          ? {
+              packaging: (await readJson(
+                option(args, "packaging", true)!,
+              )) as Record<string, PackagingChoice>,
+            }
+          : {}),
         ...(option(args, "external-data")
           ? {
               externalData: (() => {

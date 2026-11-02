@@ -49,12 +49,33 @@ export const REMOTE_FETCH = {
   publicAddressesOnly: false,
 };
 
+/**
+ * Whether synchronization carries a copy of a linked file to the project's
+ * other devices, and which copy: the file's bytes stored once under
+ * bundles/<hash> (see dataset-bundles), outside history.
+ */
+export interface SourceBundle {
+  sync: boolean;
+  /** sha256 of the bundled copy; absent until a copy was made. */
+  hash?: string;
+  /**
+   * The copy shared from the linked file that this copy derives from: the
+   * copy itself when the file's device shared it, the copy edited when
+   * another device changed it. Tells an edit made on top of the file's
+   * latest version from a concurrent one.
+   */
+  base?: string;
+  bytes?: number;
+  updatedAt?: string;
+}
 /** The synchronized part of a linked file, stored in the dataset file. */
 export interface FileSource {
   kind: "file";
   format: SourceFormat;
   /** File name when it was linked; a hint for linking on another device. */
   name?: string;
+  /** Packaging for synchronization; absent means bundled while it fits. */
+  bundle?: SourceBundle;
 }
 /** Online data, read-only; the address is synchronized with the project. */
 export interface UrlSource {
@@ -131,6 +152,27 @@ const validUrl = (value: unknown) => {
   );
 };
 
+export function isSourceBundle(value: unknown): value is SourceBundle {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const bundle = value as Record<string, unknown>;
+  return (
+    typeof bundle.sync === "boolean" &&
+    [bundle.hash, bundle.base].every(
+      (hash) =>
+        hash === undefined ||
+        (typeof hash === "string" && /^[a-f0-9]{64}$/.test(hash)),
+    ) &&
+    (bundle.bytes === undefined ||
+      (Number.isSafeInteger(bundle.bytes) && (bundle.bytes as number) >= 0)) &&
+    (bundle.updatedAt === undefined ||
+      (typeof bundle.updatedAt === "string" &&
+        Number.isFinite(Date.parse(bundle.updatedAt)))) &&
+    Object.keys(bundle).every((name) =>
+      ["sync", "hash", "base", "bytes", "updatedAt"].includes(name),
+    )
+  );
+}
+
 export function isDatasetSource(value: unknown): value is DatasetSource {
   if (!value || typeof value !== "object" || Array.isArray(value)) return false;
   const source = value as Record<string, unknown>;
@@ -141,8 +183,9 @@ export function isDatasetSource(value: unknown): value is DatasetSource {
   if (source.kind === "file")
     return (
       common &&
+      (source.bundle === undefined || isSourceBundle(source.bundle)) &&
       Object.keys(source).every((name) =>
-        ["kind", "format", "name"].includes(name),
+        ["kind", "format", "name", "bundle"].includes(name),
       )
     );
   return (
@@ -599,11 +642,12 @@ export interface ExternalRead {
 const stampOf = (info: { size: number; mtimeMs: number; ino: number }) =>
   `${info.ino}:${info.size}:${info.mtimeMs}`;
 
-export async function readExternal(
+/** The bytes of a linked file with the identity of the version read. */
+export async function readExternalBytes(
   path: string,
-  format: SourceFormat,
   limit: number,
-): Promise<ExternalRead> {
+  holds = "a dataset holds",
+): Promise<{ bytes: Buffer; stamp: string; size: number; modifiedAt: Date }> {
   const file = await open(path, "r");
   try {
     const before = await file.stat();
@@ -616,7 +660,7 @@ export async function readExternal(
     if (before.size > limit)
       throw sourceFailure(
         "INVALID_DATA",
-        `${basename(path)} is ${before.size} bytes; a dataset holds at most ${limit} bytes.`,
+        `${basename(path)} is ${before.size} bytes; ${holds} at most ${limit} bytes.`,
         "TOO_LARGE",
       );
     const bytes = await file.readFile();
@@ -626,25 +670,39 @@ export async function readExternal(
         "CONFLICT",
         `${basename(path)} is still being written. Retry when it finishes.`,
       );
-    const { value, layout } = await parseSourceBytes(
-      bytes,
-      format,
-      basename(path),
-    );
     return {
-      value,
-      layout,
+      bytes,
       stamp: stampOf(after),
-      state: {
-        path,
-        format,
-        bytes: after.size,
-        modifiedAt: after.mtime.toISOString(),
-      },
+      size: after.size,
+      modifiedAt: after.mtime,
     };
   } finally {
     await file.close();
   }
+}
+
+export async function readExternal(
+  path: string,
+  format: SourceFormat,
+  limit: number,
+): Promise<ExternalRead> {
+  const read = await readExternalBytes(path, limit);
+  const { value, layout } = await parseSourceBytes(
+    read.bytes,
+    format,
+    basename(path),
+  );
+  return {
+    value,
+    layout,
+    stamp: read.stamp,
+    state: {
+      path,
+      format,
+      bytes: read.size,
+      modifiedAt: read.modifiedAt.toISOString(),
+    },
+  };
 }
 
 /**
@@ -654,7 +712,7 @@ export async function readExternal(
  */
 export async function writeExternal(
   path: string,
-  text: string,
+  text: string | Buffer,
   expected: string | null,
 ): Promise<void> {
   const current = await stat(path).catch((error: NodeJS.ErrnoException) => {
@@ -920,6 +978,42 @@ export async function fetchSource(
 // ---------------------------------------------------------------------------
 // Watching linked files
 
+/** Projects this device synchronizes, with its role in each. */
+async function synchronizedProjects(home: string) {
+  const bytes = await readLibraryBytes(
+    home,
+    join(home, "local", "sync", "config.json"),
+  );
+  const config = bytes
+    ? (JSON.parse(bytes.toString()) as {
+        projects?: { projectId: string; role?: string }[];
+      })
+    : {};
+  return new Map(
+    (config.projects ?? []).map((project) => [project.projectId, project.role]),
+  );
+}
+
+/** Shares changed linked files of synchronized projects as their bundled copies. */
+async function shareChangedFiles(store: FileStore, keys: string[]) {
+  const synchronized = await synchronizedProjects(store.root);
+  const targets = keys
+    .map((name) => name.split("/") as [string, string])
+    .filter(([projectId, datasetId]) => {
+      const role = synchronized.get(projectId);
+      return datasetId && role && role !== "viewer";
+    });
+  if (!targets.length) return;
+  // Loaded on demand: the dataset store itself reads sources through this module.
+  const { DatasetStore } = await import("./datasets");
+  const datasets = new DatasetStore(store);
+  for (const [projectId, datasetId] of targets)
+    await datasets.reconcileBundle(projectId, datasetId).catch((error) => {
+      if (error instanceof CoreError && error.code === "NOT_FOUND") return;
+      throw error;
+    });
+}
+
 /**
  * Reports changes of this device's linked files (and of the links
  * themselves) as dataset keys, together with the transforms computed from
@@ -941,6 +1035,10 @@ export function watchDatasetSources(
     if (closed || !pending.size) return;
     const keys = [...pending];
     pending.clear();
+    // A changed file of a synchronized project becomes its new shared copy.
+    void shareChangedFiles(store, keys).catch((error) =>
+      console.error("ShowAI dataset sources:", error),
+    );
     void datasetDependents(store, keys)
       .then((dependents) => {
         if (!closed) onChange([...keys, ...dependents]);

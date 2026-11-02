@@ -15,6 +15,8 @@ export const CAPACITY: Readonly<{
   publicationTransferBytes: number;
   syncManifestBytes: number;
   syncObjectBytes: number;
+  packageItemBytes: number;
+  packageTotalBytes: number;
   chatBytes: number;
   mcpImageBytes: number;
 }>;

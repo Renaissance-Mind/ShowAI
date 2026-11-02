@@ -137,6 +137,8 @@ export function scopedPath(path: string, projectId: string): string {
     !(
       path.startsWith(`projects/${identifier(projectId)}/`) ||
       /^assets\/[a-f0-9]{64}$/.test(path) ||
+      // Copies of linked files (dataset-bundles); synchronized, not versioned.
+      /^bundles\/[a-f0-9]{64}$/.test(path) ||
       /^runtimes\/readers\/[a-f0-9]{64}\//.test(path) ||
       /^packages\/(?:published\/)?(?:components|templates)\//.test(path)
     )

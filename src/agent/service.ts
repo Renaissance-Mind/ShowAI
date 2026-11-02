@@ -1,3 +1,4 @@
+import type { PackagingDecisions } from "../core/packaging";
 import { CatalogService, type CatalogSelection } from "./catalog-service";
 export type { CatalogSelection } from "./catalog-service";
 import { blocksDocument } from "./page-authoring";
@@ -875,6 +876,7 @@ export class AgentService extends CatalogService {
     reader?: "bundled" | "cdn";
     revision?: string;
     importedSnapshot?: { importId: string; snapshotId: string };
+    packaging?: PackagingDecisions;
     externalData?: "embed";
   }) {
     return exportPage({

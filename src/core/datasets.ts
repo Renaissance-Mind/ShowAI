@@ -34,7 +34,9 @@ import {
   fetchSource,
   fileProblem,
   isDatasetSource,
+  parseSourceBytes,
   readExternal,
+  readExternalBytes,
   refreshSeconds,
   serializeSource,
   sourceFormat,
@@ -44,6 +46,8 @@ import {
   type DatasetSource,
   type ExternalFileState,
   type ExternalRead,
+  type FileLayout,
+  type FileSource,
   type RemoteSourceState,
   type SourceFormat,
   type UrlSource,
@@ -54,6 +58,13 @@ import {
   type CachedValue,
 } from "./dataset-cache";
 import { TRANSFORM_LIMITS, runTransform } from "./dataset-transform";
+import {
+  BundleAgreements,
+  bundleHash,
+  datasetBundleKey,
+  readBundle,
+  storeBundle,
+} from "./dataset-bundles";
 import { transformsReading } from "./dataset-dependents";
 import {
   datasetWarning,
@@ -133,6 +144,11 @@ export interface DatasetRecord {
   /** The online data the value was fetched from (for a stale value, as last fetched). */
   remote?: RemoteSourceState;
   /**
+   * The copy of another device's linked file that synchronization carried
+   * here (source.bundle); read when this device links no file of its own.
+   */
+  bundled?: BundledCopyState;
+  /**
    * ok: the value was read now (online data: within its refresh interval).
    * stale: the source cannot be read; the value is the last one read on
    * this device, from cachedAt, and cannot be written.
@@ -146,10 +162,19 @@ export interface DatasetRecord {
   /** A transform dataset: its inputs as read and its last run. */
   transform?: TransformReadInfo;
 }
+/** A synchronized copy of a linked file, as read on a device without the file. */
+export interface BundledCopyState {
+  hash: string;
+  format: SourceFormat;
+  bytes: number;
+  updatedAt?: string;
+}
 /** An external source as listed: linked on this device and readable, or why not. */
 export type DatasetSourceSummary = DatasetSource & {
   path?: string;
   bytes?: number;
+  /** Read from the synchronized copy of another device's file. */
+  bundled?: boolean;
   available: boolean;
   error?: string;
 };
@@ -509,7 +534,9 @@ function sourceUnavailable(
     "SOURCE_UNAVAILABLE",
     source?.kind === "url"
       ? `Dataset "${dataset.name}" reads ${source.url}, which cannot be read now (${problem}).`
-      : path
+      : reason === "NOT_BUNDLED"
+        ? `Dataset "${dataset.name}" reads a file of another device${source?.name ? ` (${source.name})` : ""}; ${problem}. Link this device's copy with dataset_write(action:link) or in the shared data dialog, or let the device that links it include the file in synchronization.`
+        : path
         ? `Dataset "${dataset.name}" reads ${path}, which cannot be read on this device (${problem}). Fix or restore the file, or link another file with dataset_write(action:link).`
         : `Dataset "${dataset.name}" reads an external file${source?.name ? ` (${source.name})` : ""} that is not linked on this device. Link it with dataset_write(action:link) or in the shared data dialog.`,
   );
@@ -637,7 +664,12 @@ interface LoadedDataset {
   record: DatasetRecord;
   /** The external file as read, for a write that replaces it. */
   read?: ExternalRead;
+  /** The synchronized copy as read, for a write that replaces it. */
+  bundle?: { layout: FileLayout; format: SourceFormat };
 }
+
+/** Cache origin of values read from a synchronized copy. */
+const bundleOrigin = (source: FileSource) => `bundle:${source.format}`;
 
 const later = (a: string, b?: string) => (b && b > a ? b : a);
 
@@ -671,10 +703,12 @@ export class DatasetStore {
   private readonly files;
   readonly links: DatasetSourceLinks;
   readonly cache: DatasetValueCache;
+  readonly agreements: BundleAgreements;
   constructor(readonly store: FileStore) {
     this.files = store.datasetFiles();
     this.links = new DatasetSourceLinks(store.root);
     this.cache = new DatasetValueCache(store.root);
+    this.agreements = new BundleAgreements(store.root);
   }
   get root() {
     return this.files.root;
@@ -756,6 +790,86 @@ export class DatasetStore {
       value: read.value,
     });
     return read;
+  }
+
+  /**
+   * The synchronized copy of another device's linked file, for a device that
+   * links no file of its own; keeps the value as last good.
+   */
+  private async readBundled(
+    projectId: string,
+    dataset: DatasetDocument,
+  ): Promise<{ value: unknown; layout: FileLayout; state: BundledCopyState }> {
+    const source = dataset.source as FileSource;
+    const bundle = source.bundle;
+    if (!bundle)
+      throw sourceUnavailable(
+        dataset,
+        undefined,
+        "not linked",
+        "SOURCE_NOT_LINKED",
+      );
+    const copy =
+      bundle.sync && bundle.hash
+        ? await readBundle(this.root, bundle.hash)
+        : undefined;
+    if (!copy)
+      throw sourceUnavailable(
+        dataset,
+        undefined,
+        !bundle.sync
+          ? "it is synchronized without its file"
+          : bundle.hash
+            ? "its synchronized copy has not arrived on this device yet"
+            : "the device that links it has not shared a copy yet",
+        "NOT_BUNDLED",
+      );
+    const name = source.name ?? dataset.name;
+    let parsed: { value: unknown; layout: FileLayout };
+    try {
+      parsed = await parseSourceBytes(copy, source.format, name);
+      assertDatasetValue(parsed.value, dataset.schema, name);
+    } catch (error) {
+      const { problem, reason } = problemOf(error);
+      throw sourceUnavailable(dataset, undefined, problem, reason);
+    }
+    await this.cache.write({
+      projectId,
+      datasetId: dataset.id,
+      origin: bundleOrigin(source),
+      bytes: copy.length,
+      value: parsed.value,
+    });
+    return {
+      ...parsed,
+      state: {
+        hash: bundle.hash!,
+        format: source.format,
+        bytes: copy.length,
+        ...(bundle.updatedAt ? { updatedAt: bundle.updatedAt } : {}),
+      },
+    };
+  }
+
+  /** Why this device's file and its synchronized copy disagree, if they do. */
+  private async bundleWarnings(
+    projectId: string,
+    dataset: DatasetDocument,
+    path: string,
+  ): Promise<DatasetWarning[]> {
+    const source = dataset.source as FileSource;
+    if (!source.bundle?.sync) return [];
+    const agreement = await this.agreements.get(
+      datasetBundleKey(projectId, dataset.id),
+    );
+    if (!agreement?.conflict) return [];
+    return [
+      datasetWarning(
+        "WRITE_CONFLICT",
+        dataset.id,
+        `${basename(path)} changed on this device while another device edited the synchronized copy of "${dataset.name}". The file was kept as it is and the other version stays in the project's synchronized copy. Change the file to combine both versions; its next change is shared with the other devices.`,
+      ),
+    ];
   }
 
   /**
@@ -900,7 +1014,29 @@ export class DatasetStore {
           },
         };
       }
-      const read = await this.readFile(projectId, stored);
+      const linked = await this.links.get(projectId, stored.id);
+      if (!linked) {
+        // Another device's file, as synchronization carried it here.
+        const copy = await this.readBundled(projectId, stored);
+        const dataset = {
+          ...stored,
+          updatedAt: later(stored.updatedAt, copy.state.updatedAt),
+          value: copy.value,
+        };
+        return {
+          record: {
+            dataset,
+            hash: datasetHash(dataset),
+            ...base,
+            bundled: copy.state,
+            status: "ok",
+            editable,
+            warnings: [],
+          },
+          bundle: { layout: copy.layout, format: source.format },
+        };
+      }
+      const read = await this.readFile(projectId, stored, linked);
       const dataset = {
         ...stored,
         updatedAt: later(stored.updatedAt, read.state.modifiedAt),
@@ -914,7 +1050,7 @@ export class DatasetStore {
           external: read.state,
           status: "ok",
           editable,
-          warnings: [],
+          warnings: await this.bundleWarnings(projectId, stored, linked),
         },
         read,
       };
@@ -926,7 +1062,7 @@ export class DatasetStore {
         throw error;
       const linked = (error.details?.source as { path?: string } | undefined)
         ?.path;
-      // An unlinked file has no source to have been read from on this device.
+      // An unlinked file was read here only from its synchronized copy.
       const cached =
         source.kind === "url" || linked
           ? await this.cache.read(
@@ -934,7 +1070,9 @@ export class DatasetStore {
               stored.id,
               cacheOrigin(source, linked),
             )
-          : undefined;
+          : source.bundle
+            ? await this.cache.read(projectId, stored.id, bundleOrigin(source))
+            : undefined;
       if (!cached) throw error;
       const dataset = { ...stored, value: cached.value };
       return {
@@ -951,14 +1089,16 @@ export class DatasetStore {
                   fetchedAt: cached.readAt,
                 },
               }
-            : {
-                external: {
-                  path: linked!,
-                  format: source.format,
-                  bytes: cached.bytes,
-                  modifiedAt: cached.readAt,
-                },
-              }),
+            : linked
+              ? {
+                  external: {
+                    path: linked,
+                    format: source.format,
+                    bytes: cached.bytes,
+                    modifiedAt: cached.readAt,
+                  },
+                }
+              : {}),
           status: "stale",
           editable: false,
           warnings: [unavailableWarning(error, cached.readAt)],
@@ -1246,6 +1386,9 @@ export class DatasetStore {
               ? { path: record.external.path, bytes: record.external.bytes }
               : {}),
             ...(record.remote ? { bytes: record.remote.bytes } : {}),
+            ...(record.bundled
+              ? { bytes: record.bundled.bytes, bundled: true }
+              : {}),
             available: record.status === "ok",
             ...(record.status === "stale"
               ? { error: record.warnings[0]?.message }
@@ -1541,12 +1684,19 @@ export class DatasetStore {
         );
         wroteFile = true;
       }
+      // Another link of the same file keeps the project's packaging choice.
+      const kept: DatasetSource =
+        source.kind === "file" &&
+        base.source?.kind === "file" &&
+        base.source.bundle
+          ? { ...source, bundle: base.source.bundle }
+          : source;
       const dataset = validateDataset({
         ...base,
-        source,
+        source: kept,
         ...(input.datasetId === undefined ||
         !base.source ||
-        canonicalJson(base.source) !== canonicalJson(source)
+        canonicalJson(base.source) !== canonicalJson(kept)
           ? { updatedAt: now }
           : {}),
         value: undefined,
@@ -1580,6 +1730,18 @@ export class DatasetStore {
         );
       // Online data needs no device link; a file link it replaces is dropped.
       await this.links.set(projectId, id, online ? null : path!);
+      // The newly linked file counts as changed against the copy the project
+      // shares, so this device shares it next (see reconcileBundle).
+      await this.agreements.set(
+        datasetBundleKey(projectId, id),
+        kept.kind === "file" && kept.bundle?.hash
+          ? {
+              hash: kept.bundle.hash,
+              base: kept.bundle.base ?? kept.bundle.hash,
+              at: now,
+            }
+          : null,
+      );
       const loaded = {
         ...dataset,
         updatedAt: later(
@@ -1883,6 +2045,7 @@ export class DatasetStore {
       });
       await this.write(record.path, dataset, record.revision ?? null);
       await this.links.set(projectId, datasetId, null);
+      await this.agreements.set(datasetBundleKey(projectId, datasetId), null);
       await this.cache.remove(projectId, datasetId);
       return {
         dataset,
@@ -2011,7 +2174,47 @@ export class DatasetStore {
         value: result.value,
       });
       let external = current.external;
-      if (loaded.read) {
+      let bundled = current.bundled;
+      if (loaded.bundle) {
+        // An edit of another device's file goes into a new synchronized
+        // copy; that device writes it into its file.
+        if (result.changed) {
+          const bytes = Buffer.from(
+            serializeSource(
+              dataset.value,
+              loaded.bundle.format,
+              loaded.bundle.layout,
+            ),
+          );
+          if (bytes.length > CAPACITY.packageItemBytes)
+            throw new CoreError(
+              "INVALID_DATA",
+              `The edited copy of "${dataset.name}" is ${bytes.length} bytes; a synchronized copy holds at most ${CAPACITY.packageItemBytes} bytes.`,
+            );
+          const hash = await storeBundle(this.root, bytes);
+          const updatedAt = new Date().toISOString();
+          const previous = (dataset.source as FileSource).bundle;
+          dataset.source = {
+            ...(dataset.source as FileSource),
+            bundle: {
+              sync: true,
+              hash,
+              ...(previous?.base || previous?.hash
+                ? { base: previous.base ?? previous.hash }
+                : {}),
+              bytes: bytes.length,
+              updatedAt,
+            },
+          };
+          bundled = {
+            hash,
+            format: loaded.bundle.format,
+            bytes: bytes.length,
+            updatedAt,
+          };
+        }
+        await this.write(current.path, dataset, current.revision ?? null);
+      } else if (loaded.read) {
         const { read } = loaded;
         if (result.changed) {
           // Serializing first rejects values the file format cannot hold.
@@ -2033,6 +2236,7 @@ export class DatasetStore {
           hash: datasetHash(dataset),
           path: current.path,
           ...(external ? { external } : {}),
+          ...(bundled ? { bundled } : {}),
           ...(current.remote ? { remote: current.remote } : {}),
           ...(current.transform ? { transform: current.transform } : {}),
           status: current.status,
@@ -2043,6 +2247,173 @@ export class DatasetStore {
         conflicts: [],
         changed: true,
       };
+    });
+  }
+
+  /** The stored definition of a dataset, without reading its source. */
+  async definition(
+    projectId: string,
+    datasetId: string,
+  ): Promise<DatasetDocument> {
+    return (await this.stored(projectId, assertId(datasetId))).dataset;
+  }
+
+  /**
+   * Chooses whether synchronization carries a copy of a linked file to the
+   * project's other devices. Turning it off drops the copy's record; the
+   * other devices then show the dataset as not bundled.
+   */
+  async setBundle(
+    projectId: string,
+    datasetId: string,
+    sync: boolean,
+  ): Promise<{ changed: boolean }> {
+    const changed = await this.files.lock(
+      `dataset-${projectId}-${datasetId}`,
+      async () => {
+        await this.files.readProject(projectId);
+        const { dataset, path } = await this.stored(projectId, datasetId);
+        if (dataset.source?.kind !== "file")
+          throw new CoreError(
+            "INVALID_DATA",
+            `Dataset "${dataset.name}" does not read a linked file; only linked files are bundled for synchronization.`,
+          );
+        const current = dataset.source.bundle;
+        if ((current?.sync ?? true) === sync && current) return false;
+        const bundle = sync ? { ...current, sync: true } : { sync: false };
+        await this.write(
+          path,
+          validateDataset({
+            ...dataset,
+            source: { ...dataset.source, bundle },
+          }),
+          (await this.revision(path)) ?? null,
+        );
+        return true;
+      },
+    );
+    if (changed && sync) await this.reconcileBundle(projectId, datasetId);
+    return { changed };
+  }
+
+  /**
+   * Brings this device's linked file and the project's synchronized copy
+   * together. A file changed here is shared as a new copy (published); a
+   * copy edited on another device is written into the unchanged file
+   * (written-back); when both changed, the file is kept and the conflict is
+   * reported on reads (WRITE_CONFLICT) until the file changes again.
+   * `publish: false` leaves a changed file for the next synchronization.
+   */
+  async reconcileBundle(
+    projectId: string,
+    datasetId: string,
+    options: { publish?: boolean } = {},
+  ): Promise<{
+    state:
+      | "none"
+      | "off"
+      | "unlinked"
+      | "missing"
+      | "unchanged"
+      | "published"
+      | "written-back"
+      | "pending"
+      | "conflict"
+      | "too-large";
+    hash?: string;
+    bytes?: number;
+  }> {
+    return this.files.lock(`dataset-${projectId}-${datasetId}`, async () => {
+      const { dataset, path } = await this.stored(projectId, datasetId);
+      const source = dataset.source;
+      if (source?.kind !== "file") return { state: "none" };
+      const bundle = source.bundle;
+      if (bundle?.sync === false) return { state: "off" };
+      const linked = await this.links.get(projectId, datasetId);
+      if (!linked) return { state: "unlinked" };
+      let file: Awaited<ReturnType<typeof readExternalBytes>>;
+      try {
+        file = await readExternalBytes(
+          linked,
+          CAPACITY.packageItemBytes,
+          "a synchronized copy holds",
+        );
+      } catch (error) {
+        if (error instanceof CoreError && error.details?.reason === "TOO_LARGE")
+          return { state: "too-large" };
+        if (error instanceof CoreError && error.code === "CONFLICT")
+          return { state: "pending" };
+        if (error instanceof CoreError || (error as NodeJS.ErrnoException).code)
+          return { state: "missing" };
+        throw error;
+      }
+      const key = datasetBundleKey(projectId, datasetId);
+      const now = new Date().toISOString();
+      const current = bundleHash(file.bytes);
+      const agreed = await this.agreements.get(key);
+      const shared = bundle?.hash;
+      if (current === shared) {
+        await storeBundle(this.root, file.bytes);
+        if (agreed?.hash !== current || agreed.conflict)
+          await this.agreements.set(key, {
+            hash: current,
+            base: bundle?.base ?? current,
+            at: now,
+          });
+        return { state: "unchanged", hash: current, bytes: file.size };
+      }
+      const sharedChanged = shared !== undefined && shared !== agreed?.hash;
+      // A conflict ends when the file changes again: the person combined both.
+      const fileChanged =
+        current !== agreed?.hash &&
+        (!agreed?.conflict || current !== agreed.conflict.file);
+      if (!sharedChanged || (agreed?.conflict && fileChanged)) {
+        if (options.publish === false) return { state: "pending" };
+        const hash = await storeBundle(this.root, file.bytes);
+        await this.write(
+          path,
+          validateDataset({
+            ...dataset,
+            source: {
+              ...source,
+              bundle: {
+                sync: true,
+                hash,
+                base: hash,
+                bytes: file.size,
+                updatedAt: now,
+              },
+            },
+          }),
+          (await this.revision(path)) ?? null,
+        );
+        await this.agreements.set(key, { hash, base: hash, at: now });
+        return { state: "published", hash, bytes: file.size };
+      }
+      // An edit made on top of what this file last shared or received.
+      const derived =
+        !bundle!.base ||
+        bundle!.base === agreed?.hash ||
+        bundle!.base === agreed?.base;
+      if (current === agreed?.hash && derived) {
+        const copy = await readBundle(this.root, shared!);
+        if (!copy) return { state: "pending" };
+        await writeExternal(linked, copy, file.stamp);
+        await this.agreements.set(key, {
+          hash: shared!,
+          base: bundle!.base ?? shared!,
+          at: now,
+        });
+        return { state: "written-back", hash: shared, bytes: copy.length };
+      }
+      if (agreed?.conflict?.bundle !== shared || agreed.conflict.file !== current)
+        await this.agreements.set(key, {
+          hash: agreed?.hash ?? current,
+          ...(agreed?.base ? { base: agreed.base } : {}),
+          at: agreed?.at ?? now,
+          conflict: { file: current, bundle: shared!, at: now },
+        });
+      return { state: "conflict", hash: shared };
     });
   }
 
@@ -2151,6 +2522,7 @@ export class DatasetStore {
         );
       await this.files.remove(stored.path);
       await this.links.set(projectId, datasetId, null);
+      await this.agreements.set(datasetBundleKey(projectId, datasetId), null);
       await this.cache.remove(projectId, datasetId);
       return { removed: true as const, id: datasetId };
     });
@@ -2444,7 +2816,9 @@ export function mergeDatasetVersions(
   const operations = diffValues(base.value, local.value);
   const result = applyOperations(remote.value, operations, { atomic: false });
   const conflicts = [...result.conflicts];
-  const pick = <K extends "name" | "description" | "schema" | "transform">(
+  const pick = <
+    K extends "name" | "description" | "schema" | "transform" | "source",
+  >(
     key: K,
   ) => {
     const original = canonicalJson(base[key] ?? null),
@@ -2465,8 +2839,16 @@ export function mergeDatasetVersions(
   const name = pick("name"),
     description = pick("description"),
     schema = pick("schema"),
-    transform = pick("transform");
-  const { description: _d, schema: _s, transform: _t, ...rest } = remote;
+    transform = pick("transform"),
+    // Two devices editing a synchronized copy of a file each make a new copy.
+    source = pick("source");
+  const {
+    description: _d,
+    schema: _s,
+    transform: _t,
+    source: _source,
+    ...rest
+  } = remote;
   const dataset = {
     ...rest,
     name: name ?? remote.name,
@@ -2474,6 +2856,7 @@ export function mergeDatasetVersions(
     ...(schema ? { schema } : {}),
     // A script changed on two devices keeps the remote one and reports a conflict.
     ...(transform ? { transform } : {}),
+    ...(source ? { source } : {}),
     updatedAt: [local.updatedAt, remote.updatedAt].sort().at(-1)!,
     value: result.value,
   } as DatasetDocument;

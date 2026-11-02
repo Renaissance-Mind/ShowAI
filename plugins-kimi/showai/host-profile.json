@@ -3,7 +3,7 @@
   "profile": "kimi",
   "declaredHostDisplay": "fragment-file",
   "commonVersion": "0.27.0",
-  "commonSha256": "3d54ed56a1b8955155fc233eaec325c98300e10f598752bd842d644c93c940fa",
+  "commonSha256": "81d9aa723d249b27410dcd7d87782de05fcda183d5c11e3ad1c7e57d3971180e",
   "commonFiles": {
     "collaborate-canvas/SKILL.md": "8c703a674ce962b723e42e4f45e194be2b3466cb6dc0774ab699751d22e3e020",
     "create-component/references/component-authoring.md": "7321c40a4582442722a23c1c7f430111f969f4b938a323678202cf8cefc4a220",
@@ -22,14 +22,14 @@
     "review-presentation/references/review-criteria.md": "2952fa6b79a8ccf2f63742dfd9ad9ce4942e5fce5b475d1ee767e9f71ef3aaf4",
     "review-presentation/SKILL.md": "839b578b4648c0b0f3bb4c30af1f459071e97afc6b2e9f537b305627f79d8765",
     "show-document/references/board-authoring.md": "06b7a1656926e15816002975d626434115e0ef4551581e12089186a7169e0a28",
-    "show-document/references/capacity.md": "60d8468f39857a919122b8b582b4207424f8c53e5152b9f9677ae1652dcc4dc5",
+    "show-document/references/capacity.md": "dfb7425abe1edf0f11f4b7a5a354969d946fad3df18d111f0342287cb17f80ea",
     "show-document/references/page-reading.md": "4ef85142d9ab663a28a1b3067161003b50cde9ad037736481225693462545128",
-    "show-document/SKILL.md": "b122014e20a706885b7e78cf626f9e99678693ead6cbfa162e506392e94c60ed",
+    "show-document/SKILL.md": "4fd6b27c38103b89caf86ca7e506b839495aef02f7c90a731e682174a888e5c5",
     "show-visual/SKILL.md": "042b9e4b8c80b0e4e43252893dfe707a5e67946f6ec3e4ea874dfa3e9c73bedc",
     "use-showai/references/host-display.md": "b82c8ccb260f3f7531e514753e99bfb0c4eaccfd0f4cfe1479f17498133bfcdd",
     "use-showai/references/integration.md": "23335c3be8ef578d3c0049ee302b449eaab9db3e303016bdc90e1955270acf0f",
     "use-showai/references/runtime.md": "352ea404dfd7f6c50ac0779c065b81b667dfb00dd20ebaae20e575060bb41b55",
-    "use-showai/references/shared-data.md": "41015a267e0a4afae0cdb7be5ffb8224490c8256d27dbe291893d72881d08416",
+    "use-showai/references/shared-data.md": "370eae0a239eb096df4031e7248deb6f2faaf1b2bf3acc2144b1b9aa38e1a0e3",
     "use-showai/SKILL.md": "f9415f3d8a44828d2bf4601dbd747d8490a77cdc595ae34df470ddf290c7d689"
   },
   "adapterSha256": "062a18e1e07e33fd4dc7ce363395dc2fe4844e96ead58b7a5e617c54f7b1aaa2"

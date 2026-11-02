@@ -113,6 +113,8 @@ export default defineMessages("sync", {
     syncAccount: "同步账号",
     syncAccountHelp: "此项目使用你在该服务器上的哪个账号同步。",
     membersAndInvites: "成员与邀请",
+    packagedFiles: "随同步携带的本机文件",
+    choosePackagedFiles: "选择文件",
     membersAdminHelp: "查看成员、调整权限并生成邀请链接。",
     membersOnlyAdmins: "你在此项目中的权限是{role}，只有管理员可以管理成员。",
     showOnDevice: "在本设备显示",
@@ -165,6 +167,7 @@ export default defineMessages("sync", {
     "toast.connected": "已连接 {name}。",
     "toast.connectionRemoved": "已移除“{name}”的连接。",
     "toast.detached": "“{name}”已停止同步，本机内容保留。",
+    "toast.packaging": "已保存“{name}”随同步携带的文件。",
     "toast.synced": "“{name}”已同步。",
     "toast.uploaded": "已开始将“{name}”同步到 {server}。",
 
@@ -425,6 +428,8 @@ export default defineMessages("sync", {
     syncAccount: "Sync account",
     syncAccountHelp: "Which of your accounts on this server syncs the project.",
     membersAndInvites: "Members & invites",
+    packagedFiles: "Files from this device",
+    choosePackagedFiles: "Choose files",
     membersAdminHelp: "See members, change roles and create invite links.",
     membersOnlyAdmins: "Your role here is {role}. Only admins can manage members.",
     showOnDevice: "Show on this device",
@@ -477,6 +482,7 @@ export default defineMessages("sync", {
     "toast.connected": "Connected {name}.",
     "toast.connectionRemoved": "Removed the connection to “{name}”.",
     "toast.detached": "“{name}” stopped syncing. Local content is kept.",
+    "toast.packaging": "Saved which files sync with “{name}”.",
     "toast.synced": "“{name}” synced.",
     "toast.uploaded": "Started syncing “{name}” to {server}.",
 

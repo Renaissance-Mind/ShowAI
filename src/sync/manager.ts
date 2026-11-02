@@ -40,9 +40,16 @@ import {
   remapProjectFiles,
   validSnapshotRecord,
   sameFiles,
+  snapshotBundles,
   type FileConflict,
   type CapturedSnapshot,
 } from "./transfer";
+import {
+  bundleHash,
+  hasBundle,
+  storeBundle,
+} from "../core/dataset-bundles";
+import { refreshProjectBundles } from "../core/packaging";
 import {
   SyncError,
   syncProtocol,
@@ -1246,54 +1253,7 @@ export class SyncManager {
     if (memo?.revision === record.revision) return memo.files;
     const files = await decodeSnapshot(
       record,
-      async (digest) => {
-        const path = this.objectPath(
-          digest,
-          this.cacheKey(connection, project),
-        );
-        const cached = await readFile(path).catch(
-          (error: NodeJS.ErrnoException) => {
-            if (error.code === "ENOENT") return null;
-            throw error;
-          },
-        );
-        const legacy = cached
-          ? null
-          : await readLibraryBytes(
-              this.home,
-              join(
-                this.root,
-                "objects",
-                this.cacheKey(connection, project),
-                digest,
-              ),
-            );
-        if (legacy) {
-          if (hash(legacy) !== digest)
-            throw new CoreError("INVALID_DATA", t("cache.baselineCorrupt"));
-          await atomicLibraryFile(this.home, path, legacy);
-          return legacy;
-        }
-        // decodeSnapshot verifies every object digest, including cached ones.
-        if (cached) return cached;
-        const response = await fetch(
-          `${connection.url}/api/projects/${project.remoteProjectId}/objects/${digest}`,
-          {
-            headers: { authorization: `Bearer ${connection.token}` },
-            signal: AbortSignal.timeout(30_000),
-          },
-        );
-        if (!response.ok) {
-          const error = await response.json();
-          throw new SyncError(
-            response.status,
-            error.error?.code ?? "MISSING_OBJECT",
-            error.error?.message ?? t("download.failed"),
-          );
-        }
-        await cacheDownload(this.home, path, response, digest);
-        return readFile(path);
-      },
+      (digest) => this.readObject(connection, project, digest),
       project.remoteProjectId,
     );
     const decoded = remapProjectFiles(
@@ -1307,6 +1267,96 @@ export class SyncManager {
       this.decoded.set(memoKey, { revision: record.revision, files: decoded });
     else this.decoded.delete(memoKey);
     return decoded;
+  }
+  /** One object of a project's server snapshots, through the local object cache. */
+  private async readObject(
+    connection: ServerConnection,
+    project: ProjectConnection,
+    digest: string,
+  ): Promise<Buffer> {
+    const path = this.objectPath(
+      digest,
+      this.cacheKey(connection, project),
+    );
+    const cached = await readFile(path).catch(
+      (error: NodeJS.ErrnoException) => {
+        if (error.code === "ENOENT") return null;
+        throw error;
+      },
+    );
+    const legacy = cached
+      ? null
+      : await readLibraryBytes(
+          this.home,
+          join(
+            this.root,
+            "objects",
+            this.cacheKey(connection, project),
+            digest,
+          ),
+        );
+    if (legacy) {
+      if (hash(legacy) !== digest)
+        throw new CoreError("INVALID_DATA", t("cache.baselineCorrupt"));
+      await atomicLibraryFile(this.home, path, legacy);
+      return legacy;
+    }
+    // decodeSnapshot verifies every object digest, including cached ones.
+    if (cached) return cached;
+    const response = await fetch(
+      `${connection.url}/api/projects/${project.remoteProjectId}/objects/${digest}`,
+      {
+        headers: { authorization: `Bearer ${connection.token}` },
+        signal: AbortSignal.timeout(30_000),
+      },
+    );
+    if (!response.ok) {
+      const error = await response.json();
+      throw new SyncError(
+        response.status,
+        error.error?.code ?? "MISSING_OBJECT",
+        error.error?.message ?? t("download.failed"),
+      );
+    }
+    await cacheDownload(this.home, path, response, digest);
+    return readFile(path);
+  
+  }
+  /** Shares or writes back linked files of a project this device has. */
+  private async refreshBundles(
+    library: GitLibrary,
+    projectId: string,
+    publish: boolean,
+  ) {
+    const head = await library.head();
+    if (
+      !head ||
+      !(await library.tree(head)).some(
+        (entry) => entry.path === `projects/${projectId}/project.json`,
+      )
+    )
+      return;
+    await refreshProjectBundles(new FileStore(this.home), projectId, {
+      publish,
+    });
+  }
+  /**
+   * Stores the copies of linked files a snapshot carries (see
+   * dataset-bundles) before its records apply, so the receiving datasets
+   * and resources read them right away.
+   */
+  private async receiveBundles(
+    connection: ServerConnection,
+    project: ProjectConnection,
+    record: SnapshotRecord,
+  ) {
+    for (const digest of snapshotBundles(record)) {
+      if (await hasBundle(this.home, digest)) continue;
+      const bytes = await this.readObject(connection, project, digest);
+      if (bundleHash(bytes) !== digest)
+        throw new CoreError("INVALID_DATA", t("cache.baselineCorrupt"));
+      await storeBundle(this.home, bytes);
+    }
   }
   private async upload(
     connection: ServerConnection,
@@ -1720,6 +1770,9 @@ export class SyncManager {
     project.role = remote.role;
     const library = new GitLibrary(this.home);
     await library.recover();
+    // Changes of linked files on this device become new synchronized copies.
+    if (project.role !== "viewer")
+      await this.refreshBundles(library, project.projectId, true);
     const localHead = await library.head();
     const localExists = (await library.tree(localHead ?? undefined)).some(
       (entry) => entry.path === `projects/${project.projectId}/project.json`,
@@ -1841,6 +1894,7 @@ export class SyncManager {
     );
     for (const path of actual.keys())
       if (!localFiles.has(path)) changes.set(path, null);
+    if (remoteRecord) await this.receiveBundles(connection, project, remoteRecord);
     if (changes.size) {
       await this.savePendingImport(
         project.projectId,
@@ -1927,6 +1981,8 @@ export class SyncManager {
       error: undefined,
       syncedAt: new Date().toISOString(),
     });
+    // Copies edited on other devices go into this device's linked files.
+    await this.refreshBundles(library, project.projectId, false);
     this.trace("synchronize-complete", phaseStarted);
   }
   /**

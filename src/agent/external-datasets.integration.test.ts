@@ -210,17 +210,22 @@ test("a dataset reads and writes a CSV file outside the library", async () => {
   });
   expect(confirm.ok).toBe(false);
   expect(confirm.error.code).toBe("CONFIRMATION_REQUIRED");
-  const report = confirm.error.details.externalSnapshots;
-  expect(report.datasets).toHaveLength(1);
-  expect(report.datasets[0]).toMatchObject({
+  const report = confirm.error.details.packaging;
+  expect(report.items).toHaveLength(1);
+  expect(report.items[0]).toMatchObject({
+    id: `dataset:${projectId}/${datasetId}`,
+    kind: "file-dataset",
     datasetId,
     name: "日程",
     path: csv,
     available: true,
+    local: true,
+    choices: ["bundle", "skip"],
+    choice: "bundle",
     blocks: [{ pageId: page.document.id, blockId: block.attrs.id }],
   });
-  expect(report.datasets[0].snapshotBytes).toBeGreaterThan(100);
-  expect(report.snapshotBytes).toBe(report.datasets[0].snapshotBytes);
+  expect(report.items[0].bytes).toBeGreaterThan(100);
+  expect(report.bytes).toBe(report.items[0].bytes);
   expect(await exists(out)).toBe(false);
   const exported = await ok("page_export", {
     pageId: page.document.id,
@@ -228,7 +233,7 @@ test("a dataset reads and writes a CSV file outside the library", async () => {
     out,
     externalData: "embed",
   });
-  expect(exported.externalSnapshots.snapshotBytes).toBe(report.snapshotBytes);
+  expect(exported.externalSnapshots.snapshotBytes).toBe(report.bytes);
   const artifact = parseArtifact(
     JSON.parse(await readFile(out.replace(/\.html$/, ".showai.json"), "utf8")),
   );
@@ -254,9 +259,12 @@ test("a dataset reads and writes a CSV file outside the library", async () => {
     format: "html",
     out: join(outside, "exports", "other.html"),
   });
-  expect(unavailable.error.details.externalSnapshots.datasets[0]).toMatchObject(
-    { available: false, snapshotBytes: 0 },
-  );
+  expect(unavailable.error.details.packaging.items[0]).toMatchObject({
+    available: false,
+    bytes: null,
+    choices: ["skip"],
+    choice: "skip",
+  });
   const json = join(outside, "wrong.json");
   await writeFile(json, "{}");
   expect(
@@ -377,6 +385,10 @@ test("library data moves into a new JSON file and back", async () => {
   expect(capabilities.datasets.tools).toContain("dataset_write");
   expect(capabilities.datasets.externalFiles).toMatchObject({
     available: true,
-    exportConfirmation: { parameter: "externalData", value: "embed" },
+    exportConfirmation: {
+      parameter: "packaging",
+      details: "packaging",
+      everything: { parameter: "externalData", value: "embed" },
+    },
   });
 }, 240_000);

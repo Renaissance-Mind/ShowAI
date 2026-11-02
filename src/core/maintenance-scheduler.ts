@@ -4,6 +4,8 @@ import { LibraryMaintenance } from "./library-maintenance";
 import { atomicLibraryFile, readLibraryBytes } from "./library-files";
 import { join } from "node:path";
 import { CoreError } from "./model";
+import { collectBundles } from "./dataset-bundles";
+import { FileStore } from "./store";
 export interface MaintenancePolicy {
   automatic: boolean;
   idleMs: number;
@@ -83,6 +85,9 @@ export class MaintenanceScheduler {
     }
     if (!head || Date.now() - this.changedAt < policy.idleMs) return;
     await new IndexClient(this.root).synchronize();
+    if (this.stopped || Date.now() - this.changedAt < policy.idleMs) return;
+    // Synchronized copies of linked files no project refers to any more.
+    await collectBundles(new FileStore(this.root));
     if (this.stopped || Date.now() - this.changedAt < policy.idleMs) return;
     const objects = await library.objectStatistics();
     if (

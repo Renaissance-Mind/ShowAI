@@ -19,6 +19,10 @@ export const CAPACITY = Object.freeze({
   publicationTransferBytes: 512 * MiB,
   syncManifestBytes: 16 * MiB,
   syncObjectBytes: 64 * MiB,
+  // Packaging of files outside the library for synchronization and export:
+  // one bundled item, and everything one sync or export carries.
+  packageItemBytes: 64 * MiB,
+  packageTotalBytes: 256 * MiB,
   // The conversation renderer's limit is decimal bytes, unlike storage budgets.
   chatBytes: 1_000_000,
   mcpImageBytes: 8 * MiB,

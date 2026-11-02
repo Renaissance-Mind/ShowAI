@@ -61,6 +61,8 @@ export interface BindingRead {
     path?: string;
     url?: string;
     bytes?: number;
+    /** Read from the synchronized copy of another device's file. */
+    bundled?: boolean;
     /** False when the source cannot be read now (status stale or empty). */
     available: boolean;
   };
@@ -81,12 +83,14 @@ export interface DataNotice {
   status: "empty";
   dataset?: string;
   file?: string;
+  /** The person left the data out of this copy (packaging skip). */
+  omitted?: true;
 }
 /** Block data key of a DataNotice in resolved (rendered, exported) documents. */
 export const DATA_NOTICE_KEY = "$dataState";
 
 /** The last segment of a path or address, without query or fragment. */
-function fileName(source: {
+export function sourceFileName(source: {
   name?: string;
   path?: string;
   url?: string;
@@ -248,7 +252,7 @@ export async function resolveDocumentDatasets(
           read.source = { ...source, available: false };
         }
         read.warnings = unavailableWarnings(error);
-        const file = details.source ? fileName(details.source) : undefined;
+        const file = details.source ? sourceFileName(details.source) : undefined;
         notices.set(blockId, {
           status: "empty",
           ...(details.name ? { dataset: details.name } : {}),
@@ -263,10 +267,10 @@ export async function resolveDocumentDatasets(
             : String(error);
       continue;
     }
-    const origin = record.external ?? record.remote;
+    const origin = record.external ?? record.remote ?? record.bundled;
     if (origin)
       read.source = {
-        kind: record.external ? "file" : "url",
+        kind: record.remote ? "url" : "file",
         format: origin.format,
         ...(record.dataset.source?.name
           ? { name: record.dataset.source.name }
@@ -274,6 +278,7 @@ export async function resolveDocumentDatasets(
         ...(record.external ? { path: record.external.path } : {}),
         ...(record.remote ? { url: record.remote.url } : {}),
         bytes: origin.bytes,
+        ...(record.bundled ? { bundled: true } : {}),
         available: record.status === "ok",
       };
     if (record.transform)
@@ -322,7 +327,7 @@ export async function resolveDocumentDatasets(
       );
       replacements.set(blockId, snapshot);
       // What the dataset adds beyond the block's own values (its binding settings aside).
-      if (origin)
+      if (origin || record.transform)
         read.snapshotBytes = Math.max(
           0,
           jsonBytes(snapshot) -
@@ -357,4 +362,34 @@ export async function resolveDocumentDatasets(
     }
   }
   return { document: snapshot, bindings };
+}
+
+/**
+ * A resolved document in which the given blocks show the name-only notice
+ * instead of their data: the block keeps its own values and binding, as
+ * for a dataset without data (used when an export leaves data out).
+ */
+export function withDataNotices(
+  resolved: ShowDocument,
+  original: ShowDocument,
+  notices: Map<string, DataNotice>,
+): ShowDocument {
+  if (!notices.size) return resolved;
+  const own = new Map<string, unknown>();
+  visitNodes(original.content, (node) => {
+    const id = node.attrs?.id;
+    if (node.type === "widget" && typeof id === "string" && notices.has(id))
+      own.set(id, node.attrs!.data);
+  });
+  const copy = structuredClone(resolved);
+  visitNodes(copy.content, (node) => {
+    const id = node.attrs?.id;
+    if (node.type !== "widget" || typeof id !== "string" || !own.has(id))
+      return;
+    node.attrs!.data = {
+      ...structuredClone(own.get(id) as Record<string, unknown>),
+      [DATA_NOTICE_KEY]: notices.get(id),
+    };
+  });
+  return copy;
 }
