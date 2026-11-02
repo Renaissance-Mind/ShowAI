@@ -209,11 +209,6 @@
   .components-view .studio-library {
     padding-inline: 18px;
   }
-  .components-view .studio-section-heading {
-    align-items: flex-start;
-    flex-wrap: wrap;
-    gap: 12px;
-  }
   .components-view .studio-section-actions {
     flex-wrap: wrap;
   }

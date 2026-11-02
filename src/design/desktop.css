@@ -154,21 +154,11 @@
   max-width: 1280px;
   padding: 40px 48px 72px;
 }
-.studio-section-heading {
-  margin-bottom: 24px;
-  gap: 24px;
-}
-.studio-section-heading h1,
 .settings-heading h1 {
   font-size: 28px;
   font-weight: 700;
   line-height: 1.3;
   letter-spacing: -0.02em;
-}
-.studio-section-heading h1 + p {
-  font-size: 14px;
-  line-height: 1.6;
-  margin-top: 8px;
 }
 .studio-button {
   border-radius: 8px;
@@ -717,11 +707,6 @@
   .studio-component-detail,
   .studio-form {
     padding: 20px;
-  }
-  .studio-section-heading {
-    align-items: flex-start;
-    flex-wrap: wrap;
-    gap: 16px;
   }
   .studio-section-actions {
     flex-wrap: wrap;

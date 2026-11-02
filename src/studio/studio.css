@@ -382,26 +382,6 @@ button.studio-tree-chevron:hover {
   min-height: 100%;
   padding-block: 30px;
 }
-.studio-section-heading {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 20px;
-  min-height: 48px;
-  margin-bottom: 18px;
-}
-.studio-section-heading h1 {
-  font-size: 28px;
-  line-height: 1.25;
-  letter-spacing: -0.6px;
-  margin: 0;
-  font-weight: 600;
-}
-.studio-section-heading h1 + p {
-  color: var(--muted);
-  font-size: 13px;
-  margin: 6px 0 0;
-}
 .studio-section-actions {
   display: flex;
   align-items: center;
