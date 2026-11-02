@@ -1,5 +1,7 @@
 import { execFileSync, spawnSync } from "node:child_process";
-// Exercises the real desktop catalog across two real project directories.
+// Exercises the real desktop catalog across two real project directories. The
+// App's component and template views are read-only: revisions are written the
+// way an Agent writes them, and the UI previews, inserts and applies them.
 import assert from "node:assert/strict";
 import {
   access,
@@ -121,6 +123,15 @@ try {
     b = await api("projects:create", { name: "Catalog project B" });
   result.projectIds = [a.id, b.id];
   const original = await api("components:createExample", { projectId: a.id });
+  // An exact revision as an Agent copies it from a catalog result.
+  const exactRef = (item, owner, kind = "component") => ({
+    kind,
+    id: item.id,
+    version: item.version,
+    integrity: item.integrity,
+    scope: item.scope,
+    ...(item.scope === "project" ? { projectId: owner } : {}),
+  });
   const invoke = async (name) => {
     await page
       .getByRole("navigation", { name: "主要导航" })
@@ -133,47 +144,49 @@ try {
       0,
       await page.getByRole("alert").allTextContents(),
     );
+  const componentCard = (name, scope) =>
+    page
+      .locator(".studio-component-card")
+      .filter({ has: page.getByRole("heading", { name, exact: true }) })
+      .filter({
+        has: page
+          .locator(".component-card-metadata")
+          .getByText(scope, { exact: true }),
+      });
+  const closeDialog = () =>
+    page.getByRole("button", { name: "关闭弹窗", exact: true }).click();
   await invoke("组件");
-  assert.equal(
-    await page
-      .getByRole("button", { name: "新建组件", exact: true })
-      .isEnabled(),
-    false,
-  );
-  await page.getByLabel("目录项目", { exact: true }).selectOption(a.id);
-  await page
-    .locator(".studio-component-card")
-    .filter({
-      has: page.getByRole("heading", { name: "数据图表 内置", exact: true }),
-    })
-    .click();
-  let dialog = page.getByRole("dialog");
+  await componentCard("数据图表", "内置").click();
+  let dialog = page.getByRole("dialog", { name: "数据图表", exact: true });
   await dialog
-    .getByRole("heading", { name: "使用场景", exact: true })
+    .getByRole("region", { name: "组件示例预览", exact: true })
     .waitFor();
   await dialog
-    .getByRole("heading", { name: "可视化效果", exact: true })
+    .getByRole("heading", { name: "适用场景", exact: true })
     .waitFor();
-  assert.ok((await dialog.locator(".catalog-documentation li").count()) >= 4);
-  assert.equal(
-    await dialog.getByRole("button", { name: "示例预览", exact: true }).count(),
-    0,
-  );
-  assert.equal(await dialog.locator(".catalog-overview").count(), 1);
-  await dialog.getByRole("region", { name: "y = x", exact: true }).waitFor();
+  await dialog.getByRole("heading", { name: "可调整", exact: true }).waitFor();
+  // The App catalog only inserts into an open page; with none open the action
+  // stays visible, disabled, and says why.
+  const insert = dialog.getByRole("button", {
+    name: "插入到页面",
+    exact: true,
+  });
+  assert.equal(await insert.isEnabled(), false);
+  await dialog.getByText("先打开一个页面", { exact: true }).waitFor();
   await page.screenshot({
     path: join(output, "chart-overview.png"),
     fullPage: true,
     animations: "disabled",
   });
-  await dialog.getByRole("button", { name: "关闭弹窗", exact: true }).click();
-  await page
-    .locator(".studio-component-card")
-    .filter({
-      has: page.getByRole("heading", { name: "Markdown 内置", exact: true }),
-    })
-    .click();
-  dialog = page.getByRole("dialog");
+  await dialog.getByRole("tab", { name: "使用说明", exact: true }).click();
+  await dialog.locator(".catalog-component-guide").waitFor();
+  assert.ok(
+    (await dialog.locator(".catalog-component-guide h3").count()) >= 2,
+    "builtin chart documentation lists its sections",
+  );
+  await closeDialog();
+  await componentCard("富文本", "内置").click();
+  dialog = page.getByRole("dialog", { name: "富文本", exact: true });
   await dialog
     .getByRole("heading", { name: "让内容更容易理解", exact: true })
     .waitFor();
@@ -182,17 +195,20 @@ try {
     fullPage: true,
     animations: "disabled",
   });
-  await dialog.getByLabel("组件示例", { exact: true }).selectOption("1");
+  await dialog.getByLabel("组件示例", { exact: true }).selectOption("2");
   await dialog
     .locator(".sb-text p")
     .filter({ hasText: "记录一个想法。" })
     .waitFor();
   await page.setViewportSize({ width: 700, height: 850 });
-  const docBox = await dialog.locator(".catalog-documentation").boundingBox(),
-    previewBox = await dialog.locator(".catalog-live-example").boundingBox();
+  const previewBox = await dialog
+      .locator(".catalog-live-example")
+      .boundingBox(),
+    infoBox = await dialog.locator(".catalog-info-panel").boundingBox();
   assert.ok(
-    previewBox.y >= docBox.y + docBox.height,
-    "narrow overview stacks explanation above the preview",
+    infoBox.x >= previewBox.x + previewBox.width - 1 &&
+      infoBox.x + infoBox.width <= 700,
+    "narrow overview keeps the preview and its explanation side by side within the window",
   );
   await page.screenshot({
     path: join(output, "text-overview-narrow.png"),
@@ -200,120 +216,94 @@ try {
     animations: "disabled",
   });
   await page.setViewportSize({ width: 1280, height: 960 });
-  await dialog.getByRole("button", { name: "定制组件", exact: true }).click();
-  await dialog.getByLabel("组件名称", { exact: true }).fill("定制文本框");
-  await dialog
-    .getByLabel("组件源码", { exact: true })
-    .fill(
-      'import {Text} from "showai:components";export default function MyText({data,onChange,readOnly}){return <Text data={{...data,color:"#194a2a"}} onChange={onChange} readOnly={readOnly}/>}',
-    );
-  await dialog
-    .getByRole("button", { name: "保存项目新版本", exact: true })
-    .click();
-  await page.getByRole("dialog", { name: "定制文本框", exact: true }).waitFor();
-  const customText = await api("components:get", {
+  await closeDialog();
+  result.checks.push(
+    "builtin chart and text details share one responsive preview with scenarios and documentation; insertion stays disabled until a page is open",
+  );
+
+  // Components are written by Agents; the App catalog reads what they saved.
+  const text = await api("components:get", { id: "text", scope: "builtin" });
+  const customText = await api("components:save", {
     projectId: a.id,
-    id: "my-text",
-    version: "1.0.0",
+    manifest: {
+      id: "my-text",
+      name: "定制文本框",
+      version: "1.0.0",
+      description: "A native text variant with a fixed color",
+      entry: "index.tsx",
+      scenarios: ["Highlighted notes"],
+      defaultData: text.examples[1].data,
+      examples: [],
+    },
+    schema: text.propsSchema,
+    source:
+      'import {Text} from "showai:components";export default function MyText({data,onChange,readOnly}){return <Text data={{...data,color:"#194a2a"}} onChange={onChange} readOnly={readOnly}/>}',
   });
   assert.equal(customText.scope, "project");
-  await page
+  await page.getByLabel("目录项目", { exact: true }).selectOption(a.id);
+  await componentCard("定制文本框", "项目").click();
+  dialog = page.getByRole("dialog", { name: "定制文本框", exact: true });
+  await dialog
     .frameLocator('iframe[title="定制文本框"]')
     .getByRole("heading", { name: "让内容更容易理解", exact: true })
     .waitFor();
-  await page.getByRole("button", { name: "关闭弹窗", exact: true }).click();
+  await closeDialog();
   result.checks.push(
-    "builtin text documentation and live examples share one responsive view; the UI saves an editable native text variant through the real compiler",
+    "a native text variant saved for project A appears in A's catalog and previews through the real compiler",
   );
 
-  await page
-    .locator(".studio-component-card")
-    .filter({
-      has: page.getByRole("heading", { name: "计数器 项目", exact: true }),
-    })
-    .click();
-  dialog = page.getByRole("dialog");
-  await dialog.getByRole("button", { name: "注册到全局", exact: true }).click();
-  await poll(
-    () => dialog.locator(".catalog-lineage").innerText(),
-    (text) => text.includes("全局"),
-    "global promotion visible",
-  );
-  const global = await api("components:get", {
-    id: original.id,
-    version: original.version,
-    scope: "global",
-    integrity: original.integrity,
+  const global = await api("catalog:promote", {
     projectId: a.id,
+    ref: exactRef(original, a.id),
   });
+  assert.equal(global.scope, "global");
   assert.equal(global.integrity, original.integrity);
-  const globalBefore = await readFile(
-    join(
-      home,
-      "packages/components",
-      global.id,
-      global.version,
-      "compiled.json",
-    ),
-    "utf8",
+  const globalCompiled = join(
+    home,
+    "workspace/packages/components",
+    global.id,
+    global.version,
+    "compiled.json",
   );
+  const globalBefore = await readFile(globalCompiled, "utf8");
+  const fork = await api("catalog:fork", {
+    projectId: b.id,
+    ref: exactRef(global),
+    version: "1.0.1",
+    name: "Project B counter",
+  });
+  assert.equal(fork.scope, "project");
+  assert.notEqual(fork.integrity, global.integrity);
+  assert.equal(fork.parents[0].integrity, global.integrity);
+  assert.equal(await readFile(globalCompiled, "utf8"), globalBefore);
+  await page.getByLabel("目录项目", { exact: true }).selectOption(b.id);
+  await componentCard("计数器", "全局").click();
+  dialog = page.getByRole("dialog", { name: "计数器", exact: true });
+  await dialog
+    .frameLocator('iframe[title="计数器"]')
+    .getByRole("status")
+    .waitFor();
   await page.screenshot({
     path: join(output, "global-immutable.png"),
     fullPage: true,
     animations: "disabled",
   });
-  await dialog.getByRole("button", { name: "关闭弹窗", exact: true }).click();
-  await page.getByLabel("目录项目", { exact: true }).selectOption(b.id);
-  await page
-    .locator(".studio-component-card")
-    .filter({
-      has: page.getByRole("heading", { name: "计数器 全局", exact: true }),
-    })
-    .click();
-  dialog = page.getByRole("dialog");
-  await dialog.getByRole("button", { name: "定制组件", exact: true }).click();
+  await closeDialog();
+  await componentCard("Project B counter", "项目").click();
+  dialog = page.getByRole("dialog", { name: "Project B counter", exact: true });
   await dialog
-    .getByLabel("组件名称", { exact: true })
-    .fill("Project B counter");
-  await dialog
-    .getByLabel("组件效果", { exact: true })
-    .fill("展示项目B自己的计数。\n保留对全局版本的派生关系。");
-  await dialog
-    .getByRole("button", { name: "保存项目新版本", exact: true })
-    .click();
-  await page
-    .getByRole("dialog", { name: "Project B counter", exact: true })
+    .frameLocator('iframe[title="Project B counter"]')
+    .getByRole("status")
     .waitFor();
-  const fork = await api("components:get", {
-    id: original.id,
-    version: "1.0.1",
-    scope: "project",
-    projectId: b.id,
-  });
-  assert.notEqual(fork.integrity, global.integrity);
-  assert.equal(fork.parents[0].integrity, global.integrity);
-  assert.equal(
-    await readFile(
-      join(
-        home,
-        "packages/components",
-        global.id,
-        global.version,
-        "compiled.json",
-      ),
-      "utf8",
-    ),
-    globalBefore,
-  );
   await noAlerts();
   await page.screenshot({
     path: join(output, "project-fork.png"),
     fullPage: true,
     animations: "disabled",
   });
-  await page.getByRole("button", { name: "关闭弹窗", exact: true }).click();
+  await closeDialog();
   result.checks.push(
-    "Project is required for creation; metadata has bullet scenarios/effects/examples; explicit promotion freezes a global revision and B edits a separate project child",
+    "explicit promotion freezes a global revision that B's catalog lists; B's fork is a separate project child and the global files stay unchanged",
   );
   const sourcePage = await api("pages:create", {
     projectId: b.id,
@@ -376,50 +366,43 @@ try {
     version: child.version,
     integrity: child.integrity,
   };
-  await invoke("模板");
-  await page.getByLabel("目录范围", { exact: true }).selectOption("all");
-  await page.getByRole("button", { name: "新建模板", exact: true }).click();
-  dialog = page.getByRole("dialog");
-  await dialog.getByLabel("模板名称", { exact: true }).fill("Combined report");
-  await dialog
-    .getByLabel("模板使用场景", { exact: true })
-    .fill("Combine an introduction and a reusable section.");
-  await dialog.getByRole("button", { name: "组合模板", exact: true }).click();
-  await dialog
-    .getByLabel("选择子模板", { exact: true })
-    .selectOption({ label: `Reusable section · 项目 · ${child.version}` });
-  await dialog.getByRole("button", { name: "添加部分", exact: true }).click();
-  await dialog
-    .getByLabel("组合部分 2 标题", { exact: true })
-    .fill("Nested evidence");
-  await page.screenshot({
-    path: join(output, "template-composition.png"),
-    fullPage: true,
-    animations: "disabled",
-  });
-  await dialog
-    .getByRole("button", { name: "保存项目新版本", exact: true })
-    .click();
-  await page.getByRole("dialog").waitFor({ state: "detached" });
-  const list = await api("templates:list", {
+  const composed = await api("templates:save", {
     projectId: b.id,
-    scope: "project",
+    name: "Combined report",
+    description: "An introduction followed by a reusable section",
+    scenarios: ["Combine an introduction and a reusable section."],
+    composition: [
+      {
+        type: "content",
+        content: {
+          type: "paragraph",
+          content: [{ type: "text", text: "Introduction." }],
+        },
+      },
+      {
+        type: "template",
+        ref: exactRef(child, b.id, "template"),
+        title: "Nested evidence",
+      },
+    ],
   });
-  const parent = list.find((item) => item.name === "Combined report");
-  assert.ok(parent);
+  const parent = (
+    await api("templates:list", { projectId: b.id, scope: "project" })
+  ).find((item) => item.name === "Combined report");
+  assert.equal(parent.integrity, composed.integrity);
   result.parentTemplate = {
     id: parent.id,
     version: parent.version,
     integrity: parent.integrity,
   };
-  const card = page.locator(".studio-template-card").filter({
-    has: page.getByRole("heading", { name: "Combined report", exact: true }),
+  await invoke("模板");
+  await page.getByLabel("目录项目", { exact: true }).selectOption(b.id);
+  await page.getByLabel("目录范围", { exact: true }).selectOption("project");
+  const templateCard = page.getByRole("button", {
+    name: /^查看模板 Combined report /,
   });
-  await card.getByRole("button", { name: /查看模板/ }).click();
-  dialog = page.getByRole("dialog");
-  await dialog
-    .getByRole("heading", { name: "内容处理方式", exact: true })
-    .waitFor();
+  await templateCard.click();
+  dialog = page.getByRole("dialog", { name: "Combined report", exact: true });
   await dialog
     .getByRole("region", { name: "模板示例预览", exact: true })
     .waitFor();
@@ -433,40 +416,34 @@ try {
     fullPage: true,
     animations: "disabled",
   });
-  await dialog.getByRole("button", { name: "注册到全局", exact: true }).click();
-  await page.getByRole("dialog").waitFor({ state: "detached" });
+  await closeDialog();
+  await api("catalog:promote", {
+    projectId: b.id,
+    ref: exactRef(parent, b.id, "template"),
+  });
+  await rename(
+    join(home, "workspace", "projects", b.id),
+    join(output, "removed-source-project"),
+  );
+  // The workspace drops the removed project, including its open catalog view.
+  await page
+    .locator(`.studio-sidebar .studio-tree-row[data-library-id="${b.id}"]`)
+    .waitFor({ state: "detached" });
+  await invoke("模板");
   await page.getByLabel("目录项目", { exact: true }).selectOption(a.id);
   await page.getByLabel("目录范围", { exact: true }).selectOption("global");
   await poll(
-    () =>
-      page
-        .locator(".studio-template-card")
-        .filter({
-          has: page.getByRole("heading", {
-            name: "Combined report",
-            exact: true,
-          }),
-        })
-        .count(),
+    () => templateCard.count(),
     (count) => count === 1,
     "global catalog filter settled",
   );
-  await page
-    .locator(".studio-template-card")
-    .filter({
-      has: page.getByRole("heading", { name: "Combined report", exact: true }),
-    })
-    .waitFor();
-  await rename(
-    join(home, "projects", b.id),
-    join(output, "removed-source-project"),
+  await templateCard.click();
+  dialog = page.getByRole("dialog", { name: "Combined report", exact: true });
+  const pagesBefore = new Set(
+    (await api("pages:list", { projectId: a.id })).map((item) => item.id),
   );
-  await page
-    .locator(".studio-template-card")
-    .filter({
-      has: page.getByRole("heading", { name: "Combined report", exact: true }),
-    })
-    .getByRole("button", { name: "使用模板", exact: true })
+  await dialog
+    .getByRole("button", { name: "用此模板新建页面", exact: true })
     .click();
   await page.getByRole("textbox", { name: "文档内容", exact: true }).waitFor();
   await page
@@ -491,12 +468,14 @@ try {
     fullPage: true,
     animations: "disabled",
   });
-  const pages = await api("pages:list", { projectId: a.id });
-  const created = pages.find((item) => item.title === "Combined report");
-  assert.ok(created);
+  const created = (await api("pages:list", { projectId: a.id })).filter(
+    (item) => !pagesBefore.has(item.id),
+  );
+  assert.equal(created.length, 1);
+  const [{ id: createdId }] = created;
   const expanded = await api("pages:get", {
     projectId: a.id,
-    pageId: created.id,
+    pageId: createdId,
   });
   const nodes = [];
   const walk = (node) => {
@@ -513,7 +492,7 @@ try {
     .map((node) => node.attrs.id);
   assert.equal(new Set(ids).size, ids.length);
   result.checks.push(
-    "UI composes a nested template; global promotion preserves its custom dependency closure; A applies it after B's source directory is removed, with locked identity and working props",
+    "the template view previews a nested composition; global promotion preserves its custom dependency closure; A creates a page from it after B's source directory is removed, with locked identity and working props",
   );
 
   const childRef = {
@@ -546,12 +525,13 @@ try {
   });
   const latest = await api("pages:get", {
     projectId: a.id,
-    pageId: created.id,
+    pageId: createdId,
   });
   await api("pages:save", {
     projectId: a.id,
-    pageId: created.id,
+    pageId: createdId,
     baseHash: latest.hash,
+    baseRevision: latest.revision,
     document: {
       ...latest.document,
       content: {
@@ -574,6 +554,8 @@ try {
       },
     },
   });
+  // The open editor keeps its own draft; reloading reopens the saved page.
+  await page.reload();
   const panelFrame = page.frameLocator('iframe[title="嵌套面板"]');
   await panelFrame
     .getByRole("heading", { name: "组合中的文本", exact: true })
@@ -590,7 +572,7 @@ try {
     async () => {
       const edited = await api("pages:get", {
         projectId: a.id,
-        pageId: created.id,
+        pageId: createdId,
       });
       return edited.document.content.content.find(
         (node) => node.attrs?.data?.componentId === panel.id,
@@ -608,7 +590,7 @@ try {
         "--project",
         a.id,
         "--page",
-        created.id,
+        createdId,
         "--format",
         "html",
         "--out",
@@ -683,10 +665,7 @@ try {
   const inlineResponse = JSON.parse(inlineResult.stdout);
   if (inlineResult.status !== 0) {
     assert.equal(inlineResponse.ok, false);
-    assert.match(
-      inlineResponse.error.message,
-      /Compressed chat preview.*limit is/,
-    );
+    assert.match(inlineResponse.error.message, /chat preview is .*; limit is/);
     await assert.rejects(access(join(output, "nested-inline.html")), {
       code: "ENOENT",
     });
