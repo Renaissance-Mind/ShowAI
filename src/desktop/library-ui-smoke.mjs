@@ -116,15 +116,16 @@ try {
   );
   const project = projects.find((item) => item.name === projectName);
   result.projectId = project.id;
-  const projectFile = join(home, "projects", project.id, "project.json");
+  const projectsRoot = join(home, "workspace", "projects");
+  const projectFile = join(projectsRoot, project.id, "project.json");
   const projectData = () => readJson(projectFile);
   const projectPages = async (projectId) =>
     Promise.all(
-      (await readdir(join(home, "projects", projectId, "pages")))
+      (await readdir(join(projectsRoot, projectId, "pages")))
         .filter((file) => file.endsWith(".json"))
         .map(
           async (file) =>
-            (await readJson(join(home, "projects", projectId, "pages", file)))
+            (await readJson(join(projectsRoot, projectId, "pages", file)))
               .document,
         ),
     );
@@ -152,6 +153,8 @@ try {
       "页面",
       "白板",
       "新页面并交给 Agent…",
+      "从模板新建…",
+      "导入文件…",
       "新建项目",
     ]);
     await menu.getByRole("menuitem", { name: label, exact: true }).click();
@@ -186,6 +189,13 @@ try {
       )
     ).find((doc) => doc.title === title);
   };
+  // The project name in the top bar identifies the directory in the main area.
+  const breadcrumbProject = () =>
+    page.locator(".studio-breadcrumb > button").first().innerText();
+  // A non-interactive heading in the main area, away from every sidebar row.
+  const emptyProjectHeading = page
+    .locator(".studio-main")
+    .getByRole("heading", { name: "项目为空", exact: true });
   const remove = async (id) => {
     await choose(id, "删除");
     await page
@@ -210,7 +220,7 @@ try {
     "Project rows must not append page counts.",
   );
   await page.getByRole("button", { name: "当前目录操作", exact: true }).focus();
-  await page.locator(".studio-section-heading h1").hover();
+  await emptyProjectHeading.hover();
   await poll(
     () =>
       row(project.id)
@@ -238,7 +248,19 @@ try {
     .allTextContents();
   assert.deepEqual(
     labels.map((label) => label.trim()).sort(),
-    ["在新标签页打开", "在新窗口打开", "重命名", "删除", "置顶", "移到分组…"].sort(),
+    [
+      "在新标签页打开",
+      "在新窗口打开",
+      "重命名",
+      "删除",
+      "置顶",
+      "移到分组…",
+      "项目上移",
+      "项目下移",
+      "在本设备隐藏",
+      "同步到服务器…",
+      "共享给成员…",
+    ].sort(),
   );
   await poll(
     () =>
@@ -302,7 +324,7 @@ try {
     false,
   );
   await openMenu(project.id);
-  await page.locator(".studio-section-heading h1").click();
+  await emptyProjectHeading.click();
   await page.getByRole("menu").waitFor({ state: "detached" });
   result.checks.push(
     "Project menu fits viewport; initial focus, arrows, End, Escape restoration, Tab and outside click work",
@@ -372,7 +394,7 @@ try {
     await row(project.id).locator(".studio-tree-title").innerText(),
     "Renamed project",
   );
-  assert.equal(await row(project.id).locator(".studio-tree-pin").count(), 1);
+  assert.equal(await row(project.id).getAttribute("data-pinned"), "true");
   await row(project.id).locator(".studio-tree-main").click();
   await expand(project.id);
   await expand(folderA.id);
@@ -381,12 +403,12 @@ try {
     await row(folderB.id).locator(".studio-tree-title").innerText(),
     "Renamed folder",
   );
-  assert.equal(await row(folderB.id).locator(".studio-tree-pin").count(), 1);
+  assert.equal(await row(folderB.id).getAttribute("data-pinned"), "true");
   assert.equal(
     await row(nested.id).locator(".studio-tree-title").innerText(),
     "Renamed page",
   );
-  assert.equal(await row(nested.id).locator(".studio-tree-pin").count(), 1);
+  assert.equal(await row(nested.id).getAttribute("data-pinned"), "true");
   await row(folderB.id).locator(".studio-tree-main").click();
   await page.screenshot({
     path: join(output, "nested-persisted.png"),
@@ -409,10 +431,6 @@ try {
   // Preserve an opened A page, navigate to B, then delete A's ancestor from
   // the sidebar. The deletion must not carry A's parent folder into B.
   const otherName = "Project B context";
-  await sidebar
-    .getByRole("navigation", { name: "主要导航" })
-    .getByRole("button", { name: "项目", exact: true })
-    .click();
   await page
     .getByRole("button", { name: "新建项目", exact: true })
     .first()
@@ -440,13 +458,10 @@ try {
     "Folder descendant",
   );
   await row(otherProject.id).locator(".studio-tree-main").click();
-  assert.equal(
-    await page.locator(".studio-section-heading h1").innerText(),
-    otherName,
-  );
+  assert.equal(await breadcrumbProject(), otherName);
   await remove(folderB.id);
   assert.equal(
-    await page.locator(".studio-section-heading h1").innerText(),
+    await breadcrumbProject(),
     otherName,
     "Deleting A's ancestor must preserve B navigation.",
   );
