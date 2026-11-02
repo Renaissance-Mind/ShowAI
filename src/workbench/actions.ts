@@ -100,6 +100,7 @@ import {
   externalSnapshotReport,
   resolveDocumentDatasets,
 } from "../core/dataset-resolution";
+import { DatasetSourceLinks } from "../core/dataset-sources";
 import {
   datasetActions,
   datasetMutationActions,
@@ -239,6 +240,7 @@ export const workbenchActions = new Set([
   "media:reveal",
   "export:reveal",
   "library:reveal",
+  "datasets:revealSource",
   "app:openPageWindow",
   "app:openWindow",
   ...datasetActions,
@@ -1579,8 +1581,17 @@ export function createWorkbench(
       case "datasets:chooseFile": {
         const id = projectId(args);
         await store.readProject(id);
+        // Spreadsheets are read-only sources: they can be linked, not written.
         const filters = [
-          { name: tf("filter.datasetFile"), extensions: ["json", "csv", "tsv"] },
+          args.mode === "save"
+            ? {
+                name: tf("filter.datasetSaveFile"),
+                extensions: ["json", "csv", "tsv"],
+              }
+            : {
+                name: tf("filter.datasetFile"),
+                extensions: ["json", "csv", "tsv", "xlsx"],
+              },
         ];
         if (args.mode === "save") {
           const selection = await host.saveDialog({
@@ -1711,6 +1722,31 @@ export function createWorkbench(
         target = await realpath(target);
         if (!inside(target))
           throw new CoreError("INVALID_PATH", "Only locations inside the library can be shown.");
+        return host.invoke("media:reveal", { path: target });
+      }
+      case "datasets:revealSource": {
+        // Shows the file this device links for an external dataset; a missing
+        // file shows its nearest existing folder.
+        const id = projectId(args);
+        await store.readProject(id);
+        const linked = await new DatasetSourceLinks(store.root).get(
+          id,
+          assertId(required(args, "datasetId")),
+        );
+        if (!linked)
+          throw new CoreError(
+            "NOT_FOUND",
+            "This dataset has no file linked on this device. Link one first.",
+          );
+        let target = linked;
+        while (
+          dirname(target) !== target &&
+          !(await stat(target).then(
+            () => true,
+            () => false,
+          ))
+        )
+          target = dirname(target);
         return host.invoke("media:reveal", { path: target });
       }
       case "media:reveal": {

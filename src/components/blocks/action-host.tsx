@@ -22,6 +22,17 @@ export const BlockItemSources = createContext<ReadonlyMap<
   BlockItemSource
 > | null>(null);
 
+/**
+ * What a block bound to shared data may rely on: how current its data is
+ * and which parts can change (true, false or { paths }, see
+ * datasets/editable.mjs). Unbound blocks have none.
+ */
+export interface BlockDataStateValue {
+  status: "ok" | "stale" | "empty";
+  editable: boolean | { paths: string[] };
+}
+export const BlockDataState = createContext<BlockDataStateValue | null>(null);
+
 export function BlockActions({ children }: { children: ReactNode }) {
   const host = useContext(BlockActionHost);
   if (!host) return children;

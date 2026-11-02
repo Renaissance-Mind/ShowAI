@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, expect, test } from "vitest";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { openLibrary } from "../core/open-library";
@@ -13,6 +13,7 @@ import {
 } from "../workbench/dataset-actions";
 import { DatasetClient, type DatasetSession } from "./client";
 import { valueAt } from "./operations.mjs";
+import { xlsxWorkbook } from "../test/xlsx";
 
 let root: string;
 let store: FileStore;
@@ -254,4 +255,70 @@ test("closing names shared data whose writes can be neither saved nor kept", asy
   expect(await client.prepareClose()).toBe(false);
   refuse = false;
   expect(await client.closeProblems()).toEqual([]);
+});
+
+test("a session reports stale and empty reads with their warnings, and recovers on retry", async () => {
+  const outside = await mkdtemp(join(tmpdir(), "showai-dataset-client-files-"));
+  try {
+    const csv = join(outside, "tasks.csv");
+    await writeFile(csv, "id,title\nt1,写周报\n");
+    const linked = (await transport.invoke("datasets:link", {
+      projectId,
+      name: "任务",
+      path: csv,
+    })) as { dataset: { id: string } };
+    const client = new DatasetClient(transport, "window-state");
+    const session = await ready(client.session(projectId, linked.dataset.id));
+    expect(session.getSnapshot()).toMatchObject({
+      dataStatus: "ok",
+      editable: true,
+      readOnly: false,
+      warnings: [],
+    });
+
+    await rm(csv);
+    await session.refresh();
+    expect(session.getSnapshot()).toMatchObject({
+      status: "ready",
+      dataStatus: "stale",
+      editable: false,
+      readOnly: true,
+      warnings: [{ code: "SOURCE_MISSING", actions: ["retry", "link-file"] }],
+    });
+
+    // Without a value read here the dataset is empty, and says why.
+    await rm(join(root, "local", "dataset-cache", projectId, `${linked.dataset.id}.json`));
+    const empty = client.session(projectId, linked.dataset.id);
+    await empty.refresh({ retry: true });
+    expect(empty.getSnapshot()).toMatchObject({
+      status: "error",
+      errorCode: "SOURCE_UNAVAILABLE",
+      dataStatus: "empty",
+      editable: false,
+      warnings: [{ code: "SOURCE_MISSING", level: "error" }],
+    });
+    await writeFile(csv, "id,title\nt1,写周报\nt2,订票\n");
+    await empty.refresh({ retry: true });
+    expect(empty.getSnapshot()).toMatchObject({
+      status: "ready",
+      dataStatus: "ok",
+      editable: true,
+      warnings: [],
+    });
+
+    // A spreadsheet stays read-only when a later read finds it unchanged.
+    const xlsx = join(outside, "budget.xlsx");
+    await writeFile(xlsx, xlsxWorkbook([{ name: "预算", rows: [["id"], ["b1"]] }]));
+    const sheet = (await transport.invoke("datasets:link", {
+      projectId,
+      name: "预算",
+      path: xlsx,
+    })) as { dataset: { id: string } };
+    const book = await ready(client.session(projectId, sheet.dataset.id));
+    expect(book.getSnapshot()).toMatchObject({ readOnly: true, editable: false });
+    await book.refresh();
+    expect(book.getSnapshot()).toMatchObject({ readOnly: true, editable: false });
+  } finally {
+    await rm(outside, { recursive: true, force: true });
+  }
 });

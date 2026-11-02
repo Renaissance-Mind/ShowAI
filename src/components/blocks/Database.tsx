@@ -1,4 +1,5 @@
-import { BlockItemSources, BlockSettings } from "./action-host";
+import { BlockDataState, BlockItemSources, BlockSettings } from "./action-host";
+import { canEdit } from "../../datasets/editable.mjs";
 import ExpandableSearch from "../ExpandableSearch";
 import {
   createContext,
@@ -453,7 +454,11 @@ export function DatabaseBlock({ data, onChange, readOnly }: BlockProps) {
   const rows: DatabaseRow[] = Array.isArray(data.rows)
     ? data.rows.filter((row) => row && typeof row.id === "string")
     : [];
-  const editable = Boolean(onChange && !readOnly);
+  // A bound table follows what its shared data allows: columns, then each row's fields.
+  const dataState = useContext(BlockDataState);
+  const editable =
+    Boolean(onChange && !readOnly) &&
+    (!dataState || canEdit(dataState.editable, "columns"));
   const viewName = (type: DatabaseViewType) =>
     t(VIEWS.find((item) => item.type === type)!.label);
   const { views } = databaseViews(data, viewName);
@@ -525,7 +530,9 @@ export function DatabaseBlock({ data, onChange, readOnly }: BlockProps) {
   // Rows mapped from shared data keep their source fields and stay in the source.
   const sources = useContext(BlockItemSources);
   const cellEditable = (row: DatabaseRow, column: DatabaseColumn) =>
-    editable && !sources?.get(row.id)?.readOnly.includes(column.id);
+    editable &&
+    !sources?.get(row.id)?.readOnly.includes(column.id) &&
+    (!dataState || canEdit(dataState.editable, "rows", row.id, column.id));
   const removable = (row: DatabaseRow) =>
     sources?.get(row.id)?.removable ?? true;
   const selectColumns = columns.filter((column) => column.type === "select");
@@ -1805,7 +1812,9 @@ export function DatabaseBlock({ data, onChange, readOnly }: BlockProps) {
                           <div
                             className={`sb-board-card ${draggingId === row.id ? "is-dragging" : ""}`}
                             key={row.id}
-                            draggable={editable && Boolean(groupColumn)}
+                            draggable={
+                              !!groupColumn && cellEditable(row, groupColumn)
+                            }
                             onDragStart={() => setDraggingId(row.id)}
                             onDragEnd={() => setDraggingId(null)}
                           >
@@ -1829,6 +1838,7 @@ export function DatabaseBlock({ data, onChange, readOnly }: BlockProps) {
                                 {groupColumn && (
                                   <select
                                     aria-label={t("moveToGroup")}
+                                    disabled={!cellEditable(row, groupColumn)}
                                     value={text(row[groupColumn.id])}
                                     onChange={(event) =>
                                       updateRow(

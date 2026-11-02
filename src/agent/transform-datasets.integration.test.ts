@@ -249,7 +249,8 @@ test("a transform over a spreadsheet, a CSV file and project data feeds a chart"
     blockId: found.attrs.id,
     datasetId,
     status: "ok",
-    editable: false,
+    // The chart's own settings stay editable next to the computed values.
+    editable: { paths: ["title", "type", "unit"] },
     warnings: [],
     transform: {
       inputs: {

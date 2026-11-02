@@ -487,13 +487,16 @@ function collect(root, collection, issues) {
 
 /**
  * Component props for a bound block, plus what the host needs to route
- * changes: every projected item by id and any issues to show.
+ * changes: every projected item by id and any issues to show. With
+ * `writable: false` (a read-only or stale dataset) mapped fields are shown
+ * but cannot be changed; the block's own items and fields still can.
  */
 export function resolveBinding(
   kind,
   data,
   value,
   compiled = compileBinding(readBinding(data)),
+  { writable = true } = {},
 ) {
   const issues = [];
   const projected = new Map();
@@ -564,6 +567,7 @@ export function resolveBinding(
         });
         continue;
       }
+      const fieldsWritable = writable && entry.writable;
       projected.set(entry.key, {
         id: entry.key,
         collection,
@@ -571,12 +575,12 @@ export function resolveBinding(
         row,
         source: entry.writable ? entry.path : null,
         label: collection.label,
-        writable: entry.writable
+        writable: fieldsWritable
           ? collection.fields.map((field) => field.target)
           : [],
         readOnly: [
           ...collection.derived.map((derivation) => derivation.target),
-          ...(entry.writable
+          ...(fieldsWritable
             ? []
             : collection.fields.map((field) => field.target)),
         ],
@@ -601,7 +605,7 @@ export function resolveBinding(
       ...target.items,
     ];
   }
-  return { props, projected, issues, compiled };
+  return { props, projected, issues, compiled, writable };
 }
 
 function compiledIdField(compiled, into) {
@@ -648,11 +652,22 @@ function writeField(field, info, basisValue, next, rejected) {
  * Routes a component change. `basis` is the dataset value and props the
  * component last rendered from; writes carry the basis values, so a change
  * made elsewhere meanwhile becomes a conflict instead of being overwritten.
+ * With `writable: false` every change that would reach the dataset is
+ * rejected; the block's own values are still stored.
  */
-export function splitBindingChange({ kind, data, value, nextProps, basis }) {
+export function splitBindingChange({
+  kind,
+  data,
+  value,
+  nextProps,
+  basis,
+  writable = true,
+}) {
   const compiled = compileBinding(readBinding(data));
   const basisValue = basis ? basis.value : value;
-  const resolved = resolveBinding(kind, data, basisValue, compiled);
+  const resolved = resolveBinding(kind, data, basisValue, compiled, {
+    writable,
+  });
   const previous = basis?.props ?? resolved.props;
   const ownProps = componentProps(kind, data);
   const nextOwn = { ...ownProps };
@@ -679,6 +694,11 @@ export function splitBindingChange({ kind, data, value, nextProps, basis }) {
       continue;
     }
     const after = own(nextProps, key) ? nextProps[key] : undefined;
+    if (!writable) {
+      if (!equalValues(previous[key], after))
+        rejected.push({ field: key, reason: "source-read-only" });
+      continue;
+    }
     if (sharedRoot === undefined) {
       if (after !== undefined) created[key] = cloneValue(after);
       continue;
@@ -727,7 +747,12 @@ export function splitBindingChange({ kind, data, value, nextProps, basis }) {
           (entry) => entry.target === field,
         );
         if (mapping) {
-          if (!info.source) rejected.push({ id, field, reason: "read-only" });
+          if (!info.writable.includes(field))
+            rejected.push({
+              id,
+              field,
+              reason: info.source ? "source-read-only" : "read-only",
+            });
           else
             operations.push(
               ...writeField(mapping, info, basisValue, item[field], rejected),
@@ -761,7 +786,10 @@ export function splitBindingChange({ kind, data, value, nextProps, basis }) {
     for (const item of stored)
       if (resolved.projected.has(String(item?.[idField]))) local.push(item);
     if (!isShared(into)) nextOwn[into] = local;
-    else if (sharedRoot === undefined) created[into] = local;
+    else if (!writable) {
+      if (!equalValues(sharedRoot?.[into] ?? [], local))
+        rejected.push({ field: into, reason: "source-read-only" });
+    } else if (sharedRoot === undefined) created[into] = local;
     else
       operations.push(
         ...diffValues(sharedRoot[into], local, [...sharedPath, into]),

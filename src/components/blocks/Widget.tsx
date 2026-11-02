@@ -29,6 +29,7 @@ import { useTranslator } from "../../i18n/react";
 import messages from "../../i18n/messages/widget";
 import { PendingNotice } from "../../ui/PendingNotice";
 import { useQueuedMount } from "./mount-queue";
+import { dataNotice, unavailableText } from "./data-notice";
 
 const widgetMessages = translator(messages);
 
@@ -133,6 +134,12 @@ export const Widget = memo(function Widget(props: BlockProps & { kind: string })
         {host && <host.Action {...props} />}
         <WidgetBody {...props} />
       </>
+    );
+  if (!host && dataNotice(props.data))
+    return (
+      <p className="sb-block sb-data-notice" role="status">
+        {unavailableText(props.data)}
+      </p>
     );
   return host ? (
     <>

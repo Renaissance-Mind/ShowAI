@@ -10,6 +10,9 @@ export default defineMessages("widget", {
     invalidData: "组件数据格式不正确。",
     loading: "正在加载组件…",
     sharedDataUnavailable: "此组件的数据来自共享数据，在当前位置无法读取。",
+    sharedDataEmptyFile:
+      "共享数据「{name}」读取的文件「{file}」在生成此页面时无法读取，这里没有数据。",
+    sharedDataEmpty: "共享数据「{name}」在生成此页面时还没有数据。",
     "status.unavailable": "「{name}」组件暂时无法显示",
     "status.rejectionCause": "组件在后台执行的操作出错，显示的内容可能不完整。",
     "status.missingBuiltinCause": "当前版本的 ShowAI 没有「{kind}」组件。",
@@ -23,6 +26,10 @@ export default defineMessages("widget", {
     loading: "Loading component…",
     sharedDataUnavailable:
       "This component's data comes from shared data, which can't be read here.",
+    sharedDataEmptyFile:
+      "Shared data “{name}” reads the file “{file}”, which couldn't be read when this page was made, so there is no data here.",
+    sharedDataEmpty:
+      "Shared data “{name}” had no data when this page was made.",
     "status.unavailable": "The “{name}” component can't be displayed here",
     "status.rejectionCause":
       "Something the component was doing in the background failed. What it shows may be incomplete.",

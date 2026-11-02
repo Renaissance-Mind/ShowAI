@@ -1721,6 +1721,16 @@
   padding: 20px;
   background: var(--sb-soft);
 }
+/* A block bound to shared data that had no value when the page was made. */
+.sb-data-notice {
+  margin: 0;
+  padding: 18px 16px;
+  border: 1px dashed var(--sb-line);
+  border-radius: 8px;
+  color: var(--sb-muted);
+  font-size: 12px;
+  text-align: center;
+}
 .sb-unavailable-heading {
   display: flex;
   gap: 12px;

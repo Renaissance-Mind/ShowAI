@@ -46,6 +46,10 @@ import {
   requestNavigation,
 } from "../../portable/page-link.mjs";
 import { BindingBasisContext } from "../../datasets/basis";
+import {
+  BlockDataState,
+  type BlockDataStateValue,
+} from "../blocks/action-host";
 import { ComponentStatus } from "../blocks/ComponentStatus";
 import widgetMessages from "../../i18n/messages/widget";
 import { PendingNotice } from "../../ui/PendingNotice";
@@ -142,6 +146,18 @@ function jsonObject(value: unknown): value is Record<string, unknown> {
   return visit(value);
 }
 
+/**
+ * The dataState a component frame receives: a bound block's own, otherwise
+ * current data that is editable exactly when the block is.
+ */
+export function frameDataState(
+  bound: BlockDataStateValue | null,
+  readOnly: boolean,
+): BlockDataStateValue {
+  if (!bound) return { status: "ok", editable: !readOnly };
+  return readOnly ? { ...bound, editable: false } : bound;
+}
+
 export function CustomBlock({ data, onChange, readOnly }: BlockProps) {
   const parsed = readCustomBlockData(data);
   const components = useContext(ComponentsContext);
@@ -220,10 +236,21 @@ function SandboxComponent({
   } | null>(null);
   // Present in the workbench page; readers and exports have no conversation.
   const assistant = useContext(AssistantContext);
-  const latest = useRef({ data, parsed, onChange, readOnly, assistant });
+  // A bound block says how current its data is and which parts can change.
+  const bound = useContext(BlockDataState);
+  const dataState = frameDataState(bound, !!readOnly || !onChange);
+  const latest = useRef({
+    data,
+    parsed,
+    onChange,
+    readOnly,
+    assistant,
+    dataState,
+  });
   const initial = useRef({
     props: parsed.props,
     readOnly: !!readOnly || !onChange,
+    dataState,
   });
   // A page block in the App keeps the reader's view of it on this device.
   const readerScope = useReaderStateScope();
@@ -235,7 +262,7 @@ function SandboxComponent({
     scope: readerScope,
     slot: `component:${parsed.componentId}`,
   };
-  latest.current = { data, parsed, onChange, readOnly, assistant };
+  latest.current = { data, parsed, onChange, readOnly, assistant, dataState };
   // A bound block asks which props each change started from. The frame posts
   // showai:valid after applying each props message, in order.
   const basisContext = useContext(BindingBasisContext);
@@ -349,6 +376,7 @@ function SandboxComponent({
         type: "showai:props",
         props: current.parsed.props,
         readOnly: !!current.readOnly || !current.onChange,
+        dataState: current.dataState,
         // Previews and dialogs are not page blocks, so they cannot hand over state.
         context: !!current.assistant && !!blockId(),
       },
@@ -623,6 +651,8 @@ function SandboxComponent({
     editable,
     channel,
     !!assistant,
+    dataState.status,
+    JSON.stringify(dataState.editable),
   ]);
   useEffect(() => {
     const sendTheme = () =>

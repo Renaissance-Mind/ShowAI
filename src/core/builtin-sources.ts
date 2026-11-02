@@ -62,6 +62,7 @@ import nativeInkCss from "../surface/native-ink.css?raw";
 import capacity from "../portable/capacity.mjs?raw";
 import ownedJson from "../portable/owned-json.mjs?raw";
 import pageLinkSource from "../portable/page-link.mjs?raw";
+import editableSource from "../datasets/editable.mjs?raw";
 import sdk from "../components/blocks/sdk.tsx?raw";
 import actionHost from "../components/blocks/action-host.tsx?raw";
 import manualEditing from "../components/blocks/manual-editing.ts?raw";
@@ -270,6 +271,7 @@ const sources: Record<string, string> = {
   "capacity.mjs": capacity,
   "owned-json.mjs": ownedJson,
   "page-link.mjs": pageLinkSource,
+  "editable.mjs": editableSource,
   "sdk.tsx": sdk,
   "action-host.tsx": actionHost,
   "manual-editing.ts": manualEditing,
@@ -411,6 +413,7 @@ export const builtinSources: Record<string, string> = Object.fromEntries(
           : '"./NativeInkPreview"',
       )
       .replaceAll('"../portable/capacity.mjs"', '"./capacity.mjs"')
+      .replaceAll('"../../datasets/editable.mjs"', '"./editable.mjs"')
       .replaceAll('"../portable/owned-json.mjs"', '"./owned-json.mjs"')
       .replaceAll(
         '"../../portable/page-link.mjs"',

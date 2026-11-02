@@ -3,12 +3,12 @@
   "profile": "claude",
   "declaredHostDisplay": "model-html",
   "commonVersion": "0.27.0",
-  "commonSha256": "dd8371fd24df79b16842f81232397f2075df97e2ac5cc985f6edd6aba1325b33",
+  "commonSha256": "8a10d984383c271c2cfed8c0e581eb641c511e540d872140d1ef773011912d9b",
   "commonFiles": {
     "collaborate-canvas/SKILL.md": "8c703a674ce962b723e42e4f45e194be2b3466cb6dc0774ab699751d22e3e020",
-    "create-component/references/component-authoring.md": "9a2b1e9f8340d7213c444874ae4636838b4986e497618c5c9b1b56b466cebe47",
+    "create-component/references/component-authoring.md": "26c889979e36553808a6fcf6450a15f3a8333cb658549ce6942f9e53f477d0b7",
     "create-component/references/parameter-contract.md": "ad6b4931fcae8730559877e2f931ffcd038688f1340fc6467b12510be636d122",
-    "create-component/SKILL.md": "f3b2e1cc05ca04c0a8dd98b045e46e17f1daf7ce0049f24a33cd5449ce4ab9bf",
+    "create-component/SKILL.md": "ce13fc92abada2a769a14ef4ce422e9edddc102e4165680bb8a4271e90dd50f1",
     "create-template/references/template-abstraction.md": "63695b7da3b23b7b2395563b7e645127014296181f8a4b112c1766f9d97d56d8",
     "create-template/references/template-creation.md": "da962a84c97e12c4404daada2b0613b4ebe3bbd93d90dd801064b6bc5b1c34be",
     "create-template/SKILL.md": "ab2a8945c038f1543ddf2b007e1b5456074fb76fa322c18c61ff74ec7c3f6bfb",
@@ -29,7 +29,7 @@
     "use-showai/references/host-display.md": "b82c8ccb260f3f7531e514753e99bfb0c4eaccfd0f4cfe1479f17498133bfcdd",
     "use-showai/references/integration.md": "23335c3be8ef578d3c0049ee302b449eaab9db3e303016bdc90e1955270acf0f",
     "use-showai/references/runtime.md": "352ea404dfd7f6c50ac0779c065b81b667dfb00dd20ebaae20e575060bb41b55",
-    "use-showai/references/shared-data.md": "53708c7439cf698b077ce335eee58855a54fac483fd5ad2d475d5942e7b1e897",
+    "use-showai/references/shared-data.md": "41015a267e0a4afae0cdb7be5ffb8224490c8256d27dbe291893d72881d08416",
     "use-showai/SKILL.md": "f9415f3d8a44828d2bf4601dbd747d8490a77cdc595ae34df470ddf290c7d689"
   },
   "adapterSha256": "bddcffbb897e6646c21708ea2257f3c652f34b006d2e32634aa6475daab7626a"

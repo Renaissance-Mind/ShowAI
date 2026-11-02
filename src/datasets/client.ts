@@ -60,6 +60,10 @@ interface DatasetRecord {
   status?: Exclude<DatasetReadStatus, "empty">;
   editable?: Editable;
   warnings?: DatasetWarning[];
+  /** A transform dataset: its inputs as read. */
+  transform?: {
+    inputs: Record<string, { datasetId: string; name?: string }>;
+  };
 }
 /** Where the value of an external dataset comes from, as last read. */
 export interface DatasetSourceState {
@@ -104,8 +108,17 @@ export interface DatasetSnapshot {
   source?: DatasetSourceState;
   /** Names of the inputs of a dataset computed by a script. */
   transform?: { inputs: string[] };
-  /** Why the shown value is stale (see datasets/warnings). */
+  /** Why the shown value is stale, or why there is none (see datasets/warnings). */
   warnings: DatasetWarning[];
+  /**
+   * How current the value is: ok, stale (the last value read on this
+   * device), or empty (no value: see warnings). Absent while loading.
+   */
+  dataStatus?: DatasetReadStatus;
+  /** Whether the dataset accepts writes (false for a read-only project). */
+  editable: Editable;
+  /** Names of other datasets that warnings refer to (transform inputs), by id. */
+  names: Record<string, string>;
   canUndo: boolean;
   canRedo: boolean;
 }
@@ -119,6 +132,33 @@ function errorCode(error: unknown): string | undefined {
   return error && typeof error === "object" && "code" in error
     ? String(error.code)
     : undefined;
+}
+/** Why a SOURCE_UNAVAILABLE error left the dataset without a value. */
+function unavailableWarnings(error: unknown): DatasetWarning[] {
+  if (errorCode(error) !== "SOURCE_UNAVAILABLE") return [];
+  return (
+    (error as { details?: { warnings?: DatasetWarning[] } }).details
+      ?.warnings ?? []
+  );
+}
+/** The state a failed read leaves: missing, empty (source unavailable) or an error. */
+function failedRead(error: unknown): Partial<DatasetSnapshot> {
+  const code = errorCode(error);
+  if (code === "NOT_FOUND")
+    return { status: "missing", error: errorText(error), errorCode: code };
+  return {
+    status: "error",
+    error: errorText(error),
+    errorCode: code,
+    ...(code === "SOURCE_UNAVAILABLE"
+      ? {
+          dataStatus: "empty" as const,
+          warnings: unavailableWarnings(error),
+          source: unavailableSource(error),
+          editable: false,
+        }
+      : {}),
+  };
 }
 /** The external source a SOURCE_UNAVAILABLE error names. */
 function unavailableSource(error: unknown): DatasetSourceState | undefined {
@@ -151,6 +191,8 @@ export class DatasetSession {
   private past: HistoryEntry[] = [];
   private future: HistoryEntry[] = [];
   private draftWritten = false;
+  /** Whether the dataset itself accepts writes, apart from the project's role. */
+  private sourceEditable: Editable = true;
   private retryDelay = 0;
   references = 0;
 
@@ -169,6 +211,8 @@ export class DatasetSession {
       conflicts: [],
       recovered: [],
       warnings: [],
+      editable: true,
+      names: {},
       canUndo: false,
       canRedo: false,
     };
@@ -195,12 +239,15 @@ export class DatasetSession {
     for (const listener of this.listeners) listener();
   }
 
-  load(): Promise<void> {
-    this.loading ??= this.loadNow().finally(() => (this.loading = undefined));
+  /** Reads the dataset; `refresh` reads online data now instead of within its interval. */
+  load(options: { refresh?: boolean } = {}): Promise<void> {
+    this.loading ??= this.loadNow(options).finally(
+      () => (this.loading = undefined),
+    );
     return this.loading;
   }
 
-  private async loadNow() {
+  private async loadNow(options: { refresh?: boolean }) {
     let record: DatasetRecord;
     try {
       record = await this.client.transport.invoke<DatasetRecord>(
@@ -208,14 +255,12 @@ export class DatasetSession {
         {
           projectId: this.projectId,
           datasetId: this.datasetId,
+          ...(options.refresh ? { refresh: true } : {}),
         },
       );
     } catch (error) {
       this.publish({
-        status: errorCode(error) === "NOT_FOUND" ? "missing" : "error",
-        error: errorText(error),
-        errorCode: errorCode(error),
-        source: unavailableSource(error),
+        ...failedRead(error),
         name:
           (error as { details?: { name?: string } }).details?.name ??
           this.snapshot.name,
@@ -250,6 +295,7 @@ export class DatasetSession {
   }
 
   private adopt(record: DatasetRecord) {
+    this.sourceEditable = record.editable ?? true;
     this.snapshot = {
       ...this.snapshot,
       name: record.dataset.name,
@@ -257,7 +303,14 @@ export class DatasetSession {
       origin: record.dataset.origin,
       // Online data, spreadsheets and stale values cannot be edited.
       readOnly: !!record.readOnly || record.editable === false,
+      editable: record.readOnly ? false : (record.editable ?? true),
+      dataStatus: record.status ?? "ok",
       warnings: record.warnings ?? [],
+      names: Object.fromEntries(
+        Object.values(record.transform?.inputs ?? {}).flatMap((input) =>
+          input.name ? [[input.datasetId, input.name]] : [],
+        ),
+      ),
       transform: record.dataset.transform
         ? { inputs: Object.keys(record.dataset.transform.inputs) }
         : undefined,
@@ -578,10 +631,14 @@ export class DatasetSession {
     this.adopt(record);
   }
 
-  /** Reads the saved dataset again after a change elsewhere and merges pending writes. */
-  async refresh(): Promise<void> {
+  /**
+   * Reads the saved dataset again after a change elsewhere and merges pending
+   * writes. `retry` reads the source now (online data too) and always
+   * returns its current state, as the 重试 action of a warning.
+   */
+  async refresh(options: { retry?: boolean } = {}): Promise<void> {
     if (this.loading) return this.loading;
-    if (!this.base) return this.load();
+    if (!this.base) return this.load({ refresh: options.retry });
     if (this.refreshQueued) return;
     this.refreshQueued = true;
     try {
@@ -591,15 +648,22 @@ export class DatasetSession {
       >("datasets:get", {
         projectId: this.projectId,
         datasetId: this.datasetId,
+        ...(options.retry ? { refresh: true } : {}),
         // After a source error the same content still needs its new source details.
-        ...(this.snapshot.errorCode === "SOURCE_UNAVAILABLE" ||
+        ...(options.retry ||
+        this.snapshot.errorCode === "SOURCE_UNAVAILABLE" ||
         this.snapshot.source?.available === false
           ? {}
           : { ifHash: this.base.hash }),
       });
       if ("unchanged" in result) {
-        if (!!result.readOnly !== this.snapshot.readOnly)
-          this.publish({ readOnly: !!result.readOnly });
+        // The project may have become read-only (or writable); the source has not changed.
+        const readOnly = !!result.readOnly || this.sourceEditable === false;
+        if (readOnly !== this.snapshot.readOnly)
+          this.publish({
+            readOnly,
+            editable: result.readOnly ? false : this.sourceEditable,
+          });
         return;
       }
       this.rebase(result);
@@ -607,18 +671,12 @@ export class DatasetSession {
       if (this.snapshot.dirty) this.scheduleSave();
       await this.persistDraft();
     } catch (error) {
+      const code = errorCode(error);
+      // The source went away without a value to keep: show why instead.
       this.publish(
-        errorCode(error) === "NOT_FOUND"
-          ? { status: "missing", error: errorText(error) }
-          : errorCode(error) === "SOURCE_UNAVAILABLE"
-            ? {
-                // The linked file went away: show why instead of stale values.
-                status: "error",
-                error: errorText(error),
-                errorCode: "SOURCE_UNAVAILABLE",
-                source: unavailableSource(error),
-              }
-            : { error: errorText(error) },
+        code === "NOT_FOUND" || code === "SOURCE_UNAVAILABLE"
+          ? failedRead(error)
+          : { error: errorText(error) },
       );
     } finally {
       this.refreshQueued = false;

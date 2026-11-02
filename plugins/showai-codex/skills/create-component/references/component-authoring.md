@@ -4,7 +4,7 @@
 
 新组件使用 documentation.version=2；按 [参数契约](parameter-contract.md) 同步 schema、字段语义、遗漏行为、示例及关系约束。结构检查与实际交互分别验证，不把例子中的初始值称为自动默认值。
 
-定义数据契约：输入字段、必填条件、数组上限、单位、默认值以及空数据状态。schema 与 defaultData、examples、React 入口一致。界面需要的计算与状态说明保持在组件内；正式数据通过 `onChange(nextData)` 返回，读取态保持页面源数据。每个组件接收 `{data, onChange, readOnly, goTo}`，`goTo` 见下方「跳转到页面或组件」；有对话的宿主还会传入 `onContext` 与 `context`，见下方「交给对话」；App 页面中的组件块还会收到 `viewState` 与 `onViewState`，见下方「记住读者的位置」。
+定义数据契约：输入字段、必填条件、数组上限、单位、默认值以及空数据状态。schema 与 defaultData、examples、React 入口一致。界面需要的计算与状态说明保持在组件内；正式数据通过 `onChange(nextData)` 返回，读取态保持页面源数据。每个组件接收 `{data, onChange, readOnly, dataState, goTo}`，`dataState` 见下方「数据状态与可改范围」，`goTo` 见下方「跳转到页面或组件」；有对话的宿主还会传入 `onContext` 与 `context`，见下方「交给对话」；App 页面中的组件块还会收到 `viewState` 与 `onViewState`，见下方「记住读者的位置」。
 
 包包含 `manifest.json`、`props.schema.json` 和 manifest.entry 指定的本地文件。manifest 记录 id、name、version、description、scenarios、entry、defaultData、examples。输入与示例保留可用的最小实例；参考本次真实内容验证较复杂情况，不为未知事实生成示例测量。
 
@@ -18,6 +18,16 @@ Archify、Diagram Design 和 Fireworks 技术图带有固定上游提交的完�
 - 列表条目给稳定且唯一的 `id`（参数契约里声明 `unique`，见 [参数契约](parameter-contract.md)），这样不同页面同时修改不同条目才能逐条合并；没有 id 的列表只能整体替换。
 - 共享的记录和每个页面各自的设置（如标题、视图、列宽比例）放在不同的顶层参数，绑定时后者可以列为 `local`。
 - 验证时在测试项目或测试页面放两个绑定同一份共享数据的块，分别修改不同条目和同一字段，确认合并、冲突提示和重新读取的结果。
+
+### 数据状态与可改范围
+
+`dataState` 说明组件此刻的数据有多新、哪些部分能改：
+
+- `status`：`"ok"` 为当前数据；`"stale"` 为来源暂时读不到时这台设备上次读到的数据，照常显示；`"empty"` 时宿主显示提示，组件不会收到这种状态的数据。
+- `editable`：`true` 全部可改，`false` 只读，`{paths}` 只有一部分可改，例如表格行来自只读的 Excel 文件，而组件自己的标题、列和新加的行仍可编辑。
+- `canEdit(prop, itemId?, field?)`：按 `editable` 判断一个顶层参数、列表中的一个条目或条目的一个字段能否修改。渲染编辑控件前调用它，不能改的部分按只读样式显示，例如 `dataState.canEdit("rows", row.id, "title")`。
+
+`paths` 的写法：`"*"` 表示所有非列表的顶层参数，`"title"` 表示一个顶层参数，`"rows[*]"` 表示 rows 的条目可以增删改；以 `!` 开头的是其中不能修改的部分，`"!rows[id=task:*].title"` 指 id 以 `task:` 开头的条目的 title，`"!rows[id=t1].title"` 指 id 为 t1 的条目。来自共享数据的条目由宿主映射，在组件中保持存在；它们的字段按 `canEdit` 修改。超出范围的修改由宿主退回并在组件块上提示，组件随后收到原来的 `data`。
 
 组件有汇总或计算字段时，可在 manifest 声明 `reader: "readData"`，并从入口命名导出同步 `readData(props)`。返回不超过 64 KiB 的 JSON，以稳定 ID 对应源数据并标明派生字段。它与组件使用同一份计算逻辑，在浏览器沙箱中执行；数据读取不访问文件或服务。Agent 的 structured 视图保留原始 props 与 computed.data，image/html 使用同一固定版本。增加或修改读取模型后用 component_save 保存新版本，并验证原始字段与计算值一致。
 

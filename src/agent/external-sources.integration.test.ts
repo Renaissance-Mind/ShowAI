@@ -14,6 +14,7 @@ import { visitNodes } from "../surface/document.mjs";
 import { xlsxWorkbook } from "../test/xlsx";
 import { dataServer } from "../test/data-server";
 import type { ShowDocument } from "../core/model";
+import { parseArtifact } from "../portable/validation.mjs";
 
 let root: string;
 let outside: string;
@@ -320,7 +321,8 @@ test("online data refreshes, revalidates and falls back to its last value", asyn
     let read = await ok("page_read", { pageId, rendered: false });
     expect(read.bindings[0]).toMatchObject({
       status: "ok",
-      editable: false,
+      // Mapped fields of online data are read-only; the table's own parts are not.
+      editable: { paths: ["*", "rows[*]", "!rows[id=row:*].title"] },
       warnings: [],
       source: { kind: "url", url, format: "json", available: true },
     });
@@ -397,7 +399,7 @@ test("online data refreshes, revalidates and falls back to its last value", asyn
     read = await ok("page_read", { pageId, rendered: false });
     expect(read.bindings[0]).toMatchObject({
       status: "stale",
-      editable: false,
+      editable: { paths: ["*", "rows[*]", "!rows[id=row:*].title"] },
       source: { kind: "url", available: false },
       warnings: [{ code: "SOURCE_UNREACHABLE" }],
     });
@@ -494,7 +496,8 @@ test("a linked file falls back to its last value, and reports empty without one"
   let read = await ok("page_read", { pageId, rendered: false });
   expect(read.bindings[0]).toMatchObject({
     status: "stale",
-    editable: false,
+    // Mapped titles are read-only now; the table's own parts are not.
+    editable: { paths: ["*", "rows[*]", "!rows[id=row:*].title"] },
     source: { kind: "file", path: csv, available: false },
     warnings: [{ code: "SOURCE_MISSING" }],
   });
@@ -561,6 +564,19 @@ test("a linked file falls back to its last value, and reports empty without one"
     warnings: [{ code: "SOURCE_MISSING", level: "error" }],
   });
   expect(read.bindings[0].error).toMatch(/cannot be read/);
+  // An export says why the block has no data, naming the file but not its path.
+  const out = join(outside, "exports", "empty.html");
+  await ok("page_export", { pageId, format: "html", out, externalData: "embed" });
+  const artifact = parseArtifact(
+    JSON.parse(await readFile(out.replace(/\.html$/, ".showai.json"), "utf8")),
+  );
+  expect(widget(artifact.document, "database").attrs.data.$dataState).toEqual({
+    status: "empty",
+    dataset: "任务",
+    file: "tasks.csv",
+  });
+  for (const file of [out, out.replace(/\.html$/, ".showai.json")])
+    expect(await readFile(file, "utf8")).not.toContain(outside);
   const listed = (await ok("dataset_read", { action: "list" })).find(
     (item: { id: string }) => item.id === datasetId,
   );

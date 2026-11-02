@@ -62,6 +62,27 @@ async function chooseDataFile(
   return result?.path ?? null;
 }
 
+/**
+ * Asks for a data file and links it to a dataset on this device; false when
+ * the person cancels. `replace` makes library data read the file instead.
+ */
+export async function linkDataFile(
+  scope: DatasetScopeValue,
+  projectId: string,
+  datasetId: string,
+  options: { name?: string; replace?: boolean } = {},
+): Promise<boolean> {
+  const path = await chooseDataFile(scope, projectId, "open", options.name);
+  if (!path) return false;
+  await scope.client.transport.invoke("datasets:link", {
+    projectId,
+    datasetId,
+    path,
+    ...(options.replace ? { use: "file" } : {}),
+  });
+  return true;
+}
+
 /** Where a bound dataset keeps its value, and moving it to or from a file. */
 function SourceSection({
   scope,
@@ -96,15 +117,21 @@ function SourceSection({
   };
   const link = (mode: "open" | "save") =>
     run(async () => {
+      if (mode === "open") {
+        // Choosing a file for library data replaces it with the file's content.
+        await linkDataFile(scope, projectId, datasetId, {
+          name: snapshot?.name,
+          replace: !source,
+        });
+        return;
+      }
       const path = await chooseDataFile(scope, projectId, mode, snapshot?.name);
       if (!path) return;
       await scope.client.transport.invoke("datasets:link", {
         projectId,
         datasetId,
         path,
-        ...(mode === "save" ? { use: "dataset" } : {}),
-        // Choosing a file for library data replaces it with the file's content.
-        ...(mode === "open" && !source ? { use: "file" } : {}),
+        use: "dataset",
       });
     });
   const embed = () =>

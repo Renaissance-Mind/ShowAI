@@ -6,6 +6,7 @@ import {
   withComponentProps,
   type BindingIssue,
 } from "../datasets/binding.mjs";
+import { bindingEditable } from "../datasets/editable.mjs";
 import { visitNodes } from "../surface/document.mjs";
 import { formatPath } from "../datasets/operations.mjs";
 import type {
@@ -45,7 +46,11 @@ export interface BindingRead {
    * the last value read on this device; empty: no data (see warnings/error).
    */
   status: DatasetReadStatus;
-  /** Whether edits of the block can be written to the dataset. */
+  /**
+   * What edits of the block can change: true, false, or { paths } when only
+   * part of it can (see datasets/editable.mjs): e.g. mapped fields of a
+   * read-only dataset next to the block's own items and fields.
+   */
   editable: Editable;
   warnings: DatasetWarning[];
   /** The dataset reads a file or online data outside the library (see dataset-sources). */
@@ -66,6 +71,35 @@ export interface BindingRead {
   transform?: { inputs: Record<string, string> };
   /** Bytes the resolved snapshot adds to the block's stored data. */
   snapshotBytes?: number;
+}
+
+/**
+ * What a reader shows for a bound block without data: the dataset name and
+ * only the file name of its source, never a path of this device.
+ */
+export interface DataNotice {
+  status: "empty";
+  dataset?: string;
+  file?: string;
+}
+/** Block data key of a DataNotice in resolved (rendered, exported) documents. */
+export const DATA_NOTICE_KEY = "$dataState";
+
+/** The last segment of a path or address, without query or fragment. */
+function fileName(source: {
+  name?: string;
+  path?: string;
+  url?: string;
+}): string | undefined {
+  if (source.name) return source.name;
+  if (source.path) return source.path.split(/[\\/]/).pop() || undefined;
+  if (source.url) {
+    const url = new URL(source.url);
+    return (
+      decodeURIComponent(url.pathname.split("/").pop() ?? "") || url.hostname
+    );
+  }
+  return undefined;
 }
 
 /** One external dataset whose snapshot an export would embed. */
@@ -174,6 +208,7 @@ export async function resolveDocumentDatasets(
   const snapshot = structuredClone(document);
   const bindings: BindingRead[] = [];
   const replacements = new Map<string, Record<string, unknown>>();
+  const notices = new Map<string, DataNotice>();
   for (const { node } of bound) {
     const binding = readBinding(node.attrs!.data)!;
     const kind = String(node.attrs!.kind);
@@ -213,6 +248,12 @@ export async function resolveDocumentDatasets(
           read.source = { ...source, available: false };
         }
         read.warnings = unavailableWarnings(error);
+        const file = details.source ? fileName(details.source) : undefined;
+        notices.set(blockId, {
+          status: "empty",
+          ...(details.name ? { dataset: details.name } : {}),
+          ...(file ? { file } : {}),
+        });
       }
       read.error =
         error instanceof CoreError && error.code === "NOT_FOUND"
@@ -257,8 +298,11 @@ export async function resolveDocumentDatasets(
         kind,
         node.attrs!.data,
         record.dataset.value,
+        undefined,
+        { writable: record.editable === true },
       );
       read.issues = resolved.issues;
+      read.editable = bindingEditable(resolved);
       if (options.includeProps) read.props = resolved.props;
       const mapped: Record<string, number> = {};
       for (const item of resolved.projected.values())
@@ -296,8 +340,14 @@ export async function resolveDocumentDatasets(
     }
   }
   visitNodes(snapshot.content, (node) => {
-    if (node.type === "widget" && replacements.has(String(node.attrs?.id)))
-      node.attrs!.data = replacements.get(String(node.attrs!.id));
+    if (node.type !== "widget") return;
+    const id = String(node.attrs?.id);
+    if (replacements.has(id)) node.attrs!.data = replacements.get(id);
+    else if (notices.has(id))
+      node.attrs!.data = {
+        ...(node.attrs!.data as Record<string, unknown>),
+        [DATA_NOTICE_KEY]: notices.get(id),
+      };
   });
   if (options.remember) {
     const baselines = new DatasetBaselines(store.root);

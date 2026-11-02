@@ -19,7 +19,9 @@ import { Database } from "../ui/icons";
 import {
   BlockActionHost,
   BlockActions,
+  BlockDataState,
   BlockItemSources,
+  type BlockDataStateValue,
   type BlockItemSource,
 } from "../components/blocks/action-host";
 import type { BlockProps } from "../components/blocks/types";
@@ -46,13 +48,31 @@ import {
   type DatasetSession,
   type DatasetSnapshot,
 } from "./client";
-import { DatasetDialog, type DatasetDialogRequest } from "./DatasetDialog";
+import {
+  DatasetDialog,
+  linkDataFile,
+  type DatasetDialogRequest,
+} from "./DatasetDialog";
 import {
   ProblemNotice,
   bindProblemActions,
   describeError,
 } from "../studio/problems";
 import { BoundWidgetHost } from "./widget-host";
+import { bindingEditable } from "./editable.mjs";
+import {
+  agentRequest,
+  topLevel,
+  warningEntries,
+  type WarningEntry,
+} from "./warning-entries";
+import {
+  DataEmptyState,
+  DataWarningBadge,
+  type RunWarningAction,
+} from "./DataWarnings";
+import { AssistantContext } from "../components/assistant-context";
+import type { WarningAction } from "./warnings.mjs";
 import "./datasets.css";
 
 const closeText = translator(messages);
@@ -251,21 +271,26 @@ export function BoundWidget({
     compiled?.dataset,
   );
   const snapshot = useDatasetSnapshot(session);
+  const assistant = useContext(AssistantContext);
   const [nonce, setNonce] = useState(0);
   const [notice, setNotice] = useState("");
   const [expanded, setExpanded] = useState(false);
   const wrapper = useRef<HTMLDivElement>(null);
   const ready = snapshot?.status === "ready";
+  // Read-only sources, transforms and stale values keep the block's own parts editable.
+  const writable = !snapshot?.readOnly;
   const resolved = useMemo(() => {
     if (!compiled || !ready) return undefined;
     try {
-      return resolveBinding(kind, data, snapshot!.value, compiled);
+      return resolveBinding(kind, data, snapshot!.value, compiled, {
+        writable,
+      });
     } catch (error) {
       return { error: errorMessage(error) };
     }
     // `compiled` derives from data; nonce re-sends props a component changed locally.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [kind, data, snapshot?.value, ready, nonce]);
+  }, [kind, data, snapshot?.value, ready, writable, nonce]);
   const resolvedProps =
     resolved && "props" in resolved ? resolved.props : undefined;
   const rendered = useMemo(
@@ -288,8 +313,8 @@ export function BoundWidget({
   const reportBasis = useCallback((props: Record<string, unknown>) => {
     reported.current = props;
   }, []);
-  const latest = useRef({ data, onChange, resolvedProps, snapshot });
-  latest.current = { data, onChange, resolvedProps, snapshot };
+  const latest = useRef({ data, onChange, resolvedProps, snapshot, writable });
+  latest.current = { data, onChange, resolvedProps, snapshot, writable };
   const rejection = useCallback(
     (item: BindingRejection) =>
       item.reason === "derived"
@@ -298,12 +323,14 @@ export function BoundWidget({
           ? t("rejectedRemoved")
           : item.reason === "read-only"
             ? t("rejectedReadOnly")
-            : item.reason === "unmapped"
-              ? t("rejectedUnmapped", {
-                  field: item.field ?? "",
-                  value: JSON.stringify(item.value),
-                })
-              : t("rejectedGeneric"),
+            : item.reason === "source-read-only"
+              ? t("rejectedSourceReadOnly", { field: item.field ?? "" })
+              : item.reason === "unmapped"
+                ? t("rejectedUnmapped", {
+                    field: item.field ?? "",
+                    value: JSON.stringify(item.value),
+                  })
+                : t("rejectedGeneric"),
     [t],
   );
   const change = useCallback(
@@ -334,6 +361,7 @@ export function BoundWidget({
           value: session.getSnapshot().value,
           nextProps,
           basis,
+          writable: current.writable,
         });
       } catch (error) {
         setNotice(errorMessage(error));
@@ -396,12 +424,117 @@ export function BoundWidget({
     return map;
   }, [resolved, snapshot?.name]);
 
-  const locked =
-    !!readOnly || !onChange || !!snapshot?.readOnly || !!scope?.readOnly;
+  const blockEditable =
+    resolved && "projected" in resolved ? bindingEditable(resolved) : false;
+  const pageEditable = !readOnly && !!onChange && !scope?.readOnly;
+  const locked = !pageEditable || blockEditable === false;
+  const dataStatus = snapshot?.dataStatus ?? "ok";
+  const dataState = useMemo<BlockDataStateValue>(
+    () => ({
+      status: dataStatus,
+      editable: locked ? false : blockEditable,
+    }),
+    // The paths are recomputed per render; compare them by value.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [dataStatus, locked, canonicalJson(blockEditable)],
+  );
   const openSettings =
     scope && !scope.readOnly && onChange
       ? () => scope.openDialog({ kind, data, apply: onChange })
       : undefined;
+  const issues = resolved && "issues" in resolved ? resolved.issues : [];
+  const translate = useCallback(
+    (key: string, values?: Record<string, unknown>) =>
+      t(key as never, values as never),
+    [t],
+  );
+  const entries: WarningEntry[] =
+    snapshot &&
+    compiled &&
+    (snapshot.status === "ready" || snapshot.dataStatus === "empty")
+      ? warningEntries(
+          {
+            datasetId: compiled.dataset,
+            name: snapshot.name,
+            names: snapshot.names,
+            status: dataStatus,
+            warnings: snapshot.warnings,
+            datasetEditable: snapshot.editable,
+            blockEditable: dataState.editable,
+            pageEditable,
+            source: snapshot.source,
+            transform: !!snapshot.transform,
+            issues,
+            rejection: notice || undefined,
+            available: {
+              "link-file": !!scope && !scope.readOnly,
+              retry: !!session,
+              "open-file": !!scope,
+              "ask-agent": pageEditable,
+              packaging: !!openSettings,
+            },
+          },
+          translate,
+        )
+      : [];
+  const run: RunWarningAction = async (
+    action: WarningAction,
+    entry: WarningEntry,
+  ) => {
+    if (!scope || !session || !projectId) return;
+    const datasetId = entry.datasetId ?? compiled?.dataset ?? "";
+    switch (action) {
+      case "retry":
+        await session.refresh({ retry: true });
+        return;
+      case "link-file":
+        if (
+          await linkDataFile(scope, projectId, datasetId, {
+            name: entry.dataset,
+          })
+        )
+          await session.refresh({ retry: true });
+        return;
+      case "open-file":
+        await scope.client.transport.invoke("datasets:revealSource", {
+          projectId,
+          datasetId,
+        });
+        return;
+      case "ask-agent": {
+        const prompt = agentRequest(entry, translate);
+        const root = wrapper.current;
+        const owner = root?.closest<HTMLElement>(
+          "[data-block-id],[data-surface-id]",
+        );
+        const blockId = owner?.dataset.blockId ?? owner?.dataset.surfaceId;
+        if (assistant && root) {
+          const rect = root.getBoundingClientRect();
+          const anchor = {
+            left: rect.left + rect.width / 2,
+            top: rect.top,
+            bottom: rect.bottom,
+          };
+          assistant.open(
+            blockId
+              ? { kind: "blocks", blockIds: [blockId], anchor, prompt }
+              : { kind: "page", anchor, prompt },
+          );
+          return;
+        }
+        // Without a conversation in this window, the request goes to another Agent.
+        await desktop.invoke("clipboard:write", { text: prompt });
+        return "copied";
+      }
+      case "packaging":
+        // Packaging choices arrive with the packaging list; the dialog shows the source today.
+        openSettings?.();
+        return;
+    }
+  };
+  const actionLabels = assistant
+    ? undefined
+    : { "ask-agent": t("action.copy-request") };
   const label = (
     <span className="dataset-source-name">
       <Database size={13} aria-hidden="true" />
@@ -427,26 +560,13 @@ export function BoundWidget({
         {t("loading")}
       </p>
     );
-  else if (snapshot.errorCode === "SOURCE_UNAVAILABLE")
+  else if (snapshot.dataStatus === "empty")
     body = (
-      <div className="dataset-message" role="alert">
-        <p>
-          {snapshot.source?.path
-            ? t("sourceUnreadable", {
-                name: snapshot.name ?? compiled?.dataset ?? "",
-                path: snapshot.source.path,
-              })
-            : t("sourceUnlinked", {
-                name: snapshot.name ?? compiled?.dataset ?? "",
-                file: snapshot.source?.name ?? "",
-              })}
-        </p>
-        {openSettings && (
-          <button type="button" onClick={openSettings}>
-            {t("linkSourceAction")}
-          </button>
-        )}
-      </div>
+      <DataEmptyState
+        entry={entries.find((entry) => entry.level === topLevel(entries))}
+        run={run}
+        labels={actionLabels}
+      />
     );
   else if (snapshot.status === "missing") {
     const id = compiled?.dataset ?? "";
@@ -499,7 +619,7 @@ export function BoundWidget({
           cause: t("errorCause"),
         }}
         actions={bindProblemActions(["retry"], {
-          retry: () => void session.refresh(),
+          retry: () => void session.refresh({ retry: true }),
         })}
       />
     );
@@ -513,23 +633,25 @@ export function BoundWidget({
     body = (
       <BlockItemSources.Provider value={sources}>
         <BindingBasisContext.Provider value={reportBasis}>
-          {render({
-            kind,
-            data: rendered,
-            onChange: locked ? undefined : change,
-            readOnly: locked,
-            host,
-          })}
+          <BlockDataState.Provider value={dataState}>
+            {render({
+              kind,
+              data: rendered,
+              onChange: locked ? undefined : change,
+              readOnly: locked,
+              host,
+            })}
+          </BlockDataState.Provider>
         </BindingBasisContext.Provider>
       </BlockItemSources.Provider>
     );
   const conflicts = snapshot?.conflicts ?? [];
-  const issues = resolved && "issues" in resolved ? resolved.issues : [];
   return (
     <div
       className="dataset-bound"
       ref={wrapper}
       data-dataset-id={compiled?.dataset}
+      data-data-status={snapshot?.dataStatus}
     >
       <div className="dataset-source" role="group" aria-label={t("shared")}>
         {openSettings ? (
@@ -549,17 +671,15 @@ export function BoundWidget({
         ) : snapshot?.dirty && !snapshot.error ? (
           <span className="dataset-state">{t("unsaved")}</span>
         ) : null}
-        {snapshot?.readOnly && (
-          <span className="dataset-state">{t("readOnly")}</span>
-        )}
-        {issues.length > 0 && (
-          <span
-            className="dataset-state"
-            title={issues.map((issue) => issue.message).join("\n")}
-          >
-            {t("issueCount", { count: issues.length })}
-          </span>
-        )}
+        <DataWarningBadge
+          entries={entries}
+          stale={dataStatus === "stale"}
+          readOnlyLabel={
+            dataState.editable === false ? t("readOnly") : t("partlyReadOnly")
+          }
+          run={run}
+          labels={actionLabels}
+        />
         {conflicts.length > 0 && (
           <button
             type="button"
@@ -574,25 +694,6 @@ export function BoundWidget({
       {snapshot?.error && snapshot.status === "ready" && (
         <p className="dataset-message" role="alert">
           {t("saveFailed", { error: snapshot.error })}
-        </p>
-      )}
-      {snapshot?.status === "ready" &&
-        snapshot.source &&
-        !snapshot.source.available && (
-          <p className="dataset-message" role="alert">
-            {t("sourceUnreadable", {
-              name: snapshot.name ?? compiled?.dataset ?? "",
-              path:
-                snapshot.source.path ??
-                snapshot.source.url ??
-                snapshot.source.name ??
-                "",
-            })}
-          </p>
-        )}
-      {notice && (
-        <p className="dataset-message" role="alert">
-          {notice}
         </p>
       )}
       {conflicts.length > 0 &&

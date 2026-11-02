@@ -201,7 +201,7 @@ export function installBrowserBridge() {
           : {
               title: t("title.datasetOpenFile"),
               kind: "file",
-              extensions: ["json", "csv", "tsv"],
+              extensions: ["json", "csv", "tsv", "xlsx"],
             };
     if (action === "settings:chooseHome") {
       const info = await request<{ home: string }>("invoke", {

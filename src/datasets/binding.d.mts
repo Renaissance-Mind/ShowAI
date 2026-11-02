@@ -79,7 +79,18 @@ export interface ProjectedItem {
 export interface BindingRejection {
   id?: string;
   field?: string;
-  reason: "removed" | "derived" | "read-only" | "unmapped" | "not-a-list";
+  /**
+   * read-only: the record has no stable id to write to; source-read-only:
+   * the dataset itself cannot be written (online data, spreadsheets,
+   * transforms, stale values).
+   */
+  reason:
+    | "removed"
+    | "derived"
+    | "read-only"
+    | "source-read-only"
+    | "unmapped"
+    | "not-a-list";
   value?: unknown;
 }
 
@@ -110,18 +121,23 @@ export declare function resolveBinding(
   data: unknown,
   value: unknown,
   compiled?: CompiledBinding,
-): {
+  options?: { writable?: boolean },
+): ResolvedBinding;
+export interface ResolvedBinding {
   props: Record<string, unknown>;
   projected: Map<string, ProjectedItem>;
   issues: BindingIssue[];
   compiled: CompiledBinding;
-};
+  /** Whether the dataset accepts writes (see resolveBinding options). */
+  writable: boolean;
+}
 export declare function splitBindingChange(input: {
   kind: string;
   data: unknown;
   value: unknown;
   nextProps: Record<string, unknown>;
   basis?: { value: unknown; props?: Record<string, unknown> };
+  writable?: boolean;
 }): {
   operations: DatasetOperation[];
   rejected: BindingRejection[];

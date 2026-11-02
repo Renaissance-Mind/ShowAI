@@ -3,6 +3,7 @@ import {
   DatasetDrafts,
   DatasetStore,
   sharedPropsSchema,
+  unavailableWarnings,
   type DatasetDocument,
 } from "../core/datasets";
 import { getComponent } from "../core/catalog";
@@ -69,9 +70,19 @@ export async function handleDatasetAction(
     case "datasets:list":
       return datasets.list(projectId);
     case "datasets:get": {
-      const record = await datasets.read(projectId, id(args, "datasetId"), {
-        refresh: args.refresh === true,
-      });
+      const record = await datasets
+        .read(projectId, id(args, "datasetId"), {
+          refresh: args.refresh === true,
+        })
+        .catch((error: unknown) => {
+          // A dataset without a value says why, as warnings the block can act on.
+          if (error instanceof CoreError && error.code === "SOURCE_UNAVAILABLE")
+            error.details = {
+              ...error.details,
+              warnings: unavailableWarnings(error),
+            };
+          throw error;
+        });
       const readOnly = await readOnlyProject(store, projectId);
       // A stale value can equal the last one read; its state still changed.
       if (args.ifHash === record.hash && record.status === "ok")
