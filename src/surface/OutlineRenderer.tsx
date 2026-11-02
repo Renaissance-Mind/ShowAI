@@ -9,7 +9,10 @@ import {
 import { injectComponentBootstrap } from "../components/custom/contract";
 import { InlineComponent } from "../components/custom/InlineComponent";
 import { useInlineComponentHost } from "../components/custom/CustomBlock";
-import { componentSandboxPolicy } from "../components/custom/sandbox-policy.mjs";
+import {
+  componentSandboxPolicy,
+  withoutPackagePolicies,
+} from "../components/custom/sandbox-policy.mjs";
 import type { CompiledComponent } from "../components/custom/types";
 import { appearanceTokens, installSandboxTheme } from "../design/sandbox-theme";
 import type { PageOutlineComponentProps } from "./page-outline.mjs";
@@ -87,7 +90,7 @@ function OutlineFrame({
     () =>
       `<!doctype html><meta http-equiv="Content-Security-Policy" content="${componentSandboxPolicy}">` +
       injectComponentBootstrap(
-        component.html,
+        withoutPackagePolicies(component.html),
         `<script>(${installSandboxTheme.toString()})(${json(channel)},${json(contract.outline.theme)},${json(appearanceTokens())});window.addEventListener('keydown',event=>{if(event.key==='Escape'){event.preventDefault();parent.postMessage({channel:${json(channel)},type:'showai:outline-action',action:'collapse'},'*');}},true);</script><script id="showai-component-data" type="application/json">${json({ channel, props: contract.props, readOnly: true, outline: contract.outline })}</script>`,
       ),
     [component.html, channel],

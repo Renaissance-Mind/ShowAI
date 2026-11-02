@@ -2,7 +2,13 @@ import { componentSelectionScript } from "./selection-bridge";
 import { useSelectionFrame } from "./useSelectionFrame";
 import { CAPACITY, assertContent } from "../../portable/capacity.mjs";
 import { installIconTooltips } from "../../ui/icon-tooltip.mjs";
-import { componentSandboxPolicy } from "./sandbox-policy.mjs";
+import {
+  componentSandboxPolicyFor,
+  withoutPackagePolicies,
+} from "./sandbox-policy.mjs";
+import { localMediaSource } from "./local-media-link";
+import { frameResource } from "../local-resources";
+import { isLocalResourceRef } from "../../portable/local-files.mjs";
 import { useAppearanceTheme } from "../../design/useAppearanceTheme";
 import {
   appearanceTokens,
@@ -117,6 +123,13 @@ function safeJson(value: unknown): string {
     .replace(/</g, "\\u003c")
     .replace(/\u2028/g, "\\u2028")
     .replace(/\u2029/g, "\\u2029");
+}
+
+/** Whether a string appears as a value anywhere in a component's props. */
+function propsMention(value: unknown, text: string, depth = 0): boolean {
+  if (value === text) return true;
+  if (depth > 40 || !value || typeof value !== "object") return false;
+  return Object.values(value).some((item) => propsMention(item, text, depth + 1));
 }
 
 function jsonObject(value: unknown): value is Record<string, unknown> {
@@ -342,11 +355,11 @@ function SandboxComponent({
   const html = useMemo(() => {
     // A portable package is executable user content. Enforce the policy before
     // parsing any of its markup, even if its own document omits or changes CSP.
-    const policy = `<!doctype html><meta http-equiv="Content-Security-Policy" content="${componentSandboxPolicy}">`;
+    const policy = `<!doctype html><meta http-equiv="Content-Security-Policy" content="${componentSandboxPolicyFor(localMediaSource())}">`;
     return (
       policy +
       injectComponentBootstrap(
-        component.html,
+        withoutPackagePolicies(component.html),
         // Built-in blocks compiled into the package start in the workbench language.
         `<style>body{color:var(--text)}</style><script>(${installFrameErrorReporter.toString()})(${safeJson(channel)});</script><script>document.documentElement.lang=document.documentElement.dataset.showaiLocale=${safeJson(locale)};(${installComponentActivity.toString()})(${safeJson(channel)});(${installSandboxTheme.toString()})(${safeJson(channel)},${safeJson(initialTheme.current)},${safeJson(appearanceTokens())});</script><script id="showai-component-data" type="application/json">${safeJson({ channel, ...initial.current, ...savedView() })}</script>`,
       ) +
@@ -477,6 +490,33 @@ function SandboxComponent({
       }
       if (event.data.type === "showai:open-media") {
         openComponentMedia(event.data.url);
+        return;
+      }
+      if (event.data.type === "showai:resource") {
+        // A component shows a local file named in its own props only.
+        const { requestId, ref, kind } = event.data;
+        const frame = event.source as Window;
+        const reply = (answer: Record<string, unknown>) =>
+          frame.postMessage(
+            { channel, type: "showai:resource", requestId, ...answer },
+            "*",
+          );
+        if (
+          typeof requestId !== "string" ||
+          !["image", "video", "audio"].includes(kind) ||
+          !isLocalResourceRef(ref, kind) ||
+          !propsMention(latest.current.parsed.props, ref)
+        ) {
+          reply({ status: "unavailable" });
+          return;
+        }
+        void frameResource(ref, kind).then(({ answer, transfer }) =>
+          frame.postMessage(
+            { channel, type: "showai:resource", requestId, ...answer },
+            "*",
+            transfer,
+          ),
+        );
         return;
       }
       if (

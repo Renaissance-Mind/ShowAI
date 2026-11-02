@@ -15,6 +15,9 @@ import commonMessages from "../../i18n/messages/common";
 import { supportsManualEditing } from "../blocks/manual-editing";
 import messages from "../../i18n/messages/richText";
 import noteMessages from "../../i18n/messages/richTextNotes";
+import mediaMessages from "../../i18n/messages/media";
+import { useLocalFileChooser } from "../local-resources";
+import { isLocalResourceRef } from "../../portable/local-files.mjs";
 import ExpandableSearch from "../ExpandableSearch";
 import { RichTextEnvironment } from "./environment";
 import type { CatalogComponent } from "../../core/component-categories";
@@ -213,7 +216,8 @@ function ToolButton({
 function safeImageUrl(value: string) {
   return (
     /^https?:\/\//i.test(value) ||
-    /^data:image\/(png|jpe?g|gif|webp|avif);base64,/i.test(value)
+    /^data:image\/(png|jpe?g|gif|webp|avif);base64,/i.test(value) ||
+    isLocalResourceRef(value, "image")
   );
 }
 
@@ -250,6 +254,8 @@ export default function RichTextEditor({
   const t = useTranslator(messages);
   const tc = useTranslator(commonMessages);
   const tn = useTranslator(noteMessages);
+  const tm = useTranslator(mediaMessages);
+  const chooseFiles = useLocalFileChooser();
   const latestOnChange = useRef(onChange);
   const selectionMenuId = useId();
   latestOnChange.current = onChange;
@@ -966,6 +972,25 @@ export default function RichTextEditor({
     else chain.unsetMark("annotation");
     chain.run();
     return true;
+  }
+
+  /** Inserts images that link their original files instead of embedding copies. */
+  async function linkImageFiles() {
+    if (!editor || !editor.isEditable || !chooseFiles) return;
+    const files = await chooseFiles("image", true).catch((error: unknown) => {
+      setDialogError(error instanceof Error ? error.message : String(error));
+      return [];
+    });
+    if (!files.length || editor.isDestroyed || !editor.isEditable) return;
+    if (selectionBeforeDialog.current)
+      editor.commands.setTextSelection(selectionBeforeDialog.current);
+    for (const file of files)
+      editor
+        .chain()
+        .focus()
+        .setImage({ src: file.ref, alt: file.name.replace(/\.[^.]+$/, "") })
+        .run();
+    setDialog(null);
   }
 
   async function insertImageFiles(
@@ -2299,15 +2324,27 @@ export default function RichTextEditor({
                 </button>
               </div>
               {dialog.type === "image" && (
-                <button
-                  className="image-upload-area"
-                  type="button"
-                  onClick={() => fileRef.current?.click()}
-                >
-                  <Upload size={23} />
-                  <strong>{t("dialog.chooseImage")}</strong>
-                  <span>{t("dialog.imageFormats")}</span>
-                </button>
+                <div className="image-source-choices">
+                  <button
+                    className="image-upload-area"
+                    type="button"
+                    onClick={() => fileRef.current?.click()}
+                  >
+                    <Upload size={23} />
+                    <strong>{t("dialog.chooseImage")}</strong>
+                    <span>{t("dialog.imageFormats")}</span>
+                  </button>
+                  {chooseFiles && (
+                    <button
+                      className="image-upload-area"
+                      type="button"
+                      onClick={() => void linkImageFiles()}
+                    >
+                      <Link2 size={23} />
+                      <strong>{tm("linkOriginal")}</strong>
+                    </button>
+                  )}
+                </div>
               )}
               {dialog.type === "note" && (
                 <label className="editor-field">

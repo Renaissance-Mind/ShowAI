@@ -3,29 +3,36 @@ import { marked } from "marked";
 import { resourceMime } from "../components/blocks/research-contract.mjs";
 import { isImageIcon } from "../lib/page-icon.mjs";
 import { isSafeUrl, validateDocument } from "./validation.mjs";
+import { detachedRef, isLocalFileRef, localRefType } from "./local-files.mjs";
 
-/** Built-in blocks declare every resource that has to be embedded for offline viewing. */
-function imageSlots(document) {
+/**
+ * Every resource field of a document: page and container icons, image
+ * nodes, image/gallery/bookmark/video-poster images, rich-text images, and
+ * video, audio and PDF files. Each slot names its object and key so a copy
+ * can be rewritten, the resource kind, and the nearest block id.
+ * `components` also lists local file references inside custom component
+ * props (strings naming a supported file type).
+ */
+export function resourceSlots(document, { components = false } = {}) {
   const slots = [];
-  if (isImageIcon(document.icon)) slots.push([document, "icon"]);
-  const visit = (node) => {
+  const add = (object, key, kind, blockId, field) =>
+    slots.push({ object, key, kind, blockId, field });
+  if (isImageIcon(document.icon)) add(document, "icon", "image", undefined, "icon");
+  const visit = (node, owner) => {
+    const blockId =
+      typeof node.attrs?.id === "string" ? node.attrs.id : owner;
+    const data = node.attrs?.data;
+    const widget = node.type === "widget" ? node.attrs?.kind : undefined;
     if (node.type === "surface" && isImageIcon(node.attrs?.icon))
-      slots.push([node.attrs, "icon"]);
+      add(node.attrs, "icon", "image", blockId, "icon");
     if (node.type === "image" && node.attrs?.src)
-      slots.push([node.attrs, "src"]);
+      add(node.attrs, "src", "image", blockId, "src");
+    if (widget === "image" && data?.src) add(data, "src", "image", blockId, "src");
     if (
-      node.type === "widget" &&
-      node.attrs?.kind === "image" &&
-      node.attrs.data?.src
-    )
-      slots.push([node.attrs.data, "src"]);
-    if (
-      node.type === "widget" &&
-      ["text", "callout", "toggle"].includes(node.attrs?.kind) &&
-      typeof node.attrs.data?.content === "string" &&
-      node.attrs.data?.format !== "plain"
+      ["text", "callout", "toggle"].includes(widget) &&
+      typeof data?.content === "string" &&
+      data?.format !== "plain"
     ) {
-      const data = node.attrs.data;
       marked.walkTokens(marked.lexer(data.content ?? ""), (token) => {
         if (token.type !== "image") return;
         let src = token.href;
@@ -40,66 +47,66 @@ function imageSlots(document) {
             src = value;
           },
         };
-        slots.push([slot, "src"]);
+        add(slot, "src", "image", blockId, "content");
       });
     }
-    if (node.type === "widget" && node.attrs?.kind === "gallery") {
-      for (const item of node.attrs.data?.images ?? [])
-        if (item?.src) slots.push([item, "src"]);
-    }
+    if (widget === "gallery")
+      (data?.images ?? []).forEach((item, index) => {
+        if (item?.src)
+          add(item, "src", "image", blockId, `images[${index}].src`);
+      });
+    if (widget === "bookmark" && data?.image)
+      add(data, "image", "image", blockId, "image");
+    if (widget === "video" && data?.poster)
+      add(data, "poster", "image", blockId, "poster");
+    if (["video", "audio", "pdf"].includes(widget) && data?.src)
+      add(data, "src", widget, blockId, "src");
+    if (components && widget === "custom" && data?.props)
+      propSlots(data.props, "props", (object, key, field, kind) =>
+        add(object, key, kind, blockId, field),
+      );
     if (
-      node.type === "widget" &&
-      node.attrs?.kind === "bookmark" &&
-      node.attrs.data?.image
+      widget === "text" &&
+      data?.content &&
+      typeof data.content === "object"
     )
-      slots.push([node.attrs.data, "image"]);
-    if (
-      node.type === "widget" &&
-      node.attrs?.kind === "video" &&
-      node.attrs.data?.poster
-    )
-      slots.push([node.attrs.data, "poster"]);
-    if (
-      node.type === "widget" &&
-      node.attrs?.kind === "text" &&
-      node.attrs.data?.content &&
-      typeof node.attrs.data.content === "object"
-    )
-      visit(node.attrs.data.content);
-    node.content?.forEach(visit);
+      visit(data.content, blockId);
+    node.content?.forEach((child) => visit(child, blockId));
   };
   visit(document.content);
   return slots;
 }
 
-function fileSlots(document) {
-  const slots = [];
-  const visit = (node) => {
-    if (
-      node.type === "widget" &&
-      ["video", "audio", "pdf"].includes(node.attrs?.kind) &&
-      node.attrs.data?.src
-    )
-      slots.push([node.attrs.data, "src", node.attrs.kind]);
-    if (
-      node.type === "widget" &&
-      node.attrs?.kind === "text" &&
-      node.attrs.data?.content &&
-      typeof node.attrs.data.content === "object"
-    )
-      visit(node.attrs.data.content);
-    node.content?.forEach(visit);
-  };
-  visit(document.content);
-  return slots;
+/** Local file references among a custom component's props, by JSON path. */
+function propSlots(value, path, add, depth = 0) {
+  if (depth > 40 || !value || typeof value !== "object") return;
+  for (const [key, item] of Object.entries(value)) {
+    const field = Array.isArray(value) ? `${path}[${key}]` : `${path}.${key}`;
+    if (typeof item === "string") {
+      const type = localRefType(item);
+      if (type && isLocalFileRef(item)) add(value, key, field, type.kind);
+    } else propSlots(item, field, add, depth + 1);
+  }
 }
+
+const imageSlots = (document) =>
+  resourceSlots(document)
+    .filter((slot) => slot.kind === "image")
+    .map((slot) => [slot.object, slot.key]);
+const fileSlots = (document) =>
+  resourceSlots(document)
+    .filter((slot) => slot.kind !== "image")
+    .map((slot) => [slot.object, slot.key, slot.kind]);
+
+/** Web addresses in resource fields; embedded data and local references are not web addresses. */
+const isWebAddress = (url) => !url.startsWith("data:") && !isLocalFileRef(url);
 export function externalResourceUrls(document) {
   return [
     ...new Set([
       ...externalImageUrls(document),
       ...fileSlots(document)
         .map(([object, key]) => object[key])
-        .filter((url) => !url.startsWith("data:")),
+        .filter(isWebAddress),
     ]),
   ];
 }
@@ -109,7 +116,7 @@ export function externalImageUrls(document) {
     ...new Set(
       imageSlots(document)
         .map(([object, key]) => object[key])
-        .filter((url) => !url.startsWith("data:")),
+        .filter(isWebAddress),
     ),
   ];
 }
@@ -190,6 +197,11 @@ export async function embedDocumentImages(document) {
   ]) {
     const url = object[key];
     if (url.startsWith("data:")) continue;
+    // A standalone copy cannot reach this device's files; it keeps the name.
+    if (isLocalFileRef(url)) {
+      object[key] = detachedRef(url);
+      continue;
+    }
     const cacheKey = `${kind}:${url}`;
     if (!downloaded.has(cacheKey)) {
       try {

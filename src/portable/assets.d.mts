@@ -5,3 +5,15 @@ export function assertOfflineImages(document: ShowDocument): void;
 export function embedDocumentImages(
   document: ShowDocument,
 ): Promise<ShowDocument>;
+export interface ResourceSlot {
+  object: Record<string, unknown>;
+  key: string;
+  kind: "image" | "video" | "audio" | "pdf";
+  blockId?: string;
+  /** Where the value sits in its block, e.g. `src`, `images[0].src`, `props.clip`. */
+  field: string;
+}
+export function resourceSlots(
+  document: ShowDocument,
+  options?: { components?: boolean },
+): ResourceSlot[];

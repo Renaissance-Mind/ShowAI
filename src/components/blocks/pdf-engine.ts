@@ -24,6 +24,25 @@ export function loadPdf(src: string) {
       data: Uint8Array.from(binary, (char) => char.charCodeAt(0)),
     });
   }
+  // A linked local file comes from the host's media address, which pdf.js
+  // would not fetch itself (it streams only http and https).
+  if (!/^https?:$/i.test(new URL(src, location.href).protocol)) {
+    let task: ReturnType<typeof getDocument> | undefined;
+    let destroyed = false;
+    return {
+      promise: fetch(src).then(async (response) => {
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const data = new Uint8Array(await response.arrayBuffer());
+        if (destroyed) throw new Error("PDF loading was cancelled.");
+        task = getDocument({ ...options, data });
+        return task.promise;
+      }),
+      destroy: async () => {
+        destroyed = true;
+        await task?.destroy();
+      },
+    };
+  }
   return getDocument({ ...options, url: src, withCredentials: false });
 }
 class OfflineBinaryDataFactory {

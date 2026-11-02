@@ -1,4 +1,8 @@
 import { chooseLocalPath, type FileDialogOptions } from "./FileDialog";
+import {
+  LOCAL_FILE_TYPES,
+  type LocalResourceKind,
+} from "../portable/local-files.mjs";
 import type {
   CloseResult,
   CloseSource,
@@ -203,6 +207,16 @@ export function installBrowserBridge() {
               kind: "file",
               extensions: ["json", "csv", "tsv", "xlsx"],
             };
+    if (action === "media:chooseFile") {
+      const kind = String(args.kind) as LocalResourceKind;
+      dialogs[action] = {
+        title: t(`title.resourceFile.${kind}`),
+        kind: "file",
+        extensions: Object.entries(LOCAL_FILE_TYPES)
+          .filter(([, type]) => type.kind === kind)
+          .map(([extension]) => extension.slice(1)),
+      };
+    }
     if (action === "settings:chooseHome") {
       const info = await request<{ home: string }>("invoke", {
         action: "app:info",

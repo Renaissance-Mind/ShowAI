@@ -121,7 +121,7 @@ export default defineMessages("richText", {
 
     "dialog.addLink": "添加链接",
     "dialog.close": "关闭弹窗",
-    "dialog.chooseImage": "选择本地图片",
+    "dialog.chooseImage": "嵌入本地图片",
     "dialog.imageFormats": "PNG、JPEG、GIF、WebP、AVIF · 原始文件最大 64 MiB",
     "dialog.imageUrl": "或使用图片链接",
     "dialog.linkUrl": "链接地址",
@@ -134,7 +134,7 @@ export default defineMessages("richText", {
     "dialog.removeLink": "移除链接",
     "dialog.cancel": "取消",
     "dialog.confirm": "确认",
-    "dialog.invalidImageUrl": "请输入有效的 http 或 https 图片链接。",
+    "dialog.invalidImageUrl": "请输入有效的 http、https 图片链接或本机图片的 file: 引用。",
     "dialog.invalidLinkUrl": "请输入有效的链接，或输入页面名称后选择页面。",
 
     "callout.changeIcon": "更换图标",
@@ -301,7 +301,7 @@ export default defineMessages("richText", {
 
     "dialog.addLink": "Add link",
     "dialog.close": "Close dialog",
-    "dialog.chooseImage": "Choose a local image",
+    "dialog.chooseImage": "Embed a local image",
     "dialog.imageFormats":
       "PNG, JPEG, GIF, WebP, AVIF · Original file up to 64 MiB",
     "dialog.imageUrl": "Or use an image URL",
@@ -315,7 +315,7 @@ export default defineMessages("richText", {
     "dialog.removeLink": "Remove link",
     "dialog.cancel": "Cancel",
     "dialog.confirm": "Confirm",
-    "dialog.invalidImageUrl": "Enter a valid http or https image URL.",
+    "dialog.invalidImageUrl": "Enter a valid http or https image URL, or a file: reference to a local image.",
     "dialog.invalidLinkUrl":
       "Enter a valid link, or type a page name and choose a page.",
 

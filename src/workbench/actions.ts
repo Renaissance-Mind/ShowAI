@@ -23,7 +23,13 @@ import {
   surfaceKind,
 } from "../surface/containers.mjs";
 import { readFile, writeFile, stat, realpath } from "node:fs/promises";
-import { localMediaGrants } from "./local-media";
+import { localMediaGrants, localMediaPath } from "./local-media";
+import {
+  LOCAL_FILE_TYPES,
+  isLocalFileRef,
+  localFileRef,
+  type LocalResourceKind,
+} from "../portable/local-files.mjs";
 import { join, sep, resolve, dirname, relative, isAbsolute } from "node:path";
 import { randomUUID, createHash } from "node:crypto";
 import { changeContext, withChangeContext } from "../core/history-context";
@@ -237,6 +243,8 @@ export const workbenchActions = new Set([
   "settings:chooseHome",
   "clipboard:write",
   "media:open",
+  "media:resolve",
+  "media:chooseFile",
   "media:reveal",
   "export:reveal",
   "library:reveal",
@@ -267,6 +275,21 @@ function projectScope(args: Record<string, unknown>) {
       "Project scope must be an array of project identities.",
     );
   return projectIds.map((id) => assertId(id));
+}
+const RESOURCE_KINDS: readonly LocalResourceKind[] = [
+  "image",
+  "video",
+  "audio",
+  "pdf",
+];
+function resourceKind(args: Record<string, unknown>): LocalResourceKind {
+  const kind = args.kind as LocalResourceKind;
+  if (!RESOURCE_KINDS.includes(kind))
+    throw new CoreError(
+      "INVALID_DATA",
+      "kind must be image, video, audio or pdf.",
+    );
+  return kind;
 }
 export const projectId = (args: Record<string, unknown>) =>
   assertId(required(args, "projectId"));
@@ -1703,6 +1726,49 @@ export function createWorkbench(
         return host.invoke(action, args);
       case "media:open":
         return localMediaGrants.grant(args.path);
+      case "media:resolve": {
+        // A resource field shows its linked file; the grant is reused per file.
+        const ref = required(args, "ref");
+        const kind = resourceKind(args);
+        if (!isLocalFileRef(ref))
+          throw new CoreError("INVALID_DATA", "ref must be a file: reference.");
+        const grant = await localMediaGrants.grant(ref, { reuse: true });
+        if (grant.kind !== kind)
+          throw new CoreError(
+            "INVALID_DATA",
+            `${grant.name} is not a supported ${kind} file.`,
+          );
+        const { path: _path, ...shown } = grant;
+        return shown;
+      }
+      case "media:chooseFile": {
+        // Links original files to a resource field instead of embedding them.
+        const kind = resourceKind(args);
+        const extensions = Object.entries(LOCAL_FILE_TYPES)
+          .filter(([, type]) => type.kind === kind)
+          .map(([extension]) => extension.slice(1));
+        const selection = await host.openDialog({
+          title: tf(`title.resourceFile.${kind}`),
+          properties:
+            args.multiple === true
+              ? ["openFile", "multiSelections"]
+              : ["openFile"],
+          filters: [{ name: tf(`filter.resourceFile.${kind}`), extensions }],
+        });
+        if (selection.canceled || !selection.filePaths.length) return null;
+        const files = [];
+        for (const path of selection.filePaths) {
+          const ref = localFileRef(path);
+          const grant = await localMediaGrants.grant(ref, { reuse: true });
+          if (grant.kind !== kind)
+            throw new CoreError(
+              "INVALID_DATA",
+              `${grant.name} is not a supported ${kind} file.`,
+            );
+          files.push({ ref, name: grant.name, size: grant.size });
+        }
+        return { files };
+      }
       case "library:reveal": {
         // Reveals a location inside this library only, e.g. the folder a save
         // could not write; a missing target shows its nearest existing parent.
@@ -1750,6 +1816,20 @@ export function createWorkbench(
         return host.invoke("media:reveal", { path: target });
       }
       case "media:reveal": {
+        if (args.ref !== undefined) {
+          // A linked resource shows its file, or its nearest existing folder
+          // when the file has moved.
+          let target = localMediaPath(required(args, "ref"));
+          while (
+            dirname(target) !== target &&
+            !(await stat(target).then(
+              () => true,
+              () => false,
+            ))
+          )
+            target = dirname(target);
+          return host.invoke(action, { path: target });
+        }
         const grant = localMediaGrants.resolve(required(args, "token"));
         if (!grant)
           throw new CoreError("NOT_FOUND", "Open the file again to reveal it.");

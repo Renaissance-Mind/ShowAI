@@ -258,8 +258,16 @@ export async function renderReading(
       // Without it Chromium reports the runtime's locale to the reader and its components.
       ...(locale ? { locale } : {}),
     });
-    // The preview is self-contained. Component code stays in its browser sandbox.
-    await context.route(/^https?:/, (route) => route.abort());
+    // Online images and media of the page load as they would for a reader;
+    // every other request (scripts, data, frames) stays blocked, and
+    // component code stays in its browser sandbox.
+    await context.route(/^https?:/, (route) => {
+      const request = route.request();
+      return request.method() === "GET" &&
+        ["image", "media"].includes(request.resourceType())
+        ? route.continue()
+        : route.abort();
+    });
     const page = await context.newPage();
     page.setDefaultTimeout(5000);
     const errors: string[] = [];
@@ -295,8 +303,15 @@ export async function renderReading(
     for (const frame of page.frames()) {
       await frame.evaluate(async () => {
         await document.fonts.ready;
+        // An online image that cannot load, or not within 8 s, shows as
+        // broken in the capture.
         await Promise.all(
-          Array.from(document.images).map((image) => image.decode()),
+          Array.from(document.images).map((image) =>
+            Promise.race([
+              image.decode().catch(() => undefined),
+              new Promise((done) => setTimeout(done, 8000)),
+            ]),
+          ),
         );
       });
       await settleFramePaint(frame);

@@ -59,6 +59,8 @@ import {
   describeError,
 } from "../studio/problems";
 import { BoundWidgetHost } from "./widget-host";
+import { LocalResourceUi } from "../components/local-resources";
+import { ResourceIssue } from "./ResourceIssue";
 import { bindingEditable } from "./editable.mjs";
 import {
   agentRequest,
@@ -131,6 +133,9 @@ export interface DatasetScopeValue {
   readOnly: boolean;
   openDialog: (request: DatasetDialogRequest) => void;
 }
+/** Resource fields with linked local files show their problems with the reading layer's warnings. */
+const resourceUi = { Issue: ResourceIssue };
+
 const ScopeContext = createContext<DatasetScopeValue | null>(null);
 export const useDatasetScope = () => useContext(ScopeContext);
 
@@ -172,7 +177,11 @@ export function DatasetScope({
   }, [value, readOnly]);
   return (
     <ScopeContext.Provider value={value}>
-      <BoundWidgetHost.Provider value={host}>{children}</BoundWidgetHost.Provider>
+      <BoundWidgetHost.Provider value={host}>
+        <LocalResourceUi.Provider value={resourceUi}>
+          {children}
+        </LocalResourceUi.Provider>
+      </BoundWidgetHost.Provider>
       {dialog &&
         value &&
         createPortal(

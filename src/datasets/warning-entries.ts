@@ -154,3 +154,42 @@ export function agentRequest(entry: WarningEntry, t: Translate): string {
     message: entry.detail ?? entry.title,
   });
 }
+
+/** A linked local file a resource field cannot show. */
+export interface ResourceProblem {
+  /** missing: the host cannot open the file; failed: it opens but cannot be shown. */
+  status: "missing" | "failed";
+  name: string;
+  /** The host's reason. */
+  message?: string;
+  /** Whether the reference names a location (not only a file name). */
+  located: boolean;
+}
+
+/**
+ * The warning entry of a resource field whose linked file cannot be shown,
+ * in the same shape as a dataset warning: the file to link instead, where
+ * the file was, and asking again.
+ */
+export function resourceEntry(
+  problem: ResourceProblem,
+  available: Partial<Record<WarningAction, boolean>>,
+  t: Translate,
+): WarningEntry {
+  const code = problem.status === "missing" ? "SOURCE_MISSING" : "PARSE_FAILED";
+  const actions: WarningAction[] = [
+    "link-file",
+    ...(problem.located ? (["open-file"] as const) : []),
+    "retry",
+  ];
+  return {
+    key: `resource:${code}`,
+    level: problem.status === "missing" ? "warning" : "error",
+    code,
+    title: t(`resource.${code}`),
+    ...(problem.message ? { detail: problem.message } : {}),
+    dataset: t("resourceLabel", { name: problem.name }),
+    stage: problem.status === "missing" ? "location" : "format",
+    actions: actions.filter((action) => available[action]),
+  };
+}

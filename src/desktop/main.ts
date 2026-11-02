@@ -1748,7 +1748,14 @@ else {
   protocol.registerSchemesAsPrivileged([
     {
       scheme: LOCAL_MEDIA_SCHEME,
-      privileges: { standard: true, secure: true, stream: true },
+      // The PDF reader fetches linked PDFs; images and media load directly.
+      privileges: {
+        standard: true,
+        secure: true,
+        stream: true,
+        supportFetchAPI: true,
+        corsEnabled: true,
+      },
     },
   ]);
   app.on("open-url", (event, url) => {

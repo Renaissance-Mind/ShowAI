@@ -203,15 +203,20 @@ export function DataWarningBadge({
   );
 }
 
-/** The body of a bound block without data: the main warning and its first action. */
+/**
+ * The body of a bound block without data: the main warning and its first
+ * action, or all of its actions (`allActions`) where nothing else offers them.
+ */
 export function DataEmptyState({
   entry,
   run,
   labels,
+  allActions,
 }: {
   entry: WarningEntry | undefined;
   run: RunWarningAction;
   labels?: ActionLabels;
+  allActions?: boolean;
 }) {
   const t = useTranslator(messages);
   return (
@@ -222,11 +227,21 @@ export function DataEmptyState({
       </strong>
       {entry?.dataset && (
         <span className="dataset-warning-meta">
-          {t("sourceLabel", { name: entry.dataset })}
+          {entry.datasetId
+            ? t("sourceLabel", { name: entry.dataset })
+            : entry.dataset}
         </span>
       )}
+      {entry?.detail && entry.detail !== entry.title && allActions && (
+        <span className="dataset-warning-detail">{entry.detail}</span>
+      )}
       {entry && (
-        <ActionButtons entry={entry} run={run} labels={labels} primary />
+        <ActionButtons
+          entry={entry}
+          run={run}
+          labels={labels}
+          primary={!allActions}
+        />
       )}
     </div>
   );

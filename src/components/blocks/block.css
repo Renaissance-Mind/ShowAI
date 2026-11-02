@@ -2217,3 +2217,16 @@
 @media (hover: none) {
   .sb-board-column > .sb-add-row { opacity: 1; }
 }
+
+/* A linked local file a reader or export does not include, or one opening now. */
+.sb-resource-notice,
+.sb-resource-loading {
+  margin: 0;
+  padding: 18px 16px;
+  border: 1px dashed var(--line);
+  border-radius: 8px;
+  color: var(--muted);
+  font-size: 12px;
+  text-align: center;
+  overflow-wrap: anywhere;
+}

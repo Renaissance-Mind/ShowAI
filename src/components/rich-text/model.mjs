@@ -7,6 +7,7 @@ import {
   noteMarkdownExtension,
 } from "../blocks/note-markup.mjs";
 import { parsePageLink } from "../../portable/page-link.mjs";
+import { isLocalResourceRef } from "../../portable/local-files.mjs";
 
 // ==text== is the common Markdown highlight syntax (Obsidian, Typora, many AI
 // outputs). Its content must not start or end with a space, so `a == b` stays text.
@@ -368,7 +369,8 @@ export function validateRichTextData(data) {
       node.attrs?.src !== "" &&
       !/^(https?:\/\/|data:image\/(?:png|jpe?g|gif|webp|avif);base64,)/i.test(
         node.attrs?.src ?? "",
-      )
+      ) &&
+      !isLocalResourceRef(node.attrs?.src, "image")
     )
       throw Error("无效的图片地址。");
     if (node.content !== undefined) {

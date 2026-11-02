@@ -12,3 +12,16 @@ export function localMediaUrl(token: string): string {
     ? `/api/media/${token}`
     : `${LOCAL_MEDIA_SCHEME}://media/${token}`;
 }
+
+/**
+ * The source component frames load granted files from, for their content
+ * policy: the desktop scheme. The browser workbench serves files from a
+ * loopback address that opaque frames cannot reach, so it hands frames the
+ * bytes instead (see CustomBlock); undefined there and without a host.
+ */
+export function localMediaSource(): string | undefined {
+  if (typeof window === "undefined" || !window.showai) return undefined;
+  return (window as { __SHOWAI_LOCAL__?: unknown }).__SHOWAI_LOCAL__
+    ? undefined
+    : `${LOCAL_MEDIA_SCHEME}:`;
+}

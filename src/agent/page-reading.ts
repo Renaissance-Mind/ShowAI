@@ -17,6 +17,7 @@ import { resolveDocumentComponents } from "../core/catalog";
 import { selectDocumentBlocks } from "../portable/selection.mjs";
 import { assertExportDestination, buildPageHtml } from "./exporter";
 import { renderReading, type ReadingCapture } from "./reading-renderer";
+import { describeResources, type ResourceRead } from "../core/local-resources";
 import type { ShowDocument } from "../types";
 
 import { collectCustomComponentRefs } from "../components/custom/contract";
@@ -136,6 +137,11 @@ export interface ReadIdentity {
    * from any later connection ("projectId/datasetId" for other projects).
    */
   datasetBases?: Record<string, string>;
+  /**
+   * Local files (file: references) and web addresses in resource fields and
+   * custom component props, once per reference with where each is used.
+   */
+  resources?: ResourceRead[];
 }
 
 /** datasetBases for page_apply from the bindings of a read. */
@@ -276,6 +282,7 @@ export async function readPageView(
     remember: true,
   });
   const resolved = shared.document;
+  const resources = await describeResources(resolved);
   const sourceOnly =
     options.view === "structured" &&
     (options.detail === "outline" ||
@@ -315,6 +322,7 @@ export async function readPageView(
             : {}),
         }
       : {}),
+    ...(resources.length ? { resources } : {}),
     partial: !!options.blockIds,
     ...(options.blockIds ? { blockIds: options.blockIds } : {}),
     componentRefs: sourceOnly
@@ -385,7 +393,8 @@ export async function readPageView(
         undefined,
       ),
       options,
-      identity,
+      // The preview names the page, not this device's files.
+      { ...identity, resources: undefined },
       locale,
     );
     path = await outputPath(

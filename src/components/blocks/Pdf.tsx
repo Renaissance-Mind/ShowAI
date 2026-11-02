@@ -17,6 +17,7 @@ import { useTranslator } from "../../i18n/react";
 import messages from "../../i18n/messages/pdf";
 import "./research-media.css";
 import { isIndex, useReaderState } from "../../surface/reader-state";
+import { LocalResourceNotice, useResource } from "../local-resources";
 
 function PdfReader({
   src,
@@ -285,8 +286,9 @@ function PdfReader({
 export function PdfBlock({ data, onChange, readOnly }: BlockProps) {
   const t = useTranslator(messages);
   const [editing, setEditing] = useState(false);
-  const src = safeResourceUrl("pdf", data.src);
   const editable = Boolean(onChange && !readOnly);
+  const view = useResource(data.src, "pdf");
+  const src = view.local ? view.url : safeResourceUrl("pdf", data.src);
   return (
     <section
       className="sb-block sb-pdf"
@@ -310,7 +312,17 @@ export function PdfBlock({ data, onChange, readOnly }: BlockProps) {
           }}
         />
       )}
-      {src ? (
+      {view.local && view.status !== "ready" ? (
+        <LocalResourceNotice
+          view={view}
+          kind="pdf"
+          onReplace={
+            editable
+              ? (ref) => onChange?.({ ...data, src: ref, fileName: "" })
+              : undefined
+          }
+        />
+      ) : src ? (
         <PdfReader
           key={`${src}-${data.page}`}
           src={src}

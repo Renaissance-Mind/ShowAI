@@ -49,6 +49,38 @@ describe("local media grants", () => {
     await expect(grants.grant(join(root, "folder.mp4"))).rejects.toMatchObject({ code: "INVALID_PATH" });
   });
 
+  it("reuses one grant per file for resource fields and renews its lifetime", async () => {
+    let now = 0;
+    const grants = new LocalMediaGrants(() => now);
+    const first = await grants.grant(video, { reuse: true });
+    now = 5 * 60 * 60 * 1000;
+    const again = await grants.grant(pathToFileURL(video).href, { reuse: true });
+    expect(again.token).toBe(first.token);
+    expect(again.expiresAt).toBe(now + 6 * 60 * 60 * 1000);
+    now = 8 * 60 * 60 * 1000;
+    // Renewed at 5 h, so it still serves at 8 h.
+    expect(grants.resolve(first.token)?.path).toBe(first.path);
+    // The player keeps minting its own grants.
+    expect((await grants.grant(video)).token).not.toBe(first.token);
+  });
+
+  it("serves linked PDFs to the reader that fetches them", async () => {
+    const grants = new LocalMediaGrants();
+    const pdf = join(root, "paper.pdf");
+    await writeFile(pdf, "%PDF-1.7");
+    const grant = await grants.grant(pdf, { reuse: true });
+    expect(grant).toMatchObject({ kind: "pdf", mime: "application/pdf" });
+    const response = await localMediaResponse(grant.token, null, false, grants);
+    expect(response.headers).toMatchObject({
+      "Content-Type": "application/pdf",
+      "Access-Control-Allow-Origin": "*",
+    });
+    // Images and media load without CORS, so frames cannot read their pixels.
+    const { token } = await grants.grant(video);
+    const media = await localMediaResponse(token, null, true, grants);
+    expect(media.headers["Access-Control-Allow-Origin"]).toBeUndefined();
+  });
+
   it("expires grants", async () => {
     let now = 0;
     const grants = new LocalMediaGrants(() => now);

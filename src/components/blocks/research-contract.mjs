@@ -1,4 +1,5 @@
 import { CAPACITY } from "../../portable/capacity.mjs";
+import { isLocalResourceRef } from "../../portable/local-files.mjs";
 const formats = {
   video: ["video/mp4", "video/webm", "video/ogg", "video/quicktime"],
   audio: [
@@ -117,13 +118,17 @@ export function validateResearchData(kind, data) {
   if (
     data.src !== undefined &&
     data.src !== "" &&
-    !safeResourceUrl(kind, data.src)
+    !safeResourceUrl(kind, data.src) &&
+    !isLocalResourceRef(data.src, kind)
   )
-    throw new Error("文件需要 http、https 或匹配文件类型的内嵌地址。");
+    throw new Error(
+      "文件需要 http、https、匹配文件类型的内嵌地址，或指向本机同类文件的 file: 引用。",
+    );
   if (
     data.poster &&
     !(
       safeResourceUrl("pdf", data.poster) ||
+      isLocalResourceRef(data.poster, "image") ||
       /^data:image\/(png|jpeg|gif|webp|avif);base64,[a-z\d+/=\s]+$/i.test(
         data.poster,
       )

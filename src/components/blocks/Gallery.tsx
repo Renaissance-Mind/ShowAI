@@ -4,7 +4,7 @@ import {
   assertContent,
   formatBytes,
 } from "../../portable/capacity.mjs";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import {
   ArrowDown,
@@ -14,6 +14,7 @@ import {
   ChevronRight,
   Expand,
   Images,
+  Link2,
   Plus,
   Trash2,
   Upload,
@@ -25,6 +26,16 @@ import type { BlockProps } from "./types";
 import { translator } from "../../i18n";
 import { useTranslator } from "../../i18n/react";
 import messages from "../../i18n/messages/gallery";
+import mediaMessages from "../../i18n/messages/media";
+import {
+  LocalResourceNotice,
+  useLocalFileChooser,
+  useResource,
+} from "../local-resources";
+import {
+  isLocalResourceRef,
+  localRefName,
+} from "../../portable/local-files.mjs";
 
 interface GalleryImage {
   id: string;
@@ -65,6 +76,76 @@ export function imageFileToDataUrl(file: File): Promise<string> {
         : reject(new Error(translate("error.readFailed")));
     reader.readAsDataURL(file);
   });
+}
+
+/** An image a gallery can show: a web address, embedded data or a linked local file. */
+const isGalleryImage = (src: string) =>
+  !!safeImageUrl(src) || isLocalResourceRef(src, "image");
+
+/** One gallery image, with a linked local file granted by the host. */
+function ResourceImage({
+  src,
+  alt,
+  lazy,
+  fallback,
+}: {
+  src: string;
+  alt: string;
+  lazy?: boolean;
+  /** Shown while a linked file is not available. */
+  fallback?: ReactNode;
+}) {
+  const view = useResource(src, "image");
+  if (view.local && view.status !== "ready")
+    return fallback ?? <LocalResourceNotice view={view} kind="image" />;
+  return (
+    <img
+      src={view.local ? view.url : safeImageUrl(src)}
+      alt={alt}
+      loading={lazy ? "lazy" : undefined}
+      referrerPolicy="no-referrer"
+      onError={view.local ? view.failed : undefined}
+    />
+  );
+}
+
+/** A grid cell: the image opens the preview; a linked file it cannot show offers its fixes. */
+function GalleryItem({
+  item,
+  label,
+  onPreview,
+  onReplace,
+}: {
+  item: GalleryImage;
+  label: string;
+  onPreview: () => void;
+  onReplace?: (ref: string) => void;
+}) {
+  const view = useResource(item.src, "image");
+  if (view.local && view.status !== "ready")
+    return (
+      <figure>
+        <LocalResourceNotice view={view} kind="image" onReplace={onReplace} />
+        {item.caption && <figcaption>{item.caption}</figcaption>}
+      </figure>
+    );
+  return (
+    <figure>
+      <button type="button" onClick={onPreview} aria-label={label}>
+        <img
+          src={view.local ? view.url : safeImageUrl(item.src)}
+          alt={item.alt}
+          loading="lazy"
+          referrerPolicy="no-referrer"
+          onError={view.local ? view.failed : undefined}
+        />
+        <span className="sb-gallery-expand">
+          <Expand size={16} />
+        </span>
+      </button>
+      {item.caption && <figcaption>{item.caption}</figcaption>}
+    </figure>
+  );
 }
 
 function Lightbox({
@@ -153,11 +234,7 @@ function Lightbox({
         </button>
       )}
       <figure>
-        <img
-          src={safeImageUrl(item.src)}
-          alt={item.alt}
-          referrerPolicy="no-referrer"
-        />
+        <ResourceImage src={item.src} alt={item.alt} />
         <figcaption>
           {item.caption || item.alt}
           <span>
@@ -182,6 +259,8 @@ function Lightbox({
 
 export function GalleryBlock({ data, onChange, readOnly }: BlockProps) {
   const t = useTranslator(messages);
+  const tm = useTranslator(mediaMessages);
+  const chooseFiles = useLocalFileChooser();
   const galleryRoot = useRef<HTMLElement>(null);
   const images: GalleryImage[] = Array.isArray(data.images)
     ? data.images
@@ -202,7 +281,7 @@ export function GalleryBlock({ data, onChange, readOnly }: BlockProps) {
   const [preview, setPreview] = useState<number | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
   const editable = Boolean(onChange && !readOnly);
-  const visibleImages = images.filter((item) => safeImageUrl(item.src));
+  const visibleImages = images.filter((item) => isGalleryImage(item.src));
   const columns = data.columns === 1 || data.columns === 3 ? data.columns : 2;
   const openEditor = () => {
     setDraftTitle(text(data.title));
@@ -247,8 +326,34 @@ export function GalleryBlock({ data, onChange, readOnly }: BlockProps) {
       if (fileInput.current) fileInput.current.value = "";
     }
   };
+  const link = async () => {
+    if (!chooseFiles) return;
+    setBusy(true);
+    setError("");
+    try {
+      const additions = (await chooseFiles("image", true)).map((file) => ({
+        id: uid(),
+        src: file.ref,
+        alt: file.name.replace(/\.[^.]+$/, ""),
+        caption: "",
+      }));
+      setDraftImages((current) => [...current, ...additions]);
+    } catch (caught) {
+      setError(
+        caught instanceof Error ? caught.message : t("error.importFailed"),
+      );
+    } finally {
+      setBusy(false);
+    }
+  };
+  /** Stores another linked file for one image, keeping the others. */
+  const replaceImage = (id: string, ref: string) =>
+    onChange?.({
+      ...data,
+      images: images.map((item) => (item.id === id ? { ...item, src: ref } : item)),
+    });
   const save = () => {
-    if (draftImages.some((item) => !safeImageUrl(item.src.trim()))) {
+    if (draftImages.some((item) => !isGalleryImage(item.src.trim()))) {
       setError(t("error.invalidSource"));
       return;
     }
@@ -302,11 +407,11 @@ export function GalleryBlock({ data, onChange, readOnly }: BlockProps) {
             {draftImages.map((item, index) => (
               <div className="sb-gallery-editor" key={item.id}>
                 <div className="sb-gallery-editor-preview">
-                  {safeImageUrl(item.src) ? (
-                    <img
-                      src={safeImageUrl(item.src)}
+                  {isGalleryImage(item.src) ? (
+                    <ResourceImage
+                      src={item.src}
                       alt=""
-                      referrerPolicy="no-referrer"
+                      fallback={<Images size={20} />}
                     />
                   ) : (
                     <Images size={20} />
@@ -318,9 +423,14 @@ export function GalleryBlock({ data, onChange, readOnly }: BlockProps) {
                       value={
                         item.src.startsWith("data:")
                           ? t("embeddedImage")
-                          : item.src
+                          : isLocalResourceRef(item.src)
+                            ? tm("linkedFile", { name: localRefName(item.src) })
+                            : item.src
                       }
-                      readOnly={item.src.startsWith("data:")}
+                      readOnly={
+                        item.src.startsWith("data:") ||
+                        isLocalResourceRef(item.src)
+                      }
                       placeholder="https://…"
                       onChange={(event) =>
                         updateImage(index, { src: event.target.value })
@@ -406,6 +516,17 @@ export function GalleryBlock({ data, onChange, readOnly }: BlockProps) {
                   <Upload size={14} />
                   {busy ? t("reading") : t("uploadImages")}
                 </button>
+                {chooseFiles && (
+                  <button
+                    type="button"
+                    className="sb-button"
+                    disabled={busy}
+                    onClick={() => void link()}
+                  >
+                    <Link2 size={14} />
+                    {tm("linkOriginal")}
+                  </button>
+                )}
                 <button
                   type="button"
                   className="sb-button"
@@ -437,26 +558,17 @@ export function GalleryBlock({ data, onChange, readOnly }: BlockProps) {
       {visibleImages.length ? (
         <div className={`sb-gallery-grid sb-gallery-columns-${columns}`}>
           {visibleImages.map((item, index) => (
-            <figure key={`${item.id}-${index}`}>
-              <button
-                type="button"
-                onClick={() => setPreview(index)}
-                aria-label={t("viewImage", {
-                  name: item.alt || item.caption || index + 1,
-                })}
-              >
-                <img
-                  src={safeImageUrl(item.src)}
-                  alt={item.alt}
-                  loading="lazy"
-                  referrerPolicy="no-referrer"
-                />
-                <span className="sb-gallery-expand">
-                  <Expand size={16} />
-                </span>
-              </button>
-              {item.caption && <figcaption>{item.caption}</figcaption>}
-            </figure>
+            <GalleryItem
+              key={`${item.id}-${index}`}
+              item={item}
+              label={t("viewImage", {
+                name: item.alt || item.caption || index + 1,
+              })}
+              onPreview={() => setPreview(index)}
+              onReplace={
+                editable ? (ref) => replaceImage(item.id, ref) : undefined
+              }
+            />
           ))}
         </div>
       ) : (

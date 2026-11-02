@@ -2,6 +2,7 @@ import type { JSONContent } from "@tiptap/core";
 import { useState } from "react";
 import { NativeInkPreview } from "../../surface/NativeInkPreview";
 import { safeImageUrl } from "../blocks/helpers";
+import { LocalResourceNotice, useResource } from "../local-resources";
 import { richTextStyle } from "./model.mjs";
 import { useTranslator } from "../../i18n/react";
 import messages from "../../i18n/messages/media";
@@ -56,15 +57,29 @@ function ImageUnavailable({
 /** Image content has one presentation in editable documents, SDK blocks and exports. */
 export function ImageContent({
   attrs,
+  onSourceChange,
 }: {
   attrs: NonNullable<JSONContent["attrs"]>;
+  /** Replaces the image source, e.g. with another linked file; absent when read-only. */
+  onSourceChange?: (src: string) => void;
 }) {
   const [failed, setFailed] = useState("");
-  const src = attrs.src ? safeImageUrl(attrs.src) : undefined;
+  const view = useResource(attrs.src, "image");
+  const src = view.local
+    ? view.url
+    : attrs.src
+      ? safeImageUrl(attrs.src)
+      : undefined;
   return (
     <figure className="sb-image" style={richTextStyle(attrs.componentStyle)}>
       {attrs.nativeInk ? (
         <NativeInkPreview ink={attrs.nativeInk} />
+      ) : view.local && view.status !== "ready" ? (
+        <LocalResourceNotice
+          view={view}
+          kind="image"
+          onReplace={onSourceChange}
+        />
       ) : attrs.src && (!src || failed === src) ? (
         <ImageUnavailable src={String(attrs.src)} blocked={!src} />
       ) : src ? (
@@ -73,7 +88,7 @@ export function ImageContent({
           src={src}
           alt={attrs.alt ?? ""}
           title={attrs.title}
-          onError={() => setFailed(src)}
+          onError={() => (view.local ? view.failed() : setFailed(src))}
           style={{
             width: attrs.width ?? undefined,
             height: attrs.height ?? "auto",

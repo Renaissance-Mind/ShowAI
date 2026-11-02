@@ -4,6 +4,7 @@ import { validateInkArchiveGroup } from "../surface/ink-archive-group.mjs";
 import { isResource } from "../surface/containers.mjs";
 import { validatePageIcon } from "../lib/page-icon.mjs";
 import { parsePageLink } from "./page-link.mjs";
+import { isLocalResourceRef } from "./local-files.mjs";
 import { artifactVersion, assignSurfaceIds } from "../surface/document.mjs";
 import { validateSurface } from "../surface/validation.mjs";
 import {
@@ -175,6 +176,11 @@ export function isSafeUrl(value, image = false) {
   }
 }
 
+/** An image field: a web URL, an embedded raster image or a local image file reference. */
+export function isImageSource(value) {
+  return isSafeUrl(value, true) || isLocalResourceRef(value, "image");
+}
+
 // A successful JSON check is context-independent except for the containing
 // depth. Only this module's successful check of an actual exclusive capture
 // can populate this weak cache; recursive freeze/caller flags never grant it.
@@ -229,9 +235,9 @@ function validateAttrs(attrs, path, permitted, surfaceIcon = false) {
     if (value === null || value === undefined) continue;
     if (key === "href" && !isSafeUrl(value))
       throw new Error(`${path}.href must be a safe web, email, anchor or ShowAI page URL.`);
-    if (key === "src" && value !== "" && !isSafeUrl(value, true))
+    if (key === "src" && value !== "" && !isImageSource(value))
       throw new Error(
-        `${path}.src must be a web URL or embedded raster image.`,
+        `${path}.src must be a web URL, embedded raster image or file: reference to a local image.`,
       );
     if (
       ["textAlign", "align"].includes(key) &&
@@ -408,8 +414,8 @@ function validateWidgetData(kind, data, path) {
         surface: false,
         resource: false,
       });
-    if (kind === "image" && data.src && !isSafeUrl(data.src, true))
-      throw new Error(`${path}.src must be a safe raster image URL.`);
+    if (kind === "image" && data.src && !isImageSource(data.src))
+      throw new Error(`${path}.src must be a safe raster image URL or local image reference.`);
     return;
   }
   if (
@@ -495,8 +501,8 @@ function validateWidgetData(kind, data, path) {
     if (data.columns !== undefined && ![1, 2, 3].includes(data.columns))
       throw new Error(`${path}.columns must be 1, 2, or 3.`);
     for (const item of rows(list("images", 100), true)) {
-      if (item.src !== "" && !isSafeUrl(item.src, true))
-        throw new Error(`${path}.image.src must be a safe raster image URL.`);
+      if (item.src !== "" && !isImageSource(item.src))
+        throw new Error(`${path}.image.src must be a safe raster image URL or local image reference.`);
       label(item.alt, "image.alt");
       label(item.caption, "image.caption");
     }
@@ -507,9 +513,9 @@ function validateWidgetData(kind, data, path) {
     if (
       data.image !== undefined &&
       data.image !== "" &&
-      !isSafeUrl(data.image, true)
+      !isImageSource(data.image)
     )
-      throw new Error(`${path}.image must be a safe raster image URL.`);
+      throw new Error(`${path}.image must be a safe raster image URL or local image reference.`);
   }
 }
 
@@ -626,7 +632,7 @@ function validateNode(value, path, counter, depth = 0, parentType = null) {
   if (
     node.type === "image" &&
     node.attrs?.src !== "" &&
-    !isSafeUrl(node.attrs?.src, true)
+    !isImageSource(node.attrs?.src)
   )
     throw new Error(`${path} requires a safe image src.`);
   if (node.type === "image")

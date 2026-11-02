@@ -1,7 +1,7 @@
 import { BlockSettings } from "./action-host";
 import { CAPACITY, formatBytes } from "../../portable/capacity.mjs";
 import { useState } from "react";
-import { Check, Upload } from "../../ui/icons";
+import { Check, Link2, Upload } from "../../ui/icons";
 import { Field } from "./shared";
 import {
   fileMime,
@@ -13,6 +13,12 @@ import type { BlockData } from "./types";
 import { useTranslator } from "../../i18n/react";
 import messages from "../../i18n/messages/resourceEditor";
 import common from "../../i18n/messages/common";
+import mediaMessages from "../../i18n/messages/media";
+import { useLocalFileChooser } from "../local-resources";
+import {
+  isLocalFileRef,
+  localRefName,
+} from "../../portable/local-files.mjs";
 
 export function ResourceEditor({
   kind,
@@ -27,6 +33,8 @@ export function ResourceEditor({
 }) {
   const t = useTranslator(messages);
   const tc = useTranslator(common);
+  const tm = useTranslator(mediaMessages);
+  const chooseFiles = useLocalFileChooser();
   const [draft, setDraft] = useState(data);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -75,6 +83,21 @@ export function ResourceEditor({
       setLoading(false);
     }
   };
+  /** Links the original file where it is, instead of embedding a copy. */
+  const link = async () => {
+    if (!chooseFiles) return;
+    setError("");
+    setLoading(true);
+    try {
+      const [file] = await chooseFiles(kind);
+      if (file)
+        setDraft((current) => ({ ...current, src: file.ref, fileName: "" }));
+    } catch (failure) {
+      setError(failure instanceof Error ? failure.message : t("readFailed"));
+    } finally {
+      setLoading(false);
+    }
+  };
   const save = () => {
     try {
       validateResearchData(kind, draft);
@@ -108,9 +131,22 @@ export function ResourceEditor({
               }}
             />
           </label>
-          {text(draft.fileName) && (
+          {chooseFiles && (
+            <button
+              type="button"
+              className="sb-button"
+              disabled={loading}
+              onClick={() => void link()}
+            >
+              <Link2 size={14} />
+              {tm("linkOriginal")}
+            </button>
+          )}
+          {(text(draft.fileName) || isLocalFileRef(draft.src)) && (
             <span className="sb-resource-file-name">
-              {text(draft.fileName)}
+              {isLocalFileRef(draft.src)
+                ? tm("linkedFile", { name: localRefName(draft.src) })
+                : text(draft.fileName)}
             </span>
           )}
         </div>
@@ -118,7 +154,11 @@ export function ResourceEditor({
           <input
             type="url"
             placeholder="https://…"
-            value={text(draft.src).startsWith("data:") ? "" : text(draft.src)}
+            value={
+              text(draft.src).startsWith("data:") || isLocalFileRef(draft.src)
+                ? ""
+                : text(draft.src)
+            }
             onChange={(event) =>
               setDraft((current) => ({
                 ...current,

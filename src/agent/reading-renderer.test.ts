@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { pageReadSchema } from "./page-reading";
 import { renderReading } from "./reading-renderer";
+import { dataServer } from "../test/data-server";
 
 const fixtures: string[] = [];
 afterEach(async () => {
@@ -184,5 +185,52 @@ window.__SHOWAI_COMPONENT_READING__={ready:true,status:"raw",props:{}};</script>
       expect.stringContaining(`locale ${locale} ${locale}`),
       expect.stringContaining(`locale ${locale} ${locale}`),
     ]);
+  }
+}, 30000);
+
+test("rendered reading loads online images but no other online requests", async () => {
+  const png = Buffer.from(
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=",
+    "base64",
+  );
+  const server = await dataServer((request, response) => {
+    if (request.url === "/plot.png") {
+      response.writeHead(200, { "content-type": "image/png" });
+      response.end(png);
+    } else if (request.url === "/tracker.js") {
+      response.writeHead(200, { "content-type": "text/javascript" });
+      response.end("document.title='tracked'");
+    } else {
+      response.writeHead(200, { "content-type": "application/json" });
+      response.end("{}");
+    }
+  });
+  const root = await mkdtemp(join(tmpdir(), "showai-reading-online-"));
+  fixtures.push(root);
+  const html = join(root, "online.html");
+  await writeFile(
+    html,
+    `<!doctype html><html><body><main class="portable-app">
+<img alt="plot" src="${server.origin}/plot.png" onload="document.getElementById('state').textContent='image loaded '+this.naturalWidth">
+<img alt="broken" src="${server.origin}/missing.png">
+<p id="state">waiting</p><p id="data">no data</p>
+</main>
+<script src="${server.origin}/tracker.js"></script>
+<script>fetch("${server.origin}/data.json").then(()=>{document.getElementById('data').textContent='data fetched'},()=>{document.getElementById('data').textContent='data blocked'});</script>
+</body></html>`,
+  );
+  try {
+    const result = await renderReading(
+      html,
+      pageReadSchema.parse({ view: "html" }),
+    );
+    expect(result.dom[0].accessibility).toContain("image loaded 1");
+    expect(result.dom[0].accessibility).toContain("data blocked");
+    const urls = server.requests.map((request) => request.url);
+    expect(urls).toContain("/plot.png");
+    expect(urls).not.toContain("/tracker.js");
+    expect(urls).not.toContain("/data.json");
+  } finally {
+    await server.close();
   }
 }, 30000);

@@ -6,6 +6,7 @@ import messages from "../i18n/messages/datasets";
 import { datasetWarning } from "./warnings.mjs";
 import {
   agentRequest,
+  resourceEntry,
   topLevel,
   warningEntries,
   type WarningEntryInput,
@@ -13,6 +14,7 @@ import {
 import { DataEmptyState, DataWarningBadge } from "./DataWarnings";
 import { frameDataState } from "../components/custom/CustomBlock";
 import { unavailableText } from "../components/blocks/data-notice";
+import { LocalResourceNotice } from "../components/local-resources";
 
 setLocale("zh-CN");
 const t = translator(messages);
@@ -241,5 +243,56 @@ describe("data state outside the workbench", () => {
     expect(unavailableText({ $binding: { dataset: "x" } })).toBe(
       "此组件的数据来自共享数据，在当前位置无法读取。",
     );
+  });
+});
+
+describe("linked local files in resource fields", () => {
+  const all = { "link-file": true, "open-file": true, retry: true };
+  it("use the warning shape of the reading layer", () => {
+    const missing = resourceEntry(
+      { status: "missing", name: "clip.mp4", message: "File not found: /a/clip.mp4", located: true },
+      all,
+      translate,
+    );
+    expect(missing).toMatchObject({
+      code: "SOURCE_MISSING",
+      level: "warning",
+      stage: "location",
+      title: "找不到链接的文件",
+      dataset: "本机文件 · clip.mp4",
+      detail: "File not found: /a/clip.mp4",
+      actions: ["link-file", "open-file", "retry"],
+    });
+    // A name-only reference has no folder to show; a read-only field links nothing.
+    expect(
+      resourceEntry(
+        { status: "failed", name: "a.png", located: false },
+        { ...all, "link-file": false },
+        translate,
+      ),
+    ).toMatchObject({ code: "PARSE_FAILED", level: "error", actions: ["retry"] });
+    const html = renderToStaticMarkup(
+      createElement(DataEmptyState, { entry: missing, run, allActions: true }),
+    );
+    expect(html).toContain("本机文件 · clip.mp4");
+    expect(html).toContain("链接文件…");
+    expect(html).toContain("显示文件");
+    expect(html).toContain("重试");
+  });
+
+  it("name only the file in readers without a device", () => {
+    const view = {
+      status: "unavailable" as const,
+      local: true,
+      ref: "file:~/私人/clip.mp4",
+      name: "clip.mp4",
+      retry: () => {},
+      failed: () => {},
+    };
+    const html = renderToStaticMarkup(
+      createElement(LocalResourceNotice, { view, kind: "video" }),
+    );
+    expect(html).toContain("本机文件「clip.mp4」不在这份页面中");
+    expect(html).not.toContain("私人");
   });
 });

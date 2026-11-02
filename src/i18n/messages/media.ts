@@ -17,6 +17,10 @@ export default defineMessages("media", {
     openAddress: "打开原地址",
     copyAddress: "复制地址",
     copyAddressFailed: "无法复制",
+    localLoading: "正在打开「{name}」…",
+    localUnavailable: "本机文件「{name}」不在这份页面中",
+    linkOriginal: "链接原文件",
+    linkedFile: "已链接本机文件「{name}」",
   },
   en: {
     video: "Video",
@@ -36,5 +40,9 @@ export default defineMessages("media", {
     openAddress: "Open original address",
     copyAddress: "Copy address",
     copyAddressFailed: "Couldn't copy",
+    localLoading: "Opening “{name}”…",
+    localUnavailable: "The local file “{name}” isn't included here",
+    linkOriginal: "Link original file",
+    linkedFile: "Linked local file “{name}”",
   },
 });

@@ -6,6 +6,8 @@ import { BlockHeader, EmptyState, Field } from "./shared";
 import type { BlockProps } from "./types";
 import { useTranslator } from "../../i18n/react";
 import messages from "../../i18n/messages/references";
+import { LocalResourceNotice, useResource } from "../local-resources";
+import { isLocalResourceRef } from "../../portable/local-files.mjs";
 
 export function BookmarkBlock({ data, onChange, readOnly }: BlockProps) {
   const t = useTranslator(messages);
@@ -19,7 +21,8 @@ export function BookmarkBlock({ data, onChange, readOnly }: BlockProps) {
   const [error, setError] = useState("");
   const editable = Boolean(onChange && !readOnly);
   const url = safeUrl(data.url);
-  const image = safeImageUrl(data.image);
+  const view = useResource(data.image, "image");
+  const image = view.local ? view.url : safeImageUrl(data.image);
   const hostname = url ? new URL(url).hostname.replace(/^www\./, "") : "";
   const openEditor = () => {
     setDraft({
@@ -36,7 +39,11 @@ export function BookmarkBlock({ data, onChange, readOnly }: BlockProps) {
       setError(t("bookmark.invalidUrl"));
       return;
     }
-    if (draft.image.trim() && !safeImageUrl(draft.image.trim())) {
+    if (
+      draft.image.trim() &&
+      !safeImageUrl(draft.image.trim()) &&
+      !isLocalResourceRef(draft.image.trim(), "image")
+    ) {
       setError(t("bookmark.invalidImage"));
       return;
     }
@@ -151,6 +158,7 @@ export function BookmarkBlock({ data, onChange, readOnly }: BlockProps) {
               alt=""
               loading="lazy"
               referrerPolicy="no-referrer"
+              onError={view.local ? view.failed : undefined}
             />
           )}
         </a>
@@ -165,6 +173,15 @@ export function BookmarkBlock({ data, onChange, readOnly }: BlockProps) {
                 {t("bookmark.add")}
               </button>
             ) : undefined
+          }
+        />
+      )}
+      {url && view.local && !["ready", "loading"].includes(view.status) && (
+        <LocalResourceNotice
+          view={view}
+          kind="image"
+          onReplace={
+            editable ? (ref) => onChange?.({ ...data, image: ref }) : undefined
           }
         />
       )}

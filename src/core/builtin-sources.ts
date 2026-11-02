@@ -62,6 +62,9 @@ import nativeInkCss from "../surface/native-ink.css?raw";
 import capacity from "../portable/capacity.mjs?raw";
 import ownedJson from "../portable/owned-json.mjs?raw";
 import pageLinkSource from "../portable/page-link.mjs?raw";
+import localFilesSource from "../portable/local-files.mjs?raw";
+import localResourcesSource from "../components/local-resources.tsx?raw";
+import localMediaLinkSource from "../components/custom/local-media-link.ts?raw";
 import editableSource from "../datasets/editable.mjs?raw";
 import sdk from "../components/blocks/sdk.tsx?raw";
 import actionHost from "../components/blocks/action-host.tsx?raw";
@@ -271,6 +274,9 @@ const sources: Record<string, string> = {
   "capacity.mjs": capacity,
   "owned-json.mjs": ownedJson,
   "page-link.mjs": pageLinkSource,
+  "local-files.mjs": localFilesSource,
+  "local-resources.tsx": localResourcesSource,
+  "custom/local-media-link.ts": localMediaLinkSource,
   "editable.mjs": editableSource,
   "sdk.tsx": sdk,
   "action-host.tsx": actionHost,
@@ -415,6 +421,17 @@ export const builtinSources: Record<string, string> = Object.fromEntries(
       .replaceAll('"../portable/capacity.mjs"', '"./capacity.mjs"')
       .replaceAll('"../../datasets/editable.mjs"', '"./editable.mjs"')
       .replaceAll('"../portable/owned-json.mjs"', '"./owned-json.mjs"')
+      .replaceAll('"../portable/local-files.mjs"', '"./local-files.mjs"')
+      .replaceAll(
+        '"../../portable/local-files.mjs"',
+        name.startsWith("rich-text/")
+          ? '"../local-files.mjs"'
+          : '"./local-files.mjs"',
+      )
+      .replaceAll(
+        '"../local-resources"',
+        name.includes("/") ? '"../local-resources"' : '"./local-resources"',
+      )
       .replaceAll(
         '"../../portable/page-link.mjs"',
         name.startsWith("rich-text/")

@@ -5,6 +5,7 @@ import type { PublishedComponentLocator } from "./publication-types";
 export const MAX_ARTIFACT_BYTES: number;
 export const ARTIFACT_DATA_ID: string;
 export function isSafeUrl(value: unknown, image?: boolean): boolean;
+export function isImageSource(value: unknown): boolean;
 export function validateDocument(value: unknown): ShowDocument;
 export function isDocumentTimestamp(value: unknown): boolean;
 /** Internal trusted adapter: held body must come from the actual source registry. */

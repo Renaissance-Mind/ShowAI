@@ -49,3 +49,5 @@ export { CardGridBlock as CardGrid } from "./CardGrid";
 export { RoadmapBlock as Roadmap } from "./Roadmap";
 export { WaterfallBlock as Waterfall } from "./Waterfall";
 export { EventTimelineBlock as EventTimeline } from "./EventTimeline";
+// Linked local files in resource props: a granted address in the workbench.
+export { useResource } from "../local-resources";

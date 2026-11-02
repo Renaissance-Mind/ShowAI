@@ -34,7 +34,12 @@ import { resolvePublishedComponents } from "../core/publication";
 import { publicationRefKey } from "../portable/remote.mjs";
 import type { PublishedComponentLocator } from "../portable/publication-types";
 import type { CompiledComponent } from "../components/custom/types";
-import { assertOfflineImages } from "../portable/assets.mjs";
+import { externalResourceUrls } from "../portable/assets.mjs";
+import {
+  withLocalResources,
+  type LocalResourceDecisions,
+  type LocalResourcePlanItem,
+} from "../core/local-resources";
 import { toCdnPage } from "../portable/cdn-fragment.mjs";
 import { conversationPreview } from "../core/conversation-preview";
 import {
@@ -77,6 +82,12 @@ export interface ExportOptions {
    * and the sizes, and writes nothing.
    */
   externalData?: "embed";
+  /**
+   * Per local file (by its file: reference): "embed" its bytes or "skip" it,
+   * keeping only its name. Files left out embed when they fit the resource
+   * budget and are skipped otherwise.
+   */
+  resources?: LocalResourceDecisions;
 }
 export interface ExportResult {
   format: ExportFormat;
@@ -91,6 +102,25 @@ export interface ExportResult {
   requiresNetwork: boolean;
   /** Snapshots of external datasets embedded in the export. */
   externalSnapshots?: ExternalSnapshotReport;
+  /** Local files of resource fields and what the export carries for each. */
+  localResources?: LocalResourcePlanItem[];
+  /** Web addresses of resource fields, kept as they are; readers load them online. */
+  onlineResources?: string[];
+}
+
+/** The resource report of an export: local files and kept web addresses. */
+function resourceReport(
+  documents: ShowDocument[],
+  local: LocalResourcePlanItem[],
+): Pick<ExportResult, "localResources" | "onlineResources"> {
+  const online = [
+    ...new Set(documents.flatMap((document) => externalResourceUrls(document))),
+  ];
+  const files = [...new Map(local.map((item) => [item.id, item])).values()];
+  return {
+    ...(files.length ? { localResources: files } : {}),
+    ...(online.length ? { onlineResources: online } : {}),
+  };
 }
 
 export function formatBytes(bytes: number): string {
@@ -206,12 +236,14 @@ export async function buildPageHtml(
   presentation?: "spatial" | "reading",
   selection?: ShowArtifact["selection"],
   readerHtml?: string,
+  resources?: LocalResourceDecisions,
 ): Promise<string> {
-  assertOfflineImages(document);
+  // Web addresses stay; local files are embedded or keep their name only.
+  const prepared = (await withLocalResources(document, resources)).document;
   return withHtmlLanguage(
     injectArtifactIntoHtml(
-      readerHtml ?? (await buildReaderTemplate([document], templatePath)),
-      document,
+      readerHtml ?? (await buildReaderTemplate([prepared], templatePath)),
+      prepared,
       components,
       remoteComponents,
       presentation,
@@ -403,9 +435,11 @@ export async function exportPage(
       record.document,
     );
     const fullDocument = resolved.document;
-    const sourceDocument = selection
+    const selected = selection
       ? selectDocumentBlocks(fullDocument, selection.blockIds)
       : fullDocument;
+    const local = await withLocalResources(selected, options.resources);
+    const sourceDocument = local.document;
     const externalSnapshots = externalSnapshotReport([
       {
         pageId: options.pageId,
@@ -486,6 +520,7 @@ export async function exportPage(
       reader: deliveredReader,
       requiresNetwork: deliveredReader === "cdn" || remoteComponents.length > 0,
       ...(externalSnapshots.datasets.length ? { externalSnapshots } : {}),
+      ...resourceReport([document], local.resources),
     };
   }
 
@@ -517,10 +552,14 @@ export async function exportPage(
     })),
   );
   assertExternalSnapshots(externalSnapshots, options.externalData);
-  let documents = resolvedPages.map(({ document }) => document);
-  if (!documents.length)
+  if (!resolvedPages.length)
     throw new Error("This project has no active pages to export.");
-  for (const document of documents) assertOfflineImages(document);
+  const localPages = await Promise.all(
+    resolvedPages.map(({ document }) =>
+      withLocalResources(document, options.resources),
+    ),
+  );
+  let documents = localPages.map(({ document }) => document);
   const pageComponents = await Promise.all(
     documents.map((document) =>
       resolveDocumentComponents(store.root, document, options.projectId),
@@ -743,5 +782,9 @@ export async function exportPage(
     reader: "bundled",
     requiresNetwork: allRemote.length > 0,
     ...(externalSnapshots.datasets.length ? { externalSnapshots } : {}),
+    ...resourceReport(
+      documents,
+      localPages.flatMap(({ resources }) => resources),
+    ),
   };
 }

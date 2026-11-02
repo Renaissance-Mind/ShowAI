@@ -407,14 +407,19 @@ export function MathView({
   );
 }
 
-export function ImageView({ node }: NodeViewProps) {
+export function ImageView({ node, editor, updateAttributes }: NodeViewProps) {
   return (
     <NodeViewWrapper
       data-block-id={node.attrs.id}
       data-drag-handle
       contentEditable={false}
     >
-      <ImageContent attrs={node.attrs} />
+      <ImageContent
+        attrs={node.attrs}
+        onSourceChange={
+          editor.isEditable ? (src) => updateAttributes({ src }) : undefined
+        }
+      />
     </NodeViewWrapper>
   );
 }
