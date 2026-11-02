@@ -221,6 +221,20 @@ async function settleComponents(page: Page): Promise<void> {
   }
 }
 
+/**
+ * Document height plus what the page-level scroll shell still hides. Runs in
+ * the page; scrollers smaller than half the viewport belong to components.
+ */
+function contentHeight() {
+  let hidden = 0;
+  for (const element of document.querySelectorAll<HTMLElement>("body *")) {
+    if (element.clientHeight < window.innerHeight / 2) continue;
+    if (!/auto|scroll/.test(getComputedStyle(element).overflowY)) continue;
+    hidden = Math.max(hidden, element.scrollHeight - element.clientHeight);
+  }
+  return document.documentElement.scrollHeight + hidden;
+}
+
 export async function renderReading(
   htmlPath: string,
   options: ReadingOptions,
@@ -336,9 +350,23 @@ export async function renderReading(
           });
       }
     }
-    const height = await page.evaluate(
-      () => document.documentElement.scrollHeight,
-    );
+    // The reader lays a Page out inside a 100dvh shell that scrolls on its
+    // own, so a full-page screenshot of the document alone stops at the
+    // viewport. Grow the viewport until that shell no longer scrolls.
+    let height = await page.evaluate(contentHeight);
+    for (
+      let attempt = 0;
+      options.presentation === "reading" &&
+      height > page.viewportSize()!.height &&
+      height <= 16000 &&
+      attempt < 3;
+      attempt++
+    ) {
+      await page.setViewportSize({ width: options.viewport.width, height });
+      await settleComponents(page);
+      for (const frame of page.frames()) await settleFramePaint(frame);
+      height = await page.evaluate(contentHeight);
+    }
     if (height > 16000)
       throw new Error(
         "The rendered page exceeds 16000 px. Read a component or region using blockIds.",

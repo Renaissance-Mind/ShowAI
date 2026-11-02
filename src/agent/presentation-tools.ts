@@ -86,16 +86,19 @@ export function conversationHandoff(
   blockIds: string[] | undefined,
   display: HostDisplay | undefined,
   tool: "page_present" | "render_document",
+  cdnReader: boolean,
 ) {
   const saved = tool === "page_present";
   if (!display || HOST_DISPLAYS[display] !== "compact") return undefined;
-  if (!compact)
+  if (!cdnReader)
     return {
       mode: "unavailable",
       next: `This runtime has no CDN reader, so the page cannot be shown in the conversation. Give the person ${saved ? "openUrl" : "the html file"} and say that the inline view is unavailable.`,
     };
-  const bytes = Buffer.byteLength(compact);
-  if (bytes <= COMPACT_BYTES)
+  // Without a fragment but with a reader, the page data itself (usually
+  // embedded images) is over the conversation budget.
+  const bytes = compact ? Buffer.byteLength(compact) : undefined;
+  if (compact && bytes! <= COMPACT_BYTES)
     return {
       mode: "compact",
       fragment: compact,
@@ -103,7 +106,7 @@ export function conversationHandoff(
     };
   return {
     mode: "too-large",
-    bytes,
+    ...(bytes ? { bytes } : {}),
     limit: COMPACT_BYTES,
     next: blockIds
       ? `These blocks are still too large to show in the conversation. Call ${tool} again with fewer blockIds, or give the person ${saved ? "openUrl" : "the html file"}.`
@@ -540,6 +543,7 @@ export function registerPresentationTools(
                 input.blockIds,
                 declaredDisplay,
                 "render_document",
+                !!presentation.online,
               ),
             ),
             delivery: delivery ?? {
@@ -609,7 +613,7 @@ export function registerPresentationTools(
             warnings.push(
               compact
                 ? `The compact fragment is ${Buffer.byteLength(compact)} bytes, above ${COMPACT_BYTES}; an image is returned instead.`
-                : "No CDN reader is configured for a compact fragment; an image is returned instead.",
+                : "No compact fragment is available: either no CDN reader is configured or the component data is over the conversation budget. An image is returned instead.",
             );
             mode = "image";
           }

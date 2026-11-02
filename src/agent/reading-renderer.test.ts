@@ -87,6 +87,30 @@ test("rendered reading settles and captures component iframes below the viewport
   expect(result.height).toBeGreaterThan(2400);
 }, 15000);
 
+test("rendered reading captures content below the viewport inside the reader's scroll shell", async () => {
+  const root = await mkdtemp(join(tmpdir(), "showai-reading-shell-"));
+  fixtures.push(root);
+  const html = join(root, "shell.html");
+  // Like the portable reader: a 100dvh app whose inner element scrolls.
+  await writeFile(
+    html,
+    `<!doctype html><html><body style="margin:0"><main class="portable-app" style="height:100dvh">
+<div style="height:100%;overflow-y:auto">
+<div style="height:2600px">Long translated article</div>
+<div style="height:200px;overflow:auto"><div style="height:900px">Component with its own scroll</div></div>
+</div></main></body></html>`,
+  );
+  const result = await renderReading(
+    html,
+    pageReadSchema.parse({
+      view: "image",
+      viewport: { width: 800, height: 700 },
+    }),
+  );
+  expect(result.height).toBeGreaterThanOrEqual(2800);
+  expect(result.height).toBeLessThan(3200);
+}, 15000);
+
 test("rendered reading waits for lazily loaded components to replace their placeholder", async () => {
   const root = await mkdtemp(join(tmpdir(), "showai-reading-pending-"));
   fixtures.push(root);

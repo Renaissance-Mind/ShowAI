@@ -1351,6 +1351,7 @@ export function createMcpServer(options: {
                 blockIds,
                 options.presentation?.hostDisplay ?? hostDisplay(),
                 "page_present",
+                !!value.online,
               ),
             ),
             ...(value.externalSnapshots
