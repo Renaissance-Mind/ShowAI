@@ -69,11 +69,14 @@ export async function handleDatasetAction(
     case "datasets:list":
       return datasets.list(projectId);
     case "datasets:get": {
-      const record = await datasets.read(projectId, id(args, "datasetId"));
+      const record = await datasets.read(projectId, id(args, "datasetId"), {
+        refresh: args.refresh === true,
+      });
       const readOnly = await readOnlyProject(store, projectId);
-      if (args.ifHash === record.hash)
+      // A stale value can equal the last one read; its state still changed.
+      if (args.ifHash === record.hash && record.status === "ok")
         return { unchanged: true, hash: record.hash, readOnly };
-      return { ...record, readOnly };
+      return { ...record, readOnly, ...(readOnly ? { editable: false } : {}) };
     }
     case "datasets:create": {
       const name = optionalText(args, "name");
@@ -141,7 +144,9 @@ export async function handleDatasetAction(
           ? { datasetId: id(args, "datasetId") }
           : {}),
         ...(args.id !== undefined ? { id: id(args, "id") } : {}),
-        path: optionalText(args, "path") ?? "",
+        ...(args.url !== undefined
+          ? { url: optionalText(args, "url") }
+          : { path: optionalText(args, "path") ?? "" }),
         ...(use ? { use } : {}),
         ...(args.name !== undefined
           ? { name: optionalText(args, "name") }

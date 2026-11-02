@@ -16,6 +16,11 @@ import {
   type DatasetConflict,
   type DatasetOperation,
 } from "./operations.mjs";
+import type {
+  DatasetReadStatus,
+  DatasetWarning,
+  Editable,
+} from "./warnings.mjs";
 
 export interface DatasetTransport {
   invoke<T = unknown>(
@@ -35,7 +40,7 @@ interface DatasetFile {
     pageId?: string;
     blockId?: string;
   };
-  source?: { kind: "file"; format: string; name?: string };
+  source?: { kind: "file" | "url"; format: string; name?: string; url?: string };
   updatedAt: string;
 }
 interface DatasetRecord {
@@ -49,15 +54,21 @@ interface DatasetRecord {
     bytes: number;
     modifiedAt: string;
   };
+  remote?: { url: string; format: string; bytes: number; fetchedAt: string };
+  status?: Exclude<DatasetReadStatus, "empty">;
+  editable?: Editable;
+  warnings?: DatasetWarning[];
 }
 /** Where the value of an external dataset comes from, as last read. */
 export interface DatasetSourceState {
+  kind?: "file" | "url";
   format: string;
   name?: string;
   path?: string;
+  url?: string;
   bytes?: number;
   modifiedAt?: string;
-  /** False while the linked file cannot be read on this device. */
+  /** False while the source cannot be read on this device (the value may be stale). */
   available: boolean;
 }
 export interface HeldConflict extends DatasetConflict {
@@ -89,6 +100,8 @@ export interface DatasetSnapshot {
   errorCode?: string;
   /** Present for a dataset whose value lives in a file outside the library. */
   source?: DatasetSourceState;
+  /** Why the shown value is stale (see datasets/warnings). */
+  warnings: DatasetWarning[];
   canUndo: boolean;
   canRedo: boolean;
 }
@@ -151,6 +164,7 @@ export class DatasetSession {
       dirty: false,
       conflicts: [],
       recovered: [],
+      warnings: [],
       canUndo: false,
       canRedo: false,
     };
@@ -237,19 +251,30 @@ export class DatasetSession {
       name: record.dataset.name,
       description: record.dataset.description,
       origin: record.dataset.origin,
-      readOnly: !!record.readOnly,
+      // Online data, spreadsheets and stale values cannot be edited.
+      readOnly: !!record.readOnly || record.editable === false,
+      warnings: record.warnings ?? [],
       source: record.dataset.source
         ? {
+            kind: record.dataset.source.kind,
             format: record.dataset.source.format,
             name: record.dataset.source.name,
+            ...(record.dataset.source.url
+              ? { url: record.dataset.source.url }
+              : {}),
             ...(record.external
               ? {
                   path: record.external.path,
                   bytes: record.external.bytes,
                   modifiedAt: record.external.modifiedAt,
                 }
-              : {}),
-            available: true,
+              : record.remote
+                ? {
+                    bytes: record.remote.bytes,
+                    modifiedAt: record.remote.fetchedAt,
+                  }
+                : {}),
+            available: record.status !== "stale",
           }
         : undefined,
     };
@@ -560,7 +585,8 @@ export class DatasetSession {
         projectId: this.projectId,
         datasetId: this.datasetId,
         // After a source error the same content still needs its new source details.
-        ...(this.snapshot.errorCode === "SOURCE_UNAVAILABLE"
+        ...(this.snapshot.errorCode === "SOURCE_UNAVAILABLE" ||
+        this.snapshot.source?.available === false
           ? {}
           : { ifHash: this.base.hash }),
       });

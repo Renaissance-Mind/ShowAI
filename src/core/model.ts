@@ -313,6 +313,8 @@ export type CoreErrorCode =
   | "LOCKED"
   /** A dataset's linked external file cannot be read on this device. */
   | "SOURCE_UNAVAILABLE"
+  /** The data cannot be written: online data, a spreadsheet, or a stale copy. */
+  | "READ_ONLY"
   /** The action needs the person's decision first; details describe it. */
   | "CONFIRMATION_REQUIRED";
 

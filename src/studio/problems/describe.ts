@@ -156,6 +156,7 @@ const CODES: Record<string, { cause: ErrorKey; actions: ProblemActionId[] }> = {
   SNAPSHOT_EXPIRED: { cause: "cause.snapshotExpired", actions: ["retry"] },
   MISSING_BASELINE: { cause: "cause.missingBaseline", actions: ["retry"] },
   SOURCE_UNAVAILABLE: { cause: "cause.sourceUnavailable", actions: [] },
+  READ_ONLY: { cause: "cause.readOnly", actions: [] },
   CONFIRMATION_REQUIRED: { cause: "cause.confirmationRequired", actions: [] },
 };
 

@@ -57,7 +57,7 @@ export function registerDatasetTools(
   const description = z.string().max(4000);
   const baseHash = z.string().min(1);
   const read = actionTool(
-    `Read shared datasets: list them, or read one's value, hash and the pages using it; path (e.g. a[id=o1].b) narrows the value. sinceHash (a hash you read earlier, e.g. from page_read datasetBases) returns record-level changes since then instead, paged with offset/limit.${
+    `Read shared datasets: list them, or read one's value, hash, status (ok/stale/empty), editable, warnings and the pages using it; path (e.g. a[id=o1].b) narrows the value. refresh:true fetches online data now. sinceHash (a hash you read earlier, e.g. from page_read datasetBases) returns record-level changes since then instead, paged with offset/limit.${
       localFiles ? " out writes the value or comparison to a JSON file." : ""
     }`,
     {
@@ -72,6 +72,7 @@ export function registerDatasetTools(
           sinceHash: z.string().min(1).optional(),
           offset: z.number().int().nonnegative().optional(),
           limit: z.number().int().min(1).max(500).optional(),
+          refresh: z.boolean().optional(),
           ...(localFiles
             ? {
                 out: z.string().min(1).max(4096).optional(),
@@ -79,7 +80,16 @@ export function registerDatasetTools(
               }
             : {}),
         },
-        run: ({ datasetId, path, sinceHash, offset, limit, out, overwrite }) =>
+        run: ({
+          datasetId,
+          path,
+          sinceHash,
+          offset,
+          limit,
+          refresh,
+          out,
+          overwrite,
+        }) =>
           call(async () => {
             if (out !== undefined) assertLocalPath(out, "out");
             const result = await service.datasetRead(
@@ -91,6 +101,7 @@ export function registerDatasetTools(
                 offset: offset as number | undefined,
                 limit: limit as number | undefined,
                 full: out !== undefined,
+                refresh: refresh === true,
               },
             );
             if (out === undefined) return result;
@@ -245,63 +256,75 @@ export function registerDatasetTools(
         }, metadata),
     },
   };
-  if (localFiles)
-    actions.link = {
-      fields: {
-        ...changeSchema,
-        datasetId: datasetId.optional(),
-        path: z.union([z.string().min(1).max(4096), z.null()]),
-        format: z.enum(["json", "csv", "tsv"]).optional(),
-        use: z.enum(["file", "dataset"]).optional(),
-        name: datasetName.optional(),
-        description: description.optional(),
-        value: z.unknown().optional(),
-        ...valueFile,
-        schema: jsonObject.optional(),
-        baseHash: baseHash.optional(),
-      },
-      run: ({
-        datasetId,
-        path,
-        format,
-        use,
-        name,
-        description,
-        value: inlineValue,
-        valueFile,
-        schema,
-        baseHash,
-        ...metadata
-      }) =>
-        call(async () => {
-          const value = await fileValue(inlineValue, valueFile);
-          if (path === null) {
-            if (!datasetId)
-              throw new Error(
-                "path null needs the datasetId to copy into the library.",
-              );
-            return service.datasetEmbed(
-              projectId,
-              datasetId as string,
-              baseHash as string | undefined,
+  // Online data is not a file of this device, so every transport links it;
+  // files (and copying a file's data back) need a local connection.
+  actions.link = {
+    fields: {
+      ...changeSchema,
+      datasetId: datasetId.optional(),
+      ...(localFiles
+        ? { path: z.union([z.string().min(1).max(4096), z.null()]).optional() }
+        : {}),
+      url: z.string().min(1).max(2048).optional(),
+      format: z.enum(["json", "csv", "tsv", "xlsx"]).optional(),
+      refreshSeconds: z.number().int().min(0).max(86_400).optional(),
+      use: z.enum(["file", "dataset"]).optional(),
+      name: datasetName.optional(),
+      description: description.optional(),
+      value: z.unknown().optional(),
+      ...valueFile,
+      schema: jsonObject.optional(),
+      baseHash: baseHash.optional(),
+    },
+    run: ({
+      datasetId,
+      path,
+      url,
+      format,
+      refreshSeconds,
+      use,
+      name,
+      description,
+      value: inlineValue,
+      valueFile,
+      schema,
+      baseHash,
+      ...metadata
+    }) =>
+      call(async () => {
+        const value = await fileValue(inlineValue, valueFile);
+        if (path === null) {
+          if (!datasetId)
+            throw new CoreError(
+              "INVALID_DATA",
+              "path null needs the datasetId to copy into the library.",
             );
-          }
-          return service.datasetLink(projectId, {
-            ...(datasetId ? { datasetId: datasetId as string } : {}),
-            path: path as string,
-            format: format as "json" | "csv" | "tsv" | undefined,
-            use: use as "file" | "dataset" | undefined,
-            name: name as string | undefined,
-            description: description as string | undefined,
-            value,
-            schema: schema as Record<string, unknown> | undefined,
-          });
-        }, metadata),
-    };
+          return service.datasetEmbed(
+            projectId,
+            datasetId as string,
+            baseHash as string | undefined,
+          );
+        }
+        return service.datasetLink(projectId, {
+          ...(datasetId ? { datasetId: datasetId as string } : {}),
+          ...(path !== undefined ? { path: path as string } : {}),
+          ...(url !== undefined ? { url: url as string } : {}),
+          format: format as "json" | "csv" | "tsv" | "xlsx" | undefined,
+          ...(refreshSeconds !== undefined
+            ? { refreshSeconds: refreshSeconds as number }
+            : {}),
+          use: use as "file" | "dataset" | undefined,
+          name: name as string | undefined,
+          description: description as string | undefined,
+          value,
+          schema: schema as Record<string, unknown> | undefined,
+        });
+      }, metadata),
+  };
   const write = actionTool(
-    `Change shared datasets (guide datasets). create takes value, or fromBlock {pageId,blockId,baseHash} to move a block's props into the dataset and bind it. apply takes the read baseHash and operations {op:"set",path,value}, {op:"remove",path}, {op:"insert",path:list,value,after?}, {op:"move",path:item,after}; path segments select records by id ([id=t1]).${
+    `Change shared datasets (guide datasets). create takes value, or fromBlock {pageId,blockId,baseHash} to move a block's props into the dataset and bind it. apply takes the read baseHash and operations {op:"set",path,value}, {op:"remove",path}, {op:"insert",path:list,value,after?}, {op:"move",path:item,after}; path segments select records by id ([id=t1]). link with url reads online .json/.csv/.tsv/.xlsx data (read-only, refreshSeconds default 300).${
       localFiles
-        ? " link keeps the value in a .json/.csv/.tsv file outside the library; path:null copies it back. valueFile/operationsFile read value or operations from a JSON file."
+        ? " link with path keeps the value in a .json/.csv/.tsv file outside the library (.xlsx files are read-only); path:null copies it back. valueFile/operationsFile read value or operations from a JSON file."
         : ""
     }`,
     actions,

@@ -144,8 +144,9 @@ export function datasetBasesFor(
   bindings: BindingRead[],
 ): Record<string, string> | undefined {
   const bases: Record<string, string> = {};
+  // A stale value is not the source's, so it is never a base for writes.
   for (const binding of bindings)
-    if (binding.hash)
+    if (binding.hash && binding.status === "ok")
       bases[
         binding.projectId === projectId
           ? binding.datasetId

@@ -19,6 +19,7 @@ import {
 import {
   DatasetBaselines,
   DatasetStore,
+  assertWritable,
   sharedPropsSchema,
   type DatasetLinkInput,
   type DatasetRecord,
@@ -103,9 +104,13 @@ export class DatasetService {
       offset?: number;
       limit?: number;
       full?: boolean;
+      /** Fetch online data now instead of within its refresh interval. */
+      refresh?: boolean;
     } = {},
   ) {
-    const record = await this.datasets.read(projectId, datasetId);
+    const record = await this.datasets.read(projectId, datasetId, {
+      refresh: options.refresh,
+    });
     const baselines = new DatasetBaselines(this.store.root);
     // The earlier version is looked up before this read is remembered.
     const before =
@@ -473,6 +478,8 @@ export class DatasetService {
         const kind = String(node.attrs!.kind);
         const project = binding.project ?? projectId;
         const { key, record } = await load(project, binding.dataset);
+        // Read-only and stale data refuse edits before anything is merged.
+        assertWritable(record);
         const basis = await this.basis(project, record, bases);
         const basisProps = resolveBinding(kind, node.attrs!.data, basis).props;
         if (

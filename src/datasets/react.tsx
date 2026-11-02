@@ -576,6 +576,20 @@ export function BoundWidget({
           {t("saveFailed", { error: snapshot.error })}
         </p>
       )}
+      {snapshot?.status === "ready" &&
+        snapshot.source &&
+        !snapshot.source.available && (
+          <p className="dataset-message" role="alert">
+            {t("sourceUnreadable", {
+              name: snapshot.name ?? compiled?.dataset ?? "",
+              path:
+                snapshot.source.path ??
+                snapshot.source.url ??
+                snapshot.source.name ??
+                "",
+            })}
+          </p>
+        )}
       {notice && (
         <p className="dataset-message" role="alert">
           {notice}

@@ -17,6 +17,7 @@ import {
 import { getObjectShape } from "@modelcontextprotocol/sdk/server/zod-compat.js";
 import { z } from "zod";
 import { createMcpServer } from "./mcp";
+import { REMOTE_FETCH } from "../core/dataset-sources";
 import {
   McpAuthorization,
   AuthorizationError,
@@ -119,6 +120,8 @@ export interface McpHttpOptions {
   };
 }
 export async function createMcpHttpApp(options: McpHttpOptions) {
+  // Online data linked by hosted clients never reaches this server's own network.
+  REMOTE_FETCH.publicAddressesOnly = true;
   const url = new URL(options.publicUrl);
   if (
     url.username ||

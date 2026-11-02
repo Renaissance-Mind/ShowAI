@@ -77,12 +77,14 @@ Start with one project:
 
 Shared datasets (one value that blocks on several pages read and write; see guide datasets):
   datasets list --project PROJECT
-  datasets read DATASET --project PROJECT [--path 'objectives[id=o1]']
+  datasets read DATASET --project PROJECT [--path 'objectives[id=o1]'] [--refresh]
   datasets create --project PROJECT --name NAME --input VALUE_OR_FROM_BLOCK.json
   datasets apply DATASET --project PROJECT --input operations.json --base-hash HASH
-  datasets link [DATASET] --project PROJECT --file /abs/data.json|.csv|.tsv [--name NAME] [--use file|dataset] [--input VALUE.json]
+  datasets link [DATASET] --project PROJECT --file /abs/data.json|.csv|.tsv|.xlsx [--name NAME] [--use file|dataset] [--input VALUE.json]
+  datasets link [DATASET] --project PROJECT --url https://host/data.json|.csv|.tsv|.xlsx [--format FORMAT] [--refresh-seconds 300] [--name NAME] [--use file]
   datasets link DATASET --project PROJECT --embed [--base-hash HASH]
-    Keeps the value in a file outside the library (linked on this device); --embed copies it back.
+    Keeps the value in a file outside the library (linked on this device) or reads online data
+    (read-only; .xlsx files too); --embed copies it back; read --refresh fetches online data now.
   datasets delete DATASET --project PROJECT --base-hash HASH
 
 Discover only what you need:
@@ -139,6 +141,7 @@ function parseArguments(args: string[]): Arguments {
     "draft",
     "public",
     "embed",
+    "refresh",
   ]);
   const strings = new Set([
     "state",
@@ -224,6 +227,7 @@ function parseArguments(args: string[]): Arguments {
     "invite",
     "use",
     "external-data",
+    "refresh-seconds",
   ]);
   for (let index = 0; index < args.length; index++) {
     const argument = args[index];
@@ -901,6 +905,7 @@ async function runCliCommand(argv: string[]): Promise<unknown> {
         requireCount(args, 3);
         return service.datasetRead(await project(), id, {
           path: option(args, "path"),
+          refresh: !!args.options.refresh,
         });
       }
       if (action === "create") {
@@ -952,12 +957,22 @@ async function runCliCommand(argv: string[]): Promise<unknown> {
         if (use !== undefined && !["file", "dataset"].includes(use))
           throw new Error("--use must be file or dataset.");
         const format = option(args, "format");
-        if (format !== undefined && !["json", "csv", "tsv"].includes(format))
-          throw new Error("--format must be json, csv or tsv.");
+        if (
+          format !== undefined &&
+          !["json", "csv", "tsv", "xlsx"].includes(format)
+        )
+          throw new Error("--format must be json, csv, tsv or xlsx.");
+        const url = option(args, "url");
+        const file = option(args, "file");
+        if (!url === !file) throw new Error("Give either --file or --url.");
+        const refresh = option(args, "refresh-seconds");
         return service.datasetLink(await project(), {
           ...(dataset ? { datasetId: dataset } : {}),
-          path: resolve(option(args, "file", true)!),
-          ...(format ? { format: format as "json" | "csv" | "tsv" } : {}),
+          ...(file ? { path: resolve(file) } : { url: url! }),
+          ...(refresh !== undefined ? { refreshSeconds: Number(refresh) } : {}),
+          ...(format
+            ? { format: format as "json" | "csv" | "tsv" | "xlsx" }
+            : {}),
           ...(use ? { use: use as "file" | "dataset" } : {}),
           ...(option(args, "name") ? { name: option(args, "name") } : {}),
           ...(option(args, "description")

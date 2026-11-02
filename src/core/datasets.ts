@@ -28,19 +28,38 @@ import type { JsonSchema } from "../components/custom/types";
 import type { ShowDocument } from "./model";
 import { visitNodes } from "../surface/document.mjs";
 import {
+  DEFAULT_REFRESH_SECONDS,
   DatasetSourceLinks,
   externalPath,
+  fetchSource,
   fileProblem,
   isDatasetSource,
   readExternal,
+  refreshSeconds,
   serializeSource,
   sourceFormat,
+  sourceUrl,
+  sourceWritable,
   writeExternal,
   type DatasetSource,
   type ExternalFileState,
   type ExternalRead,
+  type RemoteSourceState,
   type SourceFormat,
+  type UrlSource,
 } from "./dataset-sources";
+import {
+  DatasetValueCache,
+  cacheOrigin,
+  type CachedValue,
+} from "./dataset-cache";
+import {
+  datasetWarning,
+  type DatasetReadStatus,
+  type DatasetWarning,
+  type Editable,
+  type WarningCode,
+} from "../datasets/warnings.mjs";
 
 /** A project's shared data: one JSON value that several page blocks read and write. */
 export interface DatasetDocument {
@@ -61,8 +80,9 @@ export interface DatasetDocument {
   /** Optional JSON Schema every write must satisfy. */
   schema?: JsonSchema;
   /**
-   * The value lives in a file outside the library, linked on each device
-   * (see dataset-sources). The stored file then has no value.
+   * The value lives outside the library: in a file linked on each device, or
+   * at an http(s) address (see dataset-sources). The stored file then has no
+   * value.
    */
   source?: DatasetSource;
   value: unknown;
@@ -72,8 +92,21 @@ export interface DatasetRecord {
   hash: string;
   revision?: string;
   path: string;
-  /** The linked file the value was read from. */
+  /** The linked file the value was read from (for a stale value, as last read). */
   external?: ExternalFileState;
+  /** The online data the value was fetched from (for a stale value, as last fetched). */
+  remote?: RemoteSourceState;
+  /**
+   * ok: the value was read now (online data: within its refresh interval).
+   * stale: the source cannot be read; the value is the last one read on
+   * this device, from cachedAt, and cannot be written.
+   */
+  status: Exclude<DatasetReadStatus, "empty">;
+  /** Whether writes are accepted: library data and JSON/CSV/TSV files. */
+  editable: Editable;
+  /** Why the value is stale; empty when status is ok. */
+  warnings: DatasetWarning[];
+  cachedAt?: string;
 }
 /** An external source as listed: linked on this device and readable, or why not. */
 export type DatasetSourceSummary = DatasetSource & {
@@ -93,6 +126,9 @@ export interface DatasetSummary {
   bytes: number;
   origin?: DatasetDocument["origin"];
   source?: DatasetSourceSummary;
+  status: DatasetReadStatus;
+  editable: Editable;
+  warnings: DatasetWarning[];
 }
 export interface DatasetReference {
   projectId: string;
@@ -297,27 +333,119 @@ function assertDatasetValue(
   } catch (error) {
     if (!origin) invalid(error);
     const message = error instanceof Error ? error.message : String(error);
-    throw new CoreError("INVALID_DATA", `${origin}: ${message}`);
+    const failure = new CoreError("INVALID_DATA", `${origin}: ${message}`);
+    failure.details = {
+      reason:
+        (error as { code?: string })?.code === "CAPACITY_EXCEEDED"
+          ? "TOO_LARGE"
+          : "SHAPE_CHANGED",
+    };
+    throw failure;
   }
+}
+
+/** The warning code a failed source read carries, and its readable cause. */
+function problemOf(error: unknown): { problem: string; reason: WarningCode } {
+  if (error instanceof CoreError)
+    return {
+      problem: error.message,
+      reason:
+        (error.details?.reason as WarningCode | undefined) ??
+        (error.code === "INVALID_DATA" ? "PARSE_FAILED" : "SOURCE_MISSING"),
+    };
+  return { problem: fileProblem(error), reason: "SOURCE_MISSING" };
 }
 
 function sourceUnavailable(
   dataset: DatasetDocument,
   path: string | undefined,
   problem: string,
+  reason: WarningCode,
 ): CoreError {
+  const source = dataset.source;
   const error = new CoreError(
     "SOURCE_UNAVAILABLE",
-    path
-      ? `Dataset "${dataset.name}" reads ${path}, which cannot be read on this device (${problem}). Fix or restore the file, or link another file with dataset_write(action:link).`
-      : `Dataset "${dataset.name}" reads an external file${dataset.source?.name ? ` (${dataset.source.name})` : ""} that is not linked on this device. Link it with dataset_write(action:link) or in the shared data dialog.`,
+    source?.kind === "url"
+      ? `Dataset "${dataset.name}" reads ${source.url}, which cannot be read now (${problem}).`
+      : path
+        ? `Dataset "${dataset.name}" reads ${path}, which cannot be read on this device (${problem}). Fix or restore the file, or link another file with dataset_write(action:link).`
+        : `Dataset "${dataset.name}" reads an external file${source?.name ? ` (${source.name})` : ""} that is not linked on this device. Link it with dataset_write(action:link) or in the shared data dialog.`,
   );
   error.details = {
     datasetId: dataset.id,
     name: dataset.name,
-    source: { ...dataset.source, ...(path ? { path } : {}) },
+    source: { ...source, ...(path ? { path } : {}) },
+    reason,
   };
   return error;
+}
+
+/**
+ * The warning of a source that could not be read. `cachedAt` names the
+ * stale value shown instead; without it the dataset has no value here.
+ */
+export function unavailableWarning(
+  error: CoreError,
+  cachedAt?: string,
+): DatasetWarning {
+  const details = error.details as {
+    datasetId: string;
+    source?: { kind?: string };
+    reason?: WarningCode;
+  };
+  return datasetWarning(
+    details.reason ?? "SOURCE_MISSING",
+    details.datasetId,
+    cachedAt
+      ? `${error.message} Showing the value last read on this device at ${cachedAt}; it cannot be changed until the source can be read again.`
+      : error.message,
+    {
+      source: details.source?.kind === "url" ? "url" : "file",
+      ...(cachedAt ? {} : { level: "error" as const }),
+    },
+  );
+}
+
+/** Rejects writes to read-only data before anything is changed. */
+function readOnly(dataset: DatasetDocument): CoreError {
+  const source = dataset.source!;
+  const message =
+    source.kind === "url"
+      ? `Dataset "${dataset.name}" reads online data from ${source.url}, which ShowAI does not write. Change it at its source, or copy it into the library (dataset_write link path:null) to edit it here.`
+      : `Dataset "${dataset.name}" reads a .${source.format} file, which ShowAI does not write. Change the file itself, or copy the data into the library (dataset_write link path:null) to edit it here.`;
+  const error = new CoreError("READ_ONLY", message);
+  error.details = {
+    datasetId: dataset.id,
+    name: dataset.name,
+    source,
+    reason: "READ_ONLY",
+    warning: datasetWarning("READ_ONLY", dataset.id, message, {
+      source: source.kind === "url" ? "url" : "file",
+    }),
+  };
+  return error;
+}
+
+/**
+ * Throws unless a read can be the base of a write: read-only sources are
+ * READ_ONLY, a stale value is SOURCE_UNAVAILABLE.
+ */
+export function assertWritable(record: DatasetRecord): void {
+  if (record.status === "stale") {
+    const warning = record.warnings[0];
+    const error = new CoreError(
+      "SOURCE_UNAVAILABLE",
+      `${warning?.message ?? `Dataset "${record.dataset.name}" shows a stale value.`} Nothing was written.`,
+    );
+    error.details = {
+      datasetId: record.dataset.id,
+      name: record.dataset.name,
+      source: record.dataset.source,
+      reason: warning?.code,
+    };
+    throw error;
+  }
+  if (record.editable === false) throw readOnly(record.dataset);
 }
 
 interface LoadedDataset {
@@ -325,6 +453,8 @@ interface LoadedDataset {
   /** The external file as read, for a write that replaces it. */
   read?: ExternalRead;
 }
+
+const later = (a: string, b?: string) => (b && b > a ? b : a);
 
 export interface DatasetLinkInput {
   /** An existing dataset to link; omitted creates a new dataset. */
@@ -334,8 +464,12 @@ export interface DatasetLinkInput {
   name?: string;
   description?: string;
   schema?: JsonSchema;
-  /** Absolute path of a file outside the library. */
-  path: string;
+  /** Absolute path of a file outside the library; or give url. */
+  path?: string;
+  /** http(s) address of online data (read-only); or give path. */
+  url?: string;
+  /** Online data: seconds before a read fetches again (0 = only on refresh). */
+  refreshSeconds?: number;
   format?: SourceFormat;
   /**
    * "file" adopts the file's content as the value; "dataset" writes the
@@ -351,9 +485,11 @@ export interface DatasetLinkInput {
 export class DatasetStore {
   private readonly files;
   readonly links: DatasetSourceLinks;
+  readonly cache: DatasetValueCache;
   constructor(readonly store: FileStore) {
     this.files = store.datasetFiles();
     this.links = new DatasetSourceLinks(store.root);
+    this.cache = new DatasetValueCache(store.root);
   }
   get root() {
     return this.files.root;
@@ -395,14 +531,20 @@ export class DatasetStore {
     return { dataset: validateDataset(value, datasetId), path };
   }
 
-  /** Reads the linked file of an external dataset. */
-  private async readSource(
+  /** Reads the linked file of an external dataset and keeps the value as last good. */
+  private async readFile(
     projectId: string,
     dataset: DatasetDocument,
     linked?: string,
   ): Promise<ExternalRead> {
     const path = linked ?? (await this.links.get(projectId, dataset.id));
-    if (!path) throw sourceUnavailable(dataset, undefined, "not linked");
+    if (!path)
+      throw sourceUnavailable(
+        dataset,
+        undefined,
+        "not linked",
+        "SOURCE_NOT_LINKED",
+      );
     let read: ExternalRead;
     try {
       read = await readExternal(
@@ -411,62 +553,244 @@ export class DatasetStore {
         CAPACITY.datasetBytes,
       );
     } catch (error) {
-      if (error instanceof CoreError) {
-        if (error.code === "CONFLICT") throw error;
-        throw sourceUnavailable(dataset, path, error.message);
-      }
-      throw sourceUnavailable(dataset, path, fileProblem(error));
+      if (error instanceof CoreError && error.code === "CONFLICT") throw error;
+      const { problem, reason } = problemOf(error);
+      throw sourceUnavailable(dataset, path, problem, reason);
     }
     try {
       assertDatasetValue(read.value, dataset.schema, basename(path));
     } catch (error) {
-      throw sourceUnavailable(
-        dataset,
-        path,
-        error instanceof Error ? error.message : String(error),
-      );
+      const { problem, reason } = problemOf(error);
+      throw sourceUnavailable(dataset, path, problem, reason);
     }
+    await this.cache.write({
+      projectId,
+      datasetId: dataset.id,
+      origin: cacheOrigin(dataset.source!, path),
+      bytes: read.state.bytes,
+      value: read.value,
+    });
     return read;
   }
 
+  /**
+   * Online data: the cached value while it is younger than the refresh
+   * interval, otherwise fetched again (conditionally, when the last response
+   * named an ETag or Last-Modified).
+   */
+  private async readUrl(
+    projectId: string,
+    dataset: DatasetDocument,
+    refresh: boolean,
+  ): Promise<{ value: unknown; state: RemoteSourceState }> {
+    const source = dataset.source as UrlSource;
+    const origin = cacheOrigin(source);
+    const cached = await this.cache.read(projectId, dataset.id, origin);
+    const state = (entry: CachedValue): RemoteSourceState => ({
+      url: source.url,
+      format: source.format,
+      bytes: entry.bytes,
+      fetchedAt: entry.readAt,
+      ...(entry.lastModified && Number.isFinite(Date.parse(entry.lastModified))
+        ? { modifiedAt: new Date(entry.lastModified).toISOString() }
+        : {}),
+    });
+    const interval = source.refreshSeconds ?? DEFAULT_REFRESH_SECONDS;
+    if (
+      cached &&
+      !refresh &&
+      (interval === 0 ||
+        Date.now() - Date.parse(cached.failure?.at ?? cached.readAt) <
+          interval * 1000)
+    ) {
+      // A failed fetch is not retried on every read; the last value stays stale.
+      if (cached.failure)
+        throw sourceUnavailable(
+          dataset,
+          undefined,
+          cached.failure.problem,
+          cached.failure.reason,
+        );
+      return { value: cached.value, state: state(cached) };
+    }
+    let fetched: Awaited<ReturnType<typeof fetchSource>>;
+    let value: unknown;
+    try {
+      fetched = await fetchSource(
+        source.url,
+        source.format,
+        CAPACITY.datasetBytes,
+        cached ? { etag: cached.etag, lastModified: cached.lastModified } : {},
+      );
+      value = fetched.notModified ? cached!.value : fetched.value;
+      assertDatasetValue(value, dataset.schema, source.url);
+    } catch (error) {
+      const { problem, reason } = problemOf(error);
+      if (cached) {
+        const { format: _f, version: _v, hash: _h, ...kept } = cached;
+        await this.cache.write(
+          {
+            ...kept,
+            failure: { at: new Date().toISOString(), reason, problem },
+          },
+          { always: true },
+        );
+      }
+      throw sourceUnavailable(dataset, undefined, problem, reason);
+    }
+    const etag = fetched.etag ?? cached?.etag;
+    const lastModified = fetched.lastModified ?? cached?.lastModified;
+    const entry = await this.cache.write(
+      {
+        projectId,
+        datasetId: dataset.id,
+        origin,
+        bytes: fetched.notModified ? cached!.bytes : fetched.bytes,
+        ...(etag ? { etag } : {}),
+        ...(lastModified ? { lastModified } : {}),
+        value,
+      },
+      { always: true },
+    );
+    return { value, state: state(entry) };
+  }
+
+  /**
+   * The dataset with its current value. With `fallback`, an external source
+   * that cannot be read returns the last value read on this device as
+   * stale; without a cached value (or without fallback) it throws
+   * SOURCE_UNAVAILABLE. Writes load without fallback.
+   */
   private async load(
     projectId: string,
     datasetId: string,
+    options: { fallback?: boolean; refresh?: boolean } = {},
   ): Promise<LoadedDataset> {
     const { dataset: stored, path } = await this.stored(projectId, datasetId);
     const revision = await this.revision(path);
-    let dataset = stored;
-    let read: ExternalRead | undefined;
-    if (stored.source) {
-      read = await this.readSource(projectId, stored);
-      dataset = {
+    const base = { path, ...(revision ? { revision } : {}) };
+    const source = stored.source;
+    if (!source)
+      return {
+        record: {
+          dataset: stored,
+          hash: datasetHash(stored),
+          ...base,
+          status: "ok",
+          editable: true,
+          warnings: [],
+        },
+      };
+    const editable = sourceWritable(source);
+    try {
+      if (source.kind === "url") {
+        const { value, state } = await this.readUrl(
+          projectId,
+          stored,
+          !!options.refresh,
+        );
+        const dataset = {
+          ...stored,
+          updatedAt: later(stored.updatedAt, state.modifiedAt),
+          value,
+        };
+        return {
+          record: {
+            dataset,
+            hash: datasetHash(dataset),
+            ...base,
+            remote: state,
+            status: "ok",
+            editable,
+            warnings: [],
+          },
+        };
+      }
+      const read = await this.readFile(projectId, stored);
+      const dataset = {
         ...stored,
-        updatedAt: [stored.updatedAt, read.state.modifiedAt].sort().at(-1)!,
+        updatedAt: later(stored.updatedAt, read.state.modifiedAt),
         value: read.value,
       };
+      return {
+        record: {
+          dataset,
+          hash: datasetHash(dataset),
+          ...base,
+          external: read.state,
+          status: "ok",
+          editable,
+          warnings: [],
+        },
+        read,
+      };
+    } catch (error) {
+      if (
+        !options.fallback ||
+        !(error instanceof CoreError && error.code === "SOURCE_UNAVAILABLE")
+      )
+        throw error;
+      const linked = (error.details?.source as { path?: string } | undefined)
+        ?.path;
+      // An unlinked file has no source to have been read from on this device.
+      const cached =
+        source.kind === "url" || linked
+          ? await this.cache.read(
+              projectId,
+              stored.id,
+              cacheOrigin(source, linked),
+            )
+          : undefined;
+      if (!cached) throw error;
+      const dataset = { ...stored, value: cached.value };
+      return {
+        record: {
+          dataset,
+          hash: datasetHash(dataset),
+          ...base,
+          ...(source.kind === "url"
+            ? {
+                remote: {
+                  url: source.url,
+                  format: source.format,
+                  bytes: cached.bytes,
+                  fetchedAt: cached.readAt,
+                },
+              }
+            : {
+                external: {
+                  path: linked!,
+                  format: source.format,
+                  bytes: cached.bytes,
+                  modifiedAt: cached.readAt,
+                },
+              }),
+          status: "stale",
+          editable: false,
+          warnings: [unavailableWarning(error, cached.readAt)],
+          cachedAt: cached.readAt,
+        },
+      };
     }
-    return {
-      record: {
-        dataset,
-        hash: datasetHash(dataset),
-        path,
-        ...(revision ? { revision } : {}),
-        ...(read ? { external: read.state } : {}),
-      },
-      ...(read ? { read } : {}),
-    };
   }
 
-  private async record(
+  /**
+   * The dataset with its current value; an unreadable external source gives
+   * its last value read on this device (status stale). `refresh` fetches
+   * online data now instead of within its refresh interval.
+   */
+  async read(
     projectId: string,
     datasetId: string,
+    options: { refresh?: boolean } = {},
   ): Promise<DatasetRecord> {
-    return (await this.load(projectId, datasetId)).record;
-  }
-
-  async read(projectId: string, datasetId: string): Promise<DatasetRecord> {
     await this.files.readProject(projectId);
-    return this.record(projectId, datasetId);
+    return (
+      await this.load(projectId, datasetId, {
+        fallback: true,
+        refresh: options.refresh,
+      })
+    ).record;
   }
 
   async list(projectId: string): Promise<DatasetSummary[]> {
@@ -481,54 +805,77 @@ export class DatasetStore {
     for (const name of names) {
       const id = name.slice(0, -5);
       if (!/^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/.test(id)) continue;
-      let record: DatasetRecord;
-      let source: DatasetSourceSummary | undefined;
+      let record: DatasetRecord | undefined;
+      let unavailable: CoreError | undefined;
       try {
-        record = await this.record(projectId, id);
-        if (record.dataset.source)
-          source = {
-            ...record.dataset.source,
-            path: record.external!.path,
-            bytes: record.external!.bytes,
-            available: true,
-          };
+        record = (await this.load(projectId, id, { fallback: true })).record;
       } catch (error) {
-        // A missing or broken linked file still lists the dataset.
+        // A missing or broken source without a cached value still lists the dataset.
         if (!(
           error instanceof CoreError && error.code === "SOURCE_UNAVAILABLE"
         ))
           throw error;
+        unavailable = error;
+      }
+      let source: DatasetSourceSummary | undefined;
+      let summary: Omit<DatasetSummary, "id" | "bytes" | "source">;
+      let bytes = 0;
+      if (record) {
+        const { dataset } = record;
+        if (dataset.source)
+          source = {
+            ...dataset.source,
+            ...(record.external
+              ? { path: record.external.path, bytes: record.external.bytes }
+              : {}),
+            ...(record.remote ? { bytes: record.remote.bytes } : {}),
+            available: record.status === "ok",
+            ...(record.status === "stale"
+              ? { error: record.warnings[0]?.message }
+              : {}),
+          };
+        bytes = Buffer.byteLength(JSON.stringify(dataset.value));
+        summary = {
+          name: dataset.name,
+          ...(dataset.description ? { description: dataset.description } : {}),
+          createdAt: dataset.createdAt,
+          updatedAt: dataset.updatedAt,
+          hash: record.hash,
+          ...(record.revision ? { revision: record.revision } : {}),
+          ...(dataset.origin ? { origin: dataset.origin } : {}),
+          status: record.status,
+          editable: record.editable,
+          warnings: record.warnings,
+        };
+      } else {
         const { dataset, path } = await this.stored(projectId, id);
-        const linked = (error.details?.source as { path?: string }).path;
+        const linked = (
+          unavailable!.details?.source as { path?: string } | undefined
+        )?.path;
         source = {
           ...dataset.source!,
           ...(linked ? { path: linked } : {}),
           available: false,
-          error: error.message,
+          error: unavailable!.message,
         };
         const revision = await this.revision(path);
-        record = {
-          dataset,
+        summary = {
+          name: dataset.name,
+          ...(dataset.description ? { description: dataset.description } : {}),
+          createdAt: dataset.createdAt,
+          updatedAt: dataset.updatedAt,
           hash: datasetHash(dataset),
-          path,
           ...(revision ? { revision } : {}),
+          ...(dataset.origin ? { origin: dataset.origin } : {}),
+          status: "empty",
+          editable: false,
+          warnings: [unavailableWarning(unavailable!)],
         };
       }
       summaries.push({
         id,
-        name: record.dataset.name,
-        ...(record.dataset.description
-          ? { description: record.dataset.description }
-          : {}),
-        createdAt: record.dataset.createdAt,
-        updatedAt: record.dataset.updatedAt,
-        hash: record.hash,
-        ...(record.revision ? { revision: record.revision } : {}),
-        bytes:
-          record.dataset.value === undefined
-            ? 0
-            : Buffer.byteLength(JSON.stringify(record.dataset.value)),
-        ...(record.dataset.origin ? { origin: record.dataset.origin } : {}),
+        ...summary,
+        bytes,
         ...(source ? { source } : {}),
       });
     }
@@ -585,7 +932,14 @@ export class DatasetStore {
       });
       await this.write(path, dataset, null);
       // The committing transaction attaches the new revision.
-      return { dataset, hash: datasetHash(dataset), path };
+      return {
+        dataset,
+        hash: datasetHash(dataset),
+        path,
+        status: "ok",
+        editable: true,
+        warnings: [],
+      };
     });
   }
 
@@ -606,18 +960,50 @@ export class DatasetStore {
   }
 
   /**
-   * Keeps a dataset's value in a file outside the library: creates a dataset
-   * from a file, moves an existing dataset's value into a new file, or links
-   * this device's copy of an external dataset's file.
+   * Keeps a dataset's value outside the library: creates a dataset from a
+   * file or online data, moves an existing dataset's value into a new file,
+   * replaces it with a file's or address's content, or links this device's
+   * copy of an external dataset's file.
    */
   async link(
     projectId: string,
     input: DatasetLinkInput,
   ): Promise<DatasetRecord & { created: boolean; wroteFile: boolean }> {
-    const path = externalPath(this.root, input.path);
-    const format = sourceFormat(path, input.format);
+    if ((input.path === undefined) === (input.url === undefined))
+      throw new CoreError(
+        "INVALID_DATA",
+        "Give either path (a file on this device) or url (online data).",
+      );
     if (input.use !== undefined && !["file", "dataset"].includes(input.use))
       throw new CoreError("INVALID_DATA", 'use is "file" or "dataset".');
+    const online = input.url !== undefined;
+    const path = online ? undefined : externalPath(this.root, input.path);
+    const url = online ? sourceUrl(input.url) : undefined;
+    const format = sourceFormat(path ?? new URL(url!).pathname, input.format);
+    if (!online && input.refreshSeconds !== undefined)
+      throw new CoreError(
+        "INVALID_DATA",
+        "refreshSeconds applies to online data; a linked file is read on every read.",
+      );
+    const refresh = refreshSeconds(input.refreshSeconds);
+    const source: DatasetSource = online
+      ? {
+          kind: "url",
+          format,
+          url: url!,
+          ...(basename(new URL(url!).pathname)
+            ? { name: basename(new URL(url!).pathname).slice(0, 255) }
+            : {}),
+          ...(refresh !== undefined ? { refreshSeconds: refresh } : {}),
+        }
+      : { kind: "file", format, name: basename(path!) };
+    if (input.use === "dataset" && !sourceWritable(source))
+      throw new CoreError(
+        "READ_ONLY",
+        online
+          ? "Online data is read-only: ShowAI cannot write a dataset to an address. Link the address to read it."
+          : `ShowAI does not write .${format} files. Choose a .json, .csv or .tsv file to write the dataset into.`,
+      );
     const id =
       input.datasetId !== undefined
         ? assertId(input.datasetId)
@@ -626,20 +1012,22 @@ export class DatasetStore {
           : assertId(input.id);
     return this.files.lock(`dataset-${projectId}-${id}`, async () => {
       await this.files.readProject(projectId);
-      const exists = await stat(path).then(
-        (info) => {
-          if (!info.isFile())
-            throw new CoreError("INVALID_PATH", `${path} is not a file.`);
-          return true;
-        },
-        (error: NodeJS.ErrnoException) => {
-          if (error.code === "ENOENT") return false;
-          throw new CoreError(
-            "INVALID_PATH",
-            `Cannot use ${path}: ${fileProblem(error)}.`,
+      const exists = online
+        ? true
+        : await stat(path!).then(
+            (info) => {
+              if (!info.isFile())
+                throw new CoreError("INVALID_PATH", `${path} is not a file.`);
+              return true;
+            },
+            (error: NodeJS.ErrnoException) => {
+              if (error.code === "ENOENT") return false;
+              throw new CoreError(
+                "INVALID_PATH",
+                `Cannot use ${path}: ${fileProblem(error)}.`,
+              );
+            },
           );
-        },
-      );
       const use = input.use ?? (exists ? "file" : "dataset");
       if (use === "file" && !exists)
         throw new CoreError(
@@ -652,11 +1040,6 @@ export class DatasetStore {
           `${path} already exists and is never overwritten. Choose a new file name, or use "file" to read this file instead.`,
         );
       const now = new Date().toISOString();
-      const source: DatasetSource = {
-        kind: "file",
-        format,
-        name: basename(path),
-      };
       let current: LoadedDataset | undefined;
       let base: DatasetDocument;
       if (input.datasetId === undefined) {
@@ -666,7 +1049,7 @@ export class DatasetStore {
         if (use === "file" && input.value !== undefined)
           throw new CoreError(
             "INVALID_DATA",
-            "The file supplies the value; omit value, or choose a new file to write it into.",
+            `${online ? "The address" : "The file"} supplies the value; omit value${online ? "" : ", or choose a new file to write it into"}.`,
           );
         if (use === "dataset" && input.value === undefined)
           throw new CoreError(
@@ -689,18 +1072,22 @@ export class DatasetStore {
         if (input.value !== undefined || input.id !== undefined)
           throw new CoreError(
             "INVALID_DATA",
-            "Linking an existing dataset takes its value from the file or the dataset; omit value and id.",
+            "Linking an existing dataset takes its value from the source or the dataset; omit value and id.",
           );
         const stored = await this.stored(projectId, id);
-        if (stored.dataset.source && stored.dataset.source.format !== format)
+        const previous = stored.dataset.source;
+        // Other devices link their own copy of the same file format.
+        if (previous?.kind === "file" && !online && previous.format !== format)
           throw new CoreError(
             "INVALID_DATA",
-            `This dataset reads a ${stored.dataset.source.format} file; choose a .${stored.dataset.source.format} file.`,
+            `This dataset reads a ${previous.format} file; choose a .${previous.format} file.`,
           );
-        if (!stored.dataset.source && use === "file" && input.use !== "file")
+        if (!previous && use === "file" && input.use !== "file")
           throw new CoreError(
             "CONFLICT",
-            `Both the dataset and ${basename(path)} hold data. Pass use "file" to replace the dataset's value with the file, or choose a new file name to write the dataset into.`,
+            online
+              ? `The dataset holds data. Pass use "file" to replace its value with the data at ${url}.`
+              : `Both the dataset and ${basename(path!)} hold data. Pass use "file" to replace the dataset's value with the file, or choose a new file name to write the dataset into.`,
           );
         if (use === "dataset") current = await this.load(projectId, id);
         base = current?.record.dataset ?? stored.dataset;
@@ -710,12 +1097,11 @@ export class DatasetStore {
             "Rename an existing dataset with dataset_write(action:apply).",
           );
       }
-      let value: unknown;
       let wroteFile = false;
       if (use === "dataset") {
-        value = base.value;
+        const value = base.value;
         assertDatasetValue(value, base.schema);
-        await writeExternal(path, serializeSource(value, format), null).catch(
+        await writeExternal(path!, serializeSource(value, format), null).catch(
           (error) => {
             if (error instanceof CoreError) throw error;
             throw new CoreError(
@@ -729,12 +1115,25 @@ export class DatasetStore {
       const dataset = validateDataset({
         ...base,
         source,
-        ...(input.datasetId === undefined || !base.source
+        ...(input.datasetId === undefined ||
+        !base.source ||
+        canonicalJson(base.source) !== canonicalJson(source)
           ? { updatedAt: now }
           : {}),
         value: undefined,
       });
-      const read = await this.readSource(projectId, dataset, path);
+      let value: unknown;
+      let external: ExternalFileState | undefined;
+      let remote: RemoteSourceState | undefined;
+      if (online) {
+        const read = await this.readUrl(projectId, dataset, true);
+        value = read.value;
+        remote = read.state;
+      } else {
+        const read = await this.readFile(projectId, dataset, path);
+        value = read.value;
+        external = read.state;
+      }
       const stored = await this.stored(projectId, id).catch((error) => {
         if (error instanceof CoreError && error.code === "NOT_FOUND")
           return undefined;
@@ -750,17 +1149,25 @@ export class DatasetStore {
           dataset,
           stored ? ((await this.revision(stored.path)) ?? null) : null,
         );
-      await this.links.set(projectId, id, path);
+      // Online data needs no device link; a file link it replaces is dropped.
+      await this.links.set(projectId, id, online ? null : path!);
       const loaded = {
         ...dataset,
-        updatedAt: [dataset.updatedAt, read.state.modifiedAt].sort().at(-1)!,
-        value: read.value,
+        updatedAt: later(
+          dataset.updatedAt,
+          external?.modifiedAt ?? remote?.modifiedAt,
+        ),
+        value,
       };
       return {
         dataset: loaded,
         hash: datasetHash(loaded),
         path: this.path(projectId, id),
-        external: read.state,
+        ...(external ? { external } : {}),
+        ...(remote ? { remote } : {}),
+        status: "ok" as const,
+        editable: sourceWritable(source),
+        warnings: [],
         created: input.datasetId === undefined,
         wroteFile,
       };
@@ -797,7 +1204,15 @@ export class DatasetStore {
       });
       await this.write(record.path, dataset, record.revision ?? null);
       await this.links.set(projectId, datasetId, null);
-      return { dataset, hash: datasetHash(dataset), path: record.path };
+      await this.cache.remove(projectId, datasetId);
+      return {
+        dataset,
+        hash: datasetHash(dataset),
+        path: record.path,
+        status: "ok",
+        editable: true,
+        warnings: [],
+      };
     });
   }
 
@@ -829,7 +1244,14 @@ export class DatasetStore {
       );
     return this.files.lock(`dataset-${projectId}-${datasetId}`, async () => {
       await this.files.readProject(projectId);
-      const loaded = await this.load(projectId, datasetId);
+      // Read-only data refuses value changes before its source is read;
+      // renaming it (or changing its schema) still works from a stale read.
+      const { dataset: stored } = await this.stored(projectId, datasetId);
+      const readOnlySource = !!stored.source && !sourceWritable(stored.source);
+      if (readOnlySource && operations.length) throw readOnly(stored);
+      const loaded = await this.load(projectId, datasetId, {
+        fallback: readOnlySource,
+      });
       const current = loaded.record;
       const sameBase =
         (input.baseHash === undefined || input.baseHash === current.hash) &&
@@ -918,9 +1340,8 @@ export class DatasetStore {
             read.layout,
           );
           await writeExternal(read.state.path, text, read.stamp);
-          external = (
-            await this.readSource(projectId, dataset, read.state.path)
-          ).state;
+          external = (await this.readFile(projectId, dataset, read.state.path))
+            .state;
         }
         if (metadataChanged)
           await this.write(current.path, dataset, current.revision ?? null);
@@ -931,6 +1352,11 @@ export class DatasetStore {
           hash: datasetHash(dataset),
           path: current.path,
           ...(external ? { external } : {}),
+          ...(current.remote ? { remote: current.remote } : {}),
+          status: current.status,
+          editable: current.editable,
+          warnings: current.warnings,
+          ...(current.cachedAt ? { cachedAt: current.cachedAt } : {}),
         },
         conflicts: [],
         changed: true,
@@ -999,17 +1425,20 @@ export class DatasetStore {
     }
     return this.files.lock(`dataset-${projectId}-${datasetId}`, async () => {
       const stored = await this.stored(projectId, datasetId);
-      // An unreadable linked file still lets the dataset be deleted by its stored hash.
-      const current = await this.record(projectId, datasetId).catch((error) => {
-        if (error instanceof CoreError && error.code === "SOURCE_UNAVAILABLE")
-          return {
-            ...stored,
-            hash: datasetHash(stored.dataset),
-            revision: undefined,
-          };
-        throw error;
-      });
-      if (current.hash !== input.baseHash)
+      const storedHash = datasetHash(stored.dataset);
+      // An unreadable source still lets the dataset be deleted by the hash
+      // listed for it: its stale value's, or the stored file's.
+      const current = await this.load(projectId, datasetId, { fallback: true })
+        .then(({ record }) => record)
+        .catch((error) => {
+          if (error instanceof CoreError && error.code === "SOURCE_UNAVAILABLE")
+            return { hash: storedHash, revision: undefined, status: "stale" };
+          throw error;
+        });
+      if (
+        current.hash !== input.baseHash &&
+        !(current.status === "stale" && input.baseHash === storedHash)
+      )
         throw new CoreError(
           "CONFLICT",
           "The dataset changed since it was read.",
@@ -1028,6 +1457,7 @@ export class DatasetStore {
         );
       await this.files.remove(stored.path);
       await this.links.set(projectId, datasetId, null);
+      await this.cache.remove(projectId, datasetId);
       return { removed: true as const, id: datasetId };
     });
   }
@@ -1079,6 +1509,8 @@ export class DatasetBaselines {
     return value === undefined ? undefined : { hash, value };
   }
   async remember(projectId: string, record: DatasetRecord): Promise<void> {
+    // A stale value is not the source's; no write may merge from it.
+    if (record.status !== "ok") return;
     const actor = changeContext().actor;
     await atomicLibraryFile(
       this.home,

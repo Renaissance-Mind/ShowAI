@@ -387,8 +387,25 @@ export function registerPresentationTools(
             available: options.transport !== "http",
             tool: "dataset_write",
             action: "link",
-            formats: ["json", "csv", "tsv"],
+            formats: ["json", "csv", "tsv", "xlsx"],
+            readOnlyFormats: ["xlsx"],
             exportConfirmation: { parameter: "externalData", value: "embed" },
+          },
+          sources: {
+            kinds: ["file", "url"],
+            file: {
+              available: options.transport !== "http",
+              formats: ["json", "csv", "tsv", "xlsx"],
+              writable: ["json", "csv", "tsv"],
+            },
+            url: {
+              available: true,
+              formats: ["json", "csv", "tsv", "xlsx"],
+              readOnly: true,
+              refreshSeconds: { default: 300, min: 0, max: 86_400 },
+              refresh: { tool: "dataset_read", parameter: "refresh" },
+            },
+            readStatus: ["ok", "stale", "empty"],
           },
           pageOperations: [
             "component.binding.set",

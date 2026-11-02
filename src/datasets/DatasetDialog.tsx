@@ -142,10 +142,10 @@ function SourceSection({
         </>
       ) : (
         <>
-          {source.available && source.path ? (
+          {source.available && (source.path ?? source.url) ? (
             <>
               <p className="dataset-source-path">
-                {t("sourceFile", { path: source.path })}
+                {t("sourceFile", { path: source.path ?? source.url! })}
               </p>
               <p className="dataset-muted">
                 {t("sourceFileMeta", {
@@ -159,10 +159,10 @@ function SourceSection({
             </>
           ) : (
             <p className="dataset-message" role="alert">
-              {source.path
+              {(source.path ?? source.url)
                 ? t("sourceUnreadable", {
                     name: snapshot?.name ?? datasetId,
-                    path: source.path,
+                    path: source.path ?? source.url!,
                   })
                 : t("sourceUnlinked", {
                     name: snapshot?.name ?? datasetId,

@@ -10,27 +10,64 @@ import {
   resolve,
   sep,
 } from "node:path";
+import { lookup } from "node:dns";
+import { BlockList, isIP } from "node:net";
 import { watch, type FSWatcher } from "chokidar";
+import type { Agent } from "undici";
+import type { WarningCode } from "../datasets/warnings.mjs";
 import { atomicRename } from "./atomic-rename";
 import { atomicLibraryFile, readLibraryBytes } from "./library-files";
 import { CoreError } from "./model";
 
-// A dataset can keep its value in a file outside the content library. The
-// library stores only the dataset's description and `source` (format and file
-// name, synchronized with the project); the absolute path is linked per device
+// A dataset can keep its value outside the content library: in a local file
+// or at an http(s) address. The library stores only the dataset's description
+// and `source` (format, file name, and for online data the address, all
+// synchronized with the project). A file's absolute path is linked per device
 // in local/dataset-sources.json, so a shared project never makes another
 // device read files it did not choose, and each device links its own copy.
+// JSON, CSV and TSV files are read and written; spreadsheets (.xlsx) and
+// online data are read-only.
 
-export const SOURCE_FORMATS = ["json", "csv", "tsv"] as const;
+export const SOURCE_FORMATS = ["json", "csv", "tsv", "xlsx"] as const;
 export type SourceFormat = (typeof SOURCE_FORMATS)[number];
+/** Formats ShowAI writes back into a linked file. */
+export const WRITABLE_FORMATS: readonly SourceFormat[] = ["json", "csv", "tsv"];
+export const SOURCE_KINDS = ["file", "url"] as const;
+/** Online data is fetched again when the last fetch is older than this. */
+export const DEFAULT_REFRESH_SECONDS = 300;
+export const MAX_REFRESH_SECONDS = 86_400;
+/**
+ * Limits of one fetch of online data; hosts and tests may adjust them. A
+ * hosted server sets publicAddressesOnly so that addresses of its own
+ * network (loopback, private ranges, link-local) are never fetched.
+ */
+export const REMOTE_FETCH = {
+  timeoutMs: 15_000,
+  maxRedirects: 5,
+  publicAddressesOnly: false,
+};
 
-/** The synchronized part of an external source, stored in the dataset file. */
-export interface DatasetSource {
+/** The synchronized part of a linked file, stored in the dataset file. */
+export interface FileSource {
   kind: "file";
   format: SourceFormat;
   /** File name when it was linked; a hint for linking on another device. */
   name?: string;
 }
+/** Online data, read-only; the address is synchronized with the project. */
+export interface UrlSource {
+  kind: "url";
+  format: SourceFormat;
+  /** http(s) address without credentials. */
+  url: string;
+  name?: string;
+  /**
+   * Seconds after which a read fetches the data again (default 300); 0
+   * fetches only on an explicit refresh.
+   */
+  refreshSeconds?: number;
+}
+export type DatasetSource = FileSource | UrlSource;
 
 /** What a read of the linked file found, carried by the dataset record. */
 export interface ExternalFileState {
@@ -38,6 +75,32 @@ export interface ExternalFileState {
   format: SourceFormat;
   bytes: number;
   modifiedAt: string;
+}
+/** What the last fetch of online data found. */
+export interface RemoteSourceState {
+  url: string;
+  format: SourceFormat;
+  bytes: number;
+  /** When the data was last fetched or confirmed unchanged. */
+  fetchedAt: string;
+  /** Last-Modified of the response, when the server sent one. */
+  modifiedAt?: string;
+}
+
+/** Whether ShowAI writes changes back into the source. */
+export function sourceWritable(source: DatasetSource): boolean {
+  return source.kind === "file" && WRITABLE_FORMATS.includes(source.format);
+}
+
+/** A CoreError of a source read, with the warning code that explains it. */
+export function sourceFailure(
+  code: "INVALID_DATA" | "INVALID_PATH" | "SOURCE_UNAVAILABLE",
+  message: string,
+  reason: WarningCode,
+): CoreError {
+  const error = new CoreError(code, message);
+  error.details = { reason };
+  return error;
 }
 
 interface SourceLink {
@@ -57,27 +120,50 @@ function registryPath(home: string) {
   return join(home, "local", "dataset-sources.json");
 }
 
+const validUrl = (value: unknown) => {
+  if (typeof value !== "string" || value.length > 2048 || !URL.canParse(value))
+    return false;
+  const url = new URL(value);
+  return (
+    ["http:", "https:"].includes(url.protocol) && !url.username && !url.password
+  );
+};
+
 export function isDatasetSource(value: unknown): value is DatasetSource {
   if (!value || typeof value !== "object" || Array.isArray(value)) return false;
   const source = value as Record<string, unknown>;
-  return (
-    source.kind === "file" &&
+  const common =
     SOURCE_FORMATS.includes(source.format as SourceFormat) &&
     (source.name === undefined ||
-      (typeof source.name === "string" && source.name.length <= 255)) &&
+      (typeof source.name === "string" && source.name.length <= 255));
+  if (source.kind === "file")
+    return (
+      common &&
+      Object.keys(source).every((name) =>
+        ["kind", "format", "name"].includes(name),
+      )
+    );
+  return (
+    source.kind === "url" &&
+    common &&
+    validUrl(source.url) &&
+    (source.refreshSeconds === undefined ||
+      (Number.isInteger(source.refreshSeconds) &&
+        (source.refreshSeconds as number) >= 0 &&
+        (source.refreshSeconds as number) <= MAX_REFRESH_SECONDS)) &&
     Object.keys(source).every((name) =>
-      ["kind", "format", "name"].includes(name),
+      ["kind", "format", "url", "name", "refreshSeconds"].includes(name),
     )
   );
 }
 
-/** The format a file name implies, or the explicit one. */
+/** The format a file name or address implies, or the explicit one. */
 export function sourceFormat(path: string, format?: unknown): SourceFormat {
   if (format !== undefined) {
     if (!SOURCE_FORMATS.includes(format as SourceFormat))
       throw new CoreError(
         "INVALID_DATA",
-        `An external dataset file is ${SOURCE_FORMATS.join(", ")}.`,
+        `External data is ${SOURCE_FORMATS.join(", ")}.`,
       );
     return format as SourceFormat;
   }
@@ -86,8 +172,46 @@ export function sourceFormat(path: string, format?: unknown): SourceFormat {
     return extension as SourceFormat;
   throw new CoreError(
     "INVALID_DATA",
-    `Cannot tell the format of ${basename(path)}; name a .json, .csv or .tsv file or pass format.`,
+    `Cannot tell the format of ${basename(path) || path}; name a .json, .csv, .tsv or .xlsx file or pass format.`,
   );
+}
+
+/** An http(s) address for online data; credentials are never stored. */
+export function sourceUrl(value: unknown): string {
+  if (typeof value !== "string" || !value.trim() || value.length > 2048)
+    throw new CoreError(
+      "INVALID_DATA",
+      "Give the http(s) address of the data (at most 2048 characters).",
+    );
+  if (!URL.canParse(value.trim()))
+    throw new CoreError("INVALID_DATA", `${value} is not a valid address.`);
+  const url = new URL(value.trim());
+  if (!["http:", "https:"].includes(url.protocol))
+    throw new CoreError(
+      "INVALID_DATA",
+      "Online data is read over http or https.",
+    );
+  if (url.username || url.password)
+    throw new CoreError(
+      "INVALID_DATA",
+      "Remove the user name and password from the address. The address is stored and synchronized with the project, and ShowAI sends no credentials.",
+    );
+  return url.href;
+}
+
+/** The refresh interval of online data, in seconds. */
+export function refreshSeconds(value: unknown): number | undefined {
+  if (value === undefined) return undefined;
+  if (
+    !Number.isInteger(value) ||
+    (value as number) < 0 ||
+    (value as number) > MAX_REFRESH_SECONDS
+  )
+    throw new CoreError(
+      "INVALID_DATA",
+      `refreshSeconds is a whole number from 0 (only on explicit refresh) to ${MAX_REFRESH_SECONDS}.`,
+    );
+  return value as number;
 }
 
 function inside(root: string, target: string) {
@@ -241,7 +365,11 @@ function parseDelimited(text: string, delimiter: string): string[][] {
     }
   }
   if (quoted)
-    throw new CoreError("INVALID_DATA", "The file has an unclosed quote.");
+    throw sourceFailure(
+      "INVALID_DATA",
+      "The file has an unclosed quote.",
+      "PARSE_FAILED",
+    );
   if (started || cell) {
     row.push(cell);
     rows.push(row);
@@ -359,16 +487,84 @@ export function parseSource(
       const position = String(
         error instanceof Error ? error.message : error,
       ).match(/position \d+(?: \(line \d+ column \d+\))?/);
-      throw new CoreError(
+      throw sourceFailure(
         "INVALID_DATA",
         `The file is not valid JSON${position ? ` at ${position[0]}` : ""}.`,
+        "PARSE_FAILED",
       );
     }
   }
+  if (format === "xlsx")
+    throw new CoreError("INVALID_DATA", "A spreadsheet is read as bytes.");
   return {
     value: parseTable(body, format === "tsv" ? "\t" : ","),
     layout: { ...layout, indent: 0 },
   };
+}
+
+function readOnlyFormat(format: SourceFormat): CoreError {
+  const error = new CoreError(
+    "READ_ONLY",
+    `ShowAI reads .${format} files but does not write them. Change the data in the file itself, or copy it into the library (dataset_write link path:null) to edit it in ShowAI.`,
+  );
+  error.details = { reason: "READ_ONLY" };
+  return error;
+}
+
+/** A cell of a spreadsheet as JSON: dates become ISO strings. */
+type SheetCell = string | number | boolean | null;
+function sheetCell(cell: unknown): SheetCell {
+  if (cell instanceof Date)
+    return Number.isNaN(cell.getTime()) ? null : cell.toISOString();
+  if (typeof cell === "number") return Number.isFinite(cell) ? cell : null;
+  if (typeof cell === "string" || typeof cell === "boolean") return cell;
+  return cell === null || cell === undefined ? null : String(cell);
+}
+
+/** Every sheet of a workbook as { sheets: [{ name, rows }] }. */
+export async function parseWorkbook(
+  bytes: Buffer,
+): Promise<{ sheets: { name: string; rows: SheetCell[][] }[] }> {
+  // Loaded on first use, so commands that never read a workbook start faster.
+  const { default: readXlsxFile } = await import("read-excel-file/node");
+  const sheets = await readXlsxFile(bytes).catch((error: unknown) => {
+    // The library reports damaged or unsupported files by throwing.
+    throw sourceFailure(
+      "INVALID_DATA",
+      `The file is not a readable .xlsx workbook (${error instanceof Error ? error.message : String(error)}).`,
+      "PARSE_FAILED",
+    );
+  });
+  return {
+    sheets: sheets.map((sheet) => ({
+      name: sheet.sheet,
+      rows: sheet.data.map((row) => row.map(sheetCell)),
+    })),
+  };
+}
+
+/** Parses the bytes of a file or response in its format. */
+export async function parseSourceBytes(
+  bytes: Buffer,
+  format: SourceFormat,
+  name: string,
+): Promise<{ value: unknown; layout: FileLayout }> {
+  if (format === "xlsx")
+    return { value: await parseWorkbook(bytes), layout: DEFAULT_LAYOUT };
+  let text: string;
+  try {
+    // Undecodable bytes would be read as replacement characters and
+    // written back, damaging the file.
+    text = new TextDecoder("utf-8", { fatal: true }).decode(bytes);
+  } catch (error) {
+    if (!(error instanceof TypeError)) throw error;
+    throw sourceFailure(
+      "INVALID_DATA",
+      `${name} is not UTF-8 text. Save it as UTF-8 (in Excel: CSV UTF-8) and read it again.`,
+      "PARSE_FAILED",
+    );
+  }
+  return parseSource(text, format);
 }
 
 export function serializeSource(
@@ -376,6 +572,7 @@ export function serializeSource(
   format: SourceFormat,
   layout: FileLayout = DEFAULT_LAYOUT,
 ): string {
+  if (!WRITABLE_FORMATS.includes(format)) throw readOnlyFormat(format);
   const text =
     format === "json"
       ? JSON.stringify(value, null, layout.indent).replace(
@@ -409,33 +606,29 @@ export async function readExternal(
   try {
     const before = await file.stat();
     if (!before.isFile())
-      throw new CoreError("INVALID_PATH", `${path} is not a file.`);
+      throw sourceFailure(
+        "INVALID_PATH",
+        `${path} is not a file.`,
+        "SOURCE_MISSING",
+      );
     if (before.size > limit)
-      throw new CoreError(
+      throw sourceFailure(
         "INVALID_DATA",
         `${basename(path)} is ${before.size} bytes; a dataset holds at most ${limit} bytes.`,
+        "TOO_LARGE",
       );
-    let text: string;
-    try {
-      // Undecodable bytes would be read as replacement characters and
-      // written back, damaging the file.
-      text = new TextDecoder("utf-8", { fatal: true }).decode(
-        await file.readFile(),
-      );
-    } catch (error) {
-      if (!(error instanceof TypeError)) throw error;
-      throw new CoreError(
-        "INVALID_DATA",
-        `${basename(path)} is not UTF-8 text. Save it as UTF-8 (in Excel: CSV UTF-8) and read it again.`,
-      );
-    }
+    const bytes = await file.readFile();
     const after = await file.stat();
     if (stampOf(before) !== stampOf(after))
       throw new CoreError(
         "CONFLICT",
         `${basename(path)} is still being written. Retry when it finishes.`,
       );
-    const { value, layout } = parseSource(text, format);
+    const { value, layout } = await parseSourceBytes(
+      bytes,
+      format,
+      basename(path),
+    );
     return {
       value,
       layout,
@@ -503,6 +696,223 @@ export function fileProblem(error: unknown): string {
   if (code === "EACCES" || code === "EPERM") return "permission denied";
   if (code === "EISDIR") return "it is a directory";
   return error instanceof Error ? error.message : String(error);
+}
+
+// ---------------------------------------------------------------------------
+// Fetching online data
+
+export type RemoteFetch =
+  | { notModified: true; etag?: string; lastModified?: string }
+  | {
+      notModified: false;
+      value: unknown;
+      bytes: number;
+      etag?: string;
+      lastModified?: string;
+    };
+
+const NON_PUBLIC = new BlockList();
+for (const [network, prefix] of [
+  ["0.0.0.0", 8],
+  ["10.0.0.0", 8],
+  ["100.64.0.0", 10],
+  ["127.0.0.0", 8],
+  ["169.254.0.0", 16],
+  ["172.16.0.0", 12],
+  ["192.0.0.0", 24],
+  ["192.168.0.0", 16],
+  ["198.18.0.0", 15],
+  ["224.0.0.0", 3],
+] as const)
+  NON_PUBLIC.addSubnet(network, prefix, "ipv4");
+for (const [network, prefix] of [
+  ["::", 127],
+  ["::ffff:0:0", 96],
+  ["64:ff9b::", 96],
+  ["fc00::", 7],
+  ["fe80::", 10],
+  ["ff00::", 8],
+] as const)
+  NON_PUBLIC.addSubnet(network, prefix, "ipv6");
+
+function publicIp(address: string): boolean {
+  const family = isIP(address);
+  return (
+    family !== 0 && !NON_PUBLIC.check(address, family === 6 ? "ipv6" : "ipv4")
+  );
+}
+
+/** Connections that resolve only to public addresses (checked at connect time). */
+let publicDispatcher: Agent | undefined;
+async function publicOnly(): Promise<Agent> {
+  const { Agent } = await import("undici");
+  publicDispatcher ??= new Agent({
+    connect: {
+      lookup: ((
+        hostname: string,
+        options: object,
+        callback: (
+          error: NodeJS.ErrnoException | null,
+          address: string | { address: string; family: number }[],
+          family?: number,
+        ) => void,
+      ) =>
+        lookup(hostname, options, (error, address, family) => {
+          if (error) return callback(error, address, family);
+          const addresses = Array.isArray(address)
+            ? address.map((entry) => entry.address)
+            : [address];
+          if (addresses.some((entry) => !publicIp(entry)))
+            return callback(
+              Object.assign(
+                new Error(`${hostname} is not a public internet address`),
+                { code: "ENOTPUBLIC" },
+              ),
+              address,
+              family,
+            );
+          callback(null, address, family);
+        })) as never,
+    },
+  });
+  return publicDispatcher;
+}
+
+const unreachable = (url: string, problem: string) =>
+  sourceFailure(
+    "SOURCE_UNAVAILABLE",
+    `${url} could not be read (${problem}).`,
+    "SOURCE_UNREACHABLE",
+  );
+
+/** Reads the body of a response, stopping as soon as it exceeds the limit. */
+async function responseBytes(
+  response: Response,
+  url: string,
+  limit: number,
+): Promise<Buffer> {
+  const declared = Number(response.headers.get("content-length"));
+  const tooLarge = (bytes: number | string) =>
+    sourceFailure(
+      "INVALID_DATA",
+      `${url} returned ${bytes} bytes; a dataset holds at most ${limit} bytes.`,
+      "TOO_LARGE",
+    );
+  if (Number.isFinite(declared) && declared > limit) {
+    await response.body?.cancel();
+    throw tooLarge(declared);
+  }
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  const reader = response.body!.getReader();
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    total += value.byteLength;
+    if (total > limit) {
+      await reader.cancel();
+      throw tooLarge(`more than ${limit}`);
+    }
+    chunks.push(value);
+  }
+  return Buffer.concat(chunks);
+}
+
+/**
+ * Fetches online data without cookies or credentials, following redirects
+ * only to http(s) addresses. With the validators of an earlier fetch, an
+ * unchanged response comes back as notModified.
+ */
+export async function fetchSource(
+  url: string,
+  format: SourceFormat,
+  limit: number,
+  validators: { etag?: string; lastModified?: string } = {},
+): Promise<RemoteFetch> {
+  const signal = AbortSignal.timeout(REMOTE_FETCH.timeoutMs);
+  const guarded = REMOTE_FETCH.publicAddressesOnly;
+  let target = url;
+  try {
+    for (let hop = 0; ; hop++) {
+      const host = new URL(target).hostname.replace(/^\[|\]$/g, "");
+      if (guarded && isIP(host) && !publicIp(host))
+        throw unreachable(url, `${host} is not a public internet address`);
+      const response = await fetch(target, {
+        redirect: "manual",
+        credentials: "omit",
+        signal,
+        ...(guarded ? { dispatcher: await publicOnly() } : {}),
+        headers: {
+          accept:
+            format === "json"
+              ? "application/json, */*;q=0.5"
+              : format === "xlsx"
+                ? "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, */*;q=0.5"
+                : "text/csv, text/tab-separated-values, text/plain, */*;q=0.5",
+          ...(validators.etag ? { "if-none-match": validators.etag } : {}),
+          ...(validators.lastModified
+            ? { "if-modified-since": validators.lastModified }
+            : {}),
+        },
+      });
+      const location = response.headers.get("location");
+      if (response.status >= 300 && response.status < 400 && location) {
+        await response.body?.cancel();
+        if (hop >= REMOTE_FETCH.maxRedirects)
+          throw unreachable(url, "too many redirects");
+        const next = URL.canParse(location, target)
+          ? new URL(location, target)
+          : undefined;
+        if (
+          !next ||
+          !["http:", "https:"].includes(next.protocol) ||
+          next.username ||
+          next.password
+        )
+          throw unreachable(
+            url,
+            "it redirects to an address that is not http(s)",
+          );
+        target = next.href;
+        continue;
+      }
+      const etag = response.headers.get("etag") ?? undefined;
+      const lastModified = response.headers.get("last-modified") ?? undefined;
+      const fresh = {
+        ...(etag ? { etag } : {}),
+        ...(lastModified ? { lastModified } : {}),
+      };
+      if (response.status === 304) {
+        await response.body?.cancel();
+        return { notModified: true, ...fresh };
+      }
+      if (!response.ok) {
+        await response.body?.cancel();
+        throw unreachable(url, `the server answered ${response.status}`);
+      }
+      const bytes = await responseBytes(response, url, limit);
+      const { value } = await parseSourceBytes(
+        bytes,
+        format,
+        basename(new URL(target).pathname) || target,
+      );
+      return { notModified: false, value, bytes: bytes.length, ...fresh };
+    }
+  } catch (error) {
+    // Network failures and the timeout reject fetch or the body read.
+    if (error instanceof CoreError) throw error;
+    const cause = (error as { cause?: { code?: string; message?: string } })
+      ?.cause;
+    throw unreachable(
+      url,
+      signal.aborted
+        ? `no answer within ${REMOTE_FETCH.timeoutMs / 1000} s`
+        : cause?.code === "ENOTPUBLIC"
+          ? cause.message!
+          : (cause?.code ??
+            (error instanceof Error ? error.message : String(error))),
+    );
+  }
 }
 
 // ---------------------------------------------------------------------------

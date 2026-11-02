@@ -107,6 +107,7 @@
     "playwright-core": "1.63.0",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
+    "read-excel-file": "9.3.12",
     "three": "0.186.1",
     "topojson-client": "3.1.0",
     "undici": "7.30.1",

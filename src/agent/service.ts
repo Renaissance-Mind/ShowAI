@@ -1258,6 +1258,12 @@ const AGENT_GUIDANCE: Record<string, { nextStep: string; userMessage: string }> 
       userMessage:
         "A file linked to this data cannot be read on this device. The stored copy is unchanged.",
     },
+    READ_ONLY: {
+      nextStep:
+        "This data is read-only in ShowAI (online data, an .xlsx file, or the last value read while its source is unavailable). Tell the user to change it at its source; copy it into the library with dataset_write(action:link, path:null) only if they want to edit it in ShowAI.",
+      userMessage:
+        "This data comes from a read-only source, so ShowAI did not change it.",
+    },
     CONFIRMATION_REQUIRED: {
       nextStep:
         "Ask the user to decide as described in details, then call again with their decision.",

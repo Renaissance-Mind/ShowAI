@@ -55,7 +55,8 @@
 | INVALID_PATH                        | 路径不可用                                       | 改用本机绝对路径或 ShowAI 返回的 ID                                                                                                                                                        |
 | LOCKED                              | 内容库正被其他操作占用                           | 等几秒后重试同一调用一次                                                                                                                                                                   |
 | SNAPSHOT_EXPIRED / MISSING_BASELINE | 之前的读取结果或比较基线已失效                   | 重新读取后继续；写共享数据时返回的 MISSING_BASELINE 带 `details.datasetBases`，说明要传哪个共享数据的读取 hash，见 [共享数据](shared-data.md#读写)                                         |
-| SOURCE_UNAVAILABLE                  | 共享数据链接的外部文件在本机不可读               | 请用户恢复该文件，或使用已存储的副本                                                                                                                                                       |
+| SOURCE_UNAVAILABLE                  | 共享数据的外部文件或在线数据现在读不到           | 请用户恢复该文件或检查网址；本机读到过的值以 stale 返回，只能查看不能写入，见 [共享数据](shared-data.md#外部文件中的数据)                                                                    |
+| READ_ONLY                           | 数据只读（在线数据、xlsx 文件），没有改动        | 请用户在数据源中修改；用户要在 ShowAI 中编辑时，用 `dataset_write` 的 link `path:null` 复制进内容库                                                                                          |
 | CONFIRMATION_REQUIRED               | 需要用户先做决定                                 | 按 `details` 询问用户，再带上决定重试                                                                                                                                                      |
 | ERROR 或其他                        | 未归类的失败                                     | 按下一节处理                                                                                                                                                                               |
 

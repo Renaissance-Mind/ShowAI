@@ -8,7 +8,17 @@ import {
 } from "../datasets/binding.mjs";
 import { visitNodes } from "../surface/document.mjs";
 import { formatPath } from "../datasets/operations.mjs";
-import { DatasetBaselines, DatasetStore, type DatasetRecord } from "./datasets";
+import type {
+  DatasetReadStatus,
+  DatasetWarning,
+  Editable,
+} from "../datasets/warnings.mjs";
+import {
+  DatasetBaselines,
+  DatasetStore,
+  unavailableWarning,
+  type DatasetRecord,
+} from "./datasets";
 import { CoreError } from "./model";
 import type { FileStore } from "./store";
 import type { ShowDocument } from "./model";
@@ -30,12 +40,23 @@ export interface BindingRead {
   sources?: Record<string, string>;
   issues: BindingIssue[];
   error?: string;
-  /** The dataset reads a file outside the library (see dataset-sources). */
+  /**
+   * ok: current data; stale: the source cannot be read and the props show
+   * the last value read on this device; empty: no data (see warnings/error).
+   */
+  status: DatasetReadStatus;
+  /** Whether edits of the block can be written to the dataset. */
+  editable: Editable;
+  warnings: DatasetWarning[];
+  /** The dataset reads a file or online data outside the library (see dataset-sources). */
   source?: {
+    kind?: "file" | "url";
     format: string;
     name?: string;
     path?: string;
+    url?: string;
     bytes?: number;
+    /** False when the source cannot be read now (status stale or empty). */
     available: boolean;
   };
   /** Bytes the resolved snapshot adds to the block's stored data. */
@@ -49,13 +70,18 @@ export interface ExternalSnapshot {
   name?: string;
   format: string;
   path?: string;
-  /** Size of the linked file when it was read. */
+  url?: string;
+  /** Size of the linked file (or online data) when it was read. */
   fileBytes?: number;
   /** JSON bytes the export adds for this dataset, over all its blocks. */
   snapshotBytes: number;
   blocks: { pageId: string; blockId: string }[];
-  /** False when the file cannot be read: its blocks are exported without data. */
+  /**
+   * False when the source cannot be read: with status stale the blocks are
+   * exported with the last value read on this device, otherwise without data.
+   */
   available: boolean;
+  status: DatasetReadStatus;
   error?: string;
 }
 export interface ExternalSnapshotReport {
@@ -82,13 +108,19 @@ export function externalSnapshotReport(
         ...(binding.name ? { name: binding.name } : {}),
         format: binding.source.format,
         ...(binding.source.path ? { path: binding.source.path } : {}),
+        ...(binding.source.url ? { url: binding.source.url } : {}),
         ...(binding.source.bytes !== undefined
           ? { fileBytes: binding.source.bytes }
           : {}),
         snapshotBytes: 0,
         blocks: [],
         available: binding.source.available,
-        ...(binding.error ? { error: binding.error } : {}),
+        status: binding.status,
+        ...(binding.error
+          ? { error: binding.error }
+          : binding.status === "stale" && binding.warnings[0]
+            ? { error: binding.warnings[0].message }
+            : {}),
       };
       entry.snapshotBytes += binding.snapshotBytes ?? 0;
       entry.blocks.push({ pageId: page.pageId, blockId: binding.blockId });
@@ -148,6 +180,9 @@ export async function resolveDocumentDatasets(
       projectId: project,
       datasetId: binding.dataset,
       issues: [],
+      status: "empty",
+      editable: false,
+      warnings: [],
     };
     bindings.push(read);
     let record: DatasetRecord;
@@ -157,10 +192,20 @@ export async function resolveDocumentDatasets(
       if (error instanceof CoreError && error.code === "SOURCE_UNAVAILABLE") {
         const details = error.details as {
           name?: string;
-          source?: { format: string; name?: string; path?: string };
+          source?: {
+            kind?: "file" | "url";
+            format: string;
+            name?: string;
+            path?: string;
+            url?: string;
+          };
         };
         if (details.name) read.name = details.name;
-        read.source = { ...details.source!, available: false };
+        const { refreshSeconds: _refresh, ...source } = details.source as {
+          refreshSeconds?: number;
+        } & NonNullable<typeof details.source>;
+        read.source = { ...source, available: false };
+        read.warnings = [unavailableWarning(error)];
       }
       read.error =
         error instanceof CoreError && error.code === "NOT_FOUND"
@@ -170,20 +215,26 @@ export async function resolveDocumentDatasets(
             : String(error);
       continue;
     }
-    if (record.external)
+    const origin = record.external ?? record.remote;
+    if (origin)
       read.source = {
-        format: record.external.format,
+        kind: record.external ? "file" : "url",
+        format: origin.format,
         ...(record.dataset.source?.name
           ? { name: record.dataset.source.name }
           : {}),
-        path: record.external.path,
-        bytes: record.external.bytes,
-        available: true,
+        ...(record.external ? { path: record.external.path } : {}),
+        ...(record.remote ? { url: record.remote.url } : {}),
+        bytes: origin.bytes,
+        available: record.status === "ok",
       };
     Object.assign(read, {
       name: record.dataset.name,
       hash: record.hash,
       ...(record.revision ? { revision: record.revision } : {}),
+      status: record.status,
+      editable: record.editable,
+      warnings: record.warnings,
     });
     try {
       const resolved = resolveBinding(
@@ -211,7 +262,7 @@ export async function resolveDocumentDatasets(
       );
       replacements.set(blockId, snapshot);
       // What the dataset adds beyond the block's own values (its binding settings aside).
-      if (record.external)
+      if (origin)
         read.snapshotBytes = Math.max(
           0,
           jsonBytes(snapshot) -
