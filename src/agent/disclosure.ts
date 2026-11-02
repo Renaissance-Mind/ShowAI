@@ -130,6 +130,21 @@ export function catalogSearchText(value: object): string {
   return text.join("\n").toLocaleLowerCase();
 }
 
+/**
+ * Scores searchable catalog text against a query of one or more terms split
+ * on whitespace or list punctuation: 0 matches nothing, any matching term
+ * counts, and the whole query as one phrase ranks above separate terms.
+ */
+export function catalogQueryScore(text: string, query: string): number {
+  const phrase = query.trim().toLocaleLowerCase();
+  if (!phrase) return 1;
+  const terms = [
+    ...new Set(phrase.split(/[\s,，、;；|/]+/u).filter(Boolean)),
+  ];
+  const matched = terms.filter((term) => text.includes(term)).length;
+  return matched && text.includes(phrase) ? terms.length + 1 : matched;
+}
+
 export function summarizeCatalog(
   kind: CatalogKind,
   value: object,

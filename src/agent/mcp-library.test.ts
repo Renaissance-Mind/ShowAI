@@ -257,6 +257,14 @@ test("catalog discovery returns all compact entries, with optional pagination be
     expect(filtered.items.length).toBeLessThan(all.items.length);
     expect(filtered.total).toBe(filtered.items.length);
     expect(filtered.nextCursor).toBeNull();
+    // Several terms match any of them, best-matching entries first.
+    const terms = await call(client, name, {
+      ...args,
+      query: "流程 架构 不存在的词",
+    });
+    expect(terms.items.map((item: any) => item.id)).toContain("flowchart");
+    const phrase = await call(client, name, { ...args, query: "交互流程图" });
+    expect(phrase.items[0].id).toBe("flowchart");
   }
   const details = await call(client, "catalog_describe", {
     projectId: project.id,

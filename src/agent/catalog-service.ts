@@ -21,6 +21,7 @@ import {
 } from "../portable/component-parameters.mjs";
 import {
   describeCommand,
+  catalogQueryScore,
   catalogSearchText,
   compareCatalogVersions,
   catalogEntry,
@@ -93,8 +94,8 @@ export class CatalogService {
     const scope = input.scope ?? "all";
     const componentScope = input.scope ?? (projectId ? "project" : "builtin");
     const query = input.query?.trim().toLocaleLowerCase();
-    const matches = (item: object) =>
-      !query || catalogSearchText(item).includes(query);
+    const score = (item: object) =>
+      query ? catalogQueryScore(catalogSearchText(item), query) : 1;
     const identity = (item: {
       kind: CatalogKind;
       scope: CatalogScope;
@@ -103,11 +104,12 @@ export class CatalogService {
       integrity?: string;
     }) =>
       `${item.kind}:${item.scope}:${item.id}:${item.version ?? ""}:${item.integrity ?? ""}`;
-    const matching = new Set<string>();
+    const matching = new Map<string, number>();
     const documentationRevisions = new Map<string, string>();
     const summarize = (kind: CatalogKind, item: object) => {
       const summary = summarizeCatalog(kind, item, projectId);
-      if (matches(item)) matching.add(identity(summary));
+      const matched = score(item);
+      if (matched) matching.set(identity(summary), matched);
       documentationRevisions.set(
         identity(summary),
         createHash("sha256")
@@ -167,8 +169,12 @@ export class CatalogService {
                     previous.scope === item.scope,
                 ),
           );
+    // Items matching more query terms come first; ties keep catalog order.
     const entries = recommended
       .filter((item) => matching.has(identity(item)))
+      .sort(
+        (a, b) => matching.get(identity(b))! - matching.get(identity(a))!,
+      )
       .map(catalogEntry);
     const revision = createHash("sha256")
       .update(
