@@ -264,6 +264,16 @@ function ActivePageOutline({
     const scroller = scroll.current;
     if (!scroller) return;
     let frame = 0;
+    // Scrolling only moves the headings; look each one up again after it is replaced.
+    const found = new Map<string, HTMLElement | undefined>();
+    const locate = (nodeId: string) => {
+      let target = found.get(nodeId);
+      if (!target?.isConnected) {
+        target = element(nodeId);
+        found.set(nodeId, target);
+      }
+      return target;
+    };
     const measure = () => {
       cancelAnimationFrame(frame);
       frame = requestAnimationFrame(() => {
@@ -271,7 +281,7 @@ function ActivePageOutline({
         let selected: string | null = null;
         for (const item of flat) {
           const id = generated.targets.get(item.id);
-          const target = id ? element(id) : undefined;
+          const target = id ? locate(id) : undefined;
           if (
             target &&
             target.getClientRects().length &&

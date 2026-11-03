@@ -38,11 +38,17 @@ export function WorkspaceSwipeNavigation({
   const [preview, setPreview] = useState<SwipePreview | null>(null);
   const [leaving, setLeaving] = useState(false);
   const dismiss = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  // Ordinary scrolling must not schedule renders: only a visible preview does.
+  const shown = useRef(false);
+  const show = (next: SwipePreview | null) => {
+    shown.current = next !== null;
+    setPreview(next);
+  };
 
   useEffect(() => {
     if (!machine.current.committed) {
       machine.current.cancel();
-      setPreview(null);
+      show(null);
     }
   }, [locationKey, busy]);
 
@@ -55,50 +61,51 @@ export function WorkspaceSwipeNavigation({
     const hide = () => {
       setLeaving(true);
       clearTimeout(dismiss.current);
-      dismiss.current = setTimeout(() => setPreview(null), 180);
+      dismiss.current = setTimeout(() => show(null), 180);
     };
     const cancel = () => {
       machine.current.cancel();
-      setPreview(null);
+      if (shown.current) show(null);
     };
     const observe = (event: WheelEvent) => {
       const now = performance.now();
+      if (machine.current.settled(now)) return;
       // A child may stop propagation instead of preventDefault. Remember that
       // recipient too, before a later momentum event reaches another element.
       const observation = setTimeout(() => {
         observations.delete(observation);
         if (handled.has(event)) return;
         machine.current.push(event, now, { ...latest.current, blocked: true });
-        setPreview(null);
+        if (shown.current) show(null);
       }, 0);
       observations.add(observation);
     };
     // Bubble on window: native and React component handlers have first refusal.
+    // The listener is passive so the compositor never waits for it to scroll.
     const wheel = (event: WheelEvent) => {
       handled.add(event);
       const current = latest.current;
       const result = machine.current.push(event, performance.now(), {
         ...current,
-        blocked:
-          current.busy ||
-          event.defaultPrevented ||
-          ownsHorizontalSwipe(event, root),
+        blocked: current.busy || event.defaultPrevented,
+        contentOwns: () => ownsHorizontalSwipe(event, root),
       });
-      clearTimeout(idle);
-      idle = setTimeout(hide, SWIPE_IDLE);
-      if (result.owned && event.cancelable) event.preventDefault();
       if (result.preview) {
         clearTimeout(dismiss.current);
         setLeaving(false);
-        setPreview(result.preview);
-      } else if (!result.owned) setPreview(null);
+        show(result.preview);
+      } else if (!result.owned && shown.current) show(null);
+      if (shown.current) {
+        clearTimeout(idle);
+        idle = setTimeout(hide, SWIPE_IDLE);
+      }
       if (result.navigate) current.onStep(result.navigate);
     };
     const key = (event: KeyboardEvent) => {
       if (event.key === "Escape") cancel();
     };
     window.addEventListener("wheel", observe, { capture: true, passive: true });
-    window.addEventListener("wheel", wheel, { passive: false });
+    window.addEventListener("wheel", wheel, { passive: true });
     window.addEventListener("keydown", key);
     window.addEventListener("blur", cancel);
     window.addEventListener("pointerdown", cancel);

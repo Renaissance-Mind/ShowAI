@@ -35,6 +35,15 @@ export class WorkspaceSwipe {
     if (!this.committed) this.owner = "content";
   }
 
+  /** The current burst already belongs to the content under the pointer. */
+  settled(now: number) {
+    return this.owner === "content" && now - this.lastWheel <= GESTURE_IDLE;
+  }
+
+  /**
+   * `contentOwns` inspects the DOM, so it runs only once a burst shows
+   * horizontal intent; vertical reading never pays for it.
+   */
   push(
     input: SwipeInput,
     now: number,
@@ -42,10 +51,12 @@ export class WorkspaceSwipe {
       blocked,
       canBack,
       canForward,
+      contentOwns,
     }: {
       blocked: boolean;
       canBack: boolean;
       canForward: boolean;
+      contentOwns?: () => boolean;
     },
   ): { owned: boolean; preview?: SwipePreview; navigate?: -1 | 1 } {
     if (now - this.lastWheel > GESTURE_IDLE) {
@@ -72,7 +83,7 @@ export class WorkspaceSwipe {
       this.y += input.deltaY;
       if (Math.max(Math.abs(this.x), Math.abs(this.y)) < INTENT_DISTANCE)
         return { owned: false };
-      if (Math.abs(this.x) < Math.abs(this.y) * 1.5) {
+      if (Math.abs(this.x) < Math.abs(this.y) * 1.5 || contentOwns?.()) {
         this.owner = "content";
         return { owned: false };
       }

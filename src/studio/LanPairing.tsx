@@ -306,10 +306,14 @@ export function MacPairingPrompt() {
       void desktop
         .invoke<{ pendingClients: Device[] }>("agent:remoteDevice")
         .then((value) => {
-          if (!stopped)
-            setRequests(
-              value.pendingClients.filter((p) => p.id.startsWith("lan:")),
-            );
+          if (stopped) return;
+          const next = value.pendingClients.filter((p) =>
+            p.id.startsWith("lan:"),
+          );
+          // Polled continuously: an unchanged list keeps its identity and skips a commit.
+          setRequests((current) =>
+            JSON.stringify(current) === JSON.stringify(next) ? current : next,
+          );
         })
         .catch((reason) => {
           if (stopped) return;

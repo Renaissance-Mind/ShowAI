@@ -57,12 +57,23 @@ export function useSyncOverview(home?: string) {
   const [lastError, setLastError] = useState("");
   useEffect(() => {
     let active = true;
+    let previous = "";
     setState(null);
     const read = () =>
       desktop.invoke<SyncOverviewState>("sync:status").then(
         (next) => {
           if (!active) return;
-          setState(next);
+          // Every poll returns a new object; only a changed status may
+          // re-render the workbench, which would otherwise stall scrolling.
+          const value = {
+            projects: next.projects,
+            connections: next.connections,
+          };
+          const serialized = JSON.stringify(value);
+          if (serialized !== previous) {
+            previous = serialized;
+            setState(value);
+          }
           setFailures(0);
           setLastError("");
         },

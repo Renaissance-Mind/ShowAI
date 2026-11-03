@@ -162,7 +162,10 @@ export function useTableHover(
       if (event.target instanceof HTMLElement && event.target.contains(root))
         dismiss();
     };
-    const update = () => refresh((value) => value + 1);
+    const update = () => {
+      // Every editor listens; only the one showing controls re-measures them.
+      if (latest.current.target) refresh((value) => value + 1);
+    };
     document.addEventListener("pointermove", move);
     document.addEventListener("pointerdown", down);
     document.addEventListener("focusin", focus);
@@ -170,7 +173,7 @@ export function useTableHover(
     root.addEventListener("contextmenu", context);
     window.addEventListener("blur", dismiss);
     window.addEventListener("showai:viewport-change", viewport);
-    window.addEventListener("scroll", update, true);
+    window.addEventListener("scroll", update, { capture: true, passive: true });
     window.addEventListener("resize", update);
     return () => {
       keep();

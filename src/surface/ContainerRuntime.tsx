@@ -1317,7 +1317,7 @@ function ContainerView({
             data-input-surface={id}
             aria-label={t("node.pageLabel", { name: nodeName(node) })}
             onScroll={(event) => {
-              if (!runtime.printing && !matchMedia("print").matches)
+              if (!runtime.printing && !printMedia().matches)
                 runtime.scrolls.set(persistKey, event.currentTarget.scrollTop);
             }}
             onPointerDownCapture={(event) => {
@@ -1740,6 +1740,11 @@ function readOutlineView(value: unknown): OutlineViewState {
     ...(isFlag(value.pinned) ? { pinned: value.pinned } : {}),
     ...(isStringList(value.branches) ? { branches: value.branches } : {}),
   };
+}
+let printQuery: MediaQueryList | undefined;
+/** Scroll events read this on every frame; one query object serves them all. */
+function printMedia() {
+  return (printQuery ??= matchMedia("print"));
 }
 function readScroll(key: string) {
   try {

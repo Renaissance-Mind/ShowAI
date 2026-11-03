@@ -120,4 +120,37 @@ describe("workspace swipe navigation", () => {
       swipe.push(input(-180), 20 + SWIPE_IDLE + 1, available).navigate,
     ).toBe(-1);
   });
+
+  it("inspects the content only once a burst turns horizontal", () => {
+    let inspections = 0;
+    const contentOwns = () => {
+      inspections++;
+      return false;
+    };
+    const vertical = new WorkspaceSwipe();
+    for (let now = 0; now < 200; now += 20)
+      vertical.push(input(1, 30), now, { ...available, contentOwns });
+    expect(inspections).toBe(0);
+    expect(vertical.settled(200)).toBe(true);
+    expect(vertical.settled(200 + SWIPE_IDLE + 1)).toBe(false);
+
+    const horizontal = new WorkspaceSwipe();
+    expect(horizontal.push(input(-3), 0, { ...available, contentOwns }).owned)
+      .toBe(false);
+    expect(inspections).toBe(0);
+    expect(horizontal.push(input(-40), 20, { ...available, contentOwns }).owned)
+      .toBe(true);
+    horizontal.push(input(-40), 40, { ...available, contentOwns });
+    expect(inspections).toBe(1);
+    expect(horizontal.settled(40)).toBe(false);
+  });
+
+  it("leaves a horizontal burst to content that owns it", () => {
+    const swipe = new WorkspaceSwipe();
+    expect(
+      swipe.push(input(-60), 0, { ...available, contentOwns: () => true }),
+    ).toEqual({ owned: false });
+    expect(swipe.settled(10)).toBe(true);
+    expect(swipe.push(input(-200), 20, available)).toEqual({ owned: false });
+  });
 });

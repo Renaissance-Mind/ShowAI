@@ -99,12 +99,66 @@ export function hasG2ViewportInteraction(spec) {
     return enabled(interaction[type]);
   });
 }
+/**
+ * G repaints every chart on every animation frame. A rendered chart far from
+ * the viewport parks those frames and resumes them before it scrolls back in.
+ */
+function viewportFrames(container) {
+  let visible = true;
+  let next = 0;
+  const parked = new Map();
+  const live = new Map();
+  const schedule = (id, callback) =>
+    live.set(
+      id,
+      requestAnimationFrame((time) => {
+        live.delete(id);
+        callback(time);
+      }),
+    );
+  const observer = new IntersectionObserver(
+    (entries) => {
+      visible = entries[entries.length - 1].isIntersecting;
+      if (!visible) return;
+      for (const [id, callback] of parked) schedule(id, callback);
+      parked.clear();
+    },
+    { rootMargin: "50% 0px" },
+  );
+  observer.observe(container);
+  const request = (callback) => {
+    const id = ++next;
+    if (visible) schedule(id, callback);
+    else parked.set(id, callback);
+    return id;
+  };
+  const cancel = (id) => {
+    parked.delete(id);
+    if (live.has(id)) cancelAnimationFrame(live.get(id));
+    live.delete(id);
+  };
+  return {
+    attach(canvas) {
+      canvas.requestAnimationFrame = request;
+      canvas.cancelAnimationFrame = cancel;
+    },
+    dispose() {
+      observer.disconnect();
+      parked.clear();
+    },
+  };
+}
+
 export function createG2Context(container, chartType, data, locked = false) {
   const ChartBase = extend(Runtime, { ...stdlib(), ...plotlib() });
   const charts = [],
     renders = new Set();
   let renderError;
   let disposed = false;
+  const frames =
+    typeof IntersectionObserver === "function"
+      ? viewportFrames(container)
+      : null;
   let hasViewportInteraction = false;
   const selected = g2Themes[data.theme ?? "indigo"];
   const palette = data.appearance?.palette ?? selected.palette;
@@ -295,7 +349,11 @@ export function createG2Context(container, chartType, data, locked = false) {
       const task = super.render();
       renders.add(task);
       task.then(
-        () => renders.delete(task),
+        () => {
+          renders.delete(task);
+          // The first render and its animation always run to completion.
+          if (!disposed) frames?.attach(this.getContext().canvas);
+        },
         (error) => {
           renders.delete(task);
           renderError ??= error;
@@ -341,6 +399,7 @@ export function createG2Context(container, chartType, data, locked = false) {
     destroy() {
       disposed = true;
       charts.forEach((c) => c.destroy());
+      frames?.dispose();
     },
   };
 }
