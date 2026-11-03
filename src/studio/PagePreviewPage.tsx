@@ -66,11 +66,21 @@ export default function PagePreviewPage() {
       let previous = "";
       while (current && stable < 3) {
         const element = stage.current!;
+        // The capture covers only the viewport, and Chromium does not render
+        // cross-origin frames outside it, so those frames never report a height.
         const frames = [
           ...element.querySelectorAll<HTMLIFrameElement>(
             ".showai-custom-block iframe",
           ),
-        ];
+        ].filter((frame) => {
+          const box = frame.getBoundingClientRect();
+          return (
+            box.bottom > 0 &&
+            box.right > 0 &&
+            box.top < window.innerHeight &&
+            box.left < window.innerWidth
+          );
+        });
         const pending =
           element.querySelector(
             '[data-preview-pending="true"],[aria-busy="true"]',

@@ -679,7 +679,10 @@ export function pagePreviewStatus() {
   };
 }
 let warmTheme = "light";
-const warmFailures = new Map<string, number>();
+// Each failure doubles the wait before the same page revision is tried again.
+const warmFailures = new Map<string, { at: number; attempts: number }>();
+const warmRetryDelay = (attempts: number) =>
+  Math.min(60000 * 2 ** (attempts - 1), 6 * 60 * 60 * 1000);
 app.on("will-quit", () => {
   warmShutdown = true;
   warmGeneration++;
@@ -721,7 +724,9 @@ async function warmPages() {
       )?.webContents;
       if (!owner) break;
       const failureKey = `${home}:${candidate.pageId}:${candidate.hash}:${theme}`;
-      if (Date.now() - (warmFailures.get(failureKey) ?? 0) < 60000) continue;
+      const failure = warmFailures.get(failureKey);
+      if (failure && Date.now() - failure.at < warmRetryDelay(failure.attempts))
+        continue;
       try {
         await pageThumbnail(
           owner,
@@ -735,7 +740,11 @@ async function warmPages() {
           generation === warmGeneration &&
           workbenchOwners.size
         ) {
-          warmFailures.set(failureKey, Date.now());
+          warmFailures.delete(failureKey);
+          warmFailures.set(failureKey, {
+            at: Date.now(),
+            attempts: (failure?.attempts ?? 0) + 1,
+          });
           if (warmFailures.size > 512)
             warmFailures.delete(warmFailures.keys().next().value!);
           console.warn(
