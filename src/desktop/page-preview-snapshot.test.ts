@@ -16,6 +16,28 @@ const context = {
   actor: { kind: "human" as const },
   channel: "desktop" as const,
 };
+const pageUsing = (componentId: string) =>
+  Buffer.from(
+    JSON.stringify({
+      format: "showai",
+      document: {
+        content: {
+          type: "doc",
+          attrs: { id: "root" },
+          content: [
+            {
+              type: "widget",
+              attrs: {
+                id: "block",
+                kind: "custom",
+                data: { componentId, version: "1.0.0", props: {} },
+              },
+            },
+          ],
+        },
+      },
+    }),
+  );
 
 it("releases the writer lease before compilation and keeps captured source bytes pinned", async () => {
   const root = await mkdtemp(join(tmpdir(), "showai-preview-snapshot-"));
@@ -24,7 +46,10 @@ it("releases the writer lease before compilation and keeps captured source bytes
   await library.initialize();
   const path = "projects/project-a/packages/components/chart/1.0.0/source.ts";
   await library.writeFiles(
-    new Map([[path, Buffer.from("export const value = 1;")]]),
+    new Map([
+      ["projects/project-a/pages/page-a.json", pageUsing("chart")],
+      [path, Buffer.from("export const value = 1;")],
+    ]),
     context,
   );
   const snapshot = await pagePreviewSnapshot(root, "project-a", "page-a");
@@ -43,25 +68,31 @@ it("releases the writer lease before compilation and keeps captured source bytes
   expect(frozen?.toString()).toContain("value = 1");
 });
 
-it("limits frozen package inputs to the target project and shared catalog", async () => {
+it("freezes only the component revisions the page references", async () => {
   const root = await mkdtemp(join(tmpdir(), "showai-preview-scope-"));
   roots.push(root);
   const library = new SqliteLibrary(root);
   await library.initialize();
-  const shared = "packages/components/shared/1.0.0/index.ts",
-    other = "projects/project-b/packages/components/private/1.0.0/index.ts";
+  const used = "packages/components/shared/1.0.0/index.ts",
+    older = "packages/components/shared/0.9.0/index.ts",
+    unused = "projects/project-a/packages/components/unused/1.0.0/index.ts",
+    other = "projects/project-b/packages/components/shared/1.0.0/index.ts";
   await library.writeFiles(
     new Map([
-      [shared, Buffer.from("shared source")],
+      ["projects/project-a/pages/page-a.json", pageUsing("shared")],
+      [used, Buffer.from("used source")],
+      [older, Buffer.from("older source")],
+      [unused, Buffer.from("unused source")],
       [other, Buffer.from("other source")],
     ]),
     context,
   );
   const snapshot = await pagePreviewSnapshot(root, "project-a", "page-a");
-  expect((await snapshot!.library.readFile(shared)).toString()).toBe(
-    "shared source",
+  expect((await snapshot!.library.readFile(used)).toString()).toBe(
+    "used source",
   );
-  await expect(snapshot!.library.readFile(other)).rejects.toMatchObject({
-    code: "NOT_FOUND",
-  });
+  for (const path of [older, unused, other])
+    await expect(snapshot!.library.readFile(path)).rejects.toMatchObject({
+      code: "NOT_FOUND",
+    });
 });
