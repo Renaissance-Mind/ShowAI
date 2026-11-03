@@ -152,6 +152,14 @@ export interface ComponentMetadata extends ComponentManifest {
   mergeBase?: PackageRevisionRef;
 }
 
+/** Catalog listing entry; read the component for its default and example data. */
+export interface ComponentListing extends Omit<
+  ComponentMetadata,
+  "defaultData" | "examples"
+> {
+  examples: Omit<ComponentExample, "data">[];
+}
+
 /** Browser-safe portable payload; a page stores only the component reference and props. */
 export interface CompiledComponent extends ComponentMetadata {
   html: string;

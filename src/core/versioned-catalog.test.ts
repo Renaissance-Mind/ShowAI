@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { ContentLibrary as GitLibrary } from "./content-library";
@@ -43,6 +43,51 @@ describe("versioned component and template lifecycle", () => {
   });
   afterEach(async () => {
     await rm(root, { recursive: true, force: true });
+  });
+
+  it("lists components without sample data and projects only the listing", async () => {
+    const manifest = {
+      id: "counter",
+      name: "Counter",
+      version: "1.0.0",
+      entry: "index.tsx",
+      description: "Editable number",
+      scenarios: ["Adjust a value"],
+      defaultData: { value: 1 },
+      examples: [{ name: "One", data: { value: 1 } }],
+    };
+    const schema = {
+      type: "object",
+      properties: { value: { type: "number" } },
+      required: ["value"],
+      additionalProperties: false,
+    };
+    const source =
+      "export default function Counter({data}) { return <p>{data.value}</p>; }\n";
+    for (const version of ["1.0.0", "1.0.1"])
+      await withChangeContext(actor, () =>
+        saveComponent(
+          root,
+          { manifest: { ...manifest, version }, schema, source },
+          projectId,
+        ),
+      );
+    const listed = await listComponents(root, projectId, { scope: "project" });
+    expect(listed.map((item) => item.version)).toEqual(["1.0.1", "1.0.0"]);
+    for (const item of listed) {
+      expect(item).not.toHaveProperty("defaultData");
+      expect(item.examples).toEqual([{ name: "One" }]);
+      expect(item.signature).toEqual(expect.any(String));
+    }
+    const projection = JSON.parse(
+      await readFile(join(root, "local/catalog-metadata.json"), "utf8"),
+    );
+    expect(projection.version).toBe(2);
+    expect(Object.keys(projection.entries)).toHaveLength(2);
+    expect(JSON.stringify(projection)).not.toContain("defaultData");
+    expect(
+      (await getComponent(root, "counter", "1.0.0", projectId)).defaultData,
+    ).toEqual({ value: 1 });
   });
 
   it("compiles and uses staged components before one atomic current-state update", async () => {

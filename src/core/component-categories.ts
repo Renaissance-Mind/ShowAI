@@ -1,7 +1,7 @@
 import type {
   BuiltinComponentMetadata,
   ComponentCategory,
-  ComponentMetadata,
+  ComponentListing,
 } from "../components/custom/types";
 
 export const componentCategories = [
@@ -57,7 +57,7 @@ export const builtinCategories: Record<string, ComponentCategory> = {
   board: "surface",
 };
 
-export type CatalogCustomComponent = ComponentMetadata & {
+export type CatalogCustomComponent = ComponentListing & {
   projectId?: string;
   projectName?: string;
 };

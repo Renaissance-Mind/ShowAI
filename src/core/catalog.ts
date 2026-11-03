@@ -115,6 +115,7 @@ import type {
   BuiltinComponentMetadata,
   CatalogScope,
   CompiledComponent,
+  ComponentListing,
   ComponentManifest,
   ComponentMetadata,
   ComponentSource,
@@ -134,6 +135,7 @@ import { componentCategories, componentCategory } from "./component-categories";
 
 export type {
   CompiledComponent,
+  ComponentListing,
   ComponentManifest,
   ComponentMetadata,
   ComponentSource,
@@ -2123,17 +2125,26 @@ export default function Nested({data=defaults,onChange,readOnly=true}){check(dat
 }
 
 interface CatalogProjection {
-  entries: Record<string, ComponentMetadata>;
+  entries: Map<string, ComponentListing>;
   writes: Promise<void>;
+  queued: boolean;
 }
 const catalogProjections = new Map<string, Promise<CatalogProjection>>();
-const compiledReads = new Map<string, StoredComponent>();
+// Listings are small, so the projection can cover every installed revision;
+// a bound below the library's revision count would evict and rewrite on each listing.
+const catalogProjectionLimit = 8192;
+const compiledReads = new Map<
+  string,
+  { component: StoredComponent; size: number }
+>();
 let compiledBytes = 0;
 const compiledBudget = 24 * 1024 * 1024;
 const compiledSize = (value: StoredComponent) =>
   Buffer.byteLength(value.html) +
   Buffer.byteLength(value.inline?.script ?? "") +
-  Buffer.byteLength(value.inline?.styles ?? "");
+  Buffer.byteLength(value.inline?.styles ?? "") +
+  Buffer.byteLength(JSON.stringify(value.defaultData)) +
+  Buffer.byteLength(JSON.stringify(value.examples));
 async function componentIdentity(home: string, path: string) {
   return pinnedFileIdentity(home, path);
 }
@@ -2145,27 +2156,82 @@ async function readCompiled(
   const identity = await componentIdentity(home, path);
   const key = identity ? `${resolve(home)}:${identity}:${scope}` : undefined;
   if (key && compiledReads.has(key))
-    return structuredClone(compiledReads.get(key)!);
+    return structuredClone(compiledReads.get(key)!.component);
   const value = compiledRecord(await readJson(home, path), scope);
-  if (key && compiledSize(value) <= compiledBudget) {
-    const retained = structuredClone(value);
-    if (compiledReads.has(key))
-      compiledBytes -= compiledSize(compiledReads.get(key)!);
-    compiledReads.set(key, retained);
-    compiledBytes += compiledSize(retained);
+  const size = compiledSize(value);
+  if (key && size <= compiledBudget) {
+    if (compiledReads.has(key)) compiledBytes -= compiledReads.get(key)!.size;
+    compiledReads.set(key, { component: structuredClone(value), size });
+    compiledBytes += size;
     while (compiledBytes > compiledBudget) {
       const oldest = compiledReads.keys().next().value!;
-      compiledBytes -= compiledSize(compiledReads.get(oldest)!);
+      compiledBytes -= compiledReads.get(oldest)!.size;
       compiledReads.delete(oldest);
     }
   }
   return value;
 }
+/** Listings keep example names for search; sample data stays in the compiled package. */
+function componentListing(
+  component: Omit<StoredComponent, "html" | "inline" | "sourceIntegrity">,
+): ComponentListing {
+  const { schema, defaultData: _data, examples, ...rest } = component;
+  return {
+    ...rest,
+    examples: examples.map(({ data: _example, ...example }) => example),
+    signature: componentSignature(rest.id, schema),
+  };
+}
+function catalogProjectionPath(home: string) {
+  return join(resolve(home), "local/catalog-metadata.json");
+}
+async function loadCatalogProjection(root: string): Promise<CatalogProjection> {
+  const bytes = await readLibraryBytes(root, catalogProjectionPath(root));
+  const projection: CatalogProjection = {
+    entries: new Map(),
+    writes: Promise.resolve(),
+    queued: false,
+  };
+  if (!bytes) return projection;
+  let cache;
+  try {
+    cache = JSON.parse(bytes.toString("utf8"));
+  } catch (error) {
+    if (!(error instanceof SyntaxError)) throw error;
+  }
+  // Version 1 stored sample data and is rebuilt from the packages.
+  if (
+    cache?.version === 2 &&
+    cache.entries &&
+    cache.integrity ===
+      createHash("sha256").update(JSON.stringify(cache.entries)).digest("hex")
+  )
+    projection.entries = new Map(Object.entries(cache.entries));
+  return projection;
+}
+/** Projections written while a write is queued join that write. */
+function persistCatalogProjection(home: string, state: CatalogProjection) {
+  if (state.queued) return state.writes;
+  state.queued = true;
+  state.writes = state.writes.then(async () => {
+    state.queued = false;
+    const entries = JSON.stringify(Object.fromEntries(state.entries));
+    const integrity = createHash("sha256").update(entries).digest("hex");
+    await atomicLibraryFile(
+      home,
+      catalogProjectionPath(home),
+      Buffer.from(
+        `{"version":2,"entries":${entries},"integrity":"${integrity}"}`,
+      ),
+    );
+  });
+  return state.writes;
+}
 async function componentMetadata(
   home: string,
   path: string,
   scope: CatalogScope,
-): Promise<ComponentMetadata> {
+): Promise<ComponentListing> {
   const identity = await componentIdentity(home, path);
   const cacheKey = identity
     ? `${logicalPath(home, path)}:${identity}:${scope}`
@@ -2175,31 +2241,7 @@ async function componentMetadata(
     const root = resolve(home);
     let task = catalogProjections.get(root);
     if (!task) {
-      task = (async () => {
-        const bytes = await readLibraryBytes(
-          root,
-          join(root, "local/catalog-metadata.json"),
-        );
-        let entries: Record<string, ComponentMetadata> = {};
-        if (bytes) {
-          let cache;
-          try {
-            cache = JSON.parse(bytes.toString("utf8"));
-          } catch (error) {
-            if (!(error instanceof SyntaxError)) throw error;
-          }
-          if (
-            cache?.version === 1 &&
-            cache.entries &&
-            cache.integrity ===
-              createHash("sha256")
-                .update(JSON.stringify(cache.entries))
-                .digest("hex")
-          )
-            entries = cache.entries;
-        }
-        return { entries, writes: Promise.resolve() };
-      })();
+      task = loadCatalogProjection(root);
       catalogProjections.set(root, task);
       if (catalogProjections.size > 8)
         catalogProjections.delete(catalogProjections.keys().next().value!);
@@ -2209,44 +2251,24 @@ async function componentMetadata(
       });
     }
     projection = await task;
-    // Entries projected before signatures existed are rebuilt from the package.
-    if (typeof projection.entries[cacheKey]?.signature === "string")
-      return structuredClone(projection.entries[cacheKey]);
+    const cached = projection.entries.get(cacheKey);
+    if (cached) return structuredClone(cached);
   }
   const {
     html: _html,
     inline: _inline,
-    schema,
     sourceIntegrity: _source,
-    ...rest
+    ...component
   } = await readCompiled(home, path, scope);
-  const metadata: ComponentMetadata = {
-    ...rest,
-    signature: componentSignature(rest.id, schema),
-  };
+  const metadata = componentListing(component);
   if (projection && cacheKey) {
-    projection.entries[cacheKey] = structuredClone(metadata);
+    projection.entries.set(cacheKey, structuredClone(metadata));
     // Bound retained historic metadata too; it is always derivable from immutable packages.
-    while (Object.keys(projection.entries).length > 512)
-      delete projection.entries[Object.keys(projection.entries)[0]];
-    const state = projection;
-    state.writes = state.writes.then(async () => {
-      const entries = state.entries;
-      await atomicLibraryFile(
-        home,
-        join(home, "local/catalog-metadata.json"),
-        Buffer.from(
-          JSON.stringify({
-            version: 1,
-            entries,
-            integrity: createHash("sha256")
-              .update(JSON.stringify(entries))
-              .digest("hex"),
-          }),
-        ),
-      );
-    });
-    await state.writes;
+    for (const key of projection.entries.keys()) {
+      if (projection.entries.size <= catalogProjectionLimit) break;
+      projection.entries.delete(key);
+    }
+    await persistCatalogProjection(home, projection);
   }
   return metadata;
 }
@@ -2295,7 +2317,7 @@ export async function listComponents(
   home: string,
   projectId?: string,
   options: CatalogReadOptions = {},
-): Promise<ComponentMetadata[]> {
+): Promise<ComponentListing[]> {
   if (
     libraryReadSnapshot.getStore()?.root !== resolve(home) &&
     !libraryMutations.getStore() &&
@@ -2304,7 +2326,7 @@ export async function listComponents(
     return withLibrarySnapshot(home, () =>
       listComponents(home, projectId, options),
     );
-  const result: ComponentMetadata[] = [];
+  const result: ComponentListing[] = [];
   for (const location of locations(home, "components", projectId, options)) {
     for (const id of (await children(home, location.path))
       .filter((id) => COMPONENT_ID.test(id))
