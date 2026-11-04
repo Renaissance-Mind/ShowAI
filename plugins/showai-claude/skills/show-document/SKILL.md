@@ -152,7 +152,7 @@ description: 创作或修改要保存的作品：可交互报告、讲解页面�
 
 新作品先按 use-showai 确定项目；只要规划或设计稿时也先确定项目，查模板需要它。续改已有作品时先 `page_read({projectId,pageId,rendered:false,response:"source"})` 读回原 Page，取它的 `templateContext`，并在记录目录中查找 presentation-plan.json 里写有这个 pageId 的记录；找到就沿用其中的读者简报、规划和设计稿，只重做受影响的部分；找不到时从页面本身和用户说明反推，新建一个记录文件夹：brief.md 标明内容是反推的，presentation-plan.json 只为本次要改的部分写节点和幕（含现有块的 blockIds），check_plan 与评审以这部分为准。
 
-**查模板。** 每个新作品在理解意图之前调用一次 `catalog_list({kind:"template",projectId})`，按用户的请求和手上材料的类型（例如给了一篇论文）对照各模板的 scenarios，判断是否适用；选中的模板从第一个环节起就补充方法。用户指定模板时直接使用。用户要求空白，或没有合适的模板时，只按上面的流程制作，用 page_create 建页；需要查看模板上下文时 `template_context` 传 `templates:[]`，它会覆盖连接启动时带的默认模板。续改沿用 Page.templateContext 记下的精确版本，没有记录时不猜它原先用过哪个模板。
+**查模板。** 每个新作品在理解意图之前调用一次 `catalog_list({kind:"template",projectId})`，按用户的请求和手上材料的类型（例如给了一篇论文）对照各模板的 scenarios，判断是否适用；选中的模板从第一个环节起就补充方法。用户指定模板时直接使用。用户要求空白，或没有合适的模板时，只按上面的流程制作，用 page_create 建页；需要查看模板上下文时 `template_context` 传 `templates:[]`，它会覆盖连接启动时带的默认模板。续改沿用 Page.templateContext 记下的精确版本，没有记录时不猜它原先用过哪个模板。内置模板升级后旧版本不再随运行时提供，按记下的版本读取报找不到时，改用同一模板的当前版本，并告诉用户模板版本变了。
 
 **读模板。** 选定模板后调用一次 `template_context({projectId,templates})`，它返回每个所选模板的 README、全部指南和组件索引（组件多时按 componentPage 分页）。一次读完，然后在每个环节把模板对这类内容的方法叠加在默认做法上；模板没有写到的环节按默认做法。保留返回的 `context.templates`，建页时使用。
 

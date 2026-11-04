@@ -2230,3 +2230,13 @@
   text-align: center;
   overflow-wrap: anywhere;
 }
+.sb-chart-row-hover {
+  fill: var(--sb-line);
+  opacity: 0.35;
+  pointer-events: none;
+}
+.sb-chart-zero {
+  stroke: var(--sb-muted);
+  stroke-width: 1;
+  opacity: 0.6;
+}

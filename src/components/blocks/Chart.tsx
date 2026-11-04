@@ -24,16 +24,53 @@ import { NoteSvgText, NoteText, noteProps } from "./NoteText";
 import { plainNotes, textNotes } from "./note-markup.mjs";
 import { isIndexList, useReaderState } from "../../surface/reader-state";
 
-/** Axis label: [label]{note} keeps its note; a shortened label shows the full text on hover. */
-function AxisLabel({ label }: { label: string }) {
+const charWidth = (char: string) => (char.charCodeAt(0) > 0x2e80 ? 10 : 5.6);
+const textWidth = (value: string) =>
+  [...value].reduce((width, char) => width + charWidth(char), 0);
+
+/** The label's visible text, shortened with "…" to fit maxWidth. */
+function fitLabel(plain: string, maxWidth: number) {
+  if (textWidth(plain) <= maxWidth) return plain;
+  let shown = "";
+  for (const char of plain) {
+    if (textWidth(shown + char + "…") > maxWidth) break;
+    shown += char;
+  }
+  return shown + "…";
+}
+
+/** Width a category axis gives a label below a vertical bar: 12 characters, or 10 and "…". */
+const BELOW_BAR = 12 * 10;
+
+/**
+ * Axis label: [label]{note} keeps its note; a shortened label shows the full
+ * text on hover.
+ */
+function AxisLabel({
+  label,
+  maxWidth = BELOW_BAR,
+}: {
+  label: string;
+  maxWidth?: number;
+}) {
   const plain = plainNotes(label);
-  if (plain.length <= 12) return <NoteSvgText text={label} />;
+  const shown =
+    maxWidth === BELOW_BAR
+      ? plain.length <= 12
+        ? plain
+        : plain.slice(0, 10) + "…"
+      : fitLabel(plain, maxWidth);
+  if (shown === plain) return <NoteSvgText text={label} />;
   const notes = textNotes(label).map((item) => item.note);
   return (
-    <tspan {...noteProps([plain, ...notes].join("\n"), false)}>
-      {plain.slice(0, 10) + "…"}
-    </tspan>
+    <tspan {...noteProps([plain, ...notes].join("\n"), false)}>{shown}</tspan>
   );
+}
+
+/** Rendered width of a label below a vertical bar. */
+function labelWidth(label: string) {
+  const plain = plainNotes(label);
+  return textWidth(plain.length <= 12 ? plain : plain.slice(0, 10) + "…");
 }
 
 const WIDTH = 760,
@@ -97,6 +134,29 @@ export function ChartBlock({ data, onChange, readOnly }: BlockProps) {
   const y = (value: number) =>
     TOP + ((domainMax - value) / (domainMax - domainMin)) * chartHeight;
   const baseline = y(0);
+  // Every bar needs its category label. When the labels cannot sit under
+  // their bars (many categories or long names), the bars lie down and the
+  // labels move to the left in full.
+  const horizontal =
+    type === "bar" &&
+    (labels.length > 10 ||
+      labels.some((label) => labelWidth(label) > band - 8));
+  // Lying bars show labels in full up to a 220-unit column.
+  const labelColumn = Math.min(
+    220,
+    Math.max(
+      60,
+      Math.ceil(
+        Math.max(0, ...labels.map((label) => textWidth(plainNotes(label)))),
+      ) + 16,
+    ),
+  );
+  const rowHeight = Math.max(22, visible.length * 9 + 10);
+  const height = horizontal ? TOP + rowHeight * labels.length + BOTTOM : HEIGHT;
+  const plotWidth = WIDTH - labelColumn - RIGHT;
+  const xValue = (value: number) =>
+    labelColumn + ((value - domainMin) / (domainMax - domainMin)) * plotWidth;
+  const rowTop = (index: number) => TOP + rowHeight * index;
   const uid = useId().replaceAll(":", "");
   const ticks = useMemo(
     () => Array.from({ length: 5 }, (_, index) => index / 4),
@@ -293,7 +353,7 @@ export function ChartBlock({ data, onChange, readOnly }: BlockProps) {
           </div>
           <div className="sb-chart-canvas" onMouseLeave={() => setHover(null)}>
             <svg
-              viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
+              viewBox={`0 0 ${WIDTH} ${height}`}
               role="img"
               aria-label={t("summary", {
                 title: plainNotes(text(data.title)) || t("chart"),
@@ -302,6 +362,15 @@ export function ChartBlock({ data, onChange, readOnly }: BlockProps) {
               })}
               onPointerMove={(event) => {
                 const rect = event.currentTarget.getBoundingClientRect();
+                if (horizontal) {
+                  const row = Math.floor(
+                    (((event.clientY - rect.top) / rect.height) * height -
+                      TOP) /
+                      rowHeight,
+                  );
+                  setHover(Math.min(labels.length - 1, Math.max(0, row)));
+                  return;
+                }
                 const relative =
                   ((event.clientX - rect.left) / rect.width) * WIDTH;
                 const index =
@@ -336,143 +405,239 @@ export function ChartBlock({ data, onChange, readOnly }: BlockProps) {
                   </linearGradient>
                 ))}
               </defs>
-              {ticks.map((tick) => {
-                const value = domainMax - tick * (domainMax - domainMin),
-                  lineY = TOP + chartHeight * tick;
-                return (
-                  <g key={tick}>
-                    <line
-                      x1={LEFT}
-                      x2={WIDTH - RIGHT}
-                      y1={lineY}
-                      y2={lineY}
-                      className="sb-chart-grid"
+              {horizontal ? (
+                <>
+                  {hover !== null && (
+                    <rect
+                      x={labelColumn}
+                      y={rowTop(hover)}
+                      width={plotWidth}
+                      height={rowHeight}
+                      className="sb-chart-row-hover"
                     />
+                  )}
+                  {ticks.map((tick) => {
+                    const value = domainMin + tick * (domainMax - domainMin),
+                      lineX = xValue(value);
+                    return (
+                      <g key={tick}>
+                        <line
+                          x1={lineX}
+                          x2={lineX}
+                          y1={TOP}
+                          y2={height - BOTTOM}
+                          className="sb-chart-grid"
+                        />
+                        <text
+                          x={lineX}
+                          y={height - 12}
+                          textAnchor="middle"
+                          className="sb-chart-label"
+                        >
+                          {prettyNumber(value)}
+                        </text>
+                      </g>
+                    );
+                  })}
+                  {labels.map((label, index) => (
                     <text
-                      x={LEFT - 12}
-                      y={lineY + 4}
+                      key={index}
+                      x={labelColumn - 8}
+                      y={rowTop(index) + rowHeight / 2 + 3.5}
                       textAnchor="end"
                       className="sb-chart-label"
                     >
-                      {prettyNumber(value)}
+                      <AxisLabel label={label} maxWidth={labelColumn - 16} />
                     </text>
-                  </g>
-                );
-              })}
-              {labels.map(
-                (label, index) =>
-                  (labels.length <= 10 ||
-                    index % Math.ceil(labels.length / 8) === 0 ||
-                    index === labels.length - 1) && (
-                    <text
-                      key={index}
-                      x={x(index)}
-                      y={HEIGHT - 12}
-                      textAnchor="middle"
-                      className="sb-chart-label"
-                    >
-                      <AxisLabel label={label} />
-                    </text>
-                  ),
-              )}
-              {visible.map((item, seriesIndex) => {
-                const points = labels
-                  .map(
-                    (_, index) => `${x(index)},${y(item.values[index] ?? 0)}`,
-                  )
-                  .join(" ");
-                if (type === "bar") {
-                  const groupWidth = band * 0.66,
-                    width = Math.max(
-                      1,
-                      groupWidth / Math.max(visible.length, 1) - 3,
+                  ))}
+                  {visible.map((item, seriesIndex) => {
+                    const barHeight = Math.max(
+                      2,
+                      (rowHeight - 8 - 2 * (visible.length - 1)) /
+                        Math.max(visible.length, 1),
                     );
-                  return (
-                    <g key={`${item.name}-${seriesIndex}`}>
-                      {labels.map((label, index) => (
-                        <rect
-                          key={index}
-                          x={
-                            x(index) -
-                            groupWidth / 2 +
-                            seriesIndex * (width + 3)
-                          }
-                          y={Math.min(y(item.values[index] ?? 0), baseline)}
-                          width={width}
-                          height={Math.max(
-                            1,
-                            Math.abs(baseline - y(item.values[index] ?? 0)),
-                          )}
-                          rx={3}
-                          fill={item.color}
-                          opacity={
-                            hover === null || hover === index ? ".9" : ".5"
-                          }
-                        >
-                          <title>
-                            {plainNotes(label)} · {plainNotes(item.name)}:{" "}
-                            {item.values[index] ?? 0}
-                            {text(data.unit)}
-                          </title>
-                        </rect>
-                      ))}
-                    </g>
-                  );
-                }
-                return (
-                  <g key={`${item.name}-${seriesIndex}`}>
-                    <polygon
-                      points={`${x(0)},${baseline} ${points} ${x(labels.length - 1)},${baseline}`}
-                      fill={`url(#${uid}-fill-${seriesIndex})`}
-                    />
-                    <polyline
-                      points={points}
-                      fill="none"
-                      stroke={item.color}
-                      strokeWidth={2.3}
-                      strokeLinejoin="round"
-                      strokeLinecap="round"
-                    />
-                    {(labels.length <= 20 || hover !== null) &&
-                      labels.map(
-                        (label, index) =>
-                          (labels.length <= 20 || hover === index) && (
-                            <circle
+                    return (
+                      <g key={`${item.name}-${seriesIndex}`}>
+                        {labels.map((label, index) => {
+                          const value = item.values[index] ?? 0;
+                          return (
+                            <rect
                               key={index}
-                              cx={x(index)}
-                              cy={y(item.values[index] ?? 0)}
-                              r={hover === index ? 5 : 3}
+                              x={Math.min(xValue(value), xValue(0))}
+                              y={
+                                rowTop(index) +
+                                4 +
+                                seriesIndex * (barHeight + 2)
+                              }
+                              width={Math.max(
+                                1,
+                                Math.abs(xValue(value) - xValue(0)),
+                              )}
+                              height={barHeight}
+                              rx={3}
                               fill={item.color}
-                              stroke="var(--sb-surface)"
-                              strokeWidth={2}
+                              opacity={
+                                hover === null || hover === index ? ".9" : ".5"
+                              }
                             >
-                              <title>
-                                {plainNotes(label)} · {plainNotes(item.name)}:{" "}
-                                {item.values[index] ?? 0}
-                                {text(data.unit)}
-                              </title>
-                            </circle>
-                          ),
-                      )}
-                  </g>
-                );
-              })}
-              {hover !== null && (
-                <line
-                  x1={x(hover)}
-                  x2={x(hover)}
-                  y1={TOP}
-                  y2={HEIGHT - BOTTOM}
-                  className="sb-chart-crosshair"
-                />
+                              <title>{`${plainNotes(label)} · ${plainNotes(item.name)}: ${value}${text(data.unit)}`}</title>
+                            </rect>
+                          );
+                        })}
+                      </g>
+                    );
+                  })}
+                  {domainMin < 0 && (
+                    <line
+                      x1={xValue(0)}
+                      x2={xValue(0)}
+                      y1={TOP}
+                      y2={height - BOTTOM}
+                      className="sb-chart-zero"
+                    />
+                  )}
+                </>
+              ) : (
+                <>
+                  {ticks.map((tick) => {
+                    const value = domainMax - tick * (domainMax - domainMin),
+                      lineY = TOP + chartHeight * tick;
+                    return (
+                      <g key={tick}>
+                        <line
+                          x1={LEFT}
+                          x2={WIDTH - RIGHT}
+                          y1={lineY}
+                          y2={lineY}
+                          className="sb-chart-grid"
+                        />
+                        <text
+                          x={LEFT - 12}
+                          y={lineY + 4}
+                          textAnchor="end"
+                          className="sb-chart-label"
+                        >
+                          {prettyNumber(value)}
+                        </text>
+                      </g>
+                    );
+                  })}
+                  {labels.map(
+                    (label, index) =>
+                      (labels.length <= 10 ||
+                        index % Math.ceil(labels.length / 8) === 0 ||
+                        index === labels.length - 1) && (
+                        <text
+                          key={index}
+                          x={x(index)}
+                          y={HEIGHT - 12}
+                          textAnchor="middle"
+                          className="sb-chart-label"
+                        >
+                          <AxisLabel label={label} />
+                        </text>
+                      ),
+                  )}
+                  {visible.map((item, seriesIndex) => {
+                    const points = labels
+                      .map(
+                        (_, index) =>
+                          `${x(index)},${y(item.values[index] ?? 0)}`,
+                      )
+                      .join(" ");
+                    if (type === "bar") {
+                      const groupWidth = band * 0.66,
+                        width = Math.max(
+                          1,
+                          groupWidth / Math.max(visible.length, 1) - 3,
+                        );
+                      return (
+                        <g key={`${item.name}-${seriesIndex}`}>
+                          {labels.map((label, index) => (
+                            <rect
+                              key={index}
+                              x={
+                                x(index) -
+                                groupWidth / 2 +
+                                seriesIndex * (width + 3)
+                              }
+                              y={Math.min(y(item.values[index] ?? 0), baseline)}
+                              width={width}
+                              height={Math.max(
+                                1,
+                                Math.abs(baseline - y(item.values[index] ?? 0)),
+                              )}
+                              rx={3}
+                              fill={item.color}
+                              opacity={
+                                hover === null || hover === index ? ".9" : ".5"
+                              }
+                            >
+                              <title>{`${plainNotes(label)} · ${plainNotes(item.name)}: ${item.values[index] ?? 0}${text(data.unit)}`}</title>
+                            </rect>
+                          ))}
+                        </g>
+                      );
+                    }
+                    return (
+                      <g key={`${item.name}-${seriesIndex}`}>
+                        <polygon
+                          points={`${x(0)},${baseline} ${points} ${x(labels.length - 1)},${baseline}`}
+                          fill={`url(#${uid}-fill-${seriesIndex})`}
+                        />
+                        <polyline
+                          points={points}
+                          fill="none"
+                          stroke={item.color}
+                          strokeWidth={2.3}
+                          strokeLinejoin="round"
+                          strokeLinecap="round"
+                        />
+                        {(labels.length <= 20 || hover !== null) &&
+                          labels.map(
+                            (label, index) =>
+                              (labels.length <= 20 || hover === index) && (
+                                <circle
+                                  key={index}
+                                  cx={x(index)}
+                                  cy={y(item.values[index] ?? 0)}
+                                  r={hover === index ? 5 : 3}
+                                  fill={item.color}
+                                  stroke="var(--sb-surface)"
+                                  strokeWidth={2}
+                                >
+                                  <title>{`${plainNotes(label)} · ${plainNotes(item.name)}: ${item.values[index] ?? 0}${text(data.unit)}`}</title>
+                                </circle>
+                              ),
+                          )}
+                      </g>
+                    );
+                  })}
+                  {hover !== null && (
+                    <line
+                      x1={x(hover)}
+                      x2={x(hover)}
+                      y1={TOP}
+                      y2={HEIGHT - BOTTOM}
+                      className="sb-chart-crosshair"
+                    />
+                  )}
+                </>
               )}
             </svg>
             {hover !== null && (
               <div
                 className="sb-chart-tooltip"
-                style={{
-                  left: `${Math.min(78, Math.max(8, (x(hover) / WIDTH) * 100))}%`,
-                }}
+                style={
+                  horizontal
+                    ? {
+                        left: `${Math.min(78, Math.max(8, ((labelColumn + plotWidth / 2) / WIDTH) * 100))}%`,
+                        top: `${Math.min(80, ((rowTop(hover) + rowHeight) / height) * 100)}%`,
+                      }
+                    : {
+                        left: `${Math.min(78, Math.max(8, (x(hover) / WIDTH) * 100))}%`,
+                      }
+                }
               >
                 <strong>{plainNotes(labels[hover])}</strong>
                 {visible.map((item, index) => (

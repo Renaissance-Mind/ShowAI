@@ -2,6 +2,7 @@ export type InlineSegment =
   | { type: "text"; text: string }
   | { type: "code"; text: string }
   | { type: "strong"; children: InlineSegment[] }
+  | { type: "highlight"; children: InlineSegment[] }
   | { type: "link"; href: string; children: InlineSegment[] }
   | { type: "note"; note: string; children: InlineSegment[] };
 

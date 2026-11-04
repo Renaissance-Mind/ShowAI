@@ -10,6 +10,30 @@ import {
 import { InlineMarkup } from "./InlineMarkup";
 
 describe("inline markup", () => {
+  it("parses ==highlight== with nested marks and leaves stray equals signs alone", () => {
+    expect(parseInline("差值 ==**19.2** 分== 来自 `AIME`")).toEqual([
+      { type: "text", text: "差值 " },
+      {
+        type: "highlight",
+        children: [
+          { type: "strong", children: [{ type: "text", text: "19.2" }] },
+          { type: "text", text: " 分" },
+        ],
+      },
+      { type: "text", text: " 来自 " },
+      { type: "code", text: "AIME" },
+    ]);
+    expect(plainInline("==6.4 秒== 与 [x]{注}")).toBe("6.4 秒 与 x");
+    for (const text of ["a == b", "x === y", "== 空格 ==", "a==b"])
+      expect(parseInline(text).some((s) => s.type === "highlight")).toBe(
+        false,
+      );
+    expect(
+      renderToStaticMarkup(
+        createElement(InlineMarkup, { source: "命中 ==8== 次" }),
+      ),
+    ).toBe('命中 <mark class="sb-inline-highlight">8</mark> 次');
+  });
   it("parses nested bold, code and links", () => {
     expect(parseInline("a **b `c`** [d](https://x.dev)")).toEqual([
       { type: "text", text: "a " },

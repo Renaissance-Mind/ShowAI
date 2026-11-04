@@ -106,7 +106,8 @@
 }
 :is(.document-content, .portable-editor .tiptap, .portable-content)
   mark:not(:where(.sb-block *, .showai-custom-block *)),
-.sb-text .sb-rich-text mark {
+.sb-text .sb-rich-text mark,
+mark.sb-inline-highlight {
   --showai-highlight-start: 43%;
   color: inherit;
   background: linear-gradient(
@@ -150,7 +151,8 @@
     .portable-content,
     .sb-rich-text
   )
-  mark {
+  mark,
+:root[data-theme="dark"] mark.sb-inline-highlight {
   background-image: linear-gradient(
     transparent var(--showai-highlight-start, 43%),
     color-mix(

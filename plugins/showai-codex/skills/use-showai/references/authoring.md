@@ -16,7 +16,7 @@
 
 ## 文字标记
 
-正文的文字标记按“同类含义用同一种样式”使用：写之前先定下几种含义各用什么标记，例如结论加粗、术语首次出现加悬停注释、需要读者对照的数字高亮，全文一致。Markdown 能写 `**加粗**`、`*斜体*`、`~~删除线~~`、`` `代码` ``、`==高亮==`、`[链接](https://…)`、`[文字]{注释}`（读者悬停时显示注释）和 `$公式$`。下划线、文字颜色、高亮颜色、字体和局部字号没有 Markdown 写法，要用 `format:"richtext"` 的内容树在文字上写 marks，例如 `{type:"text",text:"6.4 秒",marks:[{type:"highlight",attrs:{color:"#fde68a"}},{type:"bold"}]}`；悬停注释的 mark 是 `{type:"annotation",attrs:{note:"注释文字"}}`。其他字段见 text 组件 guide 的“结构化富文本与局部格式”。给已有段落加这类格式用 `block.replace`，保留段落 ID。
+正文的文字标记按“同类含义用同一种样式”使用：写之前先定下几种含义各用什么标记，例如结论加粗、术语首次出现加悬停注释、需要读者对照的数字高亮，全文一致。Markdown 能写 `**加粗**`、`*斜体*`、`~~删除线~~`、`` `代码` ``、`==高亮==`、`[链接](https://…)`、`[文字]{注释}`（读者悬停时显示注释）和 `$公式$`。组件的标题、图注和说明（svg、mechanism-diagram、layer-diagram、structure-browser 等）认其中的加粗、高亮、代码、链接和悬停注释，与正文用同一套样式。下划线、文字颜色、高亮颜色、字体和局部字号没有 Markdown 写法，要用 `format:"richtext"` 的内容树在文字上写 marks，例如 `{type:"text",text:"6.4 秒",marks:[{type:"highlight",attrs:{color:"#fde68a"}},{type:"bold"}]}`；悬停注释的 mark 是 `{type:"annotation",attrs:{note:"注释文字"}}`。其他字段见 text 组件 guide 的“结构化富文本与局部格式”。给已有段落加这类格式用 `block.replace`，保留段落 ID。
 
 ## 图片、媒体与表格
 

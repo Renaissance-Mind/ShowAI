@@ -28,6 +28,12 @@ function render(
       return (
         <strong key={id}>{render(segment.children, links, id, mark)}</strong>
       );
+    if (segment.type === "highlight")
+      return (
+        <mark key={id} className="sb-inline-highlight">
+          {render(segment.children, links, id, mark)}
+        </mark>
+      );
     if (segment.type === "note")
       return (
         <span key={id} {...noteProps(segment.note)}>
@@ -50,8 +56,8 @@ function render(
 }
 
 /**
- * **bold**, `code`, safe [label](href) and hover notes [label]{note} as React
- * elements; never HTML.
+ * **bold**, ==highlight==, `code`, safe [label](href) and hover notes
+ * [label]{note} as React elements; never HTML.
  * `links={false}` keeps link labels as text, e.g. inside a card that is itself a link.
  */
 export function InlineMarkup({

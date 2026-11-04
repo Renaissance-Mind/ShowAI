@@ -1,11 +1,12 @@
-// Inline markup shared by documentation-style built-ins: **bold**, `code`,
-// [label](href) and hover notes [label]{note}. Parsing is pure so contracts,
+// Inline markup shared by documentation-style built-ins: **bold**,
+// ==highlight==, `code`, [label](href) and hover notes [label]{note}. Parsing is pure so contracts,
 // the CLI and the portable reader agree on what counts as a link or a note;
 // rendering never uses raw HTML.
 import { findNote, plainNotes } from "./note-markup.mjs";
 import { parsePageLink } from "../../portable/page-link.mjs";
 
-const INLINE = /\*\*(.+?)\*\*|`([^`]+)`|\[([^\]]+)\]\(([^)\s]+)\)/g;
+const INLINE =
+  /\*\*(.+?)\*\*|`([^`]+)`|\[([^\]]+)\]\(([^)\s]+)\)|==([^=\s](?:[^=]*?[^=\s])?)==/g;
 
 /** Links may only reach http(s), mailto, in-page anchors, ShowAI pages or relative paths. */
 export function isSafeHref(href) {
@@ -55,6 +56,8 @@ export function parseInline(source) {
     if (match[1] !== undefined)
       out.push({ type: "strong", children: parseInline(match[1]) });
     else if (match[2] !== undefined) out.push({ type: "code", text: match[2] });
+    else if (match[5] !== undefined)
+      out.push({ type: "highlight", children: parseInline(match[5]) });
     else
       out.push({
         type: "link",
@@ -72,7 +75,8 @@ export function parseInline(source) {
 export const plainInline = (source) =>
   plainNotes(source).replace(
     INLINE,
-    (_, bold, code, label) => bold ?? code ?? label,
+    (_, bold, code, label, _href, highlight) =>
+      bold ?? code ?? label ?? highlight,
   );
 
 /** Unsafe link targets in the markup, in order of appearance. */
