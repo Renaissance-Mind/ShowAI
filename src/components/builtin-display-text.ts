@@ -141,7 +141,7 @@ export const builtinEnglish: BuiltinDisplayText = {
   flowchart: {
     name: "Interactive flowchart",
     description:
-      "A zoomable React Flow chart with node details, multiple flows and node editing, plus optional step-through journeys and stage playback.",
+      "A zoomable React Flow chart with node details and multiple flows, plus optional step-through journeys and stage playback. Content and layout come only from the page data.",
   },
   video: {
     name: "Video",

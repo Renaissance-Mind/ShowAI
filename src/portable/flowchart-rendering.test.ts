@@ -113,3 +113,71 @@ it("keeps edges and SVG markers visible in standalone and opaque inline hosts", 
     );
   }
 }, 30000);
+
+it("opens details only for explained nodes and offers no editing", async () => {
+  const document = blankDocument();
+  document.title = "Node details";
+  document.content.content = [
+    {
+      type: "widget",
+      attrs: {
+        kind: "flowchart",
+        data: {
+          title: "Route choice",
+          height: 420,
+          flows: [
+            {
+              id: "flow",
+              label: "Flow",
+              direction: "LR",
+              nodes: [
+                { id: "plain", label: "Router", kind: "decision" },
+                {
+                  id: "explained",
+                  label: "Relay",
+                  subtitle: "Fallback",
+                  kind: "decision",
+                  detail: "Forwards encrypted packets.",
+                },
+              ],
+              edges: [{ id: "edge", source: "plain", target: "explained" }],
+            },
+          ],
+        },
+      },
+    },
+  ];
+  const html = await buildPageHtml(document);
+  const server = createServer((_, response) => {
+    response.setHeader("Content-Type", "text/html; charset=utf-8");
+    response.end(html);
+  });
+  await new Promise<void>((done) => server.listen(0, "127.0.0.1", done));
+  const address = server.address();
+  if (!address || typeof address === "string")
+    throw new Error("Missing test server address.");
+  let browser: Browser | undefined;
+  try {
+    browser = await chromium.launch();
+    const page = await browser.newPage({
+      viewport: { width: 900, height: 900 },
+    });
+    await page.goto(`http://127.0.0.1:${address.port}/`);
+    const block = page.locator(".sf-block");
+    await page.locator('.react-flow__node[data-id="plain"]').click();
+    await expect.poll(() => block.locator(".sf-detail").count()).toBe(0);
+    await page.locator('.react-flow__node[data-id="explained"]').click();
+    const detail = block.locator(".sf-detail");
+    await detail.waitFor();
+    expect(await detail.innerText()).toContain("Forwards encrypted packets.");
+    expect(await detail.innerText()).toContain("Fallback");
+    expect(await detail.innerText()).not.toMatch(/条件判断|Decision/);
+    expect(await block.locator("input, textarea, .sf-editor").count()).toBe(0);
+    expect(await block.locator(".sf-node-picker button").count()).toBe(1);
+  } finally {
+    await browser?.close();
+    await new Promise<void>((done, reject) =>
+      server.close((error) => (error ? reject(error) : done())),
+    );
+  }
+}, 30000);

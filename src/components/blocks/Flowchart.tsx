@@ -109,14 +109,11 @@ interface FlowData extends BlockData {
   flows: Flow[];
 }
 type DiagramNode = Node<FlowNode & { direction: "TB" | "LR" }, "showai">;
-const kinds: Record<Kind, MessageKey<typeof messages>> = {
-  request: "kind.request",
-  skill: "kind.skill",
-  decision: "kind.decision",
-  reference: "kind.reference",
-  query: "kind.query",
-  result: "kind.result",
-};
+// Only nodes that carry an explanation open the detail panel; the others are
+// fully described by their card.
+function explorable(node: FlowNode) {
+  return !!(node.detail || node.commands?.length || node.references?.length);
+}
 const stateKeys: Record<StageState, MessageKey<typeof messages>> = {
   ok: "state.ok",
   warn: "state.warn",
@@ -244,6 +241,7 @@ function DiagramCard({ id, data, selected }: NodeProps<DiagramNode>) {
     "sf-node",
     `sf-${data.kind ?? "query"}`,
     selected && "is-selected",
+    explorable(data) && "is-explorable",
     view?.state && `sf-state-${view.state}`,
     view?.current && "is-current",
     view?.dim && "is-dim",
@@ -475,49 +473,6 @@ function FitFlowViewport({ locked }: { locked: boolean }) {
   return null;
 }
 
-function NodeEditor({
-  node,
-  onSave,
-}: {
-  node: FlowNode;
-  onSave: (patch: Partial<FlowNode>) => void;
-}) {
-  const t = useTranslator(messages);
-  const [label, setLabel] = useState(node.label);
-  const [detail, setDetail] = useState(node.detail ?? "");
-  useEffect(() => {
-    setLabel(node.label);
-    setDetail(node.detail ?? "");
-  }, [node.id, node.label, node.detail]);
-  return (
-    <details className="sf-editor">
-      <summary>{t("editNode")}</summary>
-      <label>
-        {t("nodeName")}
-        <input
-          value={label}
-          aria-invalid={!label.trim()}
-          onChange={(event) => setLabel(event.target.value)}
-        />
-      </label>
-      <label>
-        {t("nodeDetail")}
-        <textarea
-          value={detail}
-          onChange={(event) => setDetail(event.target.value)}
-        />
-      </label>
-      {!label.trim() && <p role="alert">{t("nodeNameRequired")}</p>}
-      <button
-        type="button"
-        disabled={!label.trim()}
-        onClick={() => onSave({ label: label.trim(), detail })}
-      >
-        {t("saveNode")}
-      </button>
-    </details>
-  );
-}
 export function layoutFlow(flow: Flow): DiagramNode[] {
   const graph = new graphlib.Graph();
   const direction = flow.direction ?? "TB";
@@ -624,29 +579,27 @@ function FocusCurrent({ id, locked }: { id?: string; locked: boolean }) {
 function FlowCanvas({
   flow,
   height,
-  readOnly,
   locked,
-  onPosition,
   selected,
   onSelect,
   view,
 }: {
   flow: Flow;
   height: number;
-  readOnly: boolean;
   locked: boolean;
-  onPosition: (id: string, position: { x: number; y: number }) => void;
   selected: string;
   onSelect: (id: string) => void;
   view: PlaybackView;
 }) {
   const t = useTranslator(messages);
+  const explorableNodes = flow.nodes.filter(explorable);
   const marker = `sf${useId().replace(/[^a-zA-Z0-9_-]/g, "")}`;
   const layoutNodes = useMemo(() => layoutFlow(flow), [flow]);
   const initialNodes = useMemo(
     () =>
       layoutNodes.map((node) => ({
         ...node,
+        selectable: explorable(node.data),
         selected: node.id === selected,
       })),
     [layoutNodes, selected],
@@ -694,7 +647,7 @@ function FlowCanvas({
           onNodesChange={onNodesChange}
           minZoom={0.25}
           maxZoom={2}
-          nodesDraggable={!readOnly && !locked}
+          nodesDraggable={false}
           panOnDrag={!locked}
           zoomOnScroll={!locked}
           zoomOnPinch={!locked}
@@ -706,28 +659,29 @@ function FlowCanvas({
           edgesFocusable={false}
           deleteKeyCode={null}
           onNodeClick={(_, node) => onSelect(node.id)}
-          onNodeDragStop={(_, node) => onPosition(node.id, node.position)}
         >
           <FitFlowViewport locked={locked} />
           <FocusCurrent id={view.current} locked={locked} />
           <FlowControls locked={locked} />
         </ReactFlow>
       </NodeViewContext.Provider>
-      <details className="sf-node-picker">
-        <summary aria-label={t("nodeList")}>{t("nodes")}</summary>
-        <div>
-          {flow.nodes.map((item) => (
-            <button
-              type="button"
-              key={item.id}
-              aria-pressed={selected === item.id}
-              onClick={() => onSelect(item.id)}
-            >
-              {item.label}
-            </button>
-          ))}
-        </div>
-      </details>
+      {explorableNodes.length > 0 && (
+        <details className="sf-node-picker">
+          <summary aria-label={t("nodeList")}>{t("nodes")}</summary>
+          <div>
+            {explorableNodes.map((item) => (
+              <button
+                type="button"
+                key={item.id}
+                aria-pressed={selected === item.id}
+                onClick={() => onSelect(item.id)}
+              >
+                {item.label}
+              </button>
+            ))}
+          </div>
+        </details>
+      )}
     </div>
   );
 }
@@ -999,11 +953,9 @@ function PlaybackOutline({ flow }: { flow: Flow }) {
     </div>
   );
 }
-export function FlowchartBlock({
-  data: raw,
-  onChange,
-  readOnly = false,
-}: BlockProps) {
+// A display component: readers explore it, while its content and layout come
+// only from the saved data, so nothing here calls onChange.
+export function FlowchartBlock({ data: raw }: BlockProps) {
   const instanceId = useId();
   const t = useTranslator(messages);
   const lock = useViewportLock("flowchart");
@@ -1083,7 +1035,8 @@ export function FlowchartBlock({
     return () => window.clearTimeout(timer);
   }, [playing, playbackIndex, playbackTotal]);
   const selectNode = (id: string) => {
-    setSelected(id);
+    const target = flow.nodes.find((item) => item.id === id);
+    if (target && explorable(target)) setSelected(id);
     if (mode.kind !== "journey") return;
     const steps = flow.journeys!.find((item) => item.id === mode.id)!.steps;
     if (steps[mode.step].node === id) return;
@@ -1099,20 +1052,6 @@ export function FlowchartBlock({
       ? stageNodes[node.id]
       : undefined;
   const hasPlayback = !!(flow?.journeys?.length || flow?.stages?.length);
-  const changeNode = (id: string, patch: Partial<FlowNode>) =>
-    onChange?.({
-      ...data,
-      flows: data.flows.map((item) =>
-        item.id === flow.id
-          ? {
-              ...item,
-              nodes: item.nodes.map((node) =>
-                node.id === id ? { ...node, ...patch } : node,
-              ),
-            }
-          : item,
-      ),
-    });
   return (
     <section
       ref={lock.ref}
@@ -1181,14 +1120,10 @@ export function FlowchartBlock({
               <FlowCanvas
                 flow={flow}
                 height={data.height ?? 580}
-                readOnly={readOnly}
                 locked={lock.locked}
                 selected={selected}
                 onSelect={selectNode}
                 view={view}
-                onPosition={(id, position) => {
-                  if (!readOnly) changeNode(id, { position });
-                }}
               />
             </ReactFlowProvider>
             {hasPlayback && (
@@ -1200,59 +1135,48 @@ export function FlowchartBlock({
                 onPlaying={setPlaying}
               />
             )}
-            {node &&
-              (stageNode ||
-                node.detail ||
-                node.commands?.length ||
-                node.references?.length ||
-                (!readOnly && onChange)) && (
-                <div className="sf-detail" aria-live="polite">
-                  <div className="sf-detail-heading">
-                    {node.kind && <span>{t(kinds[node.kind])}</span>}
-                    <strong>{node.label}</strong>
-                    <button
-                      type="button"
-                      className="sb-icon-button"
-                      aria-label={t("closeNodeDetail")}
-                      onClick={() => setSelected("")}
-                    >
-                      <X size={16} />
-                    </button>
-                  </div>
-                  {stageNode && (
-                    <p className={`sf-stage-note sf-tone-${stageNode.state}`}>
-                      <i aria-hidden="true" />
-                      {t("stageState", {
-                        state: t(stateKeys[stageNode.state]),
-                      })}
-                      {stageNode.note && ` · ${stageNode.note}`}
-                    </p>
-                  )}
-                  {node.detail && <p>{node.detail}</p>}
-                  {!!node.commands?.length && (
-                    <div className="sf-detail-group">
-                      <span>{t("commands")}</span>
-                      {node.commands.map((command) => (
-                        <code key={command}>{command}</code>
-                      ))}
-                    </div>
-                  )}
-                  {!!node.references?.length && (
-                    <div className="sf-detail-group">
-                      <span>{t("references")}</span>
-                      {node.references.map((reference) => (
-                        <code key={reference}>{reference}</code>
-                      ))}
-                    </div>
-                  )}
-                  {!readOnly && onChange && (
-                    <NodeEditor
-                      node={node}
-                      onSave={(patch) => changeNode(node.id, patch)}
-                    />
-                  )}
+            {node && explorable(node) && (
+              <div className="sf-detail" aria-live="polite">
+                <div className="sf-detail-heading">
+                  <strong>{node.label}</strong>
+                  {node.subtitle && <span>{node.subtitle}</span>}
+                  <button
+                    type="button"
+                    className="sb-icon-button"
+                    aria-label={t("closeNodeDetail")}
+                    onClick={() => setSelected("")}
+                  >
+                    <X size={16} />
+                  </button>
                 </div>
-              )}
+                {stageNode && (
+                  <p className={`sf-stage-note sf-tone-${stageNode.state}`}>
+                    <i aria-hidden="true" />
+                    {t("stageState", {
+                      state: t(stateKeys[stageNode.state]),
+                    })}
+                    {stageNode.note && ` · ${stageNode.note}`}
+                  </p>
+                )}
+                {node.detail && <p>{node.detail}</p>}
+                {!!node.commands?.length && (
+                  <div className="sf-detail-group">
+                    <span>{t("commands")}</span>
+                    {node.commands.map((command) => (
+                      <code key={command}>{command}</code>
+                    ))}
+                  </div>
+                )}
+                {!!node.references?.length && (
+                  <div className="sf-detail-group">
+                    <span>{t("references")}</span>
+                    {node.references.map((reference) => (
+                      <code key={reference}>{reference}</code>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
             {hasPlayback && <PlaybackOutline flow={flow} />}
           </div>
         </>

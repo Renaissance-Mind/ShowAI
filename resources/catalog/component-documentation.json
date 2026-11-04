@@ -1920,7 +1920,7 @@
       "boundaries": ["可用于不同主题；替换内容必须符合公开数据关系与输入约束。"]
     },
     "usage": {
-      "purpose": "基于 React Flow 的可缩放流程图，支持节点详情、分支关系、多条流程和编辑节点；可选路线逐步讲解与阶段播放，按步骤高亮节点和连线。",
+      "purpose": "基于 React Flow 的可缩放流程图，支持节点详情、分支关系与多条流程；可选路线逐步讲解与阶段播放，按步骤高亮节点和连线。内容与布局只来自页面数据，读者不能在图上改动。",
       "structure": [
         "flows 保存可切换流程；每条流程内 nodes 和 edges 以稳定 ID 关联。",
         "每条流程可选 journeys（路线：按步骤聚焦节点）和 stages（阶段：给节点与连线着色），两者只引用本流程的节点与连线 id。"
@@ -1944,7 +1944,7 @@
         },
         {
           "path": "flows[].nodes",
-          "meaning": "节点 id、label 必填；detail 是详情，kind 区分 request/skill/decision/reference/query/result；position 是节点左上角坐标（节点约 176×72 px）；省略时按 direction 自动布局。"
+          "meaning": "节点 id、label 必填；detail 是读者点开节点后看到的说明，写成完整句子，解释这个节点在图中的作用；只有带 detail、commands 或 references 的节点可以点开。kind 只决定卡片配色（request/skill/decision/reference/query/result），不显示给读者；position 是节点左上角坐标（节点约 176×72 px）；省略时按 direction 自动布局。"
         },
         {
           "path": "flows[].edges",
@@ -2015,9 +2015,9 @@
           "persistence": "view"
         },
         {
-          "action": "编辑内容或配置",
-          "effect": "通过宿主编辑入口修改数据与配置，并由 onChange 返回有效数据；页面保存成功后形成正式版本。",
-          "persistence": "content"
+          "action": "点开节点",
+          "effect": "带 detail、commands 或 references 的节点可点击，图下显示节点名称、副标题、说明与相关命令；其他节点不响应点击，节点列表也只列出可点开的节点。",
+          "persistence": "view"
         },
         {
           "action": "选择路线并逐步播放",
@@ -2040,7 +2040,7 @@
         "手动坐标不改变连线的进出边：坐标排布与 direction 不一致时，连线会绕行并穿过其他节点。优先省略 position 让自动布局排列；确需手动坐标时按 direction 分行或分列，并给相关节点设 sourceSide/targetSide。",
         "画布整体缩放到组件宽度：坐标总宽度明显超过组件宽度（页面中约 900 px）时节点文字随之变小；横向节点多时改用 TB 或拆成多条 flows。",
         "同一对节点之间的两条反向连线画在同一路径上，互相重叠，而且连线只在终点有箭头。表达往返时用一条连线并在 label 写明两个方向，例如“分派 / 汇报”；读者需要看清每次往返的先后时改用 sequence-diagram。",
-        "阅读中的缩放、锁定与节点查看不意味着已保存源码布局；编辑保存以宿主回执为准。",
+        "组件不提供拖动节点或图上编辑；节点位置、文字与说明只通过修改页面数据（page_apply 的 component.props.set）改变。阅读中的缩放与锁定不会写入页面。",
         "路线最多 12 条、每条 1–60 步；阶段最多 30 个；步骤与阶段引用的节点、连线必须存在于同一流程，step.edge 必须连接该步节点。",
         "路线与阶段只是阅读状态，切换和播放不会修改或保存页面；initialJourney/initialStage 只决定打开时的初始画面。"
       ],
@@ -2066,7 +2066,7 @@
       ],
       "architecture": [
         "Flowchart.tsx 使用 React Flow 呈现节点与边，flowchart-contract.mjs 校验模型并计算布局。",
-        "页面实例保存源数据；阅读状态与正式编辑回传分别维护。",
+        "页面实例保存源数据；组件只读取数据、维护阅读状态，不调用 onChange。",
         "playbackView 把当前路线步骤或阶段换算成节点视图（状态、备注、当前、变暗、步骤编号）与连线视图；节点视图经 React context 传入卡片，避免播放时重置 React Flow 节点位置。",
         "连线使用自定义 showai 边类型与本实例的箭头标记，颜色全部来自 CSS 变量，跟随深色主题。"
       ],
@@ -2077,13 +2077,13 @@
       "invariants": [
         "保留原始输入与稳定 ID，明确区分源数据、派生值和阅读状态。",
         "保持只读模式不写入源内容，沿用宿主的菜单与交互边界。",
-        "路线、阶段、播放与步骤跳转均不调用 onChange；编辑节点仍保留 journeys 与 stages。",
+        "组件任何交互都不调用 onChange；节点详情只对带 detail、commands 或 references 的节点打开，不显示 kind 的内部名称。",
         "所有步骤和阶段都有可打印的文字版本；减少动态效果时连线不流动、故障节点不闪烁。"
       ],
       "verification": [
         "把最小示例放入真实 Page，核对内容、图像与关键交互。",
         "替换一组任务数据，核对边界、空数据、单位与派生结果。",
-        "核对编辑保存、只读阅读与离线导出；升级时保留旧版本和引用。",
+        "核对阅读、离线导出与没有说明的节点不响应点击；升级时保留旧版本和引用。",
         "用两个新增示例核对路线播放、节点跳转、阶段着色、窄屏控件换行、深色主题与打印文字列表。"
       ]
     }

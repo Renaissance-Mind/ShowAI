@@ -202,22 +202,12 @@
   font-size: 12px;
   font-family: "SFMono-Regular", Consolas, monospace;
 }
-.sf-editor {
-  margin-top: 14px;
+/* Only cards with an explanation respond to clicks. */
+.sf-canvas .react-flow__node {
+  cursor: default;
 }
-.sf-editor label {
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
-  margin: 12px 0;
-}
-.sf-editor input,
-.sf-editor textarea {
-  width: 100%;
-  padding: 8px;
-  border: 1px solid var(--sb-line);
-  border-radius: 4px;
-  background: var(--sb-surface);
+.sf-canvas .react-flow__node:has(> .sf-node.is-explorable) {
+  cursor: pointer;
 }
 @media (max-width: 540px) {
   .sf-tabs {
