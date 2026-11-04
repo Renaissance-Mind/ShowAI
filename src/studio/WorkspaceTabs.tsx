@@ -262,9 +262,7 @@ export default function WorkspaceTabs({
       current.finishing = true;
       current.x = event.clientX;
       current.y = event.clientY;
-      const target = latest.current.busy
-        ? null
-        : locate(current.x, current.y);
+      const target = latest.current.busy ? null : locate(current.x, current.y);
       flushSync(() => preview(target));
       const slot = list.current?.querySelector<HTMLElement>(
         `.studio-tab[data-tab-id="${CSS.escape(current.id)}"]`,
