@@ -15,10 +15,12 @@
 先确定表达形式，再查完整的当前组件索引：模板组件来自 template_context 返回的固定引用（局部名由模板 design 指南给出，实际 componentId/version/integrity 以返回为准）；内置与项目组件来自 `catalog_list({kind:"component",projectId})`。常用对应：
 
 - 对象与材料：image、gallery、video、pdf；局部热点是否可用查具体组件。
-- 概念与关系：flowchart（journeys 逐步走一条路线，stages 按阶段改变节点状态）、mindmap、layer-diagram 分层架构、sequence-diagram 参与者之间按顺序的往返；项目目录有专题图形组件时按其 guide 使用。
+- 概念与关系：flowchart（方框与连线表达流程和分支；journeys 逐步走一条路线，stages 按阶段改变节点状态；连线可单独指定进出边，ends 为 both 表示双向；节点里放不了表格或数值状态）、mindmap、layer-diagram 分层架构、sequence-diagram 参与者之间按顺序的往返；项目目录有专题图形组件时按其 guide 使用。
+- 机制与状态：mechanism-diagram 把对象摆在网格上，对象可以带小表格（映射表、缓存条目、密钥），连线带标签，勾叉标出结果；steps 只写每一步的变化（出现的连线、表格行与高亮、颜色、突出对象），同一布局逐步切换。讲网络包、请求、缓存、事务、握手这类“谁持有什么、这一步改了什么”的内容时优先用它；只有参与者之间的消息往返、没有状态表时用 sequence-diagram。各步对象和布局相同、只变状态时用 mechanism-diagram 的 steps；各步画面本身不同（换了对象或构图）时用 stepper，每步放一张图。
+- 自由构图的示意图：svg 保存 Agent 手绘的 SVG（根元素带 viewBox），用调色板类 fill-/solid-/stroke-/ink-{blue|gray|violet|teal|green|red|orange} 与 ink、ink-muted、paper、zone、line 上色，深色主题自动换色；元素加 data-note 就有悬停注释；alt 必填。适合同尺度小多图对比、分层平面、空间示意等没有现成组件的图；几个方案并排对比时画在同一张 svg 里（每格同尺度、同位置放同类对象），不用多个组件拼排。图片组件只接受位图，自己画的图用 svg，不要转成 PNG；需要原项目模板与脚本时才用 diagram-design 的 custom。
 - 操作与参考：step-guide 编号步骤、分平台代码、读者逐步勾选与计时；command-reference 可搜索的命令与参数；structure-browser 目录或字段结构与说明；card-grid 入口与选项卡片。
 - 时间与计划：roadmap 按日期阅读泳道、负责人、依赖和里程碑（只读）；event-timeline 事件、阶段与指标曲线同轴回放；database 的 calendar 视图展示带日期的记录、打卡热力与连续天数；roadmap 只负责阅读，需要持续编辑的排期用 database 等可编辑数据。
-- 逐步展示的过程与机制：stepper 是逐步切换的外壳，步骤条一次显示一步，每一步放这一步需要的画面——一句说明加一张图、一个表格或其他组件；变化用具体的值或画面表达，不靠外壳排版。先插入 stepper（steps 里写各步标题与一句说明），再用 page_read 结构化读取（outline 中 type 为 step 的条目，或 markdown 里步骤标题后方括号内的 ID）找到各 step 的 id，以 component.insert 或 block.insert 的 parentId 指向该 step，把表格、图片或组件放进这一步。step-walkthrough 只为已有页面保留，新内容不再使用；只需按阶段给节点着色时用 flowchart stages；读者要照着执行的操作步骤用 step-guide。
+- 逐步展示的过程与机制：stepper 是逐步切换的外壳，步骤条一次显示一步，每一步放这一步需要的画面——一句说明加一张图、一个表格或其他组件；变化用具体的值或画面表达，不靠外壳排版。插入 stepper 时用 steps[].blocks 一次放入每一步的组件：每项 {kind, data} 与 component.insert 相同，排在这一步 content 之后；要让图在文字之前，省略 content，把文字写成 blocks 里的 {kind:"text",data:{format:"markdown",content}}。之后往已有步骤补内容时，用 page_read 结构化读取（outline 中 type 为 step 的条目）找到 step id，以 component.insert 的 parentId 指向它。step-walkthrough 只为已有页面保留，新内容不再使用；只需按阶段给节点着色时用 flowchart stages；读者要照着执行的操作步骤用 step-guide。
 - 对照与证据：waterfall 从期初到期末的逐项增减；table、database、comparison-matrix、chart 与适配数据类型的 G2 图表；references 和 bookmark。
 - 记录集合：database 用 views 为同一组记录保存表格、看板、列表等命名视图；page 列把每条记录链接到项目里已有的页面，适合管理论文笔记、会议纪要等一组页面。工作台中点击页面链接可在右侧预览正文并编辑记录属性，数据库所在页面保持打开；没有预览宿主的阅读器和离线导出保留普通页面链接。几个组件要读写同一组记录时绑定共享数据，视图仍留在各自组件。
 - 补充说明：text、toggle；关键条件进入主线。

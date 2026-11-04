@@ -35,7 +35,7 @@ showai pages save PAGE --project PROJECT --input revised.showai.json --base-hash
 
 先完整读取，保留稳定节点 ID，再修改。pages diff --since 仅支持仍保留的读取/草稿基线；缺失时返回 MISSING_BASELINE，不提供旧页面历史浏览或版本恢复。冲突时比较双方内容；不要给旧全文替换请求换一个新 hash 强行提交。JSON 输入路径 `-` 表示标准输入。页面写入锁定自定义组件的精确版本与指纹。
 
-新资源使用 v3 Page；`--kind board` 创建 Board。内容树、`layout` 外框和 `surfaceViews` 各司其职。`component.insert` 支持普通组件和原生 Page/Board；`surface.create`、`surface.wrap`、区块及视图操作保留身份。项目文件夹的 parentId 与内容容器 parentId 不同。参见 [Page 与 Board](page-surface.zh-CN.md)。
+新资源使用 v3 Page；`--kind board` 创建 Board。内容树、`layout` 外框和 `surfaceViews` 各司其职。`component.insert` 支持普通组件和原生 Page/Board；插入 stepper 时，`steps[].blocks` 中的 `{kind, data}` 组件会在同一次插入中放到对应步骤的文字之后；`surface.create`、`surface.wrap`、区块及视图操作保留身份。项目文件夹的 parentId 与内容容器 parentId 不同。参见 [Page 与 Board](page-surface.zh-CN.md)。
 
 ## 查询目录与参数
 

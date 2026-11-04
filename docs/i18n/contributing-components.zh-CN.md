@@ -32,7 +32,7 @@ G2 图表和外部图示家族各有自己的流程。`g2.json` 中的 G2 条目
 下面的步骤依据 `scene-3d`、`roadmap` 等近期新增组件实际改动的文件整理。`src/components/builtin-registration.test.ts` 检查标有 ✓ 的注册点，失败时列出缺少注册的 kind。
 
 1. **数据契约。** 编写导出校验函数的数据契约模块，并在 `.d.mts` 中声明类型，例如 `scene3d-contract.mjs` 导出 `validateScene3dData(data)`。相关组件可以共用一个模块：`roadmap` 和 `waterfall` 都使用 `plan-contract.mjs` 中的 `validatePlanData(kind, data)`。用字段路径拒绝未知结构，为每个列表和字符串设置上限，并在数据契约旁边测试默认数据、示例和应被拒绝的结构（`scene3d.test.ts`、`plan.test.ts`）。
-2. **渲染器。** 编写接收 `BlockProps`（`data`、`onChange`、`readOnly`）的 `<Name>.tsx` 及样式表。所有界面文字放进消息命名空间 `src/i18n/messages/<namespace>.ts`，同时提供 `zh-CN` 和 `en`；`src/i18n/i18n.test.ts` 会拒绝写死的中文和不一致的键。使用宿主编辑器共用的选中、右键和悬停菜单，不另加浮动工具栏。
+2. **渲染器。** 编写接收 `BlockProps`（`data`、`onChange`、`readOnly`）的 `<Name>.tsx` 及样式表。所有界面文字放进消息命名空间 `src/i18n/messages/<namespace>.ts`，同时提供 `zh-CN` 和 `en`；`src/i18n/i18n.test.ts` 会拒绝写死的中文和不一致的键。使用宿主编辑器共用的选中、右键和悬停菜单，不另加浮动工具栏。展示类组件（读者查看和探索的图示、图形、图表）的阅读画面里不放编辑表单，不显示节点 `kind`、枚举名这类内部值；详情面板只在有解释内容时打开。这类组件通过修改数据改变，例如 `flowchart`、`mechanism-diagram` 和 `svg`。
 3. **目录条目 ✓。** 在 `components.json` 中加入对象，包含 `kind`、`name`、`description`、`scenarios`、`defaultData`、`propsSchema`、`examples`（每项为 `{ name, request, data }`）、`version`（semver，从 `1.0.0` 开始）和 `effects`。目录中的名称和描述保持中文，Agent 和 CLI 读取的就是这些文字。
 4. **使用说明 ✓。** 在 `component-documentation.json` 中以 kind 为键加入条目，包含 `version`、`reuse`、`usage` 和 `development`；可以参照 `roadmap` 等近期条目的结构。现有内置组件使用说明版本 1。版本 2 增加经过核验的参数含义和省略规则，见[组件参数](component-parameters.zh-CN.md)。
 5. **注册 ✓。** 在 `src/components/blocks/registry.ts` 中加入懒加载导入，以及一个字面量形式的 `registerBlock({ kind: "…", … })`：从 `componentMetadata` 读取 `defaultData`，把数据契约作为 `validate` 传入。kind 必须是字符串字面量，因为 `scripts/build-reader-source.mjs` 会解析这些调用，让导出页面只打包实际用到的组件。

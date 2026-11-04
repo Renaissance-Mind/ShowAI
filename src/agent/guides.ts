@@ -224,7 +224,7 @@ const guides: Record<
         },
       ],
       otherOperations: [
-        "component.insert: kind, data, parentId?, afterId? (adds a catalog component through the editor's insertion path; omitted afterId appends, null inserts first; data may carry $binding to insert a block already bound to a dataset, see guide datasets)",
+        "component.insert: kind, data, parentId?, afterId? (adds a catalog component through the editor's insertion path; omitted afterId appends, null inserts first; a stepper's steps[].blocks [{kind,data}] places components inside each step in the same insertion; data may carry $binding to insert a block already bound to a dataset, see guide datasets)",
         "block.insert: node, parentId?, afterId?",
         "block.remove: blockId",
         "block.replace: blockId, node",
@@ -434,7 +434,7 @@ const guides: Record<
       "Give every node x and y (relative to origin) or none of them. Without positions the nodes are laid out along the edges in the given direction (default right), starting at origin or beside the existing content. Sizes fit each label unless width and height are given. Edge ids default to FROM-to-TO; edges may form cycles. Edges may also point at framed objects already in the same container; only new nodes are laid out. Node ids must be new and become the stored node ids.",
       "Node ids become the stored node ids. Shapes and arrows created this way are ordinary drawings: change them later with block.attrs.set (label, labelSize, colors), surface.layout.set (frames) or block.remove, by stable id. After writing, read the Board with board_read and fix overlaps or text that does not fit; element index items include each drawing's label.",
       "To tidy existing connected objects, send {type:'diagram.arrange',nodeIds:[...],direction?:'right'|'down'|'left'|'up'}. It lays out the listed unlocked, framed objects of one container along the arrows between them (at least one such arrow; listed objects without arrows join the layout), keeps the group's top-left corner, and re-attaches those arrows to facing sides. List shapes and other objects, not arrows. Arrows to unlisted objects stay bound and follow; unlisted objects and unbound arrows stay where they are, so leave out anything that must not move, and check with board_read that the arranged group does not cover it. It uses the same layout as the editor's arrange-along-arrows command.",
-      "Use native shapes for sketches, annotations and drafts the reader will rearrange by hand. For a structured diagram the reader explores (steps, branches, sequences, layers), a catalog component such as flowchart, sequence-diagram or layer-diagram is usually clearer.",
+      "Use native shapes for sketches, annotations and drafts the reader will rearrange by hand. For a structured diagram the reader explores (steps, branches, sequences, layers), a catalog component such as flowchart, sequence-diagram or layer-diagram is usually clearer; a mechanism with objects that hold state and change step by step fits mechanism-diagram, and a hand-drawn figure the reader only views fits svg.",
     ],
     commands: [
       "showai guide containers --json",
