@@ -88,6 +88,8 @@ export interface DatabaseCalendarConfig {
   endTimeColumn?: string;
   colorColumn?: string;
   doneColumn?: string;
+  /** Text or select column shown as a small line above each entry title, e.g. the project. */
+  contextColumn?: string;
   mode?: "month" | "week" | "heatmap";
   initialDate?: string;
   weekStartsOn?: 0 | 1;

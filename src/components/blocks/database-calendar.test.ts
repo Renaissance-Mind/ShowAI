@@ -249,6 +249,34 @@ describe("database calendar view", () => {
     });
   });
 
+  it("shows the context column as a line above each title", () => {
+    const data = weekPlan();
+    expect(
+      resolveCalendar(data.columns, { contextColumn: "category" }).contextColumn
+        ?.id,
+    ).toBe("category");
+    expect(
+      resolveCalendar(data.columns, { contextColumn: "done" }).contextColumn,
+    ).toBeUndefined();
+    expect(
+      pruneCalendarConfig({ contextColumn: "date" }, data.columns),
+    ).toEqual({});
+    const wrongType = weekPlan();
+    wrongType.calendar.contextColumn = "date";
+    expect(() => validateDatabaseData(wrongType)).toThrow(
+      /calendar\.contextColumn must refer to a text or select column/,
+    );
+    const withContext = weekPlan();
+    withContext.calendar.contextColumn = "category";
+    expect(() => validateDatabaseData(withContext)).not.toThrow();
+    const html = render(withContext);
+    expect(html).toContain("sb-dbc-chip-context");
+    expect(html).toMatch(
+      /sb-dbc-chip-context">工作<\/span><span class="sb-dbc-chip-title">周会<\/span><span class="sb-dbc-time">9:00–12:00/,
+    );
+    expect(render(weekPlan())).not.toContain("sb-dbc-chip-context");
+  });
+
   it("renders a week time grid with lanes, colors, done marks and an agenda", () => {
     const html = render(weekPlan());
     expect(html).toContain("sb-dbc-weekgrid is-timed");

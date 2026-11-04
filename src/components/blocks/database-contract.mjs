@@ -108,6 +108,7 @@ function validateCalendar(calendar, columns) {
   column("endTimeColumn", ["text"]);
   column("colorColumn", ["select"]);
   column("doneColumn", ["checkbox"]);
+  column("contextColumn", ["text", "select"]);
   if (
     calendar.endDateColumn !== undefined &&
     calendar.endDateColumn === calendar.dateColumn
@@ -143,6 +144,7 @@ function validateCalendar(calendar, columns) {
         "endTimeColumn",
         "colorColumn",
         "doneColumn",
+        "contextColumn",
         "mode",
         "initialDate",
         "weekStartsOn",

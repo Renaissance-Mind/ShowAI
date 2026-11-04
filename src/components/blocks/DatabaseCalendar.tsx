@@ -49,6 +49,7 @@ export interface CalendarView {
   endTimeColumn?: DatabaseColumn;
   colorColumn?: DatabaseColumn;
   doneColumn?: DatabaseColumn;
+  contextColumn?: DatabaseColumn;
   mode: Mode;
   initialDay: number | null;
   weekStartsOn: 0 | 1;
@@ -85,6 +86,9 @@ export function resolveCalendar(
         : (pick(columns, config.colorColumn, "select") ??
           columns.find((column) => column.type === "select")),
     doneColumn: pick(columns, config.doneColumn, "checkbox"),
+    contextColumn:
+      pick(columns, config.contextColumn, "text") ??
+      pick(columns, config.contextColumn, "select"),
     mode: MODES.includes(config.mode as Mode) ? (config.mode as Mode) : "month",
     initialDay: parseDay(config.initialDate),
     weekStartsOn: config.weekStartsOn === 0 ? 0 : 1,
@@ -123,6 +127,12 @@ export function pruneCalendarConfig(
   keep("endTimeColumn", "text");
   keep("colorColumn", "select");
   keep("doneColumn", "checkbox");
+  if (
+    next.contextColumn !== undefined &&
+    !pick(columns, next.contextColumn, "text") &&
+    !pick(columns, next.contextColumn, "select")
+  )
+    delete next.contextColumn;
   if (next.endDateColumn && next.endDateColumn === next.dateColumn)
     delete next.endDateColumn;
   if (!next.startTimeColumn) delete next.endTimeColumn;
@@ -220,6 +230,7 @@ export function DatabaseCalendar({
     endTimeColumn,
     colorColumn,
     doneColumn,
+    contextColumn,
     weekStartsOn,
   } = settings;
   const primary =
@@ -361,6 +372,7 @@ export function DatabaseCalendar({
   const chip = (entry: Entry, day: number, compact = false) => {
     const tone = toneOf(entry.row);
     const title = text(entry.row[primary?.id]) || t("untitled");
+    const context = contextColumn ? text(entry.row[contextColumn.id]) : "";
     const time = timeText(entry);
     return (
       <button
@@ -373,12 +385,15 @@ export function DatabaseCalendar({
           entry.done && "is-done",
           entry.start < day && "continues-before",
           entry.end > day && "continues-after",
+          context && "has-context",
         ]
           .filter(Boolean)
           .join(" ")}
         style={toneStyle(tone)}
         aria-pressed={entry.row.id === selectedId}
-        title={[time, title].filter(Boolean).join(" ")}
+        title={[context, [time, title].filter(Boolean).join(" ")]
+          .filter(Boolean)
+          .join("\n")}
         draggable={Boolean(editable && onMove && movable(entry.row.id))}
         onDragStart={() => setDragging(entry)}
         onDragEnd={() => setDragging(null)}
@@ -391,8 +406,18 @@ export function DatabaseCalendar({
             {entry.done ? "✓" : ""}
           </span>
         )}
-        {time && !compact && <span className="sb-dbc-time">{time}</span>}
-        <span className="sb-dbc-chip-title">{title}</span>
+        {context ? (
+          <span className="sb-dbc-chip-body">
+            <span className="sb-dbc-chip-context">{context}</span>
+            <span className="sb-dbc-chip-title">{title}</span>
+            {time && !compact && <span className="sb-dbc-time">{time}</span>}
+          </span>
+        ) : (
+          <>
+            {time && !compact && <span className="sb-dbc-time">{time}</span>}
+            <span className="sb-dbc-chip-title">{title}</span>
+          </>
+        )}
       </button>
     );
   };

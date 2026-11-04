@@ -275,6 +275,10 @@
               "type": "string",
               "description": "完成标记列（checkbox 类型）；设置后热力图只统计已勾选记录。"
             },
+            "contextColumn": {
+              "type": "string",
+              "description": "可选的上下文列（text 或 select 类型），在每条记录标题上方另起一行显示，例如所属项目。"
+            },
             "mode": {
               "enum": ["month", "week", "heatmap"]
             },

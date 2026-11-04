@@ -168,6 +168,25 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.sb-block.sb-database .sb-dbc-chip.has-context {
+  align-items: flex-start;
+}
+.sb-block.sb-database .sb-dbc-chip.has-context .sb-dbc-check {
+  margin-top: 1px;
+}
+.sb-block.sb-database .sb-dbc-chip-body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+}
+.sb-block.sb-database .sb-dbc-chip-context {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--sb-muted);
+}
 .sb-block.sb-database .sb-dbc-time {
   flex: none;
   color: var(--dbc-c);

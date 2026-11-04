@@ -1204,6 +1204,10 @@
           "meaning": "checkbox 完成列；记录显示勾选状态，热力图只统计已勾选记录。"
         },
         {
+          "path": "calendar.contextColumn",
+          "meaning": "可选的 text 或 select 列，在月视图、周视图和列表里显示为标题上方的一行小字，例如所属项目；未设置时每条记录只显示标题。"
+        },
+        {
           "path": "calendar.mode / initialDate / weekStartsOn / weeks",
           "meaning": "初始模式 month/week/heatmap、初始日期（默认今天）、每周起始日 0 或 1、热力图周数 1–53（默认 12）。"
         }
