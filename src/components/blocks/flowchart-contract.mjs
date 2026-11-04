@@ -77,6 +77,20 @@ export function validateFlowchartData(data) {
       if (!ids.has(edge.source) || !ids.has(edge.target))
         throw new Error(`Flow edge ${edge.id} references a missing node.`);
       label(edge.label, "edge.label", false, 300);
+      for (const side of ["sourceSide", "targetSide"]) {
+        if (
+          edge[side] !== undefined &&
+          !["top", "bottom", "left", "right"].includes(edge[side])
+        )
+          throw new Error(
+            `Flow edge ${edge.id} ${side} must be a valid connection side.`,
+          );
+      }
+      if (
+        edge.ends !== undefined &&
+        !["end", "both", "none"].includes(edge.ends)
+      )
+        throw new Error(`Flow edge ${edge.id} ends must be end, both or none.`);
     }
     validatePlayback(flow, `flowchart.flows[${data.flows.indexOf(flow)}]`);
   }

@@ -93,6 +93,16 @@ export const builtinEnglish: BuiltinDisplayText = {
     description:
       "Step-through lifelines with calls, replies and notes, each step explained below.",
   },
+  "mechanism-diagram": {
+    name: "Mechanism diagram",
+    description:
+      "Objects on a grid with the state tables they hold and the links between them; steps change only what differs, so readers compare one picture step by step.",
+  },
+  svg: {
+    name: "Vector figure",
+    description:
+      "An SVG figure saved in the page: scaled to the page width, themed through palette classes for the dark theme, with hover notes on marked elements.",
+  },
   "layer-diagram": {
     name: "Layer diagram",
     description:

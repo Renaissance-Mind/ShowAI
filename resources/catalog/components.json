@@ -2653,7 +2653,7 @@
     "kind": "flowchart",
     "name": "交互流程图",
     "description": "基于 React Flow 的可缩放流程图，支持节点详情、分支关系与多条流程；可选路线逐步讲解与阶段播放，按步骤高亮节点和连线。内容与布局只来自页面数据，读者不能在图上改动。",
-    "version": "1.2.0",
+    "version": "1.3.0",
     "scenarios": [
       "解释技能、工作流或系统架构的触发条件与依赖。",
       "让读者选择节点，按需查看说明、操作命令和参考文档。",
@@ -2664,7 +2664,8 @@
       "清晰表达流程和分支，节点详情按需显示。",
       "可缩放和平移；只有写了 detail、commands 或 references 的节点可以点开查看说明，其他节点不响应点击；支持离线 HTML 和对话内展示。",
       "选择路线后可上一步、下一步、播放和从头开始；当前节点高亮、步骤编号标在节点上，已走过的连线以流动线条点亮（减少动态效果时为静态）。",
-      "阶段可逐个切换或自动播放，节点和连线按 ok/warn/bad/idle/active 着色并显示每个节点的状态备注；打印与导出时全部步骤和阶段以文字列在图下方。"
+      "阶段可逐个切换或自动播放，节点和连线按 ok/warn/bad/idle/active 着色并显示每个节点的状态备注；打印与导出时全部步骤和阶段以文字列在图下方。",
+      "连线可单独指定进出边与箭头（单向、双向、无方向）；同一节点引出多条带标签的连线时，标签放在各自终点旁；组件宽度小于 640 px 时，未手动摆放的横向流程自动改为竖排。"
     ],
     "defaultData": {
       "title": "交互流程图",
@@ -2819,6 +2820,18 @@
                     },
                     "label": {
                       "type": "string"
+                    },
+                    "sourceSide": {
+                      "enum": ["top", "bottom", "left", "right"],
+                      "description": "这条连线从起点的哪一边出发；覆盖节点的 sourceSide。"
+                    },
+                    "targetSide": {
+                      "enum": ["top", "bottom", "left", "right"],
+                      "description": "这条连线从终点的哪一边进入；覆盖节点的 targetSide。"
+                    },
+                    "ends": {
+                      "enum": ["end", "both", "none"],
+                      "description": "箭头：end 只在终点（默认），both 两端，none 不画箭头。"
                     }
                   },
                   "required": ["id", "source", "target"]
@@ -3817,6 +3830,868 @@
               "initialStage": "s4"
             }
           ]
+        }
+      }
+    ]
+  },
+  {
+    "kind": "mechanism-diagram",
+    "name": "机制图",
+    "description": "在网格上摆放对象、它们持有的状态（小表格）和彼此之间的连线，再用步骤只描述每一步变化的部分；同一张图逐步切换，讲清协议、缓存、事务等机制。",
+    "version": "1.0.0",
+    "scenarios": [
+      "讲解网络包、请求或消息经过哪些对象、每一步改了哪张表，例如 NAT 映射、缓存命中、DNS 解析。",
+      "对象的状态随步骤变化，需要读者在同一布局上对照前后差别。",
+      "给出成功与失败两条路径，用勾、叉和颜色标出结果。"
+    ],
+    "effects": [
+      "布局只按网格计算一次，所有步骤共用同一画面；连线自动选择进出边、正交走线，同一边的多条连线自动错开。",
+      "步骤切换显示或隐藏连线与标记、替换表格内容、高亮表格行、改变颜色，并可只突出相关对象；方向键切换步骤。",
+      "颜色来自共享调色板，深色主题自动换色；窄屏横向滚动；打印与导出依次画出全部步骤。"
+    ],
+    "defaultData": {
+      "title": "一次读请求怎样经过缓存",
+      "nodes": [
+        {
+          "id": "app",
+          "label": "应用",
+          "tone": "blue",
+          "col": 0,
+          "row": 0
+        },
+        {
+          "id": "cache",
+          "label": "缓存",
+          "sub": "Redis",
+          "tone": "teal",
+          "col": 2,
+          "row": 0
+        },
+        {
+          "id": "db",
+          "label": "数据库",
+          "tone": "violet",
+          "col": 4,
+          "row": 0
+        },
+        {
+          "id": "entries",
+          "col": 2,
+          "row": 1,
+          "colSpan": 2,
+          "table": {
+            "title": "缓存条目",
+            "columns": ["键", "值"],
+            "rows": [],
+            "empty": "（空）"
+          }
+        }
+      ],
+      "links": [
+        {
+          "id": "ask",
+          "from": "app",
+          "to": "cache",
+          "label": "读 user:42",
+          "tone": "blue"
+        },
+        {
+          "id": "load",
+          "from": "cache",
+          "to": "db",
+          "label": "未命中，查库",
+          "tone": "orange",
+          "in": ["miss"]
+        },
+        {
+          "id": "fill",
+          "from": "cache",
+          "to": "entries",
+          "style": "dashed",
+          "weight": "thin",
+          "label": "写入",
+          "tone": "orange",
+          "in": ["miss"]
+        },
+        {
+          "id": "reply",
+          "from": "cache",
+          "to": "app",
+          "tone": "green",
+          "label": "返回",
+          "in": ["hit"]
+        }
+      ],
+      "steps": [
+        {
+          "id": "miss",
+          "title": "第一次读：未命中",
+          "text": "缓存里没有 `user:42`，去数据库读取，再写进缓存。",
+          "tables": {
+            "entries": {
+              "rows": [["user:42", "{name: 林}"]],
+              "highlight": 0,
+              "tone": "orange"
+            }
+          }
+        },
+        {
+          "id": "hit",
+          "title": "第二次读：命中",
+          "text": "缓存里已有这条记录，直接返回，不再访问数据库。",
+          "focus": ["app", "cache", "entries", "ask", "reply"],
+          "tables": {
+            "entries": {
+              "rows": [["user:42", "{name: 林}"]],
+              "highlight": 0,
+              "tone": "green"
+            }
+          }
+        }
+      ]
+    },
+    "propsSchema": {
+      "type": "object",
+      "properties": {
+        "title": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "nodes": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 60,
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "label": {
+                "type": "string",
+                "maxLength": 400,
+                "description": "对象名称；带 table 的节点可省略。"
+              },
+              "sub": {
+                "type": "string",
+                "maxLength": 400,
+                "description": "名称下的一行补充，例如地址或角色。"
+              },
+              "tone": {
+                "enum": [
+                  "blue",
+                  "gray",
+                  "violet",
+                  "teal",
+                  "green",
+                  "red",
+                  "orange"
+                ]
+              },
+              "note": {
+                "type": "string",
+                "maxLength": 1000,
+                "description": "悬停或轻点对象时显示的解释。"
+              },
+              "table": {
+                "type": "object",
+                "properties": {
+                  "title": {
+                    "type": "string"
+                  },
+                  "columns": {
+                    "type": "array",
+                    "minItems": 1,
+                    "maxItems": 4,
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "rows": {
+                    "type": "array",
+                    "maxItems": 12,
+                    "items": {
+                      "type": "array",
+                      "minItems": 1,
+                      "maxItems": 4,
+                      "items": {
+                        "type": "string",
+                        "maxLength": 80
+                      }
+                    }
+                  },
+                  "empty": {
+                    "type": "string",
+                    "description": "没有行时显示的文字。"
+                  }
+                },
+                "additionalProperties": false
+              },
+              "col": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 19,
+                "description": "网格列号，从 0 开始；每列约 180 px。"
+              },
+              "row": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 19,
+                "description": "网格行号，从 0 开始；每行约 110 px。"
+              },
+              "colSpan": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 8
+              },
+              "rowSpan": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 8
+              },
+              "in": {
+                "type": "array",
+                "minItems": 1,
+                "items": {
+                  "type": "string"
+                },
+                "description": "只在这些步骤中出现；省略时每一步都出现。"
+              }
+            },
+            "required": ["id", "col", "row"]
+          }
+        },
+        "zones": {
+          "type": "array",
+          "maxItems": 12,
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "label": {
+                "type": "string"
+              },
+              "tone": {
+                "enum": [
+                  "blue",
+                  "gray",
+                  "violet",
+                  "teal",
+                  "green",
+                  "red",
+                  "orange"
+                ]
+              },
+              "col": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 19,
+                "description": "网格列号，从 0 开始；每列约 180 px。"
+              },
+              "row": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 19,
+                "description": "网格行号，从 0 开始；每行约 110 px。"
+              },
+              "colSpan": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 8
+              },
+              "rowSpan": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 8
+              }
+            },
+            "required": ["id", "col", "row"]
+          }
+        },
+        "links": {
+          "type": "array",
+          "maxItems": 120,
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "from": {
+                "type": "string",
+                "minLength": 1
+              },
+              "to": {
+                "type": "string",
+                "minLength": 1
+              },
+              "label": {
+                "type": "string",
+                "maxLength": 120
+              },
+              "tone": {
+                "enum": [
+                  "blue",
+                  "gray",
+                  "violet",
+                  "teal",
+                  "green",
+                  "red",
+                  "orange"
+                ]
+              },
+              "style": {
+                "enum": ["solid", "dashed"]
+              },
+              "ends": {
+                "enum": ["end", "both", "none"]
+              },
+              "weight": {
+                "enum": ["thin", "normal", "thick"]
+              },
+              "fromSide": {
+                "enum": ["top", "right", "bottom", "left"]
+              },
+              "toSide": {
+                "enum": ["top", "right", "bottom", "left"]
+              },
+              "in": {
+                "type": "array",
+                "minItems": 1,
+                "items": {
+                  "type": "string"
+                },
+                "description": "只在这些步骤中出现；省略时每一步都出现。"
+              }
+            },
+            "required": ["id", "from", "to"]
+          }
+        },
+        "marks": {
+          "type": "array",
+          "maxItems": 60,
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "on": {
+                "type": "string",
+                "minLength": 1
+              },
+              "kind": {
+                "enum": ["check", "cross"]
+              },
+              "tone": {
+                "enum": [
+                  "blue",
+                  "gray",
+                  "violet",
+                  "teal",
+                  "green",
+                  "red",
+                  "orange"
+                ]
+              },
+              "label": {
+                "type": "string"
+              },
+              "in": {
+                "type": "array",
+                "minItems": 1,
+                "items": {
+                  "type": "string"
+                },
+                "description": "只在这些步骤中出现；省略时每一步都出现。"
+              }
+            },
+            "required": ["id", "on", "kind"]
+          }
+        },
+        "steps": {
+          "type": "array",
+          "maxItems": 12,
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "title": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 80
+              },
+              "text": {
+                "type": "string",
+                "maxLength": 2000
+              },
+              "focus": {
+                "type": "array",
+                "minItems": 1,
+                "items": {
+                  "type": "string"
+                }
+              },
+              "tones": {
+                "type": "object",
+                "additionalProperties": {
+                  "enum": [
+                    "blue",
+                    "gray",
+                    "violet",
+                    "teal",
+                    "green",
+                    "red",
+                    "orange"
+                  ]
+                }
+              },
+              "labels": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "string"
+                }
+              },
+              "tables": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "object",
+                  "properties": {
+                    "rows": {
+                      "type": "array",
+                      "maxItems": 12,
+                      "items": {
+                        "type": "array",
+                        "minItems": 1,
+                        "maxItems": 4,
+                        "items": {
+                          "type": "string",
+                          "maxLength": 80
+                        }
+                      }
+                    },
+                    "highlight": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 11
+                    },
+                    "tone": {
+                      "enum": [
+                        "blue",
+                        "gray",
+                        "violet",
+                        "teal",
+                        "green",
+                        "red",
+                        "orange"
+                      ]
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            },
+            "required": ["id", "title"]
+          }
+        },
+        "initialStep": {
+          "type": "string"
+        }
+      },
+      "required": ["nodes"]
+    },
+    "examples": [
+      {
+        "name": "一个包经过 NAT",
+        "request": "用同一张图分三步讲清 NAT：出站时改写地址并记下映射，回包查表放行，主动入站查不到记录被丢弃。",
+        "data": {
+          "title": "一个包经过 NAT 时发生了什么",
+          "zones": [
+            {
+              "id": "internet",
+              "label": "公网",
+              "col": 2,
+              "row": 0,
+              "rowSpan": 3
+            }
+          ],
+          "nodes": [
+            {
+              "id": "laptop",
+              "label": "笔记本",
+              "sub": "192.168.0.5",
+              "tone": "blue",
+              "col": 0,
+              "row": 1
+            },
+            {
+              "id": "natA",
+              "label": "咖啡馆路由器",
+              "sub": "NAT · 198.51.100.4",
+              "tone": "gray",
+              "col": 1,
+              "row": 1,
+              "note": "NAT（网络地址转换）让局域网共用一个公网地址，并用映射表记住每条出站连接。"
+            },
+            {
+              "id": "web",
+              "label": "网站",
+              "sub": "example.com",
+              "tone": "gray",
+              "col": 2,
+              "row": 0
+            },
+            {
+              "id": "natB",
+              "label": "实验室出口",
+              "sub": "NAT · 203.0.113.7",
+              "tone": "gray",
+              "col": 3,
+              "row": 1
+            },
+            {
+              "id": "gpu",
+              "label": "GPU 服务器",
+              "sub": "10.0.3.17",
+              "tone": "blue",
+              "col": 4,
+              "row": 1
+            },
+            {
+              "id": "tableA",
+              "col": 0,
+              "row": 2,
+              "colSpan": 2,
+              "table": {
+                "title": "咖啡馆 NAT 映射表",
+                "columns": ["内网地址", "公网端口"],
+                "rows": [],
+                "empty": "（空）"
+              }
+            },
+            {
+              "id": "tableB",
+              "col": 3,
+              "row": 2,
+              "colSpan": 2,
+              "table": {
+                "title": "实验室 NAT 映射表",
+                "columns": ["内网地址", "公网端口"],
+                "rows": [],
+                "empty": "（空）"
+              }
+            }
+          ],
+          "links": [
+            {
+              "id": "out1",
+              "from": "laptop",
+              "to": "natA",
+              "tone": "blue",
+              "in": ["out", "in"]
+            },
+            {
+              "id": "out2",
+              "from": "natA",
+              "to": "web",
+              "tone": "blue",
+              "label": "从 198.51.100.4:62000",
+              "in": ["out"]
+            },
+            {
+              "id": "record",
+              "from": "natA",
+              "to": "tableA",
+              "tone": "blue",
+              "style": "dashed",
+              "weight": "thin",
+              "label": "记下",
+              "in": ["out"]
+            },
+            {
+              "id": "back1",
+              "from": "web",
+              "to": "natA",
+              "tone": "green",
+              "label": "发往 198.51.100.4:62000",
+              "in": ["back"]
+            },
+            {
+              "id": "back2",
+              "from": "natA",
+              "to": "laptop",
+              "tone": "green",
+              "label": "发往 192.168.0.5:41641",
+              "in": ["back"]
+            },
+            {
+              "id": "lookup",
+              "from": "tableA",
+              "to": "natA",
+              "tone": "green",
+              "style": "dashed",
+              "weight": "thin",
+              "label": "查表命中",
+              "in": ["back"]
+            },
+            {
+              "id": "inbound",
+              "from": "natA",
+              "to": "natB",
+              "tone": "red",
+              "label": "发往 203.0.113.7:22",
+              "in": ["in"]
+            },
+            {
+              "id": "miss",
+              "from": "natB",
+              "to": "tableB",
+              "tone": "red",
+              "style": "dashed",
+              "weight": "thin",
+              "label": "查不到",
+              "in": ["in"]
+            }
+          ],
+          "marks": [
+            {
+              "id": "drop",
+              "on": "gpu",
+              "kind": "cross",
+              "in": ["in"]
+            }
+          ],
+          "steps": [
+            {
+              "id": "out",
+              "title": "出站",
+              "text": "笔记本访问网站。NAT 把源地址 `192.168.0.5:41641` 换成 `198.51.100.4:62000`，并在映射表里**记下这一对**。",
+              "labels": {
+                "out1": "从 192.168.0.5:41641"
+              },
+              "tables": {
+                "tableA": {
+                  "rows": [["192.168.0.5:41641", "62000"]],
+                  "highlight": 0
+                }
+              }
+            },
+            {
+              "id": "back",
+              "title": "回包",
+              "text": "回包发往 `198.51.100.4:62000`，NAT 在表里找到 62000 这一行，把包转给笔记本。",
+              "tables": {
+                "tableA": {
+                  "rows": [["192.168.0.5:41641", "62000"]],
+                  "highlight": 0,
+                  "tone": "green"
+                }
+              }
+            },
+            {
+              "id": "in",
+              "title": "主动入站",
+              "text": "发往实验室 `203.0.113.7:22` 的包，在实验室 NAT 的表里没有记录，**只能丢弃**。",
+              "tables": {
+                "tableA": {
+                  "rows": [["192.168.0.5:41641", "62000"]]
+                },
+                "tableB": {
+                  "rows": []
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "缓存未命中与命中",
+        "request": "画出一次读请求经过缓存的两种情况：未命中时查库并写入缓存，命中时直接返回。",
+        "data": {
+          "title": "一次读请求怎样经过缓存",
+          "nodes": [
+            {
+              "id": "app",
+              "label": "应用",
+              "tone": "blue",
+              "col": 0,
+              "row": 0
+            },
+            {
+              "id": "cache",
+              "label": "缓存",
+              "sub": "Redis",
+              "tone": "teal",
+              "col": 2,
+              "row": 0
+            },
+            {
+              "id": "db",
+              "label": "数据库",
+              "tone": "violet",
+              "col": 4,
+              "row": 0
+            },
+            {
+              "id": "entries",
+              "col": 2,
+              "row": 1,
+              "colSpan": 2,
+              "table": {
+                "title": "缓存条目",
+                "columns": ["键", "值"],
+                "rows": [],
+                "empty": "（空）"
+              }
+            }
+          ],
+          "links": [
+            {
+              "id": "ask",
+              "from": "app",
+              "to": "cache",
+              "label": "读 user:42",
+              "tone": "blue"
+            },
+            {
+              "id": "load",
+              "from": "cache",
+              "to": "db",
+              "label": "未命中，查库",
+              "tone": "orange",
+              "in": ["miss"]
+            },
+            {
+              "id": "fill",
+              "from": "cache",
+              "to": "entries",
+              "style": "dashed",
+              "weight": "thin",
+              "label": "写入",
+              "tone": "orange",
+              "in": ["miss"]
+            },
+            {
+              "id": "reply",
+              "from": "cache",
+              "to": "app",
+              "tone": "green",
+              "label": "返回",
+              "in": ["hit"]
+            }
+          ],
+          "steps": [
+            {
+              "id": "miss",
+              "title": "第一次读：未命中",
+              "text": "缓存里没有 `user:42`，去数据库读取，再写进缓存。",
+              "tables": {
+                "entries": {
+                  "rows": [["user:42", "{name: 林}"]],
+                  "highlight": 0,
+                  "tone": "orange"
+                }
+              }
+            },
+            {
+              "id": "hit",
+              "title": "第二次读：命中",
+              "text": "缓存里已有这条记录，直接返回，不再访问数据库。",
+              "focus": ["app", "cache", "entries", "ask", "reply"],
+              "tables": {
+                "entries": {
+                  "rows": [["user:42", "{name: 林}"]],
+                  "highlight": 0,
+                  "tone": "green"
+                }
+              }
+            }
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "kind": "svg",
+    "name": "矢量图",
+    "description": "保存在页面里的 SVG 示意图：按页面宽度缩放，用调色板类跟随深色主题，图中元素可带悬停注释；读者只能查看，图形通过修改数据改变。",
+    "version": "1.0.0",
+    "scenarios": [
+      "为讲解手绘机制图、对比小多图、分层示意等没有现成组件的图形，文字可选中、可搜索，深色主题下自动换色。",
+      "把已有的 SVG 图形放进页面，并为图中对象补上悬停解释。"
+    ],
+    "effects": [
+      "保存前校验并在显示前再次清理 SVG：只保留绘图元素，去掉脚本、样式表、事件属性和外部链接，图内 id 自动加前缀，同页多张图互不冲突。",
+      "fill-*、solid-*、stroke-*、ink-* 等调色板类在浅色与深色主题下各有取值；未指定颜色的文字跟随正文颜色与字体。",
+      "带 data-note 的元素在悬停、聚焦或轻点时显示注释；导出与打印保留矢量图。"
+    ],
+    "defaultData": {
+      "source": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 640 220\"><defs><marker id=\"arrow\" viewBox=\"0 0 10 10\" refX=\"9\" refY=\"5\" markerWidth=\"7\" markerHeight=\"7\" orient=\"auto-start-reverse\"><path class=\"solid-blue\" d=\"M0 0L10 5L0 10z\"/></marker></defs><rect class=\"fill-blue stroke-blue\" x=\"30\" y=\"70\" width=\"160\" height=\"72\" rx=\"10\" stroke-width=\"1.5\"/><text class=\"ink-blue\" x=\"110\" y=\"104\" text-anchor=\"middle\" font-size=\"17\" font-weight=\"600\">笔记本</text><text class=\"ink-blue\" x=\"110\" y=\"126\" text-anchor=\"middle\" font-size=\"14\">私钥只在本机</text><rect class=\"fill-blue stroke-blue\" x=\"450\" y=\"70\" width=\"160\" height=\"72\" rx=\"10\" stroke-width=\"1.5\"/><text class=\"ink-blue\" x=\"530\" y=\"104\" text-anchor=\"middle\" font-size=\"17\" font-weight=\"600\">GPU 服务器</text><text class=\"ink-blue\" x=\"530\" y=\"126\" text-anchor=\"middle\" font-size=\"14\">私钥只在本机</text><path class=\"stroke-blue\" d=\"M190 106 H446\" stroke-width=\"3\" fill=\"none\" marker-end=\"url(#arrow)\" marker-start=\"url(#arrow)\"/><g data-note=\"WireGuard 用双方的密钥算出会话密钥，只有隧道两端能解开内容。\"><rect class=\"paper stroke-blue\" x=\"250\" y=\"90\" width=\"140\" height=\"32\" rx=\"16\"/><text class=\"ink-blue\" x=\"320\" y=\"111\" text-anchor=\"middle\" font-size=\"14\">加密隧道</text></g><text class=\"ink-muted\" x=\"320\" y=\"190\" text-anchor=\"middle\" font-size=\"14\">两端交换公钥后建立隧道</text></svg>",
+      "alt": "笔记本与 GPU 服务器之间的加密隧道示意图。"
+    },
+    "propsSchema": {
+      "type": "object",
+      "properties": {
+        "source": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 2000000,
+          "description": "完整的 <svg> 源码，根元素必须有 viewBox；只能使用绘图元素，不能含 script、style、foreignObject、事件属性或外部链接。"
+        },
+        "alt": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 2000,
+          "description": "给看不到图的读者的完整描述。"
+        },
+        "title": {
+          "type": "string",
+          "maxLength": 2000
+        },
+        "caption": {
+          "type": "string",
+          "maxLength": 2000,
+          "description": "图下说明，支持行内标记与悬停注释。"
+        },
+        "maxWidth": {
+          "type": "number",
+          "minimum": 120,
+          "maximum": 2400,
+          "description": "显示的最大宽度，单位 CSS px；省略时铺满内容宽度。"
+        }
+      },
+      "required": ["source", "alt"],
+      "additionalProperties": false
+    },
+    "examples": [
+      {
+        "name": "加密隧道示意",
+        "request": "画一张示意图：笔记本和 GPU 服务器之间有一条加密隧道，私钥各自留在本机，隧道标签带悬停解释。",
+        "data": {
+          "title": "加密隧道",
+          "source": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 640 220\"><defs><marker id=\"arrow\" viewBox=\"0 0 10 10\" refX=\"9\" refY=\"5\" markerWidth=\"7\" markerHeight=\"7\" orient=\"auto-start-reverse\"><path class=\"solid-blue\" d=\"M0 0L10 5L0 10z\"/></marker></defs><rect class=\"fill-blue stroke-blue\" x=\"30\" y=\"70\" width=\"160\" height=\"72\" rx=\"10\" stroke-width=\"1.5\"/><text class=\"ink-blue\" x=\"110\" y=\"104\" text-anchor=\"middle\" font-size=\"17\" font-weight=\"600\">笔记本</text><text class=\"ink-blue\" x=\"110\" y=\"126\" text-anchor=\"middle\" font-size=\"14\">私钥只在本机</text><rect class=\"fill-blue stroke-blue\" x=\"450\" y=\"70\" width=\"160\" height=\"72\" rx=\"10\" stroke-width=\"1.5\"/><text class=\"ink-blue\" x=\"530\" y=\"104\" text-anchor=\"middle\" font-size=\"17\" font-weight=\"600\">GPU 服务器</text><text class=\"ink-blue\" x=\"530\" y=\"126\" text-anchor=\"middle\" font-size=\"14\">私钥只在本机</text><path class=\"stroke-blue\" d=\"M190 106 H446\" stroke-width=\"3\" fill=\"none\" marker-end=\"url(#arrow)\" marker-start=\"url(#arrow)\"/><g data-note=\"WireGuard 用双方的密钥算出会话密钥，只有隧道两端能解开内容。\"><rect class=\"paper stroke-blue\" x=\"250\" y=\"90\" width=\"140\" height=\"32\" rx=\"16\"/><text class=\"ink-blue\" x=\"320\" y=\"111\" text-anchor=\"middle\" font-size=\"14\">加密隧道</text></g><text class=\"ink-muted\" x=\"320\" y=\"190\" text-anchor=\"middle\" font-size=\"14\">两端交换公钥后建立隧道</text></svg>",
+          "alt": "笔记本与 GPU 服务器各自保存私钥，中间是一条双向加密隧道。",
+          "caption": "悬停在“加密隧道”上查看会话密钥的来历。"
+        }
+      },
+      {
+        "name": "控制平面与数据平面",
+        "request": "用上下两层画出控制平面和数据平面：协调服务器在上，设备之间直连在下。",
+        "data": {
+          "source": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 720 300\"><rect class=\"zone line\" x=\"10\" y=\"10\" width=\"700\" height=\"100\" rx=\"12\" stroke-dasharray=\"5 5\"/><text class=\"ink-muted\" x=\"28\" y=\"36\" font-size=\"14\">控制平面</text><rect class=\"fill-violet stroke-violet\" x=\"270\" y=\"34\" width=\"180\" height=\"56\" rx=\"10\"/><text class=\"ink-violet\" x=\"360\" y=\"68\" text-anchor=\"middle\" font-size=\"16\" font-weight=\"600\">协调服务器</text><rect class=\"zone line\" x=\"10\" y=\"130\" width=\"700\" height=\"160\" rx=\"12\" stroke-dasharray=\"5 5\"/><text class=\"ink-muted\" x=\"28\" y=\"156\" font-size=\"14\">数据平面</text><rect class=\"fill-blue stroke-blue\" x=\"60\" y=\"200\" width=\"140\" height=\"56\" rx=\"10\"/><text class=\"ink-blue\" x=\"130\" y=\"234\" text-anchor=\"middle\" font-size=\"16\">笔记本</text><rect class=\"fill-blue stroke-blue\" x=\"520\" y=\"200\" width=\"140\" height=\"56\" rx=\"10\"/><text class=\"ink-blue\" x=\"590\" y=\"234\" text-anchor=\"middle\" font-size=\"16\">NAS</text><path class=\"stroke-blue\" d=\"M200 228 H520\" stroke-width=\"4\"/><path class=\"stroke-violet\" d=\"M320 90 L150 200 M400 90 L570 200\" stroke-width=\"1.4\" stroke-dasharray=\"4 4\" fill=\"none\"/></svg>",
+          "alt": "上层控制平面中协调服务器用虚线连接两台设备；下层数据平面中笔记本和 NAS 直接相连。",
+          "title": "两张网"
         }
       }
     ]

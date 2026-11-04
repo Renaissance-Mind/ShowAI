@@ -631,7 +631,7 @@
       "步骤条显示编号与标题，可点击、用上一步/下一步或左右方向键切换；读到第几步只属于当前阅读，不写入内容。",
       "编辑时直接修改当前步骤的标题与内容，可添加、删除和调整步骤顺序；打印与导出时依次展开全部步骤。"
     ],
-    "version": "1.0.0",
+    "version": "1.1.0",
     "defaultData": {
       "steps": [
         {
@@ -684,9 +684,27 @@
                   }
                 ],
                 "description": "支持 doc JSON 富文本树，兼容 Markdown 字符串。编辑后保留文字格式和段落结构。"
+              },
+              "blocks": {
+                "type": "array",
+                "maxItems": 20,
+                "description": "这一步正文之后的组件，按顺序插入；每项 {kind, data} 与 component.insert 相同。只给 blocks 时这一步没有空段落。",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "kind": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "data": {
+                      "type": "object"
+                    }
+                  },
+                  "required": ["kind", "data"],
+                  "additionalProperties": false
+                }
               }
             },
-            "required": ["content"],
             "additionalProperties": false
           }
         },

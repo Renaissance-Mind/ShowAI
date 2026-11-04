@@ -28,6 +28,8 @@ import { validatePlanData } from "../components/blocks/plan-contract.mjs";
 import { validateEventTimelineData } from "../components/blocks/event-timeline-contract.mjs";
 import { validatePlaygroundData } from "../components/blocks/playground-contract.mjs";
 import { validateDatabaseData } from "../components/blocks/database-contract.mjs";
+import { validateMechanismData } from "../components/blocks/mechanism-contract.mjs";
+import { validateSvgData } from "../components/blocks/svg-contract.mjs";
 import { validateResearchData } from "../components/blocks/research-contract.mjs";
 // Kept local so readers do not carry the binding engine; stores check bindings fully.
 const BINDING_KEY = "$binding";
@@ -361,6 +363,14 @@ function validateWidgetData(kind, data, path) {
   }
   if (kind === "flowchart") {
     validateFlowchartData(data);
+    return;
+  }
+  if (kind === "mechanism-diagram") {
+    validateMechanismData(data);
+    return;
+  }
+  if (kind === "svg") {
+    validateSvgData(data);
     return;
   }
   if (kind === "scene-3d") {

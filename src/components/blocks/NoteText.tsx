@@ -1,6 +1,9 @@
 import { noteSegments } from "./note-markup.mjs";
 import { installNoteBubbles } from "./note-bubble";
 
+/** Installs the note controller for anchors written outside React, such as SVG markup. */
+export const installNotes = () => installNoteBubbles();
+
 /** Props that turn any element into a hover-note anchor. */
 // Bundlers may drop bare side-effect imports of shared modules, so every
 // anchor installs the (idempotent) document controller explicitly.

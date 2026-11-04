@@ -59,6 +59,16 @@ import { validatePlanData } from "./plan-contract.mjs";
 import { validateEventTimelineData } from "./event-timeline-contract.mjs";
 import { validatePlaygroundData } from "./playground-contract.mjs";
 import { validateDatabaseData } from "./database-contract.mjs";
+import { validateMechanismData } from "./mechanism-contract.mjs";
+import { validateSvgData } from "./svg-contract.mjs";
+const MechanismDiagramBlock = /* @__PURE__ */ lazy(() =>
+  import("./MechanismDiagram").then((module) => ({
+    default: module.MechanismDiagramBlock,
+  })),
+);
+const SvgBlock = /* @__PURE__ */ lazy(() =>
+  import("./Svg").then((module) => ({ default: module.SvgBlock })),
+);
 const SequenceDiagramBlock = /* @__PURE__ */ lazy(() =>
   import("./SequenceDiagram").then((module) => ({
     default: module.SequenceDiagramBlock,
@@ -310,6 +320,31 @@ registerBlock({
     .defaultData as BlockData,
   renderer: FlowchartBlock,
   validate: validateFlowchartData,
+});
+registerBlock({
+  kind: "mechanism-diagram",
+  title: "机制图",
+  description: "对象、状态表与连线，逐步展示变化",
+  icon: "⧉",
+  defaultData: componentMetadata.find(
+    (item) => item.kind === "mechanism-diagram",
+  )!.defaultData as BlockData,
+  renderer: MechanismDiagramBlock,
+  validate: (data) => {
+    validateMechanismData(data);
+  },
+});
+registerBlock({
+  kind: "svg",
+  title: "矢量图",
+  description: "保存在页面里、跟随主题的 SVG 示意图",
+  icon: "✎",
+  defaultData: componentMetadata.find((item) => item.kind === "svg")!
+    .defaultData as BlockData,
+  renderer: SvgBlock,
+  validate: (data) => {
+    validateSvgData(data);
+  },
 });
 registerBlock({
   kind: "chart",

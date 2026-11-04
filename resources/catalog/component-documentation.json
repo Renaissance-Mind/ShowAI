@@ -705,7 +705,11 @@
         },
         {
           "path": "steps[].content",
-          "meaning": "这一步的正文，支持与 Markdown 组件相同的语法。需要放入其他组件时，在页面中向对应 step 插入块。"
+          "meaning": "这一步的正文，支持与 Markdown 组件相同的语法；只放组件时可省略。"
+        },
+        {
+          "path": "steps[].blocks",
+          "meaning": "可选：这一步正文之后的组件列表，每项 {kind, data}，与 component.insert 的 kind/data 相同，例如 {kind:\"image\",data:{src,alt}} 或 {kind:\"svg\",data:{source,alt}}。创建 stepper 时一次放好每一步的图和说明，不必再读取 step id；要让图在文字之前，省略 content，把文字作为 {kind:\"text\",data:{format:\"markdown\",content}} 放在 blocks 里。"
         },
         {
           "path": "color",
@@ -738,7 +742,7 @@
           "steps": [
             "按发生顺序拆成 2–8 步，每步一个短标题，标题说清这一步是什么事件或阶段。",
             "每一步只放读者在这一步需要看的内容：一句说明，加一张图或一个组件；变化本身用具体的值或画面表达。",
-            "在页面中先插入 stepper，再用 block.insert 把段落、图片或 widget 组件放进对应 step（parentId 为该 step 的 id）。"
+            "创建 stepper 时用 steps[].blocks 一次放入每一步的图、组件和文字；之后要往已有步骤补内容时，再用 page_read 找到 step id，以 component.insert 的 parentId 指向它。"
           ],
           "exampleIndex": 0
         }
@@ -1948,11 +1952,11 @@
         },
         {
           "path": "flows[].edges",
-          "meaning": "每条边有 id、source、target，可选 label 显示在连线中段；端点必须存在于同一条流程。连线只在终点画箭头。"
+          "meaning": "每条边有 id、source、target，可选 label 显示在连线上；端点必须存在于同一条流程。可选 sourceSide/targetSide（top/bottom/left/right）只改变这条连线的进出边，覆盖节点设置；ends 为 end（默认，终点箭头）、both（两端箭头，表示双向或往返）或 none（无箭头，表示关联）。同一节点引出多条带标签的连线时，标签自动放在各自终点旁。"
         },
         {
           "path": "flows[].nodes[].sourceSide / targetSide",
-          "meaning": "连接从节点哪一边进出：top/bottom/left/right。按节点设置，作用于该节点全部出边或入边；未设置时 TB 从下边出、上边进，LR 从右边出、左边进。"
+          "meaning": "连接从节点哪一边进出：top/bottom/left/right。作用于该节点全部出边或入边，单条连线可用 edges[].sourceSide/targetSide 覆盖；未设置时 TB 从下边出、上边进，LR 从右边出、左边进。"
         },
         {
           "path": "flows[].journeys",
@@ -2039,10 +2043,11 @@
         "每条流程最多 200 节点、400 边；最多 20 条流程；ID 唯一且连接不得悬空。",
         "手动坐标不改变连线的进出边：坐标排布与 direction 不一致时，连线会绕行并穿过其他节点。优先省略 position 让自动布局排列；确需手动坐标时按 direction 分行或分列，并给相关节点设 sourceSide/targetSide。",
         "画布整体缩放到组件宽度：坐标总宽度明显超过组件宽度（页面中约 900 px）时节点文字随之变小；横向节点多时改用 TB 或拆成多条 flows。",
-        "同一对节点之间的两条反向连线画在同一路径上，互相重叠，而且连线只在终点有箭头。表达往返时用一条连线并在 label 写明两个方向，例如“分派 / 汇报”；读者需要看清每次往返的先后时改用 sequence-diagram。",
+        "同一对节点之间的两条反向连线会画在同一路径上；表达双向关系用一条 ends: \"both\" 的连线，读者需要看清每次往返的先后时改用 sequence-diagram。",
         "组件不提供拖动节点或图上编辑；节点位置、文字与说明只通过修改页面数据（page_apply 的 component.props.set）改变。阅读中的缩放与锁定不会写入页面。",
         "路线最多 12 条、每条 1–60 步；阶段最多 30 个；步骤与阶段引用的节点、连线必须存在于同一流程，step.edge 必须连接该步节点。",
-        "路线与阶段只是阅读状态，切换和播放不会修改或保存页面；initialJourney/initialStage 只决定打开时的初始画面。"
+        "路线与阶段只是阅读状态，切换和播放不会修改或保存页面；initialJourney/initialStage 只决定打开时的初始画面。",
+        "组件宽度小于 640 px 时，节点都没有 position 的 LR 流程按 TB 自动布局；写了 position 的流程保持原坐标并整体缩放。"
       ],
       "editing": {
         "data": [
@@ -10517,6 +10522,257 @@
       ],
       "verification": [
         "检查真实 Page、深色主题、360px 窄屏、键盘操作、打印和离线导出。"
+      ]
+    }
+  },
+  "svg": {
+    "version": 1,
+    "reuse": {
+      "kind": "general",
+      "boundaries": [
+        "适合 Agent 或作者手绘的示意图：机制、对比小多图、分层或空间关系。图里的结构由 SVG 决定，组件不做布局。",
+        "对象之间有逐步变化的状态（表格、包、请求）时优先用 mechanism-diagram；标准流程、时序、分层用对应组件。",
+        "读者只查看图形；改图通过修改 source 等数据。"
+      ]
+    },
+    "usage": {
+      "purpose": "把一张 SVG 示意图保存在页面里：按内容宽度缩放、跟随深色主题、图中元素可带悬停注释。",
+      "structure": [
+        "可选标题；图形按 viewBox 等比缩放到内容宽度或 maxWidth；可选图下说明。",
+        "source 保存前校验，显示前用浏览器再次清理并给图内 id 加前缀。"
+      ],
+      "inputs": [
+        {
+          "path": "source",
+          "meaning": "完整 <svg> 源码，根元素必须有 viewBox。只能用绘图元素（g、rect、circle、ellipse、line、polyline、polygon、path、text、tspan、marker、渐变、clipPath、mask、use、symbol、image 等）；不能含 script、style、foreignObject、动画、事件属性和外部链接；href 只能是 #id 或内嵌的 PNG/JPEG/GIF/WebP，url(...) 只能引用 #id。"
+        },
+        {
+          "path": "source 调色板类",
+          "meaning": "用 class 上色，浅色与深色主题各有取值：fill-{tone} 浅色填充，solid-{tone} 实色填充（箭头头部、实心标记），stroke-{tone} 线条，ink-{tone} 浅色填充上的文字；tone 为 blue、gray、violet、teal、green、red、orange。中性角色：ink 正文色、ink-muted 次要文字、paper 卡片底色、zone 分区底色、line 分隔线。写死的颜色不会随主题变化。"
+        },
+        {
+          "path": "source 文字",
+          "meaning": "未写 fill 与 ink-* 类的文字使用正文颜色；未写 font-family 的文字使用页面字体。按渲染后的尺寸检查字号：图宽 960 时，正文类文字用 14–16，宽图缩放后不要小于 12 px。"
+        },
+        {
+          "path": "source data-note",
+          "meaning": "任意元素加 data-note=\"解释\"，读者悬停、聚焦或轻点时显示这段注释，适合解释图中的术语或对象。"
+        },
+        {
+          "path": "alt",
+          "meaning": "必填：给看不到图的读者的完整描述，写出对象、关系与结论。"
+        },
+        {
+          "path": "title",
+          "meaning": "可选：图标题。"
+        },
+        {
+          "path": "caption",
+          "meaning": "可选：图下说明，支持 **粗体**、`代码`、链接与悬停注释。"
+        },
+        {
+          "path": "maxWidth",
+          "meaning": "可选：最大显示宽度（CSS px，120–2400）；省略时铺满内容宽度。"
+        }
+      ],
+      "recipes": [
+        {
+          "title": "画一张讲解示意图",
+          "steps": [
+            "先写下图要让读者看出的关系，以及必须准确的对象、数值、箭头方向和标签。",
+            "以 960 宽的 viewBox 起稿，对象用调色板类上色，同一对象在整篇作品里保持同一名称、颜色和位置。",
+            "给术语加 data-note，写 alt；保存后用 page_read 图像检查文字大小与重叠。"
+          ],
+          "exampleIndex": 0
+        },
+        {
+          "title": "上下分层或小多图",
+          "steps": [
+            "用 zone 类画分区底色和虚线框，分区标签写在左上角。",
+            "多格对比保持同一尺度和同一对象位置，只改变要对比的部分。"
+          ],
+          "exampleIndex": 1
+        }
+      ],
+      "interactions": [
+        {
+          "action": "悬停、聚焦或轻点带 data-note 的元素",
+          "effect": "显示注释气泡；Esc 或移开关闭。",
+          "persistence": "view"
+        }
+      ],
+      "constraints": [
+        "source 最长 2,000,000 字符；不能含 <style>，内联 style 属性中的 url(...) 只能引用 #id。",
+        "图形不可在页面上直接编辑；修改 source 等字段并保存。",
+        "深色主题只对调色板类和未着色文字生效。"
+      ],
+      "editing": {
+        "data": [
+          "用 component.props.set 替换 source、alt、caption；保持同一作品中对象的名称、颜色一致。"
+        ],
+        "implementation": [
+          "新增允许的元素或调色板类时同步修改 svg-contract.mjs、svg-sanitize.ts、svg.css 与测试。"
+        ]
+      }
+    },
+    "development": {
+      "entryPoints": [
+        {
+          "path": "src/components/blocks/Svg.tsx",
+          "purpose": "渲染与主题；source 视图返回 SDK 包装起点。"
+        },
+        {
+          "path": "src/components/blocks/svg-contract.mjs",
+          "purpose": "无依赖的源码校验与允许元素清单。"
+        },
+        {
+          "path": "src/components/blocks/svg-sanitize.ts",
+          "purpose": "浏览器端清理、id 前缀与注释锚点。"
+        },
+        {
+          "path": "src/components/blocks/drawing-palette.css",
+          "purpose": "与 mechanism-diagram 共用的调色板。"
+        }
+      ],
+      "architecture": [
+        "保存时按文本校验，显示时用 DOMParser 重新解析、只保留白名单元素和安全属性，再内联到页面。"
+      ],
+      "extensionPoints": [
+        "调色板新增色调时同时修改 drawing-palette.css、svg.css 与两个组件的 DRAWING_TONES。"
+      ],
+      "invariants": [
+        "不在页面中注入 <style> 或脚本；同页多张图的 id 互不冲突。",
+        "组件不调用 onChange。"
+      ],
+      "verification": [
+        "检查真实 Page、深色主题、窄屏缩放、悬停注释、打印与离线导出。"
+      ]
+    }
+  },
+  "mechanism-diagram": {
+    "version": 1,
+    "reuse": {
+      "kind": "general",
+      "boundaries": [
+        "适合讲机制：对象、对象持有的小表格状态、对象之间的连线，以及逐步发生的变化（网络包、请求、缓存、事务、密钥交换）。",
+        "只有参与者之间按时间往返的消息、没有状态表时用 sequence-diagram；带分支的流程用 flowchart；需要自由构图时用 svg。",
+        "读者只查看与切换步骤；图形通过修改数据改变。"
+      ]
+    },
+    "usage": {
+      "purpose": "在同一张图上逐步讲清一个机制：布局只计算一次，每一步只写变化的连线、标记、表格内容和高亮。",
+      "structure": [
+        "顶部：可选标题与说明；有 steps 时是编号步骤条和上一步/下一步。",
+        "中部：网格画面——分区（zones）在底层，其上是连线、对象与表格节点、连线标签、勾叉标记。",
+        "下方：当前步骤的说明。打印时依次画出每一步。"
+      ],
+      "inputs": [
+        {
+          "path": "nodes[]",
+          "meaning": "对象：id、col、row 必填（网格从 0 开始，每列约 180 px、每行约 110 px），可选 colSpan/rowSpan、label、sub、tone、note（悬停解释）、in（只在这些步骤出现）。相邻两列之间只有约 24 px，需要在连线上写长标签时在两者之间空出一列。"
+        },
+        {
+          "path": "nodes[].table",
+          "meaning": "表格节点：title、columns（1–4 列标题）、rows（每行与 columns 等长，最多 12 行）、empty（无行时的文字）。表格较宽时用 colSpan 2；表格会撑高，下面的行要留空。"
+        },
+        {
+          "path": "zones[]",
+          "meaning": "分区底色与虚线框：id、col、row、colSpan、rowSpan，可选 label 与 tone；画在最底层，适合“公网”“控制平面”等范围。"
+        },
+        {
+          "path": "links[]",
+          "meaning": "连线：id、from、to（节点 id）；可选 label（显示为标签胶囊，支持悬停注释）、tone、style（solid|dashed）、ends（end 终点箭头、both 双向、none 无箭头）、weight（thin|normal|thick）、fromSide/toSide（top|right|bottom|left，省略时按相对位置自动选择）、in。"
+        },
+        {
+          "path": "marks[]",
+          "meaning": "勾或叉：id、on（节点或连线 id）、kind（check|cross），可选 tone、label、in。节点上的标记在右上角，连线上的标记在标签右侧。"
+        },
+        {
+          "path": "steps[]",
+          "meaning": "步骤：id、title（步骤条短标题）、可选 text（图下说明，支持行内标记与悬停注释）、focus（只突出这些 id，其他变淡）、tones（{id: tone} 改变颜色）、labels（{连线 id: 文字} 替换标签）、tables（{表格节点 id: {rows, highlight, tone}} 替换行、高亮第几行）。"
+        },
+        {
+          "path": "tone",
+          "meaning": "blue、gray、violet、teal、green、red、orange；同一作品里同类对象用同一色，放行用 green、拒绝用 red。默认对象 blue、表格与连线 gray。"
+        },
+        {
+          "path": "initialStep",
+          "meaning": "可选：打开时显示的步骤 id。"
+        }
+      ],
+      "recipes": [
+        {
+          "title": "分步讲清一个机制",
+          "steps": [
+            "先列出所有对象和它们持有的状态，排成网格；每一步都会出现的对象只写一次。",
+            "每条只在部分步骤出现的连线或标记写 in；步骤里只写这一步的变化：tables 改行与高亮，labels 改标签，focus 突出相关对象。",
+            "每步 text 写一两句：发生了什么、为什么。保存后切换各步检查画面。"
+          ],
+          "exampleIndex": 0
+        },
+        {
+          "title": "对比两条路径",
+          "steps": [
+            "把共同的对象放在同一位置，两条路径分别作为两个步骤。",
+            "用 tones 与 marks 标出结果，用 focus 让与本步无关的对象变淡。"
+          ],
+          "exampleIndex": 1
+        }
+      ],
+      "interactions": [
+        {
+          "action": "点击步骤、上一步/下一步，或在步骤条上按方向键、Home、End",
+          "effect": "切换当前步骤；画面布局不变，只改变出现的连线、标记、表格和高亮。",
+          "persistence": "view"
+        },
+        {
+          "action": "悬停、聚焦或轻点带 note 的对象或带注释的标签",
+          "effect": "显示注释。",
+          "persistence": "view"
+        }
+      ],
+      "constraints": [
+        "最多 60 个对象、12 个分区、120 条连线、60 个标记、12 个步骤；网格 0–19。",
+        "in、focus、tones、labels、tables 引用的 id 必须存在；没有 steps 时不能写 in。",
+        "连线自动正交走线，不避让其他对象；有穿越时调整网格位置或指定 fromSide/toSide。",
+        "阅读操作不调用 onChange。"
+      ],
+      "editing": {
+        "data": [
+          "用 component.props.set 修改整个 nodes、links、steps 等顶层字段；改 id 时同步修改引用。"
+        ],
+        "implementation": [
+          "新增元素类型或步骤变化时同步修改 mechanism-contract.mjs、组件、schema 与测试。"
+        ]
+      }
+    },
+    "development": {
+      "entryPoints": [
+        {
+          "path": "src/components/blocks/MechanismDiagram.tsx",
+          "purpose": "网格布局、连线走线、步骤状态与打印版本。"
+        },
+        {
+          "path": "src/components/blocks/mechanism-contract.mjs",
+          "purpose": "无依赖的数据校验。"
+        },
+        {
+          "path": "src/components/blocks/drawing-palette.css",
+          "purpose": "与 svg 组件共用的调色板。"
+        }
+      ],
+      "architecture": [
+        "arrange 用全部步骤的数据一次算出对象框、连线进出边与偏移，步骤只决定显示、颜色与表格内容，因此切换步骤画面不移动。"
+      ],
+      "extensionPoints": [
+        "新的步骤变化写进 Frame（frameFor），并在打印版本中同样呈现。"
+      ],
+      "invariants": [
+        "文字解析为 React 元素，从不注入 HTML；组件不调用 onChange。",
+        "打印与导出画出全部步骤。"
+      ],
+      "verification": [
+        "检查真实 Page 的每一步、深色主题、窄屏横向滚动、键盘切换、打印与离线导出。"
       ]
     }
   }

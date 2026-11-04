@@ -142,6 +142,36 @@ const NOTE_TEXT = /\]\{|\\note(?![A-Za-z])/;
  * note controller unless some text or formula carries a note, and the compiled
  * ink kernel unless the page holds strokes or drawings.
  */
+// Contracts of built-ins that only some pages use; the reader carries the real
+// module only when the page holds one of these kinds.
+const CONTRACT_STUBS = {
+  "src/components/blocks/svg-contract.mjs": {
+    kinds: ["svg", "mechanism-diagram"],
+    source: [
+      "export const DRAWING_TONES = [];",
+      "export const SVG_LIMITS = {};",
+      "export const SVG_ELEMENTS = [];",
+      "export const safeSvgHref = () => false;",
+      "export const safeSvgUrls = () => false;",
+      "export const validateSvgData = (data) => data;",
+    ].join("\n"),
+  },
+  "src/components/blocks/mechanism-contract.mjs": {
+    kinds: ["mechanism-diagram"],
+    source: [
+      "export const DRAWING_TONES = [];",
+      "export const MECHANISM_LIMITS = {};",
+      "export const LINK_STYLES = [];",
+      "export const LINK_ENDS = [];",
+      "export const LINK_WEIGHTS = [];",
+      "export const SIDES = [];",
+      "export const MARK_KINDS = [];",
+      "export const validateMechanismData = (data) => data;",
+    ].join("\n"),
+  },
+};
+// SVG figures mark note anchors with a data-note attribute instead of note text.
+const SVG_NOTE = /\sdata-note\s*=/;
 export function readerOmissions(documents) {
   let math = false;
   let code = false;
@@ -153,7 +183,7 @@ export function readerOmissions(documents) {
     if (typeof value === "string") {
       if (MATH_TEXT.test(value)) math = true;
       if (CODE_TEXT.test(value)) code = true;
-      if (NOTE_TEXT.test(value)) notes = true;
+      if (NOTE_TEXT.test(value) || SVG_NOTE.test(value)) notes = true;
       return;
     }
     if (Array.isArray(value)) {
@@ -164,6 +194,12 @@ export function readerOmissions(documents) {
       if (value.type === "mathInline" || value.type === "mathBlock")
         math = true;
       if (value.type === "annotation") notes = true;
+      if (
+        value.type === "widget" &&
+        value.attrs?.kind === "mechanism-diagram" &&
+        value.attrs.data?.nodes?.some?.((node) => node?.note)
+      )
+        notes = true;
       if (
         value.type === "drawing" ||
         Object.hasOwn(value, "nativeInk") ||
@@ -421,7 +457,7 @@ async function compileReader(archivePath, archive, kinds, omits = []) {
         if (omitNotes && args.path === "src/components/blocks/NoteText.tsx")
           return {
             contents:
-              'export const noteProps = () => ({}); export const NoteText = ({ text }) => String(text ?? ""); export const NoteSvgText = NoteText;',
+              'export const noteProps = () => ({}); export const installNotes = () => {}; export const NoteText = ({ text }) => String(text ?? ""); export const NoteSvgText = NoteText;',
             loader: "js",
           };
         // Without "]{" or \note anywhere on the page, parsing finds nothing.
@@ -515,6 +551,10 @@ async function compileReader(archivePath, archive, kinds, omits = []) {
               "export default function RichTextEditor() { return null; }",
             loader: "tsx",
           };
+        // A page without these kinds never runs their validators.
+        const contract = CONTRACT_STUBS[args.path];
+        if (contract && !contract.kinds.some((kind) => selected.has(kind)))
+          return { contents: contract.source, loader: "js" };
         let source = archive.files[args.path];
         if (args.path === "src/components/blocks/registry.ts")
           source = removeRanges(

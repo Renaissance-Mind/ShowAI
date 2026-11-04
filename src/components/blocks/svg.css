@@ -1,0 +1,153 @@
+/* svg: a drawn figure scaled to the page, themed through the drawing palette. */
+.sb-block.sv-block {
+  margin: 0;
+}
+.sb-block.sv-block .sv-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+.sb-block.sv-block .sv-canvas {
+  margin: 0 auto;
+}
+.sb-block.sv-block .sv-figure {
+  display: block;
+  width: 100%;
+  height: auto;
+  overflow: visible;
+}
+/* Unstyled text and shapes follow the theme; explicit attributes still win
+ * over these defaults only where a palette class is absent. */
+.sb-block.sv-block .sv-figure text:not([fill]):not([class*="ink-"]) {
+  fill: var(--dw-ink);
+}
+.sb-block.sv-block .sv-figure text:not([font-family]) {
+  font-family: inherit;
+}
+.sb-block.sv-block .sv-figure .showai-note {
+  cursor: help;
+}
+.sb-block.sv-block .sv-figure .showai-note:focus-visible {
+  outline: 2px solid var(--sb-accent);
+}
+
+/* Neutral roles. */
+.sb-block.sv-block .sv-figure .ink {
+  fill: var(--dw-ink);
+}
+.sb-block.sv-block .sv-figure .ink-muted {
+  fill: var(--dw-muted);
+}
+.sb-block.sv-block .sv-figure .paper {
+  fill: var(--dw-paper);
+}
+.sb-block.sv-block .sv-figure .zone {
+  fill: var(--dw-zone);
+}
+.sb-block.sv-block .sv-figure .line {
+  stroke: var(--dw-line);
+}
+.sb-block.sv-block .sv-figure .stroke-ink {
+  stroke: var(--dw-ink);
+}
+.sb-block.sv-block .sv-figure .stroke-muted {
+  stroke: var(--dw-muted);
+}
+
+/* Tone roles: fill-* soft fills, solid-* strong fills, stroke-* lines,
+ * ink-* text on a soft fill. */
+.sb-block.sv-block .sv-figure .fill-blue {
+  fill: var(--dw-blue-soft);
+}
+.sb-block.sv-block .sv-figure .fill-gray {
+  fill: var(--dw-gray-soft);
+}
+.sb-block.sv-block .sv-figure .fill-violet {
+  fill: var(--dw-violet-soft);
+}
+.sb-block.sv-block .sv-figure .fill-teal {
+  fill: var(--dw-teal-soft);
+}
+.sb-block.sv-block .sv-figure .fill-green {
+  fill: var(--dw-green-soft);
+}
+.sb-block.sv-block .sv-figure .fill-red {
+  fill: var(--dw-red-soft);
+}
+.sb-block.sv-block .sv-figure .fill-orange {
+  fill: var(--dw-orange-soft);
+}
+.sb-block.sv-block .sv-figure .solid-blue {
+  fill: var(--dw-blue);
+}
+.sb-block.sv-block .sv-figure .solid-gray {
+  fill: var(--dw-gray);
+}
+.sb-block.sv-block .sv-figure .solid-violet {
+  fill: var(--dw-violet);
+}
+.sb-block.sv-block .sv-figure .solid-teal {
+  fill: var(--dw-teal);
+}
+.sb-block.sv-block .sv-figure .solid-green {
+  fill: var(--dw-green);
+}
+.sb-block.sv-block .sv-figure .solid-red {
+  fill: var(--dw-red);
+}
+.sb-block.sv-block .sv-figure .solid-orange {
+  fill: var(--dw-orange);
+}
+.sb-block.sv-block .sv-figure .stroke-blue {
+  stroke: var(--dw-blue);
+}
+.sb-block.sv-block .sv-figure .stroke-gray {
+  stroke: var(--dw-gray);
+}
+.sb-block.sv-block .sv-figure .stroke-violet {
+  stroke: var(--dw-violet);
+}
+.sb-block.sv-block .sv-figure .stroke-teal {
+  stroke: var(--dw-teal);
+}
+.sb-block.sv-block .sv-figure .stroke-green {
+  stroke: var(--dw-green);
+}
+.sb-block.sv-block .sv-figure .stroke-red {
+  stroke: var(--dw-red);
+}
+.sb-block.sv-block .sv-figure .stroke-orange {
+  stroke: var(--dw-orange);
+}
+.sb-block.sv-block .sv-figure .ink-blue {
+  fill: var(--dw-blue-ink);
+}
+.sb-block.sv-block .sv-figure .ink-gray {
+  fill: var(--dw-gray-ink);
+}
+.sb-block.sv-block .sv-figure .ink-violet {
+  fill: var(--dw-violet-ink);
+}
+.sb-block.sv-block .sv-figure .ink-teal {
+  fill: var(--dw-teal-ink);
+}
+.sb-block.sv-block .sv-figure .ink-green {
+  fill: var(--dw-green-ink);
+}
+.sb-block.sv-block .sv-figure .ink-red {
+  fill: var(--dw-red-ink);
+}
+.sb-block.sv-block .sv-figure .ink-orange {
+  fill: var(--dw-orange-ink);
+}
+
+.sb-block.sv-block .sv-caption {
+  margin: 10px 0 0;
+  color: var(--sb-muted);
+  font-size: 13px;
+  line-height: 1.7;
+  text-align: center;
+}

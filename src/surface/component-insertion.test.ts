@@ -11,6 +11,50 @@ import {
 } from "../portable/validation.mjs";
 
 describe("unified component insertion", () => {
+  it("creates a stepper with components inside its steps in one insertion", () => {
+    const page = createResource(blankDocument(), "page");
+    const svg = {
+      source:
+        '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10"><rect width="5" height="5"/></svg>',
+      alt: "A square",
+    };
+    const inserted = insertComponent(page, null, "stepper", {
+      steps: [
+        {
+          title: "Figure first",
+          blocks: [
+            { kind: "svg", data: svg },
+            { kind: "text", data: { format: "markdown", content: "Caption" } },
+          ],
+        },
+        {
+          title: "Text then figure",
+          content: "Intro",
+          blocks: [{ kind: "svg", data: svg }],
+        },
+        { title: "Text only", content: "Plain" },
+      ],
+    });
+    const stepper = findSurfaceNode(inserted.document, inserted.nodeId)!.node;
+    expect(stepper.type).toBe("stepper");
+    const [first, second, third] = stepper.content!;
+    expect(first.content!.map((node) => node.type)).toEqual([
+      "widget",
+      "richText",
+    ]);
+    expect(first.content![0].attrs!.kind).toBe("svg");
+    expect(second.content!.map((node) => node.type)).toEqual([
+      "paragraph",
+      "widget",
+    ]);
+    expect(third.content!.map((node) => node.type)).toEqual(["paragraph"]);
+    expect(() => validateDocument(inserted.document)).not.toThrow();
+    expect(() =>
+      insertComponent(page, null, "stepper", {
+        steps: [{ title: "Bad", blocks: [{ kind: "svg" }] }],
+      }),
+    ).toThrow("steps[0].blocks");
+  });
   it("places Board components in editable Pages and reuses the selected Page for further components", () => {
     const board = createResource(blankDocument(), "board");
     const inserted = insertComponent(board, null, "text", {

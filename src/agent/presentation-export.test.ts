@@ -34,6 +34,8 @@ test.each([
   "roadmap",
   "waterfall",
   "event-timeline",
+  "mechanism-diagram",
+  "svg",
 ])(
   "portable reader mounts %s without requiring unused component metadata",
   async (kind) => {

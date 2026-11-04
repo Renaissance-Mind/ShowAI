@@ -58,9 +58,17 @@ export function insertComponent(
   kind: string,
   data: Record<string, unknown>,
   afterId?: string | null,
-) {
+): { document: ReturnType<typeof upgradeResource>; nodeId: string } {
   if (!data || typeof data !== "object" || Array.isArray(data))
     throw new Error("Component data must be an object.");
+  if (
+    kind === "stepper" &&
+    Array.isArray(data.steps) &&
+    data.steps.some(
+      (step) => step && typeof step === "object" && "blocks" in step,
+    )
+  )
+    return insertStepper(source, parentId, data, afterId);
   const document = upgradeResource(source);
   const parent = parentId
     ? findSurfaceNode(document, parentId)?.node
@@ -151,7 +159,9 @@ export function insertComponent(
   else if (afterId !== undefined) {
     const sibling = siblings.findIndex((child) => child.attrs?.id === afterId);
     if (sibling < 0)
-      throw new Error(`Insertion anchor ${afterId} does not belong to this parent.`);
+      throw new Error(
+        `Insertion anchor ${afterId} does not belong to this parent.`,
+      );
     index = sibling + 1;
   }
   parent.content = [
@@ -164,6 +174,72 @@ export function insertComponent(
     document: reconcileSurface(document),
     nodeId: node.attrs!.id as string,
   };
+}
+
+type StepBlock = { kind: string; data: Record<string, unknown> };
+/**
+ * A stepper may arrive with components for each step (steps[].blocks); they
+ * enter each step through the same insertion path, after the step's text.
+ */
+function insertStepper(
+  source: ShowDocument,
+  parentId: string | null,
+  data: Record<string, unknown>,
+  afterId?: string | null,
+) {
+  const steps = data.steps as Record<string, unknown>[];
+  const blocks = steps.map((step, index): StepBlock[] => {
+    const value = step && typeof step === "object" ? step.blocks : undefined;
+    if (value === undefined) return [];
+    if (
+      !Array.isArray(value) ||
+      value.some(
+        (block) =>
+          !block ||
+          typeof block !== "object" ||
+          typeof block.kind !== "string" ||
+          !block.data ||
+          typeof block.data !== "object",
+      )
+    )
+      throw new Error(
+        `steps[${index}].blocks must be a list of { kind, data } components.`,
+      );
+    return value as StepBlock[];
+  });
+  const shell = {
+    ...data,
+    steps: steps.map((step) => {
+      const { blocks: _, ...rest } = step;
+      return rest;
+    }),
+  };
+  let inserted = insertComponent(source, parentId, "stepper", shell, afterId);
+  const stepIds = (
+    findSurfaceNode(inserted.document, inserted.nodeId)!.node.content ?? []
+  ).map((step) => step.attrs!.id as string);
+  blocks.forEach((list, index) => {
+    if (!list.length) return;
+    const step = findSurfaceNode(inserted.document, stepIds[index])!.node;
+    // A step given only components drops the empty paragraph it was created with.
+    const empty =
+      !(steps[index].content as string | undefined)?.length &&
+      step.content?.length === 1 &&
+      step.content[0].type === "paragraph" &&
+      !step.content[0].content?.length;
+    if (empty) step.content = [];
+    for (const block of list)
+      inserted = {
+        ...insertComponent(
+          inserted.document,
+          stepIds[index],
+          block.kind,
+          block.data,
+        ),
+        nodeId: inserted.nodeId,
+      };
+  });
+  return inserted;
 }
 
 /** Insert a structural component at a text caret, splitting only the active text run. */

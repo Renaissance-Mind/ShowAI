@@ -1,0 +1,90 @@
+/* Shared drawing palette for the svg and mechanism-diagram built-ins.
+ * Every tone has a strong colour (lines, arrows, solid marks), a soft fill and
+ * an ink for text on that fill; the dark theme swaps all three. */
+.sb-block.dw-palette {
+  --dw-ink: var(--sb-text);
+  --dw-muted: var(--sb-muted);
+  --dw-line: var(--sb-line);
+  --dw-paper: var(--sb-surface);
+  --dw-zone: var(--sb-soft);
+  --dw-blue: #3d74c9;
+  --dw-blue-soft: #eaf2fd;
+  --dw-blue-ink: #1f3f73;
+  --dw-gray: #8a877e;
+  --dw-gray-soft: #f1efe8;
+  --dw-gray-ink: #3f3e3a;
+  --dw-violet: #534ab7;
+  --dw-violet-soft: #eeedfe;
+  --dw-violet-ink: #2f2a78;
+  --dw-teal: #0f6e56;
+  --dw-teal-soft: #e1f5ee;
+  --dw-teal-ink: #0b4c3c;
+  --dw-green: #2f7d5b;
+  --dw-green-soft: #e8f3ec;
+  --dw-green-ink: #1e5a40;
+  --dw-red: #b4412e;
+  --dw-red-soft: #f9e5e1;
+  --dw-red-ink: #8a2f20;
+  --dw-orange: #b4691c;
+  --dw-orange-soft: #f8eedd;
+  --dw-orange-ink: #7d4710;
+}
+:root[data-theme="dark"] .sb-block.dw-palette,
+[data-theme="dark"] .sb-block.dw-palette {
+  --dw-blue: #8bb4ee;
+  --dw-blue-soft: #1d2b40;
+  --dw-blue-ink: #d3e3fa;
+  --dw-gray: #a9a69c;
+  --dw-gray-soft: #2b2a27;
+  --dw-gray-ink: #e3e1da;
+  --dw-violet: #b0a8f2;
+  --dw-violet-soft: #27244a;
+  --dw-violet-ink: #e1defc;
+  --dw-teal: #5fc4a6;
+  --dw-teal-soft: #15332b;
+  --dw-teal-ink: #c9efe2;
+  --dw-green: #7cc3a0;
+  --dw-green-soft: #1f3529;
+  --dw-green-ink: #cfeedd;
+  --dw-red: #e8907f;
+  --dw-red-soft: #3d2420;
+  --dw-red-ink: #f8d6cf;
+  --dw-orange: #e0a96f;
+  --dw-orange-soft: #3a2c1e;
+  --dw-orange-ink: #f6dfc4;
+}
+.sb-block.dw-palette [data-tone="blue"] {
+  --t: var(--dw-blue);
+  --ts: var(--dw-blue-soft);
+  --ti: var(--dw-blue-ink);
+}
+.sb-block.dw-palette [data-tone="gray"] {
+  --t: var(--dw-gray);
+  --ts: var(--dw-gray-soft);
+  --ti: var(--dw-gray-ink);
+}
+.sb-block.dw-palette [data-tone="violet"] {
+  --t: var(--dw-violet);
+  --ts: var(--dw-violet-soft);
+  --ti: var(--dw-violet-ink);
+}
+.sb-block.dw-palette [data-tone="teal"] {
+  --t: var(--dw-teal);
+  --ts: var(--dw-teal-soft);
+  --ti: var(--dw-teal-ink);
+}
+.sb-block.dw-palette [data-tone="green"] {
+  --t: var(--dw-green);
+  --ts: var(--dw-green-soft);
+  --ti: var(--dw-green-ink);
+}
+.sb-block.dw-palette [data-tone="red"] {
+  --t: var(--dw-red);
+  --ts: var(--dw-red-soft);
+  --ti: var(--dw-red-ink);
+}
+.sb-block.dw-palette [data-tone="orange"] {
+  --t: var(--dw-orange);
+  --ts: var(--dw-orange-soft);
+  --ti: var(--dw-orange-ink);
+}

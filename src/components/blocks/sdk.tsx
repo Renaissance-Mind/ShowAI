@@ -41,6 +41,8 @@ export { StatusTreeBlock as StatusTree } from "./StatusTree";
 export { ExperimentTrackerBlock as ExperimentTracker } from "./ExperimentTracker";
 export { Scene3DBlock as Scene3D } from "./Scene3D";
 export { SequenceDiagramBlock as SequenceDiagram } from "./SequenceDiagram";
+export { MechanismDiagramBlock as MechanismDiagram } from "./MechanismDiagram";
+export { SvgBlock as Svg } from "./Svg";
 export { LayerDiagramBlock as LayerDiagram } from "./LayerDiagram";
 export { StepGuideBlock as StepGuide } from "./StepGuide";
 export { CommandReferenceBlock as CommandReference } from "./CommandReference";

@@ -49,6 +49,8 @@ export const builtinCategories: Record<string, ComponentCategory> = {
   "layer-diagram": "flow",
   "sequence-diagram": "flow",
   flowchart: "flow",
+  "mechanism-diagram": "flow",
+  svg: "image",
   archify: "flow",
   "diagram-design": "flow",
   "fireworks-tech-graph": "flow",

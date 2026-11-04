@@ -181,3 +181,96 @@ it("opens details only for explained nodes and offers no editing", async () => {
     );
   }
 }, 30000);
+
+it("draws two-way edges, keeps fan-out labels apart and stacks a wide flow in a narrow column", async () => {
+  const document = blankDocument();
+  document.title = "Edges";
+  document.content.content = [
+    {
+      type: "widget",
+      attrs: {
+        kind: "flowchart",
+        data: {
+          height: 420,
+          flows: [
+            {
+              id: "flow",
+              label: "Flow",
+              direction: "LR",
+              nodes: [
+                { id: "a", label: "Coordinator" },
+                { id: "b", label: "Laptop" },
+                { id: "c", label: "Server" },
+              ],
+              edges: [
+                { id: "ab", source: "a", target: "b", label: "keys" },
+                { id: "ac", source: "a", target: "c", label: "keys" },
+                {
+                  id: "bc",
+                  source: "b",
+                  target: "c",
+                  ends: "both",
+                  sourceSide: "bottom",
+                  targetSide: "bottom",
+                },
+              ],
+            },
+          ],
+        },
+      },
+    },
+  ];
+  const html = await buildPageHtml(document);
+  const server = createServer((_, response) => {
+    response.setHeader("Content-Type", "text/html; charset=utf-8");
+    response.end(html);
+  });
+  await new Promise<void>((done) => server.listen(0, "127.0.0.1", done));
+  const address = server.address();
+  if (!address || typeof address === "string")
+    throw new Error("Missing test server address.");
+  let browser: Browser | undefined;
+  try {
+    browser = await chromium.launch();
+    const page = await browser.newPage({
+      viewport: { width: 1000, height: 900 },
+    });
+    await page.goto(`http://127.0.0.1:${address.port}/`);
+    const twoWay = page.locator(
+      '.react-flow__edge[data-id="bc"] path.react-flow__edge-path',
+    );
+    await twoWay.waitFor({ state: "attached" });
+    expect(await twoWay.getAttribute("marker-start")).toMatch(/^url\(#/);
+    expect(await twoWay.getAttribute("marker-end")).toMatch(/^url\(#/);
+    const labels = await page
+      .locator(".react-flow__edge-textwrapper")
+      .evaluateAll((items) =>
+        items.map((item) => {
+          const box = item.getBoundingClientRect();
+          return [box.x, box.y, box.width, box.height];
+        }),
+      );
+    expect(labels).toHaveLength(2);
+    const [[x1, y1, w1, h1], [x2, y2, w2, h2]] = labels;
+    expect(
+      x1 + w1 <= x2 || x2 + w2 <= x1 || y1 + h1 <= y2 || y2 + h2 <= y1,
+    ).toBe(true);
+    const position = (id: string) =>
+      page.locator(`.react-flow__node[data-id="${id}"]`).evaluate((node) => {
+        const box = node.getBoundingClientRect();
+        return { x: box.x, y: box.y };
+      });
+    expect((await position("b")).x).toBeGreaterThan(
+      (await position("a")).x + 100,
+    );
+    await page.setViewportSize({ width: 520, height: 900 });
+    await expect
+      .poll(async () => (await position("b")).y - (await position("a")).y)
+      .toBeGreaterThan(30);
+  } finally {
+    await browser?.close();
+    await new Promise<void>((done, reject) =>
+      server.close((error) => (error ? reject(error) : done())),
+    );
+  }
+}, 30000);

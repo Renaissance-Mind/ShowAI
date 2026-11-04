@@ -195,6 +195,9 @@
   "layer-diagram": {
     "status": "ready"
   },
+  "mechanism-diagram": {
+    "status": "ready"
+  },
   "metrics": {
     "status": "ready"
   },
@@ -233,6 +236,9 @@
     "status": "ready"
   },
   "structure-browser": {
+    "status": "ready"
+  },
+  "svg": {
     "status": "ready"
   },
   "table": {

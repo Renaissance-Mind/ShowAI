@@ -192,6 +192,16 @@ import src_i18n_messages_sequenceDiagram_ts from "../i18n/messages/sequenceDiagr
 import src_doc_diagrams_contract_mjs from "../components/blocks/doc-diagrams-contract.mjs?raw";
 import src_sequence_diagram_css from "../components/blocks/sequence-diagram.css?raw";
 import src_SequenceDiagram_tsx from "../components/blocks/SequenceDiagram.tsx?raw";
+import src_drawing_palette_css from "../components/blocks/drawing-palette.css?raw";
+import src_svg_contract_mjs from "../components/blocks/svg-contract.mjs?raw";
+import src_svg_sanitize_ts from "../components/blocks/svg-sanitize.ts?raw";
+import src_svg_css from "../components/blocks/svg.css?raw";
+import src_Svg_tsx from "../components/blocks/Svg.tsx?raw";
+import src_i18n_messages_svg_ts from "../i18n/messages/svg.ts?raw";
+import src_mechanism_contract_mjs from "../components/blocks/mechanism-contract.mjs?raw";
+import src_mechanism_diagram_css from "../components/blocks/mechanism-diagram.css?raw";
+import src_MechanismDiagram_tsx from "../components/blocks/MechanismDiagram.tsx?raw";
+import src_i18n_messages_mechanismDiagram_ts from "../i18n/messages/mechanismDiagram.ts?raw";
 
 // Component frames have no source runtime, so a captured value only has to be
 // an independent frozen JSON copy; the SDK gets this stand-in instead of the
@@ -404,6 +414,16 @@ const sources: Record<string, string> = {
   "doc-diagrams-contract.mjs": src_doc_diagrams_contract_mjs,
   "sequence-diagram.css": src_sequence_diagram_css,
   "SequenceDiagram.tsx": src_SequenceDiagram_tsx,
+  "drawing-palette.css": src_drawing_palette_css,
+  "svg-contract.mjs": src_svg_contract_mjs,
+  "svg-sanitize.ts": src_svg_sanitize_ts,
+  "svg.css": src_svg_css,
+  "Svg.tsx": src_Svg_tsx,
+  "i18n/messages/svg.ts": src_i18n_messages_svg_ts,
+  "mechanism-contract.mjs": src_mechanism_contract_mjs,
+  "mechanism-diagram.css": src_mechanism_diagram_css,
+  "MechanismDiagram.tsx": src_MechanismDiagram_tsx,
+  "i18n/messages/mechanismDiagram.ts": src_i18n_messages_mechanismDiagram_ts,
 };
 // Package shared modules and rewrite their imports inside the trusted SDK's virtual filesystem.
 // User component packages retain the existing package-local import boundary.
@@ -529,6 +549,8 @@ export const builtinExports: Record<string, string> = {
   chart: "Chart",
   mindmap: "Mindmap",
   flowchart: "Flowchart",
+  "mechanism-diagram": "MechanismDiagram",
+  svg: "Svg",
   archify: "Archify",
   "diagram-design": "DiagramDesign",
   "fireworks-tech-graph": "FireworksTechGraph",

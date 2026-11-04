@@ -234,3 +234,30 @@ test("playback renders controls, current step text and a printable list of every
   expect(plain).not.toContain("sf-player");
   expect(plain).not.toContain("sf-outline");
 });
+
+test("flowchart edges may name their own sides and arrow ends", () => {
+  const flow = (edge: Record<string, unknown>) => ({
+    flows: [
+      {
+        id: "f",
+        label: "F",
+        nodes: [
+          { id: "a", label: "A" },
+          { id: "b", label: "B" },
+        ],
+        edges: [{ id: "ab", source: "a", target: "b", ...edge }],
+      },
+    ],
+  });
+  expect(() =>
+    validateFlowchartData(
+      flow({ sourceSide: "bottom", targetSide: "left", ends: "both" }),
+    ),
+  ).not.toThrow();
+  expect(() => validateFlowchartData(flow({ ends: "start" }))).toThrow(
+    "ends must be end, both or none",
+  );
+  expect(() => validateFlowchartData(flow({ targetSide: "middle" }))).toThrow(
+    "targetSide must be a valid connection side",
+  );
+});

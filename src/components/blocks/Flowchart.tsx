@@ -64,12 +64,23 @@ interface FlowNode extends Record<string, unknown> {
   sourceSide?: "top" | "bottom" | "left" | "right";
   targetSide?: "top" | "bottom" | "left" | "right";
 }
+type Side = "top" | "bottom" | "left" | "right";
 interface FlowEdge {
   id: string;
   source: string;
   target: string;
   label?: string;
+  sourceSide?: Side;
+  targetSide?: Side;
+  ends?: "end" | "both" | "none";
 }
+const sidePositions: Record<Side, Position> = {
+  top: Position.Top,
+  bottom: Position.Bottom,
+  left: Position.Left,
+  right: Position.Right,
+};
+const sides = Object.keys(sidePositions) as Side[];
 type StageState = "ok" | "warn" | "bad" | "idle" | "active";
 interface JourneyStep {
   node: string;
@@ -254,6 +265,7 @@ function DiagramCard({ id, data, selected }: NodeProps<DiagramNode>) {
       style={{ width: nodeWidth, minHeight: nodeHeight }}
     >
       <Handle
+        id="t"
         type="target"
         position={
           data.targetSide
@@ -263,6 +275,15 @@ function DiagramCard({ id, data, selected }: NodeProps<DiagramNode>) {
               : Position.Top
         }
       />
+      {/* Edges that name their own side attach to these. */}
+      {sides.map((side) => (
+        <Handle
+          key={`t-${side}`}
+          id={`t-${side}`}
+          type="target"
+          position={sidePositions[side]}
+        />
+      ))}
       {!!view?.badges?.length && (
         <span className="sf-badges">
           {view.badges.map((index) => (
@@ -290,6 +311,7 @@ function DiagramCard({ id, data, selected }: NodeProps<DiagramNode>) {
         </span>
       )}
       <Handle
+        id="s"
         type="source"
         position={
           data.sourceSide
@@ -299,12 +321,35 @@ function DiagramCard({ id, data, selected }: NodeProps<DiagramNode>) {
               : Position.Bottom
         }
       />
+      {sides.map((side) => (
+        <Handle
+          key={`s-${side}`}
+          id={`s-${side}`}
+          type="source"
+          position={sidePositions[side]}
+        />
+      ))}
     </div>
   );
 }
 const nodeTypes = { showai: DiagramCard };
 
-type DiagramEdge = Edge<{ view?: EdgeView; marker: string }, "showai">;
+type DiagramEdge = Edge<
+  {
+    view?: EdgeView;
+    marker: string;
+    ends: "end" | "both" | "none";
+    nearTarget: boolean;
+  },
+  "showai"
+>;
+// Label text is not measured before render; this estimate only offsets labels
+// beside a target so they clear the node.
+const labelWidth = (text: string) =>
+  [...text].reduce(
+    (width, char) => width + (/[\u2e80-\uffff]/.test(char) ? 13 : 7.5),
+    12,
+  );
 const markerTones = ["base", "path", "warn", "bad", "idle", "active"];
 // Markers are drawn here instead of React Flow's colour-keyed markers so their
 // colours follow theme tokens through CSS.
@@ -356,6 +401,20 @@ function FlowLink({
     targetPosition,
   });
   const view = data?.view;
+  // Several labelled edges leaving one node share their first segment, so
+  // their labels sit beside each target instead of on top of each other.
+  let at = { x: labelX, y: labelY };
+  if (data?.nearTarget && typeof label === "string") {
+    const half = labelWidth(label) / 2 + 6;
+    at =
+      targetPosition === Position.Top
+        ? { x: targetX, y: targetY - 22 }
+        : targetPosition === Position.Bottom
+          ? { x: targetX, y: targetY + 22 }
+          : targetPosition === Position.Left
+            ? { x: targetX - half - 10, y: targetY }
+            : { x: targetX + half + 10, y: targetY };
+  }
   // Healthy edges stay neutral so degraded ones stand out.
   const tone = view?.traversed
     ? "path"
@@ -367,13 +426,18 @@ function FlowLink({
       <BaseEdge
         id={id}
         path={path}
-        markerEnd={`url(#${data?.marker}-${tone})`}
+        markerEnd={
+          data?.ends === "none" ? undefined : `url(#${data?.marker}-${tone})`
+        }
+        markerStart={
+          data?.ends === "both" ? `url(#${data?.marker}-${tone})` : undefined
+        }
       />
       {view?.flowing && <path d={path} className="sf-edge-flow" />}
       {label && (
         <EdgeText
-          x={labelX}
-          y={labelY}
+          x={at.x}
+          y={at.y}
           label={label}
           labelStyle={{ fontSize: 13 }}
           labelBgPadding={[6, 3]}
@@ -607,28 +671,37 @@ function FlowCanvas({
   const [nodes, setNodes, onNodesChange] =
     useNodesState<DiagramNode>(initialNodes);
   useEffect(() => setNodes(initialNodes), [initialNodes, setNodes]);
-  const edges: DiagramEdge[] = useMemo(
-    () =>
-      flow.edges.map((edge) => {
-        const state = view.edges.get(edge.id);
-        return {
-          ...edge,
-          label: state?.label ?? edge.label,
-          type: "showai",
-          className: [
-            "sf-edge",
-            state?.state && `sf-edge-${state.state}`,
-            state?.traversed && "is-traversed",
-            state?.current && "is-current",
-            state?.dim && "is-dim",
-          ]
-            .filter(Boolean)
-            .join(" "),
-          data: { view: state, marker },
-        };
-      }),
-    [flow, view, marker],
-  );
+  const edges: DiagramEdge[] = useMemo(() => {
+    const labelled = new Map<string, number>();
+    for (const edge of flow.edges)
+      if (view.edges.get(edge.id)?.label ?? edge.label)
+        labelled.set(edge.source, (labelled.get(edge.source) ?? 0) + 1);
+    return flow.edges.map((edge) => {
+      const state = view.edges.get(edge.id);
+      return {
+        ...edge,
+        label: state?.label ?? edge.label,
+        type: "showai",
+        sourceHandle: edge.sourceSide ? `s-${edge.sourceSide}` : "s",
+        targetHandle: edge.targetSide ? `t-${edge.targetSide}` : "t",
+        className: [
+          "sf-edge",
+          state?.state && `sf-edge-${state.state}`,
+          state?.traversed && "is-traversed",
+          state?.current && "is-current",
+          state?.dim && "is-dim",
+        ]
+          .filter(Boolean)
+          .join(" "),
+        data: {
+          view: state,
+          marker,
+          ends: edge.ends ?? "end",
+          nearTarget: (labelled.get(edge.source) ?? 0) > 1,
+        },
+      };
+    });
+  }, [flow, view, marker]);
   return (
     <div
       className="sf-canvas"
@@ -963,7 +1036,29 @@ export function FlowchartBlock({ data: raw }: BlockProps) {
   const [flowId, setFlowId] = useReaderState("flow", data.flows[0]?.id ?? "", {
     accept: isText,
   });
-  const flow = data.flows.find((item) => item.id === flowId) ?? data.flows[0];
+  const chosen = data.flows.find((item) => item.id === flowId) ?? data.flows[0];
+  // A wide left-to-right flow turns top-to-bottom in a narrow column, unless
+  // its author placed the nodes by hand.
+  const [narrow, setNarrow] = useState(false);
+  useEffect(() => {
+    const element = lock.ref.current;
+    if (!element || typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(([entry]) =>
+      setNarrow(entry.contentRect.width > 0 && entry.contentRect.width < 640),
+    );
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, [lock.ref]);
+  const flow = useMemo(
+    () =>
+      chosen &&
+      narrow &&
+      chosen.direction === "LR" &&
+      chosen.nodes.every((node) => !node.position)
+        ? { ...chosen, direction: "TB" as const }
+        : chosen,
+    [chosen, narrow],
+  );
   const [selected, setSelected] = useState("");
   useEffect(() => {
     if (flow && !flow.nodes.some((node) => node.id === selected))
