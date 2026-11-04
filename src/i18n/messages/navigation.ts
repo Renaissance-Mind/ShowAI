@@ -51,6 +51,7 @@ export default defineMessages("navigation", {
 
     pinSidebar: "固定侧栏",
     autoHideSidebar: "自动隐藏侧栏",
+    locateInSidebar: "在侧栏中定位当前页面",
     withShortcut: "{label}（{keys}）",
     autoHideHint:
       "侧栏会在阅读时自动隐藏。将指针移到窗口左边缘即可显示，按 {keys} 固定侧栏。",
@@ -154,6 +155,7 @@ export default defineMessages("navigation", {
 
     pinSidebar: "Keep sidebar open",
     autoHideSidebar: "Hide sidebar automatically",
+    locateInSidebar: "Reveal the current page in the sidebar",
     withShortcut: "{label} ({keys})",
     autoHideHint:
       "The sidebar hides while you read. Move the pointer to the left edge of the window to show it, or press {keys} to keep it open.",

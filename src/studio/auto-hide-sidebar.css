@@ -134,7 +134,8 @@
   .studio-topbar-brand {
   padding-left: 88px;
 }
-.studio-sidebar-lock {
+.studio-sidebar-lock,
+.studio-sidebar-locate {
   display: grid;
   place-items: center;
   flex-shrink: 0;
@@ -144,9 +145,13 @@
   color: var(--muted);
   -webkit-app-region: no-drag;
 }
-.studio-sidebar-lock:hover {
+.studio-sidebar-lock:hover,
+.studio-sidebar-locate:hover:not(:disabled) {
   background: var(--hover);
   color: var(--text);
+}
+.studio-sidebar-locate:disabled {
+  opacity: 0.3;
 }
 .studio-sidebar-lock[aria-pressed="true"] {
   color: var(--accent);
@@ -176,6 +181,7 @@
   pointer-events: none;
 }
 .studio-sidebar-lock:focus-visible,
+.studio-sidebar-locate:focus-visible,
 .studio-sidebar-edge:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: -2px;

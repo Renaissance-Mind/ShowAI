@@ -1,5 +1,6 @@
 import MergeDialog from "./MergeDialog";
 import { trackDesktopPreviewActivity } from "./preview-work";
+import { revealSidebarRow } from "./sidebar-locate";
 import type { ProjectSyncRequest } from "./SyncSettings";
 import {
   PACKAGING_EVENT,
@@ -34,6 +35,7 @@ import {
   type MouseEvent as ReactMouseEvent,
   type ReactNode,
 } from "react";
+import { flushSync } from "react-dom";
 import {
   ArrowLeft,
   ArrowUp,
@@ -1722,6 +1724,33 @@ export default function Studio() {
       parentId = items.find((item) => item.id === parentId)?.parentId ?? null;
     }
     setExpandedFolders((current) => ({ ...current, ...expanded }));
+  }
+  /** Scroll the navigation to the open page, expanding whatever hides it. */
+  async function locateCurrentPage() {
+    const projectId = page.projectId;
+    const current = page.draft;
+    if (view !== "page" || !projectId || !current) return;
+    const loaded =
+      contents[projectId] ?? (await loadProjectContents(projectId));
+    const parentId =
+      current.parentId ??
+      loaded.pages.find((item) => item.id === current.id)?.parentId ??
+      null;
+    const project = projects.find((item) => item.id === projectId);
+    const groupId =
+      project && !project.pinned
+        ? organization.projectGroups[projectId]
+        : undefined;
+    // The row is measured right after this, so the tree expands synchronously.
+    flushSync(() => {
+      setExpandedProjects((state) => ({ ...state, [projectId]: true }));
+      expandFolderPath(loaded.folders, parentId);
+      if (groupId)
+        setCollapsedSections((state) => ({ ...state, [groupId]: false }));
+    });
+    const target = { projectId, pageId: current.id };
+    if (!revealSidebarRow(document, target))
+      requestAnimationFrame(() => revealSidebarRow(document, target));
   }
   async function createPage(
     templateId = "blank",
@@ -4703,6 +4732,14 @@ export default function Studio() {
           }
           switchingTab={workspace.switching || routing}
           navigation={sidebarContent}
+          canLocate={
+            view === "page" &&
+            !!page.draft &&
+            !routing &&
+            !workspace.switching &&
+            projects.some((item) => item.id === page.projectId)
+          }
+          onLocate={() => void locateCurrentPage().catch(report)}
           history={
             <WorkspaceHistory
               busy={

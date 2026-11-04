@@ -6,7 +6,7 @@ import {
   type PointerEvent,
   type ReactNode,
 } from "react";
-import { ArrowLeft, PanelLeft } from "../ui/icons";
+import { ArrowLeft, LocateFixed, PanelLeft } from "../ui/icons";
 import { appIconForTheme } from "../design/app-icon";
 import { useAppearanceTheme } from "../design/useAppearanceTheme";
 import { useTranslator } from "../i18n/react";
@@ -17,6 +17,7 @@ import {
   formatShortcut,
   isSidebarToggleShortcut,
 } from "./keyboard-shortcuts";
+import { locateHoldDuration } from "./sidebar-locate";
 import "./auto-hide-sidebar.css";
 import { mobileNavigationLayout, sidebarSwipe } from "./mobile-navigation.mjs";
 import "./mobile-navigation.css";
@@ -33,6 +34,8 @@ export default function AutoHideSidebar({
   children,
   navigation,
   history,
+  canLocate,
+  onLocate,
   topbar,
   switchingTab,
   mobileBoardKey,
@@ -43,6 +46,9 @@ export default function AutoHideSidebar({
   children: ReactNode;
   navigation: ReactNode;
   history: ReactNode;
+  /** Enabled while a page is shown; reveals its row in the navigation. */
+  canLocate: boolean;
+  onLocate: () => void;
   topbar: ReactNode;
   switchingTab: boolean;
   mobileBoardKey?: string;
@@ -52,6 +58,8 @@ export default function AutoHideSidebar({
   const tn = useTranslator(navigationMessages);
   const toggleKeys = formatShortcut("Mod+\\", clientIsMac());
   const [hint, setHint] = useState(false);
+  // Keeps an automatically hidden sidebar in view while the located row flashes.
+  const [locating, setLocating] = useState(false);
   const appIcon = appIconForTheme(useAppearanceTheme());
   const nativeTouch = document.documentElement.dataset.native === "ios";
   const [nativeOpen, setNativeOpen] = useState(false);
@@ -190,6 +198,14 @@ export default function AutoHideSidebar({
     const timer = window.setTimeout(() => setHint(false), 9000);
     return () => window.clearTimeout(timer);
   }, [hint]);
+  useEffect(() => {
+    if (!locating) return;
+    const timer = window.setTimeout(
+      () => setLocating(false),
+      locateHoldDuration,
+    );
+    return () => window.clearTimeout(timer);
+  }, [locating]);
 
   useEffect(() => {
     const update = () => {
@@ -241,6 +257,7 @@ export default function AutoHideSidebar({
       keyboardFocus ||
       interactionHeld ||
       pressed ||
+      locating ||
       hidden ||
       resizing
     )
@@ -265,6 +282,7 @@ export default function AutoHideSidebar({
     keyboardFocus,
     interactionHeld,
     pressed,
+    locating,
     hidden,
     resizing,
     width,
@@ -307,6 +325,7 @@ export default function AutoHideSidebar({
         label: locked ? tn("autoHideSidebar") : tn("pinSidebar"),
         keys: toggleKeys,
       });
+  const locateLabel = tn("locateInSidebar");
   const focusNavigation = () => {
     window.requestAnimationFrame(() => {
       sidebar.current?.querySelector<HTMLButtonElement>("button")?.focus();
@@ -439,6 +458,20 @@ export default function AutoHideSidebar({
           </span>
           <div className="studio-topbar-actions">
             {history}
+            <button
+              type="button"
+              className="studio-sidebar-locate"
+              aria-label={locateLabel}
+              title={locateLabel}
+              disabled={!canLocate}
+              onClick={() => {
+                if (hidden) setPosition("overlay");
+                setLocating(true);
+                onLocate();
+              }}
+            >
+              <LocateFixed size={17} strokeWidth={1.7} aria-hidden="true" />
+            </button>
             <button
               type="button"
               className="studio-sidebar-lock"
