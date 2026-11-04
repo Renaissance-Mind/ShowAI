@@ -215,7 +215,7 @@ test("builtin catalog ships only the system baseline, the paper explainer and bl
     const parsed = parseTemplateBundle(current.bundle);
     expect(parsed.metadata.schemaVersion).toBe(3);
     expect(parsed.metadata.version).toBe(
-      id === "paper-explainer" ? "2.3.0" : "2.2.1",
+      id === "paper-explainer" ? "2.4.0" : "2.2.2",
     );
     expect(Object.keys(parsed.guides)).toEqual([...TEMPLATE_STAGES]);
     expect(current.document.content.content ?? []).toHaveLength(0);
@@ -227,7 +227,7 @@ test("builtin catalog ships only the system baseline, the paper explainer and bl
   const paper = await service.templateContext(project.id, [
     { id: "paper-explainer", scope: "builtin" },
   ]);
-  expect(paper.context.templates[0].version).toBe("2.3.0");
+  expect(paper.context.templates[0].version).toBe("2.4.0");
   const summary = paper.templates?.[0];
   expect(summary && "stages" in summary).toBe(true);
   expect(
