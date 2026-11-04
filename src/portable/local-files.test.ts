@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { homedir } from "node:os";
-import { join } from "node:path";
+import { join, normalize } from "node:path";
 import {
   detachedRef,
   isDetachedRef,
@@ -32,7 +32,7 @@ describe("local file references", () => {
     expect(ref).toBe(
       "file:///Users/me/RM%20%E5%AE%A3%E4%BC%A0/%E6%88%90%E7%89%87%20%231%3F.mp4",
     );
-    expect(localFilePath(ref)).toBe(path);
+    expect(localFilePath(ref)).toBe(normalize(path));
     expect(localRefName(ref)).toBe("成片 #1?.mp4");
     expect(localRefType(ref)).toEqual({ mime: "video/mp4", kind: "video" });
     expect(localFilePath("file:~/Pictures/a.png")).toBe(

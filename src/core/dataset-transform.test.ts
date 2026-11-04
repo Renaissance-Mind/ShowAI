@@ -154,19 +154,28 @@ describe("sandbox", () => {
   });
 
   test("memory and stack are bounded", async () => {
-    for (const script of [
-      "return new Array(5e7).fill(1).length;",
-      'const list = []; for (let i = 0; ; i++) list.push({ i, text: "row " + i });',
-    ]) {
-      const memory = await runTransform(
-        `function transform() { ${script} }`,
-        {},
-      );
-      expect(memory, script).toMatchObject({
-        ok: false,
-        code: "TRANSFORM_FAILED",
-        message: "The script used more than 64 MiB of memory and was stopped.",
-      });
+    // Filling 64 MiB of small objects takes about 0.8 s here and over 2 s on CI runners; give the
+    // memory limit room to stop the script before the deadline does.
+    const timeoutMs = TRANSFORM_LIMITS.timeoutMs;
+    TRANSFORM_LIMITS.timeoutMs = 10_000;
+    try {
+      for (const script of [
+        "return new Array(5e7).fill(1).length;",
+        'const list = []; for (let i = 0; ; i++) list.push({ i, text: "row " + i });',
+      ]) {
+        const memory = await runTransform(
+          `function transform() { ${script} }`,
+          {},
+        );
+        expect(memory, script).toMatchObject({
+          ok: false,
+          code: "TRANSFORM_FAILED",
+          message:
+            "The script used more than 64 MiB of memory and was stopped.",
+        });
+      }
+    } finally {
+      TRANSFORM_LIMITS.timeoutMs = timeoutMs;
     }
     const recursion = await runTransform(
       `function transform() { const deep = (n) => deep(n + 1) + 1; return deep(0); }`,
