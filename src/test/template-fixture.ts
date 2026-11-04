@@ -1,31 +1,46 @@
 import {
   LEGACY_TEMPLATE_STAGES,
+  STAGED_TEMPLATE_STAGES,
   TEMPLATE_SCHEMA_VERSION,
-  TEMPLATE_STAGES,
   type TemplateBundleSource,
 } from "../portable/template-bundle.mjs";
-/** A schemaVersion 3 folder; legacy=true builds a six-stage schemaVersion 1 bundle. */
+/**
+ * A current (schemaVersion 4) folder whose guides are read whole. format
+ * "staged" builds a schemaVersion 3 four-stage bundle and "legacy" a six-stage
+ * schemaVersion 1 bundle, both still readable.
+ */
 export function templateFixture(
   id = "guided-example",
   component = true,
-  legacy = false,
+  format: boolean | "current" | "staged" | "legacy" = "current",
 ): TemplateBundleSource {
-  const stages = legacy ? LEGACY_TEMPLATE_STAGES : TEMPLATE_STAGES;
+  const kind =
+    format === true ? "legacy" : format === false ? "current" : format;
+  const stages =
+    kind === "legacy"
+      ? LEGACY_TEMPLATE_STAGES
+      : kind === "staged"
+        ? STAGED_TEMPLATE_STAGES
+        : ["method", "design"];
   const metadata = {
     format: "showai-template",
-    schemaVersion: legacy ? 1 : TEMPLATE_SCHEMA_VERSION,
+    schemaVersion:
+      kind === "legacy" ? 1 : kind === "staged" ? 3 : TEMPLATE_SCHEMA_VERSION,
     id,
     name: "Guided explanation",
     version: "1.0.0",
     description: "Explain a sequence using persistent object labels.",
     scenarios: ["Read a two-step explanation."],
-    guides: Object.fromEntries(
-      stages.map((stage) => [stage, `guides/${stage}.md`]),
-    ),
+    guides:
+      kind === "current"
+        ? stages.map((name) => `guides/${name}.md`)
+        : Object.fromEntries(
+            stages.map((stage) => [stage, `guides/${stage}.md`]),
+          ),
     components: component
       ? [{ id: "step-picker", path: "components/step-picker" }]
       : [],
-    ...(legacy ? { page: null } : {}),
+    ...(kind === "legacy" ? { page: null } : {}),
   };
   const files: Record<string, string> = {
     "README.md":
@@ -35,7 +50,7 @@ export function templateFixture(
   };
   for (const stage of stages)
     files[`guides/${stage}.md`] =
-      `# ${stage}\n\nOnly the ${stage} phase instruction.\n`;
+      `# ${stage}\n\nOnly the ${stage} guide instruction.\n`;
   if (component) {
     const documentation = {
       version: 2,

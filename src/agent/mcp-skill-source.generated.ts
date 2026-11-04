@@ -6,28 +6,24 @@ import source3 from "../../plugins/showai/skills/create-component/SKILL.md?raw";
 import source4 from "../../plugins/showai/skills/create-template/references/template-abstraction.md?raw";
 import source5 from "../../plugins/showai/skills/create-template/references/template-creation.md?raw";
 import source6 from "../../plugins/showai/skills/create-template/SKILL.md?raw";
-import source7 from "../../plugins/showai/skills/design-presentation/references/design-draft.md?raw";
-import source8 from "../../plugins/showai/skills/design-presentation/references/reuse-selection.md?raw";
-import source9 from "../../plugins/showai/skills/design-presentation/SKILL.md?raw";
-import source10 from "../../plugins/showai/skills/plan-presentation/references/presentation-contract.md?raw";
-import source11 from "../../plugins/showai/skills/plan-presentation/references/presentation-logic.md?raw";
-import source12 from "../../plugins/showai/skills/plan-presentation/scripts/check_plan.py?raw";
-import source13 from "../../plugins/showai/skills/plan-presentation/SKILL.md?raw";
-import source14 from "../../plugins/showai/skills/review-presentation/references/review-criteria.md?raw";
-import source15 from "../../plugins/showai/skills/review-presentation/SKILL.md?raw";
-import source16 from "../../plugins/showai/skills/show-document/references/board-authoring.md?raw";
-import source17 from "../../plugins/showai/skills/show-document/references/capacity.md?raw";
-import source18 from "../../plugins/showai/skills/show-document/references/page-reading.md?raw";
-import source19 from "../../plugins/showai/skills/show-document/SKILL.md?raw";
-import source20 from "../../plugins/showai/skills/show-visual/SKILL.md?raw";
-import source21 from "../../plugins/showai/host-adapters/mcp-app.md?raw";
-import source22 from "../../plugins/showai/skills/use-showai/references/host-display.md?raw";
-import source23 from "../../plugins/showai/skills/use-showai/references/integration.md?raw";
-import source24 from "../../plugins/showai/skills/use-showai/references/runtime.md?raw";
-import source25 from "../../plugins/showai/skills/use-showai/references/shared-data.md?raw";
-import source26 from "../../plugins/showai/skills/use-showai/SKILL.md?raw";
+import source7 from "../../plugins/showai/skills/show-document/scripts/check_plan.py?raw";
+import source8 from "../../plugins/showai/skills/show-document/SKILL.md?raw";
+import source9 from "../../plugins/showai/skills/show-visual/SKILL.md?raw";
+import source10 from "../../plugins/showai/skills/use-showai/references/authoring.md?raw";
+import source11 from "../../plugins/showai/skills/use-showai/references/board-authoring.md?raw";
+import source12 from "../../plugins/showai/skills/use-showai/references/capacity.md?raw";
+import source13 from "../../plugins/showai/skills/use-showai/references/editing.md?raw";
+import source14 from "../../plugins/showai/host-adapters/mcp-app.md?raw";
+import source15 from "../../plugins/showai/skills/use-showai/references/host-display.md?raw";
+import source16 from "../../plugins/showai/skills/use-showai/references/integration.md?raw";
+import source17 from "../../plugins/showai/skills/use-showai/references/page-reading.md?raw";
+import source18 from "../../plugins/showai/skills/use-showai/references/runtime.md?raw";
+import source19 from "../../plugins/showai/skills/use-showai/references/shared-data.md?raw";
+import source20 from "../../plugins/showai/skills/use-showai/references/tasks.md?raw";
+import source21 from "../../plugins/showai/skills/use-showai/references/user-references.md?raw";
+import source22 from "../../plugins/showai/skills/use-showai/SKILL.md?raw";
 
-export const mcpSkillNames = ["collaborate-canvas","create-component","create-template","design-presentation","plan-presentation","review-presentation","show-document","show-visual","use-showai"] as const;
+export const mcpSkillNames = ["collaborate-canvas","create-component","create-template","show-document","show-visual","use-showai"] as const;
 export const mcpSkillSources: Record<string, string> = {
   "collaborate-canvas/SKILL.md": source0,
   "create-component/references/component-authoring.md": source1,
@@ -36,24 +32,20 @@ export const mcpSkillSources: Record<string, string> = {
   "create-template/references/template-abstraction.md": source4,
   "create-template/references/template-creation.md": source5,
   "create-template/SKILL.md": source6,
-  "design-presentation/references/design-draft.md": source7,
-  "design-presentation/references/reuse-selection.md": source8,
-  "design-presentation/SKILL.md": source9,
-  "plan-presentation/references/presentation-contract.md": source10,
-  "plan-presentation/references/presentation-logic.md": source11,
-  "plan-presentation/scripts/check_plan.py": source12,
-  "plan-presentation/SKILL.md": source13,
-  "review-presentation/references/review-criteria.md": source14,
-  "review-presentation/SKILL.md": source15,
-  "show-document/references/board-authoring.md": source16,
-  "show-document/references/capacity.md": source17,
-  "show-document/references/page-reading.md": source18,
-  "show-document/SKILL.md": source19,
-  "show-visual/SKILL.md": source20,
-  "use-showai/references/host-adapter.md": source21,
-  "use-showai/references/host-display.md": source22,
-  "use-showai/references/integration.md": source23,
-  "use-showai/references/runtime.md": source24,
-  "use-showai/references/shared-data.md": source25,
-  "use-showai/SKILL.md": source26,
+  "show-document/scripts/check_plan.py": source7,
+  "show-document/SKILL.md": source8,
+  "show-visual/SKILL.md": source9,
+  "use-showai/references/authoring.md": source10,
+  "use-showai/references/board-authoring.md": source11,
+  "use-showai/references/capacity.md": source12,
+  "use-showai/references/editing.md": source13,
+  "use-showai/references/host-adapter.md": source14,
+  "use-showai/references/host-display.md": source15,
+  "use-showai/references/integration.md": source16,
+  "use-showai/references/page-reading.md": source17,
+  "use-showai/references/runtime.md": source18,
+  "use-showai/references/shared-data.md": source19,
+  "use-showai/references/tasks.md": source20,
+  "use-showai/references/user-references.md": source21,
+  "use-showai/SKILL.md": source22,
 };

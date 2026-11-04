@@ -198,8 +198,8 @@ test("remote guide delivers the full shared Skill workflow anonymously and retai
     await anonymous.callTool({ name: "guide", arguments: {} }),
   );
   expect(entry.protocol).toBe("showai-remote-skills-v1");
-  expect(entry.markdown).toContain("根据任务继续");
-  expect(entry.skills).toHaveLength(9);
+  expect(entry.markdown).toContain("选择路径");
+  expect(entry.skills).toHaveLength(6);
   expect(entry.connection).toMatchObject({
     mcpUrl: http.url + "/mcp",
     tools: tools.tools.map((tool) => tool.name).sort(),
@@ -237,10 +237,10 @@ test("remote guide delivers the full shared Skill workflow anonymously and retai
   const presentation = data(
     await anonymous.callTool({
       name: "guide",
-      arguments: { topic: "presentation", stage: "design" },
+      arguments: { topic: "presentation" },
     }),
   );
-  expect(presentation.stage).toBe("design");
+  expect(presentation.markdown).toContain("环节四：设计稿");
   for (const args of [
     { skill: "use-showai", file: "../package.json" },
     { skill: "use-showai", topic: "reading" },
@@ -404,27 +404,13 @@ test("anonymous clients discover and customize public resources without a projec
         id: "paper-explainer",
         kind: "template",
         view: "guide",
-        version: "2.4.0",
+        version: "3.0.0",
       },
     }),
   );
-  const stage = data(
-    await anonymous.callTool({
-      name: "public_catalog_describe",
-      arguments: {
-        id: "paper-explainer",
-        kind: "template",
-        view: "guide",
-        stage: "design",
-        version: folder.version,
-        integrity: folder.integrity,
-      },
-    }),
-  );
-  expect(stage.documents).toHaveLength(2);
-  expect((stage.documents as { ref: { id: string } }[])[0].ref.id).toBe(
-    "system-presentation",
-  );
+  expect(
+    (folder.guides as { path: string }[]).map((guide) => guide.path),
+  ).toContain("guides/04-design.md");
   const folderRender = data(
     await anonymous.callTool({
       name: "render_document",
@@ -801,16 +787,11 @@ test("authorized HTTP clients use portable template folders, exact stage refs an
   const binding = context.context as { templates: Record<string, unknown>[] };
   expect(context.components).toHaveLength(1);
   expect(JSON.stringify(context)).not.toContain("index.tsx");
-  const stage = data(
-    await remote.callTool({
-      name: "template_guide",
-      arguments: { projectId, stage: "design", templates: binding.templates },
-    }),
-  );
-  expect(stage.documents).toHaveLength(2);
-  expect(JSON.stringify(stage)).not.toContain(
-    "Only the review phase instruction",
-  );
+  const whole = (context.templates as { guides: { path: string }[] }[])[0];
+  expect(whole.guides.map((guide) => guide.path)).toEqual([
+    "guides/method.md",
+    "guides/design.md",
+  ]);
   const page = data(
     await remote.callTool({
       name: "template_apply",
@@ -868,17 +849,13 @@ test("authorized HTTP clients use portable template folders, exact stage refs an
   ).toBe("paper-explainer");
   const original = data(
     await remote.callTool({
-      name: "template_guide",
-      arguments: {
-        projectId,
-        stage: "logic",
-        templates: binding.templates,
-      },
+      name: "template_context",
+      arguments: { projectId, templates: binding.templates },
     }),
   );
-  expect((original.documents as { ref: { id: string } }[])[1].ref.id).toBe(
-    saved.id,
-  );
+  expect(
+    (original.context as { templates: { id: string }[] }).templates[0].id,
+  ).toBe(saved.id);
 });
 
 test("HTTP parameter queries preserve v2 semantics, anonymous compatibility and reject invalid input", async () => {

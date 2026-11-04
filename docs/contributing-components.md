@@ -43,13 +43,13 @@ The steps below follow what recent additions such as `scene-3d` and `roadmap` to
 10. **Inline readiness ✓.** Add `{ "status": "ready" }` to `resources/catalog/inline-readiness.json`, or another status with a `note` when the component does not yet work well inside a conversation. Measure it with the readiness run below.
 11. **Hard-coded lists.** Add the kind to the ordered list in `src/core/catalog.test.ts` (`describes all built-in blocks for agents`) and, when the offline reader should mount it, to `src/agent/presentation-export.test.ts`.
 12. **Runtime dependencies.** A new npm dependency used at runtime goes into `package.json`, the copy list in `scripts/package-runtime.mjs`, the runtime and SDK import allowlists in `compilePackage` in `src/core/catalog.ts`, and its license text into `resources/licenses/`. New icons are exported from `src/ui/icons.ts`.
-13. **Agent guidance.** Describe when to choose the component in `plugins/showai/skills/design-presentation/references/reuse-selection.md`. Then run `npm run package:plugin`, which regenerates the Codex, Claude Code and Kimi copies of the Skills.
+13. **Agent guidance.** Describe when to choose the component in the “组件与素材” paragraph of `resources/templates/system-presentation/guides/04-design.md`. Then run `npm run package:plugin`, which embeds that guide in the `show-document` Skill and regenerates the Codex, Claude Code and Kimi copies of the Skills. See [Revising the system workflow](contributing-templates.md#revising-the-system-workflow).
 
 ## Changing an existing built-in
 
 To find the code of an existing built-in, start from its `registerBlock` call in `registry.ts`, which names the renderer and the validator. Saved pages keep the data they were written with, and exported pages keep the reader they were exported with. A change must therefore accept every shape the previous contract accepted, or convert old data when it is read; never tighten the contract in a way that makes existing pages fail validation. When the data contract, defaults or behavior change, raise `version` in `components.json`, update `propsSchema`, examples and documentation together, and extend the contract test with the old shape.
 
-Agents learn the component from its documentation and examples, not from the source. After changing behavior, check that `usage`, the `recipes` and the examples still describe it, and update `reuse-selection.md` when the guidance on choosing the component changes.
+Agents learn the component from its documentation and examples, not from the source. After changing behavior, check that `usage`, the `recipes` and the examples still describe it, and update the “组件与素材” paragraph of `04-design.md` when the guidance on choosing the component changes.
 
 ## Verifying
 

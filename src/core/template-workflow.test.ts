@@ -3,10 +3,10 @@ import { mkdtemp, rm, writeFile, symlink } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
+  declaredGuidePaths,
   LEGACY_TEMPLATE_STAGES,
   parseTemplateBundle,
-  stageGuidePath,
-  TEMPLATE_STAGES,
+  STAGED_TEMPLATE_STAGES,
   TEMPLATE_WORKFLOW_CAPABILITIES,
 } from "../portable/template-bundle.mjs";
 import {
@@ -36,24 +36,28 @@ afterEach(async () => {
   for (const path of paths.splice(0))
     await rm(path, { recursive: true, force: true });
 });
-test("the workflow has four stages and the capability advertises protocol v2", () => {
-  expect([...TEMPLATE_STAGES]).toEqual([
-    "intent",
-    "material",
-    "logic",
-    "design",
-  ]);
+test("templates are read whole and the capability advertises protocol v3", () => {
   expect(TEMPLATE_WORKFLOW_CAPABILITIES.protocol).toBe(
-    "showai-template-workflow-v2",
+    "showai-template-workflow-v3",
   );
-  expect(TEMPLATE_WORKFLOW_CAPABILITIES.schemaVersion).toBe(3);
+  expect(TEMPLATE_WORKFLOW_CAPABILITIES.schemaVersion).toBe(4);
+  expect(TEMPLATE_WORKFLOW_CAPABILITIES.guideDisclosure).toBe(
+    "whole-template",
+  );
+  expect(TEMPLATE_WORKFLOW_CAPABILITIES.legacySchemaVersions).toEqual([
+    1, 2, 3,
+  ]);
 });
 test("portable folder contract rejects traversal, unknown fields, page skeletons and cross-platform collisions", () => {
   const source = templateFixture();
   const parsed = parseTemplateBundle(source);
   expect(parsed.components).toHaveLength(1);
   expect(parsed.legacy).toBe(false);
-  expect(Object.keys(parsed.guides)).toEqual([...TEMPLATE_STAGES]);
+  expect(parsed.staged).toBe(false);
+  expect(parsed.guides.map((guide) => guide.path)).toEqual([
+    "guides/method.md",
+    "guides/design.md",
+  ]);
   for (const name of [
     "../escape.md",
     "guides/CON.md",
@@ -71,40 +75,70 @@ test("portable folder contract rejects traversal, unknown fields, page skeletons
   expect(() => parseTemplateBundle(collision)).toThrow(/case-insensitive/);
   const unknown = structuredClone(source);
   unknown.files["README.md"] = unknown.files["README.md"].replace(
-    '"schemaVersion": 3',
-    '"schemaVersion": 3, "automaticPermissions": true',
+    '"schemaVersion": 4',
+    '"schemaVersion": 4, "automaticPermissions": true',
   );
   expect(() => parseTemplateBundle(unknown)).toThrow(/Unknown/);
-  const legacyStage = structuredClone(source);
-  legacyStage.files["README.md"] = legacyStage.files["README.md"].replace(
-    '"material": "guides/material.md"',
-    '"evidence": "guides/material.md"',
+  const staged = structuredClone(source);
+  staged.files["README.md"] = staged.files["README.md"].replace(
+    '"guides/method.md",',
+    '{"intent": "guides/method.md"},',
   );
-  expect(() => parseTemplateBundle(legacyStage)).toThrow(/stage guide/);
+  expect(() => parseTemplateBundle(staged)).toThrow(/guide/);
+  const outside = structuredClone(source);
+  outside.files["README.md"] = outside.files["README.md"].replace(
+    '"guides/method.md"',
+    '"method.md"',
+  );
+  outside.files["method.md"] = "# Method";
+  expect(() => parseTemplateBundle(outside)).toThrow(/under guides/);
+  const missing = structuredClone(source);
+  delete missing.files["guides/design.md"];
+  expect(() => parseTemplateBundle(missing)).toThrow(/Missing template file/);
 });
-test("a stage folder discloses its main README; null inherits the system stage", () => {
-  const source = templateFixture("folder", false);
+test("a template without guides is only its README", () => {
+  const source = templateFixture("overview-only", false);
+  source.files["README.md"] = source.files["README.md"].replace(
+    /"guides": \[[^\]]*\]/,
+    '"guides": []',
+  );
+  delete source.files["guides/method.md"];
+  delete source.files["guides/design.md"];
+  expect(parseTemplateBundle(source).guides).toEqual([]);
+});
+test("staged schemaVersion 3 bundles stay readable as guides in stage order; folders add their subfiles", () => {
+  const source = templateFixture("folder", false, "staged");
   source.files["README.md"] = source.files["README.md"]
     .replace('"design": "guides/design.md"', '"design": "guides/design"')
     .replace('"material": "guides/material.md"', '"material": null');
   source.files["guides/design/README.md"] = "# Design\nMain.";
   source.files["guides/design/detail.md"] = "# Detail\nOptional.";
+  delete source.files["guides/design.md"];
+  delete source.files["guides/material.md"];
   const parsed = parseTemplateBundle(source);
-  expect(parsed.guides.design?.path).toBe("guides/design/README.md");
-  expect(parsed.guides.material).toBeUndefined();
-  expect(stageGuidePath(parsed.metadata, "material")).toBeNull();
+  expect(parsed.staged).toBe(true);
+  expect(parsed.legacy).toBe(false);
+  expect(parsed.guides.map((guide) => guide.path)).toEqual([
+    "guides/intent.md",
+    "guides/logic.md",
+    "guides/design/README.md",
+    "guides/design/detail.md",
+  ]);
 });
-test("legacy six-stage bundles map evidence/understanding onto material/logic and keep their page skeleton", () => {
+test("legacy six-stage bundles disclose intent, evidence, understanding and design and keep their page skeleton", () => {
   const legacy = templateFixture("legacy-six", false, true);
   const parsed = parseTemplateBundle(legacy);
   expect(parsed.legacy).toBe(true);
   expect(parsed.metadata.schemaVersion).toBe(1);
-  expect(parsed.guides.material?.path).toBe("guides/evidence.md");
-  expect(parsed.guides.logic?.path).toBe("guides/understanding.md");
-  expect(stageGuidePath(parsed.metadata, "logic")).toBe(
+  expect(declaredGuidePaths(parsed.metadata)).toEqual([
+    "guides/intent.md",
+    "guides/evidence.md",
     "guides/understanding.md",
+    "guides/design.md",
+  ]);
+  expect(parsed.guides.map((guide) => guide.path)).not.toContain(
+    "guides/authoring.md",
   );
-  expect(Object.keys(parsed.guides)).toEqual([...TEMPLATE_STAGES]);
 });
 test("real directory export/import preserves portable files and rejects symlinks", async () => {
   const directory = await temporary(),
@@ -132,7 +166,7 @@ test("template components compile with isolated names, persist exact refs and su
     integrity: summary.integrity,
   });
   expect(saved.workflow?.components).toHaveLength(1);
-  expect(saved.workflow?.stages).toEqual([...TEMPLATE_STAGES]);
+  expect(saved.workflow).not.toHaveProperty("stages");
   const binding = saved.workflow!.components[0];
   expect(binding.ref.id).toMatch(/^tpl-guided-example-step-picker-/);
   const compiled = await getComponentByRef(home, binding.ref, project.id);
@@ -146,8 +180,8 @@ test("template components compile with isolated names, persist exact refs and su
     },
   ]);
   expect(context.system?.required).toBe(true);
-  expect(context.stages).toEqual([...TEMPLATE_STAGES]);
-  expect(context.templates?.[0]).not.toHaveProperty("legacyStages");
+  const whole = context.templates?.[0];
+  expect(whole && "guides" in whole ? whole.guides : []).toHaveLength(2);
   expect(context.components?.[0].ref.integrity).toBe(compiled.integrity);
   const page = await service.applyTemplate(project.id, saved.id);
   expect(page.document.templateContext?.templates[0].integrity).toBe(
@@ -202,7 +236,7 @@ test("template components compile with isolated names, persist exact refs and su
     await resolveDocumentComponents(home, updated.document, project.id),
   ).toHaveLength(1);
 });
-test("builtin catalog ships only the system baseline, the paper explainer and blank", async () => {
+test("builtin catalog ships only the system workflow, the paper explainer and blank", async () => {
   const home = await temporary(),
     service = new AgentService({ root: home });
   const project = await service.createProject("Builtins");
@@ -213,59 +247,36 @@ test("builtin catalog ships only the system baseline, the paper explainer and bl
       scope: "builtin",
     });
     const parsed = parseTemplateBundle(current.bundle);
-    expect(parsed.metadata.schemaVersion).toBe(3);
-    expect(parsed.metadata.version).toBe(
-      id === "paper-explainer" ? "2.4.0" : "2.3.0",
-    );
-    expect(Object.keys(parsed.guides)).toEqual([...TEMPLATE_STAGES]);
+    expect(parsed.metadata.schemaVersion).toBe(4);
+    expect(parsed.metadata.version).toBe("3.0.0");
+    expect(parsed.guides.length).toBeGreaterThan(0);
     expect(current.document.content.content ?? []).toHaveLength(0);
   }
   const base = await service.templateContext(project.id);
   expect(base.context.templates).toEqual([]);
-  expect(base.system?.required).toBe(true);
-  expect(base.system?.readme).toContain("理解意图");
+  expect(base.context.system.id).toBe("system-presentation");
+  expect(base.system.required).toBe(true);
+  expect(base.system).not.toHaveProperty("readme");
   const paper = await service.templateContext(project.id, [
     { id: "paper-explainer", scope: "builtin" },
   ]);
-  expect(paper.context.templates[0].version).toBe("2.4.0");
+  expect(paper.context.templates[0].version).toBe("3.0.0");
   const summary = paper.templates?.[0];
-  expect(summary && "stages" in summary).toBe(true);
+  expect(summary && "readme" in summary ? summary.readme : "").toContain(
+    "论文",
+  );
   expect(
-    summary && "stages" in summary
-      ? summary.stages.map((stage) => stage.stage)
-      : [],
-  ).toEqual([...TEMPLATE_STAGES]);
+    summary && "guides" in summary ? summary.guides.length : 0,
+  ).toBeGreaterThan(0);
   const cached = await service.templateContext(
     project.id,
     paper.context.templates,
     paper.context.hash,
   );
   expect(cached.unchanged).toBe(true);
-  expect(cached.system).toBeUndefined();
-  const design = await service.templateGuide(
-    project.id,
-    "design",
-    paper.context.templates,
-  );
-  expect(design.documents).toHaveLength(2);
-  expect(
-    design.documents?.every(
-      (document) =>
-        !("path" in document) || String(document.path).includes("design"),
-    ),
-  ).toBe(true);
-  await expect(
-    service.templateGuide(project.id, "design", [{ id: "paper-explainer" }]),
-  ).rejects.toThrow(/pinned/);
-  await expect(
-    service.templateGuide(
-      project.id,
-      "authoring" as never,
-      paper.context.templates,
-    ),
-  ).rejects.toThrow(/Unknown presentation stage/);
+  expect(cached.templates).toBeUndefined();
 });
-test("legacy saved templates stay readable through the four current stages", async () => {
+test("staged and legacy saved templates stay readable and keep verifying", async () => {
   const home = await temporary(),
     service = new AgentService({ root: home });
   const project = await service.createProject("Legacy");
@@ -280,25 +291,30 @@ test("legacy saved templates stay readable through the four current stages", asy
       integrity: saved.integrity,
     },
   ]);
-  // Records saved before the four-stage runtime hash their six declared
-  // stages; the runtime keeps that list so stored integrity still verifies.
+  // Records saved by earlier runtimes hash their declared stages; the runtime
+  // keeps that list so stored integrity still verifies.
   expect(saved.workflow?.stages).toEqual([...LEGACY_TEMPLATE_STAGES]);
   const legacySummary = context.templates?.[0];
-  expect(legacySummary).toMatchObject({ legacyStages: true });
+  expect(legacySummary).toHaveProperty("note");
   expect(
-    legacySummary && "stages" in legacySummary
-      ? legacySummary.stages.find((stage) => stage.stage === "logic")?.path
-      : undefined,
-  ).toBe("guides/understanding.md");
-  const logic = await service.templateGuide(
-    project.id,
-    "logic",
-    context.context.templates,
-  );
-  const document = logic.documents?.[1];
-  expect(document && "path" in document ? document.path : undefined).toBe(
+    legacySummary && "guides" in legacySummary
+      ? legacySummary.guides.map((guide) => guide.path)
+      : [],
+  ).toEqual([
+    "guides/intent.md",
+    "guides/evidence.md",
     "guides/understanding.md",
-  );
+    "guides/design.md",
+  ]);
+  const staged = await service.saveTemplate(project.id, undefined, {
+    bundle: templateFixture("staged-four", false, "staged"),
+  });
+  const stored = await getTemplate(home, staged.id, project.id, {
+    scope: "project",
+    version: staged.version,
+    integrity: staged.integrity,
+  });
+  expect(stored.workflow?.stages).toEqual([...STAGED_TEMPLATE_STAGES]);
 });
 test("bundled README identity cannot be overridden and the mandatory system cannot be replaced", async () => {
   const home = await temporary(),

@@ -13,7 +13,7 @@ import {
 } from "../core/catalog";
 import {
   parseTemplateBundle,
-  TEMPLATE_STAGES,
+  TEMPLATE_SCHEMA_VERSION,
 } from "../portable/template-bundle.mjs";
 import {
   componentParameterReference,
@@ -280,19 +280,14 @@ export class CatalogService {
             ...summary,
             view,
             readme: bundle.body,
-            stages: TEMPLATE_STAGES.map((stage) => ({
-              stage,
-              path: bundle.metadata.guides[stage],
-              inherited: bundle.metadata.guides[stage] === null,
-            })),
+            guides: bundle.guides,
             components: template.workflow?.components ?? [],
             next: {
               ...next,
-              stage: {
-                tool: "template_guide",
+              context: {
+                tool: "template_context",
                 arguments: {
                   projectId,
-                  stage: "intent",
                   templates: [
                     {
                       id: template.id,
@@ -354,7 +349,7 @@ export class CatalogService {
               assets: "component path → base64",
               readme: {
                 format: "showai-template",
-                schemaVersion: 1,
+                schemaVersion: TEMPLATE_SCHEMA_VERSION,
                 required: [
                   "id",
                   "name",
@@ -363,10 +358,9 @@ export class CatalogService {
                   "scenarios",
                   "guides",
                   "components",
-                  "page",
                 ],
+                guides: "ordered Markdown paths under guides/, read whole",
               },
-              stages: TEMPLATE_STAGES,
             },
             composition: [
               { type: "content", content: "doc node" },

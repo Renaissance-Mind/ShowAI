@@ -2854,15 +2854,15 @@ test("Kimi installed package discovers tools, delivers offline previews and reje
         "page_read",
         "page_present",
         "template_context",
-        "template_guide",
         "organization_update",
       ]),
     );
     const capabilities = await call("showai_capabilities");
     expect(capabilities.presentation.declaredHostDisplay).toBe("fragment-file");
     expect(capabilities.templateWorkflow.protocol).toBe(
-      "showai-template-workflow-v2",
+      "showai-template-workflow-v3",
     );
+    expect(names).not.toContain("template_guide");
     expect((await call("project_context")).root).toBe(isolated);
     const shown = await call("show_component", {
       kind: "text",

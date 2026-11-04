@@ -97,7 +97,6 @@ Discover only what you need:
   template import DIRECTORY --project PROJECT
   template export ID --project PROJECT --out NEW_DIRECTORY
   template context --project PROJECT [--templates ID[@VERSION],ID]
-  template guide STAGE --project PROJECT [--input CONTEXT.json | --templates ID]
   catalog list [--kind component|template] [--scope SCOPE] [--limit N --cursor CURSOR]
   catalog describe ID [--kind component|template] [--view VIEW]
   catalog describe ID --view parameters [--parameter-path PATH --parameter-offset N --parameter-limit N --known-hash HASH]
@@ -159,7 +158,6 @@ function parseArguments(args: string[]): Arguments {
     "host",
     "template",
     "templates",
-    "stage",
     "home",
     "automatic",
     "older-than-days",
@@ -735,11 +733,7 @@ async function runCliCommand(argv: string[]): Promise<unknown> {
     }
     case "guide":
       requireCount(args, 1, 2);
-      if (action === "presentation")
-        return systemPresentationGuide(
-          option(args, "stage") as
-            import("../portable/template-bundle.mjs").TemplateStage | undefined,
-        );
+      if (action === "presentation") return systemPresentationGuide();
       return service.guide(action);
     case "projects":
       if (action === "current") {
@@ -1282,25 +1276,6 @@ async function runCliCommand(argv: string[]): Promise<unknown> {
       if (action === "context") {
         requireCount(args, 2);
         return service.templateContext(await project(), selections());
-      }
-      if (action === "guide") {
-        requireCount(args, 3);
-        const target = await project();
-        const context = option(args, "input")
-          ? objectInput(await readJson(option(args, "input")!))
-          : await service.templateContext(target, selections());
-        const payload = objectInput(context),
-          data = objectInput(payload.data ?? payload),
-          binding = objectInput(data.context ?? data);
-        return service.templateGuide(
-          target,
-          id as import("../portable/template-bundle.mjs").TemplateStage,
-          (binding.templates ??
-            []) as import("./template-workflow").TemplateSelection[],
-          undefined,
-          option(args, "file"),
-          option(args, "id"),
-        );
       }
       if (action === "apply" || action === "instantiate") {
         requireCount(args, 3);

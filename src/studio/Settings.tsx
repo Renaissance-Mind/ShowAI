@@ -29,6 +29,7 @@ import LibrarySpace from "./LibrarySpace";
 import IconViewer from "./IconViewer";
 import SyncSettings, { type ProjectSyncRequest } from "./SyncSettings";
 import AgentSettings from "./AgentSettings";
+import WorkRecordsSettings from "./WorkRecordsSettings";
 import PluginInstallSettings, { LaunchConfigCopy } from "./PluginInstallSettings";
 import { workbenchCapabilities } from "./capabilities";
 import { AboutFeedback, type FeedbackRequest } from "./feedback/AboutFeedback";
@@ -268,6 +269,7 @@ export function SettingsPanel({
           </div>
         </section>
       )}
+      {section === "general" && info && <WorkRecordsSettings key={info.home} />}
       {section === "general" && info?.libraryVersion === 2 && (
         <details
           className="settings-group settings-advanced"

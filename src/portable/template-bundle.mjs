@@ -1,14 +1,15 @@
 /** Portable template contract: Markdown instructions and editable component files. */
-// Four presentation stages: understand intent, gather material, plan the
-// presentation logic, then write the design draft. Authoring and review are
-// skill operations that execute and check the draft, not template stages.
-export const TEMPLATE_STAGES = Object.freeze([
+// A template supplements the presentation workflow in the show-document Skill
+// with methods for one kind of content. Its guides are read whole, once per
+// task; schemaVersion 4 lists them without stages.
+export const TEMPLATE_SCHEMA_VERSION = 4;
+/** schemaVersion 3 bundles declared four stage guides; they remain readable. */
+export const STAGED_TEMPLATE_STAGES = Object.freeze([
   "intent",
   "material",
   "logic",
   "design",
 ]);
-export const TEMPLATE_SCHEMA_VERSION = 3;
 /** schemaVersion 1–2 bundles declared six stages; they remain readable. */
 export const LEGACY_TEMPLATE_STAGES = Object.freeze([
   "intent",
@@ -18,22 +19,24 @@ export const LEGACY_TEMPLATE_STAGES = Object.freeze([
   "authoring",
   "review",
 ]);
-const LEGACY_STAGE_SOURCE = Object.freeze({
-  intent: "intent",
-  material: "evidence",
-  logic: "understanding",
-  design: "design",
-});
+// Legacy authoring and review guides predate the shared authoring rules and
+// are not disclosed.
+const LEGACY_DISCLOSED_STAGES = Object.freeze([
+  "intent",
+  "evidence",
+  "understanding",
+  "design",
+]);
 export const SYSTEM_TEMPLATE_ID = "system-presentation";
 export const TEMPLATE_WORKFLOW_CAPABILITIES = Object.freeze({
-  protocol: "showai-template-workflow-v2",
+  protocol: "showai-template-workflow-v3",
   bundleFormat: 1,
   schemaVersion: TEMPLATE_SCHEMA_VERSION,
-  legacySchemaVersions: [1, 2],
-  stages: TEMPLATE_STAGES,
+  legacySchemaVersions: [1, 2, 3],
   systemBaselineRequired: true,
+  systemBaseline: "show-document Skill; guide topic presentation without Skills",
+  guideDisclosure: "whole-template",
   contextBinding: "explicit-exact-refs",
-  stageDisclosure: "on-demand",
   directoryImport: "local-cli",
   portableBundleInput: "template_save",
   compactResponses: ["source", "receipt"],
@@ -85,15 +88,15 @@ export function templateFilePath(value) {
     throw new Error("Unsafe template path key.");
   return value;
 }
-/** The declared guide for a current stage, mapping legacy six-stage bundles. */
-export function stageGuidePath(metadata, stage) {
-  if (!TEMPLATE_STAGES.includes(stage))
-    throw new Error("Unknown presentation stage.");
-  const key =
-    metadata.schemaVersion === TEMPLATE_SCHEMA_VERSION
-      ? stage
-      : LEGACY_STAGE_SOURCE[stage];
-  return metadata.guides[key] ?? null;
+/** Declared guide paths in reading order; staged and legacy bundles keep their stage order. */
+export function declaredGuidePaths(metadata) {
+  if (metadata.schemaVersion === TEMPLATE_SCHEMA_VERSION)
+    return [...metadata.guides];
+  const stages =
+    metadata.schemaVersion === 3
+      ? STAGED_TEMPLATE_STAGES
+      : LEGACY_DISCLOSED_STAGES;
+  return stages.map((stage) => metadata.guides[stage]).filter(Boolean);
 }
 export function parseTemplateReadme(source) {
   text(source, "README", 16000);
@@ -122,11 +125,9 @@ export function parseTemplateReadme(source) {
   );
   if (
     metadata.format !== "showai-template" ||
-    ![1, 2, TEMPLATE_SCHEMA_VERSION].includes(metadata.schemaVersion)
+    ![1, 2, 3, TEMPLATE_SCHEMA_VERSION].includes(metadata.schemaVersion)
   )
     throw new Error("Unsupported template README format/schemaVersion.");
-  const legacy = metadata.schemaVersion !== TEMPLATE_SCHEMA_VERSION;
-  const stages = legacy ? LEGACY_TEMPLATE_STAGES : TEMPLATE_STAGES;
   if (!idPattern.test(metadata.id)) throw new Error("Invalid template id.");
   if (!versionPattern.test(metadata.version))
     throw new Error("Template version must be exact semver.");
@@ -139,20 +140,44 @@ export function parseTemplateReadme(source) {
   )
     throw new Error("Template scenarios must contain 1–20 entries.");
   metadata.scenarios.forEach((value) => text(value, "Template scenario", 500));
-  const guides = object(metadata.guides, "Stage guides");
-  keys(guides, stages, "stage guide");
-  for (const stage of stages) {
-    if (!Object.hasOwn(guides, stage))
+  if (metadata.schemaVersion === TEMPLATE_SCHEMA_VERSION) {
+    if (!Array.isArray(metadata.guides) || metadata.guides.length > 20)
       throw new Error(
-        `Missing stage declaration: ${stage}. Use null to inherit the system guide.`,
+        "Template guides must be an array of at most 20 Markdown paths under guides/.",
       );
-    if (
-      guides[stage] !== null &&
-      !templateFilePath(guides[stage]).startsWith("guides/")
-    )
-      throw new Error(
-        `Stage ${stage} must reference guides/ Markdown, a guide folder, or null.`,
-      );
+    const seenGuides = new Set();
+    for (const path of metadata.guides) {
+      if (
+        typeof path !== "string" ||
+        !templateFilePath(path).startsWith("guides/") ||
+        !path.endsWith(".md") ||
+        seenGuides.has(path.toLowerCase())
+      )
+        throw new Error(
+          "Each template guide must be a distinct Markdown file under guides/.",
+        );
+      seenGuides.add(path.toLowerCase());
+    }
+  } else {
+    const stages =
+      metadata.schemaVersion === 3
+        ? STAGED_TEMPLATE_STAGES
+        : LEGACY_TEMPLATE_STAGES;
+    const guides = object(metadata.guides, "Stage guides");
+    keys(guides, stages, "stage guide");
+    for (const stage of stages) {
+      if (!Object.hasOwn(guides, stage))
+        throw new Error(
+          `Missing stage declaration: ${stage}. Use null when the template adds nothing.`,
+        );
+      if (
+        guides[stage] !== null &&
+        !templateFilePath(guides[stage]).startsWith("guides/")
+      )
+        throw new Error(
+          `Stage ${stage} must reference guides/ Markdown, a guide folder, or null.`,
+        );
+    }
   }
   if (!Array.isArray(metadata.components) || metadata.components.length > 30)
     throw new Error(
@@ -196,7 +221,7 @@ export function parseTemplateReadme(source) {
   text(match[2], "README body", 12000);
   if (encoder.encode(match[2]).byteLength > 4096)
     throw new Error(
-      "README body exceeds 4 KiB; move stage details into guides/.",
+      "README body exceeds 4 KiB; move method details into guides/.",
     );
   return { metadata, body: match[2].trim() };
 }
@@ -252,20 +277,37 @@ export function parseTemplateBundle(input) {
     return files[name];
   };
   const { metadata, body } = parseTemplateReadme(read("README.md"));
-  const guides = {};
-  for (const stage of TEMPLATE_STAGES) {
-    const path = stageGuidePath(metadata, stage);
-    if (path !== null) {
-      const main = path.endsWith(".md") ? path : path + "/README.md";
-      const markdown = read(main);
-      text(markdown, `Stage ${stage}`, 32000);
+  // A staged guide folder contributes its README first, then its other Markdown files.
+  const guides = [];
+  for (const declared of declaredGuidePaths(metadata)) {
+    const paths = declared.endsWith(".md")
+      ? [declared]
+      : [
+          declared + "/README.md",
+          ...Object.keys(files)
+            .filter(
+              (name) =>
+                name.startsWith(declared + "/") &&
+                name.endsWith(".md") &&
+                name !== declared + "/README.md",
+            )
+            .sort(),
+        ];
+    for (const path of paths) {
+      const markdown = read(path);
+      text(markdown, `Guide ${path}`, 32000);
       if (encoder.encode(markdown).byteLength > 32768)
-        throw new Error(
-          `Stage ${stage} exceeds 32 KiB; split it into a guide folder.`,
-        );
-      guides[stage] = { path: main, markdown };
+        throw new Error(`Guide ${path} exceeds 32 KiB; split it into files.`);
+      guides.push({ path, markdown });
     }
   }
+  if (
+    encoder.encode(guides.map(({ markdown }) => markdown).join("\n"))
+      .byteLength > 48 * 1024
+  )
+    throw new Error(
+      "Template guides exceed 48 KiB in total; an Agent reads them whole, so keep only the methods this kind of content needs.",
+    );
   const components = metadata.components.map(({ id, path }) => {
     const prefix = path + "/";
     const manifest = object(
@@ -332,7 +374,8 @@ export function parseTemplateBundle(input) {
     guides,
     components,
     document,
-    legacy: metadata.schemaVersion !== TEMPLATE_SCHEMA_VERSION,
+    legacy: metadata.schemaVersion < 3,
+    staged: metadata.schemaVersion < TEMPLATE_SCHEMA_VERSION,
     source: structuredClone(input),
   };
 }

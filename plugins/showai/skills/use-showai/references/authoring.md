@@ -1,0 +1,33 @@
+# 写入页面的操作
+
+这份参考列出把作品写进 ShowAI 页面时用到的操作写法：建页、插入与修改组件、文字标记、图片与媒体、链接、展示与导出。按设计稿制作时遇到哪类操作，读对应的一节；做什么、为什么这样做由 [show-document](../../show-document/SKILL.md) 的流程决定。
+
+## 建页与插入组件
+
+应用模板用 template_apply（空白 Page，绑定本轮固定引用）；空白路径用 page_create，只传标题和少量（一到几个）`blocks:[{kind,data}]`，不手写整棵 document。按设计稿的幕顺序填入真实内容：导语、图形或组件、图注与要点；新增内容用 page_apply 的 `component.insert`，一次插入一到几个组件，例如 `operations:[{type:"component.insert",kind:"text",data:{format:"markdown",content:"..."},afterId:"上一块ID"}]`。`blocks` 与 `component.insert` 的 kind/data 相同：data 就是该组件的参数，文字统一用 `{kind:"text",data:{format:"markdown",content}}`；afterId 省略时追加到末尾，为 null 时放在最前；要放进容器内部时加 parentId，值为该容器的块 ID；放进 stepper 的某一步时 parentId 是那一步（outline 中 type 为 step）的 ID，新建 stepper 时直接用 steps[].blocks 放入各步组件。page_create 返回含块 ID 的完整 document 与 hash/revision；page_apply 的 receipt 只含 hash/revision，按顺序追加时省略 afterId 即可，需要新块 ID 作锚点时用 response:"source"。每幕完成后记录实现它的 blockIds。
+
+## 选择组件与参数
+
+索引条目的 signature 一行给出组件参数的字段与类型，内置组件对应 data，自定义组件对应 data.props；用它判断适配、准备数据和核对顶层必填项，嵌套字段的必填与含义以 parameters 为准。选择组件后读其精确 guide，再按当前材料用 parameters 的 parameterPath 查字段含义、约束与例子；只在需要原始结构时读 schema。模板组件采用 template_context 返回的 componentId/version/integrity，不把局部名字当内置 kind。guide 返回 authoringReference 时沿用精确引用读取制作索引，流程见 [组件设计](../../create-component/references/component-authoring.md)。现有数据调整或组合够用时复用；设计稿中确认的缺口进入 [create-component](../../create-component/SKILL.md)。编辑 Board 的绘画、对象属性、布局或连接时读 [Board 对象编辑](board-authoring.md)。需要具体操作时才读 guide authoring/containers/document 等技术说明。
+
+## 修改已有页面
+
+修改前 page_read({projectId,pageId,rendered:false,response:"source"}) 读取完整源与 hash/revision；局部编辑保留必要基线，不用局部 source 覆盖整页。优先 page_apply 的稳定节点操作，response:"receipt" 只收保存回执。本机连接中操作列表很长（例如带大量数据或 base64 资源）时，把 operations 数组写进任务工作目录（宿主提供的草稿目录，不在代码仓库或内容库里）的 JSON 文件，用 `operationsFile:"/绝对路径/ops.json"` 代替内联；读取整页源或截图时可用 page_read 的 `out:"/绝对路径/文件"`，回执只含路径、sha256 与 hash/revision。页面上的自定义组件换新版本用 `component.ref.set`（见 [create-component](../../create-component/SKILL.md)），不要删除后重新插入。修改已有组件数据用 `component.props.set`（blockId 加变化的顶层 props；每个列出的顶层键整体替换，不做深度合并，嵌套值要读出后改好整段回写）。组件数据带 `$binding` 时，参数来自项目的共享数据：`page_read` 的 bindings 给出解析后的参数，`component.props.set` 会把映射字段写回共享数据，规则见 [共享数据](shared-data.md)。改已有段落或标题的文字用 `block.text.set`（该段落/标题 ID 和纯文本），它会去掉该段原有的加粗、链接、注释等标记，要保留格式时用 `block.replace`；Board 上矩形、椭圆或箭头的文字是绘画属性，用 `block.attrs.set` 改 `label`/`labelSize`，见 [Board 对象编辑](board-authoring.md)；加链接见下一段；需要其他新格式时用 `block.replace` 换成同一 ID 的新节点，或用 `block.remove`（blockId）删除旧块后再 `component.insert`。操作名以 guide authoring 为准；写错操作名时，报错会列出全部可用操作。单次参数保持浅而短，大改动拆成几次顺序 apply，每次沿用返回的 hash/revision。需要新模板绑定时以 page.set.fields.templateContext 保存 template_context 返回的 format/system/templates，去掉 hash。CONFLICT 必须比较基线、当前内容和尝试稿，保留无关修改；处理流程见 [use-showai](../SKILL.md)。
+
+## 文字标记
+
+正文的文字标记按“同类含义用同一种样式”使用：写之前先定下几种含义各用什么标记，例如结论加粗、术语首次出现加悬停注释、需要读者对照的数字高亮，全文一致。Markdown 能写 `**加粗**`、`*斜体*`、`~~删除线~~`、`` `代码` ``、`==高亮==`、`[链接](https://…)`、`[文字]{注释}`（读者悬停时显示注释）和 `$公式$`。下划线、文字颜色、高亮颜色、字体和局部字号没有 Markdown 写法，要用 `format:"richtext"` 的内容树在文字上写 marks，例如 `{type:"text",text:"6.4 秒",marks:[{type:"highlight",attrs:{color:"#fde68a"}},{type:"bold"}]}`；悬停注释的 mark 是 `{type:"annotation",attrs:{note:"注释文字"}}`。其他字段见 text 组件 guide 的“结构化富文本与局部格式”。给已有段落加这类格式用 `block.replace`，保留段落 ID。
+
+## 图片、媒体与表格
+
+图片、图库、书签图片、视频封面以及视频、音频、PDF 的 `src` 有三种来源：http(s) 地址（读者在线加载，导出保留地址）；base64 data URI（随页面保存）；本机文件引用 `file:///绝对路径` 或 `file:~/路径`（路径各段用 `encodeURIComponent` 编码）。本机文件留在原处、不占页面预算，ShowAI 在有这个文件的设备上直接显示；同步时默认带上不超过 64 MiB 的副本，其他设备直接显示这份副本，用户关闭携带后其他设备显示「未打包」并可链接自己的文件。`page_present` 把预算内的本机文件嵌入对话预览；`page_export` 先列出打包清单，由用户逐项选择。用户给出本机图片或视频且只在这台电脑上查看时，优先写引用；需要随页面分发、同步到其他设备也能看时，读成 `data:image/png;base64,…`（JPEG、GIF、WebP、AVIF 同理）写进组件数据，本机连接把带图片的 operations 写进 JSON 文件，用 `operationsFile` 提交。`page_read` 的 `resources` 列出页面用到的本机文件（含大小与是否可读）和在线地址。嵌入的图片计入对话预览预算（见 [容量](capacity.md)），几张截图就可能让整页无法在对话里展示，展示时改选不含大图的关键块。表格组件的 `rows` 按纯文本写入，单元格里的 Markdown 和 `[文字]{注释}` 都不解析，列宽默认平分。插入后它是原生表格节点：改列宽用 `block.attrs.set` 给该列单元格设 `colwidth:[像素]`，单元格加格式用 `block.replace` 换成带标记的段落；新写的表格需要格式时，也可以直接写成 text 组件里的 Markdown 表格。细节见 table 组件 guide。
+
+## 链接与多页网站
+
+页面之间和页面内部的跳转用文字链接：Markdown 写 `[文字](showai://project/项目ID/page/页面ID)`，要定位到目标页的某个块、组件或 Board 对象时加 `?blocks=块ID`；同一页内写 `[文字](#块ID)`。项目和页面 ID 取自 pages_list，块 ID 取自 page_read；文本块里的段落和标题、组件、容器里的块和 Board 对象都能作为目标，组件内部的条目不能。给已有段落或标题中的文字加链接时用 `block.replace`，传入同一 ID 的节点并给要链接的文字加 link 标记，例如 `{type:"block.replace",blockId:"段落ID",node:{type:"paragraph",attrs:{id:"段落ID"},content:[{type:"text",text:"支持"},{type:"text",text:"离线导出",marks:[{type:"link",attrs:{href:"showai://project/项目ID/page/页面ID?blocks=块ID"}}]}]}}`；块 ID 保持不变。删除后重新插入会换新 ID，指向旧 ID 的链接随之失效。
+
+在工作台中，编辑时按住 ⌘（Windows 为 Ctrl）点击链接跳转，直接点击只放置光标；阅读时直接点击。跳转后打开目标页并滚动、高亮目标块，工具栏的后退回到原页；目标页面不存在时提示错误并停留原页，目标块不存在时只打开页面。多页作品（小型网站、分章讲解）在各页导语或结尾放上这类链接。要交给别人时用 `page_export({format:"site", out:"不存在或为空的目录的绝对路径"})`：它导出项目中所有未归档的页面，不能只选其中几页，项目里还有其他页面时先告诉用户；多页网站自带各页导航栏，入口是 `index.html`，页间链接打开导出的对应页面并定位到目标块。网站需要放到静态网站托管或本地 HTTP 服务上打开，直接双击文件打开时浏览器不加载阅读器。单页 HTML 里跨页的链接，以及网站中指向未导出页面的链接，只有装了 ShowAI 且有这个项目的读者才能打开。自定义组件需要点击后跳转时用 `goTo`，见 [组件设计](../../create-component/references/component-authoring.md#跳转到页面或组件)。
+
+## 展示与导出
+
+新建的作品保存后用 page_present，并在同一轮把页面展示给用户。展示方式由 [当前宿主适配](host-adapter.md) 决定，先读它：结果带 `conversation` 时按 `mode`（`compact`、`too-large`、`unavailable`）与 `next` 执行；没有 `conversation` 时交付本轮真实 delivery。整页超出对话预算时（结果带 `inlineError`，或 `conversation.mode` 为 `too-large`；嵌入图片和长文是常见原因），用 page_read 的 `detail:"outline"` 取得块 ID，带 blockIds 再调用一次，展示一到三个关键块，并给出整页链接；单个块也超限时说明原因，只给出链接或完整文件。只回复 openUrl 不算展示；page_read 的截图用于自查，不能代替展示。续改已有页面时在原页面上修改，保存后默认不调用 page_present（它的预览卡片看起来像一篇新文章），只告诉用户改了什么、页面在哪个项目并给出链接；用户要求查看效果时再展示。本机连接的 page_create、page_save 与 page_present 回执带 projectName 和 openUrl（showai://… 链接），page_apply 回执同样带项目与页面身份：交付时告诉用户页面存在哪个项目，并给出这个链接，用户点击即在 ShowAI 中打开。用户要求导出文件（离线 HTML、会话片段、网站）时用 page_export；只要页面源数据（JSON）供离线分析时用 page_read 的 out，共享数据用 dataset_read 的 out；页面用到本机文件（共享数据、由它们计算的结果或资源字段）时，page_export 先返回 `CONFIRMATION_REQUIRED` 和打包清单 `details.packaging`，按 [共享数据](shared-data.md#外部文件中的数据) 把每项的名称和大小告诉用户，按用户的选择带 `packaging:{项id: 选择}` 导出；把 page_present 的 delivery 文件交给别人前改用 page_export 同样请用户选择。页面要显示用户指明的本机数据文件（JSON、CSV、TSV、Excel）或在线数据并随之更新时，先按同一节用 dataset_write 的 link 建立共享数据；需要从中挑选、计算出组件要的形状时（例如从 Excel 取不固定位置的合计做图），再用 transform 写处理脚本，然后在页面中绑定。容量按需读 [容量](capacity.md)，局部展示与临时状态读 [页面阅读](page-reading.md)。只有用户要一份完整独立文件且不入库时用 render_document；连接、保存或显示失败不自动改变内容归属，也不改用 show_component 了事。

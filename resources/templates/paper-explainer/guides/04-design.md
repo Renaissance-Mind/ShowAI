@@ -57,10 +57,10 @@
 
 | 画面               | 库组件                           | 内置替代                      |
 | ------------------ | -------------------------------- | ----------------------------- |
-| 并排序列或路径     | sequence-layout                  | step-walkthrough 两步对比     |
-| 阶段 × 对象矩阵    | stage-lanes                      | step-walkthrough 逐步         |
+| 并排序列或路径     | sequence-layout                  | svg 同尺度并排                |
+| 阶段 × 对象矩阵    | stage-lanes                      | mechanism-diagram 的 steps    |
 | 难题对策配对       | problem-fix-map                  | comparison-matrix、双列 table |
-| 逐步机制演示       | —                                | step-walkthrough              |
+| 逐步机制演示       | —                                | mechanism-diagram、stepper    |
 | 可拖参数与曲线     | formula-curves                   | playground                    |
 | 同口径结果表       | benchmark-compare、metric-matrix | table + 正文写差值            |
 | 排序条形           | rank-bars                        | chart                         |

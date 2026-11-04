@@ -35,10 +35,8 @@ import {
   readTemplateDirectory,
   writeTemplateDirectory,
 } from "../core/template-bundle-files";
-import { type TemplateStage } from "../portable/template-bundle.mjs";
 import {
   templateContext as readTemplateContext,
-  templateGuide as readTemplateGuide,
   type TemplateSelection,
 } from "./template-workflow";
 import { preserveRemoteSave } from "../core/remote-save-conflict";
@@ -336,7 +334,6 @@ export class AgentService extends CatalogService {
     knownHash?: string,
     componentOffset?: number,
     componentLimit?: number,
-    knownSystemHash?: string,
   ) {
     const project = this.requireProject(projectId);
     await this.store.readProject(project);
@@ -347,27 +344,6 @@ export class AgentService extends CatalogService {
       knownHash,
       componentOffset,
       componentLimit,
-      knownSystemHash,
-    );
-  }
-  async templateGuide(
-    projectId: string,
-    stage: TemplateStage,
-    selections: TemplateSelection[] = [],
-    knownHash?: string,
-    file?: string,
-    templateId?: string,
-  ) {
-    const project = this.requireProject(projectId);
-    await this.store.readProject(project);
-    return readTemplateGuide(
-      this.store.root,
-      project,
-      stage,
-      selections,
-      knownHash,
-      file,
-      templateId,
     );
   }
   async importTemplate(projectId: string, directory: string) {

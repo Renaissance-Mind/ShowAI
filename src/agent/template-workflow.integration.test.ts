@@ -48,9 +48,9 @@ afterAll(async () => {
   await syncManager(home).stop();
   await rm(home, { recursive: true, force: true });
 });
-test("two real stdio sessions retain different pinned templates and stage disclosures", async () => {
+test("two real stdio sessions retain different pinned templates and read them whole", async () => {
   const [a, b] = await Promise.all([
-    connect("paper-explainer@2.4.0"),
+    connect("paper-explainer@3.0.0"),
     connect(),
   ]);
   const first = await call(a, "template_context"),
@@ -58,26 +58,28 @@ test("two real stdio sessions retain different pinned templates and stage disclo
   expect(first.context.templates[0].id).toBe("paper-explainer");
   expect(second.context.templates).toEqual([]);
   expect(first.system.required).toBe(true);
-  expect(first.stages).toEqual(["intent", "material", "logic", "design"]);
-  const stage = await call(a, "template_guide", { stage: "design" });
-  expect(stage.documents).toHaveLength(2);
-  expect(stage.documents[1].ref.id).toBe("paper-explainer");
-  expect(
-    stage.documents.every((d: { path: string }) => d.path.includes("design")),
-  ).toBe(true);
+  expect(first.system).not.toHaveProperty("readme");
+  const paper = first.templates[0];
+  expect(paper.readme).toContain("论文");
+  expect(paper.guides.map((guide: { path: string }) => guide.path)).toEqual([
+    "guides/01-intent.md",
+    "guides/02-material.md",
+    "guides/03-logic.md",
+    "guides/04-design.md",
+  ]);
+  const tools = (await a.listTools()).tools.map((tool) => tool.name);
+  expect(tools).toContain("template_context");
+  expect(tools).not.toContain("template_guide");
   const blank = await call(a, "template_context", { templates: [] });
   expect(blank.context.templates).toEqual([]);
   expect(blank.system.required).toBe(true);
-  const blankStage = await call(a, "template_guide", {
-    stage: "design",
-    templates: [],
-  });
-  expect(blankStage.documents).toHaveLength(1);
-  expect(blankStage.documents[0].ref.id).toBe("system-presentation");
+  expect(blank.templates).toEqual([]);
+  const workflow = await call(a, "guide", { topic: "presentation" });
+  expect(workflow.markdown).toContain("环节四：设计稿");
   expect((await call(a, "template_context")).context).toEqual(first.context);
   expect(
     (await call(a, "template_context", { knownHash: first.context.hash }))
-      .system,
+      .templates,
   ).toBeUndefined();
   await expect(
     readFile(join(home, "agent-runtime.json")),
@@ -117,7 +119,7 @@ test("source and receipt profiles reduce text without losing saved content or re
   const page = await call(client, "template_apply", {
     templateId: "paper-explainer",
     scope: "builtin",
-    version: "2.4.0",
+    version: "3.0.0",
     title: "Report",
   });
   const full = await call(client, "page_read", {

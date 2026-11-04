@@ -5,11 +5,7 @@ import { join, resolve, dirname, extname } from "node:path";
 import { z } from "zod";
 import { AgentService } from "./service";
 import { builtinTemplateBundles } from "../core/builtin-template-bundles";
-import {
-  parseTemplateBundle,
-  type TemplateStage,
-} from "../portable/template-bundle.mjs";
-import { templateGuide } from "./template-workflow";
+import { parseTemplateBundle } from "../portable/template-bundle.mjs";
 import { blocksDocument } from "./page-authoring";
 import { catalogPage, type CatalogView } from "./disclosure";
 import { FileStore } from "../core/store";
@@ -128,7 +124,6 @@ export async function describePublicResource(
     parameterOffset?: number;
     parameterLimit?: number;
     knownHash?: string;
-    stage?: TemplateStage;
     version?: string;
     integrity?: string;
   } = {},
@@ -145,23 +140,6 @@ export async function describePublicResource(
       version: input.version,
       integrity: input.integrity,
     });
-    if (input.stage)
-      return templateGuide(
-        publicCatalogHome(),
-        "public",
-        input.stage,
-        [
-          {
-            id,
-            version: template.version,
-            integrity: template.integrity,
-            scope: "builtin",
-          },
-        ],
-        undefined,
-        input.file,
-        input.file ? id : undefined,
-      );
     const result = await new AgentService({
       root: publicCatalogHome(),
     }).catalogDescribe(id, {
@@ -174,7 +152,7 @@ export async function describePublicResource(
     return {
       ...result,
       next: {
-        stage: {
+        guide: {
           tool: "public_catalog_describe",
           arguments: {
             id,
@@ -182,7 +160,6 @@ export async function describePublicResource(
             view: "guide",
             version: template.version,
             integrity: template.integrity,
-            stage: "intent",
           },
         },
         source: {
@@ -198,7 +175,7 @@ export async function describePublicResource(
       },
     };
   }
-  if (input.kind === "template" || input.stage) publicTemplate(id);
+  if (input.kind === "template") publicTemplate(id);
   return new AgentService({
     root: join(tmpdir(), "showai-public-catalog"),
   }).catalogDescribe(id, {

@@ -3,8 +3,6 @@ import { builtinTemplateBundles } from "../core/builtin-template-bundles";
 import {
   parseTemplateBundle,
   SYSTEM_TEMPLATE_ID,
-  TEMPLATE_STAGES,
-  type TemplateStage,
 } from "../portable/template-bundle.mjs";
 import { compareCatalogVersions } from "./disclosure";
 const base = builtinTemplateBundles
@@ -13,30 +11,23 @@ const base = builtinTemplateBundles
   .sort((a, b) =>
     compareCatalogVersions(b.metadata.version, a.metadata.version),
   )[0]!;
-export function systemPresentationGuide(
-  stage?: TemplateStage,
-  knownHash?: string,
-) {
-  if (stage && !TEMPLATE_STAGES.includes(stage))
-    throw new Error("Unknown presentation stage.");
-  const markdown = stage ? base.guides[stage]!.markdown : base.body;
-  const hash = createHash("sha256").update(markdown).digest("hex");
+/** The whole presentation workflow, as embedded in the show-document Skill. */
+export const systemPresentationMarkdown = [
+  base.body,
+  ...base.guides.map(({ markdown }) => markdown.trim()),
+].join("\n\n");
+export function systemPresentationGuide(knownHash?: string) {
+  const hash = createHash("sha256")
+    .update(systemPresentationMarkdown)
+    .digest("hex");
   return {
     topic: "presentation",
     id: SYSTEM_TEMPLATE_ID,
     version: base.metadata.version,
     required: true,
-    stage: stage ?? "baseline",
     hash,
     unchanged: knownHash === hash,
-    ...(knownHash === hash ? {} : { markdown }),
-    stages: TEMPLATE_STAGES.map((name) => ({
-      stage: name,
-      next: {
-        tool: "guide",
-        arguments: { topic: "presentation", stage: name },
-      },
-    })),
-    rule: "The baseline applies to every presentation. Read phase detail when needed; selected template phase guides add task-specific instructions.",
+    ...(knownHash === hash ? {} : { markdown: systemPresentationMarkdown }),
+    rule: "This is the body of the show-document Skill: read it once per task. Selected templates add the methods for their kind of content through template_context.",
   };
 }

@@ -86,11 +86,8 @@ plugins/showai/scripts/cli.mjs
 !/plugins/showai/skills/create-template/references/template-abstraction.md
 !/plugins/showai/skills/create-template/references/template-creation.md
 !/plugins/showai/skills/show-document/SKILL.md
-!/plugins/showai/skills/show-document/references/board-authoring.md
 !/plugins/showai/skills/use-showai/references/host-display.md
 !/plugins/showai/skills/show-visual/SKILL.md
-!/plugins/showai/skills/show-document/references/capacity.md
-!/plugins/showai/skills/show-document/references/page-reading.md
 !/plugins/showai/skills/use-showai/SKILL.md
 !/plugins/showai/skills/use-showai/references/integration.md
 !/plugins/showai/skills/use-showai/references/runtime.md
@@ -98,14 +95,6 @@ plugins/showai/scripts/cli.mjs
 !/resources/catalog/task-gantt/README.md
 !/resources/catalog/value-slider/README.md
 
-!/plugins/showai/skills/plan-presentation/SKILL.md
-!/plugins/showai/skills/plan-presentation/references/presentation-contract.md
-!/plugins/showai/skills/plan-presentation/references/understanding-plan.md
-!/plugins/showai/skills/design-presentation/SKILL.md
-!/plugins/showai/skills/design-presentation/references/expression-and-storyboard.md
-!/plugins/showai/skills/design-presentation/references/reuse-selection.md
-!/plugins/showai/skills/review-presentation/SKILL.md
-!/plugins/showai/skills/review-presentation/references/review-criteria.md
 
 # Public template metadata and stage instructions.
 !/resources/templates/system-presentation/README.md
@@ -204,13 +193,12 @@ plugins/showai/scripts/cli.mjs
 # Public template files referenced by builtin-template-bundles.ts
 !/resources/templates/system-presentation/guides/02-material.md
 !/resources/templates/system-presentation/guides/03-logic.md
+!/resources/templates/system-presentation/guides/05-authoring-review.md
 !/resources/templates/paper-explainer/README.md
 !/resources/templates/paper-explainer/guides/01-intent.md
 !/resources/templates/paper-explainer/guides/02-material.md
 !/resources/templates/paper-explainer/guides/03-logic.md
 !/resources/templates/paper-explainer/guides/04-design.md
-!/plugins/showai/skills/design-presentation/references/design-draft.md
-!/plugins/showai/skills/plan-presentation/references/presentation-logic.md
 
 # Public generated host packages; edit common Skills and adapters, then package:plugin.
 !/plugins/showai/host-adapters/claude.md
@@ -219,6 +207,13 @@ plugins/showai/scripts/cli.mjs
 !/plugins/showai/host-adapters/kimi.md
 !/plugins/showai/host-adapters/mcp-app.md
 !/plugins/showai/skills/use-showai/references/host-adapter.md
+!/plugins/showai/skills/use-showai/references/authoring.md
+!/plugins/showai/skills/use-showai/references/board-authoring.md
+!/plugins/showai/skills/use-showai/references/capacity.md
+!/plugins/showai/skills/use-showai/references/editing.md
+!/plugins/showai/skills/use-showai/references/page-reading.md
+!/plugins/showai/skills/use-showai/references/tasks.md
+!/plugins/showai/skills/use-showai/references/user-references.md
 !/plugins/showai-claude/README.md
 !/plugins/showai-claude/README.zh-CN.md
 !/plugins/showai-claude/skills/collaborate-canvas/SKILL.md
@@ -228,18 +223,7 @@ plugins/showai/scripts/cli.mjs
 !/plugins/showai-claude/skills/create-template/SKILL.md
 !/plugins/showai-claude/skills/create-template/references/template-abstraction.md
 !/plugins/showai-claude/skills/create-template/references/template-creation.md
-!/plugins/showai-claude/skills/design-presentation/SKILL.md
-!/plugins/showai-claude/skills/design-presentation/references/design-draft.md
-!/plugins/showai-claude/skills/design-presentation/references/reuse-selection.md
-!/plugins/showai-claude/skills/plan-presentation/SKILL.md
-!/plugins/showai-claude/skills/plan-presentation/references/presentation-contract.md
-!/plugins/showai-claude/skills/plan-presentation/references/presentation-logic.md
-!/plugins/showai-claude/skills/review-presentation/SKILL.md
-!/plugins/showai-claude/skills/review-presentation/references/review-criteria.md
 !/plugins/showai-claude/skills/show-document/SKILL.md
-!/plugins/showai-claude/skills/show-document/references/board-authoring.md
-!/plugins/showai-claude/skills/show-document/references/capacity.md
-!/plugins/showai-claude/skills/show-document/references/page-reading.md
 !/plugins/showai-claude/skills/show-visual/SKILL.md
 !/plugins/showai-claude/skills/use-showai/SKILL.md
 !/plugins/showai-claude/skills/use-showai/references/host-adapter.md
@@ -247,6 +231,13 @@ plugins/showai/scripts/cli.mjs
 !/plugins/showai-claude/skills/use-showai/references/integration.md
 !/plugins/showai-claude/skills/use-showai/references/runtime.md
 !/plugins/showai-claude/skills/use-showai/references/shared-data.md
+!/plugins/showai-claude/skills/use-showai/references/authoring.md
+!/plugins/showai-claude/skills/use-showai/references/board-authoring.md
+!/plugins/showai-claude/skills/use-showai/references/capacity.md
+!/plugins/showai-claude/skills/use-showai/references/editing.md
+!/plugins/showai-claude/skills/use-showai/references/page-reading.md
+!/plugins/showai-claude/skills/use-showai/references/tasks.md
+!/plugins/showai-claude/skills/use-showai/references/user-references.md
 !/plugins/showai-codex/README.md
 !/plugins/showai-codex/README.zh-CN.md
 !/plugins/showai-codex/skills/collaborate-canvas/SKILL.md
@@ -256,18 +247,7 @@ plugins/showai/scripts/cli.mjs
 !/plugins/showai-codex/skills/create-template/SKILL.md
 !/plugins/showai-codex/skills/create-template/references/template-abstraction.md
 !/plugins/showai-codex/skills/create-template/references/template-creation.md
-!/plugins/showai-codex/skills/design-presentation/SKILL.md
-!/plugins/showai-codex/skills/design-presentation/references/design-draft.md
-!/plugins/showai-codex/skills/design-presentation/references/reuse-selection.md
-!/plugins/showai-codex/skills/plan-presentation/SKILL.md
-!/plugins/showai-codex/skills/plan-presentation/references/presentation-contract.md
-!/plugins/showai-codex/skills/plan-presentation/references/presentation-logic.md
-!/plugins/showai-codex/skills/review-presentation/SKILL.md
-!/plugins/showai-codex/skills/review-presentation/references/review-criteria.md
 !/plugins/showai-codex/skills/show-document/SKILL.md
-!/plugins/showai-codex/skills/show-document/references/board-authoring.md
-!/plugins/showai-codex/skills/show-document/references/capacity.md
-!/plugins/showai-codex/skills/show-document/references/page-reading.md
 !/plugins/showai-codex/skills/show-visual/SKILL.md
 !/plugins/showai-codex/skills/use-showai/SKILL.md
 !/plugins/showai-codex/skills/use-showai/references/host-adapter.md
@@ -275,6 +255,13 @@ plugins/showai/scripts/cli.mjs
 !/plugins/showai-codex/skills/use-showai/references/integration.md
 !/plugins/showai-codex/skills/use-showai/references/runtime.md
 !/plugins/showai-codex/skills/use-showai/references/shared-data.md
+!/plugins/showai-codex/skills/use-showai/references/authoring.md
+!/plugins/showai-codex/skills/use-showai/references/board-authoring.md
+!/plugins/showai-codex/skills/use-showai/references/capacity.md
+!/plugins/showai-codex/skills/use-showai/references/editing.md
+!/plugins/showai-codex/skills/use-showai/references/page-reading.md
+!/plugins/showai-codex/skills/use-showai/references/tasks.md
+!/plugins/showai-codex/skills/use-showai/references/user-references.md
 !/plugins-kimi/showai/skills/collaborate-canvas/SKILL.md
 !/plugins-kimi/showai/skills/create-component/SKILL.md
 !/plugins-kimi/showai/skills/create-component/references/component-authoring.md
@@ -282,18 +269,7 @@ plugins/showai/scripts/cli.mjs
 !/plugins-kimi/showai/skills/create-template/SKILL.md
 !/plugins-kimi/showai/skills/create-template/references/template-abstraction.md
 !/plugins-kimi/showai/skills/create-template/references/template-creation.md
-!/plugins-kimi/showai/skills/design-presentation/SKILL.md
-!/plugins-kimi/showai/skills/design-presentation/references/design-draft.md
-!/plugins-kimi/showai/skills/design-presentation/references/reuse-selection.md
-!/plugins-kimi/showai/skills/plan-presentation/SKILL.md
-!/plugins-kimi/showai/skills/plan-presentation/references/presentation-contract.md
-!/plugins-kimi/showai/skills/plan-presentation/references/presentation-logic.md
-!/plugins-kimi/showai/skills/review-presentation/SKILL.md
-!/plugins-kimi/showai/skills/review-presentation/references/review-criteria.md
 !/plugins-kimi/showai/skills/show-document/SKILL.md
-!/plugins-kimi/showai/skills/show-document/references/board-authoring.md
-!/plugins-kimi/showai/skills/show-document/references/capacity.md
-!/plugins-kimi/showai/skills/show-document/references/page-reading.md
 !/plugins-kimi/showai/skills/show-visual/SKILL.md
 !/plugins-kimi/showai/skills/use-showai/SKILL.md
 !/plugins-kimi/showai/skills/use-showai/references/host-adapter.md
@@ -301,6 +277,13 @@ plugins/showai/scripts/cli.mjs
 !/plugins-kimi/showai/skills/use-showai/references/integration.md
 !/plugins-kimi/showai/skills/use-showai/references/runtime.md
 !/plugins-kimi/showai/skills/use-showai/references/shared-data.md
+!/plugins-kimi/showai/skills/use-showai/references/authoring.md
+!/plugins-kimi/showai/skills/use-showai/references/board-authoring.md
+!/plugins-kimi/showai/skills/use-showai/references/capacity.md
+!/plugins-kimi/showai/skills/use-showai/references/editing.md
+!/plugins-kimi/showai/skills/use-showai/references/page-reading.md
+!/plugins-kimi/showai/skills/use-showai/references/tasks.md
+!/plugins-kimi/showai/skills/use-showai/references/user-references.md
 
 # Repository Skill for Agents contributing to this checkout (Codex and Claude Code copies).
 !/.agents/skills/showai-contributing/SKILL.md

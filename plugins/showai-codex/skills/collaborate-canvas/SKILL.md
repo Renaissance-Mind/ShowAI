@@ -5,7 +5,7 @@ description: 在 ShowAI 画布上与仍在编辑的人协作，处理 Agent 多�
 
 # 与人协作编辑画布
 
-先沿 [use-showai](../use-showai/SKILL.md) 核对当前连接、项目和页面。已有宿主注入的身份与完整目录时沿用，不重复发现。创作继续使用 [show-document](../show-document/SKILL.md) 的当前阶段；本技能补充协作规则。
+先沿 [use-showai](../use-showai/SKILL.md) 核对当前连接、项目和页面。已有宿主注入的身份与完整目录时沿用，不重复发现。创作继续按 [show-document](../show-document/SKILL.md) 的当前环节进行；本技能补充协作规则。
 
 ## 让人持续编辑
 
@@ -19,7 +19,7 @@ Agent 运行期间，人可以继续书写、画画、选择对象和切换对�
 
 Board 中的新文字、数据图表和交互组件等目录组件放在 Page 容器中；同一段讲解的多个组件尽量放进同一个 Page，让文字顺序和宽度一致。使用当前连接 `guide` 的 containers/authoring 说明及组件 Schema；`component.insert` 的 `kind:"page"` 创建原生 Page，后续插入明确使用该 Page 的稳定 ID。宿主的组件插入会为 Board 上的普通组件建立 Page 外层。手写笔迹、箭头和形状保留画布对象语义。
 
-图形自己的文字写进矩形、椭圆或箭头的 `attrs.label`，不另建 Page 叠在图形上；方框加箭头的草图用一次 `diagram.insert` 写入。图形文字、字号、可省略字段、连线绑定，以及原生图形与流程图组件的取舍见 [Board 对象编辑](../show-document/references/board-authoring.md)，操作字段读取 `guide` 的 whiteboard 说明。用户正在调整的图只改其请求涉及的图形和连线，保留其余位置；用户要求整理连好的图形时，对涉及的对象用 `diagram.arrange` 沿连线重新排布。
+图形自己的文字写进矩形、椭圆或箭头的 `attrs.label`，不另建 Page 叠在图形上；方框加箭头的草图用一次 `diagram.insert` 写入。图形文字、字号、可省略字段、连线绑定，以及原生图形与流程图组件的取舍见 [Board 对象编辑](../use-showai/references/board-authoring.md)，操作字段读取 `guide` 的 whiteboard 说明。用户正在调整的图只改其请求涉及的图形和连线，保留其余位置；用户要求整理连好的图形时，对涉及的对象用 `diagram.arrange` 沿连线重新排布。
 
 需要融入画布时，原生 Page 的 `attrs.frameless:true` 去掉边框、背景和标题行；它仍保留内容结构和直接编辑能力。按用户要求整理散落的组件时，保留各对象的稳定 ID、内部内容、阅读顺序和连线关系，先读取再移动外框，不在查找任务中自动搬动整个画布。
 
@@ -33,7 +33,7 @@ Board 中的新文字、数据图表和交互组件等目录组件放在 Page �
 
 ## 引用选区与组件状态
 
-人可以在选中菜单或右键菜单中「复制引用」，把选区、Board 对象、整个 Board 或整页交给终端里的 Agent；对话预览中右键「引用到对话」则进入宿主输入区。ShowAI 先保存页面，引用固定在保存后的 hash/revision，其中的 position 与上面的位置参考含义相同。人在你运行期间继续编辑时，按 [use-showai 的处理用户引用](../use-showai/SKILL.md#处理用户引用) 先核对版本：版本已变就比较期间的变化并重新读取相关 ID；同一内容已被人改动时不覆盖，先说明差异。
+人可以在选中菜单或右键菜单中「复制引用」，把选区、Board 对象、整个 Board 或整页交给终端里的 Agent；对话预览中右键「引用到对话」则进入宿主输入区。ShowAI 先保存页面，引用固定在保存后的 hash/revision，其中的 position 与上面的位置参考含义相同。人在你运行期间继续编辑时，按 [use-showai 的处理用户引用](../use-showai/references/user-references.md) 先核对版本：版本已变就比较期间的变化并重新读取相关 ID；同一内容已被人改动时不覆盖，先说明差异。
 
 组件状态来自组件的「交给对话」等操作，只描述人当前看到的参数，没有保存到页面。按它理解问题；人要求保留时再修改组件数据。
 

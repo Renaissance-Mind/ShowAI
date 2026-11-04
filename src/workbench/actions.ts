@@ -1,4 +1,8 @@
 import { retargetBindings } from "../datasets/binding.mjs";
+import {
+  setWorkRecordsDirectory,
+  workRecordsLocation,
+} from "../core/work-records";
 import { prepareSavedInkResolution } from "../core/ink-wire-writer";
 import type { InkWireChoice } from "../surface/ink-wire.mjs";
 import { validatePageIcon } from "../lib/page-icon.mjs";
@@ -166,6 +170,8 @@ export const workbenchActions = new Set([
   "library:rebuildIndex",
   "library:maintenancePolicy",
   "library:setMaintenancePolicy",
+  "library:workRecords",
+  "library:setWorkRecords",
   "library:archive",
   "library:verifyArchive",
   "library:prepareImport",
@@ -755,6 +761,13 @@ export function createWorkbench(
         };
       case "library:maintenancePolicy":
         return maintenancePolicy(store.root);
+      case "library:workRecords":
+        return workRecordsLocation(store.root);
+      case "library:setWorkRecords":
+        return setWorkRecordsDirectory(
+          store.root,
+          args.directory === null ? null : required(args, "directory"),
+        );
       case "library:setMaintenancePolicy":
         return setMaintenancePolicy(store.root, {
           automatic: args.automatic as boolean,

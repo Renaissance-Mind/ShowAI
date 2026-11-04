@@ -1,18 +1,4 @@
 import type { TemplateMetadata } from "../components/custom/types";
-import type { MessageKey } from "../i18n";
-import type templates from "../i18n/messages/templates";
-import type { TemplateStage } from "../portable/template-bundle.mjs";
-
-/** Message keys in the templates namespace; translate at render. */
-export const templateStageLabels: Record<
-  TemplateStage,
-  MessageKey<typeof templates>
-> = {
-  intent: "stage.intent",
-  material: "stage.material",
-  logic: "stage.logic",
-  design: "stage.design",
-};
 
 export function latestTemplateVersions(items: TemplateMetadata[]) {
   const newest = new Map<string, TemplateMetadata>();

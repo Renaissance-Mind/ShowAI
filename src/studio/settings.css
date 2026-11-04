@@ -866,3 +866,22 @@
   color: var(--muted);
   font-size: 13px;
 }
+.work-records-settings .settings-path .settings-button {
+  flex-shrink: 0;
+}
+.work-records-form {
+  display: flex;
+  gap: 8px;
+}
+.work-records-form input {
+  flex: 1;
+  min-width: 0;
+  min-height: 34px;
+  padding: 7px 10px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: var(--paper);
+  color: var(--text);
+  font-family: ui-monospace, "SFMono-Regular", Consolas, monospace;
+  font-size: 12px;
+}

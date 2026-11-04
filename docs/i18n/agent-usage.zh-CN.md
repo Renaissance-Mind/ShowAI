@@ -81,13 +81,12 @@ showai catalog merge resolve --project PROJECT --input resolved-merge.json --jso
 
 ## 模板
 
-新模板使用文件夹、严格 README 元信息、四阶段指南（intent、material、logic、design）和可选组件库：
+新模板使用文件夹、严格 README 元信息、按阅读顺序列出的指南和可选组件库；`template context` 一次返回所选模板的 README 与全部指南：
 
 ```sh
 showai template import ./my-template --project PROJECT --json
 showai template export my-template --project PROJECT --out ./new-folder --json
 showai template context --project PROJECT --templates my-template@1.0.0 --json
-showai template guide design --project PROJECT --templates my-template --json
 showai template apply TEMPLATE_ID --project PROJECT --version VERSION --title "我的报告" --json
 ```
 

@@ -45,7 +45,8 @@ describe("remote shared Skill guides", () => {
       [...mcpSkillNames].sort(),
     );
     expect(remoteSkillInstructions.slice(0, 512)).toContain("guide()");
-    expect(remoteSkillInstructions).toContain("partial presentation");
+    expect(remoteSkillInstructions).toContain("use-showai is the entry");
+    expect(remoteSkillInstructions).toContain("read whole once");
     expect(result.context.projects).toBe("authorized");
     expect(result.context.rules.join(" ")).toContain("remote branches");
   });
@@ -78,13 +79,14 @@ describe("remote shared Skill guides", () => {
     expect(runtime.requestedSection).toBe("远程");
     expect(runtime.markdown).toContain("## 远程");
     expect(entry.markdown).not.toMatch(/\]\((?:\.\.\/|references\/)/);
-    const planning = mcpSkillGuide({ skill: "plan-presentation" });
+    const document = mcpSkillGuide({ skill: "show-document" });
     expect(
-      planning.files.some((file) => file.file === "scripts/check_plan.py"),
+      document.files.some((file) => file.file === "scripts/check_plan.py"),
     ).toBe(true);
+    expect(document.markdown).toContain("环节四：设计稿");
     expect(
       mcpSkillGuide({
-        skill: "plan-presentation",
+        skill: "show-document",
         file: "scripts/check_plan.py",
       }).markdown,
     ).toContain("argparse");

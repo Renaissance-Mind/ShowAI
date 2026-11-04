@@ -2,27 +2,26 @@
 
 **语言：** [English](../skills.md) | 简体中文 · [文档目录](index.zh-CN.md)
 
-ShowAI 插件提供九个 Skill，覆盖连接阅读、理解规划、表达设计、页面制作、呈现评审、模板和组件。运行时提供存储、原生容器、目录、编译与渲染；Plugin 分发技能、指南与连接配置。CLI 用于启动、诊断与脚本，Agent 的文档操作统一使用 MCP。
+ShowAI 插件提供六个 Skill，覆盖总入口与内容管理、对话展示、作品创作、模板、组件和画布协作。运行时提供存储、原生容器、目录、编译与渲染；Plugin 分发技能、指南与连接配置。CLI 用于启动、诊断与脚本，Agent 的文档操作统一使用 MCP。
 
-| Skill                                                                           | 何时使用                             | 产物                                       |
-| ------------------------------------------------------------------------------- | ------------------------------------ | ------------------------------------------ |
-| [use-showai](../../plugins/showai/skills/use-showai/SKILL.md)                   | 基础用法、连接、查找、阅读与能力发现 | 可靠答案、项目和页面身份、当前目录         |
-| [show-visual](../../plugins/showai/skills/show-visual/SKILL.md)                 | 在对话中直接展示可视化               | 展示 1–5 个组件，不保存                    |
-| [plan-presentation](../../plugins/showai/skills/plan-presentation/SKILL.md)     | 先规划怎么讲清楚、复杂内容组织       | 任务简报、证据范围、多级理解路径与通过条件 |
-| [design-presentation](../../plugins/showai/skills/design-presentation/SKILL.md) | 视觉、布局、图形与交互分镜           | 设计稿、主要状态、静态方式与资源选择       |
-| [show-document](../../plugins/showai/skills/show-document/SKILL.md)             | 制作、续改、展示、导出或应用模板     | 可继续编辑的 Page 与实际交付               |
-| [review-presentation](../../plugins/showai/skills/review-presentation/SKILL.md) | 检查效果、诊断难理解处、按目标重做   | 可定位的问题、修订与复核范围               |
-| [create-template](../../plugins/showai/skills/create-template/SKILL.md)         | 建立或提炼可重复使用的内容结构       | 模板、填写约定与应用验证                   |
-| [create-component](../../plugins/showai/skills/create-component/SKILL.md)       | 既有数据调整和组合无法满足表达需求   | 精确版本的组件、契约与真实页面实例         |
-| [collaborate-canvas](../../plugins/showai/skills/collaborate-canvas/SKILL.md)   | 多端配对、边写边画与位置参考         | 明确保存边界的协作画布                     |
+| Skill                                                                         | 何时使用                                               | 产物                                         |
+| ----------------------------------------------------------------------------- | ------------------------------------------------------ | -------------------------------------------- |
+| [use-showai](../../plugins/showai/skills/use-showai/SKILL.md)                 | 总入口：按用户要的结果分流；连接、查找、阅读与管理内容 | 连接与项目身份、整理结果和下一步使用的 Skill |
+| [show-visual](../../plugins/showai/skills/show-visual/SKILL.md)               | 在对话中直接展示可视化                                 | 展示 1–5 个组件，不保存                      |
+| [show-document](../../plugins/showai/skills/show-document/SKILL.md)           | 创作或修改作品：报告、讲解页面、白板图示与小型网站     | 工作记录、可继续编辑的 Page 与实际交付       |
+| [create-template](../../plugins/showai/skills/create-template/SKILL.md)       | 为某一类内容建立或提炼模板                             | 模板文件夹、指南与应用验证                   |
+| [create-component](../../plugins/showai/skills/create-component/SKILL.md)     | 既有数据调整和组合无法满足表达需求                     | 精确版本的组件、契约与真实页面实例           |
+| [collaborate-canvas](../../plugins/showai/skills/collaborate-canvas/SKILL.md) | 多端配对、边写边画与位置参考                           | 明确保存边界的协作画布                       |
 
 ## 从用户任务开始
 
-简单问题直接回答；普通修改完成对应局部工作。复杂报告或交互讲解由 show-document 组织规划、设计、制作和评审，已有产物直接复用。用户无需手动逐个调用 Skill，也不需要每个阶段都重新确认。
+use-showai 是唯一的入口，按用户要的结果分流：创作或修改作品进入 show-document；只在对话里看组件、不保存，进入 show-visual；查找、阅读和管理已有内容留在 use-showai 及其参考文档；组件、模板和画布协作各有对应的 Skill。连接与项目归属、内容模型和保存规则也写在 use-showai 中。用户无需手动逐个调用 Skill。
 
-用户只要规划或设计时，交付相应方案。用户要成品时继续完成制作、验证、保存与展示。用户说“这里看不懂”时，先读取完整原作品，定位事实、先备概念、主线、图形或交互问题，连贯修改受影响的正文与图示。
+简单问题直接回答；普通修改完成对应局部工作。创作或修改作品时，Agent 在开头一次读完 show-document：它包含完整的制作流程、每个环节怎样用 ShowAI 完成、工作记录、模板使用、制作与交付。已有记录直接沿用，不需要每个环节都重新确认。
 
-共享方法见[呈现工作约定](../../plugins/showai/skills/plan-presentation/references/presentation-contract.md)。不同分支可有不同解释深度；概念关系、阅读顺序和屏幕展开分别设计。重要结论条件直接可见，补充材料可按需展开。
+用户只要规划或设计稿时，做到相应环节为止，交付这份记录。用户要成品时继续完成制作、评审、保存与展示。用户说“这里看不懂”时，先读取完整原作品，定位事实、先备概念、主线、图形或交互问题，连贯修改受影响的正文与图示。
+
+共享方法见 [show-document](../../plugins/showai/skills/show-document/SKILL.md)。不同分支可有不同解释深度；概念关系、阅读顺序和屏幕展开分别设计。重要结论条件直接可见，补充材料可按需展开。
 
 ## 连接与内容归属
 
@@ -32,11 +31,13 @@ ShowAI 插件提供九个 Skill，覆盖连接阅读、理解规划、表达设�
 
 ## 模板与组件
 
-模板复用内容结构和填写约定，组件复用数据表达与交互能力，本次事实保存在 Page 实例中。先选择适合理解任务的表达，再查当前目录；使用精确版本的 guide/schema 准备输入，开发实现时才读取 development 和必要源码。
+模板复用某一类内容的呈现方法，组件复用数据表达与交互能力，本次事实保存在 Page 实例中。先选择适合理解任务的表达，再查当前目录；使用精确版本的 guide/schema 准备输入，开发实现时才读取 development 和必要源码。
 
-系统基线规定四个阶段，每阶段一份记录：理解意图（读者简报）、收集与处理材料（材料底稿）、呈现逻辑（多级呈现规划）、呈现设计稿（逐幕设计稿）；制作按设计稿落实，评审对照记录检查。运行时内置 `paper-explainer` 论文讲解方法模板与空白页；旧的六阶段模板继续可读。组件候选见[复用选择](../../plugins/showai/skills/design-presentation/references/reuse-selection.md)。
+系统呈现规则必须遵循，分七个环节：理解意图（读者简报）、收集材料（材料底稿）、呈现逻辑（多级呈现规划）、设计稿（逐幕设计稿）、制作、评审（评审记录）与交付。制作按设计稿落实，交付展示已保存的 Page。运行时内置 `paper-explainer` 论文讲解方法模板与空白页；按阶段组织的旧模板继续可读。选用组件的判断写在 [show-document](../../plugins/showai/skills/show-document/SKILL.md) 设计稿环节的“组件与素材”中。
 
-新模板使用[模板文件夹](template-bundles.zh-CN.md)，声明四个阶段的指南与可选组件库；应用模板创建空白 Page，页面结构来自本次的呈现逻辑与设计稿。旧 document/composition/contentGuide 定义继续可读。模板由 Agent 根据真实材料填写；它不是自动变量绑定系统。缺少材料时保留缺项和结论限制。提炼模板时保留原作品，用不同材料检查适用边界。
+Agent 把每份作品的记录写进一个文件夹 `<YYYYMMDD-HHmm>-<作品短名>-<8 位随机十六进制>/`，位于 `showai_capabilities.authoring.workRecords` 返回的记录目录下，包含 `brief.md`、`material.md`、`presentation-plan.json` 和 `review.md`。记录目录默认是系统临时目录下的 `showai-records`，可以在 App「设置 → 通用」中修改，也可以用环境变量 `SHOWAI_RECORDS_DIR` 固定。续改时沿用写有该页面 ID 的记录文件夹。没有文件系统的远程连接把记录写在对话里。
+
+新模板使用[模板文件夹](template-bundles.zh-CN.md)：README、按阅读顺序排列的指南和可选组件库。模板只补充这类内容的方法，不重复制作流程；选用后 Agent 用 template_context 一次读完整个模板，在各环节叠加使用。应用模板创建空白 Page，页面结构来自本次的呈现逻辑与设计稿。旧 document/composition/contentGuide 定义继续可读。模板由 Agent 根据真实材料填写；它不是自动变量绑定系统。缺少材料时保留缺项和结论限制。提炼模板时保留原作品，用不同材料检查适用边界。
 
 组件沿用现有 schema 和版本化 documentation，说明输入、图形语义、状态、保存、窄视口与静态方式。优先调整和组合已有能力；明确缺口才进入组件开发。
 

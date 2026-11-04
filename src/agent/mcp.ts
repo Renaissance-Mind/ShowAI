@@ -44,7 +44,6 @@ import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { writePresentation } from "./presentation";
 import { syncManager } from "../sync/manager";
-import { TEMPLATE_STAGES } from "../portable/template-bundle.mjs";
 import type { TemplateSelection } from "./template-workflow";
 import { compactMcpResult } from "./mcp-response";
 import { boardReadSchema, type BoardReadResult } from "./board-reading";
@@ -268,7 +267,6 @@ export function createMcpServer(options: {
         "Read a focused ShowAI guide; without topic, list the guides.",
       inputSchema: {
         topic: z.enum(GUIDE_TOPICS).optional(),
-        stage: z.enum(TEMPLATE_STAGES).optional(),
         knownHash: z
           .string()
           .regex(/^[a-f0-9]{64}$/)
@@ -276,8 +274,8 @@ export function createMcpServer(options: {
       },
       annotations: readOnly,
     },
-    ({ topic, stage, knownHash }) =>
-      call(async () => getMcpGuide(topic, stage, knownHash)),
+    ({ topic, knownHash }) =>
+      call(async () => getMcpGuide(topic, knownHash)),
   );
   const templateSelection = z.object({
     id: z.string().min(1),
@@ -289,14 +287,10 @@ export function createMcpServer(options: {
     "template_context",
     {
       description:
-        "Resolve the system baseline, selected template READMEs, exact refs and template components for this task. templates:[] uses only the system baseline.",
+        "Read the selected templates whole for this task: README, every guide and the template component index, with exact refs. templates:[] records only the system workflow ref.",
       inputSchema: {
         templates: z.array(templateSelection).max(8).optional(),
         knownHash: z
-          .string()
-          .regex(/^[a-f0-9]{64}$/)
-          .optional(),
-        knownSystemHash: z
           .string()
           .regex(/^[a-f0-9]{64}$/)
           .optional(),
@@ -305,13 +299,7 @@ export function createMcpServer(options: {
       },
       annotations: readOnly,
     },
-    ({
-      templates,
-      knownHash,
-      knownSystemHash,
-      componentOffset,
-      componentLimit,
-    }) =>
+    ({ templates, knownHash, componentOffset, componentLimit }) =>
       call(() =>
         service.templateContext(
           projectId,
@@ -319,36 +307,6 @@ export function createMcpServer(options: {
           knownHash,
           componentOffset,
           componentLimit,
-          knownSystemHash,
-        ),
-      ),
-  );
-  register(
-    "template_guide",
-    {
-      description:
-        "Read one presentation stage: the system instructions plus the selected template guides for that stage. templates:[] reads only the system stage; file reads an additional guide file.",
-      inputSchema: {
-        stage: z.enum(TEMPLATE_STAGES),
-        templates: z.array(templateSelection).max(8).optional(),
-        knownHash: z
-          .string()
-          .regex(/^[a-f0-9]{64}$/)
-          .optional(),
-        file: z.string().optional(),
-        templateId: z.string().optional(),
-      },
-      annotations: readOnly,
-    },
-    ({ stage, templates, knownHash, file, templateId }) =>
-      call(() =>
-        service.templateGuide(
-          projectId,
-          stage,
-          templates ?? options.sessionTemplates ?? [],
-          knownHash,
-          file,
-          templateId,
         ),
       ),
   );
@@ -1470,7 +1428,6 @@ export async function startPublicMcp(root: string) {
       description: "Read a focused ShowAI authoring or integration guide.",
       inputSchema: {
         topic: z.enum(GUIDE_TOPICS).optional(),
-        stage: z.enum(TEMPLATE_STAGES).optional(),
         knownHash: z
           .string()
           .regex(/^[a-f0-9]{64}$/)
@@ -1478,11 +1435,11 @@ export async function startPublicMcp(root: string) {
       },
       annotations: { readOnlyHint: true },
     },
-    async ({ topic, stage, knownHash }) => ({
+    async ({ topic, knownHash }) => ({
       content: [
         {
           type: "text",
-          text: JSON.stringify(getMcpGuide(topic, stage, knownHash)),
+          text: JSON.stringify(getMcpGuide(topic, knownHash)),
         },
       ],
     }),

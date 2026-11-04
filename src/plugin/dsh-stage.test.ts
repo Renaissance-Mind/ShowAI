@@ -120,7 +120,7 @@ test("publishes every staged Skill without its frontmatter", async () => {
   const loaded = await provider.get(show);
   expect(loaded.description).toBe(show.description);
   expect(loaded.content.startsWith("---")).toBe(false);
-  expect(loaded.content).toContain("component.props.set");
+  expect(loaded.content).toContain("template_context");
 });
 
 test("reports Harness profile steps without editing the profile", async () => {

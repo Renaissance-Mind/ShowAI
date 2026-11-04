@@ -2,7 +2,7 @@
 
 **语言：** [English](../contributing-templates.md) | 简体中文 · [文档](index.zh-CN.md) · [参与开发](CONTRIBUTING.zh-CN.md)
 
-内置模板随每个 ShowAI 运行时一起发布，教 Agent 如何呈现某一类内容，例如一篇研究论文。运行时始终提供 `system-presentation` 系统呈现规则，它描述四个阶段（理解意图、收集材料、呈现逻辑、呈现设计稿）和视觉原则；任务模板在此基础上补充该类内容的方法。本文说明如何新增内置模板、修订内置模板，以及修订系统呈现规则。
+内置模板随每个 ShowAI 运行时一起发布，教 Agent 如何呈现某一类内容，例如一篇研究论文。运行时始终提供 `system-presentation` 系统呈现规则，它包含每份作品都要遵循的制作流程：从理解意图到交付的七个环节、每个环节交出的记录，以及视觉表达原则。任务模板在此基础上补充该类内容的方法，不重复流程。本文说明如何新增内置模板、修订内置模板，以及修订系统呈现规则。
 
 ## 内置模板还是项目模板
 
@@ -16,15 +16,15 @@
 
 内置模板是一个文件夹 `resources/templates/<id>/`。完整格式和限制见[模板文件夹](template-bundles.zh-CN.md)，最重要的部分如下：
 
-- `README.md` 以 `---` 包围的严格 JSON frontmatter 开头：`format`（`"showai-template"`）、`schemaVersion`（`3`）、`id`（与文件夹同名）、`name`、`version`（semver）、`description`、`scenarios` 和 `guides`。不接受其他键。frontmatter 之后的正文不超过 4 KiB。
-- `guides` 把 `intent`、`material`、`logic`、`design` 四个阶段分别映射到 `guides/` 下的文件或文件夹，或设为 `null` 以沿用系统规则在该阶段的指南。文件夹形式的指南包含 `README.md`，可以再有其他文件。每个阶段的主文件不超过 32 KiB。
+- `README.md` 以 `---` 包围的严格 JSON frontmatter 开头：`format`（`"showai-template"`）、`schemaVersion`（`4`）、`id`（与文件夹同名）、`name`、`version`（semver）、`description`、`scenarios`、`guides` 和 `components`。不接受其他键。frontmatter 之后的正文不超过 4 KiB。
+- `guides` 按阅读顺序列出 `guides/` 下的 Markdown 指南，可以为空。Agent 一次读完所选模板，所以只写这类内容需要的方法；各环节及其记录由系统呈现规则规定。单个指南不超过 32 KiB，全部指南合计不超过 48 KiB。
 - `components` 必须为空。内置模板不能自带组件，设计指南改为指明可用的内置组件。
 
 README 的 frontmatter 已列入 `.prettierignore`，因为 Prettier 会给 JSON 加上尾随逗号。
 
 ## 新增模板
 
-1. **文件夹。** 创建 `resources/templates/<id>/`，写好 README 和各阶段指南。与现有模板一样使用中文名称；Agent 读取的就是这些名称和描述。
+1. **文件夹。** 创建 `resources/templates/<id>/`，写好 README 和指南。与现有模板一样使用中文名称；Agent 读取的就是这些名称和描述。
 2. **注册打包。** 在 `src/core/builtin-template-bundles.ts` 中为每个文件加一个 `?raw` 导入，并加入一个打包条目。没有导入的文件不会随运行时发布。README 格式错误时目录加载会抛出异常，在修正之前大多数测试都会失败。
 3. **.gitignore。** Markdown 默认被忽略。为每个文件加一行准确的 `!/resources/templates/<id>/…`；缺少时 Git 会让文件保持未跟踪，拉取请求中就没有这个模板。
 4. **Studio 导航。** 在 `src/studio/TemplateNavigation.tsx` 的 `types` 中加入模板，并在 `src/i18n/messages/templates.ts` 中加入两种语言的 `type.<id>` 标签。
@@ -41,7 +41,7 @@ README 的 frontmatter 已列入 `.prettierignore`，因为 Prettier 会给 JSON
 
 ## 修订系统呈现规则
 
-`system-presentation` 适用于所有呈现任务。`npm run package:plugin` 会把它的 README 正文复制到 `show-document` Skill 的 `showai-system-baseline` 标记之间，并重新生成各宿主插件副本，所以修改该 README 后要运行这个命令并提交生成的文件。系统规则的改动影响所有模板，请在拉取请求中说明你对照新规则重读了哪些现有模板。
+`system-presentation` 适用于每份作品。它的 README 正文和全部指南构成制作流程，`show-document` Skill 完整收录这套流程。`npm run package:plugin` 会把 README 正文和每个指南的标题降一级，嵌入 `show-document/SKILL.md` 的 `showai-system-workflow` 标记之间；再把 README 的“视觉表达原则”一节复制到 `show-visual/SKILL.md` 的 `showai-visual-principles` 标记之间，然后重新生成各宿主插件副本。修改该模板的任何文件后都要运行这个命令，并提交生成的文件。系统规则的改动影响所有模板，请在拉取请求中说明你对照新规则重读了哪些现有模板。
 
 ## 验证
 
@@ -56,7 +56,9 @@ npm test
 
 ```sh
 <cli> template context --project PROJECT --templates <id> --json
-<cli> template guide design --project PROJECT --templates <id> --json
+<cli> guide presentation --json
 ```
+
+第一条命令按 Agent 读取的方式返回 README 和全部指南，第二条返回系统呈现规则。
 
 内置模板编译进运行时，因此实例需要在改动后完成重建；MCP 会话保持启动时的代码，所以要在新会话中测试。最后，让连接到该实例的 Agent 根据真实请求用模板制作一个页面，对照指南阅读结果。在拉取请求中写明试用了哪些实例，以及阅读结果后做了哪些修改。

@@ -10,7 +10,6 @@ import {
 } from "node:fs/promises";
 import { dirname, resolve, join, relative, sep, isAbsolute } from "node:path";
 import { fileURLToPath } from "node:url";
-import { createHash } from "node:crypto";
 import { parseTemplateReadme } from "../src/portable/template-bundle.mjs";
 import {
   bindHostSkills,
@@ -56,28 +55,56 @@ await copyFile(
   join(plugin, "host-adapters/mcp-app.md"),
   join(plugin, "skills/use-showai/references/host-adapter.md"),
 );
-const baseline = parseTemplateReadme(
-  await readFile(
-    join(root, "resources/templates/system-presentation/README.md"),
-    "utf8",
-  ),
-).body;
-const baselineHash = createHash("sha256").update(baseline).digest("hex");
-const entrypoint = join(plugin, "skills/show-document/SKILL.md");
-const entrySource = await readFile(entrypoint, "utf8");
-if (
-  !entrySource.includes("<!-- showai-system-baseline:start -->") ||
-  !entrySource.includes("<!-- showai-system-baseline:end -->")
-)
-  throw new Error(
-    "Foundational presentation skill is missing its mandatory system baseline slot.",
+// The presentation workflow has one source, the system-presentation template;
+// show-document carries all of it and show-visual its visual principles.
+const workflowSource = await readFile(
+  join(root, "resources/templates/system-presentation/README.md"),
+  "utf8",
+);
+const workflowMetadata = parseTemplateReadme(workflowSource).metadata;
+const workflowParts = [parseTemplateReadme(workflowSource).body];
+for (const path of workflowMetadata.guides)
+  workflowParts.push(
+    (
+      await readFile(
+        join(root, "resources/templates/system-presentation", path),
+        "utf8",
+      )
+    ).trim(),
   );
-await writeFile(
-  entrypoint,
-  entrySource.replace(
-    /<!-- showai-system-baseline:start -->[\s\S]*?<!-- showai-system-baseline:end -->/,
-    `<!-- showai-system-baseline:start -->\n\n${baseline}\n\n系统基线内容哈希：\`${baselineHash}\`。本轮已读到同一内容时，可用 knownSystemHash 避免重复返回；没有读过时不要仅凭哈希声明已知。\n<!-- showai-system-baseline:end -->`,
-  ),
+// Demote headings one level so the workflow nests under the Skill's own title.
+const demote = (markdown) =>
+  markdown.replace(/^(#{1,5}) /gm, (_, marks) => `${marks}# `);
+const workflow = workflowParts.map(demote).join("\n\n");
+const visualPrinciples = /(?:^|\n)## 视觉表达原则\n+([\s\S]*?)(?=\n## |(?![\s\S]))/.exec(
+  workflowParts[0],
+)?.[1];
+if (!visualPrinciples)
+  throw new Error("The system workflow is missing its 视觉表达原则 section.");
+async function fill(path, slot, content) {
+  const source = await readFile(path, "utf8");
+  const pattern = new RegExp(
+    `<!-- ${slot}:start -->[\\s\\S]*?<!-- ${slot}:end -->`,
+  );
+  if (!pattern.test(source))
+    throw new Error(`${relative(plugin, path)} is missing its ${slot} slot.`);
+  await writeFile(
+    path,
+    source.replace(
+      pattern,
+      `<!-- ${slot}:start -->\n\n${content.trim()}\n\n<!-- ${slot}:end -->`,
+    ),
+  );
+}
+await fill(
+  join(plugin, "skills/show-document/SKILL.md"),
+  "showai-system-workflow",
+  workflow,
+);
+await fill(
+  join(plugin, "skills/show-visual/SKILL.md"),
+  "showai-visual-principles",
+  visualPrinciples,
 );
 // Host packaging differs; skills, system rules and the MCP runtime remain shared.
 await mkdir(join(plugin, ".claude-plugin"), { recursive: true });

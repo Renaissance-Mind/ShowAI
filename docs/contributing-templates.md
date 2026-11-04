@@ -2,7 +2,7 @@
 
 **Language:** English | [简体中文](i18n/contributing-templates.zh-CN.md) · [Documentation](README.md) · [Contributing](../CONTRIBUTING.md)
 
-A built-in template ships with every ShowAI runtime and teaches Agents how to present one kind of content, for example a research paper. The runtime always supplies the `system-presentation` baseline, which describes the four stages (intent, material, logic, design) and the visual principles; a task template adds the method for its content type on top of that baseline. This guide covers adding a built-in template, revising one, and revising the baseline.
+A built-in template ships with every ShowAI runtime and teaches Agents how to present one kind of content, for example a research paper. The runtime always supplies the `system-presentation` template, which holds the presentation workflow every work follows: seven stages from intent to delivery, the record each stage produces, and the visual principles. A task template adds the methods for its content type on top of that workflow and does not repeat it. This guide covers adding a built-in template, revising one, and revising the system workflow.
 
 ## Built-in or project template
 
@@ -16,8 +16,8 @@ A template teaches judgment. Its guides explain what to find out about the reade
 
 A built-in template is a folder `resources/templates/<id>/`. The full format and limits are in [Template folders](template-bundles.md); the parts that matter most are:
 
-- `README.md` starts with strict JSON frontmatter between `---` lines: `format` (`"showai-template"`), `schemaVersion` (`3`), `id` (the folder name), `name`, `version` (semver), `description`, `scenarios` and `guides`. Any other key is rejected. The body after the frontmatter is limited to 4 KiB.
-- `guides` maps each of `intent`, `material`, `logic` and `design` to a file or folder under `guides/`, or to `null` to inherit the baseline guide for that stage. A folder guide has a `README.md` and may have further files. Each main guide file is limited to 32 KiB.
+- `README.md` starts with strict JSON frontmatter between `---` lines: `format` (`"showai-template"`), `schemaVersion` (`4`), `id` (the folder name), `name`, `version` (semver), `description`, `scenarios`, `guides` and `components`. Any other key is rejected. The body after the frontmatter is limited to 4 KiB.
+- `guides` lists the guide Markdown files under `guides/` in reading order, and may be empty. An Agent reads the selected template whole, once, so write only the methods this content type needs; the stages and their records come from the system workflow. Each guide is limited to 32 KiB and all guides together to 48 KiB.
 - `components` must stay empty. Built-in templates cannot ship their own components; a design guide names built-in components instead.
 
 The README frontmatter is listed in `.prettierignore` because Prettier would add trailing commas to the JSON.
@@ -39,9 +39,9 @@ Only the current files of a built-in template ship, and pages created from a tem
 
 Tool calls quoted in a guide must match the current tool schemas. `src/agent/doc-examples.test.ts` checks the examples in `resources/templates/**/*.md` against them.
 
-## Revising the system baseline
+## Revising the system workflow
 
-`system-presentation` applies to every presentation task. `npm run package:plugin` copies its README body into the `show-document` Skill between the `showai-system-baseline` markers and regenerates the host plugin copies, so run it after changing that README and commit the regenerated files. A baseline change affects all templates; describe in the pull request which existing templates you re-read against it.
+`system-presentation` applies to every work. Its README body and all of its guides form the workflow that the `show-document` Skill carries in full. `npm run package:plugin` embeds the README body and every guide, with headings demoted one level, into `show-document/SKILL.md` between the `showai-system-workflow` markers. It copies the README's “视觉表达原则” section into `show-visual/SKILL.md` between the `showai-visual-principles` markers, then regenerates the host plugin copies. Run it after changing any file of the template and commit the regenerated files. A workflow change affects all templates; describe in the pull request which existing templates you re-read against it.
 
 ## Verifying
 
@@ -56,7 +56,9 @@ Then use the template the way an Agent would. Start a development instance with 
 
 ```sh
 <cli> template context --project PROJECT --templates <id> --json
-<cli> template guide design --project PROJECT --templates <id> --json
+<cli> guide presentation --json
 ```
+
+The first command returns the README and every guide as an Agent reads them; the second returns the system workflow.
 
 Built-in templates are compiled into the runtime, so the instance must have rebuilt after your change; an MCP session keeps the code it started with, so test in a new session. Finally, ask an Agent connected to that instance to build a real page with the template from a realistic request, and read the result against the guides. Note in the pull request which instances you tried and what you changed after reading them.

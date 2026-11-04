@@ -1,9 +1,9 @@
 import { COMPONENT_PARAMETER_CAPABILITIES } from "../portable/component-parameters.mjs";
 import { cdnReaderOrigins, cdnReaderUrls } from "../core/cdn-reader";
+import { workRecordsLocation } from "../core/work-records";
 import { CAPACITY } from "../portable/capacity.mjs";
 import { TRANSFORM_LIMITS } from "../core/dataset-transform";
 import { TEMPLATE_WORKFLOW_CAPABILITIES } from "../portable/template-bundle.mjs";
-import { TEMPLATE_STAGES } from "../portable/template-bundle.mjs";
 import { INLINE_READER_OVERRIDES } from "../portable/inline-style.mjs";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
@@ -362,6 +362,22 @@ export function registerPresentationTools(
           },
           pageDiff: { entries: "record", paged: true },
           migrations: { guide: "migrations" },
+          // Stage records of a work stay on the device running the Agent.
+          workRecords:
+            options.transport !== "http" && options.componentLibrary
+              ? {
+                  available: true,
+                  ...(await workRecordsLocation(
+                    options.componentLibrary.root,
+                  )),
+                  layout:
+                    "One folder per work: <directory>/<YYYYMMDD-HHmm>-<short name>-<8 random hex>/ with brief.md, material.md, presentation-plan.json and review.md.",
+                }
+              : {
+                  available: false,
+                  reason:
+                    "This connection has no device file system; keep stage records in the conversation.",
+                },
         },
         boardReading: {
           protocol: "showai-board-reading-v1",
@@ -511,7 +527,7 @@ export function registerPresentationTools(
           htmlDisplayRequired: false,
         },
         workflow:
-          "Use MCP for all Agent document operations. Route each request: discussion is answered in text; a visualization the user only wants to see now uses show_component (1–5 components, nothing saved); a document to keep, edit or share resolves a project, reads/creates, edits, saves, then page_present. render_document is for a complete standalone document that is not saved. When the user later asks to keep a shown component, save the same {kind,data} in a Page. Do not switch connection, library or persistence mode after a failure.",
+          "Use MCP for all Agent document operations. The use-showai Skill (guide() without Skills) is the entry and decides the route by the result the user wants: discussion is answered in text; a visualization the user only wants to see now follows show-visual (show_component, 1–5 components, nothing saved); creating or revising a work follows show-document, whose presentation workflow is guide topic presentation without Skills; finding, reading and managing existing content stays in use-showai. render_document is for a complete standalone document that is not saved. Do not switch connection, library or persistence mode after a failure.",
         next: `For a conversation visualization: public_catalog_describe (or catalog_describe) view=guide for the chosen component → show_component. For a complete standalone document: public_catalog_list → public_catalog_describe → render_document. ${options.privateProjects === false ? "This connection has no private project entry; use a project connection when persistence is requested." : `For project work: ${options.transport === "http" ? "projects_list" : "project_context"} → page_read/create/apply/save. Display is optional; check synchronization separately.`}`,
       }),
   );
@@ -535,10 +551,9 @@ export function registerPresentationTools(
     "public_catalog_describe",
     {
       description:
-        "Read a public component's guide, schema, examples or source, or a public template's source.",
+        "Read a public component's guide, schema, examples or source, or a public template whole (view guide: README and every guide) or its source.",
       inputSchema: {
         id: z.string(),
-        stage: z.enum(TEMPLATE_STAGES).optional(),
         version: z.string().optional(),
         integrity: z
           .string()

@@ -290,14 +290,16 @@ async function prepare() {
     outdated("no unified MCP entry (showai-mcp-v1).");
   const templateProtocol = capabilities.templateWorkflow?.protocol;
   if (
-    !["showai-template-workflow-v2", "showai-template-workflow-v1"].includes(
-      templateProtocol,
-    )
+    ![
+      "showai-template-workflow-v3",
+      "showai-template-workflow-v2",
+      "showai-template-workflow-v1",
+    ].includes(templateProtocol)
   )
-    outdated("no staged template workflow (template_context/template_guide).");
-  if (templateProtocol === "showai-template-workflow-v1")
+    outdated("no template workflow (template_context).");
+  if (templateProtocol !== "showai-template-workflow-v3")
     process.stderr.write(
-      "ShowAI runtime still serves the six-stage template workflow (v1); the installed skills describe the four-stage workflow (v2). Update the registered runtime to use intent/material/logic/design stages.\n",
+      "ShowAI runtime still serves staged template guides (template_guide); the installed skills read a template whole with template_context (v3). Update the registered runtime.\n",
     );
   if (
     capabilities.componentParameters?.protocol !==

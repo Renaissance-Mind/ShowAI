@@ -1,6 +1,7 @@
 import type { ComponentSource } from "../components/custom/types";
 import type { ShowDocument } from "../types";
-export type TemplateStage = "intent" | "material" | "logic" | "design";
+/** Stage keys declared by schemaVersion 3 bundles. */
+export type StagedTemplateStage = "intent" | "material" | "logic" | "design";
 export type LegacyTemplateStage =
   | "intent"
   | "evidence"
@@ -15,14 +16,14 @@ export interface TemplateBundleSource {
 }
 export interface TemplateBundleMetadata {
   format: "showai-template";
-  schemaVersion: 1 | 2 | 3;
+  schemaVersion: 1 | 2 | 3 | 4;
   id: string;
   name: string;
   version: string;
   description: string;
   scenarios: string[];
-  /** Four stages for schemaVersion 3; six legacy stages for schemaVersion 1–2. */
-  guides: Record<string, string | null>;
+  /** Ordered Markdown paths for schemaVersion 4; stage maps for schemaVersion 1–3. */
+  guides: string[] | Record<string, string | null>;
   components: { id: string; path: string }[];
   /** Legacy schemaVersion 1 only. */
   page?: string | null;
@@ -30,35 +31,35 @@ export interface TemplateBundleMetadata {
 export interface ParsedTemplateBundle {
   metadata: TemplateBundleMetadata;
   body: string;
-  guides: Partial<Record<TemplateStage, { path: string; markdown: string }>>;
+  /** Every guide in reading order; an Agent reads them whole. */
+  guides: { path: string; markdown: string }[];
   components: { id: string; path: string; source: ComponentSource }[];
   document?: Partial<ShowDocument>;
-  /** True for schemaVersion 1–2 bundles whose six stages are mapped onto the current four. */
+  /** True for schemaVersion 1–2 six-stage bundles. */
   legacy: boolean;
+  /** True for schemaVersion 1–3 bundles that declared stages. */
+  staged: boolean;
   source: TemplateBundleSource;
 }
-export const TEMPLATE_STAGES: readonly TemplateStage[];
-export const TEMPLATE_SCHEMA_VERSION: 3;
+export const STAGED_TEMPLATE_STAGES: readonly StagedTemplateStage[];
+export const TEMPLATE_SCHEMA_VERSION: 4;
 export const LEGACY_TEMPLATE_STAGES: readonly LegacyTemplateStage[];
 export const SYSTEM_TEMPLATE_ID: "system-presentation";
 export const TEMPLATE_WORKFLOW_CAPABILITIES: Readonly<{
-  protocol: "showai-template-workflow-v2";
+  protocol: "showai-template-workflow-v3";
   bundleFormat: 1;
-  schemaVersion: 3;
+  schemaVersion: 4;
   legacySchemaVersions: number[];
-  stages: readonly TemplateStage[];
   systemBaselineRequired: true;
+  systemBaseline: string;
+  guideDisclosure: "whole-template";
   contextBinding: string;
-  stageDisclosure: string;
   directoryImport: string;
   portableBundleInput: string;
   compactResponses: string[];
 }>;
 export function templateFilePath(value: unknown): string;
-export function stageGuidePath(
-  metadata: TemplateBundleMetadata,
-  stage: TemplateStage,
-): string | null;
+export function declaredGuidePaths(metadata: TemplateBundleMetadata): string[];
 export function parseTemplateReadme(source: unknown): {
   metadata: TemplateBundleMetadata;
   body: string;

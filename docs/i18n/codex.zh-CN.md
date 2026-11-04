@@ -2,7 +2,7 @@
 
 **语言：** [English](../codex.md) | 简体中文 · [文档目录](index.zh-CN.md)
 
-连接 ShowAI 后，Claude Code 与 Codex 可以用界面而不是一段文字来回答，把它保存为 ShowAI 项目中的页面，之后还能在你的修改上继续。插件为 Agent 提供 ShowAI 的工具和九个 Skill；ShowAI App 负责保存页面，并提供插件连接的运行时。**先安装 App，插件随 App 提供。**
+连接 ShowAI 后，Claude Code 与 Codex 可以用界面而不是一段文字来回答，把它保存为 ShowAI 项目中的页面，之后还能在你的修改上继续。插件为 Agent 提供 ShowAI 的工具和六个 Skill；ShowAI App 负责保存页面，并提供插件连接的运行时。**先安装 App，插件随 App 提供。**
 
 ## 从 App 安装插件
 
@@ -42,7 +42,7 @@ Agent 应当调用 ShowAI 工具、保存页面并展示出来。「设置 → �
 连接 ShowAI 的 Agent 都按同样的步骤工作；了解这些步骤，便于检查 Agent 做了什么。
 
 1. **找到内容。** `projects_list` 或绑定的 `project_context` → `pages_list` / `library_search` → `page_read`。只读查找不会创建项目。新内容保存到你指定的项目；没有指定时，本机连接可用 `project_resolve` 根据 Agent 的工作目录定位项目。
-2. **读取相应指南。** `show-document` 按理解意图、收集材料、呈现逻辑、设计稿四个阶段完成一份页面。准备数据前，Agent 先读取组件指南和精确的参数说明。
+2. **读取相应指南。** `use-showai` 先判断请求走哪条路径。要保存的作品由 `show-document` 依次完成理解意图、收集材料、呈现逻辑、设计稿、制作、评审和交付七个环节，每个环节留下一份记录。准备数据前，Agent 先读取组件指南和精确的参数说明。
 3. **谨慎保存。** **读取完整 Page**，保留稳定的节点 ID，携带当前 hash/revision 调用 `page_apply` 或 `page_save`。**冲突必须比较两份内容后有意识地合并**，不能刷新版本后直接覆盖。
 4. **展示已保存的页面。** `page_present` 返回完整 HTML/source 和 inline 预览。支持 MCP Apps 的 Agent 直接显示阅读器；Codex 文件式可视化使用实际返回的 `delivery.inline` 路径；其他情况下 Agent 交给你 HTML 文件。
 

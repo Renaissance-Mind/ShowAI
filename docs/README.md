@@ -22,8 +22,8 @@ Guides describe the current source. The released app, the plugin and hosted serv
 | Guide                                            | Contents                                                |
 | ------------------------------------------------ | ------------------------------------------------------- |
 | [Components and templates](catalog-lifecycle.md) | Scopes, immutable versions, composition and publication |
-| [Skills and workflows](skills.md)                | Nine Skills and task routing                            |
-| [Template folders](template-bundles.md)          | Metadata, four stages and component libraries           |
+| [Skills and workflows](skills.md)                | Six Skills and task routing                             |
+| [Template folders](template-bundles.md)          | Metadata, guides and component libraries                |
 | [Component parameters](component-parameters.md)  | Generated references, omission and relation checks      |
 | [G2 data charts](g2-components.md)               | 43 charts, datasets and field mapping                   |
 | [Mind maps](mindmap.md)                          | Layouts, shortcuts, data and export                     |
@@ -50,7 +50,7 @@ Guides describe the current source. The released app, the plugin and hosted serv
 | [Brand assets](branding.md)                                     | Logo source, variants and generation                   |
 | [Development and testing](development.md)                       | Instances, `dev:status`, test suites and CI            |
 | [Contributing a built-in component](contributing-components.md) | Contract, registration points and verification         |
-| [Contributing a built-in template](contributing-templates.md)   | Folder, registration, revisions and the baseline       |
+| [Contributing a built-in template](contributing-templates.md)   | Folder, registration, revisions and system workflow    |
 
 [Plugin documentation](../plugins/showai/README.md) covers the Skills and installing from source. [Contributing](../CONTRIBUTING.md) explains what each kind of change updates and how to verify it; participation follows the [Code of Conduct](../CODE_OF_CONDUCT.md).
 

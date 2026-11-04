@@ -60,7 +60,7 @@ import legacyTemplates from "../../resources/catalog/templates.json";
 import { builtinTemplateBundles } from "./builtin-template-bundles";
 import {
   parseTemplateBundle,
-  TEMPLATE_STAGES,
+  STAGED_TEMPLATE_STAGES,
   LEGACY_TEMPLATE_STAGES,
   SYSTEM_TEMPLATE_ID,
 } from "../portable/template-bundle.mjs";
@@ -694,11 +694,15 @@ function templateRecord(
           bundle: bundle.source,
           workflow: {
             format: 1 as const,
-            // The bundle's own stage list is part of the integrity hash, so
-            // legacy six-stage records keep verifying under the four-stage runtime.
-            stages: bundle.legacy
-              ? [...LEGACY_TEMPLATE_STAGES]
-              : [...TEMPLATE_STAGES],
+            // A staged bundle's own stage list is part of its integrity hash,
+            // so earlier records keep verifying; stageless bundles have none.
+            ...(bundle.staged
+              ? {
+                  stages: bundle.legacy
+                    ? [...LEGACY_TEMPLATE_STAGES]
+                    : [...STAGED_TEMPLATE_STAGES],
+                }
+              : {}),
             components: bindings.map(({ id, ref }) => ({
               id,
               ref: portableRef(checkedRef(ref, "component")),

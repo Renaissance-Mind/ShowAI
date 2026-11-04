@@ -1,9 +1,8 @@
 import { getGuide, GUIDE_TOPICS, type GuideTopic } from "./guides";
 import { systemPresentationGuide } from "./system-presentation";
-import type { TemplateStage } from "../portable/template-bundle.mjs";
 
 const tools: Record<GuideTopic, string[]> = {
-  presentation: ["guide", "template_context", "template_guide"],
+  presentation: ["guide", "template_context"],
   integration: [
     "showai_capabilities",
     "project_context",
@@ -126,10 +125,10 @@ const rules: Partial<Record<GuideTopic, string[]>> = {
     "Conversation hosts also pass onContext({model, private?, label?}) and context; guide component describes the limits. Show the hand-over control only when onContext exists, call it from a reader action, and verify the chip or model context in a conversation host. Without such a host, state that this path was not verified.",
   ],
   templates: [
-    "New templates use input:{bundle:{format:1,files,assets?}}. files contains README.md, declared stage Markdown/folders and optional components; no host-local path is required. The logic guide determines content logic; the design guide determines layout, visual expression and interaction for each instance. Applying a folder template starts an empty Page. README JSON frontmatter is authoritative; duplicate legacy document/composition/contentGuide alongside a bundle is rejected.",
-    "README metadata fields are format=showai-template, schemaVersion=3, id, name, version, description, scenarios, guides and components. Declare all four stages intent, material, logic and design; null inherits the system stage. Components declare local id/path; their package includes manifest.json, props.schema.json, entry source and versioned documentation.",
-    "template_save compiles and registers namespaced template components and returns an immutable ref. Use template_context for task READMEs, fixed refs and a paged component index, then template_guide for only the current stage. Apply the exact saved ref and verify a real Page.",
-    "Legacy metadata/document/composition plus optional pageId remain supported. Component version changes accompany source changes; template versions accompany guide/package changes. Project templates cannot replace the mandatory system baseline.",
+    "New templates use input:{bundle:{format:1,files,assets?}}. files contains README.md, the guide Markdown files it lists and optional components; no host-local path is required. A template adds the methods for one kind of content to the presentation workflow of the show-document Skill (guide topic presentation); it does not repeat that workflow or split itself into stages. Applying a folder template starts an empty Page. README JSON frontmatter is authoritative; duplicate legacy document/composition/contentGuide alongside a bundle is rejected.",
+    "README metadata fields are format=showai-template, schemaVersion=4, id, name, version, description, scenarios, guides and components. guides is an ordered list of Markdown files under guides/ (it may be empty); an Agent reads the README and every guide whole in one template_context call, so keep the total under 48 KiB. Components declare local id/path; their package includes manifest.json, props.schema.json, entry source and versioned documentation.",
+    "template_save compiles and registers namespaced template components and returns an immutable ref. template_context returns each selected template's README, all its guides and a paged component index with exact refs. Apply the exact saved ref and verify a real Page.",
+    "Earlier staged bundles (schemaVersion 1–3) stay readable: their stage guides are returned in stage order. Legacy metadata/document/composition plus optional pageId remain supported. Component version changes accompany source changes; template versions accompany guide/package changes. Project templates cannot replace the system workflow.",
   ],
   sync: [
     "Local project_sync_status reads status; project_sync is the explicit project synchronization operation. Remote HTTP project calls return synchronization.state/error/remoteHead after pull/operation/push. A retained local write with failed synchronization is not remote success.",
@@ -143,15 +142,8 @@ const rules: Partial<Record<GuideTopic, string[]>> = {
   ],
 };
 /** MCP guides share model facts, but never send shell command recipes to Agents. */
-export function getMcpGuide(
-  topic?: string,
-  stage?: TemplateStage,
-  knownHash?: string,
-) {
-  if (stage && topic !== "presentation")
-    throw new Error("Stage applies only to guide presentation.");
-  if (topic === "presentation")
-    return systemPresentationGuide(stage, knownHash);
+export function getMcpGuide(topic?: string, knownHash?: string) {
+  if (topic === "presentation") return systemPresentationGuide(knownHash);
   if (!topic)
     return {
       protocol: "showai-mcp-v1",

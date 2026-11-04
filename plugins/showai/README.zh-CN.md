@@ -2,7 +2,7 @@
 
 **语言：** [English](README.md) | 简体中文 · [文档目录](https://github.com/Renaissance-Mind/ShowAI/blob/main/docs/i18n/README.zh-CN.md)
 
-ShowAI 让 Agent 用界面回答——可以交互、可以归档、在使用中不断进化。它由两部分组成：本插件为 Agent 提供 ShowAI 的工具（stdio MCP launcher）和九个 Skill；ShowAI App 保存页面，并提供插件连接的运行时。兼容性以运行时报告的实际能力为准。
+ShowAI 让 Agent 用界面回答——可以交互、可以归档、在使用中不断进化。它由两部分组成：本插件为 Agent 提供 ShowAI 的工具（stdio MCP launcher）和六个 Skill；ShowAI App 保存页面，并提供插件连接的运行时。兼容性以运行时报告的实际能力为准。
 
 ## 安装
 
@@ -44,17 +44,14 @@ npm run plugin:dsh
 
 ## Skill 与任务分工
 
-| Skill                                                      | 用途                                |
-| ---------------------------------------------------------- | ----------------------------------- |
-| [use-showai](skills/use-showai/SKILL.md)                   | 连接身份、发现、查找、阅读与分工    |
-| [show-visual](skills/show-visual/SKILL.md)                 | 在对话中直接展示 1–5 个组件，不保存 |
-| [plan-presentation](skills/plan-presentation/SKILL.md)     | 读者意图、材料与呈现逻辑            |
-| [design-presentation](skills/design-presentation/SKILL.md) | 逐幕设计稿、布局与交互              |
-| [show-document](skills/show-document/SKILL.md)             | 制作、续改、保存、展示与导出        |
-| [review-presentation](skills/review-presentation/SKILL.md) | 检查理解、修订与复核                |
-| [create-component](skills/create-component/SKILL.md)       | 可复用 React 表达能力               |
-| [create-template](skills/create-template/SKILL.md)         | 可复用模板文件夹与方法              |
-| [collaborate-canvas](skills/collaborate-canvas/SKILL.md)   | 画布协作、多端配对与保存状态        |
+| Skill                                                    | 用途                                           |
+| -------------------------------------------------------- | ---------------------------------------------- |
+| [use-showai](skills/use-showai/SKILL.md)                 | 总入口：分流、连接、查找、阅读与管理内容       |
+| [show-visual](skills/show-visual/SKILL.md)               | 在对话中直接展示 1–5 个组件，不保存            |
+| [show-document](skills/show-document/SKILL.md)           | 创作与修改作品：完整制作流程、保存、展示与导出 |
+| [create-component](skills/create-component/SKILL.md)     | 可复用 React 表达能力                          |
+| [create-template](skills/create-template/SKILL.md)       | 可复用模板文件夹与方法                         |
+| [collaborate-canvas](skills/collaborate-canvas/SKILL.md) | 画布协作、多端配对与保存状态                   |
 
 Agent 文档操作使用 MCP，先读取 guide() 并发现能力与项目。正式成果先保存到项目再 page_present；明确独立交付使用 render_document。详细方法由同源 Skill 维护，本页用于安装与接入。
 

@@ -2,7 +2,7 @@
 
 **Language:** English | [简体中文](i18n/codex.zh-CN.md) · [Documentation](README.md)
 
-With ShowAI connected, Claude Code and Codex can answer with an interface instead of a block of text, save it as a page in your ShowAI project, and continue from your edits later. The plugin gives the agent ShowAI's tools and nine Skills; the ShowAI app keeps the pages and provides the runtime the plugin talks to. Install the app first — the plugin comes with it.
+With ShowAI connected, Claude Code and Codex can answer with an interface instead of a block of text, save it as a page in your ShowAI project, and continue from your edits later. The plugin gives the agent ShowAI's tools and six Skills; the ShowAI app keeps the pages and provides the runtime the plugin talks to. Install the app first — the plugin comes with it.
 
 ## Install the plugin from the app
 
@@ -42,7 +42,7 @@ The library does not change while the connection runs. The local launcher probes
 Agents connected to ShowAI follow the same steps; knowing them helps when you review what the agent did.
 
 1. **Find the content.** `projects_list` or a bound `project_context`, then `pages_list`, `library_search` and `page_read`. Read-only lookup does not create projects. New work goes into the project you name; otherwise a local connection can use `project_resolve` with the agent's working directory.
-2. **Read the relevant guidance.** `show-document` coordinates a complete page through four stages: intent, material, presentation logic and design. The agent reads component guides and exact parameter references before preparing data.
+2. **Read the relevant guidance.** `use-showai` routes the request. For a work to save, `show-document` carries it through seven stages: intent, material, presentation logic, design, authoring, review and delivery, with a record for each stage. The agent reads component guides and exact parameter references before preparing data.
 3. **Save deliberately.** The agent reads the complete page, keeps stable node IDs and saves with the page's current hash and revision through `page_apply` or `page_save`. A conflict requires comparing both versions and merging on purpose.
 4. **Present the saved page.** `page_present` returns full HTML/source plus an inline preview. Agents that support MCP Apps display the reader directly; Codex visualizations reference the returned `delivery.inline` path; elsewhere the agent hands you the HTML file.
 

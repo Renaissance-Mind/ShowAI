@@ -6,7 +6,7 @@
 
 1. `showai_capabilities` 检查真实能力。
 2. `project_context` / `projects_list` 核对连接与项目。本机 library连接的新正式内容用 `project_resolve({sourceDirectory})` 解析可信宿主目录；绑定和远程连接不提供这个动作。
-3. 呈现任务先读取系统基线，template_context 固定本轮模板，再按阶段调用 template_guide；本机启动绑定与网页显式引用使用同一协议。
+3. 创作任务按 [show-document](../../show-document/SKILL.md) 的制作流程进行；选用模板时调用一次 template_context，固定本轮模板并读入它的全部指南。本机启动绑定与网页显式引用使用同一协议。
 4. 续改用 `page_read` 取得完整内容与 hash/revision；新建遵循 [show-document](../../show-document/SKILL.md) 的选择：匹配模板用 `template_apply`，明确从空白开始或无匹配结构时用 `page_create`。
 5. `page_apply` / `page_save` 提交变更，检查保存及同步回执。
 6. 需要展示时 `page_present({projectId,pageId,blockIds?})`，依据宿主能力交付。

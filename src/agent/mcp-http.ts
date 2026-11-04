@@ -249,7 +249,7 @@ export async function createMcpHttpApp(options: McpHttpOptions) {
           const original = tool.handler as ToolCallback<z.ZodRawShape>;
           tool.update({
             description:
-              "Start every ShowAI task with guide() to read the shared Skill entrypoint and task routes. Then use skill to read one workflow, or skill/file to read an exact referenced file. No installed plugin or local files are needed. topic still reads runtime operation guides; stage applies to topic presentation. knownHash is only for exact content already held this turn.",
+              "Start every ShowAI task with guide() to read the shared Skill entrypoint and task routes. Then use skill to read one workflow, or skill/file to read an exact referenced file. No installed plugin or local files are needed. topic still reads runtime operation guides; topic presentation is the presentation workflow for hosts without the show-document Skill. knownHash is only for exact content already held this turn.",
             paramsSchema: {
               ...shape,
               skill: z.enum(mcpSkillNames).optional(),
@@ -265,10 +265,6 @@ export async function createMcpHttpApp(options: McpHttpOptions) {
                   );
                 return original(args, extra);
               }
-              if ("stage" in args && args.stage)
-                return mcpFailure(
-                  new Error("stage requires topic presentation."),
-                );
               if ((args.file || args.section) && !args.skill)
                 return mcpFailure(new Error("file and section require skill."));
               try {

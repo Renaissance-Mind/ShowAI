@@ -80,7 +80,7 @@ export interface CatalogSummary {
   conversation?: import("../components/custom/types").InlineReadiness;
   workflow?: {
     format: 1;
-    stages: string[];
+    stages?: string[];
     componentCount: number;
     system: boolean;
   };
@@ -186,7 +186,9 @@ export function summarizeCatalog(
       ? {
           workflow: {
             format: 1 as const,
-            stages: (item.workflow as { stages: string[] }).stages,
+            ...((item.workflow as { stages?: string[] }).stages
+              ? { stages: (item.workflow as { stages: string[] }).stages }
+              : {}),
             componentCount: (item.workflow as { components: unknown[] })
               .components.length,
             system: id === "system-presentation",

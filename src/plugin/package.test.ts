@@ -31,6 +31,7 @@ async function packageSkill(
       "plugins-kimi/showai",
       "resources/templates/system-presentation",
       "plugins/showai/skills/show-document",
+      "plugins/showai/skills/show-visual",
       "plugins/showai/skills/example",
       "plugins/showai/skills/use-showai/references",
       "plugins/showai/mcp",
@@ -68,9 +69,10 @@ async function packageSkill(
     join(root, "src/portable/template-bundle.mjs"),
     join(fixture, "src/portable/template-bundle.mjs"),
   );
-  await copyFile(
-    join(root, "resources/templates/system-presentation/README.md"),
-    join(fixture, "resources/templates/system-presentation/README.md"),
+  await cp(
+    join(root, "resources/templates/system-presentation"),
+    join(fixture, "resources/templates/system-presentation"),
+    { recursive: true },
   );
   await Promise.all([
     writeFile(
@@ -79,7 +81,11 @@ async function packageSkill(
     ),
     writeFile(
       join(fixture, "plugins/showai/skills/show-document/SKILL.md"),
-      "---\nname: show-document\ndescription: Foundational presentation instructions.\n---\n<!-- showai-system-baseline:start -->\n<!-- showai-system-baseline:end -->\n",
+      "---\nname: show-document\ndescription: Foundational presentation instructions.\n---\n<!-- showai-system-workflow:start -->\n<!-- showai-system-workflow:end -->\n",
+    ),
+    writeFile(
+      join(fixture, "plugins/showai/skills/show-visual/SKILL.md"),
+      "---\nname: show-visual\ndescription: Conversation components.\n---\n<!-- showai-visual-principles:start -->\n<!-- showai-visual-principles:end -->\n",
     ),
     writeFile(join(fixture, "src/desktop/assets/icon.svg"), "<svg/>"),
     writeFile(join(fixture, "src/desktop/assets/icon-light.svg"), "<svg/>"),
@@ -113,7 +119,7 @@ describe("plugin packaging", () => {
         ].join(eol),
       );
       expect(result.stdout).toContain(
-        "Prepared ShowAI MCP plugin 0.8.0: example, show-document, use-showai",
+        "Prepared ShowAI MCP plugin 0.8.0: example, show-document, show-visual, use-showai",
       );
     },
   );

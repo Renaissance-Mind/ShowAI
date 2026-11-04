@@ -43,13 +43,13 @@ G2 图表和外部图示家族各有自己的流程。`g2.json` 中的 G2 条目
 10. **对话内展示就绪度 ✓。** 在 `resources/catalog/inline-readiness.json` 中加入 `{ "status": "ready" }`；组件在对话中展示效果还不好时，使用其他状态并附上 `note`。用下文的就绪度测量获得结果。
 11. **写死的列表。** 把 kind 加入 `src/core/catalog.test.ts` 中的有序列表（`describes all built-in blocks for agents`）；需要离线阅读器挂载它时，也加入 `src/agent/presentation-export.test.ts`。
 12. **运行时依赖。** 运行时使用的新 npm 依赖要加入 `package.json`、`scripts/package-runtime.mjs` 的复制列表、`src/core/catalog.ts` 中 `compilePackage` 的运行时与 SDK 导入允许列表，许可证文本放进 `resources/licenses/`。新图标从 `src/ui/icons.ts` 导出。
-13. **Agent 指引。** 在 `plugins/showai/skills/design-presentation/references/reuse-selection.md` 中说明何时选用该组件，然后运行 `npm run package:plugin`，重新生成 Codex、Claude Code 和 Kimi 的 Skill 副本。
+13. **Agent 指引。** 在 `resources/templates/system-presentation/guides/04-design.md` 的“组件与素材”一段中说明何时选用该组件，然后运行 `npm run package:plugin`，把这份指南嵌入 `show-document` Skill，并重新生成 Codex、Claude Code 和 Kimi 的 Skill 副本。另见[修订系统呈现规则](contributing-templates.zh-CN.md#修订系统呈现规则)。
 
 ## 修改已有内置组件
 
 查找已有内置组件的代码时，从它在 `registry.ts` 中的 `registerBlock` 调用开始，那里写明了渲染器和校验函数。已保存的页面保留写入时的数据，已导出的页面保留导出时的阅读器。因此修改必须接受旧数据契约接受过的所有结构，或者在读取时转换旧数据；不要以会让现有页面校验失败的方式收紧数据契约。数据契约、默认数据或行为变化时，提高 `components.json` 中的 `version`，同时更新 `propsSchema`、示例和使用说明，并在数据契约测试中加入旧结构。
 
-Agent 通过使用说明和示例了解组件，而不是读源码。行为变化后，核对 `usage`、`recipes` 和示例是否仍然准确；选用组件的判断有变化时，同步更新 `reuse-selection.md`。
+Agent 通过使用说明和示例了解组件，而不是读源码。行为变化后，核对 `usage`、`recipes` 和示例是否仍然准确；选用组件的判断有变化时，同步更新 `04-design.md` 的“组件与素材”一段。
 
 ## 验证
 

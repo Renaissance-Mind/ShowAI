@@ -4,6 +4,7 @@ import system_presentation_1 from "../../resources/templates/system-presentation
 import system_presentation_2 from "../../resources/templates/system-presentation/guides/02-material.md?raw";
 import system_presentation_3 from "../../resources/templates/system-presentation/guides/03-logic.md?raw";
 import system_presentation_4 from "../../resources/templates/system-presentation/guides/04-design.md?raw";
+import system_presentation_5 from "../../resources/templates/system-presentation/guides/05-authoring-review.md?raw";
 import paper_explainer_0 from "../../resources/templates/paper-explainer/README.md?raw";
 import paper_explainer_1 from "../../resources/templates/paper-explainer/guides/01-intent.md?raw";
 import paper_explainer_2 from "../../resources/templates/paper-explainer/guides/02-material.md?raw";
@@ -19,6 +20,7 @@ export const builtinTemplateBundles: TemplateBundleSource[] = [
       "guides/02-material.md": system_presentation_2,
       "guides/03-logic.md": system_presentation_3,
       "guides/04-design.md": system_presentation_4,
+      "guides/05-authoring-review.md": system_presentation_5,
     },
   },
   {

@@ -2,7 +2,7 @@
 
 **Language:** English | [简体中文](README.zh-CN.md) · [Documentation](https://github.com/Renaissance-Mind/ShowAI/blob/main/docs/README.md)
 
-ShowAI lets your agent answer with interfaces — interactive, archived, and evolving as you use them. It has two parts: this plugin gives the agent ShowAI's tools (a stdio MCP launcher) and nine Skills, and the ShowAI app keeps the pages and provides the runtime the plugin talks to. Compatibility is determined by the runtime's reported capabilities.
+ShowAI lets your agent answer with interfaces — interactive, archived, and evolving as you use them. It has two parts: this plugin gives the agent ShowAI's tools (a stdio MCP launcher) and six Skills, and the ShowAI app keeps the pages and provides the runtime the plugin talks to. Compatibility is determined by the runtime's reported capabilities.
 
 ## Install
 
@@ -58,17 +58,14 @@ The marketplace identity stays `showai@renaissance-mind`. The generated Codex an
 
 ## Skills and task routing
 
-| Skill                                                      | Purpose                                             |
-| ---------------------------------------------------------- | --------------------------------------------------- |
-| [use-showai](skills/use-showai/SKILL.md)                   | Connection identity, discovery, reading and routing |
-| [show-visual](skills/show-visual/SKILL.md)                 | Show 1–5 components in the conversation, unsaved    |
-| [plan-presentation](skills/plan-presentation/SKILL.md)     | Reader intent, material and presentation logic      |
-| [design-presentation](skills/design-presentation/SKILL.md) | Scene-by-scene design draft, layout and interaction |
-| [show-document](skills/show-document/SKILL.md)             | Create, continue, save, present and export Pages    |
-| [review-presentation](skills/review-presentation/SKILL.md) | Assess understanding, revise and verify             |
-| [create-component](skills/create-component/SKILL.md)       | Reusable React expression capabilities              |
-| [create-template](skills/create-template/SKILL.md)         | Reusable template folders and methods               |
-| [collaborate-canvas](skills/collaborate-canvas/SKILL.md)   | Co-editing on canvases, multi-device pairing        |
+| Skill                                                    | Purpose                                                              |
+| -------------------------------------------------------- | -------------------------------------------------------------------- |
+| [use-showai](skills/use-showai/SKILL.md)                 | Entry point: routing, connection, finding, reading and management    |
+| [show-visual](skills/show-visual/SKILL.md)               | Show 1–5 components in the conversation, unsaved                     |
+| [show-document](skills/show-document/SKILL.md)           | Create or revise works: full workflow, saving, presenting and export |
+| [create-component](skills/create-component/SKILL.md)     | Reusable React expression capabilities                               |
+| [create-template](skills/create-template/SKILL.md)       | Reusable template folders and methods                                |
+| [collaborate-canvas](skills/collaborate-canvas/SKILL.md) | Co-editing on canvases, multi-device pairing                         |
 
 Agent document operations use MCP. Begin with guide() and capability/project discovery. Formal work is saved in the selected project before page_present. render_document serves explicitly standalone delivery. Detailed methods remain in the canonical Skills; this README is the installation entrypoint.
 

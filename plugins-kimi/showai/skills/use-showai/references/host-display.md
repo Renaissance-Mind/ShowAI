@@ -24,7 +24,7 @@ inline 优先携带压缩后的本地阅读器；超出预算时才切换到在�
 
 接受模型上下文的宿主会把预览里的控件最新取值以 showai.readerState 交回对话，含 blockId、控件标签与取值。这是本地阅读状态，未写入页面。用户要求保留时，再按正常流程读取并保存。
 
-同一预览的引用与主动交出的组件状态分别是 showai.reference、showai.components，见 [处理用户引用](../SKILL.md#处理用户引用)。不能把读者状态当作页面已保存的内容。
+同一预览的引用与主动交出的组件状态分别是 showai.reference、showai.components，见 [用户引用与组件状态](user-references.md)。不能把读者状态当作页面已保存的内容。
 
 ## 路径与持久性
 

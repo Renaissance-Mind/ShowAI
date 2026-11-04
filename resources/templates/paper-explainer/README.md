@@ -1,10 +1,10 @@
 ---
 {
   "format": "showai-template",
-  "schemaVersion": 3,
+  "schemaVersion": 4,
   "id": "paper-explainer",
   "name": "论文讲解",
-  "version": "2.4.0",
+  "version": "3.0.0",
   "description": "教 Agent 为任意一篇论文或技术报告构建可交互讲解：判断读者要用讲解做什么，把论文读成带来源与条件的材料，从论文的主张、贡献结构与类型推出这篇论文自己的讲解顺序，再为每一部分设计让读者能看出关系、能亲手验证的画面。",
   "scenarios": [
     "用户给出一篇论文或技术报告（PDF、链接或编号），要求讲解、解读，或做成可交互的讲解页。",
@@ -12,12 +12,12 @@
     "读者要把论文的方法迁移到自己的问题，需要讲清机制、每个设计解决的难题和适用边界。",
     "多篇论文要用统一的阅读结构讲解，让读者在不同论文之间迁移阅读习惯。"
   ],
-  "guides": {
-    "intent": "guides/01-intent.md",
-    "material": "guides/02-material.md",
-    "logic": "guides/03-logic.md",
-    "design": "guides/04-design.md"
-  },
+  "guides": [
+    "guides/01-intent.md",
+    "guides/02-material.md",
+    "guides/03-logic.md",
+    "guides/04-design.md"
+  ],
   "components": []
 }
 ---
