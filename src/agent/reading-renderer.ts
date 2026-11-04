@@ -107,11 +107,20 @@ async function actionTarget(
       }
   }
   const owner = block ?? scope;
-  const target = action.selector
+  let target = action.selector
     ? owner.locator(action.selector)
     : owner.getByRole(action.role!, { name: action.name!, exact: true });
   const message = `Action target is missing or ambiguous: ${action.selector ?? `${action.role} ${action.name}`}. Read the HTML view and specify its blockId.`;
   let matches = await target.count();
+  // Controls often prefix their visible label (a step number, an icon name);
+  // a name that matches exactly one control by substring still identifies it.
+  if (matches === 0 && !action.selector) {
+    const partial = owner.getByRole(action.role!, { name: action.name! });
+    if ((await partial.count()) === 1) {
+      target = partial;
+      matches = 1;
+    }
+  }
   if (matches === 0) {
     // A preceding action can mount its next control asynchronously. count()
     // is only a snapshot and must not reject that control before it appears.

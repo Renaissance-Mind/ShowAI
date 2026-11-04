@@ -68,7 +68,9 @@ export function StepperBar({
             data-done={index < active ? "" : undefined}
             onClick={() => go(index)}
           >
-            <span className="stepper-number">{index + 1}</span>
+            <span className="stepper-number" aria-hidden="true">
+              {index + 1}
+            </span>
             <span className="stepper-title">{title}</span>
           </button>
         ))}

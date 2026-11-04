@@ -3,6 +3,19 @@ import {
   type BindingRead,
 } from "../core/dataset-resolution";
 import { structuredContent, type OutlineItem } from "./page-structured";
+/** The runtime and reader build behind a rendered read, for checking that new code is live. */
+async function renderedBy() {
+  const [support, reader] = await Promise.all([
+    supportInfo(),
+    readerIdentity(),
+  ]);
+  return {
+    version: support.version,
+    sourceCommit: support.sourceCommit,
+    ...reader,
+  };
+}
+
 export { structuredContent } from "./page-structured";
 
 import { randomUUID } from "node:crypto";
@@ -24,6 +37,8 @@ import { collectCustomComponentRefs } from "../components/custom/contract";
 import { loadBoardSnapshot } from "./board-reading";
 import { injectReadingOptions } from "./reading-preview";
 import { appLocale } from "../core/app-language";
+import { readerIdentity } from "../core/reader-template";
+import { supportInfo } from "./support";
 import { withHtmlLanguage, type Locale } from "../i18n";
 
 export const READ_VIEWS = ["structured", "image", "html"] as const;
@@ -475,6 +490,7 @@ export async function readPageView(
     url: pathToFileURL(path).href,
     state,
     capturedAt: capture.capturedAt,
+    reader: await renderedBy(),
     dom: capture.dom,
     computed,
     ...(options.view === "image"

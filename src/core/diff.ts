@@ -389,9 +389,7 @@ export function applyOperations(
       ? { parentId: parent.attrs!.id as string, id: only.attrs!.id as string }
       : undefined;
   };
-  const dropPlaceholder = (
-    placeholder: ReturnType<typeof placeholderOf>,
-  ) => {
+  const dropPlaceholder = (placeholder: ReturnType<typeof placeholderOf>) => {
     if (!placeholder) return;
     const parent = locate(placeholder.parentId).node;
     if ((parent.content?.length ?? 0) < 2) return;
@@ -714,6 +712,12 @@ export function applyOperations(
       case "component.props.set": {
         const node = locate(operation.blockId).node;
         const data = node.attrs?.data;
+        // Images, text, tables and steppers are native nodes, not widgets.
+        if (node.type !== "widget")
+          throw new CoreError(
+            "INVALID_DATA",
+            `component.props.set needs a component block; ${operation.blockId} is a native ${node.type} node. Change its attributes with block.attrs.set (for example an image's src or alt), its text with block.text.set, or replace it with block.replace.`,
+          );
         if (
           node.type !== "widget" ||
           !data ||

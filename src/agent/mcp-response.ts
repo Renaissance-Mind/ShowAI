@@ -31,6 +31,7 @@ export function compactMcpResult(
     "url",
     "state",
     "capturedAt",
+    "reader",
     "image",
     "metadataPath",
     "workspaceConflicts",

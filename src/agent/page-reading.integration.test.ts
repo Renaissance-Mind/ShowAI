@@ -307,6 +307,85 @@ test("HTML actions edit a temporary draft while preserving the full Page bytes",
   expect(await readFile(pagePath, "utf8")).toBe(before);
 }, 30000);
 
+test("actions reach a stepper's step tabs by their title", async () => {
+  const input = join(home, "stepper-page.json");
+  await writeFile(
+    input,
+    JSON.stringify({
+      id: "stepper-reading",
+      title: "Steps",
+      comments: [],
+      content: {
+        type: "doc",
+        content: [
+          {
+            type: "stepper",
+            attrs: { id: "steps" },
+            content: [
+              {
+                type: "step",
+                attrs: { id: "first", title: "Outbound" },
+                content: [
+                  {
+                    type: "paragraph",
+                    content: [{ type: "text", text: "Packet leaves" }],
+                  },
+                ],
+              },
+              {
+                type: "step",
+                attrs: { id: "second", title: "Inbound reply" },
+                content: [
+                  {
+                    type: "paragraph",
+                    content: [{ type: "text", text: "Reply returns" }],
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+      },
+    }),
+  );
+  const page = await run([
+    "pages",
+    "create",
+    "--project",
+    projectId,
+    "--input",
+    input,
+  ]);
+  const state = join(home, "stepper-state.json");
+  for (const name of ["Inbound reply", "Inbound"]) {
+    await writeFile(
+      state,
+      JSON.stringify({ actions: [{ type: "click", role: "tab", name }] }),
+    );
+    const read = await run([
+      "pages",
+      "read",
+      page.document.id,
+      "--project",
+      projectId,
+      "--view",
+      "html",
+      "--state",
+      state,
+    ]);
+    const tree = read.dom
+      .map((frame: { accessibility: string }) => frame.accessibility)
+      .join("\n");
+    expect(tree).toContain('tab "Inbound reply" [selected]');
+    expect(tree).toContain("Reply returns");
+    expect(read.reader).toMatchObject({
+      version: expect.any(String),
+      builtAt: expect.any(String),
+      integrity: expect.stringMatching(/^[0-9a-f]{12}$/),
+    });
+  }
+}, 30000);
+
 test("missing action targets and stale hashes fail instead of claiming a successful capture", async () => {
   const stale = await execute(
     process.execPath,

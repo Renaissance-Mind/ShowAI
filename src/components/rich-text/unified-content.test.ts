@@ -145,7 +145,7 @@ describe("unified content compatibility", () => {
           props: { caption: "updated" },
         },
       ]),
-    ).toThrow(/requires a component block/);
+    ).toThrow(/native image node.*block.attrs.set/);
     const result = applyOperations(inserted.document, [
       {
         type: "block.attrs.set",
