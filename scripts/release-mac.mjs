@@ -176,6 +176,12 @@ async function main(args) {
       const uploaded = remote.assets.find((item) => item.name === asset.name);
       if (uploaded?.size !== asset.size || uploaded.digest !== `sha256:${asset.sha256}`) throw new Error(`${asset.name} on GitHub differs from the local file.`);
     }
+    // The public releases API is cached for 60 s; wait until it lists this release before checking.
+    for (let attempt = 0; attempt < 12; attempt++) {
+      const releases = await (await fetch(`https://api.github.com/repos/${REPO}/releases?per_page=1`)).json();
+      if (releases[0]?.tag_name === tag) break;
+      await new Promise((done) => setTimeout(done, 10_000));
+    }
     const online = await checkOnlineEntries(version);
     for (const warning of online.warnings) console.warn(`warning: ${warning}`);
     if (online.errors.length) throw new Error(online.errors.join("\n"));
