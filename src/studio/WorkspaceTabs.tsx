@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from "react";
-import { createPortal } from "react-dom";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { createPortal, flushSync } from "react-dom";
 import {
   ArrowLeft,
   ArrowRight,
@@ -16,6 +16,9 @@ import { currentEntry, type WorkspaceTabsState } from "./workspace-tabs";
 import "./workspace-tabs.css";
 import { useTranslator } from "../i18n/react";
 import sidebarMessages from "../i18n/messages/sidebar";
+
+const duration = () =>
+  matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : 180;
 
 export function WorkspaceHistory({
   busy,
@@ -73,6 +76,7 @@ export default function WorkspaceTabs({
 }) {
   const t = useTranslator(sidebarMessages);
   const list = useRef<HTMLDivElement>(null);
+  const ghost = useRef<HTMLDivElement>(null);
   const restoreFocus = useRef(false);
   const gesture = useRef<{
     id: string;
@@ -83,29 +87,133 @@ export default function WorkspaceTabs({
     pointerId: number;
     element: HTMLButtonElement;
     active: boolean;
+    finishing: boolean;
+    offsetX: number;
+    offsetY: number;
+    width: number;
+    height: number;
+    /** Ids and scroll-content positions at drag start, free of in-flight animations. */
+    original: string[];
+    layout: Map<string, { left: number; width: number }>;
   } | null>(null);
   const latest = useRef({ busy, onMove });
   latest.current = { busy, onMove };
   const suppressClick = useRef(false);
   const [dragging, setDragging] = useState<string | null>(null);
-  const [point, setPoint] = useState({ x: 0, y: 0 });
-  const [drop, setDrop] = useState<{
-    id: string;
-    placement: "before" | "after";
-  } | null>(null);
+  const [order, setOrder] = useState<string[] | null>(null);
+  const shownOrder = useRef<string[] | null>(null);
+  const flip = useRef<Map<string, DOMRect> | null>(null);
+  const animations = useRef(new Map<string, Animation>());
+  const measure = () =>
+    new Map(
+      Array.from(
+        list.current?.querySelectorAll<HTMLElement>(".studio-tab") ?? [],
+        (element) =>
+          [element.dataset.tabId!, element.getBoundingClientRect()] as const,
+      ),
+    );
+  const preview = (next: string[] | null) => {
+    const current = shownOrder.current;
+    if (
+      current === next ||
+      (current && next && current.join("\n") === next.join("\n"))
+    )
+      return;
+    flip.current = measure();
+    shownOrder.current = next;
+    setOrder(next);
+  };
   const finishDrag = () => {
     const current = gesture.current;
     if (current?.active) suppressClick.current = true;
     gesture.current = null;
     if (current?.element.hasPointerCapture(current.pointerId))
       current.element.releasePointerCapture(current.pointerId);
+    shownOrder.current = null;
+    flip.current = null;
     setDragging(null);
-    setDrop(null);
+    setOrder(null);
+    document.body.classList.remove("studio-tab-drag-active");
+    document.body.style.cursor = "";
   };
+  const locate = (x: number, y: number) => {
+    const container = list.current;
+    const current = gesture.current;
+    if (!container || !current) return null;
+    const bounds = container.getBoundingClientRect();
+    if (
+      x < bounds.left ||
+      x > bounds.right ||
+      y < bounds.top - current.height ||
+      y > bounds.bottom + current.height
+    )
+      return null;
+    const left = x - current.offsetX - bounds.left + container.scrollLeft;
+    const right = left + current.width;
+    const from = current.original.indexOf(current.id);
+    const others = current.original.filter((id) => id !== current.id);
+    // The ghost passes a neighbour once its leading edge crosses that tab's middle.
+    let index = others.findIndex((id) => {
+      const slot = current.layout.get(id)!;
+      const middle = slot.left + slot.width / 2;
+      return current.original.indexOf(id) < from
+        ? left < middle
+        : right <= middle;
+    });
+    if (index < 0) index = others.length;
+    others.splice(index, 0, current.id);
+    return others;
+  };
+  const update = () => {
+    const current = gesture.current;
+    if (!current) return;
+    const next = locate(current.x, current.y);
+    preview(next);
+    document.body.style.cursor = next ? "grabbing" : "not-allowed";
+  };
+  const moveGhost = () => {
+    const current = gesture.current;
+    if (!current || !ghost.current) return;
+    ghost.current.style.transform = `translate3d(${current.x - current.offsetX}px, ${current.y - current.offsetY}px, 0)`;
+  };
+  useLayoutEffect(() => {
+    const before = flip.current;
+    flip.current = null;
+    if (!before || !list.current) return;
+    for (const animation of animations.current.values()) animation.cancel();
+    animations.current.clear();
+    for (const element of list.current.querySelectorAll<HTMLElement>(
+      ".studio-tab",
+    )) {
+      const id = element.dataset.tabId!;
+      const old = before.get(id);
+      if (!old || id === dragging) continue;
+      const offset = old.left - element.getBoundingClientRect().left;
+      if (Math.abs(offset) < 0.5) continue;
+      const animation = element.animate(
+        [
+          { transform: `translateX(${offset}px)` },
+          { transform: "translateX(0)" },
+        ],
+        { duration: duration(), easing: "cubic-bezier(.2,.8,.2,1)" },
+      );
+      animations.current.set(id, animation);
+      animation.onfinish = () => {
+        if (animations.current.get(id) === animation)
+          animations.current.delete(id);
+      };
+    }
+  }, [order, dragging]);
+  useLayoutEffect(moveGhost, [dragging]);
   useEffect(() => {
     const move = (event: PointerEvent) => {
       const current = gesture.current;
-      if (!current || event.pointerId !== current.pointerId) return;
+      if (
+        !current ||
+        current.finishing ||
+        event.pointerId !== current.pointerId
+      )
+        return;
       if (latest.current.busy) return finishDrag();
       current.x = event.clientX;
       current.y = event.clientY;
@@ -114,22 +222,78 @@ export default function WorkspaceTabs({
           Math.hypot(current.x - current.startX, current.y - current.startY) < 5
         )
           return;
+        const container = list.current;
+        if (!container) return finishDrag();
+        const bounds = container.getBoundingClientRect();
+        const box = current.element
+          .closest<HTMLElement>(".studio-tab")!
+          .getBoundingClientRect();
         current.active = true;
+        current.offsetX = current.startX - box.left;
+        current.offsetY = current.startY - box.top;
+        current.width = box.width;
+        current.height = box.height;
+        current.layout = new Map(
+          Array.from(measure(), ([id, rect]) => [
+            id,
+            {
+              left: rect.left - bounds.left + container.scrollLeft,
+              width: rect.width,
+            },
+          ]),
+        );
+        document.body.classList.add("studio-tab-drag-active");
         setDragging(current.id);
       }
       event.preventDefault();
-      setPoint({ x: current.x, y: current.y });
-      setDrop(locateDrop(current.x, current.y));
+      moveGhost();
+      update();
     };
-    const up = (event: PointerEvent) => {
+    const up = async (event: PointerEvent) => {
       const current = gesture.current;
-      if (!current || event.pointerId !== current.pointerId) return;
-      const target = current.active
-        ? locateDrop(event.clientX, event.clientY)
-        : null;
+      if (
+        !current ||
+        current.finishing ||
+        event.pointerId !== current.pointerId
+      )
+        return;
+      if (!current.active) return finishDrag();
+      event.preventDefault();
+      current.finishing = true;
+      current.x = event.clientX;
+      current.y = event.clientY;
+      const target = latest.current.busy
+        ? null
+        : locate(current.x, current.y);
+      flushSync(() => preview(target));
+      const slot = list.current?.querySelector<HTMLElement>(
+        `.studio-tab[data-tab-id="${CSS.escape(current.id)}"]`,
+      );
+      if (ghost.current && slot) {
+        const to = slot.getBoundingClientRect();
+        const from = ghost.current.getBoundingClientRect();
+        const animation = ghost.current.animate(
+          [
+            { transform: `translate3d(${from.x}px, ${from.y}px, 0)` },
+            { transform: `translate3d(${to.x}px, ${to.y}px, 0)` },
+          ],
+          {
+            duration: duration(),
+            easing: "cubic-bezier(.2,.8,.2,1)",
+            fill: "forwards",
+          },
+        );
+        await animation.finished.catch(() => undefined);
+      }
+      if (gesture.current !== current) return;
       finishDrag();
-      if (!latest.current.busy && target)
-        latest.current.onMove(current.id, target.id, target.placement);
+      if (!target || latest.current.busy) return;
+      const index = target.indexOf(current.id);
+      if (target.every((id, position) => id === current.original[position]))
+        return;
+      if (index > 0)
+        latest.current.onMove(current.id, target[index - 1], "after");
+      else latest.current.onMove(current.id, target[1], "before");
     };
     const cancel = () => finishDrag();
     const key = (event: KeyboardEvent) => {
@@ -153,37 +317,14 @@ export default function WorkspaceTabs({
       finishDrag();
     };
   }, []);
-  const locateDrop = (x: number, y: number) => {
-    const container = list.current;
-    if (!container || !gesture.current) return null;
-    const bounds = container.getBoundingClientRect();
-    if (
-      x < bounds.left ||
-      x > bounds.right ||
-      y < bounds.top ||
-      y > bounds.bottom
-    )
-      return null;
-    const elements = Array.from(
-      container.querySelectorAll<HTMLElement>(".studio-tab"),
-    );
-    const target = elements.find((element) => {
-      const rect = element.getBoundingClientRect();
-      return x >= rect.left && x <= rect.right;
-    });
-    if (!target || target.dataset.tabId === gesture.current.id) return null;
-    const rect = target.getBoundingClientRect();
-    return {
-      id: target.dataset.tabId!,
-      placement:
-        x < rect.left + rect.width / 2
-          ? ("before" as const)
-          : ("after" as const),
-    };
-  };
   useEffect(() => {
     if (!dragging) return;
-    if (busy || !tabs.some((tab) => tab.id === dragging)) {
+    const current = gesture.current;
+    if (
+      busy ||
+      !current ||
+      tabs.map((tab) => tab.id).join("\n") !== current.original.join("\n")
+    ) {
       finishDrag();
       return;
     }
@@ -191,7 +332,7 @@ export default function WorkspaceTabs({
     const scroll = () => {
       const container = list.current;
       const point = gesture.current;
-      if (!container || !point) return;
+      if (!container || !point || point.finishing) return;
       const bounds = container.getBoundingClientRect();
       if (
         point.y >= bounds.top &&
@@ -207,7 +348,7 @@ export default function WorkspaceTabs({
               : 0;
         if (distance) {
           container.scrollLeft += distance;
-          setDrop(locateDrop(point.x, point.y));
+          update();
         }
       }
       frame = requestAnimationFrame(scroll);
@@ -228,6 +369,30 @@ export default function WorkspaceTabs({
       ?.focus();
   }, [activeId, busy, tabs.length]);
   const draggedTab = tabs.find((tab) => tab.id === dragging);
+  const shown = order
+    ? order.map((id) => tabs.find((tab) => tab.id === id)!)
+    : tabs;
+  const tabIcon = (tab: (typeof tabs)[number]) => {
+    const entry = currentEntry(tab);
+    const view = entry.location.view;
+    const Icon =
+      view === "projects"
+        ? History
+        : view === "templates"
+          ? LayoutTemplate
+          : view === "components"
+            ? Blocks
+            : view === "settings"
+              ? Settings2
+              : Folder;
+    return (
+      <PageIcon
+        value={entry.icon}
+        size={15}
+        fallback={view === "page" ? undefined : <Icon size={15} />}
+      />
+    );
+  };
 
   return (
     <div
@@ -248,19 +413,9 @@ export default function WorkspaceTabs({
         role="tablist"
         aria-label={t("workspaceTabs")}
       >
-        {tabs.map((tab, index) => {
+        {shown.map((tab) => {
+          const index = tabs.indexOf(tab);
           const entry = currentEntry(tab);
-          const view = entry.location.view;
-          const Icon =
-            view === "projects"
-              ? History
-              : view === "templates"
-                ? LayoutTemplate
-                : view === "components"
-                  ? Blocks
-                  : view === "settings"
-                    ? Settings2
-                    : Folder;
           const active = tab.id === activeId;
           return (
             <div
@@ -269,7 +424,6 @@ export default function WorkspaceTabs({
               data-active={active || undefined}
               data-tab-id={tab.id}
               data-dragging={dragging === tab.id || undefined}
-              data-drop={drop?.id === tab.id ? drop.placement : undefined}
             >
               <button
                 type="button"
@@ -300,11 +454,19 @@ export default function WorkspaceTabs({
                     pointerId: event.pointerId,
                     element: event.currentTarget,
                     active: false,
+                    finishing: false,
+                    offsetX: 0,
+                    offsetY: 0,
+                    width: 0,
+                    height: 0,
+                    original: tabs.map((item) => item.id),
+                    layout: new Map(),
                   };
                   event.currentTarget.setPointerCapture(event.pointerId);
                 }}
                 onLostPointerCapture={() => {
-                  if (gesture.current) finishDrag();
+                  if (gesture.current && !gesture.current.finishing)
+                    finishDrag();
                 }}
                 onClick={() => {
                   restoreFocus.current = true;
@@ -354,11 +516,7 @@ export default function WorkspaceTabs({
                   }
                 }}
               >
-                <PageIcon
-                  value={entry.icon}
-                  size={15}
-                  fallback={view === "page" ? undefined : <Icon size={15} />}
-                />
+                {tabIcon(tab)}
                 <span>{entry.title}</span>
               </button>
               <button
@@ -395,11 +553,17 @@ export default function WorkspaceTabs({
       {draggedTab &&
         createPortal(
           <div
-            className="studio-tab-drag-preview"
+            ref={ghost}
+            className="studio-tab-drag-ghost"
             aria-hidden="true"
-            style={{ left: point.x + 12, top: point.y + 12 }}
+            data-active={draggedTab.id === activeId || undefined}
+            style={{
+              width: gesture.current?.width,
+              height: gesture.current?.height,
+            }}
           >
-            {currentEntry(draggedTab).title}
+            {tabIcon(draggedTab)}
+            <span>{currentEntry(draggedTab).title}</span>
           </div>,
           document.body,
         )}

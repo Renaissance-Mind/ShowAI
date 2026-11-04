@@ -68,41 +68,44 @@
   cursor: grab;
   touch-action: none;
 }
-.studio-tab[data-dragging] {
-  opacity: 0.45;
+.studio-tab-drag-active,
+.studio-tab-drag-active * {
+  user-select: none !important;
 }
-.studio-tab-drag-preview {
+/* The dragged tab keeps its slot as a translucent placeholder while siblings reflow. */
+.studio-tab[data-dragging] {
+  opacity: 0.24;
+}
+.studio-tab-drag-ghost {
   position: fixed;
+  inset: 0 auto auto 0;
   z-index: 10000;
-  max-width: 220px;
-  padding: 8px 12px;
-  border: 1px solid var(--line);
-  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  box-sizing: border-box;
+  padding: 0 30px 0 12px;
+  border-radius: 7px;
+  background: var(--surface);
+  color: var(--muted);
+  box-shadow: 0 7px 20px #00000012;
+  font-size: 13px;
+  font-weight: 450;
+  opacity: 0.78;
+  pointer-events: none;
+  will-change: transform;
+}
+.studio-tab-drag-ghost[data-active] {
   background: var(--paper);
   color: var(--text);
-  box-shadow: 0 4px 16px #0002;
-  font-size: 13px;
+}
+.studio-tab-drag-ghost > span:last-child {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  pointer-events: none;
 }
-.studio-tab[data-drop]::after {
-  content: "";
-  position: absolute;
-  top: 4px;
-  bottom: 4px;
-  width: 3px;
-  border-radius: 2px;
-  background: var(--accent);
-  pointer-events: none;
-  z-index: 1;
-}
-.studio-tab[data-drop="before"]::after {
-  left: 0;
-}
-.studio-tab[data-drop="after"]::after {
-  right: 0;
+.studio-tab-drag-ghost .page-icon {
+  flex-shrink: 0;
 }
 .studio-tab > [role="tab"] > span:last-child {
   overflow: hidden;
