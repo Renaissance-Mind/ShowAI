@@ -1,4 +1,5 @@
-/* structure-browser: expandable tree on the left, the selected node's description on the right.
+/* structure-browser: expandable tree on the left, the selected node's description on the right,
+ * with a draggable divider between them.
  * Neutral colors follow the design tokens so the block follows light and dark themes. */
 /* Page typography reaches into blocks at 0,2,1; this baseline (0,2,2) clears it
  * for structural elements, and the rules below (0,3,0) set this block's own values. */
@@ -57,7 +58,7 @@
 
 .sb-block.stb-block .stb-frame {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr);
+  grid-template-columns: minmax(0, var(--stb-split, 32%)) 1px minmax(0, 1fr);
   border: 1px solid var(--stb-line);
   border-radius: 10px;
   overflow: hidden;
@@ -65,7 +66,6 @@
 }
 .sb-block.stb-block .stb-nav {
   background: var(--stb-surface);
-  border-right: 1px solid var(--stb-line);
   padding: 8px 0;
   min-width: 0;
 }
@@ -73,6 +73,56 @@
   display: flex;
   flex-direction: column;
   gap: 1px;
+}
+
+/* divider: a 1px line with a wider grab area and a grip */
+.sb-block.stb-block .stb-divider {
+  position: relative;
+  z-index: 1;
+  background: var(--stb-line);
+  cursor: col-resize;
+  touch-action: none;
+  outline: none;
+  transition: background 0.12s;
+}
+.sb-block.stb-block .stb-divider::before {
+  content: "";
+  position: absolute;
+  inset: 0 -5px;
+}
+.sb-block.stb-block .stb-divider::after {
+  content: "";
+  position: absolute;
+  top: min(50%, 160px);
+  left: 50%;
+  width: 6px;
+  height: 28px;
+  transform: translate(-50%, -50%);
+  border: 1px solid var(--stb-line);
+  border-radius: 3px;
+  background: var(--stb-paper);
+  transition:
+    border-color 0.12s,
+    background 0.12s;
+}
+.sb-block.stb-block .stb-divider:hover,
+.sb-block.stb-block .stb-divider:focus-visible,
+.sb-block.stb-block.is-resizing .stb-divider {
+  background: var(--stb-accent);
+}
+.sb-block.stb-block .stb-divider:hover::after,
+.sb-block.stb-block .stb-divider:focus-visible::after,
+.sb-block.stb-block.is-resizing .stb-divider::after {
+  border-color: var(--stb-accent);
+}
+.sb-block.stb-block .stb-divider:focus-visible::after {
+  background: var(--stb-accent-soft);
+}
+.sb-block.stb-block.is-resizing,
+.sb-block.stb-block.is-resizing * {
+  cursor: col-resize;
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 /* rows */
@@ -551,8 +601,10 @@
   .sb-block.stb-block .stb-frame {
     grid-template-columns: minmax(0, 1fr);
   }
+  .sb-block.stb-block .stb-divider {
+    display: none;
+  }
   .sb-block.stb-block .stb-nav {
-    border-right: 0;
     border-bottom: 1px solid var(--stb-line);
   }
   .sb-block.stb-block .stb-detail {
@@ -574,7 +626,8 @@
   }
 }
 @media print {
-  .sb-block.stb-block .stb-frame {
+  .sb-block.stb-block .stb-frame,
+  .sb-block.stb-block .stb-divider {
     display: none;
   }
   .sb-block.stb-block .stb-print {

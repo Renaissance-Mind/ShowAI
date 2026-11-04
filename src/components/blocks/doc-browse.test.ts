@@ -122,6 +122,14 @@ describe("structure browser contract", () => {
     expect(() => validateDocBrowseData("structure-browser", link)).toThrow(
       /nodes\[0\]\.children\[1\]\.detail links to javascript/,
     );
+    for (const split of [18, 40.5, 60])
+      expect(() =>
+        validateDocBrowseData("structure-browser", { ...structure(), split }),
+      ).not.toThrow();
+    for (const split of [10, 61, "30", Number.NaN])
+      expect(() =>
+        validateDocBrowseData("structure-browser", { ...structure(), split }),
+      ).toThrow(/split must be a number from 18 to 60/);
   });
 });
 
@@ -132,7 +140,8 @@ describe("structure browser rendering", () => {
     expect(html).toMatch(
       /aria-selected="false" aria-expanded="true"[^>]*>.*?data</,
     );
-    expect(html.match(/tabindex="0"/g)).toHaveLength(1);
+    const rows = html.slice(0, html.indexOf('class="stb-divider"'));
+    expect(rows.match(/tabindex="0"/g)).toHaveLength(1);
     expect(html).toContain('aria-current="location">status</span>');
     expect(html).toContain("<code>pending</code>");
     expect(html).toContain('<ul class="stb-para">');
@@ -147,6 +156,17 @@ describe("structure browser rendering", () => {
     expect(tree).not.toContain("readme.md");
     expect(html).toMatch(/class="stb-print".*readme\.md/);
     expect(html).toMatch(/class="stb-print".*商品编码/);
+  });
+
+  it("puts a resizable divider between the tree and the detail", () => {
+    const html = render(StructureBrowserBlock, structure());
+    expect(html).toContain('style="--stb-split:32%"');
+    expect(html).toMatch(
+      /class="stb-nav".*<div class="stb-divider" role="separator" aria-orientation="vertical" aria-label="调整结构与详情的宽度" aria-valuemin="18" aria-valuemax="60" aria-valuenow="32" aria-valuetext="32%" tabindex="0"><\/div><div class="stb-detail"/,
+    );
+    const wide = render(StructureBrowserBlock, { ...structure(), split: 45 });
+    expect(wide).toContain('style="--stb-split:45%"');
+    expect(wide).toContain('aria-valuenow="45"');
   });
 
   it("falls back to the first node and shows unsafe links as text", () => {

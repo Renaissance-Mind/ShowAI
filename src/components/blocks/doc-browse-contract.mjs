@@ -65,6 +65,8 @@ const NODE_KEYS = [
   "open",
 ];
 export const STRUCTURE_LIMITS = { siblings: 60, nodes: 400, depth: 8 };
+/** Tree column width as a percent of the frame: allowed range and the default. */
+export const STRUCTURE_SPLIT = { min: 18, max: 60, fallback: 32 };
 
 /** A node's path segment: its name without trailing slashes ("src/" → "src"). */
 export const pathSegment = (name) => name.replace(/\/+$/, "") || name;
@@ -104,6 +106,14 @@ export function structureOutline(nodes) {
 
 function validateStructure(data) {
   optionalText(data.caption, "caption", 600);
+  if (
+    data.split !== undefined &&
+    (typeof data.split !== "number" ||
+      !(data.split >= STRUCTURE_SPLIT.min && data.split <= STRUCTURE_SPLIT.max))
+  )
+    fail(
+      `split must be a number from ${STRUCTURE_SPLIT.min} to ${STRUCTURE_SPLIT.max} (percent of the width).`,
+    );
   inlineLinks(data.caption, "caption");
   let count = 0;
   const paths = new Set();

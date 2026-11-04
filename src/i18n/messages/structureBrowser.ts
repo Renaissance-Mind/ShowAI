@@ -5,6 +5,7 @@ export default defineMessages("structureBrowser", {
   "zh-CN": {
     title: "结构浏览器",
     tree: "结构",
+    resize: "调整结构与详情的宽度",
     path: "路径",
     "kind.dir": "文件夹",
     "kind.file": "文件",
@@ -25,6 +26,7 @@ export default defineMessages("structureBrowser", {
   en: {
     title: "Structure browser",
     tree: "Structure",
+    resize: "Resize structure and details",
     path: "Path",
     "kind.dir": "Folder",
     "kind.file": "File",

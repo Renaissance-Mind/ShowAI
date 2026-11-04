@@ -2,6 +2,7 @@ import {
   Fragment,
   type CSSProperties,
   type KeyboardEvent,
+  type PointerEvent,
   useEffect,
   useLayoutEffect,
   useMemo,
@@ -13,6 +14,7 @@ import {
   normalizePath,
   pathSegment,
   plainInline,
+  STRUCTURE_SPLIT,
   structureOutline,
   type StructureItem,
   type StructureKind,
@@ -36,8 +38,19 @@ type Structure = {
   nodes: StructureNode[];
   initial?: string;
   caption?: string;
+  split?: number;
 };
 type Outline = ReturnType<typeof structureOutline>;
+
+const clampSplit = (value: number) =>
+  Math.min(
+    STRUCTURE_SPLIT.max,
+    Math.max(STRUCTURE_SPLIT.min, Math.round(value * 10) / 10),
+  );
+const isSplit = (value: unknown): value is number =>
+  typeof value === "number" &&
+  value >= STRUCTURE_SPLIT.min &&
+  value <= STRUCTURE_SPLIT.max;
 
 /** Blank lines separate paragraphs; a paragraph whose lines all start with "- " is a list. */
 function Paragraphs({ source }: { source: string }) {
@@ -290,6 +303,58 @@ export function StructureBrowserBlock({ data }: BlockProps) {
   );
   const { selected, open } = view;
 
+  // The tree width the reader drags to is their own reading state; null follows the data.
+  const baseSplit = isSplit(model.split)
+    ? clampSplit(model.split)
+    : STRUCTURE_SPLIT.fallback;
+  const [savedSplit, setSavedSplit] = useReaderState<number | null>(
+    "split",
+    null,
+    { accept: (value) => value === null || isSplit(value) },
+  );
+  useResetOnChange(baseSplit, () => setSavedSplit(null));
+  const [dragSplit, setDragSplit] = useState<number | null>(null);
+  const liveSplit = useRef<number | null>(null);
+  const split = dragSplit ?? savedSplit ?? baseSplit;
+  const frame = useRef<HTMLDivElement>(null);
+  const keepSplit = (value: number | null) =>
+    setSavedSplit(value === null || value === baseSplit ? null : value);
+  const splitAt = (clientX: number) => {
+    const element = frame.current!;
+    const left = element.getBoundingClientRect().left + element.clientLeft;
+    return clampSplit(((clientX - left) / element.clientWidth) * 100);
+  };
+  const onDividerDown = (event: PointerEvent<HTMLDivElement>) => {
+    if (event.button !== 0 || !event.isPrimary) return;
+    event.preventDefault();
+    event.stopPropagation();
+    event.currentTarget.setPointerCapture(event.pointerId);
+    event.currentTarget.focus({ preventScroll: true });
+    liveSplit.current = split;
+    setDragSplit(split);
+  };
+  const onDividerMove = (event: PointerEvent<HTMLDivElement>) => {
+    if (!event.currentTarget.hasPointerCapture(event.pointerId)) return;
+    liveSplit.current = splitAt(event.clientX);
+    setDragSplit(liveSplit.current);
+  };
+  const onDividerRelease = () => {
+    if (liveSplit.current === null) return;
+    keepSplit(liveSplit.current);
+    liveSplit.current = null;
+    setDragSplit(null);
+  };
+  const onDividerKey = (event: KeyboardEvent) => {
+    if (event.altKey || event.ctrlKey || event.metaKey) return;
+    const step = event.shiftKey ? 5 : 2;
+    if (event.key === "ArrowLeft") keepSplit(clampSplit(split - step));
+    else if (event.key === "ArrowRight") keepSplit(clampSplit(split + step));
+    else if (event.key === "Home") keepSplit(null);
+    else return;
+    event.preventDefault();
+    event.stopPropagation();
+  };
+
   const select = (path: string, toggle?: "open" | "close" | "flip") =>
     setView((current) => {
       const next = new Set(current.open);
@@ -370,7 +435,7 @@ export function StructureBrowserBlock({ data }: BlockProps) {
 
   return (
     <section
-      className="sb-block stb-block"
+      className={`sb-block stb-block${dragSplit === null ? "" : " is-resizing"}`}
       aria-label={blockLabel(model.title, t("title"))}
     >
       {model.title && (
@@ -378,7 +443,11 @@ export function StructureBrowserBlock({ data }: BlockProps) {
           <NoteText text={model.title} />
         </h3>
       )}
-      <div className="stb-frame">
+      <div
+        ref={frame}
+        className="stb-frame"
+        style={{ "--stb-split": `${split}%` } as CSSProperties}
+      >
         <div className="stb-nav">
           <div
             className="stb-tree"
@@ -462,6 +531,30 @@ export function StructureBrowserBlock({ data }: BlockProps) {
             })}
           </div>
         </div>
+        <div
+          className="stb-divider"
+          role="separator"
+          aria-orientation="vertical"
+          aria-label={t("resize")}
+          aria-valuemin={STRUCTURE_SPLIT.min}
+          aria-valuemax={STRUCTURE_SPLIT.max}
+          aria-valuenow={Math.round(split)}
+          aria-valuetext={`${Math.round(split)}%`}
+          tabIndex={0}
+          onPointerDown={onDividerDown}
+          onPointerMove={onDividerMove}
+          onPointerUp={(event) =>
+            event.currentTarget.releasePointerCapture(event.pointerId)
+          }
+          onLostPointerCapture={onDividerRelease}
+          onClick={(event) => event.stopPropagation()}
+          onDoubleClick={(event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            keepSplit(null);
+          }}
+          onKeyDown={onDividerKey}
+        />
         <div className="stb-detail" aria-live="polite">
           {current ? (
             <>

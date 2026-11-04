@@ -49,6 +49,11 @@ export declare const STRUCTURE_LIMITS: {
   nodes: number;
   depth: number;
 };
+export declare const STRUCTURE_SPLIT: {
+  min: number;
+  max: number;
+  fallback: number;
+};
 export declare function pathSegment(name: string): string;
 export declare function normalizePath(path: string): string;
 export declare function nodeKind(node: StructureNode): StructureKind;

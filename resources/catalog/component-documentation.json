@@ -9840,7 +9840,7 @@
     "reuse": {
       "kind": "general",
       "boundaries": [
-        "内容由实例提供；展开、选中与复制只改变当前视图，不修改页面数据。",
+        "内容由实例提供；展开、选中、复制和拖动分隔线只改变当前视图，不修改页面数据。",
         "建议总项数不超过 60、层级不超过 6 层；更大的结构拆成几个树，或只展示读者需要的部分。"
       ]
     },
@@ -9890,6 +9890,10 @@
         {
           "path": "initial",
           "meaning": "可选：初始选中项的路径，例如 data/status；该项及祖先自动展开。省略时选中第一个顶层节点。"
+        },
+        {
+          "path": "split",
+          "meaning": "可选：树所占的初始宽度，单位是整个框宽度的百分比，取 18–60；省略时为 32。读者拖动后的宽度只保存在本机。"
         },
         {
           "path": "caption",
@@ -9947,6 +9951,16 @@
           "persistence": "view"
         },
         {
+          "action": "拖动树与详情之间的分隔线",
+          "effect": "调整树所占的宽度，范围 18%–60%；双击分隔线恢复初始宽度。",
+          "persistence": "view"
+        },
+        {
+          "action": "聚焦分隔线后按 ← / →",
+          "effect": "每次调整 2%，按住 Shift 调整 5%；Home 恢复初始宽度。",
+          "persistence": "view"
+        },
+        {
           "action": "点击复制",
           "effect": "复制示例；剪贴板不可用时选中代码并提示按 ⌘C / Ctrl+C。",
           "persistence": "none"
@@ -9956,7 +9970,7 @@
         "同一父节点下名称唯一；initial 必须指向存在的路径。",
         "顶层与每层最多 60 项，全树最多 400 项、8 层。",
         "链接只允许 http(s)、mailto、# 锚点和相对路径。",
-        "宽度不足 640px 时详情移到树下方；打印时显示完整展开的大纲。"
+        "宽度不足 640px 时详情移到树下方并隐藏分隔线；打印时显示完整展开的大纲。"
       ],
       "editing": {
         "data": ["增删节点只需修改 nodes / children；改名后同步更新 initial。"],
@@ -9983,17 +9997,18 @@
       "architecture": [
         "structureOutline 把嵌套节点展开为以路径为键的 Map，记录深度、父路径、种类与子项；可见列表由展开集合计算。",
         "树采用 WAI-ARIA tree 模式：role=tree / treeitem、aria-level、aria-expanded、aria-selected，选中项是唯一的 Tab 停留点。",
-        "行内标记由 parseInline 解析为片段再生成 React 元素，不使用 HTML 字符串。"
+        "行内标记由 parseInline 解析为片段再生成 React 元素，不使用 HTML 字符串。",
+        "分隔线是 .stb-frame 网格的中间一列（role=separator），宽度通过 --stb-split 设置；拖动中只更新本地状态，松手后写入阅读状态，与初始宽度相同时不保存。"
       ],
       "extensionPoints": [
         "种类图标在 KindIcon 中绘制；新增视图时保留打印大纲。"
       ],
       "invariants": [
-        "组件不调用 onChange；展开、选中与复制只改变本地状态。",
+        "组件不调用 onChange；展开、选中、复制与分隔线宽度只改变本机阅读状态（view、split）。",
         "不安全的链接在校验时拒绝，渲染时也只作为文字显示。"
       ],
       "verification": [
-        "键盘：↓ 移到下一项，→ 展开，← 回到父项，Enter 收起；Tab 只停在选中项上。",
+        "键盘：↓ 移到下一项，→ 展开，← 回到父项，Enter 收起；Tab 只停在选中项上；聚焦分隔线后 ← → 调整宽度，Home 复原。",
         "检查真实 Page、深色主题、360px 窄屏、打印与离线导出。"
       ]
     }
