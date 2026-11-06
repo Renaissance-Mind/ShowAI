@@ -1,6 +1,62 @@
 import { defineMessages } from "../index";
 export default defineMessages("remoteMcp", {
   "zh-CN": {
+    formTitle: "在 ChatGPT 中填写连接",
+    formPath: "插件 → 添加 → 添加自定义 MCP 服务器",
+    formName: "名称",
+    formNameValue: "ShowAI 本机",
+    formNameHint:
+      "提示同名时，加上设备名；已创建过的连接可从“个人”或“已安装”列表继续。",
+    formConnection: "连接方式",
+    formConnectionValue: "服务器 URL",
+    formConnectionHint: "Cloudflare 和 Tailscale Funnel 都使用这个选项。",
+    formAuthentication: "身份验证",
+    formRegistration: "高级 OAuth 设置 → 注册方法",
+    formRegistrationValue: "动态客户端注册（DCR）",
+    formClientCredentials: "客户端 ID / 密钥",
+    formClientCredentialsValue: "自动注册，无需填写",
+    formScopes: "默认请求的权限范围",
+    formScopesValue: "保留自动发现并勾选的权限",
+    formBaseScope: "基础授权范围",
+    formBlank: "留空",
+    formUnavailable: "CIMD 或 OIDC 不可用是正常的，无需开启。",
+    createPluginStep:
+      "核对地址和权限，勾选“我已了解，并希望继续”，点击“创建为插件”。随后点击“连接”或“继续连接应用”。",
+    closedLinking:
+      "误关连接窗口时，从已安装的“ShowAI 本机”打开“连接”，无需重新创建插件。",
+    authPageReady: "已打开 ShowAI 授权页，继续",
+    discoveryHelp: "处理自动发现失败",
+    discoveryTitle: "OAuth 自动发现失败",
+    discoveryRetry:
+      "先在 ChatGPT 的高级 OAuth 设置里点击“重试元数据发现”，等待结果更新，再选择 DCR。",
+    discoveryExpected: "发现成功后，注册方法可选 DCR，下面的地址会自动填入。",
+    discoveryNetwork:
+      "仍失败时，确认 ShowAI 正在运行且 Funnel 已开放公网。本机检查通过不等于 ChatGPT 已能连接。",
+    discoveryManual:
+      "需要核对或手动补填时，使用当前连接的这些值；这不能替代网络连通性。",
+    oauthAuthorization: "授权网址",
+    oauthToken: "Token URL",
+    oauthRegistration: "注册地址",
+    oauthIssuer: "授权服务器基础地址",
+    oauthResource: "资源",
+    oauthPkce: "支持 PKCE（S256）；手动填写时勾选此项。",
+    recheckService: "重新检查 ShowAI 服务",
+    recheckDone: "本机服务检查通过，请回 ChatGPT 重试元数据发现。",
+    copyField: "复制{name}",
+    regenerate: "重新生成配对码",
+    pairExpires: "剩余 {minutes} 分 {seconds} 秒 · 只能使用一次",
+    pairExpired: "配对码已过期，请重新生成。",
+    pairUsed: "配对码已使用，请回 ChatGPT 完成连接并发送验证指令。",
+    pairReplaced: "配对码已被另一个窗口更新，请在此重新生成。",
+    pairInstructions:
+      "在 ShowAI 授权页粘贴配对码并点击“确认授权”。不要填到 ChatGPT 的客户端密钥字段或聊天输入框。",
+    verifyInstructions:
+      "回到刚创建的插件，点击“在聊天中试用”；也可在新对话输入 @，选择“ShowAI 本机”，再发送验证指令。",
+    authWindowExpired: "授权窗口已失效",
+    authWindowRecovery:
+      "回到发起授权的客户端重新点击连接，再使用 ShowAI 中有效的配对码。重新生成配对码不会恢复已经失效的授权窗口。",
+    backToChatgpt: "打开 ChatGPT 插件页面",
+
     choose: "选择方式",
     establish: "建立连接",
     client: "连接客户端",
@@ -96,6 +152,69 @@ export default defineMessages("remoteMcp", {
     write: "读取与编辑",
   },
   en: {
+    formTitle: "Fill in the ChatGPT connection",
+    formPath: "Plugins → Add → Add custom MCP server",
+    formName: "Name",
+    formNameValue: "ShowAI Local",
+    formNameHint:
+      "If the name exists, append the device name. Resume existing connections from Personal or Installed.",
+    formConnection: "Connection",
+    formConnectionValue: "Server URL",
+    formConnectionHint:
+      "Use this option for both Cloudflare and Tailscale Funnel.",
+    formAuthentication: "Authentication",
+    formRegistration: "Advanced OAuth settings → Registration method",
+    formRegistrationValue: "Dynamic Client Registration (DCR)",
+    formClientCredentials: "Client ID / secret",
+    formClientCredentialsValue: "Registered automatically; leave unset",
+    formScopes: "Default requested scopes",
+    formScopesValue: "Keep the automatically discovered and selected scopes",
+    formBaseScope: "Base scopes",
+    formBlank: "Leave blank",
+    formUnavailable:
+      "Unavailable CIMD or OIDC is expected; do not enable them.",
+    createPluginStep:
+      "Review the address and permissions, check “I understand and want to continue”, and click “Create as a plugin”. Then select “Connect” or “Continue connecting app”.",
+    closedLinking:
+      "If you close the linking window, reopen the installed ShowAI Local plugin and select Connect. You do not need to create it again.",
+    authPageReady: "ShowAI authorization page is open — continue",
+    discoveryHelp: "Resolve discovery failure",
+    discoveryTitle: "OAuth discovery failed",
+    discoveryRetry:
+      "In ChatGPT's advanced OAuth settings, select Retry metadata discovery, wait for the result, then choose DCR.",
+    discoveryExpected:
+      "After discovery succeeds, DCR becomes available and the addresses below are filled automatically.",
+    discoveryNetwork:
+      "If it still fails, keep ShowAI running and confirm Funnel is public. A local check alone does not prove that ChatGPT can connect.",
+    discoveryManual:
+      "Use these values for the current connection when checking or completing metadata manually. They cannot fix an unreachable endpoint.",
+    oauthAuthorization: "Authorization URL",
+    oauthToken: "Token URL",
+    oauthRegistration: "Registration URL",
+    oauthIssuer: "Authorization server base URL",
+    oauthResource: "Resource",
+    oauthPkce:
+      "PKCE (S256) is supported; select it when entering settings manually.",
+    recheckService: "Recheck ShowAI service",
+    recheckDone:
+      "Local service check passed. Retry metadata discovery in ChatGPT.",
+    copyField: "Copy {name}",
+    regenerate: "Generate a new pairing code",
+    pairExpires: "{minutes} min {seconds} sec remaining · One use only",
+    pairExpired: "Pairing code expired. Generate a new one.",
+    pairUsed:
+      "Pairing code used. Finish connecting in ChatGPT, then send the verification prompt.",
+    pairReplaced:
+      "Another window generated a newer code. Generate a new code here.",
+    pairInstructions:
+      "Paste the code on the ShowAI authorization page and select Authorize. Do not enter it as a ChatGPT client secret or chat message.",
+    verifyInstructions:
+      "Select Try in chat on the new plugin, or type @ in a new chat and choose ShowAI Local, then send the verification prompt.",
+    authWindowExpired: "Authorization window expired",
+    authWindowRecovery:
+      "Return to the client and start connecting again, then use a valid pairing code from ShowAI. A new pairing code does not renew an expired authorization window.",
+    backToChatgpt: "Open ChatGPT Plugins",
+
     choose: "Choose method",
     establish: "Connect",
     client: "Connect a client",

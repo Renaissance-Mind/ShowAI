@@ -1,5 +1,6 @@
 // Real hidden Electron acceptance for the remote connection wizard. No mocked bridge/provider.
 import assert from "node:assert/strict";
+import {createHash, randomBytes} from "node:crypto";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import { tmpdir } from "node:os";
@@ -102,11 +103,70 @@ try {
   const windows=await application.evaluate(({BrowserWindow})=>BrowserWindow.getAllWindows().map(w=>({visible:w.isVisible(),focused:w.isFocused()})));
   assert.ok(windows.every(w=>!w.visible&&!w.focused));
   result.checks.push("dark/narrow layout and keyboard flow work with all native windows hidden");
+  if (process.env.SHOWAI_TEST_PUBLIC_TUNNEL === "1") {
+    await page.getByRole("button",{name:"Cloudflare",exact:true}).click();
+    await page.getByRole("button",{name:"创建临时连接",exact:false}).click();
+    await page.getByRole("button",{name:"选择连接工具",exact:true}).click();
+    await page.getByRole("textbox",{name:"程序路径",exact:true}).fill("");
+    await page.getByRole("button",{name:"继续",exact:true}).click();
+    await page.getByRole("button",{name:/^(建立连接|下载工具并连接)$/}).click();
+    const readyButton=page.getByRole("button",{name:"复制 MCP 地址",exact:true});
+    const retryButton=page.getByRole("button",{name:"重新检查并连接",exact:true});
+    await readyButton.or(retryButton).first().waitFor({timeout:120000});
+    for(let retry=0;retry<2 && await retryButton.isVisible();retry++) {
+      await retryButton.click();
+      await page.waitForFunction(()=>document.querySelector('.remote-flow')?.getAttribute('aria-busy')==='false');
+    }
+    await readyButton.waitFor({timeout:15000});
+    await page.getByRole("button",{name:"复制 MCP 地址",exact:true}).click();
+    const status = await page.evaluate(()=>window.showai.invoke("remoteMcp:status"));
+    const origin = new URL(status.url).origin;
+    const metadata = await fetch(origin + "/.well-known/oauth-authorization-server").then(r=>r.json());
+    for (const value of [metadata.authorization_endpoint,metadata.token_endpoint,metadata.registration_endpoint,metadata.issuer]) assert.ok(value);
+    assert.equal(await page.getByRole("button",{name:"生成配对码",exact:true}).count(),0);
+    await page.getByRole("button",{name:"处理自动发现失败",exact:true}).click();
+    for (const value of [metadata.authorization_endpoint,metadata.token_endpoint,metadata.registration_endpoint,metadata.issuer,status.url]) assert.ok((await page.getByRole("dialog").innerText()).includes(value));
+    await page.getByRole("button",{name:"重新检查 ShowAI 服务",exact:true}).click();
+    await page.getByRole("status").filter({hasText:"本机服务检查通过"}).waitFor();
+    await page.keyboard.press("Escape");
+    assert.equal(await page.getByRole("button",{name:"处理自动发现失败",exact:true}).evaluate(el=>el===document.activeElement),true);
+    assert.equal(await page.locator(".remote-flow").evaluate(el=>el.scrollWidth>el.clientWidth+1),false);
+    await page.screenshot({path:join(output,"chatgpt-guide-dark-narrow.png")});
+    await page.getByRole("button",{name:"已打开 ShowAI 授权页，继续",exact:true}).click();
+    await page.getByRole("button",{name:"生成配对码",exact:true}).click();
+    await page.getByRole("button",{name:"复制配对码",exact:true}).waitFor();
+    const first = await page.evaluate(()=>window.showai.invoke("remoteMcp:status"));
+    await page.getByRole("button",{name:"重新生成配对码",exact:true}).click();
+    const second = await page.evaluate(()=>window.showai.invoke("remoteMcp:status"));
+    assert.notEqual(first.pairing.id,second.pairing.id);
+    await page.getByRole("button",{name:"复制配对码",exact:true}).click();
+    const code = await application.evaluate(({clipboard})=>clipboard.readText());
+    assert.match(code,/^[A-Za-z0-9_-]{24}$/);
+    const redirect = "http://127.0.0.1:12345/callback";
+    const registration = await fetch(origin+"/oauth/register",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({client_name:"Hidden desktop UI test",redirect_uris:[redirect],token_endpoint_auth_method:"none"})}).then(r=>r.json());
+    const verifier = randomBytes(32).toString("base64url");
+    const auth = await fetch(origin+"/oauth/authorize?"+new URLSearchParams({client_id:registration.client_id,redirect_uri:redirect,response_type:"code",code_challenge_method:"S256",code_challenge:createHash("sha256").update(verifier).digest("base64url"),scope:"projects.read projects.write projects.create",resource:status.url}));
+    const html=await auth.text();
+    assert.equal(auth.status,200);
+    const consent=await fetch(origin+"/oauth/consent",{method:"POST",redirect:"manual",headers:{"content-type":"application/x-www-form-urlencoded",origin,cookie:auth.headers.get("set-cookie").split(";")[0]},body:new URLSearchParams({flow:html.match(/name="flow" value="([^"]+)"/)[1],csrf:html.match(/name="csrf" value="([^"]+)"/)[1],decision:"allow",pairingCode:code})});
+    assert.equal(consent.status,302);
+    await page.getByRole("status").filter({hasText:"配对码已使用"}).waitFor();
+    assert.equal(await page.getByRole("button",{name:"复制配对码",exact:true}).count(),0);
+    assert.equal((await page.locator(".remote-flow").innerText()).includes(code),false);
+    await page.screenshot({path:join(output,"pairing-consumed.png")});
+    await page.getByRole("button",{name:"授权窗口已失效",exact:true}).click();
+    assert.ok((await page.getByRole("dialog").innerText()).includes("重新生成配对码不会恢复"));
+    await page.keyboard.press("Escape");
+    await page.getByRole("button",{name:"断开连接",exact:true}).click();
+    result.checks.push("live Quick Tunnel discovery values match the inline form; real clipboard, regeneration, OAuth consumption and recovery dialog work in dark narrow Electron");
+  }
   assert.deepEqual(result.rendererErrors,[]);result.passed=true;
 } catch(error) {
   result.error=error.stack??String(error);process.exitCode=1;
+  if(page) result.remoteFailure=await page.evaluate(async()=>{const s=await window.showai.invoke("remoteMcp:status");return {phase:s.phase,error:s.error,diagnostics:s.diagnostics};}).catch(()=>undefined);
   if(page){await snapshot("failure").catch(()=>{});await page.screenshot({path:join(output,"failure.png")}).catch(()=>{});}
 } finally {
+  if(page)await page.evaluate(()=>window.showai.invoke("remoteMcp:stop")).catch(()=>{});
   if(application)await stopTestProcess(application.process(),()=>application.close(),{label:"remote flow UI test",timeoutMs:15000});
   await writeFile(join(output,"result.json"),JSON.stringify(result,null,2));await writeFile(join(output,"process.log"),processLog);
   await rm(fixtures,{recursive:true,force:true});console.log(JSON.stringify(result,null,2));

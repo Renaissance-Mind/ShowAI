@@ -16,6 +16,8 @@ import type {
 } from "../remote-mcp/types";
 import { desktop, errorMessage } from "./bridge";
 import Dialog from "./Dialog";
+import ChatgptConnectionGuide from "./ChatgptConnectionGuide";
+import { pairingDisplay } from "../remote-mcp/client-setup";
 import cloudflareLogo from "./assets/connection-brands/cloudflare.svg";
 import tailscaleLight from "./assets/connection-brands/tailscale-light.svg";
 import tailscaleDark from "./assets/connection-brands/tailscale-dark.svg";
@@ -38,13 +40,17 @@ export default function RemoteMcpSettings() {
   const [error, setError] = useState("");
   const [token, setToken] = useState("");
   const [pair, setPair] = useState("");
+  const [pairReceipt, setPairReceipt] = useState<{
+    id: string;
+    expiresAt: string;
+  }>();
   const [copied, setCopied] = useState("");
   const [routeStep, setRouteStep] = useState(0);
   const [clientStep, setClientStep] = useState(0);
   const [otherClient, setOtherClient] = useState(false);
-  const [modal, setModal] = useState<"rules" | "tools" | "diagnostics" | null>(
-    null,
-  );
+  const [modal, setModal] = useState<
+    "rules" | "tools" | "diagnostics" | "authorization" | null
+  >(null);
   const [rules, setRules] = useState<RemoteMcpConfig>();
   const initialized = useRef(false);
   const attempt = useRef(0);
@@ -119,10 +125,22 @@ export default function RemoteMcpSettings() {
     await desktop.invoke("clipboard:write", { text });
     setCopied(id);
   }
+  async function generatePair() {
+    const value = await desktop.invoke<{
+      code: string;
+      id: string;
+      expiresAt: string;
+    }>("remoteMcp:pair");
+    setState(await desktop.invoke<RemoteMcpStatus>("remoteMcp:status"));
+    setPair(value.code);
+    setPairReceipt({ id: value.id, expiresAt: value.expiresAt });
+    setCopied("");
+  }
   async function stop() {
     attempt.current++;
     setState(await desktop.invoke<RemoteMcpStatus>("remoteMcp:stop"));
     setPair("");
+    setPairReceipt(undefined);
     setClientStep(0);
   }
   async function choose(provider: RemoteMcpProvider) {
@@ -182,6 +200,7 @@ export default function RemoteMcpSettings() {
       setState(value);
       setToken("");
       setPair("");
+      setPairReceipt(undefined);
       setClientStep(0);
     });
   }
@@ -208,6 +227,16 @@ export default function RemoteMcpSettings() {
   );
   if (!config || !state)
     return <p role={error ? "alert" : "status"}>{error || t("working")}</p>;
+  const pairState = pairingDisplay(
+    pair ? pairReceipt : undefined,
+    state.pairing,
+  );
+  const secondsLeft = pairReceipt
+    ? Math.max(
+        0,
+        Math.ceil((Date.parse(pairReceipt.expiresAt) - Date.now()) / 1000),
+      )
+    : 0;
   const stage =
     screen === "provider" || screen === "cloudflare"
       ? 0
@@ -589,9 +618,27 @@ export default function RemoteMcpSettings() {
                       </button>
                     </>
                   ) : (
-                    link("https://chatgpt.com/plugins", t("openChatgpt"), () =>
-                      setClientStep(2),
-                    )
+                    <>
+                      {link("https://chatgpt.com/plugins", t("openChatgpt"))}
+                      {clientStep === 1 && (
+                        <ChatgptConnectionGuide
+                          endpoint={state.url!}
+                          busy={pending}
+                          onCopy={(text) => copy(text, "field")}
+                          onCheck={async () => {
+                            const value =
+                              await desktop.invoke<RemoteMcpStatus>(
+                                "remoteMcp:check",
+                              );
+                            setState(value);
+                            if (!value.reachable)
+                              throw new Error(value.error || t("errorTitle"));
+                            return true;
+                          }}
+                          onReady={() => setClientStep(2)}
+                        />
+                      )}
+                    </>
                   )}
                   <button
                     className="remote-secondary"
@@ -607,44 +654,59 @@ export default function RemoteMcpSettings() {
                 <span>3</span>
                 <section>
                   <h4>{t("authorize")}</h4>
-                  {!pair ? (
-                    <button
-                      className="settings-button primary"
-                      onClick={() =>
-                        void run(async () => {
-                          const value = await desktop.invoke<{ code: string }>(
-                            "remoteMcp:pair",
-                          );
-                          setPair(value.code);
-                        })
-                      }
-                    >
-                      {t("generate")}
-                    </button>
-                  ) : (
+                  <p>{t("pairInstructions")}</p>
+                  {pairState === "ready" && (
                     <>
                       <code>{pair}</code>
+                      <p role="status">
+                        {t("pairExpires", {
+                          minutes: Math.floor(secondsLeft / 60),
+                          seconds: secondsLeft % 60,
+                        })}
+                      </p>
                       <button
-                        className="settings-button"
-                        onClick={() => void run(() => copy(pair, "pair"))}
-                      >
-                        {t(copied === "pair" ? "copied" : "copyPair")}
-                      </button>
-                      <p>{t("pairPlace")}</p>
-                      <button
-                        className="remote-secondary"
+                        className="settings-button primary"
+                        disabled={pending}
                         onClick={() =>
                           void run(async () => {
-                            const value = await desktop.invoke<{
-                              code: string;
-                            }>("remoteMcp:pair");
-                            setPair(value.code);
-                            setCopied("");
+                            const latest =
+                              await desktop.invoke<RemoteMcpStatus>(
+                                "remoteMcp:status",
+                              );
+                            setState(latest);
+                            if (
+                              pairingDisplay(pairReceipt, latest.pairing) ===
+                              "ready"
+                            )
+                              await copy(pair, "pair");
                           })
                         }
                       >
-                        {t("generate")}
+                        {t(copied === "pair" ? "copied" : "copyPair")}
                       </button>
+                    </>
+                  )}
+                  {pairState !== "none" && pairState !== "ready" && (
+                    <p role="status">
+                      {t(
+                        pairState === "used"
+                          ? "pairUsed"
+                          : pairState === "replaced"
+                            ? "pairReplaced"
+                            : "pairExpired",
+                      )}
+                    </p>
+                  )}
+                  <button
+                    className={`settings-button ${pairState === "none" || pairState === "expired" || pairState === "replaced" ? "primary" : ""}`}
+                    disabled={pending}
+                    onClick={() => void run(generatePair)}
+                  >
+                    {t(pair ? "regenerate" : "generate")}
+                  </button>
+                  {pair && (
+                    <>
+                      <p>{t("verifyInstructions")}</p>
                       <button
                         className="settings-button"
                         onClick={() =>
@@ -656,6 +718,12 @@ export default function RemoteMcpSettings() {
                       <p role="status">{t("waiting")}</p>
                     </>
                   )}
+                  <button
+                    className="settings-button"
+                    onClick={() => setModal("authorization")}
+                  >
+                    {t("authWindowExpired")}
+                  </button>
                 </section>
               </div>
             )}
@@ -696,6 +764,7 @@ export default function RemoteMcpSettings() {
                 awaitingClient.current = true;
                 setClientStep(0);
                 setPair("");
+                setPairReceipt(undefined);
                 setScreen("client");
               }}
             >
@@ -860,6 +929,12 @@ export default function RemoteMcpSettings() {
               {t("continue")}
             </button>
           </div>
+        </Dialog>
+      )}
+      {modal === "authorization" && (
+        <Dialog title={t("authWindowExpired")} onClose={() => setModal(null)}>
+          <p>{t("authWindowRecovery")}</p>
+          {link("https://chatgpt.com/plugins", t("backToChatgpt"))}
         </Dialog>
       )}
       {modal === "diagnostics" && (

@@ -1,4 +1,9 @@
 export type RemoteMcpProvider = "cloudflare-quick" | "cloudflare" | "tailscale";
+export interface PairingStatus {
+  id: string;
+  expiresAt: string;
+  state: "ready" | "used" | "expired";
+}
 export interface RemoteMcpConfig {
   provider: RemoteMcpProvider;
   publicUrl: string;
@@ -19,6 +24,7 @@ export interface RemoteMcpStatus {
   reachable?: boolean;
   lastCallAt?: string;
   lastCallClientId?: string;
+  pairing?: PairingStatus;
   clients: Array<{
     id: string;
     name: string;

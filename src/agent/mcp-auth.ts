@@ -532,12 +532,30 @@ export class McpAuthorization {
           cookie !== flowId ||
           (request.headers.has("origin") &&
             request.headers.get("origin") !== this.url)
-        )
+        ) {
+          if (
+            this.local &&
+            request.headers.get("accept")?.includes("text/html")
+          )
+            return new Response(
+              `<!doctype html><html lang="${getLocale()}"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escaped(localT("authWindowExpired"))}</title><style>body{font:16px/1.6 system-ui;max-width:520px;margin:8vh auto;padding:24px;color:#173341;background:#f9fbfc}h1{font-size:28px}a{display:inline-block;padding:12px 20px;background:#075e7c;color:white;border-radius:6px;text-decoration:none}</style><h1>${escaped(localT("authWindowExpired"))}</h1><p>${escaped(localT("authWindowRecovery"))}</p><a href="https://chatgpt.com/plugins" rel="noreferrer">${escaped(localT("backToChatgpt"))}</a></html>`,
+              {
+                status: 400,
+                headers: {
+                  "content-type": "text/html; charset=utf-8",
+                  "cache-control": "no-store",
+                  "referrer-policy": "no-referrer",
+                  "content-security-policy":
+                    "default-src 'none'; style-src 'unsafe-inline'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'",
+                },
+              },
+            );
           throw new AuthorizationError(
             "The authorization form expired. Start the connection again.",
             "invalid_request",
             400,
           );
+        }
         if (this.local) {
           if (path !== "/oauth/consent")
             throw new AuthorizationError(

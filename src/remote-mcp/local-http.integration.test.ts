@@ -92,6 +92,26 @@ async function authorize(scope = "projects.read projects.write") {
     });
   pairingCode = randomBytes(18).toString("base64url");
   expect((await submit(pairingCode, "invalid-csrf")).status).toBe(400);
+  const expiredBrowser = await fetch(http.url + "/oauth/consent", {
+    method: "POST",
+    headers: { ...headers, accept: "text/html" },
+    body: new URLSearchParams({
+      flow: "expired",
+      csrf,
+      pairingCode,
+      decision: "allow",
+    }),
+  });
+  expect(expiredBrowser.status).toBe(400);
+  expect(expiredBrowser.headers.get("content-type")).toContain("text/html");
+  expect(expiredBrowser.headers.get("cache-control")).toBe("no-store");
+  const recovery = await expiredBrowser.text();
+  expect(recovery).toContain('href="https://chatgpt.com/plugins"');
+  expect(recovery).not.toContain(pairingCode);
+  const invalidMachine = await submit(pairingCode, "invalid-csrf");
+  expect(await invalidMachine.json()).toMatchObject({
+    error: "invalid_request",
+  });
   expect(await (await submit("wrong-code")).text()).toMatch(
     /Invalid or expired pairing code|配对码无效/,
   );

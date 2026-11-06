@@ -326,3 +326,56 @@
     font-size: 11px;
   }
 }
+
+.remote-chatgpt-guide {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+}
+.remote-chatgpt-guide h4,
+.remote-chatgpt-guide p {
+  margin: 0;
+}
+.remote-chatgpt-guide p {
+  font-size: 13px;
+  line-height: 1.6;
+}
+.remote-chatgpt-guide dl {
+  margin: 0;
+  border-top: 1px solid var(--line);
+}
+.remote-field-guide {
+  display: grid;
+  grid-template-columns: minmax(100px, 0.7fr) minmax(0, 1.3fr);
+  gap: 16px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--line);
+  font-size: 13px;
+}
+.remote-field-guide dt {
+  color: var(--muted);
+}
+.remote-field-guide dd {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 0;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.remote-field-guide dd span {
+  min-width: 0;
+}
+.remote-field-guide button {
+  flex-shrink: 0;
+}
+.remote-chatgpt-guide > button {
+  justify-self: start;
+}
+@media (max-width: 520px) {
+  .remote-field-guide {
+    grid-template-columns: 1fr;
+    gap: 6px;
+  }
+}

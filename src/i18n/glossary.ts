@@ -109,6 +109,8 @@ export const glossaryRules: readonly GlossaryRule[] = [
  * words is treated as untranslated.
  */
 export const englishInChinese: readonly string[] = [
+  "Token URL", // Exact field label in ChatGPT’s OAuth setup.
+  "Tailscale Funnel",
   "Logs or screenshots",
   "Responses API",
   "Chat Completions",

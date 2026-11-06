@@ -1,5 +1,5 @@
 import { spawn, type ChildProcess } from "node:child_process";
-import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 import { access, mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { constants } from "node:fs";
 import { isAbsolute, join } from "node:path";
@@ -9,6 +9,7 @@ import { FileStore, assertId } from "../core/store";
 import type { RemoteMcpConfig, RemoteMcpStatus } from "./types";
 import { installCloudflared } from "./install";
 import { localLibraryPolicy } from "./local-library";
+import { PairingCodes } from "./pairing";
 
 const defaults: RemoteMcpConfig = {
   provider: "cloudflare-quick",
@@ -81,7 +82,7 @@ export class RemoteMcpManager {
   private child?: ChildProcess;
   private childClosed?: Promise<void>;
   private http?: Awaited<ReturnType<typeof startMcpHttpServer>>;
-  private pairing?: { hash: Buffer; expires: number };
+  private readonly pairing = new PairingCodes();
   private instanceId = randomBytes(16).toString("hex");
   private initialized?: Promise<void>;
   private task?: Promise<void>;
@@ -202,6 +203,7 @@ export class RemoteMcpManager {
       reachable: this.reachable,
       lastCallAt: this.lastCallAt,
       lastCallClientId: this.lastCallClientId,
+      pairing: this.pairing.status(),
       clients: this.http?.authorization.connections() ?? [],
       projects: projects
         .filter((p) => !p.archived)
@@ -248,17 +250,7 @@ export class RemoteMcpManager {
     return {
       root: home,
       ...localLibraryPolicy(home, c),
-      consumePairingCode: (code: string) => {
-        const digest = createHash("sha256").update(code.trim()).digest();
-        if (
-          !this.pairing ||
-          this.pairing.expires < Date.now() ||
-          !timingSafeEqual(digest, this.pairing.hash)
-        )
-          return false;
-        this.pairing = undefined;
-        return true;
-      },
+      consumePairingCode: (code: string) => this.pairing.consume(code),
       onCall: (_name: string, clientId: string) => {
         this.lastCallClientId = clientId;
         this.lastCallAt = new Date().toISOString();
@@ -549,14 +541,9 @@ export class RemoteMcpManager {
   pair() {
     if (!this.http || this.phase !== "running")
       throw new Error("Start the connection first.");
-    const code = randomBytes(18).toString("base64url");
-    const expires = Date.now() + 10 * 60_000;
-    this.pairing = {
-      hash: createHash("sha256").update(code).digest(),
-      expires,
-    };
-    return { code, expiresAt: new Date(expires).toISOString() };
+    return this.pairing.issue();
   }
+
   async revoke(id: string) {
     this.http?.authorization.revoke(id);
     return this.status();
@@ -573,7 +560,7 @@ export class RemoteMcpManager {
     const http = this.http;
     this.http = undefined;
     await http?.close();
-    this.pairing = undefined;
+    this.pairing.clear();
   }
   stop() {
     return this.command(() => this.stopImpl());
