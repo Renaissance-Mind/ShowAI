@@ -1,4 +1,5 @@
 import { createHash, randomUUID } from "node:crypto";
+import { assertDatasetAccess } from "./dataset-access";
 import { readdir, rm, stat } from "node:fs/promises";
 import { basename, join } from "node:path";
 import { CAPACITY, assertContent } from "../portable/capacity.mjs";
@@ -715,6 +716,7 @@ export class DatasetStore {
   }
 
   path(projectId: string, datasetId: string): string {
+    assertDatasetAccess(this.root, projectId);
     return join(
       this.files.directory(assertId(projectId)),
       `${assertId(datasetId)}.json`,
@@ -1479,6 +1481,7 @@ export class DatasetStore {
       schema?: JsonSchema;
     },
   ): Promise<DatasetRecord> {
+    assertDatasetAccess(this.root, projectId, true);
     const id = input.id === undefined ? randomUUID() : assertId(input.id);
     return this.files.lock(`dataset-${projectId}-${id}`, async () => {
       await this.files.readProject(projectId);
@@ -1536,6 +1539,7 @@ export class DatasetStore {
     projectId: string,
     input: DatasetLinkInput,
   ): Promise<DatasetRecord & { created: boolean; wroteFile: boolean }> {
+    assertDatasetAccess(this.root, projectId, true);
     if ((input.path === undefined) === (input.url === undefined))
       throw new CoreError(
         "INVALID_DATA",
@@ -1842,6 +1846,7 @@ export class DatasetStore {
     changed: boolean;
     warnings?: DatasetWarning[];
   }> {
+    assertDatasetAccess(this.root, projectId, true);
     const creating = input.datasetId === undefined;
     const id = creating
       ? input.id === undefined
@@ -2020,6 +2025,7 @@ export class DatasetStore {
     datasetId: string,
     input: { baseHash?: string } = {},
   ): Promise<DatasetRecord> {
+    assertDatasetAccess(this.root, projectId, true);
     return this.files.lock(`dataset-${projectId}-${datasetId}`, async () => {
       await this.files.readProject(projectId);
       const { record } = await this.load(projectId, datasetId);
@@ -2070,6 +2076,7 @@ export class DatasetStore {
     input: DatasetApplyInput,
     options: { throwOnConflict?: boolean } = {},
   ): Promise<DatasetApplyResult> {
+    assertDatasetAccess(this.root, projectId, true);
     let operations: DatasetOperation[];
     try {
       operations = validateOperations(input.operations);
@@ -2467,6 +2474,7 @@ export class DatasetStore {
     datasetId: string,
     input: { baseHash: string },
   ): Promise<{ removed: true; id: string }> {
+    assertDatasetAccess(this.root, projectId, true);
     const transforms = await transformsReading(
       this.store,
       `${projectId}/${datasetId}`,

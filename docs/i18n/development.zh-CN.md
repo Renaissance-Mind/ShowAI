@@ -114,3 +114,7 @@ npm run release:mac -- --headline "最显著的变化" --changes changes.json --
 `changes.json` 列出发版说明中的 `new`、`improved` 和 `fixed` 条目。脚本等待 Check 通过，从该提交建立干净副本，签名并打包 App，然后验证签名、打包后的 App（`src/desktop/smoke.mjs`）、DMG、ZIP 和更新信息文件（`latest-mac.yml`）。加 `--publish` 时，脚本随后为提交打标签、上传五个发版文件并核对上传后的副本；不加时在验证后停止。各步骤耗时和文件摘要记录在 `<目录>/release-receipt.json`。
 
 签名只针对 Mach-O 文件（`src/desktop/sign-mac.cjs`），其余文件由 App 整体签名封存。每次签名都向 Apple 取时间戳，请求超时会重试。
+
+## 桌面远程 MCP 验证
+
+`npm run test:remote-mcp` 构建 App，以真实内容库验证本机 OAuth 和项目权限，再用隐藏 Electron 验证设置页。`SHOWAI_SMOKE_OUTPUT` 指定截图与结果目录，`TMPDIR` 指定临时库目录；测试结束清理临时库和连接器进程。可选 `SHOWAI_TEST_CLOUDFLARED` 指向真实 cloudflared 程序，执行公网 Quick Tunnel 的 OAuth/MCP 检查；`SHOWAI_TEST_DOWNLOAD=1` 校验真实官方工具下载。网络检查受提供方与本机网络影响。固定 Cloudflare 和 Tailscale 账号授权需要所有者配置，不模拟账号或网络服务。

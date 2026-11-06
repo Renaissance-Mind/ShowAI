@@ -79,6 +79,10 @@ Some tests read build output. Run `npm run build` before running them on their o
 
 To run one file: `npx vitest run src/path/to/file.test.ts`.
 
+### Desktop remote MCP
+
+`npm run test:remote-mcp` builds the App, tests local OAuth and project permissions against a real library, then exercises the settings UI in hidden Electron. Set `SHOWAI_SMOKE_OUTPUT` for retained screenshots/results and `TMPDIR` for temporary libraries. Fixtures and connector processes are cleaned up. Optional `SHOWAI_TEST_CLOUDFLARED` points to a real cloudflared executable for public Quick Tunnel OAuth/MCP checks; `SHOWAI_TEST_DOWNLOAD=1` verifies a real vendor download. These network checks depend on the provider and local network. Fixed Cloudflare and Tailscale account authorization require the owner's setup and are not simulated.
+
 ### Smoke tests
 
 Smoke tests drive the real desktop app or browser workbench and write their output under `output/playwright/`. Install Chromium once with `npx playwright-core install chromium`.

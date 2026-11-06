@@ -36,6 +36,8 @@ For local project work, keep the usual read → modify with hash/revision → sa
 
 ## Remote MCP
 
+The desktop App can expose selected local projects through **Settings → Remote connection**, using the user's Cloudflare or Tailscale connection, local pairing and direct local saves. See [ChatGPT setup](chatgpt.md). The `mcp serve` gateway below uses a configured sync server; passing `--home` alone does not expose that library's private projects.
+
 Run the agent gateway with the independently installed ShowAI runtime. It uses Node.js and the same compiler/reader assets as the CLI. It is separate from the content synchronization server; the sync server continues storing snapshots and objects without executing components.
 
 ```sh

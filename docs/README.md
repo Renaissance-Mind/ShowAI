@@ -15,7 +15,7 @@ Guides describe the current source. The released app, the plugin and hosted serv
 | [Built-in agent](agent-host.md)                | Local/API, Cloud and paired Mac execution           |
 | [Page and Board](page-surface.md)              | Nested containers, drawing, reading and shortcuts   |
 | [Local browser edition](local-browser.md)      | Run from source on macOS, Linux and Windows         |
-| [ChatGPT on the web (invite only)](chatgpt.md) | Account, hosted MCP, consent and updates            |
+| [ChatGPT on the web (local MCP)](chatgpt.md) | Desktop tunnels, pairing, permissions and updates            |
 
 ## Components and templates
 

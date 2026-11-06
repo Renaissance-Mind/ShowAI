@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { AsyncLocalStorage } from "node:async_hooks";
 import { chmod, open, rm, stat } from "node:fs/promises";
 import {
   basename,
@@ -43,6 +44,18 @@ export const MAX_REFRESH_SECONDS = 86_400;
  * hosted server sets publicAddressesOnly so that addresses of its own
  * network (loopback, private ranges, link-local) are never fetched.
  */
+const publicRemoteFetch = new AsyncLocalStorage<boolean>();
+/** Limit an external MCP request without changing the desktop's own data connections. */
+export function withPublicRemoteFetch<T>(
+  operation: () => Promise<T>,
+): Promise<T> {
+  return publicRemoteFetch.run(true, operation);
+}
+export function remoteFetchRestricted() {
+  return (
+    REMOTE_FETCH.publicAddressesOnly || publicRemoteFetch.getStore() === true
+  );
+}
 export const REMOTE_FETCH = {
   timeoutMs: 15_000,
   maxRedirects: 5,
@@ -878,6 +891,39 @@ async function responseBytes(
   return Buffer.concat(chunks);
 }
 
+/** Browser captures of remote-authored pages must not request the device's private network. */
+export async function fetchPublicMedia(url: string) {
+  let target = sourceUrl(url);
+  const signal = AbortSignal.timeout(15000);
+  for (let hop = 0; hop <= 5; hop++) {
+    const host = new URL(target).hostname.replace(/^\[|\]$/g, "");
+    if (isIP(host) && !publicIp(host))
+      throw unreachable(url, "not a public internet address");
+    const response = await fetch(target, {
+      redirect: "manual",
+      credentials: "omit",
+      signal,
+      ...{ dispatcher: await publicOnly() },
+    });
+    const location = response.headers.get("location");
+    if (response.status >= 300 && response.status < 400 && location) {
+      await response.body?.cancel();
+      target = sourceUrl(new URL(location, target).href);
+      continue;
+    }
+    if (!response.ok) {
+      await response.body?.cancel();
+      throw unreachable(url, `HTTP ${response.status}`);
+    }
+    return {
+      body: await responseBytes(response, url, 20 * 1024 * 1024),
+      contentType:
+        response.headers.get("content-type") ?? "application/octet-stream",
+    };
+  }
+  throw unreachable(url, "too many redirects");
+}
+
 /**
  * Fetches online data without cookies or credentials, following redirects
  * only to http(s) addresses. With the validators of an earlier fetch, an
@@ -890,7 +936,7 @@ export async function fetchSource(
   validators: { etag?: string; lastModified?: string } = {},
 ): Promise<RemoteFetch> {
   const signal = AbortSignal.timeout(REMOTE_FETCH.timeoutMs);
-  const guarded = REMOTE_FETCH.publicAddressesOnly;
+  const guarded = remoteFetchRestricted();
   let target = url;
   try {
     for (let hop = 0; ; hop++) {

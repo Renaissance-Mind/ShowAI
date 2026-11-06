@@ -43,7 +43,7 @@ The agent saves the interface in ShowAI and shows it in the conversation (or as 
 | Built-in agent                            | Supported    | Inside ShowAI, using your local Codex or Claude Code sign-in, a model API key or Cloud                                                 |
 | DeepSeek Harness                          | Preview      | ShowAI → **Settings → Plugins** → Prepare plugin, then add it in DeepSeek Harness ([steps](plugins/showai/README.md#deepseek-harness)) |
 | Kimi Work                                 | Preview      | Add ShowAI's MCP server and the [Kimi plugin](plugins-kimi/showai/README.md) in Kimi Work                                              |
-| ChatGPT on the web                        | Invite only  | Hosted MCP with a ShowAI Cloud account; registration needs a key or a project invitation ([guide](docs/chatgpt.md))                    |
+| ChatGPT on the web                        | Self-hosted  | Enable Remote connection in the desktop App with your own Cloudflare or Tailscale account ([guide](docs/chatgpt.md))                    |
 | Other MCP clients (Gemini CLI, OpenCode…) | Experimental | Configure the stdio MCP entry by hand ([Agent integration](docs/agent-integration.md))                                                 |
 
 ## 💡 See what it makes
@@ -147,7 +147,7 @@ All guides have paired English and Simplified Chinese editions. Browse the [comp
 | [Use in Claude Code and Codex](docs/codex.md) | [Template folders](docs/template-bundles.md)          | [Cloud and accounts](docs/cloud.md)            |
 | [Built-in agent](docs/agent-host.md)          | [Component parameters](docs/component-parameters.md)  | [Project sync](docs/project-sync.md)           |
 | [Page and Board](docs/page-surface.md)        | [Agent integration](docs/agent-integration.md)        | [Server operations](docs/server-operations.md) |
-| [ChatGPT web (invite only)](docs/chatgpt.md)  | [Artifact format v3](docs/artifact-format.md)         | [MCP deployment](docs/cloud-mcp-deployment.md) |
+| [ChatGPT web (local MCP)](docs/chatgpt.md)  | [Artifact format v3](docs/artifact-format.md)         | [MCP deployment](docs/cloud-mcp-deployment.md) |
 
 ## 🛠️ Development and contributions
 

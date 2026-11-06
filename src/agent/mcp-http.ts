@@ -17,11 +17,13 @@ import {
 import { getObjectShape } from "@modelcontextprotocol/sdk/server/zod-compat.js";
 import { z } from "zod";
 import { createMcpServer } from "./mcp";
-import { REMOTE_FETCH } from "../core/dataset-sources";
+import { withPublicRemoteFetch } from "../core/dataset-sources";
+import { withDatasetAccess } from "../core/dataset-access";
 import {
   McpAuthorization,
   AuthorizationError,
   type ProjectGrant,
+  type LocalMcpAuthorization,
 } from "./mcp-auth";
 import { RemoteWorkspaces, type RemoteWorkspaceContext } from "./mcp-workspace";
 import {
@@ -108,6 +110,12 @@ export interface McpHttpOptions {
   syncServers?: string[];
   widgetDomain?: string;
   allowedHosts?: string[];
+  instanceId?: string;
+  /** Desktop-owned library and access policy, never accepted from an MCP request. */
+  local?: LocalMcpAuthorization & {
+    root: string;
+    onCall?: (name: string) => void;
+  };
   /** Successful startup screenshot check, supplied by the Cloud entry point. */
   browserRendering?: CloudBrowserCheck;
   /** Cloud deployments persist private state before acknowledging a request. */
@@ -121,7 +129,6 @@ export interface McpHttpOptions {
 }
 export async function createMcpHttpApp(options: McpHttpOptions) {
   // Online data linked by hosted clients never reaches this server's own network.
-  REMOTE_FETCH.publicAddressesOnly = true;
   const url = new URL(options.publicUrl);
   if (
     url.username ||
@@ -146,6 +153,7 @@ export async function createMcpHttpApp(options: McpHttpOptions) {
     join(state, "auth"),
     origin,
     servers,
+    options.local,
   );
   const workspaces = new RemoteWorkspaces(join(state, "replicas"));
   const artifacts = new Map<string, StoredArtifact>();
@@ -211,10 +219,20 @@ export async function createMcpHttpApp(options: McpHttpOptions) {
     context?: RemoteWorkspaceContext,
     grant?: ProjectGrant,
   ) {
+    return withPublicRemoteFetch(() =>
+      executeRequest(request, body, context, grant),
+    );
+  }
+  async function executeRequest(
+    request: Request,
+    body: Record<string, unknown>,
+    context?: RemoteWorkspaceContext,
+    grant?: ProjectGrant,
+  ) {
     const remoteTools = new Set([
       ...publicTools,
       "projects_list",
-      "project_create",
+      ...(!options.local ? ["project_create"] : []),
     ]);
     const server = createMcpServer({
       root: context?.root ?? join(state, "public"),
@@ -233,7 +251,7 @@ export async function createMcpHttpApp(options: McpHttpOptions) {
         transport: "http",
         storePresentation: (value) => storePresentation(value, true),
         widgetDomain: options.widgetDomain,
-        privateProjects: servers.length > 0,
+        privateProjects: !!options.local || servers.length > 0,
         // Hosted connections serve MCP Apps clients and have no local files.
         hostDisplay: "mcp-app",
       },
@@ -272,6 +290,13 @@ export async function createMcpHttpApp(options: McpHttpOptions) {
                   ...mcpSkillGuide(args),
                   connection: {
                     mcpUrl: `${origin}/mcp`,
+                    ...(options.local
+                      ? {
+                          storage: "local",
+                          authorization:
+                            "Pair using a code from ShowAI Settings → Remote connection. Only selected local projects are accessible. Writes save directly in the desktop library; no cloud synchronization is required. Do not use device filesystem paths.",
+                        }
+                      : {}),
                     tools: [...remoteTools].sort(),
                     discovery:
                       "These tools are exposed by this exact MCP server. The host may load only a subset initially. Use its tool discovery for the selected connection to load a listed tool before declaring it missing. Never substitute a similarly named connection. A listed tool does not imply the account has its required OAuth scope or project permission.",
@@ -329,6 +354,15 @@ export async function createMcpHttpApp(options: McpHttpOptions) {
             securitySchemes: oauth(writeTools.has(name)),
           },
           callback: async (input, extra) => {
+            if (
+              options.local &&
+              sidebarOperations.has(`${name}:${String(input.action ?? "")}`)
+            )
+              return mcpFailure(
+                new Error(
+                  "Manage the device sidebar in ShowAI. Remote access is limited to project content.",
+                ),
+              );
             const { projectId: _projectId, ...rest } = input;
             const args: Record<string, unknown> = rest;
             for (const key of ["destinationProjectId", "relativeProjectId"]) {
@@ -378,7 +412,10 @@ export async function createMcpHttpApp(options: McpHttpOptions) {
                     ),
                   );
                 outputDirectory = join(state, "exports", randomUUID());
-                await mkdir(outputDirectory, { recursive: true, mode: 0o700 });
+                await mkdir(outputDirectory, {
+                  recursive: true,
+                  mode: 0o700,
+                });
                 args.out = join(
                   outputDirectory,
                   args.view === "image" ? "page.png" : "page.html",
@@ -501,7 +538,10 @@ export async function createMcpHttpApp(options: McpHttpOptions) {
                       typeof sourcePath === "string"
                         ? await readFile(sourcePath, "utf8")
                         : "{}",
-                    persistence: { savedToProject: false, synchronized: false },
+                    persistence: {
+                      savedToProject: false,
+                      synchronized: false,
+                    },
                     bytes: {
                       html: Buffer.byteLength(output),
                       inline: preview.inline
@@ -653,50 +693,66 @@ export async function createMcpHttpApp(options: McpHttpOptions) {
       },
       async ({ includeArchived }) =>
         grant
-          ? mcpSuccess(await workspaces.projects(grant, includeArchived))
+          ? mcpSuccess(
+              options.local
+                ? (await options.local.projects())
+                    .filter(
+                      (p) =>
+                        grant.projectIds.includes(p.id) &&
+                        (includeArchived || !p.archived),
+                    )
+                    .map((p) => ({
+                      ...p,
+                      role: grant.scopes.includes("projects.write")
+                        ? p.role
+                        : "viewer",
+                    }))
+                : await workspaces.projects(grant, includeArchived),
+            )
           : mcpFailure(new Error("Sign in to ShowAI.")),
     );
-    server.registerTool(
-      "project_create",
-      {
-        description:
-          "Create a cloud project in the authorized account when the user asks. Requires account-wide authorization and projects.create. Returns the server project id to use for subsequent page operations.",
-        inputSchema: {
-          name: z.string().trim().min(1).max(1000),
-          operationId: z
-            .string()
-            .uuid()
-            .optional()
-            .describe(
-              "Reuse the same UUID only to retry the same project creation.",
-            ),
+    if (!options.local)
+      server.registerTool(
+        "project_create",
+        {
+          description:
+            "Create a cloud project in the authorized account when the user asks. Requires account-wide authorization and projects.create. Returns the server project id to use for subsequent page operations.",
+          inputSchema: {
+            name: z.string().trim().min(1).max(1000),
+            operationId: z
+              .string()
+              .uuid()
+              .optional()
+              .describe(
+                "Reuse the same UUID only to retry the same project creation.",
+              ),
+          },
+          annotations: {
+            readOnlyHint: false,
+            destructiveHint: false,
+            openWorldHint: false,
+          },
+          _meta: {
+            securitySchemes: [
+              {
+                type: "oauth2",
+                scopes: ["projects.read", "projects.write", "projects.create"],
+              },
+            ],
+          },
         },
-        annotations: {
-          readOnlyHint: false,
-          destructiveHint: false,
-          openWorldHint: false,
+        async ({ name, operationId }) => {
+          try {
+            return grant
+              ? mcpSuccess(
+                  await workspaces.createProject(grant, name, operationId),
+                )
+              : mcpFailure(new Error("Sign in to ShowAI."));
+          } catch (error) {
+            return mcpFailure(error);
+          }
         },
-        _meta: {
-          securitySchemes: [
-            {
-              type: "oauth2",
-              scopes: ["projects.read", "projects.write", "projects.create"],
-            },
-          ],
-        },
-      },
-      async ({ name, operationId }) => {
-        try {
-          return grant
-            ? mcpSuccess(
-                await workspaces.createProject(grant, name, operationId),
-              )
-            : mcpFailure(new Error("Sign in to ShowAI."));
-        } catch (error) {
-          return mcpFailure(error);
-        }
-      },
-    );
+      );
     const transport = new WebStandardStreamableHTTPServerTransport({
       sessionIdGenerator: undefined,
       enableJsonResponse: true,
@@ -709,11 +765,48 @@ export async function createMcpHttpApp(options: McpHttpOptions) {
       });
       if (response.status === 202) return response;
       const output = await response.json();
+      if (
+        options.local &&
+        (body.params as { name?: string })?.name === "showai_capabilities" &&
+        output.result?.structuredContent?.data
+      ) {
+        const data = output.result.structuredContent.data;
+        data.projects.storage = "local";
+        data.projects.sharedSynchronization = false;
+        data.management.sidebar.available = false;
+        data.management.drafts.scope = "library-project";
+        output.result.content = [
+          {
+            type: "text",
+            text: JSON.stringify(output.result.structuredContent),
+          },
+        ];
+      }
+      if (
+        options.local &&
+        grant &&
+        body.method === "tools/call" &&
+        output.result &&
+        !output.result.isError
+      )
+        options.local.onCall?.(
+          String((body.params as { name?: string })?.name),
+        );
       // The SDK preserves tool extensions in _meta. Advertise the canonical field as well.
       if (output.result?.tools)
-        for (const tool of output.result.tools)
+        for (const tool of output.result.tools) {
+          if (
+            options.local &&
+            [
+              "render_document",
+              "show_component",
+              "presentation_source",
+            ].includes(tool.name)
+          )
+            tool._meta = { ...tool._meta, securitySchemes: oauth(false) };
           if (tool._meta?.securitySchemes)
             tool.securitySchemes = tool._meta.securitySchemes;
+        }
       return json(output, response.status);
     } finally {
       await server.close();
@@ -735,9 +828,10 @@ export async function createMcpHttpApp(options: McpHttpOptions) {
       if (target.pathname === "/health")
         return json({
           ok: true,
+          ...(options.instanceId ? { instanceId: options.instanceId } : {}),
           protocol: "showai-agent-http-v1",
           publicPresentation: true,
-          privateProjects: servers.length > 0,
+          privateProjects: !!options.local || servers.length > 0,
           ...(options.browserRendering
             ? { browserRendering: options.browserRendering }
             : {}),
@@ -853,7 +947,16 @@ export async function createMcpHttpApp(options: McpHttpOptions) {
           },
         });
       try {
-        if (name && !publicTools.has(name)) {
+        if (
+          name &&
+          (!publicTools.has(name) ||
+            (options.local &&
+              [
+                "render_document",
+                "show_component",
+                "presentation_source",
+              ].includes(name)))
+        ) {
           const bearer = request.headers
             .get("authorization")
             ?.match(/^Bearer ([A-Za-z0-9_-]+)$/)?.[1];
@@ -865,6 +968,14 @@ export async function createMcpHttpApp(options: McpHttpOptions) {
                 ? "projects.write"
                 : "projects.read",
           );
+          if (options.local && publicTools.has(name))
+            return execute(request, body, undefined, grant);
+          if (options.local && name === "project_create")
+            return toolError(
+              new Error(
+                "Create projects in ShowAI, then select them for remote access.",
+              ),
+            );
           if (name === "projects_list" || name === "project_create")
             return execute(request, body, undefined, grant);
           if (
@@ -885,7 +996,79 @@ export async function createMcpHttpApp(options: McpHttpOptions) {
           for (const key of ["destinationProjectId", "relativeProjectId"])
             if (typeof params?.arguments?.[key] === "string")
               participants.push(params.arguments[key] as string);
+          if (
+            options.local &&
+            ["catalog_version", "catalog_merge_preview"].includes(name)
+          ) {
+            for (const key of ["ref", "base", "ours", "theirs"]) {
+              const reference = params?.arguments?.[key] as
+                { projectId?: unknown } | undefined;
+              if (typeof reference?.projectId === "string")
+                participants.push(reference.projectId);
+            }
+          }
           const operation = `${name}:${String(params?.arguments?.action ?? "")}`;
+          if (options.local) {
+            const projects = (await options.local.projects()).filter((p) =>
+              grant.projectIds.includes(p.id),
+            );
+            const writers = new Set([project]);
+            if (
+              operation === "organization_update:move" &&
+              typeof params?.arguments?.destinationProjectId === "string"
+            )
+              writers.add(params.arguments.destinationProjectId);
+            for (const id of participants) {
+              const selected = projects.find((p) => p.id === id);
+              if (
+                !selected ||
+                (writeTools.has(name) &&
+                  writers.has(id) &&
+                  selected.role === "viewer")
+              )
+                throw new AuthorizationError(
+                  "This project or operation is not allowed by the device owner.",
+                  "access_denied",
+                  403,
+                );
+            }
+            const context: RemoteWorkspaceContext = {
+              root: options.local.root,
+              projectId: project,
+              projectIds: projects.map((p) => p.id),
+              projectMap: Object.fromEntries(projects.map((p) => [p.id, p.id])),
+            };
+            const response = await withDatasetAccess(
+              {
+                root: context.root,
+                read: new Set(context.projectIds),
+                write: new Set(
+                  projects
+                    .filter(
+                      (p) =>
+                        p.role !== "viewer" &&
+                        grant.scopes.includes("projects.write"),
+                    )
+                    .map((p) => p.id),
+                ),
+              },
+              () => execute(request, body, context, grant),
+            );
+            const result = await response.json();
+            if (result.result?.structuredContent) {
+              result.result.structuredContent.persistence = {
+                storage: "local",
+                synchronized: false,
+              };
+              result.result.content.push({
+                type: "text",
+                text: JSON.stringify({
+                  persistence: result.result.structuredContent.persistence,
+                }),
+              });
+            }
+            return json(result, response.status);
+          }
           if (sidebarOperations.has(operation))
             participants.push(
               ...(await workspaces.projects(grant, true)).map((p) => p.id),
@@ -1027,7 +1210,13 @@ export async function startMcpHttpServer(
     host?: string;
     port?: number;
   },
-): Promise<{ server: Server; url: string; close(): Promise<void> }> {
+): Promise<{
+  server: Server;
+  url: string;
+  localUrl: string;
+  authorization: McpAuthorization;
+  close(): Promise<void>;
+}> {
   let app: Awaited<ReturnType<typeof createMcpHttpApp>> | undefined;
   const server = createServer(async (incoming, outgoing) => {
     try {
@@ -1108,6 +1297,8 @@ export async function startMcpHttpServer(
   return {
     server,
     url: options.publicUrl ?? localUrl,
+    localUrl,
+    authorization: app.authorization,
     async close() {
       server.closeAllConnections();
       await new Promise<void>((done, reject) =>

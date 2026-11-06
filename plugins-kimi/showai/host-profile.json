@@ -2,8 +2,8 @@
   "protocol": "showai-host-profile-v1",
   "profile": "kimi",
   "declaredHostDisplay": "fragment-file",
-  "commonVersion": "0.28.1",
-  "commonSha256": "2c297963715eb3ea620b84a5d4d3cea5c5f9fff5c4ea735ffb0a888d93952c7b",
+  "commonVersion": "0.28.2",
+  "commonSha256": "0bf2fd8e5660486f6cffb9574850ce0d9e327ebaf046a87183bb3ee5072e8f55",
   "commonFiles": {
     "collaborate-canvas/SKILL.md": "1a21a0419504732c39821582e891721fa3e8deba4808bab19e737eca53a68c49",
     "create-component/references/component-authoring.md": "3cc16a095ef7f2f0f3d7be0b3e58e2a74ad8ead96f2fc66c4950dde0540ebcd1",
@@ -20,13 +20,13 @@
     "use-showai/references/capacity.md": "87b855fa1ddc1721a4f6674f59d1103cd943fcd65c58f14bb417388e87f471d2",
     "use-showai/references/editing.md": "937f21c78ad3843ab1cf0945b3d09ecf050e900f26ac035a55a1e83aebd86d6a",
     "use-showai/references/host-display.md": "450870e7a34bcb0c6d7a1a6a3f871d16c86467ce6fa4b52c47a9e33e63b1531a",
-    "use-showai/references/integration.md": "6b633698206c141ea535a2ed577fcd5871b6fa5cc4d7c5735e47eed45a8f155b",
+    "use-showai/references/integration.md": "14766af0a00cc7a57ab426a1172f3160eb45d566e450aab4964354e659806f3a",
     "use-showai/references/page-reading.md": "4ef85142d9ab663a28a1b3067161003b50cde9ad037736481225693462545128",
-    "use-showai/references/runtime.md": "2ccb5865621c52007d148f125e785591d165a987013dfaba3b54e6b5e6e906f2",
+    "use-showai/references/runtime.md": "6a20a4cf4f203c7ddb79713f9500f06d43ad9a1853965e0d97c1c46058b000bc",
     "use-showai/references/shared-data.md": "01e1c8193ed84c7287e2581cc15f0ca9b4ee84085323be78e226a36a141c7601",
     "use-showai/references/tasks.md": "5d59d519c080fd1c442f5b90eb10d74794f1c56387d60aa5206a14b1fffe988f",
     "use-showai/references/user-references.md": "e328b96eb23b5179b8c55af0d5361f0ccf2c42fac36cebbcdcd50447a37041dd",
-    "use-showai/SKILL.md": "c17f203e28d56dcfdb52dabc7aecbd20140488c935973b0f6a1dd6696cf57eb7"
+    "use-showai/SKILL.md": "3d8d830f5885db0b013e0f3d38d92fe595be492a861ede22f0a2c75d40c470c2"
   },
   "adapterSha256": "062a18e1e07e33fd4dc7ce363395dc2fe4844e96ead58b7a5e617c54f7b1aaa2"
 }

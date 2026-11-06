@@ -12,6 +12,7 @@ import {
   Moon,
   Settings2,
   Sun,
+  Globe,
 } from "../ui/icons";
 import type { DesktopInfo } from "../desktop/bridge";
 import type { AppearancePreference } from "../design/appearance-preference";
@@ -31,6 +32,8 @@ import SyncSettings, { type ProjectSyncRequest } from "./SyncSettings";
 import AgentSettings from "./AgentSettings";
 import WorkRecordsSettings from "./WorkRecordsSettings";
 import PluginInstallSettings, { LaunchConfigCopy } from "./PluginInstallSettings";
+import RemoteMcpSettings from "./RemoteMcpSettings";
+import remoteMcpMessages from "../i18n/messages/remoteMcp";
 import { workbenchCapabilities } from "./capabilities";
 import { AboutFeedback, type FeedbackRequest } from "./feedback/AboutFeedback";
 
@@ -61,6 +64,11 @@ const sections = [
     icon: Puzzle,
   },
   {
+    id: "remote",
+    label: "section.remote",
+    icon: Globe,
+  },
+  {
     id: "icons",
     label: "section.icons",
     icon: Shapes,
@@ -80,7 +88,7 @@ export function availableSettingsSection(
 ): SettingsSection {
   const capabilities = workbenchCapabilities(platform);
   return (section === "general" && !capabilities.manageLibrary) ||
-    (section === "plugins" && !capabilities.localPlugins)
+    ((section === "plugins" || section === "remote") && !capabilities.localPlugins)
     ? "sync"
     : section;
 }
@@ -187,6 +195,7 @@ export function SettingsPanel({
 }) {
   const t = useTranslator(messages);
   const language = useLanguagePreference();
+  const tr = useTranslator(remoteMcpMessages);
   // Storage statistics are read only once the maintenance section is opened.
   const [maintenanceOpen, setMaintenanceOpen] = useState(false);
   section = availableSettingsSection(section, info?.platform);
@@ -350,6 +359,7 @@ export function SettingsPanel({
         </section>
       )}
       {section === "agent" && <AgentSettings />}
+      {section === "remote" && (info?.mode === "browser" ? <p className="settings-help">{tr("desktopOnly")}</p> : <RemoteMcpSettings />)}
       {section === "plugins" && (
         <>
           {info && <PluginInstallSettings home={info.home} />}

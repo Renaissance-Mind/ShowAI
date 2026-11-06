@@ -1,3 +1,6 @@
+import { getLocale, translator } from "../i18n";
+import remoteMcpMessages from "../i18n/messages/remoteMcp";
+const localT = translator(remoteMcpMessages);
 import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
 import { mkdir, chmod } from "node:fs/promises";
 import { join } from "node:path";
@@ -41,6 +44,18 @@ type Flow = {
     url: string;
   };
 };
+/** A desktop-owned policy; never supplied by an HTTP caller. */
+export interface LocalMcpAuthorization {
+  projects(): Promise<
+    Array<{
+      id: string;
+      name: string;
+      role: "viewer" | "editor";
+      archived?: boolean;
+    }>
+  >;
+  consumePairingCode(code: string): boolean;
+}
 const token = () => randomBytes(32).toString("base64url");
 const hash = (value: string) =>
   createHash("sha256").update(value).digest("hex");
@@ -150,10 +165,16 @@ export class McpAuthorization {
     readonly url: string,
     readonly servers: string[],
     private db: DatabaseSync,
+    private local?: LocalMcpAuthorization,
   ) {
     this.resource = url + "/mcp";
   }
-  static async open(home: string, url: string, servers: string[]) {
+  static async open(
+    home: string,
+    url: string,
+    servers: string[],
+    local?: LocalMcpAuthorization,
+  ) {
     await mkdir(home, { recursive: true, mode: 0o700 });
     const path = join(home, "authorization.sqlite");
     const db = new DatabaseSync(path);
@@ -161,7 +182,27 @@ export class McpAuthorization {
     db.exec(
       "PRAGMA journal_mode=WAL; PRAGMA busy_timeout=10000; CREATE TABLE IF NOT EXISTS records(kind TEXT NOT NULL,key TEXT NOT NULL,value TEXT NOT NULL,expires INTEGER NOT NULL,PRIMARY KEY(kind,key));",
     );
-    return new McpAuthorization(url, servers, db);
+    return new McpAuthorization(url, servers, db, local);
+  }
+  connections() {
+    return (
+      this.db
+        .prepare("SELECT value FROM records WHERE kind='grant' AND expires>?")
+        .all(Date.now()) as { value: string }[]
+    ).map(({ value }) => {
+      const grant = JSON.parse(value) as ProjectGrant;
+      return {
+        id: grant.id,
+        name:
+          this.get<Client>("client", grant.clientId)?.client_name ??
+          "MCP client",
+        projectIds: grant.projectIds,
+        scopes: grant.scopes,
+      };
+    });
+  }
+  revoke(id: string) {
+    this.remove("grant", id);
   }
   close() {
     this.db.close();
@@ -287,23 +328,25 @@ export class McpAuthorization {
   private form(flowId: string, flow: Flow, error = "") {
     const hidden = `<input type="hidden" name="flow" value="${escaped(flowId)}"><input type="hidden" name="csrf" value="${escaped(flow.csrf)}">`;
     const client = this.get<Client>("client", flow.clientId)!;
-    const content = flow.connection
-      ? `<p>${escaped(client.client_name || "Agent")} 请求访问服务器上的 ShowAI 账号 <strong>${escaped(flow.connection.user.name)}</strong>。</p><p>${flow.scopes.includes("projects.write") ? "可读取及编辑；每次操作都检查最新项目成员权限。" : "只允许读取。"}${flow.scopes.includes("projects.create") ? "包含新建项目。" : ""}</p><form method="post" action="${this.url}/oauth/consent">${hidden}<label><input type="radio" name="access" value="account" checked>授权这个账号当前及今后有权限的所有项目</label><p>以后从本地同步到此账号的项目也会进入授权范围。可以随时在 ChatGPT 断开连接。</p><label><input type="radio" name="access" value="selected">仅授权一个项目<select name="project"><option value="">请选择</option>${(
-          flow.projects ?? []
-        )
-          .filter((p) => !p.archived)
-          .map(
-            (p) =>
-              `<option value="${escaped(p.id)}">${escaped(p.name)} · ${escaped(p.role)}</option>`,
+    const content = this.local
+      ? `<p>${escaped(localT("auth.request", { client: client.client_name || "Agent" }))}</p><form method="post" action="${this.url}/oauth/consent">${hidden}<label>${escaped(localT("auth.code"))}<input name="pairingCode" type="password" autocomplete="one-time-code" required maxlength="100"></label><p>${escaped(localT("auth.help", { permission: localT(flow.scopes.includes("projects.write") ? "write" : "read") }))}</p><button name="decision" value="allow">${escaped(localT("auth.allow"))}</button><button name="decision" value="deny" formnovalidate class="secondary">${escaped(localT("auth.cancel"))}</button></form>`
+      : flow.connection
+        ? `<p>${escaped(client.client_name || "Agent")} 请求访问服务器上的 ShowAI 账号 <strong>${escaped(flow.connection.user.name)}</strong>。</p><p>${flow.scopes.includes("projects.write") ? "可读取及编辑；每次操作都检查最新项目成员权限。" : "只允许读取。"}${flow.scopes.includes("projects.create") ? "包含新建项目。" : ""}</p><form method="post" action="${this.url}/oauth/consent">${hidden}<label><input type="radio" name="access" value="account" checked>授权这个账号当前及今后有权限的所有项目</label><p>以后从本地同步到此账号的项目也会进入授权范围。可以随时在 ChatGPT 断开连接。</p><label><input type="radio" name="access" value="selected">仅授权一个项目<select name="project"><option value="">请选择</option>${(
+            flow.projects ?? []
           )
-          .join(
-            "",
-          )}</select></label><button name="decision" value="allow">确认授权</button><button name="decision" value="deny" class="secondary">取消</button></form>`
-      : flow.external
-        ? `<p>打开登录页面完成验证。页面最后会显示一个 8 位完成码，把它填到这里继续。已有账号需要先在 ShowAI 中绑定该登录方式。</p><a href="${escaped(flow.external.url)}" target="_blank" rel="noopener noreferrer">打开登录页面</a><form method="post" action="${this.url}/oauth/external/finish">${hidden}<label>完成码<input name="completionCode" autocomplete="one-time-code" autocapitalize="characters" spellcheck="false" maxlength="12" placeholder="XXXX-XXXX"></label><button>继续</button><button name="restart" value="1" class="secondary">重新选择登录方式</button></form>`
-        : `<p>公开组件、模板和展示无需登录。访问私有项目时，使用你已有的 ShowAI Server 账号。</p><form method="post" action="${this.url}/oauth/login">${hidden}<label>服务器<select name="server" required>${this.servers.map((s) => `<option value="${escaped(s)}">${escaped(s)}</option>`).join("")}</select></label><button formaction="${this.url}/oauth/external/start" name="provider" value="github">使用 GitHub 登录</button><button formaction="${this.url}/oauth/external/start" name="provider" value="google">使用 Google 登录</button><label>账号<input name="account" autocomplete="username" maxlength="100"></label><label>密码<input name="password" type="password" autocomplete="current-password"></label><button>使用账号密码登录</button></form>`;
+            .filter((p) => !p.archived)
+            .map(
+              (p) =>
+                `<option value="${escaped(p.id)}">${escaped(p.name)} · ${escaped(p.role)}</option>`,
+            )
+            .join(
+              "",
+            )}</select></label><button name="decision" value="allow">确认授权</button><button name="decision" value="deny" class="secondary">取消</button></form>`
+        : flow.external
+          ? `<p>打开登录页面完成验证。页面最后会显示一个 8 位完成码，把它填到这里继续。已有账号需要先在 ShowAI 中绑定该登录方式。</p><a href="${escaped(flow.external.url)}" target="_blank" rel="noopener noreferrer">打开登录页面</a><form method="post" action="${this.url}/oauth/external/finish">${hidden}<label>完成码<input name="completionCode" autocomplete="one-time-code" autocapitalize="characters" spellcheck="false" maxlength="12" placeholder="XXXX-XXXX"></label><button>继续</button><button name="restart" value="1" class="secondary">重新选择登录方式</button></form>`
+          : `<p>公开组件、模板和展示无需登录。访问私有项目时，使用你已有的 ShowAI Server 账号。</p><form method="post" action="${this.url}/oauth/login">${hidden}<label>服务器<select name="server" required>${this.servers.map((s) => `<option value="${escaped(s)}">${escaped(s)}</option>`).join("")}</select></label><button formaction="${this.url}/oauth/external/start" name="provider" value="github">使用 GitHub 登录</button><button formaction="${this.url}/oauth/external/start" name="provider" value="google">使用 Google 登录</button><label>账号<input name="account" autocomplete="username" maxlength="100"></label><label>密码<input name="password" type="password" autocomplete="current-password"></label><button>使用账号密码登录</button></form>`;
     return new Response(
-      `<!doctype html><html lang="zh"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>连接 ShowAI</title><style>body{font:16px/1.6 system-ui;max-width:520px;margin:8vh auto;padding:24px;color:#173341;background:#f9fbfc}h1{font-size:30px}label{display:block;margin:18px 0}input,select{display:block;box-sizing:border-box;width:100%;padding:12px;margin-top:5px;border:1px solid #aebdc5;border-radius:5px;font:inherit}button{padding:12px 20px;border:0;border-radius:5px;background:#075e7c;color:white;font:inherit;margin-right:12px}.secondary{background:#e5edf1;color:#173341}.error{color:#a42e29}</style><h1>连接 ShowAI</h1>${error ? `<p class="error" role="alert">${escaped(error)}</p>` : ""}${content}</html>`,
+      `<!doctype html><html lang="${this.local ? getLocale() : "zh"}"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${this.local ? escaped(localT("auth.title")) : "连接 ShowAI"}</title><style>body{font:16px/1.6 system-ui;max-width:520px;margin:8vh auto;padding:24px;color:#173341;background:#f9fbfc}h1{font-size:30px}label{display:block;margin:18px 0}input,select{display:block;box-sizing:border-box;width:100%;padding:12px;margin-top:5px;border:1px solid #aebdc5;border-radius:5px;font:inherit}button{padding:12px 20px;border:0;border-radius:5px;background:#075e7c;color:white;font:inherit;margin-right:12px}.secondary{background:#e5edf1;color:#173341}.error{color:#a42e29}</style><h1>${this.local ? escaped(localT("auth.title")) : "连接 ShowAI"}</h1>${error ? `<p class="error" role="alert">${escaped(error)}</p>` : ""}${content}</html>`,
       {
         headers: {
           "content-type": "text/html; charset=utf-8",
@@ -329,7 +372,7 @@ export class McpAuthorization {
       return json({
         resource: this.resource,
         authorization_servers: [this.url],
-        scopes_supported: scopeNames,
+        scopes_supported: this.local ? scopeNames.slice(0, 2) : scopeNames,
       });
     if (path === "/.well-known/oauth-authorization-server")
       return json({
@@ -346,7 +389,7 @@ export class McpAuthorization {
           "client_secret_basic",
         ],
         code_challenge_methods_supported: ["S256"],
-        scopes_supported: scopeNames,
+        scopes_supported: this.local ? scopeNames.slice(0, 2) : scopeNames,
         authorization_response_iss_parameter_supported: true,
       });
     if (!path.startsWith("/oauth/")) return null;
@@ -425,7 +468,7 @@ export class McpAuthorization {
             400,
           );
         this.validateResource(q.get("resource") ?? undefined);
-        if (!this.servers.length)
+        if (!this.servers.length && !this.local)
           throw new AuthorizationError(
             "This deployment provides public presentation only. Configure a ShowAI sync server to enable private projects.",
             "temporarily_unavailable",
@@ -441,6 +484,12 @@ export class McpAuthorization {
             csrf: token(),
             attempts: 0,
           };
+        if (this.local && flow.scopes.includes("projects.create"))
+          throw new AuthorizationError(
+            "Create projects in the desktop App, then select them for remote access.",
+            "invalid_scope",
+            400,
+          );
         this.put("flow", id, flow, 10 * 60_000);
         return this.form(id, flow);
       }
@@ -473,6 +522,59 @@ export class McpAuthorization {
             "invalid_request",
             400,
           );
+        if (this.local) {
+          if (path !== "/oauth/consent")
+            throw new AuthorizationError(
+              "Use the local pairing form.",
+              "invalid_request",
+              400,
+            );
+          this.limit("local-pairing", 10);
+          const target = new URL(flow.redirect);
+          if (flow.state) target.searchParams.set("state", flow.state);
+          target.searchParams.set("iss", this.url);
+          if (input.decision !== "allow")
+            target.searchParams.set("error", "access_denied");
+          else {
+            const projects = (await this.local.projects()).filter(
+              (p) => !p.archived,
+            );
+            if (!projects.length)
+              return this.form(flowId, flow, localT("auth.empty"));
+            if (!this.local.consumePairingCode(String(input.pairingCode ?? "")))
+              return this.form(flowId, flow, localT("auth.invalid"));
+            const grant: ProjectGrant = {
+              id: token(),
+              clientId: flow.clientId,
+              serverUrl: this.url,
+              serverId: "local",
+              user: { id: "local", name: "Local ShowAI" },
+              upstreamToken: "",
+              projectAccess: "selected",
+              projectIds: projects.map((p) => p.id),
+              scopes: flow.scopes,
+            };
+            this.put("grant", grant.id, grant, 180 * 86400_000);
+            const code = token();
+            this.put(
+              "code",
+              hash(code),
+              {
+                grantId: grant.id,
+                clientId: flow.clientId,
+                redirect: flow.redirect,
+                challenge: flow.challenge,
+              },
+              5 * 60_000,
+            );
+            target.searchParams.set("code", code);
+          }
+          this.remove("flow", flowId);
+          return new Response(null, {
+            status: 302,
+            headers: { location: target.href, "cache-control": "no-store" },
+          });
+        }
         if (
           path === "/oauth/external/start" ||
           path === "/oauth/external/finish"

@@ -23,11 +23,11 @@ Agent 通过 MCP 操作 ShowAI。App、网页、CLI 和 MCP 共用内容核心�
 
 ## 核对连接和归属
 
-首次实际操作时调用 `showai_capabilities`；宿主没有安装 ShowAI Skill 时，先读当前连接的 `guide()` 入口说明。工具可能带宿主前缀，使用实际暴露的名称。检查 `agentProtocol`、`transport`、`projects.access`、`projects.available` 和展示能力；调用 `project_context` 或 `projects_list` 核对目标。不能仅凭“Codex”“ChatGPT”判断连接或显示能力。
+首次实际操作时调用 `showai_capabilities`；宿主没有安装 ShowAI Skill 时，先读当前连接的 `guide()` 入口说明。工具可能带宿主前缀，使用实际暴露的名称。检查 `agentProtocol`、`transport`、`projects.access`、`projects.available` 和展示能力；HTTP 连接同时检查 `projects.storage`（或 `guide().connection.storage`），`local` 表示桌面直接保存。调用 `project_context` 或 `projects_list` 核对目标。不能仅凭“Codex”“ChatGPT”判断连接或显示能力。
 
 - **library 本机连接**：`project_context` 返回固定内容库。纯查询用 `projects_list`、`pages_list`、`library_search`，不创建项目。新正式内容未指定项目时，`project_resolve({sourceDirectory})` 使用宿主提供的绝对项目目录；首次映射可创建项目。不要使用插件、预览或临时输出目录。宿主当前工作目录是用户的项目或代码仓库、且内容与之相关时可以作为可信目录；对话整理、与当前目录无关的内容或没有可信目录时询问归属。用户要求独立命名项目时才用 `project_create`。
 - **project 绑定连接**：`project_context` 返回固定项目。沿用它，不能用另一个 projectId 越过绑定。
-- **authorized 远程连接**：`projects_list` 返回授权项目与当前权限。所有私有操作使用返回的 projectId；不要查询本机内容库或向远程传本机路径。用户明确要求新项目时用 `project_create`，授权、重试、登录和本机项目可见性见 [连接配置的远程部分](references/runtime.md#远程)。
+- **authorized 远程连接**：`projects_list` 返回授权项目与当前权限。所有私有操作使用返回的 projectId；不要查询本机内容库或向远程传本机路径。用户明确要求新项目且连接实际提供 `project_create` 时使用它；桌面远程连接的新项目在 App 创建。授权、重试、登录和本机项目可见性见 [连接配置的远程部分](references/runtime.md#远程)。
 
 项目操作显式传 `projectId`。进入页面制作或组件制作任务时，用 `project_context({projectId})` 取得 `componentCatalog`：完整内置＋项目索引、目录 revision 和两条工作流说明。项目解析回执也包含该索引；内置 Agent 由宿主在启动时注入。已持有当前连接、当前项目的完整索引时可传 knownCatalogRevision；回执 unchanged=true 时沿用已持有索引，不将省略的 items 当作空目录。没有完整索引时不传该参数。目录变化或切换项目后更新。页面身份来自真实结果中的 `document.id` 或页面列表；会话 ID 用于来源记录，不代替项目或页面身份。远程与本机 ID 不可自行互换。
 

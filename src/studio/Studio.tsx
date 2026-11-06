@@ -5639,7 +5639,7 @@ export default function Studio() {
           // A downloaded App update brings its own plugin, so it is offered after the restart.
           hidden={
             appUpdate.state?.phase === "ready" ||
-            (view === "settings" && settingsSection === "plugins") ||
+            (view === "settings" && (settingsSection === "plugins" || settingsSection === "remote")) ||
             (view === "docs" && docPage?.id === WELCOME_DOC) ||
             (view === "projects" && workspaceReady && welcoming && !showDocs)
           }

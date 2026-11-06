@@ -1,0 +1,203 @@
+.remote-mcp-settings {
+  display: grid;
+  gap: 20px;
+}
+.remote-mcp-settings fieldset {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.remote-mcp-settings legend {
+  margin-bottom: 12px;
+  font-size: 13px;
+  font-weight: 500;
+}
+.remote-mcp-status {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+.remote-mcp-status strong {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-size: 14px;
+  font-weight: 500;
+}
+.remote-mcp-status span {
+  display: block;
+  margin-top: 6px;
+  color: var(--muted);
+  font-size: 12px;
+}
+.remote-mcp-status i {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--muted);
+}
+.remote-mcp-status i[data-online="true"] {
+  background: #27845c;
+}
+.remote-mcp-providers {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+.remote-mcp-providers button {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  text-align: left;
+}
+.remote-mcp-providers button[aria-pressed="true"] {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+.remote-mcp-modes {
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  width: fit-content;
+}
+.remote-mcp-modes button {
+  padding: 7px 16px;
+  border-radius: 4px;
+  font-size: 13px;
+}
+.remote-mcp-modes button[aria-pressed="true"] {
+  background: var(--accent-soft);
+  color: var(--text);
+}
+.remote-mcp-fields {
+  display: grid;
+  gap: 14px;
+}
+.remote-mcp-fields label {
+  display: grid;
+  gap: 7px;
+  font-size: 13px;
+}
+.remote-mcp-fields input {
+  width: 100%;
+  min-width: 0;
+  padding: 9px 11px;
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+}
+.remote-mcp-tool,
+.remote-mcp-project,
+.remote-mcp-copy {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  justify-content: space-between;
+  font-size: 13px;
+  min-width: 0;
+}
+.remote-mcp-tool span {
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+.remote-mcp-project {
+  padding: 12px 0;
+  border-bottom: 1px solid var(--line);
+}
+.remote-mcp-project label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  overflow-wrap: anywhere;
+}
+.remote-mcp-project select {
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--line);
+  padding: 5px 8px;
+  border-radius: 5px;
+}
+.remote-mcp-copy {
+  padding: 12px 0;
+  flex-wrap: wrap;
+}
+.remote-mcp-copy code {
+  overflow-wrap: anywhere;
+  font-size: 12px;
+  flex: 1;
+}
+.remote-mcp-disclosure {
+  border-top: 1px solid var(--line);
+  padding-top: 14px;
+  font-size: 13px;
+  line-height: 1.7;
+}
+.remote-mcp-disclosure summary {
+  cursor: pointer;
+  font-weight: 500;
+}
+.remote-mcp-disclosure fieldset {
+  padding-top: 16px;
+}
+.remote-mcp-disclosure ol {
+  padding-left: 22px;
+}
+.remote-mcp-disclosure li {
+  margin: 10px 0;
+}
+.remote-mcp-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+.remote-mcp-disclosure a {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--accent);
+}
+.remote-mcp-error {
+  margin: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  color: var(--danger, #bb4038);
+  font:
+    12px/1.6 ui-monospace,
+    monospace;
+  max-height: 180px;
+  overflow: auto;
+}
+.remote-mcp-settings .settings-group {
+  margin-bottom: 0;
+}
+.remote-mcp-settings h3 {
+  font-size: 13px;
+  margin: 20px 0 0;
+}
+.remote-mcp-settings button:focus-visible,
+.remote-mcp-settings summary:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+@media (max-width: 540px) {
+  .remote-mcp-providers {
+    grid-template-columns: 1fr;
+  }
+  .remote-mcp-status {
+    flex-wrap: wrap;
+  }
+  .remote-mcp-tool {
+    flex-wrap: wrap;
+  }
+}

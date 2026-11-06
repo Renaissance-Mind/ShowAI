@@ -29,6 +29,7 @@
     "test": "vitest run --maxWorkers=4 --testTimeout=30000 --hookTimeout=30000",
     "build:remote-agent": "npm run build:portable && node scripts/build-remote-agent.mjs",
     "build:cloud-mcp": "npm run build:portable && npm run build:cdn && node scripts/build-cloud-mcp.mjs",
+    "test:remote-mcp": "npm run build && vitest run src/remote-mcp --maxWorkers=2 --testTimeout=30000 --hookTimeout=30000 && node src/desktop/remote-mcp-ui-smoke.mjs",
     "test:cloud-mcp": "vitest run src/agent/mcp-http.integration.test.ts src/agent/cloud-state.test.ts --maxWorkers=2 --testTimeout=30000 --hookTimeout=60000",
     "build:server": "node scripts/build-server.mjs",
     "server": "node dist-server/server.mjs",

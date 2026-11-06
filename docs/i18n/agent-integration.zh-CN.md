@@ -28,6 +28,8 @@ library MCP 增加 projects_list/project_resolve/project_create；绑定项目�
 
 ## 远程 MCP 服务
 
+桌面 App 可在「设置 → 远程连接」通过用户自己的 Cloudflare 或 Tailscale 开放本机项目，采用本机配对授权并直接保存本机内容。逐步操作见 [ChatGPT 接入](chatgpt.zh-CN.md)。下文的 `mcp serve` 是连接同步服务器的托管网关；仅传 `--home` 不会开放该库的私有项目。
+
 MCP 网关独立于内容同步服务器。它使用已安装运行时的 Node、编译器与阅读器，内容服务器只保存快照和对象。
 
 ```sh

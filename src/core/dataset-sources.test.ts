@@ -7,6 +7,8 @@ import {
   REMOTE_FETCH,
   externalPath,
   fetchSource,
+  fetchPublicMedia,
+  withPublicRemoteFetch,
   isDatasetSource,
   parseSource,
   readExternal,
@@ -359,6 +361,24 @@ describe("online data", () => {
         REMOTE_FETCH.publicAddressesOnly = false;
       }
       expect(server.requests).toHaveLength(requests);
+      await expect(
+        withPublicRemoteFetch(() =>
+          fetchSource(`${server.origin}/data.csv`, "csv", 1024),
+        ),
+      ).rejects.toThrow("not a public");
+      await expect(
+        fetchPublicMedia(`${server.origin}/image.png`),
+      ).rejects.toThrow("not a public");
+      await expect(
+        fetchPublicMedia(
+          `http://localhost:${new URL(server.origin).port}/image.png`,
+        ),
+      ).rejects.toThrow();
+      expect(server.requests).toHaveLength(requests);
+      // A remote request must not disable the desktop's own loopback data sources.
+      expect(
+        await fetchSource(`${server.origin}/data.csv`, "csv", 1024),
+      ).toMatchObject({ notModified: false });
     } finally {
       await server.close();
     }

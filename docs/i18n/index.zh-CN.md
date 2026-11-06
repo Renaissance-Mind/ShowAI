@@ -15,7 +15,7 @@ ShowAI 是可进化的人机交互界面：Agent 的回答不再只是一段文�
 | [内置 Agent](agent-host.zh-CN.md)                | 本机/API、云端与配对 Mac 执行         |
 | [Page 与 Board](page-surface.zh-CN.md)           | 嵌套容器、绘画、阅读与快捷键          |
 | [本地浏览器版](local-browser.zh-CN.md)           | 在 macOS、Linux 与 Windows 从源码运行 |
-| [网页版 ChatGPT（邀请制）](chatgpt.zh-CN.md)     | 账号、托管 MCP、授权与更新            |
+| [网页版 ChatGPT（本机 MCP）](chatgpt.zh-CN.md)     | 桌面隧道、配对、权限与更新            |
 
 ## 组件与模板
 

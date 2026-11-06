@@ -88,7 +88,11 @@ ShowAI 内置 Agent由宿主提供项目绑定 MCP；它安装的私有 Skill �
 
 ## 远程
 
-宿主连接明确的 HTTP MCP 地址，完成所需授权。授权可限定项目，也可覆盖该服务器账号当前及以后有权限的所有项目。`projects_list` 每次读取服务器最新成员权限；账号授权会发现后续同步到服务器的项目。仅保存在本机且尚未同步的项目不在远程列表中：请用户在 ShowAI 应用的“设置 → 账号与同步”把项目同步到同一服务器账号，再重新调用 `projects_list`；仅授权单个项目的连接需重新授权为账号范围才能看到新项目。用户明确要求新项目时，且当前工具暴露 `project_create`、账号已授予 `projects.create`，使用该工具创建；保留返回的项目 ID 和 synchronization 回执，后续页面操作显式使用该 ID。创建超时或结果不明时，用同一个 operationId 和同一名称重试：已创建则返回原项目，不会重复创建；同一 operationId 换名称会被拒绝。不同请求使用不同 ID。受限授权或工具缺失时说明所缺权限，不绕过到本机创建。项目权限来自服务端当前成员身份。远程没有本机文件配置步骤，不能把用户电脑的 home 当作远程项目路径。远程网关部署与本机内容同步服务是不同模块。
+桌面 App 的「设置 → 远程连接」可以通过用户自己的 Cloudflare（临时地址或固定隧道）或 Tailscale Funnel 开放本机 MCP。此模式由 `showai_capabilities.projects.storage:"local"` 或 `guide().connection.storage:"local"` 标识：用户在 App 选择项目及只读/可编辑权限，再生成一次性配对码，在客户端打开的 OAuth 授权页亲自填写。模型不索取、读取或转述配对码、Tunnel Token。`projects_list` 仅返回该次授权与当前 App 配置同时允许的项目；新增项目需在 App 勾选并重新授权。保存直接进入本机内容库，回执 `persistence.storage:"local"` 不表示已同步到云端。此模式不提供 `project_create`，新项目在 App 中创建；本机侧栏偏好在 App 管理。远程客户端仍不能传本机文件路径。电脑必须保持联网、唤醒且 App 正在运行；Quick 地址重新连接后变化，需要更新客户端地址并重新配对。先查看 App 的公网检查和最近工具调用，再判断连接是否成功。
+
+用户配置自己的固定 Cloudflare 域名时，在 Cloudflare 账号创建 Cloudflared Tunnel 和 Published application 路由，服务类型为 HTTP，目标地址使用 App「连接设置」显示的本机端口（默认 `http://127.0.0.1:18789`）。在 App 选择固定域名，填 HTTPS 主机地址和隧道 Token；由 App 启动连接器。公网检查通过后，把 App 生成的完整 `/mcp` 地址填到 ChatGPT 的 Add custom MCP server，选择 OAuth / DCR，再由用户在授权页填写配对码。安装工具、Tailscale 权限与其他方式的逐步操作见 App 内「配置教程」及[完整用户教程](https://github.com/Renaissance-Mind/ShowAI/blob/main/docs/i18n/chatgpt.zh-CN.md)。
+
+以下为配置了同步服务器的托管 HTTP 连接：宿主连接明确的 HTTP MCP 地址，完成所需授权。授权可限定项目，也可覆盖该服务器账号当前及以后有权限的所有项目。`projects_list` 每次读取服务器最新成员权限；账号授权会发现后续同步到服务器的项目。仅保存在本机且尚未同步的项目不在远程列表中：请用户在 ShowAI 应用的“设置 → 账号与同步”把项目同步到同一服务器账号，再重新调用 `projects_list`；仅授权单个项目的连接需重新授权为账号范围才能看到新项目。用户明确要求新项目时，且当前工具暴露 `project_create`、账号已授予 `projects.create`，使用该工具创建；保留返回的项目 ID 和 synchronization 回执，后续页面操作显式使用该 ID。创建超时或结果不明时，用同一个 operationId 和同一名称重试：已创建则返回原项目，不会重复创建；同一 operationId 换名称会被拒绝。不同请求使用不同 ID。受限授权或工具缺失时说明所缺权限，不绕过到本机创建。项目权限来自服务端当前成员身份。远程没有本机文件配置步骤，不能把用户电脑的 home 当作远程项目路径。远程网关部署与本机内容同步服务是不同模块。
 
 GitHub／Google 登录由所选 ShowAI Server 的已配置登录方式提供。已有账号需先绑定对应身份。用户在第三方登录标签页完成验证后，该页显示一个 8 位完成码；用户回到 MCP 授权标签页填入完成码并继续，再确认项目或账号范围授权。完成码一次性、短期有效，由用户本人填写；模型不索取或转述。用户把完成码贴到对话中时不使用它，提醒其在授权页填写。模型不读取、索取或转发密码、登录轮询密钥和会话 Token。服务器未启用对应登录方式时报告实际错误，不把登录按钮可见当作登录已配置。
 

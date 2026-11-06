@@ -6,6 +6,10 @@ import { pathToFileURL } from "node:url";
 import type { Browser, Frame, Locator, Page } from "playwright-core";
 import type { ReadingAction, ReadingOptions } from "./page-reading";
 import type { Locale } from "../i18n";
+import {
+  fetchPublicMedia,
+  remoteFetchRestricted,
+} from "../core/dataset-sources";
 
 export interface ComponentReading {
   blockId: string;
@@ -270,12 +274,29 @@ export async function renderReading(
     // Online images and media of the page load as they would for a reader;
     // every other request (scripts, data, frames) stays blocked, and
     // component code stays in its browser sandbox.
-    await context.route(/^https?:/, (route) => {
+    const restrictedNetwork = remoteFetchRestricted();
+    if (restrictedNetwork)
+      await context.route(/^file:/, (route) =>
+        route.request().isNavigationRequest() &&
+        route.request().url() === pathToFileURL(htmlPath).href
+          ? route.continue()
+          : route.abort(),
+      );
+    await context.route(/^https?:/, async (route) => {
       const request = route.request();
-      return request.method() === "GET" &&
-        ["image", "media"].includes(request.resourceType())
-        ? route.continue()
-        : route.abort();
+      if (
+        request.method() !== "GET" ||
+        !["image", "media"].includes(request.resourceType())
+      )
+        return route.abort();
+      if (!restrictedNetwork) return route.continue();
+      try {
+        const media = await fetchPublicMedia(request.url());
+        return route.fulfill({ status: 200, ...media });
+      } catch {
+        // Network boundary: unavailable/forbidden media stays a failed resource in the capture.
+        return route.abort();
+      }
     });
     const page = await context.newPage();
     page.setDefaultTimeout(5000);

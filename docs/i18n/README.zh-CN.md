@@ -43,7 +43,7 @@ Agent 会把界面保存到 ShowAI 并在对话中展示（不能内嵌显示的
 | 内置 Agent                                 | 正式   | 在 ShowAI 中使用本机 Codex 或 Claude Code 的登录、模型 API Key 或 Cloud                                                        |
 | DeepSeek Harness                           | 预览   | ShowAI「设置 → 插件」→ 准备插件，再在 DeepSeek Harness 中添加（[步骤](../../plugins/showai/README.zh-CN.md#deepseek-harness)） |
 | Kimi Work                                  | 预览   | 在 Kimi Work 中添加 ShowAI 的 MCP 服务和 [Kimi 插件](../../plugins-kimi/showai/README.md)                                      |
-| 网页版 ChatGPT                             | 邀请制 | 通过托管 MCP 与 ShowAI Cloud 账号接入，注册需要注册码或项目邀请（[指南](chatgpt.zh-CN.md)）                                    |
+| 网页版 ChatGPT                             | 自行部署 | 在桌面 App 开启远程连接，使用自己的 Cloudflare 或 Tailscale 接入本机项目（[指南](chatgpt.zh-CN.md)）                                    |
 | 其他 MCP 客户端（Gemini CLI、OpenCode 等） | 实验   | 手动配置 stdio MCP（[Agent 接入](agent-integration.zh-CN.md)）                                                                 |
 
 ## 💡 看看做出来的样子
@@ -147,7 +147,7 @@ claude plugin install showai@renaissance-mind
 | [在 Claude Code 与 Codex 中使用](codex.zh-CN.md) | [模板文件夹](template-bundles.zh-CN.md)     | [Cloud 与账号](cloud.zh-CN.md)            |
 | [内置 Agent](agent-host.zh-CN.md)                | [组件参数](component-parameters.zh-CN.md)   | [项目同步](project-sync.zh-CN.md)         |
 | [Page 与 Board](page-surface.zh-CN.md)           | [Agent 接入](agent-integration.zh-CN.md)    | [服务器运维](server-operations.zh-CN.md)  |
-| [网页版 ChatGPT（邀请制）](chatgpt.zh-CN.md)     | [页面数据格式 v3](artifact-format.zh-CN.md) | [MCP 部署](cloud-mcp-deployment.zh-CN.md) |
+| [网页版 ChatGPT（本机 MCP）](chatgpt.zh-CN.md)     | [页面数据格式 v3](artifact-format.zh-CN.md) | [MCP 部署](cloud-mcp-deployment.zh-CN.md) |
 
 ## 🛠️ 开发与贡献
 

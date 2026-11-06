@@ -22,7 +22,10 @@ import {
   nativeTheme,
   protocol,
   shell,
+  safeStorage,
 } from "electron";
+import { RemoteMcpManager } from "../remote-mcp/manager";
+import { remoteMcpActions } from "../remote-mcp/types";
 import type { IpcMainEvent, IpcMainInvokeEvent, NativeImage } from "electron";
 import { watchLibrary, type LibraryWatcher } from "../core/library-watcher";
 import {
@@ -136,6 +139,7 @@ let agentHost: AgentHost;
 let pluginInstaller: DesktopPluginInstaller;
 let appUpdates: AppUpdates | undefined;
 let remoteConnector: RemoteMacConnector;
+let remoteMcp: RemoteMcpManager | undefined;
 let watcher: LibraryWatcher | undefined;
 let sources: ReturnType<typeof watchDatasetSources> | undefined;
 let maintenance: MaintenanceScheduler | undefined;
@@ -381,6 +385,7 @@ async function deliverFiles(root: string, batch: string[]): Promise<void> {
 }
 
 async function useHome(home?: string): Promise<void> {
+  await remoteMcp?.stop();
   if (store) await syncManager(store.root).stop();
   await maintenance?.stop();
   await watcher?.close();
@@ -805,6 +810,31 @@ async function handle(
   window: BrowserWindow,
 ): Promise<unknown> {
   maintenance?.markActivity();
+  if (remoteMcpActions.has(action)) {
+    if (!remoteMcp) throw new Error("Remote MCP is not ready.");
+    switch (action) {
+      case "remoteMcp:installCloudflare":
+        return remoteMcp.installCloudflare();
+      case "remoteMcp:status":
+        return remoteMcp.status(args.refresh === true);
+      case "remoteMcp:start":
+        return remoteMcp.start(args.config, args.token);
+      case "remoteMcp:stop":
+        return remoteMcp.stop();
+      case "remoteMcp:check":
+        return remoteMcp.check();
+      case "remoteMcp:pair":
+        return remoteMcp.pair();
+      case "remoteMcp:revoke":
+        return remoteMcp.revoke(String(args.id));
+      case "remoteMcp:chooseExecutable": {
+        const selection = await dialog.showOpenDialog(window, {
+          properties: ["openFile"],
+        });
+        return selection.canceled ? null : selection.filePaths[0];
+      }
+    }
+  }
   if (desktopPluginActions.has(action))
     return pluginInstallerAction(pluginInstaller, action, args);
   if (action === "agent:remoteDevice") return remoteConnector.status();
@@ -1868,6 +1898,23 @@ else {
         channel: app.isPackaged ? "packaged" : "development",
       });
       remoteConnector = new RemoteMacConnector(agentHost, () => store.root);
+      remoteMcp = new RemoteMcpManager({
+        directory: join(app.getPath("userData"), "remote-mcp"),
+        home: () => store.root,
+        encrypt: (value) => {
+          if (
+            !safeStorage.isEncryptionAvailable() ||
+            (process.platform === "linux" &&
+              safeStorage.getSelectedStorageBackend() === "basic_text")
+          )
+            throw new Error(
+              "Unlock the system credential store before saving a tunnel token.",
+            );
+          return safeStorage.encryptString(value).toString("base64");
+        },
+        decrypt: (value) =>
+          safeStorage.decryptString(Buffer.from(value, "base64")),
+      });
       void remoteConnector
         .start()
         .catch((error) =>
@@ -2037,6 +2084,7 @@ else {
                 !agentActions.has(action) &&
                 !desktopPluginActions.has(action) &&
                 !remoteDeviceActions.has(action) &&
+                !remoteMcpActions.has(action) &&
                 !appUpdateActions.has(action))
             )
               throw new CoreError("INVALID_DATA", "Unknown desktop action.");
@@ -2137,6 +2185,7 @@ else {
       await quitRecord.clear();
       await presence?.remove();
       remoteConnector?.close();
+      await shutdownStep("remote MCP", () => remoteMcp?.stop());
       agentHost?.close();
       clearTimeout(notification);
       // Stopping waits for running work (maintenance, sync); a slow step is named.
