@@ -1,3 +1,4 @@
+import { desktopTestEnvironment } from "../../scripts/desktop-test-env.mjs";
 // Build first, then run: node src/desktop/directory-selection-ui-smoke.mjs.
 // Real Electron, workbench actions and filesystem; every write uses an isolated library.
 import assert from "node:assert/strict";
@@ -14,7 +15,7 @@ const output = await mkdtemp(
 );
 const home = join(output, "home");
 const env = {
-  ...process.env,
+  ...desktopTestEnvironment(),
   SHOWAI_HOME: home,
   SHOWAI_USER_DATA: join(output, "profile"),
   SHOWAI_LANGUAGE: "zh-CN",

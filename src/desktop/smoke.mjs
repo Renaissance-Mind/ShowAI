@@ -1,3 +1,4 @@
+import { desktopTestEnvironment } from "../../scripts/desktop-test-env.mjs";
 // Runs the actual Electron binary against an isolated data directory and built UI.
 import assert from "node:assert/strict";
 import { execFile, spawn } from "node:child_process";
@@ -36,7 +37,7 @@ async function availablePort() {
 const rendererPort = await availablePort(),
   mainPort = await availablePort();
 const environment = {
-  ...process.env,
+  ...desktopTestEnvironment(),
   SHOWAI_HOME: join(temporary, "home"),
   SHOWAI_USER_DATA: join(temporary, "profile"),
 };
@@ -306,13 +307,13 @@ try {
     "({count:window.__closeCount,bridge:!!window.showai})",
   );
   assert.deepEqual(refusal, { count: 1, bridge: true });
-  // The refusal is explained in a dialog; quitting meanwhile joins that same
-  // request instead of asking the page again.
+  // Visible runs keep the explanation dialog open; hidden runs report the
+  // refusal without a dialog, and a subsequent quit asks the page again.
   await main(`${native}.app.quit(); 'quit requested'`);
   await new Promise((done) => setTimeout(done, 300));
   assert.deepEqual(
     await renderer("({count:window.__closeCount,bridge:!!window.showai})"),
-    { count: 1, bridge: true },
+    { count: environment.SHOWAI_BACKGROUND === "1" ? 2 : 1, bridge: true },
   );
   await renderer("window.__release();'released'");
   // Reply before closing the last window. Windows quits the event loop at that

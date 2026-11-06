@@ -1,3 +1,4 @@
+import { desktopTestEnvironment } from "../../scripts/desktop-test-env.mjs";
 // Real Electron + filesystem lifecycle check. No mocked bridge, storage or clock.
 // Build first: npm run build
 // Run: node src/desktop/ui-smoke.mjs
@@ -62,7 +63,7 @@ const fingerprints = async () =>
       ]),
     ),
   );
-const env = { ...process.env, SHOWAI_HOME: home, SHOWAI_USER_DATA: profile };
+const env = { ...desktopTestEnvironment(), SHOWAI_HOME: home, SHOWAI_USER_DATA: profile };
 delete env.ELECTRON_RUN_AS_NODE;
 const runFile = promisify(execFile);
 const delay = (milliseconds) =>

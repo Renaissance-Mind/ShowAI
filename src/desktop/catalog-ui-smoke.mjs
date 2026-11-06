@@ -1,3 +1,4 @@
+import { desktopTestEnvironment } from "../../scripts/desktop-test-env.mjs";
 import { execFileSync, spawnSync } from "node:child_process";
 // Exercises the real desktop catalog across two real project directories. The
 // App's component and template views are read-only: revisions are written the
@@ -24,7 +25,7 @@ await mkdir(join(root, "output/playwright"), { recursive: true });
 const output = await mkdtemp(join(root, "output/playwright/catalog-ui-"));
 const home = join(output, "home"),
   env = {
-    ...process.env,
+    ...desktopTestEnvironment(),
     SHOWAI_HOME: home,
     SHOWAI_USER_DATA: join(output, "profile"),
   };

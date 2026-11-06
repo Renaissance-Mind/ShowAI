@@ -89,6 +89,7 @@ async function freePort() {
   return port;
 }
 const checks = [];
+let passed = false;
 function record(...messages) {
   checks.push(...messages);
   if (process.env.SHOWAI_SMOKE_PROGRESS)
@@ -110,7 +111,6 @@ function startDevelopment() {
       String(port),
       "--home",
       home,
-      "--no-open",
     ],
     {
       cwd: fixture,
@@ -154,7 +154,10 @@ try {
       : await chromium.launch({ headless: true });
   let page =
     mode === "desktop"
-      ? browser.contexts()[0].pages()[0]
+      ? browser
+          .contexts()[0]
+          .pages()
+          .find((candidate) => candidate.url().split("?")[0] === original.url)
       : await browser.newPage({ locale: "zh-CN" });
   debugPage = page;
   page.on("pageerror", (error) => {
@@ -227,6 +230,25 @@ try {
     JSON.stringify(statusReport.instances),
   );
   record("dev:status reports the running backend and its presence record");
+  async function assertBackground(label) {
+    if (mode !== "desktop") return;
+    const status = await poll(
+      developmentStatus,
+      (value) => value.presentation?.windows.length > 0,
+      "desktop presentation state",
+    );
+    assert.equal(status.presentation.background, true, JSON.stringify(status));
+    assert.ok(
+      status.presentation.windows.every(
+        (window) => !window.visible && !window.focused,
+      ),
+      JSON.stringify(status.presentation),
+    );
+    record(label);
+  }
+  await assertBackground(
+    "default desktop launch keeps all windows hidden and unfocused",
+  );
   const [first, second] = await Promise.all([reuse(), reuse()]);
   assert.equal(first.backendPid, original.backendPid);
   assert.equal(second.backendPid, original.backendPid);
@@ -263,6 +285,7 @@ try {
     "commits update the source badge and session without reloading the workbench or backend",
   );
   if (mode === "desktop") {
+    const beforeReloadUrl = page.url();
     const navigated = page.waitForEvent("framenavigated", {
       predicate: (frame) => frame === page.mainFrame(),
       timeout: 15000,
@@ -273,29 +296,35 @@ try {
       .getByRole("button", { name: "新建项目", exact: true })
       .first()
       .waitFor();
-    assert.equal(page.url(), original.url);
+    assert.equal(page.url(), beforeReloadUrl);
     assert.equal((await receipt()).backendPid, original.backendPid);
     record("JavaScript reload stays inside the same desktop window");
-    const closed = page.waitForEvent("close");
-    await page.evaluate(() => window.close());
-    await closed;
-    const context = browser.contexts()[0];
-    const reopened = context.waitForEvent("page");
-    await fetch(original.url + "__showai-dev/focus", {
-      method: "POST",
-      headers: { Origin: new URL(original.url).origin },
-    });
-    page = await reopened;
-    debugPage = page;
-    await page
-      .getByRole("button", { name: "新建项目", exact: true })
-      .first()
-      .waitFor();
-    assert.equal((await receipt()).backendPid, original.backendPid);
-    record(
-      "reopening after closing every desktop window reuses the running backend",
-    );
+    if (process.env.SHOWAI_TEST_SHOW === "1") {
+      const closed = page.waitForEvent("close");
+      await page.evaluate(() => window.close());
+      await closed;
+      const context = browser.contexts()[0];
+      const reopened = context.waitForEvent("page", {
+        predicate: (candidate) =>
+          candidate.url().split("?")[0] === original.url,
+      });
+      await fetch(original.url + "__showai-dev/focus", {
+        method: "POST",
+        headers: { Origin: new URL(original.url).origin },
+      });
+      page = await reopened;
+      debugPage = page;
+      await page
+        .getByRole("button", { name: "新建项目", exact: true })
+        .first()
+        .waitFor();
+      assert.equal((await receipt()).backendPid, original.backendPid);
+      record(
+        "reopening after closing every desktop window reuses the running backend",
+      );
+    }
   }
+
   if (mode === "desktop") {
     observer = await chromium.launch({ headless: true });
     const tab = await observer.newPage({ locale: "zh-CN" });
@@ -307,6 +336,34 @@ try {
       .filter({ hasText: "请打开 Applications/ShowAI.app" })
       .waitFor();
     record("a browser tab at the desktop URL cannot block desktop updates");
+  }
+
+  if (mode === "desktop" && process.env.SHOWAI_TEST_SHOW === "1") {
+    const present = async (flag) => {
+      const response = await execute(
+        process.execPath,
+        [
+          join(fixture, "scripts/dev-open.mjs"),
+          "--port",
+          String(port),
+          "--home",
+          home,
+          flag,
+        ],
+        { cwd: fixture },
+      );
+      return JSON.parse(response.stdout);
+    };
+    const shown = await present("--show");
+    assert.equal(shown.backendPid, original.backendPid);
+    assert.equal(shown.presentation.background, false);
+    assert.ok(shown.presentation.windows.some((window) => window.visible));
+    await present("--hide");
+    await assertBackground(
+      "explicit --show and --hide reuse the same desktop process",
+    );
+    // Leave it explicitly shown to prove the subsequent hot restart does not show it again.
+    await present("--show");
   }
 
   const style = join(fixture, "src/design/desktop.css");
@@ -326,13 +383,11 @@ try {
 
   const studio = join(fixture, "src/studio/Studio.tsx");
   const studioSource = await readFile(studio, "utf8");
-  assert.ok(studioSource.includes('className="studio-main"'));
+  const studioTag = /className=\{`studio-main[^`]*`\}/;
+  assert.ok(studioTag.test(studioSource));
   await writeFile(
     studio,
-    studioSource.replace(
-      'className="studio-main"',
-      'className="studio-main" data-development-smoke="live"',
-    ),
+    studioSource.replace(studioTag, '$& data-development-smoke="live"'),
   );
   await page.locator('[data-development-smoke="live"]').waitFor();
   assert.equal((await receipt()).backendPid, original.backendPid);
@@ -669,8 +724,13 @@ try {
     "successful guarded restart",
   );
   assert.equal(
-    (await poll(developmentStatus, (value) => value.ready, "ready after restart"))
-      .pendingRestart,
+    (
+      await poll(
+        developmentStatus,
+        (value) => value.ready,
+        "ready after restart",
+      )
+    ).pendingRestart,
     undefined,
   );
   if (mode === "desktop") {
@@ -693,6 +753,9 @@ try {
         )
       : page;
   await updatedPage.waitForFunction(() => !!window.showai);
+  await assertBackground(
+    "backend hot restart returns to hidden, unfocused windows",
+  );
   await poll(
     async () => {
       try {
@@ -809,7 +872,10 @@ try {
   );
   await updatedPage.reload();
   await updatedPage.locator('[data-navigation-state="current"]').waitFor();
-  await updatedPage.getByText(verifiedName, { exact: true }).first().waitFor();
+  await updatedPage
+    .getByText(verifiedName, { exact: true })
+    .first()
+    .waitFor({ state: "attached" });
   record(
     "cached navigation reconciles a real project rename with the current library",
   );
@@ -838,7 +904,10 @@ try {
     ),
     0,
   );
-  await updatedPage.getByText(verifiedName, { exact: true }).first().waitFor();
+  await updatedPage
+    .getByText(verifiedName, { exact: true })
+    .first()
+    .waitFor({ state: "attached" });
   record(
     "malformed cached rows are discarded and replaced by verified navigation",
   );
@@ -863,7 +932,7 @@ try {
     await updatedPage
       .getByText(verifiedName, { exact: true })
       .first()
-      .waitFor();
+      .waitFor({ state: "attached" });
   }
   record(
     "malformed manual ordering is discarded before cached navigation renders",
@@ -884,11 +953,15 @@ try {
     "warm relaunch",
   );
   assert.equal(warm.startup.cacheHit, true);
+  await assertBackground("full launcher relaunch stays hidden and unfocused");
   if (mode === "desktop")
     browser = await chromium.connectOverCDP(`http://127.0.0.1:${debugPort}`);
   const warmPage =
     mode === "desktop"
-      ? browser.contexts()[0].pages()[0]
+      ? browser
+          .contexts()[0]
+          .pages()
+          .find((candidate) => candidate.url().split("?")[0] === warm.url)
       : await browser.newPage({ locale: "zh-CN" });
   debugPage = warmPage;
   if (mode === "browser") await warmPage.goto(warm.url);
@@ -901,9 +974,11 @@ try {
   record(
     `validated warm relaunch uses cache: cold ${original.startup.totalMs} ms, warm ${warm.startup.totalMs} ms (preparation ${original.startup.preparationMs} → ${warm.startup.preparationMs} ms)`,
   );
+  passed = true;
   console.log(
     JSON.stringify(
       {
+        passed,
         mode,
         output,
         checks,
@@ -943,6 +1018,6 @@ try {
   ]);
   await writeFile(
     join(output, "result.json"),
-    JSON.stringify({ mode, checks, fixturesRetained }, null, 2),
+    JSON.stringify({ passed, mode, checks, fixturesRetained }, null, 2),
   );
 }

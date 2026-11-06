@@ -1,3 +1,4 @@
+import { desktopTestEnvironment } from "../../scripts/desktop-test-env.mjs";
 // Supplementary real Electron regression for the data reading layer: linked
 // files and spreadsheets in bound blocks, transforms, local files in built-in
 // and custom components (showai-media:), the warning surface and its
@@ -41,7 +42,7 @@ await mkdir(files, { recursive: true });
 await mkdir(shots, { recursive: true });
 assert.notEqual(home, join(homedir(), ".showai"));
 const env = {
-  ...process.env,
+  ...desktopTestEnvironment(),
   SHOWAI_HOME: home,
   SHOWAI_USER_DATA: join(output, "profile"),
   SHOWAI_LANGUAGE: "zh-CN",

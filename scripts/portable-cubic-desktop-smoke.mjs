@@ -1,3 +1,4 @@
+import { desktopTestEnvironment } from "./desktop-test-env.mjs";
 import { _electron } from "playwright-core";
 import assert from "node:assert/strict";
 import { mkdtemp, mkdir, writeFile, readFile } from "node:fs/promises";
@@ -5,7 +6,7 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 const directory = await mkdtemp(join(tmpdir(), "showai-cubic-desktop-")),
   environment = {
-    ...process.env,
+    ...desktopTestEnvironment(),
     SHOWAI_HOME: join(directory, "library"),
     SHOWAI_USER_DATA: join(directory, "profile"),
     SHOWAI_LANGUAGE: "zh-CN",

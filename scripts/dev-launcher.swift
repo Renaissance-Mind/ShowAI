@@ -24,7 +24,7 @@ final class DevelopmentLauncher: NSObject, NSApplicationDelegate {
             let process = Process()
             process.executableURL = URL(fileURLWithPath: config["nodeExecutable"] as! String)
             process.currentDirectoryURL = URL(fileURLWithPath: source)
-            process.arguments = [source + "/scripts/dev-open.mjs", "--home", config["home"] as! String, "--port", String(config["port"] as! Int)]
+            process.arguments = [source + "/scripts/dev-open.mjs", "--show", "--home", config["home"] as! String, "--port", String(config["port"] as! Int)]
             if let url = pendingURL { process.arguments! += ["--url", url]; pendingURL = nil }
             var environment = ProcessInfo.processInfo.environment
             environment.removeValue(forKey: "ELECTRON_RUN_AS_NODE")

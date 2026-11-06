@@ -71,6 +71,7 @@ const pending = new Map<
 >();
 const requests = new Map<string, PreviewLease>();
 const previewWindows = new Set<BrowserWindow>();
+const previewInitializations = new WeakMap<BrowserWindow, Promise<void>>();
 const workbenchOwners = new Set<BrowserWindow>();
 const busyPreviews = new Set<BrowserWindow>();
 const pageShells = new WeakSet<BrowserWindow>();
@@ -133,6 +134,13 @@ function createPreviewWindow() {
     closePreview(preview);
   });
   previewWindows.add(preview);
+  // An unused native window has no committed page. Commit a blank document so
+  // debugger clients can attach without waiting for a thumbnail request.
+  const initialized = preview.loadURL("about:blank");
+  previewInitializations.set(preview, initialized);
+  void initialized.catch((error) =>
+    console.error("Preview initialization failed:", error),
+  );
   preview.once("closed", () => {
     previewWindows.delete(preview);
     busyPreviews.delete(preview);
@@ -140,7 +148,7 @@ function createPreviewWindow() {
   return preview;
 }
 
-/** Allocate native windows before the workbench accepts input. */
+/** Prepare hidden preview windows after the owning workbench has loaded. */
 export function preparePreviewWindows(owner: BrowserWindow) {
   workbenchOwners.add(owner);
   owner.once("closed", () => {
@@ -302,6 +310,7 @@ async function capture(
       readyCaptures.get(captureId)!.reject(error);
   };
   try {
+    await previewInitializations.get(preview);
     const query = {
       [page ? "pagePreview" : "componentPreview"]: JSON.stringify({
         ...reference,

@@ -1,3 +1,4 @@
+import { desktopTestEnvironment } from "../../scripts/desktop-test-env.mjs";
 import assert from "node:assert/strict";
 import { mkdtemp, mkdir, writeFile, readdir } from "node:fs/promises";
 import { join, resolve, dirname } from "node:path";
@@ -13,7 +14,7 @@ const output = await mkdtemp(
   join(root, "output/playwright/component-gallery-"),
 );
 const env = {
-  ...process.env,
+  ...desktopTestEnvironment(),
   SHOWAI_HOME: join(output, "home"),
   SHOWAI_USER_DATA: join(output, "profile"),
 };

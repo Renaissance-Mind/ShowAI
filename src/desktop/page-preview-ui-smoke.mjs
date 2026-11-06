@@ -1,3 +1,4 @@
+import { desktopTestEnvironment } from "../../scripts/desktop-test-env.mjs";
 // Supplementary real Electron regression; UI acceptance also uses the official computer tool.
 import assert from "node:assert/strict";
 import {
@@ -28,7 +29,7 @@ assert.notEqual(
   "Use an isolated library or an authorized copy",
 );
 const env = {
-  ...process.env,
+  ...desktopTestEnvironment(),
   SHOWAI_HOME: home,
   SHOWAI_USER_DATA: join(output, "profile"),
   SHOWAI_LANGUAGE: "zh-CN",

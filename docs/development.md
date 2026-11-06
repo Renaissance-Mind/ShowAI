@@ -10,10 +10,10 @@ The development launcher builds the app with hot reload. Frontend changes update
 
 | Command                                       | What it does                                                                      |
 | --------------------------------------------- | --------------------------------------------------------------------------------- |
-| `npm run dev:open`                            | Start (or reuse) a desktop development instance in the background and open it     |
+| `npm run dev:open`                            | Start (or reuse) a hidden desktop development instance                            |
 | `npm run dev:open -- browser`                 | Same, using the browser workbench                                                 |
 | `npm run dev:status`                          | Show the running instance: mode, port, content library, source branch and process |
-| `npm run dev:desktop` / `npm run dev:browser` | Run the desktop or browser instance in the foreground                             |
+| `npm run dev:desktop` / `npm run dev:browser` | Run the launcher in the terminal without opening a UI                             |
 | `npm run dev`                                 | Standalone single-page canvas only; not a substitute for the full workbench       |
 
 By default an instance uses port 5173 and the content library `.showai-dev/library`. Give each parallel instance its own port, content library, and (for desktop) settings directory so they cannot write to each other's data:
@@ -21,13 +21,15 @@ By default an instance uses port 5173 and the content library `.showai-dev/libra
 ```sh
 mkdir -p /absolute/showai-dev-a/profile /absolute/showai-dev-a/tmp
 SHOWAI_USER_DATA=/absolute/showai-dev-a/profile TMPDIR=/absolute/showai-dev-a/tmp \
-  npm run dev:open -- --port 5180 --home /absolute/showai-dev-a/library --no-focus
+  npm run dev:open -- --port 5180 --home /absolute/showai-dev-a/library
 npm run dev:status -- --port 5180 --home /absolute/showai-dev-a/library
 ```
 
 - `--home` must be an absolute path. An instance keeps its port and library for its whole lifetime.
 - `SHOWAI_USER_DATA` isolates the desktop app's settings and agent state.
-- `--no-focus` (with `dev:open`) or `--no-open` (with `dev:desktop` / `dev:browser`) starts the instance without bringing a window forward, which is useful for automated runs.
+- Development instances stay in the background by default. Add `--show` to display the workbench; `dev:open -- --show` reuses the running instance. For desktop, use the same command with `--hide` to hide its windows again. `--url showai://project/…` requires `--show`.
+- `--no-focus` (`dev:open`) and `--no-open` (`dev:desktop` / `dev:browser`) remain compatible background options. Removing them no longer opens a window. The native development launcher icon explicitly requests `--show`.
+- Every desktop backend restart returns to hidden windows, even after an explicit show. Save refusals pause the restart and remain in status/logs without opening a modal. After changing the launcher itself, save and restart your own launcher process to load the new behavior.
 - Build output and launcher records for each instance live in `.showai-dev/<mode>-<port>/`. Do not move or delete them while the instance is running.
 - Do not point a development instance at your everyday content library (`~/.showai`) when testing changes that write data.
 
@@ -43,6 +45,7 @@ The development badge in the bottom-right corner shows the source directory, bra
 
 - `reason` (present whenever `ready` is false): a `code` and `message`. `NOT_LISTENING` (with `lastSession`, the last launcher record of that port), `NO_RESPONSE`, `PORT_IN_USE`, `OTHER_SOURCE_ROOT`, `PREPARING`, `STARTING_BACKEND`, `BUILDING`, `RESTARTING`, `WAITING_FOR_APP_QUIT` (the desktop app is closing its windows; once it agreed to quit, `step` names the service it is stopping), `BACKEND_EXITED` (with `exitCode`), `BACKEND_NOT_READY`, `BUILD_FAILED` (with `error`) or `STOPPING`. `phase` repeats the code, or is `RUNNING`.
 - `pendingRestart`: the backend is ready but still serves the code it started with (`startedCommit`) because a restart is waiting. `code` is `BUILDING`, `WAITING_FOR_PAGES`, `RESTART_PAUSED` (open pages did not confirm saving; `blockers` name each page or shared dataset, the window URL and why), `QUIT_BLOCKED` (the desktop app refused to quit; `windows` and `record`) or `BUILD_FAILED`. `since` is when the first unapplied change was requested. Fix the cause, then click the development badge to retry.
+- `presentation` (desktop): `background` plus each workbench window’s `id`, `visible` and `focused` state. Hidden windows still run the real renderer and IPC.
 - `stopBlocked`: Ctrl+C did not stop the instance because the desktop app refused to quit.
 - `quitRecord` (desktop): the path of the app's `quit-blocked.json`, which lists every window that refused to close and why.
 - `instances`: every running app that serves the requested library. They come from the presence records apps write to `<home>/local/instances/<pid>.json`, from development launchers of this checkout (`.showai-dev/*/session.json`), and from processes whose command matches the launch in `<home>/agent-runtime.json` (apps built before presence records existed). Each entry has `pid`, `mode`, `channel`, `appVersion` or `sourceCommit`, `evidence`, `self` (the service on this port) and `registered`.
@@ -79,6 +82,8 @@ To run one file: `npx vitest run src/path/to/file.test.ts`.
 ### Smoke tests
 
 Smoke tests drive the real desktop app or browser workbench and write their output under `output/playwright/`. Install Chromium once with `npx playwright-core install chromium`.
+
+Desktop smoke scripts default to `SHOWAI_BACKGROUND=1`; native windows and previews remain hidden while renderer automation and screenshots run. Set `SHOWAI_TEST_SHOW=1` only for a run that needs visible native UI. The development smoke then also verifies explicit `--show`/`--hide` and that the next hot restart hides a previously shown window. Hidden close refusals preserve data and report blockers without displaying the discard dialog. To validate that dialog itself, use a visible run.
 
 | Command                                                      | What it covers                                                                              |
 | ------------------------------------------------------------ | ------------------------------------------------------------------------------------------- |

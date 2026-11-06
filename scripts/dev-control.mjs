@@ -1,5 +1,5 @@
 /** Loopback control channel for reusing the same source development app. */
-export function developmentControl(origin, state, focus, next) {
+export function developmentControl(origin, state, focus, next, hide) {
   return (request, response) => {
     const path = new URL(request.url ?? "/", origin).pathname;
     if (!path.startsWith("/__showai-dev/")) return next(request, response);
@@ -17,6 +17,16 @@ export function developmentControl(origin, state, focus, next) {
       response.end(
         JSON.stringify({ protocol: "showai-development-v1", ...state() }),
       );
+      return;
+    }
+    if (path === "/__showai-dev/hide" && request.method === "POST") {
+      if (!state().ready || state().mode !== "desktop" || !hide) {
+        response.writeHead(409);
+        response.end(JSON.stringify({ error: "Desktop app is not ready" }));
+        return;
+      }
+      hide();
+      response.end(JSON.stringify({ ok: true }));
       return;
     }
     if (path === "/__showai-dev/focus" && request.method === "POST") {

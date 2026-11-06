@@ -1,6 +1,14 @@
 import { spawn } from "node:child_process";
 import { once } from "node:events";
-import { mkdir, open, readFile, rm, stat, writeFile } from "node:fs/promises";
+import {
+  mkdir,
+  open,
+  readFile,
+  rename,
+  rm,
+  stat,
+  writeFile,
+} from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
@@ -15,8 +23,16 @@ const { values, positionals } = parseArgs({
     home: { type: "string" },
     url: { type: "string" },
     "no-focus": { type: "boolean" },
+    show: { type: "boolean" },
+    hide: { type: "boolean" },
   },
 });
+if (
+  (values.show && (values.hide || values["no-focus"])) ||
+  (values.status && (values.show || values.hide))
+)
+  throw new Error("Choose either --show, --hide, --no-focus or --status.");
+if (values.url && !values.show) throw new Error("--url requires --show.");
 const readJson = (path) =>
   readFile(path, "utf8")
     .then(JSON.parse)
@@ -28,6 +44,8 @@ const config = (await readJson(join(root, ".showai-dev/launcher.json"))) ?? {};
 const mode = positionals[0] ?? "desktop";
 if (!["desktop", "browser"].includes(mode) || positionals.length > 1)
   throw new Error("Choose desktop or browser.");
+if (values.hide && mode !== "desktop")
+  throw new Error("--hide requires desktop mode.");
 const port = Number(values.port ?? config.port ?? 5173);
 if (!Number.isInteger(port) || port < 1 || port > 65535)
   throw new Error("Invalid development port.");
@@ -261,15 +279,21 @@ while (!owned) {
   );
   if (owned) {
     await writeFile(
-      join(lock, "owner.json"),
+      join(lock, "owner.json.tmp"),
       JSON.stringify({ pid: process.pid }),
     );
+    await rename(join(lock, "owner.json.tmp"), join(lock, "owner.json"));
     break;
   }
   const owner = await readJson(join(lock, "owner.json"));
-  if (
-    owner ? !alive(owner.pid) : Date.now() - (await stat(lock)).mtimeMs > 10000
-  ) {
+  const lockStat = !owner
+    ? await stat(lock).catch((error) => {
+        if (error.code === "ENOENT") return undefined;
+        throw error;
+      })
+    : undefined;
+  if (!owner && !lockStat) continue;
+  if (owner ? !alive(owner.pid) : Date.now() - lockStat.mtimeMs > 10000) {
     await rm(lock, { recursive: true });
     continue;
   }
@@ -315,17 +339,40 @@ try {
     await delay(250);
     current = await status();
   }
-  const focusUrl = new URL("/__showai-dev/focus", origin);
+  const focusUrl = new URL(
+    values.hide ? "/__showai-dev/hide" : "/__showai-dev/focus",
+    origin,
+  );
   if (values.url) focusUrl.searchParams.set("url", values.url);
-  if (!values["no-focus"]) {
+  if (values.show || values.hide) {
     const focused = await fetch(focusUrl, {
       method: "POST",
       headers: { Origin: origin },
     });
     if (!focused.ok)
       throw new Error(`无法打开开发窗口：${await focused.text()}`);
+    if (mode === "desktop" && current.presentation) {
+      do {
+        current = await status();
+        const state = current?.presentation;
+        if (
+          state &&
+          (values.hide
+            ? state.background &&
+              state.windows.every(
+                (window) => !window.visible && !window.focused,
+              )
+            : !state.background &&
+              state.windows.some((window) => window.visible))
+        )
+          break;
+        if (Date.now() > deadline)
+          throw new Error(`窗口状态未更新，请查看 ${logPath}`);
+        await delay(100);
+      } while (true);
+    }
   }
-  console.log(JSON.stringify({ ...current, logPath }));
+  console.log(JSON.stringify({ ...(await status()), logPath }));
 } finally {
   await rm(lock, { recursive: true, force: true });
 }

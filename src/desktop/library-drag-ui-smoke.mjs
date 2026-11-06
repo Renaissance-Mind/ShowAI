@@ -1,3 +1,4 @@
+import { desktopTestEnvironment } from "../../scripts/desktop-test-env.mjs";
 // Build first, then run: node src/desktop/library-drag-ui-smoke.mjs.
 // Real pointer gestures, Electron IPC and isolated versioned storage; no mocked bridge.
 import assert from "node:assert/strict";
@@ -12,7 +13,7 @@ await mkdir(join(root, "output/playwright"), { recursive: true });
 const output = await mkdtemp(join(root, "output/playwright/library-drag-"));
 const home = join(output, "home");
 const env = {
-  ...process.env,
+  ...desktopTestEnvironment(),
   SHOWAI_HOME: home,
   SHOWAI_USER_DATA: join(output, "profile"),
   SHOWAI_LANGUAGE: "zh-CN",

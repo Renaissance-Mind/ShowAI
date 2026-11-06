@@ -1,3 +1,4 @@
+import { desktopTestEnvironment } from "./desktop-test-env.mjs";
 // Real CLI, filesystem, local browser bridge and exported readers. No mocked services.
 import assert from "node:assert/strict";
 import { execFile, spawn } from "node:child_process";
@@ -23,7 +24,7 @@ const desktop =
   process.argv.includes("--desktop") ||
   Boolean(process.env.SHOWAI_SMOKE_BINARY);
 const env = {
-  ...process.env,
+  ...desktopTestEnvironment(),
   SHOWAI_HOME: join(output, "home"),
   SHOWAI_USER_DATA: join(output, "profile"),
 };

@@ -1,3 +1,4 @@
+import { desktopTestEnvironment } from "../../scripts/desktop-test-env.mjs";
 // Real sidebar/menu acceptance. Build first, then node src/desktop/library-ui-smoke.mjs.
 // Optional SHOWAI_SMOKE_BINARY points at an already built application executable.
 // All writes use an isolated home/profile; evidence and canonical files are retained.
@@ -49,7 +50,7 @@ const fingerprints = async () =>
       ]),
     ),
   );
-const env = { ...process.env, SHOWAI_HOME: home, SHOWAI_USER_DATA: profile };
+const env = { ...desktopTestEnvironment(), SHOWAI_HOME: home, SHOWAI_USER_DATA: profile };
 delete env.ELECTRON_RUN_AS_NODE;
 const readJson = async (path) => JSON.parse(await readFile(path, "utf8"));
 async function poll(read, accepts, label) {

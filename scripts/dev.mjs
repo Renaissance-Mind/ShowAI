@@ -25,13 +25,16 @@ const { values, positionals } = parseArgs({
     port: { type: "string" },
     home: { type: "string" },
     "no-open": { type: "boolean" },
+    show: { type: "boolean" },
     help: { type: "boolean" },
   },
 });
+if (values.show && values["no-open"])
+  throw new Error("--show conflicts with --no-open.");
 const mode = positionals[0];
 if (values.help) {
   console.log(
-    "npm run dev:desktop|dev:browser -- [--port 5173] [--home /absolute/library] [--no-open]\n前端自动更新，本地服务保存完成后自动重启。不同 worktree 请使用不同端口与测试内容库。",
+    "npm run dev:desktop|dev:browser -- [--port 5173] [--home /absolute/library] [--show | --no-open]\n默认后台运行；--show 显示窗口。前端自动更新，本地服务保存完成后自动重启。不同 worktree 请使用不同端口与测试内容库。",
   );
   process.exit(0);
 }
@@ -223,6 +226,7 @@ frontendServer.on(
       startup,
       pid: process.pid,
       backendPid: child?.pid,
+      ...(presentation ? { presentation } : {}),
       ready: !!child && !!readyReceipt,
       ...statusDetails(),
       cli: {
@@ -237,6 +241,11 @@ frontendServer.on(
       else child?.send("showai:development-open");
     },
     vite.middlewares,
+    () => {
+      if (mode !== "desktop")
+        throw new Error("Only desktop instances can be hidden.");
+      child?.send("showai:development-hide");
+    },
   ),
 );
 const sessions = developmentSessions(vite.ws);
@@ -252,6 +261,7 @@ let child,
   timer;
 let dependencies = new Set();
 let readyReceipt;
+let presentation;
 // What dev:status explains: why the backend is not serving (phase) and what
 // keeps a source change from reaching a backend that still serves (pendingRestart).
 let phase = { code: "PREPARING", since: new Date().toISOString() };
@@ -344,6 +354,7 @@ const environment = {
   SHOWAI_VIEWER: join(runtime, "assets/viewer.html"),
   SHOWAI_DEV_BACKEND_PORT: String(backendPort),
   SHOWAI_DEV_TOKEN: token,
+  SHOWAI_BACKGROUND: "1",
   SHOWAI_DEV_SETTINGS: join(directory, "browser-settings.json"),
   SHOWAI_USER_DATA: process.env.SHOWAI_USER_DATA ?? join(directory, "profile"),
   SHOWAI_HOME: resolve(
@@ -405,10 +416,17 @@ const entrypoints = [
           input: "src/desktop/page-preview-worker.ts",
           output: "desktop/page-preview-worker.mjs",
           external: [],
-          plugins: [rawSourcePlugin, {
-            name: "page-preview-compiler",
-            setup(builder) { builder.onResolve({ filter: /^esbuild$/ }, () => ({ path: join(root, "src/desktop/page-preview-compiler.ts") })); },
-          }],
+          plugins: [
+            rawSourcePlugin,
+            {
+              name: "page-preview-compiler",
+              setup(builder) {
+                builder.onResolve({ filter: /^esbuild$/ }, () => ({
+                  path: join(root, "src/desktop/page-preview-compiler.ts"),
+                }));
+              },
+            },
+          ],
           banner,
         },
       ]),
@@ -533,6 +551,7 @@ function writeSession() {
         url: origin + "/",
         pid: process.pid,
         backendPid: child?.pid,
+        ...(presentation ? { presentation } : {}),
         home: readyReceipt.home,
         runtime,
         startedAt: launchedAt,
@@ -549,6 +568,7 @@ function writeSession() {
 }
 async function launch() {
   readyReceipt = undefined;
+  presentation = undefined;
   setPhase(startup ? "RESTARTING" : "STARTING_BACKEND");
   const args =
     mode === "desktop"
@@ -573,6 +593,10 @@ async function launch() {
       30000,
     );
     next.on("message", (message) => {
+      if (message?.type === "presentation") {
+        presentation = message.presentation;
+        if (readyReceipt) void writeSession();
+      }
       if (message?.type === "ready") {
         clearTimeout(deadline);
         readyReceipt = message;
@@ -624,7 +648,10 @@ async function stopChild() {
   setPhase("WAITING_FOR_APP_QUIT", { pid: previous.pid });
   const exited = new Promise((done, reject) => {
     const blocked = (message) => {
-      if (message?.type === "quit-progress" && typeof message.step === "string") {
+      if (
+        message?.type === "quit-progress" &&
+        typeof message.step === "string"
+      ) {
         // The App agreed to quit and is stopping this service.
         phase = {
           ...phase,
@@ -660,7 +687,9 @@ function quitBlockedDetails(message) {
   return {
     record: typeof message?.record === "string" ? message.record : undefined,
     at: typeof message?.at === "string" ? message.at : new Date().toISOString(),
-    windows: Array.isArray(message?.windows) ? message.windows.slice(0, 20) : [],
+    windows: Array.isArray(message?.windows)
+      ? message.windows.slice(0, 20)
+      : [],
   };
 }
 async function rebuild(backend = true) {
@@ -737,10 +766,14 @@ async function rebuild(backend = true) {
     else if (step === "launch" && !child)
       setPhase("BACKEND_EXITED", {
         error: failure,
-        ...(lastExit ? { exitCode: lastExit.exitCode, signal: lastExit.signal } : {}),
+        ...(lastExit
+          ? { exitCode: lastExit.exitCode, signal: lastExit.signal }
+          : {}),
       });
-    else if (step === "launch") setPhase("BACKEND_NOT_READY", { error: failure });
-    else if (!child || !readyReceipt) setPhase("BUILD_FAILED", { error: failure });
+    else if (step === "launch")
+      setPhase("BACKEND_NOT_READY", { error: failure });
+    else if (!child || !readyReceipt)
+      setPhase("BUILD_FAILED", { error: failure });
     console.error("ShowAI 开发更新失败：", error);
     vite.ws.send("showai:restart-cancelled", {});
     vite.ws.send("showai:status", {
@@ -824,8 +857,10 @@ try {
   console.log(
     `启动耗时：${startup.totalMs} ms（准备 ${startup.preparationMs} ms，本地服务与窗口 ${startup.backendMs} ms）。`,
   );
-  if (mode === "browser" && !values["no-open"])
-    child.send("showai:development-open");
+  if (values.show) {
+    if (mode === "desktop") child.send({ type: "showai:development-focus" });
+    else child.send("showai:development-open");
+  }
   const gitPaths = ["HEAD", "refs/heads", "packed-refs"].map((path) =>
     resolve(root, git(["rev-parse", "--git-path", path])),
   );
@@ -839,8 +874,7 @@ try {
       const module = vite.environments.client.moduleGraph.getModuleById(
         "\0virtual:showai-development-info",
       );
-      if (module)
-        vite.environments.client.moduleGraph.invalidateModule(module);
+      if (module) vite.environments.client.moduleGraph.invalidateModule(module);
       vite.ws.send("showai:identity", identity);
       if (readyReceipt)
         void writeSession().catch((error) =>

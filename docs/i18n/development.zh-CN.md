@@ -10,10 +10,10 @@
 
 | 命令                                          | 作用                                                 |
 | --------------------------------------------- | ---------------------------------------------------- |
-| `npm run dev:open`                            | 在后台启动（或复用）桌面开发实例并打开窗口           |
+| `npm run dev:open`                            | 在后台启动（或复用）隐藏的桌面开发实例               |
 | `npm run dev:open -- browser`                 | 同上，使用浏览器工作台                               |
 | `npm run dev:status`                          | 显示运行中的实例：模式、端口、内容库、源码分支和进程 |
-| `npm run dev:desktop` / `npm run dev:browser` | 在前台运行桌面或浏览器实例                           |
+| `npm run dev:desktop` / `npm run dev:browser` | 在终端运行启动器，默认不显示界面                     |
 | `npm run dev`                                 | 仅独立的单页画布，不能代替完整工作台                 |
 
 实例默认使用 5173 端口和内容库 `.showai-dev/library`。并行运行多个实例时，为每个实例分配独立的端口、内容库和（桌面版的）设置目录，避免它们写入彼此的数据：
@@ -21,13 +21,15 @@
 ```sh
 mkdir -p /absolute/showai-dev-a/profile /absolute/showai-dev-a/tmp
 SHOWAI_USER_DATA=/absolute/showai-dev-a/profile TMPDIR=/absolute/showai-dev-a/tmp \
-  npm run dev:open -- --port 5180 --home /absolute/showai-dev-a/library --no-focus
+  npm run dev:open -- --port 5180 --home /absolute/showai-dev-a/library
 npm run dev:status -- --port 5180 --home /absolute/showai-dev-a/library
 ```
 
 - `--home` 必须是绝对路径。实例在整个生命周期内保持同一个端口和内容库。
 - `SHOWAI_USER_DATA` 隔离桌面应用的设置和 Agent 状态。
-- `--no-focus`（配合 `dev:open`）或 `--no-open`（配合 `dev:desktop` / `dev:browser`）启动实例时不把窗口切到前台，适合自动化运行。
+- 开发实例默认后台运行。加 `--show` 才显示工作台；`dev:open -- --show` 复用正在运行的实例。桌面验收后用相同命令加 `--hide` 收回窗口。`--url showai://project/…` 必须与 `--show` 一起使用。
+- 旧 `--no-focus`（`dev:open`）和 `--no-open`（`dev:desktop` / `dev:browser`）仍兼容后台运行；去掉它们不再显示窗口。原生开发启动器图标主动传入 `--show`。
+- 桌面后端每次重启都回到隐藏状态，即使此前显式显示过。保存拒绝会暂停重启，并把原因保留在状态与日志中，不弹出决定对话框。修改启动器自身后，需要保存并重启自己启动的服务以加载新逻辑。
 - 每个实例的构建产物和启动记录位于 `.showai-dev/<mode>-<port>/`。实例运行期间不要移动或删除它们。
 - 测试会写入数据的改动时，不要让开发实例指向日常使用的内容库（`~/.showai`）。
 
@@ -43,6 +45,7 @@ npm run dev:status -- --port 5180 --home /absolute/showai-dev-a/library
 
 - `reason`（`ready` 为 false 时出现）：包含 `code` 和 `message`。可能是 `NOT_LISTENING`（附 `lastSession`，即该端口最近一次的启动记录）、`NO_RESPONSE`、`PORT_IN_USE`、`OTHER_SOURCE_ROOT`、`PREPARING`、`STARTING_BACKEND`、`BUILDING`、`RESTARTING`、`WAITING_FOR_APP_QUIT`（桌面应用正在关闭窗口；同意退出后，`step` 给出正在停止的服务）、`BACKEND_EXITED`（附 `exitCode`）、`BACKEND_NOT_READY`、`BUILD_FAILED`（附 `error`）或 `STOPPING`。`phase` 重复该代码，或为 `RUNNING`。
 - `pendingRestart`：后端已就绪，但因为有一次重启在等待，仍在运行启动时的代码（`startedCommit`）。`code` 为 `BUILDING`、`WAITING_FOR_PAGES`、`RESTART_PAUSED`（打开的页面没有确认保存；`blockers` 列出每个页面或共享数据集、窗口 URL 和原因）、`QUIT_BLOCKED`（桌面应用拒绝退出；附 `windows` 和 `record`）或 `BUILD_FAILED`。`since` 是第一个尚未生效的改动请求的时间。处理原因后，点击开发标记重试。
+- `presentation`（桌面版）：包含 `background` 和各工作台窗口的 `id`、`visible`、`focused`。隐藏窗口仍运行真实渲染器和 IPC。
 - `stopBlocked`：桌面应用拒绝退出，Ctrl+C 没能停止实例。
 - `quitRecord`（桌面版）：应用的 `quit-blocked.json` 路径，其中列出每个拒绝关闭的窗口及原因。
 - `instances`：所有正在服务所请求内容库的应用。来源包括应用写入 `<home>/local/instances/<pid>.json` 的在线记录、本 checkout 的开发启动记录（`.showai-dev/*/session.json`），以及命令与 `<home>/agent-runtime.json` 中启动配置一致的进程（用于没有在线记录的旧版应用）。每项包含 `pid`、`mode`、`channel`、`appVersion` 或 `sourceCommit`、`evidence`、`self`（本端口的服务）和 `registered`。
@@ -79,6 +82,8 @@ Vitest 配置位于 `vite.config.ts` 的 `test` 部分。测试文件为 `src/**
 ### 冒烟测试
 
 冒烟测试驱动真实的桌面应用或浏览器工作台，输出写入 `output/playwright/`。先运行一次 `npx playwright-core install chromium` 安装 Chromium。
+
+桌面 smoke 脚本默认设置 `SHOWAI_BACKGROUND=1`，窗口和预览保持隐藏，渲染器自动化及截图仍正常运行。只有确实需要可见原生界面的测试才设置 `SHOWAI_TEST_SHOW=1`；开发 smoke 此时还会验证显式 `--show` / `--hide`，以及下一次热重启会隐藏此前显示的窗口。后台关闭被拒绝时保留数据并记录阻塞原因，不显示丢弃草稿对话框；该对话框本身通过可见运行验收。
 
 | 命令                                                         | 覆盖范围                                                               |
 | ------------------------------------------------------------ | ---------------------------------------------------------------------- |

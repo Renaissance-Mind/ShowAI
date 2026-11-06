@@ -1,3 +1,4 @@
+import { desktopTestEnvironment } from "../../scripts/desktop-test-env.mjs";
 // Build first, then node src/desktop/window-ui-smoke.mjs.
 // Exercises real native windows against an isolated content library and profile.
 import assert from "node:assert/strict";
@@ -12,7 +13,7 @@ const parent = join(repository, "output/playwright");
 await mkdir(parent, { recursive: true });
 const output = await mkdtemp(join(parent, "window-ui-"));
 const env = {
-  ...process.env,
+  ...desktopTestEnvironment(),
   SHOWAI_LANGUAGE: "zh-CN",
   SHOWAI_HOME: join(output, "home"),
   SHOWAI_USER_DATA: join(output, "profile"),

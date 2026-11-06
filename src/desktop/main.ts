@@ -1,3 +1,4 @@
+import { DesktopPresentation } from "./presentation";
 import { changedResources } from "../core/change-notification";
 import { watchDatasetSources } from "../core/dataset-sources";
 import { datasetDependents } from "../core/dataset-dependents";
@@ -112,6 +113,15 @@ const t = translator(desktopMessages);
 const directory = dirname(fileURLToPath(import.meta.url));
 const repository = resolve(directory, "..");
 const windows = new Set<BrowserWindow>();
+const presentation = new DesktopPresentation(
+  process.env.SHOWAI_BACKGROUND === "1" ||
+    (!!process.env.SHOWAI_DEV_URL && process.env.SHOWAI_BACKGROUND !== "0"),
+  windows,
+  (state) => {
+    if (process.env.SHOWAI_DEV_URL)
+      process.send?.({ type: "presentation", presentation: state });
+  },
+);
 const menuCommands = new MenuCommandQueue<BrowserWindow, MenuCommand>(
   (window, command) => {
     if (!window.isDestroyed())
@@ -516,11 +526,16 @@ async function menuWindow(target?: unknown): Promise<BrowserWindow> {
   return createWindow();
 }
 
+function showWindowError(title: string, error: unknown) {
+  if (presentation.background) console.error(title, errorResult(error).message);
+  else dialog.showErrorBox(title, errorResult(error).message);
+}
+
 function sendMenuCommand(command: MenuCommand) {
   return (_item: unknown, target: unknown) => {
     void menuWindow(target)
       .then((window) => {
-        window.show();
+        presentation.show(window);
         menuCommands.send(window, command);
       })
       .catch((error) => console.error("ShowAI menu command:", error));
@@ -598,10 +613,7 @@ function buildApplicationMenu() {
             accelerator: "CommandOrControl+Shift+N",
             click: () =>
               void createWindow().catch((error) =>
-                dialog.showErrorBox(
-                  t("openWindowFailed"),
-                  errorResult(error).message,
-                ),
+                showWindowError(t("openWindowFailed"), error),
               ),
           },
           { type: "separator" },
@@ -984,7 +996,7 @@ function windowTitle(window: BrowserWindow): string {
  * logout), so the window that explains it is restored and brought to the front.
  */
 function revealWindow(window: BrowserWindow): void {
-  if (window.isDestroyed()) return;
+  if (window.isDestroyed() || presentation.background) return;
   if (window.isMinimized()) window.restore();
   if (process.platform === "darwin") {
     app.show();
@@ -1201,6 +1213,11 @@ function requestClose(
             seconds: CLOSE_REPLY_TIMEOUT_MS / 1000,
           },
         ];
+    // Hidden automation must preserve changes and report the refusal without a modal.
+    if (presentation.background) {
+      noteRefusal(window, trigger, blockers, "kept-open");
+      return outcome(false, blockers, "keep");
+    }
     noteRefusal(window, trigger, blockers, "awaiting-decision");
     revealWindow(window);
     let decision: "retry" | "discard" | "keep";
@@ -1265,6 +1282,10 @@ function watchWindowHealth(window: BrowserWindow): void {
     waitable = false,
   ) => {
     if (open || window.isDestroyed()) return;
+    if (presentation.background) {
+      console.error("ShowAI background window failed:", details);
+      return;
+    }
     open = true;
     try {
       for (;;) {
@@ -1342,6 +1363,7 @@ async function createWindow(page?: WindowTarget): Promise<BrowserWindow> {
     trafficLightPosition:
       process.platform === "darwin" ? { x: 16, y: 12 } : undefined,
     webPreferences: {
+      backgroundThrottling: !presentation.background,
       preload: join(directory, "preload.cjs"),
       contextIsolation: true,
       nodeIntegration: false,
@@ -1351,12 +1373,12 @@ async function createWindow(page?: WindowTarget): Promise<BrowserWindow> {
     },
   });
   windows.add(window);
+  presentation.track(window);
   // A reload or navigation replaces the renderer's menu listener.
   window.webContents.on("did-start-navigation", (details) => {
     if (details.isMainFrame && !details.isSameDocument)
       menuCommands.reset(window);
   });
-  preparePreviewWindows(window);
   watchWindowHealth(window);
   applyWindowAppearance(
     window,
@@ -1420,7 +1442,7 @@ async function createWindow(page?: WindowTarget): Promise<BrowserWindow> {
             }
           : undefined,
       ).catch((error) =>
-        dialog.showErrorBox(t("openPageFailed"), errorResult(error).message),
+        showWindowError(t("openPageFailed"), error),
       );
       return { action: "deny" };
     }
@@ -1442,7 +1464,7 @@ async function createWindow(page?: WindowTarget): Promise<BrowserWindow> {
     if (!event.isMainFrame && !event.url.startsWith("about:"))
       event.preventDefault();
   });
-  window.once("ready-to-show", () => window.show());
+  window.once("ready-to-show", () => presentation.show(window));
   const query = windowQuery(page);
   if (process.env.SHOWAI_DEV_URL) {
     const url = new URL(process.env.SHOWAI_DEV_URL);
@@ -1450,6 +1472,7 @@ async function createWindow(page?: WindowTarget): Promise<BrowserWindow> {
       url.searchParams.set(key, value);
     await window.loadURL(url.href);
   } else await window.loadFile(join(directory, "index.html"), { query });
+  preparePreviewWindows(window);
   return window;
 }
 
@@ -1472,6 +1495,10 @@ async function handleDeepLink(source: string): Promise<void> {
     const window =
       [...windows].find((window) => !window.isDestroyed()) ??
       (await createWindow());
+    if (presentation.background) {
+      console.error("ShowAI background link failed:", errorResult(error).message);
+      return;
+    }
     window.show();
     window.focus();
     const missing =
@@ -1524,8 +1551,7 @@ async function openDeepLink(source: string): Promise<void> {
       url.searchParams.get("code") ?? "",
     );
     const window = [...windows][0];
-    window?.show();
-    window?.focus();
+    if (window) presentation.show(window);
     return;
   }
   if (url.protocol === "showai:" && url.hostname === "join") {
@@ -1654,6 +1680,7 @@ async function openStartupLibrary(
       }
     }
     mainLog.write("warn", "main", `${prompt.message}: ${prompt.detail}`);
+    if (presentation.background) throw new Error(`${prompt.message}: ${prompt.detail}`);
     const retry = !damagedBackup || home !== undefined;
     const buttons = [
       ...(retry ? [t("action.retry")] : []),
@@ -1689,6 +1716,7 @@ async function openStartupLibrary(
 
 async function startupFailed(error: unknown): Promise<void> {
   console.error("ShowAI startup failed:", error);
+  if (presentation.background) return;
   const message = errorResult(error).message;
   for (;;) {
     const buttons = [
@@ -1720,28 +1748,19 @@ else {
   if (!app.isPackaged && process.env.SHOWAI_DEV_URL)
     process.on("message", (message) => {
       if (message === "showai:development-quit") app.quit();
+      if (message === "showai:development-hide") presentation.hide();
       if (
         message &&
         typeof message === "object" &&
         "type" in message &&
         message.type === "showai:development-focus"
       ) {
-        if ("url" in message && typeof message.url === "string")
-          void handleDeepLink(message.url);
-        else {
-          const window = [...windows][0];
-          if (window) {
-            window.restore();
-            window.show();
-            window.focus();
-          } else
-            void createWindow().catch((error) =>
-              dialog.showErrorBox(
-                t("openWindowFailed"),
-                errorResult(error).message,
-              ),
-            );
-        }
+        void (async () => {
+          if ("url" in message && typeof message.url === "string")
+            await handleDeepLink(message.url);
+          const window = [...windows].at(-1) ?? (await createWindow());
+          presentation.show(window, true);
+        })().catch((error) => console.error("ShowAI development show failed:", error));
       }
     });
   // Granted local files (videos, audio, images) for the workbench player; streamed with ranges.
@@ -1768,8 +1787,7 @@ else {
     if (link) void handleDeepLink(link);
     else {
       const window = [...windows][0];
-      window?.show();
-      window?.focus();
+      if (window) presentation.show(window);
     }
   });
   app
@@ -2044,7 +2062,9 @@ else {
       else await createWindow({ restoreTabs: true });
       if (!app.isPackaged && process.env.SHOWAI_DEV_URL)
         process.send?.({ type: "ready", home: store.root });
+      presentation.report();
       app.on("activate", () => {
+        if (presentation.background) return;
         if (!windows.size) void createWindow();
       });
     })
