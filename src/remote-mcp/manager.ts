@@ -8,11 +8,13 @@ import { startMcpHttpServer } from "../agent/mcp-http";
 import { FileStore, assertId } from "../core/store";
 import type { RemoteMcpConfig, RemoteMcpStatus } from "./types";
 import { installCloudflared } from "./install";
+import { localLibraryPolicy } from "./local-library";
 
 const defaults: RemoteMcpConfig = {
   provider: "cloudflare-quick",
   publicUrl: "",
-  port: 18789,
+  port: 0,
+  access: "all",
   executable: "",
   projects: [],
 };
@@ -22,11 +24,12 @@ export function validateRemoteMcpConfig(value: unknown): RemoteMcpConfig {
     !c ||
     !["cloudflare-quick", "cloudflare", "tailscale"].includes(c.provider) ||
     !Number.isInteger(c.port) ||
-    c.port < 1024 ||
+    (c.port !== 0 && c.port < 1024) ||
     c.port > 65535 ||
     typeof c.publicUrl !== "string" ||
     typeof c.executable !== "string" ||
     (c.executable && !isAbsolute(c.executable)) ||
+    (c.access !== undefined && !["all", "selected"].includes(c.access)) ||
     !Array.isArray(c.projects)
   )
     throw new Error("Invalid remote connection configuration.");
@@ -38,7 +41,7 @@ export function validateRemoteMcpConfig(value: unknown): RemoteMcpConfig {
   if (new Set(projects.map((p) => p.id)).size !== projects.length)
     throw new Error("Duplicate project permissions.");
   let publicUrl = c.publicUrl.trim();
-  if (c.provider === "cloudflare") {
+  if (c.provider === "cloudflare" && publicUrl) {
     const u = new URL(publicUrl);
     if (
       u.protocol !== "https:" ||
@@ -55,6 +58,7 @@ export function validateRemoteMcpConfig(value: unknown): RemoteMcpConfig {
   }
   return {
     provider: c.provider,
+    access: c.access ?? "all",
     port: c.port,
     publicUrl,
     executable: c.executable.trim(),
@@ -73,6 +77,7 @@ export class RemoteMcpManager {
   private checkedAt?: string;
   private reachable?: boolean;
   private lastCallAt?: string;
+  private lastCallClientId?: string;
   private child?: ChildProcess;
   private childClosed?: Promise<void>;
   private http?: Awaited<ReturnType<typeof startMcpHttpServer>>;
@@ -105,6 +110,8 @@ export class RemoteMcpManager {
         throw error;
       });
       if (saved) {
+        // Legacy setup required picking projects without an explicit access mode.
+        // New defaults are library-wide; old limited grants are revoked before use.
         this.config = validateRemoteMcpConfig(saved.config);
         this.managedCloudflared =
           typeof saved.managedCloudflared === "string"
@@ -194,6 +201,7 @@ export class RemoteMcpManager {
       checkedAt: this.checkedAt,
       reachable: this.reachable,
       lastCallAt: this.lastCallAt,
+      lastCallClientId: this.lastCallClientId,
       clients: this.http?.authorization.connections() ?? [],
       projects: projects
         .filter((p) => !p.archived)
@@ -212,19 +220,95 @@ export class RemoteMcpManager {
   start(value: unknown, token?: unknown) {
     return this.command(() => this.startImpl(value, token));
   }
+  prepare(value: unknown) {
+    return this.command(async () => {
+      await this.initialize();
+      if (["starting", "running"].includes(this.phase))
+        throw new Error("Stop the connection before changing its route.");
+      const input = value as RemoteMcpConfig;
+      const config = validateRemoteMcpConfig({
+        ...input,
+        publicUrl: "https://setup.invalid",
+      });
+      config.publicUrl = input.publicUrl;
+      await this.stopImpl();
+      this.config = config;
+      this.http = await this.openListener(config);
+      this.config = {
+        ...config,
+        port: Number(new URL(this.http.localUrl).port),
+      };
+      this.phase = "prepared";
+      this.error = undefined;
+      return this.status();
+    });
+  }
+  private localPolicy(c: RemoteMcpConfig) {
+    const home = this.options.home();
+    return {
+      root: home,
+      ...localLibraryPolicy(home, c),
+      consumePairingCode: (code: string) => {
+        const digest = createHash("sha256").update(code.trim()).digest();
+        if (
+          !this.pairing ||
+          this.pairing.expires < Date.now() ||
+          !timingSafeEqual(digest, this.pairing.hash)
+        )
+          return false;
+        this.pairing = undefined;
+        return true;
+      },
+      onCall: (_name: string, clientId: string) => {
+        this.lastCallClientId = clientId;
+        this.lastCallAt = new Date().toISOString();
+      },
+    };
+  }
+  private serverOptions(c: RemoteMcpConfig, origin?: string) {
+    return {
+      local: this.localPolicy(c),
+      instanceId: this.instanceId,
+      stateDirectory: join(
+        this.options.directory,
+        createHash("sha256")
+          .update(this.options.home() + (origin ?? this.instanceId))
+          .digest("hex"),
+      ),
+    };
+  }
+  private async openListener(c: RemoteMcpConfig, origin?: string) {
+    const options = this.serverOptions(c, origin);
+    try {
+      return await startMcpHttpServer({
+        ...options,
+        port: c.provider === "cloudflare" ? c.port : 0,
+        publicUrl: origin,
+      });
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== "EADDRINUSE") throw error;
+      return startMcpHttpServer({ ...options, port: 0, publicUrl: origin });
+    }
+  }
   private async startImpl(value: unknown, token?: unknown) {
     await this.initialize();
     if (this.phase === "starting" || this.phase === "running")
       throw new Error(
         "Stop the current connection before changing its configuration.",
       );
-    await this.stopImpl();
+    if (this.phase !== "prepared") await this.stopImpl();
     const config = validateRemoteMcpConfig(value);
-    if (!config.projects.length)
+    if (config.provider === "cloudflare" && !config.publicUrl)
+      throw new Error("Enter the public HTTPS domain before connecting.");
+    if (config.access === "selected" && !config.projects.length)
       throw new Error("Select at least one project.");
     const store = new FileStore(this.options.home());
     for (const p of config.projects) await store.readProject(p.id);
-    if (typeof token === "string" && token.trim())
+    if (
+      config.provider === "cloudflare" &&
+      typeof token === "string" &&
+      token.trim()
+    )
       this.encryptedToken = this.options.encrypt(token.trim());
     if (config.provider === "cloudflare" && !this.encryptedToken)
       throw new Error("Enter your Cloudflare tunnel token.");
@@ -243,6 +327,8 @@ export class RemoteMcpManager {
     this.phase = "starting";
     this.error = undefined;
     this.diagnostics = undefined;
+    this.lastCallAt = undefined;
+    this.lastCallClientId = undefined;
     this.checkedAt = undefined;
     this.reachable = undefined;
     this.abort = new AbortController();
@@ -307,51 +393,25 @@ export class RemoteMcpManager {
         );
       origin = `https://${String(state.Self.DNSName).replace(/\.$/, "")}`;
     }
-    const home = this.options.home();
-    const local = {
-      root: home,
-      projects: async () => {
-        const available = await new FileStore(home).listProjects({
-          includeArchived: true,
-        });
-        return available
-          .filter((p) => c.projects.some((a) => a.id === p.id))
-          .map((p) => ({
-            id: p.id,
-            name: p.name,
-            archived: p.archived,
-            role: c.projects.find((a) => a.id === p.id)!.write
-              ? ("editor" as const)
-              : ("viewer" as const),
-          }));
-      },
-      consumePairingCode: (code: string) => {
-        const digest = createHash("sha256").update(code.trim()).digest();
-        if (
-          !this.pairing ||
-          this.pairing.expires < Date.now() ||
-          !timingSafeEqual(digest, this.pairing.hash)
-        )
-          return false;
-        this.pairing = undefined;
-        return true;
-      },
-      onCall: () => {
-        this.lastCallAt = new Date().toISOString();
-      },
-    };
-    const options = {
-      port: c.port,
-      local,
-      instanceId: this.instanceId,
-      stateDirectory: join(
-        this.options.directory,
-        createHash("sha256")
-          .update(home + (origin ?? this.instanceId))
-          .digest("hex"),
-      ),
-    };
-    this.http = await startMcpHttpServer({ ...options, publicUrl: origin });
+    if (this.http)
+      await this.http.configure({
+        ...this.serverOptions(c, origin),
+        publicUrl: origin ?? this.http.localUrl,
+      });
+    else this.http = await this.openListener(c, origin);
+    if (c.access !== "selected") {
+      for (const client of this.http.authorization.connections())
+        if (client.projectAccess !== "account")
+          this.http.authorization.revoke(client.id);
+    }
+    const actualPort = Number(new URL(this.http.localUrl).port);
+    if (c.provider === "cloudflare" && actualPort !== c.port) {
+      this.config = { ...c, port: actualPort };
+      this.phase = "prepared";
+      this.error =
+        "The local route changed. Copy the new address to your Cloudflare route, then connect again.";
+      return;
+    }
     signal.throwIfAborted();
     const tunnelToken =
       c.provider === "cloudflare"
@@ -359,7 +419,7 @@ export class RemoteMcpManager {
         : "";
     const args =
       c.provider === "tailscale"
-        ? ["funnel", "--yes", String(c.port)]
+        ? ["funnel", "--yes", String(actualPort)]
         : c.provider === "cloudflare"
           ? ["tunnel", "--no-autoupdate", "run"]
           : ["tunnel", "--no-autoupdate", "--url", this.http.localUrl];
@@ -425,16 +485,9 @@ export class RemoteMcpManager {
         });
       });
       signal.throwIfAborted();
-      await this.http.close();
-      this.http = await startMcpHttpServer({
-        ...options,
+      await this.http.configure({
+        ...this.serverOptions(c, origin),
         publicUrl: origin,
-        stateDirectory: join(
-          this.options.directory,
-          createHash("sha256")
-            .update(home + origin)
-            .digest("hex"),
-        ),
       });
     }
     signal.throwIfAborted();
@@ -531,6 +584,7 @@ export class RemoteMcpManager {
     this.task = undefined;
     await this.cleanup();
     this.phase = "stopped";
+    this.error = undefined;
     this.reachable = false;
     return this.status();
   }

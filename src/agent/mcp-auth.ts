@@ -46,11 +46,13 @@ type Flow = {
 };
 /** A desktop-owned policy; never supplied by an HTTP caller. */
 export interface LocalMcpAuthorization {
+  access?: "all" | "selected";
+  createProject?(name: string, operationId?: string): Promise<unknown>;
   projects(): Promise<
     Array<{
       id: string;
       name: string;
-      role: "viewer" | "editor";
+      role: "viewer" | "editor" | "admin";
       archived?: boolean;
     }>
   >;
@@ -197,6 +199,7 @@ export class McpAuthorization {
           this.get<Client>("client", grant.clientId)?.client_name ??
           "MCP client",
         projectIds: grant.projectIds,
+        projectAccess: grant.projectAccess,
         scopes: grant.scopes,
       };
     });
@@ -329,7 +332,7 @@ export class McpAuthorization {
     const hidden = `<input type="hidden" name="flow" value="${escaped(flowId)}"><input type="hidden" name="csrf" value="${escaped(flow.csrf)}">`;
     const client = this.get<Client>("client", flow.clientId)!;
     const content = this.local
-      ? `<p>${escaped(localT("auth.request", { client: client.client_name || "Agent" }))}</p><form method="post" action="${this.url}/oauth/consent">${hidden}<label>${escaped(localT("auth.code"))}<input name="pairingCode" type="password" autocomplete="one-time-code" required maxlength="100"></label><p>${escaped(localT("auth.help", { permission: localT(flow.scopes.includes("projects.write") ? "write" : "read") }))}</p><button name="decision" value="allow">${escaped(localT("auth.allow"))}</button><button name="decision" value="deny" formnovalidate class="secondary">${escaped(localT("auth.cancel"))}</button></form>`
+      ? `<p>${escaped(localT("auth.request", { client: client.client_name || "Agent" }))}</p><form method="post" action="${this.url}/oauth/consent">${hidden}<label>${escaped(localT("auth.code"))}<input name="pairingCode" type="password" autocomplete="one-time-code" required maxlength="100"></label><p>${escaped(localT(this.local.access === "all" ? "auth.allHelp" : "auth.help", { permission: localT(flow.scopes.includes("projects.write") ? "write" : "read") }))}</p><button name="decision" value="allow">${escaped(localT("auth.allow"))}</button><button name="decision" value="deny" formnovalidate class="secondary">${escaped(localT("auth.cancel"))}</button></form>`
       : flow.connection
         ? `<p>${escaped(client.client_name || "Agent")} 请求访问服务器上的 ShowAI 账号 <strong>${escaped(flow.connection.user.name)}</strong>。</p><p>${flow.scopes.includes("projects.write") ? "可读取及编辑；每次操作都检查最新项目成员权限。" : "只允许读取。"}${flow.scopes.includes("projects.create") ? "包含新建项目。" : ""}</p><form method="post" action="${this.url}/oauth/consent">${hidden}<label><input type="radio" name="access" value="account" checked>授权这个账号当前及今后有权限的所有项目</label><p>以后从本地同步到此账号的项目也会进入授权范围。可以随时在 ChatGPT 断开连接。</p><label><input type="radio" name="access" value="selected">仅授权一个项目<select name="project"><option value="">请选择</option>${(
             flow.projects ?? []
@@ -372,7 +375,10 @@ export class McpAuthorization {
       return json({
         resource: this.resource,
         authorization_servers: [this.url],
-        scopes_supported: this.local ? scopeNames.slice(0, 2) : scopeNames,
+        scopes_supported:
+          this.local && this.local.access !== "all"
+            ? scopeNames.slice(0, 2)
+            : scopeNames,
       });
     if (path === "/.well-known/oauth-authorization-server")
       return json({
@@ -389,7 +395,10 @@ export class McpAuthorization {
           "client_secret_basic",
         ],
         code_challenge_methods_supported: ["S256"],
-        scopes_supported: this.local ? scopeNames.slice(0, 2) : scopeNames,
+        scopes_supported:
+          this.local && this.local.access !== "all"
+            ? scopeNames.slice(0, 2)
+            : scopeNames,
         authorization_response_iss_parameter_supported: true,
       });
     if (!path.startsWith("/oauth/")) return null;
@@ -484,7 +493,14 @@ export class McpAuthorization {
             csrf: token(),
             attempts: 0,
           };
-        if (this.local && flow.scopes.includes("projects.create"))
+        // The device owner explicitly chooses full-library access in the App;
+        // the consent page and token response disclose its complete scope.
+        if (this.local?.access === "all") flow.scopes = [...scopeNames];
+        if (
+          this.local &&
+          this.local.access !== "all" &&
+          flow.scopes.includes("projects.create")
+        )
           throw new AuthorizationError(
             "Create projects in the desktop App, then select them for remote access.",
             "invalid_scope",
@@ -539,7 +555,7 @@ export class McpAuthorization {
             const projects = (await this.local.projects()).filter(
               (p) => !p.archived,
             );
-            if (!projects.length)
+            if (!projects.length && this.local.access !== "all")
               return this.form(flowId, flow, localT("auth.empty"));
             if (!this.local.consumePairingCode(String(input.pairingCode ?? "")))
               return this.form(flowId, flow, localT("auth.invalid"));
@@ -550,8 +566,10 @@ export class McpAuthorization {
               serverId: "local",
               user: { id: "local", name: "Local ShowAI" },
               upstreamToken: "",
-              projectAccess: "selected",
-              projectIds: projects.map((p) => p.id),
+              projectAccess:
+                this.local.access === "all" ? "account" : "selected",
+              projectIds:
+                this.local.access === "all" ? [] : projects.map((p) => p.id),
               scopes: flow.scopes,
             };
             this.put("grant", grant.id, grant, 180 * 86400_000);

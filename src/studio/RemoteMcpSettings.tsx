@@ -1,467 +1,875 @@
-import { useEffect, useState } from "react";
-import { Cloud, Globe, Copy, RefreshCw, ExternalLink } from "../ui/icons";
+import { useEffect, useRef, useState } from "react";
+import {
+  ArrowLeft,
+  ArrowRight,
+  Check,
+  Copy,
+  ExternalLink,
+  RefreshCw,
+} from "../ui/icons";
 import { useTranslator } from "../i18n/react";
 import messages from "../i18n/messages/remoteMcp";
-import type { RemoteMcpConfig, RemoteMcpStatus } from "../remote-mcp/types";
+import type {
+  RemoteMcpConfig,
+  RemoteMcpProvider,
+  RemoteMcpStatus,
+} from "../remote-mcp/types";
 import { desktop, errorMessage } from "./bridge";
+import Dialog from "./Dialog";
+import cloudflareLogo from "./assets/connection-brands/cloudflare.svg";
+import tailscaleLight from "./assets/connection-brands/tailscale-light.svg";
+import tailscaleDark from "./assets/connection-brands/tailscale-dark.svg";
 import "./remote-mcp-settings.css";
 
+type Screen =
+  | "provider"
+  | "cloudflare"
+  | "cloudflare-quick"
+  | "domain"
+  | "tailscale"
+  | "client"
+  | "connected";
 export default function RemoteMcpSettings() {
   const t = useTranslator(messages);
   const [state, setState] = useState<RemoteMcpStatus>();
   const [config, setConfig] = useState<RemoteMcpConfig>();
-  const [token, setToken] = useState("");
-  const [pair, setPair] = useState("");
+  const [screen, setScreen] = useState<Screen>("provider");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [token, setToken] = useState("");
+  const [pair, setPair] = useState("");
   const [copied, setCopied] = useState("");
+  const [routeStep, setRouteStep] = useState(0);
+  const [clientStep, setClientStep] = useState(0);
+  const [otherClient, setOtherClient] = useState(false);
+  const [modal, setModal] = useState<"rules" | "tools" | "diagnostics" | null>(
+    null,
+  );
+  const [rules, setRules] = useState<RemoteMcpConfig>();
+  const initialized = useRef(false);
+  const attempt = useRef(0);
+  const awaitingClient = useRef(false);
+  const clientBaseline = useRef(new Set<string>());
+  const active = state?.phase === "starting" || state?.phase === "running";
+  const pending = busy || state?.phase === "starting";
+  const methodScreen = (p: RemoteMcpProvider): Screen =>
+    p === "cloudflare" ? "domain" : p;
   useEffect(() => {
-    let active = true;
-    const read = (refresh = false) =>
-      desktop
-        .invoke<RemoteMcpStatus>("remoteMcp:status", { refresh })
-        .then((value) => {
-          if (!active) return;
-          setState(value);
-          setConfig((previous) => previous ?? value.config);
-        })
-        .catch((reason) => {
-          if (active) setError(errorMessage(reason));
-        });
+    let mounted = true;
+    const read = async (refresh = false) => {
+      try {
+        const value = await desktop.invoke<RemoteMcpStatus>(
+          "remoteMcp:status",
+          { refresh },
+        );
+        if (!mounted) return;
+        setState(value);
+        if (!initialized.current) {
+          initialized.current = true;
+          setConfig({ ...value.config, access: value.config.access ?? "all" });
+          if (value.phase === "prepared") setScreen("domain");
+          else if (["starting", "running", "error"].includes(value.phase))
+            setScreen(methodScreen(value.config.provider));
+        }
+        if (value.phase === "prepared" && value.error) setRouteStep(0);
+        if (value.phase === "error" || value.phase === "stopped")
+          setScreen((current) =>
+            current === "client" || current === "connected"
+              ? methodScreen(value.config.provider)
+              : current,
+          );
+        if (value.phase === "prepared")
+          setConfig((previous) =>
+            previous ? { ...previous, port: value.config.port } : previous,
+          );
+        if (value.phase === "running" && value.reachable)
+          setScreen((current) =>
+            current === "connected"
+              ? current
+              : value.lastCallAt &&
+                  (!awaitingClient.current ||
+                    (!!value.lastCallClientId &&
+                      !clientBaseline.current.has(value.lastCallClientId)))
+                ? "connected"
+                : "client",
+          );
+      } catch (reason) {
+        if (mounted) setError(errorMessage(reason));
+      }
+    };
     void read(true);
-    const timer = setInterval(() => void read(), 3000);
+    const timer = setInterval(() => void read(), 1500);
     return () => {
-      active = false;
+      mounted = false;
       clearInterval(timer);
     };
   }, []);
-  async function action(name: string, args = {}) {
+  async function run(operation: () => Promise<void>) {
     setBusy(true);
     setError("");
     try {
-      const value = await desktop.invoke<RemoteMcpStatus>(name, args);
-      setState(value);
-      if (name === "remoteMcp:start") {
-        setToken("");
-        setPair("");
+      await operation();
+    } catch (reason) {
+      setError(errorMessage(reason));
+    } finally {
+      setBusy(false);
+    }
+  }
+  async function copy(text: string, id: string) {
+    await desktop.invoke("clipboard:write", { text });
+    setCopied(id);
+  }
+  async function stop() {
+    attempt.current++;
+    setState(await desktop.invoke<RemoteMcpStatus>("remoteMcp:stop"));
+    setPair("");
+    setClientStep(0);
+  }
+  async function choose(provider: RemoteMcpProvider) {
+    await run(async () => {
+      if (state?.localUrl) await stop();
+      const next = {
+        ...config!,
+        provider,
+        executable: "",
+        access: config!.access ?? "all",
+        port:
+          provider === "cloudflare" && config!.provider === "cloudflare"
+            ? config!.port
+            : 0,
+      };
+      setConfig(next);
+      setToken("");
+      setRouteStep(0);
+      setScreen(methodScreen(provider));
+      if (provider === "cloudflare") {
+        const prepared = await desktop.invoke<RemoteMcpStatus>(
+          "remoteMcp:prepare",
+          { config: next },
+        );
+        setState(prepared);
+        setConfig(prepared.config);
+        if (
+          next.publicUrl &&
+          state?.tokenSaved &&
+          next.port > 0 &&
+          prepared.config.port === next.port
+        )
+          setRouteStep(2);
       }
-      if (name === "remoteMcp:stop") setPair("");
-    } catch (reason) {
-      setError(errorMessage(reason));
-    } finally {
-      setBusy(false);
-    }
+    });
   }
-  async function copy(value: string, id: string) {
-    try {
-      await desktop.invoke("clipboard:write", { text: value });
-      setCopied(id);
-    } catch (reason) {
-      setError(errorMessage(reason));
-    }
+  async function connect(next = config!) {
+    const ticket = ++attempt.current;
+    await run(async () => {
+      if (
+        next.provider !== "tailscale" &&
+        !(next.executable || state?.executables.cloudflare)
+      ) {
+        next = {
+          ...next,
+          executable: await desktop.invoke<string>(
+            "remoteMcp:installCloudflare",
+          ),
+        };
+        setConfig(next);
+      }
+      if (ticket !== attempt.current) return;
+      const value = await desktop.invoke<RemoteMcpStatus>("remoteMcp:start", {
+        config: next,
+        token,
+      });
+      setState(value);
+      setToken("");
+      setPair("");
+      setClientStep(0);
+    });
   }
-  async function install() {
-    setBusy(true);
-    setError("");
-    try {
-      const executable = await desktop.invoke<string>(
-        "remoteMcp:installCloudflare",
-      );
-      setConfig((previous) =>
-        previous ? { ...previous, executable } : previous,
-      );
-      setState(
-        await desktop.invoke<RemoteMcpStatus>("remoteMcp:status", {
-          refresh: true,
-        }),
-      );
-    } catch (reason) {
-      setError(errorMessage(reason));
-    } finally {
-      setBusy(false);
-    }
-  }
-  if (!state || !config)
-    return <p role={error ? "alert" : "status"}>{error || t("working")}</p>;
-  const running = state.phase === "running" || state.phase === "starting";
-  const locked = busy || running;
-  const tailscale = config.provider === "tailscale";
-  const tool = tailscale ? "tailscale" : "cloudflared";
-  const executable =
-    config.executable ||
-    (tailscale ? state.executables.tailscale : state.executables.cloudflare);
-  const update = (patch: Partial<RemoteMcpConfig>) => {
-    setConfig({ ...config, ...patch });
-    setError("");
-  };
-  const link = (href: string, label: string) => (
-    <a href={href} target="_blank" rel="noreferrer">
+  const logo = (provider: RemoteMcpProvider) =>
+    provider === "tailscale" ? (
+      <span className="remote-brand">
+        <img className="remote-logo-light" src={tailscaleLight} alt="" />
+        <img className="remote-logo-dark" src={tailscaleDark} alt="" />
+      </span>
+    ) : (
+      <img className="remote-brand" src={cloudflareLogo} alt="" />
+    );
+  const link = (href: string, label: string, onClick?: () => void) => (
+    <a
+      className="settings-button remote-action"
+      href={href}
+      target="_blank"
+      rel="noreferrer"
+      onClick={onClick}
+    >
       {label}
-      <ExternalLink size={12} aria-hidden="true" />
+      <ExternalLink size={14} />
     </a>
   );
+  if (!config || !state)
+    return <p role={error ? "alert" : "status"}>{error || t("working")}</p>;
+  const stage =
+    screen === "provider" || screen === "cloudflare"
+      ? 0
+      : screen === "client" || screen === "connected"
+        ? 2
+        : 1;
+  const provider = config.provider;
+  const toolReady = !!(
+    config.executable ||
+    (provider === "tailscale"
+      ? state.executables.tailscale
+      : state.executables.cloudflare)
+  );
+  const visibleError = error || (stage === 1 ? state.error : "");
   return (
-    <div className="remote-mcp-settings" aria-busy={busy}>
-      <div className="remote-mcp-status" aria-label={t("status")}>
-        <div>
-          <strong role="status">
-            <i data-online={state.phase === "running" && state.reachable} />
-            {t(state.phase)}
-          </strong>
-          {running && (
-            <span>
-              {t(
-                state.reachable === true
-                  ? "reachable"
-                  : state.reachable === false
-                    ? "unreachable"
-                    : "unchecked",
-              )}
-            </span>
-          )}
-        </div>
-        <button
-          className="settings-button"
-          disabled={busy || (!running && !config.projects.length)}
-          onClick={() =>
-            void action(
-              running ? "remoteMcp:stop" : "remoteMcp:start",
-              running ? {} : { config, token },
-            )
-          }
-        >
-          {t(running ? "stop" : "start")}
-        </button>
-      </div>
-      {(error || state.error) && (
-        <pre className="remote-mcp-error" role="alert">
-          {error || state.error}
-        </pre>
-      )}
-      {state.diagnostics && state.error && (
-        <details className="remote-mcp-disclosure">
-          <summary>{t("diagnostics")}</summary>
-          <pre className="remote-mcp-error">{state.diagnostics}</pre>
-        </details>
-      )}
-      <fieldset disabled={locked} className="remote-mcp-providers">
-        <legend>{t("provider")}</legend>
-        <button
-          type="button"
-          aria-pressed={!tailscale}
-          onClick={() =>
-            update({ provider: "cloudflare-quick", executable: "" })
-          }
-        >
-          <Cloud size={22} />
-          Cloudflare
-        </button>
-        <button
-          type="button"
-          aria-pressed={tailscale}
-          onClick={() => update({ provider: "tailscale", executable: "" })}
-        >
-          <Globe size={22} />
-          Tailscale
-        </button>
-      </fieldset>
-      {!tailscale && (
-        <div
-          className="remote-mcp-modes"
-          role="group"
-          aria-label={t("cloudflare")}
-        >
-          {(["cloudflare-quick", "cloudflare"] as const).map((provider) => (
-            <button
-              key={provider}
-              disabled={locked}
-              aria-pressed={config.provider === provider}
-              onClick={() => update({ provider })}
-            >
-              {t(provider === "cloudflare" ? "named" : "quick")}
-            </button>
-          ))}
-        </div>
-      )}
-      {config.provider !== "cloudflare" && (
-        <p className="settings-help">
-          {t(tailscale ? "tailscaleNote" : "quickNote")}
-        </p>
-      )}
-      {config.provider === "cloudflare" && (
-        <fieldset disabled={locked} className="remote-mcp-fields">
-          <label>
-            {t("url")}
-            <input
-              type="url"
-              value={config.publicUrl}
-              placeholder="https://showai.example.com"
-              onChange={(e) => update({ publicUrl: e.target.value })}
-            />
-          </label>
-          <label>
-            {t("token")}
-            <input
-              type="password"
-              autoComplete="off"
-              value={token}
-              placeholder={t(state.tokenSaved ? "tokenSaved" : "tokenEmpty")}
-              onChange={(e) => setToken(e.target.value)}
-            />
-          </label>
-        </fieldset>
-      )}
-      <div className="remote-mcp-tool">
-        <span>
-          {executable
-            ? t(config.executable ? "selectedTool" : "detected", { tool })
-            : t("missing", { tool })}
-        </span>
-        <button
-          className="settings-button"
-          disabled={busy}
-          onClick={() => void action("remoteMcp:status", { refresh: true })}
-        >
-          <RefreshCw size={13} />
-          {t("refresh")}
-        </button>
-      </div>
-      {!tailscale && !executable && (
-        <button
-          className="settings-button"
-          disabled={locked}
-          onClick={() => void install()}
-        >
-          {t(busy ? "working" : "downloadCloudflare")}
-        </button>
-      )}
-      <details className="remote-mcp-disclosure">
-        <summary>{t("advanced")}</summary>
-        <fieldset disabled={locked} className="remote-mcp-fields">
-          <label>
-            {t("port")}
-            <input
-              type="number"
-              min={1024}
-              max={65535}
-              value={config.port}
-              onChange={(e) => update({ port: Number(e.target.value) })}
-            />
-          </label>
-          <label>
-            {t("executable")}
-            <input
-              value={config.executable}
-              placeholder={t("auto")}
-              onChange={(e) => update({ executable: e.target.value })}
-            />
-          </label>
+    <div className="remote-flow" aria-busy={pending}>
+      <ol className="remote-progress" aria-label={t("client")}>
+        {(["choose", "establish", "client"] as const).map((key, i) => (
+          <li
+            key={key}
+            aria-current={i === stage ? "step" : undefined}
+            data-done={i < stage}
+          >
+            <span>{i < stage ? <Check size={14} /> : i + 1}</span>
+            {t(key)}
+          </li>
+        ))}
+      </ol>
+      {error && stage !== 1 && (
+        <div role="alert" className="remote-error">
+          <strong>{t("errorTitle")}</strong>
           <button
             className="settings-button"
-            onClick={() =>
-              void desktop
-                .invoke<string | null>("remoteMcp:chooseExecutable")
-                .then((path) => {
-                  if (path) update({ executable: path });
-                })
-                .catch((reason) => setError(errorMessage(reason)))
-            }
+            onClick={() => setModal("diagnostics")}
           >
-            {t("choose")}
+            {t("details")}
           </button>
-        </fieldset>
-      </details>
-      <section className="settings-group">
-        <h2>{t("projects")}</h2>
-        {!state.projects.length && (
-          <p className="settings-help">{t("noProjects")}</p>
-        )}
-        {state.projects.map((project) => {
-          const permission = config.projects.find((p) => p.id === project.id);
-          return (
-            <div className="remote-mcp-project" key={project.id}>
-              <label>
-                <input
-                  type="checkbox"
-                  disabled={locked}
-                  checked={!!permission}
-                  onChange={(e) =>
-                    update({
-                      projects: e.target.checked
-                        ? [...config.projects, { id: project.id, write: false }]
-                        : config.projects.filter((p) => p.id !== project.id),
-                    })
-                  }
-                />
-                {project.name}
-              </label>
-              <select
-                aria-label={t("permission", { name: project.name })}
-                disabled={locked || !permission}
-                value={permission?.write ? "write" : "read"}
-                onChange={(e) =>
-                  update({
-                    projects: config.projects.map((p) =>
-                      p.id === project.id
-                        ? { ...p, write: e.target.value === "write" }
-                        : p,
-                    ),
+        </div>
+      )}
+      {stage > 0 && !active && (
+        <button
+          className="remote-back"
+          disabled={busy}
+          onClick={() =>
+            void run(async () => {
+              await stop();
+              setScreen("provider");
+            })
+          }
+        >
+          <ArrowLeft size={15} />
+          {t("back")}
+        </button>
+      )}
+      {screen === "provider" && (
+        <section className="remote-stage">
+          <h3>{t("providerTitle")}</h3>
+          <div className="remote-provider-cards">
+            <button
+              aria-label="Cloudflare"
+              onClick={() => {
+                setError("");
+                setScreen("cloudflare");
+              }}
+            >
+              {logo("cloudflare")}
+              <strong>Cloudflare</strong>
+              <ArrowRight size={18} />
+            </button>
+            <button
+              aria-label="Tailscale"
+              onClick={() => void choose("tailscale")}
+            >
+              {logo("tailscale")}
+              <strong>Tailscale</strong>
+              <ArrowRight size={18} />
+            </button>
+          </div>
+        </section>
+      )}
+      {screen === "cloudflare" && (
+        <section className="remote-stage">
+          <button className="remote-back" onClick={() => setScreen("provider")}>
+            <ArrowLeft size={15} />
+            {t("back")}
+          </button>
+          <h3>{t("cloudflareChoice")}</h3>
+          <div className="remote-methods">
+            <button onClick={() => void choose("cloudflare-quick")}>
+              <span>
+                <strong>{t("quick")}</strong>
+                <small>{t("quickHint")}</small>
+              </span>
+              <ArrowRight size={18} />
+            </button>
+            <button onClick={() => void choose("cloudflare")}>
+              <span>
+                <strong>{t("domain")}</strong>
+                <small>{t("domainHint")}</small>
+              </span>
+              <ArrowRight size={18} />
+            </button>
+          </div>
+        </section>
+      )}
+      {stage === 1 && (
+        <section className="remote-stage remote-setup">
+          <header>
+            {logo(provider)}
+            <h3>
+              {t(
+                provider === "cloudflare"
+                  ? "domainTitle"
+                  : provider === "tailscale"
+                    ? "tailscaleTitle"
+                    : "quickTitle",
+              )}
+            </h3>
+          </header>
+          {visibleError && (
+            <div role="alert" className="remote-error">
+              <strong>{t("errorTitle")}</strong>
+              <button
+                className="settings-button"
+                onClick={() => setModal("diagnostics")}
+              >
+                {t("details")}
+              </button>
+            </div>
+          )}
+          {pending ? (
+            <div className="remote-wait" role="status">
+              <RefreshCw size={24} />
+              {t(busy ? "working" : "starting")}
+              <button
+                className="settings-button"
+                onClick={() =>
+                  void run(async () => {
+                    await stop();
                   })
                 }
               >
-                <option value="read">{t("read")}</option>
-                <option value="write">{t("write")}</option>
-              </select>
+                {t("cancel")}
+              </button>
             </div>
-          );
-        })}
-      </section>
-      {state.url && running && (
-        <section className="settings-group">
-          <h2>{t("address")}</h2>
-          <div className="remote-mcp-copy">
-            <code>{state.url}</code>
-            <button
-              className="settings-button"
-              onClick={() => void copy(state.url!, "url")}
-            >
-              <Copy size={13} />
-              {t(copied === "url" ? "copied" : "copy")}
-            </button>
+          ) : state.phase === "running" ? (
+            <div className="remote-primary-row">
+              <button
+                className="settings-button primary"
+                onClick={() =>
+                  void run(async () => {
+                    setState(
+                      await desktop.invoke<RemoteMcpStatus>("remoteMcp:check"),
+                    );
+                  })
+                }
+              >
+                {t("retry")}
+              </button>
+              <button
+                className="remote-secondary"
+                onClick={() =>
+                  void run(async () => {
+                    await stop();
+                    if (provider === "cloudflare") {
+                      const prepared = await desktop.invoke<RemoteMcpStatus>(
+                        "remoteMcp:prepare",
+                        { config },
+                      );
+                      setState(prepared);
+                      setConfig(prepared.config);
+                      setRouteStep(0);
+                    }
+                  })
+                }
+              >
+                {t("repair")}
+              </button>
+            </div>
+          ) : (
+            <>
+              {provider === "cloudflare-quick" && (
+                <div className="remote-primary-row">
+                  <button
+                    className="settings-button primary"
+                    onClick={() => void connect()}
+                  >
+                    {t(
+                      toolReady
+                        ? state.error
+                          ? "retry"
+                          : "connect"
+                        : "download",
+                    )}
+                    <ArrowRight size={16} />
+                  </button>
+                  <button
+                    className="remote-secondary"
+                    onClick={() => setModal("tools")}
+                  >
+                    {t("chooseTool")}
+                  </button>
+                </div>
+              )}
+              {provider === "tailscale" && (
+                <div className="remote-steps">
+                  <div>
+                    <span>1</span>
+                    {link(
+                      "https://tailscale.com/download",
+                      t("installTailscale"),
+                    )}
+                  </div>
+                  <div>
+                    <span>2</span>
+                    <section>
+                      {link(
+                        "https://login.tailscale.com/admin/dns",
+                        t("tailscaleSettings"),
+                      )}
+                      <p>{t("tailscaleSetup")}</p>
+                    </section>
+                  </div>
+                  <div>
+                    <span>3</span>
+                    <button
+                      className="settings-button primary"
+                      onClick={() => void connect()}
+                    >
+                      {t("tailscaleCheck")}
+                      <ArrowRight size={16} />
+                    </button>
+                  </div>
+                  <button
+                    className="remote-secondary"
+                    onClick={() => setModal("tools")}
+                  >
+                    {t("chooseTool")}
+                  </button>
+                </div>
+              )}
+              {provider === "cloudflare" && (
+                <div className="remote-steps">
+                  <div>
+                    <span>{routeStep > 0 ? <Check size={14} /> : 1}</span>
+                    <section>
+                      <label>{t("route")}</label>
+                      <code>{state.localUrl || t("working")}</code>
+                      <button
+                        className="settings-button"
+                        disabled={!state.localUrl}
+                        onClick={() =>
+                          void run(async () => {
+                            await copy(state.localUrl!, "route");
+                            setRouteStep(1);
+                          })
+                        }
+                      >
+                        {t(copied === "route" ? "copied" : "copyRoute")}
+                        <Copy size={14} />
+                      </button>
+                    </section>
+                  </div>
+                  {routeStep >= 1 && (
+                    <div>
+                      <span>{routeStep > 1 ? <Check size={14} /> : 2}</span>
+                      <section>
+                        {link(
+                          "https://dash.cloudflare.com/",
+                          t("openCloudflare"),
+                        )}
+                        <p>{t("routeSetup")}</p>
+                        {routeStep === 1 && (
+                          <button
+                            className="settings-button"
+                            onClick={() => setRouteStep(2)}
+                          >
+                            {t("routeDone")}
+                            <ArrowRight size={14} />
+                          </button>
+                        )}
+                      </section>
+                    </div>
+                  )}
+                  {routeStep >= 2 && (
+                    <div>
+                      <span>3</span>
+                      <form
+                        onSubmit={(event) => {
+                          event.preventDefault();
+                          void connect();
+                        }}
+                      >
+                        <label>
+                          {t("publicUrl")}
+                          <input
+                            type="url"
+                            required
+                            placeholder="https://showai.example.com"
+                            value={config.publicUrl}
+                            onChange={(e) => {
+                              setError("");
+                              setConfig({
+                                ...config,
+                                publicUrl: e.target.value,
+                              });
+                            }}
+                          />
+                        </label>
+                        <label>
+                          {t("token")}
+                          <input
+                            type="password"
+                            required={!state.tokenSaved}
+                            autoComplete="off"
+                            value={token}
+                            placeholder={t(
+                              state.tokenSaved
+                                ? "tokenSaved"
+                                : "tokenPlaceholder",
+                            )}
+                            onChange={(e) => setToken(e.target.value)}
+                          />
+                        </label>
+                        <button
+                          className="settings-button primary"
+                          type="submit"
+                        >
+                          {t(toolReady ? "connect" : "download")}
+                          <ArrowRight size={16} />
+                        </button>
+                      </form>
+                    </div>
+                  )}
+                </div>
+              )}
+            </>
+          )}
+        </section>
+      )}
+      {screen === "client" && (
+        <section className="remote-stage">
+          <header>
+            <Check size={20} />
+            <h3>{t("connected")}</h3>
+          </header>
+          <div className="remote-steps">
+            <div>
+              <span>{clientStep > 0 ? <Check size={14} /> : 1}</span>
+              <section>
+                <label>{t("endpoint")}</label>
+                <code>{state.url}</code>
+                <button
+                  className="settings-button"
+                  onClick={() =>
+                    void run(async () => {
+                      await copy(state.url!, "endpoint");
+                      setClientStep(Math.max(1, clientStep));
+                    })
+                  }
+                >
+                  {t(copied === "endpoint" ? "copied" : "copyEndpoint")}
+                  <Copy size={14} />
+                </button>
+              </section>
+            </div>
+            {clientStep >= 1 && (
+              <div>
+                <span>{clientStep > 1 ? <Check size={14} /> : 2}</span>
+                <section>
+                  {otherClient ? (
+                    <>
+                      <p>{t("addOther")}</p>
+                      <button
+                        className="settings-button"
+                        onClick={() => setClientStep(2)}
+                      >
+                        {t("addedOther")}
+                      </button>
+                    </>
+                  ) : (
+                    link("https://chatgpt.com/plugins", t("openChatgpt"), () =>
+                      setClientStep(2),
+                    )
+                  )}
+                  <button
+                    className="remote-secondary"
+                    onClick={() => setOtherClient(!otherClient)}
+                  >
+                    {t(otherClient ? "chatgptClient" : "otherClient")}
+                  </button>
+                </section>
+              </div>
+            )}
+            {clientStep >= 2 && (
+              <div>
+                <span>3</span>
+                <section>
+                  <h4>{t("authorize")}</h4>
+                  {!pair ? (
+                    <button
+                      className="settings-button primary"
+                      onClick={() =>
+                        void run(async () => {
+                          const value = await desktop.invoke<{ code: string }>(
+                            "remoteMcp:pair",
+                          );
+                          setPair(value.code);
+                        })
+                      }
+                    >
+                      {t("generate")}
+                    </button>
+                  ) : (
+                    <>
+                      <code>{pair}</code>
+                      <button
+                        className="settings-button"
+                        onClick={() => void run(() => copy(pair, "pair"))}
+                      >
+                        {t(copied === "pair" ? "copied" : "copyPair")}
+                      </button>
+                      <p>{t("pairPlace")}</p>
+                      <button
+                        className="remote-secondary"
+                        onClick={() =>
+                          void run(async () => {
+                            const value = await desktop.invoke<{
+                              code: string;
+                            }>("remoteMcp:pair");
+                            setPair(value.code);
+                            setCopied("");
+                          })
+                        }
+                      >
+                        {t("generate")}
+                      </button>
+                      <button
+                        className="settings-button"
+                        onClick={() =>
+                          void run(() => copy(t("verifyPrompt"), "prompt"))
+                        }
+                      >
+                        {t(copied === "prompt" ? "copied" : "copyPrompt")}
+                      </button>
+                      <p role="status">{t("waiting")}</p>
+                    </>
+                  )}
+                </section>
+              </div>
+            )}
           </div>
           <button
-            className="settings-button"
-            disabled={busy}
-            onClick={() => void action("remoteMcp:check")}
+            className="remote-secondary"
+            onClick={() =>
+              void run(async () => {
+                await stop();
+                setScreen("provider");
+              })
+            }
           >
-            {t("check")}
+            {t("disconnect")}
           </button>
         </section>
       )}
-      {state.phase === "running" && (
-        <section className="settings-group">
-          <h2>{t("pairing")}</h2>
-          <button
-            className="settings-button"
-            onClick={() =>
-              void desktop
-                .invoke<{ code: string }>("remoteMcp:pair")
-                .then((value) => {
-                  setPair(value.code);
-                  setCopied("");
+      {screen === "connected" && (
+        <section className="remote-stage">
+          <header>
+            <Check size={22} />
+            <h3>{t("verified")}</h3>
+          </header>
+          <code>{state.url}</code>
+          <div className="remote-primary-row">
+            <button
+              className="settings-button"
+              onClick={() => void run(() => copy(state.url!, "endpoint"))}
+            >
+              {t(copied === "endpoint" ? "copied" : "copyEndpoint")}
+            </button>
+            <button
+              className="settings-button"
+              onClick={() => {
+                clientBaseline.current = new Set(
+                  state.clients.map((client) => client.id),
+                );
+                awaitingClient.current = true;
+                setClientStep(0);
+                setPair("");
+                setScreen("client");
+              }}
+            >
+              {t("addClient")}
+            </button>
+            <button
+              className="remote-secondary"
+              onClick={() =>
+                void run(async () => {
+                  await stop();
+                  setScreen("provider");
                 })
-                .catch((reason) => setError(errorMessage(reason)))
-            }
-          >
-            {t("generate")}
-          </button>
-          {pair && (
-            <>
-              <div className="remote-mcp-copy">
-                <code>{pair}</code>
-                <button
-                  className="settings-button"
-                  onClick={() => void copy(pair, "pair")}
-                >
-                  {t(copied === "pair" ? "copied" : "copy")}
-                </button>
-              </div>
-              <p className="settings-help">{t("pairingNote")}</p>
-            </>
-          )}
-          <h3>{t("clients")}</h3>
-          {!state.clients.length && (
-            <p className="settings-help">{t("noClients")}</p>
-          )}
-          {state.clients.map((client) => (
-            <div className="remote-mcp-project" key={client.id}>
-              <span>{client.name}</span>
+              }
+            >
+              {t("disconnect")}
+            </button>
+          </div>
+          {state.clients.map((c) => (
+            <div className="remote-client" key={c.id}>
+              <span>{c.name}</span>
               <button
-                className="settings-button"
-                disabled={busy}
+                className="remote-secondary"
                 onClick={() =>
-                  void action("remoteMcp:revoke", { id: client.id })
+                  void run(async () => {
+                    setState(
+                      await desktop.invoke<RemoteMcpStatus>(
+                        "remoteMcp:revoke",
+                        { id: c.id },
+                      ),
+                    );
+                  })
                 }
               >
                 {t("revoke")}
               </button>
             </div>
           ))}
-          {state.lastCallAt && (
-            <p className="settings-help">
-              {t("lastCall", {
-                time: new Date(state.lastCallAt).toLocaleString(),
-              })}
-            </p>
-          )}
         </section>
       )}
-      <details className="remote-mcp-disclosure" open={!executable}>
-        <summary>{t("setup")}</summary>
-        <ol>
-          {(tailscale
-            ? ["tailscale1", "tailscale2", "tailscale3"]
-            : config.provider === "cloudflare"
-              ? ["quick1", "named1", "named2", "named3"]
-              : ["quick1", "quick2"]
-          ).map((key) => (
-            <li key={key}>{t(key as Parameters<typeof t>[0])}</li>
-          ))}
-        </ol>
-        {config.provider === "cloudflare" && (
-          <div className="remote-mcp-copy">
-            <span>{t("route")}</span>
-            <code>http://127.0.0.1:{config.port}</code>
+      <footer className="remote-rules">
+        <span>
+          {t(config.access === "selected" ? "selectedAccess" : "allAccess")}
+        </span>
+        <button
+          className="remote-secondary"
+          disabled={pending}
+          onClick={() => {
+            setRules({ ...config, projects: [...config.projects] });
+            setModal("rules");
+          }}
+        >
+          {t("accessRules")}
+        </button>
+      </footer>
+      {modal === "rules" && rules && (
+        <Dialog title={t("accessRules")} onClose={() => setModal(null)}>
+          <div className="remote-form">
+            <label>
+              {t("accessRange")}
+              <select
+                value={rules.access ?? "all"}
+                onChange={(e) =>
+                  setRules({
+                    ...rules,
+                    access: e.target.value as "all" | "selected",
+                  })
+                }
+              >
+                <option value="all">{t("allProjects")}</option>
+                <option value="selected">{t("selectedProjects")}</option>
+              </select>
+            </label>
+            {rules.access !== "selected" ? (
+              <p>{t("createAllowed")}</p>
+            ) : (
+              state.projects.map((p) => {
+                const rule = rules.projects.find((r) => r.id === p.id);
+                return (
+                  <label key={p.id} className="remote-rule-row">
+                    {p.name}
+                    <select
+                      aria-label={t("permission", { name: p.name })}
+                      value={rule ? (rule.write ? "write" : "read") : "none"}
+                      onChange={(e) =>
+                        setRules({
+                          ...rules,
+                          projects: [
+                            ...rules.projects.filter((r) => r.id !== p.id),
+                            ...(e.target.value === "none"
+                              ? []
+                              : [
+                                  {
+                                    id: p.id,
+                                    write: e.target.value === "write",
+                                  },
+                                ]),
+                          ],
+                        })
+                      }
+                    >
+                      <option value="none">{t("none")}</option>
+                      <option value="read">{t("read")}</option>
+                      <option value="write">{t("full")}</option>
+                    </select>
+                  </label>
+                );
+              })
+            )}
+            <button
+              className="settings-button primary"
+              disabled={rules.access === "selected" && !rules.projects.length}
+              onClick={() => {
+                setConfig(rules);
+                setModal(null);
+                if (active)
+                  void run(async () => {
+                    await stop();
+                    setScreen(methodScreen(rules.provider));
+                    setState(
+                      await desktop.invoke<RemoteMcpStatus>("remoteMcp:start", {
+                        config: rules,
+                      }),
+                    );
+                  });
+              }}
+            >
+              {t(active ? "saveReconnect" : "save")}
+            </button>
+          </div>
+        </Dialog>
+      )}
+      {modal === "tools" && (
+        <Dialog title={t("tools")} onClose={() => setModal(null)}>
+          <div className="remote-form">
+            <label>
+              {t("toolPath")}
+              <input
+                placeholder={t("autoDetect")}
+                value={config.executable}
+                onChange={(e) =>
+                  setConfig({ ...config, executable: e.target.value })
+                }
+              />
+            </label>
             <button
               className="settings-button"
               onClick={() =>
-                void copy(`http://127.0.0.1:${config.port}`, "route")
+                void run(async () => {
+                  const path = await desktop.invoke<string | null>(
+                    "remoteMcp:chooseExecutable",
+                  );
+                  if (path) setConfig({ ...config, executable: path });
+                })
               }
             >
-              {t(copied === "route" ? "copied" : "copy")}
+              {t("browse")}
+            </button>
+            <button
+              className="settings-button primary"
+              onClick={() => setModal(null)}
+            >
+              {t("continue")}
             </button>
           </div>
-        )}
-        <div className="remote-mcp-links">
-          {tailscale ? (
-            <>
-              {link("https://tailscale.com/download", t("installTailscale"))}
-              {link(
-                "https://login.tailscale.com/admin/dns",
-                t("tailscaleAdmin"),
-              )}
-              {link(
-                "https://tailscale.com/docs/features/tailscale-funnel",
-                t("docs"),
-              )}
-            </>
-          ) : (
-            <>
-              {link(
-                "https://developers.cloudflare.com/cloudflare-one/networks/connectors/cloudflare-tunnel/downloads/",
-                t("installCloudflare"),
-              )}
-              {link("https://dash.cloudflare.com/", t("cloudDashboard"))}
-            </>
-          )}
-        </div>
-      </details>
-      <details className="remote-mcp-disclosure">
-        <summary>{t("chatgpt")}</summary>
-        <ol>
-          {(["chatgpt1", "chatgpt2", "chatgpt3", "chatgpt4"] as const).map(
-            (key) => (
-              <li key={key}>{t(key)}</li>
-            ),
-          )}
-        </ol>
-        {link("https://chatgpt.com/plugins", t("openChatgpt"))}
-      </details>
-      <details className="remote-mcp-disclosure">
-        <summary>{t("other")}</summary>
-        <p>{t("otherText")}</p>
-      </details>
-      <p className="settings-help">{t("onlineNote")}</p>
+        </Dialog>
+      )}
+      {modal === "diagnostics" && (
+        <Dialog title={t("details")} onClose={() => setModal(null)}>
+          <pre className="remote-diagnostics">
+            {error || state.error}
+            {state.diagnostics ? `\n\n${state.diagnostics}` : ""}
+          </pre>
+        </Dialog>
+      )}
     </div>
   );
 }

@@ -114,7 +114,7 @@ export interface McpHttpOptions {
   /** Desktop-owned library and access policy, never accepted from an MCP request. */
   local?: LocalMcpAuthorization & {
     root: string;
-    onCall?: (name: string) => void;
+    onCall?: (name: string, clientId: string) => void;
   };
   /** Successful startup screenshot check, supplied by the Cloud entry point. */
   browserRendering?: CloudBrowserCheck;
@@ -232,7 +232,9 @@ export async function createMcpHttpApp(options: McpHttpOptions) {
     const remoteTools = new Set([
       ...publicTools,
       "projects_list",
-      ...(!options.local ? ["project_create"] : []),
+      ...(!options.local || options.local.access === "all"
+        ? ["project_create"]
+        : []),
     ]);
     const server = createMcpServer({
       root: context?.root ?? join(state, "public"),
@@ -294,7 +296,7 @@ export async function createMcpHttpApp(options: McpHttpOptions) {
                       ? {
                           storage: "local",
                           authorization:
-                            "Pair using a code from ShowAI Settings → Remote connection. Only selected local projects are accessible. Writes save directly in the desktop library; no cloud synchronization is required. Do not use device filesystem paths.",
+                            "Pair using a code from ShowAI Settings → Remote connection. Access follows the desktop library policy and OAuth grant. Full-library grants include future projects and project creation; selected grants stay restricted. Writes save directly in the desktop library; no cloud synchronization is required. Do not use device filesystem paths.",
                         }
                       : {}),
                     tools: [...remoteTools].sort(),
@@ -356,6 +358,10 @@ export async function createMcpHttpApp(options: McpHttpOptions) {
           callback: async (input, extra) => {
             if (
               options.local &&
+              !(
+                options.local.access === "all" &&
+                grant?.projectAccess === "account"
+              ) &&
               sidebarOperations.has(`${name}:${String(input.action ?? "")}`)
             )
               return mcpFailure(
@@ -698,7 +704,8 @@ export async function createMcpHttpApp(options: McpHttpOptions) {
                 ? (await options.local.projects())
                     .filter(
                       (p) =>
-                        grant.projectIds.includes(p.id) &&
+                        (grant.projectAccess === "account" ||
+                          grant.projectIds.includes(p.id)) &&
                         (includeArchived || !p.archived),
                     )
                     .map((p) => ({
@@ -711,12 +718,13 @@ export async function createMcpHttpApp(options: McpHttpOptions) {
             )
           : mcpFailure(new Error("Sign in to ShowAI.")),
     );
-    if (!options.local)
+    if (!options.local || options.local.access === "all")
       server.registerTool(
         "project_create",
         {
-          description:
-            "Create a cloud project in the authorized account when the user asks. Requires account-wide authorization and projects.create. Returns the server project id to use for subsequent page operations.",
+          description: options.local
+            ? "Create a local project in the authorized ShowAI library when the user asks. Requires full-library authorization. Reuse operationId and name only to retry the same creation. Returns project.id for subsequent page operations."
+            : "Create a cloud project in the authorized account when the user asks. Requires account-wide authorization and projects.create. Returns the server project id to use for subsequent page operations.",
           inputSchema: {
             name: z.string().trim().min(1).max(1000),
             operationId: z
@@ -745,7 +753,9 @@ export async function createMcpHttpApp(options: McpHttpOptions) {
           try {
             return grant
               ? mcpSuccess(
-                  await workspaces.createProject(grant, name, operationId),
+                  options.local
+                    ? await options.local.createProject!(name, operationId)
+                    : await workspaces.createProject(grant, name, operationId),
                 )
               : mcpFailure(new Error("Sign in to ShowAI."));
           } catch (error) {
@@ -773,7 +783,8 @@ export async function createMcpHttpApp(options: McpHttpOptions) {
         const data = output.result.structuredContent.data;
         data.projects.storage = "local";
         data.projects.sharedSynchronization = false;
-        data.management.sidebar.available = false;
+        data.management.sidebar.available = options.local.access === "all";
+        data.projects.creation = options.local.access === "all";
         data.management.drafts.scope = "library-project";
         output.result.content = [
           {
@@ -791,6 +802,7 @@ export async function createMcpHttpApp(options: McpHttpOptions) {
       )
         options.local.onCall?.(
           String((body.params as { name?: string })?.name),
+          grant.id,
         );
       // The SDK preserves tool extensions in _meta. Advertise the canonical field as well.
       if (output.result?.tools)
@@ -970,7 +982,12 @@ export async function createMcpHttpApp(options: McpHttpOptions) {
           );
           if (options.local && publicTools.has(name))
             return execute(request, body, undefined, grant);
-          if (options.local && name === "project_create")
+          if (
+            options.local &&
+            name === "project_create" &&
+            (options.local.access !== "all" ||
+              grant.projectAccess !== "account")
+          )
             return toolError(
               new Error(
                 "Create projects in ShowAI, then select them for remote access.",
@@ -1009,8 +1026,10 @@ export async function createMcpHttpApp(options: McpHttpOptions) {
           }
           const operation = `${name}:${String(params?.arguments?.action ?? "")}`;
           if (options.local) {
-            const projects = (await options.local.projects()).filter((p) =>
-              grant.projectIds.includes(p.id),
+            const projects = (await options.local.projects()).filter(
+              (p) =>
+                grant.projectAccess === "account" ||
+                grant.projectIds.includes(p.id),
             );
             const writers = new Set([project]);
             if (
@@ -1215,6 +1234,9 @@ export async function startMcpHttpServer(
   url: string;
   localUrl: string;
   authorization: McpAuthorization;
+  configure(
+    input: Pick<McpHttpOptions, "publicUrl" | "stateDirectory" | "local">,
+  ): Promise<void>;
   close(): Promise<void>;
 }> {
   let app: Awaited<ReturnType<typeof createMcpHttpApp>> | undefined;
@@ -1296,9 +1318,24 @@ export async function startMcpHttpServer(
   }
   return {
     server,
-    url: options.publicUrl ?? localUrl,
+    get url() {
+      return app!.authorization.url;
+    },
     localUrl,
-    authorization: app.authorization,
+    get authorization() {
+      return app!.authorization;
+    },
+    async configure(input) {
+      // Startup only: keep the bound port while the owner configures the public route.
+      const next = await createMcpHttpApp({
+        ...options,
+        ...input,
+        allowedHosts: [new URL(localUrl).host, `localhost:${address.port}`],
+      });
+      const previous = app;
+      app = next;
+      previous?.close();
+    },
     async close() {
       server.closeAllConnections();
       await new Promise<void>((done, reject) =>

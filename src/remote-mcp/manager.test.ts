@@ -39,7 +39,10 @@ test("remote configuration accepts only explicit provider, local port, project I
       projects: [{ id: "../other", write: true }],
     }),
   ).toThrow();
-  expect(() => validateRemoteMcpConfig({ ...config, port: 0 })).toThrow();
+  expect(validateRemoteMcpConfig({ ...config, port: 0 })).toMatchObject({
+    port: 0,
+    access: "all",
+  });
 });
 
 test.skipIf(!process.env.SHOWAI_TEST_DOWNLOAD)(

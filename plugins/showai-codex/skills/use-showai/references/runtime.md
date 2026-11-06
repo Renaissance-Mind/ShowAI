@@ -88,9 +88,11 @@ ShowAI 内置 Agent由宿主提供项目绑定 MCP；它安装的私有 Skill �
 
 ## 远程
 
-桌面 App 的「设置 → 远程连接」可以通过用户自己的 Cloudflare（临时地址或固定隧道）或 Tailscale Funnel 开放本机 MCP。此模式由 `showai_capabilities.projects.storage:"local"` 或 `guide().connection.storage:"local"` 标识：用户在 App 选择项目及只读/可编辑权限，再生成一次性配对码，在客户端打开的 OAuth 授权页亲自填写。模型不索取、读取或转述配对码、Tunnel Token。`projects_list` 仅返回该次授权与当前 App 配置同时允许的项目；新增项目需在 App 勾选并重新授权。保存直接进入本机内容库，回执 `persistence.storage:"local"` 不表示已同步到云端。此模式不提供 `project_create`，新项目在 App 中创建；本机侧栏偏好在 App 管理。远程客户端仍不能传本机文件路径。电脑必须保持联网、唤醒且 App 正在运行；Quick 地址重新连接后变化，需要更新客户端地址并重新配对。先查看 App 的公网检查和最近工具调用，再判断连接是否成功。
+桌面 App 的「设置 → 远程连接」按“选择方式 → 建立连接 → 连接客户端”提供用户自己的 Cloudflare 临时/固定隧道和 Tailscale Funnel。此模式由 `showai_capabilities.projects.storage:"local"` 或 `guide().connection.storage:"local"` 标识。新连接默认完整授权当前及以后新增的全部项目，支持读取、编辑、侧栏组织和 `project_create`。项目创建需要工具确实可用、完整内容库授权和 projects.create scope；保留返回的 project.id，后续操作显式使用它。同一次创建重试沿用同一个 operationId 和名称。受限连接仍只返回配置及授权同时允许的项目，不能从另一个连接照搬 ID。用户可以在「访问规则」中选择指定项目与只读权限；显式指定的访问规则保留；旧版没有 access 模式字段的配置采用全部内容库默认值，但原有受限 OAuth 授权会在启用前撤销，客户端必须重新配对确认新范围。将仅授权指定项目的客户端改为全部内容库授权时，也需要重新配对。
 
-用户配置自己的固定 Cloudflare 域名时，在 Cloudflare 账号创建 Cloudflared Tunnel 和 Published application 路由，服务类型为 HTTP，目标地址使用 App「连接设置」显示的本机端口（默认 `http://127.0.0.1:18789`）。在 App 选择固定域名，填 HTTPS 主机地址和隧道 Token；由 App 启动连接器。公网检查通过后，把 App 生成的完整 `/mcp` 地址填到 ChatGPT 的 Add custom MCP server，选择 OAuth / DCR，再由用户在授权页填写配对码。安装工具、Tailscale 权限与其他方式的逐步操作见 App 内「配置教程」及[完整用户教程](https://github.com/Renaissance-Mind/ShowAI/blob/main/docs/i18n/chatgpt.zh-CN.md)。
+用户在 App 生成一次性配对码，在客户端打开的 OAuth 授权页亲自填写；模型不索取、读取或转述配对码、隧道令牌。保存直接进入本机内容库，persistence.storage:local 不表示已同步到云端。远程客户端不能传本机文件路径。电脑需要保持联网、唤醒且 App 运行；Quick 地址重新连接后变化。实际接入成功以公网检查和客户端真实调用为依据。
+
+端口由程序自动绑定。自有域名步骤先保留本机监听，再让用户复制实际 HTTP 地址并配置 Cloudflare 路由，之后填写公网域名与隧道令牌；公网地址切换不释放监听端口。已有固定路由端口被其他程序占用时使用新的可用端口并引导更新路由，不结束其他程序。客户端使用流程生成的完整 /mcp 地址，选择 OAuth / DCR 并完成配对。详细操作见[用户教程](https://github.com/Renaissance-Mind/ShowAI/blob/main/docs/i18n/chatgpt.zh-CN.md)。
 
 以下为配置了同步服务器的托管 HTTP 连接：宿主连接明确的 HTTP MCP 地址，完成所需授权。授权可限定项目，也可覆盖该服务器账号当前及以后有权限的所有项目。`projects_list` 每次读取服务器最新成员权限；账号授权会发现后续同步到服务器的项目。仅保存在本机且尚未同步的项目不在远程列表中：请用户在 ShowAI 应用的“设置 → 账号与同步”把项目同步到同一服务器账号，再重新调用 `projects_list`；仅授权单个项目的连接需重新授权为账号范围才能看到新项目。用户明确要求新项目时，且当前工具暴露 `project_create`、账号已授予 `projects.create`，使用该工具创建；保留返回的项目 ID 和 synchronization 回执，后续页面操作显式使用该 ID。创建超时或结果不明时，用同一个 operationId 和同一名称重试：已创建则返回原项目，不会重复创建；同一 operationId 换名称会被拒绝。不同请求使用不同 ID。受限授权或工具缺失时说明所缺权限，不绕过到本机创建。项目权限来自服务端当前成员身份。远程没有本机文件配置步骤，不能把用户电脑的 home 当作远程项目路径。远程网关部署与本机内容同步服务是不同模块。
 

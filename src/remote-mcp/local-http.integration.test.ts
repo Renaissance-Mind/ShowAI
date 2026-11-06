@@ -2,13 +2,14 @@ import { afterAll, beforeAll, expect, test } from "vitest";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { createHash, randomBytes } from "node:crypto";
+import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import { AgentService } from "../agent/service";
 import { startMcpHttpServer } from "../agent/mcp-http";
 import { REMOTE_FETCH } from "../core/dataset-sources";
 import { withDatasetAccess } from "../core/dataset-access";
+import { localLibraryPolicy } from "./local-library";
 import { parameterComponent } from "../test/parameter-component";
 
 let directory: string;
@@ -273,4 +274,76 @@ test("read-only OAuth scope cannot write and persisted authorization survives a 
     (await reconnected.callTool({ name: "projects_list", arguments: {} }))
       .isError,
   ).not.toBe(true);
+});
+
+test("full-library consent includes future projects and idempotent project creation", async () => {
+  for (const c of clients.splice(0)) await c.close();
+  const beforePort = new URL(http.localUrl).port;
+  await http.configure({
+    publicUrl: http.url,
+    stateDirectory: join(directory, "all-state"),
+    local: {
+      ...authorizationOptions(),
+      ...localLibraryPolicy(service.store.root, { projects: [] }),
+    },
+  });
+  expect(new URL(http.localUrl).port).toBe(beforePort);
+  const token = await authorize("projects.read");
+  const c = await client(token.access_token);
+  const future = await service.createProject(
+    "Created locally after OAuth consent",
+  );
+  const listed = await c.callTool({ name: "projects_list", arguments: {} });
+  expect(JSON.stringify(listed)).toContain(future.id);
+  expect(JSON.stringify(listed)).toContain(hidden);
+  const operationId = randomUUID();
+  const input = { name: "Created remotely after consent", operationId };
+  const first = await c.callTool({ name: "project_create", arguments: input });
+  expect(first.isError, JSON.stringify(first)).not.toBe(true);
+  const repeated = await c.callTool({
+    name: "project_create",
+    arguments: input,
+  });
+  expect(repeated.isError, JSON.stringify(repeated)).not.toBe(true);
+  const id = (first.structuredContent as any).data.project.id;
+  expect((repeated.structuredContent as any).data.project.id).toBe(id);
+  expect(
+    (await service.store.listProjects()).filter((p) => p.name === input.name),
+  ).toHaveLength(1);
+  expect(
+    (
+      await c.callTool({
+        name: "project_create",
+        arguments: { ...input, name: "Different operation" },
+      })
+    ).isError,
+  ).toBe(true);
+  const page = await c.callTool({
+    name: "page_create",
+    arguments: { projectId: id, title: "Editable immediately" },
+  });
+  expect(page.isError, JSON.stringify(page)).not.toBe(true);
+}, 30000);
+
+test("an empty library can be paired and receive its first remotely created project", async () => {
+  for (const c of clients.splice(0)) await c.close();
+  service = new AgentService({ root: join(directory, "empty-library") });
+  await http.configure({
+    publicUrl: http.url,
+    stateDirectory: join(directory, "empty-auth"),
+    local: {
+      ...authorizationOptions(),
+      ...localLibraryPolicy(service.store.root, { projects: [] }),
+    },
+  });
+  const token = await authorize("projects.read");
+  const c = await client(token.access_token);
+  const listed = await c.callTool({ name: "projects_list", arguments: {} });
+  expect((listed.structuredContent as any).data).toEqual([]);
+  const created = await c.callTool({
+    name: "project_create",
+    arguments: { name: "First project" },
+  });
+  expect(created.isError, JSON.stringify(created)).not.toBe(true);
+  expect(await service.store.listProjects()).toHaveLength(1);
 });

@@ -815,6 +815,8 @@ async function handle(
     switch (action) {
       case "remoteMcp:installCloudflare":
         return remoteMcp.installCloudflare();
+      case "remoteMcp:prepare":
+        return remoteMcp.prepare(args.config);
       case "remoteMcp:status":
         return remoteMcp.status(args.refresh === true);
       case "remoteMcp:start":

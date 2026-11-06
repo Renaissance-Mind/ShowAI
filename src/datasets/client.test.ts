@@ -19,6 +19,7 @@ let root: string;
 let store: FileStore;
 let projectId: string;
 let datasetId: string;
+const sessions = new Set<DatasetSession>();
 
 const transport = {
   invoke: <T>(action: string, args: Record<string, unknown> = {}) =>
@@ -54,6 +55,7 @@ const task = (id: string, field: string) => [
   field,
 ];
 const ready = async (session: DatasetSession) => {
+  sessions.add(session);
   await session.load();
   expect(session.getSnapshot().status).toBe("ready");
   return session;
@@ -73,6 +75,8 @@ beforeAll(async () => {
   ).dataset.id;
 });
 afterAll(async () => {
+  // Drain save/draft timers before removing the real library they still write to.
+  for (const session of sessions) await session.prepareClose();
   await syncManager(root).stop();
   await rm(root, { recursive: true, force: true });
 });
