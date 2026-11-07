@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { DatabaseSync } from "node:sqlite";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { mkdtemp, readFile, rm, writeFile, readdir } from "node:fs/promises";
+import { mkdtemp, readFile, rm, writeFile, readdir, mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { SyncManager } from "./manager";
@@ -14,6 +14,10 @@ import { applyOperations } from "../core/diff";
 import { plainText } from "../lib/document";
 import { importComponent, resolveDocumentComponents } from "../core/catalog";
 import { syncProtocol } from "./protocol";
+import { LibraryImport } from "../core/library-import";
+import { LibraryOperations } from "../core/library-operations";
+import { captureProject } from "./transfer";
+import { serializeArtifact } from "../portable/validation.mjs";
 const actions: (() => Promise<unknown>)[] = [];
 
 it("signing out preserves project identity, drafts and device visibility when signing back in", async () => {
@@ -235,6 +239,50 @@ describe("project synchronization between independent real content libraries", (
       ),
     ).toBe(true);
     expect(slots).toContain("baseline.json");
+  });
+  it("synchronizes migrated pages while keeping imported checkpoints on their original device", async () => {
+    const { directory, server, alice, bob } = await fixture();
+    const source = join(directory, "legacy-source");
+    const legacy = new FileStore(source);
+    const project = await legacy.createProject({ name: "Migrated project" });
+    const page = await legacy.createPage(project.id, { title: "Preserved page" });
+    const snapshotDirectory = join(source, "projects", project.id, "snapshots", page.document.id);
+    await mkdir(snapshotDirectory, { recursive: true });
+    await writeFile(join(snapshotDirectory, `${page.hash}.json`), serializeArtifact(page.document));
+    const original = await readFile(page.path);
+    const home = join(directory, "migrated");
+    const importer = new LibraryImport(home);
+    const report = await importer.prepare(source);
+    await importer.activate(report.id);
+    const library = new GitLibrary(home);
+    const revision = (await library.head())!;
+    const files = await new LibraryOperations(home, project.id).projectFiles(project.id, revision);
+    expect([...files.keys()].some(path => /\/history\/|runtimes\/|reader\.json/.test(path))).toBe(false);
+
+    // Recovery inputs written by older clients can still contain this projection.
+    const archivedPath = `projects/${project.id}/history/imports/${report.id}/manifest.json`;
+    files.set(archivedPath, await library.readFile(`imports/${report.id}/manifest.json`, revision));
+    const captured = await captureProject(home, project.id, await library.entryAt(revision), [], project.id, undefined, files);
+    expect(captured.snapshot.files[archivedPath]).toBeUndefined();
+    expect(files.has(archivedPath)).toBe(true);
+
+    const manager = new SyncManager(home, { events: false });
+    actions.push(() => manager.stop());
+    const credentials = (await alice.manager.configuration()).connections[0];
+    const connection = await manager.connect({ url: server.url, token: credentials.token });
+    await manager.stop();
+    await manager.attach(connection.id, project.id);
+    await manager.stop();
+    expect((await manager.status()).projects[0]).toMatchObject({ status: "synced" });
+    const snapshot = await (await fetch(`${server.url}/api/projects/${project.id}/snapshot`, {
+      headers: { authorization: `Bearer ${credentials.token}` },
+    })).json();
+    expect(Object.keys(snapshot.snapshot.files).some(path => /\/history\/|runtimes\/|reader\.json/.test(path))).toBe(false);
+    const invite = await manager.manage(connection.id, project.id, "invite", { role: "editor" }) as { url: string };
+    await bob.manager.join(bob.connection.id, invite.url);
+    await bob.manager.stop();
+    expect((await bob.store.readPage(project.id, page.document.id)).document.title).toBe("Preserved page");
+    expect(await importer.original(report.id, `projects/${project.id}/pages/${page.document.id}.json`)).toEqual(original);
   });
   it("renames and archives the current cloud project through the current-state publication path", async () => {
     const { directory, alice, bob, project } = await fixture();

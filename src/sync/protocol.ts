@@ -1,6 +1,11 @@
 /** Shared by Workers, Linux and the local application. No host filesystem APIs. */
 export const syncProtocol = "showai-project-sync-v2";
 export const legacySyncProtocol = "showai-project-sync-v1";
+/** Archived readers and imported history belong to the originating device. */
+export const isCurrentSyncPath = (path: string): boolean =>
+  !path.startsWith("runtimes/") &&
+  !path.includes("/history/") &&
+  !/\/reader\.json$|\.reader\.json$/.test(path);
 export type ProjectRole = "admin" | "editor" | "viewer";
 export interface SyncUser {
   id: string;

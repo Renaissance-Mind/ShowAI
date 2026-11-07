@@ -29,6 +29,7 @@ import {
   validateSnapshot,
   scopedPath,
   portablePathKey,
+  isCurrentSyncPath,
   type ProjectSnapshot,
   type SnapshotRecord,
 } from "./protocol";
@@ -98,15 +99,21 @@ export async function captureProject(
   /** Project files already read at `entry.revision`. */
   read?: Map<string, Buffer>,
 ): Promise<CapturedSnapshot> {
-  const logical = remapProjectFiles(
-    read ??
-      (await new LibraryOperations(home, projectId).projectFiles(
-        projectId,
-        entry.revision,
-      )),
-    projectId,
-    remoteProjectId,
+  const logical = new Map(
+    remapProjectFiles(
+      read ??
+        (await new LibraryOperations(home, projectId).projectFiles(
+          projectId,
+          entry.revision,
+        )),
+      projectId,
+      remoteProjectId,
+    ),
   );
+  // A retained import from an earlier client can still carry archived files.
+  // Filter at the publication boundary as well as when reading local content.
+  for (const path of logical.keys())
+    if (!isCurrentSyncPath(path)) logical.delete(path);
   const files: Record<string, string> = {},
     objects = new Map<string, Buffer>();
   for (const [path, bytes] of logical)
@@ -140,7 +147,12 @@ export async function captureProject(
       ...(entry.restoredFrom ? { restoredFrom: entry.restoredFrom } : {}),
       ...(entry.mergedFrom ? { mergedFrom: entry.mergedFrom } : {}),
       paths: entry.paths
-        .filter((path) => path.startsWith(prefix) && !path.includes("/.sync/"))
+        .filter(
+          (path) =>
+            path.startsWith(prefix) &&
+            !path.includes("/.sync/") &&
+            isCurrentSyncPath(path),
+        )
         .map(
           (path) => `projects/${remoteProjectId}/${path.slice(prefix.length)}`,
         ),

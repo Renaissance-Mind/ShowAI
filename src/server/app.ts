@@ -5,6 +5,7 @@ import {
   digestId,
   hash,
   identifier,
+  isCurrentSyncPath,
   plainText,
   role,
   snapshotRevision,
@@ -1554,12 +1555,7 @@ export function createSyncServer(options: ServerOptions) {
           );
       }
       if (
-        Object.keys(snapshot.files).some(
-          (path) =>
-            path.startsWith("runtimes/") ||
-            path.includes("/history/") ||
-            /\/reader\.json$|\.reader\.json$/.test(path),
-        )
+        Object.keys(snapshot.files).some((path) => !isCurrentSyncPath(path))
       )
         throw new SyncError(
           400,
