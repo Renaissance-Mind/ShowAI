@@ -240,6 +240,24 @@ describe("project synchronization between independent real content libraries", (
     ).toBe(true);
     expect(slots).toContain("baseline.json");
   });
+  it("publishes and downloads every object with bounded bulk upload concurrency", async () => {
+    const { alice, bob, project } = await fixture();
+    const files = new Map(Array.from({ length: 96 }, (_, index) => [
+      `projects/${project.id}/attachments/part-${index}.txt`,
+      Buffer.from(String(index).padEnd(4096, "-")),
+    ] as [string, Buffer]));
+    await alice.library.transaction(
+      { actor: { kind: "system" }, channel: "system" },
+      () => alice.library.stageFiles(files),
+    );
+    expect(() => new SyncManager(alice.home, { uploadConcurrency: 9 })).toThrow("1 to 8");
+    const manager = new SyncManager(alice.home, { events: false, uploadConcurrency: 8 });
+    actions.push(() => manager.stop());
+    await manager.run(project.id);
+    expect((await manager.status()).projects[0].status).toBe("synced");
+    await bob.manager.run(project.id);
+    expect(await bob.library.readFiles([...files.keys()])).toEqual(files);
+  });
   it("synchronizes migrated pages while keeping imported checkpoints on their original device", async () => {
     const { directory, server, alice, bob } = await fixture();
     const source = join(directory, "legacy-source");

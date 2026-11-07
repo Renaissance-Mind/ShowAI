@@ -148,13 +148,22 @@ export class SyncManager {
     readonly home: string,
     readonly options: {
       events?: boolean;
+      /** Bulk callers may use the server's eight per-account upload slots. */
+      uploadConcurrency?: number;
       trace?: (event: {
         stage: string;
         at: number;
         durationMs?: number;
       }) => void;
     } = {},
-  ) {}
+  ) {
+    const concurrency = options.uploadConcurrency ?? 2;
+    if (!Number.isInteger(concurrency) || concurrency < 1 || concurrency > 8)
+      throw new CoreError(
+        "INVALID_DATA",
+        "Synchronization upload concurrency must be an integer from 1 to 8.",
+      );
+  }
   private trace(stage: string, start?: number) {
     this.options.trace?.({
       stage,
@@ -1590,7 +1599,10 @@ export class SyncManager {
           }
         };
         const completed = await Promise.allSettled(
-          Array.from({ length: Math.min(2, missing.length) }, send),
+          Array.from(
+            { length: Math.min(this.options.uploadConcurrency ?? 2, missing.length) },
+            send,
+          ),
         );
         const failure = completed.find((item) => item.status === "rejected");
         if (failure?.status === "rejected") throw failure.reason;
