@@ -379,3 +379,23 @@
     gap: 6px;
   }
 }
+
+.remote-approval-code {
+  font:
+    28px ui-monospace,
+    monospace;
+  letter-spacing: 4px;
+}
+.remote-resume {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.remote-approval-dialog > .remote-chatgpt-guide {
+  padding: 24px;
+  overflow-wrap: anywhere;
+}
+.remote-approval-dialog .remote-primary-row {
+  justify-content: flex-end;
+  margin-top: 8px;
+}

@@ -196,6 +196,7 @@ test.skipIf(!process.env.SHOWAI_TEST_CLOUDFLARED)(
       );
       const form = await authorization.text();
       expect(authorization.status).toBe(200);
+      manager.decide(form.match(/name="flow" value="([^"]+)"/)![1], "allow");
       const consent = await fetch(origin + "/oauth/consent", {
         method: "POST",
         redirect: "manual",
@@ -209,7 +210,6 @@ test.skipIf(!process.env.SHOWAI_TEST_CLOUDFLARED)(
           flow: form.match(/name="flow" value="([^"]+)"/)![1],
           csrf: form.match(/name="csrf" value="([^"]+)"/)![1],
           decision: "allow",
-          pairingCode: manager.pair().code,
         }),
       });
       expect(consent.status).toBe(302);

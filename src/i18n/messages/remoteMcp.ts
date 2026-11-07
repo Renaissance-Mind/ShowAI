@@ -1,6 +1,36 @@
 import { defineMessages } from "../index";
 export default defineMessages("remoteMcp", {
   "zh-CN": {
+    bindPluginTitle: "关联 ChatGPT 网页连接",
+    bindPluginHelp:
+      "首次先在 ChatGPT 创建自定义 MCP 连接；打开该插件，复制浏览器地址栏中的完整链接。",
+    chatgptPluginLink: "ChatGPT 连接页面链接",
+    bindPluginOnce:
+      "只需关联一次。之后导出的 ZIP 会自动复用此连接，并包含全部 Skills。",
+
+    approvalTitle: "允许这次远程连接？",
+    approvalWaiting: "等待 ShowAI 本机确认",
+    approvalBrowserHelp:
+      "回到运行 ShowAI 的电脑，核对相同的连接编号，点击“允许连接”。",
+    approvalBrowserReturn: "确认后此页面会自动返回客户端。请求十分钟内有效。",
+    approvalCheck: "检查确认结果",
+    approvalMatch: "与授权页显示的连接编号一致后允许：",
+    approvalAllow: "允许连接",
+    approvalDeny: "拒绝",
+    exportPlugin: "下载 ChatGPT 插件 ZIP",
+    exportAgain: "重新下载插件 ZIP",
+    exportReady: "插件已保存",
+    importPlugin: "打开 ChatGPT 导入插件",
+    importStep:
+      "在 ChatGPT 插件页面上传刚下载的 ZIP。它会带上 Skills，并复用你关联的网页连接。",
+    importConnected: "已导入，等待连接",
+    localApprovalStep:
+      "回到 ShowAI，在弹出的连接请求中点击“允许连接”。授权页会自动返回 ChatGPT。",
+    manualSetup: "手动填写 MCP 地址",
+    packageSetup: "使用完整插件 ZIP",
+    quickPackage: "临时地址在重连后变化，需要重新导出插件。",
+    restoreEnabled: "App 启动时自动恢复连接",
+
     formTitle: "在 ChatGPT 中填写连接",
     formPath: "插件 → 添加 → 添加自定义 MCP 服务器",
     formName: "名称",
@@ -51,10 +81,10 @@ export default defineMessages("remoteMcp", {
     pairInstructions:
       "在 ShowAI 授权页粘贴配对码并点击“确认授权”。不要填到 ChatGPT 的客户端密钥字段或聊天输入框。",
     verifyInstructions:
-      "回到刚创建的插件，点击“在聊天中试用”；也可在新对话输入 @，选择“ShowAI 本机”，再发送验证指令。",
+      "回到刚创建的插件，点击“在聊天中试用”；也可在新对话输入 @，选择刚安装的 ShowAI 插件，再发送验证指令。",
     authWindowExpired: "授权窗口已失效",
     authWindowRecovery:
-      "回到发起授权的客户端重新点击连接，再使用 ShowAI 中有效的配对码。重新生成配对码不会恢复已经失效的授权窗口。",
+      "回到发起授权的客户端重新点击连接，然后在 ShowAI 确认新的连接请求。旧授权窗口不能继续使用。",
     backToChatgpt: "打开 ChatGPT 插件页面",
 
     choose: "选择方式",
@@ -152,6 +182,39 @@ export default defineMessages("remoteMcp", {
     write: "读取与编辑",
   },
   en: {
+    bindPluginTitle: "Link the ChatGPT web connection",
+    bindPluginHelp:
+      "First create a custom MCP connection in ChatGPT. Open that plugin and copy its complete page URL from the browser address bar.",
+    chatgptPluginLink: "ChatGPT connection page URL",
+    bindPluginOnce:
+      "Link once. Future ZIP exports reuse this connection and include all Skills.",
+
+    approvalTitle: "Allow this remote connection?",
+    approvalWaiting: "Waiting for approval in ShowAI",
+    approvalBrowserHelp:
+      "Return to the computer running ShowAI, match the connection number, and select Allow connection.",
+    approvalBrowserReturn:
+      "This page returns to the client automatically after approval. The request expires in ten minutes.",
+    approvalCheck: "Check approval",
+    approvalMatch:
+      "Allow after matching this number with the authorization page:",
+    approvalAllow: "Allow connection",
+    approvalDeny: "Deny",
+    exportPlugin: "Download ChatGPT plugin ZIP",
+    exportAgain: "Download plugin ZIP again",
+    exportReady: "Plugin saved",
+    importPlugin: "Open ChatGPT to import the plugin",
+    importStep:
+      "Upload the downloaded ZIP on the ChatGPT Plugins page. It includes the Skills and reuses the web connection you linked.",
+    importConnected: "Imported — waiting for connection",
+    localApprovalStep:
+      "Return to ShowAI and select Allow connection in the request dialog. The authorization page returns to ChatGPT automatically.",
+    manualSetup: "Enter the MCP URL manually",
+    packageSetup: "Use the complete plugin ZIP",
+    quickPackage:
+      "Temporary addresses change on reconnect. Export a new plugin after the address changes.",
+    restoreEnabled: "Restore the connection when the App starts",
+
     formTitle: "Fill in the ChatGPT connection",
     formPath: "Plugins → Add → Add custom MCP server",
     formName: "Name",
@@ -209,10 +272,10 @@ export default defineMessages("remoteMcp", {
     pairInstructions:
       "Paste the code on the ShowAI authorization page and select Authorize. Do not enter it as a ChatGPT client secret or chat message.",
     verifyInstructions:
-      "Select Try in chat on the new plugin, or type @ in a new chat and choose ShowAI Local, then send the verification prompt.",
+      "Select Try in chat on the new plugin, or type @ in a new chat and choose the ShowAI plugin you installed, then send the verification prompt.",
     authWindowExpired: "Authorization window expired",
     authWindowRecovery:
-      "Return to the client and start connecting again, then use a valid pairing code from ShowAI. A new pairing code does not renew an expired authorization window.",
+      "Return to the client and start connecting again, then approve the new request in ShowAI. The old authorization window cannot be reused.",
     backToChatgpt: "Open ChatGPT Plugins",
 
     choose: "Choose method",

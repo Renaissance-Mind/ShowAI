@@ -1,3 +1,4 @@
+import RemoteMcpApprovalDialog from "./RemoteMcpApprovalDialog";
 import MergeDialog from "./MergeDialog";
 import { trackDesktopPreviewActivity } from "./preview-work";
 import { revealSidebarRow } from "./sidebar-locate";
@@ -4697,6 +4698,7 @@ export default function Studio() {
             : undefined
         }
       >
+        {info && info.mode !== "browser" && <RemoteMcpApprovalDialog />}
         <WorkspaceSwipeNavigation
           rootRef={studioRoot}
           busy={

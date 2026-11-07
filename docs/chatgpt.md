@@ -28,34 +28,20 @@ On a failure, the current step offers a retry or return to configuration. **View
 
 ## Connect ChatGPT
 
-Keep ShowAI open. Copy the MCP URL, then open ChatGPT's **Plugins → Add → Add custom MCP server**. The available entry depends on the account and workspace policy. Fill the form as follows:
+After the public connection check succeeds, copy the MCP URL and create a custom MCP connection in ChatGPT using the in-step form guide. Open its plugin page and copy the complete browser URL. Choose **Download ChatGPT plugin ZIP** in ShowAI and paste this page link once. ShowAI remembers the binding for the current endpoint. The ZIP includes all six Skills, references, icons and the registered ChatGPT connection mapping, with no local launcher, project content or credentials. Import it in ChatGPT Plugins to use the complete **ShowAI Personal** plugin. A ZIP containing only a portable HTTP MCP declaration is currently classified as desktop-only by ChatGPT; the registered connection mapping is required for web use. Plugin upload availability depends on the account and workspace policy.
 
-| Field | Value |
-| --- | --- |
-| Name | **ShowAI Local**, or a unique name identifying this computer |
-| Connection | **Server URL**, using the MCP URL copied from ShowAI |
-| Authentication | **OAuth** |
-| Advanced OAuth settings → Registration method | **Dynamic Client Registration (DCR)** |
-| Client ID / Client Secret | Automatically registered; no manual values needed |
-| Default requested scopes | Keep the discovered selection; full access includes `projects.read`, `projects.write` and `projects.create` |
-| Base scopes | Leave empty |
+The authorization page displays **Waiting for approval in ShowAI** and a connection number. Return to the desktop App: its connection dialog appears wherever you are in the workbench. Match the number, check the requesting client, callback origin and access scope, then choose **Allow connection**. The page automatically returns to ChatGPT. A request expires after ten minutes; denying or canceling it grants no access. The client name is supplied by the requesting client; matching the number identifies the request you just started.
 
-Both Cloudflare and Tailscale Funnel use **Server URL** in this form. If metadata discovery fails, click **Retry metadata discovery** in the advanced OAuth settings. Successful discovery makes DCR available and fills the endpoint fields. ShowAI's **Resolve discovery failure** action shows the exact values for the current connection, with copy buttons. For a server at `https://your-host/mcp`, the authorization, token and registration URLs end in `/oauth/authorize`, `/oauth/token` and `/oauth/register`; the authorization server base is `https://your-host` and the resource is the full MCP URL. PKCE uses S256. CIMD and OIDC being unavailable is expected.
+Choose **Try in chat** on the installed plugin, or mention it in a new chat and send the verification prompt from ShowAI. The wizard completes after a real authenticated tool call succeeds. Installation, authorization and successful tool use are separate checks. Use **Connect another client** to add one later, and revoke individual clients from the connected view.
 
-If discovery still fails, keep the App running and check public tunnel access. A check from your own computer does not establish that ChatGPT can reach it. Manual endpoint values cannot repair a network failure.
+If the authorization window expires, start connecting again in ChatGPT and approve the new request in ShowAI. Each request is handled once. Restarting the service cancels pending requests while retaining existing valid grants.
 
-Review the warning and permissions, acknowledge them, then choose **Create as plugin**. If the name is already taken, add your device name. Open the newly created plugin and choose **Connect** or **Continue connecting app**. If you close the dialog accidentally, reopen that plugin from **Personal** or **Installed** and continue connecting it.
-
-When ChatGPT opens **Connect local ShowAI**, return to ShowAI and choose **ShowAI authorization page is open — continue**, then **Generate pairing code**. Copy it into the authorization page's **Pairing code** field and click **Authorize**. The code expires after ten minutes and works once. ShowAI shows its remaining time and retires expired, used or replaced codes. Use **Generate a new pairing code** when needed.
-
-The authorization window also expires independently. If it has expired, return to the client and start connecting again before entering a valid pairing code. Generating a new code does not renew the old authorization window. Put the code only into the ShowAI authorization page, never into the OAuth Client Secret field or a chat message.
-
-After connecting, choose **Try in chat** on this plugin, or mention its exact name with `@` in a new chat. Send the verification prompt copied from ShowAI. A successful authenticated tool call completes the setup; installation alone does not verify access.
+**Enter the MCP URL manually** remains available for an existing custom connection or another client. In ChatGPT choose **Server URL**, **OAuth**, and **Dynamic Client Registration (DCR)**. Client credentials are registered automatically. Keep discovered scopes selected and base scopes empty. If discovery fails, use **Retry metadata discovery** in ChatGPT. ShowAI's recovery dialog provides the exact endpoint fields. Both Cloudflare and Tailscale use the Server URL option. CIMD and OIDC being unavailable is expected; PKCE uses S256. A duplicate plugin name needs a device suffix; an already created plugin can be reopened to continue connecting.
 
 Choose **Other MCP client** for an HTTP/OAuth-capable client on another computer. That computer does not need tunnel software. The connected view lets you copy the address, connect another client, revoke a client's grant or disconnect.
 
 Pages save directly in the local ShowAI library with normal version and conflict checks. Full-library grants automatically discover later projects; `project_create` creates a local project. Reuse the same operationId and name only when retrying the same creation after an uncertain response. Cloud synchronization, if configured separately, has its own status.
 
-Quitting the App closes its listener and connector. Fixed hostnames retain full-library grants across normal restarts; changed temporary addresses require client configuration and pairing again. Refresh the client's MCP tools after an App update changes capabilities. If a save was interrupted, read the Page after reconnecting before retrying. Preview links expire after one hour; the saved Page remains the source.
+Quitting the App closes its listener and connector. Enabled connections restore on the next App launch and retry transient failures. Choosing Disconnect disables restoration. Fixed hostnames retain full-library grants across normal restarts; changed temporary addresses require an updated client address or a newly exported plugin and renewed authorization. Refresh the client's MCP tools after an App update changes capabilities. If a save was interrupted, read the Page after reconnecting before retrying. Preview links expire after one hour; the saved Page remains the source.
 
 Provider references: [Cloudflare setup](https://developers.cloudflare.com/tunnel/get-started/), [Tailscale Funnel](https://tailscale.com/docs/features/tailscale-funnel). Separately administered cloud gateways are covered in [MCP deployment](cloud-mcp-deployment.md).

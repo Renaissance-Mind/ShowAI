@@ -24,6 +24,10 @@ import {
   shell,
   safeStorage,
 } from "electron";
+import {
+  remotePluginPackage,
+  chatgptAppId,
+} from "../remote-mcp/plugin-package";
 import { RemoteMcpManager } from "../remote-mcp/manager";
 import { remoteMcpActions } from "../remote-mcp/types";
 import type { IpcMainEvent, IpcMainInvokeEvent, NativeImage } from "electron";
@@ -240,7 +244,8 @@ const quitRecord = new QuitRecord(
     home: store ? store.root : "",
     log: mainLog.path,
   }),
-  (error) => mainLog.write("error", "main", "Quit record could not be written:", error),
+  (error) =>
+    mainLog.write("error", "main", "Quit record could not be written:", error),
 );
 
 function iconForAppearance(appearance: DesktopAppearance): NativeImage {
@@ -372,7 +377,10 @@ async function deliverFiles(root: string, batch: string[]): Promise<void> {
   }
   const previewPaths = batch.filter((path) =>
     /^(projects|packages|assets|imports|publications)\//.test(
-      relative(root, path).split(sep).join("/").replace(/^workspace\//, ""),
+      relative(root, path)
+        .split(sep)
+        .join("/")
+        .replace(/^workspace\//, ""),
     ),
   );
   if (previewPaths.length)
@@ -473,7 +481,8 @@ interface DesktopSettings {
 }
 
 class InvalidSettings extends Error {}
-const settingsPath = () => join(app.getPath("userData"), "showai-settings.json");
+const settingsPath = () =>
+  join(app.getPath("userData"), "showai-settings.json");
 
 async function readSettings(): Promise<DesktopSettings> {
   const path = settingsPath();
@@ -488,7 +497,9 @@ async function readSettings(): Promise<DesktopSettings> {
   try {
     settings = JSON.parse(contents);
   } catch (error) {
-    throw new InvalidSettings(`ShowAI settings are not valid JSON: ${(error as Error).message}`);
+    throw new InvalidSettings(
+      `ShowAI settings are not valid JSON: ${(error as Error).message}`,
+    );
   }
   if (!settings || typeof settings !== "object" || Array.isArray(settings))
     throw new InvalidSettings("ShowAI settings are not an object.");
@@ -504,7 +515,9 @@ async function readSettings(): Promise<DesktopSettings> {
         ? settings.locale
         : undefined,
     autoUpdate:
-      typeof settings.autoUpdate === "boolean" ? settings.autoUpdate : undefined,
+      typeof settings.autoUpdate === "boolean"
+        ? settings.autoUpdate
+        : undefined,
   };
 }
 
@@ -825,6 +838,49 @@ async function handle(
         return remoteMcp.stop();
       case "remoteMcp:check":
         return remoteMcp.check();
+      case "remoteMcp:requests":
+        return remoteMcp.requests();
+      case "remoteMcp:decide":
+        return remoteMcp.decide(
+          String(args.id),
+          args.decision as "allow" | "deny",
+        );
+      case "remoteMcp:exportPlugin": {
+        const status = await remoteMcp.status();
+        if (status.phase !== "running" || !status.reachable || !status.url)
+          throw new Error(
+            "Connect the remote service before exporting a plugin.",
+          );
+        const registeredApp = chatgptAppId(
+          String(
+            args.connection ||
+              (status.config.chatgptEndpoint === status.url
+                ? status.config.chatgptAppId
+                : "") ||
+              "",
+          ),
+        );
+        const bundle = await remotePluginPackage(
+          process.env.SHOWAI_DEV_URL
+            ? join(process.cwd(), "plugins/showai")
+            : join(runtimePath(), "assets/agent-plugin"),
+          status.url,
+          registeredApp,
+        );
+        const selection = await dialog.showSaveDialog(window, {
+          defaultPath: join(app.getPath("downloads"), bundle.name + ".zip"),
+          filters: [{ name: "ZIP", extensions: ["zip"] }],
+        });
+        if (selection.canceled || !selection.filePath) return null;
+        await writeFile(selection.filePath, bundle.bytes, { mode: 0o600 });
+        await remoteMcp.rememberChatgptApp(registeredApp, status.url);
+        return {
+          path: selection.filePath,
+          name: bundle.name,
+          version: bundle.version,
+          url: bundle.endpoint,
+        };
+      }
       case "remoteMcp:pair":
         return remoteMcp.pair();
       case "remoteMcp:revoke":
@@ -1039,14 +1095,15 @@ function revealWindow(window: BrowserWindow): void {
   window.focus();
 }
 
-const blockerSources: Record<CloseBlocker["source"], Parameters<typeof t>[0]> = {
-  pages: "close.source.pages",
-  datasets: "close.source.datasets",
-  assistant: "close.source.assistant",
-  sidebar: "close.source.sidebar",
-  workbench: "close.source.workbench",
-  window: "close.source.window",
-};
+const blockerSources: Record<CloseBlocker["source"], Parameters<typeof t>[0]> =
+  {
+    pages: "close.source.pages",
+    datasets: "close.source.datasets",
+    assistant: "close.source.assistant",
+    sidebar: "close.source.sidebar",
+    workbench: "close.source.workbench",
+    window: "close.source.window",
+  };
 
 /** One dialog line: what holds the window open, and why. */
 function blockerLine(blocker: CloseBlocker): string {
@@ -1270,7 +1327,8 @@ function requestClose(
         cancelId: 0,
         noLink: true,
       });
-      decision = window.isDestroyed() || choice.response === 1 ? "discard" : "keep";
+      decision =
+        window.isDestroyed() || choice.response === 1 ? "discard" : "keep";
     }
     if (decision === "discard") {
       mainLog.write(
@@ -1473,9 +1531,7 @@ async function createWindow(page?: WindowTarget): Promise<BrowserWindow> {
               blocks: blocks ?? undefined,
             }
           : undefined,
-      ).catch((error) =>
-        showWindowError(t("openPageFailed"), error),
-      );
+      ).catch((error) => showWindowError(t("openPageFailed"), error));
       return { action: "deny" };
     }
     // The workbench follows page links itself; any other opener gets a window.
@@ -1490,7 +1546,8 @@ async function createWindow(page?: WindowTarget): Promise<BrowserWindow> {
     if (isWorkbenchLocation(event.url)) return;
     event.preventDefault();
     if (parsePageLink(event.url)) void handleDeepLink(event.url);
-    else if (/^https?:\/\//i.test(event.url)) void shell.openExternal(event.url);
+    else if (/^https?:\/\//i.test(event.url))
+      void shell.openExternal(event.url);
   });
   window.webContents.on("will-frame-navigate", (event) => {
     if (!event.isMainFrame && !event.url.startsWith("about:"))
@@ -1528,7 +1585,10 @@ async function handleDeepLink(source: string): Promise<void> {
       [...windows].find((window) => !window.isDestroyed()) ??
       (await createWindow());
     if (presentation.background) {
-      console.error("ShowAI background link failed:", errorResult(error).message);
+      console.error(
+        "ShowAI background link failed:",
+        errorResult(error).message,
+      );
       return;
     }
     window.show();
@@ -1712,7 +1772,8 @@ async function openStartupLibrary(
       }
     }
     mainLog.write("warn", "main", `${prompt.message}: ${prompt.detail}`);
-    if (presentation.background) throw new Error(`${prompt.message}: ${prompt.detail}`);
+    if (presentation.background)
+      throw new Error(`${prompt.message}: ${prompt.detail}`);
     const retry = !damagedBackup || home !== undefined;
     const buttons = [
       ...(retry ? [t("action.retry")] : []),
@@ -1792,7 +1853,9 @@ else {
             await handleDeepLink(message.url);
           const window = [...windows].at(-1) ?? (await createWindow());
           presentation.show(window, true);
-        })().catch((error) => console.error("ShowAI development show failed:", error));
+        })().catch((error) =>
+          console.error("ShowAI development show failed:", error),
+        );
       }
     });
   // Granted local files (videos, audio, images) for the workbench player; streamed with ranges.
@@ -1917,6 +1980,9 @@ else {
         decrypt: (value) =>
           safeStorage.decryptString(Buffer.from(value, "base64")),
       });
+      void remoteMcp
+        .restore()
+        .catch((error) => console.error("Remote MCP restore:", error.message));
       void remoteConnector
         .start()
         .catch((error) =>
@@ -1994,7 +2060,9 @@ else {
               app.getPath("downloads"),
               `showai-diagnostics-${stamp}.txt`,
             ),
-            filters: [{ name: t("diagnostics.exportFilter"), extensions: ["txt"] }],
+            filters: [
+              { name: t("diagnostics.exportFilter"), extensions: ["txt"] },
+            ],
           });
           if (selection.canceled || !selection.filePath) return null;
           // The renderer already redacted it; the main process knows the home directory.
@@ -2006,7 +2074,10 @@ else {
           return { path: redactLogText(selection.filePath, homedir()) };
         },
       );
-      const rendererReports = new Map<number, { minute: number; count: number }>();
+      const rendererReports = new Map<
+        number,
+        { minute: number; count: number }
+      >();
       ipcMain.on("showai:renderer-error", (event, payload: unknown) => {
         let window: BrowserWindow;
         try {
@@ -2137,7 +2208,8 @@ else {
       );
       for (const entry of quitRecord.windows()) {
         const waiting = BrowserWindow.fromId(entry.windowId);
-        if (waiting && entry.state === "awaiting-decision") revealWindow(waiting);
+        if (waiting && entry.state === "awaiting-decision")
+          revealWindow(waiting);
       }
       return;
     }
@@ -2148,58 +2220,61 @@ else {
       "main",
       `Quit requested; asking ${open.length} window(s) to close.`,
     );
-    void Promise.all(
-      open.map((window) => requestClose(window, "quit")),
-    ).then(async (outcomes) => {
-      checkingQuit = false;
-      const refused = outcomes.filter((outcome) => !outcome.allow);
-      if (refused.length) {
-        appUpdates?.cancelInstall();
+    void Promise.all(open.map((window) => requestClose(window, "quit"))).then(
+      async (outcomes) => {
+        checkingQuit = false;
+        const refused = outcomes.filter((outcome) => !outcome.allow);
+        if (refused.length) {
+          appUpdates?.cancelInstall();
+          mainLog.write(
+            "warn",
+            "main",
+            `Quit blocked: ${refused.length} of ${outcomes.length} window(s) stay open. Details: ${quitRecord.path}`,
+            refused.map(
+              (outcome) =>
+                `window ${outcome.windowId} (${outcome.decision ?? "refused"}): ${loggedBlockers(outcome.blockers).join("; ")}`,
+            ),
+          );
+          if (!app.isPackaged && process.env.SHOWAI_DEV_URL)
+            process.send?.({
+              type: "quit-blocked",
+              at: new Date().toISOString(),
+              record: quitRecord.path,
+              windows: refused.map((outcome) => ({
+                windowId: outcome.windowId,
+                title: outcome.title,
+                decision: outcome.decision ?? "refused",
+                blockers: outcome.blockers,
+              })),
+            });
+          return;
+        }
         mainLog.write(
-          "warn",
+          "info",
           "main",
-          `Quit blocked: ${refused.length} of ${outcomes.length} window(s) stay open. Details: ${quitRecord.path}`,
-          refused.map(
-            (outcome) =>
-              `window ${outcome.windowId} (${outcome.decision ?? "refused"}): ${loggedBlockers(outcome.blockers).join("; ")}`,
-          ),
+          `Quit allowed: ${outcomes.length} window(s) closed; stopping services.`,
         );
-        if (!app.isPackaged && process.env.SHOWAI_DEV_URL)
-          process.send?.({
-            type: "quit-blocked",
-            at: new Date().toISOString(),
-            record: quitRecord.path,
-            windows: refused.map((outcome) => ({
-              windowId: outcome.windowId,
-              title: outcome.title,
-              decision: outcome.decision ?? "refused",
-              blockers: outcome.blockers,
-            })),
-          });
-        return;
-      }
-      mainLog.write(
-        "info",
-        "main",
-        `Quit allowed: ${outcomes.length} window(s) closed; stopping services.`,
-      );
-      allowedQuit = true;
-      await quitRecord.clear();
-      await presence?.remove();
-      remoteConnector?.close();
-      await shutdownStep("remote MCP", () => remoteMcp?.stop());
-      agentHost?.close();
-      clearTimeout(notification);
-      // Stopping waits for running work (maintenance, sync); a slow step is named.
-      await shutdownStep("library watcher", () => watcher?.close());
-      await shutdownStep("dataset sources", () => sources?.close());
-      await shutdownStep("library maintenance", () => maintenance?.stop());
-      if (store)
-        await shutdownStep("project sync", () => syncManager(store.root).stop());
-      for (const window of windows) if (!window.isDestroyed()) window.destroy();
-      mainLog.write("info", "main", "Quit: services stopped.");
-      appUpdates?.dispose();
-      if (!appUpdates?.finishQuit(() => app.quit())) app.quit();
-    });
+        allowedQuit = true;
+        await quitRecord.clear();
+        await presence?.remove();
+        remoteConnector?.close();
+        await shutdownStep("remote MCP", () => remoteMcp?.suspend());
+        agentHost?.close();
+        clearTimeout(notification);
+        // Stopping waits for running work (maintenance, sync); a slow step is named.
+        await shutdownStep("library watcher", () => watcher?.close());
+        await shutdownStep("dataset sources", () => sources?.close());
+        await shutdownStep("library maintenance", () => maintenance?.stop());
+        if (store)
+          await shutdownStep("project sync", () =>
+            syncManager(store.root).stop(),
+          );
+        for (const window of windows)
+          if (!window.isDestroyed()) window.destroy();
+        mainLog.write("info", "main", "Quit: services stopped.");
+        appUpdates?.dispose();
+        if (!appUpdates?.finishQuit(() => app.quit())) app.quit();
+      },
+    );
   });
 }

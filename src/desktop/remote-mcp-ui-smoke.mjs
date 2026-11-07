@@ -1,5 +1,6 @@
 // Real hidden Electron acceptance for the remote connection wizard. No mocked bridge/provider.
 import assert from "node:assert/strict";
+import {createServer} from "node:http";
 import {createHash, randomBytes} from "node:crypto";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
@@ -19,6 +20,43 @@ delete env.ELECTRON_RUN_AS_NODE; delete env.SHOWAI_DEV_URL;
 const result={passed:false,output,checks:[],rendererErrors:[]};
 let application,page,processLog="";
 const snapshot=async name=>writeFile(join(output,name+".txt"),await page.locator("body").ariaSnapshot());
+async function verifyDesktopApproval(origin, layout="light") {
+  let finish;
+  const callback = createServer((request,response)=>{
+    response.writeHead(200,{"content-type":"text/html"});response.end("<title>Connection complete</title>Connection complete");
+    if(request.url.startsWith("/callback")) finish(new URL(request.url,"http://127.0.0.1"));
+  });
+  await new Promise(resolve=>callback.listen(0,"127.0.0.1",resolve));
+  const redirect=`http://127.0.0.1:${callback.address().port}/callback`;
+  try {
+    for(const decision of ["deny","allow"]) {
+      const received = new Promise(resolve=>finish=resolve);
+      const registration = await fetch(origin+"/oauth/register",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({client_name:"Desktop approval acceptance",redirect_uris:[redirect],token_endpoint_auth_method:"none"})}).then(r=>r.json());
+      const verifier=randomBytes(32).toString("base64url");
+      const authorizationUrl=origin+"/oauth/authorize?"+new URLSearchParams({client_id:registration.client_id,redirect_uri:redirect,response_type:"code",code_challenge_method:"S256",code_challenge:createHash("sha256").update(verifier).digest("base64url"),resource:origin+"/mcp",scope:"projects.read projects.write projects.create",state:"ui-approval"});
+      const windowReady=application.waitForEvent("window");
+      await application.evaluate(({BrowserWindow},url)=>{const browser=new BrowserWindow({show:false,webPreferences:{sandbox:true,contextIsolation:true}});void browser.loadURL(url);},authorizationUrl);
+      const browser=await windowReady;
+      await browser.getByRole("heading",{name:"等待 ShowAI 本机确认",exact:true}).waitFor();
+      assert.equal(await browser.locator('input[name="pairingCode"]').count(),0);
+      await page.getByRole("dialog",{name:"允许这次远程连接？",exact:true}).waitFor();
+      const number=(await page.locator('.remote-approval-code').innerText()).trim();
+      assert.equal((await browser.locator("code").innerText()).trim(),number);
+      await page.screenshot({animations:"disabled",path:join(output,`local-approval-${layout}-${decision}.png`)});
+      await browser.screenshot({animations:"disabled",path:join(output,`authorization-wait-${layout}-${decision}.png`)});
+      await page.getByRole("button",{name:decision==="allow"?"允许连接":"拒绝",exact:true}).click();
+      const destination=await Promise.race([received,new Promise((_,reject)=>setTimeout(()=>reject(new Error("Authorization did not return automatically")),10000).unref())]);
+      assert.equal(destination.searchParams.get("state"),"ui-approval");
+      if(decision==="deny")assert.equal(destination.searchParams.get("error"),"access_denied");
+      else {
+        const token=await fetch(origin+"/oauth/token",{method:"POST",headers:{"content-type":"application/x-www-form-urlencoded"},body:new URLSearchParams({client_id:registration.client_id,grant_type:"authorization_code",code:destination.searchParams.get("code"),redirect_uri:redirect,code_verifier:verifier,resource:origin+"/mcp"})}).then(r=>r.json());
+        assert.ok(token.access_token);
+      }
+      await browser.close();
+    }
+    result.checks.push("real browser authorization waits for the matching desktop dialog; Deny and Allow return automatically, without a pairing code");
+  } finally {await new Promise(resolve=>callback.close(resolve));}
+}
 try {
   application=await _electron.launch({executablePath:electron,args:[root],cwd:root,env,timeout:30000});
   application.process().stderr?.on("data",data=>processLog+=data.toString());
@@ -37,7 +75,7 @@ try {
   assert.equal(await page.locator('.remote-flow details,.remote-flow [role="switch"],.remote-flow [aria-pressed],.remote-flow input[type="checkbox"]').count(),0);
   const logos=await page.locator('.remote-provider-cards img').evaluateAll(images=>images.map(image=>({src:image.src,loaded:image.complete&&image.naturalWidth>0})));
   assert.equal(logos.length,3);assert.ok(logos.every(image=>image.loaded));
-  await page.screenshot({path:join(output,"providers-light.png")});
+  await page.screenshot({animations:"disabled",path:join(output,"providers-light.png")});
   result.checks.push("official provider logos, full-library default and a wizard without switches or disclosure tutorials");
 
   await page.getByRole("button",{name:"访问规则",exact:true}).click();
@@ -65,8 +103,9 @@ try {
   assert.equal(await page.locator('input[type="password"]').count(),1);
   const again=await page.evaluate(()=>window.showai.invoke("remoteMcp:status"));
   assert.equal(again.localUrl,prepared.localUrl);
+  await verifyDesktopApproval(prepared.localUrl);
   await snapshot("owned-domain");
-  await page.screenshot({path:join(output,"owned-domain.png")});
+  await page.screenshot({animations:"disabled",path:join(output,"owned-domain.png")});
   await page.getByRole("button",{name:"返回",exact:true}).click();
   await page.getByRole("button",{name:"Tailscale",exact:true}).waitFor();
   await assert.rejects(fetch(prepared.localUrl+"/health"));
@@ -76,7 +115,7 @@ try {
   await page.getByRole("button",{name:"已登录，检查并连接",exact:true}).waitFor();
   assert.equal(await page.getByRole("link",{name:"安装并登录 Tailscale",exact:true}).count(),1);
   assert.equal(await page.getByRole("link",{name:"打开网络设置",exact:true}).count(),1);
-  await page.screenshot({path:join(output,"tailscale-setup.png")});
+  await page.screenshot({animations:"disabled",path:join(output,"tailscale-setup.png")});
   await page.getByRole("button",{name:"返回",exact:true}).click();
   await page.getByRole("button",{name:"Cloudflare",exact:true}).click();
   await page.getByRole("button",{name:"创建临时连接",exact:false}).click();
@@ -99,10 +138,17 @@ try {
   await page.getByRole("button",{name:"Cloudflare",exact:true}).focus();await page.keyboard.press("Tab");
   assert.equal(await page.getByRole("button",{name:"Tailscale",exact:true}).evaluate(el=>el===document.activeElement),true);
   assert.equal(await page.locator(".remote-flow").evaluate(el=>el.scrollWidth>el.clientWidth+1),false);
-  await page.screenshot({path:join(output,"providers-dark-narrow.png")});
+  await page.screenshot({animations:"disabled",path:join(output,"providers-dark-narrow.png")});
   const windows=await application.evaluate(({BrowserWindow})=>BrowserWindow.getAllWindows().map(w=>({visible:w.isVisible(),focused:w.isFocused()})));
   assert.ok(windows.every(w=>!w.visible&&!w.focused));
   result.checks.push("dark/narrow layout and keyboard flow work with all native windows hidden");
+  await page.getByRole("button",{name:"Cloudflare",exact:true}).click();
+  await page.getByRole("button",{name:"连接自己的域名",exact:false}).click();
+  await page.getByRole("button",{name:"复制本机地址",exact:true}).waitFor();
+  const darkPrepared=await page.evaluate(()=>window.showai.invoke("remoteMcp:status"));
+  await verifyDesktopApproval(darkPrepared.localUrl,"dark-narrow");
+  await page.getByRole("button",{name:"返回",exact:true}).click();
+
   if (process.env.SHOWAI_TEST_PUBLIC_TUNNEL === "1") {
     await page.getByRole("button",{name:"Cloudflare",exact:true}).click();
     await page.getByRole("button",{name:"创建临时连接",exact:false}).click();
@@ -131,40 +177,21 @@ try {
     await page.keyboard.press("Escape");
     assert.equal(await page.getByRole("button",{name:"处理自动发现失败",exact:true}).evaluate(el=>el===document.activeElement),true);
     assert.equal(await page.locator(".remote-flow").evaluate(el=>el.scrollWidth>el.clientWidth+1),false);
-    await page.screenshot({path:join(output,"chatgpt-guide-dark-narrow.png")});
+    await page.screenshot({animations:"disabled",path:join(output,"chatgpt-guide-dark-narrow.png")});
     await page.getByRole("button",{name:"已打开 ShowAI 授权页，继续",exact:true}).click();
-    await page.getByRole("button",{name:"生成配对码",exact:true}).click();
-    await page.getByRole("button",{name:"复制配对码",exact:true}).waitFor();
-    const first = await page.evaluate(()=>window.showai.invoke("remoteMcp:status"));
-    await page.getByRole("button",{name:"重新生成配对码",exact:true}).click();
-    const second = await page.evaluate(()=>window.showai.invoke("remoteMcp:status"));
-    assert.notEqual(first.pairing.id,second.pairing.id);
-    await page.getByRole("button",{name:"复制配对码",exact:true}).click();
-    const code = await application.evaluate(({clipboard})=>clipboard.readText());
-    assert.match(code,/^[A-Za-z0-9_-]{24}$/);
-    const redirect = "http://127.0.0.1:12345/callback";
-    const registration = await fetch(origin+"/oauth/register",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({client_name:"Hidden desktop UI test",redirect_uris:[redirect],token_endpoint_auth_method:"none"})}).then(r=>r.json());
-    const verifier = randomBytes(32).toString("base64url");
-    const auth = await fetch(origin+"/oauth/authorize?"+new URLSearchParams({client_id:registration.client_id,redirect_uri:redirect,response_type:"code",code_challenge_method:"S256",code_challenge:createHash("sha256").update(verifier).digest("base64url"),scope:"projects.read projects.write projects.create",resource:status.url}));
-    const html=await auth.text();
-    assert.equal(auth.status,200);
-    const consent=await fetch(origin+"/oauth/consent",{method:"POST",redirect:"manual",headers:{"content-type":"application/x-www-form-urlencoded",origin,cookie:auth.headers.get("set-cookie").split(";")[0]},body:new URLSearchParams({flow:html.match(/name="flow" value="([^"]+)"/)[1],csrf:html.match(/name="csrf" value="([^"]+)"/)[1],decision:"allow",pairingCode:code})});
-    assert.equal(consent.status,302);
-    await page.getByRole("status").filter({hasText:"配对码已使用"}).waitFor();
-    assert.equal(await page.getByRole("button",{name:"复制配对码",exact:true}).count(),0);
-    assert.equal((await page.locator(".remote-flow").innerText()).includes(code),false);
-    await page.screenshot({path:join(output,"pairing-consumed.png")});
+    assert.equal(await page.getByRole("button",{name:"生成配对码",exact:true}).count(),0);
+    assert.ok((await page.locator(".remote-flow").innerText()).includes("允许连接"));
     await page.getByRole("button",{name:"授权窗口已失效",exact:true}).click();
-    assert.ok((await page.getByRole("dialog").innerText()).includes("重新生成配对码不会恢复"));
+    assert.ok((await page.getByRole("dialog").innerText()).includes("确认新的连接请求"));
     await page.keyboard.press("Escape");
     await page.getByRole("button",{name:"断开连接",exact:true}).click();
-    result.checks.push("live Quick Tunnel discovery values match the inline form; real clipboard, regeneration, OAuth consumption and recovery dialog work in dark narrow Electron");
+    result.checks.push("live Quick Tunnel discovery values match the inline form; ZIP entry, manual setup and authorization recovery work in dark narrow Electron");
   }
   assert.deepEqual(result.rendererErrors,[]);result.passed=true;
 } catch(error) {
   result.error=error.stack??String(error);process.exitCode=1;
   if(page) result.remoteFailure=await page.evaluate(async()=>{const s=await window.showai.invoke("remoteMcp:status");return {phase:s.phase,error:s.error,diagnostics:s.diagnostics};}).catch(()=>undefined);
-  if(page){await snapshot("failure").catch(()=>{});await page.screenshot({path:join(output,"failure.png")}).catch(()=>{});}
+  if(page){await snapshot("failure").catch(()=>{});await page.screenshot({animations:"disabled",path:join(output,"failure.png")}).catch(()=>{});}
 } finally {
   if(page)await page.evaluate(()=>window.showai.invoke("remoteMcp:stop")).catch(()=>{});
   if(application)await stopTestProcess(application.process(),()=>application.close(),{label:"remote flow UI test",timeoutMs:15000});

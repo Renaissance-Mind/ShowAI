@@ -34,6 +34,11 @@ type Flow = {
   scopes: string[];
   csrf: string;
   attempts: number;
+  desktopApproval?: {
+    createdAt: string;
+    expiresAt: string;
+    decision?: "allow" | "deny";
+  };
   connection?: Omit<ProjectGrant, "id" | "clientId" | "projectIds" | "scopes">;
   projects?: SyncProject[];
   external?: {
@@ -57,6 +62,7 @@ export interface LocalMcpAuthorization {
     }>
   >;
   consumePairingCode(code: string): boolean;
+  desktopApproval?: boolean;
 }
 const token = () => randomBytes(32).toString("base64url");
 const hash = (value: string) =>
@@ -184,6 +190,8 @@ export class McpAuthorization {
     db.exec(
       "PRAGMA journal_mode=WAL; PRAGMA busy_timeout=10000; CREATE TABLE IF NOT EXISTS records(kind TEXT NOT NULL,key TEXT NOT NULL,value TEXT NOT NULL,expires INTEGER NOT NULL,PRIMARY KEY(kind,key));",
     );
+    if (local?.desktopApproval)
+      db.exec("DELETE FROM records WHERE kind='flow'");
     return new McpAuthorization(url, servers, db, local);
   }
   connections() {
@@ -203,6 +211,61 @@ export class McpAuthorization {
         scopes: grant.scopes,
       };
     });
+  }
+  pendingApprovals() {
+    if (!this.local?.desktopApproval) return [];
+    const rows = this.db
+      .prepare("SELECT key,value FROM records WHERE kind='flow' AND expires>?")
+      .all(Date.now()) as { key: string; value: string }[];
+    return rows.flatMap((row) => {
+      const flow = JSON.parse(row.value) as Flow;
+      if (!flow.desktopApproval || flow.desktopApproval.decision) return [];
+      const client = this.get<Client>("client", flow.clientId);
+      if (!client) return [];
+      return [
+        {
+          id: row.key,
+          code: row.key.slice(-6).toUpperCase(),
+          clientName: client.client_name || "MCP client",
+          callbackOrigin: new URL(flow.redirect).origin,
+          scopes: flow.scopes,
+          access: this.local!.access ?? "selected",
+          createdAt: flow.desktopApproval.createdAt,
+          expiresAt: flow.desktopApproval.expiresAt,
+        },
+      ];
+    });
+  }
+  decideApproval(id: string, decision: "allow" | "deny") {
+    if (!this.local?.desktopApproval || !["allow", "deny"].includes(decision))
+      throw new Error("Invalid local approval.");
+    const flow = this.get<Flow>("flow", id);
+    if (!flow?.desktopApproval || flow.desktopApproval.decision)
+      throw new Error(
+        "This connection request has expired or was already handled.",
+      );
+    flow.desktopApproval.decision = decision;
+    this.put(
+      "flow",
+      id,
+      flow,
+      Math.max(0, Date.parse(flow.desktopApproval.expiresAt) - Date.now()),
+    );
+  }
+  private waitingForm(flowId: string, flow: Flow) {
+    const nonce = token();
+    return new Response(
+      `<!doctype html><html lang="${getLocale()}"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escaped(localT("approvalWaiting"))}</title><style>body{font:16px/1.6 system-ui;max-width:520px;margin:8vh auto;padding:24px;color:#173341;background:#f9fbfc}h1{font-size:28px}code{display:block;font:32px monospace;letter-spacing:4px;margin:24px 0}button{font:inherit;padding:10px 20px}p{overflow-wrap:anywhere}</style><h1>${escaped(localT("approvalWaiting"))}</h1><p>${escaped(localT("approvalBrowserHelp"))}</p><code>${escaped(flowId.slice(-6).toUpperCase())}</code><p>${escaped(localT("approvalBrowserReturn"))}</p><form id="approval" method="post" action="${this.url}/oauth/consent"><input type="hidden" name="flow" value="${escaped(flowId)}"><input type="hidden" name="csrf" value="${escaped(flow.csrf)}"><input type="hidden" name="decision" value="wait"><button name="decision" value="deny">${escaped(localT("auth.cancel"))}</button><noscript><button>${escaped(localT("approvalCheck"))}</button></noscript></form><script nonce="${nonce}">setTimeout(()=>document.getElementById('approval').requestSubmit(),2000)</script></html>`,
+      {
+        headers: {
+          "content-type": "text/html; charset=utf-8",
+          "cache-control": "no-store",
+          "referrer-policy": "same-origin",
+          "content-security-policy": `default-src 'none'; script-src 'nonce-${nonce}'; style-src 'unsafe-inline'; form-action 'self' ${new URL(flow.redirect).origin}; frame-ancestors 'none'; base-uri 'none'`,
+          "set-cookie": `showai_oauth=${flowId}; Path=/oauth; HttpOnly; SameSite=Lax; Max-Age=600${this.url.startsWith("https:") ? "; Secure" : ""}`,
+        },
+      },
+    );
   }
   revoke(id: string) {
     this.remove("grant", id);
@@ -329,6 +392,7 @@ export class McpAuthorization {
     });
   }
   private form(flowId: string, flow: Flow, error = "") {
+    if (flow.desktopApproval) return this.waitingForm(flowId, flow);
     const hidden = `<input type="hidden" name="flow" value="${escaped(flowId)}"><input type="hidden" name="csrf" value="${escaped(flow.csrf)}">`;
     const client = this.get<Client>("client", flow.clientId)!;
     const content = this.local
@@ -506,6 +570,18 @@ export class McpAuthorization {
             "invalid_scope",
             400,
           );
+        if (this.local?.desktopApproval) {
+          if (this.pendingApprovals().length >= 8)
+            throw new AuthorizationError(
+              "Too many pending connection requests.",
+              "temporarily_unavailable",
+              429,
+            );
+          flow.desktopApproval = {
+            createdAt: new Date().toISOString(),
+            expiresAt: new Date(Date.now() + 10 * 60_000).toISOString(),
+          };
+        }
         this.put("flow", id, flow, 10 * 60_000);
         return this.form(id, flow);
       }
@@ -563,11 +639,22 @@ export class McpAuthorization {
               "invalid_request",
               400,
             );
-          this.limit("local-pairing", 10);
+          const desktopApproval = flow.desktopApproval;
+          if (
+            desktopApproval &&
+            input.decision !== "deny" &&
+            !desktopApproval.decision
+          )
+            return this.waitingForm(flowId, flow);
+          if (!desktopApproval) this.limit("local-pairing", 10);
           const target = new URL(flow.redirect);
           if (flow.state) target.searchParams.set("state", flow.state);
           target.searchParams.set("iss", this.url);
-          if (input.decision !== "allow")
+          if (
+            desktopApproval
+              ? input.decision === "deny" || desktopApproval.decision === "deny"
+              : input.decision !== "allow"
+          )
             target.searchParams.set("error", "access_denied");
           else {
             const projects = (await this.local.projects()).filter(
@@ -575,8 +662,21 @@ export class McpAuthorization {
             );
             if (!projects.length && this.local.access !== "all")
               return this.form(flowId, flow, localT("auth.empty"));
-            if (!this.local.consumePairingCode(String(input.pairingCode ?? "")))
+            if (
+              !desktopApproval &&
+              !this.local.consumePairingCode(String(input.pairingCode ?? ""))
+            )
               return this.form(flowId, flow, localT("auth.invalid"));
+            if (desktopApproval) {
+              // Consume after async policy lookup, before issuing anything. Parallel polls cannot mint two grants.
+              if (!this.get<Flow>("flow", flowId))
+                throw new AuthorizationError(
+                  "Authorization was already completed.",
+                  "invalid_request",
+                  400,
+                );
+              this.remove("flow", flowId);
+            }
             const grant: ProjectGrant = {
               id: token(),
               clientId: flow.clientId,

@@ -2,8 +2,8 @@
   "protocol": "showai-host-profile-v1",
   "profile": "codex",
   "declaredHostDisplay": "codex-visualize",
-  "commonVersion": "0.29.0",
-  "commonSha256": "a7020bffcffec5eceff7b7443b0acea417f8c02c271813c87ed2f08164b7e840",
+  "commonVersion": "0.29.3",
+  "commonSha256": "2354028a96a1250e1084a5f7606035fa5482560bc6954c6ca94920830a806345",
   "commonFiles": {
     "collaborate-canvas/SKILL.md": "1a21a0419504732c39821582e891721fa3e8deba4808bab19e737eca53a68c49",
     "create-component/references/component-authoring.md": "3cc16a095ef7f2f0f3d7be0b3e58e2a74ad8ead96f2fc66c4950dde0540ebcd1",
@@ -22,11 +22,11 @@
     "use-showai/references/host-display.md": "450870e7a34bcb0c6d7a1a6a3f871d16c86467ce6fa4b52c47a9e33e63b1531a",
     "use-showai/references/integration.md": "e7e16787c97ebb6abf1a2e4b753a8a363546f31257d0e8beb5ae2a218ac85380",
     "use-showai/references/page-reading.md": "4ef85142d9ab663a28a1b3067161003b50cde9ad037736481225693462545128",
-    "use-showai/references/runtime.md": "24a7d985aed1f2c919e1f05d10772af0ddcb98e93587988e91062fd759d2cf8c",
+    "use-showai/references/runtime.md": "5e7d118c3096ccf0340db7e15fdc8df68c14ca76b989f30128caa278d1f93a42",
     "use-showai/references/shared-data.md": "01e1c8193ed84c7287e2581cc15f0ca9b4ee84085323be78e226a36a141c7601",
     "use-showai/references/tasks.md": "5d59d519c080fd1c442f5b90eb10d74794f1c56387d60aa5206a14b1fffe988f",
     "use-showai/references/user-references.md": "e328b96eb23b5179b8c55af0d5361f0ccf2c42fac36cebbcdcd50447a37041dd",
-    "use-showai/SKILL.md": "e987b6fbb2cf43be8a9cb1d3e88c501ede3d54d32f323347dad1e55825f4b4f6"
+    "use-showai/SKILL.md": "649ad7fa77c6c5cc613dc03205738a14609ebb049b7ece921a5cfd7bf1875b0e"
   },
   "adapterSha256": "81dc575de58880d9214858b212fbf8d1f13688f88aad6ab0bace2fe70e5cb95c"
 }

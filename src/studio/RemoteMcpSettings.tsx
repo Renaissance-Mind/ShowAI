@@ -17,7 +17,6 @@ import type {
 import { desktop, errorMessage } from "./bridge";
 import Dialog from "./Dialog";
 import ChatgptConnectionGuide from "./ChatgptConnectionGuide";
-import { pairingDisplay } from "../remote-mcp/client-setup";
 import cloudflareLogo from "./assets/connection-brands/cloudflare.svg";
 import tailscaleLight from "./assets/connection-brands/tailscale-light.svg";
 import tailscaleDark from "./assets/connection-brands/tailscale-dark.svg";
@@ -39,17 +38,15 @@ export default function RemoteMcpSettings() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [token, setToken] = useState("");
-  const [pair, setPair] = useState("");
-  const [pairReceipt, setPairReceipt] = useState<{
-    id: string;
-    expiresAt: string;
-  }>();
+  const [manualSetup, setManualSetup] = useState(true);
+  const [pluginLink, setPluginLink] = useState("");
+  const [exported, setExported] = useState<{ path: string; url: string }>();
   const [copied, setCopied] = useState("");
   const [routeStep, setRouteStep] = useState(0);
   const [clientStep, setClientStep] = useState(0);
   const [otherClient, setOtherClient] = useState(false);
   const [modal, setModal] = useState<
-    "rules" | "tools" | "diagnostics" | "authorization" | null
+    "rules" | "tools" | "diagnostics" | "authorization" | "package" | null
   >(null);
   const [rules, setRules] = useState<RemoteMcpConfig>();
   const initialized = useRef(false);
@@ -125,22 +122,30 @@ export default function RemoteMcpSettings() {
     await desktop.invoke("clipboard:write", { text });
     setCopied(id);
   }
-  async function generatePair() {
-    const value = await desktop.invoke<{
-      code: string;
-      id: string;
-      expiresAt: string;
-    }>("remoteMcp:pair");
-    setState(await desktop.invoke<RemoteMcpStatus>("remoteMcp:status"));
-    setPair(value.code);
-    setPairReceipt({ id: value.id, expiresAt: value.expiresAt });
-    setCopied("");
+  async function exportPlugin(connection = "") {
+    const saved =
+      state?.config.chatgptEndpoint === state?.url
+        ? state?.config.chatgptAppId
+        : undefined;
+    if (!connection && !saved) {
+      setModal("package");
+      return;
+    }
+    const value = await desktop.invoke<{ path: string; url: string } | null>(
+      "remoteMcp:exportPlugin",
+      { connection: connection || saved },
+    );
+    if (value) {
+      setModal(null);
+      setState(await desktop.invoke<RemoteMcpStatus>("remoteMcp:status"));
+      setExported(value);
+      setClientStep(1);
+    }
   }
   async function stop() {
     attempt.current++;
     setState(await desktop.invoke<RemoteMcpStatus>("remoteMcp:stop"));
-    setPair("");
-    setPairReceipt(undefined);
+    setExported(undefined);
     setClientStep(0);
   }
   async function choose(provider: RemoteMcpProvider) {
@@ -199,8 +204,7 @@ export default function RemoteMcpSettings() {
       });
       setState(value);
       setToken("");
-      setPair("");
-      setPairReceipt(undefined);
+      setExported(undefined);
       setClientStep(0);
     });
   }
@@ -227,16 +231,6 @@ export default function RemoteMcpSettings() {
   );
   if (!config || !state)
     return <p role={error ? "alert" : "status"}>{error || t("working")}</p>;
-  const pairState = pairingDisplay(
-    pair ? pairReceipt : undefined,
-    state.pairing,
-  );
-  const secondsLeft = pairReceipt
-    ? Math.max(
-        0,
-        Math.ceil((Date.parse(pairReceipt.expiresAt) - Date.now()) / 1000),
-      )
-    : 0;
   const stage =
     screen === "provider" || screen === "cloudflare"
       ? 0
@@ -587,27 +581,64 @@ export default function RemoteMcpSettings() {
             <div>
               <span>{clientStep > 0 ? <Check size={14} /> : 1}</span>
               <section>
-                <label>{t("endpoint")}</label>
-                <code>{state.url}</code>
-                <button
-                  className="settings-button"
-                  onClick={() =>
-                    void run(async () => {
-                      await copy(state.url!, "endpoint");
-                      setClientStep(Math.max(1, clientStep));
-                    })
-                  }
-                >
-                  {t(copied === "endpoint" ? "copied" : "copyEndpoint")}
-                  <Copy size={14} />
-                </button>
+                {manualSetup ? (
+                  <>
+                    <label>{t("endpoint")}</label>
+                    <code>{state.url}</code>
+                    <button
+                      className="settings-button primary"
+                      disabled={pending}
+                      onClick={() =>
+                        void run(async () => {
+                          await copy(state.url!, "endpoint");
+                          setClientStep(Math.max(1, clientStep));
+                        })
+                      }
+                    >
+                      {t(copied === "endpoint" ? "copied" : "copyEndpoint")}
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <button
+                      className="settings-button primary"
+                      disabled={pending}
+                      onClick={() => void run(() => exportPlugin())}
+                    >
+                      {t(
+                        exported?.url === state.url
+                          ? "exportAgain"
+                          : "exportPlugin",
+                      )}
+                    </button>
+                    {exported?.url === state.url && (
+                      <p role="status">{t("exportReady")}</p>
+                    )}
+                    {provider === "cloudflare-quick" && (
+                      <p>{t("quickPackage")}</p>
+                    )}
+                  </>
+                )}
               </section>
             </div>
             {clientStep >= 1 && (
               <div>
                 <span>{clientStep > 1 ? <Check size={14} /> : 2}</span>
                 <section>
-                  {otherClient ? (
+                  {!manualSetup ? (
+                    <>
+                      {link("https://chatgpt.com/plugins", t("importPlugin"))}
+                      <p>{t("importStep")}</p>
+                      {clientStep === 1 && (
+                        <button
+                          className="settings-button"
+                          onClick={() => setClientStep(2)}
+                        >
+                          {t("importConnected")}
+                        </button>
+                      )}
+                    </>
+                  ) : otherClient ? (
                     <>
                       <p>{t("addOther")}</p>
                       <button
@@ -640,12 +671,14 @@ export default function RemoteMcpSettings() {
                       )}
                     </>
                   )}
-                  <button
-                    className="remote-secondary"
-                    onClick={() => setOtherClient(!otherClient)}
-                  >
-                    {t(otherClient ? "chatgptClient" : "otherClient")}
-                  </button>
+                  {manualSetup && (
+                    <button
+                      className="remote-secondary"
+                      onClick={() => setOtherClient(!otherClient)}
+                    >
+                      {t(otherClient ? "chatgptClient" : "otherClient")}
+                    </button>
+                  )}
                 </section>
               </div>
             )}
@@ -654,70 +687,24 @@ export default function RemoteMcpSettings() {
                 <span>3</span>
                 <section>
                   <h4>{t("authorize")}</h4>
-                  <p>{t("pairInstructions")}</p>
-                  {pairState === "ready" && (
-                    <>
-                      <code>{pair}</code>
-                      <p role="status">
-                        {t("pairExpires", {
-                          minutes: Math.floor(secondsLeft / 60),
-                          seconds: secondsLeft % 60,
-                        })}
-                      </p>
-                      <button
-                        className="settings-button primary"
-                        disabled={pending}
-                        onClick={() =>
-                          void run(async () => {
-                            const latest =
-                              await desktop.invoke<RemoteMcpStatus>(
-                                "remoteMcp:status",
-                              );
-                            setState(latest);
-                            if (
-                              pairingDisplay(pairReceipt, latest.pairing) ===
-                              "ready"
-                            )
-                              await copy(pair, "pair");
-                          })
-                        }
-                      >
-                        {t(copied === "pair" ? "copied" : "copyPair")}
-                      </button>
-                    </>
-                  )}
-                  {pairState !== "none" && pairState !== "ready" && (
-                    <p role="status">
-                      {t(
-                        pairState === "used"
-                          ? "pairUsed"
-                          : pairState === "replaced"
-                            ? "pairReplaced"
-                            : "pairExpired",
-                      )}
-                    </p>
-                  )}
                   <button
-                    className={`settings-button ${pairState === "none" || pairState === "expired" || pairState === "replaced" ? "primary" : ""}`}
+                    className="settings-button"
                     disabled={pending}
-                    onClick={() => void run(generatePair)}
+                    onClick={() => void run(() => exportPlugin())}
                   >
-                    {t(pair ? "regenerate" : "generate")}
+                    {t("exportPlugin")}
                   </button>
-                  {pair && (
-                    <>
-                      <p>{t("verifyInstructions")}</p>
-                      <button
-                        className="settings-button"
-                        onClick={() =>
-                          void run(() => copy(t("verifyPrompt"), "prompt"))
-                        }
-                      >
-                        {t(copied === "prompt" ? "copied" : "copyPrompt")}
-                      </button>
-                      <p role="status">{t("waiting")}</p>
-                    </>
-                  )}
+                  <p>{t("localApprovalStep")}</p>
+                  <p>{t("verifyInstructions")}</p>
+                  <button
+                    className="settings-button"
+                    onClick={() =>
+                      void run(() => copy(t("verifyPrompt"), "prompt"))
+                    }
+                  >
+                    {t(copied === "prompt" ? "copied" : "copyPrompt")}
+                  </button>
+                  <p role="status">{t("waiting")}</p>
                   <button
                     className="settings-button"
                     onClick={() => setModal("authorization")}
@@ -728,6 +715,15 @@ export default function RemoteMcpSettings() {
               </div>
             )}
           </div>
+          <button
+            className="remote-secondary"
+            onClick={() => {
+              setManualSetup(!manualSetup);
+              setClientStep(0);
+            }}
+          >
+            {t(manualSetup ? "packageSetup" : "manualSetup")}
+          </button>
           <button
             className="remote-secondary"
             onClick={() =>
@@ -750,6 +746,13 @@ export default function RemoteMcpSettings() {
           <code>{state.url}</code>
           <div className="remote-primary-row">
             <button
+              className="settings-button primary"
+              disabled={pending}
+              onClick={() => void run(() => exportPlugin())}
+            >
+              {t("exportPlugin")}
+            </button>
+            <button
               className="settings-button"
               onClick={() => void run(() => copy(state.url!, "endpoint"))}
             >
@@ -763,8 +766,7 @@ export default function RemoteMcpSettings() {
                 );
                 awaitingClient.current = true;
                 setClientStep(0);
-                setPair("");
-                setPairReceipt(undefined);
+                setExported(undefined);
                 setScreen("client");
               }}
             >
@@ -803,6 +805,9 @@ export default function RemoteMcpSettings() {
             </div>
           ))}
         </section>
+      )}
+      {state.resumeOnLaunch && (
+        <p className="remote-resume">{t("restoreEnabled")}</p>
       )}
       <footer className="remote-rules">
         <span>
@@ -929,6 +934,38 @@ export default function RemoteMcpSettings() {
               {t("continue")}
             </button>
           </div>
+        </Dialog>
+      )}
+      {modal === "package" && (
+        <Dialog title={t("bindPluginTitle")} onClose={() => setModal(null)}>
+          <form
+            className="remote-form"
+            onSubmit={(event) => {
+              event.preventDefault();
+              void run(() => exportPlugin(pluginLink));
+            }}
+          >
+            <p>{t("bindPluginHelp")}</p>
+            {link("https://chatgpt.com/plugins", t("openChatgpt"))}
+            <label>
+              {t("chatgptPluginLink")}
+              <input
+                value={pluginLink}
+                placeholder="https://chatgpt.com/plugins/plugin_asdk_app_…"
+                onChange={(event) => setPluginLink(event.target.value)}
+                required
+              />
+            </label>
+            <p>{t("bindPluginOnce")}</p>
+            {error && <p role="alert">{error}</p>}
+            <button
+              className="settings-button primary"
+              disabled={pending || !pluginLink.trim()}
+              type="submit"
+            >
+              {t("exportPlugin")}
+            </button>
+          </form>
         </Dialog>
       )}
       {modal === "authorization" && (

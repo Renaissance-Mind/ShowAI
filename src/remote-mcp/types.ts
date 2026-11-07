@@ -1,3 +1,13 @@
+export interface RemoteApprovalRequest {
+  id: string;
+  code: string;
+  clientName: string;
+  callbackOrigin: string;
+  scopes: string[];
+  access: "all" | "selected";
+  createdAt: string;
+  expiresAt: string;
+}
 export type RemoteMcpProvider = "cloudflare-quick" | "cloudflare" | "tailscale";
 export interface PairingStatus {
   id: string;
@@ -10,6 +20,8 @@ export interface RemoteMcpConfig {
   port: number;
   executable: string;
   access?: "all" | "selected";
+  chatgptAppId?: string;
+  chatgptEndpoint?: string;
   projects: Array<{ id: string; write: boolean }>;
 }
 export interface RemoteMcpStatus {
@@ -25,6 +37,7 @@ export interface RemoteMcpStatus {
   lastCallAt?: string;
   lastCallClientId?: string;
   pairing?: PairingStatus;
+  resumeOnLaunch?: boolean;
   clients: Array<{
     id: string;
     name: string;
@@ -42,6 +55,9 @@ export const remoteMcpActions = new Set([
   "remoteMcp:stop",
   "remoteMcp:check",
   "remoteMcp:pair",
+  "remoteMcp:requests",
+  "remoteMcp:decide",
+  "remoteMcp:exportPlugin",
   "remoteMcp:revoke",
   "remoteMcp:chooseExecutable",
 ]);

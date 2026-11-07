@@ -296,7 +296,7 @@ export async function createMcpHttpApp(options: McpHttpOptions) {
                       ? {
                           storage: "local",
                           authorization:
-                            "Pair using a code from ShowAI Settings → Remote connection. Access follows the desktop library policy and OAuth grant. Full-library grants include future projects and project creation; selected grants stay restricted. Writes save directly in the desktop library; no cloud synchronization is required. Do not use device filesystem paths.",
+                            "Approve the matching connection request in the desktop ShowAI App; the OAuth page returns automatically. Older versions may use a pairing code. Access follows the desktop library policy and OAuth grant. Full-library grants include future projects and project creation; selected grants stay restricted. Writes save directly in the desktop library; no cloud synchronization is required. Do not use device filesystem paths.",
                         }
                       : {}),
                     tools: [...remoteTools].sort(),

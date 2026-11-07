@@ -31,6 +31,10 @@ export function validateRemoteMcpConfig(value: unknown): RemoteMcpConfig {
     typeof c.executable !== "string" ||
     (c.executable && !isAbsolute(c.executable)) ||
     (c.access !== undefined && !["all", "selected"].includes(c.access)) ||
+    (c.chatgptAppId !== undefined &&
+      !/^asdk_app_[A-Za-z0-9]+$/.test(c.chatgptAppId)) ||
+    (c.chatgptEndpoint !== undefined &&
+      typeof c.chatgptEndpoint !== "string") ||
     !Array.isArray(c.projects)
   )
     throw new Error("Invalid remote connection configuration.");
@@ -59,6 +63,9 @@ export function validateRemoteMcpConfig(value: unknown): RemoteMcpConfig {
   }
   return {
     provider: c.provider,
+    ...(c.chatgptAppId
+      ? { chatgptAppId: c.chatgptAppId, chatgptEndpoint: c.chatgptEndpoint }
+      : {}),
     access: c.access ?? "all",
     port: c.port,
     publicUrl,
@@ -85,6 +92,9 @@ export class RemoteMcpManager {
   private readonly pairing = new PairingCodes();
   private instanceId = randomBytes(16).toString("hex");
   private initialized?: Promise<void>;
+  private resumeOnLaunch = false;
+  private suspended = false;
+  private recovery?: ReturnType<typeof setTimeout>;
   private task?: Promise<void>;
   private commands: Promise<unknown> = Promise.resolve();
   private abort?: AbortController;
@@ -114,6 +124,7 @@ export class RemoteMcpManager {
         // Legacy setup required picking projects without an explicit access mode.
         // New defaults are library-wide; old limited grants are revoked before use.
         this.config = validateRemoteMcpConfig(saved.config);
+        this.resumeOnLaunch = saved.resumeOnLaunch === true;
         this.managedCloudflared =
           typeof saved.managedCloudflared === "string"
             ? saved.managedCloudflared
@@ -140,6 +151,7 @@ export class RemoteMcpManager {
         path + ".tmp",
         JSON.stringify({
           config: this.config,
+          resumeOnLaunch: this.resumeOnLaunch,
           encryptedToken: this.encryptedToken,
           managedCloudflared: this.managedCloudflared,
         }),
@@ -204,6 +216,7 @@ export class RemoteMcpManager {
       lastCallAt: this.lastCallAt,
       lastCallClientId: this.lastCallClientId,
       pairing: this.pairing.status(),
+      resumeOnLaunch: this.resumeOnLaunch,
       clients: this.http?.authorization.connections() ?? [],
       projects: projects
         .filter((p) => !p.archived)
@@ -249,6 +262,7 @@ export class RemoteMcpManager {
     const home = this.options.home();
     return {
       root: home,
+      desktopApproval: true,
       ...localLibraryPolicy(home, c),
       consumePairingCode: (code: string) => this.pairing.consume(code),
       onCall: (_name: string, clientId: string) => {
@@ -305,11 +319,14 @@ export class RemoteMcpManager {
     if (config.provider === "cloudflare" && !this.encryptedToken)
       throw new Error("Enter your Cloudflare tunnel token.");
     this.config = config;
+    this.resumeOnLaunch = true;
+    this.suspended = false;
     const path = join(this.options.directory, "config.json");
     await writeFile(
       path + ".tmp",
       JSON.stringify({
         config,
+        resumeOnLaunch: this.resumeOnLaunch,
         encryptedToken: this.encryptedToken,
         managedCloudflared: this.managedCloudflared,
       }),
@@ -325,13 +342,15 @@ export class RemoteMcpManager {
     this.reachable = undefined;
     this.abort = new AbortController();
     const signal = this.abort.signal;
-    this.task = this.launch(signal).catch(async (error: Error) => {
-      if (!signal.aborted) {
-        this.phase = "error";
-        this.error = error.message;
-      }
-      await this.cleanup();
-    });
+    this.task = this.launch(signal)
+      .catch(async (error: Error) => {
+        if (!signal.aborted) {
+          this.phase = "error";
+          this.error = error.message;
+        }
+        await this.cleanup();
+      })
+      .finally(() => this.scheduleRecovery());
     return this.status();
   }
   private async launch(signal: AbortSignal) {
@@ -538,6 +557,74 @@ export class RemoteMcpManager {
     this.checkedAt = new Date().toISOString();
     return this.status();
   }
+  rememberChatgptApp(id: string, endpoint: string) {
+    return this.command(async () => {
+      await this.initialize();
+      if (
+        !/^asdk_app_[A-Za-z0-9]+$/.test(id) ||
+        this.http?.url + "/mcp" !== endpoint
+      )
+        throw new Error(
+          "The remote connection changed. Export the plugin again.",
+        );
+      this.config = {
+        ...this.config,
+        chatgptAppId: id,
+        chatgptEndpoint: endpoint,
+      };
+      const path = join(this.options.directory, "config.json");
+      await writeFile(
+        path + ".tmp",
+        JSON.stringify({
+          config: this.config,
+          encryptedToken: this.encryptedToken,
+          managedCloudflared: this.managedCloudflared,
+          resumeOnLaunch: this.resumeOnLaunch,
+        }),
+        { mode: 0o600 },
+      );
+      await rename(path + ".tmp", path);
+    });
+  }
+  requests() {
+    return this.http?.authorization.pendingApprovals() ?? [];
+  }
+  decide(id: string, decision: "allow" | "deny") {
+    if (!this.http) throw new Error("The remote connection is not running.");
+    this.http.authorization.decideApproval(id, decision);
+    return this.requests();
+  }
+  async restore() {
+    await this.initialize();
+    if (this.resumeOnLaunch) return this.start(this.config);
+    return this.status();
+  }
+  private scheduleRecovery() {
+    clearTimeout(this.recovery);
+    if (!this.resumeOnLaunch || this.suspended) return;
+    this.recovery = setTimeout(() => {
+      void this.command(async () => {
+        if (this.suspended || !this.resumeOnLaunch) return;
+        if (this.phase === "running") await this.check();
+        else if (this.phase !== "starting") await this.startImpl(this.config);
+      })
+        .catch((error: Error) => {
+          this.error = error.message;
+          this.phase = "error";
+        })
+        .finally(() => this.scheduleRecovery());
+    }, 30_000);
+    this.recovery.unref();
+  }
+  suspend() {
+    this.suspended = true;
+    clearTimeout(this.recovery);
+    return this.command(() => {
+      this.suspended = true;
+      clearTimeout(this.recovery);
+      return this.stopImpl();
+    });
+  }
   pair() {
     if (!this.http || this.phase !== "running")
       throw new Error("Start the connection first.");
@@ -563,7 +650,25 @@ export class RemoteMcpManager {
     this.pairing.clear();
   }
   stop() {
-    return this.command(() => this.stopImpl());
+    this.suspended = true;
+    clearTimeout(this.recovery);
+    return this.command(async () => {
+      await this.initialize();
+      this.resumeOnLaunch = false;
+      const path = join(this.options.directory, "config.json");
+      await writeFile(
+        path + ".tmp",
+        JSON.stringify({
+          config: this.config,
+          encryptedToken: this.encryptedToken,
+          managedCloudflared: this.managedCloudflared,
+          resumeOnLaunch: false,
+        }),
+        { mode: 0o600 },
+      );
+      await rename(path + ".tmp", path);
+      return this.stopImpl();
+    });
   }
   private async stopImpl() {
     this.abort?.abort();
