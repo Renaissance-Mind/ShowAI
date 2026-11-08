@@ -4698,7 +4698,9 @@ export default function Studio() {
             : undefined
         }
       >
-        {info && info.mode !== "browser" && <RemoteMcpApprovalDialog />}
+        {info && info.mode !== "browser" && capabilities.remoteApprovals && (
+          <RemoteMcpApprovalDialog />
+        )}
         <WorkspaceSwipeNavigation
           rootRef={studioRoot}
           busy={

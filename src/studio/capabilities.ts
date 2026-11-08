@@ -15,5 +15,7 @@ export function workbenchCapabilities(platform?: string) {
     externalChanges: !ios,
     componentSource: !ios,
     componentThumbnails: !ios,
+    /** Requests of remote MCP clients to this computer's library. */
+    remoteApprovals: !ios,
   };
 }
