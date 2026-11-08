@@ -4,15 +4,21 @@ import { readdir, rm, stat } from "node:fs/promises";
 import { basename, join } from "node:path";
 import { CAPACITY, assertContent } from "../portable/capacity.mjs";
 import {
-  applyOperations,
   cloneValue,
-  diffValues,
-  isPlainObject,
-  refineOperations,
   validateOperations,
   type DatasetConflict,
   type DatasetOperation,
 } from "../datasets/operations.mjs";
+import {
+  applyDatasetWrite,
+  assertJsonTree,
+  assertTransform,
+  throwInvalidData as invalid,
+  validateDataset,
+  type DatasetDocument,
+  type DatasetTransform,
+  type TransformInput,
+} from "../datasets/dataset-file";
 import { readBinding } from "../datasets/binding.mjs";
 import { canonicalJson } from "./canonical";
 import { CoreError } from "./model";
@@ -34,7 +40,6 @@ import {
   externalPath,
   fetchSource,
   fileProblem,
-  isDatasetSource,
   parseSourceBytes,
   readExternal,
   readExternalBytes,
@@ -58,7 +63,7 @@ import {
   cacheOrigin,
   type CachedValue,
 } from "./dataset-cache";
-import { TRANSFORM_LIMITS, runTransform } from "./dataset-transform";
+import { runTransform } from "./dataset-transform";
 import {
   BundleAgreements,
   bundleHash,
@@ -75,18 +80,18 @@ import {
   type WarningCode,
 } from "../datasets/warnings.mjs";
 
-/** An input of a transform: a dataset of the same project, or of another one. */
-export type TransformInput = string | { project: string; dataset: string };
-/**
- * A dataset computed by a script from other datasets. The script defines
- * function transform(inputs, helpers) and returns the value; it runs in a
- * sandbox (see dataset-transform) whenever an input or the script changes.
- */
-export interface DatasetTransform {
-  /** Input name (the key of `inputs` in the script) → dataset. */
-  inputs: Record<string, TransformInput>;
-  script: string;
-}
+export {
+  assertTransform,
+  mergeDatasetVersions,
+  sharedPropsSchema,
+  validateDataset,
+} from "../datasets/dataset-file";
+export type {
+  DatasetDocument,
+  DatasetTransform,
+  TransformInput,
+} from "../datasets/dataset-file";
+
 /** How the value of a transform dataset was computed. */
 export interface TransformReadInfo {
   /** sha256 of the script. */
@@ -107,34 +112,6 @@ export interface TransformReadInfo {
   ranAt?: string;
 }
 
-/** A project's shared data: one JSON value that several page blocks read and write. */
-export interface DatasetDocument {
-  format: "showai-dataset";
-  version: 1;
-  id: string;
-  name: string;
-  description?: string;
-  createdAt: string;
-  updatedAt: string;
-  /** Where the data was first shared from; informational. */
-  origin?: {
-    kind: string;
-    componentId?: string;
-    pageId?: string;
-    blockId?: string;
-  };
-  /** Optional JSON Schema every write must satisfy. */
-  schema?: JsonSchema;
-  /**
-   * The value lives outside the library: in a file linked on each device, or
-   * at an http(s) address (see dataset-sources). The stored file then has no
-   * value.
-   */
-  source?: DatasetSource;
-  /** The value is computed from other datasets; the stored file has no value. */
-  transform?: DatasetTransform;
-  value: unknown;
-}
 export interface DatasetRecord {
   dataset: DatasetDocument;
   hash: string;
@@ -223,203 +200,9 @@ export interface DatasetApplyResult {
   changed: boolean;
 }
 
-const MAX_NAME = 200;
 export function datasetHash(dataset: DatasetDocument): string {
   const { createdAt: _c, updatedAt: _u, ...content } = dataset;
   return createHash("sha256").update(canonicalJson(content)).digest("hex");
-}
-
-function assertJsonTree(value: unknown, depth = 0): void {
-  if (depth > 64)
-    throw new CoreError(
-      "INVALID_DATA",
-      "Dataset values are nested at most 64 levels.",
-    );
-  if (value === null || typeof value === "string" || typeof value === "boolean")
-    return;
-  if (typeof value === "number") {
-    if (!Number.isFinite(value))
-      throw new CoreError("INVALID_DATA", "Dataset numbers must be finite.");
-    return;
-  }
-  if (Array.isArray(value)) {
-    for (const item of value) assertJsonTree(item, depth + 1);
-    return;
-  }
-  if (!isPlainObject(value))
-    throw new CoreError("INVALID_DATA", "Dataset values contain only JSON.");
-  for (const [key, item] of Object.entries(value)) {
-    if (["__proto__", "constructor", "prototype"].includes(key))
-      throw new CoreError("INVALID_DATA", `Dataset keys cannot be ${key}.`);
-    assertJsonTree(item, depth + 1);
-  }
-}
-
-function invalid(error: unknown): never {
-  if (error instanceof CoreError) throw error;
-  if (
-    error &&
-    typeof error === "object" &&
-    "code" in error &&
-    error.code === "CAPACITY_EXCEEDED"
-  )
-    throw error;
-  throw new CoreError(
-    "INVALID_DATA",
-    error instanceof Error ? error.message : String(error),
-  );
-}
-
-export function validateDataset(
-  value: unknown,
-  expectedId?: string,
-): DatasetDocument {
-  if (!isPlainObject(value))
-    throw new CoreError("INVALID_DATA", "Invalid dataset file.");
-  const dataset = value as unknown as DatasetDocument;
-  for (const key of Object.keys(dataset))
-    if (
-      ![
-        "format",
-        "version",
-        "id",
-        "name",
-        "description",
-        "createdAt",
-        "updatedAt",
-        "origin",
-        "schema",
-        "source",
-        "transform",
-        "value",
-      ].includes(key)
-    )
-      throw new CoreError("INVALID_DATA", `Unknown dataset field: ${key}.`);
-  if (
-    dataset.format !== "showai-dataset" ||
-    dataset.version !== 1 ||
-    typeof dataset.id !== "string" ||
-    (expectedId !== undefined && dataset.id !== expectedId) ||
-    !Number.isFinite(Date.parse(dataset.createdAt)) ||
-    !Number.isFinite(Date.parse(dataset.updatedAt))
-  )
-    throw new CoreError(
-      "INVALID_DATA",
-      `Invalid dataset file${expectedId ? `: ${expectedId}` : ""}.`,
-    );
-  assertId(dataset.id);
-  if (
-    typeof dataset.name !== "string" ||
-    !dataset.name.trim() ||
-    dataset.name.length > MAX_NAME
-  )
-    throw new CoreError(
-      "INVALID_DATA",
-      `A dataset name has 1–${MAX_NAME} characters.`,
-    );
-  if (
-    dataset.description !== undefined &&
-    (typeof dataset.description !== "string" ||
-      dataset.description.length > 4000)
-  )
-    throw new CoreError(
-      "INVALID_DATA",
-      "A dataset description is text of at most 4000 characters.",
-    );
-  if (dataset.origin !== undefined) {
-    if (
-      !isPlainObject(dataset.origin) ||
-      typeof dataset.origin.kind !== "string"
-    )
-      throw new CoreError("INVALID_DATA", "Invalid dataset origin.");
-  }
-  if (dataset.schema !== undefined && !isPlainObject(dataset.schema))
-    throw new CoreError(
-      "INVALID_DATA",
-      "A dataset schema is a JSON Schema object.",
-    );
-  if (dataset.source !== undefined && !isDatasetSource(dataset.source))
-    throw new CoreError("INVALID_DATA", "Invalid dataset source.");
-  if (dataset.transform !== undefined) {
-    if (dataset.source !== undefined)
-      throw new CoreError(
-        "INVALID_DATA",
-        "A dataset reads a source or is computed by a transform, not both.",
-      );
-    assertTransform(dataset.transform);
-  }
-  // An external or computed dataset's stored file has no value.
-  if ((dataset.source || dataset.transform) && dataset.value === undefined)
-    return dataset;
-  if (!("value" in dataset))
-    throw new CoreError("INVALID_DATA", "A dataset needs a value.");
-  try {
-    assertJsonTree(dataset.value);
-    assertContent(dataset.value, "Dataset value", CAPACITY.datasetBytes);
-    if (dataset.schema) assertProps(dataset.schema, dataset.value);
-  } catch (error) {
-    invalid(error);
-  }
-  return dataset;
-}
-
-const INPUT_NAME = /^[A-Za-z_$][A-Za-z0-9_$]{0,63}$/;
-
-/** Checks the shape of a transform definition (inputs and script). */
-export function assertTransform(
-  value: unknown,
-): asserts value is DatasetTransform {
-  if (!isPlainObject(value))
-    throw new CoreError(
-      "INVALID_DATA",
-      "A transform is { inputs: { name: datasetId }, script }.",
-    );
-  for (const key of Object.keys(value))
-    if (!["inputs", "script"].includes(key))
-      throw new CoreError("INVALID_DATA", `Unknown transform field: ${key}.`);
-  const { inputs, script } = value as Record<string, unknown>;
-  if (!isPlainObject(inputs) || !Object.keys(inputs).length)
-    throw new CoreError(
-      "INVALID_DATA",
-      "A transform needs inputs: { name: datasetId or {project, dataset} }.",
-    );
-  if (Object.keys(inputs).length > TRANSFORM_LIMITS.maxInputs)
-    throw new CoreError(
-      "INVALID_DATA",
-      `A transform has at most ${TRANSFORM_LIMITS.maxInputs} inputs.`,
-    );
-  for (const [name, input] of Object.entries(inputs)) {
-    if (!INPUT_NAME.test(name))
-      throw new CoreError(
-        "INVALID_DATA",
-        `Input name ${JSON.stringify(name)} is not an identifier (letters, digits, _ or $; at most 64).`,
-      );
-    try {
-      if (typeof input === "string") assertId(input);
-      else if (
-        isPlainObject(input) &&
-        Object.keys(input).every((key) => ["project", "dataset"].includes(key))
-      ) {
-        assertId(input.project as string);
-        assertId(input.dataset as string);
-      } else throw new Error();
-    } catch {
-      throw new CoreError(
-        "INVALID_DATA",
-        `Input ${name} names a dataset id, or {project, dataset} for a dataset of another project.`,
-      );
-    }
-  }
-  if (typeof script !== "string" || !script.trim())
-    throw new CoreError(
-      "INVALID_DATA",
-      "A transform needs a script defining function transform(inputs, helpers).",
-    );
-  if (Buffer.byteLength(script) > TRANSFORM_LIMITS.scriptBytes)
-    throw new CoreError(
-      "INVALID_DATA",
-      `A transform script has at most ${TRANSFORM_LIMITS.scriptBytes} bytes.`,
-    );
 }
 
 /** The project and dataset an input of a transform in projectId reads. */
@@ -2117,75 +1900,43 @@ export class DatasetStore {
           input.baseHash,
           input.baseRevision,
         );
-      if (
-        !sameBase &&
-        base === undefined &&
-        operations.some(
-          (operation) =>
-            (operation.op === "set" || operation.op === "remove") &&
-            !("before" in operation) &&
-            !("absent" in operation),
-        )
-      ) {
-        const error = new CoreError(
+      const write = applyDatasetWrite(
+        current.dataset,
+        {
+          operations,
+          name: input.name,
+          description: input.description,
+          schema: input.schema,
+        },
+        { sameBase, base },
+      );
+      if (write.status === "missing-baseline")
+        throw new CoreError(
           "MISSING_BASELINE",
           "The dataset changed since it was read and the read is unavailable. Read it again before writing.",
           { currentHash: current.hash, currentRevision: current.revision },
         );
-        throw error;
-      }
-      const prepared = refineOperations(
-        operations,
-        sameBase ? current.dataset.value : base,
-      );
-      let result;
-      try {
-        result = applyOperations(current.dataset.value, prepared);
-      } catch (error) {
-        invalid(error);
-      }
-      if (result.conflicts.length) {
+      if (write.status === "conflicts") {
         if (options.throwOnConflict) {
           const error = new CoreError(
             "CONFLICT",
-            `${result.conflicts.length} change(s) conflict with newer edits of the same fields. Nothing was written. Read the dataset, decide each field, then write with the new baseHash.`,
+            `${write.conflicts.length} change(s) conflict with newer edits of the same fields. Nothing was written. Read the dataset, decide each field, then write with the new baseHash.`,
             { currentHash: current.hash, currentRevision: current.revision },
           );
-          error.details = { datasetId, conflicts: result.conflicts };
+          error.details = { datasetId, conflicts: write.conflicts };
           throw error;
         }
-        return { record: current, conflicts: result.conflicts, changed: false };
+        return { record: current, conflicts: write.conflicts, changed: false };
       }
-      const name = input.name?.trim() ?? current.dataset.name;
-      const description =
-        input.description === null
-          ? undefined
-          : (input.description ?? current.dataset.description);
-      const schema =
-        input.schema === null
-          ? undefined
-          : (input.schema ?? current.dataset.schema);
-      const metadataChanged =
-        name !== current.dataset.name ||
-        description !== current.dataset.description ||
-        schema !== current.dataset.schema;
-      if (!result.changed && !metadataChanged)
+      if (write.status === "unchanged")
         return { record: current, conflicts: [], changed: false };
-      const { description: _old, schema: _schema, ...rest } = current.dataset;
-      const dataset = validateDataset({
-        ...rest,
-        name,
-        ...(description ? { description } : {}),
-        ...(schema ? { schema } : {}),
-        updatedAt: new Date().toISOString(),
-        value: result.value,
-      });
+      const { dataset, valueChanged, metadataChanged } = write;
       let external = current.external;
       let bundled = current.bundled;
       if (loaded.bundle) {
         // An edit of another device's file goes into a new synchronized
         // copy; that device writes it into its file.
-        if (result.changed) {
+        if (valueChanged) {
           const bytes = Buffer.from(
             serializeSource(
               dataset.value,
@@ -2223,7 +1974,7 @@ export class DatasetStore {
         await this.write(current.path, dataset, current.revision ?? null);
       } else if (loaded.read) {
         const { read } = loaded;
-        if (result.changed) {
+        if (valueChanged) {
           // Serializing first rejects values the file format cannot hold.
           const text = serializeSource(
             dataset.value,
@@ -2790,100 +2541,5 @@ export class DatasetDrafts {
     assertId(projectId);
     assertId(datasetId);
     await rm(this.file(clientId, projectId, datasetId), { force: true });
-  }
-}
-
-/**
- * The part of a component's props schema that describes its shared keys, so
- * every write to the dataset keeps it valid for that component.
- */
-export function sharedPropsSchema(
-  schema: JsonSchema,
-  local: string[],
-): JsonSchema {
-  if (!isPlainObject(schema) || schema.type !== "object") return schema;
-  const copy = cloneValue(schema) as Record<string, unknown>;
-  if (isPlainObject(copy.properties))
-    for (const key of local)
-      delete (copy.properties as Record<string, unknown>)[key];
-  if (Array.isArray(copy.required))
-    copy.required = copy.required.filter((key) => !local.includes(String(key)));
-  return copy as JsonSchema;
-}
-
-/**
- * Three-way merge of two versions of a dataset file (sync): local changes are
- * replayed onto the remote version per record and field. Conflicting fields
- * keep the remote value and are returned so both inputs can be retained.
- */
-export function mergeDatasetVersions(
-  base: DatasetDocument,
-  local: DatasetDocument,
-  remote: DatasetDocument,
-): { dataset: DatasetDocument; conflicts: DatasetConflict[] } {
-  const operations = diffValues(base.value, local.value);
-  const result = applyOperations(remote.value, operations, { atomic: false });
-  const conflicts = [...result.conflicts];
-  const pick = <
-    K extends "name" | "description" | "schema" | "transform" | "source",
-  >(
-    key: K,
-  ) => {
-    const original = canonicalJson(base[key] ?? null),
-      ours = canonicalJson(local[key] ?? null),
-      theirs = canonicalJson(remote[key] ?? null);
-    if (ours === theirs || original === ours) return remote[key];
-    if (original === theirs) return local[key];
-    conflicts.push({
-      op: "set",
-      path: [`$${key}`],
-      reason: "changed",
-      base: base[key],
-      mine: local[key],
-      theirs: remote[key],
-    });
-    return remote[key];
-  };
-  const name = pick("name"),
-    description = pick("description"),
-    schema = pick("schema"),
-    transform = pick("transform"),
-    // Two devices editing a synchronized copy of a file each make a new copy.
-    source = pick("source");
-  const {
-    description: _d,
-    schema: _s,
-    transform: _t,
-    source: _source,
-    ...rest
-  } = remote;
-  const dataset = {
-    ...rest,
-    name: name ?? remote.name,
-    ...(description ? { description } : {}),
-    ...(schema ? { schema } : {}),
-    // A script changed on two devices keeps the remote one and reports a conflict.
-    ...(transform ? { transform } : {}),
-    ...(source ? { source } : {}),
-    updatedAt: [local.updatedAt, remote.updatedAt].sort().at(-1)!,
-    value: result.value,
-  } as DatasetDocument;
-  try {
-    return { dataset: validateDataset(dataset, remote.id), conflicts };
-  } catch {
-    // A merged value that no longer satisfies the schema keeps the remote version.
-    return {
-      dataset: remote,
-      conflicts: [
-        {
-          op: "set",
-          path: [],
-          reason: "invalid",
-          base: undefined,
-          mine: local.value,
-          theirs: remote.value,
-        },
-      ],
-    };
   }
 }

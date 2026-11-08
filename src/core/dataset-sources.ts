@@ -21,6 +21,29 @@ import { atomicLibraryFile, readLibraryBytes } from "./library-files";
 import { datasetDependents } from "./dataset-dependents";
 import { FileStore } from "./store";
 import { CoreError } from "./model";
+import {
+  MAX_REFRESH_SECONDS,
+  SOURCE_FORMATS,
+  WRITABLE_FORMATS,
+  type SourceFormat,
+} from "../datasets/dataset-file";
+export {
+  DEFAULT_REFRESH_SECONDS,
+  MAX_REFRESH_SECONDS,
+  SOURCE_FORMATS,
+  SOURCE_KINDS,
+  WRITABLE_FORMATS,
+  isDatasetSource,
+  isSourceBundle,
+  sourceWritable,
+} from "../datasets/dataset-file";
+export type {
+  DatasetSource,
+  FileSource,
+  SourceBundle,
+  SourceFormat,
+  UrlSource,
+} from "../datasets/dataset-file";
 
 // A dataset can keep its value outside the content library: in a local file
 // or at an http(s) address. The library stores only the dataset's description
@@ -31,14 +54,6 @@ import { CoreError } from "./model";
 // JSON, CSV and TSV files are read and written; spreadsheets (.xlsx) and
 // online data are read-only.
 
-export const SOURCE_FORMATS = ["json", "csv", "tsv", "xlsx"] as const;
-export type SourceFormat = (typeof SOURCE_FORMATS)[number];
-/** Formats ShowAI writes back into a linked file. */
-export const WRITABLE_FORMATS: readonly SourceFormat[] = ["json", "csv", "tsv"];
-export const SOURCE_KINDS = ["file", "url"] as const;
-/** Online data is fetched again when the last fetch is older than this. */
-export const DEFAULT_REFRESH_SECONDS = 300;
-export const MAX_REFRESH_SECONDS = 86_400;
 /**
  * Limits of one fetch of online data; hosts and tests may adjust them. A
  * hosted server sets publicAddressesOnly so that addresses of its own
@@ -62,49 +77,6 @@ export const REMOTE_FETCH = {
   publicAddressesOnly: false,
 };
 
-/**
- * Whether synchronization carries a copy of a linked file to the project's
- * other devices, and which copy: the file's bytes stored once under
- * bundles/<hash> (see dataset-bundles), outside history.
- */
-export interface SourceBundle {
-  sync: boolean;
-  /** sha256 of the bundled copy; absent until a copy was made. */
-  hash?: string;
-  /**
-   * The copy shared from the linked file that this copy derives from: the
-   * copy itself when the file's device shared it, the copy edited when
-   * another device changed it. Tells an edit made on top of the file's
-   * latest version from a concurrent one.
-   */
-  base?: string;
-  bytes?: number;
-  updatedAt?: string;
-}
-/** The synchronized part of a linked file, stored in the dataset file. */
-export interface FileSource {
-  kind: "file";
-  format: SourceFormat;
-  /** File name when it was linked; a hint for linking on another device. */
-  name?: string;
-  /** Packaging for synchronization; absent means bundled while it fits. */
-  bundle?: SourceBundle;
-}
-/** Online data, read-only; the address is synchronized with the project. */
-export interface UrlSource {
-  kind: "url";
-  format: SourceFormat;
-  /** http(s) address without credentials. */
-  url: string;
-  name?: string;
-  /**
-   * Seconds after which a read fetches the data again (default 300); 0
-   * fetches only on an explicit refresh.
-   */
-  refreshSeconds?: number;
-}
-export type DatasetSource = FileSource | UrlSource;
-
 /** What a read of the linked file found, carried by the dataset record. */
 export interface ExternalFileState {
   path: string;
@@ -121,11 +93,6 @@ export interface RemoteSourceState {
   fetchedAt: string;
   /** Last-Modified of the response, when the server sent one. */
   modifiedAt?: string;
-}
-
-/** Whether ShowAI writes changes back into the source. */
-export function sourceWritable(source: DatasetSource): boolean {
-  return source.kind === "file" && WRITABLE_FORMATS.includes(source.format);
 }
 
 /** A CoreError of a source read, with the warning code that explains it. */
@@ -154,65 +121,6 @@ const key = (projectId: string, datasetId: string) =>
 
 function registryPath(home: string) {
   return join(home, "local", "dataset-sources.json");
-}
-
-const validUrl = (value: unknown) => {
-  if (typeof value !== "string" || value.length > 2048 || !URL.canParse(value))
-    return false;
-  const url = new URL(value);
-  return (
-    ["http:", "https:"].includes(url.protocol) && !url.username && !url.password
-  );
-};
-
-export function isSourceBundle(value: unknown): value is SourceBundle {
-  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
-  const bundle = value as Record<string, unknown>;
-  return (
-    typeof bundle.sync === "boolean" &&
-    [bundle.hash, bundle.base].every(
-      (hash) =>
-        hash === undefined ||
-        (typeof hash === "string" && /^[a-f0-9]{64}$/.test(hash)),
-    ) &&
-    (bundle.bytes === undefined ||
-      (Number.isSafeInteger(bundle.bytes) && (bundle.bytes as number) >= 0)) &&
-    (bundle.updatedAt === undefined ||
-      (typeof bundle.updatedAt === "string" &&
-        Number.isFinite(Date.parse(bundle.updatedAt)))) &&
-    Object.keys(bundle).every((name) =>
-      ["sync", "hash", "base", "bytes", "updatedAt"].includes(name),
-    )
-  );
-}
-
-export function isDatasetSource(value: unknown): value is DatasetSource {
-  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
-  const source = value as Record<string, unknown>;
-  const common =
-    SOURCE_FORMATS.includes(source.format as SourceFormat) &&
-    (source.name === undefined ||
-      (typeof source.name === "string" && source.name.length <= 255));
-  if (source.kind === "file")
-    return (
-      common &&
-      (source.bundle === undefined || isSourceBundle(source.bundle)) &&
-      Object.keys(source).every((name) =>
-        ["kind", "format", "name", "bundle"].includes(name),
-      )
-    );
-  return (
-    source.kind === "url" &&
-    common &&
-    validUrl(source.url) &&
-    (source.refreshSeconds === undefined ||
-      (Number.isInteger(source.refreshSeconds) &&
-        (source.refreshSeconds as number) >= 0 &&
-        (source.refreshSeconds as number) <= MAX_REFRESH_SECONDS)) &&
-    Object.keys(source).every((name) =>
-      ["kind", "format", "url", "name", "refreshSeconds"].includes(name),
-    )
-  );
 }
 
 /** The format a file name or address implies, or the explicit one. */

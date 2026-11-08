@@ -9,7 +9,7 @@ import {
   type QuickJSWASMModule,
 } from "quickjs-emscripten-core";
 import releaseSync from "@jitl/quickjs-wasmfile-release-sync";
-import { CAPACITY } from "../portable/capacity.mjs";
+import { TRANSFORM_LIMITS } from "../datasets/dataset-file";
 import { TRANSFORM_HELPERS_SOURCE } from "./dataset-transform-helpers";
 
 // Transform datasets compute their value with a script an Agent wrote. The
@@ -17,15 +17,7 @@ import { TRANSFORM_HELPERS_SOURCE } from "./dataset-transform-helpers";
 // runtime with only the ECMAScript built-ins and the helpers (no files,
 // network, timers or host objects), a memory limit and a deadline.
 
-export const TRANSFORM_LIMITS = {
-  memoryBytes: 64 * 1024 * 1024,
-  timeoutMs: 2000,
-  /** QuickJS stack; deep recursion fails inside the sandbox. */
-  stackBytes: 256 * 1024,
-  scriptBytes: 256 * 1024,
-  maxInputs: 16,
-  outputBytes: CAPACITY.datasetBytes,
-};
+export { TRANSFORM_LIMITS };
 
 /** The file name errors of the script point at. */
 const SCRIPT_FILE = "transform.js";
