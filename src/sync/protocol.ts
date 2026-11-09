@@ -285,12 +285,16 @@ export interface ProjectConnection {
   errorDetail?: string;
   syncedAt?: string;
   pendingCreation?: boolean;
+  /** Keep the local copy and merge baseline while synchronization is disabled. */
+  paused?: boolean;
 }
 export interface SyncConfiguration {
   version: 1;
   deviceId: string;
   connections: ServerConnection[];
   projects: ProjectConnection[];
+  /** Stored apart so older runtimes also leave stopped copies alone. */
+  pausedProjects?: ProjectConnection[];
   defaultConnectionId: string | null;
   defaultSince?: string;
   /** Projects created to stay on this device; never enrolled by the default account. */

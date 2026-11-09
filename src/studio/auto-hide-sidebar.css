@@ -223,3 +223,9 @@
   color: inherit;
   font: inherit;
 }
+.studio-workspace[data-compact-sidebar] {
+  position: relative;
+}
+.studio-workspace[data-compact-sidebar] .studio-sidebar-resizer {
+  display: none;
+}

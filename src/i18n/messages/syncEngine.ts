@@ -44,6 +44,7 @@ export default defineMessages("syncEngine", {
     "project.pendingDraft":
       "项目有待恢复或上传的合并草稿，请先完成同步或处理冲突，再解除连接。",
     "project.syncMissing": "项目同步连接不存在。",
+    "project.syncPaused": "项目已停止同步，请先重新启用同步。",
     "project.switchSameServer":
       "切换账号需要选择同一服务器；更换存储服务器请先解除同步。",
     "project.accountMissing": "项目同步账号不存在。",
@@ -97,6 +98,8 @@ export default defineMessages("syncEngine", {
     "resources.configChanged": "资源来源配置已变化，请重新从服务器添加该资源。",
   },
   en: {
+    "project.syncPaused":
+      "Sync is stopped for this project. Enable sync first.",
     "server.status": "The server returned {status}",
     "network.failed": "Sync network request failed.",
     "network.unavailable":
@@ -105,7 +108,8 @@ export default defineMessages("syncEngine", {
       "The server hit an error ({status}). Sync will retry automatically; local changes are kept.",
     "server.notShowAI":
       "This does not look like a ShowAI Server address. Did you leave out /cloud? For example https://showai.example.com/cloud.",
-    "server.invalidResponse": "The server returned a response ShowAI cannot read ({status}).",
+    "server.invalidResponse":
+      "The server returned a response ShowAI cannot read ({status}).",
     "network.redirected":
       "The server address redirected. Reconnect using the final server base URL.",
     "url.invalidBase":

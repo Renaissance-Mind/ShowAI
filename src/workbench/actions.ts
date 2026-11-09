@@ -133,6 +133,9 @@ export const workbenchActions = new Set([
   "sync:projects",
   "sync:attach",
   "sync:subscribe",
+  "sync:cancelDownload",
+  "sync:pausePlan",
+  "sync:setEnabled",
   "sync:detach",
   "sync:previewInvite",
   "sync:retained",
@@ -496,7 +499,7 @@ export function createWorkbench(
         return {
           unchanged: true as const,
           readOnly:
-            connection?.role === "viewer" || connection?.status === "revoked",
+            !connection?.paused && (connection?.role === "viewer" || connection?.status === "revoked"),
         };
       }
       return enrichPage(id, record, conditional?.knownComponents);
@@ -551,8 +554,8 @@ export function createWorkbench(
           ),
       ),
       readOnly:
-        projectConnection?.role === "viewer" ||
-        projectConnection?.status === "revoked",
+        !projectConnection?.paused && (projectConnection?.role === "viewer" ||
+        projectConnection?.status === "revoked"),
       components: reused ? [] : components,
       ...(reused ? { reuseComponents: true } : {}),
     };
@@ -649,7 +652,18 @@ export function createWorkbench(
           return sync.subscribe(
             required(args, "connectionId"),
             required(args, "remoteProjectId"),
+            text(args, "requestId", true),
           );
+        case "sync:cancelDownload":
+          return sync.cancelDownload(
+            required(args, "connectionId"),
+            required(args, "remoteProjectId"),
+            text(args, "requestId", true),
+          );
+        case "sync:pausePlan":
+          return sync.pausePlan(projectId(args));
+        case "sync:setEnabled":
+          return sync.setEnabled(projectId(args), boolean(args, "enabled"));
         case "sync:detach":
           return sync.detach(projectId(args));
         case "sync:changeAccount":
@@ -665,6 +679,7 @@ export function createWorkbench(
           return sync.join(
             required(args, "connectionId"),
             required(args, "link"),
+            args.download !== false,
           );
         case "sync:dashboard":
           return sync.dashboard(
@@ -736,10 +751,32 @@ export function createWorkbench(
             }),
           );
         case "sync:createProject": {
-          const project = await store.createProject({
-            name: required(args, "name"),
-          });
-          await sync.attach(required(args, "connectionId"), project.id);
+          const id = text(args, "id", true);
+          const existing =
+            id &&
+            (await store.listProjects({ includeArchived: true })).find(
+              (item) => item.id === id,
+            );
+          const project =
+            existing ||
+            (await store.createProject({ id, name: required(args, "name") }));
+          const binding = (await sync.configuration()).projects.find(
+            (item) => item.projectId === project.id,
+          );
+          const connectionId = required(args, "connectionId");
+          if (binding) {
+            if (binding.connectionId !== connectionId)
+              throw new CoreError("CONFLICT", t("invalidProjectAction"));
+            await sync.run(project.id);
+          } else await sync.attach(connectionId, project.id, !!existing);
+          const saved = (await sync.configuration()).projects.find(
+            (item) => item.projectId === project.id,
+          );
+          if (saved?.status !== "synced")
+            throw new CoreError(
+              "CONFLICT",
+              saved?.error ?? t("invalidProjectAction"),
+            );
           return project;
         }
       }

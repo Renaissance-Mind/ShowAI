@@ -1036,7 +1036,12 @@ export class SqliteLibrary {
       ).then(
         (bytes) =>
           JSON.parse(bytes) as {
-            projects: { projectId: string; role: string; status: string }[];
+            projects: {
+              projectId: string;
+              role: string;
+              status: string;
+              paused?: boolean;
+            }[];
           },
         (error: NodeJS.ErrnoException) => {
           if (error.code === "ENOENT") return undefined;
@@ -1046,7 +1051,10 @@ export class SqliteLibrary {
       for (const path of changes.keys()) {
         const id = path.match(/^projects\/([^/]+)\//)?.[1],
           binding = config?.projects.find((item) => item.projectId === id);
-        if (binding?.role === "viewer" || binding?.status === "revoked")
+        if (
+          !binding?.paused &&
+          (binding?.role === "viewer" || binding?.status === "revoked")
+        )
           throw new CoreError(
             "CONFLICT",
             "当前账号没有项目编辑权限，修改已保留为本地草稿。",

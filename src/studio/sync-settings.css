@@ -1504,3 +1504,379 @@
 .sync-connect .sync-account-disclosure {
   margin: 16px 0;
 }
+
+/* Account and project flows share the workbench's icon actions and menus. */
+.sync-view-tabs {
+  margin-bottom: 26px;
+}
+.sync-flat-tabs {
+  display: flex;
+  gap: 22px;
+  align-items: center;
+}
+.sync-flat-tabs > button {
+  border: 0;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+  background: none;
+  color: var(--muted);
+  padding: 9px 0;
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+.sync-flat-tabs > button[aria-pressed="true"] {
+  color: var(--text);
+  border-bottom-color: var(--brand-accent, var(--accent));
+}
+.sync-manager-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  margin-bottom: 25px;
+}
+.sync-manager-heading > h2 {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 650;
+}
+.sync-manager-actions,
+.sync-manager-row-actions {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+.sync-action.studio-icon,
+.sync-manager-actions .studio-icon {
+  width: 36px;
+  height: 36px;
+  flex: 0 0 36px;
+  border: 0;
+  background: none;
+  border-radius: 6px;
+}
+.sync-action.studio-icon:hover,
+.sync-manager-actions .studio-icon:hover {
+  background: var(--surface);
+}
+.sync-action.is-accent {
+  color: var(--brand-accent, var(--accent));
+}
+.sync-action.is-synced {
+  color: var(--sync-ok, #4e8067);
+}
+.sync-manager-filters {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 20px;
+  margin-bottom: 20px;
+}
+.sync-manager-filters > select {
+  border: 0;
+  background: transparent;
+  font-size: 12px;
+  max-width: 200px;
+  padding-left: 0;
+}
+.sync-manager-search {
+  margin-left: auto;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  width: 190px;
+  color: var(--muted);
+  border-bottom: 1px solid var(--line);
+}
+.sync-settings .sync-manager-search input {
+  padding-left: 0;
+  width: 100%;
+  border: 0;
+  background: none;
+  border-radius: 0;
+  font-size: 13px;
+}
+.sync-manager-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.sync-manager-table th {
+  font-size: 11px;
+  color: var(--muted);
+  font-weight: 450;
+  text-align: left;
+  padding: 9px 7px;
+  border-bottom: 1px solid var(--line);
+}
+.sync-manager-table td {
+  padding: 18px 7px;
+  border-bottom: 1px solid var(--line);
+  vertical-align: middle;
+}
+.sync-manager-table td:first-child,
+.sync-manager-table th:first-child {
+  padding-left: 0;
+}
+.sync-manager-table td:last-child,
+.sync-manager-table th:last-child {
+  padding-right: 0;
+  text-align: right;
+}
+.sync-manager-table small {
+  display: block;
+  color: var(--muted);
+  font-size: 11px;
+  margin-top: 4px;
+}
+.sync-project-link {
+  background: none;
+  border: 0;
+  padding: 0;
+  text-align: left;
+  color: var(--text);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+.sync-project-link:disabled {
+  opacity: 1 !important;
+  cursor: default;
+}
+.sync-manager-row-actions {
+  justify-content: flex-end;
+}
+.sync-manager-source {
+  font-size: 12px;
+  color: var(--muted);
+}
+.sync-state-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--muted);
+  font-size: 12px;
+  white-space: nowrap;
+}
+.sync-manager-notice {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  border-left: 2px solid var(--brand-accent, var(--accent));
+  padding: 8px 12px;
+  margin-top: 20px;
+  font-size: 13px;
+  color: var(--muted);
+}
+.sync-text-button {
+  border: 0;
+  background: none;
+  color: var(--brand-accent, var(--accent));
+  font: inherit;
+  font-size: 13px;
+  padding: 7px 3px;
+  cursor: pointer;
+}
+.sync-form-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 20px;
+  margin-top: 22px;
+}
+.sync-accounts-view {
+  min-width: 0;
+}
+.sync-account-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 14px;
+  padding: 20px 0;
+  border-bottom: 1px solid var(--line);
+}
+.sync-account-identity {
+  min-width: 0;
+  flex: 1;
+}
+.sync-account-identity strong {
+  font-size: 15px;
+  font-weight: 600;
+}
+.sync-account-identity span {
+  display: block;
+  font-size: 12px;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+.sync-account-row > .sync-account-panel {
+  flex-basis: 100%;
+}
+.sync-login {
+  width: min(440px, 100%);
+  margin: 12px auto 35px;
+}
+.sync-login .sync-server-field {
+  margin-bottom: 25px;
+}
+.sync-login .sync-server-field > span {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.sync-login .sync-server-field input {
+  background: none;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  border-radius: 0;
+  padding-left: 0;
+}
+.sync-login-tabs {
+  display: flex;
+  align-items: stretch;
+  border-bottom: 1px solid var(--line);
+  gap: 9px;
+  margin-bottom: 23px;
+}
+.sync-login-tabs > button {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+  padding: 13px 1px;
+  margin-bottom: -1px;
+  white-space: nowrap;
+  color: var(--muted);
+  background: none;
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.sync-login-tabs > button[aria-selected="true"] {
+  color: var(--text);
+  border-bottom-color: var(--brand-accent, var(--accent));
+}
+.sync-login-panel {
+  min-height: 240px;
+}
+.sync-login .sync-field {
+  margin: 0 0 17px;
+}
+.sync-login .sync-field input {
+  width: 100%;
+}
+.sync-login-submit,
+.sync-login-panel .sync-oauth > .sync-actions > .settings-button {
+  width: 100%;
+  justify-content: center;
+  min-height: 40px;
+  margin-top: 4px;
+}
+.sync-login-panel .sync-oauth > .sync-actions > .settings-button {
+  background: var(--text);
+  color: var(--paper);
+}
+.sync-login-panel .sync-oauth {
+  border: 0;
+  padding: 20px 0;
+  margin: 0;
+}
+.sync-login-panel .sync-oauth .sync-actions {
+  width: 100%;
+}
+.sync-dialog
+  :is(.sync-management, .sync-account-panel)
+  .settings-button:not(.sync-primary, .sync-danger-fill),
+.sync-account-panel .settings-button:not(.sync-primary, .sync-danger-fill) {
+  border-color: transparent;
+  background: none;
+  box-shadow: none;
+}
+.sync-dialog
+  .sync-management
+  .settings-button:not(.sync-primary, .sync-danger-fill):hover,
+.sync-account-panel
+  .settings-button:not(.sync-primary, .sync-danger-fill):hover {
+  background: var(--surface);
+}
+.sync-simple-dialog {
+  width: min(460px, calc(100vw - 28px));
+}
+.sync-manager-mobile-state {
+  display: none;
+}
+.sync-spin {
+  animation: sync-spin 1s linear infinite;
+}
+@keyframes sync-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sync-spin {
+    animation: none;
+  }
+}
+@media (max-width: 1000px) {
+  .sync-manager-source {
+    display: none;
+  }
+}
+@media (max-width: 640px) {
+  .sync-manager-state {
+    display: none;
+  }
+  .sync-manager-mobile-state {
+    display: inline;
+  }
+  .sync-manager-search {
+    flex-basis: 100%;
+    width: 100%;
+  }
+  .sync-manager-filters {
+    gap: 12px;
+  }
+  .sync-manager-row-actions {
+    gap: 0;
+  }
+  .sync-action.studio-icon {
+    width: 34px;
+    flex-basis: 34px;
+  }
+  .sync-manager-table td {
+    padding: 17px 3px;
+  }
+  .sync-login-tabs {
+    gap: 4px;
+  }
+  .sync-login-tabs > button {
+    font-size: 11px;
+    gap: 4px;
+  }
+  .sync-login-tabs > button > :is(svg, img) {
+    width: 16px;
+    height: 16px;
+  }
+  .sync-account-row > .sync-manager-actions {
+    margin-left: auto;
+  }
+}
+
+:root[data-theme="dark"] .sync-auth-github {
+  filter: invert(1);
+}
+.studio-project-manager-entry {
+  border: 0;
+  background: none;
+  padding: 0;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}

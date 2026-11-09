@@ -32,9 +32,9 @@ it("marks projects that are read-only, need sign-in or did not sync", () => {
       signedOut: true,
     } as never),
   ).toBe("signIn");
-  expect(
-    syncMarker(binding({ status: "offline", errorKind: "network" })),
-  ).toBe("unsynced");
+  expect(syncMarker(binding({ status: "offline", errorKind: "network" }))).toBe(
+    "unsynced",
+  );
   expect(syncMarker(binding({ status: "pending", error: "x" }))).toBe(
     "unsynced",
   );
@@ -53,4 +53,17 @@ it("groups projects whose sign-in expired by connection", () => {
   ).toEqual([
     { connection: undefined, connectionId: "c", projectIds: ["a", "b"] },
   ]);
+});
+
+it("does not mark stopped copies read-only or request sign-in for a stopped sync", () => {
+  expect(syncMarker(binding({ paused: true, role: "viewer" }))).toBeUndefined();
+  expect(
+    syncMarker(binding({ paused: true, errorKind: "auth", status: "offline" })),
+  ).toBeUndefined();
+  expect(
+    expiredConnections({
+      connections: [],
+      projects: [binding({ paused: true, errorKind: "auth" })],
+    }),
+  ).toEqual([]);
 });

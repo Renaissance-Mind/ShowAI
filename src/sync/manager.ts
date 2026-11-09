@@ -44,11 +44,7 @@ import {
   type FileConflict,
   type CapturedSnapshot,
 } from "./transfer";
-import {
-  bundleHash,
-  hasBundle,
-  storeBundle,
-} from "../core/dataset-bundles";
+import { bundleHash, hasBundle, storeBundle } from "../core/dataset-bundles";
 import { refreshProjectBundles } from "../core/packaging";
 import {
   SyncError,
@@ -133,6 +129,56 @@ export class SyncManager {
   private pushed = new Map<string, Map<string, SyncProject>>();
   private pushEligible = false;
   private capabilityRefresh?: Promise<void>;
+  private downloads = new Map<
+    string,
+    {
+      connectionId: string;
+      remoteProjectId: string;
+      projectId?: string;
+      controller: AbortController;
+      completion?: Promise<unknown>;
+      requestId?: string;
+    }
+  >();
+  private cancelledDownloads = new Map<string, number>();
+  private downloadKey(url: string, projectId: string) {
+    return `${serverBaseUrl(url)}#${projectId}`;
+  }
+  private transferSignal(url: string, projectId: string, timeout = 30_000) {
+    const signal = this.downloads.get(this.downloadKey(url, projectId))
+      ?.controller.signal;
+    return signal
+      ? AbortSignal.any([signal, AbortSignal.timeout(timeout)])
+      : AbortSignal.timeout(timeout);
+  }
+  private checkDownload(
+    connection: ServerConnection,
+    project: ProjectConnection,
+  ) {
+    this.downloads
+      .get(this.downloadKey(connection.url, project.remoteProjectId))
+      ?.controller.signal.throwIfAborted();
+  }
+  private projectLease(projectId: string) {
+    return (
+      "sync-project-" +
+      hash(projectId).replace(/[0-9a-f]/g, (digit) =>
+        String.fromCharCode(97 + parseInt(digit, 16)),
+      )
+    );
+  }
+  private async checkTransfer(
+    connection: ServerConnection,
+    project: ProjectConnection,
+  ) {
+    this.checkDownload(connection, project);
+    if (
+      (await this.configuration()).projects.find(
+        (item) => item.projectId === project.projectId,
+      )?.paused
+    )
+      throw new CoreError("CONFLICT", t("project.syncPaused"));
+  }
   private announced = new Map<
     string,
     { previous: string | null; record: SnapshotRecord }
@@ -183,10 +229,24 @@ export class SyncManager {
       if (
         saved.version !== 1 ||
         !Array.isArray(saved.connections) ||
-        !Array.isArray(saved.projects)
+        !Array.isArray(saved.projects) ||
+        (saved.pausedProjects !== undefined &&
+          !Array.isArray(saved.pausedProjects))
       )
         throw new CoreError("INVALID_DATA", t("config.invalid"));
-      return saved;
+      const { pausedProjects = [], ...config } = saved;
+      const active = new Set(
+        config.projects.map((project) => project.projectId),
+      );
+      return {
+        ...config,
+        projects: [
+          ...config.projects,
+          ...pausedProjects
+            .filter((project) => !active.has(project.projectId))
+            .map((project) => ({ ...project, paused: true })),
+        ],
+      };
     }
     return {
       version: 1,
@@ -202,10 +262,23 @@ export class SyncManager {
       async () => {
         const config = await this.configuration();
         action(config);
+        const paused = config.projects.filter((project) => project.paused);
+        if (paused.length)
+          config.localProjectIds = [
+            ...new Set([
+              ...(config.localProjectIds ?? []),
+              ...paused.map((project) => project.projectId),
+            ]),
+          ];
+        const persisted = {
+          ...config,
+          projects: config.projects.filter((project) => !project.paused),
+          ...(paused.length ? { pausedProjects: paused } : {}),
+        };
         await atomicLibraryFile(
           this.home,
           this.configPath,
-          Buffer.from(JSON.stringify(config, null, 2)),
+          Buffer.from(JSON.stringify(persisted, null, 2)),
         );
         return config;
       },
@@ -225,7 +298,9 @@ export class SyncManager {
       if (connection.signedOut) continue;
       const projects = config.projects.filter(
         (project) =>
-          project.connectionId === connection.id && !project.pendingCreation,
+          project.connectionId === connection.id &&
+          !project.pendingCreation &&
+          !project.paused,
       );
       if (!projects.length) continue;
       if (!connection.capabilities?.includes(eventCapability)) {
@@ -287,9 +362,13 @@ export class SyncManager {
     )
       return;
     const bindings = config.projects.filter(
-      (item) => item.connectionId === connection.id,
+      (item) => item.connectionId === connection.id && !item.paused,
     );
-    const allowed = new Set(bindings.map((item) => item.remoteProjectId));
+    const allowed = new Set(
+      config.projects
+        .filter((item) => item.connectionId === connection.id)
+        .map((item) => item.remoteProjectId),
+    );
     const incoming = event.type === "heads" ? event.projects : [event.project];
     if (!Array.isArray(incoming) || incoming.length > maximumEventProjects)
       throw new CoreError("INVALID_DATA", t("event.invalidCount"));
@@ -507,7 +586,9 @@ export class SyncManager {
           ...(data === undefined ? {} : { "content-type": "application/json" }),
         },
         body: data === undefined ? undefined : JSON.stringify(data),
-        signal: AbortSignal.timeout(30_000),
+        signal: /^\/api\/projects\/[^/]+/.test(path)
+          ? this.transferSignal(connection.url, path.split("/")[3])
+          : AbortSignal.timeout(30_000),
       });
       const value = await serverJson(response);
       if (response.ok) return value as T;
@@ -545,6 +626,14 @@ export class SyncManager {
         ({ token: _token, ...connection }) => connection,
       ),
       running: !!this.running,
+      downloads: [...this.downloads.values()]
+        .filter((item) => !item.controller.signal.aborted)
+        .map(({ connectionId, remoteProjectId, projectId, requestId }) => ({
+          connectionId,
+          remoteProjectId,
+          projectId,
+          requestId,
+        })),
       federation: await this.accounts.status(),
       scheduler: {
         ...this.metrics,
@@ -620,7 +709,10 @@ export class SyncManager {
             error instanceof SyncError &&
             error.code === "REGISTRATION_KEY_REQUIRED"
           ) {
-            const required = new CoreError("CONFIRMATION_REQUIRED", error.message);
+            const required = new CoreError(
+              "CONFIRMATION_REQUIRED",
+              error.message,
+            );
             required.details = { field: "registrationKey" };
             throw required;
           }
@@ -747,7 +839,9 @@ export class SyncManager {
       )?.remainingAttempts;
       if (
         error instanceof SyncError &&
-        ["INVALID_COMPLETION_CODE", "INVALID_EMAIL_CODE"].includes(error.code) &&
+        ["INVALID_COMPLETION_CODE", "INVALID_EMAIL_CODE"].includes(
+          error.code,
+        ) &&
         typeof remaining === "number" &&
         remaining > 0
       )
@@ -826,14 +920,20 @@ export class SyncManager {
   async signOut(connectionId: string) {
     if (this.running) await this.running;
     const connection = await this.connection(connectionId);
-    if (!connection.signedOut) await this.request(connection, "/api/auth/logout", "POST");
+    if (!connection.signedOut)
+      await this.request(connection, "/api/auth/logout", "POST");
     await this.accounts.signOut(connection.serverId, connection.user.id);
     await this.update((config) => {
-      const saved = config.connections.find((item) => item.id === connectionId)!;
+      const saved = config.connections.find(
+        (item) => item.id === connectionId,
+      )!;
       saved.token = "";
       saved.signedOut = true;
-      if (config.defaultConnectionId === connectionId) config.defaultConnectionId = null;
-      for (const project of config.projects.filter((item) => item.connectionId === connectionId)) {
+      if (config.defaultConnectionId === connectionId)
+        config.defaultConnectionId = null;
+      for (const project of config.projects.filter(
+        (item) => item.connectionId === connectionId,
+      )) {
         project.status = "offline";
         delete project.error;
         delete project.errorKind;
@@ -1053,7 +1153,7 @@ export class SyncManager {
       throw new CoreError("INVALID_DATA", t("invite.chooseAccount"));
     return result;
   }
-  async join(connectionId: string, link: string) {
+  async join(connectionId: string, link: string, download = true) {
     const invitation = await this.previewInvite(link, connectionId),
       connection = await this.connection(connectionId);
     if (invitation.serverId !== connection.serverId)
@@ -1064,10 +1164,14 @@ export class SyncManager {
       "POST",
       { invite: invitation.invite },
     );
-    await this.subscribe(connectionId, project.id);
-    return this.status();
+    if (download) await this.subscribe(connectionId, project.id);
+    return { ...(await this.status()), joinedProjectId: project.id };
   }
-  async attach(connectionId: string, projectId: string) {
+  async attach(
+    connectionId: string,
+    projectId: string,
+    retryEmptyProject = false,
+  ) {
     assertId(projectId);
     const metadata = await new FileStore(this.home).readProject(projectId);
     const config = await this.configuration();
@@ -1079,7 +1183,18 @@ export class SyncManager {
       "/api/projects",
       "POST",
       { id: projectId, name: metadata.name },
-    );
+    ).catch(async (error) => {
+      if (
+        !retryEmptyProject ||
+        !(error instanceof SyncError) ||
+        error.status !== 409
+      )
+        throw error;
+      return this.request<SyncProject>(
+        connection,
+        `/api/projects/${projectId}`,
+      );
+    });
     if (remote.head) throw new CoreError("CONFLICT", t("project.remoteExists"));
     await this.update((next) => {
       next.projects.push({
@@ -1096,8 +1211,116 @@ export class SyncManager {
     await this.run(projectId);
     return this.status();
   }
-  async subscribe(connectionId: string, remoteProjectId: string) {
+  async subscribe(
+    connectionId: string,
+    remoteProjectId: string,
+    requestId?: string,
+  ) {
     identifier(remoteProjectId);
+    if (requestId) {
+      identifier(requestId);
+      const cancelled = this.cancelledDownloads.get(requestId);
+      if (cancelled) {
+        this.cancelledDownloads.delete(requestId);
+        if (Date.now() - cancelled < 60_000) return this.status();
+      }
+    }
+    const connection = await this.connection(connectionId);
+    const key = this.downloadKey(connection.url, remoteProjectId);
+    const previous = this.downloads.get(key);
+    if (previous) {
+      await previous.completion;
+      return this.status();
+    }
+    const attempt: {
+      connectionId: string;
+      remoteProjectId: string;
+      projectId?: string;
+      controller: AbortController;
+      completion?: Promise<unknown>;
+      requestId?: string;
+    } = {
+      connectionId,
+      remoteProjectId,
+      requestId,
+      controller: new AbortController(),
+    };
+    this.downloads.set(key, attempt);
+    let saved: ProjectConnection | undefined;
+    const completion = (async () => {
+      try {
+        saved = (await this.configuration()).projects.find(
+          (item) =>
+            item.connectionId === connectionId &&
+            item.remoteProjectId === remoteProjectId,
+        );
+        attempt.projectId = saved?.projectId;
+        await this.subscribeProject(
+          connectionId,
+          remoteProjectId,
+          (projectId) => {
+            attempt.projectId = projectId;
+          },
+        );
+        attempt.controller.signal.throwIfAborted();
+      } catch (error) {
+        if (!attempt.controller.signal.aborted) throw error;
+        if (attempt.projectId) {
+          const local = (
+            await new FileStore(this.home).listProjects({
+              includeArchived: true,
+            })
+          ).some((item) => item.id === attempt.projectId);
+          const pending = await readJson(this.pendingPath(attempt.projectId));
+          await this.update((config) => {
+            if (!saved && !local && !pending)
+              config.projects = config.projects.filter(
+                (item) => item.projectId !== attempt.projectId,
+              );
+            else {
+              const binding = config.projects.find(
+                (item) => item.projectId === attempt.projectId,
+              );
+              if (binding) binding.paused = true;
+            }
+          });
+        }
+      } finally {
+        if (this.downloads.get(key) === attempt) this.downloads.delete(key);
+      }
+    })();
+    attempt.completion = completion;
+    await completion;
+    return this.status();
+  }
+  async cancelDownload(
+    connectionId: string,
+    remoteProjectId: string,
+    requestId?: string,
+  ) {
+    identifier(remoteProjectId);
+    const connection = await this.connection(connectionId);
+    const attempt = this.downloads.get(
+      this.downloadKey(connection.url, remoteProjectId),
+    );
+    if (attempt && (!requestId || attempt.requestId === requestId)) {
+      attempt.controller.abort();
+      await attempt.completion;
+    } else if (requestId) {
+      identifier(requestId);
+      this.cancelledDownloads.set(requestId, Date.now());
+      while (this.cancelledDownloads.size > 100)
+        this.cancelledDownloads.delete(
+          this.cancelledDownloads.keys().next().value!,
+        );
+    }
+    return this.status();
+  }
+  private async subscribeProject(
+    connectionId: string,
+    remoteProjectId: string,
+    selected: (projectId: string) => void,
+  ) {
     const connection = await this.connection(connectionId),
       config = await this.configuration();
     const existing = config.projects.find(
@@ -1106,6 +1329,9 @@ export class SyncManager {
         project.remoteProjectId === remoteProjectId,
     );
     if (existing) {
+      selected(existing.projectId);
+      if (existing.paused)
+        await this.state(existing.projectId, { paused: false });
       await this.run(existing.projectId);
       return this.status();
     }
@@ -1123,6 +1349,9 @@ export class SyncManager {
           ?.serverId === connection.serverId,
     );
     if (sameServer) {
+      selected(sameServer.projectId);
+      if (sameServer.paused)
+        await this.state(sameServer.projectId, { paused: false });
       await this.changeAccount(sameServer.projectId, connectionId);
       return this.status();
     }
@@ -1136,6 +1365,10 @@ export class SyncManager {
       )
         ? crypto.randomUUID()
         : remoteProjectId;
+    selected(projectId);
+    this.downloads
+      .get(this.downloadKey(connection.url, remoteProjectId))
+      ?.controller.signal.throwIfAborted();
     await this.update((next) => {
       next.projects.push({
         projectId,
@@ -1149,6 +1382,80 @@ export class SyncManager {
     });
     this.start();
     await this.run(projectId);
+    return this.status();
+  }
+  async pausePlan(projectId: string) {
+    assertId(projectId);
+    const project = (await this.configuration()).projects.find(
+      (item) => item.projectId === projectId,
+    );
+    if (!project) throw new CoreError("NOT_FOUND", t("project.syncMissing"));
+    const library = new GitLibrary(this.home);
+    const head = await library.head();
+    const operations = new LibraryOperations(this.home, projectId);
+    const current = head
+      ? await operations.projectFiles(projectId, head)
+      : new Map<string, Buffer>();
+    // Current-only libraries may compact old local revisions. Compare with the
+    // retained server baseline, without requiring a network request to stop sync.
+    const connection = await this.connection(project.connectionId);
+    const record = project.remoteHead
+      ? await this.cachedRecord(connection, project, project.remoteHead)
+      : undefined;
+    let baseline = new Map<string, Buffer>();
+    if (record) {
+      const ids = [...new Set(Object.values(record.snapshot.files))];
+      const objects = new Map(
+        await Promise.all(
+          ids.map(
+            async (id) =>
+              [
+                id,
+                await readLibraryBytes(
+                  this.home,
+                  this.objectPath(id, this.cacheKey(connection, project)),
+                ),
+              ] as const,
+          ),
+        ),
+      );
+      if ([...objects.values()].some((value) => value === null))
+        return { pending: true };
+      baseline = remapProjectFiles(
+        await decodeSnapshot(
+          record,
+          async (id) => objects.get(id)!,
+          project.remoteProjectId,
+        ),
+        project.remoteProjectId,
+        projectId,
+      );
+    } else if (project.remoteHead) return { pending: true };
+    return {
+      pending:
+        !!project.pendingCreation ||
+        !sameFiles(current, baseline) ||
+        !!(await readJson(this.pendingPath(projectId))),
+    };
+  }
+  async setEnabled(projectId: string, enabled: boolean) {
+    assertId(projectId);
+    await this.update((config) => {
+      const project = config.projects.find(
+        (item) => item.projectId === projectId,
+      );
+      if (!project) throw new CoreError("NOT_FOUND", t("project.syncMissing"));
+      project.paused = !enabled;
+    });
+    if (enabled) {
+      this.start();
+      await this.run(projectId);
+    } else
+      await withLibraryLock(
+        this.home,
+        async () => {},
+        this.projectLease(projectId),
+      );
     return this.status();
   }
   async detach(projectId: string) {
@@ -1283,10 +1590,7 @@ export class SyncManager {
     project: ProjectConnection,
     digest: string,
   ): Promise<Buffer> {
-    const path = this.objectPath(
-      digest,
-      this.cacheKey(connection, project),
-    );
+    const path = this.objectPath(digest, this.cacheKey(connection, project));
     const cached = await readFile(path).catch(
       (error: NodeJS.ErrnoException) => {
         if (error.code === "ENOENT") return null;
@@ -1316,7 +1620,7 @@ export class SyncManager {
       `${connection.url}/api/projects/${project.remoteProjectId}/objects/${digest}`,
       {
         headers: { authorization: `Bearer ${connection.token}` },
-        signal: AbortSignal.timeout(30_000),
+        signal: this.transferSignal(connection.url, project.remoteProjectId),
       },
     );
     if (!response.ok) {
@@ -1329,7 +1633,6 @@ export class SyncManager {
     }
     await cacheDownload(this.home, path, response, digest);
     return readFile(path);
-  
   }
   /** Shares or writes back linked files of a project this device has. */
   private async refreshBundles(
@@ -1374,6 +1677,7 @@ export class SyncManager {
     expected: string | null,
     publish = true,
   ) {
+    await this.checkTransfer(connection, project);
     if (publish)
       await withLibraryLock(this.home, async () => {
         const paths = new Set(
@@ -1456,13 +1760,19 @@ export class SyncManager {
       ...(objects ? { objects } : {}),
     });
     const post = async (objects?: Record<string, string>) => {
-      const publishWith = (full: boolean) =>
-        this.request<{ revision: string; head: string; published: boolean }>(
+      const publishWith = async (full: boolean) => {
+        await this.checkTransfer(connection, project);
+        return this.request<{
+          revision: string;
+          head: string;
+          published: boolean;
+        }>(
           connection,
           `/api/projects/${project.remoteProjectId}/snapshot`,
           "POST",
           body(full, objects),
         );
+      };
       try {
         return await publishWith(false);
       } catch (error) {
@@ -1600,7 +1910,12 @@ export class SyncManager {
         };
         const completed = await Promise.allSettled(
           Array.from(
-            { length: Math.min(this.options.uploadConcurrency ?? 2, missing.length) },
+            {
+              length: Math.min(
+                this.options.uploadConcurrency ?? 2,
+                missing.length,
+              ),
+            },
             send,
           ),
         );
@@ -1714,11 +2029,6 @@ export class SyncManager {
   ) {
     // App windows, the development App and CLI processes share checkpoints and
     // recovery plans. Serialize the whole project cycle, not just config writes.
-    const lease =
-      "sync-project-" +
-      hash(project.projectId).replace(/[0-9a-f]/g, (digit) =>
-        String.fromCharCode(97 + parseInt(digit, 16)),
-      );
     return withLibraryLock(
       this.home,
       async () => {
@@ -1726,7 +2036,7 @@ export class SyncManager {
         const latest = config.projects.find(
           (item) => item.projectId === project.projectId,
         );
-        if (!latest) return;
+        if (!latest || latest.paused) return;
         const currentConnection = config.connections.find(
           (item) => item.id === latest.connectionId,
         );
@@ -1742,7 +2052,7 @@ export class SyncManager {
           config.deviceId,
         );
       },
-      lease,
+      this.projectLease(project.projectId),
     );
   }
   private async synchronizeUnlocked(
@@ -1906,8 +2216,10 @@ export class SyncManager {
     );
     for (const path of actual.keys())
       if (!localFiles.has(path)) changes.set(path, null);
-    if (remoteRecord) await this.receiveBundles(connection, project, remoteRecord);
+    if (remoteRecord)
+      await this.receiveBundles(connection, project, remoteRecord);
     if (changes.size) {
+      await this.checkTransfer(connection, project);
       await this.savePendingImport(
         project.projectId,
         {
@@ -2066,7 +2378,7 @@ export class SyncManager {
     const config = await this.configuration();
     if (this.started) this.configureStreams(config);
     const selected = config.projects.filter(
-      (item) => !projectIds || projectIds.has(item.projectId),
+      (item) => !item.paused && (!projectIds || projectIds.has(item.projectId)),
     );
     const library = new GitLibrary(this.home);
     const global = await library.head();
@@ -2166,6 +2478,13 @@ export class SyncManager {
           const saved = (await this.configuration()).projects.find(
             (item) => item.projectId === project.projectId,
           );
+          // A stopped copy or retained viewer edit has no new synchronized
+          // revision. Its older local revision may already have been compacted.
+          if (saved?.status !== "synced" || saved.paused) {
+            this.observed.delete(project.projectId);
+            changed ||= before !== saved?.remoteHead;
+            continue;
+          }
           // Anchor the memo at the last synchronized revision. A concurrent new commit
           // must remain visible on the next cycle, even if it arrived during upload.
           const revision = saved?.localRevision ?? null;
@@ -2181,6 +2500,14 @@ export class SyncManager {
           });
           changed ||= before !== saved?.remoteHead;
         } catch (error) {
+          if (
+            (await this.configuration()).projects.find(
+              (item) => item.projectId === project.projectId,
+            )?.paused
+          ) {
+            this.observed.delete(project.projectId);
+            continue;
+          }
           failed = true;
           this.observed.delete(project.projectId);
           const status =
@@ -2228,6 +2555,13 @@ export class SyncManager {
   async run(
     projectId?: string,
   ): Promise<Awaited<ReturnType<SyncManager["status"]>>> {
+    if (
+      projectId &&
+      (await this.configuration()).projects.find(
+        (item) => item.projectId === projectId,
+      )?.paused
+    )
+      throw new CoreError("CONFLICT", t("project.syncPaused"));
     await this.dispatch(projectId ? [projectId] : undefined, true);
     return this.status();
   }
@@ -2312,6 +2646,9 @@ export class SyncManager {
   async stop() {
     await this.accounts.stop();
     this.started = false;
+    const downloads = [...this.downloads.values()];
+    for (const attempt of downloads) attempt.controller.abort();
+    await Promise.all(downloads.map((attempt) => attempt.completion));
     if (this.timer) clearTimeout(this.timer);
     this.timer = undefined;
     this.metrics.nextPollAt = 0;
@@ -2327,7 +2664,10 @@ export class SyncManager {
     const project = (await this.configuration()).projects.find(
       (item) => item.projectId === projectId,
     );
-    if (project?.role === "viewer" || project?.status === "revoked")
+    if (
+      !project?.paused &&
+      (project?.role === "viewer" || project?.status === "revoked")
+    )
       throw new CoreError("CONFLICT", t("role.readOnly"));
   }
 }
@@ -2352,7 +2692,10 @@ export function syncFailure(
         errorDetail: original,
       };
     return {
-      error: error.status >= 500 ? t("server.failed", { status: error.status }) : original,
+      error:
+        error.status >= 500
+          ? t("server.failed", { status: error.status })
+          : original,
       errorKind: "server",
       errorDetail: `${error.code} · ${error.status} · ${original}`,
     };

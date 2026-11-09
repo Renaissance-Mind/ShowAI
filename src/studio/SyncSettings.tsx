@@ -1,13 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
-  ChevronDown,
   Database,
+  FolderOpen,
+  LogOut,
+  Settings2,
   Folder,
-  Link2,
   Plus,
   RefreshCw,
-  Search,
-  Upload,
   X,
 } from "../ui/icons";
 import { desktop, errorMessage } from "./bridge";
@@ -19,74 +18,37 @@ import SyncDashboard, {
   type SyncInvite,
 } from "./SyncDashboard";
 import AccountBindings from "./AccountBindings";
-import ServiceLogin from "./ServiceLogin";
+import AccountLogin from "./AccountLogin";
+import ProjectManager, { type ManagedSyncStatus } from "./ProjectManager";
 import SyncAccountPanel, { IssuedToken } from "./SyncAccountPanel";
 import { conflictPreview } from "./sync-conflict-preview";
 import type { ProjectSummary } from "../core/model";
-import type {
-  SyncConfiguration,
-  SyncProject,
-  ProjectRole,
-} from "../sync/protocol";
+import type { SyncProject, ProjectRole } from "../sync/protocol";
 import type { SyncConflict } from "../sync/manager";
-import { getLocale, type MessageKey } from "../i18n";
+import { type MessageKey } from "../i18n";
 import { useTranslator } from "../i18n/react";
 import messages from "../i18n/messages/sync";
 import common from "../i18n/messages/common";
 import { PendingNotice } from "../ui/PendingNotice";
 import flowMessages from "../i18n/messages/accountFlow";
-import navigationMessages from "../i18n/messages/navigation";
-import { syncListedProjects } from "./sync-project-list";
+
 import "./sync-settings.css";
-import {
-  PackagingDialog,
-  type PackagingPlan,
-} from "./PackagingDialog";
-type Status = Omit<SyncConfiguration, "connections"> & {
-  connections: Omit<SyncConfiguration["connections"][number], "token">[];
-  running: boolean;
-};
-type Binding = Status["projects"][number];
+import { PackagingDialog, type PackagingPlan } from "./PackagingDialog";
+type Status = ManagedSyncStatus;
 type SyncKey = MessageKey<typeof messages>;
-type ConnectMode = "login" | "register" | "token";
 const roleKeys: Record<ProjectRole, SyncKey> = {
   admin: "role.admin",
   editor: "role.editor",
   viewer: "role.viewer",
 };
-const stateKeys = {
-  pending: "state.pending",
-  synced: "state.synced",
-  "save-failed": "state.save-failed",
-  offline: "state.offline",
-  conflict: "state.conflict",
-  revoked: "state.revoked",
-} satisfies Record<string, SyncKey>;
-/** Visual tone of each sync state; anything needing attention reads as a problem. */
-const stateTones: Record<Binding["status"], "ok" | "busy" | "problem"> = {
-  synced: "ok",
-  pending: "busy",
-  offline: "problem",
-  conflict: "problem",
-  "save-failed": "problem",
-  revoked: "problem",
-};
-const emptyForm = {
-  url: "https://showai.renaissancemind.ai/cloud",
-  account: "",
-  password: "",
-  registrationKey: "",
-  token: "",
-  tokenOnly: false,
-  mode: "login" as ConnectMode,
-};
+const defaultServer = "https://showai.renaissancemind.ai/cloud";
 export type ProjectSyncRequest = {
   projectId: string;
   /**
    * signIn: the project's account must sign in again. packaging: choose
    * what synchronization carries, starting at the item `focus`.
    */
-  intent: "share" | "sync" | "signIn" | "packaging";
+  intent: "share" | "sync" | "signIn" | "packaging" | "manage";
   focus?: string;
   key: number;
 };
@@ -108,11 +70,13 @@ export default function SyncSettings({
     null,
   );
   const [joinIntent, setJoinIntent] = useState(false);
-  const [passwordExpanded, setPasswordExpanded] = useState(false);
-  const [projectQuery, setProjectQuery] = useState("");
+  const [activeView, setActiveView] = useState<"accounts" | "projects">(
+    "projects",
+  );
+  const [projectFilter, setProjectFilter] = useState("all");
+  const initialized = useRef(false);
   const [dashboardFocused, setDashboardFocused] = useState(false);
   const t = useTranslator(messages);
-  const tn = useTranslator(navigationMessages);
   const tc = useTranslator(common);
   const role = (value: ProjectRole) => t(roleKeys[value]);
   const [status, setStatus] = useState<Status | null>(null),
@@ -120,12 +84,10 @@ export default function SyncSettings({
   const [busy, setBusy] = useState(false),
     [error, setError] = useState(""),
     [message, setMessage] = useState("");
-  const [form, setForm] = useState(emptyForm);
-  // The server is probed when its address is committed, not on every keystroke.
-  const [probeUrl, setProbeUrl] = useState(emptyForm.url);
-  const [registrationMode, setRegistrationMode] = useState("");
-  const [advancedOpen, setAdvancedOpen] = useState(false);
-  const registrationKeyInput = useRef<HTMLInputElement>(null);
+  const [loginInitial, setLoginInitial] = useState<{
+    url: string;
+    account?: string;
+  }>({ url: defaultServer });
   const [showConnect, setShowConnect] = useState(false),
     [server, setServer] = useState("");
   const [issuedToken, setIssuedToken] = useState("");
@@ -143,7 +105,7 @@ export default function SyncSettings({
   const connectSection = useRef<HTMLDivElement>(null);
   const [connectRequest, setConnectRequest] = useState(0);
   const [panel, setPanel] = useState<
-    "projects" | "dashboard" | "conflict" | "upload" | null
+    "dashboard" | "conflict" | "upload" | null
   >(null);
   const panelBody = useRef<HTMLDivElement>(null);
   const panelTrigger = useRef<HTMLElement | null>(null);
@@ -204,6 +166,14 @@ export default function SyncSettings({
     return () => clearInterval(timer);
   }, [refresh]);
   useEffect(() => {
+    if (!status || initialized.current) return;
+    initialized.current = true;
+    if (!status.connections.some((item) => !item.signedOut) && !request) {
+      setActiveView("accounts");
+      openConnect();
+    }
+  }, [status, request]);
+  useEffect(() => {
     // Success notices fade; errors stay until dismissed or replaced.
     if (!message) return;
     const timer = setTimeout(() => setMessage(""), 6000);
@@ -216,12 +186,10 @@ export default function SyncSettings({
       .invoke<NonNullable<typeof preview>>("sync:previewInvite", { link })
       .then((result) => {
         setPreview(result);
-        setForm((current) => ({
-          ...current,
+        setLoginInitial({
           url: result.url,
-          mode: "login",
-          account: result.target_name ?? current.account,
-        }));
+          account: result.target_name ?? undefined,
+        });
       })
       .catch((error) => setError(errorMessage(error)));
   }, []);
@@ -232,6 +200,11 @@ export default function SyncSettings({
   useEffect(() => {
     if (!request || !status || handledRequest.current === request.key) return;
     handledRequest.current = request.key;
+    if (request.intent === "manage") {
+      setActiveView("projects");
+      return;
+    }
+    setActiveView(request.intent === "signIn" ? "accounts" : "projects");
     const binding = status.projects.find(
       (item) => item.projectId === request.projectId,
     );
@@ -274,7 +247,9 @@ export default function SyncSettings({
     else {
       setUploadProject(request);
       setUploadTarget(
-        status.defaultConnectionId || status.connections.find((item) => !item.signedOut)?.id || "",
+        status.defaultConnectionId ||
+          status.connections.find((item) => !item.signedOut)?.id ||
+          "",
       );
       setPanel("upload");
     }
@@ -282,7 +257,8 @@ export default function SyncSettings({
   useEffect(() => {
     if (!preview || !status || server) return;
     const existing = status.connections.find(
-      (connection) => !connection.signedOut && connection.serverId === preview.serverId,
+      (connection) =>
+        !connection.signedOut && connection.serverId === preview.serverId,
     );
     // Without an account there, the invitation card offers sign-in explicitly.
     if (existing) setServer(existing.id);
@@ -304,8 +280,6 @@ export default function SyncSettings({
       target.offsetParent !== null &&
       !target.matches(":disabled")
         ? target
-        : panel === "projects"
-          ? panelBody.current?.closest<HTMLElement>(".sync-dialog")
         : [
             ...(panelBody.current?.querySelectorAll<HTMLElement>(
               "input:not([disabled]),select:not([disabled]),button:not([disabled])",
@@ -335,17 +309,6 @@ export default function SyncSettings({
     } finally {
       setBusy(false);
     }
-  }
-  async function loadServer(connectionId: string) {
-    setPanel(connectionId ? "projects" : null);
-    setDashboard(null);
-    setManagedProject("");
-    setServer(connectionId);
-    setRemote([]);
-    if (connectionId)
-      setRemote(
-        await desktop.invoke<SyncProject[]>("sync:projects", { connectionId }),
-      );
   }
   async function loadDashboard(
     connectionId: string,
@@ -398,41 +361,7 @@ export default function SyncSettings({
     await loadDashboard(dashboard!, managedProject, dashboardFocused);
     return result;
   }
-  async function connect() {
-    const register = form.mode === "register";
-    const connection = await desktop.invoke<{
-      id: string;
-      issuedPersonalToken?: string;
-    }>("sync:connect", {
-      url: form.url,
-      account: form.account,
-      password:
-        form.mode === "token" || (register && form.tokenOnly)
-          ? undefined
-          : form.password,
-      registrationKey: form.registrationKey,
-      token: form.mode === "token" ? form.token : undefined,
-      register,
-      continue: form.mode === "login",
-      personalToken: register && form.tokenOnly,
-      invite: preview?.invite,
-    }).catch((error: unknown) => {
-      // The server needs a registration key: open the field and focus it.
-      if (
-        (error as { details?: { field?: string } })?.details?.field ===
-        "registrationKey"
-      ) {
-        setAdvancedOpen(true);
-        requestAnimationFrame(() => registrationKeyInput.current?.focus());
-      }
-      throw error;
-    });
-    setShowConnect(false);
-    setIssuedToken(connection.issuedPersonalToken ?? "");
-    setForm(emptyForm);
-    await connected(connection.id);
-  }
-  async function openRemote(connectionId: string, remoteProjectId: string) {
+  async function downloadRemote(connectionId: string, remoteProjectId: string) {
     await desktop.invoke("sync:subscribe", { connectionId, remoteProjectId });
     const next = await desktop.invoke<Status>("sync:status");
     const binding = next.projects.find(
@@ -442,44 +371,56 @@ export default function SyncSettings({
     );
     if (!binding) throw new Error(t("readingProjects"));
     if (binding.error) throw new Error(binding.error);
-    await desktop.invoke("sync:projectVisibility", {
-      projectId: binding.projectId,
-      visible: true,
-      });
     await refresh();
     setPanel(null);
-    await onOpenProject?.(binding.projectId);
+    setActiveView("projects");
+    setProjectFilter(connectionId);
+    setMessage(
+      f("projects.downloaded", {
+        name:
+          localProjects.find((item) => item.id === binding.projectId)?.name ??
+          "",
+      }),
+    );
   }
   async function acceptInvite(connectionId: string) {
     if (!preview) return;
     const target = preview.project_id;
-    await desktop.invoke("sync:join", { connectionId, link: inviteLink });
-    await openRemote(connectionId, target);
-      setPreview(null);
-      setInviteLink("");
-      setShowJoin(false);
+    await desktop.invoke("sync:join", {
+      connectionId,
+      link: inviteLink,
+      download: false,
+    });
+    setShowJoin(false);
+    setActiveView("projects");
+    setProjectFilter(connectionId);
+    await downloadRemote(connectionId, target);
+    setPreview(null);
+    setInviteLink("");
+    setShowJoin(false);
     setJoinIntent(false);
     localStorage.removeItem(pendingInviteKey);
   }
   async function connected(connectionId: string) {
     setShowConnect(false);
-    setForm(emptyForm);
     await refresh();
     if (preview && joinIntent) {
       await acceptInvite(connectionId);
       return;
     }
     if (uploadProject) {
+      setActiveView("projects");
       setUploadTarget(connectionId);
       setPanel("upload");
       return;
     }
+    setActiveView("projects");
+    setProjectFilter(connectionId);
     setMessage(f("connected"));
   }
-  function openConnect(next: Partial<typeof emptyForm> = {}) {
-    setForm({ ...emptyForm, ...next });
-    setProbeUrl(next.url ?? emptyForm.url);
-    setAdvancedOpen(false);
+  function openConnect(next: { url?: string; account?: string } = {}) {
+    setLoginInitial({ url: next.url ?? defaultServer, account: next.account });
+    setActiveView("accounts");
     setShowConnect(true);
     setConnectRequest((value) => value + 1);
     setError("");
@@ -499,904 +440,403 @@ export default function SyncSettings({
     const connection = status?.connections.find((item) => item.id === id);
     return connection ? `${connection.name} · ${connection.user.name}` : "";
   };
-  const syncTime = (value?: string) =>
-    value
-      ? new Date(value).toLocaleString(getLocale(), {
-          month: "short",
-          day: "numeric",
-          hour: "2-digit",
-          minute: "2-digit",
-        })
-      : "";
   if (!status)
     return (
-      <PendingNotice label={t("readingConnections")} lines={3} minHeight={240} />
+      <PendingNotice
+        label={t("readingConnections")}
+        lines={3}
+        minHeight={240}
+      />
     );
-  const hidden = new Set(status.hiddenProjectIds ?? []);
-  const bindingFor = (projectId: string) =>
-    status.projects.find((item) => item.projectId === projectId);
   const projectsOn = (connectionId: string) =>
     status.projects.filter((item) => item.connectionId === connectionId).length;
-  const stateLabel = (item: Binding) =>
-    item.status === "offline" && item.errorKind
-      ? t(`state.offline.${item.errorKind}`)
-      : t(stateKeys[item.status]);
-  const attention = status.projects.filter(
-    (item) => stateTones[item.status] === "problem",
-  ).length;
   const invitedServer =
     preview &&
     status.connections.filter(
-      (connection) => !connection.signedOut && connection.serverId === preview.serverId,
+      (connection) =>
+        !connection.signedOut && connection.serverId === preview.serverId,
     );
   return (
     <div className="sync-settings" aria-busy={busy}>
-      <section
-        className="settings-group sync-section"
-        aria-labelledby="sync-servers-title"
+      <nav
+        className="sync-view-tabs sync-flat-tabs"
+        aria-label={f("projects.navigation")}
       >
-        <div className="sync-section-header">
-          <div>
-            <h2 id="sync-servers-title">{f("accounts")}</h2>
-            <p className="settings-help">{f("accountHelp")}</p>
+        <button
+          type="button"
+          aria-pressed={activeView === "accounts"}
+          onClick={() => setActiveView("accounts")}
+        >
+          {f("accounts")}
+        </button>
+        <button
+          type="button"
+          aria-pressed={activeView === "projects"}
+          onClick={() => setActiveView("projects")}
+        >
+          {f("projects.title")}
+        </button>
+      </nav>
+      {activeView === "accounts" && (
+        <section className="sync-accounts-view">
+          <div className="sync-manager-heading">
+            <h2>{showConnect ? f("auth.title") : f("accounts")}</h2>
+            <div className="sync-manager-actions">
+              {showConnect ? (
+                <button
+                  type="button"
+                  className="studio-icon"
+                  aria-label={tc("cancel")}
+                  title={tc("cancel")}
+                  onClick={() => setShowConnect(false)}
+                >
+                  <X size={18} />
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  className="studio-icon"
+                  aria-label={f("addAccount")}
+                  title={f("addAccount")}
+                  onClick={() => openConnect()}
+                >
+                  <Plus size={19} />
+                </button>
+              )}
+            </div>
           </div>
-          {!showConnect && (
-            <button
-              className="settings-button"
-              disabled={busy}
-              onClick={() => openConnect()}
-            >
-              <Plus size={14} aria-hidden="true" />
-              {f("addAccount")}
-            </button>
+          {issuedToken && (
+            <IssuedToken
+              token={issuedToken}
+              busy={busy}
+              run={run}
+              onDone={() => setIssuedToken("")}
+            />
           )}
-        </div>
-        {issuedToken && (
-          <IssuedToken
-            token={issuedToken}
-            busy={busy}
-            run={run}
-            onDone={() => setIssuedToken("")}
-          />
-        )}
-        {!status.connections.some((item) => !item.signedOut) && !showConnect && (
-          <div className="sync-empty">
-            <strong>{f("localTitle")}</strong>
-            <p>{f("localHelp")}</p>
-          </div>
-        )}
-        {status.connections.map((connection) => {
-          const open = accountPanel === connection.id;
-          const count = projectsOn(connection.id);
-          return (
-            <article
-              className={`sync-card sync-server ${open ? "is-open" : ""}`}
-              key={connection.id}
-            >
-              <div className="sync-server-summary">
-                <Database size={18} aria-hidden="true" />
-                <div className="sync-server-name">
-                  <strong>{connection.name}</strong>
+          {showConnect ? (
+            <div ref={connectSection}>
+              <AccountLogin
+                key={connectRequest}
+                initial={loginInitial}
+                invite={joinIntent ? preview?.invite : undefined}
+                onConnected={async (id, token) => {
+                  setIssuedToken(token ?? "");
+                  await run(() => connected(id));
+                }}
+              />
+            </div>
+          ) : (
+            status.connections.map((connection) => (
+              <article key={connection.id} className="sync-account-row">
+                <Database size={20} />
+                <div className="sync-account-identity">
+                  <strong>{connection.user.name}</strong>
                   <span>
-                    {connection.user.name} · {connection.url}
+                    {connection.name} · {connection.url}
                   </span>
+                  {connection.signedOut && <span>{f("signedOut")}</span>}
                 </div>
-                <span className="sync-server-count">
-                  {count
-                    ? t("projectsSyncing", { count })
-                    : t("noProjectsSyncing")}
-                </span>
-              </div>
-              {connection.signedOut ? (
-                <div className="sync-server-actions">
-                  <span>{f("signedOut")}</span>
-                  <button
-                    className="settings-button"
-                    onClick={() =>
+                <div className="sync-manager-actions">
+                  {connection.signedOut ? (
+                    <button
+                      type="button"
+                      className="studio-icon"
+                      aria-label={f("signIn")}
+                      title={f("signIn")}
+                      onClick={() =>
+                        openConnect({
+                          url: connection.url,
+                          account: connection.user.name,
+                        })
+                      }
+                    >
+                      <RefreshCw size={18} />
+                    </button>
+                  ) : (
+                    <>
+                      <button
+                        type="button"
+                        className="studio-icon"
+                        aria-label={f("viewProjects")}
+                        title={f("viewProjects")}
+                        onClick={() => {
+                          setProjectFilter(connection.id);
+                          setActiveView("projects");
+                        }}
+                      >
+                        <FolderOpen size={18} />
+                      </button>
+                      <button
+                        type="button"
+                        className="studio-icon"
+                        aria-label={t("accountAndDevices")}
+                        title={t("accountAndDevices")}
+                        aria-expanded={accountPanel === connection.id}
+                        onClick={() =>
+                          setAccountPanel(
+                            accountPanel === connection.id ? "" : connection.id,
+                          )
+                        }
+                      >
+                        <Settings2 size={18} />
+                      </button>
+                      <button
+                        type="button"
+                        className="studio-icon"
+                        aria-label={f("signOut")}
+                        title={f("signOut")}
+                        disabled={busy}
+                        onClick={() =>
+                          void run(async () => {
+                            await desktop.invoke("sync:signOut", {
+                              connectionId: connection.id,
+                            });
+                            setAccountPanel("");
+                            setMessage(f("signedOut"));
+                          })
+                        }
+                      >
+                        <LogOut size={18} />
+                      </button>
+                    </>
+                  )}
+                </div>
+                {!connection.signedOut && accountPanel === connection.id && (
+                  <SyncAccountPanel
+                    connection={connection}
+                    busy={busy}
+                    syncedProjects={projectsOn(connection.id)}
+                    run={run}
+                    notify={setMessage}
+                    onSignedOut={() =>
                       openConnect({
                         url: connection.url,
                         account: connection.user.name,
                       })
                     }
-                  >
-                    {f("signIn")}
-                  </button>
-                </div>
-              ) : (
-                <div className="sync-server-actions">
-                <button
-                  className="settings-button"
-                  disabled={busy}
-                  title={t("serverProjectsHelp")}
-                  onClick={() => void run(() => loadServer(connection.id))}
-                >
-                  {f("viewProjects")}
-                </button>
-                <button
-                  className="settings-button"
-                  disabled={busy}
-                  title={t("membersAdminHelp")}
-                  onClick={() => void run(() => loadDashboard(connection.id))}
-                >
-                  {t("membersAndInvites")}
-                </button>
-                <button
-                  className="settings-button"
-                  aria-expanded={open}
-                  onClick={() => setAccountPanel(open ? "" : connection.id)}
-                >
-                  {t("accountAndDevices")}
-                  <ChevronDown
-                    className="sync-chevron"
-                    size={14}
-                    aria-hidden="true"
+                    onRemoved={() => {
+                      setAccountPanel("");
+                      void refresh();
+                    }}
                   />
-                </button>
-                </div>
-              )}
-              {!connection.signedOut && open && (
-                <SyncAccountPanel
-                  connection={connection}
-                  busy={busy}
-                  syncedProjects={count}
-                  run={run}
-                  notify={setMessage}
-                  onSignedOut={() => {
-                    setAccountPanel("");
-                    openConnect({
-                      url: connection.url,
-                      account: connection.user.name,
-                    });
-                  }}
-                  onRemoved={() => {
-                    setAccountPanel("");
-                    setMessage(
-                      t("toast.connectionRemoved", { name: connection.name }),
-                    );
-                  }}
-                />
-              )}
-            </article>
-          );
-        })}
-        {showConnect && (
-          <div className="sync-card sync-connect" ref={connectSection}>
-            <div className="sync-connect-heading">
-              <h3>
-                {preview
-                  ? t("connectForInvite", { name: preview.name })
-                  : f("addAccount")}
-              </h3>
-              <button
-                className="settings-icon-button"
-                aria-label={tc("cancel")}
-                disabled={busy}
-                onClick={() => setShowConnect(false)}
-              >
-                <X size={15} aria-hidden="true" />
-              </button>
-            </div>
-            <details
-              className="sync-account-disclosure"
-              open={(form.url !== emptyForm.url && !preview) || undefined}
+                )}
+              </article>
+            ))
+          )}
+          {!showConnect && !status.connections.length && (
+            <button
+              className="settings-button sync-primary"
+              onClick={() => openConnect()}
             >
-              <summary>{f("otherService")}</summary>
-              <label className="sync-field">
-                <span>{t("serverUrl")}</span>
-                <input
-                  type="url"
-                  value={form.url}
-                  aria-describedby="sync-server-url-hint"
-                  onChange={(event) =>
-                    setForm({ ...form, url: event.target.value })
-                  }
-                  onBlur={() => setProbeUrl(form.url)}
-                  onKeyDown={(event) => {
-                    if (event.key === "Enter") {
-                      event.preventDefault();
-                      setProbeUrl(form.url);
+              {f("auth.title")}
+            </button>
+          )}
+          {!!status.connections.some((item) => !item.signedOut) &&
+            !showConnect && (
+              <details className="sync-account-disclosure">
+                <summary>{f("accountAdvanced")}</summary>
+                <AccountBindings
+                  connections={status.connections}
+                  refresh={refresh}
+                />
+                <label className="sync-field">
+                  <span>{f("defaults")}</span>
+                  <select
+                    value={status.defaultConnectionId ?? ""}
+                    onChange={(e) =>
+                      void run(() =>
+                        desktop.invoke("sync:default", {
+                          connectionId: e.target.value || null,
+                        }),
+                      )
                     }
-                  }}
-                />
-                <span className="settings-help" id="sync-server-url-hint">
-                  {t("serverUrlHint")}
-                </span>
-              </label>
-            </details>
-            <ServiceLogin
-              url={probeUrl}
-              registrationKey={form.registrationKey}
-              invite={preview?.invite}
-              onMethods={(methods) =>
-                setPasswordExpanded(
-                  !methods.some((method) =>
-                    ["github", "google", "email"].includes(method),
-                  ),
-                )
-              }
-              onInfo={(info) => setRegistrationMode(info.registration ?? "")}
-              onConnected={(id) => run(() => connected(id)).then(() => {})}
-            />
-            <details
-              className="sync-account-disclosure"
-              open={passwordExpanded}
-              onToggle={(event) =>
-                setPasswordExpanded(event.currentTarget.open)
-              }
-            >
-              <summary>{f("passwordMethod")}</summary>
-              <p className="settings-help">{f("passwordHelp")}</p>
-              <form
-                className="sync-connect-form"
-                onSubmit={(event) => {
-                  event.preventDefault();
-                  setProbeUrl(form.url);
-                  void run(connect);
-                }}
-              >
-                {form.mode === "token" ? (
-                  <label className="sync-field">
-                    <span>{t("token")}</span>
-                    <input
-                      required
-                      type="password"
-                      value={form.token}
-                      onChange={(event) =>
-                        setForm({ ...form, token: event.target.value })
-                      }
-                    />
-                    <span className="settings-help">{t("tokenHint")}</span>
-                  </label>
-                ) : (
-                  <div className="sync-field-grid">
-                    <label className="sync-field">
-                      <span>{t("account")}</span>
-                      <input
-                        required
-                        autoComplete="username"
-                        value={form.account}
-                        onChange={(event) =>
-                          setForm({ ...form, account: event.target.value })
-                        }
-                      />
-                    </label>
-                    <label className="sync-field">
-                      <span>{t("password")}</span>
-                      <input
-                        required
-                        type="password"
-                        autoComplete="current-password"
-                        value={form.password}
-                        onChange={(event) =>
-                          setForm({ ...form, password: event.target.value })
-                        }
-                      />
-                    </label>
-                  </div>
-                )}
-                <details
-                  open={advancedOpen}
-                  onToggle={(event) => setAdvancedOpen(event.currentTarget.open)}
-                >
-                  <summary>{f("advanced")}</summary>
-                  {preview ? (
-                    form.mode === "register" && (
-                      <p className="settings-help">{t("inviteRegistration")}</p>
-                    )
-                  ) : (
-                    <label className="sync-field">
-                      <span>{t("registrationKey")}</span>
-                      <input
-                        ref={registrationKeyInput}
-                        type="password"
-                        required={
-                          form.mode === "register" &&
-                          registrationMode === "controlled"
-                        }
-                        value={form.registrationKey}
-                        onChange={(event) =>
-                          setForm({
-                            ...form,
-                            registrationKey: event.target.value,
-                          })
-                        }
-                      />
-                      <span className="settings-help">
-                        {t("registrationKeyHelp")}
-                      </span>
-                    </label>
-                  )}
-                  <label className="sync-field">
-                    <span>{t("connectMethod")}</span>
-                    <select
-                      value={form.mode}
-                      onChange={(event) => {
-                        const mode = event.target.value as ConnectMode;
-                        setForm({ ...form, mode });
-                        // A server that controls registration needs its key first.
-                        if (
-                          mode === "register" &&
-                          !preview &&
-                          registrationMode === "controlled" &&
-                          !form.registrationKey
-                        )
-                          requestAnimationFrame(() =>
-                            registrationKeyInput.current?.focus(),
-                          );
-                      }}
-                    >
-                      <option value="login">{f("continue")}</option>
-                      <option value="token">{t("mode.token")}</option>
-                      <option value="register">{t("mode.register")}</option>
-                    </select>
-                  </label>
-                </details>
-                <div className="sync-form-actions">
-                  <button
-                    className="settings-button sync-primary"
-                    disabled={busy}
                   >
-                    {preview && joinIntent ? f("signInJoin") : f("continue")}
-                  </button>
-                </div>
-              </form>
-            </details>
-          </div>
-        )}
-      </section>
-      <section
-        className="settings-group sync-section"
-        aria-labelledby="sync-projects-title"
-      >
-        <div className="sync-section-header">
-          <div>
-            <h2 id="sync-projects-title">{t("section.projects")}</h2>
-            <p className="settings-help">
-              {attention
-                ? t("projectsAttention", { count: attention })
-                : t("section.projectsHelp")}
-            </p>
-            {localProjects.some((project) => !bindingFor(project.id)) && (
-              <p className="settings-help">{t("storedLocallyNote")}</p>
+                    <option value="">{t("localOnly")}</option>
+                    {status.connections
+                      .filter((item) => !item.signedOut)
+                      .map((item) => (
+                        <option key={item.id} value={item.id}>
+                          {connectionLabel(item.id)}
+                        </option>
+                      ))}
+                  </select>
+                </label>
+              </details>
             )}
-          </div>
-          <button
-            className="settings-button"
-            aria-expanded={showJoin}
-            disabled={busy}
-            onClick={() => setShowJoin(!showJoin)}
-          >
-            <Link2 size={14} aria-hidden="true" />
-            {t("joinShared")}
-          </button>
-        </div>
-        {showJoin && (
-          <div className="sync-card sync-join">
-            <form
-              className="sync-inline-field"
-              onSubmit={(event) => {
-                event.preventDefault();
-                void run(previewInvite);
-              }}
-            >
-              <label className="sync-field">
-                <span>{t("inviteLinkLabel")}</span>
-                <input
-                  type="url"
-                  required
-                  placeholder={t("pasteInviteLink")}
-                  value={inviteLink}
-                  onChange={(event) => {
-                    setInviteLink(event.target.value);
-                    setPreview(null);
-                  }}
-                />
-              </label>
-              <button className="settings-button" disabled={busy}>
-                {t("viewInvite")}
-              </button>
-              <button
-                type="button"
-                className="settings-icon-button"
-                aria-label={t("closeJoin")}
-                onClick={() => {
-                  setShowJoin(false);
-                  setPreview(null);
-                  setInviteLink("");
-                  setJoinIntent(false);
-                }}
-              >
-                <X size={14} aria-hidden="true" />
-              </button>
-            </form>
-            {preview && (
-              <div className="sync-invitation">
-                <Folder size={18} aria-hidden="true" />
-                <div>
-                  <strong>{preview.name}</strong>
-                  {preview.invitedBy && (
-                    <span>{f("invitedBy", { name: preview.invitedBy })}</span>
-                  )}
-                  <span>
-                    {preview.serverName} · {preview.url}
-                  </span>
-                  <span>{t("joinAsRole", { role: role(preview.role) })}</span>
-                </div>
-                {invitedServer?.length ? (
-                  <div className="sync-invitation-actions">
-                    {invitedServer.length > 1 && (
-                      <select
-                        aria-label={t("joinWithAccount")}
-                        value={server}
-                        onChange={(event) => setServer(event.target.value)}
-                      >
-                        {invitedServer.map((connection) => (
-                          <option key={connection.id} value={connection.id}>
-                            {connection.user.name}
-                          </option>
-                        ))}
-                      </select>
-                    )}
-                    <button
-                      className="settings-button sync-primary"
-                      disabled={busy || !server}
-                      onClick={() =>
-                        void run(async () => {
-                          if (preview.joined) {
-                            await openRemote(server, preview.project_id);
-                            setPreview(null); setInviteLink(""); setShowJoin(false); localStorage.removeItem(pendingInviteKey);
-                          }
-                          else await acceptInvite(server);
-                        })
-                      }
-                    >
-                      {preview.joined ? f("openProject") : invitedServer.length > 1
-                        ? t("confirmJoin")
-                        : t("joinAs", { name: invitedServer[0].user.name })}
-                    </button>
-                  </div>
-                ) : (
-                  <div className="sync-invitation-actions">
-                    <p className="settings-help">{t("signInBeforeJoin")}</p>
-                    <button
-                      className="settings-button sync-primary"
-                      disabled={busy}
-                      onClick={() => {
-                        setJoinIntent(true);
-                        openConnect({
-                          url: preview.url,
-                          mode: "login",
-                          account: preview.target_name ?? "",
-                        });
-                      }}
-                    >
-                      {f("signInJoin")}
-                    </button>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-        )}
-        <div className="sync-card">
-          <div className="sync-card-row sync-default-row">
-            <div>
-              <label htmlFor="sync-default-location">{f("defaults")}</label>
-              <p className="settings-help">{f("defaultHelp")}</p>
-            </div>
-            <select
-              id="sync-default-location"
-              value={status.defaultConnectionId ?? ""}
-              disabled={busy}
-              onChange={(event) => {
-                const value = event.target.value;
+        </section>
+      )}
+      {activeView === "projects" && (
+        <>
+          <ProjectManager
+            status={status}
+            localProjects={localProjects}
+            filter={projectFilter}
+            onFilter={setProjectFilter}
+            onRefresh={refresh}
+            onOpenProject={onOpenProject}
+            onJoin={() => setShowJoin(!showJoin)}
+            onSignIn={(account) =>
+              openConnect({ url: account.url, account: account.user.name })
+            }
+            onShare={(row) => {
+              if (row.connection && row.remote)
                 void run(() =>
-                  desktop.invoke("sync:default", {
-                    connectionId: value || null,
+                  loadDashboard(row.connection!.id, row.remote!.id),
+                );
+              else if (row.local) {
+                setUploadProject({
+                  projectId: row.local.id,
+                  intent: "share",
+                  key: Date.now(),
+                });
+                setUploadTarget(
+                  status.defaultConnectionId ??
+                    status.connections.find((item) => !item.signedOut)?.id ??
+                    "",
+                );
+                setPanel("upload");
+              }
+            }}
+            onUpload={(id) => {
+              setUploadProject({
+                projectId: id,
+                intent: "sync",
+                key: Date.now(),
+              });
+              setUploadTarget(
+                status.defaultConnectionId ??
+                  status.connections.find((item) => !item.signedOut)?.id ??
+                  "",
+              );
+              setPanel("upload");
+            }}
+            onDetails={setExpanded}
+            onConflict={(binding) =>
+              void run(async () => {
+                setPanel("conflict");
+                setConflict(null);
+                setChoices({});
+                setConflict(
+                  await desktop.invoke("sync:conflict", {
+                    projectId: binding.projectId,
                   }),
                 );
-              }}
-            >
-              <option value="">{t("localOnly")}</option>
-              {status.connections.filter((connection) => !connection.signedOut).map((connection) => (
-                <option key={connection.id} value={connection.id}>
-                  {connectionLabel(connection.id)}
-                </option>
-              ))}
-            </select>
-          </div>
-          <ul className="sync-project-list">
-            {syncListedProjects(
-              localProjects,
-              new Set(status.projects.map((item) => item.projectId)),
-            ).map((project) => {
-              const binding = bindingFor(project.id),
-                connection =
-                  binding &&
-                  status.connections.find(
-                    (item) => item.id === binding.connectionId,
-                  );
-              const open = expanded === project.id;
-              const tone = binding ? stateTones[binding.status] : "local";
-              const sameServer = status.connections.filter(
-                (item) => item.serverId === connection?.serverId,
-              );
-              const toggle = () => {
-                setExpanded(open ? "" : project.id);
-                setConfirmDetach("");
-                setUploadTarget(
-                  status.defaultConnectionId ?? status.connections[0]?.id ?? "",
-                );
-              };
-              return (
-                <li
-                  key={project.id}
-                  className={`sync-project-item ${open ? "is-open" : ""}`}
+              })
+            }
+          />
+          {showJoin && (
+            <div className="sync-card sync-join">
+              <form
+                className="sync-inline-field"
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  void run(previewInvite);
+                }}
+              >
+                <label className="sync-field">
+                  <span>{t("inviteLinkLabel")}</span>
+                  <input
+                    type="url"
+                    required
+                    placeholder={t("pasteInviteLink")}
+                    value={inviteLink}
+                    onChange={(event) => {
+                      setInviteLink(event.target.value);
+                      setPreview(null);
+                    }}
+                  />
+                </label>
+                <button className="settings-button" disabled={busy}>
+                  {t("viewInvite")}
+                </button>
+                <button
+                  type="button"
+                  className="settings-icon-button"
+                  aria-label={t("closeJoin")}
+                  onClick={() => {
+                    setShowJoin(false);
+                    setPreview(null);
+                    setInviteLink("");
+                    setJoinIntent(false);
+                  }}
                 >
-                  <div className="sync-project-summary">
-                    <div className="sync-project-name">
-                      <strong>
-                        {project.name}
-                        {hidden.has(project.id) && (
-                          <span className="sync-badge">
-                            {t("hiddenOnDevice")}
-                          </span>
-                        )}
-                        {project.archived && (
-                          <span className="sync-badge">
-                            {tn("deletedBadge")}
-                          </span>
-                        )}
-                      </strong>
-                      <span>
-                        {connection
-                          ? `${connection.name} · ${connection.user.name} · ${role(binding!.role)}`
-                          : ""}
-                        {binding?.status === "synced" && binding.syncedAt
-                          ? ` · ${t("syncedAt", { date: syncTime(binding.syncedAt) })}`
-                          : ""}
-                      </span>
-                    </div>
-                    <span className={`sync-state is-${tone}`}>
-                      {binding ? stateLabel(binding) : t("status.local")}
+                  <X size={14} aria-hidden="true" />
+                </button>
+              </form>
+              {preview && (
+                <div className="sync-invitation">
+                  <Folder size={18} aria-hidden="true" />
+                  <div>
+                    <strong>{preview.name}</strong>
+                    {preview.invitedBy && (
+                      <span>{f("invitedBy", { name: preview.invitedBy })}</span>
+                    )}
+                    <span>
+                      {preview.serverName} · {preview.url}
                     </span>
-                    <div className="sync-project-actions">
-                      {binding?.status === "conflict" ? (
-                        <button
-                          className="settings-button sync-primary"
-                          disabled={busy}
-                          onClick={() =>
-                            void run(async () => {
-                              setPanel("conflict");
-                              setConflict(null);
-                              setChoices({});
-                              setConflict(
-                                await desktop.invoke("sync:conflict", {
-                                  projectId: project.id,
-                                }),
-                              );
-                            })
-                          }
+                    <span>{t("joinAsRole", { role: role(preview.role) })}</span>
+                  </div>
+                  {invitedServer?.length ? (
+                    <div className="sync-invitation-actions">
+                      {invitedServer.length > 1 && (
+                        <select
+                          aria-label={t("joinWithAccount")}
+                          value={server}
+                          onChange={(event) => setServer(event.target.value)}
                         >
-                          {t("resolveConflict")}
-                        </button>
-                      ) : binding ? (
-                        <button
-                          className="settings-button"
-                          disabled={busy}
-                          onClick={() =>
-                            void run(async () => {
-                              const next = await desktop.invoke<Status>(
-                                "sync:run",
-                                { projectId: project.id },
-                              );
-                              // Only a synced result is reported as 已同步.
-                              const result = next.projects.find(
-                                (item) => item.projectId === project.id,
-                              );
-                              if (result?.status === "synced")
-                                setMessage(
-                                  t("toast.synced", { name: project.name }),
-                                );
-                              else
-                                throw new Error(
-                                  t("syncNowIncomplete", {
-                                    name: project.name,
-                                    reason:
-                                      result?.error ??
-                                      (result ? stateLabel(result) : ""),
-                                  }),
-                                );
-                            })
-                          }
-                        >
-                          <RefreshCw size={14} aria-hidden="true" />
-                          {t("syncNow")}
-                        </button>
-                      ) : (
-                        <button
-                          className="settings-button"
-                          disabled={busy || !status.connections.some((item) => !item.signedOut)}
-                          title={
-                            status.connections.filter((item) => !item.signedOut).length
-                              ? undefined
-                              : t("needAccountFirst")
-                          }
-                          onClick={() => {
-                            if (!open) toggle();
-                          }}
-                        >
-                          <Upload size={14} aria-hidden="true" />
-                          {t("uploadToServer")}
-                        </button>
+                          {invitedServer.map((connection) => (
+                            <option key={connection.id} value={connection.id}>
+                              {connection.user.name}
+                            </option>
+                          ))}
+                        </select>
                       )}
                       <button
-                        className="settings-icon-button sync-disclosure"
-                        aria-expanded={open}
-                        aria-label={t("manageProject", { name: project.name })}
-                        title={t("manageProject", { name: project.name })}
-                        onClick={toggle}
+                        className="settings-button sync-primary"
+                        disabled={busy || !server}
+                        onClick={() =>
+                          void run(async () => {
+                            if (preview.joined) {
+                              await downloadRemote(server, preview.project_id);
+                              setPreview(null);
+                              setInviteLink("");
+                              setShowJoin(false);
+                              localStorage.removeItem(pendingInviteKey);
+                            } else await acceptInvite(server);
+                          })
+                        }
                       >
-                        <ChevronDown size={16} aria-hidden="true" />
+                        {preview.joined
+                          ? f("openProject")
+                          : invitedServer.length > 1
+                            ? t("confirmJoin")
+                            : t("joinAs", { name: invitedServer[0].user.name })}
                       </button>
                     </div>
-                  </div>
-                  {binding?.error && (
-                    <div className="sync-error sync-project-error">
-                      <p>{binding.error}</p>
-                      {binding.errorDetail &&
-                        binding.errorDetail !== binding.error && (
-                          <details>
-                            <summary>{t("errorDetails")}</summary>
-                            <code>{binding.errorDetail}</code>
-                          </details>
-                        )}
+                  ) : (
+                    <div className="sync-invitation-actions">
+                      <p className="settings-help">{t("signInBeforeJoin")}</p>
+                      <button
+                        className="settings-button sync-primary"
+                        disabled={busy}
+                        onClick={() => {
+                          setJoinIntent(true);
+                          openConnect({
+                            url: preview.url,
+                            account: preview.target_name ?? "",
+                          });
+                        }}
+                      >
+                        {f("signInJoin")}
+                      </button>
                     </div>
                   )}
-                  {open && (
-                    <div className="sync-project-details">
-                      {binding ? (
-                        <>
-                          {sameServer.length > 1 && (
-                            <div className="sync-detail-row">
-                              <div>
-                                <label htmlFor={`sync-account-${project.id}`}>
-                                  {t("syncAccount")}
-                                </label>
-                                <p className="settings-help">
-                                  {t("syncAccountHelp")}
-                                </p>
-                              </div>
-                              <select
-                                id={`sync-account-${project.id}`}
-                                value={binding.connectionId}
-                                disabled={busy}
-                                onChange={(event) => {
-                                  const value = event.target.value;
-                                  void run(() =>
-                                    desktop.invoke("sync:changeAccount", {
-                                      projectId: project.id,
-                                      connectionId: value,
-                                    }),
-                                  );
-                                }}
-                              >
-                                {sameServer.map((item) => (
-                                  <option key={item.id} value={item.id}>
-                                    {item.user.name}
-                                  </option>
-                                ))}
-                              </select>
-                            </div>
-                          )}
-                          <div className="sync-detail-row">
-                            <div>
-                              <strong>{t("membersAndInvites")}</strong>
-                              <p className="settings-help">
-                                {binding.role === "admin"
-                                  ? t("membersAdminHelp")
-                                  : t("membersOnlyAdmins", {
-                                      role: role(binding.role),
-                                    })}
-                              </p>
-                            </div>
-                            {binding.role === "admin" && (
-                              <button
-                                className="settings-button"
-                                disabled={busy}
-                                onClick={() =>
-                                  void run(() =>
-                                    loadDashboard(
-                                      binding.connectionId,
-                                      binding.remoteProjectId,
-                                    ),
-                                  )
-                                }
-                              >
-                                {t("manageMembers")}
-                              </button>
-                            )}
-                          </div>
-                          {binding.role !== "viewer" && (
-                            <div className="sync-detail-row">
-                              <div>
-                                <strong>{t("packagedFiles")}</strong>
-                              </div>
-                              <button
-                                className="settings-button"
-                                disabled={busy}
-                                onClick={() =>
-                                  void run(async () =>
-                                    setPackaging({
-                                      projectId: project.id,
-                                      name: project.name,
-                                      plan: await desktop.invoke<PackagingPlan>(
-                                        "packaging:sync",
-                                        { projectId: project.id },
-                                      ),
-                                    }),
-                                  )
-                                }
-                              >
-                                {t("choosePackagedFiles")}
-                              </button>
-                            </div>
-                          )}
-                        </>
-                      ) : (
-                        <form
-                          className="sync-detail-row"
-                          onSubmit={(event) => {
-                            event.preventDefault();
-                            void run(async () => {
-                              await desktop.invoke("sync:attach", {
-                                projectId: project.id,
-                                connectionId: uploadTarget,
-                              });
-                              setMessage(
-                                t("toast.uploaded", {
-                                  name: project.name,
-                                  server: connectionLabel(uploadTarget),
-                                }),
-                              );
-                            });
-                          }}
-                        >
-                          <div>
-                            <label htmlFor={`sync-upload-${project.id}`}>
-                              {t("uploadAccount")}
-                            </label>
-                            <p className="settings-help">
-                              {status.connections.filter(
-                                (item) => !item.signedOut,
-                              ).length
-                                ? t("uploadHelp")
-                                : t("needAccountFirst")}
-                            </p>
-                          </div>
-                          {!!status.connections.some(
-                            (item) => !item.signedOut,
-                          ) && (
-                            <div className="sync-detail-controls">
-                              <select
-                                id={`sync-upload-${project.id}`}
-                                required
-                                value={uploadTarget}
-                                disabled={busy}
-                                onChange={(event) =>
-                                  setUploadTarget(event.target.value)
-                                }
-                              >
-                                {status.connections.filter((item) => !item.signedOut).map((item) => (
-                                  <option key={item.id} value={item.id}>
-                                    {connectionLabel(item.id)}
-                                  </option>
-                                ))}
-                              </select>
-                              <button
-                                className="settings-button sync-primary"
-                                disabled={busy || !uploadTarget}
-                              >
-                                {t("confirmUpload")}
-                              </button>
-                            </div>
-                          )}
-                        </form>
-                      )}
-                      <div className="sync-detail-row">
-                        <div>
-                          <label htmlFor={`sync-visible-${project.id}`}>
-                            {t("showOnDevice")}
-                          </label>
-                          <p className="settings-help">
-                            {t("showOnDeviceHelp")}
-                          </p>
-                        </div>
-                        <input
-                          id={`sync-visible-${project.id}`}
-                          type="checkbox"
-                          role="switch"
-                          className="settings-switch"
-                          disabled={busy}
-                          checked={!hidden.has(project.id)}
-                          onChange={(event) => {
-                            const visible = event.target.checked;
-                            void run(() =>
-                              desktop.invoke("sync:projectVisibility", {
-                                projectId: project.id,
-                                visible,
-                              }),
-                            );
-                          }}
-                        />
-                      </div>
-                      {binding && (
-                        <div className="sync-detail-row">
-                          <div>
-                            <strong>{t("detach")}</strong>
-                            <p className="settings-help">{t("detachHelp")}</p>
-                          </div>
-                          {confirmDetach === project.id ? (
-                            <div
-                              className="sync-detail-controls"
-                              role="group"
-                              aria-label={t("confirmDetach")}
-                            >
-                              <button
-                                className="settings-button"
-                                disabled={busy}
-                                onClick={() => setConfirmDetach("")}
-                              >
-                                {tc("cancel")}
-                              </button>
-                              <button
-                                className="settings-button sync-danger-fill"
-                                disabled={busy}
-                                onClick={() =>
-                                  void run(async () => {
-                                    await desktop.invoke("sync:detach", {
-                                      projectId: project.id,
-                                    });
-                                    setConfirmDetach("");
-                                    setMessage(
-                                      t("toast.detached", {
-                                        name: project.name,
-                                      }),
-                                    );
-                                  })
-                                }
-                              >
-                                {t("confirmDetach")}
-                              </button>
-                            </div>
-                          ) : (
-                            <button
-                              className="settings-button sync-danger"
-                              disabled={busy}
-                              onClick={() => setConfirmDetach(project.id)}
-                            >
-                              {t("detach")}
-                            </button>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </li>
-              );
-            })}
-          </ul>
-          {!localProjects.length && (
-            <p className="sync-empty">{t("noLocalProjects")}</p>
+                </div>
+              )}
+            </div>
           )}
-        </div>
-      </section>
-      {!!status.connections.some((item) => !item.signedOut) && (
-        <details className="sync-account-disclosure">
-          <summary>{f("accountAdvanced")}</summary>
-          <AccountBindings connections={status.connections} refresh={refresh} />
-        </details>
-          )}
+        </>
+      )}
       {(error || message) && !panel && (
         <div
           className={`sync-feedback ${error ? "is-error" : ""}`}
@@ -1418,15 +858,17 @@ export default function SyncSettings({
       {panel && (
         <Dialog
           key={panel}
-          initialFocus={panel === "projects" ? "container" : "auto"}
+          initialFocus="auto"
           returnFocus={panelTrigger.current}
           title={
             panel === "upload"
-              ? f(uploadProject?.intent === "share" ? "shareTitle" : "uploadTitle")
-              : panel === "projects"
-                ? f("viewProjects")
+              ? f(
+                  uploadProject?.intent === "share"
+                    ? "shareTitle"
+                    : "uploadTitle",
+                )
               : panel === "dashboard"
-                  ? f("manageMembers")
+                ? f("manageMembers")
                 : t("compareChanges")
           }
           wide
@@ -1466,12 +908,17 @@ export default function SyncSettings({
                   }
                 </h3>
                 <p>
-                  {f(uploadProject.intent === "share" ? "shareHelp" : "uploadHelp", {
-                    name:
-                      localProjects.find(
-                        (project) => project.id === uploadProject.projectId,
-                      )?.name ?? "",
-                  })}
+                  {f(
+                    uploadProject.intent === "share"
+                      ? "shareHelp"
+                      : "uploadHelp",
+                    {
+                      name:
+                        localProjects.find(
+                          (project) => project.id === uploadProject.projectId,
+                        )?.name ?? "",
+                    },
+                  )}
                 </p>
                 {status.connections.some((item) => !item.signedOut) ? (
                   <form
@@ -1520,11 +967,13 @@ export default function SyncSettings({
                           setUploadTarget(event.target.value)
                         }
                       >
-                        {status.connections.filter((item) => !item.signedOut).map((item) => (
-                          <option key={item.id} value={item.id}>
-                            {item.name} · {item.user.name}
-                          </option>
-                        ))}
+                        {status.connections
+                          .filter((item) => !item.signedOut)
+                          .map((item) => (
+                            <option key={item.id} value={item.id}>
+                              {item.name} · {item.user.name}
+                            </option>
+                          ))}
                       </select>
                     </label>
                     <button
@@ -1547,157 +996,6 @@ export default function SyncSettings({
                     {f("addAccount")}
                   </button>
                 )}
-              </section>
-            )}
-            {panel === "projects" && (
-              <section className="sync-project-browser">
-                <div className="sync-project-browser-toolbar">
-                  <p className="sync-project-account">
-                    {connectionLabel(server)}
-                  </p>
-                  <label className="sync-project-search-field">
-                    <Search size={14} aria-hidden="true" />
-                    <input
-                      type="search"
-                      className="sync-project-search"
-                      aria-label={f("projectSearch")}
-                      placeholder={f("projectSearch")}
-                      value={projectQuery}
-                      onChange={(event) => setProjectQuery(event.target.value)}
-                    />
-                  </label>
-                </div>
-                <table className="sync-project-table">
-                  <colgroup>
-                    <col />
-                    <col className="sync-project-role-column" />
-                    <col className="sync-project-visibility-column" />
-                    <col className="sync-project-actions-column" />
-                  </colgroup>
-                  <thead>
-                    <tr>
-                      <th scope="col">{f("projectColumn")}</th>
-                      <th scope="col" className="sync-project-role">
-                        {f("roleColumn")}
-                      </th>
-                      <th scope="col" className="sync-project-visibility">
-                        {f("showing")}
-                      </th>
-                      <th scope="col" className="sync-project-row-actions">
-                        {f("actionsColumn")}
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {remote
-                      .filter((project) =>
-                        project.name
-                          .toLocaleLowerCase()
-                          .includes(projectQuery.toLocaleLowerCase()),
-                      )
-                      .map((project) => {
-                        const binding = status.projects.find(
-                          (item) =>
-                            item.connectionId === server &&
-                            item.remoteProjectId === project.id,
-                        );
-                        return (
-                          <tr key={project.id}>
-                            <th scope="row" className="sync-project-row-name">
-                              <div className="sync-project-title">
-                                <span>{project.name}</span>
-                                {project.archived && (
-                                  <small>{t("archived")}</small>
-                                )}
-                              </div>
-                            </th>
-                            <td className="sync-project-role">
-                              {role(project.role)}
-                            </td>
-                            <td className="sync-project-visibility">
-                              {binding ? (
-                                <label className="sync-project-visibility-control">
-                                  <input
-                                    type="checkbox"
-                                    aria-label={f("showProject", {
-                                      name: project.name,
-                                    })}
-                                    checked={!hidden.has(binding.projectId)}
-                                    disabled={busy}
-                                    onChange={(event) => {
-                                      const visible = event.target.checked;
-                                      void run(() =>
-                                        desktop.invoke(
-                                          "sync:projectVisibility",
-                                          {
-                                            projectId: binding.projectId,
-                                            visible,
-                                          },
-                                        ),
-                                      );
-                                    }}
-                                  />
-                                  <span className="sync-project-visibility-caption">
-                                    {f("showing")}
-                                  </span>
-                                </label>
-                              ) : (
-                                <span className="sync-project-not-downloaded">
-                                  {f("notDownloaded")}
-                                </span>
-                              )}
-                            </td>
-                            <td className="sync-project-row-actions">
-                              <div>
-                                <button
-                                  className="settings-button sync-project-row-button"
-                                  disabled={busy}
-                                  onClick={() =>
-                                    void run(() =>
-                                      openRemote(server, project.id),
-                                    )
-                                  }
-                                >
-                                  {binding ? f("openCompact") : f("download")}
-                                </button>
-                                {project.role === "admin" && (
-                                  <button
-                                    className="settings-button sync-project-row-button"
-                                    disabled={busy}
-                                    onClick={() =>
-                                      void run(() =>
-                                        loadDashboard(server, project.id),
-                                      )
-                                    }
-                                  >
-                                    {f("shareCompact")}
-                                  </button>
-                                )}
-                              </div>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    {!busy &&
-                      !error &&
-                      !remote.some((project) =>
-                        project.name
-                          .toLocaleLowerCase()
-                          .includes(projectQuery.toLocaleLowerCase()),
-                      ) && (
-                        <tr>
-                          <td
-                            colSpan={4}
-                            className="sync-project-browser-empty"
-                          >
-                            {remote.length
-                              ? t("noMatchingProjects")
-                              : t("noRemoteProjects")}
-                          </td>
-                        </tr>
-                      )}
-                  </tbody>
-                </table>
               </section>
             )}
             {panel === "dashboard" && dashboard && (
@@ -1877,6 +1175,128 @@ export default function SyncSettings({
           </div>
         </Dialog>
       )}
+      {expanded &&
+        (() => {
+          const binding = status.projects.find(
+              (item) => item.projectId === expanded,
+            ),
+            project = localProjects.find((item) => item.id === expanded);
+          if (!binding || !project) return null;
+          const connection = status.connections.find(
+            (item) => item.id === binding.connectionId,
+          );
+          const sameServer = status.connections.filter(
+            (item) => item.serverId === connection?.serverId && !item.signedOut,
+          );
+          return (
+            <Dialog
+              title={f("projects.details")}
+              onClose={() => setExpanded("")}
+              className="sync-dialog"
+            >
+              <div className="sync-dialog-body">
+                <h3>{project.name}</h3>
+                {sameServer.length > 1 && (
+                  <label className="sync-field">
+                    <span>{t("syncAccount")}</span>
+                    <select
+                      value={binding.connectionId}
+                      onChange={(e) =>
+                        void run(() =>
+                          desktop.invoke("sync:changeAccount", {
+                            projectId: project.id,
+                            connectionId: e.target.value,
+                          }),
+                        )
+                      }
+                    >
+                      {sameServer.map((item) => (
+                        <option key={item.id} value={item.id}>
+                          {item.user.name}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                )}
+                {binding.error && <p className="sync-error">{binding.error}</p>}
+                {binding.role !== "viewer" && (
+                  <button
+                    type="button"
+                    className="sync-text-button"
+                    onClick={() =>
+                      void run(async () =>
+                        setPackaging({
+                          projectId: project.id,
+                          name: project.name,
+                          plan: await desktop.invoke<PackagingPlan>(
+                            "packaging:sync",
+                            { projectId: project.id },
+                          ),
+                        }),
+                      )
+                    }
+                  >
+                    {t("choosePackagedFiles")}
+                  </button>
+                )}
+                <label className="sync-detail-row">
+                  <span>{t("showOnDevice")}</span>
+                  <input
+                    type="checkbox"
+                    checked={!status.hiddenProjectIds?.includes(project.id)}
+                    onChange={(e) =>
+                      void run(() =>
+                        desktop.invoke("sync:projectVisibility", {
+                          projectId: project.id,
+                          visible: e.target.checked,
+                        }),
+                      )
+                    }
+                  />
+                </label>
+                <details className="sync-account-disclosure">
+                  <summary>{t("detach")}</summary>
+                  <p className="settings-help">{t("detachHelp")}</p>
+                  {confirmDetach === project.id ? (
+                    <div className="sync-form-actions">
+                      <button
+                        className="sync-text-button"
+                        onClick={() => setConfirmDetach("")}
+                      >
+                        {tc("cancel")}
+                      </button>
+                      <button
+                        className="sync-text-button sync-danger"
+                        disabled={busy}
+                        onClick={() =>
+                          void run(async () => {
+                            await desktop.invoke("sync:detach", {
+                              projectId: project.id,
+                            });
+                            setExpanded("");
+                            setConfirmDetach("");
+                            setMessage(
+                              t("toast.detached", { name: project.name }),
+                            );
+                          })
+                        }
+                      >
+                        {t("confirmDetach")}
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      className="sync-text-button sync-danger"
+                      onClick={() => setConfirmDetach(project.id)}
+                    >
+                      {t("detach")}
+                    </button>
+                  )}
+                </details>
+              </div>
+            </Dialog>
+          );
+        })()}
       {packaging && (
         <PackagingDialog
           plan={packaging.plan}

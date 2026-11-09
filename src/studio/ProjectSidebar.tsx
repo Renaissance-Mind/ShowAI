@@ -16,6 +16,7 @@ import { useLibraryDrag } from "./LibraryDrag";
 import { useTranslator } from "../i18n/react";
 import sidebarMessages from "../i18n/messages/sidebar";
 import navigationMessages from "../i18n/messages/navigation";
+import accountFlowMessages from "../i18n/messages/accountFlow";
 
 export default function ProjectSidebar({
   projects,
@@ -27,6 +28,7 @@ export default function ProjectSidebar({
   onCreate,
   onNew,
   onMenu,
+  onManage,
   onGroupMenu,
   unreadable,
   docs,
@@ -41,6 +43,7 @@ export default function ProjectSidebar({
   /** Opens the New menu: content for the current project, and a new project. */
   onNew: (anchor: HTMLButtonElement) => void;
   onMenu: (anchor: HTMLElement) => void;
+  onManage?: () => void;
   onGroupMenu: (group: ProjectGroup, anchor: HTMLElement) => void;
   /** Rows for project folders that could not be read. */
   unreadable?: ReactNode;
@@ -49,6 +52,7 @@ export default function ProjectSidebar({
 }) {
   const t = useTranslator(sidebarMessages);
   const tn = useTranslator(navigationMessages);
+  const accountFlow = useTranslator(accountFlowMessages);
   const drag = useLibraryDrag();
   projects = orderSidebarProjects(projects, organization.projectOrder);
   const selected = projects.find((item) => item.id === selectedProject);
@@ -103,6 +107,14 @@ export default function ProjectSidebar({
               <ChevronDown size={13} />
             )}
             <span>{name}</span>
+          </button>
+        ) : id === "projects" && onManage ? (
+          <button
+            type="button"
+            className="studio-section-title studio-project-manager-entry"
+            onClick={onManage}
+          >
+            {accountFlow("projects.title")}
           </button>
         ) : (
           <span className="studio-section-title">{name}</span>

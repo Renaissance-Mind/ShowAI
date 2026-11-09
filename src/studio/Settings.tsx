@@ -202,9 +202,9 @@ export function SettingsPanel({
   const current = sections.find((item) => item.id === section)!;
   return (
     <div className="studio-settings" key={section}>
-      <header className="settings-heading">
+      {section !== "sync" && <header className="settings-heading">
         <h2>{t(current.label)}</h2>
-      </header>
+      </header>}
       {section === "icons" && <IconViewer />}
       {section === "sync" && (
         <SyncSettings request={syncRequest} onOpenProject={onOpenProject} />

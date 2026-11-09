@@ -2,5 +2,7 @@
   "cloudflare": "https://raw.githubusercontent.com/cloudflare/cloudflare-docs/production/src/assets/logo.svg",
   "tailscale": "https://tailscale.com/press",
   "tailscaleArchive": "https://cdn.sanity.io/files/w77i7m8x/production/a426ba5f63316745e108a18a6dbbfed6970752fd.zip",
-  "usage": "Unmodified vendor icons identify the available connection providers. Trademarks belong to their owners."
+  "usage": "Unmodified vendor icons identify the available connection providers. Trademarks belong to their owners.",
+  "github": "https://vercel.com/_next/static/immutable/media/logo-github-color-light.1184n6l5g07-6.svg",
+  "google": "https://vercel.com/_next/static/immutable/media/logo-google-color-light.2x6g4y99zlarz.svg"
 }

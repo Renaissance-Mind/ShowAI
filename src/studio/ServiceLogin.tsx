@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { desktop, errorMessage } from "./bridge";
 import { useTranslator } from "../i18n/react";
 import messages from "../i18n/messages/sync";
@@ -18,6 +18,8 @@ export default function ServiceLogin({
   onInfo,
   connectionId,
   onConnected,
+  provider,
+  availableMethods,
 }: {
   url: string;
   registrationKey: string;
@@ -27,8 +29,18 @@ export default function ServiceLogin({
   onInfo?: (info: { auth: string[]; registration?: string }) => void;
   connectionId?: string;
   onConnected: (id: string) => Promise<void>;
+  /** A selected peer in the account login tabs; omitted when linking methods. */
+  provider?: string;
+  availableMethods?: string[];
 }) {
   const t = useTranslator(messages);
+  const epoch = useRef(0);
+  useEffect(() => {
+    epoch.current++;
+    return () => {
+      epoch.current++;
+    };
+  }, [url, provider, connectionId]);
   const [methods, setMethods] = useState<string[]>([]),
     [flow, setFlow] = useState<Flow | null>(null);
   const [email, setEmail] = useState(""),
@@ -48,6 +60,10 @@ export default function ServiceLogin({
     setMethods([]);
     setFlow(null);
     setError("");
+    if (availableMethods) {
+      setMethods(availableMethods);
+      return;
+    }
     if (!url) return;
     // The parent passes the address once it is committed (blur or submit),
     // so typing does not probe the server on every keystroke.
@@ -73,11 +89,12 @@ export default function ServiceLogin({
     return () => {
       cancelled = true;
     };
-  }, [url, invite, connectionId]);
+  }, [url, invite, connectionId, availableMethods]);
   async function finish(
     current: Flow,
     entered?: { code?: string; completionCode?: string },
   ) {
+    const ticket = epoch.current;
     const result = await desktop.invoke<{
       status: string;
       connection?: { id: string };
@@ -88,6 +105,7 @@ export default function ServiceLogin({
       pollSecret: current.pollSecret,
       ...entered,
     });
+    if (ticket !== epoch.current) return false;
     if (result.status === "completed" && result.connection) {
       setFlow(null);
       setConfirming(false);
@@ -132,26 +150,28 @@ export default function ServiceLogin({
     };
   }, [flow]);
   async function start(provider: string) {
+    const ticket = epoch.current;
     setBusy(true);
     setError("");
     setCode("");
     setConfirming(false);
     setRemaining(null);
     try {
-      setFlow(
-        await desktop.invoke<Flow>("sync:beginLogin", {
-          url,
-          provider,
-          email,
-          registrationKey,
-          invite,
-          connectionId,
-        }),
-      );
+      const next = await desktop.invoke<Flow>("sync:beginLogin", {
+        url,
+        provider,
+        email,
+        registrationKey,
+        invite,
+        connectionId,
+      });
+      if (ticket !== epoch.current) return;
+      setFlow(next);
+      if (next.url) window.open(next.url, "_blank", "noopener,noreferrer");
     } catch (error) {
-      setError(errorMessage(error));
+      if (ticket === epoch.current) setError(errorMessage(error));
     } finally {
-      setBusy(false);
+      if (ticket === epoch.current) setBusy(false);
     }
   }
   if (!methods.some((method) => ["github", "google", "email"].includes(method)))
@@ -162,11 +182,12 @@ export default function ServiceLogin({
     ) : null;
   return (
     <div className="sync-oauth">
-      {connectionId ? (
-        <p className="settings-help">{t("login.addMethodHelp")}</p>
-      ) : (
-        <p className="sync-divider">{t("login.otherMethods")}</p>
-      )}
+      {!provider &&
+        (connectionId ? (
+          <p className="settings-help">{t("login.addMethodHelp")}</p>
+        ) : (
+          <p className="sync-divider">{t("login.otherMethods")}</p>
+        ))}
       {error && (
         <p role="alert" className="sync-error">
           {error}
@@ -183,26 +204,28 @@ export default function ServiceLogin({
       )}
       {!["email"].includes(flow?.provider ?? "") && (
         <div className="sync-actions">
-          {methods.includes("github") && (
-            <button
-              type="button"
-              className="settings-button"
-              disabled={busy || !!flow}
-              onClick={() => void start("github")}
-            >
-              {connectionId ? t("login.addGithub") : t("login.github")}
-            </button>
-          )}
-          {methods.includes("google") && (
-            <button
-              type="button"
-              className="settings-button"
-              disabled={busy || !!flow}
-              onClick={() => void start("google")}
-            >
-              {connectionId ? t("login.addGoogle") : t("login.google")}
-            </button>
-          )}
+          {methods.includes("github") &&
+            (!provider || provider === "github") && (
+              <button
+                type="button"
+                className="settings-button"
+                disabled={busy || !!flow}
+                onClick={() => void start("github")}
+              >
+                {connectionId ? t("login.addGithub") : t("login.github")}
+              </button>
+            )}
+          {methods.includes("google") &&
+            (!provider || provider === "google") && (
+              <button
+                type="button"
+                className="settings-button"
+                disabled={busy || !!flow}
+                onClick={() => void start("google")}
+              >
+                {connectionId ? t("login.addGoogle") : t("login.google")}
+              </button>
+            )}
         </div>
       )}
       {flow?.url && !confirming && (
@@ -247,27 +270,29 @@ export default function ServiceLogin({
           </button>
         </div>
       )}
-      {methods.includes("email") && !flow && (
-        <div className="sync-inline-field">
-          <label className="sync-field">
-            <span>{t("login.email")}</span>
-            <input
-              type="email"
-              value={email}
-              onChange={(event) => setEmail(event.target.value)}
-              autoComplete="email"
-            />
-          </label>
-          <button
-            type="button"
-            className="settings-button"
-            disabled={busy || !email}
-            onClick={() => void start("email")}
-          >
-            {t("login.sendCode")}
-          </button>
-        </div>
-      )}
+      {methods.includes("email") &&
+        (!provider || provider === "email") &&
+        !flow && (
+          <div className="sync-inline-field">
+            <label className="sync-field">
+              <span>{t("login.email")}</span>
+              <input
+                type="email"
+                value={email}
+                onChange={(event) => setEmail(event.target.value)}
+                autoComplete="email"
+              />
+            </label>
+            <button
+              type="button"
+              className="settings-button"
+              disabled={busy || !email}
+              onClick={() => void start("email")}
+            >
+              {t("login.sendCode")}
+            </button>
+          </div>
+        )}
       {flow?.provider === "email" && (
         <div className="sync-inline-field">
           <label className="sync-field">
@@ -301,6 +326,7 @@ export default function ServiceLogin({
           type="button"
           className="sync-text-button"
           onClick={() => {
+            epoch.current++;
             setFlow(null);
             setCode("");
             setConfirming(false);

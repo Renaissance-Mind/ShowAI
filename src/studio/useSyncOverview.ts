@@ -17,7 +17,7 @@ export function syncMarker(
   binding: ProjectConnection | undefined,
   connection?: Connection,
 ): SyncMarker | undefined {
-  if (!binding) return undefined;
+  if (!binding || binding.paused) return undefined;
   if (binding.role === "viewer" || binding.status === "revoked")
     return "readOnly";
   if (binding.errorKind === "auth" || connection?.signedOut) return "signIn";
@@ -35,7 +35,7 @@ export function syncMarker(
 export function expiredConnections(state: SyncOverviewState) {
   const expired = new Map<string, string[]>();
   for (const project of state.projects)
-    if (project.errorKind === "auth")
+    if (!project.paused && project.errorKind === "auth")
       expired.set(project.connectionId, [
         ...(expired.get(project.connectionId) ?? []),
         project.projectId,

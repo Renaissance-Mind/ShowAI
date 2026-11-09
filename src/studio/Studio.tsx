@@ -4048,6 +4048,12 @@ export default function Studio() {
     />
   );
 
+  const openProjectManagement = action(async () => {
+    if (!(await page.flush())) return;
+    setSyncRequest({projectId:"",intent:"manage",key:Date.now()});
+    setSettingsSection("sync");
+    await navigate("settings");
+  });
   const sidebarContent = (
     <LibraryDragContext.Provider value={libraryDrag.bindings}>
       {(view === "templates" ||
@@ -4102,6 +4108,7 @@ export default function Studio() {
           onMenu={(anchor) =>
             setProjectsMenu((current) => (current === anchor ? null : anchor))
           }
+          onManage={openProjectManagement}
           onGroupMenu={(group, anchor) => setGroupMenu({ group, anchor })}
           unreadable={unreadableProjects.map((item) => (
             <button
@@ -4717,6 +4724,7 @@ export default function Studio() {
         />
         <AutoHideSidebar
           enabled={view === "page" && !!page.draft}
+          compactOverlay={view === "settings" && settingsSection === "sync"}
           mobileBoardKey={
             view === "page" && page.draft?.content.attrs?.kind === "board"
               ? page.draft.id
@@ -5716,6 +5724,11 @@ export default function Studio() {
             label={t("projectListActions")}
             onClose={() => setProjectsMenu(null)}
             items={[
+              {
+                label: accountFlow("projects.title"),
+                icon: <FolderOpen size={15} />,
+                onSelect: openProjectManagement,
+              },
               {
                 label: t("newProject"),
                 icon: <FolderPlus size={15} />,

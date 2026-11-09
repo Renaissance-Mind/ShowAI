@@ -40,6 +40,7 @@ export default function AutoHideSidebar({
   switchingTab,
   mobileBoardKey,
   onMobileBack,
+  compactOverlay = false,
 }: {
   enabled: boolean;
   interactionHeld: boolean;
@@ -53,6 +54,8 @@ export default function AutoHideSidebar({
   switchingTab: boolean;
   mobileBoardKey?: string;
   onMobileBack?: () => void;
+  /** Keep settings forms usable in narrow browser/desktop windows. */
+  compactOverlay?: boolean;
 }) {
   const t = useTranslator(sidebarMessages);
   const tn = useTranslator(navigationMessages);
@@ -113,6 +116,7 @@ export default function AutoHideSidebar({
     ? nativeLayout.width
     : clampWidth(preferredWidth ?? (viewportWidth <= 1100 ? 208 : 240));
   const sidebar = useRef<HTMLElement>(null);
+  const compact = compactOverlay && !nativeTouch && viewportWidth < 720;
   const automatic = enabled && !locked && !nativeTouch;
   const mode = nativeTouch
     ? nativeLayout.docked
@@ -120,9 +124,13 @@ export default function AutoHideSidebar({
       : nativeOpen
         ? "overlay"
         : "hidden"
-    : automatic
-      ? position
-      : "docked";
+    : compact
+      ? nativeOpen
+        ? "overlay"
+        : "hidden"
+      : automatic
+        ? position
+        : "docked";
   const hidden = mode === "hidden";
 
   const pointerIsInside = (point: { x: number; y: number }) => {
@@ -174,8 +182,8 @@ export default function AutoHideSidebar({
 
   useEffect(() => {
     setPosition("docked");
-    if (nativeTouch) setNativeOpen(false);
-  }, [enabled, locked, mobileBoardKey]);
+    if (nativeTouch || compact) setNativeOpen(false);
+  }, [enabled, locked, mobileBoardKey, compact]);
 
   const toggleLocked = () =>
     setLocked((current) => {
@@ -188,11 +196,15 @@ export default function AutoHideSidebar({
       if (!isSidebarToggleShortcut(event) || event.repeat) return;
       event.preventDefault();
       setHint(false);
+      if (compact) {
+        setNativeOpen((value) => !value);
+        return;
+      }
       toggleLocked();
     };
     window.addEventListener("keydown", key);
     return () => window.removeEventListener("keydown", key);
-  }, [nativeTouch]);
+  }, [nativeTouch, compact]);
   useEffect(() => {
     if (!hint) return;
     const timer = window.setTimeout(() => setHint(false), 9000);
@@ -317,14 +329,15 @@ export default function AutoHideSidebar({
     setHovered(true);
     if (hidden) setPosition("overlay");
   };
-  const lockLabel = nativeTouch
-    ? nativeOpen
-      ? t("collapseSidebar")
-      : t("expandSidebar")
-    : tn("withShortcut", {
-        label: locked ? tn("autoHideSidebar") : tn("pinSidebar"),
-        keys: toggleKeys,
-      });
+  const lockLabel =
+    nativeTouch || compact
+      ? nativeOpen
+        ? t("collapseSidebar")
+        : t("expandSidebar")
+      : tn("withShortcut", {
+          label: locked ? tn("autoHideSidebar") : tn("pinSidebar"),
+          keys: toggleKeys,
+        });
   const locateLabel = tn("locateInSidebar");
   const focusNavigation = () => {
     window.requestAnimationFrame(() => {
@@ -477,9 +490,9 @@ export default function AutoHideSidebar({
               className="studio-sidebar-lock"
               aria-label={lockLabel}
               title={lockLabel}
-              aria-pressed={nativeTouch ? nativeOpen : locked}
+              aria-pressed={nativeTouch || compact ? nativeOpen : locked}
               aria-controls="studio-project-navigation"
-              aria-expanded={nativeTouch ? nativeOpen : !hidden}
+              aria-expanded={nativeTouch || compact ? nativeOpen : !hidden}
               onPointerDown={
                 nativeTouch
                   ? (event) => {
@@ -491,6 +504,10 @@ export default function AutoHideSidebar({
               onClick={(event) => {
                 if (nativeTouch) {
                   if (event.detail === 0) setNativeOpen((value) => !value);
+                  return;
+                }
+                if (compact) {
+                  setNativeOpen((value) => !value);
                   return;
                 }
                 setHint(false);
@@ -505,6 +522,7 @@ export default function AutoHideSidebar({
       </header>
       <div
         className="studio-workspace"
+        data-compact-sidebar={compact || undefined}
         inert={switchingTab}
         aria-busy={switchingTab}
       >
@@ -531,6 +549,14 @@ export default function AutoHideSidebar({
                 setKeyboardFocus(false);
             }}
             onKeyDown={(event) => {
+              if (event.key === "Escape" && compact) {
+                event.preventDefault();
+                setNativeOpen(false);
+                document
+                  .querySelector<HTMLButtonElement>(".studio-sidebar-lock")
+                  ?.focus();
+                return;
+              }
               if (event.key !== "Escape" || !automatic || interactionHeld)
                 return;
               event.preventDefault();
@@ -629,6 +655,14 @@ export default function AutoHideSidebar({
             </button>
           )}
         </div>
+        {compact && nativeOpen && (
+          <button
+            type="button"
+            className="studio-mobile-sidebar-scrim"
+            aria-label={t("closeNavigation")}
+            onClick={() => setNativeOpen(false)}
+          />
+        )}
         {children}
       </div>
       {hint && (
