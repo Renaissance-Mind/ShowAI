@@ -330,6 +330,14 @@ export default function RichTextEditor({
       setDialogToolbar(null);
     }
   }, [Boolean(bubble), dialogToolbar]);
+  const [focused, setFocused] = useState(false);
+  const [widgetSelected, setWidgetSelected] = useState(false);
+  const windowHandlers = useRef<{
+    trackMenuInteraction: (event: Event) => void;
+    scroll: (event: Event) => void;
+    resize: () => void;
+    viewportChanged: (event: Event) => void;
+  } | null>(null);
   const dismissedSelection = useRef<string | null>(null);
   // Native selects and color pickers blur ProseMirror before they emit a value.
   const selectionMenuInteracting = useRef(false);
@@ -630,6 +638,13 @@ export default function RichTextEditor({
       if (editor.isInitialized) clearInitialSelection();
       else editor.on("create", clearInitialSelection);
     }
+    return () => {
+      editor.off("create", clearInitialSelection);
+    };
+  }, [editor, readOnly]);
+  // Only an editor holding a selected component listens on the document.
+  useEffect(() => {
+    if (!editor || readOnly || !widgetSelected) return;
     const clearOnBlank = (event: PointerEvent) => {
       if (event.button !== 0 || !(event.target instanceof Element)) return;
       const target = event.target;
@@ -658,10 +673,9 @@ export default function RichTextEditor({
     };
     document.addEventListener("pointerdown", clearOnBlank, true);
     return () => {
-      editor.off("create", clearInitialSelection);
       document.removeEventListener("pointerdown", clearOnBlank, true);
     };
-  }, [editor, readOnly]);
+  }, [editor, readOnly, widgetSelected]);
 
   useEffect(() => {
     if (!slash?.manual) return;
@@ -692,6 +706,10 @@ export default function RichTextEditor({
   useEffect(() => {
     if (!editor) return;
     const refresh = () => {
+      setWidgetSelected(
+        editor.state.selection instanceof NodeSelection &&
+          editor.state.selection.node.type.name === "widget",
+      );
       if (!minimal || !editor.state.selection.empty)
         setRevision((value) => value + 1);
       if (!editor.isEditable) return;
@@ -783,29 +801,59 @@ export default function RichTextEditor({
       setBlockMenu(false);
       setHover(null);
     };
+    const focusIn = () => setFocused(true);
+    const focusOut = () => setFocused(false);
+    setFocused(editor.isFocused);
+    windowHandlers.current = {
+      trackMenuInteraction,
+      scroll,
+      resize: refresh,
+      viewportChanged,
+    };
     editor.on("transaction", refresh);
     editor.on("focus", refresh);
+    editor.on("focus", focusIn);
     editor.on("blur", blur);
+    editor.on("blur", focusOut);
     editor.view.dom.addEventListener("blur", enteringMenu, true);
-    document.addEventListener("pointerdown", trackMenuInteraction, true);
-    document.addEventListener("focusin", trackMenuInteraction, true);
     editor.view.dom.addEventListener("contextmenu", hideBubble);
-    window.addEventListener("scroll", scroll, true);
-    window.addEventListener("resize", refresh);
-    window.addEventListener("showai:viewport-change", viewportChanged);
     return () => {
+      windowHandlers.current = null;
       editor.off("transaction", refresh);
       editor.off("focus", refresh);
+      editor.off("focus", focusIn);
       editor.off("blur", blur);
+      editor.off("blur", focusOut);
       editor.view.dom.removeEventListener("blur", enteringMenu, true);
-      document.removeEventListener("pointerdown", trackMenuInteraction, true);
-      document.removeEventListener("focusin", trackMenuInteraction, true);
       editor.view.dom.removeEventListener("contextmenu", hideBubble);
-      window.removeEventListener("scroll", scroll, true);
-      window.removeEventListener("resize", refresh);
-      window.removeEventListener("showai:viewport-change", viewportChanged);
     };
   }, [editor, selectionMenuId, minimal]);
+  // Document and window listeners matter only while this editor is focused or
+  // shows a menu, bubble or block handle; a Board with many text boxes then
+  // runs one set of handlers per event rather than one per editor.
+  const listensToWindow =
+    focused || !!bubble || !!slash || blockMenu || !!hover;
+  useEffect(() => {
+    if (!editor || !listensToWindow) return;
+    const trackMenuInteraction = (event: Event) =>
+      windowHandlers.current?.trackMenuInteraction(event);
+    const scroll = (event: Event) => windowHandlers.current?.scroll(event);
+    const resize = () => windowHandlers.current?.resize();
+    const viewportChanged = (event: Event) =>
+      windowHandlers.current?.viewportChanged(event);
+    document.addEventListener("pointerdown", trackMenuInteraction, true);
+    document.addEventListener("focusin", trackMenuInteraction, true);
+    window.addEventListener("scroll", scroll, true);
+    window.addEventListener("resize", resize);
+    window.addEventListener("showai:viewport-change", viewportChanged);
+    return () => {
+      document.removeEventListener("pointerdown", trackMenuInteraction, true);
+      document.removeEventListener("focusin", trackMenuInteraction, true);
+      window.removeEventListener("scroll", scroll, true);
+      window.removeEventListener("resize", resize);
+      window.removeEventListener("showai:viewport-change", viewportChanged);
+    };
+  }, [editor, listensToWindow]);
 
   useEffect(() => setSelectedIndex(0), [slash?.query]);
   useEffect(() => {
