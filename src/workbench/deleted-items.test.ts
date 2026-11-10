@@ -84,4 +84,76 @@ describe("deleted items", () => {
       pages: [],
     });
   });
+
+  it("does not open a deleted page until it is restored", async () => {
+    const project = await invoke("projects:create", { name: "Project" });
+    const other = await invoke("projects:create", { name: "Other" });
+    const folder: FolderMetadata = await invoke("folders:create", {
+      projectId: project.id,
+      name: "Folder",
+    });
+    const inside = await invoke("pages:create", {
+      projectId: project.id,
+      parentId: folder.id,
+      title: "Inside",
+    });
+    const loose = await invoke("pages:create", {
+      projectId: project.id,
+      title: "Loose",
+    });
+    const elsewhere = await invoke("pages:create", {
+      projectId: other.id,
+      title: "Elsewhere",
+    });
+    const read = (projectId: string, pageId: string) =>
+      invoke("pages:get", { projectId, pageId });
+
+    await invoke("pages:remove", {
+      projectId: project.id,
+      pageId: loose.document.id,
+    });
+    await invoke("folders:remove", {
+      projectId: project.id,
+      folderId: folder.id,
+    });
+    await invoke("projects:remove", { projectId: other.id });
+    for (const [projectId, pageId] of [
+      [project.id, loose.document.id],
+      [project.id, inside.document.id],
+      [other.id, elsewhere.document.id],
+    ])
+      await expect(read(projectId, pageId)).rejects.toMatchObject({
+        code: "NOT_FOUND",
+      });
+    // A reader that knew the page's version is told the same.
+    await expect(
+      invoke("pages:get", {
+        projectId: project.id,
+        pageId: loose.document.id,
+        ifHash: loose.hash,
+        ifRevision: loose.revision,
+      }),
+    ).rejects.toMatchObject({ code: "NOT_FOUND" });
+
+    await invoke("library:restore", {
+      kind: "page",
+      projectId: project.id,
+      pageId: loose.document.id,
+    });
+    await invoke("library:restore", {
+      kind: "folder",
+      projectId: project.id,
+      folderId: folder.id,
+    });
+    await invoke("library:restore", { kind: "project", projectId: other.id });
+    expect((await read(project.id, loose.document.id)).document.title).toBe(
+      "Loose",
+    );
+    expect((await read(project.id, inside.document.id)).document.title).toBe(
+      "Inside",
+    );
+    expect((await read(other.id, elsewhere.document.id)).document.title).toBe(
+      "Elsewhere",
+    );
+  });
 });

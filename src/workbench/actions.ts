@@ -67,7 +67,7 @@ import {
   syncPackagingPlan,
   type PackagingDecisions,
 } from "../core/packaging";
-import { assertId, CoreError, FileStore } from "../core/store";
+import { assertId, CoreError, FileStore, folderVisible } from "../core/store";
 import type { PageRecord, ProjectBinding } from "../core/model";
 import { isDirectorySortBy } from "../core/directory-sort";
 import { deletedEntries } from "../core/deleted-entries";
@@ -488,6 +488,18 @@ export function createWorkbench(
   ) {
     return withLibrarySnapshot(store.root, async () => {
       const record = await store.readPage(id, page);
+      // A deleted page, or one inside a deleted folder or project, opens
+      // again only after it is restored from Deleted items.
+      const project = await store.readProject(id);
+      const parentId = record.document.parentId;
+      if (
+        project.archived ||
+        record.document.archived ||
+        (parentId &&
+          project.folders?.some((folder) => folder.id === parentId) &&
+          !folderVisible(project.folders, parentId))
+      )
+        throw new CoreError("NOT_FOUND", "This page was deleted.");
       if (
         conditional?.ifHash === record.hash &&
         conditional.ifRevision === record.revision &&
