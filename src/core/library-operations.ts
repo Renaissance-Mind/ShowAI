@@ -67,6 +67,21 @@ function revision(value: string): string {
   return value;
 }
 
+/** A package revision's stored record and the files under its root. */
+interface LocatedPackage {
+  root: string;
+  kind: "components" | "templates";
+  record: CompiledComponent | TemplateRecord;
+  sourceFiles: Map<string, Buffer>;
+}
+interface DependencyContext {
+  sourceRevision: string;
+  tree: { path: string; oid: string }[];
+  paths: Set<string>;
+  packages: Map<string, Promise<LocatedPackage>>;
+  validated: Set<string>;
+}
+
 /** Shared versioned operations for CLI, MCP and both workbench hosts. */
 export class LibraryOperations {
   readonly library: GitLibrary;
@@ -185,30 +200,42 @@ export class LibraryOperations {
     return { before, after, paths };
   }
 
+  /**
+   * Revision state one dependency resolution reads, shareable by several
+   * resolutions at the same revision: its tree, each package revision found
+   * with its files, and the bundles already validated.
+   */
+  private async dependencyContext(
+    sourceRevision: string,
+  ): Promise<DependencyContext> {
+    const tree = await this.library.tree(sourceRevision);
+    return {
+      sourceRevision,
+      tree,
+      paths: new Set(tree.map((entry) => entry.path)),
+      packages: new Map(),
+      validated: new Set(),
+    };
+  }
+
   private async dependencies(
     document: ShowDocument,
     projectId: string,
     sourceRevision: string,
     extraRefs: PackageRevisionRef[] = [],
+    shared?: DependencyContext,
   ): Promise<{ components: CompiledComponent[]; files: Map<string, Buffer> }> {
-    const tree = await this.library.tree(sourceRevision),
-      paths = new Set(tree.map((entry) => entry.path));
+    const context =
+      shared?.sourceRevision === sourceRevision
+        ? shared
+        : await this.dependencyContext(sourceRevision);
+    const { tree, paths } = context;
     const components: CompiledComponent[] = [],
       templates: TemplateRecord[] = [],
       files = new Map<string, Buffer>(),
       visited = new Set<string>();
-    const walk = async (
-      ref: PackageRevisionRef,
-      depth: number,
-    ): Promise<void> => {
-      if (depth > 16 || visited.size > 1000)
-        throw new CoreError(
-          "INVALID_DATA",
-          "Historical dependency closure is too large or deep.",
-        );
-      const key = `${ref.kind}:${ref.id}@${ref.version}:${ref.integrity}`;
-      if (visited.has(key)) return;
-      visited.add(key);
+    /** The stored revision a reference names and the files under its root. */
+    const locate = async (ref: PackageRevisionRef): Promise<LocatedPackage> => {
       const kind = ref.kind === "component" ? "components" : "templates",
         filename = ref.kind === "component" ? "compiled.json" : "template.json";
       const historical = `projects/${projectId}/packages/historical/${kind}/${ref.integrity}`;
@@ -242,15 +269,37 @@ export class LibraryOperations {
           "NOT_FOUND",
           `Historical dependency is missing: ${ref.id}@${ref.version} (${ref.integrity}).`,
         );
-      for (const dependency of found.record.dependencies ?? [])
-        await walk(dependency, depth + 1);
       const owned = tree
         .filter((entry) => entry.path.startsWith(found!.root + "/"))
         .map((entry) => entry.path);
       const sourceFiles = await this.library.readFiles(owned, sourceRevision);
+      return { ...found, kind, sourceFiles };
+    };
+    const walk = async (
+      ref: PackageRevisionRef,
+      depth: number,
+    ): Promise<void> => {
+      if (depth > 16 || visited.size > 1000)
+        throw new CoreError(
+          "INVALID_DATA",
+          "Historical dependency closure is too large or deep.",
+        );
+      const key = `${ref.kind}:${ref.id}@${ref.version}:${ref.integrity}`;
+      if (visited.has(key)) return;
+      visited.add(key);
+      // Where a reference resolves depends only on it and this project.
+      const located = `${projectId}\0${key}`;
+      let resolution = context.packages.get(located);
+      if (!resolution) {
+        resolution = locate(ref);
+        context.packages.set(located, resolution);
+      }
+      const found = await resolution;
+      for (const dependency of found.record.dependencies ?? [])
+        await walk(dependency, depth + 1);
       // Exact immutable identities can coexist with same-name current versions.
-      const target = `projects/${projectId}/packages/historical/${kind}/${ref.integrity}`;
-      for (const [path, bytes] of sourceFiles)
+      const target = `projects/${projectId}/packages/historical/${found.kind}/${ref.integrity}`;
+      for (const [path, bytes] of found.sourceFiles)
         files.set(`${target}/${path.slice(found.root.length + 1)}`, bytes);
       if (ref.kind === "component")
         components.push(found.record as CompiledComponent);
@@ -267,7 +316,14 @@ export class LibraryOperations {
     );
     refs.push(...extraRefs);
     for (const ref of refs) await walk(ref, 0);
-    for (const root of refs)
+    const included = JSON.stringify([
+      components.map((item) => `${item.id}@${item.version}:${item.integrity}`),
+      templates.map((item) => `${item.id}@${item.version}:${item.integrity}`),
+    ]);
+    for (const root of refs) {
+      // The same root over the same stored records validates the same way.
+      const bundle = JSON.stringify([projectId, root, included]);
+      if (context.validated.has(bundle)) continue;
       validatePackageBundle({
         format: "showai-catalog-bundle",
         version: 1,
@@ -275,6 +331,8 @@ export class LibraryOperations {
         components: components.map((component) => ({ component })),
         templates,
       });
+      context.validated.add(bundle);
+    }
     return { components, files };
   }
 
@@ -284,8 +342,9 @@ export class LibraryOperations {
     sourceRevision: string,
   ): Promise<Map<string, Buffer>> {
     const project = this.project(projectId)!;
-    const tree = await this.library.tree(sourceRevision);
-    const paths = tree
+    // Pages share one tree and resolve each package revision once.
+    const context = await this.dependencyContext(sourceRevision);
+    const paths = context.tree
       .map((entry) => entry.path)
       .filter(
         (path) =>
@@ -302,6 +361,8 @@ export class LibraryOperations {
           document,
           project,
           sourceRevision,
+          [],
+          context,
         );
         for (const [name, content] of closure.files) files.set(name, content);
       }
@@ -321,6 +382,7 @@ export class LibraryOperations {
             project,
             sourceRevision,
             record.dependencies,
+            context,
           );
           for (const [name, content] of closure.files) files.set(name, content);
         }
