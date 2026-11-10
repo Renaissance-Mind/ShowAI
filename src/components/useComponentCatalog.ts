@@ -6,7 +6,7 @@ import {
   latestComponentVersions,
   type CatalogComponent,
 } from "../core/component-categories";
-import { builtinComponentCatalog } from "./catalog";
+import { readBuiltinComponentCatalog } from "./catalog";
 import { componentWidgetData } from "./custom/contract";
 import { translator } from "../i18n";
 import {
@@ -23,7 +23,7 @@ export const RegisterComponentContext = createContext<
 export function useComponentCatalog(open: boolean) {
   const library = useContext(ComponentLibraryContext);
   const available = useAvailableComponents();
-  const builtins = useMemo(() => builtinComponentCatalog(), []);
+  const builtins = readBuiltinComponentCatalog();
   const [catalog, setCatalog] = useState<CatalogComponent[] | null>(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
