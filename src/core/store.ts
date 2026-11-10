@@ -979,10 +979,7 @@ export class FileStore {
           (project) => project.id === input.id,
         )
       )
-        throw new CoreError(
-          "CONFLICT",
-          "A project with this id already exists.",
-        );
+        throw new CoreError("CONFLICT", "A project with this id already exists.");
       return this.writeNewProject(name, binding, undefined, icon, input.id);
     });
   }
