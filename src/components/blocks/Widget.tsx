@@ -170,7 +170,12 @@ const WidgetBody = memo(function WidgetBody({
 }: BlockProps & { kind: string }) {
   // Components own a mutable working copy, including read-only renderers that
   // internally prepare their data. Published callbacks capture before returning.
-  const draft = useMemo(() => cloneSourceValue(data), [data]);
+  // Rich text only reads its data and publishes new objects, so it receives the
+  // data itself: unchanged blocks keep their identity for the editor's echo check.
+  const draft = useMemo(
+    () => (kind === "text" ? data : cloneSourceValue(data)),
+    [data, kind],
+  );
   const publish = onChange && !readOnly
     ? (value: typeof data) => onChange(ownSourceValue(value))
     : undefined;

@@ -31,6 +31,8 @@ import {
   isReconciledSurface,
 } from "./document.mjs";
 import type { ContentRenderProps } from "./SurfaceContent";
+import type { JSONContent } from "@tiptap/core";
+import type { RichTextHost } from "../components/rich-text/RichText";
 import { toPageEditor, fromPageEditor, fromPageEditorDraft } from "./page-content";
 import { PageModuleContext, pageEditorNodes } from "./PageEditorNodes";
 import { mergePageContent, canCommitPageMerge } from "../core/page-merge-model";
@@ -48,6 +50,50 @@ const contentKey = (document: ShowDocument) =>
     document.surfaceViews,
     document.icon,
   ]);
+/** The page tail paragraph is rebuilt on every conversion with the same id. */
+const isPageTail = (node: JSONContent | undefined) =>
+  node?.type === "richText" &&
+  typeof node.attrs?.id === "string" &&
+  node.attrs.id.startsWith("page-tail-");
+/** Editor content whose blocks are the same objects needs no new data. */
+function samePageEditorDoc(previous: JSONContent, next: JSONContent) {
+  if (previous === next) return true;
+  const before = previous.content ?? [],
+    after = next.content ?? [];
+  return (
+    previous.type === next.type &&
+    before.length === after.length &&
+    before.every(
+      (node, index) =>
+        node === after[index] ||
+        (isPageTail(node) &&
+          isPageTail(after[index]) &&
+          JSON.stringify(node) === JSON.stringify(after[index])),
+    )
+  );
+}
+type HostCallback<K extends keyof RichTextHost> = NonNullable<RichTextHost[K]>;
+interface TextActions {
+  insertNative: (
+    props: ContentRenderProps,
+    ...args: Parameters<HostCallback<"onInsertNative">>
+  ) => void;
+  detachBlock: (
+    props: ContentRenderProps,
+    ...args: Parameters<HostCallback<"onDetachBlock">>
+  ) => void;
+  contentChange: (
+    props: ContentRenderProps,
+    ...args: Parameters<HostCallback<"onContentChange">>
+  ) => void;
+}
+interface TextView {
+  props: ContentRenderProps;
+  hostShape: string;
+  host: RichTextHost;
+  componentData?: Record<string, unknown>;
+  data: Record<string, unknown>;
+}
 export interface SurfaceEditorState {
   runtime?: ContainerViewState;
   document?: ContainerDocument;
@@ -679,6 +725,73 @@ reservePortable.current = (options) => {
     (next: ShowDocument, group?: string) => commit(next, group),
     [commit],
   );
+  const textViews = useRef(new Map<string, TextView>());
+  const textActions = useRef<TextActions>(null!);
+  textActions.current = {
+    insertNative: ({ parentId, ids, kind, renderModule }, componentKind, data, point) => {
+      const inserted = insertComponentAtText(
+        current.current,
+        { parentId, ids, kind },
+        renderModule
+          ? {
+              before: point.before.map((node) => fromPageEditor(node)),
+              after: point.after.map((node) => fromPageEditor(node)),
+            }
+          : point,
+        componentKind,
+        data,
+      );
+      commit(inserted.document);
+      setInsertedId(inserted.nodeId);
+    },
+    detachBlock: ({ parentId }, block) => {
+      const target = findSurfaceNode(current.current, parentId);
+      if (!target) return;
+      const next = detachBlock(current.current, parentId, block, {
+        x: 0,
+        y: 0,
+        width: 420,
+      });
+      commit(next);
+    },
+    contentChange: ({ parentId, ids, kind, renderModule }, value, options) => {
+      let source = current.current;
+      if (renderModule) {
+        const converted=fromPageEditorDraft(value,source);source=converted.document;value=converted.content;
+      }
+      const group =
+        options?.historyGroup ??
+        (options?.separateHistory ? "" : `text:${parentId}`);
+      if (kind === "children")
+        commit(
+          replaceChildren(source, parentId, ids, value.content ?? [],{normalize:false}),
+          group,
+        );
+      else
+        commit(
+          editNode(current.current, parentId, (node) => {
+            const values = value.content ?? [];
+            if (values.length === 1)
+              Object.assign(node, values[0], {
+                attrs: { ...values[0].attrs, id: parentId },
+              });
+            else {
+              node.type = "richText";
+              node.attrs = { id: parentId, name: "文本" }; // i18n-exempt: default node name saved into documents
+              node.content = values.map((child) =>
+                child.attrs?.id === parentId
+                  ? {
+                      ...child,
+                      attrs: { ...child.attrs, id: crypto.randomUUID() },
+                    }
+                  : child,
+              );
+            }
+          },{normalize:false}),
+          group,
+        );
+    },
+  };
   const render = ({
     content,
     parentId,
@@ -722,93 +835,53 @@ reservePortable.current = (options) => {
           draggable={false}
         />
       );
-    const editor = (
-      <Widget
-        kind="text"
-        data={{
-          ...componentData,
-          format: "richtext",
-          content: renderModule
-            ? toPageEditor(content, current.current, parentId)
-            : content,
-        }}
-        host={{
-          retentionKey: `${parentId}:${kind}:${ids?.[0] ?? "content"}`,
-          additionalExtensions: renderModule ? pageEditorNodes : undefined,
-          continuousPage: !!renderModule,
-          onInsertNative: readOnly
+    const retentionKey = `${parentId}:${kind}:${ids?.[0] ?? "content"}`;
+    const editorContent = renderModule
+      ? toPageEditor(content, current.current, parentId)
+      : content;
+    let view = textViews.current.get(retentionKey);
+    const hostShape = `${readOnly}:${!!renderModule}`;
+    if (!view) {
+      view = { props: undefined!, hostShape: "", host: undefined!, data: undefined! };
+      textViews.current.set(retentionKey, view);
+    }
+    view.props = { content, parentId, ids, kind, renderModule, componentData };
+    // The host and data keep their identity until their real inputs change, so
+    // the memoized Widget and its rich text skip unchanged editors. Callbacks
+    // read the latest render props and editor state when they run.
+    if (view.hostShape !== hostShape) {
+      const owner = view;
+      view.hostShape = hostShape;
+      view.host = {
+        retentionKey,
+        additionalExtensions: renderModule ? pageEditorNodes : undefined,
+        continuousPage: !!renderModule,
+        onInsertNative: readOnly
+          ? undefined
+          : (componentKind, data, point) =>
+              textActions.current.insertNative(owner.props, componentKind, data, point),
+        onDetachBlock:
+          readOnly || renderModule
             ? undefined
-            : (componentKind, data, point) => {
-                const inserted = insertComponentAtText(
-                  current.current,
-                  { parentId, ids, kind },
-                  renderModule
-                    ? {
-                        before: point.before.map((node) =>
-                          fromPageEditor(node),
-                        ),
-                        after: point.after.map((node) => fromPageEditor(node)),
-                      }
-                    : point,
-                  componentKind,
-                  data,
-                );
-                commit(inserted.document);
-                setInsertedId(inserted.nodeId);
-              },
-          onDetachBlock:
-            readOnly || renderModule
-              ? undefined
-              : (block) => {
-                  const target = findSurfaceNode(current.current, parentId);
-                  if (!target) return;
-                  const next = detachBlock(current.current, parentId, block, {
-                    x: 0,
-                    y: 0,
-                    width: 420,
-                  });
-                  commit(next);
-                },
-          onContentChange: (value, options) => {
-            let source = current.current;
-            if (renderModule) {
-              const converted=fromPageEditorDraft(value,source);source=converted.document;value=converted.content;
-            }
-            const group =
-              options?.historyGroup ??
-              (options?.separateHistory ? "" : `text:${parentId}`);
-            if (kind === "children")
-              commit(
-                replaceChildren(source, parentId, ids, value.content ?? [],{normalize:false}),
-                group,
-              );
-            else
-              commit(
-                editNode(current.current, parentId, (node) => {
-                  const values = value.content ?? [];
-                  if (values.length === 1)
-                    Object.assign(node, values[0], {
-                      attrs: { ...values[0].attrs, id: parentId },
-                    });
-                  else {
-                    node.type = "richText";
-                    node.attrs = { id: parentId, name: "文本" }; // i18n-exempt: default node name saved into documents
-                    node.content = values.map((child) =>
-                      child.attrs?.id === parentId
-                        ? {
-                            ...child,
-                            attrs: { ...child.attrs, id: crypto.randomUUID() },
-                          }
-                        : child,
-                    );
-                  }
-                },{normalize:false}),
-                group,
-              );
-          },
-        }}
-        readOnly={readOnly}
-      />
+            : (block) => textActions.current.detachBlock(owner.props, block),
+        onContentChange: (value, options) =>
+          textActions.current.contentChange(owner.props, value, options),
+      };
+    }
+    if (
+      !view.data ||
+      view.componentData !== componentData ||
+      !samePageEditorDoc(view.data.content as JSONContent, editorContent)
+    ) {
+      view.componentData = componentData;
+      view.data = {
+        ...componentData,
+        format: "richtext",
+        content: editorContent,
+      };
+    }
+    const editor = (
+      <Widget kind="text" data={view.data} host={view.host} readOnly={readOnly} />
     );
     return renderModule ? (
       <PageModuleContext.Provider value={renderModule}>

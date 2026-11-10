@@ -12,6 +12,7 @@ export function markdownToRichText(
   options?: { allowComponentBlocks?: boolean },
 ): JSONContent;
 export function richTextDocument(data: Record<string, unknown>): JSONContent;
+export function richTextContent(data: Record<string, unknown>): JSONContent;
 export function validateRichTextData(data: Record<string, unknown>): void;
 export function createRichTextNode(
   data: Record<string, unknown>,
@@ -28,3 +29,4 @@ export function primitiveContentNode(
   id?: string,
 ): JSONContent;
 export function normalizeContentTree(node: JSONContent): JSONContent;
+export function readContentTree(node: JSONContent): JSONContent;

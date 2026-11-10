@@ -15,7 +15,7 @@ import { RichTextEnvironment } from "./environment";
 import { useTranslator } from "../../i18n/react";
 import messages from "../../i18n/messages/richText";
 import {
-  richTextDocument,
+  richTextContent,
   validateRichTextData,
   richTextStyle,
 } from "./model.mjs";
@@ -48,7 +48,7 @@ export function RichText({
   installNoteBubbles();
   validateRichTextData(data);
   const content = useMemo(
-    () => richTextDocument(data),
+    () => richTextContent(data),
     [data.content, data.format],
   );
   const { renderWidget } = useContext(RichTextEnvironment);
