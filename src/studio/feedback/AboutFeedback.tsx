@@ -34,6 +34,11 @@ import {
 } from "./diagnostics";
 import { DiagnosticsPreview, useDiagnostics } from "./DiagnosticsPreview";
 import { ReportProblemForm } from "./ReportProblemForm";
+import {
+  readSessionDraft,
+  useSessionDraft,
+  writeSessionDraft,
+} from "../session-draft";
 import "./feedback.css";
 
 /** What opened 关于与反馈: the page itself, the report form or the diagnostics preview. */
@@ -264,15 +269,31 @@ export function AboutFeedback({
 }) {
   const t = useTranslator(messages);
   const appIcon = appIconForTheme(useAppearanceTheme());
-  const [view, setView] = useState<"about" | "report">(
-    request?.view === "report" ? "report" : "about",
+  // Returning to this section shows the report form as it was left.
+  const [shownView, setView] = useSessionDraft<"about" | "report">(
+    "feedback.view",
+    "about",
   );
-  const [context, setContext] = useState(request?.context);
+  const [shownContext, setContext] = useSessionDraft<
+    ReportProblemDetail | undefined
+  >("feedback.context", undefined);
+  // Each request opens once; coming back later keeps what the user did since.
+  const opening =
+    request && readSessionDraft("feedback.request", 0) !== request.id
+      ? request
+      : undefined;
+  const view = opening
+    ? opening.view === "report"
+      ? "report"
+      : "about"
+    : shownView;
+  const context = opening ? opening.context : shownContext;
   useEffect(() => {
-    if (!request) return;
-    setView(request.view === "report" ? "report" : "about");
-    setContext(request.context);
-  }, [request]);
+    if (!opening) return;
+    writeSessionDraft("feedback.request", opening.id);
+    setView(opening.view === "report" ? "report" : "about");
+    setContext(opening.context);
+  }, [opening]);
   const diagnostics = useDiagnostics(info, view === "about");
   const [status, setStatus] = useState<{ text: string; error?: boolean }>();
   const channels = supportChannels();
@@ -290,6 +311,7 @@ export function AboutFeedback({
       <ReportProblemForm
         info={info}
         context={context}
+        onContextChange={setContext}
         onBack={() => {
           setContext(undefined);
           setView("about");
