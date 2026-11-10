@@ -458,6 +458,22 @@ export class PageSessions {
     const session = this.pages.get(this.pageKey(projectId, pageId));
     return session?.getSnapshot().draft?.id === pageId ? session : undefined;
   }
+  /** Every retained page with its location, for operations on several pages at once. */
+  retained() {
+    return [...new Set(this.pages.values())].flatMap((session) => {
+      const state = session.getSnapshot();
+      return state.draft && state.projectId
+        ? [
+            {
+              projectId: state.projectId,
+              pageId: state.draft.id,
+              parentId: state.draft.parentId ?? null,
+              session,
+            },
+          ]
+        : [];
+    });
+  }
   async clear() {
     const show = await this.prepareClear();
     return !!show && show();
