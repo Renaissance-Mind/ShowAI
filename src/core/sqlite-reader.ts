@@ -282,15 +282,17 @@ async function readWithin(db: DatabaseSync, home: string, request: Request) {
     const key = `${home}:${selected}`;
     let tree = trees.get(key);
     if (!tree) {
+      // Selecting blobs.bytes would walk each large object's overflow pages;
+      // joining on the key alone reads only the blobs index.
       tree = (current
         ? db
             .prepare(
-              "SELECT f.path,f.oid,b.bytes FROM current_files f JOIN blobs b ON b.oid=f.oid ORDER BY f.path",
+              "SELECT f.path,f.oid FROM current_files f JOIN blobs b ON b.oid=f.oid ORDER BY f.path",
             )
             .all()
         : db
             .prepare(
-              "SELECT p.path,c.oid,b.bytes FROM paths p JOIN changes c ON c.path=p.path AND c.sequence=(SELECT c2.sequence FROM changes c2 WHERE c2.path=p.path AND c2.sequence<=? ORDER BY c2.sequence DESC LIMIT 1) JOIN blobs b ON b.oid=c.oid WHERE c.oid IS NOT NULL ORDER BY p.path",
+              "SELECT p.path,c.oid FROM paths p JOIN changes c ON c.path=p.path AND c.sequence=(SELECT c2.sequence FROM changes c2 WHERE c2.path=p.path AND c2.sequence<=? ORDER BY c2.sequence DESC LIMIT 1) JOIN blobs b ON b.oid=c.oid WHERE c.oid IS NOT NULL ORDER BY p.path",
             )
             .all(sequence)) as unknown as SqliteTreeEntry[];
       trees.set(key, tree);

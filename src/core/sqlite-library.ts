@@ -52,6 +52,8 @@ import {
   type LibraryManifest,
 } from "./history-model";
 
+/** Set once archived resource tokens have been copied into current_resources. */
+const RESOURCES_BACKFILLED = "current_resources_backfilled";
 const oid = (value: string) => /^[a-f0-9]{40}(?:[a-f0-9]{24})?$/.test(value);
 const sha = (value: Buffer | string) =>
   createHash("sha256").update(value).digest("hex");
@@ -1241,9 +1243,24 @@ export class SqliteLibrary {
         // The legacy revision tables are a frozen archive. New saves replace only
         // current content; resource tokens retain optimistic concurrency checks.
         const data = JSON.stringify(entry);
-        db.prepare(
-          "INSERT INTO current_resources SELECT c.path,r.revision,c.sequence,r.entry FROM resource_changes c JOIN revisions r ON r.sequence=c.sequence WHERE c.sequence=(SELECT MAX(c2.sequence) FROM resource_changes c2 WHERE c2.path=c.path) ON CONFLICT(path) DO NOTHING",
-        ).run();
+        // Releasing a replaced object looks up other references by oid. The
+        // first save after an upgrade builds these indexes in its transaction.
+        db.exec(
+          "CREATE INDEX IF NOT EXISTS current_files_oid ON current_files(oid); CREATE INDEX IF NOT EXISTS changes_oid ON changes(oid);",
+        );
+        // Copy each archived resource's latest token once; the flag commits with it.
+        if (
+          !db
+            .prepare("SELECT 1 FROM metadata WHERE key=?")
+            .get(RESOURCES_BACKFILLED)
+        ) {
+          db.prepare(
+            "INSERT INTO current_resources SELECT c.path,r.revision,c.sequence,r.entry FROM resource_changes c JOIN revisions r ON r.sequence=c.sequence WHERE c.sequence=(SELECT MAX(c2.sequence) FROM resource_changes c2 WHERE c2.path=c.path) ON CONFLICT(path) DO NOTHING",
+          ).run();
+          db.prepare("INSERT INTO metadata VALUES(?,'1')").run(
+            RESOURCES_BACKFILLED,
+          );
+        }
         const sequence = Number(
           db
             .prepare(
@@ -1305,6 +1322,8 @@ export class SqliteLibrary {
         db.exec("COMMIT");
         return;
       }
+      // Archived resource tokens written here still need copying by the next save.
+      db.prepare("DELETE FROM metadata WHERE key=?").run(RESOURCES_BACKFILLED);
       const data = JSON.stringify(entry),
         result = db
           .prepare(

@@ -364,3 +364,69 @@ test("startup finishes archiving the original after the SQLite marker has alread
     code: "ENOENT",
   });
 });
+test("the first save after migration copies archived resource tokens once and indexes object references", async () => {
+  const f = await legacyFixture(),
+    store = new FileStore(f.root);
+  await new ContentLibrary(f.root).initialize();
+  const projectPath = `projects/${f.project.id}/project.json`;
+  const sqlite = new ContentLibrary(f.root);
+  const archivedProject = await sqlite.resourceRevision(projectPath);
+  expect(archivedProject).toBeTruthy();
+  const database = () =>
+    new DatabaseSync(join(f.root, "history", "content.sqlite"));
+  const inspect = () => {
+    const db = database();
+    try {
+      return {
+        flag: db
+          .prepare(
+            "SELECT value FROM metadata WHERE key='current_resources_backfilled'",
+          )
+          .get()?.value,
+        resources: (
+          db.prepare("SELECT path FROM current_resources").all() as {
+            path: string;
+          }[]
+        ).map((row) => row.path),
+        indexes: (
+          db
+            .prepare(
+              "SELECT name FROM sqlite_master WHERE type='index' AND name IN ('current_files_oid','changes_oid') ORDER BY name",
+            )
+            .all() as { name: string }[]
+        ).map((row) => row.name),
+      };
+    } finally {
+      db.close();
+    }
+  };
+  // A migrated library predates the flag: nothing has been copied yet.
+  expect(inspect()).toEqual({ flag: undefined, resources: [], indexes: [] });
+  const page = await store.readPage(f.project.id, f.page.document.id);
+  const saved = await store.savePage(
+    f.project.id,
+    f.page.document.id,
+    { ...page.document, title: "First current save" },
+    page.hash,
+    page.revision,
+  );
+  const first = inspect();
+  expect(first.flag).toBe("1");
+  expect(first.indexes).toEqual(["changes_oid", "current_files_oid"]);
+  expect(first.resources).toContain(projectPath);
+  // The untouched resource keeps its archived token for concurrency checks.
+  expect(await sqlite.resourceRevision(projectPath)).toBe(archivedProject);
+  // A later save does not copy again: a removed row stays removed.
+  const db = database();
+  db.prepare("DELETE FROM current_resources WHERE path=?").run(projectPath);
+  db.close();
+  await store.savePage(
+    f.project.id,
+    f.page.document.id,
+    { ...saved.document, title: "Second current save" },
+    saved.hash,
+    saved.revision,
+  );
+  expect(inspect().resources).not.toContain(projectPath);
+  await sqlite.verify();
+});
