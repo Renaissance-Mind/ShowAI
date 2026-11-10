@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { flushSync } from "react-dom";
 import {
   addWorkspaceTab,
@@ -7,11 +7,13 @@ import {
   currentEntry,
   moveWorkspaceTab,
   parseWorkspaceTabs,
+  pruneWorkspace,
   sameEntry,
   sameLocation,
   setWorkspaceAssistantOpen,
   visitWorkspace,
   type WorkspaceEntry,
+  type WorkspaceLocation,
   type WorkspaceTabsState,
 } from "./workspace-tabs";
 
@@ -51,6 +53,11 @@ export function useWorkspaceTabs({
   const launch = useRef<"new" | "restored" | null>(null);
   const latest = useRef({ entry, restore, getScroll, onError, beforeClose });
   latest.current = { entry, restore, getScroll, onError, beforeClose };
+  const readyRef = useRef(ready);
+  readyRef.current = ready;
+  // A tab command made while another switch runs waits for it; the latest wins.
+  const waiting = useRef<{ start: () => void; drop: () => void } | null>(null);
+  const idle = useRef<(() => void)[]>([]);
 
   const publish = (next: WorkspaceTabsState) => {
     current.current = next;
@@ -75,8 +82,36 @@ export function useWorkspaceTabs({
     });
   };
 
+  const busyNow = () => pending.current || closing.current || !readyRef.current;
+  /** Runs when no switch is in flight; a later request replaces one still waiting. */
+  const whenFree = (request: () => Promise<boolean>): Promise<boolean> => {
+    if (!busyNow()) return request();
+    return new Promise<boolean>((resolve, reject) => {
+      waiting.current?.drop();
+      waiting.current = {
+        start: () => void whenFree(request).then(resolve, reject),
+        drop: () => resolve(false),
+      };
+    });
+  };
+  const switchingNow = () => pending.current || closing.current;
+  const drain = () => {
+    if (switchingNow()) return;
+    const next = waiting.current;
+    if (next) {
+      if (!readyRef.current) return;
+      waiting.current = null;
+      next.start();
+      return;
+    }
+    for (const resolve of idle.current.splice(0)) resolve();
+  };
+  useEffect(() => {
+    if (ready) drain();
+  });
+
   const activate = async (next: WorkspaceTabsState) => {
-    if (pending.current || closing.current || !ready) return false;
+    if (busyNow()) return false;
     pending.current = true;
     // A quick switch renders once; only a slow one shows its busy state.
     const busy = setTimeout(() => setSwitching(true), 150);
@@ -101,6 +136,7 @@ export function useWorkspaceTabs({
       clearTimeout(busy);
       pending.current = false;
       if (!shown) setSwitching(false);
+      queueMicrotask(drain);
     }
   };
 
@@ -164,29 +200,35 @@ export function useWorkspaceTabs({
     publish(visitWorkspace(current.current, visited));
   }, [home, ready, entry, switching]);
 
-  const select = async (id: string) => {
-    if (
-      id === current.current.activeId ||
-      !current.current.tabs.some((tab) => tab.id === id)
-    )
-      return;
-    rememberScroll();
-    await activate({ ...current.current, activeId: id });
-  };
-  const add = async () => {
-    rememberScroll();
-    await activate(addWorkspaceTab(current.current));
-  };
-  const open = async (entry: WorkspaceEntry, foreground = true) => {
-    if (pending.current || !ready) return false;
-    rememberScroll();
-    const next = addWorkspaceTab(current.current, entry, foreground);
-    if (foreground) return activate(next);
-    publish(next);
-    return true;
-  };
-  const close = async (id = current.current.activeId) => {
-    if (pending.current || closing.current) return;
+  const select = (id: string) =>
+    whenFree(async () => {
+      if (
+        id === current.current.activeId ||
+        !current.current.tabs.some((tab) => tab.id === id)
+      )
+        return false;
+      rememberScroll();
+      return activate({ ...current.current, activeId: id });
+    });
+  const add = () =>
+    whenFree(async () => {
+      rememberScroll();
+      return activate(addWorkspaceTab(current.current));
+    });
+  const open = (entry: WorkspaceEntry, foreground = true) =>
+    whenFree(async () => {
+      rememberScroll();
+      const next = addWorkspaceTab(current.current, entry, foreground);
+      if (foreground) return activate(next);
+      publish(next);
+      return true;
+    });
+  const close = (id?: string) =>
+    whenFree(async () => {
+      await closeNow(id ?? current.current.activeId);
+      return true;
+    });
+  const closeNow = async (id: string) => {
     closing.current = true;
     setSwitching(true);
     try {
@@ -200,28 +242,40 @@ export function useWorkspaceTabs({
     } finally {
       closing.current = false;
       if (!pending.current) setSwitching(false);
+      queueMicrotask(drain);
     }
   };
-  const step = async (offset: number) => {
-    rememberScroll();
-    const tab = current.current.tabs.find(
-      (tab) => tab.id === current.current.activeId,
-    )!;
-    const cursor = tab.cursor + offset;
-    if (cursor < 0 || cursor >= tab.entries.length) return;
-    await activate({
-      ...current.current,
-      tabs: current.current.tabs.map((item) =>
-        item.id === tab.id ? { ...tab, cursor } : item,
-      ),
+  const step = (offset: number) =>
+    whenFree(async () => {
+      rememberScroll();
+      const tab = current.current.tabs.find(
+        (tab) => tab.id === current.current.activeId,
+      )!;
+      const cursor = tab.cursor + offset;
+      if (cursor < 0 || cursor >= tab.entries.length) return false;
+      return activate({
+        ...current.current,
+        tabs: current.current.tabs.map((item) =>
+          item.id === tab.id ? { ...tab, cursor } : item,
+        ),
+      });
     });
-  };
   const active = state.tabs.find((tab) => tab.id === state.activeId)!;
   return {
     ...state,
     switching,
     /** Event handlers read this; `switching` is only shown once a switch is slow. */
     isSwitching: () => pending.current || closing.current,
+    /** Resolves once no tab switch is running or waiting. */
+    settled: () =>
+      switchingNow() || waiting.current
+        ? new Promise<void>((resolve) => idle.current.push(resolve))
+        : Promise.resolve(),
+    /** Removes history entries for deleted content from every tab. */
+    prune: (gone: (location: WorkspaceLocation) => boolean) => {
+      const next = pruneWorkspace(current.current, gone);
+      if (next !== current.current) publish(next);
+    },
     select,
     add,
     open,

@@ -25,6 +25,9 @@ export interface WorkspaceEntry {
   title: string;
   icon?: string;
   scrollTop: number;
+  /** The search typed in this location; Back returns to the same results. */
+  query?: string;
+  searchLibrary?: boolean;
 }
 
 export interface WorkspaceTab {
@@ -82,7 +85,9 @@ export function sameEntry(a: WorkspaceEntry, b: WorkspaceEntry) {
     a.location.folderId === b.location.folderId &&
     a.title === b.title &&
     a.icon === b.icon &&
-    a.scrollTop === b.scrollTop
+    a.scrollTop === b.scrollTop &&
+    (a.query ?? "") === (b.query ?? "") &&
+    !!a.searchLibrary === !!b.searchLibrary
   );
 }
 
@@ -132,6 +137,35 @@ export function closeWorkspaceTab(state: WorkspaceTabsState, id: string) {
         ? tabs[Math.min(index, tabs.length - 1)].id
         : state.activeId,
   };
+}
+
+/**
+ * Drops history entries for deleted pages, folders or projects from every tab.
+ * A tab keeps its nearest earlier entry; a tab with nothing left shows Recent.
+ */
+export function pruneWorkspace(
+  state: WorkspaceTabsState,
+  gone: (location: WorkspaceLocation) => boolean,
+): WorkspaceTabsState {
+  let changed = false;
+  const tabs = state.tabs.map((tab) => {
+    if (!tab.entries.some((entry) => gone(entry.location))) return tab;
+    changed = true;
+    const entries: WorkspaceEntry[] = [];
+    let cursor = 0;
+    tab.entries.forEach((entry, index) => {
+      if (gone(entry.location)) return;
+      const previous = entries.at(-1);
+      if (previous && sameLocation(previous.location, entry.location))
+        entries[entries.length - 1] = entry;
+      else entries.push(entry);
+      if (index <= tab.cursor) cursor = entries.length - 1;
+    });
+    return entries.length
+      ? { ...tab, entries, cursor }
+      : { ...tab, entries: [recentEntry()], cursor: 0 };
+  });
+  return changed ? { ...state, tabs } : state;
 }
 
 /** Move an existing tab without changing its identity, history or selection. */
@@ -214,6 +248,10 @@ export function parseWorkspaceTabs(
         (loc.view === "project" && !loc.projectId) ||
         typeof entry.title !== "string" ||
         (entry.icon !== undefined && typeof entry.icon !== "string") ||
+        (entry.query !== undefined &&
+          (typeof entry.query !== "string" || entry.query.length > 1000)) ||
+        (entry.searchLibrary !== undefined &&
+          typeof entry.searchLibrary !== "boolean") ||
         !Number.isFinite(entry.scrollTop) ||
         entry.scrollTop < 0
       )

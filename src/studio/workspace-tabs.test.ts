@@ -7,6 +7,7 @@ import {
   detourReturnOffset,
   moveWorkspaceTab,
   parseWorkspaceTabs,
+  pruneWorkspace,
   recentEntry,
   sameEntry,
   setWorkspaceAssistantOpen,
@@ -36,6 +37,60 @@ describe("workspace tabs", () => {
         location: { ...entry.location, folderId: "folder" },
       }),
     ).toBe(false);
+  });
+  it("keeps a location's search so Back returns to the same results", () => {
+    const recent = { ...recentEntry(), query: "plan", searchLibrary: true };
+    expect(sameEntry(recent, { ...recent })).toBe(true);
+    expect(sameEntry(recent, { ...recent, query: "plans" })).toBe(false);
+    expect(sameEntry(recent, { ...recent, searchLibrary: false })).toBe(false);
+    expect(sameEntry({ ...recent, query: "" }, { ...recent, query: undefined }))
+      .toBe(true);
+    const state = visitWorkspace(createWorkspace(recent), page("page-a"));
+    const bytes = JSON.stringify({ version: 1, ...state });
+    expect(parseWorkspaceTabs(bytes)?.tabs[0].entries[0]).toMatchObject({
+      query: "plan",
+      searchLibrary: true,
+    });
+    const invalid = JSON.parse(bytes);
+    invalid.tabs[0].entries[0].query = 7;
+    expect(parseWorkspaceTabs(JSON.stringify(invalid))).toBeUndefined();
+  });
+  it("drops deleted pages from every tab's history and keeps each tab's place", () => {
+    const projectEntry: WorkspaceEntry = {
+      location: {
+        view: "project",
+        projectId: "project-a",
+        folderId: null,
+        pageId: null,
+      },
+      title: "Project",
+      scrollTop: 0,
+    };
+    let state = createWorkspace(page("page-a"));
+    state = visitWorkspace(state, page("page-b"));
+    state = visitWorkspace(state, page("page-a"));
+    state = visitWorkspace(state, page("page-c"));
+    // A second tab showing only the deleted page, and one untouched.
+    state = addWorkspaceTab(state, page("page-b"), false);
+    state = addWorkspaceTab(state, projectEntry, false);
+    const [first, second, third] = state.tabs;
+    state = {
+      ...state,
+      tabs: [{ ...first, cursor: 2 }, second, third],
+    };
+    const gone = (location: WorkspaceEntry["location"]) =>
+      location.view === "page" && location.pageId === "page-b";
+    const pruned = pruneWorkspace(state, gone);
+    // page-a, page-b, page-a collapses to one page-a; the cursor stays on it.
+    expect(
+      pruned.tabs[0].entries.map((entry) => entry.location.pageId),
+    ).toEqual(["page-a", "page-c"]);
+    expect(pruned.tabs[0].cursor).toBe(0);
+    expect(pruned.tabs[1].entries).toEqual([recentEntry()]);
+    expect(pruned.tabs[1].cursor).toBe(0);
+    expect(pruned.tabs[2]).toBe(third);
+    expect(pruned.activeId).toBe(state.activeId);
+    expect(pruneWorkspace(pruned, gone)).toBe(pruned);
   });
   it("moves tabs in either direction while preserving selection, history and Agent state", () => {
     const first = createWorkspace(page("page-a"));
