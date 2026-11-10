@@ -45,6 +45,20 @@ export function queueNavigationScope(
   for (const id of change?.projectIds ?? []) scope.ids.add(id);
   boundScope(scope);
 }
+/** The change an operation on known projects makes, so only they are read again. */
+export function libraryChange(
+  home: string,
+  projectIds: string[],
+  options: { sidebar?: boolean; pageIds?: string[] } = {},
+): DesktopChange {
+  return {
+    type: "files",
+    home,
+    projectIds: [...new Set(projectIds)],
+    ...(options.sidebar ? { sidebar: true } : {}),
+    ...(options.pageIds ? { pageIds: options.pageIds } : {}),
+  };
+}
 /** Preserve unchanged navigation values so a background refresh does not rebuild the editor. */
 export function retainEqual<T>(previous: T, next: T): T {
   return previous === next || JSON.stringify(previous) === JSON.stringify(next)
@@ -128,6 +142,173 @@ export function savedPageMoved(
     previous.parentId !== (record.document.parentId ?? null) ||
     previous.archived !== !!record.document.archived
   );
+}
+export interface LibraryEntryFields {
+  name?: string;
+  icon?: string;
+  pinned?: boolean;
+}
+/** Shows a rename, icon or pin change in loaded navigation before the library confirms it. */
+export function withLibraryEntry(
+  contents: ProjectContents,
+  target: { kind: "page" | "folder"; projectId: string; id: string },
+  fields: LibraryEntryFields,
+): ProjectContents {
+  const current = contents[target.projectId];
+  if (!current) return contents;
+  if (target.kind === "folder") {
+    if (!current.folders.some((folder) => folder.id === target.id))
+      return contents;
+    return {
+      ...contents,
+      [target.projectId]: {
+        ...current,
+        folders: current.folders.map((folder) =>
+          folder.id === target.id
+            ? {
+                ...folder,
+                ...(fields.name !== undefined ? { name: fields.name } : {}),
+                ...(fields.icon !== undefined ? { icon: fields.icon } : {}),
+                ...(fields.pinned !== undefined ? { pinned: fields.pinned } : {}),
+              }
+            : folder,
+        ),
+      },
+    };
+  }
+  if (!current.pages.some((page) => page.id === target.id)) return contents;
+  return {
+    ...contents,
+    [target.projectId]: {
+      ...current,
+      pages: current.pages.map((page) =>
+        page.id === target.id
+          ? {
+              ...page,
+              ...(fields.name !== undefined ? { title: fields.name } : {}),
+              ...(fields.icon !== undefined ? { icon: fields.icon } : {}),
+              ...(fields.pinned !== undefined ? { favorite: fields.pinned } : {}),
+            }
+          : page,
+      ),
+    },
+  };
+}
+export function withProjectFields(
+  projects: ProjectSummary[],
+  projectId: string,
+  fields: LibraryEntryFields,
+): ProjectSummary[] {
+  const project = projects.find((item) => item.id === projectId);
+  if (!project) return projects;
+  return mergeNavigationProjects(
+    projects,
+    [
+      {
+        ...project,
+        ...(fields.name !== undefined ? { name: fields.name } : {}),
+        ...(fields.icon !== undefined ? { icon: fields.icon } : {}),
+        ...(fields.pinned !== undefined ? { pinned: fields.pinned } : {}),
+      },
+    ],
+    new Set([projectId]),
+  );
+}
+/** The folders and pages inside a folder, the folder included. */
+export function folderSubtree(
+  contents: ProjectContents,
+  projectId: string,
+  folderId: string,
+): { folders: Set<string>; pages: Set<string> } {
+  const current = contents[projectId];
+  const folders = new Set([folderId]);
+  for (let grew = true; grew; ) {
+    grew = false;
+    for (const folder of current?.folders ?? [])
+      if (
+        folder.parentId &&
+        folders.has(folder.parentId) &&
+        !folders.has(folder.id)
+      ) {
+        folders.add(folder.id);
+        grew = true;
+      }
+  }
+  return {
+    folders,
+    pages: new Set(
+      (current?.pages ?? [])
+        .filter((page) => page.parentId && folders.has(page.parentId))
+        .map((page) => page.id),
+    ),
+  };
+}
+/** Removes deleted folders and pages from loaded navigation before the library confirms it. */
+export function withoutLibraryEntries(
+  contents: ProjectContents,
+  projectId: string,
+  ids: Set<string>,
+): ProjectContents {
+  const current = contents[projectId];
+  if (
+    !current ||
+    (!current.folders.some((folder) => ids.has(folder.id)) &&
+      !current.pages.some((page) => ids.has(page.id)))
+  )
+    return contents;
+  return {
+    ...contents,
+    [projectId]: {
+      folders: current.folders.filter((folder) => !ids.has(folder.id)),
+      pages: current.pages.filter((page) => !ids.has(page.id)),
+    },
+  };
+}
+/** Adds a page this window just created, until the scoped refresh lists it. */
+export function withCreatedPage(
+  contents: ProjectContents,
+  projectId: string,
+  record: Pick<PageRecord, "document" | "hash" | "revision">,
+): ProjectContents {
+  const current = contents[projectId];
+  if (!current || current.pages.some((page) => page.id === record.document.id))
+    return contents;
+  const { document } = record;
+  return {
+    ...contents,
+    [projectId]: {
+      ...current,
+      pages: [
+        {
+          id: document.id,
+          title: document.title,
+          icon: document.icon,
+          createdAt: document.createdAt,
+          updatedAt: document.updatedAt,
+          hash: record.hash,
+          ...(record.revision ? { revision: record.revision } : {}),
+          blockCount: 0,
+          parentId: document.parentId ?? null,
+          favorite: !!document.favorite,
+          archived: false,
+        },
+        ...current.pages,
+      ],
+    },
+  };
+}
+export function withCreatedFolder(
+  contents: ProjectContents,
+  projectId: string,
+  folder: FolderMetadata,
+): ProjectContents {
+  const current = contents[projectId];
+  if (!current || current.folders.some((item) => item.id === folder.id))
+    return contents;
+  return {
+    ...contents,
+    [projectId]: { ...current, folders: [folder, ...current.folders] },
+  };
 }
 export function withSavedProjectTime(
   projects: ProjectSummary[],

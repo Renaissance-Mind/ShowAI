@@ -11,14 +11,29 @@ import accountFlowMessages from "../i18n/messages/accountFlow";
 import { coalescedTask } from "../lib/coalesced-task";
 import {
   emptyNavigationScope,
+  folderSubtree,
+  libraryChange,
   queueNavigationScope,
   mergeNavigationProjects,
   retainEqual,
   mergeNavigationScope,
   savedPageMoved,
+  withCreatedFolder,
+  withCreatedPage,
+  withLibraryEntry,
+  withoutLibraryEntries,
+  withProjectFields,
   withSavedPage,
   withSavedProjectTime,
+  type LibraryEntryFields,
 } from "./navigation-refresh";
+import { LatestRequest } from "./latest-request";
+import {
+  LibraryHistory,
+  reverseMoves,
+  type LibraryChange,
+  type LibraryPlace,
+} from "./library-history";
 import { readNavigationCache, writeNavigationCache } from "./navigation-cache";
 import { applyLibraryMove, type LibraryContents } from "./library-move";
 import { ComponentLibraryContext } from "../components/ComponentLibrary";
@@ -28,6 +43,7 @@ import { artifactVersion, findSurfaceNode } from "../surface/document.mjs";
 import { upgradeResource } from "../surface/containers.mjs";
 import {
   useCallback,
+  useDeferredValue,
   useEffect,
   useMemo,
   useRef,
@@ -184,7 +200,7 @@ import {
   templateHasPage,
 } from "./template-catalog-model";
 import TemplateThumbnail from "./TemplateThumbnail";
-import RecentPages, { recentPages } from "./RecentPages";
+import RecentPages, { recentPages, type RecentPage } from "./RecentPages";
 import Welcome from "./Welcome";
 import PluginUpdateNotice from "./PluginUpdateNotice";
 import AppUpdateNotice from "./AppUpdateNotice";
@@ -399,6 +415,39 @@ function focusAssistantInput(started = Date.now()) {
     window.setTimeout(() => focusAssistantInput(started), 100);
 }
 
+/**
+ * A blank page the person just made takes its title first. The page mounts
+ * after the view switches, and a closing dialog or the editor's own focus
+ * restore can move focus once more, so this keeps trying until the title has
+ * held focus for two checks in a row. Boards have no body title and use the
+ * title field in the top bar.
+ */
+function focusPageTitle(
+  isShown: () => boolean,
+  started = Date.now(),
+  held = 0,
+) {
+  if (!isShown() || Date.now() - started > 1500) return;
+  const usable = (selector: string) =>
+    [
+      ...document.querySelectorAll<HTMLTextAreaElement | HTMLInputElement>(
+        selector,
+      ),
+    ].find((element) => !element.disabled && element.offsetParent !== null);
+  const title =
+    usable(".studio-scroll textarea.studio-page-heading-title") ??
+    usable(".studio-topbar .studio-page-title-input");
+  const focused = !!title && document.activeElement === title;
+  if (title && !focused) title.focus();
+  if (focused && held >= 1) return;
+  window.setTimeout(
+    () => focusPageTitle(isShown, started, focused ? held + 1 : 0),
+    100,
+  );
+}
+
+const recentLoading = <div className="studio-welcome" aria-busy="true" />;
+
 function shortDate(value: string) {
   return new Intl.DateTimeFormat(getLocale(), {
     month: "short",
@@ -579,7 +628,7 @@ export default function Studio() {
       if (typeof link !== "string" || !link || receivingInvite.current) return;
       receivingInvite.current = true;
       void (async () => {
-        if (!(await page.flush())) return;
+        await settleOpenPage();
         localStorage.setItem("showai:pending-invitation", link);
         delete host.showaiPendingInvite;
         setSyncRequest(undefined);
@@ -624,7 +673,7 @@ export default function Studio() {
         return;
       event.preventDefault();
       void (async () => {
-        if (!(await page.flush())) return;
+        await settleOpenPage();
         setSyncRequest({
           projectId: detail.projectId,
           intent: "packaging",
@@ -695,10 +744,21 @@ export default function Studio() {
   catalogScopeRef.current = catalogScope;
   const [query, setQuery] = useState("");
   const [searchLibrary, setSearchLibrary] = useState(false);
-  const [searchRevision, setSearchRevision] = useState(0);
+  // Lists filter on the deferred query so typing stays responsive.
+  const deferredQuery = useDeferredValue(query);
+  // A history entry brings back the search it was left with; other view
+  // changes start without one.
+  const restoredSearch = useRef<{
+    view: View;
+    query: string;
+    library: boolean;
+  } | null>(null);
   useEffect(() => {
-    setSearchLibrary(false);
-    setQuery("");
+    const restored =
+      restoredSearch.current?.view === view ? restoredSearch.current : null;
+    restoredSearch.current = null;
+    setSearchLibrary(restored?.library ?? false);
+    setQuery(restored?.query ?? "");
   }, [view]);
   const [dialog, setDialog] = useState<DialogState>(null);
   const [packagingDecision, setPackagingDecision] = useState<{
@@ -964,6 +1024,15 @@ export default function Studio() {
     return next;
   }, []);
   const navigationScope = useRef(emptyNavigationScope());
+  // Counts library switches; a refresh started before one discards its reads.
+  const libraryGeneration = useRef(0);
+  useEffect(
+    () =>
+      desktop.onChange((change) => {
+        if (change.type === "home") libraryGeneration.current++;
+      }),
+    [],
+  );
   const navigationState = useRef({ projects, organization: savedOrganization });
   navigationState.current = { projects, organization: savedOrganization };
   const refreshNavigation = useMemo(
@@ -973,6 +1042,7 @@ export default function Studio() {
         navigationScope.current = emptyNavigationScope();
         try {
           const revision = sidebarRevision.current;
+          const generation = libraryGeneration.current;
           const appInfo = await desktop.invoke<DesktopInfo>("app:info");
           const scope = { expectedHome: appInfo.home };
           const changedHome = sidebarHome.current !== appInfo.home;
@@ -988,12 +1058,10 @@ export default function Studio() {
               ? desktop.invoke<SidebarOrganization>("sidebar:get", scope)
               : Promise.resolve(navigationState.current.organization),
           ]);
-          if (
-            (await desktop.invoke<DesktopInfo>("app:info")).home !==
-            appInfo.home
-          )
-            return;
+          if (generation !== libraryGeneration.current) return;
           if (changedHome) {
+            libraryHistory.current.clear();
+            refreshLibraryHistory((value) => value + 1);
             const saved = readSidebarExpansion(appInfo.home);
             sidebarHome.current = appInfo.home;
             expandedRef.current = saved.projects;
@@ -1055,11 +1123,7 @@ export default function Studio() {
               return { id: item.id, pages, folders };
             }),
           );
-          if (
-            (await desktop.invoke<DesktopInfo>("app:info")).home !==
-            appInfo.home
-          )
-            return;
+          if (generation !== libraryGeneration.current) return;
           setContents((current) => {
             const updated = full ? {} : { ...current };
             for (const id of requested.ids) delete updated[id];
@@ -1098,6 +1162,64 @@ export default function Studio() {
     },
     [refreshNavigation, resolveProblem],
   );
+  /** Confirms an operation by reading only the projects it changed. */
+  const refreshProjects = (
+    projectIds: string[],
+    options?: { sidebar?: boolean; pageIds?: string[] },
+  ) =>
+    info?.home
+      ? refresh(libraryChange(info.home, projectIds, options))
+      : refresh();
+  /** Before an action on the open page itself: it must be saved, conflict or not. */
+  async function saveOpenPage() {
+    if (!(await page.flush())) throw new Error(t("resolveDraftFirst"));
+  }
+  /**
+   * Before an action elsewhere: a page waiting on a save conflict keeps its
+   * draft and banner, and the action goes ahead.
+   */
+  async function settleOpenPage() {
+    if (!(await page.flushOrDefer())) throw new Error(t("resolveDraftFirst"));
+  }
+  /**
+   * Saves every retained page an operation on library items touches; one
+   * that cannot save (a conflict, a failed write) holds the operation.
+   */
+  async function settlePages(
+    projectId: string,
+    touches: (pageId: string, parentId: string | null) => boolean,
+  ) {
+    const active = page.sessions.getSnapshot().active;
+    for (const item of page.sessions.retained()) {
+      if (item.projectId !== projectId || !touches(item.pageId, item.parentId))
+        continue;
+      const saved =
+        item.session === active ? await page.flush() : await item.session.flush();
+      if (!saved) throw new Error(t("resolveDraftFirst"));
+    }
+  }
+  /** Retires the editors of deleted pages and drops them from every tab's history. */
+  function forgetDeleted(
+    projectId: string,
+    gone: { project?: boolean; folders?: Set<string>; pages?: Set<string> },
+  ) {
+    const pageGone = (pageId: string | null, parentId?: string | null) =>
+      !!gone.project ||
+      (!!pageId && !!gone.pages?.has(pageId)) ||
+      (!!parentId && !!gone.folders?.has(parentId));
+    for (const item of page.sessions.retained())
+      if (item.projectId === projectId && pageGone(item.pageId, item.parentId))
+        page.sessions.forgetPage(item.projectId, item.pageId);
+    workspace.prune(
+      (location) =>
+        location.projectId === projectId &&
+        (location.view === "page"
+          ? pageGone(location.pageId)
+          : location.view === "project" &&
+            (!!gone.project ||
+              (!!location.folderId && !!gone.folders?.has(location.folderId)))),
+    );
+  }
   // A library the App just created gets its sample project once.
   const sampleProject = useSampleProject(
     info && capabilities.manageLibrary ? info.home : null,
@@ -1399,56 +1521,91 @@ export default function Studio() {
     };
   }, [externalChangesAvailable, !!dialog, info?.home]);
 
-  async function navigate(next: View) {
-    if (routingRef.current) return;
-    workspace.rememberScroll();
-    routingRef.current = true;
-    setRouting(true);
-    try {
-      if (!(await page.leave())) {
-        setView("page");
-        return;
-      }
-      setContextMenu(null);
-      setQuery("");
-      setView(next);
-      if (next === "projects") {
-        setSelectedProject(null);
-        selectedRef.current = null;
-        setSelectedFolder(null);
-        await refresh();
-      }
-      if (next === "templates" || next === "components") await loadCatalog();
-    } finally {
-      routingRef.current = false;
-      setRouting(false);
-    }
+  /** A page that could not keep its edits holds navigation; say so instead of doing nothing. */
+  function draftHeld(): false {
+    report(new Error(t("resolveDraftFirst")));
+    return false;
   }
-  async function openProject(id: string, folderId: string | null = null) {
-    if (routingRef.current) return false;
-    workspace.rememberScroll();
-    routingRef.current = true;
-    setRouting(true);
-    try {
-      if (!(await page.leave())) {
-        setView("page");
-        return false;
-      }
-      selectedRef.current = id;
-      setSelectedProject(id);
-      setSelectedFolder(folderId);
-      setExpandedProjects((current) => ({ ...current, [id]: true }));
-      setQuery("");
-      setView("project");
-      setContextMenu(null);
-      const loaded = await loadProjectContents(id);
-      expandFolderPath(loaded.folders, folderId);
-      if (catalogLoaded.current) void loadCatalog().catch(report);
-      return true;
-    } finally {
+  // Navigation runs one request at a time; a click made meanwhile wins over
+  // the one still loading, and runs as soon as it settles.
+  const routes = useRef<{
+    navigate: (next: View, current: () => boolean) => Promise<void>;
+    openProject: (
+      id: string,
+      folderId: string | null,
+      current: () => boolean,
+    ) => Promise<boolean>;
+    openPage: (
+      id: string,
+      projectId: string | null,
+      current: () => boolean,
+    ) => Promise<boolean>;
+    openDoc: (id: string, hash: string, current: () => boolean) => Promise<boolean>;
+  }>(null!);
+  const router = useRef<LatestRequest>(null!);
+  router.current ??= new LatestRequest({
+    start: () => {
+      routingRef.current = true;
+      setRouting(true);
+    },
+    settle: () => {
       routingRef.current = false;
       setRouting(false);
+    },
+  });
+  function navigate(next: View) {
+    return router.current.run(undefined, (current) => {
+      workspace.rememberScroll();
+      return routes.current.navigate(next, current);
+    });
+  }
+  function openProject(id: string, folderId: string | null = null) {
+    return router.current.run(false, (current) => {
+      workspace.rememberScroll();
+      return routes.current.openProject(id, folderId, current);
+    });
+  }
+  function openPage(id: string, projectId = selectedProject) {
+    return router.current.run(false, (current) => {
+      workspace.rememberScroll();
+      return routes.current.openPage(id, projectId, current);
+    });
+  }
+  async function navigateNow(next: View, latest: () => boolean) {
+    if (!(await page.leave())) {
+      draftHeld();
+      return;
     }
+    if (!latest()) return;
+    setContextMenu(null);
+    setQuery("");
+    setView(next);
+    if (next === "projects") {
+      setSelectedProject(null);
+      selectedRef.current = null;
+      setSelectedFolder(null);
+      await refresh();
+    }
+    if (next === "templates" || next === "components") await loadCatalog();
+  }
+  async function openProjectNow(
+    id: string,
+    folderId: string | null,
+    latest: () => boolean,
+  ) {
+    if (!(await page.leave())) return draftHeld();
+    if (!latest()) return false;
+    selectedRef.current = id;
+    setSelectedProject(id);
+    setSelectedFolder(folderId);
+    setExpandedProjects((current) => ({ ...current, [id]: true }));
+    setQuery("");
+    setView("project");
+    setContextMenu(null);
+    const loaded = await loadProjectContents(id);
+    expandFolderPath(loaded.folders, folderId);
+    if (catalogLoaded.current) void loadCatalog().catch(report);
+    return true;
   }
   /** Open the page an Agent turn worked on and highlight the blocks it named. */
   /** Save the page as shown, then copy a reference pinned to that version. */
@@ -1584,44 +1741,44 @@ export default function Studio() {
     };
     window.setTimeout(flash, 240);
   }
-  async function openPage(id: string, projectId = selectedProject) {
-    if (routingRef.current) return false;
-    workspace.rememberScroll();
-    routingRef.current = true;
-    setRouting(true);
-    try {
-      if (!projectId) return false;
-      if (await page.open(projectId, id, workspace.activeId)) {
-        selectedRef.current = projectId;
-        setSelectedProject(projectId);
-        setExpandedProjects((current) => ({ ...current, [projectId]: true }));
-        setView("page");
-        const loaded = contents[projectId];
-        const parentId =
-          page.sessions.getSnapshot().active?.getSnapshot().draft?.parentId ??
-          loaded?.pages.find((item) => item.id === id)?.parentId ??
-          null;
-        setSelectedFolder(parentId);
-        expandFolderPath(loaded?.folders ?? [], parentId);
-        setView("page");
-        performance.clearMarks("showai:page-visible");
-        performance.mark("showai:page-visible");
-        if (!loaded) void loadProjectContents(projectId).catch(report);
-        setContextMenu(null);
-        return true;
-      }
-      return false;
-    } finally {
-      routingRef.current = false;
-      setRouting(false);
+  async function openPageNow(
+    id: string,
+    projectId: string | null,
+    latest: () => boolean,
+  ) {
+    if (!projectId) return false;
+    const show = await page.prepare(projectId, id);
+    if (!show) return page.status === "error" ? draftHeld() : false;
+    // A newer click is waiting; it opens next and this page is not shown.
+    if (!latest()) return false;
+    if (show(workspace.activeId)) {
+      selectedRef.current = projectId;
+      setSelectedProject(projectId);
+      setExpandedProjects((current) => ({ ...current, [projectId]: true }));
+      setView("page");
+      const loaded = contents[projectId];
+      const parentId =
+        page.sessions.getSnapshot().active?.getSnapshot().draft?.parentId ??
+        loaded?.pages.find((item) => item.id === id)?.parentId ??
+        null;
+      setSelectedFolder(parentId);
+      expandFolderPath(loaded?.folders ?? [], parentId);
+      setView("page");
+      performance.clearMarks("showai:page-visible");
+      performance.mark("showai:page-visible");
+      if (!loaded) void loadProjectContents(projectId).catch(report);
+      setContextMenu(null);
+      return true;
     }
+    return false;
   }
   async function openTarget(
     target: LibraryTarget,
     disposition: OpenDisposition = "current",
   ) {
-    if (!workspaceReady || routingRef.current || workspace.isSwitching())
-      return false;
+    if (!workspaceReady) return false;
+    // A tab switch in flight finishes first; this click then opens in its tab.
+    await workspace.settled();
     if ((!capabilities.tabs && disposition !== "window") ||
         (!capabilities.windows && disposition === "window")) disposition = "current";
     if (disposition === "window") {
@@ -1661,8 +1818,8 @@ export default function Studio() {
     hash = "",
     disposition: OpenDisposition = "current",
   ) {
-    if (!workspaceReady || routingRef.current || workspace.isSwitching())
-      return false;
+    if (!workspaceReady) return false;
+    await workspace.settled();
     const meta = docTitle(id);
     if (
       capabilities.tabs &&
@@ -1681,28 +1838,30 @@ export default function Studio() {
           scrollTop: 0,
         },
       );
-    workspace.rememberScroll();
-    routingRef.current = true;
-    setRouting(true);
-    try {
-      if (!(await page.leave())) {
-        setView("page");
-        return false;
-      }
-      setContextMenu(null);
-      setQuery("");
-      selectedRef.current = null;
-      setSelectedProject(null);
-      setSelectedFolder(null);
-      setEditorControls(null);
-      setDocPage({ id, hash });
-      setView("docs");
-      return true;
-    } finally {
-      routingRef.current = false;
-      setRouting(false);
-    }
+    return router.current.run(false, (current) => {
+      workspace.rememberScroll();
+      return routes.current.openDoc(id, hash, current);
+    });
   }
+  async function openDocNow(id: string, hash: string, latest: () => boolean) {
+    if (!(await page.leave())) return draftHeld();
+    if (!latest()) return false;
+    setContextMenu(null);
+    setQuery("");
+    selectedRef.current = null;
+    setSelectedProject(null);
+    setSelectedFolder(null);
+    setEditorControls(null);
+    setDocPage({ id, hash });
+    setView("docs");
+    return true;
+  }
+  routes.current = {
+    navigate: navigateNow,
+    openProject: openProjectNow,
+    openPage: openPageNow,
+    openDoc: openDocNow,
+  };
   async function beginNewPage(projectId: string, parentId: string | null) {
     const choices = await desktop.invoke<TemplateMetadata[]>("templates:list", {
       projectId,
@@ -1750,6 +1909,8 @@ export default function Studio() {
     template?: TemplateMetadata,
     kind?: "page" | "board",
     directory?: { projectId: string; parentId: string | null },
+    /** A blank page made by the person takes typing in its title at once. */
+    focusTitle = false,
   ) {
     const projectId =
       directory?.projectId ??
@@ -1760,10 +1921,9 @@ export default function Studio() {
         ? dialog.parentId
         : selectedFolder;
     if (!projectId) return false;
-    if (!(await page.flush())) {
+    if (!(await page.flushOrDefer())) {
       setDialog(null);
-      setView("page");
-      return false;
+      return draftHeld();
     }
     setBusy(true);
     try {
@@ -1776,19 +1936,33 @@ export default function Studio() {
         templateScope: template?.scope,
         templateIntegrity: template?.integrity,
       });
-      await page.open(
-        projectId,
-        created.document.id,
-        workspace.activeId,
-        created,
-      );
+      setContents((current) => withCreatedPage(current, projectId, created));
+      if (
+        !(await page.open(
+          projectId,
+          created.document.id,
+          workspace.activeId,
+          created,
+        ))
+      ) {
+        setDialog(null);
+        void refreshProjects([projectId]).catch(report);
+        return page.status === "error" ? draftHeld() : false;
+      }
       selectedRef.current = projectId;
       setSelectedProject(projectId);
       setSelectedFolder(parentId);
       setExpandedProjects((current) => ({ ...current, [projectId]: true }));
       setDialog(null);
       setView("page");
-      await refresh();
+      if (focusTitle)
+        focusPageTitle(
+          () =>
+            page.sessions.getSnapshot().active?.getSnapshot().draft?.id ===
+            created.document.id,
+        );
+      // The page is listed already; confirm only its project.
+      void refreshProjects([projectId]).catch(report);
       return created.document.id;
     } catch (reason) {
       report(reason, { action: operation("op.createPage") });
@@ -1830,7 +2004,7 @@ export default function Studio() {
       kind: "page",
       ...(input.title ? { title: input.title } : {}),
     });
-    await refresh();
+    await refreshProjects([input.projectId]);
     return { pageId: created.document.id, folderId: folder.id };
   }
   /** Renames a page a component on another page links to, as the sidebar does. */
@@ -1857,7 +2031,7 @@ export default function Studio() {
         title: input.title,
       });
     }
-    await refresh();
+    await refreshProjects([input.projectId]);
   }
   /**
    * Copies the open read-only page into a new project this device owns. The
@@ -1887,11 +2061,11 @@ export default function Studio() {
       });
     } catch (reason) {
       await desktop.invoke("projects:remove", { projectId: created.id });
-      await refresh();
+      await refreshProjects([created.id], { sidebar: true });
       throw reason;
     }
     resolveProblem("saveLocalCopy");
-    await refresh();
+    await refreshProjects([created.id], { sidebar: true });
     await openPage(imported.document.id, created.id);
     setNotice(ts("readOnly.copied", { name }));
   }
@@ -1922,7 +2096,7 @@ export default function Studio() {
     dropped?: { name: string; content: string }[],
   ) {
     if (!directory) return;
-    if (!(await page.flush())) return;
+    if (!(await page.flushOrDefer())) return draftHeld();
     const files = dropped ?? [
       await desktop.invoke<{ name: string; content: string } | null>(
         "dialog:openPage",
@@ -1937,10 +2111,12 @@ export default function Studio() {
         artifact: importedArtifact(file),
       });
     if (chosen.length === 1 && imported) {
+      setContents((current) =>
+        withCreatedPage(current, directory.projectId, imported),
+      );
       await openPage(imported.document.id, directory.projectId);
-      setView("page");
     }
-    await refresh();
+    await refreshProjects([directory.projectId]);
     setNotice(
       chosen.length === 1
         ? t("pageImported")
@@ -1976,10 +2152,11 @@ export default function Studio() {
     presentation?: "spatial" | "reading",
     reader?: "bundled" | "cdn",
   ) {
-    if (!selectedProject || !page.draft || !(await page.flush())) return;
+    if (!selectedProject || !page.draft) return;
     setBusy(true);
     setContextMenu(null);
     try {
+      await saveOpenPage();
       const packaging = await packagingChoice(
         selectedProject,
         page.draft.id,
@@ -2015,9 +2192,12 @@ export default function Studio() {
     }
   }
   async function exportSite(components: "bundled" | "remote" = "bundled") {
-    if (!selectedProject || !(await page.flush())) return;
+    if (!selectedProject) return;
     setBusy(true);
     try {
+      // The open page is part of the site when it belongs to this project.
+      if (page.projectId === selectedProject) await saveOpenPage();
+      else await settleOpenPage();
       const packaging = await packagingChoice(selectedProject, undefined, "site");
       if (packaging === null) return;
       const result = await desktop.invoke<{ path: string } | null>(
@@ -2123,14 +2303,14 @@ export default function Studio() {
         label: t("create.page"),
         icon: <FileText size={15} />,
         onSelect: action(() =>
-          createPage("blank", undefined, "page", directory),
+          createPage("blank", undefined, "page", directory, true),
         ),
       },
       {
         label: t("create.board"),
         icon: <Presentation size={15} />,
         onSelect: action(() =>
-          createPage("blank", undefined, "board", directory),
+          createPage("blank", undefined, "board", directory, true),
         ),
       },
       {
@@ -2300,6 +2480,15 @@ export default function Studio() {
     if (dialogRef.current) return;
     setContextMenu(null);
     if (command === "rename") beginRename(target);
+    else beginDelete(target);
+  }
+  /** A page is deleted at once with Undo in the toast; a folder or project is confirmed first. */
+  function beginDelete(target: LibraryTarget) {
+    setContextMenu(null);
+    if (target.kind === "page")
+      void deleteTarget(target).catch((error) =>
+        report(error, { action: operation("op.delete"), object: target.title }),
+      );
     else setDialog({ type: "delete", target });
   }
   /** Back from templates, components or settings returns to where the person was. */
@@ -2347,7 +2536,10 @@ export default function Studio() {
   }
   async function beginPageIcon(target: LibraryTarget) {
     const retained = page.sessions.sessionFor(target.projectId, target.id);
-    if (!(await (retained ? retained.flush() : page.flush()))) return;
+    if (retained === page.sessions.getSnapshot().active) await saveOpenPage();
+    else if (retained) {
+      if (!(await retained.flush())) throw new Error(t("resolveDraftFirst"));
+    } else await settleOpenPage();
     const record = await desktop.invoke<LoadedPage>("pages:get", {
       projectId: target.projectId,
       pageId: target.id,
@@ -2416,7 +2608,7 @@ export default function Studio() {
       parentId: target.kind === "folder" ? target.id : null,
       sortBy,
     });
-    await refresh();
+    await refreshProjects([target.projectId], { sidebar: true });
   }
   function directorySortMenuItems(
     target: LibraryTarget,
@@ -2451,7 +2643,7 @@ export default function Studio() {
   }
   async function moveProject(projectId: string, groupId: string | null) {
     await desktop.invoke("projects:group", { projectId, groupId });
-    await refresh();
+    await refreshProjects([projectId], { sidebar: true });
   }
   function projectOrderMenuItems(target: LibraryTarget) {
     if (target.kind !== "project") return [];
@@ -2482,10 +2674,15 @@ export default function Studio() {
     }));
   }
   const movingLibrary = useRef(false);
-  const libraryUndo = useRef<{ undo: LibraryDrop; redo: LibraryDrop }[]>([]);
-  const libraryRedo = useRef<{ undo: LibraryDrop; redo: LibraryDrop }[]>([]);
+  // Cmd+Z in the library reverses moves, deletions and renames, newest first.
+  const libraryHistory = useRef<LibraryHistory>(null!);
+  libraryHistory.current ??= new LibraryHistory();
   const historyBusy = useRef(false);
   const [, refreshLibraryHistory] = useState(0);
+  function rememberLibraryChange(entry: LibraryChange) {
+    libraryHistory.current.record(entry);
+    refreshLibraryHistory((value) => value + 1);
+  }
   function inverseLibraryDrop(drop: LibraryDrop): LibraryDrop {
     const source = drop.source;
     const siblings =
@@ -2533,26 +2730,71 @@ export default function Studio() {
       placement: next ? "before" : "after",
     };
   }
-  async function replayLibraryMove(redo: boolean) {
+  /** Carries out one direction of a recorded change; true when the library took it. */
+  async function applyLibraryChange(entry: LibraryChange, redo: boolean) {
+    switch (entry.kind) {
+      case "move":
+        return dropLibraryItem(redo ? entry.redo : entry.undo, false);
+      case "rename":
+        return updateTarget(entry.target, redo ? entry.after : entry.before, {
+          record: false,
+        });
+      case "batchMove":
+        return moveLibraryEntries(reverseMoves(entry.moves, redo));
+      case "delete": {
+        if (redo) {
+          for (const target of entry.targets)
+            if (
+              !(await deleteTarget(target, {
+                record: false,
+                notify: entry.targets.length === 1,
+              }))
+            )
+              return false;
+          if (entry.targets.length > 1)
+            setNotice(t("pagesDeleted", { count: entry.targets.length }));
+          return true;
+        }
+        for (const target of entry.targets)
+          await restoreItem(restoreTargetOf(target));
+        await refreshProjects(
+          entry.targets.map((target) => target.projectId),
+          { sidebar: entry.targets.some((target) => target.kind === "project") },
+        );
+        setNotice(
+          entry.targets.length === 1
+            ? tn("restoredNamed", { title: entry.targets[0].title })
+            : tn("pagesRestored", { count: entry.targets.length }),
+        );
+        return true;
+      }
+    }
+  }
+  async function replayLibraryChange(redo: boolean) {
     if (historyBusy.current || movingLibrary.current) return;
-    const from = redo ? libraryRedo.current : libraryUndo.current;
-    const to = redo ? libraryUndo.current : libraryRedo.current;
-    const entry = from.at(-1);
+    const entry = libraryHistory.current.next(redo);
     if (!entry) return;
     historyBusy.current = true;
     refreshLibraryHistory((value) => value + 1);
     try {
-      if (await dropLibraryItem(redo ? entry.redo : entry.undo, false)) {
-        from.pop();
-        to.push(entry);
-      }
+      if (await applyLibraryChange(entry, redo))
+        libraryHistory.current.replayed(entry, redo);
     } finally {
       historyBusy.current = false;
       refreshLibraryHistory((value) => value + 1);
     }
   }
-  const replayLibraryRef = useRef(replayLibraryMove);
-  replayLibraryRef.current = replayLibraryMove;
+  /** A toast's Undo reverses its own change, even after later ones were made. */
+  async function undoLibraryChange(entry: LibraryChange) {
+    if (libraryHistory.current.next(false) === entry)
+      return replayLibraryChange(false);
+    if (historyBusy.current || movingLibrary.current) return;
+    if (await applyLibraryChange(entry, false))
+      libraryHistory.current.replayed(entry, false);
+    refreshLibraryHistory((value) => value + 1);
+  }
+  const replayLibraryRef = useRef(replayLibraryChange);
+  replayLibraryRef.current = replayLibraryChange;
   useEffect(() => {
     const key = (event: KeyboardEvent) => {
       if (!(event.metaKey || event.ctrlKey) || event.key.toLowerCase() !== "z")
@@ -2566,13 +2808,12 @@ export default function Studio() {
         view !== "projects"
       )
         return;
-      const stack = event.shiftKey ? libraryRedo.current : libraryUndo.current;
-      if (!stack.length) return;
+      if (!libraryHistory.current.next(event.shiftKey)) return;
       event.preventDefault();
       event.stopPropagation();
       void replayLibraryRef.current(event.shiftKey).catch((error) =>
         report(error, {
-          action: operation(event.shiftKey ? "op.redoMove" : "op.undoMove"),
+          action: operation(event.shiftKey ? "op.redoLibrary" : "op.undoLibrary"),
         }),
       );
     };
@@ -2625,7 +2866,7 @@ export default function Studio() {
         );
         if (sidebarHome.current === home) {
           setOrganization(saved);
-          await refresh();
+          await refreshProjects([source.projectId], { sidebar: true });
           setNotice(t("moved"));
         }
       } catch (error) {
@@ -2638,7 +2879,9 @@ export default function Studio() {
           pending.filter((move) => move.token !== token),
         );
         if (failed && sidebarHome.current === home)
-          void refresh().catch(report);
+          void refreshProjects([source.projectId], { sidebar: true }).catch(
+            report,
+          );
       }
       return !failed;
     });
@@ -2648,12 +2891,11 @@ export default function Studio() {
   async function dropLibraryItem(drop: LibraryDrop, recordHistory = true) {
     if (movingLibrary.current) return false;
     const inverse = recordHistory ? inverseLibraryDrop(drop) : null;
+    const entry: LibraryChange | null = inverse
+      ? { kind: "move", undo: inverse, redo: drop }
+      : null;
     const remember = () => {
-      if (!inverse) return;
-      libraryUndo.current.push({ undo: inverse, redo: drop });
-      if (libraryUndo.current.length > 100) libraryUndo.current.shift();
-      libraryRedo.current = [];
-      refreshLibraryHistory((value) => value + 1);
+      if (entry) rememberLibraryChange(entry);
     };
     if (
       drop.source.kind !== "project" &&
@@ -2731,11 +2973,19 @@ export default function Studio() {
     let cleared = false;
     try {
       await reorderQueue.current;
-      if (source.kind !== "project" && !(await page.flush())) {
-        setView("page");
-        return false;
+      // Pages that move save first; other pages, even one in a conflict, stay as they are.
+      if (source.kind !== "project") {
+        const moving =
+          source.kind === "page"
+            ? { folders: new Set<string>(), pages: new Set([source.id]) }
+            : folderSubtree(contents, source.projectId, source.id);
+        await settlePages(
+          source.projectId,
+          (pageId, parentId) =>
+            moving.pages.has(pageId) ||
+            (!!parentId && moving.folders.has(parentId)),
+        );
       }
-      if (crossProject && !(await page.sessions.flushAll())) return false;
       if (source.kind === "project") {
         const saved = await desktop.invoke<SidebarOrganization>(
           "sidebar:moveProject",
@@ -2762,7 +3012,8 @@ export default function Studio() {
                 pageId: source.id,
               })
             : null;
-        if (reopen && !(await page.clear())) return false;
+        if (reopen && !(await page.clear()))
+          throw new Error(t("resolveDraftFirst"));
         cleared = reopen;
         const saved = await desktop.invoke<SidebarOrganization>(
           "sidebar:moveEntry",
@@ -2813,13 +3064,13 @@ export default function Studio() {
       if (moved && sidebarHome.current === home)
         setNotice(
           t("moved"),
-          inverse
+          entry
             ? {
                 action: {
                   label: operation("toast.undo"),
                   onSelect: () =>
-                    void replayLibraryRef.current(false).catch((error) =>
-                      report(error, { action: operation("op.undoMove") }),
+                    void undoLibraryChange(entry).catch((error) =>
+                      report(error, { action: operation("op.undoLibrary") }),
                     ),
                 },
               }
@@ -2842,78 +3093,159 @@ export default function Studio() {
       setGroupMenu(null);
     },
   });
+  /** The name, icon and pin an item has in loaded navigation, to undo a change. */
+  function currentFields(target: LibraryTarget): LibraryEntryFields {
+    if (target.kind === "project") {
+      const item = projects.find((project) => project.id === target.projectId);
+      return { name: item?.name ?? target.title, icon: item?.icon ?? "", pinned: !!item?.pinned };
+    }
+    const loaded = contents[target.projectId];
+    if (target.kind === "folder") {
+      const item = loaded?.folders.find((folder) => folder.id === target.id);
+      return { name: item?.name ?? target.title, icon: item?.icon ?? "", pinned: !!item?.pinned };
+    }
+    const item = loaded?.pages.find((entry) => entry.id === target.id);
+    return { name: item?.title ?? target.title, icon: item?.icon ?? "", pinned: !!item?.favorite };
+  }
+  /** Shows a name, icon or pin change in the sidebar at once; the returned function takes it back. */
+  function showFields(target: LibraryTarget, fields: LibraryEntryFields) {
+    const before = currentFields(target);
+    const apply = (values: LibraryEntryFields) => {
+      if (target.kind === "project")
+        setProjects((current) =>
+          withProjectFields(current, target.projectId, values),
+        );
+      else
+        setContents((current) =>
+          withLibraryEntry(
+            current,
+            { kind: target.kind as "page" | "folder", projectId: target.projectId, id: target.id },
+            values,
+          ),
+        );
+    };
+    apply(fields);
+    return () =>
+      apply(
+        Object.fromEntries(
+          Object.keys(fields).map((key) => [
+            key,
+            before[key as keyof LibraryEntryFields],
+          ]),
+        ) as LibraryEntryFields,
+      );
+  }
+  /**
+   * Renames, re-icons or pins one item. The sidebar shows the change and the
+   * dialog closes before the library confirms it; a failure takes the change
+   * back and is reported. A page being edited takes the change in its editor.
+   */
   async function updateTarget(
     target: LibraryTarget,
     change: { name?: string; icon?: string; pinned?: boolean },
+    options: { close?: () => void; record?: boolean } = {},
   ) {
-    if (!(await page.flush())) {
-      setView("page");
-      return false;
-    }
-    if (
-      target.kind === "page" &&
-      page.draft?.id === target.id &&
-      page.projectId === target.projectId
-    ) {
-      page.edit({
-        ...(change.name !== undefined ? { title: change.name } : {}),
-        ...(change.pinned !== undefined ? { favorite: change.pinned } : {}),
-      });
-      if (!(await page.flush())) return false;
-    } else if (target.kind === "page") {
-      const record = await desktop.invoke<LoadedPage>("pages:get", {
-        projectId: target.projectId,
-        pageId: target.id,
-      });
-      await desktop.invoke(
-        change.name !== undefined ? "pages:rename" : "pages:pin",
-        {
+    const retained =
+      target.kind === "page"
+        ? page.sessions.sessionFor(target.projectId, target.id)
+        : undefined;
+    const active = page.sessions.getSnapshot().active;
+    // A page with unsaved edits saves them first; a conflict there needs a decision.
+    if (retained === active && retained) await saveOpenPage();
+    else if (retained && !(await retained.flush()))
+      throw new Error(t("resolveDraftFirst"));
+    const before = currentFields(target);
+    const revert = showFields(target, change);
+    options.close?.();
+    try {
+      if (retained) {
+        retained.edit({
+          ...(change.name !== undefined ? { title: change.name } : {}),
+          ...(change.icon !== undefined ? { icon: change.icon } : {}),
+          ...(change.pinned !== undefined ? { favorite: change.pinned } : {}),
+        });
+        if (!(await (retained === active ? page.flush() : retained.flush())))
+          throw new Error(t("resolveDraftFirst"));
+      } else if (target.kind === "page") {
+        const record = await desktop.invoke<LoadedPage>("pages:get", {
           projectId: target.projectId,
           pageId: target.id,
-          baseHash: record.hash,
-          baseRevision: record.revision,
-          ...(change.name !== undefined
-            ? { title: change.name }
-            : { pinned: change.pinned }),
-        },
-      );
-    } else {
-      await desktop.invoke(
-        `${target.kind === "project" ? "projects" : "folders"}:${change.name !== undefined ? "rename" : "pin"}`,
-        {
-          projectId: target.projectId,
-          ...(target.kind === "folder" ? { folderId: target.id } : {}),
-          ...change,
-        },
-      );
+        });
+        await desktop.invoke(
+          change.name !== undefined ? "pages:rename" : "pages:pin",
+          {
+            projectId: target.projectId,
+            pageId: target.id,
+            baseHash: record.hash,
+            baseRevision: record.revision,
+            ...(change.name !== undefined
+              ? { title: change.name }
+              : { pinned: change.pinned }),
+          },
+        );
+      } else {
+        await desktop.invoke(
+          `${target.kind === "project" ? "projects" : "folders"}:${change.name !== undefined ? "rename" : "pin"}`,
+          {
+            projectId: target.projectId,
+            ...(target.kind === "folder" ? { folderId: target.id } : {}),
+            ...change,
+          },
+        );
+      }
+    } catch (error) {
+      revert();
+      report(error, {
+        action: operation(change.name !== undefined ? "op.rename" : "op.pin"),
+        object: target.title,
+      });
+      return false;
     }
-    await refresh();
+    if (change.name !== undefined && options.record !== false)
+      rememberLibraryChange({
+        kind: "rename",
+        target: { ...target, title: change.name },
+        before: { name: before.name, ...(change.icon !== undefined ? { icon: before.icon } : {}) },
+        after: { name: change.name, ...(change.icon !== undefined ? { icon: change.icon } : {}) },
+      });
+    await refreshProjects([target.projectId], {
+      sidebar: target.kind === "project",
+    });
     return true;
   }
-  async function deleteTarget(target: LibraryTarget) {
-    if (!(await page.flush())) {
-      setDialog(null);
-      setView("page");
-      return;
-    }
-    const owning = contents[target.projectId];
-    const insideFolder = (parentId: string | null): boolean => {
-      const visited = new Set<string>();
-      while (parentId && !visited.has(parentId)) {
-        if (parentId === target.id) return true;
-        visited.add(parentId);
-        parentId =
-          owning?.folders.find((item) => item.id === parentId)?.parentId ??
-          null;
-      }
-      return false;
-    };
+  /** Ids a deletion removes: the page, the folder with everything in it, or the whole project. */
+  function deletionScope(target: LibraryTarget): {
+    project?: boolean;
+    folders: Set<string>;
+    pages: Set<string>;
+  } {
+    if (target.kind === "project")
+      return { project: true, folders: new Set(), pages: new Set() };
+    if (target.kind === "page")
+      return { folders: new Set(), pages: new Set([target.id]) };
+    return folderSubtree(contents, target.projectId, target.id);
+  }
+  /**
+   * Deletes one item. Pages it holds that are open anywhere save first; their
+   * editors close, their tab history falls back, and the item leaves the
+   * sidebar before the library confirms. Deleting archives, so the toast and
+   * Cmd+Z restore it.
+   */
+  async function deleteTarget(
+    target: LibraryTarget,
+    options: { close?: () => void; record?: boolean; notify?: boolean } = {},
+  ) {
+    const home = info?.home;
+    const gone = deletionScope(target);
+    const touches = (pageId: string, parentId: string | null) =>
+      !!gone.project ||
+      gone.pages.has(pageId) ||
+      (!!parentId && gone.folders.has(parentId));
+    await settlePages(target.projectId, touches);
     const closePage =
       page.projectId === target.projectId &&
-      (target.kind === "project" ||
-        (target.kind === "page" && page.draft?.id === target.id) ||
-        (target.kind === "folder" &&
-          insideFolder(page.draft?.parentId ?? null)));
+      !!page.draft &&
+      touches(page.draft.id, page.draft.parentId ?? null);
     const currentRecord =
       target.kind === "page"
         ? await desktop.invoke<LoadedPage>("pages:get", {
@@ -2921,23 +3253,25 @@ export default function Studio() {
             pageId: target.id,
           })
         : null;
-    if (closePage && !(await page.clear())) return;
-    await desktop.invoke(
-      `${target.kind === "project" ? "projects" : target.kind === "folder" ? "folders" : "pages"}:remove`,
-      {
-        projectId: target.projectId,
-        ...(target.kind === "folder" ? { folderId: target.id } : {}),
-        ...(currentRecord
-          ? {
-              pageId: target.id,
-              baseHash: currentRecord.hash,
-              baseRevision: currentRecord.revision,
-            }
-          : {}),
-      },
-    );
-    setDialog(null);
+    if (closePage && !(await page.clear())) throw new Error(t("resolveDraftFirst"));
+    const previousProjects = projects;
+    const previousContents = contents[target.projectId];
+    if (target.kind === "project")
+      setProjects((current) =>
+        current.filter((item) => item.id !== target.projectId),
+      );
+    else
+      setContents((current) =>
+        withoutLibraryEntries(
+          current,
+          target.projectId,
+          new Set([...gone.folders, ...gone.pages]),
+        ),
+      );
+    options.close?.();
     setContextMenu(null);
+    const insideDeleted = (folderId: string | null) =>
+      !!folderId && gone.folders.has(folderId);
     if (target.kind === "project" && selectedRef.current === target.projectId) {
       setSelectedProject(null);
       selectedRef.current = null;
@@ -2945,17 +3279,54 @@ export default function Studio() {
       setView("projects");
     } else if (
       selectedRef.current === target.projectId &&
-      (closePage || (target.kind === "folder" && insideFolder(selectedFolder)))
+      (closePage || insideDeleted(selectedFolder))
     ) {
       setSelectedFolder(
-        target.kind === "folder" ? target.parentId : selectedFolder,
+        target.kind === "folder"
+          ? target.parentId
+          : insideDeleted(selectedFolder)
+            ? null
+            : (page.draft?.parentId ?? selectedFolder),
       );
       setView("project");
     }
-    await refresh();
-    notifyWithUndo(tn("deletedNamed", { title: target.title }), () =>
-      restoreDeleted(restoreTargetOf(target)),
-    );
+    try {
+      await desktop.invoke(
+        `${target.kind === "project" ? "projects" : target.kind === "folder" ? "folders" : "pages"}:remove`,
+        {
+          ...(home ? { expectedHome: home } : {}),
+          projectId: target.projectId,
+          ...(target.kind === "folder" ? { folderId: target.id } : {}),
+          ...(currentRecord
+            ? {
+                pageId: target.id,
+                baseHash: currentRecord.hash,
+                baseRevision: currentRecord.revision,
+              }
+            : {}),
+        },
+      );
+    } catch (error) {
+      if (target.kind === "project") setProjects(previousProjects);
+      else if (previousContents)
+        setContents((current) => ({
+          ...current,
+          [target.projectId]: previousContents,
+        }));
+      report(error, { action: operation("op.delete"), object: target.title });
+      return false;
+    }
+    forgetDeleted(target.projectId, gone);
+    const entry: LibraryChange = { kind: "delete", targets: [target] };
+    if (options.record !== false) rememberLibraryChange(entry);
+    if (options.notify !== false)
+      notifyWithUndo(tn("deletedNamed", { title: target.title }), () =>
+        undoLibraryChange(entry),
+      );
+    await refreshProjects([target.projectId], {
+      sidebar: target.kind === "project",
+    });
+    return true;
   }
   const restoreTargetOf = (target: LibraryTarget): RestoreTarget =>
     target.kind === "project"
@@ -2966,43 +3337,66 @@ export default function Studio() {
           id: target.id,
           title: target.title,
         };
-  /** Deleting archives; restoring brings the item back where it was. */
-  async function restoreDeleted(target: RestoreTarget) {
-    await restoreItem(target);
-    await refresh();
-    setNotice(tn("restoredNamed", { title: target.title }));
-  }
+  // Each folder's sorted rows, computed once per project when its contents,
+  // order or pending reorders change rather than on every workbench render.
+  const sidebarChildren = useMemo(() => {
+    const cache = new Map<string, Map<string | null, LibraryTarget[]>>();
+    return (projectId: string, parentId: string | null): LibraryTarget[] => {
+      let byParent = cache.get(projectId);
+      if (!byParent) {
+        byParent = new Map();
+        cache.set(projectId, byParent);
+        const current = contents[projectId];
+        const folderIds = new Set(current?.folders.map((item) => item.id));
+        const groups = new Map<
+          string | null,
+          (Parameters<typeof sortDirectoryItems>[0][number] & {
+            target: LibraryTarget;
+          })[]
+        >();
+        const add = (
+          parent: string | null,
+          item: Parameters<typeof sortDirectoryItems>[0][number] & {
+            target: LibraryTarget;
+          },
+        ) => {
+          const group = groups.get(parent);
+          if (group) group.push(item);
+          else groups.set(parent, [item]);
+        };
+        for (const item of current?.folders ?? [])
+          add(item.parentId ?? null, {
+            ...item,
+            target: folderTarget(item, projectId),
+          });
+        for (const item of current?.pages ?? [])
+          add(item.parentId && folderIds.has(item.parentId) ? item.parentId : null, {
+            ...item,
+            name: item.title || tc("untitled"),
+            pinned: item.favorite,
+            target: pageTarget(item, projectId),
+          });
+        for (const [parent, items] of groups)
+          byParent.set(
+            parent,
+            sortDirectoryItems(
+              items,
+              folderPreferences(projectId, parent),
+              organization.entryOrder?.[projectId],
+            ).map((item) => item.target),
+          );
+      }
+      return byParent.get(parentId) ?? [];
+    };
+  }, [contents, projects, pendingReorders, organization, savedOrganization, info?.home, tc]);
   function renderChildren(
     projectId: string,
     parentId: string | null = null,
     depth = 0,
   ): ReactNode {
     if (depth > 30) return null;
-    const current = contents[projectId];
-    if (!current) return null;
-    const folderIds = new Set(current.folders.map((item) => item.id));
-    const targets = sortDirectoryItems(
-      [
-        ...current.folders
-          .filter((item) => (item.parentId ?? null) === parentId)
-          .map((item) => ({ ...item, target: folderTarget(item, projectId) })),
-        ...current.pages
-          .filter(
-            (item) =>
-              (item.parentId && folderIds.has(item.parentId)
-                ? item.parentId
-                : null) === parentId,
-          )
-          .map((item) => ({
-            ...item,
-            name: item.title || tc("untitled"),
-            pinned: item.favorite,
-            target: pageTarget(item, projectId),
-          })),
-      ],
-      folderPreferences(projectId, parentId),
-      organization.entryOrder?.[projectId],
-    ).map((item) => item.target);
+    if (!contents[projectId]) return null;
+    const targets = sidebarChildren(projectId, parentId);
     return targets.map((target) => (
       <div key={target.id}>
         <LibraryRow
@@ -3054,7 +3448,7 @@ export default function Studio() {
     const inserted = insertComponent(source, destination.attrs!.id, kind, data);
     const nodeId = inserted.nodeId;
     page.edit(inserted.document);
-    if (!(await page.flush())) return;
+    await saveOpenPage();
     setDialog(null);
     setRevealNode(nodeId);
     setSelectedProject(page.projectId);
@@ -3174,16 +3568,16 @@ export default function Studio() {
   const currentFolder = folders.find((item) => item.id === selectedFolder);
   const filteredPages = pages.filter(
     (item) =>
-      item.title.toLowerCase().includes(query.toLowerCase()) &&
-      (query ||
+      item.title.toLowerCase().includes(deferredQuery.toLowerCase()) &&
+      (deferredQuery ||
         (item.parentId && folderIds.has(item.parentId)
           ? item.parentId
           : null) === selectedFolder),
   );
   const filteredFolders = folders.filter(
     (item) =>
-      item.name.toLowerCase().includes(query.toLowerCase()) &&
-      (query || (item.parentId ?? null) === selectedFolder),
+      item.name.toLowerCase().includes(deferredQuery.toLowerCase()) &&
+      (deferredQuery || (item.parentId ?? null) === selectedFolder),
   );
   const visibleEntries = sortDirectoryItems(
     [
@@ -3225,12 +3619,12 @@ export default function Studio() {
       .map(({ kind, id, updatedAt, hash }) => ({ kind, id, updatedAt, hash }));
   }
   const pageSelection = useDirectoryPageSelection(
-    JSON.stringify([info?.home, view, selectedProject, selectedFolder, query]),
+    JSON.stringify([info?.home, view, selectedProject, selectedFolder, deferredQuery]),
     visibleEntries.map((item) => item.id),
   );
   const directoryMarquee = useDirectoryMarquee(
     pageSelection,
-    JSON.stringify([info?.home, view, selectedProject, selectedFolder, query]),
+    JSON.stringify([info?.home, view, selectedProject, selectedFolder, deferredQuery]),
     view === "project" && !dialog,
   );
   const selectedPageTargets = visibleEntries
@@ -3241,87 +3635,128 @@ export default function Studio() {
     setContextMenu(null);
     setDialog({ type: "batchPages", operation, targets: selectedPageTargets });
   }
+  /** Moves one folder or page; a moved page's editor closes, as its location changed. */
+  async function moveLibraryEntry(
+    target: LibraryTarget,
+    destination: LibraryPlace,
+  ) {
+    const home = info?.home;
+    const record =
+      target.kind === "page"
+        ? await desktop.invoke<LoadedPage>("pages:get", {
+            expectedHome: home,
+            projectId: target.projectId,
+            pageId: target.id,
+          })
+        : null;
+    await desktop.invoke("sidebar:moveEntry", {
+      expectedHome: home,
+      kind: target.kind,
+      projectId: target.projectId,
+      id: target.id,
+      destinationProjectId: destination.projectId,
+      parentId: destination.parentId,
+      placement: "after",
+      ...(record
+        ? { baseHash: record.hash, baseRevision: record.revision }
+        : {}),
+    });
+    if (target.kind === "page")
+      page.sessions.forgetPage(target.projectId, target.id);
+  }
+  /**
+   * Saves the open pages several library items hold, and closes the open page
+   * when it is one of them. Other pages, even one in a conflict, stay as they are.
+   */
+  async function settleTargets(targets: LibraryTarget[]) {
+    const scopes = targets.map((target) => ({
+      target,
+      scope: deletionScope(target),
+    }));
+    const touches = (projectId: string, pageId: string, parentId: string | null) =>
+      scopes.some(
+        ({ target, scope }) =>
+          target.projectId === projectId &&
+          (scope.pages.has(pageId) || (!!parentId && scope.folders.has(parentId))),
+      );
+    for (const projectId of new Set(targets.map((target) => target.projectId)))
+      await settlePages(projectId, (pageId, parentId) =>
+        touches(projectId, pageId, parentId),
+      );
+    if (
+      page.projectId &&
+      page.draft &&
+      touches(page.projectId, page.draft.id, page.draft.parentId ?? null) &&
+      !(await page.clear())
+    )
+      throw new Error(t("resolveDraftFirst"));
+    return scopes;
+  }
+  /** Undo and redo of Move to…: each item goes back to (or again to) its place. */
+  async function moveLibraryEntries(
+    moves: { target: LibraryTarget; destination: LibraryPlace }[],
+  ) {
+    if (movingLibrary.current) return false;
+    movingLibrary.current = true;
+    const projectIds = new Set<string>();
+    try {
+      await reorderQueue.current;
+      await settleTargets(moves.map((move) => move.target));
+      for (const move of [
+        ...moves.filter((move) => move.target.kind === "page"),
+        ...moves.filter((move) => move.target.kind === "folder"),
+      ]) {
+        await moveLibraryEntry(move.target, move.destination);
+        projectIds.add(move.target.projectId);
+        projectIds.add(move.destination.projectId);
+      }
+      setNotice(t("pagesMoved", { count: moves.length }));
+      return true;
+    } finally {
+      movingLibrary.current = false;
+      if (projectIds.size)
+        await refreshProjects([...projectIds], { sidebar: true }).catch(report);
+    }
+  }
   async function applyBatchPages(destination?: PageDestination) {
     if (dialog?.type !== "batchPages" || movingLibrary.current) return;
     const { operation, targets } = dialog;
     const home = info?.home;
     let completed = 0;
     const done = new Set<string>();
+    const projectIds = new Set(targets.map((target) => target.projectId));
+    if (destination) projectIds.add(destination.projectId);
     movingLibrary.current = true;
     try {
       await reorderQueue.current;
-      if (!(await page.flush()) || !(await page.sessions.flushAll())) {
-        setDialog(null);
-        setView("page");
-        return;
-      }
-      const folderIds = new Set(
-        targets.filter((target) => target.kind === "folder").map((target) => target.id),
-      );
-      const insideSelectedFolder = (
-        projectId: string | null,
-        parentId: string | null,
-      ) => {
-        const seen = new Set<string>();
-        while (parentId && !seen.has(parentId)) {
-          if (folderIds.has(parentId)) return true;
-          seen.add(parentId);
-          parentId =
-            contents[projectId ?? ""]?.folders.find(
-              (item) => item.id === parentId,
-            )?.parentId ?? null;
-        }
-        return false;
-      };
-      const openInsideFolder = insideSelectedFolder(
-        page.projectId,
-        page.draft?.parentId ?? null,
-      );
-      if (
-        targets.some(
-          (target) =>
-            target.projectId === page.projectId && target.id === page.draft?.id,
-        ) ||
-        (operation === "delete" && openInsideFolder)
-      ) {
-        if (!(await page.clear())) return;
-      }
+      const scopes = await settleTargets(targets);
+      const insideSelectedFolder = (folderId: string | null) =>
+        !!folderId &&
+        scopes.some(
+          ({ target, scope }) =>
+            target.projectId === selectedProject && scope.folders.has(folderId),
+        );
       // Pages go first so a page inside a selected folder is handled before its folder.
       for (const target of [
         ...targets.filter((target) => target.kind === "page"),
         ...targets.filter((target) => target.kind === "folder"),
       ]) {
-        if (target.kind === "folder") {
-          if (operation === "delete")
-            await desktop.invoke("folders:remove", {
-              expectedHome: home,
-              projectId: target.projectId,
-              folderId: target.id,
-            });
-          else {
-            if (!destination)
-              throw new Error("A destination is required to move folders.");
-            await desktop.invoke("sidebar:moveEntry", {
-              expectedHome: home,
-              kind: "folder",
-              projectId: target.projectId,
-              id: target.id,
-              destinationProjectId: destination.projectId,
-              parentId: destination.parentId,
-              placement: "after",
-            });
-          }
-          completed++;
-          done.add(target.id);
-          pageSelection.remove(target.id);
-          continue;
-        }
-        const record = await desktop.invoke<LoadedPage>("pages:get", {
-          expectedHome: home,
-          projectId: target.projectId,
-          pageId: target.id,
-        });
-        if (operation === "delete") {
+        if (operation === "move") {
+          if (!destination)
+            throw new Error("A destination is required to move pages.");
+          await moveLibraryEntry(target, destination);
+        } else if (target.kind === "folder")
+          await desktop.invoke("folders:remove", {
+            expectedHome: home,
+            projectId: target.projectId,
+            folderId: target.id,
+          });
+        else {
+          const record = await desktop.invoke<LoadedPage>("pages:get", {
+            expectedHome: home,
+            projectId: target.projectId,
+            pageId: target.id,
+          });
           await desktop.invoke("pages:remove", {
             expectedHome: home,
             projectId: target.projectId,
@@ -3329,24 +3764,11 @@ export default function Studio() {
             baseHash: record.hash,
             baseRevision: record.revision,
           });
-        } else {
-          if (!destination)
-            throw new Error("A destination is required to move pages.");
-          await desktop.invoke("sidebar:moveEntry", {
-            expectedHome: home,
-            kind: "page",
-            projectId: target.projectId,
-            id: target.id,
-            destinationProjectId: destination.projectId,
-            parentId: destination.parentId,
-            placement: "after",
-            baseHash: record.hash,
-            baseRevision: record.revision,
-          });
         }
+        if (operation === "delete")
+          forgetDeleted(target.projectId, deletionScope(target));
         completed++;
         done.add(target.id);
-        page.sessions.forgetPage(target.projectId, target.id);
         pageSelection.remove(target.id);
       }
       if (destination) {
@@ -3362,22 +3784,26 @@ export default function Studio() {
       }
       pageSelection.clear();
       setDialog(null);
-      if (
-        operation === "delete" &&
-        insideSelectedFolder(selectedProject, selectedFolder)
-      )
+      if (operation === "delete" && insideSelectedFolder(selectedFolder))
         setSelectedFolder(null);
       const message = t(operation === "move" ? "pagesMoved" : "pagesDeleted", {
         count: completed,
       });
-      if (operation === "delete")
-        notifyWithUndo(message, async () => {
-          for (const target of targets)
-            await restoreItem(restoreTargetOf(target));
-          await refresh();
-          setNotice(tn("pagesRestored", { count: targets.length }));
+      if (operation === "delete") {
+        const entry: LibraryChange = { kind: "delete", targets };
+        rememberLibraryChange(entry);
+        notifyWithUndo(message, () => undoLibraryChange(entry));
+      } else {
+        rememberLibraryChange({
+          kind: "batchMove",
+          moves: targets.map((target) => ({
+            target,
+            from: { projectId: target.projectId, parentId: target.parentId },
+            to: destination!,
+          })),
         });
-      else setNotice(message);
+        setNotice(message);
+      }
     } catch (reason) {
       setDialog((current) =>
         current?.type === "batchPages"
@@ -3396,7 +3822,7 @@ export default function Studio() {
       );
     } finally {
       movingLibrary.current = false;
-      await refresh().catch(report);
+      await refreshProjects([...projectIds], { sidebar: true }).catch(report);
     }
   }
   const docFolders = useBuiltinDocFolders(
@@ -3453,6 +3879,8 @@ export default function Studio() {
                 : project?.icon
               : undefined,
       scrollTop: 0,
+      ...(deferredQuery ? { query: deferredQuery } : {}),
+      ...(searchLibrary ? { searchLibrary } : {}),
     }),
     [
       view,
@@ -3465,6 +3893,8 @@ export default function Studio() {
       heading,
       docPage?.id,
       docMeta?.icon,
+      deferredQuery,
+      searchLibrary,
     ],
   );
   const workspace = useWorkspaceTabs({
@@ -3480,7 +3910,11 @@ export default function Studio() {
         target.view === "page" && target.projectId && target.pageId
           ? await page.prepare(target.projectId, target.pageId)
           : await page.prepareClear();
-      if (!show) return null;
+      if (!show) {
+        // Superseded switches end quietly; a page that could not keep its edits says so.
+        if (page.status === "error") draftHeld();
+        return null;
+      }
       return () => {
         if (!show(tabId)) return false;
         const loaded = target.projectId ? contents[target.projectId] : null;
@@ -3506,8 +3940,23 @@ export default function Studio() {
         setProjectsMenu(null);
         setGroupMenu(null);
         setExportMenu(null);
-        setQuery("");
-        setSearchLibrary(false);
+        // The entry's search comes back with it, so Back shows the same results.
+        const search = {
+          view: target.view,
+          query: entry.query ?? "",
+          library: !!entry.searchLibrary,
+        };
+        restoredSearch.current = search;
+        setQuery(search.query);
+        setSearchLibrary(search.library);
+        if (search.query && search.library)
+          requestAnimationFrame(() =>
+            document
+              .querySelector<HTMLInputElement>(
+                ".studio-topbar .expandable-search input",
+              )
+              ?.focus(),
+          );
         setRevealNode(null);
         if (target.view !== "page") setEditorControls(null);
         if (target.view === "docs" && target.pageId)
@@ -3600,7 +4049,7 @@ export default function Studio() {
   useEffect(() => {
     if (!capabilities.tabs) return;
     const command = (command: TabCommand) => {
-      if (dialogRef.current || !workspaceReady || routingRef.current) return;
+      if (dialogRef.current || !workspaceReady) return;
       const index = workspace.tabs.findIndex(
         (tab) => tab.id === workspace.activeId,
       );
@@ -3806,9 +4255,10 @@ export default function Studio() {
       ? clickDisposition(event, info?.platform === "darwin") : "current";
     if (target && disposition !== "current") {
       event.preventDefault();
-      if (!(await openTarget(target, disposition)))
-        throw new Error(t("resolveDraftFirst"));
-      if (disposition === "tab" || disposition === "foreground-tab")
+      if (
+        (await openTarget(target, disposition)) &&
+        (disposition === "tab" || disposition === "foreground-tab")
+      )
         setRevealNode(result.blockId);
       return;
     }
@@ -3821,12 +4271,9 @@ export default function Studio() {
       /^projects\/([^/]+)\/pages\/([^/]+)\.json$/,
     );
     if (match) {
-      if (!(await openPage(match[2], match[1])))
-        throw new Error(t("resolveDraftFirst"));
-      setRevealNode(result.blockId);
+      if (await openPage(match[2], match[1])) setRevealNode(result.blockId);
     } else if (result.kind === "project" && result.projectId) {
-      if (!(await openProject(result.projectId)))
-        throw new Error(t("resolveDraftFirst"));
+      await openProject(result.projectId);
     } else if (result.kind === "component" || result.kind === "source") {
       const packageMatch = result.path.match(
         /(?:^|\/)components\/([^/]+)\/([^/]+)\//,
@@ -3859,9 +4306,6 @@ export default function Studio() {
         projectId: result.projectId ?? undefined,
       });
     }
-
-    setQuery("");
-    setSearchRevision((revision) => revision + 1);
   }
 
   const contentCreationDisabled =
@@ -3933,6 +4377,7 @@ export default function Studio() {
     toggleProject,
     libraryKeyCommand,
     unpinTarget,
+    pageTarget,
   });
   rowHandlers.current = {
     openTargetClick,
@@ -3940,7 +4385,26 @@ export default function Studio() {
     toggleProject,
     libraryKeyCommand,
     unpinTarget,
+    pageTarget,
   };
+  const openRecent = useCallback(
+    (item: RecentPage, event: ReactMouseEvent<HTMLButtonElement>) =>
+      rowHandlers.current.openTargetClick(
+        rowHandlers.current.pageTarget(item, item.projectId),
+        event,
+      ),
+    [],
+  );
+  const showRecentMenu = useCallback(
+    (item: RecentPage, anchor: HTMLElement, point?: LibraryMenuPoint) =>
+      rowHandlers.current.showMenu(
+        rowHandlers.current.pageTarget(item, item.projectId),
+        anchor,
+        point,
+      ),
+    [],
+  );
+  const beginProject = useCallback(() => setDialog({ type: "project" }), []);
   const rowCommand = useCallback<NonNullable<LibraryRowProps["onCommand"]>>(
     (target, command) => rowHandlers.current.libraryKeyCommand(target, command),
     [],
@@ -4041,7 +4505,7 @@ export default function Studio() {
   );
 
   const openProjectManagement = action(async () => {
-    if (!(await page.flush())) return;
+    await settleOpenPage();
     setSyncRequest({projectId:"",intent:"manage",key:Date.now()});
     setSettingsSection("sync");
     await navigate("settings");
@@ -4338,7 +4802,7 @@ export default function Studio() {
                 onChange={(event) => {
                   const id = event.target.value;
                   void (async () => {
-                    if (!(await page.flush())) return;
+                    await settleOpenPage();
                     selectedRef.current = id || null;
                     setSelectedProject(id || null);
                     setSelectedFolder(null);
@@ -4432,7 +4896,7 @@ export default function Studio() {
           view !== "components" &&
           view !== "templates" && (
             <ExpandableSearch
-              key={`${view}:${selectedProject}:${selectedFolder}:${searchRevision}`}
+              key={`${view}:${selectedProject}:${selectedFolder}`}
               label={
                 !searchLibrary && view === "projects"
                   ? t("searchRecentPages")
@@ -4485,14 +4949,14 @@ export default function Studio() {
           {document.documentElement.dataset.native === "ios" && (view === "project" || view === "projects") && (
             <>
               <button className="studio-icon" aria-label={t("libraryUndo")} title={t("libraryUndo")}
-                disabled={historyBusy.current || !libraryUndo.current.length}
-                onClick={() => void replayLibraryMove(false).catch((error) =>
-                  report(error, { action: operation("op.undoMove") }),
+                disabled={historyBusy.current || !libraryHistory.current.next(false)}
+                onClick={() => void replayLibraryChange(false).catch((error) =>
+                  report(error, { action: operation("op.undoLibrary") }),
                 )}><Undo2 size={16} /></button>
               <button className="studio-icon" aria-label={t("libraryRedo")} title={t("libraryRedo")}
-                disabled={historyBusy.current || !libraryRedo.current.length}
-                onClick={() => void replayLibraryMove(true).catch((error) =>
-                  report(error, { action: operation("op.redoMove") }),
+                disabled={historyBusy.current || !libraryHistory.current.next(true)}
+                onClick={() => void replayLibraryChange(true).catch((error) =>
+                  report(error, { action: operation("op.redoLibrary") }),
                 )}><Redo2 size={16} /></button>
             </>
           )}
@@ -4598,7 +5062,7 @@ export default function Studio() {
                   onChange={(event) => {
                     const id = event.target.value;
                     void (async () => {
-                      if (!(await page.flush())) return;
+                      await settleOpenPage();
                       componentProjectRef.current = id;
                       setComponentProject(id);
                       if (id !== "all") {
@@ -5014,7 +5478,8 @@ export default function Studio() {
                 onKeepCopy={action(async () => {
                   const copy = await page.keepCopy();
                   if (copy) {
-                    await refresh();
+                    if (page.projectId) await refreshProjects([page.projectId]);
+                    else await refresh();
                     setNotice(t("draftKeptAsCopy"));
                   }
                 })}
@@ -5199,7 +5664,7 @@ export default function Studio() {
                   section={settingsSection}
                     syncRequest={syncRequest}
                     onOpenProject={async (id) => {
-                      await refresh();
+                      await refreshProjects([id], { sidebar: true });
                       await openProject(id);
                     }}
                   info={info}
@@ -5276,33 +5741,22 @@ export default function Studio() {
                   {view === "projects" && (
                     <RecentPages
                       pages={recent}
-                      query={query}
-                      onOpen={(item, event) =>
-                          openTargetClick(
-                            pageTarget(item, item.projectId),
-                            event,
-                          )
-                      }
-                      onMenu={(item, anchor, point) =>
-                        showMenu(
-                          pageTarget(item, item.projectId),
-                          anchor,
-                          point,
-                        )
-                      }
-                      onCreateProject={() => setDialog({ type: "project" })}
+                      query={deferredQuery}
+                      onOpen={openRecent}
+                      onMenu={showRecentMenu}
+                      onCreateProject={beginProject}
                       welcome={
-                        !workspaceReady ? (
-                          <div className="studio-welcome" aria-busy="true" />
-                        ) : welcoming && !showDocs ? (
-                          welcomeView
-                        ) : undefined
+                        !workspaceReady
+                          ? recentLoading
+                          : welcoming && !showDocs
+                            ? welcomeView
+                            : undefined
                       }
                     />
                   )}
                   {view === "project" && (
                     <>
-                      {visibleEntries.length || !query ? (
+                      {visibleEntries.length || !deferredQuery ? (
                           <div
                             className="studio-page-list"
                             data-view={directoryView}
@@ -5438,7 +5892,7 @@ export default function Studio() {
                               </button>
                             </div>
                           ))}
-                          {!query && !pageSelection.active && (
+                          {!deferredQuery && !pageSelection.active && (
                             <div className="studio-page-list-row studio-page-list-add">
                               <button
                                 type="button"
@@ -5470,14 +5924,14 @@ export default function Studio() {
                         <div className="studio-empty">
                           <FilePlus2 size={30} strokeWidth={1.2} />
                           <h2>
-                            {query
+                            {deferredQuery
                               ? t("noMatchingContent")
                               : currentFolder
                                 ? t("folderEmpty")
                                 : t("projectEmpty")}
                           </h2>
-                          {!query && <p>{t("emptyHint")}</p>}
-                          {!query && project && (
+                          {!deferredQuery && <p>{t("emptyHint")}</p>}
+                          {!deferredQuery && project && (
                             <div
                               className="studio-empty-actions"
                               role="group"
@@ -5491,7 +5945,7 @@ export default function Studio() {
                                   createPage("blank", undefined, "page", {
                                     projectId: project.id,
                                     parentId: selectedFolder,
-                                  }),
+                                  }, true),
                                 )}
                               >
                                 <FileText size={15} aria-hidden="true" />
@@ -5798,7 +6252,7 @@ export default function Studio() {
                   await desktop.invoke("groups:remove", {
                     groupId: groupMenu.group.id,
                   });
-                  await refresh();
+                  await refreshProjects([], { sidebar: true });
                   setNotice(t("groupRemoved"));
                 }),
               },
@@ -5942,7 +6396,7 @@ export default function Studio() {
                               ),
                             onSelect: action(async () => {
                               const projectId = contextMenu.target.projectId;
-                              if (!(await page.flush())) return;
+                              await settleOpenPage();
                               setSyncRequest({
                                 projectId,
                                 intent,
@@ -5957,14 +6411,14 @@ export default function Studio() {
                             icon: <EyeOff size={15} />,
                             onSelect: action(async () => {
                               const { projectId, title } = contextMenu.target;
-                              if (!(await page.flush())) return;
+                              await settleOpenPage();
                               await desktop.invoke("sync:projectVisibility", {
                                 projectId,
                                 visible: false,
                               });
                               if (selectedProject === projectId)
                                 await navigate("projects");
-                              await refresh();
+                              await refreshProjects([projectId], { sidebar: true });
                               notifyWithUndo(
                                 tn("hiddenNamed", { name: title }),
                                 async () => {
@@ -5972,7 +6426,9 @@ export default function Studio() {
                                     "sync:projectVisibility",
                                     { projectId, visible: true },
                                   );
-                                  await refresh();
+                                  await refreshProjects([projectId], {
+                                    sidebar: true,
+                                  });
                                   setNotice(tn("shownNamed", { name: title }));
                                 },
                               );
@@ -6023,7 +6479,7 @@ export default function Studio() {
                             label: t("duplicatePage"),
                             icon: <Copy size={15} />,
                             onSelect: action(async () => {
-                              if (!(await page.flush())) return;
+                              await saveOpenPage();
                               const result = await desktop.invoke<LoadedPage>(
                                 "pages:duplicate",
                                 {
@@ -6031,11 +6487,20 @@ export default function Studio() {
                                   pageId: contextMenu.target.id,
                                 },
                               );
+                              setContents((current) =>
+                                withCreatedPage(
+                                  current,
+                                  contextMenu.target.projectId,
+                                  result,
+                                ),
+                              );
                               await openPage(
                                 result.document.id,
                                 contextMenu.target.projectId,
                               );
-                              await refresh();
+                              await refreshProjects([
+                                contextMenu.target.projectId,
+                              ]);
                             }),
                           },
                           {
@@ -6051,11 +6516,7 @@ export default function Studio() {
                       icon: <Trash2 size={15} />,
                       danger: true,
                       separatorBefore: true,
-                      onSelect: () =>
-                        setDialog({
-                          type: "delete",
-                          target: contextMenu.target,
-                        }),
+                      onSelect: () => beginDelete(contextMenu.target),
                     },
                   ]
             }
@@ -6079,15 +6540,33 @@ export default function Studio() {
                 if (!(await retained.flush()))
                   throw new Error(t("iconKeptInDraft"));
               } else {
-                await desktop.invoke("pages:save", {
-                  projectId: dialog.target.projectId,
-                  pageId: dialog.target.id,
-                  baseHash: dialog.record.hash,
-                  baseRevision: dialog.record.revision,
-                  document: { ...dialog.record.document, icon },
-                });
+                const { target } = dialog;
+                const before = target.icon ?? "";
+                setContents((current) =>
+                  withLibraryEntry(current, { ...target, kind: "page" }, { icon }),
+                );
+                closeDialog();
+                try {
+                  await desktop.invoke("pages:save", {
+                    projectId: target.projectId,
+                    pageId: target.id,
+                    baseHash: dialog.record.hash,
+                    baseRevision: dialog.record.revision,
+                    document: { ...dialog.record.document, icon },
+                  });
+                } catch (reason) {
+                  setContents((current) =>
+                    withLibraryEntry(
+                      current,
+                      { ...target, kind: "page" },
+                      { icon: before },
+                    ),
+                  );
+                  report(reason, { action: operation("op.setIcon"), object: target.title });
+                  return;
+                }
               }
-              await refresh();
+              await refreshProjects([dialog.target.projectId]);
             }}
           />
         )}
@@ -6115,7 +6594,7 @@ export default function Studio() {
             onDiscard={page.acceptResolution}
             onMerged={async () => {
               await page.acceptResolution();
-              await refresh();
+              await refreshProjects([dialog.projectId]);
               setNotice(t("mergeSaved"));
             }}
           />
@@ -6192,7 +6671,7 @@ export default function Studio() {
               );
               if (dialog.projectId)
                 await moveProject(dialog.projectId, sidebar.groups.at(-1)!.id);
-              await refresh();
+              await refreshProjects([], { sidebar: true });
               setDialog(null);
             }}
           />
@@ -6217,11 +6696,14 @@ export default function Studio() {
             onClose={closeDialog}
             onSave={async (name, icon) => {
               if (dialog.target) {
-                if (await updateTarget(dialog.target, { name, icon }))
-                  setDialog(null);
+                await updateTarget(
+                  dialog.target,
+                  { name, icon },
+                  { close: closeDialog },
+                );
                 return;
               }
-              if (!(await page.flush())) return;
+              await settleOpenPage();
               const folder = await desktop.invoke<FolderMetadata>(
                 "folders:create",
                 {
@@ -6231,13 +6713,16 @@ export default function Studio() {
                   ...(icon ? { icon } : {}),
                 },
               );
+              setContents((current) =>
+                withCreatedFolder(current, dialog.projectId, folder),
+              );
               setExpandedFolders((current) => ({
                 ...current,
                 ...(dialog.parentId ? { [dialog.parentId]: true } : {}),
               }));
-              await openProject(dialog.projectId, folder.id);
-              await refresh();
               setDialog(null);
+              await openProject(dialog.projectId, folder.id);
+              await refreshProjects([dialog.projectId]);
             }}
           />
         )}
@@ -6248,7 +6733,7 @@ export default function Studio() {
             initialValue={dialog.target.title}
             onClose={closeDialog}
             onSave={async (name) => {
-              if (await updateTarget(dialog.target, { name })) setDialog(null);
+              await updateTarget(dialog.target, { name }, { close: closeDialog });
             }}
           />
         )}
@@ -6265,7 +6750,7 @@ export default function Studio() {
           <DeletedItemsDialog
             onClose={closeDialog}
             onRestored={async (target) => {
-              await refresh();
+              await refreshProjects([target.projectId], { sidebar: true });
               setNotice(tn("restoredNamed", { title: target.title }));
             }}
           />
@@ -6298,7 +6783,9 @@ export default function Studio() {
           <DeleteDialog
             target={dialog.target}
             onClose={closeDialog}
-            onDelete={() => deleteTarget(dialog.target)}
+            onDelete={async () => {
+              await deleteTarget(dialog.target, { close: closeDialog });
+            }}
           />
         )}
         {dialog?.type === "project" && (
@@ -6306,20 +6793,25 @@ export default function Studio() {
             project={dialog.project}
             onClose={closeDialog}
             onSave={async (name, icon) => {
-              const result = dialog.project
-                ? await desktop.invoke<ProjectSummary>("projects:rename", {
-                    projectId: dialog.project.id,
-                    name,
-                    icon,
-                  })
-                : await desktop.invoke<ProjectSummary>("projects:create", {
-                    name,
-                    icon,
-                  });
-              if (dialog.groupId) await moveProject(result.id, dialog.groupId);
-              await refresh();
-              if (!dialog.project) await openProject(result.id);
+              if (dialog.project) {
+                await updateTarget(
+                  projectTarget(dialog.project),
+                  { name, icon },
+                  { close: closeDialog },
+                );
+                return;
+              }
+              const result = await desktop.invoke<ProjectSummary>(
+                "projects:create",
+                { name, icon },
+              );
+              setProjects((current) =>
+                mergeNavigationProjects(current, [result], new Set([result.id])),
+              );
               setDialog(null);
+              if (dialog.groupId) await moveProject(result.id, dialog.groupId);
+              await openProject(result.id);
+              await refreshProjects([result.id], { sidebar: true });
             }}
           />
         )}
@@ -6329,7 +6821,7 @@ export default function Studio() {
               <button
                 disabled={busy}
                 aria-label={t("newPageAria")}
-                onClick={() => void createPage("blank", undefined, "page")}
+                onClick={() => void createPage("blank", undefined, "page", undefined, true)}
               >
                 <span>
                   <FileText size={21} />
@@ -6342,7 +6834,7 @@ export default function Studio() {
               <button
                 aria-label={t("newBoardAria")}
                 disabled={busy}
-                onClick={() => void createPage("blank", undefined, "board")}
+                onClick={() => void createPage("blank", undefined, "board", undefined, true)}
               >
                 <span>
                   <Presentation size={21} />
@@ -6604,6 +7096,7 @@ function DeleteDialog({
           </button>
           <button
             className="studio-button danger"
+            data-autofocus
             disabled={busy}
             onClick={() => {
               setBusy(true);

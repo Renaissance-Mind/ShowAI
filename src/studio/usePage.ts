@@ -173,7 +173,8 @@ export function usePage(home?: string) {
   }, [sessions]);
   // A page waiting on a save conflict cannot save, but leaving it is safe:
   // the session's leave keeps its edits in the local draft, and the conflict
-  // banner is still there when the person comes back to resolve it.
+  // banner is still there when the person comes back to resolve it. Hiding
+  // it (clear) takes the same leave, so its draft survives too.
   const flushOrDefer = useCallback(
     async () =>
       (await flush()) ||
@@ -201,12 +202,12 @@ export function usePage(home?: string) {
     [sessions, flushOrDefer],
   );
   const clear = useCallback(
-    async () => (await flush()) && sessions.clear(),
-    [sessions, flush],
+    async () => (await flushOrDefer()) && sessions.clear(),
+    [sessions, flushOrDefer],
   );
   const prepareClear = useCallback(
-    async () => ((await flush()) ? sessions.prepareClear() : null),
-    [sessions, flush],
+    async () => ((await flushOrDefer()) ? sessions.prepareClear() : null),
+    [sessions, flushOrDefer],
   );
   const reload = useCallback(
     () => sessions.getSnapshot().active?.reload() ?? Promise.resolve(),
@@ -286,6 +287,7 @@ export function usePage(home?: string) {
     open,
     prepare,
     flush,
+    flushOrDefer,
     leave,
     clear,
     prepareClear,

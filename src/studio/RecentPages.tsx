@@ -1,4 +1,12 @@
-import { useEffect, useState, type MouseEvent, type ReactNode } from "react";
+import {
+  memo,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type MouseEvent,
+  type ReactNode,
+} from "react";
 import PageIcon from "../components/PageIcon";
 import { FileText } from "../ui/icons";
 import type { PageSummary, ProjectSummary } from "../core/model";
@@ -11,6 +19,8 @@ import { writerName } from "./external-change";
 import "./external-change.css";
 
 const translate = translator(sidebarMessages);
+/** Rows rendered at first and added each time the list nears its end. */
+const ROW_STEP = 200;
 const absoluteTimeFormats = new Map<string, Intl.DateTimeFormat>();
 
 function formatAbsoluteTime(date: Date): string {
@@ -75,7 +85,11 @@ export function recentPages(
     );
 }
 
-export default function RecentPages({
+/**
+ * Recently updated pages across projects. Rows render in steps as the list
+ * scrolls, and a parent re-render with the same props does not render it again.
+ */
+export default memo(function RecentPages({
   pages,
   query,
   onOpen,
@@ -103,9 +117,34 @@ export default function RecentPages({
     return () => window.clearInterval(timer);
   }, []);
   const term = query.trim().toLocaleLowerCase();
-  const visible = pages.filter((page) =>
-    `${page.title} ${page.projectName}`.toLocaleLowerCase().includes(term),
+  const visible = useMemo(
+    () =>
+      term
+        ? pages.filter((page) =>
+            `${page.title} ${page.projectName}`
+              .toLocaleLowerCase()
+              .includes(term),
+          )
+        : pages,
+    [pages, term],
   );
+  const [limit, setLimit] = useState(ROW_STEP);
+  useEffect(() => setLimit(ROW_STEP), [term]);
+  const end = useRef<HTMLDivElement>(null);
+  const more = visible.length > limit;
+  useEffect(() => {
+    const element = end.current;
+    if (!more || !element) return;
+    // Observing again after each step also covers a list still shorter than the view.
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) setLimit((value) => value + ROW_STEP);
+      },
+      { rootMargin: "800px 0px" },
+    );
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, [more, limit]);
   if (welcome && !term) return <>{welcome}</>;
   if (!visible.length)
     return (
@@ -124,7 +163,7 @@ export default function RecentPages({
       className="studio-page-list studio-recent-pages"
       aria-label={t("recentPages")}
     >
-      {visible.map((page) => (
+      {visible.slice(0, limit).map((page) => (
         <div
           key={`${page.projectId}:${page.id}`}
           className="studio-page-list-row"
@@ -191,6 +230,7 @@ export default function RecentPages({
           </button>
         </div>
       ))}
+      {more && <div ref={end} aria-hidden="true" />}
     </div>
   );
-}
+});
