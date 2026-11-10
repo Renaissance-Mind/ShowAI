@@ -9,7 +9,9 @@ import { useBoardInteraction } from "./useBoardInteraction";
 import type {
   BoardGesture,
   BoardGestureInput as BoardGesturePoint,
+  BoardInteraction,
 } from "./useBoardInteraction";
+import { ObjectSceneContext } from "./object-scene-context";
 import { useInlineInk } from "./useInlineInk";
 import { BoardGestureInput } from "./BoardGestureInput";
 import { DrawingInput } from "./Drawing";
@@ -1135,6 +1137,38 @@ export default function PageSurface({
     setLabelEditing(hit.id);
     return true;
   };
+  // The board interaction object is rebuilt each render. Objects receive a
+  // view that changes only with the selection they display; its methods call
+  // the latest board, so a commit does not re-render every object.
+  const liveBoard = useRef(board);
+  liveBoard.current = board;
+  const boardSelection = [...board.ids].join(":");
+  const boardView = useMemo<BoardInteraction>(
+    () => ({
+      ids: board.ids,
+      drawingSnapIndex: () => liveBoard.current.drawingSnapIndex(),
+      selectionHit: (...args) => liveBoard.current.selectionHit(...args),
+      edgeHit: (...args) => liveBoard.current.edgeHit(...args),
+      createHitTest: (...args) => liveBoard.current.createHitTest(...args),
+      selectionTarget: (...args) => liveBoard.current.selectionTarget(...args),
+      hitTest: (...args) => liveBoard.current.hitTest(...args),
+      select: (...args) => liveBoard.current.select(...args),
+      selectAll: () => liveBoard.current.selectAll(),
+      selectIds: (...args) => liveBoard.current.selectIds(...args),
+      lassoHit: (...args) => liveBoard.current.lassoHit(...args),
+      nudge: (...args) => liveBoard.current.nudge(...args),
+      measured: (...args) => liveBoard.current.measured(...args),
+      start: (...args) => liveBoard.current.start(...args),
+      update: (...args) => liveBoard.current.update(...args),
+      finish: () => liveBoard.current.finish(),
+      cancel: () => liveBoard.current.cancel(),
+    }),
+    [boardSelection],
+  );
+  const objectScene = useMemo(
+    () => ({ nativeScene, geometry, readOnly: !onMove }),
+    [nativeScene, geometry, !onMove],
+  );
   const objectContext = useMemo<ObjectActions>(
     () => ({
       componentActionsHost,
@@ -1145,8 +1179,8 @@ export default function PageSurface({
       },
       geometry,
       selected,
-      select: onTransform ? board.select : onSelect,
-      board: onTransform && !locked ? board : undefined,
+      select: onTransform ? boardView.select : onSelect,
+      board: onTransform && !locked ? boardView : undefined,
       inspect: onInspect,
       expand: onExpand,
       remove: onRemove,
@@ -1160,14 +1194,12 @@ export default function PageSurface({
       revealAll: revealAll || printing || !!capture,
       revealed,
     }),
-    // The board interaction object is rebuilt each render; its selection is
-    // the part objects read.
     [
       componentActionsHost,
       nativeScene,
       geometry,
       selected,
-      [...board.ids].join(":"),
+      boardView,
       onTransform,
       locked,
       onInspect,
@@ -1181,11 +1213,11 @@ export default function PageSurface({
       revealAll,
       printing,
       revealed,
-      boardDocument,
     ],
   );
   return (
     <ObjectContext.Provider value={objectContext}>
+    <ObjectSceneContext.Provider value={objectScene}>
       <div
         ref={(element) => {
           rootRef.current = element;
@@ -2589,6 +2621,7 @@ export default function PageSurface({
           )}
         </DockableBoardToolbar>
       </div>
+    </ObjectSceneContext.Provider>
     </ObjectContext.Provider>
   );
 }

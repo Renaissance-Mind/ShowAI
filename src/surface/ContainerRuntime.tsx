@@ -63,6 +63,7 @@ import {
 } from "./SurfaceContent";
 import PageSurface, { type SurfaceHandle } from "./PageSurface";
 import { ObjectContext, type ObjectActions } from "./SurfaceObject";
+import { ObjectSceneContext } from "./object-scene-context";
 import {
   addNode,
   editNode as editSurfaceNode,
@@ -230,6 +231,12 @@ export function ContainerRuntime({
     [],
   );
   const closeSlash = useCallback(() => setSlash(null), []);
+  // A stable value keeps every component body from re-rendering per commit.
+  const registerComponent = useCallback(
+    (component: CompiledComponent) =>
+      setLoadedComponents((items) => [...items, component]),
+    [],
+  );
   const [printing, setPrinting] = useState(false);
   useEffect(() => {
     const media = matchMedia("print");
@@ -427,11 +434,7 @@ export function ContainerRuntime({
     );
   return (
     <AdditionalComponentsProvider components={loadedComponents}>
-      <RegisterComponentContext.Provider
-        value={(component) =>
-          setLoadedComponents((items) => [...items, component])
-        }
-      >
+      <RegisterComponentContext.Provider value={registerComponent}>
         <Context.Provider value={runtime}>
           {outlineSettingsId &&
             !runtime.readOnly &&
@@ -1170,6 +1173,10 @@ function ContainerView({
       );
     runtime.requestReveal(null);
   }, [runtime.revealRequest]);
+  // Object actions come from the runtime's stable parts, so a commit does not
+  // hand every object a new context; mutations read the latest runtime.
+  const latestRuntime = useRef(runtime);
+  latestRuntime.current = runtime;
   const actions = useMemo<ObjectActions>(
     () => ({
       geometry: runtime.geometry,
@@ -1183,43 +1190,66 @@ function ContainerView({
       revealed: new Set(),
       move: readOnly
         ? undefined
-        : (nodeId, frame) =>
-            runtime.commit(
+        : (nodeId, frame) => {
+            const current = latestRuntime.current;
+            current.commit(
               transformObjects(
-                runtime.geometry.materialize(runtime.current.current),
+                current.geometry.materialize(current.current.current),
                 { [nodeId]: frame },
               ),
-            ),
+            );
+          },
       remove: readOnly
         ? undefined
         : (nodeId) => {
-            runtime.commit(
+            const current = latestRuntime.current;
+            current.commit(
               removeNode(
-                runtime.geometry.materialize(runtime.current.current),
+                current.geometry.materialize(current.current.current),
                 nodeId,
               ),
             );
-            runtime.select(null);
+            current.select(null);
           },
     }),
-    [runtime, readOnly, kind, reading],
+    [
+      runtime.geometry,
+      runtime.selected,
+      runtime.select,
+      runtime.inspect,
+      runtime.expand,
+      readOnly,
+      kind,
+      reading,
+    ],
+  );
+  const revealingActions = useMemo(
+    () => ({ ...actions, revealAll: true }),
+    [actions],
+  );
+  // Content nodes read only these; selection changes leave them untouched.
+  const scene = useMemo(
+    () => ({ geometry: runtime.geometry, readOnly }),
+    [runtime.geometry, readOnly],
   );
   // Local tool/style state must not broadcast a new object context. These
-  // handlers capture the actual runtime and are renewed on document, selection
-  // or permission context changes; mutations still read its current source.
+  // handlers keep their identity and read the latest runtime when they run.
   const transformObjectFrames = useCallback(
-    (frames: Record<string, NodeLayout>, group?: string) =>
+    (frames: Record<string, NodeLayout>, group?: string) => {
+      const runtime = latestRuntime.current;
       runtime.commit(
         transformObjects(
           runtime.geometry.materialize(runtime.current.current),
           frames,
         ),
         group,
-      ),
-    [runtime],
+      );
+    },
+    [],
   );
   const connectObject = useCallback<NonNullable<ObjectActions["connect"]>>(
     (nodeId, endpoint, point) => {
+      const runtime = latestRuntime.current;
       const source = runtime.geometry.materialize(runtime.current.current),
         entry = findSurfaceNode(source, nodeId);
       if (!entry || !source.layout[nodeId]) return;
@@ -1253,10 +1283,11 @@ function ContainerView({
         ),
       );
     },
-    [runtime],
+    [],
   );
   const setObjectLabel = useCallback<NonNullable<ObjectActions["setLabel"]>>(
     (nodeId, label, minHeight) => {
+      const runtime = latestRuntime.current;
       let next = runtime.geometry.materialize(runtime.current.current);
       const frame = next.layout?.[nodeId];
       if (minHeight && frame && minHeight > (frame.height ?? 0))
@@ -1269,7 +1300,7 @@ function ContainerView({
       }) as ContainerDocument;
       runtime.commit(next);
     },
-    [runtime],
+    [],
   );
   // A borderless Page blends into its Board: no frame and no title line.
   const heading =
@@ -1285,23 +1316,25 @@ function ContainerView({
   );
   if (root && nativeInkBackground && readOnly && kind === "board")
     return (
-      <ObjectContext.Provider value={{ ...actions, revealAll: true }}>
-        <div className="native-ink-background">
-          <div className="native-ink-world" data-native-ink-world>
-            <SurfaceContent
-              document={runtime.document}
-              container={node}
-              spatial
-              renderContent={runtime.render}
-              renderSurface={renderSurface}
-            />
+      <ObjectContext.Provider value={revealingActions}>
+        <ObjectSceneContext.Provider value={scene}>
+          <div className="native-ink-background">
+            <div className="native-ink-world" data-native-ink-world>
+              <SurfaceContent
+                document={runtime.document}
+                container={node}
+                spatial
+                renderContent={runtime.render}
+                renderSurface={renderSurface}
+              />
+            </div>
           </div>
-        </div>
+        </ObjectSceneContext.Provider>
       </ObjectContext.Provider>
     );
   if (kind === "page" || reading)
     return (
-      <ObjectContext.Provider value={actions}>
+      <ObjectContext.Provider value={actions}><ObjectSceneContext.Provider value={scene}>
         <div className="page-outline-shell" ref={pageShell}>
           <div
             ref={page}
@@ -1360,7 +1393,7 @@ function ContainerView({
             />
           )}
         </div>
-      </ObjectContext.Provider>
+      </ObjectSceneContext.Provider></ObjectContext.Provider>
     );
   return (
     <div
