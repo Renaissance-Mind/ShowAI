@@ -11,7 +11,6 @@ import type {
   BoardGestureInput as BoardGesturePoint,
   BoardInteraction,
 } from "./useBoardInteraction";
-import { ObjectSceneContext } from "./object-scene-context";
 import { useInlineInk } from "./useInlineInk";
 import { BoardGestureInput } from "./BoardGestureInput";
 import { DrawingInput } from "./Drawing";
@@ -539,10 +538,10 @@ export default function PageSurface({
   const hoverWindow = useRef({ id: "", since: 0, until: 0 });
   const hoverFrame = useRef(0);
   const bindTarget = useRef<HTMLElement | null>(null);
+  // The board interaction object is rebuilt each render; handlers and the
+  // objects' board view below call the latest one.
   const currentBoard = useRef(board);
-  useLayoutEffect(() => {
-    currentBoard.current = board;
-  }, [board]);
+  currentBoard.current = board;
   const highlightTarget = useCallback(
     (x: number | null, y?: number, exclude?: string) => {
       let next: HTMLElement | null = null;
@@ -1137,37 +1136,23 @@ export default function PageSurface({
     setLabelEditing(hit.id);
     return true;
   };
-  // The board interaction object is rebuilt each render. Objects receive a
-  // view that changes only with the selection they display; its methods call
-  // the latest board, so a commit does not re-render every object.
-  const liveBoard = useRef(board);
-  liveBoard.current = board;
+  // Objects receive a board view that changes only with the selection they
+  // display, so a commit does not re-render every object.
   const boardSelection = [...board.ids].join(":");
-  const boardView = useMemo<BoardInteraction>(
-    () => ({
-      ids: board.ids,
-      drawingSnapIndex: () => liveBoard.current.drawingSnapIndex(),
-      selectionHit: (...args) => liveBoard.current.selectionHit(...args),
-      edgeHit: (...args) => liveBoard.current.edgeHit(...args),
-      createHitTest: (...args) => liveBoard.current.createHitTest(...args),
-      selectionTarget: (...args) => liveBoard.current.selectionTarget(...args),
-      hitTest: (...args) => liveBoard.current.hitTest(...args),
-      select: (...args) => liveBoard.current.select(...args),
-      selectAll: () => liveBoard.current.selectAll(),
-      selectIds: (...args) => liveBoard.current.selectIds(...args),
-      lassoHit: (...args) => liveBoard.current.lassoHit(...args),
-      nudge: (...args) => liveBoard.current.nudge(...args),
-      measured: (...args) => liveBoard.current.measured(...args),
-      start: (...args) => liveBoard.current.start(...args),
-      update: (...args) => liveBoard.current.update(...args),
-      finish: () => liveBoard.current.finish(),
-      cancel: () => liveBoard.current.cancel(),
-    }),
+  const boardView = useMemo(
+    () =>
+      Object.fromEntries(
+        Object.entries(board).map(([key, value]) => [
+          key,
+          typeof value === "function"
+            ? (...args: unknown[]) =>
+                (currentBoard.current as unknown as Record<string, Function>)[
+                  key
+                ](...args)
+            : value,
+        ]),
+      ) as unknown as BoardInteraction,
     [boardSelection],
-  );
-  const objectScene = useMemo(
-    () => ({ nativeScene, geometry, readOnly: !onMove }),
-    [nativeScene, geometry, !onMove],
   );
   const objectContext = useMemo<ObjectActions>(
     () => ({
@@ -1217,7 +1202,6 @@ export default function PageSurface({
   );
   return (
     <ObjectContext.Provider value={objectContext}>
-    <ObjectSceneContext.Provider value={objectScene}>
       <div
         ref={(element) => {
           rootRef.current = element;
@@ -2621,7 +2605,6 @@ export default function PageSurface({
           )}
         </DockableBoardToolbar>
       </div>
-    </ObjectSceneContext.Provider>
     </ObjectContext.Provider>
   );
 }

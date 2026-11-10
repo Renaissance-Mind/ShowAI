@@ -18,8 +18,7 @@ import {
 } from "react";
 import type { JSONContent } from "@tiptap/core";
 import type { ShowDocument } from "../types";
-import { SurfaceObject } from "./SurfaceObject";
-import { ObjectSceneContext } from "./object-scene-context";
+import { ObjectContext, SurfaceObject } from "./SurfaceObject";
 import { orderedSurfaceNodes } from "./document.mjs";
 import { translator } from "../i18n";
 import { useTranslator } from "../i18n/react";
@@ -134,7 +133,7 @@ const ContentNode = memo(
     spatial?: boolean;
     renderSurface?: (node: JSONContent) => ReactNode;
   }) {
-    const actions = useContext(ObjectSceneContext);
+    const actions = useContext(ObjectContext);
     const observed = useConnectionGeometry(
       sourceNode,
       document,
@@ -360,7 +359,7 @@ const ContentNode = memo(
 );
 function AddToRegion({ id }: { id: string }) {
   const t = useTranslator(messages);
-  const actions = useContext(ObjectSceneContext);
+  const actions = useContext(ObjectContext);
   return actions.readOnly ? null : (
     <div
       tabIndex={0}
@@ -386,7 +385,7 @@ export function SurfaceContent({
   container?: JSONContent;
   renderSurface?: (node: JSONContent) => ReactNode;
 }) {
-  const actions = useContext(ObjectSceneContext);
+  const actions = useContext(ObjectContext);
   if (
     isResource(document) &&
     container.type === "surface" &&
