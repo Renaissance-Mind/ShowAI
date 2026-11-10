@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { desktop, errorMessage } from "./bridge";
 import Dialog from "./Dialog";
+import { visibleInterval } from "./visible-interval";
 import { useTranslator } from "../i18n/react";
 import messages from "../i18n/messages/remoteMcp";
 import type { RemoteApprovalRequest } from "../remote-mcp/types";
@@ -20,7 +21,11 @@ export default function RemoteMcpApprovalDialog() {
       try {
         const next =
           await desktop.invoke<RemoteApprovalRequest[]>("remoteMcp:requests");
-        if (active) setRequests(next);
+        // Polled continuously: an unchanged list keeps its identity and skips a commit.
+        if (active)
+          setRequests((current) =>
+            JSON.stringify(current) === JSON.stringify(next) ? current : next,
+          );
       } catch (reason) {
         if (active) setError(errorMessage(reason));
       } finally {
@@ -28,10 +33,10 @@ export default function RemoteMcpApprovalDialog() {
       }
     };
     void read();
-    const timer = setInterval(() => void read(), 1500);
+    const stop = visibleInterval(() => void read(), 1500);
     return () => {
       active = false;
-      clearInterval(timer);
+      stop();
     };
   }, []);
   const request = requests[0];
