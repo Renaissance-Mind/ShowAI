@@ -7,6 +7,7 @@ import { ContentLibrary } from "./content-library";
 import { scanWorkspaceResources } from "./package-recovery";
 import { withLibraryLock } from "./library-lock";
 import { WorkspaceProtection } from "./workspace-conflicts";
+import type { TreeQuery } from "./sqlite-reader";
 
 const roots: string[] = [];
 afterEach(async () => {
@@ -96,7 +97,8 @@ it("reads committed files for a workspace comparison in bounded batches", async 
   const counted = {
     root: library.root,
     workspace: library.workspace,
-    tree: (revision?: string) => library.tree(revision),
+    treeEntries: (query: TreeQuery, revision?: string) =>
+      library.treeEntries(query, revision),
     readFiles: (batch: string[], revision?: string) => {
       requested.push(batch.length);
       return library.readFiles(batch, revision);

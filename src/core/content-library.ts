@@ -2,6 +2,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { CoreError } from "./model";
 import { SqliteLibrary } from "./sqlite-library";
+import type { TreeQuery } from "./sqlite-reader";
 import type { GitLibrary as LegacyLibrary } from "./git-library";
 import type { ChangeContext, FileChanges, HistoryEntry } from "./history-model";
 import type { WorkspaceConflict } from "./workspace-conflicts";
@@ -78,6 +79,10 @@ export class ContentLibrary {
   }
   async tree(revision?: string) {
     return (await this.backend()).tree(revision);
+  }
+  /** The tree entries at exact paths and below directory prefixes ("dir/"). */
+  async treeEntries(query: TreeQuery, revision?: string) {
+    return (await this.backend()).treeEntries(query, revision);
   }
   async readFiles(paths: string[], revision?: string) {
     return (await this.backend()).readFiles(paths, revision);

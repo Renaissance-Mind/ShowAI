@@ -3,6 +3,11 @@ import { access, mkdir, readFile, readdir, rename, rm } from "node:fs/promises";
 import { createHash, randomUUID } from "node:crypto";
 import { isAbsolute, join, relative, resolve, sep } from "node:path";
 import { CoreError } from "./model";
+import {
+  assertTreeQuery,
+  selectTreeEntries,
+  type TreeQuery,
+} from "./sqlite-reader";
 import { encodeFile, decodeFile, nodePrefix } from "./history-codec";
 import { withLibraryLock } from "./library-lock";
 import { libraryMutations } from "./history-context";
@@ -328,6 +333,12 @@ export class GitLibrary {
         "The requested library revision is missing.",
       );
     return selected;
+  }
+
+  /** The tree entries at exact paths and below directory prefixes ("dir/"). */
+  async treeEntries(query: TreeQuery, revision?: string): Promise<TreeEntry[]> {
+    assertTreeQuery(query);
+    return selectTreeEntries(await this.tree(revision), query);
   }
 
   async tree(revision?: string): Promise<TreeEntry[]> {

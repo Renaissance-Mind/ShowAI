@@ -14,8 +14,40 @@ export interface SqliteTreeEntry {
   oid: string;
   bytes?: number;
 }
+/** Exact paths and directory prefixes (each ending in "/") of one tree. */
+export interface TreeQuery {
+  paths?: string[];
+  prefixes?: string[];
+}
+export function assertTreeQuery(query: TreeQuery): TreeQuery {
+  query.paths?.forEach(assertSqlitePath);
+  for (const prefix of query.prefixes ?? []) {
+    if (!prefix.endsWith("/"))
+      throw new CoreError(
+        "INVALID_PATH",
+        `A library directory prefix must end with "/": ${prefix}`,
+      );
+    // A directory prefix is valid when a file directly inside it is.
+    assertSqlitePath(`${prefix}_`);
+  }
+  return query;
+}
+/** The entries of a full tree that a query selects, in tree order. */
+export function selectTreeEntries<T extends { path: string }>(
+  tree: T[],
+  query: TreeQuery,
+): T[] {
+  const paths = new Set(query.paths ?? []),
+    prefixes = query.prefixes ?? [];
+  return tree.filter(
+    (entry) =>
+      paths.has(entry.path) ||
+      prefixes.some((prefix) => entry.path.startsWith(prefix)),
+  );
+}
 type Request = { session?: string } & (
   | { kind: "tree"; revision?: string }
+  | { kind: "entries"; revision?: string; query: TreeQuery }
   | { kind: "files"; revision?: string; paths: string[] }
   | { kind: "revisions"; revision?: string; paths: string[] }
   | { kind: "entry"; revision: string }
@@ -193,6 +225,7 @@ export async function runSqliteRead(home: string, request: Request) {
     throw new CoreError("INVALID_DATA", "Invalid history revision.");
   if (request.kind === "files" || request.kind === "revisions")
     request.paths.forEach(assertSqlitePath);
+  if (request.kind === "entries") assertTreeQuery(request.query);
   if (request.session) {
     const session = sessions.get(request.session);
     if (session?.home !== resolve(home))
@@ -217,7 +250,7 @@ async function readWithin(db: DatabaseSync, home: string, request: Request) {
   // read transaction as the requested content and dependent objects.
   const selected = request.revision ?? headOf(db) ?? undefined;
   if (!selected) {
-    if (request.kind === "tree") return [];
+    if (request.kind === "tree" || request.kind === "entries") return [];
     if (request.kind === "revisions")
       return new Map(request.paths.map((path) => [path, null]));
     throw new CoreError(
@@ -264,6 +297,39 @@ async function readWithin(db: DatabaseSync, home: string, request: Request) {
       if (trees.size > 8) trees.delete(trees.keys().next().value!);
     }
     return tree.map((entry) => ({ ...entry }));
+  }
+  if (request.kind === "entries") {
+    const cached = trees.get(`${home}:${selected}`);
+    if (cached) return selectTreeEntries(cached, request.query);
+    // The same rows the tree query returns, restricted by the primary key range.
+    const select = current
+      ? "SELECT f.path,f.oid FROM current_files f JOIN blobs b ON b.oid=f.oid WHERE f.path"
+      : "SELECT p.path,c.oid FROM paths p JOIN changes c ON c.path=p.path AND c.sequence=(SELECT c2.sequence FROM changes c2 WHERE c2.path=p.path AND c2.sequence<=$sequence ORDER BY c2.sequence DESC LIMIT 1) JOIN blobs b ON b.oid=c.oid WHERE c.oid IS NOT NULL AND p.path";
+    const exact = db.prepare(`${select}=$path`),
+      range = db.prepare(
+        `${select}>=$start AND ${current ? "f" : "p"}.path<$end`,
+      );
+    const found = new Map<string, SqliteTreeEntry>();
+    const add = (rows: Record<string, unknown>[]) => {
+      for (const row of rows)
+        found.set(String(row.path), {
+          path: String(row.path),
+          oid: String(row.oid),
+        });
+    };
+    const pinned: Record<string, number> = current
+      ? {}
+      : { sequence: Number(sequence) };
+    for (const path of new Set(request.query.paths ?? []))
+      add(exact.all({ ...pinned, path }));
+    for (const prefix of new Set(request.query.prefixes ?? []))
+      add(
+        range.all({ ...pinned, start: prefix, end: prefix.slice(0, -1) + "0" }),
+      );
+    // SQLite orders TEXT by its UTF-8 bytes, as the tree query does.
+    return [...found.values()].sort((a, b) =>
+      Buffer.compare(Buffer.from(a.path), Buffer.from(b.path)),
+    );
   }
   if (request.kind === "revisions" && stateCurrent) {
     const exact = db.prepare(

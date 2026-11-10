@@ -52,7 +52,7 @@ export function workspaceHash(
 export async function recordWorkspaceChanges(
   library: Pick<
     GitLibrary,
-    "root" | "workspace" | "tree" | "readFiles" | "head" | "readSnapshot"
+    "root" | "workspace" | "treeEntries" | "readFiles" | "head" | "readSnapshot"
   >,
   paths: string[],
 ): Promise<WorkspaceConflict[]> {
@@ -83,11 +83,10 @@ const COMPARE_BATCH = 16;
 
 /** External content stays in place and is independently retained before resolution. */
 export class WorkspaceProtection {
-  private inspectedTree?: { revision: string | null; paths: Set<string> };
   constructor(
     readonly library: Pick<
       GitLibrary,
-      "root" | "workspace" | "tree" | "readFiles"
+      "root" | "workspace" | "treeEntries" | "readFiles"
     >,
   ) {}
 
@@ -208,17 +207,18 @@ export class WorkspaceProtection {
     return conflicts;
   }
 
+  /** Which of the paths the revision contains. */
+  private async tracked(paths: string[], revision: string | null) {
+    return new Set(
+      (revision && paths.length
+        ? await this.library.treeEntries({ paths }, revision)
+        : []
+      ).map((entry) => entry.path),
+    );
+  }
+
   private async compare(paths: string[], revision: string | null) {
-    if (!this.inspectedTree || this.inspectedTree.revision !== revision)
-      this.inspectedTree = {
-        revision,
-        paths: new Set(
-          (revision ? await this.library.tree(revision) : []).map(
-            (entry) => entry.path,
-          ),
-        ),
-      };
-    const tree = this.inspectedTree.paths;
+    const tree = await this.tracked(paths, revision);
     const differences: {
       path: string;
       actual: Buffer | null;
@@ -284,9 +284,7 @@ export class WorkspaceProtection {
     revision: string,
     before: Record<string, string | null>,
   ): Promise<WorkspaceConflict[]> {
-    const tree = new Set(
-      (await this.library.tree(revision)).map((entry) => entry.path),
-    );
+    const tree = await this.tracked(paths, revision);
     const files = await this.library.readFiles(
       paths.filter((path) => tree.has(path)),
       revision,

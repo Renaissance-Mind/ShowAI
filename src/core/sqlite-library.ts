@@ -15,11 +15,13 @@ import { deflateRaw, inflateRawSync } from "node:zlib";
 import { promisify } from "node:util";
 import {
   activeSqliteSnapshot,
+  assertTreeQuery,
   readSqlite,
   selectEntry,
   sqliteResourcePath as resourcePath,
   withSqliteSnapshot,
   type SqliteTreeEntry,
+  type TreeQuery,
 } from "./sqlite-reader";
 const compress = promisify(deflateRaw);
 import { CoreError } from "./model";
@@ -415,6 +417,15 @@ export class SqliteLibrary {
   async tree(revision?: string): Promise<SqliteTreeEntry[]> {
     return readSqlite(this.root, { kind: "tree", revision });
   }
+  /** The tree entries at exact paths and below directory prefixes. */
+  async treeEntries(
+    query: TreeQuery,
+    revision?: string,
+  ): Promise<SqliteTreeEntry[]> {
+    assertTreeQuery(query);
+    if (!query.paths?.length && !query.prefixes?.length) return [];
+    return readSqlite(this.root, { kind: "entries", revision, query });
+  }
   async readFiles(
     paths: string[],
     revision?: string,
@@ -780,7 +791,10 @@ export class SqliteLibrary {
         );
       const head = await this.head();
       const tree = new Set(
-        (head ? await this.tree(head) : []).map((entry) => entry.path),
+        (head
+          ? await this.treeEntries({ paths: [conflict.path] }, head)
+          : []
+        ).map((entry) => entry.path),
       );
       const current =
         head && tree.has(conflict.path)
@@ -1028,7 +1042,16 @@ export class SqliteLibrary {
           { currentRevision: parent ?? undefined },
         );
     changes = new Map(changes);
-    const existing = await this.tree(parent ?? undefined);
+    // Changed files and the stored nodes of changed pages, not the whole library.
+    const existing = await this.treeEntries(
+      {
+        paths: [...changes.keys()],
+        prefixes: [...changes.keys()]
+          .filter((path) => /^projects\/[^/]+\/pages\/[^/]+\.json$/.test(path))
+          .map(nodePrefix),
+      },
+      parent ?? undefined,
+    );
     if (!context.syncOrigin) {
       const config = await readFile(
         join(this.root, "local", "sync", "config.json"),

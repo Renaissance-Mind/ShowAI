@@ -1643,9 +1643,12 @@ export class SyncManager {
     const head = await library.head();
     if (
       !head ||
-      !(await library.tree(head)).some(
-        (entry) => entry.path === `projects/${projectId}/project.json`,
-      )
+      !(
+        await library.treeEntries(
+          { paths: [`projects/${projectId}/project.json`] },
+          head,
+        )
+      ).length
     )
       return;
     await refreshProjectBundles(new FileStore(this.home), projectId, {
@@ -1983,13 +1986,14 @@ export class SyncManager {
     const library = new GitLibrary(this.home),
       head = await library.head();
     if (!head) return [];
-    const paths = (await library.tree(head))
+    const paths = (
+      await library.treeEntries(
+        { prefixes: [`projects/${projectId}/conflicts/`] },
+        head,
+      )
+    )
       .map((entry) => entry.path)
-      .filter(
-        (path) =>
-          path.startsWith(`projects/${projectId}/conflicts/`) &&
-          path.endsWith("/record.json"),
-      );
+      .filter((path) => path.endsWith("/record.json"));
     return [...(await library.readFiles(paths, head))].map(
       ([, bytes]) => JSON.parse(bytes.toString()) as RetainedConflict,
     );
@@ -2096,9 +2100,12 @@ export class SyncManager {
     if (project.role !== "viewer")
       await this.refreshBundles(library, project.projectId, true);
     const localHead = await library.head();
-    const localExists = (await library.tree(localHead ?? undefined)).some(
-      (entry) => entry.path === `projects/${project.projectId}/project.json`,
-    );
+    const localExists = !!(
+      await library.treeEntries(
+        { paths: [`projects/${project.projectId}/project.json`] },
+        localHead ?? undefined,
+      )
+    ).length;
     let localFiles =
       localExists && localHead
         ? await new LibraryOperations(
