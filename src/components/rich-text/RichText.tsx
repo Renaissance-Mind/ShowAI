@@ -15,7 +15,7 @@ import { RichTextEnvironment } from "./environment";
 import { useTranslator } from "../../i18n/react";
 import messages from "../../i18n/messages/richText";
 import {
-  richTextContent,
+  richTextDocument,
   validateRichTextData,
   richTextStyle,
 } from "./model.mjs";
@@ -47,12 +47,16 @@ export function RichText({
   // Annotated text and formulas show their notes in reading and editing.
   installNoteBubbles();
   validateRichTextData(data);
+  const editable = !readOnly && !!(onChange || host?.onContentChange);
+  // The editor normalizes a content tree itself and keeps unchanged blocks.
   const content = useMemo(
-    () => richTextContent(data),
-    [data.content, data.format],
+    () =>
+      editable && typeof data.content == "object"
+        ? (data.content as JSONContent)
+        : richTextDocument(data),
+    [data.content, data.format, editable],
   );
   const { renderWidget } = useContext(RichTextEnvironment);
-  const editable = !readOnly && !!(onChange || host?.onContentChange);
   const style = richTextStyle(data);
   return (
     <section

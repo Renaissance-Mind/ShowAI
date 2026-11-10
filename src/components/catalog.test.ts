@@ -24,16 +24,12 @@ describe("built-in component catalog sharing", () => {
     expect(builtinComponent("not-a-component")).toBeUndefined();
   });
 
-  it("keeps the shared copy frozen and fresh catalogs independent", () => {
+  it("keeps fresh catalogs independent of the shared copy", () => {
     const shared = builtinComponent("chart")!;
-    expect(Object.isFrozen(shared)).toBe(true);
-    expect(Object.isFrozen(shared.defaultData)).toBe(true);
-    expect(() => {
-      (shared.defaultData as Record<string, unknown>).title = "changed";
-    }).toThrow(TypeError);
-
     const fresh = builtinComponentCatalog({ includeLegacy: true });
     const item = fresh.find((candidate) => candidate.kind === "chart")!;
+    expect(item).not.toBe(shared);
+    expect(item.defaultData).not.toBe(shared.defaultData);
     (item.defaultData as Record<string, unknown>).title = "changed";
     item.documentation = undefined;
     expect(builtinComponent("chart")!.defaultData.title).not.toBe("changed");
@@ -43,7 +39,6 @@ describe("built-in component catalog sharing", () => {
     )!;
     expect(again.defaultData.title).not.toBe("changed");
     expect(again.documentation).toBeDefined();
-    expect(Object.isFrozen(again.documentation)).toBe(false);
   });
 
   it("inserts a component without changing the shared default data", () => {

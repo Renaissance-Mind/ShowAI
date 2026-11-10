@@ -1,7 +1,11 @@
 import { textRangeEditMeta } from "./text-range-edit";
 import { registerSelectionEditor } from "../../surface/text-selection";
 import { ContentNodeActions } from "./ContentNodeActions";
-import { primitiveNodeTypes, primitiveContentNode } from "./model.mjs";
+import {
+  primitiveNodeTypes,
+  primitiveContentNode,
+  readContentTree,
+} from "./model.mjs";
 import { CAPACITY, formatBytes } from "../../portable/capacity.mjs";
 import {
   navigationTarget,
@@ -240,7 +244,7 @@ function menuPosition(editor: Editor, from: number) {
 }
 
 export default function RichTextEditor({
-  content,
+  content: source,
   onChange,
   readOnly = false,
   minimal = true,
@@ -251,6 +255,9 @@ export default function RichTextEditor({
   trailingNode = true,
   retentionKey,
 }: RichTextEditorProps) {
+  // Primitive component nodes become editor nodes; every other block keeps its
+  // identity, so the echo of a local edit is recognised without parsing.
+  const content = useMemo(() => readContentTree(source), [source]);
   const t = useTranslator(messages);
   const tc = useTranslator(commonMessages);
   const tn = useTranslator(noteMessages);

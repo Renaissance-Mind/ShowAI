@@ -260,15 +260,6 @@ export function richTextDocument(data) {
     data.content ?? { type: "doc", content: [{ type: "paragraph" }] },
   );
 }
-/**
- * richTextDocument for renderers that only read the result: nodes that need
- * no normalization keep their identity instead of being copied.
- */
-export function richTextContent(data) {
-  if (typeof data.content === "string" || !data.content)
-    return richTextDocument(data);
-  return readContentTree(data.content);
-}
 const nodes = new Set([
   "doc",
   "text",
@@ -299,20 +290,6 @@ const nodes = new Set([
   "mathInline",
   "mathBlock",
 ]);
-/** Frozen content subtrees that passed validation: node count and height. */
-const validatedTrees = new WeakMap();
-/** Everything validation reads on this node is frozen; children are checked separately. */
-const frozenNode = (node) =>
-  Object.isFrozen(node) &&
-  (node.content === undefined || Object.isFrozen(node.content)) &&
-  (node.attrs === undefined || Object.isFrozen(node.attrs)) &&
-  (node.marks === undefined ||
-    (Object.isFrozen(node.marks) &&
-      node.marks.every(
-        (mark) =>
-          Object.isFrozen(mark) &&
-          (mark.attrs === undefined || Object.isFrozen(mark.attrs)),
-      )));
 export function validateRichTextData(data) {
   if (typeof data.content === "string") {
     if (
@@ -332,15 +309,6 @@ export function validateRichTextData(data) {
     throw Error("富文本 content 必须是 doc 内容树。");
   let count = 0;
   const visit = (node, depth = 0) => {
-    // An immutable subtree validated before only adds its size and height.
-    const known = node && validatedTrees.get(node);
-    if (known) {
-      count += known.count;
-      if (count > 12000 || depth + known.height - 1 > 48)
-        throw Error("富文本包含无效的节点或超出大小限制。");
-      return known.height;
-    }
-    const start = count;
     if (++count > 12000 || depth > 48 || !node || !nodes.has(node.type))
       throw Error("富文本包含无效的节点或超出大小限制。");
     if (node.type === "text" && typeof node.text !== "string")
@@ -405,18 +373,11 @@ export function validateRichTextData(data) {
       !isLocalResourceRef(node.attrs?.src, "image")
     )
       throw Error("无效的图片地址。");
-    let height = 1,
-      immutable = frozenNode(node);
     if (node.content !== undefined) {
       if (!Array.isArray(node.content))
         throw Error("富文本节点 content 必须为数组。");
-      for (const child of node.content) {
-        height = Math.max(height, 1 + visit(child, depth + 1));
-        if (!validatedTrees.has(child)) immutable = false;
-      }
+      node.content.forEach((child) => visit(child, depth + 1));
     }
-    if (immutable) validatedTrees.set(node, { count: count - start, height });
-    return height;
   };
   visit(data.content);
 }
