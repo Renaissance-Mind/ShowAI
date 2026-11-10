@@ -166,4 +166,37 @@ describe("stable block IDs in the real editor schema", () => {
     expect(ids(state)[0]).toBe("first");
     expect(new Set(ids(state)).size).toBe(2);
   });
+
+  it("assigns and deduplicates inline atom IDs inside paragraphs it has already seen", () => {
+    let state = EditorState.create({
+      schema,
+      doc: schema.nodes.doc.create(null, [
+        paragraph("plain text", "plain"),
+        schema.nodes.paragraph.create({ id: "with-break" }, [
+          schema.text("a"),
+          schema.nodes.hardBreak.create({ id: "break" }),
+          schema.text("b"),
+        ]),
+      ]),
+      plugins: [createBlockIdPlugin(() => true)],
+    });
+    // A text edit lets the plugin record the plain paragraph as text-only.
+    state = state.applyTransaction(state.tr.insertText("X", 2)).state;
+    expect(ids(state)).toEqual(["plain", "with-break", "break"]);
+    // The same paragraph later gains an inline atom without an ID, then one
+    // that duplicates an existing ID; both receive fresh IDs.
+    state = state.applyTransaction(
+      state.tr.insert(3, schema.nodes.hardBreak.create({ id: null })),
+    ).state;
+    state = state.applyTransaction(
+      state.tr.insert(4, schema.nodes.hardBreak.create({ id: "break" })),
+    ).state;
+    const result = ids(state);
+    expect(result).toHaveLength(5);
+    expect(result.every(Boolean)).toBe(true);
+    expect(new Set(result).size).toBe(5);
+    expect(result[0]).toBe("plain");
+    expect(result).toContain("with-break");
+    expect(result).toContain("break");
+  });
 });

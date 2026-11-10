@@ -5,6 +5,7 @@ import messages from "../../i18n/messages/richText";
 import { Extension, mergeAttributes, Node, Mark } from "@tiptap/core";
 import { ReactNodeViewRenderer } from "@tiptap/react";
 import { Plugin, PluginKey } from "@tiptap/pm/state";
+import type { Node as ProseMirrorNode } from "@tiptap/pm/model";
 import StarterKit from "@tiptap/starter-kit";
 import { HighlightedCodeBlock } from "./code-block";
 import Placeholder from "@tiptap/extension-placeholder";
@@ -52,6 +53,8 @@ export const blockIdNodeTypes = [
 ];
 
 export const blockIdPluginKey = new PluginKey("showaiBlockIds");
+/** Textblocks without id-bearing inline atoms; nodes are immutable. */
+const plainTextblocks = new WeakSet<ProseMirrorNode>();
 
 /** Attribute-only steps leave document positions, selection, and text untouched. */
 export function createBlockIdPlugin(isEditable: () => boolean): Plugin {
@@ -76,8 +79,7 @@ export function createBlockIdPlugin(isEditable: () => boolean): Plugin {
         return null;
       const used = new Set<string>();
       const transaction = current.tr;
-      current.doc.descendants((node, position) => {
-        if (!types.has(node.type.name)) return;
+      const assign = (node: ProseMirrorNode, position: number) => {
         const existing = node.attrs.id;
         if (
           typeof existing === "string" &&
@@ -93,6 +95,19 @@ export function createBlockIdPlugin(isEditable: () => boolean): Plugin {
         } while (used.has(id));
         used.add(id);
         transaction.setNodeAttribute(position, "id", id);
+      };
+      current.doc.descendants((node, position) => {
+        if (types.has(node.type.name)) assign(node, position);
+        if (!node.isTextblock) return true;
+        // Inline content carries ids only on atoms such as hard breaks and
+        // inline formulas; text-only blocks are skipped once known.
+        if (plainTextblocks.has(node)) return false;
+        let plain = true;
+        node.forEach((child) => {
+          if (types.has(child.type.name)) plain = false;
+        });
+        if (plain) plainTextblocks.add(node);
+        return !plain;
       });
       if (!transaction.docChanged) return null;
       return transaction
