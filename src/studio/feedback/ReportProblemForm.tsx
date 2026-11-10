@@ -13,6 +13,7 @@ import {
   useDiagnostics,
 } from "./DiagnosticsPreview";
 import { issueUrl, reportText, type ReportKind } from "./issue-url";
+import { useSessionDraft } from "../session-draft";
 import "./feedback.css";
 
 const CONTEXT_MESSAGE_LIMIT = 1200;
@@ -42,11 +43,14 @@ function timeText(at: string) {
 export function ReportProblemForm({
   info: givenInfo,
   context: initialContext,
+  onContextChange,
   onBack,
 }: {
   /** Undefined: the form reads App information itself (crash page). */
   info?: DesktopInfo | null;
   context?: ReportProblemDetail;
+  /** Called when the attached problem is removed or the report is submitted. */
+  onContextChange?: (context: ReportProblemDetail | undefined) => void;
   onBack?: () => void;
 }) {
   const t = useTranslator(messages);
@@ -66,11 +70,19 @@ export function ReportProblemForm({
       stopped = true;
     };
   }, [givenInfo]);
-  const [kind, setKind] = useState<ReportKind>("problem");
-  const [summary, setSummary] = useState("");
-  const [steps, setSteps] = useState("");
-  const [context, setContext] = useState(initialContext);
-  useEffect(() => setContext(initialContext), [initialContext]);
+  // What was typed survives leaving Settings until it is submitted.
+  const [kind, setKind] = useSessionDraft<ReportKind>(
+    "feedback.report.kind",
+    "problem",
+  );
+  const [summary, setSummary] = useSessionDraft("feedback.report.summary", "");
+  const [steps, setSteps] = useSessionDraft("feedback.report.steps", "");
+  const [context, setContextState] = useState(initialContext);
+  useEffect(() => setContextState(initialContext), [initialContext]);
+  const setContext = (value: ReportProblemDetail | undefined) => {
+    setContextState(value);
+    onContextChange?.(value);
+  };
   const diagnostics = useDiagnostics(info);
   const [status, setStatus] = useState<{ text: string; error?: boolean }>();
   const [busy, setBusy] = useState(false);
@@ -141,6 +153,10 @@ export function ReportProblemForm({
         "_blank",
         "noopener",
       );
+      setKind("problem");
+      setSummary("");
+      setSteps("");
+      setContext(undefined);
       return text ? t("report.githubOpened") : t("report.githubOpenedPlain");
     });
   const copyAll = () =>

@@ -32,6 +32,7 @@ import {
   remoteExecution,
 } from "./AgentExecution";
 import { AGENT_SETUP_EVENT, takeAgentSetup } from "./AgentReadiness";
+import { useSessionDraft } from "./session-draft";
 
 function formatBytes(bytes: number) {
   return bytes >= 1024 * 1024
@@ -132,10 +133,17 @@ export default function AgentSettings() {
   const [busy, setBusy] = useState(false),
     [error, setError] = useState(""),
     [notice, setNotice] = useState("");
-  const [adding, setAdding] = useState(false);
-  const [editing, setEditing] = useState<ModelSource | null>(null),
-    [key, setKey] = useState("");
-  const [models, setModels] = useState<{ id: string; name: string }[]>([]);
+  // The model source form survives leaving Settings; the key stays in memory.
+  const [adding, setAdding] = useSessionDraft("agent-settings.adding", false);
+  const [editing, setEditing] = useSessionDraft<ModelSource | null>(
+      "agent-settings.source",
+      null,
+    ),
+    [key, setKey] = useSessionDraft("agent-settings.apiKey", "");
+  const [models, setModels] = useSessionDraft<{ id: string; name: string }[]>(
+    "agent-settings.models",
+    [],
+  );
   const [taskId, setTaskId] = useState("");
   const mounted = useRef(true),
     settingsRef = useRef<Configuration | null>(null);
@@ -290,6 +298,7 @@ export default function AgentSettings() {
       ...(key.trim() ? { apiKey: key } : {}),
     });
     setKey("");
+    setModels([]);
     update(next);
     setEditing(null);
     setNotice(t("toast.sourceSaved"));
@@ -821,6 +830,7 @@ export default function AgentSettings() {
                     onClick={() => {
                       setEditing(null);
                       setKey("");
+                      setModels([]);
                     }}
                   >
                     {tc("cancel")}
@@ -941,6 +951,8 @@ export default function AgentSettings() {
                       }),
                     );
                     setEditing(null);
+                    setKey("");
+                    setModels([]);
                   })}
                 >
                   <Trash2 size={12} />
