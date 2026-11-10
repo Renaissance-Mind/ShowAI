@@ -1,4 +1,4 @@
-import { constants } from "node:fs";
+import { constants, type Stats } from "node:fs";
 import { lstat, mkdir, open, rm } from "node:fs/promises";
 import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { randomUUID } from "node:crypto";
@@ -39,6 +39,19 @@ export async function readLibraryBytes(
   root: string,
   path: string,
 ): Promise<Buffer | null> {
+  return (await readLibraryFileState(root, path))?.bytes ?? null;
+}
+
+/** File identity that changes whenever a file is replaced or rewritten. */
+export function fileIdentity(info: Stats): string {
+  return `${info.dev}:${info.ino}:${info.size}:${info.mtimeMs}:${info.ctimeMs}`;
+}
+
+/** The file's bytes and the identity of the file they were read from. */
+export async function readLibraryFileState(
+  root: string,
+  path: string,
+): Promise<{ bytes: Buffer; identity: string } | null> {
   await safeLibraryPath(root, path);
   const file = await open(
     path,
@@ -59,7 +72,7 @@ export async function readLibraryBytes(
         "CONFLICT",
         "The external file is still being written. Retry when it finishes.",
       );
-    return bytes;
+    return { bytes, identity: fileIdentity(after) };
   } finally {
     await file.close();
   }

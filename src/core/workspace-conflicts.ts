@@ -1,11 +1,13 @@
 import { createHash } from "node:crypto";
-import { readdir, rm } from "node:fs/promises";
+import { lstat, readdir, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { canonicalJson } from "./diff";
 import { CoreError } from "./model";
 import {
   atomicLibraryFile,
+  fileIdentity,
   readLibraryBytes,
+  readLibraryFileState,
   safeLibraryPath,
 } from "./library-files";
 import type { ContentLibrary as GitLibrary } from "./content-library";
@@ -79,6 +81,16 @@ export async function recordWorkspaceChanges(
   return conflicts;
 }
 
+/**
+ * Parsed conflict records by conflicts directory and id, with the identity of
+ * the file each was read from. capture() can rewrite a resolved record as
+ * unresolved under the same id, so a record is reused only while its file is.
+ */
+const conflictRecords = new Map<
+  string,
+  Map<string, { identity: string; record: WorkspaceConflict }>
+>();
+
 const COMPARE_BATCH = 16;
 const sameBytes = (a: Buffer | null, b: Buffer | null) =>
   a === null || b === null ? a === b : a.equals(b);
@@ -99,32 +111,60 @@ export class WorkspaceProtection {
 
   async list(path?: string): Promise<WorkspaceConflict[]> {
     const root = join(this.library.root, "local", "conflicts");
-    const names = await readdir(root).catch((error: NodeJS.ErrnoException) => {
-      if (error.code === "ENOENT") return [];
-      throw error;
-    });
-    const records: WorkspaceConflict[] = [];
-    for (const name of names) {
+    const entries = await readdir(root, { withFileTypes: true }).catch(
+      (error: NodeJS.ErrnoException) => {
+        if (error.code === "ENOENT") return [];
+        throw error;
+      },
+    );
+    let cache = conflictRecords.get(root);
+    if (!cache) conflictRecords.set(root, (cache = new Map()));
+    const records: WorkspaceConflict[] = [],
+      present = new Set<string>();
+    let parentsChecked = false;
+    for (const entry of entries) {
+      const name = entry.name;
       if (!/^[a-f0-9]{64}$/.test(name)) continue;
-      const bytes = await readLibraryBytes(
-        this.library.root,
-        join(root, name, "conflict.json"),
-      );
-      if (!bytes) continue;
-      const value = JSON.parse(bytes.toString("utf8")) as WorkspaceConflict;
-      if (
-        value.format !== "showai-workspace-conflict" ||
-        value.version !== 1 ||
-        value.id !== name ||
-        !value.path ||
-        !["unresolved", "resolved"].includes(value.state)
-      )
-        throw new CoreError(
-          "INVALID_DATA",
-          "Invalid workspace conflict record.",
-        );
-      if (!path || value.path === path) records.push(value);
+      present.add(name);
+      const file = join(root, name, "conflict.json");
+      // A real directory holding an unchanged regular file needs no read.
+      if (entry.isDirectory() && !parentsChecked) {
+        await safeLibraryPath(this.library.root, root);
+        parentsChecked = true;
+      }
+      const info = entry.isDirectory()
+        ? await lstat(file).catch((error: NodeJS.ErrnoException) => {
+            if (error.code === "ENOENT") return undefined;
+            throw error;
+          })
+        : undefined;
+      const cached = cache.get(name);
+      let value: WorkspaceConflict;
+      if (info?.isFile() && cached?.identity === fileIdentity(info))
+        value = cached.record;
+      else {
+        const read = await readLibraryFileState(this.library.root, file);
+        if (!read) {
+          cache.delete(name);
+          continue;
+        }
+        value = JSON.parse(read.bytes.toString("utf8")) as WorkspaceConflict;
+        if (
+          value.format !== "showai-workspace-conflict" ||
+          value.version !== 1 ||
+          value.id !== name ||
+          !value.path ||
+          !["unresolved", "resolved"].includes(value.state)
+        )
+          throw new CoreError(
+            "INVALID_DATA",
+            "Invalid workspace conflict record.",
+          );
+        cache.set(name, { identity: read.identity, record: value });
+      }
+      if (!path || value.path === path) records.push({ ...value });
     }
+    for (const name of cache.keys()) if (!present.has(name)) cache.delete(name);
     return records.sort((a, b) => b.observedAt.localeCompare(a.observedAt));
   }
 
