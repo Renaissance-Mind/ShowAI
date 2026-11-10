@@ -145,15 +145,17 @@ function validateViews(views, ids, rootIds) {
   views.initial ??= null;
   if (views.initial !== null && !viewIds.has(views.initial))
     throw new Error("The initial view does not exist.");
+  const roots = new Set(rootIds);
+  let order;
   if (
     !Array.isArray(readingOrder) ||
-    new Set(readingOrder).size !== readingOrder.length ||
-    readingOrder.some((id) => !rootIds.includes(id))
+    (order = new Set(readingOrder)).size !== readingOrder.length ||
+    readingOrder.some((id) => !roots.has(id))
   )
     throw new Error("Reading order must contain unique root node ids.");
   views.readingOrder = [
     ...readingOrder,
-    ...rootIds.filter((id) => !readingOrder.includes(id)),
+    ...rootIds.filter((id) => !order.has(id)),
   ];
 }
 
