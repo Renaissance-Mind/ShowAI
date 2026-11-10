@@ -9,6 +9,7 @@ import { useBoardInteraction } from "./useBoardInteraction";
 import type {
   BoardGesture,
   BoardGestureInput as BoardGesturePoint,
+  BoardInteraction,
 } from "./useBoardInteraction";
 import { useInlineInk } from "./useInlineInk";
 import { BoardGestureInput } from "./BoardGestureInput";
@@ -537,10 +538,10 @@ export default function PageSurface({
   const hoverWindow = useRef({ id: "", since: 0, until: 0 });
   const hoverFrame = useRef(0);
   const bindTarget = useRef<HTMLElement | null>(null);
+  // The board interaction object is rebuilt each render; handlers and the
+  // objects' board view below call the latest one.
   const currentBoard = useRef(board);
-  useLayoutEffect(() => {
-    currentBoard.current = board;
-  }, [board]);
+  currentBoard.current = board;
   const highlightTarget = useCallback(
     (x: number | null, y?: number, exclude?: string) => {
       let next: HTMLElement | null = null;
@@ -1135,6 +1136,24 @@ export default function PageSurface({
     setLabelEditing(hit.id);
     return true;
   };
+  // Objects receive a board view that changes only with the selection they
+  // display, so a commit does not re-render every object.
+  const boardSelection = [...board.ids].join(":");
+  const boardView = useMemo(
+    () =>
+      Object.fromEntries(
+        Object.entries(board).map(([key, value]) => [
+          key,
+          typeof value === "function"
+            ? (...args: unknown[]) =>
+                (currentBoard.current as unknown as Record<string, Function>)[
+                  key
+                ](...args)
+            : value,
+        ]),
+      ) as unknown as BoardInteraction,
+    [boardSelection],
+  );
   const objectContext = useMemo<ObjectActions>(
     () => ({
       componentActionsHost,
@@ -1145,8 +1164,8 @@ export default function PageSurface({
       },
       geometry,
       selected,
-      select: onTransform ? board.select : onSelect,
-      board: onTransform && !locked ? board : undefined,
+      select: onTransform ? boardView.select : onSelect,
+      board: onTransform && !locked ? boardView : undefined,
       inspect: onInspect,
       expand: onExpand,
       remove: onRemove,
@@ -1160,14 +1179,12 @@ export default function PageSurface({
       revealAll: revealAll || printing || !!capture,
       revealed,
     }),
-    // The board interaction object is rebuilt each render; its selection is
-    // the part objects read.
     [
       componentActionsHost,
       nativeScene,
       geometry,
       selected,
-      [...board.ids].join(":"),
+      boardView,
       onTransform,
       locked,
       onInspect,
@@ -1181,7 +1198,6 @@ export default function PageSurface({
       revealAll,
       printing,
       revealed,
-      boardDocument,
     ],
   );
   return (

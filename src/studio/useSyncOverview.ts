@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { desktop, errorMessage } from "./bridge";
+import { visibleInterval } from "./visible-interval";
 import type { SyncConfiguration, ProjectConnection } from "../sync/protocol";
 
 type Connection = Omit<SyncConfiguration["connections"][number], "token">;
@@ -84,10 +85,10 @@ export function useSyncOverview(home?: string) {
         },
       );
     void read();
-    const timer = setInterval(() => void read(), 3000);
+    const stop = visibleInterval(() => void read(), 3000);
     return () => {
       active = false;
-      clearInterval(timer);
+      stop();
     };
   }, [home]);
   return useMemo(() => {

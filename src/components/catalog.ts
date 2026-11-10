@@ -28,8 +28,30 @@ export function builtinComponentCatalog({
   })) as BuiltinComponentMetadata[];
   return includeLegacy ? items : items.filter((item) => !item.replacedBy);
 }
-export function builtinComponent(kind: string) {
-  return builtinComponentCatalog({ includeLegacy: true }).find(
-    (item) => item.kind === kind,
-  );
+
+// One shared copy for workbench readers, by kind. Its users only read it;
+// insertion copies default data before changing it.
+let byKind: Map<string, BuiltinComponentMetadata> | undefined;
+let current: readonly BuiltinComponentMetadata[] | undefined;
+const shared = () =>
+  (byKind ??= new Map(
+    builtinComponentCatalog({ includeLegacy: true }).map((item) => [
+      item.kind,
+      item,
+    ]),
+  ));
+/**
+ * The current built-in catalog as one shared list. Callers that change an
+ * item, such as inserting its default data, copy that part first.
+ */
+export function readBuiltinComponentCatalog(): readonly BuiltinComponentMetadata[] {
+  return (current ??= [...shared().values()].filter(
+    (item) => !item.replacedBy,
+  ));
+}
+/** A built-in component's shared metadata, including legacy kinds. */
+export function builtinComponent(
+  kind: string,
+): Readonly<BuiltinComponentMetadata> | undefined {
+  return shared().get(kind);
 }

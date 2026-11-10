@@ -28,3 +28,4 @@ export function primitiveContentNode(
   id?: string,
 ): JSONContent;
 export function normalizeContentTree(node: JSONContent): JSONContent;
+export function readContentTree(node: JSONContent): JSONContent;

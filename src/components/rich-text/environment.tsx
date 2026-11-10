@@ -40,8 +40,13 @@ export interface RecordPeekState extends RecordPeekTarget {
 export interface PageLinkBridge {
   projectId: string;
   pageId: string;
-  /** Pages of the same project the link dialog can offer. */
-  pages: LinkablePage[];
+  /**
+   * Pages of the same project the link dialog can offer. Hosts may serve the
+   * current list through a getter; components that show it subscribe below.
+   */
+  readonly pages: LinkablePage[];
+  /** Calls the listener when pages changes; absent when the list is fixed. */
+  subscribePages?(listener: () => void): () => void;
   /** Copy a link to the page, or to these blocks on it. */
   copyLink(blockIds: string[]): void;
   /**

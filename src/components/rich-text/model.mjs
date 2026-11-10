@@ -509,3 +509,16 @@ export function normalizeContentTree(input) {
   };
   return visit(structuredClone(input));
 }
+/** normalizeContentTree that copies only the paths it changes; read-only use. */
+export function readContentTree(input) {
+  if (input.type === "widget" && primitiveNodeTypes[input.attrs?.kind])
+    return normalizeContentTree(input);
+  if (!Array.isArray(input.content)) return input;
+  let changed = false;
+  const content = input.content.map((child) => {
+    const next = readContentTree(child);
+    if (next !== child) changed = true;
+    return next;
+  });
+  return changed ? { ...input, content } : input;
+}

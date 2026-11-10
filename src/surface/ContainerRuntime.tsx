@@ -116,6 +116,8 @@ interface Runtime {
   geometry: SurfaceGeometryStore;
   document: ContainerDocument;
   current: RefObject<ContainerDocument>;
+  /** The current document with measured geometry, as edits start from. */
+  source: () => ContainerDocument;
   /** Commits sharing a group within a short interval form one undo step. */
   commit: (next: ShowDocument, group?: string) => void;
   readOnly: boolean;
@@ -230,6 +232,12 @@ export function ContainerRuntime({
     [],
   );
   const closeSlash = useCallback(() => setSlash(null), []);
+  // A stable value keeps every component body from re-rendering per commit.
+  const registerComponent = useCallback(
+    (component: CompiledComponent) =>
+      setLoadedComponents((items) => [...items, component]),
+    [],
+  );
   const [printing, setPrinting] = useState(false);
   useEffect(() => {
     const media = matchMedia("print");
@@ -392,6 +400,7 @@ export function ContainerRuntime({
     geometry,
     document,
     current,
+    source: () => geometry.materialize(current.current),
     commit: (next, group) => {
       const measured = ownSourceValue(geometry.materialize(next));
       current.current = measured as ContainerDocument;
@@ -421,17 +430,13 @@ export function ContainerRuntime({
   const frame = inspecting ? document.layout[inspecting] : undefined;
   const updateFrame = (value: NodeLayout) =>
     runtime.commit(
-      transformObjects(runtime.geometry.materialize(current.current), {
+      transformObjects(runtime.source(), {
         [inspecting!]: value,
       }),
     );
   return (
     <AdditionalComponentsProvider components={loadedComponents}>
-      <RegisterComponentContext.Provider
-        value={(component) =>
-          setLoadedComponents((items) => [...items, component])
-        }
-      >
+      <RegisterComponentContext.Provider value={registerComponent}>
         <Context.Provider value={runtime}>
           {outlineSettingsId &&
             !runtime.readOnly &&
@@ -880,7 +885,7 @@ export function ContainerRuntime({
                         const parentId = event.target.value;
                         runtime.commit(
                           moveNode(
-                            runtime.geometry.materialize(current.current),
+                            runtime.source(),
                             inspecting!,
                             parentId,
                             {
@@ -954,7 +959,7 @@ export function ContainerRuntime({
                     onClick={() => {
                       runtime.commit(
                         removeNode(
-                          runtime.geometry.materialize(current.current),
+                          runtime.source(),
                           inspecting!,
                         ),
                       );
@@ -1170,6 +1175,25 @@ function ContainerView({
       );
     runtime.requestReveal(null);
   }, [runtime.revealRequest]);
+  // Object actions come from the runtime's stable parts, so a commit does not
+  // hand every object a new context; mutations read the latest runtime.
+  const latestRuntime = useRef(runtime);
+  latestRuntime.current = runtime;
+  // Local tool/style state must not broadcast a new object context. These
+  // handlers keep their identity and read the latest runtime when they run.
+  const transformObjectFrames = useCallback(
+    (frames: Record<string, NodeLayout>, group?: string) => {
+      const runtime = latestRuntime.current;
+      runtime.commit(
+        transformObjects(
+          runtime.source(),
+          frames,
+        ),
+        group,
+      );
+    },
+    [],
+  );
   const actions = useMemo<ObjectActions>(
     () => ({
       geometry: runtime.geometry,
@@ -1183,44 +1207,27 @@ function ContainerView({
       revealed: new Set(),
       move: readOnly
         ? undefined
-        : (nodeId, frame) =>
-            runtime.commit(
-              transformObjects(
-                runtime.geometry.materialize(runtime.current.current),
-                { [nodeId]: frame },
-              ),
-            ),
+        : (nodeId, frame) => transformObjectFrames({ [nodeId]: frame }),
       remove: readOnly
         ? undefined
         : (nodeId) => {
-            runtime.commit(
+            const current = latestRuntime.current;
+            current.commit(
               removeNode(
-                runtime.geometry.materialize(runtime.current.current),
+                current.source(),
                 nodeId,
               ),
             );
-            runtime.select(null);
+            current.select(null);
           },
     }),
-    [runtime, readOnly, kind, reading],
-  );
-  // Local tool/style state must not broadcast a new object context. These
-  // handlers capture the actual runtime and are renewed on document, selection
-  // or permission context changes; mutations still read its current source.
-  const transformObjectFrames = useCallback(
-    (frames: Record<string, NodeLayout>, group?: string) =>
-      runtime.commit(
-        transformObjects(
-          runtime.geometry.materialize(runtime.current.current),
-          frames,
-        ),
-        group,
-      ),
-    [runtime],
+    // select and inspect are state setters and never change.
+    [runtime.geometry, runtime.selected, runtime.expand, readOnly, kind, reading],
   );
   const connectObject = useCallback<NonNullable<ObjectActions["connect"]>>(
     (nodeId, endpoint, point) => {
-      const source = runtime.geometry.materialize(runtime.current.current),
+      const runtime = latestRuntime.current;
+      const source = runtime.source(),
         entry = findSurfaceNode(source, nodeId);
       if (!entry || !source.layout[nodeId]) return;
       const endpoints = arrowEndpoints(entry.node, source.layout[nodeId]);
@@ -1253,11 +1260,12 @@ function ContainerView({
         ),
       );
     },
-    [runtime],
+    [],
   );
   const setObjectLabel = useCallback<NonNullable<ObjectActions["setLabel"]>>(
     (nodeId, label, minHeight) => {
-      let next = runtime.geometry.materialize(runtime.current.current);
+      const runtime = latestRuntime.current;
+      let next = runtime.source();
       const frame = next.layout?.[nodeId];
       if (minHeight && frame && minHeight > (frame.height ?? 0))
         next = transformObjects(next, {
@@ -1269,7 +1277,7 @@ function ContainerView({
       }) as ContainerDocument;
       runtime.commit(next);
     },
-    [runtime],
+    [],
   );
   // A borderless Page blends into its Board: no frame and no title line.
   const heading =
@@ -1387,7 +1395,7 @@ function ContainerView({
               ? undefined
               : (ids, offset) => {
                   const copied = duplicateObjects(
-                    runtime.geometry.materialize(runtime.current.current),
+                    runtime.source(),
                     ids,
                     offset,
                   );
@@ -1398,7 +1406,7 @@ function ContainerView({
           }
           onCopyObjects={(ids) =>
             copyObjects(
-              runtime.geometry.materialize(runtime.current.current),
+              runtime.source(),
               ids,
             )
           }
@@ -1406,9 +1414,7 @@ function ContainerView({
             readOnly
               ? undefined
               : (paste, point) => {
-                  const source = runtime.geometry.materialize(
-                    runtime.current.current,
-                  );
+                  const source = runtime.source();
                   if ("text" in paste) {
                     const inserted = insertComponent(source, id, "text", {
                       format: "richtext",
@@ -1461,7 +1467,7 @@ function ContainerView({
               : (ids, order) =>
                   runtime.commit(
                     reorderObjects(
-                      runtime.geometry.materialize(runtime.current.current),
+                      runtime.source(),
                       ids,
                       order,
                     ),
@@ -1472,7 +1478,7 @@ function ContainerView({
               ? undefined
               : (ids, bounds, offset) => {
                   const grouped = groupObjects(
-                    runtime.geometry.materialize(runtime.current.current),
+                    runtime.source(),
                     ids,
                     bounds,
                     offset,
@@ -1488,7 +1494,7 @@ function ContainerView({
               ? undefined
               : (regionId, offset) => {
                   const result = ungroupRegion(
-                    runtime.geometry.materialize(runtime.current.current),
+                    runtime.source(),
                     regionId,
                     offset,
                   );
@@ -1504,7 +1510,7 @@ function ContainerView({
               : (ids, locked) =>
                   runtime.commit(
                     setObjectsLocked(
-                      runtime.geometry.materialize(runtime.current.current),
+                      runtime.source(),
                       ids,
                       locked,
                     ),
@@ -1516,7 +1522,7 @@ function ContainerView({
               : (ids) =>
                   runtime.commit(
                     removeObjects(
-                      runtime.geometry.materialize(runtime.current.current),
+                      runtime.source(),
                       ids,
                     ),
                   )
@@ -1613,9 +1619,7 @@ function ContainerView({
             readOnly
               ? undefined
               : (ids, direction) => {
-                  const source = runtime.geometry.materialize(
-                    runtime.current.current,
-                  );
+                  const source = runtime.source();
                   const tidy = tidyFrames(source, ids, direction);
                   if (!tidy) return;
                   let next = transformObjects(source, tidy.frames);
@@ -1673,13 +1677,13 @@ function ContainerView({
                   if (drawing.attrs?.tool === "arrow") {
                     const endpoints = arrowEndpoints(drawing, frame);
                     const start = bindingAtPoint(
-                      runtime.geometry.materialize(runtime.current.current),
+                      runtime.source(),
                       id,
                       endpoints[0],
                       8 / (viewport.current?.scale() ?? 1),
                     );
                     const end = bindingAtPoint(
-                      runtime.geometry.materialize(runtime.current.current),
+                      runtime.source(),
                       id,
                       endpoints[1],
                       8 / (viewport.current?.scale() ?? 1),

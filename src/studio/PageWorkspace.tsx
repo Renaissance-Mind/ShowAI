@@ -8,6 +8,7 @@ import {
   useRef,
   useState,
   useSyncExternalStore,
+  useCallback,
   type ReactNode,
 } from "react";
 import {
@@ -35,6 +36,7 @@ import {
   MountQueueContext,
 } from "../components/blocks/mount-queue";
 
+const noPages: LinkablePage[] = [];
 function PageContent({
   view,
   readOnly,
@@ -97,7 +99,23 @@ function PageContent({
   );
   const projectId = state.projectId;
   const pageId = state.draft?.id;
-  const pages = projectId ? linkablePages[projectId]?.pages : undefined;
+  const pages =
+    (projectId ? linkablePages[projectId]?.pages : undefined) ?? noPages;
+  // Each save lists the project's pages again. The bridge reads the list
+  // through a getter so its identity, and every component's environment,
+  // survives saves; components that show the list subscribe.
+  const latestPages = useRef(pages);
+  latestPages.current = pages;
+  const pageListeners = useRef(new Set<() => void>());
+  const subscribePages = useCallback((listener: () => void) => {
+    pageListeners.current.add(listener);
+    return () => {
+      pageListeners.current.delete(listener);
+    };
+  }, []);
+  useLayoutEffect(() => {
+    for (const listener of pageListeners.current) listener();
+  }, [pages]);
   const latestCopy = useRef(onCopyLink);
   latestCopy.current = onCopyLink;
   const latestCreate = useRef(onCreateLinkedPage);
@@ -164,11 +182,14 @@ function PageContent({
       pageActions
         ? {
             ...pageActions,
-            pages: pages ?? [],
+            get pages() {
+              return latestPages.current;
+            },
+            subscribePages,
             ...(recordPeek ? { recordPeek } : {}),
           }
         : null,
-    [pageActions, pages, recordPeek],
+    [pageActions, subscribePages, recordPeek],
   );
   const readerState = useMemo(
     () =>

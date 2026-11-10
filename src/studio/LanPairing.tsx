@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { desktop, errorCode, errorMessage } from "./bridge";
 import Dialog from "./Dialog";
+import { visibleInterval } from "./visible-interval";
 import { Laptop, Tablet, Link2, Loader2, RefreshCw } from "../ui/icons";
 import { translator } from "../i18n";
 import messages from "../i18n/messages/lanPairing";
@@ -320,7 +321,7 @@ export function MacPairingPrompt() {
           // Hosts without nearby pairing, such as the website workbench, answer UNAVAILABLE.
           if (errorCode(reason) === "UNAVAILABLE") {
             stopped = true;
-            clearInterval(timer);
+            stop();
             return;
           }
           console.error("Pairing status:", reason);
@@ -330,10 +331,10 @@ export function MacPairingPrompt() {
         });
     };
     load();
-    const timer = setInterval(load, 1800);
+    const stop = visibleInterval(load, 1800);
     return () => {
       stopped = true;
-      clearInterval(timer);
+      stop();
     };
   }, []);
   const request = requests[0];

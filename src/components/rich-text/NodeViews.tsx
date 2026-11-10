@@ -7,7 +7,9 @@ import { richTextStyle } from "./model.mjs";
 import { mathHtml } from "../blocks/markdown-math.mjs";
 import { installNoteBubbles } from "../blocks/note-bubble";
 import {
+  useCallback,
   useEffect,
+  useRef,
   useState,
   useContext,
   type PointerEvent,
@@ -38,6 +40,13 @@ export function WidgetView({
     editor,
     selector: ({ editor: current }) => current.isEditable,
   });
+  // A stable callback lets the memoized widget skip renders of this view.
+  const latest = useRef({ editor, updateAttributes });
+  latest.current = { editor, updateAttributes };
+  const onChange = useCallback((data: Record<string, unknown>) => {
+    if (latest.current.editor.isEditable)
+      latest.current.updateAttributes({ data: ownSourceValue(data) });
+  }, []);
   return (
     <NodeViewWrapper
       className={`document-widget${selected && editable ? " is-selected" : ""}`}
@@ -98,9 +107,7 @@ export function WidgetView({
         {renderWidget({
           kind: node.attrs.kind,
           data: node.attrs.data,
-          onChange: (data) => {
-            if (editor.isEditable) updateAttributes({ data: ownSourceValue(data) });
-          },
+          onChange,
           readOnly: !editable,
         })}
       </ReaderBlock>

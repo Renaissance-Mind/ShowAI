@@ -60,7 +60,7 @@ import { useColumnResize } from "./database-column-resize";
 import { useDatabaseViewMotion } from "./database-view-motion";
 import { databaseRecordTargets } from "./database-records";
 import { pageLink } from "../../portable/page-link.mjs";
-import { PageLinkContext, type PageLinkBridge } from "../page-links";
+import { usePageLinks, type PageLinkBridge } from "../page-links";
 import type { MessageKey } from "../../i18n";
 import { useTranslator } from "../../i18n/react";
 import messages from "../../i18n/messages/database";
@@ -140,7 +140,7 @@ function PageCell({
   openRecord?: () => void;
 }) {
   const t = useTranslator(messages);
-  const pages = useContext(PageLinkContext);
+  const pages = usePageLinks();
   const target = parsePageCell(value);
   const title = pageTitle(value, pages);
   const canPeek = !!pages?.openRecord && !!openRecord;
@@ -422,7 +422,7 @@ function AddProperty({
 
 export function DatabaseBlock({ data, onChange, readOnly }: BlockProps) {
   const t = useTranslator(messages);
-  const pages = useContext(PageLinkContext);
+  const pages = usePageLinks();
   const sourceId = useId();
   const closeRecord = pages?.closeRecord;
   useEffect(() => () => closeRecord?.(sourceId), [sourceId, closeRecord]);
