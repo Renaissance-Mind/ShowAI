@@ -403,6 +403,8 @@ type ProjectScan = {
 const operation = translator(errorMessages);
 const LOAD_LIBRARY = "loadLibrary";
 /** The Agent panel mounts its input after opening; focus it once it can take text. */
+/** The open page holds edits it could not save, so the requested action did not run. */
+class DraftHeld extends Error {}
 function focusAssistantInput(started = Date.now()) {
   const input = document.querySelector<HTMLTextAreaElement>(
     ".assistant-input textarea",
@@ -975,8 +977,14 @@ export default function Studio() {
    * later success of the same operation clears it via resolveProblem.
    */
   const report = useCallback(
-    (error: unknown, options?: ReportOptions) => queueProblem(error, options),
-    [queueProblem],
+    (error: unknown, options?: ReportOptions) => {
+      // An action refused over an unresolved draft answers next to the action;
+      // the conflict banner already holds the notice stack.
+      if (error instanceof DraftHeld)
+        showToast(error.message, { kind: "warning", duration: 6000 });
+      else queueProblem(error, options);
+    },
+    [queueProblem, showToast],
   );
   // Dismissing a conflict dialog defers the decision: the unsaved edits stay
   // in the local draft and the save-conflict banner reopens the dialog.
@@ -1172,14 +1180,14 @@ export default function Studio() {
       : refresh();
   /** Before an action on the open page itself: it must be saved, conflict or not. */
   async function saveOpenPage() {
-    if (!(await page.flush())) throw new Error(t("resolveDraftFirst"));
+    if (!(await page.flush())) throw new DraftHeld(t("resolveDraftFirst"));
   }
   /**
    * Before an action elsewhere: a page waiting on a save conflict keeps its
    * draft and banner, and the action goes ahead.
    */
   async function settleOpenPage() {
-    if (!(await page.flushOrDefer())) throw new Error(t("resolveDraftFirst"));
+    if (!(await page.flushOrDefer())) throw new DraftHeld(t("resolveDraftFirst"));
   }
   /**
    * Saves every retained page an operation on library items touches; one
@@ -1195,7 +1203,7 @@ export default function Studio() {
         continue;
       const saved =
         item.session === active ? await page.flush() : await item.session.flush();
-      if (!saved) throw new Error(t("resolveDraftFirst"));
+      if (!saved) throw new DraftHeld(t("resolveDraftFirst"));
     }
   }
   /** Retires the editors of deleted pages and drops them from every tab's history. */
@@ -1523,7 +1531,7 @@ export default function Studio() {
 
   /** A page that could not keep its edits holds navigation; say so instead of doing nothing. */
   function draftHeld(): false {
-    report(new Error(t("resolveDraftFirst")));
+    report(new DraftHeld(t("resolveDraftFirst")));
     return false;
   }
   // Navigation runs one request at a time; a click made meanwhile wins over
@@ -2538,7 +2546,7 @@ export default function Studio() {
     const retained = page.sessions.sessionFor(target.projectId, target.id);
     if (retained === page.sessions.getSnapshot().active) await saveOpenPage();
     else if (retained) {
-      if (!(await retained.flush())) throw new Error(t("resolveDraftFirst"));
+      if (!(await retained.flush())) throw new DraftHeld(t("resolveDraftFirst"));
     } else await settleOpenPage();
     const record = await desktop.invoke<LoadedPage>("pages:get", {
       projectId: target.projectId,
@@ -3013,7 +3021,7 @@ export default function Studio() {
               })
             : null;
         if (reopen && !(await page.clear()))
-          throw new Error(t("resolveDraftFirst"));
+          throw new DraftHeld(t("resolveDraftFirst"));
         cleared = reopen;
         const saved = await desktop.invoke<SidebarOrganization>(
           "sidebar:moveEntry",
@@ -3153,7 +3161,7 @@ export default function Studio() {
     // A page with unsaved edits saves them first; a conflict there needs a decision.
     if (retained === active && retained) await saveOpenPage();
     else if (retained && !(await retained.flush()))
-      throw new Error(t("resolveDraftFirst"));
+      throw new DraftHeld(t("resolveDraftFirst"));
     const before = currentFields(target);
     const revert = showFields(target, change);
     options.close?.();
@@ -3165,7 +3173,7 @@ export default function Studio() {
           ...(change.pinned !== undefined ? { favorite: change.pinned } : {}),
         });
         if (!(await (retained === active ? page.flush() : retained.flush())))
-          throw new Error(t("resolveDraftFirst"));
+          throw new DraftHeld(t("resolveDraftFirst"));
       } else if (target.kind === "page") {
         const record = await desktop.invoke<LoadedPage>("pages:get", {
           projectId: target.projectId,
@@ -3253,7 +3261,7 @@ export default function Studio() {
             pageId: target.id,
           })
         : null;
-    if (closePage && !(await page.clear())) throw new Error(t("resolveDraftFirst"));
+    if (closePage && !(await page.clear())) throw new DraftHeld(t("resolveDraftFirst"));
     const previousProjects = projects;
     const previousContents = contents[target.projectId];
     if (target.kind === "project")
@@ -3689,7 +3697,7 @@ export default function Studio() {
       touches(page.projectId, page.draft.id, page.draft.parentId ?? null) &&
       !(await page.clear())
     )
-      throw new Error(t("resolveDraftFirst"));
+      throw new DraftHeld(t("resolveDraftFirst"));
     return scopes;
   }
   /** Undo and redo of Move to…: each item goes back to (or again to) its place. */
