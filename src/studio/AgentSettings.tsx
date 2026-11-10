@@ -100,10 +100,12 @@ function TaskResult({
         </p>
       )}
       {tools.length > 0 && (
-        <details className="agent-events">
-          <summary>{t("eventLog", { count: tools.length })}</summary>
+        <section className="agent-events">
+          <h3 className="settings-section-heading">
+            {t("eventLog", { count: tools.length })}
+          </h3>
           <pre>{tools.map((event) => event.text).join("\n\n")}</pre>
-        </details>
+        </section>
       )}
       {task.state === "running" && (
         <p className="settings-help" role="status">
@@ -567,9 +569,8 @@ export default function AgentSettings() {
                 <button
                   className="device-model-add"
                   disabled={busy}
-                  aria-expanded={adding}
                   onClick={() => {
-                    setAdding(!adding);
+                    setAdding(true);
                     setEditing(null);
                     setKey("");
                   }}
@@ -962,10 +963,12 @@ export default function AgentSettings() {
             {status.authorization.error && (
               <div className="agent-error" role="alert">
                 <p>{t("authorizationIncomplete")}</p>
-                <details className="agent-events">
-                  <summary>{t("runtime.failureDetail")}</summary>
+                <section className="agent-events">
+                  <h3 className="settings-section-heading">
+                    {t("runtime.failureDetail")}
+                  </h3>
                   <pre>{status.authorization.error}</pre>
-                </details>
+                </section>
               </div>
             )}
           </section>
@@ -1045,13 +1048,17 @@ export default function AgentSettings() {
               {status.runtime.state === "failed" && (
                 <div className="agent-error" role="alert">
                   <p>
-                    {t(`runtime.failure.${status.runtime.failure ?? "unknown"}`)}
+                    {t(
+                      `runtime.failure.${status.runtime.failure ?? "unknown"}`,
+                    )}
                   </p>
                   {status.runtime.error && (
-                    <details className="agent-events">
-                      <summary>{t("runtime.failureDetail")}</summary>
+                    <section className="agent-events">
+                      <h3 className="settings-section-heading">
+                        {t("runtime.failureDetail")}
+                      </h3>
                       <pre>{status.runtime.error}</pre>
-                    </details>
+                    </section>
                   )}
                 </div>
               )}
@@ -1091,8 +1098,8 @@ export default function AgentSettings() {
       )}
       <RemoteDeviceSettings />
       {!remoteExecution() && (
-        <details className="agent-storage">
-          <summary>{t("storage")}</summary>
+        <section className="agent-storage">
+          <h3 className="settings-section-heading">{t("storage")}</h3>
           <p>
             {t("taskWorkspace")}
             <code>{status.workspaceRoot}</code>
@@ -1102,7 +1109,7 @@ export default function AgentSettings() {
             <code>{status.credentialRoot}</code>
           </p>
           <p>{t("storageHelp")}</p>
-        </details>
+        </section>
       )}
       {error && (
         <p className="agent-error agent-feedback" role="alert">

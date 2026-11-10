@@ -350,24 +350,15 @@
   border-radius: 8px;
   background: var(--surface);
 }
-.settings-config summary {
+.settings-config > .settings-section-heading {
   display: flex;
   align-items: center;
   gap: 8px;
+  margin: 0;
   padding: 11px 13px;
-  list-style: none;
+  border-bottom: 1px solid var(--line);
   font-size: 12px;
   color: var(--muted);
-  cursor: pointer;
-}
-.settings-config summary::-webkit-details-marker {
-  display: none;
-}
-.settings-config[open] summary {
-  border-bottom: 1px solid var(--line);
-}
-.settings-config[open] summary > svg:first-child {
-  transform: rotate(90deg);
 }
 .settings-config pre {
   margin: 0;
@@ -513,12 +504,6 @@
   color: var(--text);
   background: var(--paper);
 }
-.library-space-toggle {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  font-size: 13px;
-}
 .library-space-plan {
   padding: 14px;
   margin: 0;
@@ -530,7 +515,7 @@
   overflow-wrap: anywhere;
   font-size: 11px;
 }
-.library-space-plan details {
+.library-space-plan > section {
   margin: 12px 0;
   max-height: 240px;
   overflow: auto;
@@ -726,9 +711,8 @@
 .plugin-install-error p {
   margin: 0;
 }
-.plugin-install-error summary,
-.plugin-manual-path summary {
-  cursor: pointer;
+.plugin-install-error .settings-section-heading,
+.plugin-manual-path .settings-section-heading {
   font-size: 12px;
   color: var(--muted);
 }
@@ -776,13 +760,9 @@
 .plugin-launch-config .settings-config {
   margin-top: 12px;
 }
-.plugin-launch-config .settings-config summary > span {
+.plugin-launch-config .settings-config .settings-section-heading > span {
   flex: 1;
   min-width: 0;
-}
-.plugin-launch-config .settings-config summary > svg {
-  flex-shrink: 0;
-  transition: transform 0.12s;
 }
 @media (max-width: 600px) {
   .plugin-install-path {
@@ -803,41 +783,6 @@
   font-size: 12px;
   color: var(--accent);
 }
-/* An on/off setting; also used by per-project sync options. */
-.settings-switch {
-  appearance: none;
-  position: relative;
-  flex-shrink: 0;
-  width: 34px;
-  height: 20px;
-  margin: 0;
-  border-radius: 10px;
-  background: var(--line);
-  cursor: pointer;
-  transition: background 0.15s;
-}
-.settings-switch::after {
-  content: "";
-  position: absolute;
-  top: 2px;
-  left: 2px;
-  width: 16px;
-  height: 16px;
-  border-radius: 50%;
-  background: var(--paper);
-  box-shadow: 0 1px 2px #0003;
-  transition: transform 0.15s;
-}
-.settings-switch:checked {
-  background: var(--brand-accent, var(--accent));
-}
-.settings-switch:checked::after {
-  transform: translateX(14px);
-}
-.settings-switch:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
-}
 .settings-theme-legend {
   grid-column: 1 / -1;
   float: left;
@@ -846,25 +791,17 @@
   padding: 0;
   font-size: 14px;
 }
-.settings-advanced > summary {
+.settings-section-heading {
   display: flex;
   align-items: center;
   gap: 8px;
-  list-style: none;
-  cursor: pointer;
-  font-size: 15px;
-  font-weight: 600;
-}
-.settings-advanced > summary::-webkit-details-marker {
-  display: none;
-}
-.settings-advanced[open] > summary > svg:first-child {
-  transform: rotate(90deg);
-}
-.settings-advanced-detail {
-  margin: 8px 0 16px;
-  color: var(--muted);
+  margin: 12px 0;
   font-size: 13px;
+  font-weight: 500;
+  line-height: 1.5;
+}
+.settings-config > .settings-section-heading {
+  margin: 0;
 }
 .work-records-settings .settings-path .settings-button {
   flex-shrink: 0;

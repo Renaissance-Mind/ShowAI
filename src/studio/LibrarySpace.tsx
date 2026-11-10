@@ -7,7 +7,6 @@ import type {
   CleanupPlan,
   StorageCategory,
 } from "../core/library-maintenance";
-import type { MaintenancePolicy } from "../core/maintenance-scheduler";
 import { getLocale } from "../i18n";
 import { useTranslator } from "../i18n/react";
 import messages from "../i18n/messages/library";
@@ -19,8 +18,7 @@ function bytes(value: number) {
 }
 export default function LibrarySpace({ home }: { home: string }) {
   const t = useTranslator(messages);
-  const [storage, setStorage] = useState<LibraryStorage | null>(null),
-    [policy, setPolicy] = useState<MaintenancePolicy | null>(null);
+  const [storage, setStorage] = useState<LibraryStorage | null>(null);
   const [plan, setPlan] = useState<CleanupPlan | null>(null),
     [busy, setBusy] = useState(false),
     [analyzing, setAnalyzing] = useState(false),
@@ -30,12 +28,9 @@ export default function LibrarySpace({ home }: { home: string }) {
   const [archivePath, setArchivePath] = useState("");
   const refresh = useCallback(
     async (projects = false) => {
-      const [stats, rules] = await Promise.all([
-        desktop.invoke<LibraryStorage>("library:storage", { projects }),
-        desktop.invoke<MaintenancePolicy>("library:maintenancePolicy"),
-      ]);
-      setStorage(stats);
-      setPolicy(rules);
+      setStorage(
+        await desktop.invoke<LibraryStorage>("library:storage", { projects }),
+      );
     },
     [home],
   );
@@ -71,6 +66,7 @@ export default function LibrarySpace({ home }: { home: string }) {
       className="settings-group library-space"
       aria-label={t("spaceManagement")}
     >
+      <h2>{t("spaceManagement")}</h2>
       <section className="library-space-section" aria-label={t("storage")}>
         <div className="settings-row">
           <div className="settings-row-text">
@@ -126,31 +122,8 @@ export default function LibrarySpace({ home }: { home: string }) {
           )}
         </div>
       </section>
-      <section className="library-space-section" aria-label={t("autoCompact")}>
-        <div className="settings-row">
-          <div className="settings-row-text">
-            <h3>{t("autoCompact")}</h3>
-          </div>
-          <label className="library-space-toggle">
-            <input
-              type="checkbox"
-              aria-label={t("autoCompactLabel")}
-              checked={policy?.automatic ?? true}
-              disabled={!policy || busy}
-              onChange={(event) =>
-                void run(async () => {
-                  setPolicy(
-                    await desktop.invoke<MaintenancePolicy>(
-                      "library:setMaintenancePolicy",
-                      { automatic: event.target.checked },
-                    ),
-                  );
-                })
-              }
-            />
-            {t("on")}
-          </label>
-        </div>
+      <section className="library-space-section" aria-label={t("maintenance")}>
+        <h3>{t("maintenance")}</h3>
         <div className="library-space-section-content">
           <div className="library-space-actions">
             <button
@@ -210,14 +183,16 @@ export default function LibrarySpace({ home }: { home: string }) {
                   conflicts: plan.protectedConflicts,
                 })}
               </p>
-              <details>
-                <summary>{t("showCleanupFiles")}</summary>
+              <section>
+                <h3 className="settings-section-heading">
+                  {t("showCleanupFiles")}
+                </h3>
                 {plan.files.map((item) => (
                   <p key={item.path}>
                     <code>{item.path}</code> · {bytes(item.bytes)}
                   </p>
                 ))}
-              </details>
+              </section>
               <button
                 className="settings-button"
                 disabled={busy || !plan.files.length}

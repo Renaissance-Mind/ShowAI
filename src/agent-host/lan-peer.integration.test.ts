@@ -1,5 +1,5 @@
 import { beforeAll, afterAll, expect, test } from "vitest";
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { randomUUID, X509Certificate } from "node:crypto";
@@ -305,6 +305,10 @@ test("nearby Mac accepts a local iPad project without any cloud account and neve
   expect(first.settings.nearbyEnabled).toBe(true);
   expect(first.settings.enabled).toBe(false);
   expect(first.connections).toEqual([]);
+  await writeFile(join(host.options.root, "remote-device.json"), JSON.stringify({ ...first.settings, nearbyEnabled: false }));
+  const upgraded = await new RemoteMacConnector(host, () => service.store.root).status();
+  expect(upgraded.settings.nearbyEnabled).toBe(true);
+  expect(upgraded.settings.enabled).toBe(false);
   settings = first.settings;
   peer = connector.lan;
   const cancelledStart = connector.start();

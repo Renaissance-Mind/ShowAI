@@ -197,10 +197,8 @@ export function RemoteDeviceSettings() {
   if (remoteExecution()) return null;
   if (!state)
     return (
-      <details className="settings-group agent-device-settings">
-        <summary>
-          <h2>{t("useThisComputerFromIPad")}</h2>
-        </summary>
+      <section className="settings-group agent-device-settings">
+        <h2>{t("useThisComputerFromIPad")}</h2>
         {error ? (
           <p role="alert" className="agent-error">
             {error}
@@ -211,7 +209,7 @@ export function RemoteDeviceSettings() {
         <button className="settings-button" onClick={() => void refresh()}>
           {t("refresh")}
         </button>
-      </details>
+      </section>
     );
   const change = (value: Partial<ConnectorSettings>) =>
     setState({ ...state, settings: { ...state.settings, ...value } });
@@ -227,45 +225,20 @@ export function RemoteDeviceSettings() {
       setBusy(false);
     }
   };
-  // Pairing is secondary to choosing an Agent: collapsed until a device asks.
   return (
-    <details
-      className="settings-group agent-device-settings"
-      open={state.pendingClients.length > 0 || undefined}
-    >
-      <summary>
-        <h2>{t("useThisComputerFromIPad")}</h2>
-      </summary>
+    <section className="settings-group agent-device-settings">
+      <h2>{t("useThisComputerFromIPad")}</h2>
       <p className="settings-help">{t("nearbyHelp")}</p>
-      <label className="settings-row agent-nearby-toggle">
-        <input
-          type="checkbox"
-          disabled={busy}
-          checked={state.settings.nearbyEnabled ?? state.settings.enabled}
-          onChange={(e) =>
-            void save({ ...state.settings, nearbyEnabled: e.target.checked })
-          }
-        />
-        {t("allowNearbyConnection")}
-        <span className="settings-help" role="status">
-          {state.lan?.online ? t("discoverableOnLAN") : t("nearbyOff")}
-        </span>
-      </label>
-      <details className="agent-remote-advanced">
-        <summary>{t("acrossNetworks")}</summary>
+      <p className="settings-help" role="status">
+        {state.lan?.online ? t("discoverableOnLAN") : t("disconnected")}
+      </p>
+      <section className="agent-remote-advanced">
+        <h3 className="settings-section-heading">{t("acrossNetworks")}</h3>
         <p className="settings-help">
           {t(
             "connectThisComputerToShowAICloudOverWSSDevicesSignedIntoTheSameServerAccountCanRunTasksHereKeepShowAIRunningAndTheComputerAwake",
           )}
         </p>
-        <label className="settings-row">
-          <input
-            type="checkbox"
-            checked={state.settings.enabled}
-            onChange={(e) => change({ enabled: e.target.checked })}
-          />
-          {t("allowRemoteExecution")}
-        </label>
         <label className="settings-row">
           {t("deviceName")}
           <input
@@ -300,39 +273,86 @@ export function RemoteDeviceSettings() {
                 : t("chooseAnAccountToShowSynchronizedProjects")}
             </p>
           )}
-          {state.projects
-            .filter((p) => p.connectionId === state.settings.connectionId)
-            .map((p) => (
-              <label className="settings-row" key={p.id}>
-                <input
-                  type="checkbox"
-                  checked={state.settings.projectIds.includes(p.id)}
-                  onChange={(e) =>
-                    change({
-                      projectIds: e.target.checked
-                        ? [...state.settings.projectIds, p.id]
-                        : state.settings.projectIds.filter((id) => id !== p.id),
-                    })
-                  }
-                />
-                {p.name ?? p.id}
-              </label>
-            ))}
+          {state.settings.projectIds.map((id) => (
+            <div className="settings-row" key={id}>
+              <span>
+                {state.projects.find((project) => project.id === id)?.name ??
+                  id}
+              </span>
+              <button
+                type="button"
+                className="settings-button"
+                disabled={busy}
+                onClick={() =>
+                  change({
+                    projectIds: state.settings.projectIds.filter(
+                      (projectId) => projectId !== id,
+                    ),
+                  })
+                }
+              >
+                {t("removeProject")}
+              </button>
+            </div>
+          ))}
+          <select
+            aria-label={t("addProject")}
+            value=""
+            disabled={busy || !state.settings.connectionId}
+            onChange={(event) => {
+              if (event.target.value)
+                change({
+                  projectIds: [
+                    ...state.settings.projectIds,
+                    event.target.value,
+                  ],
+                });
+            }}
+          >
+            <option value="">{t("addProject")}</option>
+            {state.projects
+              .filter(
+                (project) =>
+                  project.connectionId === state.settings.connectionId &&
+                  !state.settings.projectIds.includes(project.id),
+              )
+              .map((project) => (
+                <option key={project.id} value={project.id}>
+                  {project.name ?? project.id}
+                </option>
+              ))}
+          </select>
         </fieldset>
         <div className="settings-row">
           <span role="status">
             {state.online ? t("connected") : t("disconnected")}
           </span>
-          <button
-            type="button"
-            className="settings-button"
-            disabled={busy}
-            onClick={() => void save()}
-          >
-            {t("save")}
-          </button>
+          <div className="agent-device-actions">
+            {state.settings.enabled && (
+              <button
+                type="button"
+                className="settings-button"
+                disabled={busy}
+                onClick={() => void save({ ...state.settings, enabled: false })}
+              >
+                {t("disconnect")}
+              </button>
+            )}
+            <button
+              type="button"
+              className="settings-button"
+              disabled={
+                busy ||
+                !state.settings.connectionId ||
+                !state.settings.projectIds.length
+              }
+              onClick={() => void save({ ...state.settings, enabled: true })}
+            >
+              {t(state.settings.enabled ? "save" : "connect")}
+            </button>
+          </div>
         </div>
-      </details>
+      </section>
       {state.pendingClients
         .filter((client) => !client.id.startsWith("lan:"))
         .map((client) => (
@@ -394,11 +414,11 @@ export function RemoteDeviceSettings() {
           </button>
         </div>
       ))}
-      {(error || state.error) && (
+      {(error || state.error || state.lan?.error) && (
         <p role="alert" className="agent-error">
-          {error || state.error}
+          {error || state.error || state.lan?.error}
         </p>
       )}
-    </details>
+    </section>
   );
 }

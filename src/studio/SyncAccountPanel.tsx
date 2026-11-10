@@ -94,8 +94,8 @@ export default function SyncAccountPanel({
           }}
         />
         {secure && (
-          <details className="sync-account-disclosure">
-            <summary>{t("changePassword")}</summary>
+          <section className="sync-account-disclosure">
+            <h3 className="settings-section-heading">{t("changePassword")}</h3>
             <p className="settings-help">{t("changePasswordHelp")}</p>
             <form
               className="sync-field-grid"
@@ -150,7 +150,7 @@ export default function SyncAccountPanel({
                 </button>
               </div>
             </form>
-          </details>
+          </section>
         )}
       </section>
       <section className="sync-account-block">

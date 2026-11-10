@@ -73,18 +73,6 @@
 .feedback-diagnostics-preview {
   margin-top: 14px;
 }
-.feedback-diagnostics-options {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px 18px;
-  font-size: 13px;
-}
-.feedback-diagnostics-options label,
-.feedback-attach label {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-}
 .feedback-diagnostics-text {
   display: block;
   width: 100%;
@@ -213,14 +201,6 @@
   padding: 2px;
   border-radius: 50%;
   color: var(--muted);
-}
-.feedback-attach {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 12px;
-  margin-top: 12px;
-  font-size: 13px;
 }
 .app-crash-report {
   width: min(100%, 620px);

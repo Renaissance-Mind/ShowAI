@@ -428,38 +428,8 @@
   font-size: 13px;
   font-weight: 500;
 }
-.sync-account-disclosure summary {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  width: fit-content;
-  padding: 6px 8px;
-  margin-left: -8px;
-  border-radius: 5px;
-  font-size: 13px;
-  list-style: none;
-  cursor: pointer;
-}
-.sync-account-disclosure summary::-webkit-details-marker {
-  display: none;
-}
-.sync-account-disclosure summary::before {
-  content: "";
-  width: 6px;
-  height: 6px;
-  border-right: 1.5px solid currentColor;
-  border-bottom: 1.5px solid currentColor;
-  transform: rotate(-45deg);
-  transition: transform 0.15s;
-}
-.sync-account-disclosure[open] summary::before {
-  transform: rotate(45deg);
-}
-.sync-account-disclosure summary:hover {
-  background: var(--hover, var(--paper));
-}
-.sync-account-disclosure[open] summary {
-  margin-bottom: 8px;
+.sync-account-disclosure > .settings-section-heading {
+  margin: 12px 0;
 }
 .sync-session-list li,
 .sync-binding-list li {
@@ -1033,11 +1003,7 @@
 .sync-pending-invites {
   margin-top: 18px;
 }
-.sync-pending-invites summary {
-  font-size: 13px;
-  cursor: pointer;
-}
-.sync-pending-invites summary span {
+.sync-pending-invites .settings-section-heading span {
   color: var(--muted);
   margin-left: 5px;
 }

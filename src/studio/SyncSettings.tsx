@@ -3,7 +3,6 @@ import {
   Database,
   FolderOpen,
   LogOut,
-  Settings2,
   Folder,
   Plus,
   RefreshCw,
@@ -97,7 +96,6 @@ export default function SyncSettings({
     plan: PackagingPlan;
     focus?: string;
   } | null>(null);
-  const [accountPanel, setAccountPanel] = useState("");
   const [expanded, setExpanded] = useState(""),
     [confirmDetach, setConfirmDetach] = useState(""),
     [uploadTarget, setUploadTarget] = useState("");
@@ -569,20 +567,6 @@ export default function SyncSettings({
                       <button
                         type="button"
                         className="studio-icon"
-                        aria-label={t("accountAndDevices")}
-                        title={t("accountAndDevices")}
-                        aria-expanded={accountPanel === connection.id}
-                        onClick={() =>
-                          setAccountPanel(
-                            accountPanel === connection.id ? "" : connection.id,
-                          )
-                        }
-                      >
-                        <Settings2 size={18} />
-                      </button>
-                      <button
-                        type="button"
-                        className="studio-icon"
                         aria-label={f("signOut")}
                         title={f("signOut")}
                         disabled={busy}
@@ -591,7 +575,6 @@ export default function SyncSettings({
                             await desktop.invoke("sync:signOut", {
                               connectionId: connection.id,
                             });
-                            setAccountPanel("");
                             setMessage(f("signedOut"));
                           })
                         }
@@ -601,7 +584,7 @@ export default function SyncSettings({
                     </>
                   )}
                 </div>
-                {!connection.signedOut && accountPanel === connection.id && (
+                {!connection.signedOut && (
                   <SyncAccountPanel
                     connection={connection}
                     busy={busy}
@@ -615,7 +598,6 @@ export default function SyncSettings({
                       })
                     }
                     onRemoved={() => {
-                      setAccountPanel("");
                       void refresh();
                     }}
                   />
@@ -633,8 +615,10 @@ export default function SyncSettings({
           )}
           {!!status.connections.some((item) => !item.signedOut) &&
             !showConnect && (
-              <details className="sync-account-disclosure">
-                <summary>{f("accountAdvanced")}</summary>
+              <section className="sync-account-disclosure">
+                <h3 className="settings-section-heading">
+                  {f("accountAdvanced")}
+                </h3>
                 <AccountBindings
                   connections={status.connections}
                   refresh={refresh}
@@ -661,7 +645,7 @@ export default function SyncSettings({
                       ))}
                   </select>
                 </label>
-              </details>
+              </section>
             )}
         </section>
       )}
@@ -1239,23 +1223,8 @@ export default function SyncSettings({
                     {t("choosePackagedFiles")}
                   </button>
                 )}
-                <label className="sync-detail-row">
-                  <span>{t("showOnDevice")}</span>
-                  <input
-                    type="checkbox"
-                    checked={!status.hiddenProjectIds?.includes(project.id)}
-                    onChange={(e) =>
-                      void run(() =>
-                        desktop.invoke("sync:projectVisibility", {
-                          projectId: project.id,
-                          visible: e.target.checked,
-                        }),
-                      )
-                    }
-                  />
-                </label>
-                <details className="sync-account-disclosure">
-                  <summary>{t("detach")}</summary>
+                <section className="sync-account-disclosure">
+                  <h3 className="settings-section-heading">{t("detach")}</h3>
                   <p className="settings-help">{t("detachHelp")}</p>
                   {confirmDetach === project.id ? (
                     <div className="sync-form-actions">
@@ -1292,7 +1261,7 @@ export default function SyncSettings({
                       {t("detach")}
                     </button>
                   )}
-                </details>
+                </section>
               </div>
             </Dialog>
           );

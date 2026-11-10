@@ -11,7 +11,6 @@ import {
   DiagnosticsPreview,
   logAvailable,
   useDiagnostics,
-  type DiagnosticsOptions,
 } from "./DiagnosticsPreview";
 import { issueUrl, reportText, type ReportKind } from "./issue-url";
 import "./feedback.css";
@@ -72,13 +71,7 @@ export function ReportProblemForm({
   const [steps, setSteps] = useState("");
   const [context, setContext] = useState(initialContext);
   useEffect(() => setContext(initialContext), [initialContext]);
-  const [attach, setAttach] = useState(true);
-  const [preview, setPreview] = useState(false);
-  const [options, setOptions] = useState<DiagnosticsOptions>({
-    includeLibraryPath: false,
-    includeLog: logAvailable(),
-  });
-  const diagnostics = useDiagnostics(info, options, attach && preview);
+  const diagnostics = useDiagnostics(info);
   const [status, setStatus] = useState<{ text: string; error?: boolean }>();
   const [busy, setBusy] = useState(false);
   const sourceKey = context
@@ -118,8 +111,8 @@ export function ReportProblemForm({
     diagnostics.text ??
     (await gatherDiagnostics({
       info,
-      includeLibraryPath: options.includeLibraryPath,
-      includeLog: options.includeLog,
+      includeLibraryPath: false,
+      includeLog: logAvailable(),
     }));
   const run = (work: () => Promise<string>) => {
     if (!summary.trim()) {
@@ -128,18 +121,20 @@ export function ReportProblemForm({
     }
     setBusy(true);
     setStatus(undefined);
-    work().then(
-      (text) => setStatus({ text }),
-      (reason: unknown) =>
-        setStatus({
-          text: t("report.failed", { message: errorMessage(reason) }),
-          error: true,
-        }),
-    ).finally(() => setBusy(false));
+    work()
+      .then(
+        (text) => setStatus({ text }),
+        (reason: unknown) =>
+          setStatus({
+            text: t("report.failed", { message: errorMessage(reason) }),
+            error: true,
+          }),
+      )
+      .finally(() => setBusy(false));
   };
   const submit = () =>
     run(async () => {
-      const text = attach ? await fullDiagnostics() : "";
+      const text = await fullDiagnostics();
       if (text) await writeClipboard(text);
       window.open(
         issueUrl({ ...draft, logs: text ? t("report.logsHint") : "" }),
@@ -150,7 +145,7 @@ export function ReportProblemForm({
     });
   const copyAll = () =>
     run(async () => {
-      const text = attach ? await fullDiagnostics() : undefined;
+      const text = await fullDiagnostics();
       await writeClipboard(
         reportText(
           draft,
@@ -225,35 +220,8 @@ export function ReportProblemForm({
           </button>
         </div>
       )}
-      <div className="feedback-attach">
-        <label>
-          <input
-            type="checkbox"
-            checked={attach}
-            onChange={(event) => setAttach(event.target.checked)}
-          />
-          {t("report.attach")}
-          <span className="feedback-muted"> · {t("report.attachDetail")}</span>
-        </label>
-        {attach && (
-          <button
-            type="button"
-            className="feedback-link"
-            aria-expanded={preview}
-            onClick={() => setPreview((value) => !value)}
-          >
-            {preview ? t("report.hidePreview") : t("report.showPreview")}
-          </button>
-        )}
-      </div>
-      {attach && preview && (
-        <DiagnosticsPreview
-          options={options}
-          onOptionsChange={setOptions}
-          text={diagnostics.text}
-          error={diagnostics.error}
-        />
-      )}
+      <h3>{t("diag.title")}</h3>
+      <DiagnosticsPreview text={diagnostics.text} error={diagnostics.error} />
       <div className="feedback-actions">
         <button
           type="button"

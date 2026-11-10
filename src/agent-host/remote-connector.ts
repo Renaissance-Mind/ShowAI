@@ -66,7 +66,7 @@ export class RemoteMacConnector {
     this.initialization ??= (async () => {
       const saved = await readOptional<ConnectorSettings>(this.path);
       this.settings = saved
-        ? { ...saved, nearbyEnabled: saved.nearbyEnabled ?? saved.enabled }
+        ? { ...saved, nearbyEnabled: true }
         : {
             enabled: false,
             nearbyEnabled: true,
@@ -132,6 +132,7 @@ export class RemoteMacConnector {
     return this.status();
   }
   async save(input: ConnectorSettings) {
+    input = { ...input, nearbyEnabled: true };
     const { settings: previous } = await this.status();
     if (this.settings && this.settings.connectionId !== input.connectionId)
       input.trustedClients = [];

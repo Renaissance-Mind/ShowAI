@@ -10,7 +10,6 @@ export default defineMessages("agentExecution", {
     pairANearbyMac: "连接 Mac",
     connecting: "正在连接…",
     nearbyHelp: "iPad 选择这台 Mac 后，首次在这里确认即可。保持 ShowAI 打开。",
-    allowNearbyConnection: "允许附近的 iPad 连接",
     nearbyOff: "已关闭",
     acrossNetworks: "跨网络连接",
     useThisComputerFromIPad: "让 iPad 使用这台电脑",
@@ -18,7 +17,6 @@ export default defineMessages("agentExecution", {
     refresh: "刷新",
     connectThisComputerToShowAICloudOverWSSDevicesSignedIntoTheSameServerAccountCanRunTasksHereKeepShowAIRunningAndTheComputerAwake:
       "设备通过 WSS 连接 ShowAI Cloud。iPad 使用同一服务器账号后，可将任务交给这台电脑。保持 ShowAI 运行并让电脑保持唤醒。",
-    allowRemoteExecution: "允许远程执行",
     deviceName: "设备名称",
     allowedProjects: "允许访问的项目",
     syncTheRequiredProjectsOnThisComputerFirst:
@@ -31,6 +29,10 @@ export default defineMessages("agentExecution", {
     connected: "已连接",
     disconnected: "未连接",
     save: "保存",
+    connect: "连接",
+    disconnect: "断开连接",
+    addProject: "添加项目",
+    removeProject: "移除",
   },
   en: {
     serverAccount: "Server account",
@@ -43,7 +45,6 @@ export default defineMessages("agentExecution", {
     connecting: "Connecting…",
     nearbyHelp:
       "Choose this Mac on your iPad, then approve here once. Keep ShowAI open.",
-    allowNearbyConnection: "Allow nearby iPads to connect",
     nearbyOff: "Off",
     acrossNetworks: "Connect across networks",
     useThisComputerFromIPad: "Use this computer from iPad",
@@ -51,7 +52,6 @@ export default defineMessages("agentExecution", {
     refresh: "Refresh",
     connectThisComputerToShowAICloudOverWSSDevicesSignedIntoTheSameServerAccountCanRunTasksHereKeepShowAIRunningAndTheComputerAwake:
       "Connect this computer to ShowAI Cloud over WSS. Devices signed into the same server account can run tasks here. Keep ShowAI running and the computer awake.",
-    allowRemoteExecution: "Allow remote execution",
     deviceName: "Device name",
     allowedProjects: "Allowed projects",
     syncTheRequiredProjectsOnThisComputerFirst:
@@ -65,5 +65,9 @@ export default defineMessages("agentExecution", {
     connected: "Connected",
     disconnected: "Disconnected",
     save: "Save",
+    connect: "Connect",
+    disconnect: "Disconnect",
+    addProject: "Add project",
+    removeProject: "Remove",
   },
 });

@@ -43,14 +43,22 @@ export async function maintenancePolicy(root: string) {
     join(root, "local", "maintenance-policy.json"),
   );
   return bytes
-    ? checked({ ...defaults, ...JSON.parse(bytes.toString("utf8")) })
+    ? checked({
+        ...defaults,
+        ...JSON.parse(bytes.toString("utf8")),
+        automatic: true,
+      })
     : { ...defaults };
 }
 export async function setMaintenancePolicy(
   root: string,
   update: Partial<MaintenancePolicy>,
 ) {
-  const policy = checked({ ...(await maintenancePolicy(root)), ...update });
+  const policy = checked({
+    ...(await maintenancePolicy(root)),
+    ...update,
+    automatic: true,
+  });
   await atomicLibraryFile(
     root,
     join(root, "local", "maintenance-policy.json"),

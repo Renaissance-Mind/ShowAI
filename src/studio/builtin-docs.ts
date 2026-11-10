@@ -38,7 +38,6 @@ const docs = manifest as {
 export const WELCOME_DOC = "welcome";
 /** The documentation's own front page (/doc). */
 export const DOCS_HOME = docs.slugs[""];
-export const DOCS_VISIBLE_KEY = "showai:builtin-docs";
 
 const files = import.meta.glob<string>("../../resources/docs/*/*/*.json", {
   query: "?raw",
@@ -114,9 +113,4 @@ export function builtinDocLink(
   if (!match) return;
   const pageId = docs.slugs[(match[1] ?? "").toLowerCase()];
   return pageId ? { pageId, hash: url.hash } : undefined;
-}
-
-/** An App preference (Settings → General), shown unless the person turned it off. */
-export function readDocsVisible() {
-  return localStorage.getItem(DOCS_VISIBLE_KEY) !== "hidden";
 }

@@ -21,6 +21,7 @@ import { LibraryIndex } from "./library-index";
 import { scanWorkspaceResources } from "./package-recovery";
 import {
   MaintenanceScheduler,
+  maintenancePolicy,
   setMaintenancePolicy,
 } from "./maintenance-scheduler";
 import type { PageRecord } from "./model";
@@ -325,14 +326,18 @@ describe("library space, cleanup and archival", () => {
       maintenance.archive(join(alias, "nested-backup")),
     ).rejects.toMatchObject({ code: "INVALID_PATH" });
   });
-  it("runs an enabled compaction through the actual background timer and stops cleanly", async () => {
-    await setMaintenancePolicy(root, {
+  it("automatically compacts even when an older settings file disabled maintenance, and stops cleanly", async () => {
+    const policy = await setMaintenancePolicy(root, {
+      automatic: false,
       idleMs: 0,
       intervalMs: 50,
       minimumPacks: 0,
       minimumLooseObjects: 0,
       minimumLooseBytes: 0,
     });
+    expect(policy.automatic).toBe(true);
+    await writeFile(join(root, "local", "maintenance-policy.json"), JSON.stringify({ ...policy, automatic: false }));
+    expect((await maintenancePolicy(root)).automatic).toBe(true);
     const failures: unknown[] = [],
       scheduler = new MaintenanceScheduler(root, (error) =>
         failures.push(error),

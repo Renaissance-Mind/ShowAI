@@ -22,7 +22,6 @@ import {
   LOCALES,
   setLanguagePreference,
 } from "../i18n";
-import { useState } from "react";
 import { useLanguagePreference, useTranslator } from "../i18n/react";
 import messages from "../i18n/messages/settings";
 import "./settings.css";
@@ -31,7 +30,9 @@ import IconViewer from "./IconViewer";
 import SyncSettings, { type ProjectSyncRequest } from "./SyncSettings";
 import AgentSettings from "./AgentSettings";
 import WorkRecordsSettings from "./WorkRecordsSettings";
-import PluginInstallSettings, { LaunchConfigCopy } from "./PluginInstallSettings";
+import PluginInstallSettings, {
+  LaunchConfigCopy,
+} from "./PluginInstallSettings";
 import RemoteMcpSettings from "./RemoteMcpSettings";
 import remoteMcpMessages from "../i18n/messages/remoteMcp";
 import { workbenchCapabilities } from "./capabilities";
@@ -88,7 +89,8 @@ export function availableSettingsSection(
 ): SettingsSection {
   const capabilities = workbenchCapabilities(platform);
   return (section === "general" && !capabilities.manageLibrary) ||
-    ((section === "plugins" || section === "remote") && !capabilities.localPlugins)
+    ((section === "plugins" || section === "remote") &&
+      !capabilities.localPlugins)
     ? "sync"
     : section;
 }
@@ -165,8 +167,6 @@ export function SettingsPanel({
   onCopyHome,
   onMigrate,
   onOpenShortcuts,
-  docsVisible,
-  onDocsVisibleChange,
   feedbackRequest,
   onOpenDocs,
   onOpenFaq,
@@ -184,9 +184,6 @@ export function SettingsPanel({
   onCopyConfig?: () => void;
   onMigrate: () => void;
   onOpenShortcuts: () => void;
-  /** Absent where the host publishes its own documentation. */
-  docsVisible?: boolean;
-  onDocsVisibleChange?: (visible: boolean) => void;
   /** Opens 关于与反馈 on its report form or diagnostics preview. */
   feedbackRequest?: FeedbackRequest;
   /** Opens the built-in documentation; absent where it is unavailable. */
@@ -196,15 +193,15 @@ export function SettingsPanel({
   const t = useTranslator(messages);
   const language = useLanguagePreference();
   const tr = useTranslator(remoteMcpMessages);
-  // Storage statistics are read only once the maintenance section is opened.
-  const [maintenanceOpen, setMaintenanceOpen] = useState(false);
   section = availableSettingsSection(section, info?.platform);
   const current = sections.find((item) => item.id === section)!;
   return (
     <div className="studio-settings" key={section}>
-      {section !== "sync" && <header className="settings-heading">
-        <h2>{t(current.label)}</h2>
-      </header>}
+      {section !== "sync" && (
+        <header className="settings-heading">
+          <h2>{t(current.label)}</h2>
+        </header>
+      )}
       {section === "icons" && <IconViewer />}
       {section === "sync" && (
         <SyncSettings request={syncRequest} onOpenProject={onOpenProject} />
@@ -256,45 +253,9 @@ export function SettingsPanel({
           )}
         </section>
       )}
-      {section === "general" && onDocsVisibleChange && (
-        <section
-          className="settings-group"
-          aria-labelledby="settings-sidebar-title"
-        >
-          <h2 id="settings-sidebar-title">{t("sidebar")}</h2>
-          <div className="settings-row">
-            <div className="settings-row-text">
-              <label htmlFor="settings-builtin-docs">{t("builtinDocs")}</label>
-              <p>{t("builtinDocsDetail")}</p>
-            </div>
-            <input
-              id="settings-builtin-docs"
-              type="checkbox"
-              role="switch"
-              className="settings-switch"
-              checked={!!docsVisible}
-              onChange={(event) => onDocsVisibleChange(event.target.checked)}
-            />
-          </div>
-        </section>
-      )}
       {section === "general" && info && <WorkRecordsSettings key={info.home} />}
       {section === "general" && info?.libraryVersion === 2 && (
-        <details
-          className="settings-group settings-advanced"
-          onToggle={(event) => setMaintenanceOpen(event.currentTarget.open)}
-        >
-          <summary>
-            <ChevronRight size={14} aria-hidden="true" />
-            {t("advancedStorage")}
-          </summary>
-          <p className="settings-advanced-detail">
-            {t("advancedStorageDetail")}
-          </p>
-          {maintenanceOpen && (
-            <LibrarySpace key={info.home} home={info.home} />
-          )}
-        </details>
+        <LibrarySpace key={info.home} home={info.home} />
       )}
       {section === "appearance" && (
         <section
@@ -325,7 +286,9 @@ export function SettingsPanel({
                   />
                   <span className="settings-theme-label">
                     <Icon size={16} strokeWidth={1.7} aria-hidden="true" />
-                    <span>{t(option === "system" ? "themeSystem" : option)}</span>
+                    <span>
+                      {t(option === "system" ? "themeSystem" : option)}
+                    </span>
                     <span className="settings-radio-mark" aria-hidden="true" />
                   </span>
                 </label>
@@ -359,7 +322,12 @@ export function SettingsPanel({
         </section>
       )}
       {section === "agent" && <AgentSettings />}
-      {section === "remote" && (info?.mode === "browser" ? <p className="settings-help">{tr("desktopOnly")}</p> : <RemoteMcpSettings />)}
+      {section === "remote" &&
+        (info?.mode === "browser" ? (
+          <p className="settings-help">{tr("desktopOnly")}</p>
+        ) : (
+          <RemoteMcpSettings />
+        ))}
       {section === "plugins" && (
         <>
           {info && <PluginInstallSettings home={info.home} />}

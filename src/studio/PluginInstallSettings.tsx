@@ -19,7 +19,7 @@ import messages from "../i18n/messages/pluginInstall";
 import onboardingMessages from "../i18n/messages/onboarding";
 import settingsMessages from "../i18n/messages/settings";
 import { PendingNotice } from "../ui/PendingNotice";
-import { ChevronRight, Copy, ExternalLink, RefreshCw } from "../ui/icons";
+import { Copy, ExternalLink, RefreshCw } from "../ui/icons";
 import { desktop, errorMessage } from "./bridge";
 import {
   pluginActionBlocked,
@@ -110,10 +110,10 @@ export function PluginError({
     <div role="alert" className="plugin-install-error">
       <p>{message}</p>
       {details && (
-        <details>
-          <summary>{t("technicalDetails")}</summary>
+        <section>
+          <h3 className="settings-section-heading">{t("technicalDetails")}</h3>
           <pre className="plugin-install-details">{details}</pre>
-        </details>
+        </section>
       )}
     </div>
   );
@@ -211,7 +211,9 @@ function useFailureReason() {
   return (code: string) => {
     const key = `failure.${code}` as Parameters<typeof t>[0];
     const text = t(key);
-    return text.startsWith("onboarding.") ? t("failure.unknown", { code }) : text;
+    return text.startsWith("onboarding.")
+      ? t("failure.unknown", { code })
+      : text;
   };
 }
 
@@ -306,12 +308,14 @@ export function VerifyConnection({
                       {busy ? t("verify.repairing") : t("verify.repair")}
                     </button>
                     {state.detail && (
-                      <details className="plugin-verify-detail">
-                        <summary>{t("verify.details")}</summary>
+                      <section className="plugin-verify-detail">
+                        <h3 className="settings-section-heading">
+                          {t("verify.details")}
+                        </h3>
                         <pre className="plugin-install-details">
                           {state.code}: {state.detail}
                         </pre>
-                      </details>
+                      </section>
                     )}
                   </>
                 )}
@@ -361,8 +365,7 @@ function RuntimeRegistration({
   const t = useTranslator(messages);
   if (runtime.state === "current") return null;
   const registered = runtime.registered;
-  const state =
-    runtime.state === "other" ? runtime.reason! : runtime.state;
+  const state = runtime.state === "other" ? runtime.reason! : runtime.state;
   return (
     <div className="settings-row plugin-runtime" data-runtime-state={state}>
       <div className="settings-row-text">
@@ -405,8 +408,8 @@ function ManualPath({
   return (
     <div className="plugin-manual-path">
       {host.searched && (
-        <details>
-          <summary>{t("searched")}</summary>
+        <section>
+          <h3 className="settings-section-heading">{t("searched")}</h3>
           <ul className="plugin-install-searched">
             {host.searched.map((directory) => (
               <li key={directory}>
@@ -414,7 +417,7 @@ function ManualPath({
               </li>
             ))}
           </ul>
-        </details>
+        </section>
       )}
       <form
         className="plugin-install-path"
@@ -492,9 +495,8 @@ export function LaunchConfigCopy({ info }: { info: DesktopInfo | null }) {
       {kinds.map((kind) => {
         const text = launchSnippet(kind, server, info.platform);
         return (
-          <details key={kind} className="settings-config">
-            <summary>
-              <ChevronRight size={14} aria-hidden="true" />
+          <section key={kind} className="settings-config">
+            <h3 className="settings-section-heading">
               <span>{t(`launch.${kind}Hint`)}</span>
               <button
                 className="settings-button"
@@ -510,11 +512,11 @@ export function LaunchConfigCopy({ info }: { info: DesktopInfo | null }) {
                 <Copy size={14} aria-hidden="true" />
                 {copied === kind ? t("copied") : t(`launch.${kind}`)}
               </button>
-            </summary>
+            </h3>
             <pre>
               <code>{text}</code>
             </pre>
-          </details>
+          </section>
         );
       })}
       {error && (
@@ -697,12 +699,14 @@ export default function PluginInstallSettings({ home }: { home: string }) {
                 </p>
               )}
               {failed?.detail && (
-                <details className="plugin-verify-detail">
-                  <summary>{tv("verify.details")}</summary>
+                <section className="plugin-verify-detail">
+                  <h3 className="settings-section-heading">
+                    {tv("verify.details")}
+                  </h3>
                   <pre className="plugin-install-details">
                     {failed.code}: {failed.detail}
                   </pre>
-                </details>
+                </section>
               )}
               {host.manualPath && host.executable === host.manualPath && (
                 <p className="plugin-install-note">
@@ -743,7 +747,9 @@ export default function PluginInstallSettings({ home }: { home: string }) {
                   });
                 }}
               >
-                {busy === host.host ? tv("verify.repairing") : tv("verify.repair")}
+                {busy === host.host
+                  ? tv("verify.repairing")
+                  : tv("verify.repair")}
               </button>
             ) : (
               !pluginActionBlocked(host) && (

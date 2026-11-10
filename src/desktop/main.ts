@@ -1894,7 +1894,7 @@ else {
       );
       const settings = await startupSettings();
       appUpdates = new AppUpdates({
-        automatic: settings.autoUpdate ?? true,
+        automatic: true,
         log: (level, ...values) => mainLog.write(level, "update", ...values),
         publish: (state) => {
           for (const window of windows)

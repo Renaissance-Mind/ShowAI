@@ -108,7 +108,6 @@ export default function SyncDashboard({
 }) {
   const t = useTranslator(messages);
   const f = useTranslator(flowMessages);
-  const [advanced, setAdvanced] = useState(false);
   const [days, setDays] = useState("7");
   const tc = useTranslator(common);
   const expiry = (date: string) =>
@@ -128,7 +127,6 @@ export default function SyncDashboard({
   const [query, setQuery] = useState("");
   const [inviteUses, setInviteUses] = useState("25"),
     [inviteTarget, setInviteTarget] = useState("");
-  const [revokeRelated, setRevokeRelated] = useState(true);
   const controlledInvites =
     !!connection?.capabilities?.includes("invite-controls-v1");
   const [remove, setRemove] = useState<SyncMember | null>(null),
@@ -384,7 +382,6 @@ export default function SyncDashboard({
                               confirmationTrigger.current = event.currentTarget;
                               setArchive(false);
                               setRemove(member);
-                              setRevokeRelated(true);
                             }}
                           >
                             {t("removeMember")}
@@ -409,19 +406,7 @@ export default function SyncDashboard({
                     {withStrong(t("removeMemberQuestion"), remove.name)}
                     <span>{t("removeMemberConsequence")}</span>
                   </p>
-                  {controlledInvites && (
-                    <label className="sync-revoke-choice">
-                      <input
-                        type="checkbox"
-                        checked={revokeRelated}
-                        disabled={busy}
-                        onChange={(event) =>
-                          setRevokeRelated(event.target.checked)
-                        }
-                      />
-                      {t("revokeRelatedInvites")}
-                    </label>
-                  )}
+                  {controlledInvites && <p>{t("revokeRelatedInvites")}</p>}
                   <div>
                     <button
                       className="settings-button"
@@ -435,10 +420,7 @@ export default function SyncDashboard({
                       disabled={busy}
                       onClick={() => {
                         confirmationTrigger.current?.focus();
-                        void onRemove(
-                          remove,
-                          controlledInvites && revokeRelated,
-                        ).then((ok) => {
+                        void onRemove(remove, controlledInvites).then((ok) => {
                           if (ok) setRemove(null);
                         });
                       }}
@@ -475,7 +457,7 @@ export default function SyncDashboard({
                       onInviteRole(event.target.value as ProjectRole)
                     }
                   >
-                    {roleOptions.filter((item) => advanced || inviteRole === "admin" || item.key !== "admin")}
+                    {roleOptions}
                   </select>
                 </label>
                 <button
@@ -495,12 +477,10 @@ export default function SyncDashboard({
                   {f("createCopy")}
                 </button>
               </div>
-              <details
-                className="sync-account-disclosure"
-                open={advanced}
-                onToggle={(event) => setAdvanced(event.currentTarget.open)}
-              >
-                <summary>{f("inviteAdvanced")}</summary>
+              <section className="sync-account-disclosure">
+                <h3 className="settings-section-heading">
+                  {f("inviteAdvanced")}
+                </h3>
                 {controlledInvites && (
                   <>
                     <label>
@@ -550,7 +530,7 @@ export default function SyncDashboard({
                     ))}
                   </select>
                 </label>
-              </details>
+              </section>
               <p className="sync-permission-note">
                 {t(permissions[inviteRole])}
               </p>
@@ -590,10 +570,10 @@ export default function SyncDashboard({
                 </div>
               )}
               {!!pendingInvites.length && (
-                <details className="sync-pending-invites">
-                  <summary>
+                <section className="sync-pending-invites">
+                  <h3 className="settings-section-heading">
                     {t("existingInvites")} <span>{pendingInvites.length}</span>
-                  </summary>
+                  </h3>
                   {pendingInvites.map((invite) => {
                     const expired =
                       new Date(invite.expires_at).getTime() <= Date.now();
@@ -624,10 +604,10 @@ export default function SyncDashboard({
                               : full
                                 ? f("full")
                                 : expired
-                              ? t("invite.expired")
-                              : t("expiresAt", {
-                                  date: expiry(invite.expires_at),
-                                })}
+                                  ? t("invite.expired")
+                                  : t("expiresAt", {
+                                      date: expiry(invite.expires_at),
+                                    })}
                           </span>
                         </div>
                         {active && (
@@ -654,18 +634,18 @@ export default function SyncDashboard({
                           </button>
                         )}
                         {!invite.revoked && (
-                        <button
-                          className="sync-text-button sync-danger"
-                          disabled={busy}
-                          onClick={() => onRevoke(invite.digest)}
-                        >
-                          {t("revokeInvite")}
-                        </button>
+                          <button
+                            className="sync-text-button sync-danger"
+                            disabled={busy}
+                            onClick={() => onRevoke(invite.digest)}
+                          >
+                            {t("revokeInvite")}
+                          </button>
                         )}
                       </div>
                     );
                   })}
-                </details>
+                </section>
               )}
             </section>
             <section

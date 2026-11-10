@@ -32,12 +32,7 @@ import {
   runtimeLine,
   versionLine,
 } from "./diagnostics";
-import {
-  DiagnosticsPreview,
-  logAvailable,
-  useDiagnostics,
-  type DiagnosticsOptions,
-} from "./DiagnosticsPreview";
+import { DiagnosticsPreview, useDiagnostics } from "./DiagnosticsPreview";
 import { ReportProblemForm } from "./ReportProblemForm";
 import "./feedback.css";
 
@@ -84,7 +79,9 @@ function InfoRow({ label, value }: { label: string; value: string }) {
           aria-label={
             copied ? t("info.copied", { label }) : t("info.copy", { label })
           }
-          title={copied ? t("info.copied", { label }) : t("info.copy", { label })}
+          title={
+            copied ? t("info.copied", { label }) : t("info.copy", { label })
+          }
           disabled={value === "—"}
           onClick={() =>
             void writeClipboard(`${label}: ${value}`).then(
@@ -162,25 +159,6 @@ function UpdateRows() {
           ) : (
             <Loader2 size={14} className="studio-spin" aria-hidden="true" />
           )}
-        </dd>
-      </div>
-      <div className="settings-row feedback-info-row">
-        <dt>
-          <label htmlFor="feedback-auto-update">{t("update.automatic")}</label>
-        </dt>
-        <dd>
-          <input
-            id="feedback-auto-update"
-            type="checkbox"
-            role="switch"
-            className="settings-switch"
-            checked={state.automatic}
-            onChange={(event) =>
-              act("appUpdate:setAutomatic", {
-                automatic: event.target.checked,
-              })
-            }
-          />
         </dd>
       </div>
     </>
@@ -290,20 +268,12 @@ export function AboutFeedback({
     request?.view === "report" ? "report" : "about",
   );
   const [context, setContext] = useState(request?.context);
-  const [previewOpen, setPreviewOpen] = useState(
-    request?.view === "diagnostics",
-  );
   useEffect(() => {
     if (!request) return;
     setView(request.view === "report" ? "report" : "about");
     setContext(request.context);
-    if (request.view === "diagnostics") setPreviewOpen(true);
   }, [request]);
-  const [options, setOptions] = useState<DiagnosticsOptions>({
-    includeLibraryPath: false,
-    includeLog: logAvailable(),
-  });
-  const diagnostics = useDiagnostics(info, options, previewOpen);
+  const diagnostics = useDiagnostics(info, view === "about");
   const [status, setStatus] = useState<{ text: string; error?: boolean }>();
   const channels = supportChannels();
   const desktopLogs = !!window.showai?.openLogFolder;
@@ -386,10 +356,7 @@ export function AboutFeedback({
           {info && localPlugins && <PluginRows home={info.home} />}
         </dl>
       </section>
-      <section
-        className="settings-group"
-        aria-labelledby="feedback-help-title"
-      >
+      <section className="settings-group" aria-labelledby="feedback-help-title">
         <h2 id="feedback-help-title">{t("help.title")}</h2>
         <div className="feedback-cards">
           <button type="button" className="feedback-card" onClick={faq}>
@@ -410,7 +377,11 @@ export function AboutFeedback({
             <span>{t("help.reportDetail")}</span>
           </button>
           {onOpenDocs && (
-            <button type="button" className="feedback-card" onClick={onOpenDocs}>
+            <button
+              type="button"
+              className="feedback-card"
+              onClick={onOpenDocs}
+            >
               <BookOpen size={16} aria-hidden="true" />
               <strong>{t("help.docs")}</strong>
               <span>{t("help.docsDetail")}</span>
@@ -443,15 +414,18 @@ export function AboutFeedback({
       >
         <h2 id="feedback-diagnostics-title">{t("diag.title")}</h2>
         <p className="feedback-muted">{t("diag.privacy")}</p>
+        <DiagnosticsPreview text={diagnostics.text} error={diagnostics.error} />
         <div className="feedback-actions">
           <button
             type="button"
             className="settings-button feedback-primary"
-            aria-expanded={previewOpen}
-            onClick={() => {
-              setStatus(undefined);
-              setPreviewOpen(true);
-            }}
+            disabled={!diagnostics.text}
+            onClick={() =>
+              void writeClipboard(diagnostics.text!).then(
+                () => done(t("diag.copied")),
+                fail,
+              )
+            }
           >
             <Copy size={14} aria-hidden="true" />
             {t("diag.copy")}
@@ -469,61 +443,15 @@ export function AboutFeedback({
           <button
             type="button"
             className="settings-button"
-            onClick={() => {
-              setStatus(undefined);
-              if (diagnostics.text)
-                void exportDiagnostics(diagnostics.text).catch(fail);
-              else setPreviewOpen(true);
-            }}
+            disabled={!diagnostics.text}
+            onClick={() =>
+              void exportDiagnostics(diagnostics.text!).catch(fail)
+            }
           >
             <Download size={14} aria-hidden="true" />
             {t("diag.export")}
           </button>
         </div>
-        {previewOpen && (
-          <>
-            <DiagnosticsPreview
-              options={options}
-              onOptionsChange={setOptions}
-              text={diagnostics.text}
-              error={diagnostics.error}
-            />
-            <div className="feedback-actions">
-              <button
-                type="button"
-                className="settings-button feedback-primary"
-                disabled={!diagnostics.text}
-                onClick={() =>
-                  void writeClipboard(diagnostics.text!).then(
-                    () => done(t("diag.copied")),
-                    fail,
-                  )
-                }
-              >
-                <Copy size={14} aria-hidden="true" />
-                {t("diag.copyNow")}
-              </button>
-              <button
-                type="button"
-                className="settings-button"
-                disabled={!diagnostics.text}
-                onClick={() =>
-                  void exportDiagnostics(diagnostics.text!).catch(fail)
-                }
-              >
-                <Download size={14} aria-hidden="true" />
-                {t("diag.export")}
-              </button>
-              <button
-                type="button"
-                className="settings-button"
-                onClick={() => setPreviewOpen(false)}
-              >
-                {t("diag.close")}
-              </button>
-            </div>
-          </>
-        )}
         {status && (
           <p
             className={status.error ? "feedback-error" : "feedback-status"}

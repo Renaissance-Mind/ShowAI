@@ -199,8 +199,6 @@ import {
   builtinDocLink,
   builtinDocs,
   DOCS_HOME,
-  DOCS_VISIBLE_KEY,
-  readDocsVisible,
   WELCOME_DOC,
 } from "./builtin-docs";
 import { useSampleProject } from "./sample-project";
@@ -470,14 +468,8 @@ export default function Studio() {
   const [docPage, setDocPage] = useState<{ id: string; hash: string } | null>(
     null,
   );
-  const [docsVisible, setDocsVisible] = useState(readDocsVisible);
   const docsAvailable = !!info && info.builtinDocs !== false;
-  const showDocs = docsAvailable && docsVisible;
-  const changeDocsVisible = useCallback((visible: boolean) => {
-    setDocsVisible(visible);
-    if (visible) localStorage.removeItem(DOCS_VISIBLE_KEY);
-    else localStorage.setItem(DOCS_VISIBLE_KEY, "hidden");
-  }, []);
+  const showDocs = docsAvailable;
   const docTitle = useBuiltinDocTitle();
   const locale = useLocale();
   const [projects, setProjects] = useState<ProjectSummary[]>([]);
@@ -5220,10 +5212,6 @@ export default function Studio() {
                   onOpenDocs={() => void helpDoc("").catch(report)}
                   onOpenFaq={() =>
                     void helpDoc("agent-troubleshooting").catch(report)
-                  }
-                  docsVisible={docsVisible}
-                  onDocsVisibleChange={
-                    docsAvailable ? changeDocsVisible : undefined
                   }
                   onChooseHome={action(async () => {
                     if (!(await page.prepareClose())) return;
