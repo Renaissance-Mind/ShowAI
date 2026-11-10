@@ -72,9 +72,11 @@ async function build(library: GitLibrary, revision: string) {
   const paths = tree
     .map((e) => e.path)
     .filter((path) => /^projects\/[^/]+\/pages\/[^/.]+\.json$/.test(path));
+  const pageSignatures = new Map(
+    paths.map((path) => [path, digest(signatures.get(path))]),
+  );
   const changed = paths.filter(
-    (path) =>
-      previous?.entries[path]?.signature !== digest(signatures.get(path)),
+    (path) => previous?.entries[path]?.signature !== pageSignatures.get(path),
   );
   const loaded = new Map<string, Buffer>();
   for (let offset = 0; offset < changed.length; offset += 32)
@@ -86,7 +88,7 @@ async function build(library: GitLibrary, revision: string) {
   const entries: Record<string, Entry> = {};
   const revisions = await library.resourceRevisions(paths, revision);
   for (const path of paths) {
-    const signature = digest(signatures.get(path));
+    const signature = pageSignatures.get(path)!;
     const prior = previous?.entries[path];
     const document = loaded.has(path)
       ? normalizeDocument(

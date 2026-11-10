@@ -8,6 +8,7 @@ import { readLibraryBytes } from "../core/library-files";
 import { withLibraryLock } from "../core/library-lock";
 import { ContentLibrary as GitLibrary } from "../core/content-library";
 import { FileStore, CoreError, assertId } from "../core/store";
+import { isId } from "../core/identifier";
 import { LibraryOperations } from "../core/library-operations";
 import { WorkspaceProtection } from "../core/workspace-conflicts";
 import { serverBaseUrl, serverEndpoint, invitationBaseUrl } from "./server-url";
@@ -2400,6 +2401,24 @@ export class SyncManager {
     );
     const library = new GitLibrary(this.home);
     const global = await library.head();
+    // Resource tokens at this head, read in one request for the projects whose
+    // memo is older. Other identifiers fail on their own below, as before.
+    let tokens: Promise<Map<string, string | null>> | undefined;
+    const resourceToken = async (projectId: string) => {
+      const path = `projects/${projectId}`;
+      if (!isId(projectId)) return library.resourceRevision(path, global!);
+      tokens ??= library.resourceRevisions(
+        selected
+          .map((item) => item.projectId)
+          .filter((id) => isId(id) && this.observed.get(id)?.global !== global)
+          .map((id) => `projects/${id}`),
+        global!,
+      );
+      const read = await tokens;
+      return read.has(path)
+        ? read.get(path)!
+        : library.resourceRevision(path, global!);
+    };
     let changed = false,
       failed = false;
     for (const connection of config.connections) {
@@ -2469,10 +2488,7 @@ export class SyncManager {
             memo?.global === global
               ? memo.resource
               : global
-                ? await library.resourceRevision(
-                    `projects/${project.projectId}`,
-                    global,
-                  )
+                ? await resourceToken(project.projectId)
                 : null;
           if (
             !force &&
