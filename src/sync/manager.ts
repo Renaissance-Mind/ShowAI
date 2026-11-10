@@ -2342,8 +2342,19 @@ export class SyncManager {
   async enrollNewProjects(projectId?: string) {
     const config = await this.configuration();
     if (!config.defaultConnectionId || !config.defaultSince) return;
-    const local = await new FileStore(this.home).listProjects({
+    const store = new FileStore(this.home);
+    // Only projects neither synchronized nor kept local need their metadata.
+    const known = new Set([
+      ...config.projects.map((connection) => connection.projectId),
+      ...(config.localProjectIds ?? []),
+    ]);
+    const unknown = (await store.projectDirectories()).filter(
+      (id) => !known.has(id) && (!projectId || id === projectId),
+    );
+    if (!unknown.length) return;
+    const local = await store.listProjects({
       includeArchived: true,
+      projectIds: unknown,
     });
     for (const project of local)
       if (

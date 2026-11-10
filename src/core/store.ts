@@ -839,6 +839,14 @@ export class FileStore {
     });
   }
 
+  /** Directory names under projects/, without reading any project. */
+  async projectDirectories(): Promise<string[]> {
+    return this.contentNames(
+      join(workspaceRoot(this.root), "projects"),
+      "directory",
+    );
+  }
+
   async listProjects(
     options: { includeArchived?: boolean; projectIds?: string[] } = {},
   ): Promise<ProjectSummary[]> {
@@ -891,15 +899,25 @@ export class FileStore {
     const names = await this.contentNames(path, "directory");
     const projects: ProjectSummary[] = [];
     const failures: { directory: string; error: unknown }[] = [];
-    for (const name of names) {
-      if (options.projectIds && !options.projectIds.includes(name)) continue;
+    const selected = names.filter(
+      (name) => !options.projectIds || options.projectIds.includes(name),
+    );
+    // Metadata reads are issued together; each project's failure stays its own.
+    const metadata = await Promise.allSettled(
+      selected.map((name) => this.readProject(name)),
+    );
+    for (const [index, name] of selected.entries()) {
       let project: ProjectMetadata, pages: PageSummary[];
       try {
-        project = await this.readProject(name);
+        const read = metadata[index];
+        if (read.status === "rejected") throw read.reason;
+        project = read.value;
         if (project.archived && !options.includeArchived) continue;
-        pages = await this.listPages(project.id, {
-          includeArchived: !!options.includeArchived,
-        });
+        pages = await this.listPages(
+          project.id,
+          { includeArchived: !!options.includeArchived },
+          project,
+        );
       } catch (error) {
         failures.push({ directory: name, error });
         if (!isolate) break;
@@ -1464,6 +1482,8 @@ export class FileStore {
   async listPages(
     projectId: string,
     options: { includeArchived?: boolean } = {},
+    /** The project's metadata when the caller read it in the same snapshot. */
+    read?: ProjectMetadata,
   ): Promise<PageSummary[]> {
     if (
       !libraryReadSnapshot.getStore() &&
@@ -1473,7 +1493,8 @@ export class FileStore {
       return withLibrarySnapshot(this.root, () =>
         this.listPages(projectId, options),
       );
-    const project = await this.readProject(projectId);
+    const project =
+      read?.id === projectId ? read : await this.readProject(projectId);
     if (project.archived && options.includeArchived === false) return [];
     const snapshot = libraryReadSnapshot.getStore();
     if (
