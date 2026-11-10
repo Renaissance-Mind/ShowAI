@@ -11,7 +11,7 @@ import { EditorDrafts } from "./editor-drafts";
 import { LibraryOperations } from "./library-operations";
 import { AgentService } from "../agent/service";
 import { encodeFile } from "./history-codec";
-import { withLibrarySnapshot } from "./library-runtime";
+import { mutateLibrary, withLibrarySnapshot } from "./library-runtime";
 
 const roots: string[] = [];
 afterEach(async () => {
@@ -226,4 +226,42 @@ it("activates current storage on a legacy library write while retaining its orig
   );
   expect(await current.history()).toEqual([]);
   await current.verify();
+});
+it("reuses a page read within its transaction only until the page is staged again", async () => {
+  const { root, store } = await fixture();
+  const project = await store.createProject({ name: "Reused reads" });
+  const page = await store.createPage(project.id, { title: "Initial" });
+  const result = await mutateLibrary(root, async () => {
+    const read = await store.readPage(project.id, page.document.id);
+    const first = await store.savePage(
+      project.id,
+      page.document.id,
+      { ...read.document, title: "First" },
+      read.hash,
+      read.revision,
+      read,
+    );
+    // The earlier read no longer describes the staged page and is read again.
+    const stale = await store
+      .savePage(
+        project.id,
+        page.document.id,
+        { ...read.document, title: "Overwrite" },
+        read.hash,
+        read.revision,
+        read,
+      )
+      .then(
+        () => undefined,
+        (error) => error,
+      );
+    return { first, stale };
+  });
+  expect(result.stale).toMatchObject({
+    code: "CONFLICT",
+    currentHash: result.first.hash,
+  });
+  expect(
+    (await store.readPage(project.id, page.document.id)).document.title,
+  ).toBe("First");
 });

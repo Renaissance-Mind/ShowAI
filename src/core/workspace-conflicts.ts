@@ -80,9 +80,16 @@ export async function recordWorkspaceChanges(
 }
 
 const COMPARE_BATCH = 16;
+const sameBytes = (a: Buffer | null, b: Buffer | null) =>
+  a === null || b === null ? a === b : a.equals(b);
 
 /** External content stays in place and is independently retained before resolution. */
 export class WorkspaceProtection {
+  /** Workspace bytes baseline() fingerprinted, so materialize() can reuse them. */
+  private recorded = new Map<
+    string,
+    { bytes: Buffer | null; hash: string | null }
+  >();
   constructor(
     readonly library: Pick<
       GitLibrary,
@@ -239,7 +246,10 @@ export class WorkspaceProtection {
           join(this.library.workspace, path),
         );
         const expected = committed.get(path) ?? null;
-        if (workspaceHash(path, actual) !== workspaceHash(path, expected))
+        if (
+          !sameBytes(actual, expected) &&
+          workspaceHash(path, actual) !== workspaceHash(path, expected)
+        )
           differences.push({ path, actual, tracked: tree.has(path) });
       }
     }
@@ -268,15 +278,23 @@ export class WorkspaceProtection {
         },
       );
     const result: Record<string, string | null> = Object.create(null);
-    for (const path of paths)
-      result[path] = workspaceHash(
-        path,
-        await readLibraryBytes(
-          this.library.root,
-          join(this.library.workspace, path),
-        ),
+    for (const path of paths) {
+      const bytes = await readLibraryBytes(
+        this.library.root,
+        join(this.library.workspace, path),
       );
+      result[path] = workspaceHash(path, bytes);
+      this.recorded.set(path, { bytes, hash: result[path] });
+    }
     return result;
+  }
+
+  /** workspaceHash, reusing the fingerprint baseline() took of the same bytes. */
+  private fingerprint(path: string, bytes: Buffer | null) {
+    const recorded = this.recorded.get(path);
+    return recorded && sameBytes(recorded.bytes, bytes)
+      ? recorded.hash
+      : workspaceHash(path, bytes);
   }
 
   async materialize(
@@ -294,10 +312,15 @@ export class WorkspaceProtection {
       const target = join(this.library.workspace, path);
       const actual = await readLibraryBytes(this.library.root, target),
         desired = files.get(path) ?? null;
-      const fingerprint = workspaceHash(path, actual);
+      // Identical bytes have identical fingerprints; otherwise the file is the
+      // save's own projection when it still has the fingerprint taken before.
+      const fingerprint = sameBytes(actual, desired)
+        ? undefined
+        : this.fingerprint(path, actual);
       if (
-        fingerprint !== workspaceHash(path, desired) &&
-        fingerprint !== before[path]
+        fingerprint !== undefined &&
+        fingerprint !== before[path] &&
+        fingerprint !== workspaceHash(path, desired)
       ) {
         conflicts.push(
           await this.capture(path, revision, actual, tree.has(path)),

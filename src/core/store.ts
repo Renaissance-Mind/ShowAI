@@ -29,7 +29,11 @@ import {
 } from "./diff";
 import { CoreError } from "./model";
 import { atomicRename } from "./atomic-rename";
-import { libraryMutations, legacyMutations } from "./history-context";
+import {
+  libraryMutations,
+  legacyMutations,
+  type LibraryMutation,
+} from "./history-context";
 import { pageWriteCapture } from "./page-write-capture";
 import { stampSavedInk } from "./ink-wire-writer";
 import { withLibraryLock } from "./library-lock";
@@ -87,6 +91,16 @@ export type {
 function errno(error: unknown, code: string): boolean {
   return error instanceof Error && "code" in error && error.code === code;
 }
+
+/**
+ * The transaction a page record was read in and the staged bytes of its file
+ * then (undefined when unstaged). The transaction's head is fixed, so while
+ * the same bytes stay staged a new read would return identical content.
+ */
+const recordSources = new WeakMap<
+  PageRecord,
+  { state: LibraryMutation; staged: Buffer | null | undefined }
+>();
 
 function assertHash(hash: string): void {
   if (typeof hash !== "string" || !/^[a-f0-9]{64}$/.test(hash))
@@ -947,7 +961,10 @@ export class FileStore {
           (project) => project.id === input.id,
         )
       )
-        throw new CoreError("CONFLICT", "A project with this id already exists.");
+        throw new CoreError(
+          "CONFLICT",
+          "A project with this id already exists.",
+        );
       return this.writeNewProject(name, binding, undefined, icon, input.id);
     });
   }
@@ -1372,6 +1389,9 @@ export class FileStore {
         );
     }
     const path = this.pagePath(projectId, pageId);
+    const name =
+      state?.root === this.root ? logicalPath(this.root, path) : undefined;
+    const staged = library && name ? state!.changes.get(name) : undefined;
     const value = await this.readJson(path);
     let document: ShowDocument;
     try {
@@ -1407,13 +1427,31 @@ export class FileStore {
       library && state?.root !== this.root
         ? await this.workspaceConflicts(library, logicalPath(this.root, path)!)
         : [];
-    return {
+    const record: PageRecord = {
       document,
       hash: documentHash(document),
       path,
       ...(revision ? { revision } : {}),
       ...(workspaceConflicts.length ? { workspaceConflicts } : {}),
     };
+    // Only when nothing restaged the file while it was read.
+    if (library && name && state!.changes.get(name) === staged)
+      recordSources.set(record, { state: state!, staged });
+    return record;
+  }
+
+  /**
+   * Whether a record read earlier in the current transaction still matches
+   * the page, so reading it again would return the same content and revision.
+   */
+  private unchangedSinceRead(record: PageRecord): boolean {
+    const source = recordSources.get(record),
+      state = libraryMutations.getStore();
+    return (
+      !!source &&
+      source.state === state &&
+      state.changes.get(logicalPath(this.root, record.path)!) === source.staged
+    );
   }
 
   /** External edits of this file that a save has recorded and nobody resolved. */
@@ -1627,14 +1665,17 @@ export class FileStore {
     const record = { document, hash, path: this.pagePath(projectId, pageId) };
     await this.checkpoint(projectId, current);
     await this.checkpoint(projectId, record);
-    // Recheck after checkpoint I/O; cooperating writers hold this page's lock throughout.
-    const latest = await this.readRecord(projectId, pageId);
-    if (latest.hash !== current.hash)
-      throw new CoreError(
-        "CONFLICT",
-        "The page changed while saving. Read the changes and retry.",
-        { currentHash: latest.hash },
-      );
+    // Recheck after checkpoint I/O; cooperating writers hold this page's lock
+    // throughout. A transaction that has not restaged the page reads the same.
+    if (!this.unchangedSinceRead(current)) {
+      const latest = await this.readRecord(projectId, pageId);
+      if (latest.hash !== current.hash)
+        throw new CoreError(
+          "CONFLICT",
+          "The page changed while saving. Read the changes and retry.",
+          { currentHash: latest.hash },
+        );
+    }
     if (artifactVersion(current.document) < artifactVersion(document)) {
       const backup = join(
         this.projectPath(projectId),
@@ -1715,12 +1756,17 @@ export class FileStore {
     document: ShowDocument,
     baseHash: string,
     baseRevision?: string,
+    /** The page as the caller read it earlier in this transaction. */
+    read?: PageRecord,
   ): Promise<PageRecord> {
     assertHash(baseHash);
-    this.pagePath(projectId, pageId);
+    const path = this.pagePath(projectId, pageId);
     await this.readProject(projectId);
     return this.withLock(`page-${projectId}-${pageId}`, async () => {
-      const current = await this.readRecord(projectId, pageId);
+      const current =
+        read?.path === path && this.unchangedSinceRead(read)
+          ? read
+          : await this.readRecord(projectId, pageId);
       this.checkPageRevision(current, baseRevision);
       if (current.hash !== baseHash)
         throw new CoreError(

@@ -1146,7 +1146,8 @@ export class SqliteLibrary {
         revision,
         parents: parent ? [parent] : [],
       };
-    const before = await new WorkspaceProtection(this).baseline(
+    const protection = new WorkspaceProtection(this);
+    const before = await protection.baseline(
         record.paths,
         parent,
         allowedConflicts,
@@ -1168,7 +1169,7 @@ export class SqliteLibrary {
       Buffer.from(JSON.stringify(journal)),
     );
     await this.commit(entry, encoded, parent);
-    const conflicts = await new WorkspaceProtection(this).materialize(
+    const conflicts = await protection.materialize(
       record.paths,
       revision,
       before,
