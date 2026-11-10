@@ -994,7 +994,33 @@ export class AgentHost {
         conversation.localAgent === "claude")
     );
   }
+  /** Conversations whose next turn is being prepared and is not yet recorded as running. */
+  private starting = new Set<string>();
   async send(
+    args: {
+      projectId?: unknown;
+      conversationId?: unknown;
+      prompt?: unknown;
+      target?: unknown;
+    },
+    reserved?: { turnId: string },
+  ): Promise<AgentConversation> {
+    // Preparing a turn awaits several reads before the turn is recorded, so a
+    // second request for the same conversation is refused from the first moment.
+    const conversationId = args.conversationId
+      ? z.string().uuid().parse(args.conversationId)
+      : undefined;
+    if (!conversationId) return this.begin(args, reserved);
+    if (this.starting.has(conversationId))
+      throw new Error(t("conversation.busy"));
+    this.starting.add(conversationId);
+    try {
+      return await this.begin(args, reserved);
+    } finally {
+      this.starting.delete(conversationId);
+    }
+  }
+  private async begin(
     args: {
       projectId?: unknown;
       conversationId?: unknown;

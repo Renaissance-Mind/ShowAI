@@ -263,6 +263,43 @@ test("sending without any model source explains that no model is available", asy
   expect(await fresh.conversations.list(project.id)).toEqual([]);
   fresh.close();
 });
+test("a second request for a conversation is refused while the first is still being prepared", async () => {
+  const root = join(directory, "double-send-host");
+  const fresh = new AgentHost({ ...host.options, root });
+  await fresh.save({
+    mode: "api",
+    localAgent: "codex",
+    sourceId: "",
+    sources: [],
+  });
+  const project = await host.options
+    .library()
+    .createProject({ name: "Double send" });
+  const now = new Date().toISOString(),
+    id = randomUUID();
+  await fresh.conversations.save({
+    id,
+    projectId: project.id,
+    title: "Double send",
+    mode: "api",
+    workspace: join(root, "workspaces", id),
+    createdAt: now,
+    updatedAt: now,
+    turns: [],
+  });
+  const request = { projectId: project.id, conversationId: id, prompt: "再试一次" };
+  const first = fresh.send(request).catch((error) => error),
+    second = fresh.send(request).catch((error) => error);
+  // The first runs into the missing model source; the second never starts.
+  expect((await first).problem).toMatchObject({ code: "no_model_source" });
+  expect((await second).problem).toBeUndefined();
+  expect((await second).message).toContain("正在执行");
+  // Once the first has settled the conversation accepts requests again.
+  expect((await fresh.send(request).catch((error) => error)).problem).toMatchObject({
+    code: "no_model_source",
+  });
+  fresh.close();
+});
 test("server-owned credentials never fall back to local OAuth refresh", async () => {
   const id = randomUUID(),
     root = join(directory, "hosted-reference");
