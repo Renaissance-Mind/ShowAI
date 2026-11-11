@@ -567,6 +567,19 @@ async function openLogFolder(): Promise<void> {
   if (error) throw new Error(error);
 }
 
+/** A library folder that exists, so a startup problem can offer to show it. */
+async function existingFolder(path: string | undefined) {
+  if (!path) return undefined;
+  return stat(path).then(
+    (info) => (info.isDirectory() ? path : undefined),
+    () => undefined,
+  );
+}
+async function openLibraryFolder(path: string): Promise<void> {
+  const error = await shell.openPath(path);
+  if (error) throw new Error(error);
+}
+
 function buildApplicationMenu() {
   const darwin = process.platform === "darwin";
   const settings = {
@@ -1807,10 +1820,13 @@ async function openStartupLibrary(
     if (presentation.background)
       throw new Error(`${prompt.message}: ${prompt.detail}`);
     const retry = !damagedBackup || home !== undefined;
+    const folder = await existingFolder(home ?? defaultHome);
     const buttons = [
       ...(retry ? [t("action.retry")] : []),
       t("library.choose"),
       t("library.useDefault", { path: shown(defaultHome) }),
+      ...(folder ? [t("library.reveal")] : []),
+      t("action.openLogFolder"),
       t("action.quit"),
     ];
     const choice = await dialog.showMessageBox({
@@ -1824,6 +1840,19 @@ async function openStartupLibrary(
     });
     const label = buttons[choice.response];
     if (label === t("action.quit")) throw new StartupCancelled();
+    // Looking at the folder or the log keeps the question open.
+    if (folder && label === t("library.reveal")) {
+      await openLibraryFolder(folder).catch((reason) =>
+        console.error("ShowAI library folder:", reason),
+      );
+      continue;
+    }
+    if (label === t("action.openLogFolder")) {
+      await openLogFolder().catch((reason) =>
+        console.error("ShowAI log folder:", reason),
+      );
+      continue;
+    }
     if (label === t("library.choose")) {
       const selection = await dialog.showOpenDialog({
         title: t("library.chooseTitle"),
@@ -1843,10 +1872,15 @@ async function startupFailed(error: unknown): Promise<void> {
   console.error("ShowAI startup failed:", error);
   if (presentation.background) return;
   const message = errorResult(error).message;
+  // The library being opened when startup failed, if its folder exists.
+  const folder = await existingFolder(
+    (store as FileStore | undefined)?.root ?? process.env.SHOWAI_HOME,
+  );
   for (;;) {
     const buttons = [
       t("action.copyDiagnostics"),
       t("action.openLogFolder"),
+      ...(folder ? [t("library.reveal")] : []),
       t("action.quit"),
     ];
     const choice = await dialog.showMessageBox({
@@ -1854,15 +1888,20 @@ async function startupFailed(error: unknown): Promise<void> {
       message: t("startFailed"),
       detail: `${message}\n\n${t("startFailedDetail")}`,
       buttons,
-      defaultId: 2,
-      cancelId: 2,
+      defaultId: buttons.length - 1,
+      cancelId: buttons.length - 1,
       noLink: true,
     });
-    if (choice.response === 0)
+    const label = buttons[choice.response];
+    if (label === t("action.copyDiagnostics"))
       clipboard.writeText(diagnostics(["", `Startup error: ${message}`]));
-    else if (choice.response === 1)
+    else if (label === t("action.openLogFolder"))
       await openLogFolder().catch((reason) =>
         console.error("ShowAI log folder:", reason),
+      );
+    else if (folder && label === t("library.reveal"))
+      await openLibraryFolder(folder).catch((reason) =>
+        console.error("ShowAI library folder:", reason),
       );
     else break;
   }

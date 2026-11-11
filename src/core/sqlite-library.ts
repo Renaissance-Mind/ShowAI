@@ -24,7 +24,7 @@ import {
   type TreeQuery,
 } from "./sqlite-reader";
 const compress = promisify(deflateRaw);
-import { CoreError } from "./model";
+import { CoreError, integrityError } from "./model";
 import { encodeFile, nodePrefix } from "./history-codec";
 import { holdsLibraryLock, withLibraryLock } from "./library-lock";
 import { libraryMutations } from "./history-context";
@@ -96,8 +96,8 @@ function unpack(row: BlobRow) {
   const bytes =
     row.codec === 1 ? inflateRawSync(row.data) : Buffer.from(row.data);
   if (bytes.length !== row.bytes || sha(bytes) !== row.digest)
-    throw new CoreError(
-      "INVALID_DATA",
+    throw integrityError(
+      "content",
       "Stored content checksum mismatch. The workspace and original history remain retained.",
     );
   return bytes;
@@ -471,10 +471,7 @@ export class SqliteLibrary {
   }
   private entry(row: RevisionRow): HistoryEntry {
     if (sha(row.entry) !== row.checksum)
-      throw new CoreError(
-        "INVALID_DATA",
-        "Historical record checksum mismatch.",
-      );
+      throw integrityError("history", "Historical record checksum mismatch.");
     const entry = JSON.parse(row.entry) as HistoryEntry;
     parseRecord(changeMessage(entry));
     if (
@@ -1460,6 +1457,82 @@ export class SqliteLibrary {
       return { before: String(before.size), after: String(after.size) };
     });
   }
+  /**
+   * Drops the archived history of content that was permanently deleted, so
+   * its stored objects are released now and compaction reclaims the space.
+   * Each entry is an exact path or a directory prefix ending in "/".
+   */
+  async forgetArchived(paths: string[]) {
+    for (const path of paths)
+      assertPath(path.endsWith("/") ? path.slice(0, -1) : path);
+    if (!paths.length) return 0;
+    return withLibraryLock(this.root, () =>
+      this.query((db) => {
+        db.exec("CREATE INDEX IF NOT EXISTS changes_oid ON changes(oid);");
+        const match = "(path=?1 OR (substr(?1,-1)='/' AND substr(path,1,length(?1))=?1))";
+        const released = new Set<string>();
+        let forgotten = 0;
+        for (const path of paths) {
+          for (const row of db
+            .prepare(`SELECT DISTINCT oid FROM changes WHERE oid IS NOT NULL AND ${match}`)
+            .all(path))
+            released.add(String(row.oid));
+          forgotten += Number(
+            db.prepare(`DELETE FROM changes WHERE ${match}`).run(path).changes,
+          );
+          db.prepare(`DELETE FROM resource_changes WHERE ${match}`).run(path);
+          db.prepare(`DELETE FROM paths WHERE ${match}`).run(path);
+        }
+        const removeUnused = db.prepare(
+          "DELETE FROM blobs WHERE oid=?1 AND NOT EXISTS(SELECT 1 FROM current_files WHERE oid=?1) AND NOT EXISTS(SELECT 1 FROM changes WHERE oid=?1)",
+        );
+        for (const oid of released) removeUnused.run(oid);
+        return forgotten;
+      }),
+    );
+  }
+  /**
+   * Images and other data URLs are stored once under assets/ and shared by
+   * every file that embeds them. After content is deleted permanently, the
+   * assets no current file refers to are removed so compaction reclaims them.
+   * Archived history keeps its own references to the objects it needs.
+   */
+  async releaseUnreferencedAssets() {
+    return withLibraryLock(this.root, () =>
+      this.query((db) => {
+        const assets = db
+          .prepare(
+            "SELECT path, oid FROM current_files WHERE substr(path,1,7)='assets/'",
+          )
+          .all() as { path: string; oid: string }[];
+        if (!assets.length) return 0;
+        const referenced = new Set<string>();
+        const envelope = Buffer.from('{"format":"showai-stored-json"');
+        for (const row of db
+          .prepare(
+            "SELECT b.* FROM current_files f JOIN blobs b ON b.oid=f.oid WHERE substr(f.path,-5)='.json'",
+          )
+          .iterate()) {
+          const bytes = unpack(row as unknown as BlobRow);
+          if (!bytes.subarray(0, envelope.length).equals(envelope)) continue;
+          for (const slot of JSON.parse(bytes.toString("utf8")).assets ?? [])
+            referenced.add(`assets/${slot.id}`);
+        }
+        const removeFile = db.prepare("DELETE FROM current_files WHERE path=?");
+        const removeUnused = db.prepare(
+          "DELETE FROM blobs WHERE oid=?1 AND NOT EXISTS(SELECT 1 FROM current_files WHERE oid=?1) AND NOT EXISTS(SELECT 1 FROM changes WHERE oid=?1)",
+        );
+        let released = 0;
+        for (const asset of assets) {
+          if (referenced.has(asset.path)) continue;
+          removeFile.run(asset.path);
+          removeUnused.run(asset.oid);
+          released++;
+        }
+        return released;
+      }),
+    );
+  }
   async objectStatistics() {
     return this.query((db) => {
       const count = Number(
@@ -1524,8 +1597,8 @@ export class SqliteLibrary {
         Object.values(integrity[0])[0] !== "ok" ||
         db.prepare("PRAGMA foreign_key_check").all().length
       )
-        throw new CoreError(
-          "INVALID_DATA",
+        throw integrityError(
+          "database",
           "Content database integrity check failed.",
         );
       for (const row of db.prepare("SELECT * FROM blobs").iterate())
@@ -1539,10 +1612,7 @@ export class SqliteLibrary {
           entry.parents.length !== (previous ? 1 : 0) ||
           (previous && entry.parents[0] !== previous)
         )
-          throw new CoreError(
-            "INVALID_DATA",
-            "History ancestry is incomplete.",
-          );
+          throw integrityError("history", "History ancestry is incomplete.");
         previous = entry.revision;
       }
       const current = db
@@ -1554,8 +1624,8 @@ export class SqliteLibrary {
         (db.prepare("SELECT value FROM metadata WHERE key='head'").get()
           ?.value ?? undefined) !== previous
       )
-        throw new CoreError(
-          "INVALID_DATA",
+        throw integrityError(
+          "history",
           "The history head does not match its last durable operation.",
         );
     });

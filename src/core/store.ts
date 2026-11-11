@@ -54,6 +54,7 @@ import {
   readLibraryFile,
   writeLibraryFiles,
   listLibraryDirectory,
+  libraryPaths,
   mutateLibrary,
   withLibrarySnapshot,
   libraryReadSnapshot,
@@ -276,6 +277,17 @@ function requireActiveFolder(
       "NOT_FOUND",
       "The destination folder is missing or archived.",
     );
+}
+
+/** An item in the trash to delete permanently. */
+export type PurgeTarget =
+  | { kind: "project"; projectId: string }
+  | { kind: "folder"; projectId: string; folderId: string }
+  | { kind: "page"; projectId: string; pageId: string };
+export interface PurgeResult {
+  projects: number;
+  folders: number;
+  pages: number;
 }
 
 /** Canonical files, immutable checkpoints, and cooperating writers; no background service. */
@@ -1334,6 +1346,161 @@ export class FileStore {
         await this.repositionPinnedEntry(projectId, folderId, input.pinned);
       return updated;
     });
+  }
+
+  /**
+   * Permanently removes items already in the trash: an archived project, an
+   * archived folder with everything inside it, or an archived page. Their
+   * files, editor drafts and archived history go, so the next compaction and
+   * cleanup reclaim the space they held. This cannot be undone.
+   */
+  async purgeArchived(targets: PurgeTarget[]): Promise<PurgeResult> {
+    targets.forEach((target) => assertId(target.projectId));
+    const library = versionedLibrary(this.root);
+    const removed: PurgeResult = { projects: 0, folders: 0, pages: 0 };
+    const history: string[] = [];
+    const drafts: { projectId: string; pageId: string }[] = [];
+    const projectIds: string[] = [];
+    const removeFile = async (path: string) => {
+      const managed = logicalPath(this.root, path);
+      if (managed)
+        await writeLibraryFiles(this.root, new Map([[managed, null]]));
+      else {
+        await this.safePath(path);
+        await rm(path, { force: true });
+      }
+    };
+    await this.withLock("purge", async () => {
+      const sidebar = await this.readSidebar();
+      const forgotten = new Map<string, Set<string>>();
+      for (const target of targets) {
+        const project = await this.readProject(target.projectId);
+        const pages = await this.listPages(target.projectId, {}, project);
+        if (target.kind === "project") {
+          if (!project.archived)
+            throw new CoreError("CONFLICT", "Only deleted items can be deleted permanently.");
+          const prefix = `projects/${project.id}/`;
+          if (library)
+            await writeLibraryFiles(
+              this.root,
+              new Map(
+                (await libraryPaths(this.root))!
+                  .filter((path) => path.startsWith(prefix))
+                  .map((path) => [path, null]),
+              ),
+            );
+          else {
+            await this.safePath(this.projectPath(project.id));
+            await rm(this.projectPath(project.id), {
+              recursive: true,
+              force: true,
+            });
+          }
+          history.push(prefix);
+          projectIds.push(project.id);
+          for (const page of pages)
+            drafts.push({ projectId: project.id, pageId: page.id });
+          delete sidebar.projectGroups[project.id];
+          sidebar.projectOrder = sidebar.projectOrder?.filter(
+            (id) => id !== project.id,
+          );
+          if (sidebar.entryOrder) delete sidebar.entryOrder[project.id];
+          removed.projects++;
+          removed.folders += project.folders?.length ?? 0;
+          removed.pages += pages.length;
+          continue;
+        }
+        if (project.archived)
+          throw new CoreError("CONFLICT", "Delete the whole project permanently instead.");
+        const folders = project.folders ?? [];
+        const ids = new Set<string>();
+        if (target.kind === "folder") {
+          assertId(target.folderId);
+          const folder = folders.find((item) => item.id === target.folderId);
+          if (!folder?.archived)
+            throw new CoreError("CONFLICT", "Only deleted items can be deleted permanently.");
+          ids.add(folder.id);
+          // Folders form a tree; repeat until no folder below a removed one remains.
+          for (let size = 0; size !== ids.size; ) {
+            size = ids.size;
+            for (const item of folders)
+              if (item.parentId !== null && ids.has(item.parentId))
+                ids.add(item.id);
+          }
+          removed.folders += ids.size;
+        } else {
+          assertId(target.pageId);
+          const page = pages.find((item) => item.id === target.pageId);
+          if (!page?.archived)
+            throw new CoreError("CONFLICT", "Only deleted items can be deleted permanently.");
+        }
+        const doomed = pages.filter((page) =>
+          target.kind === "folder"
+            ? page.parentId !== null && ids.has(page.parentId)
+            : page.id === target.pageId,
+        );
+        for (const page of doomed) {
+          await removeFile(this.pagePath(project.id, page.id));
+          history.push(
+            `projects/${project.id}/pages/${page.id}.json`,
+            `projects/${project.id}/pages/${page.id}/`,
+          );
+          drafts.push({ projectId: project.id, pageId: page.id });
+          ids.add(page.id);
+        }
+        removed.pages += doomed.length;
+        const gone = forgotten.get(project.id) ?? new Set<string>();
+        ids.forEach((id) => gone.add(id));
+        forgotten.set(project.id, gone);
+      }
+      for (const [projectId, ids] of forgotten) {
+        const project = await this.readProject(projectId);
+        const order = (value: DirectoryPreferences) =>
+          value.manualOrder
+            ? { manualOrder: value.manualOrder.filter((id) => !ids.has(id)) }
+            : {};
+        await this.atomicWrite(
+          join(this.projectPath(projectId), "project.json"),
+          JSON.stringify(
+            validateProjectMetadata(
+              {
+                ...project,
+                ...order(project),
+                folders: (project.folders ?? [])
+                  .filter((folder) => !ids.has(folder.id))
+                  .map((folder) => ({ ...folder, ...order(folder) })),
+                updatedAt: new Date().toISOString(),
+              },
+              projectId,
+            ),
+            null,
+            2,
+          ),
+        );
+        const entries = sidebar.entryOrder?.[projectId];
+        if (entries)
+          sidebar.entryOrder![projectId] = entries.filter((id) => !ids.has(id));
+      }
+      await this.atomicWrite(
+        join(workspaceRoot(this.root), "sidebar.json"),
+        JSON.stringify(sidebar, null, 2),
+      );
+    });
+    if (library) {
+      // Files a library keeps beside a project's content: generated exports in
+      // the workspace and the original folder retained when it was imported.
+      for (const projectId of projectIds)
+        for (const directory of [
+          this.projectPath(projectId),
+          join(this.root, "projects", projectId),
+        ]) {
+          await this.safePath(directory);
+          await rm(directory, { recursive: true, force: true });
+        }
+      await library.releaseDeleted(history);
+    }
+    await new EditorDrafts(this.root).purgePages(drafts);
+    return removed;
   }
 
   private async repositionPinnedEntry(

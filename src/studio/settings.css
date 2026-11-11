@@ -515,6 +515,23 @@
   overflow-wrap: anywhere;
   font-size: 11px;
 }
+.library-space-integrity {
+  display: grid;
+  gap: 8px;
+  padding: 14px;
+  border: 1px solid color-mix(in srgb, var(--danger, #c43d3d) 45%, var(--line));
+  border-radius: 7px;
+  font-size: 13px;
+}
+.library-space-integrity p {
+  margin: 0;
+  line-height: 1.6;
+}
+.library-space-integrity code {
+  overflow-wrap: anywhere;
+  font-size: 11px;
+  color: var(--muted);
+}
 .library-space-plan > section {
   margin: 12px 0;
   max-height: 240px;

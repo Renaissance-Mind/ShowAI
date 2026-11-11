@@ -183,4 +183,15 @@ export class ContentLibrary {
   async verify() {
     return (await this.backend()).verify();
   }
+  /**
+   * Releases what permanently deleted paths still hold: their archived
+   * history and the shared assets nothing else embeds. Any write moves Git
+   * storage to SQLite first, so only SQLite keeps either here.
+   */
+  async releaseDeleted(paths: string[]) {
+    const backend = await this.backend();
+    if (!(backend instanceof SqliteLibrary)) return;
+    await backend.forgetArchived(paths);
+    await backend.releaseUnreferencedAssets();
+  }
 }

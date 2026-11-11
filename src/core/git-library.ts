@@ -2,7 +2,7 @@ import { createRequire } from "node:module";
 import { access, mkdir, readFile, readdir, rename, rm } from "node:fs/promises";
 import { createHash, randomUUID } from "node:crypto";
 import { isAbsolute, join, relative, resolve, sep } from "node:path";
-import { CoreError } from "./model";
+import { CoreError, integrityError } from "./model";
 import {
   assertTreeQuery,
   selectTreeEntries,
@@ -1478,7 +1478,12 @@ export class GitLibrary {
 
   async verify(): Promise<void> {
     try {
-      await this.command(["fsck", "--full", "--strict"]);
+      await this.command(["fsck", "--full", "--strict"]).catch((error) => {
+        throw integrityError(
+          "repository",
+          error instanceof Error ? error.message : String(error),
+        );
+      });
     } finally {
       const prefix = this.repository + ":";
       for (const key of treeReads.keys())
