@@ -645,9 +645,15 @@ export async function exportPage(
         ? toCdnPage(html, { readerUrls: reader.urls })
         : html);
     const deliveredReader = preview?.reader ?? reader.mode;
+    // Only an export can ask for the bundled reader instead.
     const readerReason: ReaderReason | undefined =
-      preview?.readerReason ??
-      (deliveredReader === "cdn" ? REQUESTED_CDN : undefined);
+      preview?.readerReason?.cause === "size"
+        ? {
+            ...preview.readerReason,
+            message: `${preview.readerReason.message} Pass reader bundled to fail instead.`,
+          }
+        : (preview?.readerReason ??
+          (deliveredReader === "cdn" ? REQUESTED_CDN : undefined));
     const sourcePath =
       out.slice(0, out.length - extname(out).length) + ".showai.json";
     if (sourcePath === out)

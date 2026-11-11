@@ -47,7 +47,7 @@ export async function conversationPreview(
         reader: "cdn" as const,
         readerReason: {
           cause: "size",
-          message: `${size} The page loads its reader from the CDN and needs network access; pass reader bundled to fail instead.`,
+          message: `${size} The page loads its reader from the CDN and needs network access.`,
           bytes: error.actualBytes,
           limitBytes: error.limitBytes,
         },

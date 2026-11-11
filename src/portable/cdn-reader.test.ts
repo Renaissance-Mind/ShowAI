@@ -399,7 +399,12 @@ describe("CDN reader", () => {
             readerReason: { cause: "size", limitBytes: 1_000_000 },
           });
           expect(display.readerReason.bytes).toBeGreaterThan(1_000_000);
+          // Only an export takes a reader option.
+          expect(display.readerReason.message).not.toContain("reader bundled");
         }
+        expect(fallback.readerReason!.message).toContain(
+          "Pass reader bundled to fail instead.",
+        );
         // A refused bundled export says that nothing was exported.
         const refused = await client.callTool(
           {
