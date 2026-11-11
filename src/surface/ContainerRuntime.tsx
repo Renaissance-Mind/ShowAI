@@ -327,6 +327,13 @@ export function ContainerRuntime({
     if (kind === "board" && inspecting && inspecting !== selected)
       inspect(null);
   }, [kind, selected, inspecting]);
+  // Quick jump inserts through the controls; it runs with the latest state.
+  const insertFromControls = useRef<EditorControls["insertComponent"]>(
+    () => {},
+  );
+  const insertComponentControl = useCallback<
+    EditorControls["insertComponent"]
+  >((...args) => insertFromControls.current(...args), []);
   const controls = useMemo<EditorControls | null>(
     () =>
       onChange && undo && redo
@@ -345,6 +352,7 @@ export function ContainerRuntime({
             pageWidthMode: root.attrs?.widthMode ?? "standard",
             setPageWidthMode,
             outlineSettings: () => setOutlineSettingsId(surfaceId),
+            insertComponent: insertComponentControl,
           }
         : null,
     [
@@ -423,6 +431,19 @@ export function ContainerRuntime({
     requestReveal,
     openComponents: (parentId, point, position) =>
       setSlash({ parentId, left: point.x, top: point.y, position }),
+  };
+  insertFromControls.current = (kind, data, component) => {
+    if (component) registerComponent(component);
+    const source = current.current;
+    const after =
+      selected &&
+      findSurfaceNode(source, selected)?.parent?.attrs?.id === surfaceId
+        ? selected
+        : undefined;
+    const inserted = insertComponent(source, surfaceId, kind, data, after);
+    runtime.commit(inserted.document);
+    select(inserted.nodeId);
+    requestReveal(inserted.nodeId);
   };
   const selectedEntry = inspecting
     ? findSurfaceNode(document, inspecting)

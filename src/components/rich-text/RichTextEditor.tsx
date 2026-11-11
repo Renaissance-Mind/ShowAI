@@ -24,7 +24,12 @@ import { useLocalFileChooser } from "../local-resources";
 import { isLocalResourceRef } from "../../portable/local-files.mjs";
 import ExpandableSearch from "../ExpandableSearch";
 import { SlashMenuItems, useSlashMenu } from "../SlashMenuItems";
-import { isChartKind, type SlashEntry } from "../slash-menu-model";
+import {
+  componentSlashEntry,
+  INSERT_COMPONENT_EVENT,
+  type InsertComponentDetail,
+  type SlashEntry,
+} from "../slash-menu-model";
 import { RichTextEnvironment } from "./environment";
 import type { CatalogComponent } from "../../core/component-categories";
 import {
@@ -268,6 +273,10 @@ export default function RichTextEditor({
   const selectionMenuId = useId();
   latestOnChange.current = onChange;
   const wrapperRef = useRef<HTMLDivElement>(null);
+  // Quick jump inserts at the caret the way the "/" menu does.
+  const insertAtSelection = useRef<
+    (value: InsertComponentDetail) => boolean
+  >(() => false);
   const fileRef = useRef<HTMLInputElement>(null);
   const slashInputRef = useRef<HTMLInputElement>(null);
   const menuRef = useRef<SlashState | null>(null);
@@ -1295,17 +1304,11 @@ export default function RichTextEditor({
             (!("kind" in item && item.insertion) || !!onInsertNative),
         )
         .map((item) => ({
-          id:
-            "catalog:" +
-            ("kind" in item
-              ? item.kind
-              : `${item.id}@${item.version}#${item.integrity}`),
-          title: catalog.displayName(item),
-          keywords: `${"kind" in item ? item.kind : item.id} ${item.name} ${item.description} ${catalog.displayDescription(item)}`,
+          ...componentSlashEntry(item, t("group.components"), {
+            name: catalog.displayName,
+            description: catalog.displayDescription,
+          }),
           icon: <PanelTop size={20} />,
-          group: t("group.components"),
-          chart: "kind" in item && isChartKind(item.kind),
-          component: item,
           run: () => {},
         })),
     ],
@@ -1318,6 +1321,68 @@ export default function RichTextEditor({
       t,
     ],
   );
+  /** Puts a resolved catalog component at from–to, replacing what is there. */
+  const insertResolved = (
+    value: Awaited<ReturnType<typeof catalog.resolve>>,
+    from: number,
+    to: number,
+    /** Move the caret to the end of the content first. */
+    atEnd = false,
+  ) => {
+    if (!editor) return;
+    if (value.component) registerComponent(value.component);
+    if (value.native && onInsertNative) {
+      const transaction = editor.state.tr.delete(from, to);
+      onInsertNative(
+        value.kind,
+        value.data,
+        splitForComponent(transaction.doc, from),
+      );
+    } else {
+      editor
+        .chain()
+        .focus(atEnd ? "end" : null)
+        .deleteRange({ from, to })
+        .insertContent({
+          ...(primitiveNodeTypes[value.kind]
+            ? primitiveContentNode(value.kind, value.data)
+            : {
+                type: "widget",
+                attrs: { kind: value.kind, data: value.data },
+              }),
+        })
+        .run();
+    }
+  };
+  insertAtSelection.current = (value) => {
+    if (!editor || editor.isDestroyed || readOnly) return false;
+    if (value.native && !onInsertNative) return false;
+    const { from, to } =
+      value.at === "end"
+        ? {
+            from: editor.state.doc.content.size,
+            to: editor.state.doc.content.size,
+          }
+        : editor.state.selection;
+    // The host resolved it through the same catalog this menu uses.
+    insertResolved(
+      value as Parameters<typeof insertResolved>[0],
+      from,
+      to,
+      value.at === "end",
+    );
+    return true;
+  };
+  useEffect(() => {
+    const wrapper = wrapperRef.current;
+    if (!wrapper) return;
+    const insert = (event: Event) => {
+      const detail = (event as CustomEvent<InsertComponentDetail>).detail;
+      if (detail && insertAtSelection.current(detail)) event.preventDefault();
+    };
+    wrapper.addEventListener(INSERT_COMPONENT_EVENT, insert);
+    return () => wrapper.removeEventListener(INSERT_COMPONENT_EVENT, insert);
+  }, [editor]);
   const runItem = async (item: MenuItem) => {
     const state = menuRef.current;
     if (!editor || !state || inserting) return;
@@ -1331,29 +1396,7 @@ export default function RichTextEditor({
         if (menuRef.current !== state || !editor.state.doc.eq(before)) return;
         setSlash(null);
         menuRef.current = null;
-        if (value.component) registerComponent(value.component);
-        if (value.native && onInsertNative) {
-          const transaction = editor.state.tr.delete(state.from, state.to);
-          onInsertNative(
-            value.kind,
-            value.data,
-            splitForComponent(transaction.doc, state.from),
-          );
-        } else {
-          editor
-            .chain()
-            .focus()
-            .deleteRange({ from: state.from, to: state.to })
-            .insertContent({
-              ...(primitiveNodeTypes[value.kind]
-                ? primitiveContentNode(value.kind, value.data)
-                : {
-                    type: "widget",
-                    attrs: { kind: value.kind, data: value.data },
-                  }),
-            })
-            .run();
-        }
+        insertResolved(value, state.from, state.to);
       } catch (reason) {
         setNotice((reason as Error).message);
       } finally {

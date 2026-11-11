@@ -89,3 +89,50 @@ export function rememberSlashItem(storage: Storage, id: string) {
 export function isChartKind(kind: string) {
   return kind === "chart" || kind.startsWith("g2-");
 }
+
+/** The catalog fields an insert-menu row is made from. */
+export type SlashComponent = { name: string; description: string } & (
+  | { kind: string }
+  | { kind?: undefined; id: string; version: string; integrity: string }
+);
+
+/**
+ * The insert-menu row of one catalog component. The page and board insert
+ * menus and quick jump all list components through it, so a component has
+ * one id, title and set of keywords everywhere and recent items are shared.
+ */
+export function componentSlashEntry<T extends SlashComponent>(
+  item: T,
+  group: string,
+  display: { name: (item: T) => string; description: (item: T) => string },
+): SlashEntry & { component: T } {
+  const id = item.kind !== undefined ? item.kind : item.id;
+  return {
+    id:
+      "catalog:" +
+      (item.kind !== undefined
+        ? item.kind
+        : `${item.id}@${item.version}#${item.integrity}`),
+    title: display.name(item),
+    keywords: `${item.name} ${item.description} ${display.description(item)} ${id}`,
+    group,
+    chart: item.kind !== undefined && isChartKind(item.kind),
+    component: item,
+  };
+}
+
+/**
+ * Asks the rich-text editor that holds focus to insert a resolved catalog
+ * component at its caret, exactly as its "/" menu does. The editor calls
+ * preventDefault when it took the request.
+ */
+export const INSERT_COMPONENT_EVENT = "showai:insert-component";
+export interface InsertComponentDetail<C = unknown> {
+  kind: string;
+  data: Record<string, unknown>;
+  /** A native container or primitive the host inserts as its own node. */
+  native: boolean;
+  component?: C;
+  /** Where in the editor: its caret (default) or the end of its content. */
+  at?: "selection" | "end";
+}

@@ -74,6 +74,8 @@ export interface CatalogSummary {
     state: "versioned" | "legacy" | "missing";
   };
   effects?: string[];
+  /** Quick jump commands the component declares in its contract. */
+  commands?: import("../components/custom/commands").ComponentCommand[];
   reuse?: "general" | "domain" | "content-specific" | "unclassified";
   documentationStatus?: "available" | "missing";
   /** Built-in components only: fit for show_component in a conversation column. */
@@ -127,6 +129,10 @@ export function catalogSearchText(value: object): string {
     add(section.instructions);
   }
   for (const related of records(item.related)) add(related.purpose);
+  for (const command of records(item.commands)) {
+    add(command.title);
+    add(command.keywords);
+  }
   return text.join("\n").toLocaleLowerCase();
 }
 
@@ -238,6 +244,12 @@ export function summarizeCatalog(
                 (value): value is string => typeof value === "string",
               )
             : [],
+          ...(Array.isArray(item.commands) && item.commands.length
+            ? {
+                commands:
+                  item.commands as import("../components/custom/commands").ComponentCommand[],
+              }
+            : {}),
         }
       : {}),
     scenarios,
