@@ -78,6 +78,11 @@ export const RichTextEnvironment = createContext<{
     reference: (request: AssistantRequest) => void;
   } | null;
   pageLinks?: PageLinkBridge | null;
+  /** Comment actions for the selection and block menus; present only in the editable workbench. */
+  comments?: {
+    text(editor: import("@tiptap/core").Editor, close: () => void): ReactNode;
+    block(id: unknown, close: () => void): ReactNode;
+  } | null;
 }>({
   useCatalog: () => ({
     items: [],

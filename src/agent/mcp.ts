@@ -579,7 +579,7 @@ export function createMcpServer(options: {
   register(
     "page_apply",
     {
-      description: `Apply operations by stable block id with the Page's baseHash. Insert components with {type:"component.insert",kind,data,parentId?,afterId?}, change their data with {type:"component.props.set",blockId,props} and switch a custom component to another revision with {type:"component.ref.set",blockId,version,integrity,componentId?} (keeps id and props). Other operations: guide authoring. Replies with a receipt whose changedBlocks.added lists new block ids; response:"source" adds the document.${
+      description: `Apply operations by stable block id with the Page's baseHash. Insert components with {type:"component.insert",kind,data,parentId?,afterId?}, change their data with {type:"component.props.set",blockId,props} and switch a custom component to another revision with {type:"component.ref.set",blockId,version,integrity,componentId?} (keeps id and props). Comment with {type:"comment",text,blockId?,quote?} or {type:"comment",threadId,text?,resolved?}; page_read returns open comments. Other operations: guide authoring. Replies with a receipt whose changedBlocks.added lists new block ids; response:"source" adds the document.${
         localFiles ? " operationsFile reads the operations array from a JSON file." : ""
       }`,
       // Hosted connections keep operations required and accept no device path.

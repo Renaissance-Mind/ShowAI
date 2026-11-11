@@ -3,7 +3,7 @@
   "profile": "claude",
   "declaredHostDisplay": "model-html",
   "commonVersion": "0.29.3",
-  "commonSha256": "97bce88bf6103edb4e626da2bbe74d2bd6afe8d4e0d50f3a2e3c9b521dfc4591",
+  "commonSha256": "dd757bfcea3b385424e72919cfd50f8ece055d862ece9cb040a4fc681193f5b2",
   "commonFiles": {
     "collaborate-canvas/SKILL.md": "1a21a0419504732c39821582e891721fa3e8deba4808bab19e737eca53a68c49",
     "create-component/references/component-authoring.md": "3cc16a095ef7f2f0f3d7be0b3e58e2a74ad8ead96f2fc66c4950dde0540ebcd1",
@@ -15,7 +15,7 @@
     "show-document/scripts/check_plan.py": "ebf9eb38f1348916f58eb6714e3691ac27232a2d4680454e4ccc6c4b1e1007e8",
     "show-document/SKILL.md": "8f3a2f8692c3808b736848997f8d32028000edb1d3f275fc40962fffe96fcf6f",
     "show-visual/SKILL.md": "a7d71b8944fa6b23e3e8f9478d290e02a351ce018fc6016c78627d4916a87e9b",
-    "use-showai/references/authoring.md": "82f57cfd8522c0cae9faebcbaf0f3e4c3db6087c81a59e42b6861db0b442a803",
+    "use-showai/references/authoring.md": "9ce5909aaca732046d42f83bf34f33cf03f969c3dd5cfbe475da19654243e894",
     "use-showai/references/board-authoring.md": "06b7a1656926e15816002975d626434115e0ef4551581e12089186a7169e0a28",
     "use-showai/references/capacity.md": "87b855fa1ddc1721a4f6674f59d1103cd943fcd65c58f14bb417388e87f471d2",
     "use-showai/references/editing.md": "d65b2a085148ad5f09fa18a8eb39c622732dc3609e81e6ddb84511299da601b1",
@@ -26,7 +26,7 @@
     "use-showai/references/shared-data.md": "4190e03674f784aa74c87ef5467812e4030c8df3abaa5c68e15916416b774e84",
     "use-showai/references/tasks.md": "8bd13c1a8ecc68152ac9562395b428ea682434356611b9dea8fcdf533356b7f1",
     "use-showai/references/user-references.md": "e328b96eb23b5179b8c55af0d5361f0ccf2c42fac36cebbcdcd50447a37041dd",
-    "use-showai/SKILL.md": "3528e0bddaa77427b3b44298c3fa2d0fe2b88956f8632c928d05c67d4e4290e8"
+    "use-showai/SKILL.md": "fdf4ac0b8ed675912c31775ed13f4d445cec3ec15669e3a4fd7a50c72bff26c0"
   },
   "adapterSha256": "bddcffbb897e6646c21708ea2257f3c652f34b006d2e32634aa6475daab7626a"
 }

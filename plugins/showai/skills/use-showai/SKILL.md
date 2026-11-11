@@ -15,6 +15,7 @@ Agent 通过 MCP 操作 ShowAI。App、网页、CLI 和 MCP 共用内容核心�
 | 在对话里看、试或比较 | “画出来看看”“演示一下这个机制”“做个对比图”“给我看个界面原型” | [show-visual](../show-visual/SKILL.md)：选现有组件，或改造、新建一个组件，用 `show_component` 展示；不需要项目、不保存。展示后用户说“存下来”，也按 show-visual 的“之后要保存”处理 |
 | 创作或修改作品 | “整理成文档/报告”“做一份讲解页”“把上周那页的结论改清楚”“先帮我规划怎么讲、出设计稿”“评审这页并修改” | 按下文核对连接与归属，再读 [show-document](../show-document/SKILL.md)：它一次给全制作流程（也用于只要规划、设计稿或评审的请求），选用模板时再补充模板的方法 |
 | 查找、阅读或管理已有内容 | “上周那页在哪个项目里”“这个项目里有什么”“把这三页移到新文件夹”“删掉那页，过几天再找回来”“删掉不用的组件版本”“页面接上这份 Excel” | 留在本 Skill，按 [按任务查找操作](references/tasks.md) 选工具；有 `showai.reference` 时先按 [用户引用](references/user-references.md) 读取它指向的内容 |
+| 处理页面评论 | “处理这页的评论”“回复一下评论” | page_read 读出未解决的评论，按 [评论](references/authoring.md#评论) 逐条改页面、回复并解决 |
 | 做可复用组件 | “做一个组件”“改一下这个组件” | [create-component](../create-component/SKILL.md) |
 | 做或提炼模板 | “存成模板”“做一个某类内容的模板” | [create-template](../create-template/SKILL.md) |
 | 边写边画、多端协作 | “在画布上一起画”“和 iPad 配对” | [collaborate-canvas](../collaborate-canvas/SKILL.md) |

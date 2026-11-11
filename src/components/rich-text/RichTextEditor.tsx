@@ -276,7 +276,7 @@ export default function RichTextEditor({
   const selectedRef = useRef(0);
   const dragPosition = useRef<number | null>(null);
   const [slash, setSlash] = useState<SlashState | null>(null);
-  const { useCatalog, registerComponent, assistant, pageLinks } =
+  const { useCatalog, registerComponent, assistant, pageLinks, comments } =
     useContext(RichTextEnvironment);
   const pageLinksRef = useRef(pageLinks);
   pageLinksRef.current = pageLinks;
@@ -2024,6 +2024,7 @@ export default function RichTextEditor({
                       {tc("copyReference")}
                     </button>
                   )}
+                  {comments?.block(editor.state.doc.nodeAt(hover.pos)?.attrs.id, () => setBlockMenu(false))}
                   {pageLinks && (
                     <button
                       onClick={() => {
@@ -2193,6 +2194,10 @@ export default function RichTextEditor({
               </button>
             </>
           )}
+          {comments?.text(editor, () => {
+            selectionMenuInteracting.current = false;
+            setBubble(null);
+          })}
           {
             <>
               <span className="toolbar-divider" aria-hidden="true" />

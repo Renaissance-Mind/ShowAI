@@ -39,6 +39,7 @@ import commonMessages from "../i18n/messages/common";
 import messages from "../i18n/messages/surface";
 import { AssistantContext } from "../components/assistant-context";
 import { PageLinkContext } from "../components/page-links";
+import { CommentSlots } from "../components/comment-slots";
 import {
   useContext,
   useCallback,
@@ -290,6 +291,7 @@ export default function PageSurface({
   const tc = useTranslator(commonMessages);
   const assistant = useContext(AssistantContext);
   const pageLinks = useContext(PageLinkContext);
+  const comments = useContext(CommentSlots);
   const mobile =
     typeof document !== "undefined" &&
     document.documentElement.dataset.native === "ios";
@@ -1018,6 +1020,7 @@ export default function PageSurface({
             },
           ]
         : []),
+      ...(comments ? [comments.menu(ids)] : []),
       {
         label: many
           ? t("menu.duplicateMany", { count: ids.length })
@@ -2249,6 +2252,7 @@ export default function PageSurface({
                       <Sparkles size={15} />
                     </button>
                   )}
+                  {comments?.dock(selectedIds)}
                   {selectedContainer && (
                     <button
                       type="button"

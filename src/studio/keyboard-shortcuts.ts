@@ -177,6 +177,7 @@ export function shortcutGroups(options: {
         { keys: ["Mod+F"], label: n("shortcut.find") },
         { keys: ["Alt+Mod+F"], label: n("shortcut.findReplace") },
         { keys: ["Mod+G", "Shift+Mod+G"], label: n("shortcut.findStep") },
+        { keys: ["Shift+Mod+M"], label: n("shortcut.comment") },
       ],
     },
     {

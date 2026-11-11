@@ -71,6 +71,7 @@ export function compactData(data: unknown, profile: ResponseProfile): unknown {
     "origin",
     "datasetSchemas",
     "datasetBases",
+    "comments",
     "warnings",
     "changedBlocks",
     "omitted",
