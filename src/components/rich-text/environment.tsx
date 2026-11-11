@@ -19,6 +19,8 @@ export interface LinkablePage {
   id: string;
   title: string;
   icon?: string;
+  /** Orders the @ menu's pages, recently changed first. */
+  updatedAt?: string;
 }
 export interface RecordPeekTarget {
   projectId: string;

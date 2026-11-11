@@ -103,6 +103,7 @@ import { changeContext } from "./history-context";
 import { mergeValues } from "./catalog-merge";
 import { readCustomBlockData } from "../components/custom/contract";
 import { parameterRuleIssues } from "../portable/component-parameters.mjs";
+import { validateMentionContract } from "../portable/mention-contract.mjs";
 import { componentSignature } from "../portable/component-signature.mjs";
 import {
   assertJsonValue,
@@ -1066,7 +1067,7 @@ async function saveTemplateImpl(
     });
     visitContentNodes(skeleton.content, (node) => {
       const data = node.attrs?.data;
-      if (node.type === "widget" && node.attrs?.kind === "custom" && data) {
+      if ((node.type === "widget" || node.type === "inlineWidget") && node.attrs?.kind === "custom" && data) {
         const binding = componentBindings.find(
           (item) => item.id === data.componentId,
         );
@@ -1337,6 +1338,9 @@ function manifestFrom(value: unknown): ComponentManifest {
   }
   if (item.reader !== undefined && item.reader !== "readData")
     throw new Error("Component reader must name the readData export.");
+  if (item.mention !== undefined) validateMentionContract(item.mention);
+  if (item.pageReferences !== undefined && item.pageReferences !== true)
+    throw new Error("Component pageReferences must be true when present.");
   if (
     item.category !== undefined &&
     !componentCategories.some(({ id }) => id === item.category)
@@ -1402,6 +1406,10 @@ function manifestFrom(value: unknown): ComponentManifest {
       ? { role: "page-outline" as const, pageOutlineProtocol: 1 as const }
       : {}),
     ...(item.reader ? { reader: "readData" as const } : {}),
+    ...(item.mention !== undefined
+      ? { mention: item.mention as ComponentManifest["mention"] }
+      : {}),
+    ...(item.pageReferences ? { pageReferences: true as const } : {}),
     scenarios: item.scenarios as string[],
     ...(item.documentation !== undefined
       ? {
@@ -1561,11 +1569,12 @@ const keepView=value=>{const issue=viewIssue(value);if(issue)throw new Error('on
 window.addEventListener('pagehide',sendView);
 const handOver=snapshot=>{const issue=contextIssue(snapshot);if(issue)throw new Error('onContext: '+issue);if(navigator.userActivation&&!navigator.userActivation.isActive)return false;send('showai:context',{snapshot:JSON.parse(JSON.stringify(snapshot))});return true;};
 const goTo=target=>{if(typeof target!=='string'&&(!target||typeof target!=='object'))throw new Error('goTo needs a page link, "#blockId" or {pageId, blockId}');if(navigator.userActivation&&!navigator.userActivation.isActive)return false;send('showai:navigate',{target:typeof target==='string'?target:{...target}});return true;};
-function App(){const[outline,setOutline]=useState(config.outline);outlineUpdate=setOutline;const[state,setState]=useState(()=>({data:config.props||{},readOnly:config.readOnly!==false,dataState:dataStateOf(config.dataState,config.readOnly!==false)}));const[conversation,setConversation]=useState({available:config.context===true,key:0,value:undefined});useEffect(()=>reading(state.data),[state.data]);update=(data,readOnly,available,dataState)=>{setConversation(c=>c.available===available?c:{...c,available});if(check(data)){setState({data,readOnly,dataState:dataStateOf(dataState,readOnly)});send('showai:valid')}};restore=value=>setConversation(c=>c.key?c:{...c,key:1,value});return React.createElement(UserComponent,{key:conversation.key,...state,...(outline?{props:state.data,outline,navigate:itemId=>send('showai:outline-action',{action:'navigate',itemId}),setBranchExpanded:(itemId,expanded)=>send('showai:outline-action',{action:'branch',itemId,expanded}),collapse:()=>send('showai:outline-action',{action:'collapse'})}:{}),onChange:state.readOnly?undefined:(data)=>{if(check(data)){setState(s=>({...s,data}));send('showai:change',{props:data});}},onContext:conversation.available?handOver:undefined,context:conversation.value,...(config.view===true?{viewState:config.viewState,onViewState:keepView}:{}),goTo});}
+function App(){const[outline,setOutline]=useState(config.outline);outlineUpdate=setOutline;const[state,setState]=useState(()=>({data:config.props||{},readOnly:config.readOnly!==false,dataState:dataStateOf(config.dataState,config.readOnly!==false)}));const[conversation,setConversation]=useState({available:config.context===true,key:0,value:undefined});useEffect(()=>reading(state.data),[state.data]);update=(data,readOnly,available,dataState)=>{setConversation(c=>c.available===available?c:{...c,available});if(check(data)){setState({data,readOnly,dataState:dataStateOf(dataState,readOnly)});send('showai:valid')}};restore=value=>setConversation(c=>c.key?c:{...c,key:1,value});return React.createElement(UserComponent,{key:conversation.key,...state,...(outline?{props:state.data,outline,navigate:itemId=>send('showai:outline-action',{action:'navigate',itemId}),setBranchExpanded:(itemId,expanded)=>send('showai:outline-action',{action:'branch',itemId,expanded}),collapse:()=>send('showai:outline-action',{action:'collapse'})}:{}),onChange:state.readOnly?undefined:(data)=>{if(check(data)){setState(s=>({...s,data}));send('showai:change',{props:data});}},onContext:conversation.available?handOver:undefined,context:conversation.value,...(config.view===true?{viewState:config.viewState,onViewState:keepView}:{}),...(config.inline===true?{inline:true}:{}),goTo});}
 window.addEventListener('message',event=>{if(event.source!==parent||event.data?.channel!==channel)return;if(event.data?.type==='showai:validate'){const valid=validate(event.data.props);send('showai:validation',{requestId:event.data.requestId,valid,message:valid?'':validationMessage()});return;}if(event.data?.type==='showai:outline')outlineUpdate?.(event.data.outline);if(event.data?.type==='showai:props')update?.(event.data.props,event.data.readOnly!==false,event.data.context===true,event.data.dataState);if(event.data?.type==='showai:context-restore'&&event.data.snapshot&&!contextIssue(event.data.snapshot))restore?.(event.data.snapshot);});
 window.addEventListener('error',event=>send('showai:error',{message:event.message}));window.addEventListener('unhandledrejection',event=>send('showai:error',{message:String(event.reason?.message||event.reason)}));
-createRoot(document.getElementById('component-root')).render(React.createElement(App));
-new ResizeObserver(()=>send('showai:height',{height:Math.ceil(document.getElementById('component-root').getBoundingClientRect().height)+2})).observe(document.getElementById('component-root'));send('showai:ready');`;
+const componentRoot=document.getElementById('component-root');if(config.inline===true){componentRoot.style.display='inline-block';componentRoot.style.whiteSpace='nowrap';document.documentElement.style.overflow='hidden';document.body.style.margin='0';}
+createRoot(componentRoot).render(React.createElement(App));
+new ResizeObserver(()=>{const box=componentRoot.getBoundingClientRect();send('showai:height',{height:Math.ceil(box.height)+2,...(config.inline===true?{width:Math.ceil(box.width)+2}:{})});}).observe(componentRoot);send('showai:ready');`;
 }
 
 function inlineRuntimeSource(entry: string): string {
@@ -1612,6 +1621,7 @@ export async function compilePackage(
     manifest.defaultData,
     ...manifest.examples.map((x) => x.data),
   ]);
+  if (manifest.mention) validateMentionContract(manifest.mention, schema);
   assertProps(schema, manifest.defaultData, manifest.documentation);
   manifest.examples.forEach((example) =>
     assertProps(schema, example.data, manifest.documentation),
@@ -2807,7 +2817,7 @@ export async function resolveDocumentComponents(
   // Content components are required; only a navigation renderer may fail.
   const custom: ShowDocument["content"][] = [];
   visitContentNodes(document.content, (node) => {
-    if (node.type === "widget" && node.attrs?.kind === "custom") {
+    if ((node.type === "widget" || node.type === "inlineWidget") && node.attrs?.kind === "custom") {
       custom.push(node);
       required.add(key(readCustomBlockData(node.attrs.data)));
     }
@@ -2983,7 +2993,7 @@ export async function lockDocumentComponents(
   const copy = documentCopy(document);
   const selected = new Map<string, Promise<CompiledComponent>>();
   const lock = async (node: ShowDocument["content"]): Promise<void> => {
-    if (node.type === "widget" && node.attrs?.kind === "custom") {
+    if ((node.type === "widget" || node.type === "inlineWidget") && node.attrs?.kind === "custom") {
       const data = node.attrs.data as Record<string, unknown>;
       const ref = readCustomBlockData(data);
       const key = `${ref.componentId}@${ref.version}:${ref.integrity ?? ""}:${ref.scope ?? ""}`;
@@ -3029,7 +3039,8 @@ export async function lockDocumentComponents(
   const nodes: ShowDocument["content"][] = [];
   visitContentNodes(copy.content, (node) => {
     if (
-      (node.type === "widget" && node.attrs?.kind === "custom") ||
+      ((node.type === "widget" || node.type === "inlineWidget") &&
+        node.attrs?.kind === "custom") ||
       node.attrs?.outline?.renderer
     )
       nodes.push(node);

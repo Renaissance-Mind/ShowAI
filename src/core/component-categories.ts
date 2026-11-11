@@ -40,6 +40,8 @@ export const builtinCategories: Record<string, ComponentCategory> = {
   "experiment-tracker": "data",
   "scene-3d": "image",
   "event-timeline": "data",
+  date: "text",
+  backlinks: "text",
   waterfall: "data",
   roadmap: "flow",
   "card-grid": "other",

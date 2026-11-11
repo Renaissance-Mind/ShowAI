@@ -26,7 +26,7 @@ function committedDraftHash(document: ShowDocument): string {
     // Catalog resolution adds a lookup scope; locking an exact revision removes it.
     // The immutable fingerprint, version and all content props still participate.
     if (
-      node.type === "widget" &&
+      (node.type === "widget" || node.type === "inlineWidget") &&
       node.attrs?.kind === "custom" &&
       typeof data?.integrity === "string" &&
       /^sha256-[a-f0-9]{64}$/.test(data.integrity)

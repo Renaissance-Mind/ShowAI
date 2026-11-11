@@ -97,7 +97,7 @@ function customBlocks(
   );
   const ids = new Set<string>();
   const visit = (node: ShowDocument["content"], owner?: string) => {
-    if (node.type === "widget" && node.attrs?.kind === "custom") {
+    if ((node.type === "widget" || node.type === "inlineWidget") && node.attrs?.kind === "custom") {
       const data = node.attrs.data as {
         componentId?: string;
         version?: string;
@@ -197,6 +197,8 @@ export const pageReadSchema = z
       .optional(),
     out: z.string().min(1).optional(),
     overwrite: z.boolean().default(false),
+    /** Adds pages referring to this page (to), pages it refers to (from), or both. */
+    references: z.enum(["to", "from", "both"]).optional(),
   })
   .strict();
 export type PageReadOptions = z.input<typeof pageReadSchema>;
@@ -221,6 +223,8 @@ export interface ReadIdentity {
   componentRefs: { id: string; version: string; integrity?: string }[];
   /** Blocks whose props come from a project dataset, with the resolved props. */
   bindings?: BindingRead[];
+  /** With the references option: backlinks (to) and outgoing references (from). */
+  references?: import("../core/library-index").PageReferences;
   /** Open comment threads (address them with page_apply {type:"comment"}) and the resolved count. */
   comments?: ReturnType<typeof agentCommentView>;
   /**

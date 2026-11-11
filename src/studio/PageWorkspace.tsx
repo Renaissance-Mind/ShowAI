@@ -29,6 +29,9 @@ import type { EditorControls } from "../surface/EditorControls";
 import type { PageSessions, PageViewSession } from "./page-sessions";
 import { PAGE_PREVIEW_TAB } from "./page-sessions";
 import PageHeading from "./PageHeading";
+import PageBacklinks from "./PageBacklinks";
+import { PageReferenceContext } from "../components/page-references";
+import { workbenchReferenceSource } from "./page-references";
 import { DatasetScope } from "../datasets/react";
 import { ReaderStateContext, readerStateStore } from "../surface/reader-state";
 import {
@@ -191,6 +194,13 @@ function PageContent({
         : null,
     [pageActions, subscribePages, recordPeek],
   );
+  const references = useMemo(
+    () =>
+      projectId && pageId
+        ? workbenchReferenceSource({ projectId, pageId }, subscribePages)
+        : null,
+    [projectId, pageId, subscribePages],
+  );
   const readerState = useMemo(
     () =>
       projectId && pageId
@@ -214,44 +224,47 @@ function PageContent({
   const locked = !!readOnly || !!state.record?.readOnly;
   return (
     <PageLinkContext.Provider value={pageLinks}>
-      <CustomComponentsProvider components={state.record?.components ?? []}>
-        <DatasetScope
-          projectId={state.projectId}
-          pageId={state.draft.id}
-          readOnly={locked}
-        >
-          <ReaderStateContext.Provider value={readerState}>
-            <SurfaceEditor
-              key={`${state.draft.id}:${state.renderVersion}`}
-              document={state.draft}
-              readOnly={locked}
-              onChange={view.session.edit}
-              header={
-                state.draft.content.attrs?.kind === "board" ? undefined : (
-                  <>
-                    <PageHeading
-                      title={state.draft.title}
-                      icon={state.draft.icon}
-                      readOnly={locked}
-                      onTitleChange={(title) => view.session.edit({ title })}
-                      onEditIcon={onEditIcon}
-                    />
-                    {headerAddon}
-                  </>
-                )
-              }
-              revealId={revealId}
-              onControlsChange={onControlsChange}
-              onActiveSurfaceChange={onActiveSurfaceChange}
-              onRevealHandled={onRevealHandled}
-              retainedState={view.surface}
-              inlineInkProjectId={state.projectId ?? undefined}
-              onInkSave={view.session.flush}
-              onPublishedInkSave={view.session.flushPublishedSource}
-            />
-          </ReaderStateContext.Provider>
-        </DatasetScope>
-      </CustomComponentsProvider>
+      <PageReferenceContext.Provider value={references}>
+        <CustomComponentsProvider components={state.record?.components ?? []}>
+          <DatasetScope
+            projectId={state.projectId}
+            pageId={state.draft.id}
+            readOnly={locked}
+          >
+            <ReaderStateContext.Provider value={readerState}>
+              <SurfaceEditor
+                key={`${state.draft.id}:${state.renderVersion}`}
+                document={state.draft}
+                readOnly={locked}
+                onChange={view.session.edit}
+                header={
+                  state.draft.content.attrs?.kind === "board" ? undefined : (
+                    <>
+                      <PageHeading
+                        title={state.draft.title}
+                        icon={state.draft.icon}
+                        readOnly={locked}
+                        onTitleChange={(title) => view.session.edit({ title })}
+                        onEditIcon={onEditIcon}
+                      />
+                      <PageBacklinks />
+                      {headerAddon}
+                    </>
+                  )
+                }
+                revealId={revealId}
+                onControlsChange={onControlsChange}
+                onActiveSurfaceChange={onActiveSurfaceChange}
+                onRevealHandled={onRevealHandled}
+                retainedState={view.surface}
+                inlineInkProjectId={state.projectId ?? undefined}
+                onInkSave={view.session.flush}
+                onPublishedInkSave={view.session.flushPublishedSource}
+              />
+            </ReaderStateContext.Provider>
+          </DatasetScope>
+        </CustomComponentsProvider>
+      </PageReferenceContext.Provider>
     </PageLinkContext.Provider>
   );
 }

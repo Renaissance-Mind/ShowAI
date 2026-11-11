@@ -10779,5 +10779,145 @@
         "检查真实 Page 的每一步、深色主题、窄屏横向滚动、键盘切换、打印与离线导出。"
       ]
     }
+  },
+  "date": {
+    "version": 1,
+    "reuse": {
+      "kind": "general",
+      "boundaries": ["任何需要在句子中标出日期的文字。"]
+    },
+    "usage": {
+      "purpose": "在一行文字中标出一个日历日期。",
+      "structure": ["date 是 YYYY-MM-DD；读者按自己的语言看到这一天。"],
+      "inputs": [
+        {
+          "path": "date",
+          "meaning": "YYYY-MM-DD 日历日期，不含时间与时区。"
+        }
+      ],
+      "recipes": [
+        {
+          "title": "在文字中加入日期",
+          "steps": [
+            "在富文本中输入 @，选择今天、明天或输入 2026-11-20 这样的日期。",
+            "Markdown 中写 @[date]{\"date\":\"2026-11-20\"}。"
+          ],
+          "exampleIndex": 0
+        }
+      ],
+      "interactions": [
+        {
+          "action": "阅读",
+          "effect": "显示日期。",
+          "persistence": "none"
+        },
+        {
+          "action": "点击日期并选择另一天",
+          "effect": "通过 onChange 保存新的 date。",
+          "persistence": "content"
+        }
+      ],
+      "constraints": ["只表示日期，不提醒、不计算倒计时。"],
+      "editing": {
+        "data": ["只修改 date。"],
+        "implementation": [
+          "新的提及类型做成声明 mention 的自定义组件，不修改这个组件。"
+        ]
+      }
+    },
+    "development": {
+      "entryPoints": [
+        {
+          "path": "src/components/blocks/DateMention.tsx",
+          "purpose": "软件内置实现；inline 为 true 时作为文字的一部分显示。"
+        },
+        {
+          "path": "index.tsx",
+          "purpose": "通过 source 视图获得的可编辑 SDK 包装入口。"
+        }
+      ],
+      "architecture": [
+        "目录条目声明 mention: {prop:\"date\", input:\"date\"}，@ 菜单据此列出今天、明天与输入的日期；这与自定义组件在 manifest 中的声明相同。"
+      ],
+      "extensionPoints": ["其他可提及的内容按同一 mention 契约做成组件。"],
+      "invariants": ["日期按 UTC 日历日格式化，各时区显示同一天。"],
+      "verification": [
+        "在正文输入 @ 插入今天的日期，刷新后仍显示同一天；导出后检查显示。"
+      ]
+    }
+  },
+  "backlinks": {
+    "version": 1,
+    "reuse": {
+      "kind": "general",
+      "boundaries": ["任何需要汇总哪些页面引用了某页的场景。"]
+    },
+    "usage": {
+      "purpose": "列出引用当前页面或指定页面的页面，以及每处引用周围的文字。",
+      "structure": [
+        "按页面分组；每组列出引用所在块周围的文字，点击后打开该块。"
+      ],
+      "inputs": [
+        {
+          "path": "title",
+          "meaning": "列表上方的标题；省略时不显示标题。"
+        },
+        {
+          "path": "pageId",
+          "meaning": "被引用的页面；省略时为组件所在的页面。"
+        },
+        {
+          "path": "projectId",
+          "meaning": "pageId 所在的项目；省略时为组件所在的项目。"
+        }
+      ],
+      "recipes": [
+        {
+          "title": "当前页面的反向链接",
+          "steps": [
+            "插入组件，不填 pageId。",
+            "其他页面用页面链接、数据库页面列或声明了 page 字段的组件引用这一页后，列表随之更新。"
+          ],
+          "exampleIndex": 0
+        }
+      ],
+      "interactions": [
+        {
+          "action": "点击页面或引用文字",
+          "effect": "打开引用所在的页面并定位到该块。",
+          "persistence": "none"
+        }
+      ],
+      "constraints": [
+        "列表来自内容库的引用索引，组件不保存引用本身；导出的页面显示导出时的列表。"
+      ],
+      "editing": {
+        "data": ["修改 title 或指定 pageId。"],
+        "implementation": [
+          "引用通过 SDK 的 usePageReferences 读取；需要图谱、相关页面等其他呈现时做新的组件。"
+        ]
+      }
+    },
+    "development": {
+      "entryPoints": [
+        {
+          "path": "src/components/blocks/Backlinks.tsx",
+          "purpose": "软件内置实现，只通过 usePageReferences 读取引用。"
+        },
+        {
+          "path": "index.tsx",
+          "purpose": "通过 source 视图获得的可编辑 SDK 包装入口。"
+        }
+      ],
+      "architecture": [
+        "usePageReferences({direction:\"to\"}) 在工作台读取实时索引，在组件框架中向宿主请求，在导出页面读取导出时的快照。",
+        "目录条目声明 pageReferences: true，导出时据此附带页面的引用。"
+      ],
+      "extensionPoints": ["direction:\"from\" 读取本页引用的页面。"],
+      "invariants": ["不复制引用到组件数据。"],
+      "verification": [
+        "在另一页加入指向本页的链接，确认列表出现该页与周围文字；改名、删除、恢复后检查列表；导出后检查快照。"
+      ]
+    }
   }
 }

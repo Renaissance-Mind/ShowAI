@@ -34,6 +34,8 @@ test.each([
   "roadmap",
   "waterfall",
   "event-timeline",
+  "date",
+  "backlinks",
   "mechanism-diagram",
   "svg",
 ])(
@@ -63,7 +65,9 @@ test.each([
     const expected =
       kind === "text"
         ? "Portable prose remains readable"
-        : (data as { title: string }).title;
+        : kind === "date"
+          ? "2026"
+          : (data as { title: string }).title;
     const document = {
       id: "page",
       title: "Isolated component",

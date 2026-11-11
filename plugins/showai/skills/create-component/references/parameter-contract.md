@@ -11,6 +11,7 @@ usage.rules 支持以下声明，使用字段路径引用本组件数据：
 - unique：{kind:"unique",path:"slides[].id"}，ID/值在所在数组内唯一；不同父数组可使用相同局部ID。
 - reference：{kind:"reference",path:"initialSlide",target:"slides[].id"}，引用指向同一共享父作用域的真实目标。
 - index：{kind:"index",path:"slides[].blocks[].target.region",target:"slides[].visuals[].regions",via:{source:"slides[].blocks[].target.visualId",target:"slides[].visuals[].id"}}，零起始整数索引先按ID选定目标数组，再检查范围。目标无需ID选择时省略via。
+- page：{kind:"page",path:"items[].page"}，字段保存一个页面链接 `showai://project/项目ID/page/页面ID`（可带 `?blocks=块ID`）或空字符串；字段在 schema 中是 string。页面写入时校验，内容库把这些值记入引用索引，被引用的页面能在反向链接中看到这个组件所在的块。
 - sumMaximum：{kind:"sumMaximum",paths:["slides[].visuals[].regions[].box.x","slides[].visuals[].regions[].box.w"],maximum:100}，相同数组作用域内的坐标与宽度之和不越界；y+h另声明。每个单独字段仍在schema中定义数值范围和必填。
 
 所有规则引用实际 schema 参数。坐标说明必须给出单位、原点、轴方向和缩放规则；100百分比、0–1归一化值与像素不能混用。索引必须说明零/一起始，标识符说明作用域；原文页码等真实编号不能与数组索引混淆。

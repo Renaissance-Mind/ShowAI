@@ -19,6 +19,7 @@ export function serializeArtifact(
   remoteComponents?: PublishedComponentLocator[],
   presentation?: "spatial" | "reading",
   selection?: ShowArtifact["selection"],
+  references?: ShowArtifact["references"],
 ): string;
 export function escapeJsonForHtml(value: unknown): string;
 export function injectArtifactIntoHtml(
@@ -28,6 +29,7 @@ export function injectArtifactIntoHtml(
   remoteComponents?: PublishedComponentLocator[],
   presentation?: "spatial" | "reading",
   selection?: ShowArtifact["selection"],
+  references?: ShowArtifact["references"],
 ): string;
 /** Internal closed source factories; canonical document is recursively owned before escape. */
 export function parseArtifactForSourceSnapshot(input:unknown):ShowArtifact;

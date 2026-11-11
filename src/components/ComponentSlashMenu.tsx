@@ -11,7 +11,7 @@ import {
   type CatalogComponent,
 } from "../core/component-categories";
 import { SlashMenuItems, useSlashMenu } from "./SlashMenuItems";
-import { componentSlashEntry } from "./slash-menu-model";
+import { componentSlashEntry, insertsAsBlock } from "./slash-menu-model";
 import {
   componentCategoryLabel,
   componentDisplayDescription,
@@ -51,7 +51,7 @@ export function ComponentSlashMenu({
   const items = useMemo(
     () =>
       catalog.items
-        .filter((item) => "kind" in item || item.role !== "page-outline")
+        .filter(insertsAsBlock)
         // The rich-text menu and quick jump use the same entries.
         .map((item) =>
           componentSlashEntry(item, t("allComponents"), {

@@ -259,7 +259,7 @@ function assertKnownKinds(document: ShowDocument) {
     ...listBuiltinComponents({ includeLegacy: true }).map((item) => item.kind),
   ]);
   visitContentNodes(document.content, (node) => {
-    if (node.type === "widget" && !knownKinds.has(String(node.attrs?.kind)))
+    if ((node.type === "widget" || node.type === "inlineWidget") && !knownKinds.has(String(node.attrs?.kind)))
       throw new Error(
         `Unknown widget kind '${node.attrs?.kind}' at node '${node.attrs?.id ?? "unnamed"}'. Custom components use attrs.kind='custom' and attrs.data={componentId,version,props}. The component package ID is not a built-in widget kind.`,
       );
@@ -305,7 +305,7 @@ async function renderDocumentArtifacts(
     );
     document = await lockDocumentComponents(home, document, projectId);
     visitContentNodes(document.content, (node) => {
-      if (node.type === "widget" && node.attrs?.kind === "custom") {
+      if ((node.type === "widget" || node.type === "inlineWidget") && node.attrs?.kind === "custom") {
         const reference = node.attrs.data;
         const component = components.find(
           (item) =>

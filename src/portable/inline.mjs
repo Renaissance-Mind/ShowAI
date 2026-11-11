@@ -13,7 +13,7 @@ export function assertInlineArtifact(artifact) {
   const references = new Map();
   if (artifact?.document?.content)
     visitContentNodes(artifact.document.content, (node) => {
-      if (node.type === "widget" && node.attrs?.kind === "custom") {
+      if ((node.type === "widget" || node.type === "inlineWidget") && node.attrs?.kind === "custom") {
         const data = node.attrs.data;
         references.set(
           `${data?.componentId}@${data?.version}#${data?.integrity ?? data?.scope ?? "legacy"}`,

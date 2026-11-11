@@ -8,6 +8,12 @@ import { withLibraryLock } from "./library-lock";
 import { CoreError } from "./model";
 import type { JSONContent } from "@tiptap/core";
 import { visitContentNodes, widgetDocuments } from "../surface/document.mjs";
+import {
+  declaredPageFields,
+  pageReferenceEdges,
+  type ComponentPageFields,
+  type PageReferenceEdge,
+} from "./page-reference-index";
 
 interface SearchRow {
   id: string;
@@ -32,6 +38,37 @@ export interface ReferenceEdge {
   version?: string;
   integrity?: string;
   blockId?: string;
+}
+/** One reference between pages, as seen from the page that was asked about. */
+export interface PageReferenceItem {
+  /** The other page: the referring page for `to`, the referenced page for `from`. */
+  projectId: string;
+  pageId: string;
+  title: string;
+  icon?: string;
+  /** The block on the referring page that holds the reference. */
+  blockId: string | null;
+  /** Blocks the reference points at on the referenced page. */
+  blockIds: string[];
+  kind: PageReferenceEdge["kind"];
+  snippet: string;
+  /** `from` only: the referenced page is deleted or absent. */
+  missing?: true;
+}
+export interface PageReferences {
+  /** Pages that refer to this page (backlinks), most recently changed first. */
+  to: PageReferenceItem[];
+  /** Pages this page refers to, in page order. */
+  from: PageReferenceItem[];
+  /** References in each direction; more than listed when the limit cut the list. */
+  total: { to: number; from: number };
+  revision: string | null;
+}
+export interface PageReferenceOptions {
+  /** Only references whose other page is in this project. */
+  scope?: string;
+  direction?: "to" | "from" | "both";
+  limit?: number;
 }
 export interface SearchOptions {
   query: string;
@@ -80,7 +117,7 @@ function strings(value: unknown): string[] {
 }
 
 // Bump when extraction changes so existing indexes rebuild once.
-const EXTRACTION_VERSION = "4";
+const EXTRACTION_VERSION = "5";
 // Component data keys that configure identity, layout or style rather than carry reader text.
 const NON_TEXT_KEYS = new Set([
   "id",
@@ -168,6 +205,18 @@ function dataHeadings(data: unknown): string[] {
   return [];
 }
 
+interface PageRow {
+  path: string;
+  projectId: string;
+  pageId: string;
+  title: string;
+  icon?: string;
+  archived: boolean;
+  updatedAt: string;
+}
+// A saved component version never changes, so its declared page fields stay valid.
+const declaredFields = new Map<string, string[]>();
+
 /** Every table is a rebuildable projection of a named committed revision. */
 export class LibraryIndex {
   readonly library: GitLibrary;
@@ -193,6 +242,16 @@ export class LibraryIndex {
         version TEXT, integrity TEXT, block_id TEXT
       );
       CREATE INDEX IF NOT EXISTS reference_target ON refs(target_kind,target_id,version,integrity);
+      CREATE TABLE IF NOT EXISTS pages (
+        path TEXT PRIMARY KEY, project_id TEXT NOT NULL, page_id TEXT NOT NULL, title TEXT NOT NULL,
+        icon TEXT, archived INTEGER NOT NULL, updated_at TEXT NOT NULL
+      );
+      CREATE TABLE IF NOT EXISTS page_refs (
+        source TEXT NOT NULL, position INTEGER NOT NULL, block_id TEXT, target_project TEXT NOT NULL,
+        target_page TEXT NOT NULL, target_blocks TEXT NOT NULL, kind TEXT NOT NULL, snippet TEXT NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS page_ref_target ON page_refs(target_project,target_page);
+      CREATE INDEX IF NOT EXISTS page_ref_source ON page_refs(source,position);
       CREATE TABLE IF NOT EXISTS history (
         revision TEXT PRIMARY KEY, at TEXT NOT NULL, actor_kind TEXT NOT NULL, harness TEXT,
         session_id TEXT, message TEXT NOT NULL, payload TEXT NOT NULL
@@ -299,7 +358,10 @@ export class LibraryIndex {
       }
       const paths = allPaths.filter((path) => reload.has(path));
       const rows: SearchRow[] = [],
-        edges: ReferenceEdge[] = [];
+        edges: ReferenceEdge[] = [],
+        pages: PageRow[] = [],
+        pageEdges: { source: string; edge: PageReferenceEdge }[] = [];
+      const pageFields = await this.componentPageFields(revision, allPaths);
       // Read bounded batches; the resulting index always names this exact revision.
       for (let offset = 0; offset < paths.length; offset += 32) {
         const batch = await this.library.readFiles(
@@ -307,13 +369,13 @@ export class LibraryIndex {
           revision!,
         );
         for (const [path, bytes] of batch)
-          this.extract(path, bytes, rows, edges);
+          this.extract(path, bytes, rows, edges, pages, pageEdges, pageFields);
       }
       db.exec("BEGIN IMMEDIATE");
       try {
         if (!incremental)
           db.exec(
-            "DELETE FROM resources; DELETE FROM search; DELETE FROM refs; DELETE FROM history; DELETE FROM history_resources; DELETE FROM index_state;",
+            "DELETE FROM resources; DELETE FROM search; DELETE FROM refs; DELETE FROM pages; DELETE FROM page_refs; DELETE FROM history; DELETE FROM history_resources; DELETE FROM index_state;",
           );
         else {
           const deleteSearch = db.prepare(
@@ -321,9 +383,15 @@ export class LibraryIndex {
           );
           const deleteRows = db.prepare("DELETE FROM resources WHERE path=?");
           const deleteRefs = db.prepare("DELETE FROM refs WHERE source=?");
+          const deletePage = db.prepare("DELETE FROM pages WHERE path=?");
+          const deletePageRefs = db.prepare(
+            "DELETE FROM page_refs WHERE source=?",
+          );
           for (const path of reload) {
             deleteSearch.run(path);
             deleteRows.run(path);
+            deletePage.run(path);
+            deletePageRefs.run(path);
             const resource = resourceForPath(path);
             deleteRefs.run(
               resource.kind === "component" || resource.kind === "template"
@@ -367,6 +435,34 @@ export class LibraryIndex {
             ref.integrity ?? null,
             ref.blockId ?? null,
           );
+        const pageStatement = db.prepare(
+          "INSERT INTO pages VALUES(?,?,?,?,?,?,?)",
+        );
+        for (const page of pages)
+          pageStatement.run(
+            page.path,
+            page.projectId,
+            page.pageId,
+            page.title,
+            page.icon ?? null,
+            page.archived ? 1 : 0,
+            page.updatedAt,
+          );
+        const pageRefStatement = db.prepare(
+          "INSERT INTO page_refs VALUES(?,?,?,?,?,?,?,?)",
+        );
+        pageEdges.forEach(({ source, edge }, position) =>
+          pageRefStatement.run(
+            source,
+            position,
+            edge.blockId,
+            edge.projectId,
+            edge.pageId,
+            JSON.stringify(edge.blockIds),
+            edge.kind,
+            edge.snippet,
+          ),
+        );
         const removeSignature = db.prepare(
           "DELETE FROM index_state WHERE path=?",
         );
@@ -423,11 +519,53 @@ export class LibraryIndex {
     }
   }
 
+  /**
+   * Page-reference fields of the component versions in this revision. A page
+   * resolves its project's version first, then global and published ones,
+   * like the catalog.
+   */
+  private async componentPageFields(
+    revision: string | null,
+    paths: string[],
+  ): Promise<(projectId: string) => ComponentPageFields> {
+    const versions = new Map<string, string>();
+    for (const path of paths) {
+      const match = path.match(
+        /^((?:projects\/[^/]+\/)?packages\/(?:published\/)?components\/[^/]+\/[^/]+)\/(manifest|compiled)\.json$/,
+      );
+      if (match && (match[2] === "manifest" || !versions.has(match[1])))
+        versions.set(match[1], path);
+    }
+    const missing = [...versions.values()].filter(
+      (path) => !declaredFields.has(path),
+    );
+    for (let offset = 0; offset < missing.length; offset += 32)
+      for (const [path, bytes] of await this.library.readFiles(
+        missing.slice(offset, offset + 32),
+        revision!,
+      ))
+        declaredFields.set(
+          path,
+          declaredPageFields(JSON.parse(bytes.toString("utf8"))),
+        );
+    const at = (base: string) => {
+      const path = versions.get(base);
+      return path ? declaredFields.get(path) : undefined;
+    };
+    return (projectId) => (id, version) =>
+      at(`projects/${projectId}/packages/components/${id}/${version}`) ??
+      at(`packages/components/${id}/${version}`) ??
+      at(`packages/published/components/${id}/${version}`);
+  }
+
   private extract(
     path: string,
     bytes: Buffer,
     rows: SearchRow[],
     edges: ReferenceEdge[],
+    pages: PageRow[],
+    pageEdges: { source: string; edge: PageReferenceEdge }[],
+    pageFields: (projectId: string) => ComponentPageFields,
   ): void {
     const owner = resourceForPath(path);
     const add = (
@@ -462,6 +600,21 @@ export class LibraryIndex {
     if (owner.kind === "page") {
       const document = value.document;
       add(path, "page", document.title, "", null, [document.title]);
+      pages.push({
+        path,
+        projectId: owner.projectId!,
+        pageId: owner.id,
+        title: document.title ?? "",
+        icon: typeof document.icon === "string" ? document.icon : undefined,
+        archived: document.archived === true,
+        updatedAt: String(document.updatedAt ?? ""),
+      });
+      for (const edge of pageReferenceEdges(
+        document,
+        owner.projectId!,
+        pageFields(owner.projectId!),
+      ))
+        pageEdges.push({ source: path, edge });
       // `section` is the nearest preceding heading, which names unnamed native text blocks.
       const visit = (
         node: JSONContent,
@@ -499,7 +652,7 @@ export class LibraryIndex {
             id,
             [...ancestors, String(title)],
           );
-        if (node.type === "widget") {
+        if (node.type === "widget" || node.type === "inlineWidget") {
           const data = node.attrs?.data;
           edges.push({
             source: path,
@@ -578,7 +731,7 @@ export class LibraryIndex {
         });
       if (value.document?.content)
         visitContentNodes(value.document.content, (node: JSONContent) => {
-          if (node.type === "widget" && node.attrs?.kind === "custom")
+          if ((node.type === "widget" || node.type === "inlineWidget") && node.attrs?.kind === "custom")
             edges.push({
               source: id,
               targetKind: "component",
@@ -723,6 +876,100 @@ export class LibraryIndex {
           ...(row.integrity ? { integrity: String(row.integrity) } : {}),
           ...(row.block_id ? { blockId: String(row.block_id) } : {}),
         }));
+    } finally {
+      db.close();
+    }
+  }
+
+  /** References to and from one page, with the block holding each and its surrounding text. */
+  async pageReferences(
+    projectId: string,
+    pageId: string,
+    input: PageReferenceOptions = {},
+  ): Promise<PageReferences> {
+    await this.synchronize();
+    const limit = input.limit ?? 200;
+    if (!Number.isInteger(limit) || limit < 1 || limit > 1000)
+      throw new CoreError(
+        "INVALID_DATA",
+        "Reference limit must be from 1 to 1000.",
+      );
+    const direction = input.direction ?? "both";
+    const db = this.database();
+    try {
+      db.exec("BEGIN");
+      const revision =
+        String(
+          db.prepare("SELECT value FROM metadata WHERE key='revision'").get()
+            ?.value ?? "",
+        ) || null;
+      const item = (row: Record<string, unknown>): PageReferenceItem => ({
+        projectId: String(row.project),
+        pageId: String(row.page),
+        title: String(row.title ?? ""),
+        ...(row.icon ? { icon: String(row.icon) } : {}),
+        blockId: row.block_id === null ? null : String(row.block_id),
+        blockIds: JSON.parse(String(row.target_blocks)),
+        kind: String(row.kind) as PageReferenceItem["kind"],
+        snippet: String(row.snippet),
+        ...(row.title === null || row.archived === 1
+          ? { missing: true as const }
+          : {}),
+      });
+      const scoped = input.scope ? [input.scope] : [];
+      const to =
+        direction === "from"
+          ? []
+          : db
+              .prepare(
+                `SELECT p.project_id AS project, p.page_id AS page, p.title, p.icon, 0 AS archived,
+                   r.block_id, r.target_blocks, r.kind, r.snippet
+                 FROM page_refs r JOIN pages p ON p.path=r.source
+                 WHERE r.target_project=? AND r.target_page=? AND p.archived=0${input.scope ? " AND p.project_id=?" : ""}
+                 ORDER BY p.updated_at DESC, p.path, r.position LIMIT ?`,
+              )
+              .all(projectId, pageId, ...scoped, limit)
+              .map(item);
+      const from =
+        direction === "to"
+          ? []
+          : db
+              .prepare(
+                `SELECT r.target_project AS project, r.target_page AS page, p.title, p.icon, p.archived,
+                   r.block_id, r.target_blocks, r.kind, r.snippet
+                 FROM page_refs r LEFT JOIN pages p
+                   ON p.path='projects/'||r.target_project||'/pages/'||r.target_page||'.json'
+                 WHERE r.source=?${input.scope ? " AND r.target_project=?" : ""}
+                 ORDER BY r.position LIMIT ?`,
+              )
+              .all(`projects/${projectId}/pages/${pageId}.json`, ...scoped, limit)
+              .map(item);
+      const total = {
+        to:
+          direction === "from"
+            ? 0
+            : Number(
+                db
+                  .prepare(
+                    `SELECT count(*) AS n FROM page_refs r JOIN pages p ON p.path=r.source
+                     WHERE r.target_project=? AND r.target_page=? AND p.archived=0${input.scope ? " AND p.project_id=?" : ""}`,
+                  )
+                  .get(projectId, pageId, ...scoped)!.n,
+              ),
+        from:
+          direction === "to"
+            ? 0
+            : Number(
+                db
+                  .prepare(
+                    `SELECT count(*) AS n FROM page_refs r WHERE r.source=?${input.scope ? " AND r.target_project=?" : ""}`,
+                  )
+                  .get(`projects/${projectId}/pages/${pageId}.json`, ...scoped)!
+                  .n,
+              ),
+      };
+      db.exec("COMMIT");
+      return { to, from, total, revision };
     } finally {
       db.close();
     }

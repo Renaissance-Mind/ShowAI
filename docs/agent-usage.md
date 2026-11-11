@@ -105,6 +105,8 @@ showai pages save PAGE --project PROJECT --input revised.showai.json --base-hash
 
 Read before writing, retain stable block ids and inspect user changes against the retained read/draft baseline. On `CONFLICT`, read again and merge deliberately; do not reuse an old full-document replacement with a newer hash. The authoring guide gives operation shapes, while the document guide covers the JSON tree. An input path of `-` reads JSON from stdin.
 
+`pages read PAGE --references to|from|both` (MCP `page_read` with `references`) adds the page's references: `to` lists the pages linking to it (backlinks), `from` the pages it links to, each with the block holding the reference, the target blocks and the surrounding text. Page links in text (including text inside components and steps), database page cells and component fields declared with a `page` parameter rule all count. In Markdown, a page mention is a page link `[Title](showai://project/PROJECT/page/PAGE)` and a component inside a line is `@[kind]{data}`, for example `@[date]{"date":"2026-11-20"}`.
+
 Custom references are locked to exact version and integrity when pages are written. Importing an artifact's bundled or remotely verified runtimes installs them into the selected project and rebinds matching references there; it does not change shared libraries.
 
 ## Project versions, forks and merges

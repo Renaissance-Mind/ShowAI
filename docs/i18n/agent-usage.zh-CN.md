@@ -35,6 +35,8 @@ showai pages save PAGE --project PROJECT --input revised.showai.json --base-hash
 
 先完整读取，保留稳定节点 ID，再修改。pages diff --since 仅支持仍保留的读取/草稿基线；缺失时返回 MISSING_BASELINE，不提供旧页面历史浏览或版本恢复。冲突时比较双方内容；不要给旧全文替换请求换一个新 hash 强行提交。JSON 输入路径 `-` 表示标准输入。页面写入锁定自定义组件的精确版本与指纹。
 
+`pages read PAGE --references to|from|both`（MCP 的 `page_read` 加 `references`）在读取结果中加上页面之间的引用：`to` 列出引用这一页的页面（反向链接），`from` 列出这一页引用的页面，每一项带有引用所在的块、指向的块和周围的文字。正文里的页面链接（包括组件里的文字和步骤）、数据库的页面列，以及组件用 `page` 参数规则声明的字段都计入。Markdown 中提到另一页写页面链接 `[标题](showai://project/PROJECT/page/PAGE)`，放进一行文字的组件写 `@[kind]{data}`，例如 `@[date]{"date":"2026-11-20"}`。
+
 新资源使用 v3 Page；`--kind board` 创建 Board。内容树、`layout` 外框和 `surfaceViews` 各司其职。`component.insert` 支持普通组件和原生 Page/Board；插入 stepper 时，`steps[].blocks` 中的 `{kind, data}` 组件会在同一次插入中放到对应步骤的文字之后；`surface.create`、`surface.wrap`、区块及视图操作保留身份。项目文件夹的 parentId 与内容容器 parentId 不同。参见 [Page 与 Board](page-surface.zh-CN.md)。
 
 ## 查询目录与参数

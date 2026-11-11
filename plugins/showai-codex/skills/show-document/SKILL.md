@@ -119,6 +119,7 @@ description: 创作或修改要保存的作品：可交互报告、讲解页面�
 - “谁持有什么、这一步改了什么”的机制（网络包、缓存、事务、握手）用 mechanism-diagram：对象可带小表格，steps 只写每一步的变化，同一布局逐步切换。各步画面本身不同时用 stepper，每一步放一张图或一个组件。
 - 没有现成组件的示意图（同尺度小多图、分层平面、空间示意）用 svg 手绘；几个方案并排对比时画在同一张 svg 里。
 - 数据用 chart 或适配数据类型的 G2 图表；对照用 table、comparison-matrix；参数探索用 playground；操作步骤用 step-guide；目录或字段结构用 structure-browser。
+- 主题页、人物页、项目页需要汇总“哪些页面提到了这里”时放 backlinks；句子里的日期写成 date（Markdown `@[date]{"date":"2026-11-20"}`），提到另一页时写页面链接。
 - 真实图片记录来源；生成图先写下必须保持准确的对象、数量与标签，生成后核对，精确数据与可操作对象保留为原生组件。
 
 **设计稿的记录。** 每一部分写一幕（scene）：id、nodes（它解释的规划节点）、form（表达形式与所选组件）、composition（画面中的对象、相对位置、箭头或尺度、准确标签、颜色、阅读顺序与文字落点）、visualReason（为什么这种表达支持当前任务）、text（导语、图注、要点及其样式）、interaction（trigger、change、reset，没有交互时省略）、static 与 narrow（静态导出和窄于 640 px 时怎样呈现）、assets（素材来源或生成提示）、check（读者看完这一幕应能完成什么）。“文字加关系图”“白底简洁”不能单独成为 composition。

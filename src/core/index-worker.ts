@@ -28,6 +28,9 @@ port.on("message", ({ id, home, action, args }) => {
         case "references":
           data = await index!.references(args.kind, args.id, args.options);
           break;
+        case "pageReferences":
+          data = await index!.pageReferences(args.projectId, args.pageId, args.options);
+          break;
         case "synchronize":
           data = await index!.synchronize(args.force);
           break;

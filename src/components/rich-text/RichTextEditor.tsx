@@ -14,8 +14,10 @@ import {
   requestNavigation,
 } from "../../portable/page-link.mjs";
 import { translator } from "../../i18n";
-import { useTranslator } from "../../i18n/react";
+import { useLocale, useTranslator } from "../../i18n/react";
 import commonMessages from "../../i18n/messages/common";
+import mentionMessages from "../../i18n/messages/mentions";
+import { mentionEntries, type MentionEntry } from "./mention-sources";
 import { supportsManualEditing } from "../blocks/manual-editing";
 import messages from "../../i18n/messages/richText";
 import noteMessages from "../../i18n/messages/richTextNotes";
@@ -26,7 +28,9 @@ import ExpandableSearch from "../ExpandableSearch";
 import { SlashMenuItems, useSlashMenu } from "../SlashMenuItems";
 import {
   componentSlashEntry,
+  insertsAsBlock,
   INSERT_COMPONENT_EVENT,
+  RECENT_MENTIONS,
   type InsertComponentDetail,
   type SlashEntry,
 } from "../slash-menu-model";
@@ -286,11 +290,18 @@ export default function RichTextEditor({
   >(() => false);
   const dragPosition = useRef<number | null>(null);
   const [slash, setSlash] = useState<SlashState | null>(null);
+  // The @ menu: the slash menu's rows and keys with a second trigger.
+  const [mention, setMention] = useState<SlashState | null>(null);
+  const mentionRef = useRef<SlashState | null>(null);
+  const dismissedMention = useRef<number | null>(null);
+  const mentionKeyRef = useRef<
+    (event: { key: string; preventDefault(): void }) => boolean
+  >(() => false);
   const { useCatalog, registerComponent, assistant, pageLinks, comments } =
     useContext(RichTextEnvironment);
   const pageLinksRef = useRef(pageLinks);
   pageLinksRef.current = pageLinks;
-  const catalog = useCatalog(!!slash);
+  const catalog = useCatalog(!!slash || !!mention);
   const [inserting, setInserting] = useState(false);
   const insertionTicket = useRef(0);
   useEffect(
@@ -362,6 +373,7 @@ export default function RichTextEditor({
     null,
   );
   menuRef.current = slash;
+  mentionRef.current = mention;
 
   const extensions = useMemo(
     () => [
@@ -425,6 +437,14 @@ export default function RichTextEditor({
           setBubble(null);
           event.preventDefault();
           return true;
+        }
+        if (mentionRef.current) {
+          if (mentionKeyRef.current(event)) return true;
+          if (event.key === "Escape") {
+            dismissMention();
+            return true;
+          }
+          return false;
         }
         if (!menuRef.current) return false;
         if (slashKeyRef.current(event)) return true;
@@ -504,6 +524,7 @@ export default function RichTextEditor({
     setRevision((value) => value + 1);
     if (readOnly) {
       setSlash(null);
+      setMention(null);
       setHover(null);
       setBlockMenu(false);
       setStyleMenu(false);
@@ -746,6 +767,30 @@ export default function RichTextEditor({
           dismissedSlash.current = null;
         }
       }
+      // An @ after a space or at the start of a line opens the mention menu,
+      // never inside code and never while an input method is composing.
+      if (!editor.view.composing) {
+        const before =
+          empty && $from.parent.isTextblock && !$from.parent.type.spec.code
+            ? $from.parent.textBetween(0, $from.parentOffset, "\n", "\ufffc")
+            : "";
+        const match =
+          !$from.marks().some((mark) => mark.type.name === "code") &&
+          before.match(/(?:^|[\s(（「“"'])@([^\s@\ufffc][^\n@\ufffc]{0,39}|)$/u);
+        if (match) {
+          const start = from - match[1].length - 1;
+          if (dismissedMention.current !== start)
+            setMention({
+              from: start,
+              to: from,
+              query: match[1],
+              ...menuPosition(editor, from),
+            });
+        } else {
+          setMention(null);
+          dismissedMention.current = null;
+        }
+      }
       if (
         !empty &&
         selectionPointer === null &&
@@ -835,6 +880,7 @@ export default function RichTextEditor({
         return;
       setBubble(null);
       setSlash(null);
+      setMention(null);
       setBlockMenu(false);
       setHover(null);
     };
@@ -873,7 +919,7 @@ export default function RichTextEditor({
   // shows a menu, bubble or block handle; a Board with many text boxes then
   // runs one set of handlers per event rather than one per editor.
   const listensToWindow =
-    focused || !!bubble || !!slash || blockMenu || !!hover;
+    focused || !!bubble || !!slash || !!mention || blockMenu || !!hover;
   useEffect(() => {
     if (!editor || !listensToWindow) return;
     const trackMenuInteraction = (event: Event) =>
@@ -899,6 +945,14 @@ export default function RichTextEditor({
     };
   }, [editor, listensToWindow]);
 
+
+  /** Closes the @ menu until this @ is typed again; the selection stays. */
+  function dismissMention() {
+    const current = mentionRef.current;
+    if (current) dismissedMention.current = current.from;
+    mentionRef.current = null;
+    setMention(null);
+  }
 
   function dismissSlash() {
     const current = menuRef.current;
@@ -1299,7 +1353,7 @@ export default function RichTextEditor({
       ...catalog.items
         .filter(
           (item) =>
-            ("kind" in item || item.role !== "page-outline") &&
+            insertsAsBlock(item) &&
             !("kind" in item && primitiveNodeTypes[item.kind]) &&
             (!("kind" in item && item.insertion) || !!onInsertNative),
         )
@@ -1422,6 +1476,106 @@ export default function RichTextEditor({
     !!slash,
   );
   slashKeyRef.current = slashMenu.key;
+  const tmention = useTranslator(mentionMessages);
+  const locale = useLocale();
+  const mentionRows = useMemo(
+    () =>
+      mention
+        ? mentionEntries({
+            query: mention.query,
+            projectId: pageLinks?.projectId,
+            pageId: pageLinks?.pageId,
+            pages: pageLinks?.pages ?? [],
+            components: catalog.items,
+            locale,
+            today: new Date(),
+            labels: {
+              pages: tmention("pages"),
+              today: tmention("today"),
+              tomorrow: tmention("tomorrow"),
+              yesterday: tmention("yesterday"),
+            },
+            displayName: catalog.displayName,
+          })
+        : [],
+    [mention?.query, pageLinks, catalog.items, catalog.displayName, locale, tmention],
+  );
+  const runMention = async (entry: MentionEntry) => {
+    const state = mentionRef.current;
+    if (!editor || !state || inserting) return;
+    const insertion = entry.insertion;
+    if (insertion.type === "link") {
+      setMention(null);
+      mentionRef.current = null;
+      editor
+        .chain()
+        .focus()
+        .deleteRange({ from: state.from, to: state.to })
+        .insertContent([
+          {
+            type: "text",
+            text: insertion.text || insertion.href,
+            marks: [{ type: "link", attrs: { href: insertion.href } }],
+          },
+          { type: "text", text: " " },
+        ])
+        .run();
+      return;
+    }
+    const before = editor.state.doc;
+    const ticket = ++insertionTicket.current;
+    setInserting(true);
+    try {
+      const value = await catalog.resolve(insertion.component);
+      if (ticket !== insertionTicket.current || editor.isDestroyed) return;
+      if (mentionRef.current !== state || !editor.state.doc.eq(before)) return;
+      setMention(null);
+      mentionRef.current = null;
+      if (value.component) registerComponent(value.component);
+      const data =
+        value.kind === "custom"
+          ? {
+              ...value.data,
+              props: {
+                ...(value.data.props as Record<string, unknown>),
+                [insertion.prop]: insertion.value,
+              },
+            }
+          : { ...value.data, [insertion.prop]: insertion.value };
+      editor
+        .chain()
+        .focus()
+        .deleteRange({ from: state.from, to: state.to })
+        .insertContent([
+          { type: "inlineWidget", attrs: { kind: value.kind, data } },
+          { type: "text", text: " " },
+        ])
+        .run();
+    } catch (reason) {
+      setNotice((reason as Error).message);
+    } finally {
+      if (ticket === insertionTicket.current) setInserting(false);
+    }
+  };
+  const mentionMenu = useSlashMenu(
+    mentionRows,
+    mention?.query ?? "",
+    (row) => void runMention(row.entry),
+    !!mention,
+    RECENT_MENTIONS,
+  );
+  mentionKeyRef.current = mentionMenu.key;
+  useEffect(() => {
+    if (mention)
+      document
+        .querySelector(".slash-menu .slash-item.is-selected")
+        ?.scrollIntoView({ block: "nearest" });
+  }, [mentionMenu.selected]);
+  // Typing on past every match closes the menu, like a dismissed one.
+  useEffect(() => {
+    if (mention && !mentionMenu.rows.length && /\s$/.test(mention.query))
+      dismissMention();
+  }, [mention, mentionMenu.rows.length]);
   useEffect(() => {
     document
       .querySelector(".slash-menu .slash-item.is-selected")
@@ -2310,6 +2464,55 @@ export default function RichTextEditor({
                   menu={slashMenu}
                   disabled={inserting}
                   icon={(item) => item.icon}
+                />
+              </div>
+            </div>
+          </>,
+          document.body,
+        )}
+      {mention &&
+        !readOnly &&
+        createPortal(
+          <>
+            <div
+              className="slash-dismiss"
+              onClick={() => {
+                dismissMention();
+                editor.commands.focus();
+              }}
+            />
+            <div
+              className="slash-menu is-minimal"
+              role="dialog"
+              aria-label={tmention("menu")}
+              style={{ left: mention.left, top: mention.top }}
+            >
+              <div className="slash-search">
+                <span>@{mention.query}</span>
+                <kbd>esc</kbd>
+              </div>
+              <div
+                className="slash-items"
+                role="listbox"
+                aria-label={tmention("sources")}
+                aria-busy={inserting || catalog.loading}
+              >
+                {mentionMenu.rows.length === 0 && (
+                  <div className="slash-empty">{tmention("noResults")}</div>
+                )}
+                <SlashMenuItems
+                  menu={mentionMenu}
+                  disabled={inserting}
+                  icon={(row) =>
+                    row.entry.insertion.type === "link" ? (
+                      <FileText size={20} />
+                    ) : (
+                      <AtSign size={20} />
+                    )
+                  }
+                  detail={(row) =>
+                    row.entry.detail ? <small>{row.entry.detail}</small> : null
+                  }
                 />
               </div>
             </div>

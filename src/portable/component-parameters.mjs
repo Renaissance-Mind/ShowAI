@@ -8,7 +8,7 @@ export const COMPONENT_PARAMETER_CAPABILITIES = Object.freeze({
   fieldSelection: "parameterPath",
   pagination: true,
   knownHash: true,
-  relations: ["unique", "reference", "index", "sumMaximum"],
+  relations: ["unique", "reference", "index", "sumMaximum", "page"],
   defaultPolicy: "annotation-only",
   formatPolicy: "annotation-only",
 });
@@ -359,6 +359,20 @@ export function parameterContractIssues(schema, documentation) {
         message: "An index parameter must be an integer.",
       });
     if (
+      rule.kind === "page" &&
+      !pathField(rule.path)?.schemas.some(
+        (x) =>
+          object(x) &&
+          (x.type === "string" ||
+            (Array.isArray(x.type) && x.type.includes("string"))),
+      )
+    )
+      issues.push({
+        path: parameterPath(rule.path),
+        code: "page-type",
+        message: "A page reference parameter must be a string.",
+      });
+    if (
       rule.kind === "sumMaximum" &&
       rule.paths.some(
         (path) =>
@@ -540,6 +554,21 @@ export function parameterRuleIssues(data, rules = []) {
             "Index is outside the selected target array or target is ambiguous.",
           );
       }
+    } else if (rule.kind === "page") {
+      // The same form as portable/page-link.mjs; empty means no page.
+      for (const entry of collect(rule.path))
+        if (
+          entry.value !== "" &&
+          entry.value !== null &&
+          (typeof entry.value !== "string" ||
+            !/^showai:\/\/project\/[A-Za-z0-9][A-Za-z0-9_-]{0,127}\/page\/[A-Za-z0-9][A-Za-z0-9_-]{0,127}(?:\?blocks=[A-Za-z0-9][A-Za-z0-9_-]{0,127}(?:,[A-Za-z0-9][A-Za-z0-9_-]{0,127}){0,99})?$/.test(
+              entry.value,
+            ))
+        )
+          problem(
+            entry,
+            "Page reference must be a showai://project/PROJECT/page/PAGE link or empty.",
+          );
     } else if (rule.kind === "sumMaximum") {
       const values = rule.paths.map(collect);
       for (const entry of values[0]) {

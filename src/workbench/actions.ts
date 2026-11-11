@@ -234,6 +234,7 @@ export const workbenchActions = new Set([
   "pages:list",
   "pages:get",
   "pages:reference",
+  "pages:references",
   "pages:recordExternalChange",
   "pages:externalChanges",
   "pages:dismissExternalChange",
@@ -1229,6 +1230,14 @@ export function createWorkbench(
         // page_diff can then compare the current page with this exact version.
         await new ReadBaselines(store.root).remember(id, record);
         return reference;
+      }
+      case "pages:references": {
+        const direction = text(args, "direction", true) ?? "both";
+        if (!["to", "from", "both"].includes(direction))
+          throw new CoreError("INVALID_DATA", "direction is to, from or both.");
+        return service.pageReferences(projectId(args), pageId(args), {
+          direction: direction as "to" | "from" | "both",
+        });
       }
       case "pages:insertTemplate": {
         const id = projectId(args);

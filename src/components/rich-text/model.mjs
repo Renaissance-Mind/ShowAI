@@ -26,9 +26,40 @@ const highlightExtension = {
       };
   },
 };
+// @[kind]{data} places a component inside a line, e.g. @[date]{"date":"2026-11-12"}.
+// data is the component's JSON object on one line; its kind validator checks it.
+const inlineComponentExtension = {
+  name: "inlineComponent",
+  level: "inline",
+  start: (source) => {
+    const index = source.search(/@\[[a-z][a-z0-9-]*\]\{/);
+    return index < 0 ? undefined : index;
+  },
+  tokenizer(source) {
+    const head = /^@\[([a-z][a-z0-9-]*)\](?=\{)/.exec(source);
+    if (!head) return;
+    const line = source.slice(head[0].length).split("\n")[0];
+    for (let end = line.indexOf("}"); end >= 0; end = line.indexOf("}", end + 1)) {
+      let data;
+      try {
+        data = JSON.parse(line.slice(0, end + 1));
+      } catch {
+        continue;
+      }
+      if (!data || typeof data !== "object" || Array.isArray(data)) return;
+      return {
+        type: "inlineComponent",
+        raw: head[0] + line.slice(0, end + 1),
+        kind: head[1],
+        data,
+      };
+    }
+  },
+};
 const markdownImport = new Marked({
   // [visible text]{note} attaches a hover note; see note-markup.mjs.
   extensions: [
+    inlineComponentExtension,
     ...mathExtensions,
     ...(noteMarkdownExtension ? [noteMarkdownExtension] : []),
     highlightExtension,
@@ -108,6 +139,8 @@ export function markdownToRichText(
           },
         ]);
       if (t.type === "br") return [{ type: "hardBreak" }];
+      if (t.type === "inlineComponent")
+        return [{ type: "inlineWidget", attrs: { kind: t.kind, data: t.data } }];
       if (t.type === "mathInline" || t.type === "mathBlock") {
         // Formulas carry no marks; an annotated formula keeps its note in LaTeX.
         const note = [...marks]
@@ -289,6 +322,7 @@ const nodes = new Set([
   "pageModule",
   "mathInline",
   "mathBlock",
+  "inlineWidget",
 ]);
 export function validateRichTextData(data) {
   if (typeof data.content === "string") {

@@ -51,5 +51,9 @@ export { CardGridBlock as CardGrid } from "./CardGrid";
 export { RoadmapBlock as Roadmap } from "./Roadmap";
 export { WaterfallBlock as Waterfall } from "./Waterfall";
 export { EventTimelineBlock as EventTimeline } from "./EventTimeline";
+export { DateBlock as DateMention } from "./DateMention";
+export { BacklinksBlock as Backlinks } from "./Backlinks";
 // Linked local files in resource props: a granted address in the workbench.
 export { useResource } from "../local-resources";
+// References between pages (backlinks with direction "to"), the same query built-ins use.
+export { usePageReferences } from "../page-references";

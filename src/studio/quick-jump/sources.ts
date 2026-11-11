@@ -10,7 +10,10 @@ import {
   commandProps,
   type ComponentCommand,
 } from "../../components/custom/commands";
-import { componentSlashEntry } from "../../components/slash-menu-model";
+import {
+  componentSlashEntry,
+  insertsAsBlock,
+} from "../../components/slash-menu-model";
 import {
   componentDisplayDescription,
   componentDisplayName,
@@ -296,7 +299,7 @@ export function componentCommandItems(
 ): QuickJumpItem<ComponentData>[] {
   const items: QuickJumpItem<ComponentData>[] = [];
   for (const component of components) {
-    if (!("kind" in component) && component.role === "page-outline") continue;
+    if (!insertsAsBlock(component)) continue;
     const entry = componentSlashEntry(component, group, {
       name: componentDisplayName,
       description: componentDisplayDescription,

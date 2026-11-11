@@ -21,6 +21,13 @@ export class IndexClient {
   ): ReturnType<LibraryIndex["references"]> {
     return invoke(this.home, "references", { kind, id, options });
   }
+  pageReferences(
+    projectId: string,
+    pageId: string,
+    options: Parameters<LibraryIndex["pageReferences"]>[2],
+  ): ReturnType<LibraryIndex["pageReferences"]> {
+    return invoke(this.home, "pageReferences", { projectId, pageId, options });
+  }
   synchronize(force = false): ReturnType<LibraryIndex["synchronize"]> {
     return invoke(this.home, "synchronize", { force });
   }

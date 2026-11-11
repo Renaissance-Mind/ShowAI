@@ -84,8 +84,8 @@ export function RichText({
         <div className="sb-rich-text portable-content">
           <RichTextNode
             node={content}
-            renderWidget={(kind, data) =>
-              renderWidget({ kind, data, readOnly: true })
+            renderWidget={(kind, data, inline) =>
+              renderWidget({ kind, data, readOnly: true, inline })
             }
           />
         </div>

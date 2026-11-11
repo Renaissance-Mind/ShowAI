@@ -53,6 +53,11 @@ import {
 } from "../../portable/page-link.mjs";
 import { BindingBasisContext } from "../../datasets/basis";
 import {
+  PageReferenceContext,
+  pageReferenceTarget,
+  readPageReferenceQuery,
+} from "../page-references";
+import {
   BlockDataState,
   type BlockDataStateValue,
 } from "../blocks/action-host";
@@ -171,7 +176,7 @@ export function frameDataState(
   return readOnly ? { ...bound, editable: false } : bound;
 }
 
-export function CustomBlock({ data, onChange, readOnly }: BlockProps) {
+export function CustomBlock({ data, onChange, readOnly, inline }: BlockProps) {
   const parsed = readCustomBlockData(data);
   const components = useContext(ComponentsContext);
   const inlineHost = useContext(InlineHostContext);
@@ -192,6 +197,7 @@ export function CustomBlock({ data, onChange, readOnly }: BlockProps) {
       data={data}
       onChange={onChange}
       readOnly={readOnly}
+      inline={inline}
     />
   ) : (
     <ComponentStatus
@@ -212,6 +218,7 @@ function SandboxComponent({
   data,
   onChange,
   readOnly,
+  inline,
 }: BlockProps & { component: CompiledComponent }) {
   const parsed = readCustomBlockData(data);
   const iframe = useRef<HTMLIFrameElement>(null);
@@ -223,7 +230,12 @@ function SandboxComponent({
   const initialTheme = useRef(theme);
   const [channel] = useState(() => crypto.randomUUID());
   useSelectionFrame(iframe, channel);
-  const [height, setHeight] = useState(180);
+  const [height, setHeight] = useState(inline ? 24 : 180);
+  // Inline frames take the width their content reports; older runtimes report none.
+  const [width, setWidth] = useState<number | null>(null);
+  const references = useContext(PageReferenceContext);
+  const referencesRef = useRef(references);
+  referencesRef.current = references;
   // The last height the frame measured; an empty root reports about 2px.
   const [measured, setMeasured] = useState<number | null>(null);
   // Parameter validation text from the runtime (参数不符), cleared once props apply.
@@ -361,7 +373,7 @@ function SandboxComponent({
       injectComponentBootstrap(
         withoutPackagePolicies(component.html),
         // Built-in blocks compiled into the package start in the workbench language.
-        `<style>body{color:var(--text)}</style><script>(${installFrameErrorReporter.toString()})(${safeJson(channel)});</script><script>document.documentElement.lang=document.documentElement.dataset.showaiLocale=${safeJson(locale)};(${installComponentActivity.toString()})(${safeJson(channel)});(${installSandboxTheme.toString()})(${safeJson(channel)},${safeJson(initialTheme.current)},${safeJson(appearanceTokens())});</script><script id="showai-component-data" type="application/json">${safeJson({ channel, ...initial.current, ...savedView() })}</script>`,
+        `<style>body{color:var(--text)}</style><script>(${installFrameErrorReporter.toString()})(${safeJson(channel)});</script><script>document.documentElement.lang=document.documentElement.dataset.showaiLocale=${safeJson(locale)};(${installComponentActivity.toString()})(${safeJson(channel)});(${installSandboxTheme.toString()})(${safeJson(channel)},${safeJson(initialTheme.current)},${safeJson(appearanceTokens())});</script><script id="showai-component-data" type="application/json">${safeJson({ channel, ...initial.current, ...savedView(), ...(inline ? { inline: true } : {}) })}</script>`,
       ) +
       `<script>${componentSelectionScript(channel)}(${installIconTooltips.toString()})(document);(${installComponentLinks.toString()})(${safeJson(channel)});</script>` +
       // A changed document reloads the same frame element after 重试.
@@ -488,6 +500,49 @@ function SandboxComponent({
           openComponentLink(event.data.url);
         return;
       }
+      if (event.data.type === "showai:references") {
+        // Any component reads the same index the built-ins read, through the host.
+        const { requestId } = event.data;
+        const frame = event.source as Window;
+        const reply = (answer: Record<string, unknown>) =>
+          frame.postMessage(
+            { channel, type: "showai:references", requestId, ...answer },
+            "*",
+          );
+        const source = referencesRef.current;
+        if (typeof requestId !== "string" || !source) {
+          reply({ status: "unavailable" });
+          return;
+        }
+        let target;
+        try {
+          target = pageReferenceTarget(
+            source,
+            readPageReferenceQuery(event.data.query),
+          );
+        } catch (error) {
+          console.warn(`${component.name}: ${(error as Error).message}`);
+          reply({ status: "unavailable" });
+          return;
+        }
+        void source.read(target).then(
+          (items) =>
+            reply(
+              items
+                ? {
+                    status: "ready",
+                    items,
+                    page: {
+                      projectId: target.projectId,
+                      pageId: target.pageId,
+                    },
+                  }
+                : { status: "unavailable" },
+            ),
+          () => reply({ status: "unavailable" }),
+        );
+        return;
+      }
       if (event.data.type === "showai:open-media") {
         openComponentMedia(event.data.url);
         return;
@@ -524,8 +579,19 @@ function SandboxComponent({
         typeof event.data.height === "number" &&
         Number.isFinite(event.data.height)
       ) {
-        setHeight(Math.min(4000, Math.max(48, Math.ceil(event.data.height))));
+        setHeight(
+          Math.min(
+            4000,
+            Math.max(inline ? 16 : 48, Math.ceil(event.data.height)),
+          ),
+        );
         setMeasured(event.data.height);
+        if (
+          inline &&
+          typeof event.data.width === "number" &&
+          Number.isFinite(event.data.width)
+        )
+          setWidth(Math.min(640, Math.max(8, Math.ceil(event.data.width))));
       }
       const runtime = readFrameRuntimeError(
         event,
@@ -694,6 +760,17 @@ function SandboxComponent({
     dataState.status,
     JSON.stringify(dataState.editable),
   ]);
+  // The frame reads references again when the library changes.
+  useEffect(
+    () =>
+      references?.subscribe(() =>
+        iframe.current?.contentWindow?.postMessage(
+          { channel, type: "showai:references-changed" },
+          "*",
+        ),
+      ),
+    [references, channel],
+  );
   useEffect(() => {
     const sendTheme = () =>
       iframe.current?.contentWindow?.postMessage(
@@ -710,6 +787,31 @@ function SandboxComponent({
   const blank = !!(crash || error) && (measured === null || measured <= 4);
   // The frame reports its first height once the component has rendered.
   const starting = measured === null && !crash && !error;
+  if (inline)
+    return (
+      <span
+        className="showai-custom-inline"
+        title={crash?.message ?? (error || undefined)}
+        data-state={crash ? "crashed" : error ? "invalid" : undefined}
+      >
+        <iframe
+          ref={iframe}
+          title={component.name}
+          srcDoc={html}
+          sandbox="allow-scripts allow-forms allow-downloads"
+          referrerPolicy="no-referrer"
+          onLoad={sendProps}
+          allow="camera 'none'; microphone 'none'; geolocation 'none'; clipboard-read 'none'; clipboard-write 'none'"
+          style={{
+            width: width ?? 160,
+            height,
+            border: 0,
+            verticalAlign: "text-bottom",
+            background: "transparent",
+          }}
+        />
+      </span>
+    );
   return (
     <section
       className="showai-custom-block"

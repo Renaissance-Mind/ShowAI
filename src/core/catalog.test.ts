@@ -314,6 +314,8 @@ describe("compiled React packages", () => {
       "roadmap",
       "waterfall",
       "event-timeline",
+      "date",
+      "backlinks",
       "archify",
       "diagram-design",
       "fireworks-tech-graph",
