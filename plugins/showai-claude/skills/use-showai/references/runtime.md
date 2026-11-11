@@ -59,6 +59,7 @@
 | SNAPSHOT_EXPIRED / MISSING_BASELINE | 之前的读取结果或比较基线已失效                   | 重新读取后继续；写共享数据时返回的 MISSING_BASELINE 带 `details.datasetBases`，说明要传哪个共享数据的读取 hash，见 [共享数据](shared-data.md#读写)                                         |
 | SOURCE_UNAVAILABLE                  | 共享数据的外部文件或在线数据现在读不到，或处理脚本还没有成功的结果 | 请用户恢复该文件或检查网址；本机读到过的值以 stale 返回，只能查看不能写入，见 [共享数据](shared-data.md#外部文件中的数据)；处理脚本按 `details.warnings` 修正，见 [处理脚本](shared-data.md#处理脚本) |
 | READ_ONLY                           | 数据只读（在线数据、xlsx 文件、处理脚本的结果），没有改动 | 请用户在数据源中修改；用户要在 ShowAI 中编辑时，用 `dataset_write` 的 link `path:null` 复制进内容库                                                                                          |
+| IN_USE                              | 组件或模板版本仍被页面、模板或发布使用，没有删除 | 把 `details.uses` 告诉用户；经同意后把这些块换到别的版本（component.ref.set）或移除，再删除 |
 | CONFIRMATION_REQUIRED               | 需要用户先做决定                                 | 按 `details` 询问用户，再带上决定重试                                                                                                                                                      |
 | ERROR 或其他                        | 未归类的失败                                     | 按下一节处理                                                                                                                                                                               |
 

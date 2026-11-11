@@ -7,6 +7,8 @@
 | 查询容量、超限原因或同步清单大小 | 读取 `showai_capabilities.capacities` 与 [容量与大文件](capacity.md)，按实际错误对象解释；只读查询不创建页面 |
 | 找项目、页面、正文或已有材料 | `projects_list` / `project_context` → `pages_list` / `library_search` → `page_read`；按需 `guide({topic:"reading"})` |
 | 创建、整理或恢复项目与文件夹 | `projects_list({includeArchived?})` / `organization_read({projectId,action:"folders",includeArchived?})` → `organization_update` 的 update_project / create_folder / update_folder；真实文件夹不能由同名 Page 替代，见[内容组织接口](runtime.md#内容组织接口) |
+| 删除、找回、复制或置顶页面 | `organization_update` 的 `update_page`（`archived:true` 删除且可恢复，`archived:false` 找回，`pinned`）与 `duplicate_page`；`organization_read` 的 `deleted` 列出可恢复的项目、文件夹和页面。见 [内容组织接口](runtime.md#内容组织接口) |
+| 删除不再需要的组件或模板版本 | `catalog_version({projectId,action:"remove",kind,id,version?,scope?})`，scope 为 project（默认）、global 或 published，取 catalog_list 返回的 scope；省略 version 删除该范围的全部版本；global 与 published 改的是共享库，项目绑定的连接会返回 INVALID_PATH，这时请用户在桌面端或 CLI（`showai catalog remove ID --kind KIND --scope SCOPE`）删除；仍被使用时返回 IN_USE 并在 `details.uses` 列出页面与 blockIds、模板包、发布，先征得用户同意改掉这些使用再删；删除写入历史，内置组件和模板不能删除 |
 | 移动页面、调整层级、分组和排序 | `organization_update` 的 move / sort；库或远程连接用 `organization_read` 的 sidebar 与 `organization_update` 的 create_group / update_group / move_project。先核实目标身份与权限，见[内容组织接口](runtime.md#内容组织接口) |
 | 把页面上的自定义组件换成新版本 | `catalog_references` 找到页面与块 → 每页 `page_read` 取 baseHash/baseRevision → `page_apply` 每块一条 `component.ref.set`（保留块 ID 与 props），见 [create-component 的页面升级到新版本](../../create-component/SKILL.md#页面升级到新版本)；不要删除后重新插入 |
 | 查组件或模板被哪些内容引用 | `catalog_references({projectId,kind,id,version?,integrity?})`，返回当前项目中的逻辑路径和节点 ID；正向依赖仍用 `catalog_describe({view:"dependencies"})` |

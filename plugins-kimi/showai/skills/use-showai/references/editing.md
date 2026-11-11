@@ -1,6 +1,6 @@
 # 保存、冲突与页面差异
 
-修改前读完整 Page，保留 `hash`、`revision` 和节点 ID。`page_save` / `page_apply` 同时传 `baseHash` 与 `baseRevision`。`operationId` 只用于重试同一请求；message、groupId 标记修改目的与批次。
+修改前读完整 Page，保留 `hash`、`revision` 和节点 ID；源超过 256 KiB 的页面默认只返回大纲窗口，它的 hash/revision 仍是整页的，按 [阅读视图](page-reading.md) 用 blockIds 读要改的块即可。`page_save` / `page_apply` 同时传 `baseHash` 与 `baseRevision`。`operationId` 只用于重试同一请求；message、groupId 标记修改目的与批次。
 
 绑定共享数据的块（`page_read` 的 bindings 中列出）有自己的冲突处理，见 [共享数据](shared-data.md#并发与冲突)。同设备 CONFLICT / saveFailed 表示保存失败，回执带 recovery、currentHash/currentRevision 与 nextStep。`page_apply` 失败时，用 `page_diff({projectId,pageId,sinceHash:原baseHash})` 查看期间的改动并重新 `page_read` 完整当前源；改动不涉及本次节点时在当前版本上重做这些操作，以新的 baseHash/baseRevision 保存；涉及时把这些操作应用到原基线源得到整页尝试稿，再走下面的整页合并。`page_save` 的整页尝试稿用 `page_merge_preview({projectId,pageId,baseRevision:原baseRevision,document:尝试稿})`，它返回合并候选 document 与 conflicts；逐项处理 conflicts，重叠且无法从用户意图判断时询问用户，再用 `page_merge_save({projectId,pageId,baseRevision,currentRevision:冲突回执的currentRevision,document:处理后的候选})` 提交。放弃本次修改时告诉用户哪些修改没有保存。不能只换成新版本参数原样覆盖。本机外部文件改动用 `workspace_conflict` 的 list 列出、read 读取，向用户说明差异，由用户决定 discard（放弃外部改动）、import（采用校验后的外部页面）或 merge（提交合并结果），再用 `workspace_resolve({action:"resolve",id,resolution})` 执行；外部快照仍会保留。细节查 `guide({topic:"recovery"})`。跨设备同步合并失败可能返回带来源的可见副本，后续沿用实际 document.id。阅读探索与临时预览不自动保存正文。
 

@@ -4,7 +4,7 @@
 
 ## 建页与插入组件
 
-应用模板用 template_apply（空白 Page，绑定本轮固定引用）；空白路径用 page_create，只传标题和少量（一到几个）`blocks:[{kind,data}]`，不手写整棵 document。按设计稿的幕顺序填入真实内容：导语、图形或组件、图注与要点；新增内容用 page_apply 的 `component.insert`，一次插入一到几个组件，例如 `operations:[{type:"component.insert",kind:"text",data:{format:"markdown",content:"..."},afterId:"上一块ID"}]`。`blocks` 与 `component.insert` 的 kind/data 相同：data 就是该组件的参数，文字统一用 `{kind:"text",data:{format:"markdown",content}}`；afterId 省略时追加到末尾，为 null 时放在最前；要放进容器内部时加 parentId，值为该容器的块 ID；放进 stepper 的某一步时 parentId 是那一步（outline 中 type 为 step）的 ID，新建 stepper 时直接用 steps[].blocks 放入各步组件。page_create 返回含块 ID 的完整 document 与 hash/revision；page_apply 的 receipt 只含 hash/revision，按顺序追加时省略 afterId 即可，需要新块 ID 作锚点时用 response:"source"。每幕完成后记录实现它的 blockIds。
+应用模板用 template_apply（空白 Page，绑定本轮固定引用）；空白路径用 page_create，只传标题和少量（一到几个）`blocks:[{kind,data}]`，不手写整棵 document。按设计稿的幕顺序填入真实内容：导语、图形或组件、图注与要点；新增内容用 page_apply 的 `component.insert`，一次插入一到几个组件，例如 `operations:[{type:"component.insert",kind:"text",data:{format:"markdown",content:"..."},afterId:"上一块ID"}]`。`blocks` 与 `component.insert` 的 kind/data 相同：data 就是该组件的参数，文字统一用 `{kind:"text",data:{format:"markdown",content}}`；afterId 省略时追加到末尾，为 null 时放在最前；要放进容器内部时加 parentId，值为该容器的块 ID；放进 stepper 的某一步时 parentId 是那一步（outline 中 type 为 step）的 ID，新建 stepper 时直接用 steps[].blocks 放入各步组件。page_create 返回含块 ID 的完整 document 与 hash/revision；page_apply 的回执带 hash/revision 和 `changedBlocks.added`（新插入块的 ID），按顺序追加时省略 afterId 即可，需要新块作锚点时用 added 里的 ID。每幕完成后记录实现它的 blockIds。
 
 ## 选择组件与参数
 
