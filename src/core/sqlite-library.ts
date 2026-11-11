@@ -419,6 +419,10 @@ export class SqliteLibrary {
   async tree(revision?: string): Promise<SqliteTreeEntry[]> {
     return readSqlite(this.root, { kind: "tree", revision });
   }
+  /** The tree without the stored nodes of split pages. */
+  async treeFiles(revision?: string): Promise<SqliteTreeEntry[]> {
+    return readSqlite(this.root, { kind: "tree", revision, nodes: false });
+  }
   /** The tree entries at exact paths and below directory prefixes. */
   async treeEntries(
     query: TreeQuery,

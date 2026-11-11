@@ -79,7 +79,7 @@ function strings(value: unknown): string[] {
 }
 
 // Bump when extraction changes so existing indexes rebuild once.
-const EXTRACTION_VERSION = "2";
+const EXTRACTION_VERSION = "3";
 // Component data keys that configure identity, layout or style rather than carry reader text.
 const NON_TEXT_KEYS = new Set([
   "id",
@@ -231,7 +231,14 @@ export class LibraryIndex {
         return revision;
       const incremental = !force && signaturesReady;
       const history: HistoryEntry[] = [];
-      const tree = revision ? await this.library.tree(revision) : [];
+      // SQLite libraries sign each page by its resource revision, which
+      // changes with any of its nodes, instead of listing every node.
+      const sqlite = await this.library.sqlite();
+      const tree = revision
+        ? await (sqlite
+            ? this.library.treeFiles(revision)
+            : this.library.tree(revision))
+        : [];
       const eligible = (path: string) =>
         !path.startsWith("assets/") &&
         !path.startsWith("runtimes/") &&
@@ -250,6 +257,16 @@ export class LibraryIndex {
         if (!eligible(path)) continue;
         if (!signatures.has(path)) signatures.set(path, []);
         signatures.get(path)!.push(`${entry.path}:${entry.oid}`);
+      }
+      if (sqlite && revision) {
+        const pages = allPaths.filter((path) =>
+          /^projects\/[^/]+\/pages\/[^/]+\.json$/.test(path),
+        );
+        for (const [path, token] of await this.library.resourceRevisions(
+          pages,
+          revision,
+        ))
+          signatures.get(path)!.push(`revision:${token}`);
       }
       const current = new Map(
         allPaths.map((path) => [

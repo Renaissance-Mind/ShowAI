@@ -188,7 +188,7 @@ it("rebuilds old summary caches so creation sorting uses the original page creat
     await store.setDirectorySort(project.id, null, "createdAt");
     const pages = await new FileStore(home).listPages(project.id);
     expect(pages[0].createdAt).toBe(page.document.createdAt);
-    expect(JSON.parse(await readFile(path, "utf8")).version).toBe(2);
+    expect(JSON.parse(await readFile(path, "utf8")).version).toBe(3);
     expect(directoryEntries([], pages)[0].createdAt).toBe(
       page.document.createdAt,
     );

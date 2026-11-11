@@ -52,29 +52,25 @@ async function build(library: GitLibrary, revision: string) {
     if (
       previous &&
       (previous.format !== "showai-page-summaries" ||
-        previous.version !== 2 ||
+        previous.version !== 3 ||
         !previous.entries ||
         previous.integrity !== digest([previous.revision, previous.entries]))
     )
       previous = undefined;
   }
   if (previous?.revision === revision) return previous.entries;
-  const tree = await library.tree(revision);
-  const signatures = new Map<string, string[]>();
-  for (const entry of tree) {
-    const match = entry.path.match(
-      /^(projects\/[^/]+\/pages\/[^/.]+)(?:\.json|\/nodes\/[^/]+\.json|\/reader\.json)$/,
-    );
-    if (!match) continue;
-    const page = match[1] + ".json";
-    if (!signatures.has(page)) signatures.set(page, []);
-    signatures.get(page)!.push(entry.path + ":" + entry.oid);
-  }
-  const paths = tree
-    .map((e) => e.path)
-    .filter((path) => /^projects\/[^/]+\/pages\/[^/.]+\.json$/.test(path));
+  // A page's resource revision changes with every commit that writes the page,
+  // its nodes or its reader, so the node rows themselves are not needed.
+  const pages = (await library.treeFiles(revision)).filter((entry) =>
+    /^projects\/[^/]+\/pages\/[^/.]+\.json$/.test(entry.path),
+  );
+  const paths = pages.map((entry) => entry.path);
+  const revisions = await library.resourceRevisions(paths, revision);
   const pageSignatures = new Map(
-    paths.map((path) => [path, digest(signatures.get(path))]),
+    pages.map((entry) => [
+      entry.path,
+      digest([`${entry.path}:${entry.oid}`, revisions.get(entry.path)]),
+    ]),
   );
   const changed = paths.filter(
     (path) => previous?.entries[path]?.signature !== pageSignatures.get(path),
@@ -87,7 +83,6 @@ async function build(library: GitLibrary, revision: string) {
     ))
       loaded.set(path, bytes);
   const entries: Record<string, Entry> = {};
-  const revisions = await library.resourceRevisions(paths, revision);
   for (const path of paths) {
     const signature = pageSignatures.get(path)!;
     const prior = previous?.entries[path];
@@ -135,7 +130,7 @@ async function build(library: GitLibrary, revision: string) {
   }
   const cache: SummaryCache = {
     format: "showai-page-summaries",
-    version: 2,
+    version: 3,
     revision,
     entries,
     integrity: digest([revision, entries]),
