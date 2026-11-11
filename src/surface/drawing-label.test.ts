@@ -161,6 +161,68 @@ describe("Drawing defaults for authors", () => {
   });
 });
 
+describe("Batches of board operations", () => {
+  const twoShapes = () =>
+    apply(board(), [
+      { type: "block.insert", node: { type: "drawing", attrs: { id: "a", tool: "rectangle", label: "A" } } },
+      { type: "surface.layout.set", nodeId: "a", layout: { x: 0, y: 0, width: 120, height: 72 } },
+      { type: "block.insert", node: { type: "drawing", attrs: { id: "b", tool: "rectangle", label: "B" } } },
+      { type: "surface.layout.set", nodeId: "b", layout: { x: 400, y: 0, width: 120, height: 72 } },
+    ]);
+  const arrow = (id: string, start: string, end: string) => ({
+    type: "block.insert",
+    node: {
+      type: "drawing",
+      attrs: { id, tool: "arrow", bindings: { start: { targetId: start }, end: { targetId: end } } },
+    },
+  });
+
+  it("applies insert, layout, bound arrows and a component insert like separate applies", () => {
+    const operations = [
+      { type: "block.insert", node: { type: "drawing", attrs: { id: "c", tool: "rectangle", label: "C" } } },
+      { type: "surface.layout.set", nodeId: "a", layout: { x: 20, y: 160 } },
+      arrow("a-c", "a", "c"),
+      arrow("c-b", "c", "b"),
+      { type: "component.insert", kind: "callout", data: { title: "Note", content: "Text" } },
+    ];
+    const batch = apply(twoShapes(), operations);
+    const sequential = operations.reduce(
+      (document, operation) => apply(document, [operation]),
+      twoShapes(),
+    );
+    for (const id of ["a", "b", "c", "a-c", "c-b"]) {
+      expect(attrs(batch, id)).toEqual(attrs(sequential, id));
+      expect(batch.layout![id]).toEqual(sequential.layout![id]);
+    }
+    expect(attrs(batch, "a-c").bindings).toMatchObject({
+      start: { targetId: "a" },
+      end: { targetId: "c" },
+    });
+    expect(attrs(batch, "a-c").points).toHaveLength(2);
+    expect(batch.content.content).toHaveLength(
+      sequential.content.content!.length,
+    );
+    expect(JSON.stringify(batch.content)).toContain('"Note"');
+  });
+
+  it("names the failing operation by its index instead of surfacing a TypeError", () => {
+    let error: unknown;
+    try {
+      apply(twoShapes(), [arrow("a-b", "a", "b"), { type: "block.insert" }]);
+    } catch (caught) {
+      error = caught;
+    }
+    expect(error).not.toBeInstanceOf(TypeError);
+    expect(error).toMatchObject({ code: "INVALID_DATA" });
+    expect((error as Error).message).toBe(
+      "operations[1] (block.insert): node must be a block node object with a type, such as {type:'paragraph',content:[...]}.",
+    );
+    expect(() =>
+      apply(twoShapes(), [{ type: "block.remove", blockId: "missing" }]),
+    ).toThrow("operations[0] (block.remove): Block missing does not exist.");
+  });
+});
+
 describe("diagram.insert", () => {
   const nodes = [
     { id: "client", label: "客户端" },

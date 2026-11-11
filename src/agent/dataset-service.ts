@@ -394,10 +394,11 @@ export class DatasetService {
     commit: () => Promise<void>;
     notes: ComponentRefNotes;
   }> {
+    // Malformed entries reach applyOperations, which names them by index.
     const bindingOps = (operation: PageOperation) =>
-      operation.type === "component.binding.set" ||
-      operation.type === "component.binding.remove" ||
-      (operation.type === "component.props.set" &&
+      operation?.type === "component.binding.set" ||
+      operation?.type === "component.binding.remove" ||
+      (operation?.type === "component.props.set" &&
         !!this.boundIn(document, operation.blockId));
     const refOps = Array.isArray(operations)
       ? operations.filter(
@@ -417,8 +418,10 @@ export class DatasetService {
       };
     let working = document;
     let batch: PageOperation[] = [];
+    // Index of batch[0] in the caller's operations, for error messages.
+    let batchStart = 0;
     const flush = () => {
-      if (batch.length) working = applyOperations(working, batch);
+      if (batch.length) working = applyOperations(working, batch, batchStart);
       batch = [];
     };
     const records = new Map<string, DatasetRecord>();
@@ -441,8 +444,9 @@ export class DatasetService {
       }
       return { key, record: records.get(key)! };
     };
-    for (const operation of operations) {
-      if (operation.type === "component.binding.set") {
+    for (const [index, operation] of operations.entries()) {
+      if (!batch.length) batchStart = index;
+      if (operation?.type === "component.binding.set") {
         flush();
         const node = findWidget(working, operation.blockId);
         const kind = String(node.attrs!.kind);
@@ -474,7 +478,7 @@ export class DatasetService {
             attrs: { data },
           },
         ]);
-      } else if (operation.type === "component.binding.remove") {
+      } else if (operation?.type === "component.binding.remove") {
         flush();
         const node = findWidget(working, operation.blockId);
         const binding = readBinding(node.attrs?.data);
@@ -504,7 +508,7 @@ export class DatasetService {
           },
         ]);
       } else if (
-        operation.type === "component.props.set" &&
+        operation?.type === "component.props.set" &&
         this.boundIn(working, operation.blockId)
       ) {
         flush();

@@ -301,9 +301,40 @@ export function diffDocuments(
   return changes;
 }
 
+/**
+ * Operations that reconcile the surface or read the frames and geometry of
+ * other objects. Drawings added earlier in the batch are completed before
+ * them, as they would be by a separate apply.
+ */
+const GEOMETRY_OPERATIONS = new Set<string>([
+  "component.insert",
+  "diagram.insert",
+  "diagram.arrange",
+  "surface.create",
+  "surface.wrap",
+]);
+
+/** Names the failing operation by its index in the caller's list. */
+function operationError(error: unknown, index: number, type: unknown) {
+  const label = `operations[${index}]${typeof type === "string" ? ` (${type})` : ""}`;
+  if (error instanceof CoreError) {
+    error.message = `${label}: ${error.message}`;
+    return error;
+  }
+  if (error instanceof CapacityError) return error;
+  const wrapped = new CoreError(
+    "INVALID_DATA",
+    `${label}: ${error instanceof Error ? error.message : String(error)}`,
+  );
+  wrapped.cause = error;
+  return wrapped;
+}
+
 export function applyOperations(
   document: ShowDocument,
   operations: PageOperation[],
+  /** Index of operations[0] in the caller's list, for error messages. */
+  firstIndex = 0,
 ): ShowDocument {
   if (!Array.isArray(operations) || operations.length > 1000)
     throw new CoreError(
@@ -316,6 +347,30 @@ export function applyOperations(
   // drawing completion may size from the drawing itself.
   const framed = new Set(Object.keys(document.layout ?? {}));
   let removedPlaceholder = false;
+  let originalIds: Set<string> | undefined;
+  // Fills omitted drawing fields (frames, points, arrow anchors). It runs at
+  // the end and before any operation that reads geometry, so later operations
+  // never see an arrow without points or a shape without extent.
+  const completeDraftDrawings = () => {
+    if (!isSurface(draft)) return;
+    originalIds ??= new Set(indexSurfaceTree(document.content).keys());
+    fillSurfaceLayout(draft);
+    try {
+      completeDrawings(draft, {
+        framed,
+        fresh: new Set(
+          [...indexSurfaceTree(draft.content).keys()].filter(
+            (id) => !originalIds!.has(id),
+          ),
+        ),
+      });
+    } catch (error) {
+      throw new CoreError(
+        "INVALID_DATA",
+        error instanceof Error ? error.message : "Invalid drawing.",
+      );
+    }
+  };
   const locate = (
     id: string,
   ): { parent: JSONContent; index: number; node: JSONContent } => {
@@ -401,9 +456,22 @@ export function applyOperations(
     );
     removedPlaceholder = true;
   };
-  for (const operation of operations) {
+  const applyOne = (operation: PageOperation) => {
     if (!operation || typeof operation !== "object")
       throw new CoreError("INVALID_DATA", "Invalid page operation.");
+    if (
+      (operation.type === "block.insert" ||
+        operation.type === "block.replace") &&
+      (!operation.node ||
+        typeof operation.node !== "object" ||
+        Array.isArray(operation.node) ||
+        typeof operation.node.type !== "string")
+    )
+      throw new CoreError(
+        "INVALID_DATA",
+        "node must be a block node object with a type, such as {type:'paragraph',content:[...]}.",
+      );
+    if (GEOMETRY_OPERATIONS.has(operation.type)) completeDraftDrawings();
     switch (operation.type) {
       case "component.insert": {
         const placeholder = isResource(draft)
@@ -828,26 +896,19 @@ export function applyOperations(
           `Unsupported operation: ${String((operation as { type?: unknown }).type)}. Page operations: ${Object.keys(PAGE_OPERATION_FIELDS).join(", ")} (guide authoring).`,
         );
     }
-  }
-  if (isSurface(draft)) {
-    const before = indexSurfaceTree(document.content);
-    fillSurfaceLayout(draft);
+  };
+  for (const [offset, operation] of operations.entries()) {
     try {
-      completeDrawings(draft, {
-        framed,
-        fresh: new Set(
-          [...indexSurfaceTree(draft.content).keys()].filter(
-            (id) => !before.has(id),
-          ),
-        ),
-      });
+      applyOne(operation);
     } catch (error) {
-      throw new CoreError(
-        "INVALID_DATA",
-        error instanceof Error ? error.message : "Invalid drawing.",
+      throw operationError(
+        error,
+        firstIndex + offset,
+        (operation as { type?: unknown } | null)?.type,
       );
     }
   }
+  completeDraftDrawings();
   // Validate caller-supplied references before intentional structural cleanup.
   const structural =
     removedPlaceholder ||
