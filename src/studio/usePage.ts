@@ -3,6 +3,7 @@ import type { JSONContent } from "@tiptap/core";
 import type { ShowDocument } from "../types";
 import { desktop } from "./bridge";
 import { PageSessions } from "./page-sessions";
+import { saveNow } from "./page-session";
 import type { LoadedPage, PageSnapshot, SaveStatus } from "./page-session";
 export type { LoadedPage, SaveStatus } from "./page-session";
 
@@ -134,10 +135,7 @@ export function usePage(home?: string) {
         return;
       event.preventDefault();
       const current = sessions.getSnapshot().active;
-      if (current)
-        void (current.getSnapshot().reviewingConflict
-          ? current.retry()
-          : current.flush());
+      if (current) void saveNow(current);
     };
     window.addEventListener("focus", focused);
     window.addEventListener("keydown", save);

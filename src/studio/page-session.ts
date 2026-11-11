@@ -122,6 +122,19 @@ export interface PageSessionOptions {
 
 const ref = <T>(current: T) => ({ current });
 
+/**
+ * Save now (⌘S): a page stopped by a failed save tries again and, once that
+ * succeeds, saves automatically again. A conflict stays until it is reviewed.
+ */
+export function saveNow(
+  session: Pick<PageSession, "getSnapshot" | "retry" | "flush">,
+) {
+  const { status, reviewingConflict } = session.getSnapshot();
+  return reviewingConflict || status === "error"
+    ? session.retry()
+    : session.flush();
+}
+
 /** A page owns its drafts and save queue independently of the displayed tab. */
 export function createPageSession(options: PageSessionOptions): PageSession {
   const listeners = new Set<() => void>();
