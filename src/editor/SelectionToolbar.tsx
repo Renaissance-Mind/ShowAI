@@ -9,6 +9,8 @@ export function SelectionToolbar({
   id,
   anchor,
   anchorElement,
+  boundaryElement,
+  scale = 1,
   children,
   onEscape,
   label,
@@ -23,6 +25,8 @@ export function SelectionToolbar({
   viewportTop?: number;
   className?: string;
   anchorElement?: HTMLElement | null;
+  boundaryElement?: HTMLElement | null;
+  scale?: number;
   children: ReactNode;
   onEscape: () => void;
 }) {
@@ -32,6 +36,16 @@ export function SelectionToolbar({
   useLayoutEffect(() => {
     const element = menu.current!;
     const place = () => {
+      const boundary = boundaryElement?.isConnected
+        ? boundaryElement.getBoundingClientRect()
+        : null;
+      const leftEdge = Math.max(8, (boundary?.left ?? 0) + 8);
+      const rightEdge = Math.min(
+        window.innerWidth - 8,
+        (boundary?.right ?? window.innerWidth) - 8,
+      );
+      // Layout at the unscaled width, then measure the rendered bar for placement.
+      element.style.maxWidth = `${Math.max(0, rightEdge - leftEdge) / scale}px`;
       const { width, height } = element.getBoundingClientRect();
       const bounds = anchorElement?.isConnected
         ? anchorElement.getBoundingClientRect()
@@ -52,8 +66,8 @@ export function SelectionToolbar({
           : viewportTop;
       const next = {
         left: Math.max(
-          8,
-          Math.min(point.left - width / 2, window.innerWidth - width - 8),
+          leftEdge,
+          Math.min(point.left - width / 2, rightEdge - width),
         ),
         top: Math.max(
           minimumTop,
@@ -82,9 +96,9 @@ export function SelectionToolbar({
     });
     panels.observe(element, { childList: true, subtree: true });
     // Ancestors can move the anchor while the anchor's own size stays unchanged.
-    if (anchorElement)
+    for (const target of [anchorElement, boundaryElement])
       for (
-        let ancestor: HTMLElement | null = anchorElement;
+        let ancestor: HTMLElement | null = target ?? null;
         ancestor;
         ancestor = ancestor.parentElement
       )
@@ -97,7 +111,15 @@ export function SelectionToolbar({
       window.removeEventListener("resize", place);
       if (anchorElement) window.removeEventListener("scroll", place, true);
     };
-  }, [anchor.left, anchor.top, anchor.bottom, anchorElement, viewportTop]);
+  }, [
+    anchor.left,
+    anchor.top,
+    anchor.bottom,
+    anchorElement,
+    boundaryElement,
+    scale,
+    viewportTop,
+  ]);
   return createPortal(
     <div
       ref={menu}
@@ -107,7 +129,7 @@ export function SelectionToolbar({
       data-editor-keyboard-scope={keyboardScope}
       role="toolbar"
       aria-label={label ?? t("selectionToolbar")}
-      style={position}
+      style={{ ...position, scale, transformOrigin: "top left" }}
       onMouseDown={(event) => {
         if (!(event.target as Element).closest("input,select,textarea"))
           event.preventDefault();

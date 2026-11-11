@@ -13,8 +13,11 @@ import { chromium, _electron } from "playwright-core";
 // The smoke checks select controls by their Chinese labels.
 process.env.SHOWAI_LANGUAGE ??= "zh-CN";
 const root = resolve(import.meta.dirname, "..");
-await mkdir(join(root, "output/playwright"), { recursive: true });
-const output = await mkdtemp(join(root, "output/playwright/containers-"));
+const outputRoot = resolve(
+  process.env.SHOWAI_SMOKE_OUTPUT || join(root, "output/playwright"),
+);
+await mkdir(outputRoot, { recursive: true });
+const output = await mkdtemp(join(outputRoot, "containers-"));
 const cli = resolve(
   process.env.SHOWAI_CONTAINERS_CLI ||
     join(root, "dist-runtime/scripts/cli.mjs"),
@@ -231,6 +234,101 @@ try {
   );
   result.checks.push(
     "Page text and flowing regions share one caret, selection, undo history and frameless editor",
+  );
+  const toolbar = page.locator(".rich-text-selection-toolbar");
+  const firstParagraph = continuous.locator('[data-block-id="continuous-a"]');
+  await firstParagraph.click();
+  await continuous.press("Escape");
+  const paragraphBounds = await firstParagraph.evaluate((paragraph) => {
+    const range = document.createRange();
+    range.selectNodeContents(paragraph);
+    const bounds = range.getBoundingClientRect();
+    return { x: bounds.x, y: bounds.y, height: bounds.height };
+  });
+  const textY = paragraphBounds.y + paragraphBounds.height / 2;
+  await page.mouse.move(paragraphBounds.x + 8, textY);
+  await page.mouse.down();
+  await page.mouse.move(paragraphBounds.x + 35, textY, { steps: 8 });
+  await poll(
+    () => page.evaluate(() => window.getSelection()?.toString()),
+    (text) => Boolean(text),
+    "dragging text selection",
+  );
+  assert.equal(
+    await toolbar.count(),
+    0,
+    "Selection menu stays hidden during drag",
+  );
+  await page.mouse.move(paragraphBounds.x + 65, textY, { steps: 8 });
+  assert.equal(
+    await toolbar.count(),
+    0,
+    "Extending the selection does not open the menu",
+  );
+  await page.mouse.up();
+  await toolbar.waitFor();
+  const selectedText = await page.evaluate(() =>
+    window.getSelection()?.toString(),
+  );
+  const buttonScale = await toolbar
+    .locator(".editor-tool")
+    .first()
+    .evaluate(
+      (button) => button.getBoundingClientRect().width / button.offsetWidth,
+    );
+  assert.ok(Math.abs(buttonScale - 0.8) < 0.001, "Selection menu scales to 80%");
+  await toolbar.locator(".editor-tool").first().click();
+  assert.equal(
+    await page.evaluate(() => window.getSelection()?.toString()),
+    selectedText,
+  );
+  await toolbar.locator(".editor-tool").first().click();
+  await continuous.press("Escape");
+  await toolbar.waitFor({ state: "detached" });
+  await firstParagraph.click();
+  await continuous.press("Home");
+  await continuous.press("Shift+End");
+  await toolbar.waitFor();
+  await page.setViewportSize({ width: 640, height: 900 });
+  await poll(
+    () => toolbar.boundingBox(),
+    (bounds) => bounds && bounds.height > 40,
+    "selection menu wraps in a narrow page",
+  );
+  const layout = await toolbar.evaluate((element) => {
+    const bounds = element.getBoundingClientRect();
+    const boundary = document
+      .querySelector(".container-page-column")
+      .getBoundingClientRect();
+    return {
+      left: bounds.left,
+      right: bounds.right,
+      pageLeft: Math.max(0, boundary.left),
+      pageRight: Math.min(innerWidth, boundary.right),
+      controlsFit: [...element.querySelectorAll("button, select")].every(
+        (control) => {
+          const rect = control.getBoundingClientRect();
+          return rect.left >= bounds.left && rect.right <= bounds.right + 1;
+        },
+      ),
+    };
+  });
+  assert.ok(layout.left >= layout.pageLeft + 7);
+  assert.ok(layout.right <= layout.pageRight - 7);
+  assert.ok(layout.controlsFit, "Wrapped controls stay inside the menu");
+  await toolbar.locator(".rich-format-colors-toggle").first().click();
+  const colorPanel = toolbar.locator(".rich-format-color-panel");
+  await colorPanel.waitFor();
+  const panelBounds = await colorPanel.boundingBox();
+  assert.ok(panelBounds.x >= 0 && panelBounds.x + panelBounds.width <= 640);
+  await page.keyboard.press("Escape");
+  await colorPanel.waitFor({ state: "detached" });
+  await page.screenshot({ path: join(output, "selection-menu-narrow.png") });
+  await page.keyboard.press("Escape");
+  await toolbar.waitFor({ state: "detached" });
+  await page.setViewportSize({ width: 1440, height: 960 });
+  result.checks.push(
+    "Text selection menu waits for pointer release, preserves formatting selection, scales to 80%, wraps inside a narrow page and supports keyboard dismissal",
   );
   await scene(rootId)
     .locator(".tiptap")

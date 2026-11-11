@@ -104,6 +104,7 @@
   --editor-soft: var(--accent-soft, #eeedf9);
   gap: 2px;
   width: max-content;
+  box-sizing: border-box;
   max-width: calc(100vw - 24px);
   padding: 6px;
   flex-wrap: wrap;
@@ -113,6 +114,12 @@
   box-shadow:
     0 4px 12px #25233508,
     0 12px 36px #25233514;
+}
+.rich-text-selection-toolbar .rich-format-group {
+  flex-shrink: 1;
+  flex-wrap: wrap;
+  min-width: 0;
+  max-width: 100%;
 }
 .rich-text-selection-toolbar .editor-tool,
 .editor-toolbar .rich-format-group .editor-tool {

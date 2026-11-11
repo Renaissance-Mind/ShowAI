@@ -712,6 +712,8 @@ export default function RichTextEditor({
 
   useEffect(() => {
     if (!editor) return;
+    let selectionPointer: number | null = null;
+    let selectionFrame = 0;
     const refresh = () => {
       setWidgetSelected(
         editor.state.selection instanceof NodeSelection &&
@@ -751,6 +753,7 @@ export default function RichTextEditor({
       }
       if (
         !empty &&
+        selectionPointer === null &&
         dismissedSelection.current !== `${from}:${to}` &&
         (editor.isFocused || selectionMenuInteracting.current) &&
         !editor.isActive("codeBlock") &&
@@ -777,6 +780,38 @@ export default function RichTextEditor({
     const hideBubble = () => {
       selectionMenuInteracting.current = false;
       setBubble(null);
+    };
+    const stopSelecting = () => {
+      selectionPointer = null;
+      document.removeEventListener("pointerup", finishSelecting, true);
+      document.removeEventListener("pointercancel", cancelSelecting, true);
+      window.removeEventListener("blur", cancelSelecting);
+    };
+    const finishSelecting = (event: PointerEvent) => {
+      if (event.pointerId !== selectionPointer) return;
+      stopSelecting();
+      // Let the browser and ProseMirror commit the final selection on release.
+      selectionFrame = requestAnimationFrame(refresh);
+    };
+    const cancelSelecting = () => {
+      stopSelecting();
+      cancelAnimationFrame(selectionFrame);
+      hideBubble();
+    };
+    const startSelecting = (event: PointerEvent) => {
+      if (
+        event.button !== 0 ||
+        !event.isPrimary ||
+        !(event.target instanceof Element) ||
+        event.target.closest(".document-content") !== editor.view.dom
+      )
+        return;
+      cancelAnimationFrame(selectionFrame);
+      selectionPointer = event.pointerId;
+      hideBubble();
+      document.addEventListener("pointerup", finishSelecting, true);
+      document.addEventListener("pointercancel", cancelSelecting, true);
+      window.addEventListener("blur", cancelSelecting);
     };
     const trackMenuInteraction = (event: Event) => {
       selectionMenuInteracting.current = ownsMenuTarget(event.target);
@@ -823,8 +858,11 @@ export default function RichTextEditor({
     editor.on("blur", blur);
     editor.on("blur", focusOut);
     editor.view.dom.addEventListener("blur", enteringMenu, true);
+    editor.view.dom.addEventListener("pointerdown", startSelecting, true);
     editor.view.dom.addEventListener("contextmenu", hideBubble);
     return () => {
+      stopSelecting();
+      cancelAnimationFrame(selectionFrame);
       windowHandlers.current = null;
       editor.off("transaction", refresh);
       editor.off("focus", refresh);
@@ -832,6 +870,7 @@ export default function RichTextEditor({
       editor.off("blur", blur);
       editor.off("blur", focusOut);
       editor.view.dom.removeEventListener("blur", enteringMenu, true);
+      editor.view.dom.removeEventListener("pointerdown", startSelecting, true);
       editor.view.dom.removeEventListener("contextmenu", hideBubble);
     };
   }, [editor, selectionMenuId, minimal]);
@@ -848,12 +887,15 @@ export default function RichTextEditor({
     const resize = () => windowHandlers.current?.resize();
     const viewportChanged = (event: Event) =>
       windowHandlers.current?.viewportChanged(event);
+    const observer = new ResizeObserver(resize);
+    observer.observe(editor.view.dom);
     document.addEventListener("pointerdown", trackMenuInteraction, true);
     document.addEventListener("focusin", trackMenuInteraction, true);
     window.addEventListener("scroll", scroll, true);
     window.addEventListener("resize", resize);
     window.addEventListener("showai:viewport-change", viewportChanged);
     return () => {
+      observer.disconnect();
       document.removeEventListener("pointerdown", trackMenuInteraction, true);
       document.removeEventListener("focusin", trackMenuInteraction, true);
       window.removeEventListener("scroll", scroll, true);
@@ -2092,6 +2134,12 @@ export default function RichTextEditor({
           id={selectionMenuId}
           className="rich-text-selection-toolbar"
           anchor={bubble}
+          scale={0.8}
+          boundaryElement={
+            wrapperRef.current?.closest<HTMLElement>(
+              ".container-page-column, .page-surface, .studio-scroll",
+            ) ?? wrapperRef.current
+          }
           viewportTop={
             Math.max(
               0,
