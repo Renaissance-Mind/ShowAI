@@ -6,10 +6,12 @@ import {
   useRef,
   useState,
   useSyncExternalStore,
+  type CSSProperties,
   type KeyboardEvent,
   type PointerEvent,
   type ReactNode,
 } from "react";
+import { usePresence } from "../../ui/presence";
 import { createPortal } from "react-dom";
 import {
   AssistantContext,
@@ -640,6 +642,10 @@ export default function AssistantWorkbench({
     const value = Number(localStorage.getItem(widthPreference));
     return Number.isFinite(value) && value >= 300 ? Math.min(value, 640) : 380;
   });
+  // The panel slides like the sidebar when someone opens or closes it, and
+  // leaves at once when the view no longer has a page.
+  const panel = useRef<HTMLElement>(null);
+  const presence = usePresence(open && enabled, panel, enabled);
   const list = useRef<HTMLDivElement>(null);
   const input = useRef<HTMLTextAreaElement>(null);
   useEffect(() => {
@@ -1255,11 +1261,14 @@ export default function AssistantWorkbench({
           }
         />
       )}
-      {open && enabled && (
+      {presence.mounted && (
         <aside
+          ref={panel}
           className="assistant-panel"
           aria-label={t("panel.title")}
-          style={{ width }}
+          data-presence={presence.state}
+          inert={presence.state === "exiting"}
+          style={{ width, "--assistant-width": `${width}px` } as CSSProperties}
         >
           <div
             className="assistant-resize"

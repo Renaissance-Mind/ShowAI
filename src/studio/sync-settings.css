@@ -62,7 +62,7 @@
   z-index: 5;
   width: min(560px, 100%);
   margin: 0 auto;
-  animation: studio-enter 0.15s ease-out;
+  animation: studio-enter var(--duration-fast) var(--ease-out);
   display: flex;
   align-items: flex-start;
   gap: 10px;
@@ -276,7 +276,7 @@
 }
 .sync-disclosure svg,
 .sync-chevron {
-  transition: transform 0.15s ease;
+  transition: transform var(--duration-fast) var(--ease-out);
 }
 .sync-disclosure[aria-expanded="true"] svg,
 [aria-expanded="true"] > .sync-chevron {

@@ -264,7 +264,7 @@
   border-radius: 16px;
   background: var(--paper);
   transition:
-    border-color 150ms ease,
+    border-color var(--duration-fast) var(--ease-out),
     box-shadow var(--duration-base) var(--ease-out),
     transform var(--duration-base) var(--ease-out);
 }

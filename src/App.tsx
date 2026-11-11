@@ -1,5 +1,6 @@
 import { installIconTooltips } from "./ui/icon-tooltip.mjs";
 import { installKeyboardFocus } from "./ui/keyboard-focus";
+import { installWorkbenchMotion } from "./ui/workbench-motion";
 import { lazy, Suspense, useLayoutEffect } from "react";
 import { appIconForTheme } from "./design/app-icon";
 import { useAppearanceTheme } from "./design/useAppearanceTheme";
@@ -24,6 +25,10 @@ export default function App() {
   const t = useTranslator(messages);
   useLayoutEffect(() => installIconTooltips(document), []);
   useLayoutEffect(() => installKeyboardFocus(document), []);
+  useLayoutEffect(
+    () => (capture ? undefined : installWorkbenchMotion(document)),
+    [capture],
+  );
   useLayoutEffect(() => {
     if (capture) return;
     const favicon = document.querySelector<HTMLLinkElement>("#showai-favicon");

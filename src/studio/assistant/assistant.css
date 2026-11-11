@@ -11,6 +11,29 @@
   color: var(--text);
   font: 13px/1.5 var(--font-ui, var(--font-sans, system-ui, sans-serif));
 }
+/* Opening and closing slide the panel in from the right edge while the page
+ * narrows, the same way the sidebar shell changes width. */
+.assistant-panel {
+  --assistant-travel: min(var(--assistant-width), 50vw);
+}
+.assistant-panel[data-presence="entering"] {
+  animation: assistant-panel-in var(--duration-base) var(--ease-in-out);
+}
+.assistant-panel[data-presence="exiting"] {
+  animation: assistant-panel-out var(--duration-fast) var(--ease-in-out)
+    forwards;
+  pointer-events: none;
+}
+@keyframes assistant-panel-in {
+  from {
+    margin-right: calc(-1 * var(--assistant-travel));
+  }
+}
+@keyframes assistant-panel-out {
+  to {
+    margin-right: calc(-1 * var(--assistant-travel));
+  }
+}
 .assistant-resize {
   position: absolute;
   inset: 0 auto 0 -3px;
@@ -87,7 +110,7 @@
   border-radius: 8px;
   background: var(--paper);
   box-shadow: var(--shadow, 0 4px 18px #19191916, 0 0 0 1px #19191906);
-  animation: studio-enter 0.15s ease-out;
+  animation: studio-enter var(--duration-fast) var(--ease-out);
 }
 .assistant-switcher-search {
   display: flex;
@@ -525,7 +548,7 @@
   color: var(--text);
   box-shadow: var(--shadow-dialog);
   font: 13px/1.5 var(--font-ui, var(--font-sans, system-ui, sans-serif));
-  animation: assistant-appear 0.13s ease;
+  animation: assistant-appear var(--duration-fast) var(--ease-out);
 }
 .assistant-composer header {
   display: flex;
@@ -579,6 +602,7 @@
     inset: 36px 0 0 auto;
     z-index: 150;
     width: min(100vw, 420px) !important;
+    --assistant-travel: min(100vw, 420px);
     max-width: 100vw;
     box-shadow: var(--shadow-dialog);
   }
@@ -683,7 +707,7 @@
 .assistant-message,
 .assistant-approval,
 .assistant-user {
-  animation: assistant-appear 160ms ease-out;
+  animation: assistant-appear var(--duration-fast) var(--ease-out);
 }
 @media (prefers-reduced-motion: reduce) {
   .assistant-message,

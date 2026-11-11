@@ -28,6 +28,9 @@ export function installIconTooltips(root) {
   let hideTimer = 0;
   // Only keyboard navigation reveals focus tooltips; script focus after a click or shortcut stays quiet.
   let keyboardNav = false;
+  // Hover tooltips follow a moving pointer. After a click, a key or a scroll,
+  // whatever lands under a still pointer stays quiet until the pointer moves.
+  let armed = true;
   let hovered = null;
   let focused = null;
 
@@ -68,14 +71,19 @@ export function installIconTooltips(root) {
     }
     return null;
   };
+  // Adds or removes the tooltip from the control's description, keeping others.
+  const describe = (element, described) => {
+    const ids = (element.getAttribute("aria-describedby") || "")
+      .split(/\s+/)
+      .filter((id) => id && id !== tip.id);
+    if (described) ids.push(tip.id);
+    if (ids.length) element.setAttribute("aria-describedby", ids.join(" "));
+    else element.removeAttribute("aria-describedby");
+  };
   const hide = () => {
     win.clearTimeout(hideTimer);
     if (active) {
-      const ids = (active.getAttribute("aria-describedby") || "")
-        .split(/\s+/)
-        .filter((id) => id && id !== tip.id);
-      if (ids.length) active.setAttribute("aria-describedby", ids.join(" "));
-      else active.removeAttribute("aria-describedby");
+      describe(active, false);
       if (nativeTitle !== null && !active.hasAttribute("title"))
         active.setAttribute("title", nativeTitle);
     }
@@ -108,11 +116,7 @@ export function installIconTooltips(root) {
     if (!element.isConnected || !element.getClientRects().length) return hide();
     if (hasVisibleText(element)) {
       tip.hidePopover();
-      const ids = (element.getAttribute("aria-describedby") || "")
-        .split(/\s+/)
-        .filter((id) => id && id !== tip.id);
-      if (ids.length) element.setAttribute("aria-describedby", ids.join(" "));
-      else element.removeAttribute("aria-describedby");
+      describe(element, false);
       return;
     }
     tip.textContent = label(element);
@@ -128,13 +132,7 @@ export function installIconTooltips(root) {
         : rect.top - bounds.height - 6;
     tip.style.left = `${Math.max(8, Math.min(rect.left + (rect.width - bounds.width) / 2, width - bounds.width - 8))}px`;
     tip.style.top = `${Math.max(8, Math.min(top, height - bounds.height - 8))}px`;
-    const ids = (element.getAttribute("aria-describedby") || "")
-      .split(/\s+/)
-      .filter(Boolean);
-    element.setAttribute(
-      "aria-describedby",
-      [...new Set([...ids, tip.id])].join(" "),
-    );
+    describe(element, true);
   };
   const show = (element) => {
     win.clearTimeout(hideTimer);
@@ -154,10 +152,16 @@ export function installIconTooltips(root) {
     }, 90);
   };
   const over = (event) => {
-    if (event.pointerType === "touch") return;
+    if (event.pointerType === "touch" || !armed) return;
     hovered = target(event);
     if (hovered === tip) win.clearTimeout(hideTimer);
     else show(hovered || focused);
+  };
+  // Layout changes under a still pointer report no movement.
+  const move = (event) => {
+    if (armed || !(event.movementX || event.movementY)) return;
+    armed = true;
+    over(event);
   };
   const out = (event) => {
     if (
@@ -179,17 +183,19 @@ export function installIconTooltips(root) {
   };
   const key = (event) => {
     const field = event.composedPath()[0];
-    if (
+    // Any other key, such as Enter on a menu item or a shortcut, may move
+    // focus by script; that focus stays quiet.
+    keyboardNav =
       event.key === "Tab" ||
-      (/^(Arrow(Up|Down|Left|Right)|Home|End|Page(Up|Down))$/.test(event.key) &&
+      (/^(Arrow|Home$|End$|Page)/.test(event.key) &&
         !field?.closest?.(
           'input, textarea, select, [contenteditable]:not([contenteditable="false"])',
-        ))
-    )
-      keyboardNav = true;
-    if (event.key === "Escape") hide();
+        ));
+    armed = false;
+    if (/^(Escape|Enter| )$/.test(event.key)) dismiss();
   };
   const dismiss = () => {
+    armed = false;
     hovered = null;
     focused = null;
     hide();
@@ -225,6 +231,7 @@ export function installIconTooltips(root) {
   });
   const listeners = [
     ["pointerover", over],
+    ["pointermove", move],
     ["pointerout", out],
     ["focusin", focus],
     ["focusout", blur],
