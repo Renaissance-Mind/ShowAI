@@ -1144,10 +1144,14 @@ export class SqliteLibrary {
         for (const [name, contents] of encodeFile(path, bytes))
           encoded.set(name, contents);
     }
+    const digests = new Map(
+      [...encoded].map(([path, bytes]) => [
+        path,
+        bytes === null ? null : sha(bytes),
+      ]),
+    );
     const files = Object.fromEntries(
-      [...encoded]
-        .sort(([a], [b]) => a.localeCompare(b))
-        .map(([path, bytes]) => [path, bytes === null ? null : sha(bytes)]),
+      [...digests].sort(([a], [b]) => a.localeCompare(b)),
     );
     const revision = sha(JSON.stringify({ record, parent, files })),
       entry: HistoryEntry = {
@@ -1178,7 +1182,7 @@ export class SqliteLibrary {
       join(directory, "journal.json"),
       Buffer.from(JSON.stringify(journal)),
     );
-    await this.commit(entry, encoded, parent);
+    await this.commit(entry, encoded, parent, false, digests);
     // The committed files decode from the objects just written, as a read of
     // the new revision would decode them from the database.
     const written = new Map<string, Buffer | null>();
@@ -1217,6 +1221,8 @@ export class SqliteLibrary {
     encoded: FileChanges,
     expectedHead: string | null,
     retainHistory = false,
+    /** SHA-256 of the encoded files, when the caller already computed them. */
+    digests?: Map<string, string | null>,
   ) {
     // Prepare compression before acquiring the database writer transaction.
     const prepared = new Map<
@@ -1231,7 +1237,7 @@ export class SqliteLibrary {
       assertPath(path);
       if (bytes === null) continue;
       const content = Buffer.from(bytes);
-      const id = sha(content),
+      const id = digests?.get(path) ?? sha(content),
         object = objects.get(id) ?? { id, bytes: content };
       objects.set(id, object);
       prepared.set(path, object);
