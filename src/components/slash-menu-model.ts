@@ -120,3 +120,19 @@ export function componentSlashEntry<T extends SlashComponent>(
     component: item,
   };
 }
+
+/**
+ * Asks the rich-text editor that holds focus to insert a resolved catalog
+ * component at its caret, exactly as its "/" menu does. The editor calls
+ * preventDefault when it took the request.
+ */
+export const INSERT_COMPONENT_EVENT = "showai:insert-component";
+export interface InsertComponentDetail<C = unknown> {
+  kind: string;
+  data: Record<string, unknown>;
+  /** A native container or primitive the host inserts as its own node. */
+  native: boolean;
+  component?: C;
+  /** Where in the editor: its caret (default) or the end of its content. */
+  at?: "selection" | "end";
+}

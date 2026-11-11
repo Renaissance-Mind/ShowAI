@@ -20,6 +20,11 @@ import { useTranslator } from "../../i18n/react";
 import messages from "../../i18n/messages/quickJump";
 import commonMessages from "../../i18n/messages/common";
 import { useComponentCatalog } from "../../components/useComponentCatalog";
+import {
+  INSERT_COMPONENT_EVENT,
+  type InsertComponentDetail,
+} from "../../components/slash-menu-model";
+import { flushSync } from "react-dom";
 import { componentWidgetData } from "../../components/custom/contract";
 import { requestNavigation } from "../../portable/page-link.mjs";
 import type { SearchResult } from "../../core/library-index";
@@ -60,7 +65,7 @@ export default function QuickJump({
   projects,
   pages,
   commands,
-  insert,
+  editor,
   openDirectory,
   onClose,
   onError,
@@ -68,8 +73,8 @@ export default function QuickJump({
   projects: readonly ProjectSummary[];
   pages: QuickJumpContext["pages"];
   commands: readonly WorkbenchCommand[];
-  /** The open editor's insertion, when an editable page or board is open. */
-  insert?: EditorControls["insertComponent"];
+  /** The open page or board, when it is editable. */
+  editor?: Pick<EditorControls, "kind" | "insertComponent">;
   openDirectory: QuickJumpContext["openDirectory"];
   onClose: () => void;
   onError: (error: unknown) => void;
@@ -100,9 +105,11 @@ export default function QuickJump({
   const restoreFocus = () =>
     previous.current?.isConnected &&
     previous.current.focus({ preventScroll: true });
+  // The dialog is gone and focus is back where it was when this returns,
+  // inside the key or click handler, as the "/" menu leaves things.
   const close = () => {
+    flushSync(onClose);
     restoreFocus();
-    onClose();
   };
 
   const context = useMemo<QuickJumpContext>(
@@ -111,7 +118,7 @@ export default function QuickJump({
       pages,
       commands: openedCommands,
       components: catalog.items,
-      canInsert: !!insert,
+      canInsert: !!editor,
       labels: {
         pages: t("group.pages"),
         folders: t("group.folders"),
@@ -139,7 +146,7 @@ export default function QuickJump({
       openDirectory: (projectId, folderId) =>
         latest.current.openDirectory(projectId, folderId),
       insert: async (component, props) => {
-        if (!insert) return;
+        if (!editor) return;
         const value = await latest.current.resolve(component);
         const data = props
           ? value.component
@@ -148,10 +155,38 @@ export default function QuickJump({
                 props(component as Parameters<typeof props>[0]),
               )
           : value.data;
-        insert(value.kind, data, value.component);
+        // The rich-text editor with the caret inserts there, as its "/" menu
+        // does; a page without a caret takes it at the end of its text flow;
+        // a board places it after its selection.
+        const request = (target: Element, at: "selection" | "end") =>
+          !target.dispatchEvent(
+            new CustomEvent<InsertComponentDetail>(INSERT_COMPONENT_EVENT, {
+              bubbles: true,
+              cancelable: true,
+              detail: {
+                kind: value.kind,
+                data,
+                native: value.native,
+                at,
+                ...(value.component ? { component: value.component } : {}),
+              },
+            }),
+          );
+        if (request(document.activeElement ?? document.body, "selection"))
+          return;
+        const flow =
+          editor.kind === "page"
+            ? [
+                ...document.querySelectorAll<HTMLElement>(
+                  ".container-workspace .ProseMirror",
+                ),
+              ].find((node) => node.offsetParent !== null)
+            : undefined;
+        if (flow && request(flow, "end")) return;
+        editor.insertComponent(value.kind, data, value.component);
       },
     }),
-    [projects, pages, openedCommands, catalog.items, insert, t],
+    [projects, pages, openedCommands, catalog.items, editor, t],
   );
   useEffect(
     () =>
@@ -172,12 +207,9 @@ export default function QuickJump({
   const run = (row: QuickJumpRow) => {
     if (row.item.disabled) return;
     close();
-    // The dialog unmounts first, so the command sees the workbench without it.
-    requestAnimationFrame(() => {
-      void Promise.resolve()
-        .then(() => quickJumpSources.run(row, context))
-        .catch(latest.current.onError);
-    });
+    void Promise.resolve()
+      .then(() => quickJumpSources.run(row, context))
+      .catch(latest.current.onError);
   };
   const mac = clientIsMac();
   let index = -1;

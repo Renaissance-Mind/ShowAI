@@ -7273,19 +7273,15 @@ export default function Studio() {
             projects={projects}
             pages={contents}
             commands={quickJumpCommands()}
-            insert={
+            editor={
               view === "page" &&
               page.draft &&
               editorControls?.documentId === page.draft.id
-                ? editorControls.insertComponent
+                ? editorControls
                 : undefined
             }
             openDirectory={openProject}
-            onClose={() => {
-              // A command run right after closing sees no open dialog.
-              dialogRef.current = null;
-              closeDialog();
-            }}
+            onClose={closeDialog}
             onError={report}
           />
         )}
