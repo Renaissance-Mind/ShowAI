@@ -3,56 +3,38 @@ import { canEdit } from "../../datasets/editable.mjs";
 import ExpandableSearch from "../ExpandableSearch";
 import {
   createContext,
-  useContext,
   useEffect,
   useId,
   useMemo,
   useRef,
   useState,
+  useContext,
 } from "react";
 import { createPortal } from "react-dom";
 import {
-  ArrowDown,
-  ArrowUp,
   Check,
-  Columns3,
   Download,
-  ExternalLink,
-  FileText,
   Filter,
   GripVertical,
-  LayoutDashboard,
-  LayoutList,
-  List,
   Plus,
   Table2,
   Trash2,
 } from "../../ui/icons";
+import { downloadFile, text, toCsv, uid } from "./helpers";
+import { BlockHeader, Field, blockLabel } from "./shared";
+import { pruneCalendarConfig, resolveCalendar } from "./DatabaseCalendar";
+import { parsePageCell } from "./database-contract.mjs";
 import {
-  downloadFile,
-  filterSortRows,
-  safeUrl,
-  text,
-  toCsv,
-  uid,
-} from "./helpers";
-import { BlockHeader, EmptyState, Field, blockLabel } from "./shared";
-import {
-  DatabaseCalendar,
-  pruneCalendarConfig,
-  resolveCalendar,
-} from "./DatabaseCalendar";
-import { normalizeDate, parsePageCell } from "./database-contract.mjs";
-import {
-  ROW_ACTION_WIDTH,
   changeView,
   columnWidth,
-  databaseViews,
+  databaseViews as savedViews,
   moveColumnTo,
   newViewId,
   pruneViews,
   titleSyncActions,
+  upgradeViewQuery,
   withViews,
+  ROW_ACTION_WIDTH,
   type ViewOverride,
 } from "./database-views";
 import { usePropertyReorder } from "./database-reorder";
@@ -60,16 +42,47 @@ import { useColumnResize } from "./database-column-resize";
 import { useDatabaseViewMotion } from "./database-view-motion";
 import { databaseRecordTargets } from "./database-records";
 import { pageLink } from "../../portable/page-link.mjs";
-import { usePageLinks, type PageLinkBridge } from "../page-links";
-import type { MessageKey } from "../../i18n";
+import { usePageLinks } from "../page-links";
+import { getLocale } from "../../i18n";
 import { useTranslator } from "../../i18n/react";
 import messages from "../../i18n/messages/database";
+import fieldMessages from "../../i18n/messages/databaseFields";
+import {
+  valueTypeOf,
+  type ValueTypeContext,
+} from "../../datasets/value-types.mjs";
+import {
+  groupKeys,
+  queryRecords,
+  readFilter,
+  readSorts,
+  type FilterGroup,
+  type RecordSort,
+} from "../../datasets/record-query.mjs";
+import { recordTitle } from "../../datasets/derived-fields.mjs";
+import {
+  DERIVED_KEY,
+  snapshotHost,
+  useDatabaseHost,
+  type FieldTypeListing,
+} from "./database-host";
+import { isDerivedColumn, useDatabaseDerived } from "./database-derived";
+import {
+  BUILTIN_FIELD_TYPES,
+  fieldUiOf,
+  pageTitle,
+  useFieldTypeLabel,
+  type CellEnvironment,
+} from "./database-field-ui";
+import { DatabaseQueryEditor } from "./DatabaseQueryEditor";
+import { databaseView, databaseViews } from "./DatabaseViews";
+import "./database-fields.css";
 import type {
   BlockProps,
-  ColumnType,
   DatabaseCalendarConfig,
   DatabaseColumn,
   DatabaseRow,
+  DatabaseValue,
   DatabaseView,
   DatabaseViewType,
 } from "./types";
@@ -80,134 +93,59 @@ import {
   useReaderState,
 } from "../../surface/reader-state";
 
-const TYPES: { value: ColumnType; label: MessageKey<typeof messages> }[] = [
-  { value: "text", label: "type.text" },
-  { value: "number", label: "type.number" },
-  { value: "select", label: "type.select" },
-  { value: "checkbox", label: "type.checkbox" },
-  { value: "url", label: "type.url" },
-  { value: "date", label: "type.date" },
-  { value: "page", label: "type.page" },
-];
-const VIEWS: {
-  type: DatabaseViewType;
-  label: MessageKey<typeof messages>;
-  Icon: typeof Table2;
-}[] = [
-  { type: "table", label: "table", Icon: Table2 },
-  { type: "board", label: "board", Icon: Columns3 },
-  { type: "list", label: "list", Icon: List },
-  { type: "calendar", label: "calendar", Icon: LayoutDashboard },
-];
-const TYPE_SYMBOL: Record<ColumnType, string> = {
-  text: "Aa",
-  number: "#",
-  select: "◉",
-  checkbox: "☑",
-  url: "↗",
-  date: "◫",
-  page: "▤",
-};
-// A select value standing for "create a page"; page links never take this form.
-const NEW_PAGE = "showai:new-page";
-const RecordOpenContext = createContext<
-  ((row: DatabaseRow, column: DatabaseColumn) => void) | null
->(null);
+const CellEnvironmentContext = createContext<CellEnvironment | null>(null);
 
-/** The title of the page a cell links to, when the host lists it. */
-function pageTitle(
-  value: unknown,
-  pages: PageLinkBridge | null,
-): string | undefined {
-  const target = parsePageCell(value);
-  if (!target || pages?.projectId !== target.projectId) return undefined;
-  return pages.pages.find((page) => page.id === target.pageId)?.title;
-}
+/** The type menu value of a column: its type, or the contributed component. */
+const typeKey = (column: Pick<DatabaseColumn, "type" | "component">) =>
+  column.type === "custom" && column.component
+    ? `custom:${column.component.componentId}@${column.component.version}`
+    : column.type;
+const contributedKey = (listing: FieldTypeListing) =>
+  `custom:${listing.ref.componentId}@${listing.ref.version}`;
 
-function PageCell({
-  value,
-  column,
-  editable,
-  update,
-  createPage,
-  openRecord,
-}: {
-  value: unknown;
-  column: DatabaseColumn;
-  editable: boolean;
-  update: (value: string) => void;
-  createPage?: () => void;
-  openRecord?: () => void;
-}) {
-  const t = useTranslator(messages);
-  const pages = usePageLinks();
-  const target = parsePageCell(value);
-  const title = pageTitle(value, pages);
-  const canPeek = !!pages?.openRecord && !!openRecord;
-  const link = target && (
-    <a
-      className="sb-cell-link sb-page-link"
-      href={String(value)}
-      data-open-project={target.projectId}
-      data-open-page={target.pageId}
-      data-database-record={canPeek || undefined}
-      aria-label={editable ? t("openPage", { title: title ?? "" }) : undefined}
-      onClick={(event) => {
-        if (
-          !canPeek ||
-          event.button !== 0 ||
-          event.metaKey ||
-          event.ctrlKey ||
-          event.shiftKey ||
-          event.altKey
-        )
-          return;
-        event.preventDefault();
-        event.stopPropagation();
-        openRecord?.();
-      }}
-    >
-      <FileText size={13} aria-hidden="true" />
-      {editable ? null : title || t("linkedPage")}
-    </a>
-  );
-  if (!editable || !pages)
-    return link ?? <span className="sb-cell-value sb-placeholder">—</span>;
-  const missing =
-    target &&
-    !pages.pages.some(
-      (page) =>
-        pages.projectId === target.projectId && page.id === target.pageId,
-    );
-  return (
-    <div className="sb-cell-input-wrap">
-      <select
-        aria-label={column.name}
-        className="sb-cell-page"
-        value={text(value)}
-        onChange={(event) =>
-          event.target.value === NEW_PAGE
-            ? createPage?.()
-            : update(event.target.value)
+/** A column switched to the type a menu value names, keeping only settings that type uses. */
+function withType(
+  column: DatabaseColumn,
+  key: string,
+  contributed: FieldTypeListing[],
+): DatabaseColumn {
+  const {
+    relation: _relation,
+    formula: _formula,
+    rollup: _rollup,
+    component: _component,
+    config: _config,
+    kind: _kind,
+    ...rest
+  } = column;
+  const listing = contributed.find((item) => contributedKey(item) === key);
+  if (listing)
+    return {
+      ...rest,
+      type: "custom",
+      component: { ...listing.ref },
+      // Readers without the component still filter and sort by this kind.
+      kind: listing.valueKind,
+      config: structuredClone(listing.defaultConfig),
+    };
+  const type = key as DatabaseColumn["type"];
+  return {
+    ...rest,
+    type,
+    ...(type === column.type
+      ? {
+          ...(column.relation ? { relation: column.relation } : {}),
+          ...(column.formula ? { formula: column.formula } : {}),
+          ...(column.rollup ? { rollup: column.rollup } : {}),
         }
-      >
-        <option value="">{t("notSet")}</option>
-        {createPage && <option value={NEW_PAGE}>{t("newPage")}</option>}
-        {pages.pages
-          .filter((page) => page.id !== pages.pageId)
-          .map((page) => (
-            <option
-              key={page.id}
-              value={pageLink({ projectId: pages.projectId, pageId: page.id })}
-            >
-              {page.title || t("untitled")}
-            </option>
-          ))}
-        {missing && <option value={String(value)}>{t("linkedPage")}</option>}
-      </select>
-      {link}
-    </div>
-  );
+      : type === "relation"
+        ? { relation: { dataset: "" } }
+        : type === "formula"
+          ? { formula: { expression: "" } }
+          : type === "rollup"
+            ? { rollup: { relation: "", aggregate: "count" } }
+            : {}),
+  };
 }
 
 function Cell({
@@ -220,129 +158,104 @@ function Cell({
   row: DatabaseRow;
   column: DatabaseColumn;
   editable: boolean;
-  update: (value: string | number | boolean) => void;
-  /** Page cells: create a page for this record and link it. */
+  update: (value: DatabaseValue) => void;
   createPage?: () => void;
 }) {
+  const env = useContext(CellEnvironmentContext)!;
+  const Field = fieldUiOf(column).Cell;
+  return (
+    <Field
+      row={row}
+      column={column}
+      value={env.derived.value(row, column)}
+      editable={
+        editable &&
+        !isDerivedColumn(column) &&
+        !valueTypeOf(column, {
+          contributed: (item) => env.host?.field?.(item)?.valueType,
+        }).unknown
+      }
+      update={update}
+      createPage={createPage}
+      env={env}
+    />
+  );
+}
+
+/** Settings of one column: name, type and the type's own configuration. */
+function ColumnSettings({
+  column,
+  columns,
+  onChange,
+  contributed,
+}: {
+  column: DatabaseColumn;
+  columns: DatabaseColumn[];
+  onChange: (column: DatabaseColumn) => void;
+  contributed: FieldTypeListing[];
+}) {
   const t = useTranslator(messages);
-  const openRecord = useContext(RecordOpenContext);
-  const value = row[column.id];
-  if (column.type === "page")
-    return (
-      <PageCell
-        value={value}
-        column={column}
-        editable={editable}
-        update={update}
-        createPage={createPage}
-        openRecord={openRecord ? () => openRecord(row, column) : undefined}
-      />
-    );
-  if (column.type === "checkbox")
-    return (
-      <input
-        type="checkbox"
-        aria-label={column.name}
-        checked={Boolean(value)}
-        disabled={!editable}
-        onChange={(event) => update(event.target.checked)}
-      />
-    );
-  if (!editable) {
-    if (column.type === "select" && value)
-      return (
-        <span
-          className={`sb-tag sb-tag-${(column.options?.indexOf(String(value)) ?? 0) % 5}`}
-        >
-          {text(value)}
-        </span>
-      );
-    if (column.type === "url" && safeUrl(value))
-      return (
-        <a
-          className="sb-cell-link"
-          href={safeUrl(value)}
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          {text(value)}
-          <ExternalLink size={12} />
-        </a>
-      );
-    return (
-      <span className="sb-cell-value">
-        {text(value) || <span className="sb-placeholder">—</span>}
-      </span>
-    );
-  }
-  if (column.type === "select")
-    return (
+  const typeLabel = useFieldTypeLabel();
+  const host = useDatabaseHost();
+  const Config = fieldUiOf(column).Config;
+  const key = typeKey(column);
+  return (
+    <>
       <select
-        aria-label={column.name}
-        value={text(value)}
-        className={`sb-cell-select sb-tag-${(column.options?.indexOf(String(value)) ?? 0) % 5}`}
-        onChange={(event) => update(event.target.value)}
+        aria-label={t("propertyType", { name: column.name || t("property") })}
+        value={key}
+        onChange={(event) =>
+          onChange(withType(column, event.target.value, contributed))
+        }
       >
-        <option value="">{t("notSet")}</option>
-        {column.options?.map((option) => (
-          <option key={option} value={option}>
-            {option}
+        {BUILTIN_FIELD_TYPES.map((type) => (
+          <option key={type} value={type}>
+            {typeLabel(type)}
           </option>
         ))}
-        {value && !column.options?.includes(String(value)) && (
-          <option value={String(value)}>{String(value)}</option>
-        )}
+        {contributed.map((listing) => (
+          <option key={contributedKey(listing)} value={contributedKey(listing)}>
+            {listing.name}
+          </option>
+        ))}
+        {!BUILTIN_FIELD_TYPES.includes(key) &&
+          !contributed.some((listing) => contributedKey(listing) === key) && (
+            <option value={key}>
+              {column.component?.componentId ?? column.type}
+            </option>
+          )}
       </select>
-    );
-  return (
-    <div className="sb-cell-input-wrap">
-      <input
-        aria-label={column.name}
-        type={
-          column.type === "number" || column.type === "url"
-            ? column.type
-            : column.type === "date"
-              ? "date"
-              : "text"
-        }
-        className="sb-cell-input"
-        value={text(value)}
-        placeholder={column.type === "url" ? "https://…" : "—"}
-        onChange={(event) =>
-          update(
-            column.type === "number" && event.target.value !== ""
-              ? Number(event.target.value)
-              : event.target.value,
-          )
-        }
-      />
-      {column.type === "url" && safeUrl(value) && (
-        <a
-          className="sb-icon-button"
-          href={safeUrl(value)}
-          target="_blank"
-          rel="noopener noreferrer"
-          aria-label={t("openLink", { name: column.name })}
-        >
-          <ExternalLink size={12} />
-        </a>
+      {Config && (
+        <Config
+          column={column}
+          columns={columns}
+          host={host}
+          onChange={(changes) => onChange({ ...column, ...changes })}
+        />
       )}
-    </div>
+    </>
   );
 }
 
 /** The new-property form the table header opens above the table. */
 function AddProperty({
+  columns,
+  contributed,
   onAdd,
   onClose,
 }: {
-  onAdd: (column: DatabaseColumn) => void;
+  columns: DatabaseColumn[];
+  contributed: FieldTypeListing[];
+  onAdd: (column: DatabaseColumn) => string;
   onClose: () => void;
 }) {
   const t = useTranslator(messages);
-  const [name, setName] = useState("");
-  const [type, setType] = useState<ColumnType>("text");
-  const [options, setOptions] = useState("");
+  const [draft, setDraft] = useState<DatabaseColumn>(() => ({
+    id: uid(),
+    name: "",
+    type: "text",
+  }));
+  const [error, setError] = useState("");
   return (
     <form
       className="sb-filter-row sb-add-property-row"
@@ -355,60 +268,32 @@ function AddProperty({
       }}
       onSubmit={(event) => {
         event.preventDefault();
-        if (!name.trim()) return;
-        onAdd({
-          id: uid(),
-          name: name.trim(),
-          type,
-          ...(type === "select"
-            ? {
-                options: [
-                  ...new Set(
-                    options
-                      .split(/[,，]/)
-                      .map((option) => option.trim())
-                      .filter(Boolean),
-                  ),
-                ],
-              }
-            : {}),
-        });
-        onClose();
+        if (!draft.name.trim()) return;
+        const problem = onAdd({ ...draft, name: draft.name.trim() });
+        if (problem) setError(problem);
+        else onClose();
       }}
     >
       <Plus size={13} aria-hidden="true" />
       <input
         aria-label={t("propertyName")}
         placeholder={t("propertyName")}
-        value={name}
+        value={draft.name}
         maxLength={1000}
         // Typing must reach the form, not the page editor holding this component.
         autoFocus
-        onChange={(event) => setName(event.target.value)}
+        onChange={(event) => setDraft({ ...draft, name: event.target.value })}
       />
-      <select
-        aria-label={t("propertyType", { name: name || t("property") })}
-        value={type}
-        onChange={(event) => setType(event.target.value as ColumnType)}
-      >
-        {TYPES.map((item) => (
-          <option key={item.value} value={item.value}>
-            {t(item.label)}
-          </option>
-        ))}
-      </select>
-      {type === "select" && (
-        <input
-          aria-label={t("propertyOptions", { name: name || t("property") })}
-          placeholder={t("optionsPlaceholder")}
-          value={options}
-          onChange={(event) => setOptions(event.target.value)}
-        />
-      )}
+      <ColumnSettings
+        column={draft}
+        columns={[...columns, draft]}
+        contributed={contributed}
+        onChange={setDraft}
+      />
       <button
         type="submit"
         className="sb-button sb-primary sb-small"
-        disabled={!name.trim()}
+        disabled={!draft.name.trim()}
       >
         <Check size={14} />
         {t("addProperty")}
@@ -416,52 +301,78 @@ function AddProperty({
       <button type="button" className="sb-text-button" onClick={onClose}>
         {t("cancel")}
       </button>
+      {error && (
+        <p role="alert" className="sb-error">
+          {error}
+        </p>
+      )}
     </form>
   );
 }
 
 export function DatabaseBlock({ data, onChange, readOnly }: BlockProps) {
   const t = useTranslator(messages);
+  const tf = useTranslator(fieldMessages);
   const pages = usePageLinks();
   const sourceId = useId();
   const closeRecord = pages?.closeRecord;
   useEffect(() => () => closeRecord?.(sourceId), [sourceId, closeRecord]);
+  const liveHost = useDatabaseHost();
+  const snapshot = data[DERIVED_KEY];
+  // A bound table follows what its shared data allows: columns, then each row's fields.
+  const dataState = useContext(BlockDataState);
+  const selfDataset = dataState?.dataset;
+  const host = useMemo(
+    () =>
+      liveHost
+        ? selfDataset
+          ? { ...liveHost, selfDataset }
+          : liveHost
+        : snapshotHost(snapshot),
+    [liveHost, selfDataset, snapshot],
+  );
+  const contributed = host?.fieldTypes?.() ?? [];
   const columns: DatabaseColumn[] = useMemo(
     () =>
       Array.isArray(data.columns)
         ? data.columns
             .filter((column) => column && typeof column.id === "string")
             .map((column) => ({
-              id: column.id,
+              ...column,
               name: text(column.name, t("property")),
-              type: TYPES.some((type) => type.value === column.type)
-                ? column.type
-                : "text",
+              type: typeof column.type === "string" ? column.type : "text",
               options: Array.isArray(column.options)
                 ? column.options.map((option: unknown) => text(option))
                 : [],
-              ...(column.type === "page" && typeof column.folder === "string"
-                ? { folder: column.folder }
-                : {}),
-              ...(column.type === "page" &&
-              typeof column.titleColumn === "string"
-                ? { titleColumn: column.titleColumn }
-                : {}),
             }))
         : [],
     [data.columns, t],
   );
-  const rows: DatabaseRow[] = Array.isArray(data.rows)
-    ? data.rows.filter((row) => row && typeof row.id === "string")
-    : [];
-  // A bound table follows what its shared data allows: columns, then each row's fields.
-  const dataState = useContext(BlockDataState);
+  const rows: DatabaseRow[] = useMemo(
+    () =>
+      Array.isArray(data.rows)
+        ? data.rows.filter((row) => row && typeof row.id === "string")
+        : [],
+    [data.rows],
+  );
+  const derived = useDatabaseDerived(columns, rows, host);
+  const shownColumns = derived.columns;
+  const context: ValueTypeContext = {
+    value: (row, column) =>
+      derived.value(row as DatabaseRow, column as unknown as DatabaseColumn),
+    pageTitle: (value) =>
+      value ? pageTitle(value, pages) || t("linkedPage") : "",
+    recordTitles: (column, ids) =>
+      derived.recordTitles(column as unknown as DatabaseColumn, ids),
+    contributed: (column) => host?.field?.(column)?.valueType,
+    locale: getLocale(),
+  };
+  const typeOf = (column: DatabaseColumn) => valueTypeOf(column, context);
   const editable =
     Boolean(onChange && !readOnly) &&
     (!dataState || canEdit(dataState.editable, "columns"));
-  const viewName = (type: DatabaseViewType) =>
-    t(VIEWS.find((item) => item.type === type)!.label);
-  const { views } = databaseViews(data, viewName);
+  const viewName = (type: DatabaseViewType) => t(databaseView(type).label);
+  const { views } = savedViews(data, viewName);
   const [activeView, setActiveView] = useReaderState("activeView", "", {
     accept: isText,
   });
@@ -475,6 +386,7 @@ export function DatabaseBlock({ data, onChange, readOnly }: BlockProps) {
     ...(editable ? {} : overrides[savedView.id]),
   };
   const view = current.type;
+  const viewDefinition = databaseView(view);
   const motion = useDatabaseViewMotion(
     `${savedView.id}:${view}`,
     views.length > 1,
@@ -486,8 +398,8 @@ export function DatabaseBlock({ data, onChange, readOnly }: BlockProps) {
     setDraftViewName(null);
     setPage(0);
   };
-  const sort = current.sort ?? null;
-  const filter = current.filter ?? { column: "", value: "" };
+  const sorts = readSorts(current);
+  const filter = readFilter(current.filter, shownColumns);
   const writeViews = (next: DatabaseView[], base = data) =>
     onChange?.(withViews(base, next));
   const changeCurrent = (changes: Partial<DatabaseView>) => {
@@ -495,13 +407,23 @@ export function DatabaseBlock({ data, onChange, readOnly }: BlockProps) {
     if (editable)
       writeViews(
         views.map((item) =>
-          item.id === savedView.id ? changeView(item, changes, viewName) : item,
+          item.id === savedView.id
+            ? changeView(
+                item,
+                { ...upgradeViewQuery(item, shownColumns), ...changes },
+                viewName,
+              )
+            : item,
         ),
       );
     else
       setOverrides((all) => ({
         ...all,
-        [savedView.id]: { ...all[savedView.id], ...changes },
+        [savedView.id]: {
+          ...all[savedView.id],
+          ...changes,
+          ...("sorts" in changes ? { sort: undefined } : {}),
+        },
       }));
   };
   // Calendar column choices are reading state seeded from the saved settings, like board grouping.
@@ -521,7 +443,6 @@ export function DatabaseBlock({ data, onChange, readOnly }: BlockProps) {
   const [draftViewName, setDraftViewName] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [page, setPage] = useReaderState("page", 0, { accept: isIndex });
-  const [draggingId, setDraggingId] = useState<string | null>(null);
   const [pageError, setPageError] = useState("");
   // Page creation is asynchronous; it edits the data current when it finishes.
   const latestData = useRef(data);
@@ -535,42 +456,20 @@ export function DatabaseBlock({ data, onChange, readOnly }: BlockProps) {
     (!dataState || canEdit(dataState.editable, "rows", row.id, column.id));
   const removable = (row: DatabaseRow) =>
     sources?.get(row.id)?.removable ?? true;
-  const selectColumns = columns.filter((column) => column.type === "select");
+  const groupable = shownColumns.filter(
+    (column) => !isDerivedColumn(column) && typeOf(column).groups,
+  );
   const groupColumn =
-    columns.find(
-      (column) => column.id === current.groupBy && column.type === "select",
-    ) ??
-    columns.find(
-      (column) => column.id === data.groupBy && column.type === "select",
-    ) ??
-    selectColumns[0];
-  // Search, filters and sorting read page cells by the titles readers see.
+    groupable.find((column) => column.id === current.groupBy) ??
+    groupable.find((column) => column.id === data.groupBy) ??
+    groupable.find((column) => column.type === "select");
   const pageColumns = columns.filter((column) => column.type === "page");
-  const readable = (row: DatabaseRow): DatabaseRow =>
-    pageColumns.length
-      ? {
-          ...row,
-          ...Object.fromEntries(
-            pageColumns.map((column) => [
-              column.id,
-              row[column.id]
-                ? pageTitle(row[column.id], pages) || t("linkedPage")
-                : "",
-            ]),
-          ),
-        }
-      : row;
-  const readableRows = pageColumns.length ? rows.map(readable) : rows;
-  const byId = new Map(rows.map((row) => [row.id, row]));
-  const shownRows = filterSortRows(
-    readableRows,
-    columns,
-    query,
-    columns.some((column) => column.id === filter.column)
-      ? filter
-      : { column: "", value: "" },
-    sort && columns.some((column) => column.id === sort.column) ? sort : null,
-  ).map((row) => byId.get(row.id)!);
+  const shownRows = queryRecords(
+    rows,
+    shownColumns,
+    { search: query, filter, sorts },
+    context,
+  );
   const savedCalendar: DatabaseCalendarConfig =
     data.calendar && typeof data.calendar === "object"
       ? (data.calendar as DatabaseCalendarConfig)
@@ -580,6 +479,7 @@ export function DatabaseBlock({ data, onChange, readOnly }: BlockProps) {
     ...calendarChoice,
   });
   const dateColumns = columns.filter((column) => column.type === "date");
+  const selectColumns = columns.filter((column) => column.type === "select");
   const pageSize = 30,
     totalPages = Math.max(1, Math.ceil(shownRows.length / pageSize)),
     activePage = Math.min(page, totalPages - 1);
@@ -613,50 +513,50 @@ export function DatabaseBlock({ data, onChange, readOnly }: BlockProps) {
               }),
         )
       : undefined;
-  const options = filter.column
-    ? Array.from(
-        new Set(readableRows.map((row) => String(row[filter.column] ?? ""))),
-      )
-    : [];
   const groupNames = groupColumn
-    ? Array.from(
-        new Set([
-          ...(groupColumn.options ?? []),
-          ...shownRows.map((row) => text(row[groupColumn.id])),
-          "",
-        ]),
-      )
+    ? groupColumn.type === "checkbox"
+      ? ["true", "false"]
+      : Array.from(
+          new Set([
+            ...(groupColumn.options ?? []),
+            ...shownRows.flatMap((row) => groupKeys(row, groupColumn, context)),
+            "",
+          ]),
+        )
     : [""];
+  const groupLabel = (group: string) =>
+    groupColumn?.type === "checkbox"
+      ? tf(group === "true" ? "group.true" : "group.false")
+      : group || (groupColumn ? t("notSet") : t("allRecords"));
   const widths = current.columnWidths ?? {};
-  const updateFields = (
-    id: string,
-    values: Record<string, string | number | boolean>,
-  ) =>
+  const updateFields = (id: string, values: Record<string, DatabaseValue>) =>
     onChange?.({
       ...data,
       rows: rows.map((row) => (row.id === id ? { ...row, ...values } : row)),
     });
-  const updateRow = (
-    id: string,
-    column: string,
-    value: string | number | boolean,
-  ) => updateFields(id, { [column]: value });
-  const addRow = (group?: string, preset: Record<string, string> = {}) => {
-    const row: DatabaseRow = {
-      id: uid(),
-      ...Object.fromEntries(
-        columns.map((column) => [
-          column.id,
-          column.type === "checkbox" ? false : "",
-        ]),
-      ),
-      ...preset,
-    };
-    if (groupColumn && group !== undefined) row[groupColumn.id] = group;
+  const updateRow = (id: string, column: string, value: DatabaseValue) =>
+    updateFields(id, { [column]: value });
+  const blankRow = (): Record<string, DatabaseValue> =>
+    Object.fromEntries(
+      columns
+        .filter((column) => !isDerivedColumn(column))
+        .map((column) => [column.id, typeOf(column).blank() as DatabaseValue]),
+    );
+  const addRow = (
+    group?: string,
+    preset: Record<string, DatabaseValue> = {},
+  ) => {
+    const row: DatabaseRow = { id: uid(), ...blankRow(), ...preset };
+    if (groupColumn && group !== undefined)
+      row[groupColumn.id] = typeOf(groupColumn).regroup!(
+        row[groupColumn.id],
+        "",
+        group,
+      ) as DatabaseValue;
     onChange?.({ ...data, rows: [...rows, row] });
     setPage(Math.floor(rows.length / pageSize));
     setQuery("");
-    if (filter.column) changeCurrent({ filter: undefined });
+    if (filter) changeCurrent({ filter: undefined });
     // A database of pages gives every new record its own page.
     if (canCreatePages && pageColumns[0])
       createLinkedPage(row.id, pageColumns[0]);
@@ -870,30 +770,46 @@ export function DatabaseBlock({ data, onChange, readOnly }: BlockProps) {
     onChange?.({ ...data, rows: rows.filter((row) => row.id !== id) });
   };
   const toggleSort = (column: string) => {
+    const first = sorts[0];
     changeCurrent({
-      sort:
-        sort?.column === column
-          ? sort.direction === "asc"
-            ? { column, direction: "desc" }
-            : null
-          : { column, direction: "asc" },
+      sorts:
+        first?.column === column
+          ? first.direction === "asc"
+            ? [{ column, direction: "desc" }]
+            : []
+          : [{ column, direction: "asc" }],
     });
     setPage(0);
   };
-  const setFilter = (next: { column: string; value: string }) => {
-    changeCurrent({ filter: next.column ? next : undefined });
-    setPage(0);
+  /** Checks a column's type settings; returns a message or "". */
+  const columnProblem = (column: DatabaseColumn): string => {
+    if (column.type === "relation" && !column.relation?.dataset)
+      return tf("error.relationTarget", { name: column.name });
+    if (column.type === "formula" && !column.formula?.expression.trim())
+      return tf("error.formula", { name: column.name });
+    if (
+      column.type === "rollup" &&
+      (!column.rollup?.relation ||
+        (column.rollup.aggregate !== "count" && !column.rollup.column))
+    )
+      return tf("error.rollup", { name: column.name });
+    return "";
   };
-  const addProperty = (column: DatabaseColumn) =>
+  const addProperty = (column: DatabaseColumn) => {
+    const problem = columnProblem(column);
+    if (problem) return problem;
+    const derivedColumn = isDerivedColumn(column);
     onChange?.({
       ...data,
       columns: [...columns, column],
       rows: rows.map((row) =>
-        sources?.has(row.id)
+        sources?.has(row.id) || derivedColumn
           ? row
-          : { ...row, [column.id]: column.type === "checkbox" ? false : "" },
+          : { ...row, [column.id]: typeOf(column).blank() as DatabaseValue },
       ),
     });
+    return "";
+  };
   const placeColumn = (
     id: string,
     target: string,
@@ -905,7 +821,7 @@ export function DatabaseBlock({ data, onChange, readOnly }: BlockProps) {
     });
   const columnResize = useColumnResize({
     viewId: savedView.id,
-    columns: columns.map((column, index) => ({
+    columns: shownColumns.map((column, index) => ({
       id: column.id,
       width: columnWidth(current, column.id, index),
       savedWidth: widths[column.id],
@@ -919,8 +835,8 @@ export function DatabaseBlock({ data, onChange, readOnly }: BlockProps) {
       });
     },
   });
-  const tableReorder = usePropertyReorder({
-    ids: columns.map((column) => column.id),
+  const tableReorder = usePropertyReorder<HTMLDivElement>({
+    ids: shownColumns.map((column) => column.id),
     disabled: !editable || !!columnResize.resizing,
     axis: "horizontal",
     onMove: placeColumn,
@@ -934,7 +850,7 @@ export function DatabaseBlock({ data, onChange, readOnly }: BlockProps) {
         moveColumnTo(current, id, target, placement),
       ),
   });
-  const columnById = new Map(columns.map((column) => [column.id, column]));
+  const columnById = new Map(shownColumns.map((column) => [column.id, column]));
   const tableColumns = tableReorder.orderedIds
     .map((id) => columnById.get(id))
     .filter((column): column is DatabaseColumn => !!column);
@@ -969,7 +885,7 @@ export function DatabaseBlock({ data, onChange, readOnly }: BlockProps) {
     setDraftTitle(text(data.title));
     setDraftColumns(
       columns.map((column) => ({
-        ...column,
+        ...structuredClone(column),
         options: [...(column.options ?? [])],
       })),
     );
@@ -983,6 +899,11 @@ export function DatabaseBlock({ data, onChange, readOnly }: BlockProps) {
     }
     if (draftColumns.some((column) => !column.name.trim())) {
       setError(t("error.nameEveryProperty"));
+      return;
+    }
+    const problem = draftColumns.map(columnProblem).find(Boolean);
+    if (problem) {
+      setError(problem);
       return;
     }
     const textIds = new Set(
@@ -1002,7 +923,8 @@ export function DatabaseBlock({ data, onChange, readOnly }: BlockProps) {
           (column.options ?? []).map((option) => option.trim()).filter(Boolean),
         ),
       ],
-    }));
+    })) as DatabaseColumn[];
+    const before = new Map(columns.map((column) => [column.id, column]));
     const next: Record<string, unknown> = {
       ...data,
       title: draftTitle,
@@ -1013,27 +935,31 @@ export function DatabaseBlock({ data, onChange, readOnly }: BlockProps) {
           : {
               id: row.id,
               ...Object.fromEntries(
-                cleaned.map((column) => {
+                cleaned.flatMap((column) => {
+                  // Derived values are computed, never stored.
+                  if (isDerivedColumn(column)) return [];
                   const previous = row[column.id];
-                  const value =
-                    column.type === "checkbox"
-                      ? previous === true || previous === "true"
-                      : column.type === "number"
-                        ? previous === "" ||
-                          previous === undefined ||
-                          previous === null
-                          ? ""
-                          : Number.isFinite(Number(previous))
-                            ? Number(previous)
-                            : ""
-                        : column.type === "date"
-                          ? normalizeDate(text(previous))
-                          : column.type === "page"
-                            ? parsePageCell(previous)
-                              ? String(previous)
-                              : ""
-                            : text(previous);
-                  return [column.id, value];
+                  const type = typeOf(column);
+                  // A value nothing can read stays as it was.
+                  if (type.unknown || column.type === "custom")
+                    return previous === undefined
+                      ? []
+                      : [[column.id, previous]];
+                  const same =
+                    typeKey(before.get(column.id) ?? column) ===
+                    typeKey(column);
+                  return [
+                    [
+                      column.id,
+                      same &&
+                      previous !== undefined &&
+                      !type.check(previous, column)
+                        ? previous
+                        : previous === undefined || previous === ""
+                          ? type.blank()
+                          : type.normalize(previous, column),
+                    ],
+                  ];
                 }),
               ),
             },
@@ -1055,11 +981,9 @@ export function DatabaseBlock({ data, onChange, readOnly }: BlockProps) {
     setCalendarChoice({});
     setEditing(false);
   };
-  const updateDraftColumn = (id: string, changes: Partial<DatabaseColumn>) =>
+  const updateDraftColumn = (column: DatabaseColumn) =>
     setDraftColumns((current) =>
-      current.map((column) =>
-        column.id === id ? { ...column, ...changes } : column,
-      ),
+      current.map((item) => (item.id === column.id ? column : item)),
     );
   const deleteButton = (row: DatabaseRow, label: string) =>
     removable(row) && (
@@ -1085,9 +1009,49 @@ export function DatabaseBlock({ data, onChange, readOnly }: BlockProps) {
       }
     />
   );
-  const rowName = (row: DatabaseRow) => text(readable(row)[columns[0]?.id]);
+  const readCell = (row: DatabaseRow, column: DatabaseColumn) => (
+    <Cell row={row} column={column} editable={false} update={() => undefined} />
+  );
+  const cellText = (row: DatabaseRow, column: DatabaseColumn) =>
+    typeOf(column).text(derived.value(row, column), column, context);
+  const rowName = (row: DatabaseRow) =>
+    shownColumns[0] ? cellText(row, shownColumns[0]) : "";
+  const choices = (column: DatabaseColumn) => {
+    if (column.type === "relation" && column.relation?.dataset) {
+      const table = host?.related(column.relation.dataset);
+      if (table)
+        return table.rows.map((record) => ({
+          id: record.id,
+          label: recordTitle(record, table.columns),
+        }));
+      const ids = [
+        ...new Set(
+          rows.flatMap((row) => {
+            const value = derived.value(row, column);
+            return Array.isArray(value) ? (value as string[]) : [];
+          }),
+        ),
+      ];
+      const titles = derived.recordTitles(column, ids) ?? ids;
+      return ids.map((id, index) => ({ id, label: titles[index] }));
+    }
+    const values = new Set(column.options ?? []);
+    for (const row of rows) {
+      const value = row[column.id];
+      for (const item of Array.isArray(value) ? value : [value])
+        if (typeof item === "string" && item) values.add(item);
+    }
+    return [...values].map((value) => ({ id: value, label: value }));
+  };
+  const environment: CellEnvironment = {
+    derived,
+    host,
+    pages,
+    openRecord: pages?.openRecord ? openRecord : undefined,
+  };
+  const View = viewDefinition.View;
   return (
-    <RecordOpenContext.Provider value={pages?.openRecord ? openRecord : null}>
+    <CellEnvironmentContext.Provider value={environment}>
       <section
         className="sb-block sb-database"
         aria-label={blockLabel(data.title, t("database"))}
@@ -1108,7 +1072,7 @@ export function DatabaseBlock({ data, onChange, readOnly }: BlockProps) {
             title={t("exportCsv")}
             onClick={() =>
               downloadFile(
-                toCsv(columns, shownRows),
+                toCsv(shownColumns, shownRows, cellText),
                 `${text(data.title, t("database"))}.csv`,
                 "text/csv;charset=utf-8",
               )
@@ -1123,13 +1087,13 @@ export function DatabaseBlock({ data, onChange, readOnly }: BlockProps) {
             </summary>
             <div className="sb-database-toolbar">
               <div className="sb-view-tabs">
-                {VIEWS.map(({ type, label, Icon }) => (
+                {databaseViews().map(({ type, label, Icon }) => (
                   <button
                     key={type}
                     type="button"
                     className={view === type ? "is-active" : ""}
                     onClick={() => {
-                      changeCurrent({ type });
+                      changeCurrent({ type: type as DatabaseViewType });
                       setPage(0);
                     }}
                   >
@@ -1149,8 +1113,9 @@ export function DatabaseBlock({ data, onChange, readOnly }: BlockProps) {
                 />
                 <button
                   type="button"
-                  className={`sb-icon-button ${showFilter || filter.column ? "is-active" : ""}`}
+                  className={`sb-icon-button ${showFilter || filter || sorts.length ? "is-active" : ""}`}
                   aria-label={t("filterDatabase")}
+                  aria-expanded={showFilter}
                   onClick={() => setShowFilter(!showFilter)}
                 >
                   <Filter size={15} />
@@ -1200,7 +1165,7 @@ export function DatabaseBlock({ data, onChange, readOnly }: BlockProps) {
                   )}
                 </div>
               )}
-              {view === "board" && selectColumns.length > 0 && (
+              {view === "board" && groupable.length > 0 && (
                 <div className="sb-board-grouping">
                   <span>{t("groupBy")}</span>
                   <select
@@ -1210,7 +1175,8 @@ export function DatabaseBlock({ data, onChange, readOnly }: BlockProps) {
                       changeCurrent({ groupBy: event.target.value })
                     }
                   >
-                    {selectColumns.map((column) => (
+                    {!groupColumn && <option value="">{t("notSet")}</option>}
+                    {groupable.map((column) => (
                       <option key={column.id} value={column.id}>
                         {column.name}
                       </option>
@@ -1249,8 +1215,8 @@ export function DatabaseBlock({ data, onChange, readOnly }: BlockProps) {
                         true,
                       ],
                     ] as const
-                  ).map(([key, label, choices, optional]) =>
-                    choices.length > (optional ? 0 : 1) ? (
+                  ).map(([key, label, options, optional]) =>
+                    options.length > (optional ? 0 : 1) ? (
                       <label key={key}>
                         <span>{t(label)}</span>
                         <select
@@ -1265,7 +1231,7 @@ export function DatabaseBlock({ data, onChange, readOnly }: BlockProps) {
                           {optional && (
                             <option value="">{t("calendar.none")}</option>
                           )}
-                          {choices.map((column) => (
+                          {options.map((column) => (
                             <option key={column.id} value={column.id}>
                               {column.name}
                             </option>
@@ -1292,8 +1258,7 @@ export function DatabaseBlock({ data, onChange, readOnly }: BlockProps) {
               aria-hidden="true"
             />
             {views.map((item) => {
-              const Icon =
-                VIEWS.find((entry) => entry.type === item.type)?.Icon ?? Table2;
+              const Icon = databaseView(item.type).Icon;
               const active = item.id === savedView.id;
               return (
                 <button
@@ -1378,60 +1343,21 @@ export function DatabaseBlock({ data, onChange, readOnly }: BlockProps) {
                       aria-label={t("propertyName")}
                       value={column.name}
                       onChange={(event) =>
-                        updateDraftColumn(column.id, {
+                        updateDraftColumn({
+                          ...column,
                           name: event.target.value,
                         })
                       }
                     />
-                    <select
-                      aria-label={t("propertyType", { name: column.name })}
-                      value={column.type}
-                      onChange={(event) =>
-                        updateDraftColumn(column.id, {
-                          type: event.target.value as ColumnType,
-                        })
-                      }
-                    >
-                      {TYPES.map((type) => (
-                        <option key={type.value} value={type.value}>
-                          {t(type.label)}
-                        </option>
-                      ))}
-                    </select>
-                    {column.type === "page" && (
-                      <select
-                        className="sb-options-input"
-                        aria-label={t("titleColumn", { name: column.name })}
-                        value={column.titleColumn ?? ""}
-                        onChange={(event) =>
-                          updateDraftColumn(column.id, {
-                            titleColumn: event.target.value || undefined,
-                          })
-                        }
-                      >
-                        <option value="">{t("titleColumnNone")}</option>
-                        {draftColumns
-                          .filter((item) => item.type === "text")
-                          .map((item) => (
-                            <option key={item.id} value={item.id}>
-                              {t("titleColumnFrom", { name: item.name })}
-                            </option>
-                          ))}
-                      </select>
-                    )}
-                    {column.type === "select" && (
-                      <input
-                        className="sb-options-input"
-                        aria-label={t("propertyOptions", { name: column.name })}
-                        placeholder={t("optionsPlaceholder")}
-                        value={column.options?.join(",")}
-                        onChange={(event) =>
-                          updateDraftColumn(column.id, {
-                            options: event.target.value.split(/[,，]/),
-                          })
-                        }
-                      />
-                    )}
+                    <ColumnSettings
+                      column={column}
+                      columns={[
+                        ...draftColumns,
+                        ...shownColumns.slice(columns.length),
+                      ]}
+                      contributed={contributed}
+                      onChange={updateDraftColumn}
+                    />
                     <button
                       type="button"
                       className="sb-icon-button sb-danger"
@@ -1479,56 +1405,27 @@ export function DatabaseBlock({ data, onChange, readOnly }: BlockProps) {
             </div>
           </BlockSettings>
         )}
-        {showFilter && (
-          <div className="sb-filter-row">
-            <Filter size={13} />
-            <select
-              aria-label={t("filterProperty")}
-              value={filter.column}
-              onChange={(event) => {
-                const column = event.target.value;
-                setFilter({
-                  column,
-                  value: column ? String(readableRows[0]?.[column] ?? "") : "",
-                });
-              }}
-            >
-              <option value="">{t("allRecords")}</option>
-              {columns.map((column) => (
-                <option key={column.id} value={column.id}>
-                  {column.name}
-                </option>
-              ))}
-            </select>
-            {filter.column && (
-              <>
-                <span>{t("equals")}</span>
-                <select
-                  aria-label={t("filterValue")}
-                  value={filter.value}
-                  onChange={(event) =>
-                    setFilter({ ...filter, value: event.target.value })
-                  }
-                >
-                  {[...new Set([...options, filter.value])].map((option) => (
-                    <option key={option} value={option}>
-                      {option || t("notSet")}
-                    </option>
-                  ))}
-                </select>
-                <button
-                  type="button"
-                  className="sb-text-button"
-                  onClick={() => setFilter({ column: "", value: "" })}
-                >
-                  {t("clear")}
-                </button>
-              </>
-            )}
-          </div>
+        {showFilter && shownColumns.length > 0 && (
+          <DatabaseQueryEditor
+            columns={shownColumns}
+            filter={filter}
+            sorts={sorts}
+            context={context}
+            choices={choices}
+            onFilter={(next: FilterGroup | undefined) => {
+              changeCurrent({ filter: next });
+              setPage(0);
+            }}
+            onSorts={(next: RecordSort[]) => {
+              changeCurrent({ sorts: next });
+              setPage(0);
+            }}
+          />
         )}
         {addingProperty && editable && view === "table" && (
           <AddProperty
+            columns={shownColumns}
+            contributed={contributed}
             onAdd={addProperty}
             onClose={() => {
               setAddingProperty(false);
@@ -1546,335 +1443,56 @@ export function DatabaseBlock({ data, onChange, readOnly }: BlockProps) {
               views.length > 1 ? `${sourceId}-view-${savedView.id}` : undefined
             }
           >
-            {view === "calendar" ? (
-              <DatabaseCalendar
-                key={JSON.stringify(savedCalendar)}
-                columns={columns}
-                rows={shownRows}
-                settings={calendar}
-                editable={editable}
-                renderCell={cell}
-                onMove={(id, start, end) =>
-                  updateFields(id, {
-                    [calendar.dateColumn!.id]: start,
-                    ...(end && calendar.endDateColumn
-                      ? { [calendar.endDateColumn.id]: end }
-                      : {}),
-                  })
-                }
-                onAdd={
-                  calendar.dateColumn
-                    ? (date) =>
-                        addRow(undefined, { [calendar.dateColumn!.id]: date })
-                    : undefined
-                }
-                onRemove={removeRow}
-              />
-            ) : view === "table" ? (
-              <>
-                <div
-                  className="sb-table-scroll"
-                  ref={tableReorder.container}
-                  {...tableReorder.containerProps}
-                >
-                  <table
-                    className="sb-database-table"
-                    ref={columnResize.table}
-                    style={{
-                      width:
-                        columns.reduce(
-                          (sum, column, index) =>
-                            sum + columnWidth(current, column.id, index),
-                          0,
-                        ) + (editable ? ROW_ACTION_WIDTH : 0),
-                    }}
-                  >
-                    <colgroup>
-                      {tableColumns.map((column) => (
-                        <col
-                          key={column.id}
-                          data-column-width-id={column.id}
-                          style={{
-                            width: columnWidth(
-                              current,
-                              column.id,
-                              columns.indexOf(column),
-                            ),
-                          }}
-                        />
-                      ))}
-                      {editable && <col />}
-                    </colgroup>
-                    <thead>
-                      <tr>
-                        {tableColumns.map((column) => (
-                          <th
-                            key={column.id}
-                            scope="col"
-                            {...tableReorder.itemProps(column.id)}
-                            aria-sort={
-                              sort?.column === column.id
-                                ? sort.direction === "asc"
-                                  ? "ascending"
-                                  : "descending"
-                                : "none"
-                            }
-                          >
-                            <button
-                              type="button"
-                              onClick={() => toggleSort(column.id)}
-                              title={
-                                editable ? t("propertyHeaderHint") : undefined
-                              }
-                              {...tableReorder.handleProps(column.id)}
-                            >
-                              <span className="sb-type-symbol">
-                                {TYPE_SYMBOL[column.type]}
-                              </span>
-                              <span className="sb-column-name">
-                                {column.name}
-                              </span>
-                              {sort?.column === column.id &&
-                                (sort.direction === "asc" ? (
-                                  <ArrowUp size={12} />
-                                ) : (
-                                  <ArrowDown size={12} />
-                                ))}
-                            </button>
-                            {editable && (
-                              <div
-                                {...columnResize.handleProps(column.id)}
-                                className="sb-column-resize"
-                                data-resizing={
-                                  columnResize.resizing === column.id ||
-                                  undefined
-                                }
-                                aria-label={t("resizeProperty", {
-                                  name: column.name,
-                                })}
-                                title={t("columnResizeHint")}
-                              />
-                            )}
-                          </th>
-                        ))}
-                        {editable && (
-                          <th className="sb-row-action">
-                            <button
-                              ref={addPropertyButton}
-                              type="button"
-                              className="sb-add-property"
-                              aria-label={t("addProperty")}
-                              title={t("addProperty")}
-                              aria-expanded={addingProperty}
-                              onClick={() => setAddingProperty(!addingProperty)}
-                            >
-                              <Plus size={14} aria-hidden="true" />
-                            </button>
-                          </th>
-                        )}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {pagedRows.map((row) => (
-                        <tr key={row.id} title={sources?.get(row.id)?.label}>
-                          {tableColumns.map((column) => (
-                            <td
-                              key={column.id}
-                              {...tableReorder.cellProps(column.id)}
-                            >
-                              {cell(row, column)}
-                            </td>
-                          ))}
-                          {editable && (
-                            <td className="sb-row-action">
-                              {deleteButton(
-                                row,
-                                t("deleteNamedRecord", { name: rowName(row) }),
-                              )}
-                            </td>
-                          )}
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-                {shownRows.length === 0 && (
-                  <EmptyState
-                    icon={<LayoutList size={25} strokeWidth={1.4} />}
-                    title={
-                      rows.length ? t("empty.noMatches") : t("empty.start")
-                    }
-                  />
-                )}
-              </>
-            ) : view === "list" ? (
-              <>
-                <ul className="sb-database-list">
-                  {pagedRows.map((row) => (
-                    <li key={row.id} title={sources?.get(row.id)?.label}>
-                      {columns[0] && (
-                        <div className="sb-list-title">
-                          {cell(row, columns[0])}
-                        </div>
-                      )}
-                      <div className="sb-list-properties">
-                        {columns.slice(1).map((column) =>
-                          row[column.id] === "" ||
-                          row[column.id] === undefined ||
-                          (column.type === "checkbox" &&
-                            !row[column.id]) ? null : (
-                            <span className="sb-list-property" key={column.id}>
-                              <span>{column.name}</span>
-                              <Cell
-                                row={row}
-                                column={column}
-                                editable={false}
-                                update={() => undefined}
-                              />
-                            </span>
-                          ),
-                        )}
-                      </div>
-                      {editable && (
-                        <span className="sb-row-action">
-                          {deleteButton(
-                            row,
-                            t("deleteNamedRecord", { name: rowName(row) }),
-                          )}
-                        </span>
-                      )}
-                    </li>
-                  ))}
-                </ul>
-                {editable && (
-                  <button
-                    type="button"
-                    className="sb-add-row"
-                    onClick={() => addRow()}
-                  >
-                    <Plus size={13} />
-                    {t("addRecord")}
-                  </button>
-                )}
-                {shownRows.length === 0 && (
-                  <EmptyState
-                    icon={<List size={25} strokeWidth={1.4} />}
-                    title={
-                      rows.length ? t("empty.noMatches") : t("empty.start")
-                    }
-                  />
-                )}
-              </>
-            ) : (
-              <>
-                <div className="sb-board">
-                  {groupNames.map((group, groupIndex) => {
-                    const groupRows = groupColumn
-                      ? shownRows.filter(
-                          (row) => text(row[groupColumn.id]) === group,
-                        )
-                      : shownRows;
-                    return (
-                      <div
-                        className={`sb-board-column ${draggingId ? "is-droppable" : ""}`}
-                        key={group}
-                        onDragOver={(event) => {
-                          if (editable && groupColumn && draggingId)
-                            event.preventDefault();
-                        }}
-                        onDrop={(event) => {
-                          if (!editable || !groupColumn || !draggingId) return;
-                          event.preventDefault();
-                          updateRow(draggingId, groupColumn.id, group);
-                          setDraggingId(null);
-                        }}
-                      >
-                        <div className="sb-board-column-header">
-                          <span className={`sb-tag sb-tag-${groupIndex % 5}`}>
-                            {group ||
-                              (groupColumn ? t("notSet") : t("allRecords"))}
-                          </span>
-                          <span>{groupRows.length}</span>
-                          {editable && (
-                            <button
-                              type="button"
-                              className="sb-icon-button"
-                              aria-label={t("newRecordIn", {
-                                group: group || t("notSet"),
-                              })}
-                              onClick={() => addRow(group)}
-                            >
-                              <Plus size={14} />
-                            </button>
-                          )}
-                        </div>
-                        {groupRows.map((row) => (
-                          <div
-                            className={`sb-board-card ${draggingId === row.id ? "is-dragging" : ""}`}
-                            key={row.id}
-                            draggable={
-                              !!groupColumn && cellEditable(row, groupColumn)
-                            }
-                            onDragStart={() => setDraggingId(row.id)}
-                            onDragEnd={() => setDraggingId(null)}
-                          >
-                            {columns
-                              .filter((column) => column.id !== groupColumn?.id)
-                              .map((column, index) => (
-                                <div
-                                  key={column.id}
-                                  className={
-                                    index === 0
-                                      ? "sb-board-card-title"
-                                      : "sb-board-card-field"
-                                  }
-                                >
-                                  {index > 0 && <span>{column.name}</span>}
-                                  {cell(row, column)}
-                                </div>
-                              ))}
-                            {editable && (
-                              <div className="sb-board-card-footer">
-                                {groupColumn && (
-                                  <select
-                                    aria-label={t("moveToGroup")}
-                                    disabled={!cellEditable(row, groupColumn)}
-                                    value={text(row[groupColumn.id])}
-                                    onChange={(event) =>
-                                      updateRow(
-                                        row.id,
-                                        groupColumn.id,
-                                        event.target.value,
-                                      )
-                                    }
-                                  >
-                                    <option value="">{t("notSet")}</option>
-                                    {groupNames.filter(Boolean).map((name) => (
-                                      <option key={name}>{name}</option>
-                                    ))}
-                                  </select>
-                                )}
-                                {deleteButton(row, t("deleteRecord"))}
-                              </div>
-                            )}
-                          </div>
-                        ))}
-                        {editable && (
-                          <button
-                            type="button"
-                            className="sb-add-row"
-                            onClick={() => addRow(group)}
-                          >
-                            <Plus size={13} />
-                            {t("addRecord")}
-                          </button>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              </>
-            )}
+            <View
+              view={current}
+              columns={shownColumns}
+              rows={rows}
+              shownRows={shownRows}
+              pagedRows={pagedRows}
+              editable={editable}
+              sources={sources}
+              cell={cell}
+              readCell={readCell}
+              cellEditable={cellEditable}
+              deleteButton={deleteButton}
+              rowName={rowName}
+              addRow={addRow}
+              updateFields={updateFields}
+              removeRow={removeRow}
+              board={{
+                column: groupColumn,
+                groups: groupNames,
+                groupsOf: (row) =>
+                  groupColumn ? groupKeys(row, groupColumn, context) : [""],
+                label: groupLabel,
+                move: (row, from, to) => {
+                  if (!groupColumn || from === to) return;
+                  updateRow(
+                    row.id,
+                    groupColumn.id,
+                    typeOf(groupColumn).regroup!(
+                      row[groupColumn.id],
+                      from,
+                      to,
+                    ) as DatabaseValue,
+                  );
+                },
+              }}
+              table={{
+                sorts,
+                toggleSort,
+                resize: columnResize,
+                reorder: tableReorder,
+                orderedColumns: tableColumns,
+                addingProperty,
+                toggleAddProperty: () => setAddingProperty(!addingProperty),
+                addPropertyButton,
+              }}
+              calendar={{
+                settings: calendar,
+                savedKey: JSON.stringify(savedCalendar),
+              }}
+            />
           </div>
         </div>
         {pageError && (
@@ -1890,17 +1508,17 @@ export function DatabaseBlock({ data, onChange, readOnly }: BlockProps) {
                   shown: shownRows.length,
                   count: rows.length,
                 })}
-            {sort && (
+            {sorts.length > 0 && (
               <button
                 type="button"
                 className="sb-text-button"
-                onClick={() => changeCurrent({ sort: null })}
+                onClick={() => changeCurrent({ sorts: [] })}
               >
                 {t("clearSort")}
               </button>
             )}
           </span>
-          {(view === "table" || view === "list") && totalPages > 1 && (
+          {viewDefinition.paged && totalPages > 1 && (
             <div className="sb-pagination">
               <button
                 type="button"
@@ -1930,10 +1548,10 @@ export function DatabaseBlock({ data, onChange, readOnly }: BlockProps) {
             className="sb-block sb-database-record-properties"
             aria-label={t("property")}
           >
-            {columns.map((column) => (
+            {shownColumns.map((column) => (
               <div className="sb-record-property" key={column.id}>
                 <span className="sb-record-property-name">
-                  <span aria-hidden="true">{TYPE_SYMBOL[column.type]}</span>
+                  <span aria-hidden="true">{fieldUiOf(column).symbol}</span>
                   {column.name}
                 </span>
                 <div>{cell(peekRow, column)}</div>
@@ -1942,6 +1560,6 @@ export function DatabaseBlock({ data, onChange, readOnly }: BlockProps) {
           </div>,
           peek.propertiesHost,
         )}
-    </RecordOpenContext.Provider>
+    </CellEnvironmentContext.Provider>
   );
 }

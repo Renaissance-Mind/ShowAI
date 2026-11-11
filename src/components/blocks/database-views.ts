@@ -7,6 +7,12 @@ import {
   MIN_COLUMN_WIDTH,
 } from "./database-contract.mjs";
 import type { DatabaseColumn, DatabaseView, DatabaseViewType } from "./types";
+import {
+  filterConditions,
+  readFilter,
+  readSorts,
+} from "../../datasets/record-query.mjs";
+import { valueTypeOf } from "../../datasets/value-types.mjs";
 
 export const DEFAULT_VIEW_ID = "default";
 /** Default table widths: the first property names the record. */
@@ -16,7 +22,7 @@ export const ROW_ACTION_WIDTH = 33;
 
 /** Settings a reader may change for a view without editing the page. */
 export type ViewOverride = Partial<
-  Pick<DatabaseView, "type" | "groupBy" | "sort" | "filter">
+  Pick<DatabaseView, "type" | "groupBy" | "sort" | "sorts" | "filter">
 >;
 
 const isViewType = (value: unknown): value is DatabaseViewType =>
@@ -70,17 +76,37 @@ export function changeView(
     view.name === name(view.type)
   )
     next.name = name(changes.type);
-  for (const key of ["groupBy", "sort", "filter"] as const)
+  // A saved sort list replaces the single sort older views kept.
+  if ("sorts" in changes) delete next.sort;
+  for (const key of ["groupBy", "sort", "sorts", "filter"] as const)
     if (
       next[key] === undefined ||
       next[key] === null ||
-      (key === "filter" && !next.filter?.column) ||
+      (key === "filter" && !filterConditions(readFilter(next.filter)).length) ||
+      (key === "sorts" && !next.sorts?.length) ||
       (key === "groupBy" && !next.groupBy)
     )
       delete next[key];
   if (next.columnWidths && !Object.keys(next.columnWidths).length)
     delete next.columnWidths;
   return next;
+}
+
+/**
+ * The changes that rewrite a view's older single filter and sort in the
+ * current shape: a filter group and a sort list. Columns decide how a legacy
+ * filter value reads (e.g. "true" on a checkbox column means checked).
+ */
+export function upgradeViewQuery(
+  view: DatabaseView,
+  columns: DatabaseColumn[],
+): Partial<DatabaseView> {
+  return {
+    ...(view.filter && "value" in view.filter
+      ? { filter: readFilter(view.filter, columns) ?? undefined }
+      : {}),
+    ...(view.sort !== undefined ? { sorts: readSorts(view) } : {}),
+  };
 }
 
 /** A view id that is not used yet. */
@@ -128,16 +154,45 @@ export function pruneViews(
   columns: DatabaseColumn[],
 ): DatabaseView[] {
   const ids = new Set(columns.map((column) => column.id));
-  const selects = new Set(
+  const groupable = new Set(
     columns
-      .filter((column) => column.type === "select")
+      .filter((column) => valueTypeOf(column).groups)
       .map((column) => column.id),
   );
   return views.map((view) => {
     const next: DatabaseView = { ...view };
-    if (next.groupBy && !selects.has(next.groupBy)) delete next.groupBy;
+    if (next.groupBy && !groupable.has(next.groupBy)) delete next.groupBy;
     if (next.sort && !ids.has(next.sort.column)) delete next.sort;
-    if (next.filter && !ids.has(next.filter.column)) delete next.filter;
+    if (next.sorts) {
+      const sorts = readSorts(next).filter((sort) => ids.has(sort.column));
+      if (sorts.length) next.sorts = sorts;
+      else delete next.sorts;
+    }
+    if (next.filter) {
+      const group = readFilter(next.filter, columns);
+      const kept = group && {
+        join: group.join,
+        conditions: group.conditions
+          .map((item) =>
+            "conditions" in item
+              ? {
+                  ...item,
+                  conditions: item.conditions.filter(
+                    (entry) => "column" in entry && ids.has(entry.column),
+                  ),
+                }
+              : item,
+          )
+          .filter((item) =>
+            "conditions" in item
+              ? item.conditions.length
+              : ids.has(item.column),
+          ),
+      };
+      if (kept && filterConditions(kept).length)
+        next.filter = "column" in next.filter ? next.filter : kept;
+      else delete next.filter;
+    }
     if (next.columnWidths) {
       const widths = Object.fromEntries(
         Object.entries(next.columnWidths).filter(([id]) => ids.has(id)),

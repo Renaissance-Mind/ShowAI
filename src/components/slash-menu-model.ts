@@ -109,14 +109,14 @@ export type SlashComponent = { name: string; description: string } & (
 /**
  * Whether a catalog component is offered as a block by the insert menus and
  * quick jump. Components that fill another slot (the page outline, the @ menu
- * inside a line) are placed by that slot instead.
+ * inside a line, a database field type) are placed by that slot instead.
  */
 export function insertsAsBlock(item: {
   kind?: string;
   role?: string;
   mention?: unknown;
 }) {
-  return !item.mention && (item.kind !== undefined || item.role !== "page-outline");
+  return !item.mention && (item.kind !== undefined || !item.role);
 }
 
 /**

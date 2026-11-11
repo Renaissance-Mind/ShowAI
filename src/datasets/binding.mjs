@@ -23,6 +23,7 @@ import {
   validatePath,
   valueAt,
 } from "./operations.mjs";
+import { valueTypeOf } from "./value-types.mjs";
 
 export const BINDING_KEY = "$binding";
 export const MAX_COLLECTIONS = 20;
@@ -914,9 +915,16 @@ export function findCollections(value, limit = 40) {
  * a checkbox column reads done (or status "done").
  */
 export function suggestCollections(value, columns) {
-  const dateColumn = columns.find((column) => column.type === "date");
-  const textColumn = columns.find((column) => column.type === "text");
-  const checkColumn = columns.find((column) => column.type === "checkbox");
+  // Stored fields by value kind: computed ones (formulas, rollups) cannot take a mapping.
+  const stored = columns.filter((column) => !valueTypeOf(column).derived);
+  const ofKind = (kind) =>
+    stored.find(
+      (column) =>
+        valueTypeOf(column).kind === kind && !valueTypeOf(column).unknown,
+    );
+  const dateColumn = ofKind("date");
+  const textColumn = stored.find((column) => column.type === "text");
+  const checkColumn = ofKind("boolean");
   const used = new Set();
   return findCollections(value)
     .map((candidate) => {

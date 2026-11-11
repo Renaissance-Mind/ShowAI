@@ -57,3 +57,20 @@ export { BacklinksBlock as Backlinks } from "./Backlinks";
 export { useResource } from "../local-resources";
 // References between pages (backlinks with direction "to"), the same query built-ins use.
 export { usePageReferences } from "../page-references";
+// Typed records of shared data: the same value types, filter groups and sorts
+// the database uses, for components that show a filtered dataset.
+export {
+  queryRecords,
+  readFilter,
+  readSorts,
+  groupKeys,
+  validateFilter,
+} from "../../datasets/record-query.mjs";
+export {
+  OPERATORS,
+  KIND_OPERATORS,
+  valueTypeOf,
+  kindOf,
+  operatorsOf,
+  describeValueTypes,
+} from "../../datasets/value-types.mjs";

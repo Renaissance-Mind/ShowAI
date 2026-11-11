@@ -1,6 +1,18 @@
 // Shared contract for the database built-in: validation plus the date math the
 // calendar and heatmap views share. It runs in the workbench, the CLI and the
-// portable reader, so it stays dependency-free.
+// portable reader. Value types, record queries and derived fields come from
+// the harness modules in src/datasets, which every bound component shares.
+import {
+  VALUE_KINDS,
+  formatDay,
+  localDay,
+  normalizeDate,
+  parseDay,
+  parsePageCell,
+  valueTypeOf,
+} from "../../datasets/value-types.mjs";
+import { validateFilter, validateSorts } from "../../datasets/record-query.mjs";
+import { ROLLUP_AGGREGATES } from "../../datasets/derived-fields.mjs";
 
 const fail = (message) => {
   throw new Error(message);
@@ -17,7 +29,26 @@ export const DATABASE_COLUMN_TYPES = [
   "url",
   "date",
   "page",
+  "multiSelect",
+  "relation",
+  "formula",
+  "rollup",
+  "custom",
 ];
+/** Tones of select and multi-select options, shared with the board and calendar. */
+export const OPTION_TONES = [
+  "gray",
+  "brown",
+  "orange",
+  "yellow",
+  "green",
+  "blue",
+  "purple",
+  "pink",
+  "red",
+];
+/** Column types whose values are lists of texts. */
+const LIST_TYPES = new Set(["multiSelect", "relation", "custom"]);
 export const DATABASE_VIEWS = ["table", "board", "list", "calendar"];
 export const MAX_DATABASE_VIEWS = 20;
 export const MIN_COLUMN_WIDTH = 80;
@@ -29,40 +60,7 @@ export const MAX_SPAN_DAYS = 366;
 
 const DAY_MS = 86400000;
 const ID = /^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/;
-// The same form as portable/page-link.mjs, without block targets.
-const PAGE_LINK =
-  /^showai:\/\/project\/([A-Za-z0-9][A-Za-z0-9_-]{0,127})\/page\/([A-Za-z0-9][A-Za-z0-9_-]{0,127})$/;
-
-/** The project and page a page cell links to, or null for empty or invalid values. */
-export function parsePageCell(value) {
-  const match = typeof value === "string" ? PAGE_LINK.exec(value) : null;
-  return match ? { projectId: match[1], pageId: match[2] } : null;
-}
-
-/** ISO calendar day (YYYY-MM-DD) to a whole day number, or null when invalid. */
-export function parseDay(value) {
-  if (typeof value !== "string") return null;
-  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
-  if (!match) return null;
-  const [year, month, day] = match.slice(1).map(Number);
-  const time = Date.UTC(year, month - 1, day);
-  const date = new Date(time);
-  if (date.getUTCMonth() !== month - 1 || date.getUTCDate() !== day)
-    return null;
-  return Math.round(time / DAY_MS);
-}
-
-export function formatDay(day) {
-  return new Date(day * DAY_MS).toISOString().slice(0, 10);
-}
-
-/** The reader's local calendar day as a day number. */
-export function localDay(date = new Date()) {
-  return Math.round(
-    Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()) / DAY_MS,
-  );
-}
-
+export { parseDay, formatDay, localDay, normalizeDate, parsePageCell };
 /** 0 = Sunday … 6 = Saturday. */
 export function weekdayOf(day) {
   return new Date(day * DAY_MS).getUTCDay();
@@ -70,15 +68,6 @@ export function weekdayOf(day) {
 
 export function startOfWeek(day, weekStartsOn = 1) {
   return day - ((weekdayOf(day) - weekStartsOn + 7) % 7);
-}
-
-/** Loose date text (2026/10/14, 2026-10-14T09:00) to ISO, or "" when unreadable. */
-export function normalizeDate(value) {
-  if (typeof value !== "string") return "";
-  const match = /^\s*(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})/.exec(value);
-  if (!match) return "";
-  const iso = `${match[1]}-${match[2].padStart(2, "0")}-${match[3].padStart(2, "0")}`;
-  return parseDay(iso) === null ? "" : iso;
 }
 
 /** "H:MM" or "HH:MM" (up to 24:00) to minutes after midnight, or null. */
@@ -154,7 +143,7 @@ function validateCalendar(calendar, columns) {
       fail(`calendar.${key} is not a supported setting.`);
 }
 
-function validateViews(views) {
+function validateViews(views, columns) {
   if (
     !Array.isArray(views) ||
     views.length < 1 ||
@@ -177,6 +166,7 @@ function validateViews(views) {
           "type",
           "groupBy",
           "sort",
+          "sorts",
           "filter",
           "columnWidths",
         ].includes(key)
@@ -206,18 +196,14 @@ function validateViews(views) {
         fail(`${path}.sort must be {column, direction: asc|desc} or null.`);
       reference(view.sort.column, `${path}.sort.column`);
     }
-    if (view.filter !== undefined) {
-      if (
-        !isObject(view.filter) ||
-        Object.keys(view.filter).some(
-          (key) => key !== "column" && key !== "value",
-        ) ||
-        typeof view.filter.value !== "string" ||
-        view.filter.value.length > 10000
-      )
-        fail(`${path}.filter must be {column, value} with text values.`);
-      reference(view.filter.column, `${path}.filter.column`);
-    }
+    if (view.filter !== undefined)
+      validateFilter(
+        view.filter,
+        `${path}.filter`,
+        // A contributed type's operators are its kind's (or fewer); without a kind, unchecked.
+        columns.filter((column) => column.type !== "custom" || column.kind),
+      );
+    if (view.sorts !== undefined) validateSorts(view.sorts, `${path}.sorts`);
     if (view.columnWidths !== undefined) {
       if (!isObject(view.columnWidths))
         fail(`${path}.columnWidths must map column ids to widths.`);
@@ -234,6 +220,141 @@ function validateViews(views) {
             `${path}.columnWidths.${column} must be an integer from ${MIN_COLUMN_WIDTH} to ${MAX_COLUMN_WIDTH}.`,
           );
     }
+  }
+}
+
+const isRecord = (value) =>
+  Boolean(value) && typeof value === "object" && !Array.isArray(value);
+const keysOnly = (value, allowed, path) => {
+  for (const key of Object.keys(value))
+    if (!allowed.includes(key))
+      fail(`${path}.${key} is not a supported setting.`);
+};
+/** Settings that belong to one column type: options, relation, formula, rollup, component. */
+function validateColumnConfig(column, columns, path) {
+  const only = (key, types) => {
+    if (column[key] !== undefined && !types.includes(column.type))
+      fail(`${path}.${key} only belongs to ${types.join(" or ")} columns.`);
+  };
+  only("colors", ["select", "multiSelect"]);
+  only("relation", ["relation"]);
+  only("formula", ["formula"]);
+  only("rollup", ["rollup"]);
+  only("component", ["custom"]);
+  only("config", ["custom"]);
+  only("kind", ["custom"]);
+  if (column.kind !== undefined && !VALUE_KINDS.includes(column.kind))
+    fail(`${path}.kind must be one of ${VALUE_KINDS.join(", ")}.`);
+  if (column.colors !== undefined) {
+    if (!isRecord(column.colors) || Object.keys(column.colors).length > 200)
+      fail(`${path}.colors must map options to tones.`);
+    for (const [option, tone] of Object.entries(column.colors))
+      if (!OPTION_TONES.includes(tone))
+        fail(
+          `${path}.colors.${option} must be one of ${OPTION_TONES.join(", ")}.`,
+        );
+  }
+  if (column.type === "relation") {
+    const relation = column.relation;
+    if (!isRecord(relation))
+      fail(`${path}.relation must be {dataset, project?, reverse?}.`);
+    keysOnly(
+      relation,
+      ["dataset", "project", "reverse", "reverseOf"],
+      `${path}.relation`,
+    );
+    if (typeof relation.dataset !== "string" || !ID.test(relation.dataset))
+      fail(`${path}.relation.dataset must be a dataset id.`);
+    if (
+      relation.project !== undefined &&
+      (typeof relation.project !== "string" || !ID.test(relation.project))
+    )
+      fail(`${path}.relation.project must be a project id.`);
+    if (relation.reverse !== undefined) {
+      if (!isRecord(relation.reverse))
+        fail(`${path}.relation.reverse must be {name?}.`);
+      keysOnly(relation.reverse, ["name"], `${path}.relation.reverse`);
+      if (
+        relation.reverse.name !== undefined &&
+        (typeof relation.reverse.name !== "string" ||
+          relation.reverse.name.length > 1000)
+      )
+        fail(`${path}.relation.reverse.name must be text.`);
+    }
+    if (
+      relation.reverseOf !== undefined &&
+      (typeof relation.reverseOf !== "string" ||
+        relation.reverseOf.length > 200)
+    )
+      fail(`${path}.relation.reverseOf must be a column id.`);
+  }
+  if (column.type === "formula") {
+    const formula = column.formula;
+    if (
+      !isRecord(formula) ||
+      typeof formula.expression !== "string" ||
+      formula.expression.length > 4000
+    )
+      fail(
+        `${path}.formula must be {expression, kind?} with an expression of at most 4000 characters.`,
+      );
+    keysOnly(formula, ["expression", "kind"], `${path}.formula`);
+    if (formula.kind !== undefined && !VALUE_KINDS.includes(formula.kind))
+      fail(`${path}.formula.kind must be one of ${VALUE_KINDS.join(", ")}.`);
+  }
+  if (column.type === "rollup") {
+    const rollup = column.rollup;
+    if (!isRecord(rollup))
+      fail(`${path}.rollup must be {relation, column?, aggregate}.`);
+    keysOnly(rollup, ["relation", "column", "aggregate"], `${path}.rollup`);
+    // Reverse relations (rev-DATASET-COLUMN) are derived from other datasets.
+    if (
+      typeof rollup.relation !== "string" ||
+      (!rollup.relation.startsWith("rev-") &&
+        !columns.some(
+          (item) => item.id === rollup.relation && item.type === "relation",
+        ))
+    )
+      fail(
+        `${path}.rollup.relation must name a relation column or a reverse relation (rev-DATASET-COLUMN).`,
+      );
+    if (
+      rollup.column !== undefined &&
+      (typeof rollup.column !== "string" || rollup.column.length > 200)
+    )
+      fail(`${path}.rollup.column must be a column id of the related records.`);
+    if (!ROLLUP_AGGREGATES.includes(rollup.aggregate))
+      fail(
+        `${path}.rollup.aggregate must be one of ${ROLLUP_AGGREGATES.join(", ")}.`,
+      );
+    if (rollup.aggregate !== "count" && rollup.column === undefined)
+      fail(`${path}.rollup.column is required for ${rollup.aggregate}.`);
+  }
+  if (column.type === "custom") {
+    const component = column.component;
+    if (
+      !isRecord(component) ||
+      typeof component.componentId !== "string" ||
+      !/^[a-z][a-z0-9-]{0,79}$/.test(component.componentId) ||
+      typeof component.version !== "string" ||
+      component.version.length > 100
+    )
+      fail(
+        `${path}.component must be {componentId, version, integrity?, scope?} of a field type component.`,
+      );
+    keysOnly(
+      component,
+      ["componentId", "version", "integrity", "scope"],
+      `${path}.component`,
+    );
+    if (
+      component.integrity !== undefined &&
+      (typeof component.integrity !== "string" ||
+        !/^sha256-[a-f0-9]{64}$/.test(component.integrity))
+    )
+      fail(`${path}.component.integrity must be a sha256 fingerprint.`);
+    if (column.config !== undefined && !isRecord(column.config))
+      fail(`${path}.config must be an object.`);
   }
 }
 
@@ -293,27 +414,48 @@ export function validateDatabaseData(data) {
       fail(
         `${path}.titleColumn only belongs to page columns and names a text column.`,
       );
+    validateColumnConfig(column, columns, path);
   }
+  const listColumns = new Set(
+    columns.filter((column) => LIST_TYPES.has(column.type)).map((c) => c.id),
+  );
+  const checked = columns.filter(
+    (column) =>
+      column.type === "date" ||
+      column.type === "page" ||
+      LIST_TYPES.has(column.type),
+  );
   const dateColumns = columns.filter((column) => column.type === "date");
-  const pageColumns = columns.filter((column) => column.type === "page");
   for (const [index, row] of list("rows", 5000).entries()) {
     for (const [key, value] of Object.entries(row))
-      if (!["string", "number", "boolean"].includes(typeof value))
-        fail(`rows[${index}].${key} must be text, a number or a boolean.`);
-    for (const column of dateColumns) {
-      const value = row[column.id];
-      if (value !== undefined && value !== "" && parseDay(value) === null)
-        fail(`rows[${index}].${column.id} must be a YYYY-MM-DD date or empty.`);
-    }
-    for (const column of pageColumns) {
-      const value = row[column.id];
-      if (value !== undefined && value !== "" && !parsePageCell(value))
+      if (
+        !["string", "number", "boolean"].includes(typeof value) &&
+        !(
+          listColumns.has(key) &&
+          Array.isArray(value) &&
+          value.length <= 1000 &&
+          value.every((item) => typeof item === "string" && item.length <= 1000)
+        )
+      )
         fail(
-          `rows[${index}].${column.id} must be a showai://project/PROJECT/page/PAGE link or empty.`,
+          listColumns.has(key)
+            ? `rows[${index}].${key} must be a list of texts, text, a number or a boolean.`
+            : `rows[${index}].${key} must be text, a number or a boolean.`,
+        );
+    for (const column of checked) {
+      if (column.type === "custom") continue;
+      const issue = valueTypeOf(column).check(row[column.id], column);
+      if (issue)
+        fail(
+          column.type === "date"
+            ? `rows[${index}].${column.id} must be a YYYY-MM-DD date or empty.`
+            : column.type === "page"
+              ? `rows[${index}].${column.id} must be a showai://project/PROJECT/page/PAGE link or empty.`
+              : `rows[${index}].${column.id} ${issue}`,
         );
     }
   }
-  if (data.views !== undefined) validateViews(data.views);
+  if (data.views !== undefined) validateViews(data.views, columns);
   if (data.view !== undefined && !DATABASE_VIEWS.includes(data.view))
     fail(`view must be one of ${DATABASE_VIEWS.join(", ")}.`);
   if (data.calendar !== undefined) validateCalendar(data.calendar, columns);

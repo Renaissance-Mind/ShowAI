@@ -160,6 +160,16 @@ import src_database_reorder_ts from "../components/blocks/database-reorder.ts?ra
 import src_database_column_resize_ts from "../components/blocks/database-column-resize.ts?raw";
 import src_database_view_motion_ts from "../components/blocks/database-view-motion.ts?raw";
 import src_database_records_ts from "../components/blocks/database-records.ts?raw";
+import src_database_host_ts from "../components/blocks/database-host.ts?raw";
+import src_database_derived_ts from "../components/blocks/database-derived.ts?raw";
+import src_database_field_ui_tsx from "../components/blocks/database-field-ui.tsx?raw";
+import src_database_fields_css from "../components/blocks/database-fields.css?raw";
+import src_DatabaseQueryEditor_tsx from "../components/blocks/DatabaseQueryEditor.tsx?raw";
+import src_DatabaseViews_tsx from "../components/blocks/DatabaseViews.tsx?raw";
+import src_value_types_mjs from "../datasets/value-types.mjs?raw";
+import src_record_query_mjs from "../datasets/record-query.mjs?raw";
+import src_derived_fields_mjs from "../datasets/derived-fields.mjs?raw";
+import i18n_databaseFields from "../i18n/messages/databaseFields.ts?raw";
 import src_page_links_ts from "../components/page-links.ts?raw";
 import src_playground_contract_mjs from "../components/blocks/playground-contract.mjs?raw";
 import src_playground_css from "../components/blocks/playground.css?raw";
@@ -395,6 +405,16 @@ const sources: Record<string, string> = {
   "database-column-resize.ts": src_database_column_resize_ts,
   "database-view-motion.ts": src_database_view_motion_ts,
   "database-records.ts": src_database_records_ts,
+  "database-host.ts": src_database_host_ts,
+  "database-derived.ts": src_database_derived_ts,
+  "database-field-ui.tsx": src_database_field_ui_tsx,
+  "database-fields.css": src_database_fields_css,
+  "DatabaseQueryEditor.tsx": src_DatabaseQueryEditor_tsx,
+  "DatabaseViews.tsx": src_DatabaseViews_tsx,
+  "value-types.mjs": src_value_types_mjs,
+  "record-query.mjs": src_record_query_mjs,
+  "derived-fields.mjs": src_derived_fields_mjs,
+  "i18n/messages/databaseFields.ts": i18n_databaseFields,
   "page-links.ts": src_page_links_ts,
   "playground-contract.mjs": src_playground_contract_mjs,
   "playground.css": src_playground_css,
@@ -465,7 +485,8 @@ export const builtinSources: Record<string, string> = Object.fromEntries(
           : '"./NativeInkPreview"',
       )
       .replaceAll('"../portable/capacity.mjs"', '"./capacity.mjs"')
-      .replaceAll('"../../datasets/editable.mjs"', '"./editable.mjs"')
+      // Harness modules (src/datasets) sit beside the blocks in the SDK.
+      .replaceAll('"../../datasets/', '"./')
       .replaceAll('"../portable/owned-json.mjs"', '"./owned-json.mjs"')
       .replaceAll('"../portable/local-files.mjs"', '"./local-files.mjs"')
       .replaceAll(
