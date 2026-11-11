@@ -71,6 +71,9 @@ function pageFields(document: ShowDocument) {
     content,
     createdAt: _created,
     updatedAt: _updated,
+    // Layout and views follow the blocks; inserting one is not a page-level change.
+    surfaceViews: _views,
+    layout: _layout,
     ...rest
   } = document;
   return JSON.stringify([rest, content.type, content.attrs ?? null]);

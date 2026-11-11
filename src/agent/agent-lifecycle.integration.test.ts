@@ -208,6 +208,8 @@ test("page_apply and page_save reply with receipts unless the document is reques
     changedBlocks: { removed: [], changed: [] },
   });
   expect(applied.document).toBeUndefined();
+  // Layout and views follow inserted blocks; that is not a page-level change.
+  expect(applied.changedBlocks.page).toBeUndefined();
   expect(applied.revision).toEqual(expect.any(String));
   const [added] = applied.changedBlocks.added;
   const current = await service.store.readPage(projectId, page.document.id);
