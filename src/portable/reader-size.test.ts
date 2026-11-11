@@ -132,6 +132,24 @@ describe.skipIf(!existsSync(archive))("conversation preview budget", () => {
       'name="showai-reader-omits" content="code notes ink"',
     );
     expect(bytes).toBeLessThan(CAPACITY.chatBytes * 0.9);
+    // Keep 40 kB of that budget free (measured 836,827 in November 2026), so
+    // reader growth fails here well before previews stop fitting.
+    expect(bytes).toBeLessThan(860_000);
+  });
+  test("a page carries only the styles and validators of the components it holds", async () => {
+    const { reader } = await inlineBytes(plain);
+    // Roadmap's own block class and a message only its validator raises.
+    const roadmapValidator = "must be a calendar date written YYYY-MM-DD";
+    expect(reader.includes(".rm-block")).toBe(false);
+    expect(reader.includes(roadmapValidator)).toBe(false);
+    const withRoadmap = page([paragraph("A plan.")]);
+    (withRoadmap.content.content as unknown[]).push({
+      type: "widget",
+      attrs: { id: "plan", kind: "roadmap", data: {} },
+    });
+    const roadmapReader = await bundleReader(archive, [withRoadmap]);
+    expect(roadmapReader.includes(".rm-block")).toBe(true);
+    expect(roadmapReader.includes(roadmapValidator)).toBe(true);
   });
   test("a page with code carries its syntax grammars", async () => {
     const { reader, bytes } = await inlineBytes(code);

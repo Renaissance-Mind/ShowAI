@@ -228,12 +228,41 @@ const removeRanges = (source, ranges) => {
     source = source.slice(0, start) + source.slice(end);
   return source;
 };
+/**
+ * Removed registrations plus every top-level import or binding that only they
+ * named. A block module imported solely for a removed kind then never enters
+ * the bundle, so neither does its stylesheet: esbuild drops unused JavaScript
+ * but keeps the CSS of every module it reaches.
+ */
+const unusedRegistryRanges = (source, removed, declarations) => {
+  const ranges = [...removed];
+  const named = (name, skip) => {
+    const pattern = new RegExp(`(?<![\\w$])${name}(?![\\w$])`, "g");
+    for (const match of source.matchAll(pattern))
+      if (!skip.some((r) => match.index >= r.start && match.index < r.end))
+        return true;
+    return false;
+  };
+  for (let changed = true; changed;) {
+    changed = false;
+    for (const declaration of declarations) {
+      if (ranges.includes(declaration)) continue;
+      const skip = [...ranges, declaration];
+      if (!declaration.names.some((name) => named(name, skip))) {
+        ranges.push(declaration);
+        changed = true;
+      }
+    }
+  }
+  return ranges;
+};
 const compilerIdentity = createHash("sha256")
   .update(
     JSON.stringify([
       compilerVersion,
       compileReader.toString(),
       removeRanges.toString(),
+      unusedRegistryRanges.toString(),
       readerKinds.toString(),
       readerOmissions.toString(),
     ]),
@@ -254,6 +283,13 @@ export async function bundleReader(archivePath, documents) {
         integrity
     )
       throw new Error("The reader source archive is invalid or corrupted.");
+    if (
+      !Array.isArray(archive.declarations) ||
+      !Array.isArray(archive.validators)
+    )
+      throw new Error(
+        "The reader source archive predates this reader compiler; rebuild it with npm run build:portable.",
+      );
     if (Buffer.byteLength(archiveText) < 8 * 1024 * 1024) {
       archives.set(archiveKey, archive);
       if (archives.size > 2) archives.delete(archives.keys().next().value);
@@ -563,14 +599,38 @@ async function compileReader(archivePath, archive, kinds, omits = []) {
         if (contract && !contract.kinds.some((kind) => selected.has(kind)))
           return { contents: contract.source, loader: "js" };
         let source = archive.files[args.path];
+        // validateWidgetData calls these only for their own kinds; without one
+        // on the page, the validator and its module never run. Like the
+        // contract stubs, a kind this reader does not carry is accepted and
+        // then shown as unavailable.
+        if (args.path === "src/portable/validation.mjs")
+          for (const validator of [...archive.validators].sort(
+            (a, b) => b.start - a.start,
+          ))
+            if (
+              !validator.kinds.some((kind) => selected.has(kind)) &&
+              !validator.prefixes.some((prefix) =>
+                kinds.some((kind) => kind.startsWith(prefix)),
+              )
+            )
+              source =
+                source.slice(0, validator.start) +
+                validator.names
+                  .map((name) => `const ${name} = () => {};`)
+                  .join("") +
+                source.slice(validator.end);
         if (args.path === "src/components/blocks/registry.ts")
           source = removeRanges(
             source,
-            archive.registry.filter((r) =>
-              r.kind
-                ? !selected.has(r.kind)
-                : Object.hasOwn(groupKinds, r.group) &&
-                  !groupKinds[r.group].some((kind) => selected.has(kind)),
+            unusedRegistryRanges(
+              source,
+              archive.registry.filter((r) =>
+                r.kind
+                  ? !selected.has(r.kind)
+                  : Object.hasOwn(groupKinds, r.group) &&
+                    !groupKinds[r.group].some((kind) => selected.has(kind)),
+              ),
+              archive.declarations,
             ),
           );
         if (
