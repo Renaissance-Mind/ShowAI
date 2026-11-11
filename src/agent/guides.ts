@@ -236,6 +236,7 @@ const guides: Record<
         "component.ref.set: blockId, version, integrity, componentId? (points a custom component block at another exact revision; keeps id, props and binding; props must satisfy the new schema)",
         "component.binding.set: blockId, binding (binds a component block to a project dataset; a props binding drops the block's values outside local; see guide datasets)",
         "component.binding.remove: blockId, keep? ('snapshot' keeps the shown props in the block, 'local' keeps only its own values)",
+        "comment: text, blockId?, quote? starts a thread on a block, on quoted text (exact text inside one paragraph, heading or code block; blockId narrows the search) or on the page; comment: threadId, text?, resolved? replies and/or resolves (true) or reopens (false). page_read lists open threads in comments.open with threadId, anchor, detached and each comment's author; your comments are signed as the Agent",
       ],
     },
   },

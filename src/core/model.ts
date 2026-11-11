@@ -208,6 +208,19 @@ export type PageOperation =
     }
   /** Native shapes and bound arrows from nodes and edges, laid out when unpositioned. */
   | ({ type: "diagram.insert" } & DiagramInsertInput)
+  /**
+   * Comments. No threadId: start a thread on blockId, on quoted text (quote,
+   * optionally within blockId) or on the page. threadId: reply with text
+   * and/or resolve or reopen with resolved.
+   */
+  | {
+      type: "comment";
+      text?: string;
+      blockId?: string;
+      quote?: string;
+      threadId?: string;
+      resolved?: boolean;
+    }
   /** Lay out existing connected objects along their arrows, as the editor's arrange command does. */
   | { type: "diagram.arrange"; nodeIds: string[]; direction?: DiagramDirection };
 
@@ -245,6 +258,7 @@ export const PAGE_OPERATION_FIELDS = {
     "edges",
   ],
   "diagram.arrange": ["nodeIds", "direction"],
+  comment: ["text", "blockId", "quote", "threadId", "resolved"],
 } as const satisfies {
   [K in PageOperation["type"]]: readonly Exclude<
     keyof Extract<PageOperation, { type: K }>,

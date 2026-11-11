@@ -1,3 +1,4 @@
+import { agentCommentView } from "../core/comments";
 import {
   resolveDocumentDatasets,
   type BindingRead,
@@ -147,6 +148,8 @@ export interface ReadIdentity {
   componentRefs: { id: string; version: string; integrity?: string }[];
   /** Blocks whose props come from a project dataset, with the resolved props. */
   bindings?: BindingRead[];
+  /** Open comment threads (address them with page_apply {type:"comment"}) and the resolved count. */
+  comments?: ReturnType<typeof agentCommentView>;
   /**
    * The dataset hashes this read saw, ready to pass as page_apply datasetBases
    * from any later connection ("projectId/datasetId" for other projects).
@@ -311,6 +314,7 @@ export async function readPageView(
   const components = sourceOnly
     ? []
     : await resolveDocumentComponents(store.root, resolved, projectId);
+  const commentView = agentCommentView(record.document, options.blockIds);
   const identity: ReadIdentity = {
     ...(captured
       ? {
@@ -338,6 +342,7 @@ export async function readPageView(
         }
       : {}),
     ...(resources.length ? { resources } : {}),
+    ...(commentView ? { comments: commentView } : {}),
     partial: !!options.blockIds,
     ...(options.blockIds ? { blockIds: options.blockIds } : {}),
     componentRefs: sourceOnly

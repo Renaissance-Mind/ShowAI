@@ -10,6 +10,7 @@ import { validateDocument } from "../portable/validation.mjs";
 import type { ShowDocument } from "./model";
 import type { MergeConflict } from "../components/custom/types";
 import { finishInkPageMerge, InkWireError, prepareInkPageMerge } from "../surface/ink-wire.mjs";
+import { mergeComments } from "./comment-merge";
 
 interface FlatNode {
   parent: string | null;
@@ -188,9 +189,19 @@ export function mergePageContent(
   const b = flatten(base),
     o = flatten(ours),
     t = flatten(theirs);
+  // Comments merge per record; see comment-merge.
+  const comments = mergeComments(
+    b.fields.comments as ShowDocument["comments"],
+    o.fields.comments as ShowDocument["comments"],
+    t.fields.comments as ShowDocument["comments"],
+    choices,
+  );
+  for (const side of [b, o, t]) delete side.fields.comments;
   const metadata = mergeValues(b.fields, o.fields, t.fields, "/page", choices);
+  (metadata.value as ShowDocument).comments = comments.value;
   const root = mergeValues(b.root, o.root, t.root, "/root", choices);
   const conflicts: PageMergeConflict[] = [
+    ...comments.conflicts,
     ...metadata.conflicts,
     ...root.conflicts,
   ];

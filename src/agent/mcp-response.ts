@@ -47,6 +47,7 @@ export function compactMcpResult(
     "origin",
     "datasetSchemas",
     "datasetBases",
+    "comments",
     "warnings",
     "migration",
     "out",

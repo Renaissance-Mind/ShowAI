@@ -19,6 +19,8 @@ import { createHash } from "node:crypto";
 import { compileBinding, readBinding } from "../datasets/binding.mjs";
 import { readCustomBlockData } from "../components/custom/contract";
 import { validateDocument } from "../portable/validation.mjs";
+import { rebaseCommentAnchors, validateComments } from "./comments";
+import { applyCommentOperation } from "./comment-operations";
 import { CoreError, PAGE_OPERATION_FIELDS } from "./model";
 import {
   isSurface,
@@ -72,6 +74,7 @@ export function normalizeDocument(
     document = options.validated
       ? (input as ShowDocument)
       : validateDocument(input);
+    if (!options.validated) validateComments(document.comments);
   } catch (error) {
     if (error instanceof CapacityError) throw error;
     throw new CoreError(
@@ -788,6 +791,9 @@ export function applyOperations(
         node.attrs = { ...node.attrs, data: next };
         break;
       }
+      case "comment":
+        draft.comments = applyCommentOperation(draft, operation);
+        break;
       case "block.text.set": {
         const node = locate(operation.blockId).node;
         if (node.type === "richText" && typeof operation.text === "string") {
@@ -882,5 +888,6 @@ export function applyOperations(
       else delete node!.attrs!.bindings;
     }
   }
-  return normalizeDocument(draft, document);
+  // Anchored comments follow their text through these operations.
+  return rebaseCommentAnchors(document, normalizeDocument(draft, document));
 }
