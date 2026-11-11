@@ -47,8 +47,8 @@ button {
   background: none;
   cursor: pointer;
   transition:
-    background 0.15s,
-    color 0.15s;
+    background var(--duration-fast) var(--ease-out),
+    color var(--duration-fast) var(--ease-out);
 }
 @media (hover: hover) {
   button:hover {
@@ -171,7 +171,7 @@ a {
   border: 1px solid var(--line);
   border-radius: 9px;
   box-shadow: var(--shadow);
-  animation: reveal 0.12s ease;
+  animation: reveal var(--duration-fast) var(--ease-out);
 }
 .canvas-menu button {
   display: flex;

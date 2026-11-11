@@ -78,7 +78,12 @@
 }
 /* Motion: things enter on a strong ease-out, move on ease-in-out, and stay
  * short enough that repeated use never feels slow. Patterns adapted from
- * motion-primitives and Magic UI (both MIT); see resources/licenses/motion-ui.txt. */
+ * motion-primitives and Magic UI (both MIT); see resources/licenses/motion-ui.txt.
+ * Scale: --duration-fast for hover, focus and colour changes, small menus and
+ * every exit; --duration-base for panels, dialogs, rows and the sidebar or
+ * Agent panel width; --duration-slow for large surfaces and image zoom.
+ * Panels that move or resize use --ease-in-out; everything else --ease-out.
+ * Loops, gesture tracking and highlight fades keep their own timings. */
 :root,
 [data-showai-inline-root] {
   --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
@@ -137,10 +142,10 @@ select {
 }
 button {
   transition:
-    background-color 150ms ease,
-    color 150ms ease,
-    border-color 150ms ease,
-    transform 150ms ease;
+    background-color var(--duration-fast) var(--ease-out),
+    color var(--duration-fast) var(--ease-out),
+    border-color var(--duration-fast) var(--ease-out),
+    transform var(--duration-fast) var(--ease-out);
 }
 button:focus-visible,
 a:focus-visible,

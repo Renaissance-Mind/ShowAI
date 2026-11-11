@@ -101,7 +101,7 @@ html {
   border-radius: 10px;
   background: var(--surface);
   box-shadow: 0 8px 32px #17221512;
-  animation: menu-appear 120ms ease-out;
+  animation: menu-appear var(--duration-fast) var(--ease-out);
 }
 .portable-options-menu button {
   width: 100%;

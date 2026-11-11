@@ -22,7 +22,7 @@
 }
 .studio-tree-row > .studio-tree-main {
   padding-right: calc(var(--row-menu-size) + 2 * var(--row-menu-inset));
-  transition: padding-right 180ms cubic-bezier(0.2, 0.7, 0.2, 1);
+  transition: padding-right var(--duration-base) var(--ease-out);
 }
 .studio-tree-row[data-pinned="true"] > .studio-tree-main {
   padding-right: var(--row-menu-inset);
@@ -47,7 +47,7 @@
   color: var(--muted);
   cursor: pointer;
   transform: translateY(-50%);
-  transition: right 180ms cubic-bezier(0.2, 0.7, 0.2, 1);
+  transition: right var(--duration-base) var(--ease-out);
 }
 .studio-tree-unpin:hover {
   color: var(--text);
@@ -70,8 +70,8 @@
   transform: translateY(-50%);
   z-index: 1;
   transition:
-    opacity 120ms ease,
-    background 100ms ease;
+    opacity var(--duration-fast) var(--ease-out),
+    background var(--duration-fast) var(--ease-out);
 }
 .studio-tree-row:is(
     :hover,

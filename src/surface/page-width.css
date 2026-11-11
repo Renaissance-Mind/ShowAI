@@ -15,7 +15,7 @@
   border-radius: 6px;
   background: var(--paper, var(--bg));
   box-shadow: 0 1px 4px #00000014;
-  transition: transform 140ms ease;
+  transition: transform var(--duration-fast) var(--ease-in-out);
 }
 .page-width-switch-labels {
   position: relative;

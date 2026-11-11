@@ -198,8 +198,8 @@
   color: var(--muted);
   opacity: 0;
   transition:
-    opacity 100ms ease,
-    background 100ms ease;
+    opacity var(--duration-fast) var(--ease-out),
+    background var(--duration-fast) var(--ease-out);
 }
 .studio-tree-row:hover .studio-row-menu,
 .studio-tree-row:focus-within .studio-row-menu,
@@ -372,7 +372,7 @@ button.studio-tree-chevron:hover {
   max-width: 1220px;
   margin: 0 auto;
   padding: 30px 42px 64px;
-  animation: studio-enter 0.15s ease-out;
+  animation: studio-enter var(--duration-fast) var(--ease-out);
 }
 .studio-library:has(> .studio-empty:only-child) {
   box-sizing: border-box;
@@ -488,8 +488,8 @@ button.studio-tree-chevron:hover {
   border-radius: 8px;
   background: var(--paper);
   transition:
-    background 120ms ease,
-    border-color 120ms ease;
+    background var(--duration-fast) var(--ease-out),
+    border-color var(--duration-fast) var(--ease-out);
 }
 .studio-project-card:hover {
   border-color: color-mix(in srgb, var(--text) 18%, var(--line));
@@ -661,7 +661,7 @@ button.studio-tree-chevron:hover {
   max-width: 1000px;
   margin: 0 auto;
   padding: 48px 66px 110px;
-  animation: studio-enter 0.15s ease-out;
+  animation: studio-enter var(--duration-fast) var(--ease-out);
 }
 .studio-editor-page .document-content {
   font-size: 16px;
@@ -716,7 +716,7 @@ button.studio-tree-chevron:hover {
   border-radius: 4px 4px 0 0;
   padding: 15px 13px;
   transform: translateY(7px);
-  transition: transform 0.18s;
+  transition: transform var(--duration-base) var(--ease-out);
 }
 .studio-template-art:hover .template-sheet {
   transform: translateY(3px);
@@ -1594,8 +1594,8 @@ button.studio-tree-chevron:hover {
     0 3px 10px #0000001a;
   transform-origin: 50% 100%;
   transition:
-    transform 0.22s cubic-bezier(0.2, 0.8, 0.2, 1),
-    box-shadow 0.22s ease;
+    transform var(--duration-base) var(--ease-out),
+    box-shadow var(--duration-base) var(--ease-out);
 }
 .studio-folder-sheet[data-kind="folder"] {
   background: color-mix(in srgb, var(--brand-accent) 6%, var(--paper));
@@ -1756,13 +1756,13 @@ button.studio-tree-chevron:hover {
   color: transparent;
   opacity: 0;
   transition:
-    opacity 0.12s ease,
-    background-color 0.12s ease,
-    border-color 0.12s ease;
+    opacity var(--duration-fast) var(--ease-out),
+    background-color var(--duration-fast) var(--ease-out),
+    border-color var(--duration-fast) var(--ease-out);
 }
 .studio-page-checkbox svg {
   transform: scale(0.5);
-  transition: transform 0.16s cubic-bezier(0.3, 1.5, 0.5, 1);
+  transition: transform var(--duration-fast) cubic-bezier(0.3, 1.5, 0.5, 1);
 }
 .studio-page-checkbox:hover {
   border-color: var(--accent);

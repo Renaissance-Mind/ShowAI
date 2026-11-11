@@ -216,7 +216,7 @@
   padding: 0;
   color: var(--muted);
   opacity: 0;
-  transition: opacity 0.15s;
+  transition: opacity var(--duration-fast) var(--ease-out);
 }
 .document-callout:hover .callout-color,
 .callout-color:focus-visible {
@@ -254,7 +254,7 @@
   border-radius: 3px;
 }
 .toggle-heading > button svg {
-  transition: transform 0.18s ease;
+  transition: transform var(--duration-base) var(--ease-out);
 }
 .document-toggle.is-open .toggle-heading > button svg {
   transform: rotate(90deg);
@@ -347,7 +347,7 @@
   border: 1px solid var(--editor-line);
   background: var(--editor-paper);
   box-shadow: 0 7px 25px #24342916;
-  animation: editor-menu-appear 0.14s ease;
+  animation: editor-menu-appear var(--duration-fast) var(--ease-out);
 }
 .editor-small-menu > button {
   display: flex;
@@ -480,7 +480,7 @@
   color: var(--text);
   box-shadow: 0 14px 50px #24342922;
   overflow: hidden;
-  animation: editor-menu-appear 0.15s ease;
+  animation: editor-menu-appear var(--duration-fast) var(--ease-out);
 }
 .slash-menu.is-minimal {
   width: 272px;
@@ -634,7 +634,7 @@
   background: var(--paper, #fff);
   color: var(--text);
   box-shadow: 0 24px 70px #16251c26;
-  animation: editor-modal-appear 0.18s ease;
+  animation: editor-modal-appear var(--duration-base) var(--ease-out);
 }
 .editor-modal-heading {
   display: flex;

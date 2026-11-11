@@ -71,7 +71,7 @@
   border: 1px solid var(--line);
   border-radius: 9px;
   background: var(--surface);
-  transition: border-color 0.15s;
+  transition: border-color var(--duration-fast) var(--ease-out);
 }
 .agent-card[data-selected="true"] {
   border-color: var(--accent);
@@ -187,7 +187,7 @@
   border-radius: 9px;
   text-align: left;
   background: var(--surface);
-  transition: border-color 0.15s;
+  transition: border-color var(--duration-fast) var(--ease-out);
 }
 .agent-preset:hover:not(:disabled) {
   border-color: var(--muted);

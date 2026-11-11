@@ -87,7 +87,7 @@
   border-radius: 8px;
   background: var(--paper);
   box-shadow: var(--shadow, 0 4px 18px #19191916, 0 0 0 1px #19191906);
-  animation: studio-enter 0.15s ease-out;
+  animation: studio-enter var(--duration-fast) var(--ease-out);
 }
 .assistant-switcher-search {
   display: flex;
@@ -525,7 +525,7 @@
   color: var(--text);
   box-shadow: var(--shadow-dialog);
   font: 13px/1.5 var(--font-ui, var(--font-sans, system-ui, sans-serif));
-  animation: assistant-appear 0.13s ease;
+  animation: assistant-appear var(--duration-fast) var(--ease-out);
 }
 .assistant-composer header {
   display: flex;
@@ -683,7 +683,7 @@
 .assistant-message,
 .assistant-approval,
 .assistant-user {
-  animation: assistant-appear 160ms ease-out;
+  animation: assistant-appear var(--duration-fast) var(--ease-out);
 }
 @media (prefers-reduced-motion: reduce) {
   .assistant-message,

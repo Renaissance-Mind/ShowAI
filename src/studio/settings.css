@@ -36,7 +36,7 @@
   width: min(100%, 832px);
   margin: 0 auto;
   padding: 49px 44px 80px;
-  animation: studio-enter 0.15s ease-out;
+  animation: studio-enter var(--duration-fast) var(--ease-out);
 }
 .settings-heading {
   margin-bottom: 37px;
@@ -203,7 +203,7 @@
   border: 1px solid var(--line);
   border-radius: 11px;
   cursor: pointer;
-  transition: border-color 0.15s;
+  transition: border-color var(--duration-fast) var(--ease-out);
 }
 .settings-theme-option:hover {
   border-color: var(--muted);

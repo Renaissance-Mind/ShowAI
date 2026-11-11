@@ -245,7 +245,7 @@
   z-index: 5;
   opacity: 0;
   pointer-events: none;
-  transition: opacity 0.15s;
+  transition: opacity var(--duration-fast) var(--ease-out);
 }
 .catalog-preview:hover .catalog-preview-tools,
 .catalog-preview:focus-within .catalog-preview-tools {

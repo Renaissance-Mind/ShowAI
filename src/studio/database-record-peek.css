@@ -12,7 +12,7 @@
   background: var(--paper);
   border-left: 1px solid var(--line);
   box-shadow: -8px 0 24px #1919190b;
-  animation: database-record-peek-enter 220ms cubic-bezier(0.2, 0.75, 0.25, 1);
+  animation: database-record-peek-enter var(--duration-base) var(--ease-out);
 }
 .database-record-peek-toolbar {
   display: flex;

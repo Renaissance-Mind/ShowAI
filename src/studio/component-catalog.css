@@ -68,8 +68,8 @@
   border: 1px solid transparent;
   border-radius: 13px;
   transition:
-    border-color 0.15s,
-    background-color 0.15s,
+    border-color var(--duration-fast) var(--ease-out),
+    background-color var(--duration-fast) var(--ease-out),
     box-shadow var(--duration-base) var(--ease-out),
     transform var(--duration-base) var(--ease-out);
 }

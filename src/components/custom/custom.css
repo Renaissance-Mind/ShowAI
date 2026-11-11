@@ -17,7 +17,7 @@
   background: var(--surface, #fff);
   cursor: pointer;
   opacity: 0;
-  transition: opacity 120ms ease;
+  transition: opacity var(--duration-fast) var(--ease-out);
 }
 .showai-custom-block:hover > .custom-props-trigger,
 .showai-custom-block:focus-within > .custom-props-trigger {
