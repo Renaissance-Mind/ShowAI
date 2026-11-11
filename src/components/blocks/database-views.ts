@@ -92,6 +92,23 @@ export function changeView(
   return next;
 }
 
+/**
+ * The changes that rewrite a view's older single filter and sort in the
+ * current shape: a filter group and a sort list. Columns decide how a legacy
+ * filter value reads (e.g. "true" on a checkbox column means checked).
+ */
+export function upgradeViewQuery(
+  view: DatabaseView,
+  columns: DatabaseColumn[],
+): Partial<DatabaseView> {
+  return {
+    ...(view.filter && "value" in view.filter
+      ? { filter: readFilter(view.filter, columns) ?? undefined }
+      : {}),
+    ...(view.sort !== undefined ? { sorts: readSorts(view) } : {}),
+  };
+}
+
 /** A view id that is not used yet. */
 export function newViewId(views: DatabaseView[]): string {
   const used = new Set(views.map((view) => view.id));

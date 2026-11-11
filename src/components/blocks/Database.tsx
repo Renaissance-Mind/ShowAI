@@ -32,6 +32,7 @@ import {
   newViewId,
   pruneViews,
   titleSyncActions,
+  upgradeViewQuery,
   withViews,
   ROW_ACTION_WIDTH,
   type ViewOverride,
@@ -403,7 +404,13 @@ export function DatabaseBlock({ data, onChange, readOnly }: BlockProps) {
     if (editable)
       writeViews(
         views.map((item) =>
-          item.id === savedView.id ? changeView(item, changes, viewName) : item,
+          item.id === savedView.id
+            ? changeView(
+                item,
+                { ...upgradeViewQuery(item, shownColumns), ...changes },
+                viewName,
+              )
+            : item,
         ),
       );
     else
