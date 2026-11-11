@@ -203,6 +203,7 @@ import {
 } from "./template-catalog-model";
 import TemplateThumbnail from "./TemplateThumbnail";
 import RecentPages, { recentPages, type RecentPage } from "./RecentPages";
+import { newMenuDestination, type CreationChoice } from "./new-menu";
 import Welcome from "./Welcome";
 import PluginUpdateNotice from "./PluginUpdateNotice";
 import AppUpdateNotice from "./AppUpdateNotice";
@@ -369,7 +370,13 @@ type DialogState =
     }
   | { type: "externalConflict"; id: string; saveFailure?: boolean }
   | { type: "discardDraft" }
-  | { type: "project"; project?: ProjectSummary; groupId?: string }
+  | {
+      type: "project";
+      project?: ProjectSummary;
+      groupId?: string;
+      /** Created in the new project once it exists. */
+      then?: CreationChoice;
+    }
   | { type: "group"; group?: ProjectGroup; projectId?: string }
   | { type: "moveProject"; projectId: string }
   | {
@@ -2452,48 +2459,68 @@ export default function Studio() {
         ? null
         : { target, anchor, point, pageTools, creationOnly, selection },
     );
-  function creationMenuItems(target: LibraryTarget): LibraryContextMenuItem[] {
-    const directory = {
+  /** Creates one kind of content in a project or folder. */
+  function runCreation(
+    choice: CreationChoice,
+    directory: { projectId: string; parentId: string | null },
+  ): Promise<unknown> {
+    if (choice === "folder") {
+      setDialog({ type: "folder", ...directory });
+      return Promise.resolve();
+    }
+    if (choice === "page" || choice === "board")
+      return createPage("blank", undefined, choice, directory, true);
+    if (choice === "agentPage") return createPageForAgent(directory);
+    if (choice === "template")
+      return beginNewPage(directory.projectId, directory.parentId);
+    return importPage(directory);
+  }
+  /**
+   * Content that can be created in a project or folder. Without a target, each
+   * entry first opens the new-project dialog and then creates in that project.
+   */
+  function creationMenuItems(
+    target: LibraryTarget | null,
+  ): LibraryContextMenuItem[] {
+    const directory = target && {
       projectId: target.projectId,
       parentId: target.kind === "folder" ? target.id : target.parentId,
     };
+    const select = (choice: CreationChoice) =>
+      directory
+        ? action(() => runCreation(choice, directory))
+        : () => setDialog({ type: "project", then: choice });
     return [
       {
         label: t("create.folder"),
         icon: <FolderPlus size={15} />,
-        onSelect: () => setDialog({ type: "folder", ...directory }),
+        onSelect: select("folder"),
       },
       {
         label: t("create.page"),
         icon: <FileText size={15} />,
-        onSelect: action(() =>
-          createPage("blank", undefined, "page", directory, true),
-        ),
+        onSelect: select("page"),
       },
       {
         label: t("create.board"),
         icon: <Presentation size={15} />,
-        onSelect: action(() =>
-          createPage("blank", undefined, "board", directory, true),
-        ),
+        onSelect: select("board"),
       },
       {
         label: tn("newPageForAgent"),
         icon: <Sparkles size={15} />,
-        onSelect: action(() => createPageForAgent(directory)),
+        onSelect: select("agentPage"),
       },
       {
         label: t("create.fromTemplate"),
         icon: <FilePlus2 size={15} />,
         separatorBefore: true,
-        onSelect: action(() =>
-          beginNewPage(directory.projectId, directory.parentId),
-        ),
+        onSelect: select("template"),
       },
       {
         label: t("create.import"),
         icon: <Upload size={15} />,
-        onSelect: action(() => importPage(directory)),
+        onSelect: select("import"),
       },
     ];
   }
@@ -2606,27 +2633,42 @@ export default function Studio() {
       },
     ];
   }
-  /** The sidebar's New menu: content for the current project, then a new project. */
+  /**
+   * The sidebar's New menu: content, then a new project. Content goes to the
+   * open writable project, else the most recently used writable project, else
+   * a project created first.
+   */
   function newMenuItems(): LibraryContextMenuItem[] {
-    const directory =
-      (view === "project" || view === "page") &&
-      project &&
-      !(selectedFolder && !currentFolder)
-        ? currentFolder
-          ? folderTarget(currentFolder, project.id)
-          : projectTarget(project)
+    const readOnly = (id: string) => syncOverview.markers.get(id) === "readOnly";
+    const context =
+      (view === "project" || view === "page") && project
+        ? {
+            projectId: project.id,
+            target: currentFolder
+              ? folderTarget(currentFolder, project.id)
+              : projectTarget(project),
+          }
         : null;
+    const destination = newMenuDestination(context, projects, readOnly);
+    const target =
+      destination.kind === "context"
+        ? destination.target
+        : destination.kind === "recent"
+          ? projectTarget(destination.project)
+          : null;
+    // A selected folder that is still loading would put content one level too high.
+    const disabled =
+      !workspaceReady ||
+      routing ||
+      workspace.switching ||
+      busy ||
+      (destination.kind === "context" && !!selectedFolder && !currentFolder);
     return [
-      ...(directory
-        ? creationMenuItems(directory).map((item) => ({
-            ...item,
-            disabled: contentCreationDisabled,
-          }))
-        : []),
+      ...creationMenuItems(target).map((item) => ({ ...item, disabled })),
       {
         label: tn("newProject"),
         icon: <FolderPlus size={15} />,
-        separatorBefore: !!directory,
+        separatorBefore: true,
         onSelect: () => setDialog({ type: "project" }),
       },
     ];
@@ -7155,6 +7197,11 @@ export default function Studio() {
               // pages), so the sidebar gets the project from a scoped refresh.
               await refreshProjects([result.id], { sidebar: true });
               await openProject(result.id);
+              if (dialog.then)
+                await runCreation(dialog.then, {
+                  projectId: result.id,
+                  parentId: null,
+                });
             }}
           />
         )}
