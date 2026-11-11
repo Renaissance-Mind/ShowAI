@@ -592,6 +592,7 @@ test("a database bound with props keeps only its local settings, inserted or bou
     pageId: page.document.id,
     baseHash: page.hash,
     baseRevision: page.revision,
+    response: "source",
     operations: [
       {
         type: "component.binding.set",
@@ -668,6 +669,7 @@ test("a database bound with props keeps only its local settings, inserted or bou
     pageId: page.document.id,
     baseHash: read.hash,
     baseRevision: read.revision,
+    response: "source",
     operations: [
       {
         type: "component.props.set",

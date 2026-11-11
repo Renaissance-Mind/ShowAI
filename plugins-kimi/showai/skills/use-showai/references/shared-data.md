@@ -42,7 +42,7 @@ dataset_write({projectId, action:"create", name:"全景 OKR", fromBlock:{pageId,
   }
   ```
 
-- 绑定页面上已有的块：`{type:"component.binding.set", blockId, binding:{dataset:ID, props:{local:[...]}}}`。`component.insert` 不返回块 id，也不能在同一次调用里引用新块；要绑定先前插入的块时，从 `page_apply` 结果的 `document`（默认的 `response:"full"` 和 `"source"` 都带，`"receipt"` 不带）或 `page_read` 中找到它的 id。props 绑定会保留块里 `local` 列出的参数，丢弃块原有的其他参数（例如原来的 columns、rows），所以块事先不需要任何列或行；要保留的原有值先写进共享数据或列入 `local`。
+- 绑定页面上已有的块：`{type:"component.binding.set", blockId, binding:{dataset:ID, props:{local:[...]}}}`。同一次调用里不能引用新块；`page_apply` 回执的 `changedBlocks.added` 列出新插入块的 id，下一次调用用它绑定（也可以从 `page_read` 中找到）。props 绑定会保留块里 `local` 列出的参数，丢弃块原有的其他参数（例如原来的 columns、rows），所以块事先不需要任何列或行；要保留的原有值先写进共享数据或列入 `local`。
 
 两种做法都不检查 `local` 参数与块自身数据是否匹配：database 的 calendar、groupBy、views 可以引用只存在于共享数据里的列，保存时原样保留，由组件按解析后的列显示。两种做法也都不检查共享数据是否存在；之后 `page_read` 的 `bindings[].error` 会指出找不到的共享数据，`issues` 列出读不到的路径。
 

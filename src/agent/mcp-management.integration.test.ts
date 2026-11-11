@@ -145,7 +145,7 @@ test("library MCP organizes real folders, projects and sidebar entries with scop
       boundTools.find((t) => t.name === "organization_read")?.inputSchema
         .properties?.action as { enum?: string[] }
     ).enum,
-  ).toEqual(["folders"]);
+  ).toEqual(["folders", "deleted"]);
   expect(
     (
       boundTools.find((t) => t.name === "organization_update")?.inputSchema

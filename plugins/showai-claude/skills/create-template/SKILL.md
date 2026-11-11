@@ -52,4 +52,4 @@ scenarios 写情境，不写做法或特征：请求的形式（给了什么材�
 
 本机和网页 MCP 都用 template_save({projectId,input:{bundle:{format:1,files,assets?}}})：files 以相对路径映射 UTF-8 文本，assets 保存组件图像/字体的 base64；网页端不传本机目录。CLI `template import/export` 属于宿主管理接口。按阶段组织的旧包（schemaVersion 1–3）仍可读取；新建采用 schemaVersion 4。
 
-保存后用 template_context 取得固定引用、全部指南与组件索引，用一份与示例不同的材料按 show-document 的流程走完并 template_apply 制作实例。交付前逐项检查：得到的主干与画面是否不同于示例且合理；规则里有没有实例名、具体数字、时间预算或必选组件；示例是否标注；指南是否重复了制作流程；scenarios 是否是情境；README 是否是概览。修改方法发布新版本，本次事实修订只改实例；原实例保持原样。交付元信息、精确引用、指南与组件说明、应用 Page 和完整交付文件。
+保存后用 template_context 取得固定引用、全部指南与组件索引，用一份与示例不同的材料按 show-document 的流程走完并 template_apply 制作实例。交付前逐项检查：得到的主干与画面是否不同于示例且合理；规则里有没有实例名、具体数字、时间预算或必选组件；示例是否标注；指南是否重复了制作流程；scenarios 是否是情境；README 是否是概览。修改方法发布新版本，本次事实修订只改实例；原实例保持原样。用户要删除不再需要的模板版本时，用 `catalog_version({projectId,action:"remove",kind:"template",id,version})`（省略 version 删除全部版本）；仍被使用时返回 IN_USE 并列出使用处，内置模板不能删除。交付元信息、精确引用、指南与组件说明、应用 Page 和完整交付文件。

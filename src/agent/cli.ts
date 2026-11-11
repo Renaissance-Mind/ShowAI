@@ -249,6 +249,8 @@ function parseArguments(args: string[]): Arguments {
     "refresh-seconds",
     "inputs",
     "script",
+    "response",
+    "offset",
   ]);
   for (let index = 0; index < args.length; index++) {
     const argument = args[index];
