@@ -372,7 +372,13 @@ button.studio-tree-chevron:hover {
   max-width: 1220px;
   margin: 0 auto;
   padding: 30px 42px 64px;
-  animation: studio-enter var(--duration-fast) var(--ease-out);
+  animation: showai-fade-in var(--duration-base) var(--ease-out);
+}
+/* A page or tab that comes into view fades in where it stands. Hidden tabs
+ * keep their content with display: none, so showing one replays this. */
+.studio-scroll > .surface-editor-shell,
+.studio-scroll > .studio-builtin-doc {
+  animation: showai-fade-in var(--duration-base) var(--ease-out);
 }
 .studio-library:has(> .studio-empty:only-child) {
   box-sizing: border-box;

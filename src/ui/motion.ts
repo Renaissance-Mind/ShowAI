@@ -68,3 +68,59 @@ export function exitKeyframes(style: ExitStyle): Keyframe[] {
       ];
   }
 }
+
+export interface RowBox {
+  top: number;
+  left: number;
+  width: number;
+  height: number;
+}
+
+export interface RowMotionPlan {
+  moves: { key: string; dx: number; dy: number }[];
+  enters: string[];
+  exits: string[];
+}
+
+/** Rows that move, appear or leave between two layouts of the same list. */
+export const ROW_MOTION_LIMIT = 200;
+
+/**
+ * Plans a FLIP pass between two measured layouts. Only rows that touch the
+ * visible band move, and a change larger than `limit` rows is not animated,
+ * so expanding a big folder or loading a long directory stays immediate.
+ */
+export function planRowMotion(
+  before: ReadonlyMap<string, RowBox>,
+  after: ReadonlyMap<string, RowBox>,
+  view: { top: number; bottom: number },
+  limit = ROW_MOTION_LIMIT,
+): RowMotionPlan | null {
+  const visible = (box: RowBox | undefined) =>
+    !!box && box.top + box.height > view.top && box.top < view.bottom;
+  const moves: RowMotionPlan["moves"] = [];
+  const enters: string[] = [];
+  const exits: string[] = [];
+  let changed = 0;
+  for (const [key, next] of after) {
+    const old = before.get(key);
+    if (!old) {
+      changed++;
+      if (visible(next)) enters.push(key);
+      continue;
+    }
+    const dx = old.left - next.left;
+    const dy = old.top - next.top;
+    if (Math.abs(dx) < 0.5 && Math.abs(dy) < 0.5) continue;
+    changed++;
+    if (visible(old) || visible(next)) moves.push({ key, dx, dy });
+  }
+  for (const [key, old] of before) {
+    if (after.has(key)) continue;
+    changed++;
+    if (visible(old)) exits.push(key);
+  }
+  if (changed > limit) return null;
+  if (!moves.length && !enters.length && !exits.length) return null;
+  return { moves, enters, exits };
+}
