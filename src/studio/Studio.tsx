@@ -812,6 +812,16 @@ export default function Studio() {
   const [importers, setImporters] = useState<
     { id: string; name: string; extensions: string[] }[]
   >([]);
+  const loadImporters = () => {
+    if (!selectedProject) return setImporters([]);
+    void desktop
+      .invoke<{ importers: { id: string; name: string; extensions: string[] }[] }>(
+        "imports:importers",
+        { projectId: selectedProject },
+      )
+      .then((result) => setImporters(result.importers), report);
+  };
+  useEffect(loadImporters, [selectedProject]);
   const [packagingDecision, setPackagingDecision] = useState<{
     plan: PackagingPlan;
     decide: (decisions: PackagingDecisions | null) => void;
@@ -2891,13 +2901,8 @@ export default function Studio() {
   }
   openSearchRef.current = () => {
     setDialog({ type: "quickJump" });
-    if (selectedProject)
-      void desktop
-        .invoke<{ importers: { id: string; name: string; extensions: string[] }[] }>(
-          "imports:importers",
-          { projectId: selectedProject },
-        )
-        .then((result) => setImporters(result.importers), report);
+    // A library importer saved since the project opened shows up too.
+    loadImporters();
   };
   function showDirectoryCreationMenu(
     anchor: HTMLElement,

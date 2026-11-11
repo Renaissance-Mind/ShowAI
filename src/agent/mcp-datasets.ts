@@ -53,10 +53,12 @@ function recordQueryInput(value: unknown) {
   if (!result.success)
     throw new CoreError(
       "INVALID_DATA",
-      "query " +
-        result.error.issues
-          .map((issue) => `${issue.path.join(".") || "query"} ${issue.message}`)
-          .join("; "),
+      result.error.issues
+        .map(
+          (issue) =>
+            `query${issue.path.map((part) => `.${String(part)}`).join("")} ${issue.message}`,
+        )
+        .join("; "),
     );
   return result.data as { filter?: unknown; sorts?: unknown; search?: string };
 }
