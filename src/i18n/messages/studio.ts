@@ -25,6 +25,7 @@ export default defineMessages("studio", {
     pagesMoved: "已移动 {count} 项",
     pagesDeleted: "已删除 {count} 项",
     batchPageFailed: "已完成 {completed} 项，剩余 {remaining} 项未完成：{error}",
+    importPartlyFailed: "已导入 {completed} 个页面，{remaining} 个未导入：{error}",
     folderMissing: "这个文件夹已不存在。",
     directoryView: "视图",
     libraryUndo: "撤销目录操作",
@@ -248,6 +249,7 @@ export default defineMessages("studio", {
     pagesMoved: "Moved {count} items",
     pagesDeleted: "Deleted {count} items",
     batchPageFailed: "Completed {completed} items; {remaining} items remain: {error}",
+    importPartlyFailed: "Imported {completed} pages; {remaining} were not imported: {error}",
 
     "scope.builtin": "Built-in",
     "scope.global": "Global",

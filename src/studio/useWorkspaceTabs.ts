@@ -8,6 +8,7 @@ import {
   moveWorkspaceTab,
   parseWorkspaceTabs,
   pruneWorkspace,
+  relocateWorkspace,
   sameEntry,
   sameLocation,
   setWorkspaceAssistantOpen,
@@ -274,6 +275,14 @@ export function useWorkspaceTabs({
     /** Removes history entries for deleted content from every tab. */
     prune: (gone: (location: WorkspaceLocation) => boolean) => {
       const next = pruneWorkspace(current.current, gone);
+      if (next !== current.current) publish(next);
+    },
+    /** Rewrites history entries for content that moved to another project. */
+    relocate: (
+      moved: (location: WorkspaceLocation) => boolean,
+      projectId: string,
+    ) => {
+      const next = relocateWorkspace(current.current, moved, projectId);
       if (next !== current.current) publish(next);
     },
     select,

@@ -16,6 +16,7 @@ import { useTranslator } from "../i18n/react";
 import commonMessages from "../i18n/messages/common";
 import sidebarMessages from "../i18n/messages/sidebar";
 import { writerName } from "./external-change";
+import { clientIsMac, isDeleteShortcut } from "./keyboard-shortcuts";
 import "./external-change.css";
 
 const translate = translator(sidebarMessages);
@@ -94,6 +95,7 @@ export default memo(function RecentPages({
   query,
   onOpen,
   onMenu,
+  onCommand,
   onCreateProject,
   welcome,
 }: {
@@ -107,6 +109,8 @@ export default memo(function RecentPages({
     anchor: HTMLElement,
     point?: LibraryMenuPoint,
   ) => void;
+  /** F2 renames and Delete (⌘⌫ on macOS) deletes, as the context menu does. */
+  onCommand: (page: RecentPage, command: "rename" | "delete") => void;
   onCreateProject: () => void;
 }) {
   const t = useTranslator(sidebarMessages);
@@ -189,6 +193,11 @@ export default memo(function RecentPages({
               });
             }}
             onKeyDown={(event) => {
+              if (event.key === "F2" || isDeleteShortcut(event, clientIsMac())) {
+                event.preventDefault();
+                onCommand(page, event.key === "F2" ? "rename" : "delete");
+                return;
+              }
               if (
                 event.key === "ContextMenu" ||
                 (event.shiftKey && event.key === "F10")

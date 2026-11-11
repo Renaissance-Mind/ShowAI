@@ -200,8 +200,14 @@ function PageContent({
   );
   const editors = useContext(WorkspaceEditorContext);
   useLayoutEffect(() => {
-    editors?.restoreFocus();
-    const frame = requestAnimationFrame(() => editors?.restoreFocus());
+    // A page opened from a sidebar or directory row leaves focus on that row,
+    // so its F2 and Delete keep acting on the row.
+    const restore = () => {
+      if (!document.activeElement?.closest("[data-library-id]"))
+        editors?.restoreFocus();
+    };
+    restore();
+    const frame = requestAnimationFrame(restore);
     return () => cancelAnimationFrame(frame);
   }, [editors, view.key]);
   if (!state.draft) return null;

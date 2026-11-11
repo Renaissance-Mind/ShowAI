@@ -250,7 +250,11 @@ import {
   type RestoreTarget,
 } from "./LibraryNavigationDialogs";
 import { clientIsMac, isDeleteShortcut } from "./keyboard-shortcuts";
-import { tabShortcut, type TabCommand } from "../workbench/tab-shortcuts";
+import {
+  commandKey,
+  tabShortcut,
+  type TabCommand,
+} from "../workbench/tab-shortcuts";
 import { useWindowFullscreen } from "./useWindowFullscreen";
 import { ComponentCatalog, ComponentNavigation } from "./ComponentCatalog";
 import {
@@ -768,6 +772,7 @@ export default function Studio() {
     decide: (decisions: PackagingDecisions | null) => void;
   } | null>(null);
   const dialogRef = useRef(dialog);
+  const creatingPage = useRef(false);
   dialogRef.current = dialog;
   const toasts = useToasts();
   const { show: showToast, clear: clearToasts } = toasts;
@@ -848,6 +853,8 @@ export default function Studio() {
     point?: LibraryMenuPoint;
     pageTools?: boolean;
     creationOnly?: boolean;
+    /** The directory's selected entries, acted on together. */
+    selection?: boolean;
   } | null>(null);
   const [projectsMenu, setProjectsMenu] = useState<HTMLElement | null>(null);
   const [newMenu, setNewMenu] = useState<HTMLElement | null>(null);
@@ -1006,7 +1013,7 @@ export default function Studio() {
     };
     const key = (event: KeyboardEvent) => {
       if (
-        (event.metaKey || event.ctrlKey) &&
+        commandKey(event, clientIsMac()) &&
         !event.altKey &&
         event.key.toLowerCase() === "r"
       ) {
@@ -1228,6 +1235,48 @@ export default function Studio() {
               (!!location.folderId && !!gone.folders?.has(location.folderId)))),
     );
   }
+  /** History entries follow pages and folders moved to another project. */
+  function relocateMoved(
+    projectId: string,
+    moved: { folders: Set<string>; pages: Set<string> },
+    destination: string,
+  ) {
+    if (projectId === destination) return;
+    workspace.relocate(
+      (location) =>
+        location.projectId === projectId &&
+        (location.view === "page"
+          ? !!location.pageId && moved.pages.has(location.pageId)
+          : location.view === "project" &&
+            !!location.folderId &&
+            moved.folders.has(location.folderId)),
+      destination,
+    );
+  }
+  // Pages deleted elsewhere, by an Agent or another window, leave every
+  // tab's history; the page on screen keeps its entry.
+  const openPageId = page.draft?.id;
+  useEffect(() => {
+    const listed = new Map<string, Set<string>>();
+    workspace.prune((location) => {
+      if (
+        location.view !== "page" ||
+        !location.projectId ||
+        !location.pageId ||
+        (location.projectId === page.projectId && location.pageId === openPageId)
+      )
+        return false;
+      const pages = contents[location.projectId]?.pages;
+      if (!pages) return false;
+      let ids = listed.get(location.projectId);
+      if (!ids)
+        listed.set(
+          location.projectId,
+          (ids = new Set(pages.map((item) => item.id))),
+        );
+      return !ids.has(location.pageId);
+    });
+  }, [contents, openPageId]);
   // A library the App just created gets its sample project once.
   const sampleProject = useSampleProject(
     info && capabilities.manageLibrary ? info.home : null,
@@ -1466,8 +1515,15 @@ export default function Studio() {
   useEffect(() => {
     const handle = (event: KeyboardEvent) => {
       if (event.key === "Escape") setContextMenu(null);
-      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "n") {
+      if (
+        commandKey(event, clientIsMac()) &&
+        !event.altKey &&
+        !event.shiftKey &&
+        event.key.toLowerCase() === "n"
+      ) {
         event.preventDefault();
+        // An open dialog keeps what was typed into it.
+        if (dialogRef.current) return;
         if (selectedRef.current)
           void beginNewPage(
             selectedRef.current,
@@ -1483,7 +1539,7 @@ export default function Studio() {
   useEffect(() => {
     const search = (event: KeyboardEvent) => {
       if (
-        !(event.metaKey || event.ctrlKey) ||
+        !commandKey(event, clientIsMac()) ||
         event.altKey ||
         event.shiftKey ||
         event.key.toLowerCase() !== "k" ||
@@ -1928,13 +1984,15 @@ export default function Studio() {
       : dialog?.type === "newPage"
         ? dialog.parentId
         : selectedFolder;
-    if (!projectId) return false;
-    if (!(await page.flushOrDefer())) {
-      setDialog(null);
-      return draftHeld();
-    }
+    // A second click while the open page saves must not create another page.
+    if (!projectId || creatingPage.current) return false;
+    creatingPage.current = true;
     setBusy(true);
     try {
+      if (!(await page.flushOrDefer())) {
+        setDialog(null);
+        return draftHeld();
+      }
       const created = await desktop.invoke<LoadedPage>("pages:create", {
         projectId,
         parentId,
@@ -1976,6 +2034,7 @@ export default function Studio() {
       report(reason, { action: operation("op.createPage") });
       return false;
     } finally {
+      creatingPage.current = false;
       setBusy(false);
     }
   }
@@ -2086,6 +2145,14 @@ export default function Studio() {
         retry: runSaveLocalCopy,
       }),
     );
+  /** The draft becomes a new page beside the original, which stays as saved. */
+  async function keepDraftAsCopy() {
+    const copy = await page.keepCopy();
+    if (!copy) return;
+    if (page.projectId) await refreshProjects([page.projectId]);
+    else await refresh();
+    setNotice(t("draftKeptAsCopy"));
+  }
   /** A blank page with the Agent panel open and its input focused. */
   async function createPageForAgent(directory: {
     projectId: string;
@@ -2113,11 +2180,27 @@ export default function Studio() {
     const chosen = files.filter((file) => !!file);
     if (!chosen.length) return;
     let imported: LoadedPage | undefined;
-    for (const file of chosen)
-      imported = await desktop.invoke<LoadedPage>("pages:import", {
-        ...directory,
-        artifact: importedArtifact(file),
-      });
+    let completed = 0;
+    try {
+      for (const file of chosen) {
+        imported = await desktop.invoke<LoadedPage>("pages:import", {
+          ...directory,
+          artifact: importedArtifact(file),
+        });
+        completed++;
+      }
+    } catch (reason) {
+      if (!completed) throw reason;
+      // The pages already imported show up; the failure names what is left.
+      await refreshProjects([directory.projectId]);
+      throw new Error(
+        t("importPartlyFailed", {
+          completed,
+          remaining: chosen.length - completed,
+          error: errorMessage(reason),
+        }),
+      );
+    }
     if (chosen.length === 1 && imported) {
       setContents((current) =>
         withCreatedPage(current, directory.projectId, imported),
@@ -2290,11 +2373,12 @@ export default function Studio() {
     point?: LibraryMenuPoint,
     pageTools = false,
     creationOnly = false,
+    selection = false,
   ) =>
     setContextMenu((current) =>
       !point && current?.anchor === anchor && current.target.id === target.id
         ? null
-        : { target, anchor, point, pageTools, creationOnly },
+        : { target, anchor, point, pageTools, creationOnly, selection },
     );
   function creationMenuItems(target: LibraryTarget): LibraryContextMenuItem[] {
     const directory = {
@@ -2803,7 +2887,14 @@ export default function Studio() {
   }
   const replayLibraryRef = useRef(replayLibraryChange);
   replayLibraryRef.current = replayLibraryChange;
+  // Deleting a row leaves focus on the body; the last place the person
+  // worked in decides whether Undo then belongs to the library.
+  const libraryLast = useRef(false);
   useEffect(() => {
+    const libraryAreas = ".studio-sidebar,.studio-library,.studio-topbar";
+    const place = (event: Event) => {
+      libraryLast.current = !!(event.target as Element).closest?.(libraryAreas);
+    };
     const key = (event: KeyboardEvent) => {
       if (!(event.metaKey || event.ctrlKey) || event.key.toLowerCase() !== "z")
         return;
@@ -2811,9 +2902,10 @@ export default function Studio() {
       if (target.closest("input,textarea,[contenteditable=true],.page-surface"))
         return;
       if (
-        !target.closest(".studio-sidebar,.studio-library,.studio-topbar") &&
+        !target.closest(libraryAreas) &&
         view !== "project" &&
-        view !== "projects"
+        view !== "projects" &&
+        !(target === document.body && libraryLast.current)
       )
         return;
       if (!libraryHistory.current.next(event.shiftKey)) return;
@@ -2826,7 +2918,13 @@ export default function Studio() {
       );
     };
     window.addEventListener("keydown", key, true);
-    return () => window.removeEventListener("keydown", key, true);
+    window.addEventListener("pointerdown", place, true);
+    window.addEventListener("focusin", place, true);
+    return () => {
+      window.removeEventListener("keydown", key, true);
+      window.removeEventListener("pointerdown", place, true);
+      window.removeEventListener("focusin", place, true);
+    };
   }, [view]);
   function reorderLibraryItem(drop: LibraryDrop) {
     const source = drop.source;
@@ -3040,7 +3138,10 @@ export default function Studio() {
         );
         moved = true;
         if (sidebarHome.current === home) setOrganization(saved);
-        if (crossProject) page.sessions.forgetPage(source.projectId, source.id);
+        if (crossProject) {
+          page.sessions.forgetPage(source.projectId, source.id);
+          relocateMoved(source.projectId, deletionScope(source), drop.projectId!);
+        }
         else if (source.kind === "page") page.sessions.invalidate(change);
         if (activePage && !crossProject)
           setSelectedFolder(drop.parentId ?? null);
@@ -3671,6 +3772,7 @@ export default function Studio() {
     });
     if (target.kind === "page")
       page.sessions.forgetPage(target.projectId, target.id);
+    relocateMoved(target.projectId, deletionScope(target), destination.projectId);
   }
   /**
    * Saves the open pages several library items hold, and closes the open page
@@ -3802,15 +3904,16 @@ export default function Studio() {
         rememberLibraryChange(entry);
         notifyWithUndo(message, () => undoLibraryChange(entry));
       } else {
-        rememberLibraryChange({
+        const entry: LibraryChange = {
           kind: "batchMove",
           moves: targets.map((target) => ({
             target,
             from: { projectId: target.projectId, parentId: target.parentId },
             to: destination!,
           })),
-        });
-        setNotice(message);
+        };
+        rememberLibraryChange(entry);
+        notifyWithUndo(message, () => undoLibraryChange(entry));
       }
     } catch (reason) {
       setDialog((current) =>
@@ -4086,7 +4189,7 @@ export default function Studio() {
       void operation().catch(report);
     };
     const key = (event: KeyboardEvent) => {
-      const shortcut = tabShortcut(event);
+      const shortcut = tabShortcut(event, clientIsMac());
       if (!shortcut || event.defaultPrevented || dialogRef.current) return;
       event.preventDefault();
       event.stopPropagation();
@@ -4153,9 +4256,11 @@ export default function Studio() {
     const operations: Record<MenuCommand, () => Promise<unknown> | void> = {
       newProject: () => setDialog({ type: "project" }),
       newPage: () =>
-        selectedRef.current
-          ? beginNewPage(selectedRef.current, selectedFolderRef.current)
-          : setDialog({ type: "project" }),
+        dialogRef.current
+          ? undefined
+          : selectedRef.current
+            ? beginNewPage(selectedRef.current, selectedFolderRef.current)
+            : setDialog({ type: "project" }),
       newTab: () => {
         if (capabilities.tabs && workspaceReady) return workspace.add();
       },
@@ -4409,6 +4514,14 @@ export default function Studio() {
         rowHandlers.current.pageTarget(item, item.projectId),
         anchor,
         point,
+      ),
+    [],
+  );
+  const recentCommand = useCallback(
+    (item: RecentPage, command: "rename" | "delete") =>
+      rowHandlers.current.libraryKeyCommand(
+        rowHandlers.current.pageTarget(item, item.projectId),
+        command,
       ),
     [],
   );
@@ -5483,14 +5596,7 @@ export default function Studio() {
                 }}
                 platform={info?.platform}
                 onRetry={action(page.retry)}
-                onKeepCopy={action(async () => {
-                  const copy = await page.keepCopy();
-                  if (copy) {
-                    if (page.projectId) await refreshProjects([page.projectId]);
-                    else await refresh();
-                    setNotice(t("draftKeptAsCopy"));
-                  }
-                })}
+                onKeepCopy={action(keepDraftAsCopy)}
                 onLibrarySpace={
                   capabilities.manageLibrary
                     ? () => {
@@ -5557,7 +5663,11 @@ export default function Studio() {
                       >
                         {t("compareAndMerge")}
                       </button>
-                    ) : null}
+                    ) : (
+                      <button onClick={action(keepDraftAsCopy)}>
+                        {t("keepAsCopy")}
+                      </button>
+                    )}
                     <button
                       className="is-destructive"
                       onClick={() => setDialog({ type: "discardDraft" })}
@@ -5621,6 +5731,12 @@ export default function Studio() {
                 ) {
                   event.preventDefault();
                   pageSelection.selectAll();
+                } else if (
+                  pageSelection.ids.length &&
+                  isDeleteShortcut(event, clientIsMac())
+                ) {
+                  event.preventDefault();
+                  beginBatchPages("delete");
                 }
               }}
               onPointerDown={directoryMarquee.onPointerDown}
@@ -5638,6 +5754,9 @@ export default function Studio() {
                       : projectTarget(project),
                     event.currentTarget,
                     { x: event.clientX, y: event.clientY },
+                    false,
+                    false,
+                    pageSelection.ids.length > 0,
                   );
                 }}
             >
@@ -5752,6 +5871,7 @@ export default function Studio() {
                       query={deferredQuery}
                       onOpen={openRecent}
                       onMenu={showRecentMenu}
+                      onCommand={recentCommand}
                       onCreateProject={beginProject}
                       welcome={
                         !workspaceReady
@@ -5784,16 +5904,27 @@ export default function Studio() {
                                     ".studio-row-menu",
                                   );
                                 if (anchor)
-                                  showMenu(target, anchor, {
-                                    x: event.clientX,
-                                    y: event.clientY,
-                                  });
+                                  showMenu(
+                                    target,
+                                    anchor,
+                                    { x: event.clientX, y: event.clientY },
+                                    false,
+                                    false,
+                                    pageSelection.ids.includes(target.id),
+                                  );
                               }}
                               onKeyDown={(event) => {
-                                if (
-                                  event.key === "F2" ||
-                                  isDeleteShortcut(event, clientIsMac())
-                                ) {
+                                const deleting = isDeleteShortcut(
+                                  event,
+                                  clientIsMac(),
+                                );
+                                if (deleting && pageSelection.ids.length) {
+                                  event.preventDefault();
+                                  event.stopPropagation();
+                                  beginBatchPages("delete");
+                                  return;
+                                }
+                                if (event.key === "F2" || deleting) {
                                   event.preventDefault();
                                   libraryKeyCommand(
                                     target,
@@ -6289,13 +6420,30 @@ export default function Studio() {
             }
             point={contextMenu.point}
             label={
-              contextMenu.creationOnly
-                ? t("addContent")
-                : t("itemActions", { title: contextMenu.target.title })
+              contextMenu.selection
+                ? t("pageSelectionActions")
+                : contextMenu.creationOnly
+                  ? t("addContent")
+                  : t("itemActions", { title: contextMenu.target.title })
             }
             onClose={() => setContextMenu(null)}
             items={
-              contextMenu.creationOnly
+              contextMenu.selection
+                ? [
+                    {
+                      label: t("move"),
+                      icon: <Folder size={15} />,
+                      onSelect: () => beginBatchPages("move"),
+                    },
+                    {
+                      label: tc("delete"),
+                      icon: <Trash2 size={15} />,
+                      danger: true,
+                      separatorBefore: true,
+                      onSelect: () => beginBatchPages("delete"),
+                    },
+                  ]
+                : contextMenu.creationOnly
                 ? creationMenuItems(contextMenu.target)
                 : [
                     ...(capabilities.tabs && !contextMenu.pageTools ? [
