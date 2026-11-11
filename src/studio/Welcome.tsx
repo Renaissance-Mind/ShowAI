@@ -41,6 +41,8 @@ import "./agent-settings.css";
 import "./onboarding.css";
 
 const PROMPTS = ["mortgage", "foldable", "attention"] as const;
+/** After this, a detection still running shows its result as not found. */
+const DETECTION_TIMEOUT = 20000;
 
 /**
  * The first-run page: "Get started" in the built-in documentation, opened when a new App
@@ -77,6 +79,14 @@ export default function Welcome({
   const desktopPlugins =
     !!info && workbenchCapabilities(info.platform).localPlugins;
   const plugins = usePluginHosts(desktopPlugins ? info.home : null);
+  const [detectionOverdue, setDetectionOverdue] = useState(false);
+  useEffect(() => {
+    setDetectionOverdue(false);
+    if (!desktopPlugins || plugins.scanned) return;
+    const timer = setTimeout(() => setDetectionOverdue(true), DETECTION_TIMEOUT);
+    return () => clearTimeout(timer);
+  }, [desktopPlugins, plugins.scanned]);
+  const detecting = desktopPlugins && !plugins.scanned && !detectionOverdue;
   const agent = useAgentStatus(!!info, null);
   const executionLabel = useExecutionLabel(agent.status);
   const readiness = agent.status ? agentReadiness(agent.status) : null;
@@ -109,8 +119,7 @@ export default function Welcome({
   );
   const noHost =
     desktopPlugins &&
-    plugins.scanned &&
-    !plugins.error &&
+    ((plugins.scanned && !plugins.error) || detectionOverdue) &&
     !plugins.hosts.some(
       (host) => host.host !== "deepseek" && !!host.executable,
     );
@@ -120,7 +129,7 @@ export default function Welcome({
     desktopPlugins &&
     plugins.hosts.some((host) => host.host !== "deepseek" && !!host.executable);
   const promptMode: "builtin" | "copy" | "copyOnly" | null =
-    desktopPlugins && !plugins.scanned
+    detecting
       ? null
       : externalHost
         ? "copy"
@@ -157,7 +166,7 @@ export default function Welcome({
       >
         <h3 id="welcome-connect">{t("connect.title")}</h3>
         <ul className="studio-welcome-hosts">
-          {desktopPlugins && !plugins.scanned && (
+          {detecting && (
             <li className="studio-welcome-host" role="status">
               <Loader2 size={14} className="studio-spin" aria-hidden="true" />
               <span className="studio-welcome-host-state">

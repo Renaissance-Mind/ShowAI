@@ -82,6 +82,8 @@ export interface PluginInstallReceipt {
 }
 
 const marketplaceName = "showai-desktop";
+/** How long a status scan waits for one host's `plugin list`. */
+const STATUS_TIMEOUT = 15000;
 const identity = `showai@${marketplaceName}`;
 export const desktopPluginActions = new Set([
   "plugins:status",
@@ -325,7 +327,11 @@ export class DesktopPluginInstaller {
     };
   }
 
-  private async command(executable: string, args: string[]) {
+  private async command(
+    executable: string,
+    args: string[],
+    timeout = 120000,
+  ) {
     const env: NodeJS.ProcessEnv = {
       ...process.env,
       PATH: executablePaths().join(delimiter),
@@ -335,7 +341,7 @@ export class DesktopPluginInstaller {
     const result = await execute(executable, ["plugin", ...args], {
       env,
       cwd: this.options.root,
-      timeout: 120000,
+      timeout,
     });
     if (result.code !== 0)
       throw new PluginInstallError(
@@ -355,8 +361,9 @@ export class DesktopPluginInstaller {
     host: "codex" | "claude",
     executable: string,
     args: string[],
+    timeout?: number,
   ) {
-    const output = await this.command(executable, args);
+    const output = await this.command(executable, args, timeout);
     try {
       return JSON.parse(output);
     } catch {
@@ -473,7 +480,13 @@ export class DesktopPluginInstaller {
     expected?: Promise<string>,
   ): Promise<PluginInstallation> {
     if (host === "deepseek") return this.inspectDsh(executable, expected);
-    const data = await this.listJson(host, executable, ["list", "--json"]);
+    // A host CLI that stops answering must not hold the whole scan.
+    const data = await this.listJson(
+      host,
+      executable,
+      ["list", "--json"],
+      STATUS_TIMEOUT,
+    );
     const items = host === "codex" ? data?.installed : data;
     if (!Array.isArray(items)) throw this.tooOld(host, JSON.stringify(data));
     const receipt = await readFile(
