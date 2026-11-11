@@ -86,13 +86,14 @@
   {
     "kind": "database",
     "name": "数据库",
-    "description": "带筛选、排序和表格/看板/列表/日历视图的数据库，可保存多个命名视图。单元格支持文字、数字、选择、复选框、链接、日期和页面链接；日历可按月、按周（含时间轴）或以热力图查看。",
+    "description": "带筛选、排序和表格/看板/列表/日历视图的数据库，可保存多个命名视图。单元格支持文字、数字、单选、多选、复选框、链接、日期、页面链接、关联其他共享数据的记录、公式和汇总，也可以使用组件库里声明为字段类型的组件；视图可按条件组筛选、按多个属性排序；日历可按月、按周（含时间轴）或以热力图查看。",
     "scenarios": [
       "整理可按字段比较的记录，例如论文的任务、方法、数据集与来源链接。",
       "跟踪有阶段状态的事项，例如待阅读、已阅读、已复现的论文清单。",
       "把一组页面当作记录管理，例如论文笔记、会议纪要或方案文档：每行用页面属性链接到对应页面，再用状态、日期等属性筛选和分组。",
       "把带日期的事项排进月历或周历，例如一周的时间安排、会议与截止日期。",
-      "用热力图统计每天的打卡或记录次数，查看连续天数，例如习惯打卡、训练记录。"
+      "用热力图统计每天的打卡或记录次数，查看连续天数，例如习惯打卡、训练记录。",
+      "把两份共享数据关联起来，例如任务关联项目：在项目一侧看到它的任务，用汇总统计任务工时，用公式计算进度。"
     ],
     "defaultData": {
       "title": "数据库",
@@ -130,7 +131,12 @@
                   "checkbox",
                   "url",
                   "date",
-                  "page"
+                  "page",
+                  "multiSelect",
+                  "relation",
+                  "formula",
+                  "rollup",
+                  "custom"
                 ]
               },
               "options": {
@@ -147,6 +153,111 @@
               "titleColumn": {
                 "type": "string",
                 "description": "仅 page 列：与链接页面标题保持一致的 text 列 id。"
+              },
+              "colors": {
+                "type": "object",
+                "additionalProperties": {
+                  "enum": [
+                    "gray",
+                    "brown",
+                    "orange",
+                    "yellow",
+                    "green",
+                    "blue",
+                    "purple",
+                    "pink",
+                    "red"
+                  ]
+                },
+                "description": "仅 select 与 multiSelect 列：选项的颜色；未列出的选项按位置取色。"
+              },
+              "relation": {
+                "type": "object",
+                "properties": {
+                  "dataset": {
+                    "type": "string",
+                    "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$"
+                  },
+                  "project": {
+                    "type": "string"
+                  },
+                  "reverse": {
+                    "type": "object",
+                    "properties": {
+                      "name": {
+                        "type": "string"
+                      }
+                    },
+                    "additionalProperties": false
+                  }
+                },
+                "required": ["dataset"],
+                "additionalProperties": false,
+                "description": "仅 relation 列：关联的共享数据（值为 {columns, rows}）；单元格是该数据中记录 id 的列表。reverse 让绑定该数据的数据库显示反向关联列。"
+              },
+              "formula": {
+                "type": "object",
+                "properties": {
+                  "expression": {
+                    "type": "string",
+                    "maxLength": 4000
+                  },
+                  "kind": {
+                    "enum": ["text", "number", "date", "boolean", "list"]
+                  }
+                },
+                "required": ["expression"],
+                "additionalProperties": false,
+                "description": "仅 formula 列：JavaScript 表达式，用 prop(\"属性名或 id\") 读取同一记录的属性，在处理脚本的沙箱中逐条计算；kind 决定筛选和排序方式。出错或循环引用时该单元格显示错误，值不保存。"
+              },
+              "rollup": {
+                "type": "object",
+                "properties": {
+                  "relation": {
+                    "type": "string"
+                  },
+                  "column": {
+                    "type": "string"
+                  },
+                  "aggregate": {
+                    "enum": [
+                      "count",
+                      "sum",
+                      "average",
+                      "min",
+                      "max",
+                      "unique",
+                      "percentChecked"
+                    ]
+                  }
+                },
+                "required": ["relation", "aggregate"],
+                "additionalProperties": false,
+                "description": "仅 rollup 列：对 relation 列关联的记录的 column 做统计；count 不需要 column。值由软件计算，不保存。"
+              },
+              "component": {
+                "type": "object",
+                "properties": {
+                  "componentId": {
+                    "type": "string"
+                  },
+                  "version": {
+                    "type": "string"
+                  },
+                  "integrity": {
+                    "type": "string"
+                  },
+                  "scope": {
+                    "type": "string"
+                  }
+                },
+                "required": ["componentId", "version"],
+                "additionalProperties": false,
+                "description": "仅 custom 列：声明 role=database-field 的组件精确版本；组件不可用时单元格只读显示原值。"
+              },
+              "config": {
+                "type": "object",
+                "description": "仅 custom 列：传给字段类型组件的设置，符合该组件的参数 schema。"
               }
             },
             "required": ["id", "name", "type"]
@@ -163,7 +274,18 @@
             },
             "required": ["id"],
             "additionalProperties": {
-              "type": ["string", "number", "boolean"]
+              "anyOf": [
+                {
+                  "type": ["string", "number", "boolean"]
+                },
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "maxItems": 1000
+                }
+              ]
             }
           }
         },
@@ -197,7 +319,7 @@
               },
               "groupBy": {
                 "type": "string",
-                "description": "看板分组的 select 列 id。"
+                "description": "看板分组的 select、multiSelect 或 checkbox 列 id。"
               },
               "sort": {
                 "oneOf": [
@@ -220,18 +342,126 @@
                 ]
               },
               "filter": {
-                "type": "object",
-                "properties": {
-                  "column": {
-                    "type": "string"
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "join": {
+                        "enum": ["and", "or"]
+                      },
+                      "conditions": {
+                        "type": "array",
+                        "maxItems": 50,
+                        "items": {
+                          "oneOf": [
+                            {
+                              "type": "object",
+                              "properties": {
+                                "column": {
+                                  "type": "string"
+                                },
+                                "operator": {
+                                  "enum": [
+                                    "contains",
+                                    "notContains",
+                                    "is",
+                                    "isNot",
+                                    "isEmpty",
+                                    "isNotEmpty",
+                                    "gt",
+                                    "lt",
+                                    "gte",
+                                    "lte",
+                                    "between",
+                                    "before",
+                                    "after",
+                                    "onOrBefore",
+                                    "onOrAfter",
+                                    "within",
+                                    "includesAny",
+                                    "includesAll",
+                                    "includesNone",
+                                    "checked",
+                                    "unchecked"
+                                  ]
+                                },
+                                "value": {}
+                              },
+                              "required": ["column", "operator"],
+                              "additionalProperties": false
+                            },
+                            {
+                              "type": "object",
+                              "properties": {
+                                "join": {
+                                  "enum": ["and", "or"]
+                                },
+                                "conditions": {
+                                  "type": "array",
+                                  "maxItems": 50,
+                                  "items": {
+                                    "type": "object",
+                                    "properties": {
+                                      "column": {
+                                        "type": "string"
+                                      },
+                                      "operator": {
+                                        "enum": [
+                                          "contains",
+                                          "notContains",
+                                          "is",
+                                          "isNot",
+                                          "isEmpty",
+                                          "isNotEmpty",
+                                          "gt",
+                                          "lt",
+                                          "gte",
+                                          "lte",
+                                          "between",
+                                          "before",
+                                          "after",
+                                          "onOrBefore",
+                                          "onOrAfter",
+                                          "within",
+                                          "includesAny",
+                                          "includesAll",
+                                          "includesNone",
+                                          "checked",
+                                          "unchecked"
+                                        ]
+                                      },
+                                      "value": {}
+                                    },
+                                    "required": ["column", "operator"],
+                                    "additionalProperties": false
+                                  }
+                                }
+                              },
+                              "required": ["join", "conditions"],
+                              "additionalProperties": false
+                            }
+                          ]
+                        }
+                      }
+                    },
+                    "required": ["join", "conditions"],
+                    "additionalProperties": false
                   },
-                  "value": {
-                    "type": "string"
+                  {
+                    "type": "object",
+                    "properties": {
+                      "column": {
+                        "type": "string"
+                      },
+                      "value": {
+                        "type": "string"
+                      }
+                    },
+                    "required": ["column", "value"],
+                    "additionalProperties": false
                   }
-                },
-                "required": ["column", "value"],
-                "additionalProperties": false,
-                "description": "只显示该列等于 value 的记录。"
+                ],
+                "description": "条件组：join 为 and（全部满足）或 or（任一满足），conditions 是条件或嵌套一层的条件组；条件的运算符取决于列的类型。较早保存的 {column, value}（等于）仍可读取，修改视图时改写为条件组。"
               },
               "columnWidths": {
                 "type": "object",
@@ -241,6 +471,24 @@
                   "maximum": 1200
                 },
                 "description": "表格列宽（像素），键是列 id。"
+              },
+              "sorts": {
+                "type": "array",
+                "maxItems": 10,
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "column": {
+                      "type": "string"
+                    },
+                    "direction": {
+                      "enum": ["asc", "desc"]
+                    }
+                  },
+                  "required": ["column", "direction"],
+                  "additionalProperties": false
+                },
+                "description": "按顺序应用的排序；较早的单个 sort 仍可读取，修改视图时改写为 sorts。"
               }
             },
             "required": ["id", "name", "type"],

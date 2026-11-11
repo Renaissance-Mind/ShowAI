@@ -58,7 +58,7 @@ export function registerDatasetTools(
   const description = z.string().max(4000);
   const baseHash = z.string().min(1);
   const read = actionTool(
-    `Read shared datasets: list them, or read one's value, hash, status (ok/stale/empty), editable, warnings and the pages using it; path (e.g. a[id=o1].b) narrows the value. refresh:true fetches online data now. sinceHash (a hash you read earlier, e.g. from page_read datasetBases) returns record-level changes since then instead, paged with offset/limit.${
+    `Read shared datasets: list them, or read one's value, hash, status (ok/stale/empty), editable, warnings and the pages using it; path (e.g. a[id=o1].b) narrows the value. refresh:true fetches online data now. sinceHash (a hash you read earlier, e.g. from page_read datasetBases) returns record-level changes since then instead, paged with offset/limit. query {filter, sorts, search} on a database-shaped value ({columns, rows}) returns the matching records with derived values (relations, rollups, formulas), paged with offset/limit; filter is a group {join:and|or, conditions:[{column, operator, value?} | group]} as in a database view.${
       localFiles ? " out writes the value or comparison to a JSON file." : ""
     }`,
     {
@@ -74,6 +74,14 @@ export function registerDatasetTools(
           offset: z.number().int().nonnegative().optional(),
           limit: z.number().int().min(1).max(500).optional(),
           refresh: z.boolean().optional(),
+          query: z
+            .object({
+              filter: jsonObject.optional(),
+              sorts: z.array(jsonObject).max(10).optional(),
+              search: z.string().max(1000).optional(),
+            })
+            .strict()
+            .optional(),
           ...(localFiles
             ? {
                 out: z.string().min(1).max(4096).optional(),
@@ -88,6 +96,7 @@ export function registerDatasetTools(
           offset,
           limit,
           refresh,
+          query,
           out,
           overwrite,
         }) =>
@@ -103,6 +112,9 @@ export function registerDatasetTools(
                 limit: limit as number | undefined,
                 full: out !== undefined,
                 refresh: refresh === true,
+                ...(query
+                  ? { query: query as { filter?: unknown; sorts?: unknown } }
+                  : {}),
               },
             );
             if (out === undefined) return result;

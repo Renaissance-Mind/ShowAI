@@ -35,6 +35,13 @@ import { canonicalJson } from "../core/canonical";
 import { visitNodes } from "../surface/document.mjs";
 import { pageEntries, valueDiffEntries } from "./page-diff-view";
 import type { JsonSchema } from "../components/custom/types";
+import { recordTable } from "../datasets/derived-fields.mjs";
+import {
+  queryRecords,
+  validateFilter,
+  validateSorts,
+} from "../datasets/record-query.mjs";
+import { deriveDatabase } from "../core/database-derive";
 
 /** Side effects of component.ref.set that the save receipt reports. */
 export interface ComponentRefNotes {
@@ -109,8 +116,15 @@ export class DatasetService {
       full?: boolean;
       /** Fetch online data now instead of within its refresh interval. */
       refresh?: boolean;
+      /** Filter group, sort list and search over a {columns, rows} value. */
+      query?: { filter?: unknown; sorts?: unknown; search?: string };
     } = {},
   ) {
+    if (options.query !== undefined) {
+      if (options.sinceHash !== undefined)
+        invalidData("query and sinceHash cannot be combined.");
+      return this.query(projectId, datasetId, options);
+    }
     const record = await this.datasets.read(projectId, datasetId, {
       refresh: options.refresh,
     });
@@ -172,6 +186,93 @@ export class DatasetService {
       path,
       value: valueAt(record.dataset.value, path),
       references,
+    };
+  }
+
+  /**
+   * Records of a database-shaped value ({columns, rows}) that pass a filter
+   * group, in sort order, with derived values (relations, rollups, formulas)
+   * and the reverse relation columns of other datasets.
+   */
+  private async query(
+    projectId: string,
+    datasetId: string,
+    options: {
+      path?: unknown;
+      offset?: number;
+      limit?: number;
+      refresh?: boolean;
+      query?: { filter?: unknown; sorts?: unknown; search?: string };
+    },
+  ) {
+    const record = await this.datasets.read(projectId, datasetId, {
+      refresh: options.refresh,
+    });
+    const path = options.path === undefined ? [] : parsePath(options.path);
+    const table = recordTable(valueAt(record.dataset.value, path));
+    if (!table)
+      invalidData(
+        "query reads a value shaped like a database: {columns, rows}. Use path to point at it.",
+      );
+    const { filter, sorts = [], search } = options.query ?? {};
+    if (filter !== undefined)
+      validateFilter(filter, "query.filter", table.columns.filter((c) => c.type !== "custom"));
+    validateSorts(sorts, "query.sorts");
+    const derived = await deriveDatabase(
+      this.store,
+      projectId,
+      table as unknown as Record<string, unknown>,
+      path.length ? undefined : datasetId,
+    );
+    const values = (derived?.values ?? {}) as Record<string, Record<string, unknown>>;
+    const columns = [
+      ...table.columns,
+      ...((derived?.columns ?? []) as typeof table.columns),
+    ];
+    const matched = queryRecords(
+      table.rows,
+      columns,
+      {
+        filter: filter as never,
+        sorts: sorts as never,
+        search: typeof search === "string" ? search : undefined,
+      },
+      {
+        value: (row, column) =>
+          values[(row as { id: string }).id]?.[column.id] ?? row[column.id],
+        recordTitles: (column, ids) =>
+          ids.map(
+            (id) =>
+              (derived?.titles as Record<string, Record<string, string>>)?.[
+                column.relation?.dataset ?? ""
+              ]?.[id] ?? id,
+          ),
+      },
+    );
+    const offset = options.offset ?? 0,
+      limit = options.limit ?? 100;
+    const { value: _value, ...dataset } = record.dataset;
+    return {
+      dataset,
+      hash: record.hash,
+      ...(record.revision ? { revision: record.revision } : {}),
+      ...(path.length ? { path } : {}),
+      query: {
+        total: table.rows.length,
+        matched: matched.length,
+        offset,
+        ...(offset + limit < matched.length ? { nextOffset: offset + limit } : {}),
+        ...(derived?.columns && (derived.columns as unknown[]).length
+          ? { derivedColumns: derived.columns }
+          : {}),
+        records: matched.slice(offset, offset + limit).map((row) => ({
+          ...row,
+          ...values[row.id],
+        })),
+        ...(derived && Object.keys(derived.titles as object).length
+          ? { titles: derived.titles }
+          : {}),
+      },
     };
   }
 

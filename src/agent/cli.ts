@@ -91,6 +91,7 @@ Change pages (save and apply reply with a receipt; --response source adds the do
 Shared datasets (one value that blocks on several pages read and write; see guide datasets):
   datasets list --project PROJECT
   datasets read DATASET --project PROJECT [--path 'objectives[id=o1]'] [--refresh]
+  datasets read DATASET --project PROJECT --query QUERY.json   {filter, sorts, search} over {columns, rows}
   datasets create --project PROJECT --name NAME --input VALUE_OR_FROM_BLOCK.json
   datasets apply DATASET --project PROJECT --input operations.json --base-hash HASH
   datasets link [DATASET] --project PROJECT --file /abs/data.json|.csv|.tsv|.xlsx [--name NAME] [--use file|dataset] [--input VALUE.json]
@@ -996,9 +997,19 @@ async function runCliCommand(argv: string[]): Promise<unknown> {
       }
       if (action === "read") {
         requireCount(args, 3);
+        const query = option(args, "query");
         return service.datasetRead(await project(), id, {
           path: option(args, "path"),
           refresh: !!args.options.refresh,
+          ...(query
+            ? {
+                query: (await readJson(query)) as {
+                  filter?: unknown;
+                  sorts?: unknown;
+                  search?: string;
+                },
+              }
+            : {}),
         });
       }
       if (action === "create") {

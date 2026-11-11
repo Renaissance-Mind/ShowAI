@@ -7,7 +7,11 @@ import {
   withViews,
 } from "./database-views";
 import { validateDocument } from "../../portable/validation.mjs";
-import { queryRecords, readFilter } from "../../datasets/record-query.mjs";
+import {
+  queryRecords,
+  readFilter,
+  readSorts,
+} from "../../datasets/record-query.mjs";
 import type { DatabaseColumn, DatabaseView } from "./types";
 
 // Data in the shape the database saved before field registries: a single
@@ -76,7 +80,7 @@ describe("data saved before field registries", () => {
     expect(
       queryRecords(legacy.rows, columns, {
         filter: view.filter,
-        sorts: [view.sort],
+        sorts: readSorts(view as DatabaseView),
       }).map((row) => row.id),
     ).toEqual(["b", "c"]);
     expect(

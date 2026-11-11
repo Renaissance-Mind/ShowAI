@@ -31,11 +31,30 @@ import {
   type CatalogKind,
   type CatalogView,
 } from "./disclosure";
+import {
+  KIND_OPERATORS,
+  OPERATORS,
+  describeValueTypes,
+} from "../datasets/value-types.mjs";
 import type {
   CatalogScope,
   SaveTemplateInput,
   TemplateRecord,
 } from "../components/custom/types";
+/** Column settings each built-in field type takes, for Agents writing columns. */
+const DATABASE_FIELD_SETTINGS: Record<string, string> = {
+  select: "options: [text], colors?: {option: tone} (gray, brown, orange, yellow, green, blue, purple, pink, red)",
+  multiSelect:
+    "options: [text], colors?: {option: tone}; cell value is a list of options",
+  page: "folder?: folder id, titleColumn?: text column id; value showai://project/P/page/G",
+  relation:
+    "relation: {dataset: DATASET_ID, reverse?: {name}}; value is a list of record ids of that dataset ({columns, rows}); reverse shows the links on blocks bound to the target dataset",
+  formula:
+    "formula: {expression, kind?: text|number|date|boolean|list}; JavaScript expression over prop(\"Column name or id\"), run per record in the transform sandbox; errors and cycles show per cell",
+  rollup:
+    "rollup: {relation: relation column id, column?: column id of the related records, aggregate: count|sum|average|min|max|unique|percentChecked}",
+  date: "value YYYY-MM-DD or empty",
+};
 export interface CatalogSelection {
   projectId?: string;
   kind?: CatalogKind;
@@ -239,6 +258,50 @@ export class CatalogService {
       },
       refresh:
         "Compare revision after project/catalog changes. Reuse documentation only for the same exact version; historical page references remain authoritative. Explicit scope=global/published/all discovers shared resources.",
+    };
+  }
+
+  /**
+   * The database's field types: built-ins with their value kind and filter
+   * operators, and those library components contribute (role database-field).
+   */
+  private async databaseFieldTypes(projectId?: string) {
+    const contributed = (
+      await listComponents(this.store.root, projectId, { scope: "all" })
+    ).filter((item) => item.role === "database-field");
+    return {
+      builtin: describeValueTypes().map((type) => ({
+        ...type,
+        ...(DATABASE_FIELD_SETTINGS[type.type]
+          ? { settings: DATABASE_FIELD_SETTINGS[type.type] }
+          : {}),
+      })),
+      contributed: contributed.map((item) => ({
+        column: {
+          type: "custom",
+          component: {
+            componentId: item.id,
+            version: item.version,
+            integrity: item.integrity,
+            scope: item.scope,
+          },
+        },
+        name: item.name,
+        kind: item.databaseField!.valueKind,
+        operators:
+          item.databaseField!.operators ??
+          KIND_OPERATORS[item.databaseField!.valueKind],
+      })),
+      operators: OPERATORS,
+      views: {
+        filter:
+          "{join:'and'|'or', conditions:[{column, operator, value?} | {join, conditions:[condition]}]}; one nested level, at most 50 conditions; operand shapes by OPERATORS: text, value, number, date (YYYY-MM-DD), range [from,to], relative {direction:'past'|'next', days}, list [ids or options], none.",
+        sorts: "[{column, direction:'asc'|'desc'}], at most 10, applied in order.",
+        legacy:
+          "Older views with filter {column, value} and sort {column, direction} still load; the workbench writes them as a filter group and sorts when the view changes.",
+      },
+      derived:
+        "formula, rollup and reverse relation values are computed, never stored. page_read and exports carry them in the block's $derived (read-only; leave it out when writing). dataset_read query returns them on each record.",
     };
   }
 
@@ -573,6 +636,9 @@ export class CatalogService {
       return {
         ...summary,
         view,
+        ...(builtin && id === "database"
+          ? { fieldTypes: await this.databaseFieldTypes(projectId) }
+          : {}),
         ...(documentation
           ? {
               reuse: documentation.reuse,

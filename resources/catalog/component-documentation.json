@@ -1148,7 +1148,7 @@
       "boundaries": ["可用于不同主题；替换内容必须符合公开数据关系与输入约束。"]
     },
     "usage": {
-      "purpose": "带筛选、排序和表格/看板/列表/日历视图的数据库，可保存多个命名视图。单元格支持文字、数字、选择、复选框、链接、日期和页面链接；日历可按月、按周（含时间轴）或以热力图查看。",
+      "purpose": "带筛选、排序和表格/看板/列表/日历视图的数据库，可保存多个命名视图。单元格支持文字、数字、单选、多选、复选框、链接、日期、页面链接、关联其他共享数据的记录、公式和汇总，也可以使用组件库里声明为字段类型的组件；视图可按条件组筛选、按多个属性排序；日历可按月、按周（含时间轴）或以热力图查看。",
       "structure": [
         "columns.id 对应 rows 中的字段键，rows[].id 稳定标识记录；groupBy 选择看板分组的选择列。",
         "日历读取 date 列（YYYY-MM-DD）；calendar 指定开始/结束日期、时间、颜色和完成标记列，view 决定初始视图。",
@@ -1161,11 +1161,11 @@
         },
         {
           "path": "columns",
-          "meaning": "列定义：唯一 id、显示 name、type=text/number/select/checkbox/url/date/page。select 列用 options 给出候选值；date 列的值是 YYYY-MM-DD 或空字符串；page 列的值是 showai://project/PROJECT/page/PAGE 页面链接或空字符串。 page 列可带 folder（文件夹 id），工作台为新记录建的页面放在那里；省略时第一次建页面会在本页所在位置新建一个以数据库标题命名的文件夹并写回 folder。 page 列的 titleColumn 指向一个 text 列：工作台中改记录名称会改链接页面的标题，页面改名也会写回记录；省略时第一次建页面会设为第一个 text 列。"
+          "meaning": "列定义：唯一 id、显示 name、type=text/number/select/multiSelect/checkbox/url/date/page/relation/formula/rollup/custom。select 与 multiSelect 用 options 给出候选值，colors 可为选项指定颜色（gray/brown/orange/yellow/green/blue/purple/pink/red）；multiSelect 的值是选项列表。date 列的值是 YYYY-MM-DD 或空字符串；page 列的值是 showai://project/PROJECT/page/PAGE 页面链接或空字符串，可带 folder 与 titleColumn。relation 列用 relation.dataset 指向一份 {columns, rows} 形状的共享数据，值是该数据记录 id 的列表；加 relation.reverse:{name} 后，绑定该数据的数据库会多出一列反向关联。formula 列用 formula.expression 写 JavaScript 表达式，prop(\"属性名\") 读取本记录属性，在处理脚本沙箱中计算；formula.kind 决定筛选与排序方式。rollup 列对 relation 列关联记录的某一属性做 count/sum/average/min/max/unique/percentChecked。formula、rollup 和反向关联的值不保存在 rows 里。custom 列用 component 指向声明 role=database-field 的组件精确版本，config 是该组件的设置；组件不可用时只读显示原值。可用的字段类型（含组件提供的）见 catalog_describe 的 guide 视图 fieldTypes。"
         },
         {
           "path": "rows",
-          "meaning": "每行有唯一 id；其他键必须与 columns.id 对应。number 使用数字，checkbox 使用布尔值。"
+          "meaning": "每行有唯一 id；其他键必须与 columns.id 对应。number 使用数字，checkbox 使用布尔值，multiSelect 与 relation 使用文字列表。"
         },
         {
           "path": "groupBy",
@@ -1180,8 +1180,8 @@
           "meaning": "1–20 个命名视图，按顺序显示为视图标签；只有一个视图时不显示标签。每项有唯一 id（字母、数字、_、-）、name 和 type。写入 views 后 view 与 groupBy 不再使用。 给没有 views 的旧数据增加视图时，先把当前 view 与 groupBy 写成第一个视图，再追加新视图。"
         },
         {
-          "path": "views[].groupBy / sort / filter",
-          "meaning": "看板分组的 select 列；排序 {column, direction: asc|desc}；筛选 {column, value}，只显示该列等于 value 的记录。引用已删除的列时忽略该设置。"
+          "path": "views[].groupBy / sorts / filter",
+          "meaning": "groupBy：看板分组的 select、multiSelect 或 checkbox 列。sorts：按顺序应用的 [{column, direction: asc|desc}]。filter：条件组 {join: and|or, conditions: [{column, operator, value?} 或嵌套一层的条件组]}；运算符由列类型决定（文字 contains/is…，数字 gt/lt/between…，日期 before/after/within {direction, days}…，多选与关联 includesAny/includesAll/includesNone，复选框 checked/unchecked，以及 isEmpty/isNotEmpty）。较早保存的 sort 与 {column, value} 筛选仍可读取，修改视图时改写为新形状。引用已删除的列时忽略该条件。"
         },
         {
           "path": "views[].columnWidths",
@@ -1311,7 +1311,8 @@
         "搜索与筛选同样作用于日历和热力图；没有日期的记录不进入日历，会在下方提示数量。",
         "容器宽度不足 560px 时月历和周历改为按天的日程列表；打印时附带完整日程列表。",
         "page 单元格只接受 showai://project/PROJECT/page/PAGE 或空字符串；folder 和 titleColumn 只能写在 page 列上，titleColumn 必须指向 text 列。页面标题在工作台中读取，离线导出中显示为链接的页面。",
-        "几个组件共享同一份数据时，views、view、groupBy、calendar 和 title 留在各自组件里，记录与属性共享。"
+        "几个组件共享同一份数据时，views、view、groupBy、calendar 和 title 留在各自组件里，记录与属性共享。",
+        "formula、rollup 与反向关联由软件计算：page_read 与导出在块的 $derived 中给出计算结果（只读，写入时不要带上）；dataset_read 的 query 在每条记录上返回它们。"
       ],
       "editing": {
         "data": [
@@ -1351,8 +1352,9 @@
         "日历只接收已搜索、筛选后的行；日期按 UTC 日序号计算，今天取读者本地日期。日历列选择与模式是阅读状态，初始值来自 calendar。"
       ],
       "extensionPoints": [
-        "增加列类型需更新编辑控件、校验（database-contract.mjs）、排序与导出；分组依赖 select 列，页面列的搜索、筛选和排序按页面标题进行。",
-        "新增日历模式时在 CALENDAR_MODES 与 i18n 中登记，并保留窄屏日程列表和打印输出。"
+        "字段类型：src/datasets/value-types.mjs 定义值类型（校验、规范化、比较、文本、分组、筛选运算符），database-field-ui.tsx 为每个类型提供单元格、编辑器与列设置；组件库组件声明 role=database-field 即可提供新字段类型。",
+        "视图：DatabaseViews.tsx 用 registerDatabaseView 注册表格、看板、列表与日历，新视图实现同一接口。",
+        "筛选与排序：src/datasets/record-query.mjs 是工作台、阅读器、CLI 与 SDK 共用的纯函数模块。"
       ],
       "invariants": [
         "保留原始输入与稳定 ID，明确区分源数据、派生值和阅读状态。",
