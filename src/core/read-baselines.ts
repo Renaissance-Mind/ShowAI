@@ -35,6 +35,12 @@ export class ReadBaselines {
       `${key(projectId, pageId, "revision", revision)}.ref`,
     );
   }
+  private revisionPath(projectId: string, pageId: string, hash: string) {
+    return join(
+      this.directory(),
+      `${key(projectId, pageId, "read-revision", hash)}.ref`,
+    );
+  }
 
   async remember(projectId: string, record: PageRecord) {
     const pageId = record.document.id;
@@ -58,12 +64,18 @@ export class ReadBaselines {
         ),
       );
     }
-    if (record.revision)
+    if (record.revision) {
       await atomicLibraryFile(
         this.home,
         this.aliasPath(projectId, pageId, record.revision),
         Buffer.from(JSON.stringify({ hash: record.hash })),
       );
+      await atomicLibraryFile(
+        this.home,
+        this.revisionPath(projectId, pageId, record.hash),
+        Buffer.from(JSON.stringify({ revision: record.revision })),
+      );
+    }
     await this.prune();
   }
 
@@ -105,6 +117,21 @@ export class ReadBaselines {
     return typeof hash === "string"
       ? this.load(projectId, pageId, hash)
       : undefined;
+  }
+
+  /** The revision of the most recent read that returned this hash, if kept. */
+  async revision(
+    projectId: string,
+    pageId: string,
+    hash: string,
+  ): Promise<string | undefined> {
+    const bytes = await readLibraryBytes(
+      this.home,
+      this.revisionPath(projectId, pageId, hash),
+    );
+    if (!bytes) return undefined;
+    const { revision } = JSON.parse(bytes.toString()) as { revision?: unknown };
+    return typeof revision === "string" ? revision : undefined;
   }
 
   private async load(projectId: string, pageId: string, hash: string) {

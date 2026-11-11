@@ -52,6 +52,15 @@ test("one file per page version, found by hash or revision without reading other
     expect(
       (await baselines.read(projectId, next.document.id, next.revision))?.title,
     ).toBe("Second");
+  expect(await baselines.revision(projectId, page.document.id, page.hash)).toBe(
+    page.revision,
+  );
+  expect(await baselines.revision(projectId, next.document.id, next.hash)).toBe(
+    next.revision,
+  );
+  expect(
+    await baselines.revision(projectId, page.document.id, "0".repeat(64)),
+  ).toBeUndefined();
   expect(await baselines.read(projectId, page.document.id, "0".repeat(64))).toBeUndefined();
   expect(await baselines.read("other", page.document.id, page.hash)).toBeUndefined();
 });

@@ -7,6 +7,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { withChangeContext } from "../core/history-context";
 import { mutateLibrary } from "../core/library-runtime";
 import { canonicalJson } from "../core/diff";
+import { ReadBaselines } from "../core/read-baselines";
 import { ContentLibrary as GitLibrary } from "../core/content-library";
 import { syncManager, stopSyncManagers } from "../sync/manager";
 import { openLibrary } from "../core/open-library";
@@ -80,8 +81,9 @@ Start with one project:
   pages list --project PROJECT
 
 Change pages (save and apply reply with a receipt; --response source adds the document):
-  pages save PAGE --project PROJECT --input DOCUMENT.json --base-hash HASH [--response receipt|source|full]
-  pages apply PAGE --project PROJECT --input operations.json --base-hash HASH [--response receipt|source|full]
+  pages save PAGE --project PROJECT --input DOCUMENT.json --base-hash HASH [--base-revision REVISION] [--response receipt|source|full]
+  pages apply PAGE --project PROJECT --input operations.json --base-hash HASH [--base-revision REVISION] [--response receipt|source|full]
+    In a versioned library --base-revision defaults to the revision returned by the last pages read with that hash.
   pages delete|restore|pin|unpin PAGE --project PROJECT [--base-hash HASH]
   pages duplicate PAGE --project PROJECT [--title TITLE]
   pages deleted [--project PROJECT]   deleted projects, folders and pages that can be restored
@@ -435,6 +437,23 @@ async function saveOutput(
     flag: args.options.overwrite ? "w" : "wx",
   });
   return path;
+}
+
+/**
+ * The explicit --base-revision, or the revision the last `pages read` of this
+ * page returned together with the given hash.
+ */
+async function readRevision(
+  service: AgentService,
+  args: Arguments,
+  projectId: string,
+  pageId: string,
+  baseHash: string,
+) {
+  return (
+    option(args, "base-revision") ??
+    new ReadBaselines(service.store.root).revision(projectId, pageId, baseHash)
+  );
 }
 
 async function runCliCommand(argv: string[]): Promise<unknown> {
@@ -884,14 +903,16 @@ async function runCliCommand(argv: string[]): Promise<unknown> {
       if (action === "save") {
         requireCount(args, 3);
         const input = await readDocument(option(args, "input", true)!);
+        const projectId = await project();
+        const baseHash = option(args, "base-hash", true)!;
         return service.savePage(
-          await project(),
+          projectId,
           id,
           input.document,
-          option(args, "base-hash", true)!,
+          baseHash,
           input.components,
           input.remoteComponents,
-          option(args, "base-revision"),
+          await readRevision(service, args, projectId, id, baseHash),
         );
       }
       if (action === "apply") {
@@ -906,9 +927,17 @@ async function runCliCommand(argv: string[]): Promise<unknown> {
           throw new Error(
             "Expected a JSON array of operations, or { operations: [...] }.",
           );
-        return service.applyPage(await project(), id, {
-          baseHash: option(args, "base-hash", true)!,
-          baseRevision: option(args, "base-revision"),
+        const projectId = await project();
+        const baseHash = option(args, "base-hash", true)!;
+        return service.applyPage(projectId, id, {
+          baseHash,
+          baseRevision: await readRevision(
+            service,
+            args,
+            projectId,
+            id,
+            baseHash,
+          ),
           operations: operations as PageOperation[],
           ...(input &&
           typeof input === "object" &&

@@ -2567,6 +2567,40 @@ test("versioned CLI and MCP enforce conditional revisions and replay completed r
       initial.revision,
     ]),
   ).rejects.toThrow("newer revision");
+  // Without --base-revision the revision of the last read with that hash is used.
+  await writeFile(
+    operations,
+    JSON.stringify([{ type: "page.set", fields: { title: "Read-based edit" } }]),
+  );
+  const readBased = await runHere([
+    "pages",
+    "apply",
+    initial.document.id,
+    "--input",
+    operations,
+    "--base-hash",
+    read.hash,
+  ]);
+  expect(readBased.revision).not.toBe(edited.revision);
+  // A hash that no read returned still needs an explicit revision.
+  await expect(
+    runHere([
+      "pages",
+      "apply",
+      initial.document.id,
+      "--input",
+      operations,
+      "--base-hash",
+      readBased.hash,
+    ]),
+  ).rejects.toThrow("Versioned page writes require the baseRevision");
+  const current = await runHere([
+    "pages",
+    "read",
+    initial.document.id,
+    "--rendered",
+    "false",
+  ]);
   const client = new Client({ name: "versioned-mcp-client", version: "1.0.0" });
   await client.connect(
     new StdioClientTransport({
@@ -2595,8 +2629,8 @@ test("versioned CLI and MCP enforce conditional revisions and replay completed r
   try {
     const input = {
       pageId: initial.document.id,
-      baseHash: edited.hash,
-      baseRevision: edited.revision,
+      baseHash: current.hash,
+      baseRevision: current.revision,
       operations: [{ type: "page.set", fields: { title: "MCP report" } }],
       operationId: "mcp-edit-report",
       message: "Update title",
