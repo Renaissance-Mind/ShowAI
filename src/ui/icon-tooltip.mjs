@@ -28,6 +28,11 @@ export function installIconTooltips(root) {
   let hideTimer = 0;
   // Only keyboard navigation reveals focus tooltips; script focus after a click or shortcut stays quiet.
   let keyboardNav = false;
+  // Hover tooltips follow a moving pointer. After a click, a key or a scroll,
+  // whatever lands under a still pointer stays quiet until the pointer moves.
+  let armed = true;
+  let pointer = null;
+  let still = null;
   let hovered = null;
   let focused = null;
 
@@ -153,11 +158,33 @@ export function installIconTooltips(root) {
       if (hovered !== tip) show(hovered || focused);
     }, 90);
   };
+  const disarm = (event) => {
+    armed = false;
+    still =
+      event && "clientX" in event
+        ? { x: event.clientX, y: event.clientY }
+        : pointer;
+  };
   const over = (event) => {
     if (event.pointerType === "touch") return;
+    pointer = { x: event.clientX, y: event.clientY };
+    if (!armed) return;
     hovered = target(event);
     if (hovered === tip) win.clearTimeout(hideTimer);
     else show(hovered || focused);
+  };
+  const move = (event) => {
+    if (event.pointerType === "touch") return;
+    pointer = { x: event.clientX, y: event.clientY };
+    if (armed) return;
+    if (still && Math.hypot(event.clientX - still.x, event.clientY - still.y) < 3)
+      return;
+    if (!still) {
+      still = { x: event.clientX, y: event.clientY };
+      return;
+    }
+    armed = true;
+    over(event);
   };
   const out = (event) => {
     if (
@@ -169,8 +196,9 @@ export function installIconTooltips(root) {
     leave();
   };
   const focus = (event) => {
-    if (!keyboardNav) return;
-    focused = target(event);
+    const element = target(event);
+    if (!keyboardNav || !element?.matches(":focus-visible")) return;
+    focused = element;
     show(focused);
   };
   const blur = () => {
@@ -178,25 +206,32 @@ export function installIconTooltips(root) {
     leave();
   };
   const key = (event) => {
+    if (/^(Shift|Control|Alt|Meta)$/.test(event.key)) return;
     const field = event.composedPath()[0];
-    if (
+    // Any other key, such as Enter on a menu item or a shortcut, may move
+    // focus by script; that focus stays quiet.
+    keyboardNav =
       event.key === "Tab" ||
       (/^(Arrow(Up|Down|Left|Right)|Home|End|Page(Up|Down))$/.test(event.key) &&
         !field?.closest?.(
           'input, textarea, select, [contenteditable]:not([contenteditable="false"])',
-        ))
-    )
-      keyboardNav = true;
-    if (event.key === "Escape") hide();
+        ));
+    disarm();
+    if (/^(Escape|Enter| )$/.test(event.key)) dismiss();
   };
   const dismiss = () => {
     hovered = null;
     focused = null;
     hide();
   };
-  const pointerDown = () => {
+  const pointerDown = (event) => {
     dismiss();
+    disarm(event);
     keyboardNav = false;
+  };
+  const scrolled = (event) => {
+    dismiss();
+    disarm(event);
   };
   const observer = new win.MutationObserver(() => {
     if (!active) return;
@@ -225,14 +260,16 @@ export function installIconTooltips(root) {
   });
   const listeners = [
     ["pointerover", over],
+    ["pointermove", move],
     ["pointerout", out],
     ["focusin", focus],
     ["focusout", blur],
     ["keydown", key],
     ["pointerdown", pointerDown],
     ["contextmenu", dismiss],
-    ["wheel", dismiss],
-    ["scroll", dismiss],
+    ["click", dismiss],
+    ["wheel", scrolled],
+    ["scroll", scrolled],
   ];
   for (const [name, handler] of listeners)
     root.addEventListener(name, handler, true);
