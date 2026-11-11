@@ -51,7 +51,10 @@ export function ComponentSlashMenu({
   const items = useMemo(
     () =>
       catalog.items
-        .filter((item) => "kind" in item || item.role !== "page-outline")
+        .filter(
+          (item) =>
+            ("kind" in item || item.role !== "page-outline") && !item.mention,
+        )
         .map(
           (item): SlashEntry & { component: CatalogComponent } => ({
             // The rich-text menu uses the same ids, so recent items are shared.

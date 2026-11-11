@@ -4,7 +4,11 @@ import {
   type BindingRead,
   type ExternalSnapshotReport,
 } from "../core/dataset-resolution";
-import { visitNodes } from "../surface/document.mjs";
+import { visitContentNodes, visitNodes } from "../surface/document.mjs";
+import { listBuiltinComponents } from "../core/catalog";
+import { LibraryOperations } from "../core/library-operations";
+import { versionedLibrary } from "../core/library-runtime";
+import { REFERENCE_SNAPSHOT_LIMIT } from "../portable/reference-snapshot.mjs";
 import { CAPACITY, assertBytes } from "../portable/capacity.mjs";
 import {
   access,
@@ -386,6 +390,7 @@ export async function buildPageHtml(
   selection?: ShowArtifact["selection"],
   readerHtml?: string,
   resources?: LocalResourceDecisions,
+  references?: ShowArtifact["references"],
 ): Promise<string> {
   // Web addresses stay; local files are embedded or keep their name only.
   const prepared = (await withLocalResources(document, resources)).document;
@@ -397,8 +402,50 @@ export async function buildPageHtml(
       remoteComponents,
       presentation,
       selection,
+      references,
     ),
   );
+}
+
+/**
+ * The page's references, for an export whose components declare that they
+ * read them (pageReferences in their contract). Other exports carry none, so
+ * no other page's title or text leaves the library unasked.
+ */
+async function referenceSnapshot(
+  root: string,
+  projectId: string,
+  document: ShowDocument,
+  components: CompiledComponent[],
+): Promise<ShowArtifact["references"]> {
+  const builtins = new Set(
+    listBuiltinComponents()
+      .filter((item) => item.pageReferences)
+      .map((item) => item.kind),
+  );
+  let reads = false;
+  visitContentNodes(document.content, (node) => {
+    if (reads || (node.type !== "widget" && node.type !== "inlineWidget"))
+      return;
+    const kind = node.attrs?.kind;
+    const data = node.attrs?.data;
+    reads =
+      builtins.has(kind) ||
+      (kind === "custom" &&
+        components.some(
+          (component) =>
+            component.pageReferences &&
+            component.id === data?.componentId &&
+            component.version === data?.version,
+        ));
+  });
+  if (!reads || !versionedLibrary(root)) return undefined;
+  const { to, from } = await new LibraryOperations(root).pageReferences(
+    projectId,
+    document.id,
+    { limit: REFERENCE_SNAPSHOT_LIMIT },
+  );
+  return { page: { projectId, pageId: document.id }, to, from };
 }
 
 /** Exported documents pin what was actually resolved, without mutating authoring files. */
@@ -408,7 +455,7 @@ function lockedDocument(
 ): ShowDocument {
   const copy = structuredClone(document);
   const visit = (node: ShowDocument["content"]) => {
-    if (node.type === "widget" && node.attrs?.kind === "custom") {
+    if ((node.type === "widget" || node.type === "inlineWidget") && node.attrs?.kind === "custom") {
       const data = node.attrs.data;
       const candidates = components.filter(
         (component) =>
@@ -544,12 +591,22 @@ export async function readingPageHtml(options: {
     packaged.document,
     options.projectId,
   );
+  const document = lockedDocument(packaged.document, components);
   return buildPageHtml(
-    lockedDocument(packaged.document, components),
+    document,
     undefined,
     components,
     [],
     "reading",
+    undefined,
+    undefined,
+    undefined,
+    await referenceSnapshot(
+      store.root,
+      options.projectId,
+      document,
+      components,
+    ),
   );
 }
 
@@ -628,6 +685,12 @@ export async function exportPage(
           )
         : [];
     const bundledComponents = componentMode === "bundled" ? components : [];
+    const references = await referenceSnapshot(
+      store.root,
+      options.projectId,
+      document,
+      components,
+    );
     const html = await buildPageHtml(
       document,
       options.templatePath,
@@ -636,6 +699,8 @@ export async function exportPage(
       presentation,
       selection,
       reader.mode === "cdn" ? CDN_PAGE_TEMPLATE : undefined,
+      undefined,
+      references,
     );
     const preview =
       options.format === "inline"
@@ -668,6 +733,7 @@ export async function exportPage(
         remoteComponents,
         presentation,
         selection,
+        references,
       ),
       {
         flag: options.overwrite ? "w" : "wx",
@@ -861,6 +927,12 @@ export async function exportPage(
             )!,
           )
         : [];
+    const references = await referenceSnapshot(
+      store.root,
+      options.projectId,
+      document,
+      pageComponents[index],
+    );
     let html = withHtmlLanguage(
       injectArtifactIntoHtml(
         template,
@@ -868,6 +940,8 @@ export async function exportPage(
         components,
         remoteComponents,
         options.presentation ?? "spatial",
+        undefined,
+        references,
       ),
     );
     // Each page shares one reader bundle and stylesheet; page data remains embedded.
@@ -937,6 +1011,8 @@ export async function exportPage(
         components,
         remoteComponents,
         options.presentation ?? "spatial",
+        undefined,
+        references,
       ),
     );
     sourcePaths.push(sourcePath);

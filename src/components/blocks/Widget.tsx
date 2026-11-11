@@ -168,6 +168,7 @@ const WidgetBody = memo(function WidgetBody({
   onChange,
   readOnly,
   host,
+  inline,
 }: BlockProps & { kind: string }) {
   // Components own a mutable working copy, including read-only renderers that
   // internally prepare their data. Published callbacks capture before returning.
@@ -222,7 +223,8 @@ const WidgetBody = memo(function WidgetBody({
       }
     />
   );
-  if (!queued.mounted) return pending;
+  // Inline components are part of a line of text: they mount with it.
+  if (!queued.mounted && !inline) return pending;
   if (!definition)
     return (
       <UnavailableBlock
@@ -257,6 +259,7 @@ const WidgetBody = memo(function WidgetBody({
             onChange={publish}
             readOnly={readOnly}
             host={host}
+            {...(inline ? { inline } : {})}
           />
         </RichTextEnvironment.Provider>
       </Suspense>

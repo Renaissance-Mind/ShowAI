@@ -9,7 +9,9 @@ export function PageNode({ node }: { node: JSONContent }) {
   return (
     <RichTextNode
       node={node}
-      renderWidget={(kind, data) => <ReadingWidget kind={kind} data={data} />}
+      renderWidget={(kind, data, inline) => (
+        <ReadingWidget kind={kind} data={data} inline={inline} />
+      )}
     />
   );
 }
@@ -24,7 +26,9 @@ export function PageContent({
     <RichTextContent
       content={content}
       data={data}
-      renderWidget={(kind, data) => <ReadingWidget kind={kind} data={data} />}
+      renderWidget={(kind, data, inline) => (
+        <ReadingWidget kind={kind} data={data} inline={inline} />
+      )}
     />
   );
 }
@@ -33,9 +37,11 @@ export function PageContent({
 function ReadingWidget({
   kind,
   data,
+  inline,
 }: {
   kind: string;
   data: Record<string, unknown>;
+  inline?: boolean;
 }) {
   const [local, setLocal] = useState(data);
   useEffect(() => setLocal(data), [data]);
@@ -50,6 +56,7 @@ function ReadingWidget({
     <Widget
       kind={kind}
       data={local}
+      inline={inline}
       readOnly={!draft}
       onChange={draft ? setLocal : undefined}
     />

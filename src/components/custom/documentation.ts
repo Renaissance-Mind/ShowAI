@@ -94,6 +94,8 @@ const parameterInputSchema = z
 const rulePath = text.max(500);
 export const parameterRuleSchema = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("unique"), path: rulePath }).strict(),
+  // A page-reference field: a showai:// page link or empty; the library indexes it.
+  z.object({ kind: z.literal("page"), path: rulePath }).strict(),
   z
     .object({
       kind: z.literal("reference"),

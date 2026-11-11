@@ -1,3 +1,4 @@
+import { validateReferenceSnapshot } from "./reference-snapshot.mjs";
 import {freezeOwnedJSON,isOwnedJSON,captureOwnedJSON,capturedContentSummary,shareCapturedJSON} from "./owned-json.mjs";
 import {shareNativeSource} from "../surface/native-source-delta.mjs";
 import { validateInkArchiveGroup } from "../surface/ink-archive-group.mjs";
@@ -26,6 +27,10 @@ import { validateDocReferenceData } from "../components/blocks/doc-reference-con
 import { validateDocBrowseData } from "../components/blocks/doc-browse-contract.mjs";
 import { validatePlanData } from "../components/blocks/plan-contract.mjs";
 import { validateEventTimelineData } from "../components/blocks/event-timeline-contract.mjs";
+import {
+  validateBacklinksData,
+  validateDateData,
+} from "../components/blocks/page-mention-contract.mjs";
 import { validatePlaygroundData } from "../components/blocks/playground-contract.mjs";
 import { validateDatabaseData } from "../components/blocks/database-contract.mjs";
 import { validateMechanismData } from "../components/blocks/mechanism-contract.mjs";
@@ -87,6 +92,8 @@ const nodeTypes = new Set([
   "stepper",
   "step",
   "widget",
+  // A component placed inside a line of text, such as a date mention.
+  "inlineWidget",
 ]);
 const markTypes = new Set([
   "bold",
@@ -397,6 +404,14 @@ function validateWidgetData(kind, data, path) {
     validateEventTimelineData(data);
     return;
   }
+  if (kind === "date") {
+    validateDateData(data);
+    return;
+  }
+  if (kind === "backlinks") {
+    validateBacklinksData(data);
+    return;
+  }
   if (kind === "playground") {
     validatePlaygroundData(data);
     return;
@@ -536,7 +551,8 @@ function validateNode(value, path, counter, depth = 0, parentType = null) {
   const node = object(value, path);
   // Component validators are intentionally opaque here. Never infer an output
   // capacity bound across component/data-binding normalization.
-  if (node.type === "widget") counter.capacityMayGrow = true;
+  if (node.type === "widget" || node.type === "inlineWidget")
+    counter.capacityMayGrow = true;
   if (
     !counter.resource &&
     node.type === "surface" &&
@@ -666,7 +682,7 @@ function validateNode(value, path, counter, depth = 0, parentType = null) {
       content: { type: "doc", content: node.content ?? [] },
       format: "richtext",
     });
-  if (node.type === "widget") {
+  if (node.type === "widget" || node.type === "inlineWidget") {
     string(node.attrs?.kind, `${path}.attrs.kind`, 80);
     if (!/^[a-z][a-z0-9-]*$/.test(node.attrs.kind))
       throw new Error(
@@ -711,6 +727,7 @@ function validateNode(value, path, counter, depth = 0, parentType = null) {
         "text",
         "image",
         "widget",
+        "inlineWidget",
         "drawing",
         "hardBreak",
         "horizontalRule",
@@ -761,8 +778,8 @@ function validateNode(value, path, counter, depth = 0, parentType = null) {
       ...(counter.resource ? ["surface", "drawing"] : []),
     ],
     richText: blockTypes,
-    paragraph: ["text", "hardBreak", "mathInline"],
-    heading: ["text", "hardBreak", "mathInline"],
+    paragraph: ["text", "hardBreak", "mathInline", "inlineWidget"],
+    heading: ["text", "hardBreak", "mathInline", "inlineWidget"],
     codeBlock: ["text"],
     blockquote: blockTypes,
     callout: blockTypes,
@@ -1283,6 +1300,9 @@ function parseArtifactDocument(
       : {
           remoteComponents: validateRemoteComponents(artifact.remoteComponents),
         }),
+    ...(artifact.references === undefined
+      ? {}
+      : { references: validateReferenceSnapshot(artifact.references) }),
   };
   const proof = documentCapacity.get(document);
   const documentGrowth = document === artifact.document && !proof ? 0 : proof ? Math.max(0, proof.upper.jsonBytes - proof.before.jsonBytes) : null;
@@ -1323,6 +1343,7 @@ export function serializeArtifact(
   remoteComponents,
   presentation,
   selection,
+  references,
 ) {
   if (
     presentation !== undefined &&
@@ -1341,6 +1362,7 @@ export function serializeArtifact(
     ...(remoteComponents?.length
       ? { remoteComponents: validateRemoteComponents(remoteComponents) }
       : {}),
+    ...(references ? { references: validateReferenceSnapshot(references) } : {}),
   };
   assertBytes(
     "Artifact JSON",
@@ -1381,6 +1403,7 @@ export function injectArtifactIntoHtml(
   remoteComponents,
   presentation,
   selection,
+  references,
 ) {
   if (
     presentation !== undefined &&
@@ -1399,6 +1422,7 @@ export function injectArtifactIntoHtml(
     ...(remoteComponents?.length
       ? { remoteComponents: validateRemoteComponents(remoteComponents) }
       : {}),
+    ...(references ? { references: validateReferenceSnapshot(references) } : {}),
   };
   const serialized = escapeJsonForHtml(artifact);
   assertBytes(

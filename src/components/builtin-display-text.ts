@@ -138,6 +138,16 @@ export const builtinEnglish: BuiltinDisplayText = {
     description:
       "Bridge an opening value to a closing value through increases and decreases; click a bar for its breakdown and shares, with a warning when steps do not add up.",
   },
+  date: {
+    name: "Date",
+    description:
+      "A calendar day inside a line of text, shown in the reader's language.",
+  },
+  backlinks: {
+    name: "Backlinks",
+    description:
+      "Pages that link to this page (or a given page), each with the text around its reference.",
+  },
   "event-timeline": {
     name: "Event timeline",
     description:

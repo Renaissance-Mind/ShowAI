@@ -13,6 +13,7 @@ export const COMPONENT_PARAMETER_CAPABILITIES: {
 export const COMPONENT_PARAMETER_PROTOCOL: "showai-component-parameters-v1";
 export type ParameterRule =
   | { kind: "unique"; path: string }
+  | { kind: "page"; path: string }
   | {
       kind: "reference";
       path: string;

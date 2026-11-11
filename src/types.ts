@@ -80,6 +80,8 @@ export interface ShowArtifact {
   components?: CompiledComponent[];
   /** Exact published packages required by an intentionally network-dependent export. */
   remoteComponents?: PublishedComponentLocator[];
+  /** References to and from the page when it was exported, for components that read them. */
+  references?: import("./portable/reference-snapshot.mjs").ReferenceSnapshot;
 }
 
 export type WidgetData = Record<string, unknown>;

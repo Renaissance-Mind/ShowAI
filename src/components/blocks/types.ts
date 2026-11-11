@@ -6,6 +6,8 @@ export interface BlockProps {
   onChange?: (data: BlockData) => void;
   readOnly?: boolean;
   host?: import("../rich-text/RichText").RichTextHost;
+  /** Placed inside a line of text (a mention); render as inline content. */
+  inline?: boolean;
 }
 
 export interface BlockDefinition {

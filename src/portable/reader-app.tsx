@@ -17,6 +17,10 @@ import type { CompiledComponent } from "../components/custom/types";
 import { SurfaceReader } from "./SurfaceReader";
 import { CustomComponentsProvider } from "../components/custom/CustomBlock";
 import {
+  PageReferenceContext,
+  type PageReferenceSource,
+} from "../components/page-references";
+import {
   conversationPage,
   useConversationReference,
 } from "./ConversationReference";
@@ -52,7 +56,10 @@ const translate = translator(messages);
  * language. Readers see what they can do; the publisher-facing reason (CORS,
  * checksums) stays in the collapsed technical details.
  */
-function remoteErrorMessage(error: unknown): { summary: string; detail: string } {
+function remoteErrorMessage(error: unknown): {
+  summary: string;
+  detail: string;
+} {
   const { code, params } = (error ?? {}) as {
     code?: string;
     params?: { component?: string; reason?: string };
@@ -143,6 +150,23 @@ function ArtifactReader({
     [host],
   );
   const references = useConversationReference(appRef, document, conversation);
+  // The export wrote the page's references; other pages have none here.
+  const snapshot = artifact.references;
+  const referenceSource = useMemo<PageReferenceSource | null>(
+    () =>
+      snapshot
+        ? {
+            page: snapshot.page,
+            read: async ({ projectId, pageId, direction }) =>
+              projectId === snapshot.page.projectId &&
+              pageId === snapshot.page.pageId
+                ? snapshot[direction]
+                : null,
+            subscribe: () => () => {},
+          }
+        : null,
+    [snapshot],
+  );
   const site = useMemo(() => parseSiteRoutes(host.readSite?.()), [host]);
   useEffect(
     () =>
@@ -282,50 +306,52 @@ function ArtifactReader({
       </div>
       {references.contextMenu}
       {references.status}
-      <CustomComponentsProvider
-        components={[...(artifact.components ?? []), ...remote]}
-        inlineHost={inlineHost}
-      >
-        <SurfaceReader
-          document={document}
-          presentation={artifact.presentation}
-          partial={!!artifact.selection}
-          heading={
-            <>
-              {!inlineHost &&
-                !artifact.selection &&
-                (document.icon || document.title) && (
-                  <div className="portable-page-heading">
-                    {document.icon && (
-                      <div className="portable-page-icon">
-                        <PageIcon value={document.icon} size={48} />
-                      </div>
-                    )}
-                    {document.title && (
-                      <h1 className="portable-title">{document.title}</h1>
+      <PageReferenceContext.Provider value={referenceSource}>
+        <CustomComponentsProvider
+          components={[...(artifact.components ?? []), ...remote]}
+          inlineHost={inlineHost}
+        >
+          <SurfaceReader
+            document={document}
+            presentation={artifact.presentation}
+            partial={!!artifact.selection}
+            heading={
+              <>
+                {!inlineHost &&
+                  !artifact.selection &&
+                  (document.icon || document.title) && (
+                    <div className="portable-page-heading">
+                      {document.icon && (
+                        <div className="portable-page-icon">
+                          <PageIcon value={document.icon} size={48} />
+                        </div>
+                      )}
+                      {document.title && (
+                        <h1 className="portable-title">{document.title}</h1>
+                      )}
+                    </div>
+                  )}
+                {!!artifact.remoteComponents?.length && (
+                  <p className="portable-network-note">
+                    {remoteLoading ? t("remoteLoading") : t("remoteRequired")}
+                  </p>
+                )}
+                {remoteError && (
+                  <div role="alert" className="portable-network-error">
+                    <p>{remoteError.summary}</p>
+                    {remoteError.detail && (
+                      <details>
+                        <summary>{tc("details")}</summary>
+                        <p>{remoteError.detail}</p>
+                      </details>
                     )}
                   </div>
                 )}
-              {!!artifact.remoteComponents?.length && (
-                <p className="portable-network-note">
-                  {remoteLoading ? t("remoteLoading") : t("remoteRequired")}
-                </p>
-              )}
-              {remoteError && (
-                <div role="alert" className="portable-network-error">
-                  <p>{remoteError.summary}</p>
-                  {remoteError.detail && (
-                    <details>
-                      <summary>{tc("details")}</summary>
-                      <p>{remoteError.detail}</p>
-                    </details>
-                  )}
-                </div>
-              )}
-            </>
-          }
-        />
-      </CustomComponentsProvider>
+              </>
+            }
+          />
+        </CustomComponentsProvider>
+      </PageReferenceContext.Provider>
     </div>
   );
 }

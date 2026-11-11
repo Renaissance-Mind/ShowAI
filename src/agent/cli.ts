@@ -129,6 +129,9 @@ Read one Page through structured data, an image or interactive HTML:
     A page source over 256 KiB reads as an outline window unless --detail full, --blocks or --out is given.
   pages read PAGE --project PROJECT --view image --theme dark --width 1000 --height 900 --out preview.png
   pages read PAGE --project PROJECT --view html [--state reading-state.json] --out preview.html
+  pages read PAGE --project PROJECT --references to|from|both
+    Adds references: pages linking to this page (to, backlinks) and pages it links to (from),
+    each with the block holding the reference and the text around it.
 
 Versioned libraries: library init | verify | compact
   library stats | cleanup-plan [--older-than-days DAYS] | cleanup PLAN_ID
@@ -230,6 +233,7 @@ function parseArguments(args: string[]): Arguments {
     "versions",
     "integrity",
     "detail",
+    "references",
     "theme",
     "width",
     "height",
@@ -864,6 +868,12 @@ async function runCliCommand(argv: string[]): Promise<unknown> {
         if (format) readOptions.format = format as PageReadOptions["format"];
         const detail = option(args, "detail");
         if (detail) readOptions.detail = detail as PageReadOptions["detail"];
+        const references = option(args, "references");
+        if (references) {
+          if (!["to", "from", "both"].includes(references))
+            throw new Error("--references must be to, from or both.");
+          readOptions.references = references as PageReadOptions["references"];
+        }
         const theme = option(args, "theme");
         if (theme) readOptions.theme = theme as PageReadOptions["theme"];
         const blocks = option(args, "blocks");

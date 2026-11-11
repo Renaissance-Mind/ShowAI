@@ -130,7 +130,7 @@ function rebindImportedComponents(
     ]),
   );
   const visit = (node: typeof copy.content) => {
-    if (node.type === "widget" && node.attrs?.kind === "custom") {
+    if ((node.type === "widget" || node.type === "inlineWidget") && node.attrs?.kind === "custom") {
       const data = node.attrs.data;
       const component = packages.get(`${data?.componentId}@${data?.version}`);
       if (component) {
@@ -710,7 +710,27 @@ export class AgentService extends CatalogService {
     const project = this.requireProject(projectId);
     const record = await this.store.readPage(project, pageId);
     await new ReadBaselines(this.store.root).remember(project, record);
-    return readPageView(this.store, project, pageId, options);
+    const { references, ...view } = options;
+    const result = await readPageView(this.store, project, pageId, view);
+    if (!references) return result;
+    return {
+      ...result,
+      references: await this.pageReferences(project, pageId, {
+        direction: references,
+      }),
+    };
+  }
+  /** Backlinks (to) and outgoing references (from) of a page. */
+  pageReferences(
+    projectId: string,
+    pageId: string,
+    options: { direction?: "to" | "from" | "both"; limit?: number } = {},
+  ) {
+    return this.versioned().pageReferences(
+      this.requireProject(projectId),
+      pageId,
+      options,
+    );
   }
   private async savePageImpl(
     projectId: string,

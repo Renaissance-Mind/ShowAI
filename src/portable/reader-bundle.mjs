@@ -127,7 +127,8 @@ export function readerKinds(documents) {
   for (const document of documents)
     if (document.content)
       visitContentNodes(document.content, (node) => {
-        if (node?.type === "widget") kinds.add(node.attrs?.kind);
+        if (node?.type === "widget" || node?.type === "inlineWidget")
+          kinds.add(node.attrs?.kind);
       });
   return [...kinds].filter((k) => typeof k === "string").sort();
 }

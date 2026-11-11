@@ -15,6 +15,8 @@ function text(node: JSONContent): string {
 
 function markdownText(node: JSONContent): string {
   if (node.type === "mathInline") return `$${node.attrs?.latex ?? ""}$`;
+  if (node.type === "inlineWidget")
+    return `@[${node.attrs?.kind ?? ""}]${JSON.stringify(node.attrs?.data ?? {})}`;
   if (node.type !== "text")
     return (node.content ?? []).map(markdownText).join("");
   let value = node.text ?? "";

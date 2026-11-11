@@ -161,7 +161,11 @@ export function RichTextNode({
   renderWidget,
 }: {
   node: JSONContent;
-  renderWidget?: (kind: string, data: Record<string, unknown>) => ReactNode;
+  renderWidget?: (
+    kind: string,
+    data: Record<string, unknown>,
+    inline?: boolean,
+  ) => ReactNode;
 }): ReactNode {
   const attrs = node.attrs ?? {};
   const children = node.content?.map((child, index) => (
@@ -193,6 +197,16 @@ export function RichTextNode({
       return <>{children}</>;
     case "text":
       return markedText(node);
+    case "inlineWidget":
+      return (
+        <span
+          {...props}
+          className="sb-inline-widget"
+          data-widget-kind={attrs.kind}
+        >
+          {renderWidget?.(attrs.kind, attrs.data ?? {}, true)}
+        </span>
+      );
     case "mathInline":
     case "mathBlock":
       installNoteBubbles();
@@ -388,7 +402,11 @@ export function RichTextContent({
 }: {
   content: JSONContent;
   data?: Record<string, unknown>;
-  renderWidget?: (kind: string, data: Record<string, unknown>) => ReactNode;
+  renderWidget?: (
+    kind: string,
+    data: Record<string, unknown>,
+    inline?: boolean,
+  ) => ReactNode;
 }) {
   return (
     <div className="portable-content sb-rich-text" style={richTextStyle(data)}>

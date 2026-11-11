@@ -430,3 +430,40 @@ export function ImageView({ node, editor, updateAttributes }: NodeViewProps) {
     </NodeViewWrapper>
   );
 }
+
+/** A component inside a line of text, such as a date mention. */
+export function InlineWidgetView({
+  node,
+  updateAttributes,
+  editor,
+  selected,
+}: NodeViewProps) {
+  const { renderWidget } = useContext(RichTextEnvironment);
+  const editable = useEditorState({
+    editor,
+    selector: ({ editor: current }) => current.isEditable,
+  });
+  const latest = useRef({ editor, updateAttributes });
+  latest.current = { editor, updateAttributes };
+  const onChange = useCallback((data: Record<string, unknown>) => {
+    if (latest.current.editor.isEditable)
+      latest.current.updateAttributes({ data: ownSourceValue(data) });
+  }, []);
+  return (
+    <NodeViewWrapper
+      as="span"
+      className={`sb-inline-widget${selected && editable ? " is-selected" : ""}`}
+      data-widget-kind={node.attrs.kind}
+      data-block-id={node.attrs.id ?? undefined}
+      contentEditable={false}
+    >
+      {renderWidget({
+        kind: node.attrs.kind,
+        data: node.attrs.data,
+        onChange,
+        readOnly: !editable,
+        inline: true,
+      })}
+    </NodeViewWrapper>
+  );
+}

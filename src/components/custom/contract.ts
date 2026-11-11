@@ -117,7 +117,10 @@ export function collectCustomComponentRefs(
 ): CustomComponentRef[] {
   const refs = new Map<string, CustomComponentRef>();
   const visit = (node: typeof document.content) => {
-    if (node.type === "widget" && node.attrs?.kind === "custom") {
+    if (
+      (node.type === "widget" || node.type === "inlineWidget") &&
+      node.attrs?.kind === "custom"
+    ) {
       const { componentId, version, integrity, scope } = readCustomBlockData(
         node.attrs.data,
       );

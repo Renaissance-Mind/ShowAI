@@ -102,6 +102,8 @@ export function toMarkdown(node: JSONContent, depth = 0): string {
       return `![${node.attrs?.alt ?? ""}](${node.attrs?.src ?? ""})\n\n`;
     case "mathInline":
       return `$${node.attrs?.latex ?? ""}$`;
+    case "inlineWidget":
+      return `@[${node.attrs?.kind ?? ""}]${JSON.stringify(node.attrs?.data ?? {})}`;
     case "mathBlock":
       return `$$\n${node.attrs?.latex ?? ""}\n$$\n\n`;
     case "widget":

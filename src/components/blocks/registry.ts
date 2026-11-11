@@ -57,6 +57,12 @@ import { validateDocReferenceData } from "./doc-reference-contract.mjs";
 import { validateDocBrowseData } from "./doc-browse-contract.mjs";
 import { validatePlanData } from "./plan-contract.mjs";
 import { validateEventTimelineData } from "./event-timeline-contract.mjs";
+import {
+  validateBacklinksData,
+  validateDateData,
+} from "./page-mention-contract.mjs";
+import { DateBlock } from "./DateMention";
+import { BacklinksBlock } from "./Backlinks";
 import { validatePlaygroundData } from "./playground-contract.mjs";
 import { validateDatabaseData } from "./database-contract.mjs";
 import { validateMechanismData } from "./mechanism-contract.mjs";
@@ -687,5 +693,29 @@ registerBlock({
   renderer: EventTimelineBlock,
   validate: (data) => {
     validateEventTimelineData(data);
+  },
+});
+registerBlock({
+  kind: "date",
+  title: "日期",
+  description: "放在文字中的一个日期",
+  icon: "◷",
+  defaultData: componentMetadata.find((item) => item.kind === "date")!
+    .defaultData as BlockData,
+  renderer: DateBlock,
+  validate: (data) => {
+    validateDateData(data);
+  },
+});
+registerBlock({
+  kind: "backlinks",
+  title: "反向链接",
+  description: "引用当前页面的页面",
+  icon: "↩",
+  defaultData: componentMetadata.find((item) => item.kind === "backlinks")!
+    .defaultData as BlockData,
+  renderer: BacklinksBlock,
+  validate: (data) => {
+    validateBacklinksData(data);
   },
 });

@@ -68,20 +68,30 @@ export function slashMenuRows<T extends SlashEntry>(
   return rows;
 }
 
+/** The @ menu keeps its own recent list. */
+export const RECENT_MENTIONS = "showai:mention-recent";
+
 /** Ids of recently inserted items, most recent first. */
-export function readRecentSlashItems(storage: Pick<Storage, "getItem">) {
-  return (storage.getItem(RECENT_PREFERENCE) ?? "")
+export function readRecentSlashItems(
+  storage: Pick<Storage, "getItem">,
+  key = RECENT_PREFERENCE,
+) {
+  return (storage.getItem(key) ?? "")
     .split("\n")
     .filter(Boolean)
     .slice(0, RECENT_LIMIT);
 }
 
-export function rememberSlashItem(storage: Storage, id: string) {
+export function rememberSlashItem(
+  storage: Storage,
+  id: string,
+  key = RECENT_PREFERENCE,
+) {
   const next = [
     id,
-    ...readRecentSlashItems(storage).filter((value) => value !== id),
+    ...readRecentSlashItems(storage, key).filter((value) => value !== id),
   ].slice(0, RECENT_LIMIT);
-  storage.setItem(RECENT_PREFERENCE, next.join("\n"));
+  storage.setItem(key, next.join("\n"));
   return next;
 }
 

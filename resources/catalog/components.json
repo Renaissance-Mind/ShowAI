@@ -11684,5 +11684,91 @@
       "拖动滑块、在图上拖动或点击事件时，最近一个已发生事件在列表中展开，未发生的事件变淡。",
       "打印与静态阅读时保留曲线，并展开全部事件说明。"
     ]
+  },
+  {
+    "kind": "date",
+    "name": "日期",
+    "description": "放在一行文字中的一个日期，按读者的语言显示。",
+    "scenarios": [
+      "在会议记录、计划或日志的句子里标出截止日、开会日或发生日期。",
+      "在正文中输入 @ 后选择今天、明天或输入的日期。"
+    ],
+    "defaultData": {
+      "date": "2026-01-01"
+    },
+    "propsSchema": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "date": {
+          "type": "string",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+          "description": "YYYY-MM-DD 日历日期。"
+        }
+      },
+      "required": ["date"]
+    },
+    "examples": [
+      {
+        "name": "截止日期",
+        "request": "在句子里标出 11 月 20 日的截止日期。",
+        "data": {
+          "date": "2026-11-20"
+        }
+      }
+    ],
+    "version": "1.0.0",
+    "effects": [
+      "日期作为一行文字的一部分显示，读者按自己的语言看到同一天。",
+      "编辑时点击日期即可更改。"
+    ],
+    "mention": {
+      "prop": "date",
+      "input": "date"
+    }
+  },
+  {
+    "kind": "backlinks",
+    "name": "反向链接",
+    "description": "列出引用当前页面（或指定页面）的页面，以及每处引用周围的文字。",
+    "scenarios": [
+      "在主题页、人物页或项目页底部汇总所有提到它的页面。",
+      "复盘时查看哪些记录引用了这份决定或资料。"
+    ],
+    "defaultData": {},
+    "propsSchema": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "title": {
+          "type": "string",
+          "maxLength": 200,
+          "description": "列表上方的标题，可省略。"
+        },
+        "pageId": {
+          "type": "string",
+          "description": "列出引用这个页面的页面；省略时为组件所在的页面。"
+        },
+        "projectId": {
+          "type": "string",
+          "description": "pageId 所在的项目；省略时为组件所在的项目。"
+        }
+      }
+    },
+    "examples": [
+      {
+        "name": "当前页面的反向链接",
+        "request": "在页面底部列出引用这一页的页面。",
+        "data": {
+          "title": "引用了这一页"
+        }
+      }
+    ],
+    "version": "1.0.0",
+    "effects": [
+      "按页面分组列出引用，每处引用显示周围的文字，点击后打开引用所在的块。",
+      "页面改名、删除或恢复后列表随之更新；导出的页面保留导出时的列表。"
+    ],
+    "pageReferences": true
   }
 ]

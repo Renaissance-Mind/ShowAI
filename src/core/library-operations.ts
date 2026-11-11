@@ -6,7 +6,7 @@ import { createHash } from "node:crypto";
 import { CoreError, type PageRecord, type ShowDocument } from "./model";
 import { FileStore, assertId } from "./store";
 import { ContentLibrary as GitLibrary } from "./content-library";
-import { type SearchOptions } from "./library-index";
+import { type PageReferenceOptions, type SearchOptions } from "./library-index";
 import {
   versionedLibrary,
   mutateLibrary,
@@ -157,6 +157,18 @@ export class LibraryOperations {
     return this.index.references(kind, id, {
       ...input,
       projectId: this.project(input.projectId),
+    });
+  }
+  /** Backlinks (to) and outgoing references (from) of a page; a bound connection sees its own project only. */
+  pageReferences(
+    projectId: string,
+    pageId: string,
+    input: Omit<PageReferenceOptions, "scope"> = {},
+  ) {
+    const project = this.project(projectId)!;
+    return this.index.pageReferences(project, assertId(pageId), {
+      ...input,
+      ...(this.boundProject ? { scope: this.boundProject } : {}),
     });
   }
   async changes(

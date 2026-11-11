@@ -22,6 +22,7 @@ import {
   ToggleView,
   StepperView,
   WidgetView,
+  InlineWidgetView,
   MathView,
   ImageView,
 } from "./NodeViews";
@@ -48,6 +49,7 @@ export const blockIdNodeTypes = [
   "stepper",
   "step",
   "widget",
+  "inlineWidget",
   "mathInline",
   "mathBlock",
 ];
@@ -186,6 +188,52 @@ export const WidgetNode = Node.create({
     mergeAttributes(HTMLAttributes, { "data-showai-widget": "" }),
   ],
   addNodeView: () => ReactNodeViewRenderer(WidgetView),
+});
+
+/** A component inside a line of text, such as a date or another mention. */
+export const InlineWidgetNode = Node.create({
+  name: "inlineWidget",
+  group: "inline",
+  inline: true,
+  atom: true,
+  selectable: true,
+  addAttributes() {
+    return {
+      kind: { default: "date" },
+      data: {
+        // The date component's catalog default, so a bare node is valid.
+        default: { date: "2026-01-01" },
+        parseHTML: (element) => {
+          const value = element.getAttribute("data-widget-content");
+          if (!value) return {};
+          try {
+            return JSON.parse(value);
+          } catch {
+            return {};
+          }
+        },
+        renderHTML: (attributes) => ({
+          "data-widget-content": JSON.stringify(attributes.data),
+        }),
+      },
+    };
+  },
+  parseHTML: () => [
+    {
+      tag: "span[data-showai-inline-widget]",
+      getAttrs: (element) => ({
+        kind: (element as HTMLElement).getAttribute("data-widget-kind"),
+      }),
+    },
+  ],
+  renderHTML: ({ node, HTMLAttributes }) => [
+    "span",
+    mergeAttributes(HTMLAttributes, {
+      "data-showai-inline-widget": "",
+      "data-widget-kind": node.attrs.kind,
+    }),
+  ],
+  addNodeView: () => ReactNodeViewRenderer(InlineWidgetView),
 });
 
 export const CalloutNode = Node.create({
@@ -421,6 +469,7 @@ export function createExtensions(
     StepperNode,
     StepNode,
     WidgetNode,
+    InlineWidgetNode,
   ];
 }
 

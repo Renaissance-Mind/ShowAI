@@ -136,6 +136,10 @@ export interface ComponentManifest {
   entry: string;
   /** Named, synchronous JSON read model evaluated in the component browser sandbox. */
   reader?: "readData";
+  /** Offers the component in the @ menu of rich text, placed inside the line. */
+  mention?: import("../../portable/mention-contract.mjs").MentionContract;
+  /** Reads page references (usePageReferences); exports then carry the page's references. */
+  pageReferences?: true;
   defaultData: Record<string, unknown>;
   examples: ComponentExample[];
   parents?: PackageRevisionRef[];
@@ -194,6 +198,10 @@ export interface BuiltinComponentMetadata {
   examples: ComponentExample[];
   /** How the component fits a conversation column, measured at chat widths. */
   conversation?: InlineReadiness;
+  /** Offers the component in the @ menu of rich text, placed inside the line. */
+  mention?: import("../../portable/mention-contract.mjs").MentionContract;
+  /** Reads page references (usePageReferences); exports then carry the page's references. */
+  pageReferences?: true;
 }
 
 export interface InlineReadiness {

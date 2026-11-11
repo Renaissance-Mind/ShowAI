@@ -21,6 +21,8 @@ export function useSlashMenu<T extends SlashEntry>(
   query: string,
   onRun: (item: T) => void,
   open = true,
+  /** Where this menu keeps its recently used items. */
+  recentKey?: string,
 ) {
   const t = useTranslator(messages);
   const [level, setLevel] = useState<SlashLevel>("root");
@@ -31,7 +33,7 @@ export function useSlashMenu<T extends SlashEntry>(
     if (!open) return;
     setLevel("root");
     setSelected(0);
-    setRecent(readRecentSlashItems(localStorage));
+    setRecent(readRecentSlashItems(localStorage, recentKey));
   }, [open]);
   const labels = { recent: t("recent"), charts: t("charts") };
   const rows = slashMenuRows(items, { query, level, recent, labels });
@@ -56,7 +58,7 @@ export function useSlashMenu<T extends SlashEntry>(
     const row = rows[index];
     if (!row) return;
     if (row.type === "charts") return openCharts();
-    rememberSlashItem(localStorage, row.item.id);
+    rememberSlashItem(localStorage, row.item.id, recentKey);
     onRun(row.item);
   };
   const key = (event: { key: string; preventDefault(): void }) => {

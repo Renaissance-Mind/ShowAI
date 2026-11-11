@@ -17,6 +17,8 @@ import richTextInsertion from "../components/rich-text/component-insertion.ts?ra
 import richTextNodeViews from "../components/rich-text/NodeViews.tsx?raw";
 import richTextComponent from "../components/rich-text/RichText.tsx?raw";
 import richTextEditor from "../components/rich-text/RichTextEditor.tsx?raw";
+import richTextMentionSources from "../components/rich-text/mention-sources.ts?raw";
+import mentionContractSource from "../portable/mention-contract.mjs?raw";
 import retainedEditorContent from "../components/rich-text/RetainedEditorContent.tsx?raw";
 import richTextFormatControls from "../components/rich-text/FormatControls.tsx?raw";
 import richTextFormatCss from "../components/rich-text/format-controls.css?raw";
@@ -65,6 +67,7 @@ import ownedJson from "../portable/owned-json.mjs?raw";
 import pageLinkSource from "../portable/page-link.mjs?raw";
 import localFilesSource from "../portable/local-files.mjs?raw";
 import localResourcesSource from "../components/local-resources.tsx?raw";
+import pageReferencesSource from "../components/page-references.tsx?raw";
 import localMediaLinkSource from "../components/custom/local-media-link.ts?raw";
 import editableSource from "../datasets/editable.mjs?raw";
 import sdk from "../components/blocks/sdk.tsx?raw";
@@ -161,9 +164,15 @@ import src_page_links_ts from "../components/page-links.ts?raw";
 import src_playground_contract_mjs from "../components/blocks/playground-contract.mjs?raw";
 import src_playground_css from "../components/blocks/playground.css?raw";
 import src_i18n_messages_eventTimeline_ts from "../i18n/messages/eventTimeline.ts?raw";
+import src_i18n_messages_pageMention_ts from "../i18n/messages/pageMention.ts?raw";
+import src_i18n_messages_mentions_ts from "../i18n/messages/mentions.ts?raw";
 import src_event_timeline_contract_mjs from "../components/blocks/event-timeline-contract.mjs?raw";
 import src_event_timeline_css from "../components/blocks/event-timeline.css?raw";
 import src_EventTimeline_tsx from "../components/blocks/EventTimeline.tsx?raw";
+import src_page_mention_contract_mjs from "../components/blocks/page-mention-contract.mjs?raw";
+import src_page_mention_css from "../components/blocks/page-mention.css?raw";
+import src_DateMention_tsx from "../components/blocks/DateMention.tsx?raw";
+import src_Backlinks_tsx from "../components/blocks/Backlinks.tsx?raw";
 import src_i18n_messages_waterfall_ts from "../i18n/messages/waterfall.ts?raw";
 import src_waterfall_css from "../components/blocks/waterfall.css?raw";
 import src_Waterfall_tsx from "../components/blocks/Waterfall.tsx?raw";
@@ -244,6 +253,7 @@ const sources: Record<string, string> = {
   "rich-text/NodeViews.tsx": richTextNodeViews,
   "rich-text/RichText.tsx": richTextComponent,
   "rich-text/RichTextEditor.tsx": richTextEditor,
+  "rich-text/mention-sources.ts": richTextMentionSources,
   "rich-text/RetainedEditorContent.tsx": retainedEditorContent,
   "rich-text/FormatControls.tsx": richTextFormatControls,
   "rich-text/format-controls.css": richTextFormatCss,
@@ -291,8 +301,10 @@ const sources: Record<string, string> = {
   "capacity.mjs": capacity,
   "owned-json.mjs": ownedJson,
   "page-link.mjs": pageLinkSource,
+  "mention-contract.mjs": mentionContractSource,
   "local-files.mjs": localFilesSource,
   "local-resources.tsx": localResourcesSource,
+  "page-references.tsx": pageReferencesSource,
   "custom/local-media-link.ts": localMediaLinkSource,
   "editable.mjs": editableSource,
   "sdk.tsx": sdk,
@@ -387,9 +399,15 @@ const sources: Record<string, string> = {
   "playground-contract.mjs": src_playground_contract_mjs,
   "playground.css": src_playground_css,
   "i18n/messages/eventTimeline.ts": src_i18n_messages_eventTimeline_ts,
+  "i18n/messages/pageMention.ts": src_i18n_messages_pageMention_ts,
+  "i18n/messages/mentions.ts": src_i18n_messages_mentions_ts,
   "event-timeline-contract.mjs": src_event_timeline_contract_mjs,
   "event-timeline.css": src_event_timeline_css,
   "EventTimeline.tsx": src_EventTimeline_tsx,
+  "page-mention-contract.mjs": src_page_mention_contract_mjs,
+  "page-mention.css": src_page_mention_css,
+  "DateMention.tsx": src_DateMention_tsx,
+  "Backlinks.tsx": src_Backlinks_tsx,
   "i18n/messages/waterfall.ts": src_i18n_messages_waterfall_ts,
   "waterfall.css": src_waterfall_css,
   "Waterfall.tsx": src_Waterfall_tsx,
@@ -459,6 +477,16 @@ export const builtinSources: Record<string, string> = Object.fromEntries(
       .replaceAll(
         '"../local-resources"',
         name.includes("/") ? '"../local-resources"' : '"./local-resources"',
+      )
+      .replaceAll(
+        '"../page-references"',
+        name.includes("/") ? '"../page-references"' : '"./page-references"',
+      )
+      .replaceAll(
+        '"../../portable/mention-contract.mjs"',
+        name.startsWith("rich-text/")
+          ? '"../mention-contract.mjs"'
+          : '"./mention-contract.mjs"',
       )
       .replaceAll(
         '"../../portable/page-link.mjs"',
@@ -546,6 +574,8 @@ export const builtinExports: Record<string, string> = {
   "experiment-tracker": "ExperimentTracker",
   "scene-3d": "Scene3D",
   "event-timeline": "EventTimeline",
+  date: "DateMention",
+  backlinks: "Backlinks",
   waterfall: "Waterfall",
   roadmap: "Roadmap",
   "card-grid": "CardGrid",
