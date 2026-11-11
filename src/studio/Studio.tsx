@@ -6813,13 +6813,12 @@ export default function Studio() {
                 "projects:create",
                 { name, icon },
               );
-              setProjects((current) =>
-                mergeNavigationProjects(current, [result], new Set([result.id])),
-              );
               setDialog(null);
               if (dialog.groupId) await moveProject(result.id, dialog.groupId);
-              await openProject(result.id);
+              // The creation receipt is not a navigation summary (no dates or
+              // pages), so the sidebar gets the project from a scoped refresh.
               await refreshProjects([result.id], { sidebar: true });
+              await openProject(result.id);
             }}
           />
         )}

@@ -253,9 +253,9 @@ export function SettingsPanel({
           )}
         </section>
       )}
-      {section === "general" && info && <WorkRecordsSettings key={info.home} />}
+      {section === "general" && info && <WorkRecordsSettings key={`records:${info.home}`} />}
       {section === "general" && info?.libraryVersion === 2 && (
-        <LibrarySpace key={info.home} home={info.home} />
+        <LibrarySpace key={`space:${info.home}`} home={info.home} />
       )}
       {section === "appearance" && (
         <section
