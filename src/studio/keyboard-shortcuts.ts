@@ -174,6 +174,7 @@ export function shortcutGroups(options: {
       entries: [
         { keys: ["/"], label: n("shortcut.insert") },
         { keys: ["Mod+Z", "Shift+Mod+Z"], label: n("shortcut.editUndo") },
+        { keys: ["Shift+Mod+M"], label: n("shortcut.comment") },
       ],
     },
     {

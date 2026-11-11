@@ -1,0 +1,327 @@
+/* Comment highlights: quiet until active. */
+::highlight(showai-comment) {
+  background-color: color-mix(in srgb, var(--warning) 14%, transparent);
+  text-decoration: underline 1.5px color-mix(in srgb, var(--warning) 60%, transparent);
+  text-underline-offset: 3px;
+}
+::highlight(showai-comment-active) {
+  background-color: color-mix(in srgb, var(--warning) 30%, transparent);
+  text-decoration: underline 1.5px var(--warning);
+  text-underline-offset: 3px;
+}
+
+.comment-markers {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  pointer-events: none;
+}
+.comment-marker {
+  position: fixed;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  height: 22px;
+  min-width: 22px;
+  padding: 0 5px;
+  border: 1px solid color-mix(in srgb, var(--warning) 40%, var(--line));
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--warning) 12%, var(--paper));
+  color: var(--warning);
+  font: 600 11px/1 var(--font-sans);
+  pointer-events: auto;
+  cursor: pointer;
+  animation: showai-fade-in var(--duration-fast) var(--ease-out);
+}
+.comment-marker[hidden] {
+  display: none;
+}
+.comment-marker:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.comment-flash {
+  position: fixed;
+  z-index: 30;
+  pointer-events: none;
+  border-radius: 6px;
+  box-shadow: 0 0 0 2px var(--warning);
+  background: color-mix(in srgb, var(--warning) 16%, transparent);
+  animation: comment-flash var(--comment-flash-duration, 1600ms) var(--ease-out) forwards;
+}
+@keyframes comment-flash {
+  0%,
+  45% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+.comment-popover {
+  position: fixed;
+  z-index: 160;
+  box-sizing: border-box;
+  max-height: min(60vh, 520px);
+  overflow: auto;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--paper);
+  color: var(--text);
+  box-shadow: var(--shadow-dialog);
+  font: 13px/1.5 var(--font-sans);
+  animation: showai-pop-in var(--duration-fast) var(--ease-out);
+}
+
+.comment-input textarea {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 34px;
+  padding: 7px 9px;
+  resize: none;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-control);
+  background: var(--paper);
+  color: var(--text);
+  font: inherit;
+}
+.comment-input textarea:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+.comment-input-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+  margin-top: 6px;
+}
+.comment-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 28px;
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: var(--paper);
+  color: var(--text);
+  font: 500 12px/1 var(--font-sans);
+  cursor: pointer;
+}
+.comment-button:hover {
+  background: var(--hover);
+}
+.comment-button.is-primary {
+  border-color: var(--action);
+  background: var(--action);
+  color: #fff;
+}
+.comment-button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.comment-icon {
+  display: inline-grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: var(--muted);
+  cursor: pointer;
+}
+.comment-icon:hover {
+  background: var(--hover);
+  color: var(--text);
+}
+:is(.comment-button, .comment-icon, .comments-panel button):focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.comment-list {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.comment-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 24px;
+  color: var(--muted);
+  font-size: 11px;
+}
+.comment-author {
+  color: var(--text);
+  font-weight: 600;
+  font-size: 12px;
+}
+.comment-author.is-agent {
+  color: var(--accent);
+}
+.comment-item-actions {
+  display: inline-flex;
+  margin-left: auto;
+  opacity: 0;
+  transition: opacity var(--duration-fast) var(--ease-out);
+}
+.comment-item:hover .comment-item-actions,
+.comment-item:focus-within .comment-item-actions {
+  opacity: 1;
+}
+@media (hover: none) {
+  .comment-item-actions {
+    opacity: 1;
+  }
+}
+.comment-text {
+  margin: 2px 0 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.comment-thread-footer {
+  display: grid;
+  gap: 8px;
+  margin-top: 10px;
+}
+.comment-resolve {
+  justify-self: start;
+}
+.comment-thread.is-resolved .comment-text {
+  color: var(--muted);
+}
+
+/* Shares the right-hand slot with the Agent panel. */
+.comments-panel {
+  display: flex;
+  flex: 0 0 auto;
+  flex-direction: column;
+  width: 340px;
+  min-height: 0;
+  border-left: 1px solid var(--line);
+  background: var(--paper);
+  color: var(--text);
+  font: 13px/1.5 var(--font-sans);
+  animation: showai-fade-in var(--duration-base) var(--ease-out);
+}
+.comments-panel-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--line);
+}
+.comments-filter {
+  display: flex;
+  flex: 1;
+  gap: 4px;
+}
+.comments-filter button {
+  height: 28px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 7px;
+  background: none;
+  color: var(--muted);
+  font: 500 12px/1 var(--font-sans);
+  cursor: pointer;
+}
+.comments-filter button.is-active {
+  background: var(--selected);
+  color: var(--text);
+}
+.comments-panel-list {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 8px;
+}
+.comments-empty {
+  margin: 24px 8px;
+  color: var(--muted);
+  text-align: center;
+}
+.comments-panel-thread {
+  border-radius: 10px;
+}
+.comments-panel-thread + .comments-panel-thread {
+  margin-top: 4px;
+}
+.comments-panel-thread.is-active {
+  padding-bottom: 10px;
+  background: var(--surface);
+}
+.comments-panel-thread.is-active .comment-thread {
+  padding: 0 10px;
+}
+.comments-panel-anchor {
+  display: grid;
+  gap: 2px;
+  width: 100%;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 10px;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.comments-panel-anchor:hover {
+  background: var(--hover);
+}
+.comments-panel-quote {
+  overflow: hidden;
+  padding-left: 7px;
+  border-left: 2px solid color-mix(in srgb, var(--warning) 60%, transparent);
+  color: var(--muted);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.comments-panel-anchor.is-detached .comments-panel-quote {
+  border-left-color: var(--line);
+  font-style: italic;
+}
+.comments-panel-text {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  white-space: pre-wrap;
+}
+.comments-panel-count {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+/* Narrow windows: the panel floats over the page, like the Agent panel. */
+@media (max-width: 760px) {
+  .comments-panel {
+    position: fixed;
+    inset: 36px 0 0 auto;
+    z-index: 150;
+    width: min(100vw, 380px);
+    box-shadow: var(--shadow-dialog);
+  }
+}
+@media print {
+  .comments-panel,
+  .comment-markers,
+  .comment-popover {
+    display: none !important;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .comment-flash {
+    animation-timing-function: steps(1, end);
+  }
+}

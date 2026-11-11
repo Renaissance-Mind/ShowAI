@@ -1,3 +1,4 @@
+import { CommentSlots } from "../comment-slots";
 import { textRangeEditMeta } from "./text-range-edit";
 import { registerSelectionEditor } from "../../surface/text-selection";
 import { ContentNodeActions } from "./ContentNodeActions";
@@ -278,6 +279,7 @@ export default function RichTextEditor({
   const [slash, setSlash] = useState<SlashState | null>(null);
   const { useCatalog, registerComponent, assistant, pageLinks } =
     useContext(RichTextEnvironment);
+  const comments = useContext(CommentSlots);
   const pageLinksRef = useRef(pageLinks);
   pageLinksRef.current = pageLinks;
   const catalog = useCatalog(!!slash);
@@ -2004,6 +2006,7 @@ export default function RichTextEditor({
                       {tc("copyReference")}
                     </button>
                   )}
+                  {comments?.block(editor.state.doc.nodeAt(hover.pos)?.attrs.id, () => setBlockMenu(false))}
                   {pageLinks && (
                     <button
                       onClick={() => {
@@ -2167,6 +2170,10 @@ export default function RichTextEditor({
               </button>
             </>
           )}
+          {comments?.text(editor, () => {
+            selectionMenuInteracting.current = false;
+            setBubble(null);
+          })}
           {
             <>
               <span className="toolbar-divider" aria-hidden="true" />

@@ -308,6 +308,7 @@ import {
 } from "./ExternalChangeNotice";
 import { authorName, writerName } from "./external-change";
 import AssistantWorkbench from "./assistant/AssistantWorkbench";
+import { CommentsPanel, CommentsToggle } from "../comments/CommentsPanel";
 import { referenceHeading } from "./assistant/targets";
 import type { AgentTarget } from "../agent-host/types";
 import {
@@ -5129,6 +5130,10 @@ export default function Studio() {
             >
               <ArrowUpRight size={14} />
             </button>
+            <CommentsToggle
+              documentId={page.draft.id}
+              onOpen={() => changeAssistantOpen(false)}
+            />
             <button
               className={`studio-icon studio-icon-labeled${assistantOpen ? " is-active" : ""}`}
               aria-pressed={assistantOpen}
@@ -6084,6 +6089,10 @@ export default function Studio() {
               })}
             />}
           </main>
+          <CommentsPanel
+            documentId={view === "page" ? (page.draft?.id ?? null) : null}
+            assistantOpen={assistantOpen}
+          />
           </AssistantWorkbench>
         </AutoHideSidebar>
         <AppUpdateNotice

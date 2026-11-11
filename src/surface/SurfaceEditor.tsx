@@ -35,6 +35,8 @@ import type { JSONContent } from "@tiptap/core";
 import type { RichTextHost } from "../components/rich-text/RichText";
 import { toPageEditor, fromPageEditor, fromPageEditorDraft } from "./page-content";
 import { PageModuleContext, pageEditorNodes } from "./PageEditorNodes";
+import { usePageComments } from "../comments/usePageComments";
+import { rebaseCommentAnchors } from "../core/comments";
 import { mergePageContent, canCommitPageMerge } from "../core/page-merge-model";
 import InkConflictInspector from "./InkConflictInspector";
 import {nativeContentHistoryStages} from "./native-content-history";
@@ -298,6 +300,8 @@ function SurfaceEditor({
     (value: ShowDocument, group = "", nativeAction?:NativeInkHistoryAction, recordHistory=true, authoring=true, publish=true) => {
       if (latestReadOnly.current) return;
       const before = current.current;
+      // Anchored comments follow their text through this edit.
+      if (value.content !== before.content) value = rebaseCommentAnchors(before, value);
       const owner=sourceSessionFor(before);
       const next = (owner?(authoring?owner.replace(value):sourceSessionFor(value)===owner?value:owner.replace(value)):measureNativeSync("surface.commit.reconcile",()=>
         !authoring ? reconcileSurface(value,{shareWith:before}) :
@@ -792,6 +796,14 @@ reservePortable.current = (options) => {
         );
     },
   };
+  const shell = useRef<HTMLDivElement>(null);
+  const comments = usePageComments({
+    document: current.current,
+    commit,
+    readOnly,
+    shell,
+    projectId: inlineInkProjectId,
+  });
   const render = ({
     content,
     parentId,
@@ -854,7 +866,9 @@ reservePortable.current = (options) => {
       view.hostShape = hostShape;
       view.host = {
         retentionKey,
-        additionalExtensions: renderModule ? pageEditorNodes : undefined,
+        additionalExtensions: renderModule
+          ? [...pageEditorNodes, comments.extension]
+          : [comments.extension],
         continuousPage: !!renderModule,
         onInsertNative: readOnly
           ? undefined
@@ -899,6 +913,7 @@ reservePortable.current = (options) => {
   );
   return (
     <PortableCubicContext.Provider value={portableScope}><div
+      ref={shell}
       className="surface-editor-shell"
       onKeyDownCapture={(event) => {
         if (
@@ -921,7 +936,7 @@ reservePortable.current = (options) => {
         }
       }}
     >
-      <ContainerRuntime
+      {comments.render(<ContainerRuntime
         onOpenEmbeddedSurface={onOpenEmbeddedSurface}
         document={current.current}
         geometry={geometry}
@@ -930,9 +945,9 @@ reservePortable.current = (options) => {
         onChange={readOnly ? undefined : change}
         header={header}
         renderContent={stableRender}
-        revealId={revealId}
+        revealId={comments.revealId ?? revealId}
         revealInPlace={insertedId}
-        onRevealHandled={onRevealHandled}
+        onRevealHandled={comments.revealId ? comments.revealHandled : onRevealHandled}
         undo={undo}
         redo={redo}
         onControlsChange={onControlsChange}
@@ -940,7 +955,7 @@ reservePortable.current = (options) => {
         inspectorHost={inspectorHost}
         canUndo={!travelQueue.failure&&!!history.current.past.length}
         canRedo={!travelQueue.failure&&!!history.current.future.length}
-      />
+      />)}
       <InkConflictInspector document={current.current} projectId={inlineInkProjectId} host={inspectorHost}
         beforeResolve={onInkSave} getDocument={()=>current.current}
         onResolve={value=>commit(value,"ink-conflict-resolution")} readOnly={readOnly}/>
