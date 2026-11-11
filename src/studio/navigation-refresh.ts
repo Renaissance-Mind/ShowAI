@@ -65,6 +65,27 @@ export function retainEqual<T>(previous: T, next: T): T {
     ? previous
     : next;
 }
+/**
+ * The sidebar contents after a refresh read the scanned projects and their
+ * pages. Each project's folders come from the same scan, so pages and folders
+ * always describe one moment: a page whose folder was created elsewhere (an
+ * import, another window, an Agent) never shows without its folder, whether
+ * or not the project is expanded or open.
+ */
+export function refreshedContents(
+  current: ProjectContents,
+  scanned: { project: ProjectSummary; pages: PageSummary[] }[],
+  scope: { full: boolean; ids: ReadonlySet<string> },
+): ProjectContents {
+  const updated: ProjectContents = scope.full ? {} : { ...current };
+  for (const id of scope.ids) delete updated[id];
+  for (const { project, pages } of scanned)
+    updated[project.id] = retainEqual(current[project.id], {
+      pages,
+      folders: project.folders ?? [],
+    });
+  return retainEqual(current, updated);
+}
 export function mergeNavigationProjects(
   previous: ProjectSummary[],
   next: ProjectSummary[],

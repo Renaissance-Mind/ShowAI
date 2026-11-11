@@ -10,6 +10,7 @@ import {
   withoutLibraryEntries,
   withProjectFields,
   mergeNavigationProjects,
+  refreshedContents,
   retainEqual,
   mergeNavigationScope,
   savedPageMoved,
@@ -305,4 +306,46 @@ it("shows renames, new items and deletions in loaded navigation", () => {
   expect(withProjectFields([project], "project", { name: "New" })[0].name).toBe(
     "New",
   );
+});
+
+it("a refresh after folders were created elsewhere carries them with the pages they hold", () => {
+  // The window knows project p with one page and no folders. An import from
+  // the CLI then created two nested folders holding a new page, while p is
+  // neither expanded nor open in this window.
+  const time = "2026-11-12T00:00:00.000Z";
+  const folder = (id: string, parentId: string | null) =>
+    ({ id, name: id, parentId, createdAt: time, updatedAt: time }) as FolderMetadata;
+  const pageIn = (id: string, parentId: string | null) =>
+    ({ id, title: id, kind: "page", parentId, updatedAt: time }) as unknown as PageSummary;
+  const current = {
+    p: { pages: [pageIn("start", null)], folders: [] as FolderMetadata[] },
+    q: { pages: [pageIn("other", null)], folders: [folder("kept", null)] },
+  };
+  const folders = [folder("planning", null), folder("projects", "planning")];
+  const pages = [pageIn("start", null), pageIn("launch", "projects")];
+  const scope = emptyNavigationScope();
+  queueNavigationScope(scope, libraryChange("/library", ["p"]));
+  const project = (items: FolderMetadata[], count: number) =>
+    ({ id: "p", name: "P", folders: items, pageCount: count }) as ProjectSummary;
+  const next = refreshedContents(
+    current,
+    [{ project: project(folders, 2), pages }],
+    { full: scope.all, ids: scope.ids },
+  );
+  expect(next.p).toEqual({ pages, folders });
+  // Every page's folder is known, so none is drawn at the top level.
+  const known = new Set(next.p.folders.map((item) => item.id));
+  expect(
+    next.p.pages.every((item) => !item.parentId || known.has(item.parentId)),
+  ).toBe(true);
+  // Projects outside the change keep what they had.
+  expect(next.q).toBe(current.q);
+  // Undoing the import removes the folders in the next refresh.
+  const undone = refreshedContents(
+    next,
+    [{ project: project([], 1), pages: [pageIn("start", null)] }],
+    { full: false, ids: new Set(["p"]) },
+  );
+  expect(undone.p.folders).toEqual([]);
+  expect(undone.p.pages.map((item) => item.id)).toEqual(["start"]);
 });

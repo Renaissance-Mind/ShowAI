@@ -15,6 +15,7 @@ import {
   libraryChange,
   queueNavigationScope,
   mergeNavigationProjects,
+  refreshedContents,
   retainEqual,
   mergeNavigationScope,
   savedPageMoved,
@@ -1203,29 +1204,23 @@ export default function Studio() {
           } catch (error) {
             console.warn("Could not cache the project list", error);
           }
+          // Folders come with the scan; only pages are read per project.
           const nextContents = await Promise.all(
-            next.map(async (item) => {
-              const scope = { projectId: item.id, expectedHome: appInfo.home };
-              const [pages, folders] = await Promise.all([
-                desktop.invoke<PageSummary[]>("pages:list", scope),
-                expandedRef.current[item.id] || item.id === selectedRef.current
-                  ? desktop.invoke<FolderMetadata[]>("folders:list", scope)
-                  : Promise.resolve(undefined),
-              ]);
-              return { id: item.id, pages, folders };
-            }),
+            next.map(async (project) => ({
+              project,
+              pages: await desktop.invoke<PageSummary[]>("pages:list", {
+                projectId: project.id,
+                expectedHome: appInfo.home,
+              }),
+            })),
           );
           if (generation !== libraryGeneration.current) return;
-          setContents((current) => {
-            const updated = full ? {} : { ...current };
-            for (const id of requested.ids) delete updated[id];
-            for (const { id, pages, folders } of nextContents)
-              updated[id] = retainEqual(current[id], {
-                pages,
-                folders: folders ?? current[id]?.folders ?? [],
-              });
-            return retainEqual(current, updated);
-          });
+          setContents((current) =>
+            refreshedContents(current, nextContents, {
+              full,
+              ids: requested.ids,
+            }),
+          );
         } catch (error) {
           // A failed scoped read must remain pending when another change asks for a retry.
           mergeNavigationScope(navigationScope.current, requested);
