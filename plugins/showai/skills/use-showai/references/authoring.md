@@ -30,6 +30,8 @@
 
 页面之间和页面内部的跳转用文字链接：Markdown 写 `[文字](showai://project/项目ID/page/页面ID)`，要定位到目标页的某个块、组件或 Board 对象时加 `?blocks=块ID`；同一页内写 `[文字](#块ID)`。项目和页面 ID 取自 pages_list，块 ID 取自 page_read；文本块里的段落和标题、组件、容器里的块和 Board 对象都能作为目标，组件内部的条目不能。给已有段落或标题中的文字加链接时用 `block.replace`，传入同一 ID 的节点并给要链接的文字加 link 标记，例如 `{type:"block.replace",blockId:"段落ID",node:{type:"paragraph",attrs:{id:"段落ID"},content:[{type:"text",text:"支持"},{type:"text",text:"离线导出",marks:[{type:"link",attrs:{href:"showai://project/项目ID/page/页面ID?blocks=块ID"}}]}]}}`；块 ID 保持不变。删除后重新插入会换新 ID，指向旧 ID 的链接随之失效。
 
+在句子里提到另一页（用户在正文输入 @ 选择页面得到的也是它）就写这种页面链接，文字用页面标题。句子里的日期写成日期组件：Markdown 写 `@[date]{"date":"2026-11-20"}`，richtext 树里是行内节点 `{type:"inlineWidget",attrs:{kind:"date",data:{date:"2026-11-20"}}}`。同样的 `@[kind]{data}` 能把任何声明了 mention 的组件放进一行文字。新加一句时用 `component.insert` 插入 `{kind:"text",data:{format:"markdown",content:"…"}}`，其中的页面链接和 `@[date]` 都会被解析；没有说年份的日期按今天所在的年份理解，不确定时先问用户。页面链接、数据库的页面列和组件声明的页面字段都会进入引用索引：要在页面上列出引用这一页的页面，插入 backlinks 组件；要读取引用见 [页面读取](page-reading.md#页面之间的引用)。
+
 在工作台中，编辑时按住 ⌘（Windows 为 Ctrl）点击链接跳转，直接点击只放置光标；阅读时直接点击。跳转后打开目标页并滚动、高亮目标块，工具栏的后退回到原页；目标页面不存在时提示错误并停留原页，目标块不存在时只打开页面。多页作品（小型网站、分章讲解）在各页导语或结尾放上这类链接。要交给别人时用 `page_export({format:"site", out:"不存在或为空的目录的绝对路径"})`：它导出项目中所有未归档的页面，不能只选其中几页，项目里还有其他页面时先告诉用户；多页网站自带各页导航栏，入口是 `index.html`，页间链接打开导出的对应页面并定位到目标块。网站需要放到静态网站托管或本地 HTTP 服务上打开，直接双击文件打开时浏览器不加载阅读器。单页 HTML 里跨页的链接，以及网站中指向未导出页面的链接，只有装了 ShowAI 且有这个项目的读者才能打开。自定义组件需要点击后跳转时用 `goTo`，见 [组件设计](../../create-component/references/component-authoring.md#跳转到页面或组件)。
 
 ## 展示与导出
