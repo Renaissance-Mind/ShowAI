@@ -17,6 +17,8 @@
 
 ## 示例：评分
 
+下面是 manifest 的片段，完整的 manifest 还要有 documentation（见 [组件设计](component-authoring.md)）：
+
 ```json
 {
   "id": "star-rating",
@@ -67,10 +69,10 @@ export default function RatingEditor({ data, value, onValue, onClose }) {
 { "id": "rating", "name": "评分", "type": "custom", "component": { "componentId": "star-rating", "version": "1.0.0", "integrity": "sha256-…" }, "kind": "number", "config": { "max": 5 } }
 ```
 
-`kind` 抄写组件声明的 valueKind（fieldTypes 的 contributed 条目里已经写好整列的 column）。记录里这一列写数字。在工作台中也可以从类型菜单直接选这个类型。视图的筛选条件用 `contributes.databaseField.operators` 中的运算符，例如 `{"column":"rating","operator":"gte","value":4}`。
+`kind` 抄写组件声明的 valueKind（fieldTypes 的 contributed 条目里已经写好整列的 column）。列定义放在哪里取决于数据库的数据在哪里：数据写在页面里时，用 page_apply 的 `component.props.set` 修改这个数据库块的 columns；数据库绑定了共享数据（page_read 的 bindings 列出这个块）时，列和记录都在共享数据里，用 `dataset_write({action:"apply"})` 的 `{op:"insert",path:"columns",value:…}` 加列，见 [共享数据](../../use-showai/references/shared-data.md)。记录里这一列写数字。在工作台中也可以从类型菜单直接选这个类型。视图的筛选条件用 `contributes.databaseField.operators` 中的运算符，例如 `{"column":"rating","operator":"gte","value":4}`。
 
 组件被删除、版本找不到或在导出的离线页面中，单元格只读显示存储的原值，数据不会丢失；这些地方以及 `dataset_read` 的 query 按列的 `kind` 筛选与排序存储的值，所以 `format`/`project` 不改变比较方式时结果与工作台一致。字段类型组件不会出现在插入组件的菜单里。
 
 ## 验证
 
-在测试页面放一个数据库：从类型菜单添加这一列，确认显示、编辑、按它筛选和排序；改 `config` 后确认显示随之变化；再用 `page_read` 读回，确认记录里保存的是原始值。改了 `field` 或编辑器后提高 version 保存，再用 page_apply 修改数据库的 columns，把这一列 `component` 的 version 与 integrity 换成新版本。
+在测试页面放一个数据库：从类型菜单添加这一列，确认显示、编辑、按它筛选和排序；改 `config` 后确认显示随之变化；再用 `page_read` 读回，确认记录里保存的是原始值。改了 `field` 或编辑器后提高 version 保存，再按上面同样的位置（页面里的 columns 或共享数据的 columns）把这一列 `component` 的 version 与 integrity 换成新版本。

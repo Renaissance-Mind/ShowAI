@@ -10,6 +10,8 @@
 }
 ```
 
+快速跳转和 @ 菜单读取每个组件最新版本的声明，范围是本项目可用的组件（项目、全局、已发布和内置）；修改声明后保存新版本即生效，页面里已插入的旧版本不受影响。内置组件和不能在本项目重新发布的组件，用 `catalog_version({action:"fork"})` 复制成项目里的组件后再声明。
+
 三项都可省略，可以同时声明 commands 与 mention，或 commands 与 databaseField；mention 与 databaseField 不能同时声明，因为字段类型组件的 props 是列的设置。声明属于不可变版本，修改后保存新版本。准确字段以 `guide({topic:"component"})` 返回的 `input.contributesSchema` 为准。保存时检查整个声明，错误统一写成 `contributes.<路径> <问题>`，例如 `contributes.commands[0].run.insert.example names a missing example`，按路径改正后重新保存。把 `commands`、`mention` 或 `databaseField` 写在 manifest 顶层会被拒绝。
 
 `catalog_describe` 的 summary 带出组件的 `contributes`；`catalog_list({projectId, kind:"contribution"})` 列出每个位置以及项目中填入它的组件和导入器，用来查看已有的命令、@ 菜单来源与字段类型，避免重复制作。
@@ -32,17 +34,19 @@
 
 `catalog_list` 的 query 也匹配命令标题和关键词。保存后在工作台按 ⌘K 输入命令名，确认它出现并按预期插入或跳转。
 
+这是 manifest 的片段，完整的 manifest 还要有 description、scenarios、examples 和 documentation（见 [组件设计](component-authoring.md)）。
+
 ## mention：放进一行文字的组件
 
 用户在正文输入 @ 时，菜单列出页面，以及每个声明了 `contributes.mention` 的组件：
 
 - `prop`：菜单填写的顶层 string 参数，schema 中必须存在。
 - `input`：`"date"` 列出今天、明天、昨天和输入的日期（YYYY-MM-DD）；`"text"` 用输入的文字；`"options"` 只列出固定选项。
-- `options`：可选的固定选项 `[{label, value, keywords?}]`，最多 50 个，value 写进 prop；`input:"options"` 时必填。
+- `options`：可选的固定选项 `[{label, value, keywords?}]`，最多 50 个，value 写进 prop；`keywords` 与命令的一样是文字数组；`input:"options"` 时必填。
 
 ```json
 { "id": "person", "name": "同事", "version": "1.0.0", "entry": "index.tsx", "defaultData": { "name": "" },
-  "contributes": { "mention": { "prop": "name", "input": "options", "options": [{ "label": "王芳", "value": "王芳", "keywords": "wangfang" }] } } }
+  "contributes": { "mention": { "prop": "name", "input": "options", "options": [{ "label": "王芳", "value": "王芳", "keywords": ["wangfang"] }] } } }
 ```
 
 本项目可用的组件（项目、全局、已发布和内置组件）都会进入菜单。选项随组件版本保存，名单变化时保存新版本；名单需要经常变化时用 `input:"text"` 让用户直接输入。选中后组件以其余参数的 defaultData 加上这个值放进当前行，存为行内节点 `{type:"inlineWidget",attrs:{kind:"custom",data:{componentId,version,integrity,props}}}`；Markdown 中自定义组件写 `@[custom]{"componentId":"person","version":"1.0.0","integrity":"sha256-…","props":{"name":"王芳"}}`，内置组件写 `@[kind]{data}`。组件此时收到 `inline: true`，应渲染成一行文字中的内容：不用块级外边距和固定宽高，宽度随内容。宿主按组件报告的尺寸设置行内框架；修改仍通过 `onChange`。这类组件不出现在插入组件的菜单里。验证时在正文输入 @ 选中组件，检查它与前后文字同行、可编辑和只读时的样子以及导出页。

@@ -158,7 +158,11 @@ export function componentMentionSource(
         entries.push(entry(query, query, query));
       for (const option of contract.options ?? [])
         entries.push(
-          entry(option.value, option.label, option.keywords ?? option.value),
+          entry(
+            option.value,
+            option.label,
+            [option.value, ...(option.keywords ?? [])].join(" "),
+          ),
         );
       return entries;
     },

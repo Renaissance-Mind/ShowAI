@@ -82,7 +82,7 @@ describe("@ menu sources", () => {
           prop: "label",
           input: "options",
           options: [
-            { label: "Blocked", value: "blocked", keywords: "stuck" },
+            { label: "Blocked", value: "blocked", keywords: ["stuck"] },
             { label: "Done", value: "done" },
           ],
         },

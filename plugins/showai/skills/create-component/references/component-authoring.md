@@ -4,7 +4,7 @@
 
 新组件使用 documentation.version=2；按 [参数契约](parameter-contract.md) 同步 schema、字段语义、遗漏行为、示例及关系约束。结构检查与实际交互分别验证，不把例子中的初始值称为自动默认值。
 
-定义数据契约：输入字段、必填条件、数组上限、单位、默认值以及空数据状态。schema 与 defaultData、examples、React 入口一致。界面需要的计算与状态说明保持在组件内；正式数据通过 `onChange(nextData)` 返回，读取态保持页面源数据。每个组件接收 `{data, onChange, readOnly, dataState, goTo}`，`dataState` 见下方「数据状态与可改范围」，`goTo` 见下方「跳转到页面或组件」；有对话的宿主还会传入 `onContext` 与 `context`，见下方「交给对话」；App 页面中的组件块还会收到 `viewState` 与 `onViewState`，见下方「记住读者的位置」。
+定义数据契约：输入字段、必填条件、数组上限、单位、默认值以及空数据状态。schema 与 defaultData、examples、React 入口一致。界面需要的计算与状态说明保持在组件内；正式数据通过 `onChange(nextData)` 返回，读取态保持页面源数据。每个组件接收 `{data, onChange, readOnly, dataState, goTo}`（放进一行文字时还收到 `inline: true`，见 [工作台位置](contributions.md#mention放进一行文字的组件)），`dataState` 见下方「数据状态与可改范围」，`goTo` 见下方「跳转到页面或组件」；有对话的宿主还会传入 `onContext` 与 `context`，见下方「交给对话」；App 页面中的组件块还会收到 `viewState` 与 `onViewState`，见下方「记住读者的位置」。
 
 包包含 `manifest.json`、`props.schema.json` 和 manifest.entry 指定的本地文件。manifest 记录 id、name、version、description、scenarios、entry、defaultData、examples。输入与示例保留可用的最小实例；参考本次真实内容验证较复杂情况，不为未知事实生成示例测量。
 

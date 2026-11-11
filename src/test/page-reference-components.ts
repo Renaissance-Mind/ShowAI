@@ -119,7 +119,7 @@ export function statusTagComponent(id = "status-tag"): ComponentSource {
           input: "options",
           options: [
             { label: "Todo", value: "todo" },
-            { label: "Blocked", value: "blocked", keywords: "stuck" },
+            { label: "Blocked", value: "blocked", keywords: ["stuck"] },
             { label: "Done", value: "done" },
           ],
         },

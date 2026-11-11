@@ -73,7 +73,7 @@ const mentionSchema = z
           .object({
             label: z.string().trim().min(1).max(200),
             value: z.string().max(1000),
-            keywords: z.string().max(500).optional(),
+            keywords: z.array(z.string().trim().min(1).max(60)).max(20).optional(),
           })
           .strict(),
       )

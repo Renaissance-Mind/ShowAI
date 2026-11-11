@@ -18,7 +18,7 @@ page_create({projectId, parentId?, import:{source:"/Users/me/Downloads/Export-ab
 
 内置导入器：
 
-- **notion**：Notion「Markdown & CSV」导出的 zip（含嵌套的 Part zip）或解压后的文件夹，普通 Markdown 文件夹也可以。有子页面的页面变成一个文件夹，里面是这个页面和它的子页面；页面之间的链接（相对路径或 notion.so 地址）改成 ShowAI 页面链接；每个 CSV 数据库变成绑定共享数据的数据库组件，列类型按内容推断（多选成为 multiSelect 列；关联指向导出中同一个数据库的行页面时成为保存记录 id 的 relation 列，否则保留相关页面的标题；公式和汇总保留导出时的计算结果），行页面通过 page 列连接；图片、视频、音频和 PDF 附件在资源上限内嵌入页面。
+- **notion**：Notion「Markdown & CSV」导出的 zip（含嵌套的 Part zip）或解压后的文件夹，普通 Markdown 文件夹也可以。有子页面的页面变成一个文件夹，里面是这个页面和它的子页面；页面之间的链接（相对路径或 notion.so 地址）改成 ShowAI 页面链接；每个 CSV 数据库变成绑定共享数据的数据库组件，列类型按内容推断（多选成为 multiSelect 列；一个关联列里的每个值都是导出中某一个数据库的行页面时（例如 Projects 的 Tasks 列指向 Tasks 数据库的行），这一列成为指向那个数据库、保存记录 id 的 relation 列；值指向普通页面或分散在几个数据库时保留相关页面的标题，并在计划的提示里说明。Notion 的双向关联在导出里两边各有一列，导入后两边各是一个 relation 列，不另加 reverse。公式和汇总保留导出时的计算结果），行页面通过 page 列连接；图片、视频、音频和 PDF 附件在资源上限内嵌入页面。
 - **word**：.docx 文档，保留标题、粗体、斜体、下划线、删除线、代码、链接、多级列表、含合并单元格的表格、图片和脚注；批注不属于页面内容，会在提示中列出。
 - **markdown**：.md、.markdown、.txt 以及 ShowAI 导出的 .html、.showai.json，每个文件一页。
 

@@ -21,7 +21,7 @@
 | 查看布局或操作效果 | `page_read` 的 image / html；读取 [阅读视图](page-reading.md)，遵循宿主实际 UI 操控规则 |
 | 在对话中直接展示 1–5 个组件 | [show-visual](../../show-visual/SKILL.md)，不建项目、不保存 |
 | 创建、修改、展示、导出作品，或应用模板 | [show-document](../../show-document/SKILL.md) |
-| 查询组件或模板 | `catalog_list({kind:"component"或"template",projectId})` 读取相应目录元信息；模板用 template_context 一次读完 README 与全部指南，组件再按需取 guide/schema；公开目录用 public_catalog_list/describe |
+| 查询组件或模板 | `catalog_list({kind:"component"或"template",projectId})` 读取相应目录元信息；`kind:"contribution"` 列出快速跳转命令、@ 菜单、字段类型、页面目录和导入器这些可填入的位置以及已经填入的组件和导入器，见 [扩展点](extension-points.md)；模板用 template_context 一次读完 README 与全部指南，组件再按需取 guide/schema；公开目录用 public_catalog_list/describe |
 | 创建可复用组件，包括能在正文 @ 菜单中提及的新类型（人员、事项、文献等） | [create-component](../../create-component/SKILL.md) |
 | 创建或提炼模板 | [create-template](../../create-template/SKILL.md) |
 | 同步状态 | 本机 `project_sync_status`，明确需要同步时 `project_sync`；远程检查操作返回的 synchronization |
