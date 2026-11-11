@@ -118,6 +118,8 @@ import flowchartContract from "../components/blocks/flowchart-contract.mjs?raw";
 import icons from "../ui/icons.ts?raw";
 import expandableSearch from "../components/ExpandableSearch.tsx?raw";
 import expandableSearchCss from "../components/expandable-search.css?raw";
+import slashMenuItems from "../components/SlashMenuItems.tsx?raw";
+import slashMenuModel from "../components/slash-menu-model.ts?raw";
 import i18nCore from "../i18n/index.ts?raw";
 import i18nReact from "../i18n/react.ts?raw";
 import i18n_blockHelpers from "../i18n/messages/blockHelpers.ts?raw";
@@ -141,6 +143,7 @@ import i18n_references from "../i18n/messages/references.ts?raw";
 import i18n_resourceEditor from "../i18n/messages/resourceEditor.ts?raw";
 import i18n_richText from "../i18n/messages/richText.ts?raw";
 import i18n_richTextNotes from "../i18n/messages/richTextNotes.ts?raw";
+import i18n_slashMenu from "../i18n/messages/slashMenu.ts?raw";
 import i18n_search from "../i18n/messages/search.ts?raw";
 import i18n_analysis from "../i18n/messages/analysis.ts?raw";
 import i18n_scene3d from "../i18n/messages/scene3d.ts?raw";
@@ -267,6 +270,8 @@ const sources: Record<string, string> = {
   "icons.ts": icons,
   "ExpandableSearch.tsx": expandableSearch,
   "expandable-search.css": expandableSearchCss,
+  "SlashMenuItems.tsx": slashMenuItems,
+  "slash-menu-model.ts": slashMenuModel,
   "primitive-contract.mjs": contract,
   "native-ink.mjs": nativeInkContract,
   "portable-ink.mjs": portableInkContract,
@@ -364,6 +369,7 @@ const sources: Record<string, string> = {
   "i18n/messages/resourceEditor.ts": i18n_resourceEditor,
   "i18n/messages/richText.ts": i18n_richText,
   "i18n/messages/richTextNotes.ts": i18n_richTextNotes,
+  "i18n/messages/slashMenu.ts": i18n_slashMenu,
   "i18n/messages/search.ts": i18n_search,
   "i18n/messages/analysis.ts": i18n_analysis,
   "i18n/messages/scene3d.ts": i18n_scene3d,
