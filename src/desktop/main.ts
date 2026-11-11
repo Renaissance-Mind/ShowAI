@@ -1479,13 +1479,16 @@ async function createWindow(page?: WindowTarget): Promise<BrowserWindow> {
   });
   window.webContents.on("before-input-event", (event, input) => {
     if (input.type !== "keyDown") return;
-    const command = tabShortcut({
-      key: input.key,
-      metaKey: input.meta,
-      ctrlKey: input.control,
-      shiftKey: input.shift,
-      altKey: input.alt,
-    });
+    const command = tabShortcut(
+      {
+        key: input.key,
+        metaKey: input.meta,
+        ctrlKey: input.control,
+        shiftKey: input.shift,
+        altKey: input.alt,
+      },
+      process.platform === "darwin",
+    );
     if (!command) return;
     event.preventDefault();
     if (!input.isAutoRepeat)

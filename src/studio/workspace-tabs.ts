@@ -168,6 +168,28 @@ export function pruneWorkspace(
   return changed ? { ...state, tabs } : state;
 }
 
+/** Points history entries at the project their pages and folders moved to. */
+export function relocateWorkspace(
+  state: WorkspaceTabsState,
+  moved: (location: WorkspaceLocation) => boolean,
+  projectId: string,
+): WorkspaceTabsState {
+  let changed = false;
+  const tabs = state.tabs.map((tab) => {
+    if (!tab.entries.some((entry) => moved(entry.location))) return tab;
+    changed = true;
+    return {
+      ...tab,
+      entries: tab.entries.map((entry) =>
+        moved(entry.location)
+          ? { ...entry, location: { ...entry.location, projectId } }
+          : entry,
+      ),
+    };
+  });
+  return changed ? { ...state, tabs } : state;
+}
+
 /** Move an existing tab without changing its identity, history or selection. */
 export function moveWorkspaceTab(
   state: WorkspaceTabsState,

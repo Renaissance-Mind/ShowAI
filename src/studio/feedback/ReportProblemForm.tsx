@@ -148,11 +148,14 @@ export function ReportProblemForm({
     run(async () => {
       const text = await fullDiagnostics();
       if (text) await writeClipboard(text);
-      window.open(
+      const opened = window.open(
         issueUrl({ ...draft, logs: text ? t("report.logsHint") : "" }),
         "_blank",
-        "noopener",
       );
+      if (opened) opened.opener = null;
+      // The desktop App hands web links to the system browser and returns no
+      // window; in a browser, no window means a blocked pop-up.
+      else if (draft.mode !== "desktop") throw new Error(t("report.notOpened"));
       setKind("problem");
       setSummary("");
       setSteps("");

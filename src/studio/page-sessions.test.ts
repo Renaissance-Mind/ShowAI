@@ -10,7 +10,7 @@ import {createResource} from "../surface/containers.mjs";
 import {addNode} from "../surface/editing";
 import {createPortableInk} from "../surface/portable-ink.mjs";
 import {findSurfaceNode,reconcileSurface} from "../surface/document.mjs";
-import {createPageSession,type LoadedPage} from "./page-session";
+import {createPageSession,saveNow,type LoadedPage} from "./page-session";
 import type { ContainerDocument } from "../types";
 import type { JSONContent } from "@tiptap/core";
 import {HistoryTravelQueue} from "../surface/history-travel-queue";
@@ -32,6 +32,8 @@ describe("workspace sessions against the real loopback workbench", () => {
   let first: LoadedPage;
   let second: LoadedPage;
   const calls: string[] = [];
+  /** The next page save fails as a full disk would, before reaching the library. */
+  let failNextSave = false;
   let invoke: <T>(action: string, args?: Record<string, unknown>) => Promise<T>;
   beforeEach(async () => {
     directory = await mkdtemp(join(tmpdir(), "showai-page-sessions-"));
@@ -51,6 +53,10 @@ describe("workspace sessions against the real loopback workbench", () => {
       args: Record<string, unknown> = {},
     ): Promise<T> => {
       calls.push(action);
+      if (failNextSave && action === "pages:save") {
+        failNextSave = false;
+        throw { code: "IO_ERROR", message: "No space left on device" };
+      }
       const response = await fetch(server.url + "api/invoke", {
         method: "POST",
         headers: {
@@ -644,6 +650,35 @@ describe("workspace sessions against the real loopback workbench", () => {
     await view.retainDraft();
     const retained=await invoke<{id:string}[]>("drafts:list",{kind:"page",projectId:project,resourceId:first.document.id});
     expect(retained.length).toBeGreaterThan(0);
+  });
+  it("retries a failed save on Save now and saves automatically again afterwards",async()=>{
+    const view=await warm();
+    failNextSave=true;
+    view.edit({title:"Edit written while the disk was full"});
+    expect(await view.flush()).toBe(false);
+    expect(view.getSnapshot().status).toBe("error");
+    view.edit({title:"Edit made after the failure"});
+    await new Promise((resolve)=>setTimeout(resolve,200));
+    expect(view.getSnapshot().status).toBe("error");
+    expect(await saveNow(view)).toBe(true);
+    expect(view.getSnapshot().status).toBe("saved");
+    view.edit({title:"Edit saved by autosave"});
+    await expect.poll(async()=>(await invoke<LoadedPage>("pages:get",{projectId:project,pageId:first.document.id})).document.title,{timeout:3000}).toBe("Edit saved by autosave");
+  });
+  it("keeps a conflict waiting for review when Save now is pressed",async()=>{
+    const view=await warm();
+    view.edit({title:"Local title waiting for save"});
+    await invoke("pages:save",{
+      projectId:project,pageId:first.document.id,
+      document:{...first.document,title:"Remote title already saved"},
+      baseHash:first.hash,baseRevision:first.revision,
+    });
+    await view.refresh();
+    expect(view.getSnapshot().status).toBe("conflict");
+    expect(await saveNow(view)).toBe(false);
+    expect(view.getSnapshot().status).toBe("conflict");
+    const saved=await invoke<LoadedPage>("pages:get",{projectId:project,pageId:first.document.id});
+    expect(saved.document.title).toBe("Remote title already saved");
   });
   it("saves a reviewed merge through the workbench page:mergeSave action",async()=>{
     const view=await warm();

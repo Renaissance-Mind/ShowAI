@@ -9,12 +9,13 @@ import {
   parseWorkspaceTabs,
   pruneWorkspace,
   recentEntry,
+  relocateWorkspace,
   sameEntry,
   setWorkspaceAssistantOpen,
   visitWorkspace,
   type WorkspaceEntry,
 } from "./workspace-tabs";
-import { tabShortcut } from "../workbench/tab-shortcuts";
+import { commandKey, tabShortcut } from "../workbench/tab-shortcuts";
 import { clickDisposition, libraryEntry } from "./open-target";
 import { windowQuery } from "../workbench/window-target";
 
@@ -91,6 +92,25 @@ describe("workspace tabs", () => {
     expect(pruned.tabs[2]).toBe(third);
     expect(pruned.activeId).toBe(state.activeId);
     expect(pruneWorkspace(pruned, gone)).toBe(pruned);
+  });
+  it("points history at a page moved to another project, so Back still opens it", () => {
+    let state = createWorkspace(page("page-a"));
+    state = visitWorkspace(state, page("page-b"));
+    state = visitWorkspace(state, page("page-c"));
+    state = addWorkspaceTab(state, page("page-b", "project-b"), false);
+    const moved = (location: WorkspaceEntry["location"]) =>
+      location.projectId === "project-a" &&
+      location.view === "page" &&
+      location.pageId === "page-b";
+    const relocated = relocateWorkspace(state, moved, "project-c");
+    expect(
+      relocated.tabs[0].entries.map(
+        (entry) => `${entry.location.projectId}/${entry.location.pageId}`,
+      ),
+    ).toEqual(["project-a/page-a", "project-c/page-b", "project-a/page-c"]);
+    expect(relocated.tabs[0].cursor).toBe(2);
+    expect(relocated.tabs[1]).toBe(state.tabs[1]);
+    expect(relocateWorkspace(relocated, moved, "project-c")).toBe(relocated);
   });
   it("moves tabs in either direction while preserving selection, history and Agent state", () => {
     const first = createWorkspace(page("page-a"));
@@ -435,20 +455,44 @@ describe("desktop and browser tab shortcuts", () => {
     altKey: false,
   };
   it("supports create, close and cycling, including input focus", () => {
-    expect(tabShortcut({ ...input, key: "t", metaKey: true })).toBe("new");
-    expect(tabShortcut({ ...input, key: "w", ctrlKey: true })).toBe("close");
-    expect(tabShortcut({ ...input, key: "Tab", ctrlKey: true })).toBe("next");
-    expect(
-      tabShortcut({ ...input, key: "Tab", ctrlKey: true, shiftKey: true }),
-    ).toBe("previous");
+    expect(tabShortcut({ ...input, key: "t", metaKey: true }, true)).toBe("new");
+    expect(tabShortcut({ ...input, key: "w", ctrlKey: true }, false)).toBe(
+      "close",
+    );
+    for (const mac of [true, false]) {
+      expect(tabShortcut({ ...input, key: "Tab", ctrlKey: true }, mac)).toBe(
+        "next",
+      );
+      expect(
+        tabShortcut(
+          { ...input, key: "Tab", ctrlKey: true, shiftKey: true },
+          mac,
+        ),
+      ).toBe("previous");
+    }
   });
-  it("does not consume ordinary typing, window shortcuts or alternate-key input", () => {
-    expect(tabShortcut({ ...input, key: "t" })).toBeUndefined();
+  it("leaves macOS Ctrl editing keys to text and Cmd to other platforms", () => {
     expect(
-      tabShortcut({ ...input, key: "w", metaKey: true, shiftKey: true }),
+      tabShortcut({ ...input, key: "w", ctrlKey: true }, true),
     ).toBeUndefined();
     expect(
-      tabShortcut({ ...input, key: "t", metaKey: true, altKey: true }),
+      tabShortcut({ ...input, key: "t", ctrlKey: true }, true),
+    ).toBeUndefined();
+    expect(
+      tabShortcut({ ...input, key: "t", metaKey: true }, false),
+    ).toBeUndefined();
+    expect(commandKey({ metaKey: true, ctrlKey: false }, true)).toBe(true);
+    expect(commandKey({ metaKey: false, ctrlKey: true }, true)).toBe(false);
+    expect(commandKey({ metaKey: false, ctrlKey: true }, false)).toBe(true);
+    expect(commandKey({ metaKey: true, ctrlKey: true }, true)).toBe(false);
+  });
+  it("does not consume ordinary typing, window shortcuts or alternate-key input", () => {
+    expect(tabShortcut({ ...input, key: "t" }, true)).toBeUndefined();
+    expect(
+      tabShortcut({ ...input, key: "w", metaKey: true, shiftKey: true }, true),
+    ).toBeUndefined();
+    expect(
+      tabShortcut({ ...input, key: "t", metaKey: true, altKey: true }, true),
     ).toBeUndefined();
   });
 });

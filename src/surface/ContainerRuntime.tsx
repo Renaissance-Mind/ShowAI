@@ -1415,6 +1415,13 @@ function ContainerView({
               ? undefined
               : (paste, point) => {
                   const source = runtime.source();
+                  if ("image" in paste) {
+                    const inserted = insertComponent(source, id, "image", paste.image);
+                    Object.assign(inserted.document.layout[inserted.nodeId], point);
+                    runtime.commit(inserted.document);
+                    runtime.select(inserted.nodeId);
+                    return [inserted.nodeId];
+                  }
                   if ("text" in paste) {
                     const inserted = insertComponent(source, id, "text", {
                       format: "richtext",

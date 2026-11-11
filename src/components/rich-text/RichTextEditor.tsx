@@ -6,7 +6,7 @@ import {
   primitiveContentNode,
   readContentTree,
 } from "./model.mjs";
-import { CAPACITY, formatBytes } from "../../portable/capacity.mjs";
+import { readImageFile } from "./image-files";
 import {
   navigationTarget,
   pageLink,
@@ -1107,37 +1107,15 @@ export default function RichTextEditor({
     };
     editor.on("transaction", mapBookmark);
     for (const file of files) {
-      if (!/^image\/(png|jpeg|gif|webp|avif)$/.test(file.type)) {
-        setNotice(t("notice.imageTypes"));
-        continue;
-      }
-      if (file.size > CAPACITY.resourceBytes) {
-        setNotice(
-          t("notice.imageTooLarge", {
-            name: file.name,
-            size: formatBytes(file.size),
-            limit: formatBytes(CAPACITY.resourceBytes),
-          }),
-        );
-        continue;
-      }
-      let source: string;
-      try {
-        source = await new Promise<string>((resolve, reject) => {
-          const reader = new FileReader();
-          reader.onload = () => resolve(String(reader.result));
-          reader.onerror = () => reject(reader.error);
-          reader.onabort = () => reject(new Error(t("notice.readCancelled")));
-          reader.readAsDataURL(file);
-        });
-      } catch {
-        setNotice(t("notice.imageUnreadable", { name: file.name }));
+      const read = await readImageFile(file);
+      if ("problem" in read) {
+        setNotice(read.problem);
         continue;
       }
       if (editor.isDestroyed || !editor.isEditable) break;
       const selection = bookmark.resolve(editor.state.doc);
       editor.view.dispatch(editor.state.tr.setSelection(selection));
-      editor.chain().focus().setImage({ src: source, alt: file.name }).run();
+      editor.chain().focus().setImage({ src: read.src, alt: file.name }).run();
       bookmark = editor.state.selection.getBookmark();
     }
     editor.off("transaction", mapBookmark);
