@@ -22,7 +22,7 @@ import {
   setMaintenancePolicy,
 } from "../core/maintenance-scheduler";
 import type { ChangeContext } from "../core/history-model";
-import { AgentService, errorResult } from "./service";
+import { AgentService, errorResult, type FailedOperation } from "./service";
 import { systemPresentationGuide } from "./system-presentation";
 import type {
   PageOperation,
@@ -1689,6 +1689,16 @@ function printHuman(value: unknown) {
   } else process.stdout.write(JSON.stringify(value, null, 2) + "\n");
 }
 
+/** The step a failed command was taking, for the error's user message. */
+function cliOperation(argv: string[]): FailedOperation | undefined {
+  const [command, action] = parseArguments(argv).positional;
+  if (command === "export") return "export";
+  if (command === "render") return "present";
+  return ["save", "apply", "create", "duplicate", "link", "transform", "import"].includes(action)
+    ? "save"
+    : undefined;
+}
+
 const json = process.argv.includes("--json");
 let continuous = false;
 try {
@@ -1702,7 +1712,7 @@ try {
     else printHuman(result);
   }
 } catch (error) {
-  const result = errorResult(error);
+  const result = errorResult(error, cliOperation(process.argv.slice(2)));
   if (json)
     process.stdout.write(JSON.stringify({ ok: false, error: result }) + "\n");
   else process.stderr.write(`ShowAI: ${result.message}\n`);

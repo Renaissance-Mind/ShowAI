@@ -25,7 +25,12 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
 import packageMetadata from "../../package.json";
-import { AgentService, errorResult } from "./service";
+import {
+  AgentService,
+  errorResult,
+  failedOperation,
+  type FailedOperation,
+} from "./service";
 import { followAppLanguage } from "../core/app-language";
 import { validateDocument } from "../portable/validation.mjs";
 import type {
@@ -137,24 +142,41 @@ export function createMcpServer(options: {
       const shape = getObjectShape(tool.inputSchema);
       if (!shape) throw new Error(`Missing input schema: ${name}`);
       const original = tool.handler as ToolCallback<z.ZodRawShape>;
+      // Failures name the step that failed: an export, a conversation view,
+      // or a save for any other tool that writes.
+      const operation: FailedOperation | undefined =
+        name === "page_export"
+          ? "export"
+          : name === "page_present"
+            ? "present"
+            : config.annotations?.readOnlyHint
+              ? undefined
+              : "save";
+      const handle: ToolCallback<z.ZodRawShape> = async (
+        { projectId: selected, ...args },
+        extra,
+      ) => {
+        if (selected !== undefined && selected !== projectId)
+          return mcpFailure(
+            new Error("This MCP connection is bound to another project."),
+          );
+        // Only runtimes serve MCP; their output follows the App's current language.
+        await followAppLanguage(service.store.root);
+        if (!options.pageWriteDirectory) return original(args, extra);
+        const writes: PageWrite[] = [];
+        const result = await pageWriteCapture.run(writes, () =>
+          original(args, extra),
+        );
+        if (!result.isError)
+          await savePageWrites(options.pageWriteDirectory, writes);
+        return result;
+      };
       tool.update({
         paramsSchema: { ...shape, projectId: z.string().min(1).optional() },
-        callback: async ({ projectId: selected, ...args }, extra) => {
-          if (selected !== undefined && selected !== projectId)
-            return mcpFailure(
-              new Error("This MCP connection is bound to another project."),
-            );
-          // Only runtimes serve MCP; their output follows the App's current language.
-          await followAppLanguage(service.store.root);
-          if (!options.pageWriteDirectory) return original(args, extra);
-          const writes: PageWrite[] = [];
-          const result = await pageWriteCapture.run(writes, () =>
-            original(args, extra),
-          );
-          if (!result.isError)
-            await savePageWrites(options.pageWriteDirectory, writes);
-          return result;
-        },
+        callback: operation
+          ? (args, extra) =>
+              failedOperation.run(operation, () => handle(args, extra))
+          : handle,
       });
     }
     options.decorateTool?.(name, tool);

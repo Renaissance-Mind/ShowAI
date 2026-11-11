@@ -400,6 +400,25 @@ describe("CDN reader", () => {
           });
           expect(display.readerReason.bytes).toBeGreaterThan(1_000_000);
         }
+        // A refused bundled export says that nothing was exported.
+        const refused = await client.callTool(
+          {
+            name: "page_export",
+            arguments: {
+              pageId: record.document.id,
+              format: "inline",
+              reader: "bundled",
+              out: join(home, "exports", "large-bundled-mcp.html"),
+            },
+          },
+          undefined,
+          { timeout: 240_000 },
+        );
+        expect(refused.isError).toBe(true);
+        const { error } = refused.structuredContent as any;
+        expect(error.code).toBe("CAPACITY_EXCEEDED");
+        expect(error.userMessage).toMatch(/export/);
+        expect(error.userMessage).not.toMatch(/save/i);
       } finally {
         await client.close();
         await server.close();

@@ -27,7 +27,7 @@ import {
   readerResourceUri,
   componentResourceUri,
 } from "./mcp-ui";
-import { errorResult } from "./service";
+import { errorResult, type FailedOperation } from "./service";
 import { supportInfo } from "./support";
 import { randomUUID } from "node:crypto";
 import { mkdir, mkdtemp, readdir, rm, stat, writeFile } from "node:fs/promises";
@@ -211,8 +211,8 @@ export function mcpSuccess(input: unknown) {
     structuredContent: { ok: true, data },
   };
 }
-export function mcpFailure(error: unknown) {
-  const result = { ok: false, error: errorResult(error) };
+export function mcpFailure(error: unknown, operation?: FailedOperation) {
+  const result = { ok: false, error: errorResult(error, operation) };
   return {
     isError: true,
     structuredContent: result,
@@ -628,7 +628,7 @@ export function registerPresentationTools(
           },
         };
       } catch (error) {
-        return mcpFailure(error);
+        return mcpFailure(error, "present");
       }
     },
   );
@@ -756,7 +756,7 @@ export function registerPresentationTools(
           },
         };
       } catch (error) {
-        return mcpFailure(error);
+        return mcpFailure(error, "present");
       }
     },
   );

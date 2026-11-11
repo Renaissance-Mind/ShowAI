@@ -1,3 +1,4 @@
+import { AsyncLocalStorage } from "node:async_hooks";
 import type { PackagingDecisions } from "../core/packaging";
 import { CatalogService, type CatalogSelection } from "./catalog-service";
 export type { CatalogSelection } from "./catalog-service";
@@ -1257,16 +1258,42 @@ const AGENT_GUIDANCE: Record<string, { nextStep: string; userMessage: string }> 
       nextStep:
         "Reduce the content below the limit in message (split the page, link large files instead of embedding) and retry.",
       userMessage:
-        "The content is larger than ShowAI allows for one save. Nothing was saved.",
+        "The content is larger than ShowAI allows for this step. Nothing was changed.",
     },
   };
+
+/** What a failed request was doing, so its user message names that step. */
+export type FailedOperation = "save" | "export" | "present";
+/** The operation of the request being served; errorResult reads it. */
+export const failedOperation = new AsyncLocalStorage<FailedOperation>();
+const OPERATION_GUIDANCE: Partial<
+  Record<string, Record<FailedOperation, { userMessage: string }>>
+> = {
+  CAPACITY_EXCEEDED: {
+    save: {
+      userMessage:
+        "The content is larger than ShowAI allows for one save. Nothing was saved.",
+    },
+    export: {
+      userMessage:
+        "The export is larger than ShowAI allows. No file was written and the page is unchanged.",
+    },
+    present: {
+      userMessage:
+        "This is larger than ShowAI can show in the conversation. Nothing was changed.",
+    },
+  },
+};
 const UNRECOVERABLE_GUIDANCE = {
   nextStep:
     "Tell the user which step failed with this code and message. Point them to showai_capabilities support (ShowAI Settings → About & feedback → Copy diagnostics, or reportUrl). Do not file a report for them or relay tokens or local paths.",
   userMessage: "ShowAI could not complete this step.",
 };
 
-export function errorResult(error: unknown) {
+export function errorResult(
+  error: unknown,
+  operation: FailedOperation | undefined = failedOperation.getStore(),
+) {
   const code =
     error instanceof CoreError ||
     error instanceof CapacityError ||
@@ -1284,6 +1311,7 @@ export function errorResult(error: unknown) {
     message,
     ...system,
     ...(guidance ?? {}),
+    ...(operation ? OPERATION_GUIDANCE[code]?.[operation] : undefined),
     ...(error instanceof PluginInstallError && error.details
       ? { details: error.details }
       : {}),
