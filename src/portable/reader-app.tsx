@@ -160,7 +160,16 @@ function ArtifactReader({
             read: async ({ projectId, pageId, direction }) =>
               projectId === snapshot.page.projectId &&
               pageId === snapshot.page.pageId
-                ? snapshot[direction]
+                ? {
+                    items: snapshot[direction],
+                    pages:
+                      snapshot.pages?.[direction] ??
+                      new Set(
+                        snapshot[direction].map(
+                          (item) => `${item.projectId}/${item.pageId}`,
+                        ),
+                      ).size,
+                  }
                 : null,
             subscribe: () => () => {},
           }

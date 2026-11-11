@@ -133,7 +133,7 @@ export default function Chapters({ data, goTo }) {
 内容库为页面之间的引用建了索引：正文里的页面链接（包括组件里的文字和步骤）、数据库的页面列，以及组件用 `{kind:"page",path}` 规则声明的页面字段（见 [参数契约](parameter-contract.md)）。组件从 `showai:components` 导入 `usePageReferences(query)` 读取它，内置的 backlinks 组件用的也是这个调用：
 
 - `query` 为 `{direction?, pageId?, projectId?}`：`direction:"to"`（默认）列出引用这一页的页面，`"from"` 列出这一页引用的页面；省略 pageId 指组件所在的页面。
-- 返回 `{status, items, page, error?}`，page 是这些引用所属页面的 `{projectId, pageId}`。`status` 为 `loading`、`ready` 或 `unavailable`（当前查看处没有索引，如对话预览）。`items` 的每一项有 projectId、pageId、title、blockId（引用所在的块）、blockIds（引用指向的块）、kind（link、database、component）和 snippet（引用周围的文字）。打开某一项用 `goTo({projectId,pageId,blockId})`。
+- 返回 `{status, items, pages, page, error?}`，page 是这些引用所属页面的 `{projectId, pageId}`，pages 是整个索引里不重复的页面数（items 最多 200 条引用，显示“几个页面引用了这里”时用 pages）。`status` 为 `loading`、`ready` 或 `unavailable`（当前查看处没有索引，如对话预览）。`items` 的每一项有 projectId、pageId、title、blockId（引用所在的块）、blockIds（引用指向的块）、kind（link、database、component）和 snippet（引用周围的文字）。打开某一项用 `goTo({projectId,pageId,blockId})`。
 - App 里内容库变化后结果自动更新。manifest 顶层声明 `pageReferences: true`（组件读取这项数据的能力，不属于 `contributes`）时，导出的页面带上导出那一刻这一页的引用，组件在导出页中照常显示；不声明时导出页返回 `unavailable`，也不会带出其他页面的标题和文字。导出只带这一页一层的引用（引用它的页面与它引用的页面，各最多 200 条），读取其他页面的引用在导出页返回 `unavailable`；这些页面的标题和引用文字会随导出文件交给读者，交付前告诉用户。导出页里 `goTo` 打开其他页面的规则见「跳转到页面或组件」。
 
 ```jsx

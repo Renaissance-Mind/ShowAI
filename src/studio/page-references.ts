@@ -15,7 +15,10 @@ export function workbenchReferenceSource(
   subscribePages: (listener: () => void) => () => void,
 ): PageReferenceSource {
   const listeners = new Set<() => void>();
-  let answers = new Map<string, Promise<PageReferenceItem[]>>();
+  let answers = new Map<
+    string,
+    Promise<{ items: PageReferenceItem[]; pages: number }>
+  >();
   let timer: ReturnType<typeof setTimeout> | undefined;
   let release: (() => void) | undefined;
   const changed = () => {
@@ -37,7 +40,10 @@ export function workbenchReferenceSource(
             pageId,
             direction,
           })
-          .then((result) => result[direction]);
+          .then((result) => ({
+            items: result[direction],
+            pages: result.pages[direction],
+          }));
         answers.set(key, answer);
         // A failed read is asked again next time.
         answer.catch(() => answers.delete(key));

@@ -15,9 +15,8 @@ export default function PageBacklinks() {
   const [open, setOpen] = useState(false);
   const root = useRef<HTMLDivElement>(null);
   const list = useId();
-  const count = new Set(
-    references.items.map((item) => `${item.projectId}/${item.pageId}`),
-  ).size;
+  // The index counts every referring page; the list stops at 200 references.
+  const count = references.pages;
   useEffect(() => {
     if (!open) return;
     const close = (event: Event) => {

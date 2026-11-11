@@ -55,9 +55,20 @@ export function validateReferenceSnapshot(value) {
       );
     return items.map((entry, index) => item(entry, `references.${key}[${index}]`));
   };
+  // Distinct pages in each direction; the lists may stop at the limit.
+  let pages;
+  if (value.pages !== undefined) {
+    if (!value.pages || typeof value.pages !== "object")
+      throw new Error("references.pages must be {to, from}.");
+    for (const key of ["to", "from"])
+      if (!Number.isInteger(value.pages[key]) || value.pages[key] < 0)
+        throw new Error(`references.pages.${key} must be a count.`);
+    pages = { to: value.pages.to, from: value.pages.from };
+  }
   return {
     page: { projectId: page.projectId, pageId: page.pageId },
     to: list("to"),
     from: list("from"),
+    ...(pages ? { pages } : {}),
   };
 }

@@ -526,12 +526,13 @@ function SandboxComponent({
           return;
         }
         void source.read(target).then(
-          (items) =>
+          (answer) =>
             reply(
-              items
+              answer
                 ? {
                     status: "ready",
-                    items,
+                    items: answer.items,
+                    pages: answer.pages,
                     page: {
                       projectId: target.projectId,
                       pageId: target.pageId,

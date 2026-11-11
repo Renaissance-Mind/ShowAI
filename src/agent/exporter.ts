@@ -440,12 +440,12 @@ async function referenceSnapshot(
         ));
   });
   if (!reads || !versionedLibrary(root)) return undefined;
-  const { to, from } = await new LibraryOperations(root).pageReferences(
+  const { to, from, pages } = await new LibraryOperations(root).pageReferences(
     projectId,
     document.id,
     { limit: REFERENCE_SNAPSHOT_LIMIT },
   );
-  return { page: { projectId, pageId: document.id }, to, from };
+  return { page: { projectId, pageId: document.id }, to, from, pages };
 }
 
 /** Exported documents pin what was actually resolved, without mutating authoring files. */

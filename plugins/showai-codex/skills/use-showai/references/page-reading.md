@@ -46,7 +46,7 @@ rendered 读取生成文件与 .read.json 记录来源和状态。本机连接�
 
 ## 页面之间的引用
 
-`page_read({projectId,pageId,references:"to"})` 在读取结果里加上 references：to 列出引用这一页的页面（反向链接），from 列出这一页引用的页面，`references:"both"` 两者都给。每一项有 projectId、pageId、title、blockId（引用所在页面上的块，可直接作为 page_read 的 blockIds）、blockIds（引用指向的块）、kind 和 snippet。snippet 是引用所在段落或标题的文字（含行内日期等组件的值），超过 200 字时截取引用前后的部分；需要整段时用 blockId 读取引用页。kind 为 link 时是正文里的页面链接（包括组件里的文字和步骤），database 是数据库的页面列，component 是自定义组件声明的页面字段。每个方向最多列出 200 条，total 给出全部数量。只要引用时配合 `response:"receipt"`：回执保留 references，不带整页正文。已删除的页面不出现在 to 中；from 里已删除或不存在的目标标为 missing。绑定项目的连接只看到本项目内的引用。命令行用 `showai pages read PAGE --project PROJECT --references both --json`。
+`page_read({projectId,pageId,references:"to"})` 在读取结果里加上 references：to 列出引用这一页的页面（反向链接），from 列出这一页引用的页面，`references:"both"` 两者都给。每一项有 projectId、pageId、title、blockId（引用所在页面上的块，可直接作为 page_read 的 blockIds）、blockIds（引用指向的块）、kind 和 snippet。snippet 是引用所在段落或标题的文字（含行内日期等组件的值），超过 200 字时截取引用前后的部分；需要整段时用 blockId 读取引用页。kind 为 link 时是正文里的页面链接（包括组件里的文字和步骤），database 是数据库的页面列（数据存在共享数据里的数据库同样计入；关联列保存的是记录 id，不算页面引用），component 是自定义组件声明的页面字段。每个方向最多列出 200 条，total 给出全部引用数，pages 给出不重复的页面数（例如“3 个页面引用了这一页”用 pages.to）。只要引用时配合 `response:"receipt"`：回执保留 references，不带整页正文。已删除的页面不出现在 to 中；from 里已删除或不存在的目标标为 missing。绑定项目的连接只看到本项目内的引用。命令行用 `showai pages read PAGE --project PROJECT --references both --json`。
 
 ```json
 { "projectId": "项目ID", "pageId": "页面ID", "references": "to", "response": "receipt" }

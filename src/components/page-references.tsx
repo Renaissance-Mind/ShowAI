@@ -33,6 +33,11 @@ export interface PageReferencesView {
   /** loading: asked. ready: items are current. unavailable: no index behind this view. */
   status: "loading" | "ready" | "unavailable";
   items: PageReferenceItem[];
+  /**
+   * Distinct pages in this direction across the whole index. items lists at
+   * most 200 references, so count pages with this rather than with items.
+   */
+  pages: number;
   /** The page the items belong to, when known. */
   page?: { projectId: string; pageId: string };
   /** Why the host could not read the references. */
@@ -45,7 +50,7 @@ export interface PageReferenceSource {
     projectId: string;
     pageId: string;
     direction: "to" | "from";
-  }): Promise<PageReferenceItem[] | null>;
+  }): Promise<{ items: PageReferenceItem[]; pages: number } | null>;
   /** Calls the listener when references may have changed. */
   subscribe(listener: () => void): () => void;
 }
@@ -124,13 +129,26 @@ function askHost(
         return;
       finish(
         data.status === "ready" && Array.isArray(data.items)
-          ? { status: "ready", items: data.items, page: data.page }
-          : { status: "unavailable", items: [] },
+          ? {
+              status: "ready",
+              items: data.items,
+              pages:
+                typeof data.pages === "number"
+                  ? data.pages
+                  : new Set(
+                      data.items.map(
+                        (item: PageReferenceItem) =>
+                          `${item.projectId}/${item.pageId}`,
+                      ),
+                    ).size,
+              page: data.page,
+            }
+          : { status: "unavailable", items: [], pages: 0 },
       );
     };
     // A host page without an index never answers.
     const timer = setTimeout(
-      () => finish({ status: "unavailable", items: [] }),
+      () => finish({ status: "unavailable", items: [], pages: 0 }),
       10000,
     );
     window.addEventListener("message", receive);
@@ -159,6 +177,7 @@ export function usePageReferences(
   const [view, setView] = useState<PageReferencesView>({
     status: "loading",
     items: [],
+    pages: 0,
   });
   useEffect(() => {
     let current = true;
@@ -185,27 +204,29 @@ export function usePageReferences(
       };
     }
     if (!source) {
-      setView({ status: "unavailable", items: [] });
+      setView({ status: "unavailable", items: [], pages: 0 });
       return;
     }
     const target = pageReferenceTarget(source, checked);
     const load = () =>
-      void source.read(target).then((items) => {
+      void source.read(target).then((answer) => {
         if (!current) return;
         setView(
-          items
+          answer
             ? {
                 status: "ready",
-                items,
+                items: answer.items,
+                pages: answer.pages,
                 page: { projectId: target.projectId, pageId: target.pageId },
               }
-            : { status: "unavailable", items: [] },
+            : { status: "unavailable", items: [], pages: 0 },
         );
       }, (error: unknown) => {
         if (current)
           setView({
             status: "unavailable",
             items: [],
+            pages: 0,
             error: error instanceof Error ? error.message : String(error),
           });
       });

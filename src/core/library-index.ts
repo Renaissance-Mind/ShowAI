@@ -9,8 +9,10 @@ import { CoreError } from "./model";
 import type { JSONContent } from "@tiptap/core";
 import { visitContentNodes, widgetDocuments } from "../surface/document.mjs";
 import {
+  boundDatabaseEdges,
   declaredPageFields,
   pageReferenceEdges,
+  type BoundDatabase,
   type ComponentPageFields,
   type PageReferenceEdge,
 } from "./page-reference-index";
@@ -62,6 +64,8 @@ export interface PageReferences {
   from: PageReferenceItem[];
   /** References in each direction; more than listed when the limit cut the list. */
   total: { to: number; from: number };
+  /** Distinct pages in each direction, counted over every reference. */
+  pages: { to: number; from: number };
   revision: string | null;
 }
 export interface PageReferenceOptions {
@@ -252,6 +256,9 @@ export class LibraryIndex {
       );
       CREATE INDEX IF NOT EXISTS page_ref_target ON page_refs(target_project,target_page);
       CREATE INDEX IF NOT EXISTS page_ref_source ON page_refs(source,position);
+      CREATE TABLE IF NOT EXISTS page_datasets (source TEXT NOT NULL, dataset TEXT NOT NULL);
+      CREATE INDEX IF NOT EXISTS page_dataset_target ON page_datasets(dataset);
+      CREATE INDEX IF NOT EXISTS page_dataset_source ON page_datasets(source);
       CREATE TABLE IF NOT EXISTS history (
         revision TEXT PRIMARY KEY, at TEXT NOT NULL, actor_kind TEXT NOT NULL, harness TEXT,
         session_id TEXT, message TEXT NOT NULL, payload TEXT NOT NULL
@@ -350,6 +357,16 @@ export class LibraryIndex {
           )
         : allPaths;
       const reload = new Set(changed);
+      // Pages showing a shared dataset's rows hold its page cells.
+      if (incremental) {
+        const dependents = db.prepare(
+          "SELECT source FROM page_datasets WHERE dataset=?",
+        );
+        for (const path of changed)
+          if (resourceForPath(path).kind === "dataset")
+            for (const row of dependents.all(path) as { source: string }[])
+              if (current.has(row.source)) reload.add(row.source);
+      }
       for (const path of changed) {
         const resource = resourceForPath(path);
         if (resource.kind === "component" || resource.kind === "template")
@@ -360,7 +377,8 @@ export class LibraryIndex {
       const rows: SearchRow[] = [],
         edges: ReferenceEdge[] = [],
         pages: PageRow[] = [],
-        pageEdges: { source: string; edge: PageReferenceEdge }[] = [];
+        pageEdges: { source: string; edge: PageReferenceEdge }[] = [],
+        bound: { source: string; database: BoundDatabase }[] = [];
       const pageFields = await this.componentPageFields(revision, allPaths);
       // Read bounded batches; the resulting index always names this exact revision.
       for (let offset = 0; offset < paths.length; offset += 32) {
@@ -369,13 +387,45 @@ export class LibraryIndex {
           revision!,
         );
         for (const [path, bytes] of batch)
-          this.extract(path, bytes, rows, edges, pages, pageEdges, pageFields);
+          this.extract(
+            path,
+            bytes,
+            rows,
+            edges,
+            pages,
+            pageEdges,
+            pageFields,
+            bound,
+          );
+      }
+      // Page cells of databases whose rows live in a shared dataset, read from
+      // each dataset once.
+      const datasetPath = (database: BoundDatabase) =>
+        `projects/${database.projectId}/datasets/${database.datasetId}.json`;
+      const needed = [
+        ...new Set(bound.map(({ database }) => datasetPath(database))),
+      ].filter((path) => current.has(path));
+      const values = new Map<string, unknown>();
+      for (let offset = 0; offset < needed.length; offset += 32)
+        for (const [path, bytes] of await this.library.readFiles(
+          needed.slice(offset, offset + 32),
+          revision!,
+        ))
+          values.set(path, JSON.parse(bytes.toString("utf8")).value);
+      for (const { source, database } of bound) {
+        const owner = resourceForPath(source);
+        for (const edge of boundDatabaseEdges(
+          database,
+          values.get(datasetPath(database)),
+          { projectId: owner.projectId!, pageId: owner.id },
+        ))
+          pageEdges.push({ source, edge });
       }
       db.exec("BEGIN IMMEDIATE");
       try {
         if (!incremental)
           db.exec(
-            "DELETE FROM resources; DELETE FROM search; DELETE FROM refs; DELETE FROM pages; DELETE FROM page_refs; DELETE FROM history; DELETE FROM history_resources; DELETE FROM index_state;",
+            "DELETE FROM resources; DELETE FROM search; DELETE FROM refs; DELETE FROM pages; DELETE FROM page_refs; DELETE FROM page_datasets; DELETE FROM history; DELETE FROM history_resources; DELETE FROM index_state;",
           );
         else {
           const deleteSearch = db.prepare(
@@ -387,11 +437,15 @@ export class LibraryIndex {
           const deletePageRefs = db.prepare(
             "DELETE FROM page_refs WHERE source=?",
           );
+          const deletePageDatasets = db.prepare(
+            "DELETE FROM page_datasets WHERE source=?",
+          );
           for (const path of reload) {
             deleteSearch.run(path);
             deleteRows.run(path);
             deletePage.run(path);
             deletePageRefs.run(path);
+            deletePageDatasets.run(path);
             const resource = resourceForPath(path);
             deleteRefs.run(
               resource.kind === "component" || resource.kind === "template"
@@ -463,6 +517,15 @@ export class LibraryIndex {
             edge.snippet,
           ),
         );
+        const pageDatasetStatement = db.prepare(
+          "INSERT INTO page_datasets VALUES(?,?)",
+        );
+        for (const entry of new Set(
+          bound.map(({ source, database }) =>
+            JSON.stringify([source, datasetPath(database)]),
+          ),
+        ))
+          pageDatasetStatement.run(...(JSON.parse(entry) as [string, string]));
         const removeSignature = db.prepare(
           "DELETE FROM index_state WHERE path=?",
         );
@@ -566,6 +629,7 @@ export class LibraryIndex {
     pages: PageRow[],
     pageEdges: { source: string; edge: PageReferenceEdge }[],
     pageFields: (projectId: string) => ComponentPageFields,
+    bound: { source: string; database: BoundDatabase }[],
   ): void {
     const owner = resourceForPath(path);
     const add = (
@@ -613,6 +677,7 @@ export class LibraryIndex {
         document,
         owner.projectId!,
         pageFields(owner.projectId!),
+        (database) => bound.push({ source: path, database }),
       ))
         pageEdges.push({ source: path, edge });
       // `section` is the nearest preceding heading, which names unnamed native text blocks.
@@ -968,8 +1033,32 @@ export class LibraryIndex {
                   .n,
               ),
       };
+      const pages = {
+        to:
+          direction === "from"
+            ? 0
+            : Number(
+                db
+                  .prepare(
+                    `SELECT count(DISTINCT r.source) AS n FROM page_refs r JOIN pages p ON p.path=r.source
+                     WHERE r.target_project=? AND r.target_page=? AND p.archived=0${input.scope ? " AND p.project_id=?" : ""}`,
+                  )
+                  .get(projectId, pageId, ...scoped)!.n,
+              ),
+        from:
+          direction === "to"
+            ? 0
+            : Number(
+                db
+                  .prepare(
+                    `SELECT count(DISTINCT r.target_project||'/'||r.target_page) AS n FROM page_refs r WHERE r.source=?${input.scope ? " AND r.target_project=?" : ""}`,
+                  )
+                  .get(`projects/${projectId}/pages/${pageId}.json`, ...scoped)!
+                  .n,
+              ),
+      };
       db.exec("COMMIT");
-      return { to, from, total, revision };
+      return { to, from, total, pages, revision };
     } finally {
       db.close();
     }

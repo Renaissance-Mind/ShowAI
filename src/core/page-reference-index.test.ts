@@ -80,6 +80,9 @@ test("text, step, database and declared component fields enter the index", async
     ["database", "Source"],
     ["component", "Source"],
   ]);
+  // Three references from one page: the heading count reads pages.
+  expect(references.total.to).toBe(3);
+  expect(references.pages.to).toBe(1);
   const [text, database, declared] = references.to;
   expect(text.snippet).toBe("Before the link, see the target for details.");
   expect(database.snippet).toBe("Reading list · First record");
@@ -100,6 +103,7 @@ test("text, step, database and declared component fields enter the index", async
     [target, "Target"],
     [target, "Target"],
   ]);
+  expect(outgoing.pages.from).toBe(1);
   // Invalid declared values never reach a page.
   await expect(
     service.applyPage(projectId, source.document.id, {
@@ -117,6 +121,79 @@ test("text, step, database and declared component fields enter the index", async
       ],
     } as never),
   ).rejects.toThrow();
+});
+
+test("page cells of databases bound to a shared dataset enter the index; relations do not", async () => {
+  const { home, service, projectId, target } = await setup();
+  const other = await service.createPage(projectId, { title: "Other" });
+  const people = await service.datasetCreate(projectId, {
+    name: "People",
+    value: {
+      columns: [{ id: "name", name: "Name", type: "text" }],
+      rows: [{ id: "p1", name: "Ada" }],
+    },
+  });
+  const reading = await service.datasetCreate(projectId, {
+    name: "Reading",
+    value: {
+      title: "Reading list",
+      columns: [
+        { id: "name", name: "Name", type: "text" },
+        { id: "page", name: "Page", type: "page" },
+        {
+          id: "owner",
+          name: "Owner",
+          type: "relation",
+          relation: { dataset: people.dataset.id },
+        },
+      ],
+      rows: [{ id: "r1", name: "First", page: link(projectId, target), owner: ["p1"] }],
+    },
+  });
+  const source = await service.createPage(projectId, {
+    title: "Shelf",
+    blocks: [
+      {
+        kind: "database",
+        data: {
+          title: "Shelf",
+          view: "table",
+          $binding: {
+            dataset: reading.dataset.id,
+            props: { local: ["title", "view"] },
+          },
+        },
+      },
+    ],
+  });
+  const index = new LibraryIndex(home);
+  const block = source.document.content.content![0].attrs!.id;
+  const to = async (pageId: string) =>
+    (await index.pageReferences(projectId, pageId, { direction: "to" })).to;
+  expect((await to(target)).map((item) => [item.title, item.kind, item.blockId, item.snippet])).toEqual([
+    ["Shelf", "database", block, "Shelf · First"],
+  ]);
+  // A relation holds record ids of People; no page is referred to.
+  const outgoing = await index.pageReferences(projectId, source.document.id, {
+    direction: "from",
+  });
+  expect(outgoing.from.map((item) => item.pageId)).toEqual([target]);
+  // Changing the dataset alone moves the reference.
+  const current = await service.datasetRead(projectId, reading.dataset.id);
+  await service.datasetApply(projectId, reading.dataset.id, {
+    baseHash: current.hash,
+    operations: [
+      {
+        op: "set",
+        path: "rows[id=r1].page",
+        value: link(projectId, other.document.id),
+      },
+    ],
+  });
+  expect(await to(target)).toEqual([]);
+  expect((await to(other.document.id)).map((item) => item.title)).toEqual([
+    "Shelf",
+  ]);
 });
 
 test("backlinks follow rename, delete, restore and duplicate", async () => {

@@ -3,6 +3,8 @@ import { visitContentNodes } from "../surface/document.mjs";
 import { parsePageLink } from "../portable/page-link.mjs";
 import { parsePageCell } from "../components/blocks/database-contract.mjs";
 import { parameterValues } from "../portable/component-parameters.mjs";
+import { readBinding } from "../datasets/binding.mjs";
+import { parsePath, valueAt as datasetValueAt } from "../datasets/operations.mjs";
 
 /** Where a page refers to another page. */
 export interface PageReferenceEdge {
@@ -16,6 +18,20 @@ export interface PageReferenceEdge {
   kind: "link" | "database" | "component";
   /** Text around the reference, for people deciding whether to follow it. */
   snippet: string;
+}
+
+/**
+ * A database block whose rows live in a shared dataset. Its page cells are
+ * read from the dataset, so the index resolves them once the dataset file is
+ * read (boundDatabaseEdges) and reads the page again when the dataset changes.
+ */
+export interface BoundDatabase {
+  blockId: string | null;
+  /** Project and id of the dataset. */
+  projectId: string;
+  datasetId: string;
+  /** The block's own data: its title and the props it keeps locally. */
+  data: Record<string, unknown>;
 }
 
 /** Page-reference field paths a component version declares, or none. */
@@ -81,6 +97,7 @@ export function pageReferenceEdges(
   document: { id: string; content: JSONContent },
   projectId: string,
   componentFields: ComponentPageFields = () => undefined,
+  bound?: (database: BoundDatabase) => void,
 ): PageReferenceEdge[] {
   const edges: PageReferenceEdge[] = [];
   const seen = new Set<string>();
@@ -132,28 +149,20 @@ export function pageReferenceEdges(
     const kind = node.attrs?.kind;
     const data = node.attrs?.data as Record<string, unknown> | undefined;
     if (!data || typeof data !== "object") return;
-    if (kind === "database" && Array.isArray(data.columns)) {
-      const columns = (data.columns as { id: string; type: string }[]).filter(
-        (column) => column?.type === "page",
-      );
-      const text = (data.columns as { id: string; type: string }[]).find(
-        (column) => column?.type === "text",
-      );
-      for (const row of Array.isArray(data.rows) ? data.rows : [])
-        for (const column of columns) {
-          const target = parsePageCell(row?.[column.id]);
-          if (target)
-            add(
-              holder.id,
-              target,
-              "database",
-              excerpt(
-                [data.title, text && row[text.id]]
-                  .filter((part) => typeof part === "string" && part)
-                  .join(" · "),
-              ),
-            );
-        }
+    if (kind === "database") {
+      const binding = readBinding(data);
+      if (binding && typeof binding.dataset === "string") {
+        bound?.({
+          blockId: holder.id,
+          projectId:
+            typeof binding.project === "string" ? binding.project : projectId,
+          datasetId: binding.dataset,
+          data,
+        });
+        return;
+      }
+      for (const cell of databasePageCells(data))
+        add(holder.id, cell.target, "database", cell.snippet);
       return;
     }
     if (kind !== "custom") return;
@@ -179,6 +188,85 @@ export function pageReferenceEdges(
         );
       }
   });
+  return edges;
+}
+
+/**
+ * Page cells of a database's columns and rows. Only page columns refer to
+ * pages: relation columns hold record ids of another dataset.
+ */
+function databasePageCells(data: Record<string, unknown>) {
+  if (!Array.isArray(data.columns)) return [];
+  const columns = data.columns as { id: string; type: string }[];
+  const pages = columns.filter((column) => column?.type === "page");
+  const text = columns.find((column) => column?.type === "text");
+  const cells: {
+    target: { projectId: string; pageId: string; blockIds?: string[] };
+    snippet: string;
+  }[] = [];
+  for (const row of Array.isArray(data.rows) ? data.rows : [])
+    for (const column of pages) {
+      const target = parsePageCell(row?.[column.id]);
+      if (target)
+        cells.push({
+          target,
+          snippet: excerpt(
+            [data.title, text && row[text.id]]
+              .filter((part) => typeof part === "string" && part)
+              .join(" · "),
+          ),
+        });
+    }
+  return cells;
+}
+
+/**
+ * The page cells of a database block bound to a shared dataset, read from the
+ * dataset's stored value the way the block resolves its props: the value (or
+ * the object at binding.props.path) supplies every prop the block does not
+ * keep locally. A dataset read from a file, a URL or a transform has no stored
+ * value and contributes nothing.
+ */
+export function boundDatabaseEdges(
+  database: BoundDatabase,
+  datasetValue: unknown,
+  page: { projectId: string; pageId: string },
+): PageReferenceEdge[] {
+  const binding = readBinding(database.data);
+  const props = binding?.props as
+    | { local?: string[]; path?: string }
+    | undefined;
+  if (!props) return [];
+  const shared =
+    props.path === undefined
+      ? datasetValue
+      : datasetValueAt(datasetValue, parsePath(props.path));
+  if (!shared || typeof shared !== "object" || Array.isArray(shared)) return [];
+  const merged: Record<string, unknown> = {
+    ...(shared as Record<string, unknown>),
+  };
+  for (const key of props.local ?? [])
+    if (key in database.data) merged[key] = database.data[key];
+  const edges: PageReferenceEdge[] = [];
+  const seen = new Set<string>();
+  for (const cell of databasePageCells(merged)) {
+    if (
+      cell.target.projectId === page.projectId &&
+      cell.target.pageId === page.pageId
+    )
+      continue;
+    const key = `${cell.target.projectId}/${cell.target.pageId}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    edges.push({
+      blockId: database.blockId,
+      projectId: cell.target.projectId,
+      pageId: cell.target.pageId,
+      blockIds: cell.target.blockIds ?? [],
+      kind: "database",
+      snippet: cell.snippet,
+    });
+  }
   return edges;
 }
 
