@@ -123,6 +123,9 @@ export function commentHighlights(source: HighlightSource) {
     },
     /** Client rects of a thread's highlighted text, for scrolling and flashing. */
     rects(threadId: string) {
+      // Ranges go stale when an editor re-renders its DOM (e.g. leaving a Board).
+      views.forEach((view) => measure(view));
+      paint();
       return [...painted.values()]
         .flat()
         .filter((item) => item.thread === threadId)

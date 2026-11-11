@@ -9,7 +9,7 @@ import {
   type RefObject,
 } from "react";
 import { createPortal } from "react-dom";
-import type { Editor } from "@tiptap/core";
+import type { Editor, JSONContent } from "@tiptap/core";
 import { NodeSelection } from "@tiptap/pm/state";
 import { MessageSquareText } from "../ui/icons";
 import { useTranslator } from "../i18n/react";
@@ -99,6 +99,23 @@ function editorTarget(
   const hostId =
     host?.getAttribute("data-surface-id") ?? host?.getAttribute("data-block-id");
   return hostId && blocks.has(hostId) ? { anchor: { blockId: hostId }, rect } : null;
+}
+
+/** The ancestor of a block that sits directly in a surface: what the editor's reveal can open. */
+function surfaceChild(document: ShowDocument, blockId: string): string {
+  let found = blockId;
+  const visit = (node: JSONContent, top: string | null): boolean =>
+    (node.content ?? []).some((child) => {
+      const id = typeof child.attrs?.id === "string" ? child.attrs.id : null;
+      const owner = node.type === "surface" ? id : top;
+      if (id === blockId) {
+        found = owner ?? blockId;
+        return true;
+      }
+      return visit(child, owner);
+    });
+  visit(document.content, null);
+  return found;
 }
 
 function placement(rect: Rect, width: number) {
@@ -204,7 +221,7 @@ export function usePageComments({
     const location = thread.location;
     if (location.kind === "text") {
       // The editor's reveal leaves an expanded Board; the text then scrolls to the middle and flashes.
-      setReveal(location.blockId);
+      setReveal(surfaceChild(latest.current.document, location.blockId));
       requestAnimationFrame(() =>
         requestAnimationFrame(() => {
           root.querySelector(anchorSelector(location.blockId))?.scrollIntoView({

@@ -320,8 +320,3 @@
     display: none !important;
   }
 }
-@media (prefers-reduced-motion: reduce) {
-  .comment-flash {
-    animation-timing-function: steps(1, end);
-  }
-}
