@@ -1,4 +1,3 @@
-import { CommentSlots } from "../comment-slots";
 import { textRangeEditMeta } from "./text-range-edit";
 import { registerSelectionEditor } from "../../surface/text-selection";
 import { ContentNodeActions } from "./ContentNodeActions";
@@ -277,9 +276,8 @@ export default function RichTextEditor({
   const selectedRef = useRef(0);
   const dragPosition = useRef<number | null>(null);
   const [slash, setSlash] = useState<SlashState | null>(null);
-  const { useCatalog, registerComponent, assistant, pageLinks } =
+  const { useCatalog, registerComponent, assistant, pageLinks, comments } =
     useContext(RichTextEnvironment);
-  const comments = useContext(CommentSlots);
   const pageLinksRef = useRef(pageLinks);
   pageLinksRef.current = pageLinks;
   const catalog = useCatalog(!!slash);
