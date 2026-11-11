@@ -7281,7 +7281,11 @@ export default function Studio() {
                 : undefined
             }
             openDirectory={openProject}
-            onClose={closeDialog}
+            onClose={() => {
+              // A command run right after closing sees no open dialog.
+              dialogRef.current = null;
+              closeDialog();
+            }}
             onError={report}
           />
         )}
