@@ -26,6 +26,21 @@ export default defineMessages("library", {
     compactNow: "立即压缩",
     findCleanup: "检查可清理文件",
     rebuildIndex: "重建搜索索引",
+    checkIntegrity: "检查完整性",
+    "integrity.ok": "内容库完整，未发现问题（{date}）。",
+    "integrity.database":
+      "内容数据库已损坏。先保存一份完整备份，再把详情发给我们处理；修复前不要删除内容库文件夹。",
+    "integrity.content":
+      "部分已保存的内容与校验值不符。先保存一份完整备份，再把详情发给我们处理。",
+    "integrity.history":
+      "保存记录不一致，当前内容仍可打开。先保存一份完整备份，再把详情发给我们处理。",
+    "integrity.repository":
+      "旧版本存储检查失败。先保存一份完整备份，再把详情发给我们处理。",
+    "integrity.unknown":
+      "内容库检查未通过。先保存一份完整备份，再把详情发给我们处理。",
+    "integrity.reveal": "显示内容库文件夹",
+    "integrity.copy": "复制详情",
+    "integrity.copied": "详情已复制。",
     cleanupPlan:
       "可清理 {count} 个文件，共 {size}。保留 {drafts} 份草稿及 {conflicts} 份冲突快照。",
     showCleanupFiles: "查看待清理文件",
@@ -103,6 +118,21 @@ export default defineMessages("library", {
     compactNow: "Compact now",
     findCleanup: "Find files to clean up",
     rebuildIndex: "Rebuild search index",
+    checkIntegrity: "Check integrity",
+    "integrity.ok": "The library is intact. No problems found ({date}).",
+    "integrity.database":
+      "The content database is damaged. Save a full backup, then send us the details. Keep the library folder until it is repaired.",
+    "integrity.content":
+      "Some saved content doesn't match its checksum. Save a full backup, then send us the details.",
+    "integrity.history":
+      "The record of saves is inconsistent; current content still opens. Save a full backup, then send us the details.",
+    "integrity.repository":
+      "The older storage format failed its check. Save a full backup, then send us the details.",
+    "integrity.unknown":
+      "The library didn't pass its check. Save a full backup, then send us the details.",
+    "integrity.reveal": "Show library folder",
+    "integrity.copy": "Copy details",
+    "integrity.copied": "Details copied.",
     cleanupPlan: {
       one: "{count} file can be cleaned up ({size}). Kept: {drafts} drafts, {conflicts} conflict snapshots.",
       other:
