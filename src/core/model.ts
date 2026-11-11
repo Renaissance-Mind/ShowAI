@@ -352,3 +352,12 @@ export class CoreError extends Error {
     this.conflictId = details.conflictId;
   }
 }
+
+/** What a failed library integrity check found damaged. */
+export type IntegrityProblem = "database" | "content" | "history" | "repository";
+/** An integrity failure that names its kind, so Settings can say what to do. */
+export function integrityError(kind: IntegrityProblem, message: string) {
+  const error = new CoreError("INVALID_DATA", message);
+  error.details = { integrity: kind };
+  return error;
+}

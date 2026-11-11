@@ -67,10 +67,17 @@ import {
   syncPackagingPlan,
   type PackagingDecisions,
 } from "../core/packaging";
-import { assertId, CoreError, FileStore, folderVisible } from "../core/store";
+import {
+  assertId,
+  CoreError,
+  FileStore,
+  folderVisible,
+  type PurgeTarget,
+} from "../core/store";
 import type { PageRecord, ProjectBinding } from "../core/model";
 import { isDirectorySortBy } from "../core/directory-sort";
 import { deletedEntries } from "../core/deleted-entries";
+import { checkLibraryIntegrity } from "../core/library-integrity";
 import {
   getComponent,
   blankDocument,
@@ -201,6 +208,8 @@ export const workbenchActions = new Set([
   "projects:remove",
   "library:deleted",
   "library:restore",
+  "library:purge",
+  "library:integrity",
   "sidebar:get",
   "sidebar:moveProject",
   "sidebar:moveEntry",
@@ -825,6 +834,8 @@ export function createWorkbench(
         return new LibraryMaintenance(store.root).archive(
           required(args, "out"),
         );
+      case "library:integrity":
+        return checkLibraryIntegrity(store.root);
       case "library:verifyArchive":
         return verifyLibraryArchive(required(args, "path"));
       case "library:prepareImport":
@@ -1082,6 +1093,38 @@ export function createWorkbench(
             })),
           ),
         );
+      }
+      case "library:purge": {
+        if (!Array.isArray(args.items) || !args.items.length)
+          throw new CoreError("INVALID_DATA", "Choose the items to delete.");
+        const synced = new Set(
+          (await syncManager(store.root).configuration()).projects.map(
+            (item) => item.projectId,
+          ),
+        );
+        const targets = (args.items as Record<string, unknown>[]).map(
+          (item): PurgeTarget => {
+            const id = projectId(item);
+            if (item.kind === "project") {
+              if (synced.has(id))
+                throw new CoreError("CONFLICT", t("purgeSyncedProject"));
+              return { kind: "project", projectId: id };
+            }
+            if (item.kind === "folder")
+              return {
+                kind: "folder",
+                projectId: id,
+                folderId: assertId(required(item, "folderId")),
+              };
+            if (item.kind === "page")
+              return { kind: "page", projectId: id, pageId: pageId(item) };
+            throw new CoreError(
+              "INVALID_DATA",
+              "Choose a project, folder or page.",
+            );
+          },
+        );
+        return store.purgeArchived(targets);
       }
       case "library:restore": {
         const kind = required(args, "kind");
@@ -1990,6 +2033,7 @@ export function createWorkbench(
     "projects:pin",
     "projects:remove",
     "library:restore",
+    "library:purge",
     "projects:group",
     "groups:create",
     "groups:rename",
@@ -2018,6 +2062,8 @@ export function createWorkbench(
     ...datasetMutationActions,
   ]);
   const dialogActions = new Set([
+    // Commits its own transaction, then releases drafts and archived history.
+    "library:purge",
     "components:import",
     "workspace:resolve",
     "library:prepareImport",

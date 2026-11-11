@@ -540,6 +540,56 @@ export class EditorDrafts {
     );
   }
 
+  /**
+   * Deletes every draft of permanently deleted pages, discarded copies
+   * included. Their assets become unreferenced, so cleanup reclaims them.
+   */
+  async purgePages(pages: { projectId: string; pageId: string }[]) {
+    if (!pages.length) return;
+    const doomed = (record: EditorDraftRecord) =>
+      record.kind === "page" &&
+      pages.some(
+        (page) =>
+          page.projectId === record.projectId &&
+          page.pageId === record.resourceId,
+      );
+    const names = (path: string) =>
+      readdir(path).catch((error: NodeJS.ErrnoException) => {
+        if (error.code === "ENOENT") return [];
+        throw error;
+      });
+    return withLibraryLock(
+      this.root,
+      async () => {
+        const live = join(this.root, "local", "editor-drafts");
+        for (const id of await names(live)) {
+          if (!/^[a-f0-9]{64}$/.test(id)) continue;
+          const bytes = await readLibraryBytes(
+            this.root,
+            join(live, id, "draft.json"),
+          );
+          if (bytes && doomed(JSON.parse(bytes.toString())))
+            await rm(join(live, id), { recursive: true });
+        }
+        const discarded = join(this.root, "local", "discarded-drafts");
+        for (const id of await names(discarded)) {
+          if (!/^[a-f0-9]{64}$/.test(id)) continue;
+          for (const at of await names(join(discarded, id))) {
+            const bytes = await readLibraryBytes(
+              this.root,
+              join(discarded, id, at, "draft.json"),
+            );
+            if (bytes && doomed(JSON.parse(bytes.toString()).record))
+              await rm(join(discarded, id, at), { recursive: true });
+          }
+          if (!(await names(join(discarded, id))).length)
+            await rm(join(discarded, id), { recursive: true });
+        }
+      },
+      "drafts",
+    );
+  }
+
   async completePage(
     id: string,
     generation: string,

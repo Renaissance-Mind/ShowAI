@@ -6,6 +6,7 @@ export default defineMessages("workbench", {
     chooseProjectVisibility: "请选择项目是否在本设备显示。",
     invalidProjectAction: "无效的项目管理操作。",
     librarySwitched: "内容库已切换，请重新载入。",
+    purgeSyncedProject: "这个项目正在同步。先在设置里停止同步，再彻底删除。",
     pageCopyTitle: "{title} 副本",
     referenceChanged: "页面在保存后又有了新的修改，请重新引用。",
     serveReady:
@@ -16,6 +17,8 @@ export default defineMessages("workbench", {
     chooseProjectVisibility: "Choose whether the project is shown on this device.",
     invalidProjectAction: "Invalid project action.",
     librarySwitched: "The content library changed. Reload to continue.",
+    purgeSyncedProject:
+      "This project is syncing. Stop syncing it in Settings, then delete it permanently.",
     pageCopyTitle: "{title} copy",
     referenceChanged:
       "The page changed again after it was saved. Reference it again.",
