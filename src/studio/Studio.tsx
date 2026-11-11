@@ -143,9 +143,8 @@ import {
   type EditorControls,
 } from "../surface/EditorControls";
 import {
-  IMPORT_SIZE_LIMIT,
-  importedArtifact,
-  isImportablePageFile,
+  IMPORT_DROP_LIMIT,
+  acceptsImport,
 } from "./page-import";
 import { FIND_COMPONENT_EVENT } from "../components/blocks/ComponentStatus";
 import { desktop, errorMessage } from "./bridge";
@@ -160,8 +159,12 @@ import {
   type LibraryContextMenuItem,
 } from "./LibraryNavigation";
 import Dialog from "./Dialog";
+import ImportDialog, { type StagedImportPlan } from "./ImportDialog";
+import importMessages from "../i18n/messages/imports";
+import type { ImportReport } from "../agent/import-service";
 import {
   PackagingDialog,
+  formatSize,
   type PackagingDecisions,
   type PackagingPlan,
 } from "./PackagingDialog";
@@ -507,6 +510,7 @@ export default function Studio() {
   const t = useTranslator(studioMessages);
   const tc = useTranslator(commonMessages);
   const tfind = useTranslator(findMessages);
+  const ti = useTranslator(importMessages);
   const ta = useTranslator(assistantMessages);
   const tn = useTranslator(navigationMessages);
   const tshell = useTranslator(shellMessages);
@@ -790,6 +794,10 @@ export default function Studio() {
     setQuery(restored?.query ?? "");
   }, [view]);
   const [dialog, setDialog] = useState<DialogState>(null);
+  const [importPlan, setImportPlan] = useState<{
+    plan: StagedImportPlan;
+    destination: string;
+  } | null>(null);
   const [packagingDecision, setPackagingDecision] = useState<{
     plan: PackagingPlan;
     decide: (decisions: PackagingDecisions | null) => void;
@@ -2207,56 +2215,54 @@ export default function Studio() {
     changeAssistantOpen(true);
     focusAssistantInput();
   }
-  /** One import path for the toolbar, the 「添加内容」 menu and files dropped on the directory. */
+  /**
+   * One import path for the toolbar, the 「添加内容」 menu and files dropped on
+   * the directory: the importer's plan is shown, and the import writes only
+   * after the person confirms it.
+   */
   async function importPage(
     directory: { projectId: string; parentId: string | null } | null =
       selectedProject
         ? { projectId: selectedProject, parentId: selectedFolder }
         : null,
-    dropped?: { name: string; content: string }[],
+    dropped?: { name: string; data: string }[],
   ) {
     if (!directory) return;
     if (!(await page.flushOrDefer())) return draftHeld();
-    const files = dropped ?? [
-      await desktop.invoke<{ name: string; content: string } | null>(
+    const source =
+      dropped ? { files: dropped } : await desktop.invoke<{ path: string } | null>(
         "dialog:openPage",
-      ),
-    ];
-    const chosen = files.filter((file) => !!file);
-    if (!chosen.length) return;
-    let imported: LoadedPage | undefined;
-    let completed = 0;
-    try {
-      for (const file of chosen) {
-        imported = await desktop.invoke<LoadedPage>("pages:import", {
-          ...directory,
-          artifact: importedArtifact(file),
-        });
-        completed++;
-      }
-    } catch (reason) {
-      if (!completed) throw reason;
-      // The pages already imported show up; the failure names what is left.
-      await refreshProjects([directory.projectId]);
-      throw new Error(
-        t("importPartlyFailed", {
-          completed,
-          remaining: chosen.length - completed,
-          error: errorMessage(reason),
-        }),
+        { projectId: directory.projectId },
       );
-    }
-    if (chosen.length === 1 && imported) {
-      setContents((current) =>
-        withCreatedPage(current, directory.projectId, imported),
-      );
-      await openPage(imported.document.id, directory.projectId);
-    }
-    await refreshProjects([directory.projectId]);
-    setNotice(
-      chosen.length === 1
-        ? t("pageImported")
-        : t("pagesImported", { count: chosen.length }),
+    if (!source) return;
+    const plan = await desktop.invoke<StagedImportPlan>("imports:plan", {
+      ...directory,
+      ...source,
+    });
+    const owner = projects.find((item) => item.id === directory.projectId);
+    const folder =
+      directory.projectId === selectedProject
+        ? folders.find((item) => item.id === directory.parentId)
+        : undefined;
+    setImportPlan({
+      plan,
+      destination: [owner?.name, folder?.name].filter(Boolean).join(" / "),
+    });
+  }
+  /** After an import: the new content shows, and the whole import can be undone. */
+  async function importFinished(report: ImportReport) {
+    const { projectId: target } = report.plan.target;
+    await refreshProjects([target]);
+    if (!report.created.pages && !report.created.folders) return;
+    notifyWithUndo(
+      ti(report.cancelled ? "stopped" : "done", { pages: report.created.pages }),
+      async () => {
+        for (const folderId of report.undo.folders)
+          await desktop.invoke("folders:remove", { projectId: target, folderId });
+        for (const pageId of report.undo.pages)
+          await desktop.invoke("pages:remove", { projectId: target, pageId });
+        await refreshProjects([target]);
+      },
     );
   }
   /**
@@ -4593,22 +4599,41 @@ export default function Studio() {
     (!!selectedFolder && !currentFolder);
   async function importDroppedFiles(files: File[]) {
     if (!project) return;
-    const accepted = files.filter(
-      (file) => isImportablePageFile(file.name) && file.size <= IMPORT_SIZE_LIMIT,
-    );
+    const { importers } = await desktop.invoke<{
+      importers: { extensions: string[] }[];
+    }>("imports:importers", { projectId: project.id });
+    const extensions = importers.flatMap((importer) => importer.extensions);
+    const accepted = files.filter((file) => acceptsImport(file.name, extensions));
     const skipped = files.filter((file) => !accepted.includes(file));
     if (skipped.length)
       setNotice(
-        t("dropImportUnsupported", {
+        ti("unsupported", {
           names: skipped.map((file) => file.name).join(", "),
         }),
         { kind: "warning" },
       );
     if (!accepted.length) return;
+    const size = accepted.reduce((sum, file) => sum + file.size, 0);
+    if (size > IMPORT_DROP_LIMIT) {
+      setNotice(
+        ti("tooLarge", {
+          size: formatSize(size),
+          limit: formatSize(IMPORT_DROP_LIMIT),
+        }),
+        { kind: "warning" },
+      );
+      return;
+    }
     const contents = await Promise.all(
       accepted.map(async (file) => ({
         name: file.name,
-        content: await file.text(),
+        data: await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () =>
+            resolve(String(reader.result).replace(/^data:[^,]*,/, ""));
+          reader.onerror = () => reject(reader.error);
+          reader.readAsDataURL(file);
+        }),
       })),
     );
     await importPage(
@@ -6881,6 +6906,19 @@ export default function Studio() {
                     },
                   ]
             }
+          />
+        )}
+        {importPlan && (
+          <ImportDialog
+            plan={importPlan.plan}
+            destination={importPlan.destination}
+            onFinished={importFinished}
+            onOpen={(pageId) => {
+              const target = importPlan.plan.target.projectId;
+              setImportPlan(null);
+              void openPage(pageId, target).catch(report);
+            }}
+            onClose={() => setImportPlan(null)}
           />
         )}
         {packagingDecision && (

@@ -88,6 +88,7 @@ const tools: Record<GuideTopic, string[]> = {
   sync: ["project_context", "project_sync_status", "project_sync"],
   export: ["page_present", "page_export"],
   publish: ["publication_list", "publication_prepare"],
+  import: ["page_create", "catalog_list", "catalog_describe", "catalog_version"],
   migrations: ["guide"],
 };
 const rules: Partial<Record<GuideTopic, string[]>> = {
@@ -136,6 +137,10 @@ const rules: Partial<Record<GuideTopic, string[]>> = {
   ],
   recovery: [
     'draft_read lists or reads retained project-scoped editor drafts. draft_write(action:"save") retains unsaved content, not a formal Page. Drafts stay in this library/remote connection and do not synchronize to other devices. draft_remove requires the read generation; draft_write(action:"complete") requires that generation and a committed page revision with matching content. Newer or different drafts are retained with CONFLICT. These operations do not replace external conflict handling or page merge.',
+  ],
+  import: [
+    'page_create import:{source, importer?, dryRun:true} returns the plan without writing; the same call without dryRun imports into parentId and returns the report. source is an absolute path of a file, folder or zip on this device (local connections only).',
+    'catalog_list kind:"importer" lists built-in and contributed importers; catalog_describe kind:"importer" returns a contributed importer\'s manifest and script; catalog_version action:"importer" {manifest, script} saves one to this project (a new version replaces it; history keeps the old one) and action:"remove" kind:"importer" removes it.',
   ],
   publish: [
     "Publication is separate from page saving and presentation. Only invoke available tools within their project scope. Global promotion, hosting and administrative registration require the explicit host/operator flow; do not invent a missing MCP tool.",

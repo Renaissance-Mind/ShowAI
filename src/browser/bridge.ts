@@ -164,7 +164,22 @@ export function installBrowserBridge() {
       "dialog:openPage": {
         title: t("title.importPage"),
         kind: "file",
-        extensions: ["json", "html", "htm", "md", "markdown", "txt"],
+        // The extensions of the importers this project can use.
+        extensions:
+          action === "dialog:openPage"
+            ? [
+                ...new Set(
+                  (
+                    await request<{ importers: { extensions: string[] }[] }>(
+                      "invoke",
+                      { action: "imports:importers", args: { projectId: args.projectId } },
+                    )
+                  ).importers.flatMap((importer) =>
+                    importer.extensions.map((extension) => extension.slice(1)),
+                  ),
+                ),
+              ]
+            : [],
       },
       "components:import": { title: t("title.componentSource"), kind: "directory" },
       "catalog:preparePublish": {

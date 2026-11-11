@@ -25,7 +25,7 @@ import {
   wrapSurface,
   surfaceKind,
 } from "../surface/containers.mjs";
-import { readFile, writeFile, stat, realpath } from "node:fs/promises";
+import { writeFile, stat, realpath } from "node:fs/promises";
 import { localMediaGrants, localMediaPath } from "./local-media";
 import {
   LOCAL_FILE_TYPES,
@@ -33,7 +33,7 @@ import {
   localFileRef,
   type LocalResourceKind,
 } from "../portable/local-files.mjs";
-import { join, sep, resolve, dirname, relative, isAbsolute } from "node:path";
+import { join, resolve, dirname, relative, isAbsolute } from "node:path";
 import { randomUUID, createHash } from "node:crypto";
 import { changeContext, withChangeContext } from "../core/history-context";
 import { pageReference } from "../core/page-reference";
@@ -53,6 +53,20 @@ import {
   setMaintenancePolicy,
 } from "../core/maintenance-scheduler";
 import { AgentService } from "../agent/service";
+import {
+  availableImporters,
+  cancelImport,
+  importProgress,
+  importerInfo,
+  planImport,
+  releaseImport,
+  runImport,
+  stageImport,
+  stagedImport,
+  trackImport,
+  untrackImport,
+  type ImportSource,
+} from "../agent/import-service";
 import {
   analyzeExport,
   assertExportDestination,
@@ -248,6 +262,11 @@ export const workbenchActions = new Set([
   "pages:pin",
   "pages:move",
   "pages:import",
+  "imports:importers",
+  "imports:plan",
+  "imports:run",
+  "imports:progress",
+  "imports:cancel",
   "templates:list",
   "templates:get",
   "templates:save",
@@ -342,6 +361,28 @@ function parentFolder(args: Record<string, unknown>): string | null {
   return args.parentId === null || args.parentId === undefined
     ? null
     : assertId(required(args, "parentId"));
+}
+
+/** An import source: a path on this device, or files handed over as base64 (drops). */
+function importSource(args: Record<string, unknown>): ImportSource {
+  if (args.path !== undefined) return { path: required(args, "path") };
+  const files = args.files;
+  if (
+    !Array.isArray(files) ||
+    !files.length ||
+    files.length > 1000 ||
+    files.some(
+      (file) =>
+        !file ||
+        typeof file.name !== "string" ||
+        typeof file.data !== "string",
+    )
+  )
+    throw new CoreError(
+      "INVALID_DATA",
+      "Import a path, or files as [{name, data}] with base64 data.",
+    );
+  return { files: files as { name: string; data: string }[] };
 }
 
 function catalogOptions(args: Record<string, unknown>): CatalogReadOptions {
@@ -1408,6 +1449,52 @@ export function createWorkbench(
           }),
         );
       }
+      case "imports:importers": {
+        const { importers, problems } = await availableImporters(
+          store.root,
+          projectId(args),
+        );
+        return { importers: importers.map(importerInfo), problems };
+      }
+      case "imports:plan": {
+        // The plan the person confirms; the source stays staged for the run.
+        const id = projectId(args);
+        const source = importSource(args);
+        const plan = await planImport(
+          service,
+          source,
+          { projectId: id, parentId: parentFolder(args) },
+          { importer: text(args, "importer", true) },
+        );
+        return { ...plan, token: stageImport(source) };
+      }
+      case "imports:run": {
+        const token = required(args, "token");
+        const runId = required(args, "runId");
+        const run = trackImport(runId);
+        try {
+          const report = await runImport(
+            service,
+            stagedImport(token),
+            { projectId: projectId(args), parentId: parentFolder(args) },
+            {
+              importer: text(args, "importer", true),
+              signal: run.controller.signal,
+              onProgress: (progress) => {
+                run.progress = progress;
+              },
+            },
+          );
+          releaseImport(token);
+          return report;
+        } finally {
+          untrackImport(runId);
+        }
+      }
+      case "imports:progress":
+        return importProgress(required(args, "runId"));
+      case "imports:cancel":
+        return { cancelled: cancelImport(required(args, "runId")) };
       case "templates:list":
         return listTemplates(
           store.root,
@@ -1705,27 +1792,33 @@ export function createWorkbench(
         });
       }
       case "dialog:openPage": {
+        // The file (or, on macOS, the folder) an import reads; the extensions
+        // are those of the importers this project can use.
+        const { importers } = await availableImporters(
+          store.root,
+          args.projectId === undefined ? undefined : projectId(args),
+        );
         const result = await host.openDialog({
           title: tf("title.importPage"),
-          properties: ["openFile"],
+          properties:
+            process.platform === "darwin" && host.info().mode !== "browser"
+              ? ["openFile", "openDirectory"]
+              : ["openFile"],
           filters: [
             {
               name: tf("filter.page"),
-              extensions: ["json", "html", "htm", "md", "markdown", "txt"],
+              extensions: [
+                ...new Set(
+                  importers.flatMap((importer) =>
+                    importer.extensions.map((extension) => extension.slice(1)),
+                  ),
+                ),
+              ],
             },
           ],
         });
         if (result.canceled || !result.filePaths[0]) return null;
-        const path = result.filePaths[0];
-        if ((await stat(path)).size > 20 * 1024 * 1024)
-          throw new CoreError(
-            "INVALID_DATA",
-            "The imported page exceeds 20 MB.",
-          );
-        return {
-          name: path.split(sep).at(-1),
-          content: await readFile(path, "utf8"),
-        };
+        return { path: result.filePaths[0] };
       }
       case "export:analyze": {
         // The packaging plan an export would carry, with sizes and the last choices.
@@ -2117,6 +2210,7 @@ export function createWorkbench(
     "pages:pin",
     "pages:move",
     "pages:import",
+    "imports:run",
     "templates:save",
     "templates:remove",
     "components:import",
@@ -2140,6 +2234,8 @@ export function createWorkbench(
     "workspace:resolve",
     "library:prepareImport",
     "library:activateImport",
+    // Writes folders, datasets and then each page in its own transaction.
+    "imports:run",
   ]);
   return (action: string, args: Record<string, unknown>): Promise<unknown> => {
     if (

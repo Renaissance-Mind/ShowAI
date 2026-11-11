@@ -120,16 +120,26 @@ function describe(dump: unknown): {
 export async function runTransform(
   script: string,
   inputs: Record<string, unknown>,
+  options: {
+    /** The function the script defines and the run calls; default transform. */
+    entry?: string;
+    limits?: Partial<
+      Pick<typeof TRANSFORM_LIMITS, "memoryBytes" | "timeoutMs" | "outputBytes">
+    >;
+  } = {},
 ): Promise<TransformRun> {
+  const limits = { ...TRANSFORM_LIMITS, ...options.limits };
+  if (options.entry !== undefined && !/^[A-Za-z_$][\w$]{0,63}$/.test(options.entry))
+    throw new Error("The script entry must be a function name.");
   const engineInUse = engine();
   const module = await engineInUse;
   const started = performance.now();
   const elapsed = () => Math.round(performance.now() - started);
   const runtime = module.newRuntime();
-  runtime.setMemoryLimit(TRANSFORM_LIMITS.memoryBytes);
+  runtime.setMemoryLimit(limits.memoryBytes);
   runtime.setMaxStackSize(TRANSFORM_LIMITS.stackBytes);
   runtime.setInterruptHandler(
-    shouldInterruptAfterDeadline(Date.now() + TRANSFORM_LIMITS.timeoutMs),
+    shouldInterruptAfterDeadline(Date.now() + limits.timeoutMs),
   );
   const context = runtime.newContext();
   const handles: QuickJSHandle[] = [];
@@ -152,9 +162,9 @@ export async function runTransform(
       ok: false,
       code,
       message: interrupted
-        ? `The script ran longer than ${TRANSFORM_LIMITS.timeoutMs / 1000} s and was stopped.`
+        ? `The script ran longer than ${limits.timeoutMs / 1000} s and was stopped.`
         : memory
-          ? `The script used more than ${TRANSFORM_LIMITS.memoryBytes / 1024 / 1024} MiB of memory and was stopped.`
+          ? `The script used more than ${limits.memoryBytes / 1024 / 1024} MiB of memory and was stopped.`
           : `${name}: ${message}${line ? ` (line ${line})` : ""}`,
       ...(line && !interrupted && !memory ? { line } : {}),
       ms: elapsed(),
@@ -175,6 +185,7 @@ export async function runTransform(
       keep(context.getProp(runner, "run")),
       runner,
       text,
+      keep(context.newString(options.entry ?? "transform")),
     );
     if (called.error) return failure(called.error, "TRANSFORM_FAILED");
     keep(called.value);
@@ -184,11 +195,13 @@ export async function runTransform(
     );
     if (output.error) return failure(output.error, "OUTPUT_INVALID");
     const json = context.getString(keep(output.value));
-    if (Buffer.byteLength(json) > TRANSFORM_LIMITS.outputBytes)
+    if (Buffer.byteLength(json) > limits.outputBytes)
       return {
         ok: false,
         code: "TOO_LARGE",
-        message: `The output has ${Buffer.byteLength(json)} bytes; a dataset holds at most ${TRANSFORM_LIMITS.outputBytes} bytes.`,
+        message: options.entry
+          ? `The output has ${Buffer.byteLength(json)} bytes; at most ${limits.outputBytes} bytes are accepted.`
+          : `The output has ${Buffer.byteLength(json)} bytes; a dataset holds at most ${limits.outputBytes} bytes.`,
         ms: elapsed(),
       };
     return { ok: true, value: JSON.parse(json), ms: elapsed() };

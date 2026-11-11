@@ -3,7 +3,7 @@
   "profile": "claude",
   "declaredHostDisplay": "model-html",
   "commonVersion": "0.29.3",
-  "commonSha256": "7b45783fc280d4c088e4e0f8f57a163af68deb7a4d958c4fd0240718b88ded4c",
+  "commonSha256": "90e15d3c135c5cdbf4cc43a3251c1fa851bd20844a7d503bb11ac35aa7495f6e",
   "commonFiles": {
     "collaborate-canvas/SKILL.md": "1a21a0419504732c39821582e891721fa3e8deba4808bab19e737eca53a68c49",
     "create-component/references/component-authoring.md": "3cc16a095ef7f2f0f3d7be0b3e58e2a74ad8ead96f2fc66c4950dde0540ebcd1",
@@ -20,13 +20,14 @@
     "use-showai/references/capacity.md": "87b855fa1ddc1721a4f6674f59d1103cd943fcd65c58f14bb417388e87f471d2",
     "use-showai/references/editing.md": "d65b2a085148ad5f09fa18a8eb39c622732dc3609e81e6ddb84511299da601b1",
     "use-showai/references/host-display.md": "862fd5c8345d9243eaab59f58a53135a1cfd371ae82635a96e6ab4e298f1385d",
+    "use-showai/references/import.md": "cd155c226fef658146b1c8fd69665dfbad4434a8adaa44e14aac7a81e53e54bb",
     "use-showai/references/integration.md": "e7e16787c97ebb6abf1a2e4b753a8a363546f31257d0e8beb5ae2a218ac85380",
     "use-showai/references/page-reading.md": "506b2aa64d9cccd5819b485dbeaac9e87fc55cf8aff9cbbbcdc9541b2b6dc620",
     "use-showai/references/runtime.md": "cc8910d2a349757d7db83224fef4d5f9561ec30201c52329cfcb1a9528c1a184",
     "use-showai/references/shared-data.md": "4190e03674f784aa74c87ef5467812e4030c8df3abaa5c68e15916416b774e84",
     "use-showai/references/tasks.md": "8bd13c1a8ecc68152ac9562395b428ea682434356611b9dea8fcdf533356b7f1",
     "use-showai/references/user-references.md": "e328b96eb23b5179b8c55af0d5361f0ccf2c42fac36cebbcdcd50447a37041dd",
-    "use-showai/SKILL.md": "fdf4ac0b8ed675912c31775ed13f4d445cec3ec15669e3a4fd7a50c72bff26c0"
+    "use-showai/SKILL.md": "2d0d3e3484aa32e28280bfa9b70467167c7862e09bf881fb7ff9c97108ac2ed0"
   },
   "adapterSha256": "bddcffbb897e6646c21708ea2257f3c652f34b006d2e32634aa6475daab7626a"
 }

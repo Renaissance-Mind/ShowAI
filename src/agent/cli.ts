@@ -23,6 +23,7 @@ import {
 } from "../core/maintenance-scheduler";
 import type { ChangeContext } from "../core/history-model";
 import { AgentService, errorResult } from "./service";
+import { importerCommand, importCommand } from "./import-commands";
 import { systemPresentationGuide } from "./system-presentation";
 import type {
   PageOperation,
@@ -104,8 +105,17 @@ Shared datasets (one value that blocks on several pages read and write; see guid
     --dry-run runs the script and returns its output without saving.
   datasets delete DATASET --project PROJECT --base-hash HASH
 
+Import from other apps (a file, a folder or a zip; see guide import):
+  import PATH --project PROJECT [--folder FOLDER] [--importer ID] [--dry-run]
+    Notion "Markdown & CSV" exports (zip or folder), Word .docx, Markdown/text and ShowAI exports, or an
+    importer saved in the library. --dry-run returns the plan (folders, pages, databases, attachments,
+    warnings) and writes nothing; the import reports each item it could not write.
+  importers list [--project PROJECT]
+  importers save DIRECTORY [--scope global|project --project PROJECT]   DIRECTORY holds importer.json and importer.js
+  importers remove ID [--scope global|project --project PROJECT]
+
 Discover only what you need:
-  guide [workspace|reading|authoring|containers|document|datasets|catalog|component|templates|versions|recovery|sync|export|publish]
+  guide [workspace|reading|authoring|containers|document|datasets|catalog|component|templates|versions|recovery|sync|export|publish|import]
   template import DIRECTORY --project PROJECT
   template export ID --project PROJECT --out NEW_DIRECTORY
   template context --project PROJECT [--templates ID[@VERSION],ID]
@@ -256,6 +266,8 @@ function parseArguments(args: string[]): Arguments {
     "script",
     "response",
     "offset",
+    "folder",
+    "importer",
   ]);
   for (let index = 0; index < args.length; index++) {
     const argument = args[index];
@@ -495,6 +507,8 @@ async function runCliCommand(argv: string[]): Promise<unknown> {
           publish: "publish",
           mcp: "workspace",
           sync: "sync",
+          import: "import",
+          importers: "import",
         } as Record<string, string>
       )[command],
     );
@@ -989,6 +1003,20 @@ async function runCliCommand(argv: string[]): Promise<unknown> {
         );
       }
       break;
+    case "import":
+      requireCount(args, 2);
+      return importCommand(service, action, {
+        projectId: await project(),
+        folderId: option(args, "folder"),
+        importer: option(args, "importer"),
+        dryRun: args.options["dry-run"] === true,
+        progress: !args.options.json,
+      });
+    case "importers":
+      return importerCommand(service, action, id, {
+        scope: option(args, "scope"),
+        project,
+      });
     case "datasets": {
       if (action === "list") {
         requireCount(args, 2);

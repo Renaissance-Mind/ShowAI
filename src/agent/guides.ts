@@ -26,6 +26,7 @@ export const GUIDE_TOPICS = [
   "sync",
   "export",
   "publish",
+  "import",
   "migrations",
 ] as const;
 export type GuideTopic = (typeof GUIDE_TOPICS)[number];
@@ -716,6 +717,27 @@ const guides: Record<
         },
       ],
     },
+  },
+  import: {
+    purpose:
+      "Import content from other apps (a file, a folder or a zip) and add an importer for a new format.",
+    rules: [
+      "An import plans before it writes. The plan names the importer, the destination, the folders, pages, databases and attachments it will create and every warning (content kept as text, links that leave the export, files no page uses, rows or columns over the database limits). Show the plan to the person; write only after they agree. The run saves folders, datasets and then each page in its own transaction, so a page is complete or absent; the report lists created counts and problems (each item not written with its reason), folderId and undo {folders, pages}: deleting those moves the whole import to the trash.",
+      "Built-in importers: notion reads Notion's \"Markdown & CSV\" export (the downloaded zip, nested Part zips or the unzipped folder; also folders of Markdown files): pages with subpages become a folder holding the page and its children, links between exported pages (relative or notion.so) become page links, each CSV database becomes a database component bound to a dataset with typed columns and a page column to its row pages, images, video, audio and PDF attachments are embedded within the resource limits. word reads .docx: headings, bold/italic/underline/strike/code, links, nested lists, tables with merged cells, images and footnotes; comments are reported and left out. markdown reads .md/.markdown/.txt and ShowAI .html/.showai.json exports, one page per file.",
+      "Without importer the most confident importer is chosen (plan.candidates lists the scores); name one to override it.",
+      "Add a format with a contributed importer: a folder with importer.json {format:\"showai-importer\", id, name, version, description, extensions:[\".ext\"], folders?} and importer.js. The script runs in the same QuickJS sandbox as dataset transforms (no files, network, timers or host objects; 256 MiB memory, 20 s, 64 MiB output). It defines function convert(input) and optionally function detect(input) returning 0–1. input is {name, kind:\"file\"|\"files\"|\"folder\"|\"zip\", files:[{path, size, text?}]}; text is present for UTF-8 files up to 4 MiB (32 MiB in all), detect receives no text. A project importer hides a library importer with its id; built-in ids cannot be reused.",
+      "convert returns the bundle every importer returns: {title?, folders?:[{key, title, parent?}], pages:[{key, title, parent?, blocks:[{kind, data}]}], datasets?:[{key, name, value}], warnings?:[{source?, message}]}. blocks are catalog component instances exactly as page_create blocks takes them (text with format markdown, callout, toggle, image, bookmark, video, audio, pdf, database, any custom component); each is checked by its component's contract when saved. parent names a folder key.",
+      "Inside block data and dataset values, write references as placeholders the import replaces: showai-import:page/KEY (a page link, also inside Markdown links), showai-import:folder/KEY (a folder id, e.g. a database page column folder), showai-import:dataset/KEY (e.g. $binding.dataset) and showai-import:file/PATH (an input file embedded as a data URL: images, video, audio, PDF). Encode KEY and PATH with encodeURIComponent. A reference to something missing is left empty and reported.",
+      "The Notion block and property mapping lives in one table (NOTION_BLOCKS, NOTION_PROPERTY_COLUMNS in src/core/importers/notion-mapping.ts); a contributed importer can instead target any component in the catalog.",
+    ],
+    commands: [
+      "showai import ./Export-abc.zip --project PROJECT --dry-run --json",
+      "showai import ./Export-abc.zip --project PROJECT --folder FOLDER --json",
+      "showai import ./report.docx --project PROJECT --json",
+      "showai importers list --project PROJECT --json",
+      "showai importers save ./opml-importer --scope global --json",
+      "showai importers remove opml --scope global --json",
+    ],
   },
   migrations: {
     purpose:

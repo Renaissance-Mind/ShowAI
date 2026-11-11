@@ -360,6 +360,19 @@ export class FileStore {
     return readLibraryFile(this.root, path);
   }
 
+  private async pageExists(projectId: string, pageId: string) {
+    const path = this.pagePath(projectId, pageId);
+    const managed = await this.readManaged(path).catch((error) => {
+      if ((error as { code?: string }).code === "NOT_FOUND") return undefined;
+      throw error;
+    });
+    if (managed !== undefined) return true;
+    return !!(await lstat(path).catch((error) => {
+      if (errno(error, "ENOENT")) return null;
+      throw error;
+    }));
+  }
+
   private async readJson(path: string): Promise<unknown> {
     const managed = await this.readManaged(path);
     if (managed !== undefined) return JSON.parse(managed.toString("utf8"));
@@ -1790,9 +1803,12 @@ export class FileStore {
       kind?: "page" | "board";
       document?: ShowDocument;
       parentId?: string | null;
+      /** A page id chosen beforehand, e.g. so imported pages can link to each other. */
+      id?: string;
     } = {},
   ): Promise<PageRecord> {
     assertId(projectId);
+    if (input.id !== undefined) assertId(input.id);
     return this.withLock(`project-${projectId}`, async () => {
       const project = await this.readProject(projectId);
       requireActiveFolder(project, input.parentId ?? null);
@@ -1805,7 +1821,9 @@ export class FileStore {
       )
         requireActiveFolder(project, input.document.parentId);
       const now = new Date().toISOString();
-      const id = randomUUID();
+      const id = input.id ?? randomUUID();
+      if (input.id !== undefined && (await this.pageExists(projectId, id)))
+        throw new CoreError("CONFLICT", `Page ${id} already exists.`);
       const document = normalizeDocument(
         input.document
           ? {

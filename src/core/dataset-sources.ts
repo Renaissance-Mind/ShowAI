@@ -294,7 +294,7 @@ function cellValue(text: string): string | number | boolean {
   return text;
 }
 
-function parseDelimited(text: string, delimiter: string): string[][] {
+export function parseDelimited(text: string, delimiter: string): string[][] {
   const rows: string[][] = [];
   let row: string[] = [];
   let cell = "";

@@ -15,13 +15,14 @@ import source12 from "../../plugins/showai/skills/use-showai/references/capacity
 import source13 from "../../plugins/showai/skills/use-showai/references/editing.md?raw";
 import source14 from "../../plugins/showai/host-adapters/mcp-app.md?raw";
 import source15 from "../../plugins/showai/skills/use-showai/references/host-display.md?raw";
-import source16 from "../../plugins/showai/skills/use-showai/references/integration.md?raw";
-import source17 from "../../plugins/showai/skills/use-showai/references/page-reading.md?raw";
-import source18 from "../../plugins/showai/skills/use-showai/references/runtime.md?raw";
-import source19 from "../../plugins/showai/skills/use-showai/references/shared-data.md?raw";
-import source20 from "../../plugins/showai/skills/use-showai/references/tasks.md?raw";
-import source21 from "../../plugins/showai/skills/use-showai/references/user-references.md?raw";
-import source22 from "../../plugins/showai/skills/use-showai/SKILL.md?raw";
+import source16 from "../../plugins/showai/skills/use-showai/references/import.md?raw";
+import source17 from "../../plugins/showai/skills/use-showai/references/integration.md?raw";
+import source18 from "../../plugins/showai/skills/use-showai/references/page-reading.md?raw";
+import source19 from "../../plugins/showai/skills/use-showai/references/runtime.md?raw";
+import source20 from "../../plugins/showai/skills/use-showai/references/shared-data.md?raw";
+import source21 from "../../plugins/showai/skills/use-showai/references/tasks.md?raw";
+import source22 from "../../plugins/showai/skills/use-showai/references/user-references.md?raw";
+import source23 from "../../plugins/showai/skills/use-showai/SKILL.md?raw";
 
 export const mcpSkillNames = ["collaborate-canvas","create-component","create-template","show-document","show-visual","use-showai"] as const;
 export const mcpSkillSources: Record<string, string> = {
@@ -41,11 +42,12 @@ export const mcpSkillSources: Record<string, string> = {
   "use-showai/references/editing.md": source13,
   "use-showai/references/host-adapter.md": source14,
   "use-showai/references/host-display.md": source15,
-  "use-showai/references/integration.md": source16,
-  "use-showai/references/page-reading.md": source17,
-  "use-showai/references/runtime.md": source18,
-  "use-showai/references/shared-data.md": source19,
-  "use-showai/references/tasks.md": source20,
-  "use-showai/references/user-references.md": source21,
-  "use-showai/SKILL.md": source22,
+  "use-showai/references/import.md": source16,
+  "use-showai/references/integration.md": source17,
+  "use-showai/references/page-reading.md": source18,
+  "use-showai/references/runtime.md": source19,
+  "use-showai/references/shared-data.md": source20,
+  "use-showai/references/tasks.md": source21,
+  "use-showai/references/user-references.md": source22,
+  "use-showai/SKILL.md": source23,
 };

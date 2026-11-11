@@ -1,6 +1,6 @@
 ---
 name: use-showai
-description: ShowAI 的总入口，通过 ShowAI MCP 做任何事都先读它。按用户要的结果分流：创作或修改作品（含只要规划、设计稿或评审）、在对话里展示组件、查找阅读与管理已有内容、做组件或模板、多端协作；并给出连接与项目归属、内容模型、保存与冲突的通用规则。查找、引用、共享数据（含外部 JSON/CSV/Excel）、草稿和内容库切换的做法在它的参考里。连接或显示异常时保留内容并指向「设置 → 关于与反馈」。
+description: ShowAI 的总入口，通过 ShowAI MCP 做任何事都先读它。按用户要的结果分流：创作或修改作品（含只要规划、设计稿或评审）、在对话里展示组件、查找阅读与管理已有内容、做组件或模板、多端协作；并给出连接与项目归属、内容模型、保存与冲突的通用规则。查找、引用、共享数据（含外部 JSON/CSV/Excel）、从 Notion/Word/Markdown 导入、草稿和内容库切换的做法在它的参考里。连接或显示异常时保留内容并指向「设置 → 关于与反馈」。
 ---
 
 # 使用 ShowAI
@@ -15,6 +15,7 @@ Agent 通过 MCP 操作 ShowAI。App、网页、CLI 和 MCP 共用内容核心�
 | 在对话里看、试或比较 | “画出来看看”“演示一下这个机制”“做个对比图”“给我看个界面原型” | [show-visual](../show-visual/SKILL.md)：选现有组件，或改造、新建一个组件，用 `show_component` 展示；不需要项目、不保存。展示后用户说“存下来”，也按 show-visual 的“之后要保存”处理 |
 | 创作或修改作品 | “整理成文档/报告”“做一份讲解页”“把上周那页的结论改清楚”“先帮我规划怎么讲、出设计稿”“评审这页并修改” | 按下文核对连接与归属，再读 [show-document](../show-document/SKILL.md)：它一次给全制作流程（也用于只要规划、设计稿或评审的请求），选用模板时再补充模板的方法 |
 | 查找、阅读或管理已有内容 | “上周那页在哪个项目里”“这个项目里有什么”“把这三页移到新文件夹”“删掉那页，过几天再找回来”“删掉不用的组件版本”“页面接上这份 Excel” | 留在本 Skill，按 [按任务查找操作](references/tasks.md) 选工具；有 `showai.reference` 时先按 [用户引用](references/user-references.md) 读取它指向的内容 |
+| 从其他应用导入 | “把这个 Notion 导出导进来”“导入这份 Word”“以后要能导入 OPML” | 留在本 Skill，按 [导入与导入器](references/import.md) 先给计划、确认后导入；新格式写一个导入器保存到项目 |
 | 处理页面评论 | “处理这页的评论”“回复一下评论” | page_read 读出未解决的评论，按 [评论](references/authoring.md#评论) 逐条改页面、回复并解决 |
 | 做可复用组件 | “做一个组件”“改一下这个组件” | [create-component](../create-component/SKILL.md) |
 | 做或提炼模板 | “存成模板”“做一个某类内容的模板” | [create-template](../create-template/SKILL.md) |
@@ -54,6 +55,7 @@ Agent 通过 MCP 操作 ShowAI。App、网页、CLI 和 MCP 共用内容核心�
 - [写入页面的操作](references/authoring.md)：建页、插入与修改组件、文字标记、图片与媒体、链接、展示与导出。
 - [用户引用与组件状态](references/user-references.md)：用户粘贴的 `showai.reference`、组件状态和控件取值。
 - [保存、冲突与页面差异](references/editing.md)。
+- [导入与导入器](references/import.md)：Notion、Word、Markdown 导入的计划与回执，以及新增一种格式的导入器。
 - [共享数据](references/shared-data.md)、[页面与 Board 阅读](references/page-reading.md)、[Board 对象编辑](references/board-authoring.md)、[容量与大文件](references/capacity.md)。
 - [宿主显示](references/host-display.md) 与 [当前宿主适配](references/host-adapter.md)：展示组件和页面前先读。
 - [连接配置](references/runtime.md) 与 [集成](references/integration.md)：连接、错误码、远程授权与反馈。
