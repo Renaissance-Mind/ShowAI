@@ -628,13 +628,25 @@ test("real component compilation, templates, source import and HTML/site export 
     selectedPath: htmlPath,
   });
   expect(await readFile(htmlPath, "utf8")).toContain("showai-data");
-  const file = await invoke<{ name: string; content: string }>(
-    "dialog:openPage",
-    { selectedPath: htmlPath },
-  );
-  const reimported = await invoke<LoadedPage>("pages:import", {
+  const file = await invoke<{ path: string }>("dialog:openPage", {
     projectId: project.id,
-    artifact: file.content,
+    selectedPath: htmlPath,
+  });
+  expect(file.path).toBe(await realpath(htmlPath));
+  const plan = await invoke<{ token: string; importer: { id: string } }>(
+    "imports:plan",
+    { projectId: project.id, parentId: null, path: file.path },
+  );
+  expect(plan.importer.id).toBe("markdown");
+  const report = await invoke<{ openPageId: string }>("imports:run", {
+    projectId: project.id,
+    parentId: null,
+    token: plan.token,
+    runId: "reimport",
+  });
+  const reimported = await invoke<LoadedPage>("pages:get", {
+    projectId: project.id,
+    pageId: report.openPageId,
   });
   expect(reimported.document.title).toBe("Exported");
   await mkdir(join(home, "site"));
