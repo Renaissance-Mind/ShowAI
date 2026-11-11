@@ -249,7 +249,14 @@ import {
   restoreItem,
   type RestoreTarget,
 } from "./LibraryNavigationDialogs";
-import { clientIsMac, isDeleteShortcut } from "./keyboard-shortcuts";
+import {
+  clientIsMac,
+  formatShortcut,
+  isDeleteShortcut,
+} from "./keyboard-shortcuts";
+import findMessages from "../i18n/messages/find";
+import { FindBar } from "./find/FindBar";
+import { useFind } from "./find/useFind";
 import { tabShortcut, type TabCommand } from "../workbench/tab-shortcuts";
 import { useWindowFullscreen } from "./useWindowFullscreen";
 import { ComponentCatalog, ComponentNavigation } from "./ComponentCatalog";
@@ -480,6 +487,7 @@ export default function Studio() {
   const [syncRequest, setSyncRequest] = useState<ProjectSyncRequest>();
   const t = useTranslator(studioMessages);
   const tc = useTranslator(commonMessages);
+  const tfind = useTranslator(findMessages);
   const ta = useTranslator(assistantMessages);
   const tn = useTranslator(navigationMessages);
   const tshell = useTranslator(shellMessages);
@@ -895,6 +903,26 @@ export default function Studio() {
   const catalogScrollRef = useRef<HTMLDivElement>(null);
   const page = usePage(info?.home);
   const activePageId = page.draft?.id;
+  // Built-in docs are read-only pages: find works there without replace.
+  const findKey =
+    view === "page" && page.draft
+      ? page.draft.id
+      : view === "docs" && docPage && docPage.id !== WELCOME_DOC
+        ? `docs:${docPage.id}`
+        : null;
+  const find = useFind({
+    available: () => !!findKey && !dialogRef.current,
+    mac: clientIsMac(),
+  });
+  const findPage = useCallback(
+    () =>
+      [
+        ...(catalogScrollRef.current?.querySelectorAll<HTMLElement>(
+          ".surface-editor-shell",
+        ) ?? []),
+      ].find((shell) => shell.getClientRects().length > 0) ?? null,
+    [],
+  );
   const handleActiveSurfaceChange = useCallback(
     (surfaceId: string) => {
       if (activePageId)
@@ -4185,6 +4213,10 @@ export default function Studio() {
       shortcuts: () => {
         unhandled("showai:open-shortcuts");
       },
+      find: () => void find.run("open"),
+      findReplace: () => void find.run("replace"),
+      findNext: () => void find.run("next"),
+      findPrevious: () => void find.run("previous"),
     };
     if (dialogRef.current && command !== "copyDiagnostics") return;
     void Promise.resolve(operations[command]?.()).catch(report);
@@ -5605,6 +5637,22 @@ export default function Studio() {
                 onDismiss={action(page.dismissExternalChange)}
               />
             )}
+            {find.request && findKey && (
+              <div className="find-bar-anchor">
+                <FindBar
+                  key={findKey}
+                  request={find.request}
+                  page={findPage}
+                  readOnly={
+                    view === "docs" ||
+                    !!syncReadOnly ||
+                    !!page.record?.readOnly
+                  }
+                  onClose={find.close}
+                  onReveal={setRevealNode}
+                />
+              </div>
+            )}
             <div
               ref={catalogScrollRef}
               tabIndex={view === "project" ? -1 : undefined}
@@ -6483,6 +6531,19 @@ export default function Studio() {
                       : []),
                     ...(contextMenu.pageTools
                       ? [
+                          {
+                            label: tfind("bar"),
+                            icon: <Search size={15} />,
+                            shortcut: formatShortcut("Mod+F", clientIsMac()),
+                            onSelect: () => {
+                              setContextMenu(null);
+                              find.run(
+                                syncReadOnly || page.record?.readOnly
+                                  ? "open"
+                                  : "replace",
+                              );
+                            },
+                          },
                           {
                             label: t("duplicatePage"),
                             icon: <Copy size={15} />,

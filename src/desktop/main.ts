@@ -667,6 +667,32 @@ function buildApplicationMenu() {
             : []),
           { role: "delete", label: t("menu.delete") },
           { role: "selectAll", label: t("menu.selectAll") },
+          { type: "separator" },
+          {
+            label: t("menu.find"),
+            submenu: [
+              {
+                label: t("menu.findOpen"),
+                accelerator: "CommandOrControl+F",
+                click: sendMenuCommand("find"),
+              },
+              {
+                label: t("menu.findReplace"),
+                accelerator: "CommandOrControl+Alt+F",
+                click: sendMenuCommand("findReplace"),
+              },
+              {
+                label: t("menu.findNext"),
+                accelerator: "CommandOrControl+G",
+                click: sendMenuCommand("findNext"),
+              },
+              {
+                label: t("menu.findPrevious"),
+                accelerator: "CommandOrControl+Shift+G",
+                click: sendMenuCommand("findPrevious"),
+              },
+            ],
+          },
         ],
       },
       {
