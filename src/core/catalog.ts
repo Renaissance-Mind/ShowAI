@@ -66,6 +66,10 @@ import {
 } from "../portable/template-bundle.mjs";
 import { builtinComponentCatalog } from "../components/catalog";
 import { validateComponentDocumentation } from "../components/custom/documentation";
+import {
+  commandProps,
+  validateComponentCommands,
+} from "../components/custom/commands";
 
 import { builtinSources, builtinExports } from "./builtin-sources";
 import { componentSandboxPolicy } from "../components/custom/sandbox-policy.mjs";
@@ -103,6 +107,7 @@ import {
   assertJsonValue,
   assertProps,
   assertParameterDefinition,
+  propsIssues,
 } from "../components/custom/schema";
 import {
   COMPONENT_DATA_MARKER,
@@ -1412,6 +1417,9 @@ function manifestFrom(value: unknown): ComponentManifest {
     ...(item.effects !== undefined
       ? { effects: textList(item.effects, "Component effects") }
       : {}),
+    ...(item.commands !== undefined
+      ? { commands: validateComponentCommands(item.commands, examples.length) }
+      : {}),
     ...(item.dependencies !== undefined
       ? { dependencies: componentDependencies(item.dependencies) }
       : {}),
@@ -1609,6 +1617,19 @@ export async function compilePackage(
   manifest.examples.forEach((example) =>
     assertProps(schema, example.data, manifest.documentation),
   );
+  for (const command of manifest.commands ?? []) {
+    if (!("insert" in command.run) || !command.run.insert.props) continue;
+    const issues = propsIssues(
+      schema,
+      commandProps(command, manifest),
+      manifest.documentation,
+    );
+    if (issues.length)
+      throw new Error(
+        `Component command '${command.id}' props: ` +
+          issues.map((issue) => `${issue.path || "props"} ${issue.message}`).join("; "),
+      );
+  }
   const root = await realpath(directory);
   if (!files.has(manifest.entry.replace(/^\.\//, "")))
     throw new Error("The component entry does not exist inside the package.");

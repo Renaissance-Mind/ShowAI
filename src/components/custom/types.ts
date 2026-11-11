@@ -131,6 +131,8 @@ export interface ComponentManifest {
   category?: ComponentCategory;
   scenarios: string[];
   effects?: string[];
+  /** Quick jump commands the component contributes to the workbench. */
+  commands?: import("./commands").ComponentCommand[];
   /** Exact component revisions imported through showai:component/<id>. */
   dependencies?: PackageRevisionRef[];
   entry: string;
@@ -188,6 +190,8 @@ export interface BuiltinComponentMetadata {
   description: string;
   scenarios: string[];
   effects?: string[];
+  /** Quick jump commands, declared the same way as in a library manifest. */
+  commands?: import("./commands").ComponentCommand[];
   version?: string;
   defaultData: Record<string, unknown>;
   propsSchema: JsonSchema;
