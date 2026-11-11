@@ -117,7 +117,8 @@ Discover only what you need:
 
 Display a full page or selected blocks:
   export --project PROJECT --page PAGE [--blocks ID,ID] --format html|inline --out PATH [--reader bundled|cdn]
-    html defaults to an offline page; --reader cdn writes a small online page. inline uses the CDN reader when available.
+    html defaults to an offline page; --reader cdn writes a small online page. inline carries its reader and
+    loads it from the CDN only past the conversation size limit (reported in readerReason); --reader bundled fails instead.
     Pages with files of this device stop with the packaging plan (items, sizes, choices); pass the person's
     choices with --packaging DECISIONS.json ({itemId: choice}), or --external-data embed for everything that fits.
 

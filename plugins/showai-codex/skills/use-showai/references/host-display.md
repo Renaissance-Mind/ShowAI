@@ -16,7 +16,7 @@ delivery.inline 是可内嵌的阅读片段；delivery.html 是完整离线 HTML
 
 inline 优先携带压缩后的本地阅读器；超出预算时才切换到在线阅读器。delivery.compact 与 delivery.online 只带页面数据和在线阅读器引用：compact 用于宿主的 HTML 展示工具，online 是独立网页。阅读器从 ShowAI 阅读器源、jsDelivr、unpkg 依次加载；没有控制台证据时不直接断言某个来源被拦截。display 的 available 字段仅说明文件或资源存在，不证明加载与交互正常。
 
-显式 page_export 的 reader:bundled 强制离线，reader:cdn 使用在线阅读器。加载失败时按绑定的宿主契约处理，并保留可用的离线文件。插件安装不会更新独立的软件运行时。
+显式 page_export 的 reader:bundled 强制离线，inline 超出对话预算时直接报错，并给出大小与上限；reader:cdn 使用在线阅读器。不指定 reader 的 inline 导出超出预算时改用在线阅读器，结果的 reader 为 cdn，readerReason 写明原因、大小与上限；交付需要离线阅读的文件前先看这两个字段。加载失败时按绑定的宿主契约处理，并保留可用的离线文件。插件安装不会更新独立的软件运行时。
 
 结果带 externalSnapshots 时，交付物含内容库以外文件的数据快照；对话中查看无需额外询问，交给别人或上传前按 [共享数据](shared-data.md#外部文件中的数据) 核对大小并取得同意。
 

@@ -52,7 +52,11 @@ import {
   type PackagingPlan,
 } from "../core/packaging";
 import { toCdnPage } from "../portable/cdn-fragment.mjs";
-import { conversationPreview } from "../core/conversation-preview";
+import {
+  conversationPreview,
+  REQUESTED_CDN,
+  type ReaderReason,
+} from "../core/conversation-preview";
 import {
   CDN_PAGE_TEMPLATE,
   chooseReader,
@@ -85,7 +89,10 @@ export interface ExportOptions {
   overwrite?: boolean;
   components?: "bundled" | "remote";
   presentation?: "spatial" | "reading";
-  /** Inline prefers the compressed local reader, with CDN as a size fallback. */
+  /**
+   * Inline prefers the compressed local reader, with CDN as a size fallback
+   * that the result's readerReason reports; "bundled" refuses the fallback.
+   */
   reader?: ReaderMode;
   /**
    * What the export carries, by packaging item id (see core/packaging):
@@ -112,7 +119,10 @@ export interface ExportResult {
   sourcePaths: string[];
   bytes: number;
   components: "bundled" | "remote";
+  /** The reader the written page uses. */
   reader: ReaderMode;
+  /** Why the page loads its reader online; absent when it carries its reader. */
+  readerReason?: ReaderReason;
   requiresNetwork: boolean;
   /** Snapshots of external datasets embedded in the export. */
   externalSnapshots?: ExternalSnapshotReport;
@@ -637,6 +647,9 @@ export async function exportPage(
         ? toCdnPage(html, { readerUrls: reader.urls })
         : html);
     const deliveredReader = preview?.reader ?? reader.mode;
+    const readerReason: ReaderReason | undefined =
+      preview?.readerReason ??
+      (deliveredReader === "cdn" ? REQUESTED_CDN : undefined);
     const sourcePath =
       out.slice(0, out.length - extname(out).length) + ".showai.json";
     if (sourcePath === out)
@@ -678,6 +691,7 @@ export async function exportPage(
       bytes: Buffer.byteLength(result),
       components: componentMode,
       reader: deliveredReader,
+      ...(readerReason ? { readerReason } : {}),
       requiresNetwork: deliveredReader === "cdn" || remoteComponents.length > 0,
       ...(externalSnapshots.datasets.length ? { externalSnapshots } : {}),
       ...resourceReport([document], packaged.resources),

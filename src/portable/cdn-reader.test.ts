@@ -16,6 +16,7 @@ import { toCdnFragment, toCdnPage } from "./cdn-fragment.mjs";
 import { exportPage } from "../agent/exporter";
 import { presentPage } from "../agent/page-presentation";
 import { readFile, writeFile } from "node:fs/promises";
+import { randomBytes } from "node:crypto";
 import { startCdnHost } from "./cdn-test-host";
 import components from "../../resources/catalog/components.json";
 
@@ -313,6 +314,60 @@ describe("CDN reader", () => {
       ).resolves.toMatch(/light|dark/);
       expect(errors).toEqual([]);
       await tab.close();
+    } finally {
+      process.env = saved;
+    }
+  }, 300_000);
+
+  it("reports why an inline export loads the CDN reader and refuses it when bundled is requested", async () => {
+    const saved = { ...process.env };
+    process.env.SHOWAI_CDN_MANIFEST = join(outdir, "manifest.json");
+    process.env.SHOWAI_READER_CDN = host.origin;
+    try {
+      const store = new FileStore(home),
+        project = await store.createProject({ name: "Large inline" });
+      const doc = createResource(blankDocument());
+      doc.title = "Large inline page";
+      // Random text barely compresses: with its bundled reader the inline page
+      // passes the 1,000,000-byte conversation limit; page data alone does not.
+      doc.content.content = Array.from({ length: 20 }, (_, index) => ({
+        type: "paragraph",
+        attrs: { id: `noise-${index}` },
+        content: [
+          { type: "text", text: randomBytes(30_000).toString("base64") },
+        ],
+      }));
+      doc.surfaceViews[doc.content.attrs!.id].readingOrder =
+        doc.content.content.map((node) => node.attrs!.id as string);
+      const record = await store.createPage(project.id, { document: doc });
+      const exportInline = (name: string, reader?: "bundled" | "cdn") =>
+        exportPage({
+          root: home,
+          projectId: project.id,
+          pageId: record.document.id,
+          format: "inline",
+          out: join(home, "exports", `${name}.html`),
+          ...(reader ? { reader } : {}),
+        });
+      const fallback = await exportInline("large-default");
+      expect(fallback).toMatchObject({
+        reader: "cdn",
+        requiresNetwork: true,
+        readerReason: { cause: "size", limitBytes: 1_000_000 },
+      });
+      expect(fallback.readerReason!.bytes).toBeGreaterThan(1_000_000);
+      expect(fallback.readerReason!.message).toContain("1000000 bytes");
+      await expect(exportInline("large-bundled", "bundled")).rejects.toThrow(
+        /bundled reader is .* \(\d+ bytes\); the conversation host limit is 0\.95 MiB \(1000000 bytes\)\. The bundled reader was requested, so nothing was written\./,
+      );
+      await expect(
+        readFile(join(home, "exports", "large-bundled.html")),
+      ).rejects.toMatchObject({ code: "ENOENT" });
+      const requested = await exportInline("large-cdn", "cdn");
+      expect(requested).toMatchObject({
+        reader: "cdn",
+        readerReason: { cause: "requested" },
+      });
     } finally {
       process.env = saved;
     }
