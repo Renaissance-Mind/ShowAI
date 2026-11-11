@@ -25,9 +25,12 @@ import "./mobile-navigation.css";
 const minimumWidth = 200;
 const maximumWidth = 480;
 const widthPreference = "showai:sidebar-width";
-const hintPreference = "showai:sidebar-auto-hide-hint";
+const lockedPreference = "showai:sidebar-locked";
 
-/** Keep the first view docked; subsequent edge reveals float over the document. */
+/**
+ * The sidebar stays pinned unless the person unpins it; an unpinned sidebar
+ * hides while a page is open and edge reveals float over the document.
+ */
 export default function AutoHideSidebar({
   enabled,
   interactionHeld,
@@ -60,14 +63,13 @@ export default function AutoHideSidebar({
   const t = useTranslator(sidebarMessages);
   const tn = useTranslator(navigationMessages);
   const toggleKeys = formatShortcut("Mod+\\", clientIsMac());
-  const [hint, setHint] = useState(false);
   // Keeps an automatically hidden sidebar in view while the located row flashes.
   const [locating, setLocating] = useState(false);
   const appIcon = appIconForTheme(useAppearanceTheme());
   const nativeTouch = document.documentElement.dataset.native === "ios";
   const [nativeOpen, setNativeOpen] = useState(false);
   const [locked, setLocked] = useState(
-    () => localStorage.getItem("showai:sidebar-locked") === "true",
+    () => localStorage.getItem(lockedPreference) !== "false",
   );
   const [position, setPosition] = useState<"docked" | "hidden" | "overlay">(
     "docked",
@@ -187,7 +189,7 @@ export default function AutoHideSidebar({
 
   const toggleLocked = () =>
     setLocked((current) => {
-      localStorage.setItem("showai:sidebar-locked", String(!current));
+      localStorage.setItem(lockedPreference, String(!current));
       return !current;
     });
   useEffect(() => {
@@ -195,7 +197,6 @@ export default function AutoHideSidebar({
     const key = (event: KeyboardEvent) => {
       if (!isSidebarToggleShortcut(event) || event.repeat) return;
       event.preventDefault();
-      setHint(false);
       if (compact) {
         setNativeOpen((value) => !value);
         return;
@@ -205,11 +206,6 @@ export default function AutoHideSidebar({
     window.addEventListener("keydown", key);
     return () => window.removeEventListener("keydown", key);
   }, [nativeTouch, compact]);
-  useEffect(() => {
-    if (!hint) return;
-    const timer = window.setTimeout(() => setHint(false), 9000);
-    return () => window.clearTimeout(timer);
-  }, [hint]);
   useEffect(() => {
     if (!locating) return;
     const timer = window.setTimeout(
@@ -281,11 +277,6 @@ export default function AutoHideSidebar({
         return;
       }
       setPosition("hidden");
-      // The first automatic hide explains where the sidebar went, once.
-      if (!localStorage.getItem(hintPreference)) {
-        localStorage.setItem(hintPreference, "shown");
-        setHint(true);
-      }
     }, 300);
     return () => window.clearTimeout(timer);
   }, [
@@ -510,7 +501,6 @@ export default function AutoHideSidebar({
                   setNativeOpen((value) => !value);
                   return;
                 }
-                setHint(false);
                 toggleLocked();
               }}
             >
@@ -665,14 +655,6 @@ export default function AutoHideSidebar({
         )}
         {children}
       </div>
-      {hint && (
-        <div className="studio-sidebar-hint" role="status">
-          <span>{tn("autoHideHint", { keys: toggleKeys })}</span>
-          <button type="button" onClick={() => setHint(false)}>
-            {tn("dismissHint")}
-          </button>
-        </div>
-      )}
     </>
   );
 }
