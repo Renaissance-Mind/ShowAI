@@ -505,6 +505,13 @@ async function compileReader(archivePath, archive, kinds, omits = []) {
               'export function tidyFrames() { throw new Error("Readers never edit."); }',
             loader: "js",
           };
+        // Readers never paste: reading an image file is an edit path.
+        if (args.path === "src/components/rich-text/image-files.ts")
+          return {
+            contents:
+              'export async function readImageFile() { return { problem: "" }; }',
+            loader: "ts",
+          };
         // Outline settings open only for editable pages.
         if (args.path === "src/surface/OutlineSettings.tsx")
           return {
