@@ -33,6 +33,7 @@ export const remoteTaskActions = new Set([
   ...remoteReadActions,
   "agent:send",
   "agent:undo",
+  "agent:renameConversation",
   "agent:deleteConversation",
   "agent:cancel",
   "agent:permission",

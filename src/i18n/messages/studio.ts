@@ -35,6 +35,7 @@ export default defineMessages("studio", {
     "view.large": "缩略图（大）",
     pageImported: "页面已导入",
     pageExported: "页面已导出",
+    conversationExported: "对话已导出",
     siteExportedRemote: "网站已导出，组件按固定发布版本联网加载",
     siteExportedBundled: "网站已导出，可部署到静态托管",
     "create.folder": "文件夹",
@@ -266,6 +267,7 @@ export default defineMessages("studio", {
     folderMissing: "This folder no longer exists.",
     pageImported: "Page imported",
     pageExported: "Page exported",
+    conversationExported: "Conversation exported",
     siteExportedRemote:
       "Site exported. Components load online from their pinned published versions.",
     siteExportedBundled: "Site exported. Ready to deploy to static hosting.",

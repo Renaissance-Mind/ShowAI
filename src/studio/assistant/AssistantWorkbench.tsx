@@ -35,7 +35,10 @@ import {
   ArrowUp,
   Blocks,
   Loader2,
+  Download,
   LocateFixed,
+  MoreHorizontal,
+  Pencil,
   Plus,
   Settings2,
   Sparkles,
@@ -45,6 +48,9 @@ import {
   X,
 } from "../../ui/icons";
 import { downloadAgentFile } from "./message-links";
+import { ConversationSwitcher } from "./ConversationSwitcher";
+import { conversationMarkdown } from "./conversation-markdown";
+import { LibraryContextMenu } from "../LibraryContextMenu";
 import "./assistant.css";
 import { useAssistantDrafts } from "./useAssistantDrafts";
 import { composerDraftKey } from "./draft-store";
@@ -508,6 +514,7 @@ export default function AssistantWorkbench({
   onOpenSettings,
   prefill,
   onPrefillUsed,
+  onExported,
   children,
 }: {
   enabled: boolean;
@@ -524,6 +531,8 @@ export default function AssistantWorkbench({
   /** A prompt to place in a new conversation's composer once this page's panel is open. */
   prefill?: { key: string; pageId: string; text: string } | null;
   onPrefillUsed?: () => void;
+  /** A conversation was exported to this file. */
+  onExported?: (path: string) => void;
   children: ReactNode;
 }) {
   const t = useTranslator(strings);
@@ -573,6 +582,9 @@ export default function AssistantWorkbench({
   } | null>(null);
   const to = useTranslator(onboardingStrings);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [renaming, setRenaming] = useState(false);
+  const [conversationMenu, setConversationMenu] =
+    useState<HTMLElement | null>(null);
   const [executionRevision, setExecutionRevision] = useState(0);
   const executionGeneration = useRef(0);
   const selectionGeneration = useRef(0);
@@ -664,6 +676,7 @@ export default function AssistantWorkbench({
     selectionGeneration.current++;
     markFresh(true);
     setConfirmDelete(false);
+    setRenaming(false);
     setError("");
     setSendProblem(null);
   }, []);
@@ -674,6 +687,7 @@ export default function AssistantWorkbench({
     setSelectedId(id);
     if (!keepFresh) markFresh(false, projectKey);
     setConfirmDelete(false);
+    setRenaming(false);
     setError("");
     setSendProblem(null);
     setConversation(conversationCache.current.get(id) ?? null);
@@ -926,6 +940,52 @@ export default function AssistantWorkbench({
   };
   const act = (work: () => Promise<unknown>) => () =>
     void work().catch((reason) => setError(errorMessage(reason)));
+  const rename = async (target: AgentConversation, title: string) => {
+    const renamed = await desktop.invoke<AgentConversationSummary>(
+      "agent:renameConversation",
+      { projectId: target.projectId, id: target.id, title },
+    );
+    const titled = (item: AgentConversation) => ({
+      ...item,
+      title: renamed.title,
+    });
+    const cached = conversationCache.current.get(renamed.id);
+    if (cached) conversationCache.current.set(renamed.id, titled(cached));
+    setConversation((current) =>
+      current?.id === renamed.id ? titled(current) : current,
+    );
+    await loadSummaries(target.projectId);
+  };
+  const exportMarkdown = async (target: AgentConversation) => {
+    // Read again so a reply still streaming in is exported as far as it got.
+    const latest = await desktop.invoke<AgentConversation>(
+      "agent:conversation",
+      { projectId: target.projectId, id: target.id },
+    );
+    const source = status?.settings.sources.find(
+      (item) => item.id === latest.sourceId,
+    );
+    const time = new Intl.DateTimeFormat(undefined, {
+      dateStyle: "medium",
+      timeStyle: "short",
+    });
+    const result = await desktop.invoke<{ path: string } | null>(
+      "export:conversation",
+      {
+        projectId: latest.projectId,
+        title: latest.title,
+        markdown: conversationMarkdown(latest, {
+          user: t("panel.you"),
+          agent:
+            latest.mode === "local"
+              ? agentNames[latest.localAgent ?? "codex"]
+              : (source?.name ?? "Agent"),
+          time: (iso) => time.format(new Date(iso)),
+        }),
+      },
+    );
+    if (result) onExported?.(result.path);
+  };
   // Turn actions share the send guard, so each runs once and shows as pending.
   const guard = inFlight.run;
   const pending = (key: string) => sendingKeys.includes(key);
@@ -1153,24 +1213,20 @@ export default function AssistantWorkbench({
             disabled={!!running || busy}
           />
           <header className="assistant-header">
-            <select
-              aria-label={t("panel.conversations")}
-              value={fresh || !conversation ? "" : conversation.id}
-              onChange={(event) =>
-                event.target.value
-                  ? projectId &&
-                    act(() => select(projectId, event.target.value))()
-                  : startNew()
-              }
-            >
-              <option value="">{t("panel.startedNew")}</option>
-              {summaries.map((item) => (
-                <option key={item.id} value={item.id}>
-                  {item.running ? "● " : ""}
-                  {item.title}
-                </option>
-              ))}
-            </select>
+            <ConversationSwitcher
+              projectId={projectId}
+              summaries={summaries}
+              currentId={fresh || !conversation ? null : conversation.id}
+              currentTitle={conversation?.title ?? ""}
+              renaming={renaming && !!conversation && !fresh}
+              onSelect={(id) => projectId && act(() => select(projectId, id))()}
+              onNew={startNew}
+              onRename={(title) => {
+                setRenaming(false);
+                if (title && conversation) act(() => rename(conversation, title))();
+              }}
+              onError={setError}
+            />
             <button
               type="button"
               className="assistant-icon"
@@ -1183,13 +1239,48 @@ export default function AssistantWorkbench({
             <button
               type="button"
               className="assistant-icon"
-              aria-label={t("panel.delete")}
-              title={t("panel.delete")}
-              disabled={!conversation || fresh || !!running}
-              onClick={() => setConfirmDelete(true)}
+              aria-label={t("panel.more")}
+              title={t("panel.more")}
+              aria-haspopup="menu"
+              disabled={!conversation || fresh}
+              onClick={(event) =>
+                setConversationMenu(
+                  conversationMenu ? null : event.currentTarget,
+                )
+              }
             >
-              <Trash2 size={14} />
+              <MoreHorizontal size={15} />
             </button>
+            {conversationMenu && conversation && (
+              <LibraryContextMenu
+                anchor={conversationMenu}
+                label={t("panel.more")}
+                onClose={() => setConversationMenu(null)}
+                items={[
+                  {
+                    label: t("panel.rename"),
+                    icon: <Pencil size={15} />,
+                    onSelect: () => {
+                      setConfirmDelete(false);
+                      setRenaming(true);
+                    },
+                  },
+                  {
+                    label: t("panel.exportMarkdown"),
+                    icon: <Download size={15} />,
+                    onSelect: act(() => exportMarkdown(conversation)),
+                  },
+                  {
+                    label: t("panel.delete"),
+                    icon: <Trash2 size={15} />,
+                    danger: true,
+                    separatorBefore: true,
+                    disabled: !!running,
+                    onSelect: () => setConfirmDelete(true),
+                  },
+                ]}
+              />
+            )}
             <button
               type="button"
               className="assistant-icon"

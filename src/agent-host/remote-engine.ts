@@ -254,7 +254,10 @@ export class RemoteAgentEngine {
         args,
       );
     else if (action === "agent:conversations")
-      value = await this.turns.list(localId!);
+      value = await this.turns.list(
+        localId!,
+        typeof args.query === "string" ? args.query.slice(0, 200) : "",
+      );
     else if (action === "agent:conversation")
       value = await this.turns.conversation(localId!, String(args.id));
     else if (action === "agent:turn") {
@@ -267,6 +270,12 @@ export class RemoteAgentEngine {
       value = { turn, threadId: conversation.threadId };
     } else if (action === "agent:deleteConversation")
       value = await this.turns.remove(localId!, String(args.id));
+    else if (action === "agent:renameConversation")
+      value = await this.turns.rename(
+        localId!,
+        String(args.id),
+        String(args.title),
+      );
     else value = await this.host.action(action, args);
     if (action === "agent:undo" && localId) await this.publish(localId);
     if (
