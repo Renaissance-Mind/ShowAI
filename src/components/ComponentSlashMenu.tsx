@@ -1,12 +1,17 @@
 import ExpandableSearch from "./ExpandableSearch";
-import { useContext, useEffect, useRef, useState } from "react";
+import { useContext, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { PanelTop } from "../ui/icons";
 import {
   useComponentCatalog,
   RegisterComponentContext,
 } from "./useComponentCatalog";
-import { componentCategory } from "../core/component-categories";
+import {
+  componentCategory,
+  type CatalogComponent,
+} from "../core/component-categories";
+import { SlashMenuItems, useSlashMenu } from "./SlashMenuItems";
+import { isChartKind, type SlashEntry } from "./slash-menu-model";
 import {
   componentCategoryLabel,
   componentDisplayDescription,
@@ -31,7 +36,6 @@ export function ComponentSlashMenu({
   const catalog = useComponentCatalog(true),
     register = useContext(RegisterComponentContext);
   const [query, setQuery] = useState(""),
-    [selected, select] = useState(0),
     [busy, setBusy] = useState(false),
     [error, setError] = useState("");
   const root = useRef<HTMLDivElement>(null),
@@ -44,21 +48,29 @@ export function ComponentSlashMenu({
       restore.current?.focus();
     };
   }, []);
-  useEffect(() => {
-    root.current
-      ?.querySelector('[aria-selected="true"]')
-      ?.scrollIntoView({ block: "nearest" });
-  }, [selected]);
-  const items = catalog.items
-    .filter((item) => "kind" in item || item.role !== "page-outline")
-    .filter((item) =>
-      `${item.name} ${item.description} ${componentDisplayName(item)} ${componentDisplayDescription(item)} ${"kind" in item ? item.kind : item.id}`
-        .toLowerCase()
-        .includes(query.toLowerCase()),
-    );
-  const insert = async (index: number) => {
-    const item = items[index];
-    if (!item || busy) return;
+  const items = useMemo(
+    () =>
+      catalog.items
+        .filter((item) => "kind" in item || item.role !== "page-outline")
+        .map(
+          (item): SlashEntry & { component: CatalogComponent } => ({
+            // The rich-text menu uses the same ids, so recent items are shared.
+            id:
+              "catalog:" +
+              ("kind" in item
+                ? item.kind
+                : `${item.id}@${item.version}#${item.integrity}`),
+            title: componentDisplayName(item),
+            keywords: `${item.name} ${item.description} ${componentDisplayDescription(item)} ${"kind" in item ? item.kind : item.id}`,
+            group: t("allComponents"),
+            chart: "kind" in item && isChartKind(item.kind),
+            component: item,
+          }),
+        ),
+    [catalog.items, t],
+  );
+  const insert = async (item: CatalogComponent) => {
+    if (busy) return;
     setBusy(true);
     setError("");
     try {
@@ -74,6 +86,12 @@ export function ComponentSlashMenu({
       }
     }
   };
+  const menu = useSlashMenu(items, query, (entry) => void insert(entry.component));
+  useEffect(() => {
+    root.current
+      ?.querySelector('[aria-selected="true"]')
+      ?.scrollIntoView({ block: "nearest" });
+  }, [menu.selected, menu.charts]);
   return createPortal(
     <>
       <div className="slash-dismiss" onClick={onClose} />
@@ -89,24 +107,10 @@ export function ComponentSlashMenu({
         onKeyDown={(event) => {
           if (event.nativeEvent.isComposing) return;
           event.stopPropagation();
+          if (menu.key(event)) return;
           if (event.key === "Escape") {
             event.preventDefault();
             onClose();
-          }
-          if (event.key === "Enter") {
-            event.preventDefault();
-            void insert(selected);
-          }
-          if (event.key === "ArrowDown" || event.key === "ArrowUp") {
-            event.preventDefault();
-            select((index) =>
-              items.length
-                ? (index +
-                    (event.key === "ArrowDown" ? 1 : -1) +
-                    items.length) %
-                  items.length
-                : 0,
-            );
           }
         }}
       >
@@ -116,10 +120,7 @@ export function ComponentSlashMenu({
             placeholder={t("searchComponentsPlaceholder")}
             defaultExpanded
             value={query}
-            onChange={(value) => {
-              setQuery(value);
-              select(0);
-            }}
+            onChange={setQuery}
           />
           <kbd>esc</kbd>
         </div>
@@ -134,37 +135,23 @@ export function ComponentSlashMenu({
           aria-label={t("blockTypes")}
           aria-busy={busy || catalog.loading}
         >
-          {!items.length && (
+          {!menu.rows.length && (
             <p className="slash-empty">
               {catalog.loading
                 ? t("loadingComponents")
                 : t("noComponentsFound")}
             </p>
           )}
-          {items.map((item, index) => (
-            <button
-              key={
-                "kind" in item
-                  ? item.kind
-                  : `${item.id}@${item.version}#${item.integrity}`
-              }
-              role="option"
-              className={`slash-item${selected === index ? " is-selected" : ""}`}
-              aria-selected={selected === index}
-              disabled={busy}
-              onMouseEnter={() => select(index)}
-              onMouseDown={(event) => event.preventDefault()}
-              onClick={() => void insert(index)}
-            >
-              <span className="slash-item-icon">
-                <PanelTop size={20} />
-              </span>
-              <span>
-                <strong>{componentDisplayName(item)}</strong>
-                <small>{componentCategoryLabel(componentCategory(item))}</small>
-              </span>
-            </button>
-          ))}
+          <SlashMenuItems
+            menu={menu}
+            disabled={busy}
+            icon={() => <PanelTop size={20} />}
+            detail={(entry) => (
+              <small>
+                {componentCategoryLabel(componentCategory(entry.component))}
+              </small>
+            )}
+          />
         </div>
       </div>
     </>,

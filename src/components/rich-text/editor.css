@@ -541,6 +541,15 @@
   letter-spacing: 0.05em;
   padding: 10px 10px 7px;
 }
+.slash-back {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+  border: 0;
+  background: none;
+  text-align: left;
+}
 .slash-item {
   display: flex;
   align-items: center;

@@ -23,6 +23,8 @@ import mediaMessages from "../../i18n/messages/media";
 import { useLocalFileChooser } from "../local-resources";
 import { isLocalResourceRef } from "../../portable/local-files.mjs";
 import ExpandableSearch from "../ExpandableSearch";
+import { SlashMenuItems, useSlashMenu } from "../SlashMenuItems";
+import { isChartKind, type SlashEntry } from "../slash-menu-model";
 import { RichTextEnvironment } from "./environment";
 import type { CatalogComponent } from "../../core/component-categories";
 import {
@@ -81,6 +83,9 @@ import {
   Heading1,
   Heading2,
   Heading3,
+  Heading4,
+  Heading5,
+  Heading6,
   ImagePlus,
   Link2,
   List,
@@ -133,12 +138,8 @@ export interface RichTextEditorProps {
   onDetachBlock?: (node: JSONContent) => void;
 }
 
-interface MenuItem {
-  id: string;
-  title: string;
-  keywords: string;
+interface MenuItem extends SlashEntry {
   icon: ReactNode;
-  group: string;
   run: (editor: Editor) => void;
   component?: CatalogComponent;
 }
@@ -271,9 +272,9 @@ export default function RichTextEditor({
   const slashInputRef = useRef<HTMLInputElement>(null);
   const menuRef = useRef<SlashState | null>(null);
   const dismissedSlash = useRef<string | null>(null);
-  const itemsRef = useRef<MenuItem[]>([]);
-  const runItemRef = useRef<(index: number) => void>(() => {});
-  const selectedRef = useRef(0);
+  const slashKeyRef = useRef<
+    (event: { key: string; preventDefault(): void }) => boolean
+  >(() => false);
   const dragPosition = useRef<number | null>(null);
   const [slash, setSlash] = useState<SlashState | null>(null);
   const { useCatalog, registerComponent, assistant, pageLinks, comments } =
@@ -289,7 +290,6 @@ export default function RichTextEditor({
     },
     [],
   );
-  const [selectedIndex, setSelectedIndex] = useState(0);
   const [hover, setHover] = useState<HoverBlock | null>(null);
   const [blockMenu, setBlockMenu] = useState(false);
   const hoverHideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -353,7 +353,6 @@ export default function RichTextEditor({
     null,
   );
   menuRef.current = slash;
-  selectedRef.current = selectedIndex;
 
   const extensions = useMemo(
     () => [
@@ -419,22 +418,9 @@ export default function RichTextEditor({
           return true;
         }
         if (!menuRef.current) return false;
+        if (slashKeyRef.current(event)) return true;
         if (event.key === "Escape") {
           dismissSlash();
-          return true;
-        }
-        if (event.key === "ArrowDown" || event.key === "ArrowUp") {
-          event.preventDefault();
-          const count = itemsRef.current.length;
-          setSelectedIndex((index) =>
-            count
-              ? (index + (event.key === "ArrowDown" ? 1 : -1) + count) % count
-              : 0,
-          );
-          return true;
-        }
-        if (event.key === "Enter" && itemsRef.current.length) {
-          runItemRef.current(selectedRef.current);
           return true;
         }
         return false;
@@ -904,12 +890,6 @@ export default function RichTextEditor({
     };
   }, [editor, listensToWindow]);
 
-  useEffect(() => setSelectedIndex(0), [slash?.query]);
-  useEffect(() => {
-    document
-      .querySelector(".slash-menu .slash-item.is-selected")
-      ?.scrollIntoView({ block: "nearest" });
-  }, [selectedIndex]);
 
   function dismissSlash() {
     const current = menuRef.current;
@@ -1138,15 +1118,16 @@ export default function RichTextEditor({
         id: `heading-${level}`,
         title: t("block.heading", { level }),
         keywords: `heading h${level} ${t("block.headingKeywords")}`,
-        icon:
-          level === 1 ? (
-            <Heading1 size={20} />
-          ) : level === 2 ? (
-            <Heading2 size={20} />
-          ) : (
-            <Heading3 size={20} />
-          ),
+        icon: [
+          <Heading1 size={20} />,
+          <Heading2 size={20} />,
+          <Heading3 size={20} />,
+          <Heading4 size={20} />,
+          <Heading5 size={20} />,
+          <Heading6 size={20} />,
+        ][level - 1],
         group: t("group.basic"),
+        hidden: level > 3,
         run: (e: Editor) => {
           e.chain().focus().setHeading({ level }).run();
         },
@@ -1323,6 +1304,7 @@ export default function RichTextEditor({
           keywords: `${"kind" in item ? item.kind : item.id} ${item.name} ${item.description} ${catalog.displayDescription(item)}`,
           icon: <PanelTop size={20} />,
           group: t("group.components"),
+          chart: "kind" in item && isChartKind(item.kind),
           component: item,
           run: () => {},
         })),
@@ -1336,17 +1318,9 @@ export default function RichTextEditor({
       t,
     ],
   );
-  const filteredItems = items.filter((item) =>
-    `${item.title} ${item.keywords}`
-      .toLowerCase()
-      .includes(slash?.query.toLowerCase() ?? ""),
-  );
-  itemsRef.current = filteredItems;
-
-  const runItem = async (index: number) => {
+  const runItem = async (item: MenuItem) => {
     const state = menuRef.current;
-    const item = itemsRef.current[index];
-    if (!editor || !state || !item || inserting) return;
+    if (!editor || !state || inserting) return;
     if (item.component) {
       const before = editor.state.doc;
       const ticket = ++insertionTicket.current;
@@ -1398,7 +1372,18 @@ export default function RichTextEditor({
     else editor.commands.focus();
     item.run(editor);
   };
-  runItemRef.current = runItem;
+  const slashMenu = useSlashMenu(
+    items,
+    slash?.query ?? "",
+    (item) => void runItem(item),
+    !!slash,
+  );
+  slashKeyRef.current = slashMenu.key;
+  useEffect(() => {
+    document
+      .querySelector(".slash-menu .slash-item.is-selected")
+      ?.scrollIntoView({ block: "nearest" });
+  }, [slashMenu.selected, slashMenu.charts]);
 
   const openSlash = () => {
     if (!editor) return;
@@ -1411,7 +1396,6 @@ export default function RichTextEditor({
       manual: true,
       ...menuPosition(editor, from),
     });
-    setSelectedIndex(0);
     setInsertMenu(false);
   };
 
@@ -2253,27 +2237,10 @@ export default function RichTextEditor({
                     value={slash.query}
                     onChange={(value) => setSlash({ ...slash, query: value })}
                     onKeyDown={(event) => {
+                      if (slashMenu.key(event)) return;
                       if (event.key === "Escape") {
                         dismissSlash();
                         editor.commands.focus();
-                      }
-                      if (event.key === "Enter") {
-                        event.preventDefault();
-                        runItem(selectedIndex);
-                      }
-                      if (
-                        event.key === "ArrowDown" ||
-                        event.key === "ArrowUp"
-                      ) {
-                        event.preventDefault();
-                        setSelectedIndex((index) =>
-                          filteredItems.length
-                            ? (index +
-                                (event.key === "ArrowDown" ? 1 : -1) +
-                                filteredItems.length) %
-                              filteredItems.length
-                            : 0,
-                        );
                       }
                     }}
                   />
@@ -2293,34 +2260,14 @@ export default function RichTextEditor({
                     {catalog.error}
                   </p>
                 )}
-                {filteredItems.length === 0 && (
+                {slashMenu.rows.length === 0 && (
                   <div className="slash-empty">{t("insert.noResults")}</div>
                 )}
-                {filteredItems.map((item, index) => (
-                  <div key={item.id}>
-                    {(index === 0 ||
-                      filteredItems[index - 1].group !== item.group) && (
-                      <div className="slash-group">{item.group}</div>
-                    )}
-                    <button
-                      role="option"
-                      disabled={inserting}
-                      aria-selected={index === selectedIndex}
-                      className={`slash-item${index === selectedIndex ? " is-selected" : ""}`}
-                      onMouseEnter={() => setSelectedIndex(index)}
-                      onMouseDown={(event) => event.preventDefault()}
-                      onClick={() => runItem(index)}
-                    >
-                      <span className="slash-item-icon">{item.icon}</span>
-                      <span>
-                        <strong>{item.title}</strong>
-                      </span>
-                      {index === selectedIndex && (
-                        <span className="slash-enter">↵</span>
-                      )}
-                    </button>
-                  </div>
-                ))}
+                <SlashMenuItems
+                  menu={slashMenu}
+                  disabled={inserting}
+                  icon={(item) => item.icon}
+                />
               </div>
             </div>
           </>,
