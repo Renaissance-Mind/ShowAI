@@ -1272,17 +1272,30 @@ export class SqliteLibrary {
         const insertBlob = db.prepare(
             "INSERT OR IGNORE INTO blobs VALUES(?,?,?,?,?)",
           ),
-          currentObject = db.prepare(
-            "SELECT oid FROM current_files WHERE path=?",
-          ),
           removeFile = db.prepare("DELETE FROM current_files WHERE path=?"),
           writeCurrent = db.prepare(
             "INSERT INTO current_files VALUES(?,?) ON CONFLICT(path) DO UPDATE SET oid=excluded.oid",
           );
-        // Only objects this commit stops referencing can become unused.
+        // Current objects of every written path, read in this writer transaction.
+        const current = new Map<string, string>(),
+          paths = [...encoded.keys()];
+        for (let offset = 0; offset < paths.length; offset += 500) {
+          const chunk = paths.slice(offset, offset + 500);
+          for (const row of db
+            .prepare(
+              `SELECT path,oid FROM current_files WHERE path IN(${chunk.map(() => "?").join(",")})`,
+            )
+            .all(...chunk))
+            current.set(String(row.path), String(row.oid));
+        }
+        // Only objects this commit stops referencing can become unused. Paths
+        // that already hold their object, such as a page's unedited nodes,
+        // need no write.
         const replaced = new Set<string>();
         for (const [path, bytes] of encoded) {
-          const object = prepared.get(path);
+          const object = prepared.get(path),
+            previous = current.get(path);
+          if (previous === object?.id) continue;
           if (object?.data)
             insertBlob.run(
               object.id,
@@ -1291,8 +1304,7 @@ export class SqliteLibrary {
               object.bytes.length,
               object.packed ? 1 : 0,
             );
-          const previous = currentObject.get(path)?.oid as string | undefined;
-          if (previous && previous !== object?.id) replaced.add(previous);
+          if (previous) replaced.add(previous);
           if (bytes === null) removeFile.run(path);
           else writeCurrent.run(path, object!.id);
         }
