@@ -218,7 +218,7 @@ export class DatasetService {
       validateFilter(
         filter,
         "query.filter",
-        table.columns.filter((c) => c.type !== "custom"),
+        table.columns.filter((c) => c.type !== "custom" || c.kind),
       );
     validateSorts(sorts, "query.sorts");
     const derived = await deriveDatabase(

@@ -200,7 +200,8 @@ function validateViews(views, columns) {
       validateFilter(
         view.filter,
         `${path}.filter`,
-        columns.filter((column) => column.type !== "custom"),
+        // A contributed type's operators are its kind's (or fewer); without a kind, unchecked.
+        columns.filter((column) => column.type !== "custom" || column.kind),
       );
     if (view.sorts !== undefined) validateSorts(view.sorts, `${path}.sorts`);
     if (view.columnWidths !== undefined) {
@@ -241,6 +242,9 @@ function validateColumnConfig(column, columns, path) {
   only("rollup", ["rollup"]);
   only("component", ["custom"]);
   only("config", ["custom"]);
+  only("kind", ["custom"]);
+  if (column.kind !== undefined && !VALUE_KINDS.includes(column.kind))
+    fail(`${path}.kind must be one of ${VALUE_KINDS.join(", ")}.`);
   if (column.colors !== undefined) {
     if (!isRecord(column.colors) || Object.keys(column.colors).length > 200)
       fail(`${path}.colors must map options to tones.`);

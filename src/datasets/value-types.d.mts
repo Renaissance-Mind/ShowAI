@@ -39,6 +39,7 @@ export interface TypedField {
   formula?: { expression: string; kind?: string };
   rollup?: { relation: string; column?: string; aggregate: string };
   component?: { componentId: string; version: string };
+  kind?: ValueKind;
 }
 export interface ValueTypeContext {
   today?: number;

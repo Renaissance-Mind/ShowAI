@@ -3,11 +3,11 @@
   "profile": "claude",
   "declaredHostDisplay": "model-html",
   "commonVersion": "0.29.3",
-  "commonSha256": "4e2d64dd47d6c866b6e755e3f11e540fdd1c442ffdba163d0a954dbf103c6602",
+  "commonSha256": "3daf06a3bdf1f0d148c884d79eddaf8f0afcf0f96c53f8c585be5a0962137ef4",
   "commonFiles": {
     "collaborate-canvas/SKILL.md": "1a21a0419504732c39821582e891721fa3e8deba4808bab19e737eca53a68c49",
     "create-component/references/component-authoring.md": "3cc16a095ef7f2f0f3d7be0b3e58e2a74ad8ead96f2fc66c4950dde0540ebcd1",
-    "create-component/references/database-field.md": "0600c970d35da2916b581d8be8014640c3f571fb01ada0dd8d48c2cb1311af3b",
+    "create-component/references/database-field.md": "67aacfd642393f72aa75d417fd409acab7a895acf2d6d0d75c26a4d46506fa31",
     "create-component/references/parameter-contract.md": "ad6b4931fcae8730559877e2f931ffcd038688f1340fc6467b12510be636d122",
     "create-component/SKILL.md": "516129fd3feb76ff8db963bc2107d362f38ad6d2340fa7361cde3bf74bb2ad89",
     "create-template/references/template-abstraction.md": "a602c5d888fda4d1e23abe836605deed1fa2ab8711e375134b5642c79f9708cc",

@@ -258,6 +258,10 @@
               "config": {
                 "type": "object",
                 "description": "仅 custom 列：传给字段类型组件的设置，符合该组件的参数 schema。"
+              },
+              "kind": {
+                "enum": ["text", "number", "date", "option", "list", "boolean"],
+                "description": "仅 custom 列：字段类型组件声明的 valueKind。没有该组件的地方（CLI、导出页面）按它筛选和排序存储的值。"
               }
             },
             "required": ["id", "name", "type"]

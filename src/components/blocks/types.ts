@@ -86,6 +86,8 @@ export interface DatabaseColumn {
     scope?: string;
   };
   config?: Record<string, unknown>;
+  /** Custom columns: the component's value kind, kept so readers without it filter alike. */
+  kind?: import("../../datasets/value-types.mjs").ValueKind;
 }
 export type DatabaseValue = string | number | boolean | string[];
 export interface DatabaseRow {

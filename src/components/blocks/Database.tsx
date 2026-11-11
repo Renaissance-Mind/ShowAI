@@ -115,6 +115,7 @@ function withType(
     rollup: _rollup,
     component: _component,
     config: _config,
+    kind: _kind,
     ...rest
   } = column;
   const listing = contributed.find((item) => contributedKey(item) === key);
@@ -123,6 +124,8 @@ function withType(
       ...rest,
       type: "custom",
       component: { ...listing.ref },
+      // Readers without the component still filter and sort by this kind.
+      kind: listing.valueKind,
       config: structuredClone(listing.defaultConfig),
     };
   const type = key as DatabaseColumn["type"];

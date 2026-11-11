@@ -284,6 +284,7 @@ export class CatalogService {
             integrity: item.integrity,
             scope: item.scope,
           },
+          kind: item.databaseField!.valueKind,
         },
         name: item.name,
         kind: item.databaseField!.valueKind,

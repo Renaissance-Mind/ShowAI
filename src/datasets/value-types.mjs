@@ -506,16 +506,37 @@ const unknownType = Object.freeze({
   checkConfig: noConfig,
 });
 
+/**
+ * A contributed field type read without its component (CLI, exported
+ * readers, a missing component): the column's saved `kind` still filters and
+ * sorts the stored values; cells stay read-only.
+ */
+const storedTypes = new Map(
+  VALUE_KINDS.map((kind) => [
+    kind,
+    Object.freeze({
+      ...unknownType,
+      type: "custom",
+      kind,
+      project: (value) => projectAs(kind, value),
+    }),
+  ]),
+);
+
 export const BUILTIN_VALUE_TYPES = [...builtins.keys()];
 
 /**
  * The value type of a column. `contributed(column)` supplies types that a
  * library component declares (column.type "custom"); without one the column
- * reads as an unknown type.
+ * reads by its saved kind, or as an unknown type.
  */
 export function valueTypeOf(column, context) {
   if (column?.type === "custom")
-    return context?.contributed?.(column) ?? unknownType;
+    return (
+      context?.contributed?.(column) ??
+      storedTypes.get(column.kind) ??
+      unknownType
+    );
   return builtins.get(column?.type) ?? unknownType;
 }
 /** The value kind of a column (formula columns choose theirs). */

@@ -63,12 +63,12 @@ export default function RatingEditor({ data, value, onValue, onClose }) {
 保存回执给出精确的 version 与 integrity。数据库的列写成：
 
 ```json
-{ "id": "rating", "name": "评分", "type": "custom", "component": { "componentId": "star-rating", "version": "1.0.0", "integrity": "sha256-…" }, "config": { "max": 5 } }
+{ "id": "rating", "name": "评分", "type": "custom", "component": { "componentId": "star-rating", "version": "1.0.0", "integrity": "sha256-…" }, "kind": "number", "config": { "max": 5 } }
 ```
 
-记录里这一列写数字。在工作台中也可以从类型菜单直接选这个类型。视图的筛选条件用 `databaseField.operators` 中的运算符，例如 `{"column":"rating","operator":"gte","value":4}`。
+`kind` 抄写组件声明的 valueKind（fieldTypes 的 contributed 条目里已经写好整列的 column）。记录里这一列写数字。在工作台中也可以从类型菜单直接选这个类型。视图的筛选条件用 `databaseField.operators` 中的运算符，例如 `{"column":"rating","operator":"gte","value":4}`。
 
-组件被删除、版本找不到或在导出的离线页面中，单元格只读显示存储的原值，数据不会丢失；`dataset_read` 的 query 和导出按存储的值筛选与排序。字段类型组件不会出现在插入组件的菜单里。
+组件被删除、版本找不到或在导出的离线页面中，单元格只读显示存储的原值，数据不会丢失；这些地方以及 `dataset_read` 的 query 按列的 `kind` 筛选与排序存储的值，所以 `format`/`project` 不改变比较方式时结果与工作台一致。字段类型组件不会出现在插入组件的菜单里。
 
 ## 验证
 

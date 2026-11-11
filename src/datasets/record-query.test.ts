@@ -227,6 +227,55 @@ describe("filter groups and sorts", () => {
   });
 });
 
+describe("contributed field types", () => {
+  const rating = {
+    id: "rating",
+    name: "Rating",
+    type: "custom",
+    component: { componentId: "star-rating", version: "1.0.0" },
+  };
+  const rated = [
+    { id: "a", rating: 5 },
+    { id: "b", rating: 2 },
+    { id: "c", rating: "" },
+  ];
+  it("filter and sort by the saved kind when the component is absent", () => {
+    const column = { ...rating, kind: "number" as const };
+    expect(valueTypeOf(column).unknown).toBe(true);
+    expect(
+      queryRecords(rated, [column], {
+        filter: where("rating", "gte", 3) as never,
+      }).map((row) => row.id),
+    ).toEqual(["a"]);
+    expect(
+      queryRecords(rated, [column], {
+        sorts: [{ column: "rating", direction: "asc" }],
+      }).map((row) => row.id),
+    ).toEqual(["b", "a", "c"]);
+  });
+  it("use the contributed value type when the host provides one", () => {
+    const contributed = {
+      ...valueTypeOf({ ...rating, kind: "number" as const }),
+      operators: ["gte" as const],
+      // The component's project() answer: ratings count double.
+      project: (value: unknown) => (typeof value === "number" ? value * 2 : null),
+    };
+    const context = { contributed: () => contributed };
+    expect(operatorsOf(rating, context)).toEqual(["gte"]);
+    expect(
+      queryRecords(
+        rated,
+        [rating],
+        { filter: where("rating", "gte", 4) as never },
+        context,
+      ).map((row) => row.id),
+    ).toEqual(["a", "b"]);
+  });
+  it("read a column without kind or component as text", () => {
+    expect(operatorsOf(rating)).toContain("contains");
+  });
+});
+
 describe("performance", () => {
   it("filters and sorts 10,000 records interactively", () => {
     const many = Array.from({ length: 10000 }, (_, index) => ({
