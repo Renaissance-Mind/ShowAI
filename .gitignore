@@ -92,6 +92,7 @@ plugins/showai/scripts/cli.mjs
 !/plugins/showai/skills/use-showai/references/integration.md
 !/plugins/showai/skills/use-showai/references/runtime.md
 !/plugins/showai/skills/use-showai/references/shared-data.md
+!/plugins/showai/skills/use-showai/references/import.md
 !/resources/catalog/task-gantt/README.md
 !/resources/catalog/value-slider/README.md
 
@@ -240,6 +241,7 @@ plugins/showai/scripts/cli.mjs
 !/plugins/showai-claude/skills/use-showai/references/page-reading.md
 !/plugins/showai-claude/skills/use-showai/references/tasks.md
 !/plugins/showai-claude/skills/use-showai/references/user-references.md
+!/plugins/showai-claude/skills/use-showai/references/import.md
 !/plugins/showai-codex/README.md
 !/plugins/showai-codex/README.zh-CN.md
 !/plugins/showai-codex/skills/collaborate-canvas/SKILL.md
@@ -265,6 +267,7 @@ plugins/showai/scripts/cli.mjs
 !/plugins/showai-codex/skills/use-showai/references/page-reading.md
 !/plugins/showai-codex/skills/use-showai/references/tasks.md
 !/plugins/showai-codex/skills/use-showai/references/user-references.md
+!/plugins/showai-codex/skills/use-showai/references/import.md
 !/plugins-kimi/showai/skills/collaborate-canvas/SKILL.md
 !/plugins-kimi/showai/skills/create-component/SKILL.md
 !/plugins-kimi/showai/skills/create-component/references/component-authoring.md
@@ -288,6 +291,7 @@ plugins/showai/scripts/cli.mjs
 !/plugins-kimi/showai/skills/use-showai/references/page-reading.md
 !/plugins-kimi/showai/skills/use-showai/references/tasks.md
 !/plugins-kimi/showai/skills/use-showai/references/user-references.md
+!/plugins-kimi/showai/skills/use-showai/references/import.md
 
 # Repository Skill for Agents contributing to this checkout (Codex and Claude Code copies).
 !/.agents/skills/showai-contributing/SKILL.md

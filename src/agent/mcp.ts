@@ -69,6 +69,14 @@ import {
   writeComponentDirectory,
 } from "./component-directory";
 import { writeFile } from "node:fs/promises";
+import { mutateLibrary } from "../core/library-runtime";
+import {
+  listContributedImporters,
+  removeContributedImporter,
+  saveContributedImporter,
+} from "../core/importers/contributed";
+import { availableImporters, importerInfo, planImport, runImport } from "./import-service";
+import { compactPlan, compactReport } from "./import-commands";
 
 // Capture tuning stays available to the service; agents use the defaults.
 const boardTuning = {
@@ -494,10 +502,24 @@ export function createMcpServer(options: {
   register(
     "page_create",
     {
-      description:
-        'Create a Page or Board. Prefer blocks:[{kind,data}] in reading order, e.g. {kind:"text",data:{format:"markdown",content:"..."}}, and add more with page_apply component.insert.',
+      description: `Create a Page or Board. Prefer blocks:[{kind,data}] in reading order, e.g. {kind:"text",data:{format:"markdown",content:"..."}}, and add more with page_apply component.insert.${
+        localFiles
+          ? " import:{source, importer?, dryRun?} instead imports a file, folder or zip (absolute path; Notion, Word, Markdown or a library importer) into parentId; dryRun returns the plan. guide import."
+          : ""
+      }`,
       inputSchema: {
         ...changeSchema,
+        ...(localFiles
+          ? {
+              import: z
+                .object({
+                  source: z.string().min(1),
+                  importer: z.string().min(1).optional(),
+                  dryRun: z.boolean().optional(),
+                })
+                .optional(),
+            }
+          : {}),
         title: z.string().optional(),
         kind: z.enum(["page", "board"]).optional(),
         parentId: z.string().min(1).nullable().optional(),
@@ -519,11 +541,29 @@ export function createMcpServer(options: {
       document,
       components,
       remoteComponents,
+      import: importInput,
       ...metadata
     }) =>
       call(
-        async () =>
-          withOpenLink(
+        async () => {
+          if (importInput) {
+            if (title ?? kind ?? blocks ?? document ?? components ?? remoteComponents)
+              throw new CoreError(
+                "INVALID_DATA",
+                "import creates its own pages; pass only parentId with it.",
+              );
+            assertLocalPath(importInput.source, "import.source");
+            const target = { projectId, parentId: parentId ?? null };
+            const options = { importer: importInput.importer };
+            return importInput.dryRun
+              ? compactPlan(
+                  await planImport(service, { path: importInput.source }, target, options),
+                )
+              : compactReport(
+                  await runImport(service, { path: importInput.source }, target, options),
+                );
+          }
+          return withOpenLink(
             await service.createPage(projectId, {
               title,
               kind,
@@ -535,7 +575,8 @@ export function createMcpServer(options: {
               remoteComponents: remoteComponents as unknown as
                 PublishedComponentLocator[] | undefined,
             }),
-          ),
+          );
+        },
         metadata,
       ),
   );
@@ -770,9 +811,9 @@ export function createMcpServer(options: {
     "catalog_list",
     {
       description:
-        "List component and template names, descriptions, scenarios and one-line props signatures. Defaults to built-ins plus this project's components; scope selects global/published/all; limit/cursor paginate.",
+        "List component and template names, descriptions, scenarios and one-line props signatures. Defaults to built-ins plus this project's components; scope selects global/published/all; limit/cursor paginate. kind importer lists the importers.",
       inputSchema: {
-        kind: z.enum(["component", "template"]).optional(),
+        kind: z.enum(["component", "template", "importer"]).optional(),
         scope: scopeSchema.optional(),
         query: z.string().optional(),
         limit: z.number().int().min(1).max(50).optional(),
@@ -781,7 +822,16 @@ export function createMcpServer(options: {
       },
       annotations: readOnly,
     },
-    (input) => call(() => service.catalogList({ projectId, ...input })),
+    ({ kind, ...input }) =>
+      call(async () => {
+        if (kind !== "importer")
+          return service.catalogList({ projectId, kind, ...input });
+        const { importers, problems } = await availableImporters(
+          service.store.root,
+          projectId,
+        );
+        return { importers: importers.map(importerInfo), problems };
+      }),
   );
   register(
     "catalog_describe",
@@ -794,7 +844,7 @@ export function createMcpServer(options: {
         }`,
       inputSchema: {
         id: z.string(),
-        kind: z.enum(["component", "template"]).optional(),
+        kind: z.enum(["component", "template", "importer"]).optional(),
         scope: scopeSchema.optional(),
         version: z.string().optional(),
         integrity: z.string().optional(),
@@ -818,8 +868,20 @@ export function createMcpServer(options: {
     },
     ({ id, out, overwrite, ...input }) =>
       call(async () => {
+        if (input.kind === "importer") {
+          // A contributed importer: its importer.json and importer.js.
+          const found = (
+            await listContributedImporters(service.store.root, projectId)
+          ).importers.find((item) => item.manifest.id === id);
+          if (!found)
+            throw new CoreError("NOT_FOUND", `No contributed importer ${id}.`);
+          return found;
+        }
         if (out === undefined)
-          return service.catalogDescribe(id, { projectId, ...input });
+          return service.catalogDescribe(id, {
+            projectId,
+            ...(input as typeof input & { kind?: "component" | "template" }),
+          });
         if (
           (input.view !== undefined && input.view !== "source") ||
           input.kind === "template" ||
@@ -983,12 +1045,41 @@ export function createMcpServer(options: {
   const revisionId = z.string().optional();
   const revisionVersion = z.string();
   const catalogVersion = actionTool(
-    "Save a project-owned revision (fork an exact revision, or save a reviewed merge), or remove a revision; remove without version removes every revision in that scope and refuses with IN_USE while pages, packages or publications use it.",
+    "Save a project-owned revision (fork an exact revision, or save a reviewed merge), or remove a revision; remove without version removes every revision in that scope and refuses with IN_USE while pages, packages or publications use it. importer saves an importer to this project (manifest = importer.json, script = importer.js; guide import).",
     {
+      importer: {
+        fields: {
+          ...changeSchema,
+          manifest: jsonObject,
+          script: z.string().min(1),
+        },
+        run: ({ manifest, script, operationId, message, groupId }) =>
+          call(
+            async () => {
+              const saved = await mutateLibrary(service.store.root, () =>
+                saveContributedImporter(
+                  service.store.root,
+                  { manifest, script },
+                  { scope: "project", projectId },
+                ),
+              );
+              return {
+                ...saved.manifest,
+                scope: saved.scope,
+                next: "page_create import:{source, dryRun:true}",
+              };
+            },
+            {
+              operationId: operationId as string | undefined,
+              message: message as string | undefined,
+              groupId: groupId as string | undefined,
+            },
+          ),
+      },
       remove: {
         fields: {
           ...changeSchema,
-          kind: z.enum(["component", "template"]),
+          kind: z.enum(["component", "template", "importer"]),
           id: z.string().min(1),
           version: z.string().optional(),
           scope: z.enum(["project", "global", "published"]).optional(),
@@ -996,10 +1087,18 @@ export function createMcpServer(options: {
         run: ({ operationId, message, groupId, ...input }) =>
           call(
             () =>
-              service.removeCatalog(
-                projectId,
-                input as Omit<CatalogRemovalInput, "projectId">,
-              ),
+              input.kind === "importer"
+                ? mutateLibrary(service.store.root, () =>
+                    removeContributedImporter(
+                      service.store.root,
+                      String(input.id),
+                      { scope: "project", projectId },
+                    ),
+                  )
+                : service.removeCatalog(
+                    projectId,
+                    input as Omit<CatalogRemovalInput, "projectId">,
+                  ),
             {
               operationId: operationId as string | undefined,
               message: message as string | undefined,

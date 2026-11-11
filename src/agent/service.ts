@@ -656,6 +656,8 @@ export class AgentService extends CatalogService {
       blocks?: { kind: string; data: Record<string, unknown> }[];
       components?: CompiledComponent[];
       remoteComponents?: PublishedComponentLocator[];
+      /** A page id chosen beforehand (imports link pages to each other). */
+      id?: string;
     },
   ) {
     const project = this.requireProject(projectId);

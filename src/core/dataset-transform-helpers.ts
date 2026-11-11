@@ -159,14 +159,20 @@ export const TRANSFORM_HELPERS_SOURCE = String.raw`(function () {
   }
 
   let result;
+  let called = "transform";
   return {
-    run(text) {
-      if (typeof transform !== "function")
-        throw new TypeError("The script defines no function transform(inputs, helpers).");
-      result = transform(JSON.parse(text), helpers);
+    run(text, entry) {
+      const name = entry || "transform";
+      const fn = name === "transform"
+        ? (typeof transform === "function" ? transform : undefined)
+        : Function("return typeof " + name + " === 'function' ? " + name + " : undefined")();
+      if (!fn)
+        throw new TypeError("The script defines no function " + name + "(inputs, helpers).");
+      result = fn(JSON.parse(text), helpers);
+      called = name;
     },
     output() {
-      if (result === undefined) invalid("transform returned nothing; return the output value.");
+      if (result === undefined) invalid(called + " returned nothing; return the output value.");
       return JSON.stringify(check(result, [], 0));
     },
   };

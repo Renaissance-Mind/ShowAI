@@ -1,11 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { escapeJsonForHtml, serializeArtifact } from "../lib/artifact";
 import { newDocument } from "../lib/document";
-import {
-  htmlArtifactSource,
-  importedArtifact,
-  isImportablePageFile,
-} from "./page-import";
+import { acceptsImport, htmlArtifactSource } from "./page-import";
+import { markdownImporter } from "../core/importers/markdown";
+import type { ImportInput } from "../core/importers/types";
 import { templateAgentPrompt, templateSelection } from "./template-actions";
 import {
   readAppearancePreference,
@@ -14,16 +12,33 @@ import {
 import { supportsManualEditing } from "../components/blocks/manual-editing";
 import { rememberExport, revealableExport } from "../workbench/actions";
 
+const fileInput = (name: string, content: string): ImportInput => ({
+  name,
+  kind: "file",
+  problems: [],
+  files: [
+    {
+      path: name,
+      size: content.length,
+      bytes: async () => new TextEncoder().encode(content),
+      text: async () => content,
+    },
+  ],
+});
+const importedArtifact = async (file: { name: string; content: string }) =>
+  (await markdownImporter.convert(fileInput(file.name, file.content))).pages[0]
+    .artifact!;
+
 describe("page import", () => {
-  it("accepts the same file types as the import dialog", () => {
+  it("accepts the extensions of the Markdown importer", () => {
     for (const name of ["a.json", "a.HTML", "a.htm", "notes.md", "x.markdown", "t.txt"])
-      expect(isImportablePageFile(name), name).toBe(true);
+      expect(acceptsImport(name, markdownImporter.extensions), name).toBe(true);
     for (const name of ["photo.png", "README", "md", "data.csv"])
-      expect(isImportablePageFile(name), name).toBe(false);
+      expect(acceptsImport(name, markdownImporter.extensions), name).toBe(false);
   });
 
-  it("turns Markdown and text into a new page titled after the file", () => {
-    const artifact = importedArtifact({
+  it("turns Markdown and text into a new page titled after the file", async () => {
+    const artifact = await importedArtifact({
       name: "会议纪要.md",
       content: "# 标题\n\n第一段",
     });
@@ -31,27 +46,27 @@ describe("page import", () => {
     expect(JSON.stringify(artifact.document.content)).toContain("第一段");
   });
 
-  it("reads the page source embedded in an exported HTML file", () => {
+  it("reads the page source embedded in an exported HTML file", async () => {
     const document = newDocument("导出的页面");
     const source = serializeArtifact(document, []);
     const html = `<!doctype html><html><body><script type="application/json" id="showai-data">${escapeJsonForHtml(JSON.parse(source))}</script><script>1</script></body></html>`;
     expect(htmlArtifactSource(html)).toBe(escapeJsonForHtml(JSON.parse(source)));
-    expect(importedArtifact({ name: "page.html", content: html }).document.title)
+    expect((await importedArtifact({ name: "page.html", content: html })).document.title)
       .toBe("导出的页面");
     expect(
-      importedArtifact({ name: "page.showai.json", content: source }).document.id,
+      (await importedArtifact({ name: "page.showai.json", content: source })).document.id,
     ).toBe(document.id);
   });
 
-  it("falls back to a named page data script and rejects HTML without one", () => {
+  it("falls back to a named page data script and rejects HTML without one", async () => {
     expect(
       htmlArtifactSource(
         '<script id="showai-reader-data" type="application/json">{"a":1}</script>',
       ),
     ).toBe('{"a":1}');
-    expect(() =>
+    await expect(
       importedArtifact({ name: "plain.html", content: "<p>hello</p>" }),
-    ).toThrow();
+    ).rejects.toThrow();
   });
 });
 
