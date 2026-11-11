@@ -42,7 +42,7 @@
   line-height: 1.2;
   letter-spacing: normal;
   box-shadow: 0 5px 20px #2434291c;
-  animation: editor-menu-appear var(--duration-fast) var(--ease-out);
+  animation: editor-menu-appear 0.13s ease;
   max-width: calc(100vw - 16px);
   overflow-x: auto;
 }

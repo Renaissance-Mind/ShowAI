@@ -24,7 +24,7 @@
   pointer-events: none;
 }
 .showai-pending-label {
-  animation: showai-pending-in var(--duration-fast) var(--ease-out) both;
+  animation: showai-pending-in 160ms ease-out both;
 }
 .showai-pending-bar {
   display: block;

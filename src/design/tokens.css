@@ -141,11 +141,8 @@ select {
   font-family: inherit;
 }
 button {
-  transition:
-    background-color var(--duration-fast) var(--ease-out),
-    color var(--duration-fast) var(--ease-out),
-    border-color var(--duration-fast) var(--ease-out),
-    transform var(--duration-fast) var(--ease-out);
+  transition: var(--duration-fast) var(--ease-out);
+  transition-property: background-color, color, border-color, transform;
 }
 button:focus-visible,
 a:focus-visible,

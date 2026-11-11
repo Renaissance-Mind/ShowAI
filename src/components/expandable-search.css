@@ -4,7 +4,7 @@
   min-width: 32px;
   width: 32px;
   color: var(--muted, #737373);
-  transition: width var(--duration-base) var(--ease-out);
+  transition: width 200ms ease;
   -webkit-app-region: no-drag;
 }
 .expandable-search.is-expanded {
@@ -17,7 +17,7 @@
   overflow: hidden;
   border: 0;
   border-radius: 6px;
-  transition: background var(--duration-base) var(--ease-out);
+  transition: background 200ms ease;
 }
 .is-expanded > .expandable-search-field {
   background: var(--surface, #f4f4f4);
