@@ -74,7 +74,7 @@ export default defineMessages("navigation", {
     "shortcuts.page": "页面",
     "shortcuts.board": "白板",
     "shortcuts.or": " 或 ",
-    "shortcut.search": "搜索内容库",
+    "shortcut.search": "快速跳转到页面、项目和命令",
     "shortcut.newPage": "在当前项目新建页面；未选择项目时新建项目",
     "shortcut.sidebar": "固定或自动隐藏侧栏",
     "shortcut.reload": "重新载入当前页面",
@@ -192,7 +192,7 @@ export default defineMessages("navigation", {
     "shortcuts.page": "Pages",
     "shortcuts.board": "Boards",
     "shortcuts.or": " or ",
-    "shortcut.search": "Search the library",
+    "shortcut.search": "Jump to a page, project or command",
     "shortcut.newPage":
       "New page in the current project, or a new project when none is selected",
     "shortcut.sidebar": "Keep the sidebar open or hide it automatically",

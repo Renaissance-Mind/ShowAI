@@ -1,0 +1,106 @@
+/* Quick jump sits high in the window so results grow downward without moving the input. */
+.quick-jump-shade {
+  align-items: flex-start;
+  padding-top: min(14vh, 120px);
+  animation-duration: var(--duration-fast);
+}
+.studio-modal.quick-jump {
+  width: min(600px, 100%);
+  max-height: min(520px, calc(100dvh - min(14vh, 120px) - 24px));
+  animation-duration: var(--duration-fast);
+}
+.quick-jump-input {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 16px;
+  height: 52px;
+  flex: none;
+  border-bottom: 1px solid var(--line);
+  color: var(--muted);
+}
+.quick-jump-input input {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 16px;
+}
+.quick-jump-results {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 6px;
+  min-height: 0;
+}
+.quick-jump-results:empty {
+  display: none;
+}
+.quick-jump-group {
+  padding: 10px 10px 4px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--muted);
+}
+.quick-jump-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 36px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  color: var(--text);
+  cursor: default;
+  transition: background-color var(--duration-fast) var(--ease-out);
+}
+.quick-jump-row.is-selected {
+  background: var(--hover);
+}
+.quick-jump-row[aria-disabled="true"] {
+  opacity: 0.45;
+}
+.quick-jump-icon {
+  flex: none;
+  display: inline-flex;
+  width: 18px;
+  justify-content: center;
+  color: var(--muted);
+}
+.quick-jump-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+.quick-jump-title,
+.quick-jump-path {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.quick-jump-title {
+  flex: 0 1 auto;
+  font-size: 14px;
+}
+.quick-jump-path {
+  flex: 0 10 auto;
+  min-width: 0;
+  font-size: 12px;
+  color: var(--muted);
+}
+.quick-jump-shortcut {
+  flex: none;
+  font: inherit;
+  font-size: 12px;
+  color: var(--muted);
+}
+.quick-jump-empty {
+  margin: 0;
+  padding: 14px 10px;
+  font-size: 13px;
+  color: var(--muted);
+}

@@ -24,7 +24,7 @@ import { useLocalFileChooser } from "../local-resources";
 import { isLocalResourceRef } from "../../portable/local-files.mjs";
 import ExpandableSearch from "../ExpandableSearch";
 import { SlashMenuItems, useSlashMenu } from "../SlashMenuItems";
-import { isChartKind, type SlashEntry } from "../slash-menu-model";
+import { componentSlashEntry, type SlashEntry } from "../slash-menu-model";
 import { RichTextEnvironment } from "./environment";
 import type { CatalogComponent } from "../../core/component-categories";
 import {
@@ -1295,17 +1295,11 @@ export default function RichTextEditor({
             (!("kind" in item && item.insertion) || !!onInsertNative),
         )
         .map((item) => ({
-          id:
-            "catalog:" +
-            ("kind" in item
-              ? item.kind
-              : `${item.id}@${item.version}#${item.integrity}`),
-          title: catalog.displayName(item),
-          keywords: `${"kind" in item ? item.kind : item.id} ${item.name} ${item.description} ${catalog.displayDescription(item)}`,
+          ...componentSlashEntry(item, t("group.components"), {
+            name: catalog.displayName,
+            description: catalog.displayDescription,
+          }),
           icon: <PanelTop size={20} />,
-          group: t("group.components"),
-          chart: "kind" in item && isChartKind(item.kind),
-          component: item,
           run: () => {},
         })),
     ],

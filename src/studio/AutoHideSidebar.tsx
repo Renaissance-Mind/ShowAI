@@ -22,6 +22,8 @@ import "./auto-hide-sidebar.css";
 import { mobileNavigationLayout, sidebarSwipe } from "./mobile-navigation.mjs";
 import "./mobile-navigation.css";
 
+/** Toggles the sidebar as the ⌘\ shortcut does. */
+export const SIDEBAR_TOGGLE_EVENT = "showai:toggle-sidebar";
 const minimumWidth = 200;
 const maximumWidth = 480;
 const widthPreference = "showai:sidebar-width";
@@ -194,17 +196,22 @@ export default function AutoHideSidebar({
     });
   useEffect(() => {
     if (nativeTouch) return;
+    const toggle = () => {
+      if (compact) setNativeOpen((value) => !value);
+      else toggleLocked();
+    };
     const key = (event: KeyboardEvent) => {
       if (!isSidebarToggleShortcut(event) || event.repeat) return;
       event.preventDefault();
-      if (compact) {
-        setNativeOpen((value) => !value);
-        return;
-      }
-      toggleLocked();
+      toggle();
     };
+    // Quick jump runs the same toggle as the shortcut.
     window.addEventListener("keydown", key);
-    return () => window.removeEventListener("keydown", key);
+    window.addEventListener(SIDEBAR_TOGGLE_EVENT, toggle);
+    return () => {
+      window.removeEventListener("keydown", key);
+      window.removeEventListener(SIDEBAR_TOGGLE_EVENT, toggle);
+    };
   }, [nativeTouch, compact]);
   useEffect(() => {
     if (!locating) return;

@@ -32,6 +32,8 @@ interface LibraryMenuItemBase {
   description?: string;
   /** Items sharing a group follow one heading; a new group starts a new section. */
   group?: string;
+  /** A stable id under which quick jump offers the same action. */
+  command?: string;
 }
 export type LibraryContextMenuItem = LibraryMenuItemBase &
   (

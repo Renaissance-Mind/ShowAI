@@ -11,7 +11,7 @@ import {
   type CatalogComponent,
 } from "../core/component-categories";
 import { SlashMenuItems, useSlashMenu } from "./SlashMenuItems";
-import { isChartKind, type SlashEntry } from "./slash-menu-model";
+import { componentSlashEntry } from "./slash-menu-model";
 import {
   componentCategoryLabel,
   componentDisplayDescription,
@@ -52,19 +52,11 @@ export function ComponentSlashMenu({
     () =>
       catalog.items
         .filter((item) => "kind" in item || item.role !== "page-outline")
-        .map(
-          (item): SlashEntry & { component: CatalogComponent } => ({
-            // The rich-text menu uses the same ids, so recent items are shared.
-            id:
-              "catalog:" +
-              ("kind" in item
-                ? item.kind
-                : `${item.id}@${item.version}#${item.integrity}`),
-            title: componentDisplayName(item),
-            keywords: `${item.name} ${item.description} ${componentDisplayDescription(item)} ${"kind" in item ? item.kind : item.id}`,
-            group: t("allComponents"),
-            chart: "kind" in item && isChartKind(item.kind),
-            component: item,
+        // The rich-text menu and quick jump use the same entries.
+        .map((item) =>
+          componentSlashEntry(item, t("allComponents"), {
+            name: componentDisplayName,
+            description: componentDisplayDescription,
           }),
         ),
     [catalog.items, t],

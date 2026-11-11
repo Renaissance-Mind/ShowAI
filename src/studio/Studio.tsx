@@ -204,6 +204,8 @@ import {
 import TemplateThumbnail from "./TemplateThumbnail";
 import RecentPages, { recentPages, type RecentPage } from "./RecentPages";
 import { newMenuDestination, type CreationChoice } from "./new-menu";
+import QuickJump, { type WorkbenchCommand } from "./quick-jump/QuickJump";
+import quickJumpMessages from "../i18n/messages/quickJump";
 import Welcome from "./Welcome";
 import PluginUpdateNotice from "./PluginUpdateNotice";
 import AppUpdateNotice from "./AppUpdateNotice";
@@ -221,7 +223,7 @@ import {
   WELCOME_DOC,
 } from "./builtin-docs";
 import { useSampleProject } from "./sample-project";
-import AutoHideSidebar from "./AutoHideSidebar";
+import AutoHideSidebar, { SIDEBAR_TOGGLE_EVENT } from "./AutoHideSidebar";
 import {
   DiscardDraftDialog,
   SaveFailureBanner,
@@ -313,7 +315,12 @@ import {
   SettingsPanel,
   type SettingsSection,
 } from "./Settings";
-import { getLocale } from "../i18n";
+import {
+  getLocale,
+  LOCALE_NAMES,
+  LOCALES,
+  setLanguagePreference,
+} from "../i18n";
 import { useLocale, useTranslator } from "../i18n/react";
 import commonMessages from "../i18n/messages/common";
 import studioMessages from "../i18n/messages/studio";
@@ -408,6 +415,7 @@ type DialogState =
   | { type: "deletedItems" }
   | { type: "hiddenProjects" }
   | { type: "shortcuts" }
+  | { type: "quickJump" }
   | {
       type: "template";
       record: LoadedTemplate;
@@ -509,6 +517,7 @@ export default function Studio() {
   const tfind = useTranslator(findMessages);
   const ta = useTranslator(assistantMessages);
   const tn = useTranslator(navigationMessages);
+  const tq = useTranslator(quickJumpMessages);
   const tshell = useTranslator(shellMessages);
   const tfeedback = useTranslator(feedbackMessages);
   // 关于与反馈 opens on its report form or diagnostics preview on request.
@@ -1588,6 +1597,8 @@ export default function Studio() {
         event.altKey ||
         event.shiftKey ||
         event.key.toLowerCase() !== "k" ||
+        event.isComposing ||
+        event.keyCode === 229 ||
         event.defaultPrevented ||
         dialogRef.current
       )
@@ -2494,32 +2505,38 @@ export default function Studio() {
       {
         label: t("create.folder"),
         icon: <FolderPlus size={15} />,
+        command: "new.folder",
         onSelect: select("folder"),
       },
       {
         label: t("create.page"),
         icon: <FileText size={15} />,
+        command: "new.page",
         onSelect: select("page"),
       },
       {
         label: t("create.board"),
         icon: <Presentation size={15} />,
+        command: "new.board",
         onSelect: select("board"),
       },
       {
         label: tn("newPageForAgent"),
         icon: <Sparkles size={15} />,
+        command: "new.agentPage",
         onSelect: select("agentPage"),
       },
       {
         label: t("create.fromTemplate"),
         icon: <FilePlus2 size={15} />,
         separatorBefore: true,
+        command: "new.template",
         onSelect: select("template"),
       },
       {
         label: t("create.import"),
         icon: <Upload size={15} />,
+        command: "new.import",
         onSelect: select("import"),
       },
     ];
@@ -2536,6 +2553,7 @@ export default function Studio() {
       {
         group: common,
         label: t("exportHtml"),
+        command: "export.html",
         description: t("exportHtmlDetail"),
         icon: <ArrowUpRight size={15} />,
         disabled: busy,
@@ -2544,6 +2562,7 @@ export default function Studio() {
       {
         group: common,
         label: t("exportPdf"),
+        command: "export.pdf",
         icon: <FileDown size={15} />,
         disabled: busy,
         onSelect: () =>
@@ -2554,6 +2573,7 @@ export default function Studio() {
             {
               group: common,
               label: t("exportReadingShort"),
+        command: "export.reading",
               description: t("exportReadingDetail"),
               icon: <BookOpen size={15} />,
               disabled: busy,
@@ -2562,6 +2582,7 @@ export default function Studio() {
             {
               group: agents,
               label: t("exportSnippetShort"),
+        command: "export.snippet",
               description: t("exportSnippetDetail"),
               icon: <CodeXml size={15} />,
               disabled: busy,
@@ -2574,6 +2595,7 @@ export default function Studio() {
             {
               group: common,
               label: tc("copyLink"),
+              command: "page.copyLink",
               description: t("copyPageLinkDetail"),
               icon: <Link2 size={15} />,
               onSelect: action(() =>
@@ -2591,6 +2613,7 @@ export default function Studio() {
             {
               group: agents,
               label: tc("copyReference"),
+              command: "page.copyReference",
               description: t("copyPageReferenceDetail"),
               icon: <AtSign size={15} />,
               onSelect: action(() =>
@@ -2607,6 +2630,7 @@ export default function Studio() {
             {
               group: advanced,
               label: t("exportOnlinePageShort"),
+        command: "export.online",
               description: t("exportOnlinePageDetail"),
               icon: <Globe size={15} />,
               disabled: busy,
@@ -2616,6 +2640,7 @@ export default function Studio() {
             {
               group: advanced,
               label: t("exportWithPublished"),
+        command: "export.published",
               description: t("exportWithPublishedDetail"),
               icon: <Globe size={15} />,
               disabled: busy,
@@ -2626,6 +2651,7 @@ export default function Studio() {
       {
         group: advanced,
         label: tc("downloadSource"),
+        command: "export.source",
         description: t("downloadSourceDetail"),
         icon: <Download size={15} />,
         disabled: busy,
@@ -2667,9 +2693,115 @@ export default function Studio() {
       ...creationMenuItems(target).map((item) => ({ ...item, disabled })),
       {
         label: tn("newProject"),
+        command: "new.project",
         icon: <FolderPlus size={15} />,
         separatorBefore: true,
         onSelect: () => setDialog({ type: "project" }),
+      },
+    ];
+  }
+  function quickJumpCommands(): WorkbenchCommand[] {
+    const fromMenu = (items: LibraryContextMenuItem[]) =>
+      items.flatMap((item) =>
+        item.command && item.onSelect
+          ? [
+              {
+                id: item.command,
+                title: item.command.startsWith("export.")
+                  ? tq("command.export", { format: item.label })
+                  : item.command === "new.folder"
+                    ? tq("command.newFolder")
+                    : item.command === "new.page"
+                      ? tq("command.newPage")
+                      : item.command === "new.board"
+                        ? tq("command.newBoard")
+                        : item.label,
+                ...(item.disabled ? { disabled: true } : {}),
+                run: item.onSelect,
+              },
+            ]
+          : [],
+      );
+    const pageOpen = view === "page" && !!page.draft;
+    const dark = appearance.theme === "dark";
+    const otherLocale = LOCALES.find((locale) => locale !== getLocale())!;
+    const shortcut = (label: string, keys: string) => ({ title: label, shortcut: keys });
+    return [
+      ...fromMenu(newMenuItems()),
+      ...(pageOpen ? fromMenu(pageExportMenuItems()) : []),
+      ...(pageOpen
+        ? [
+            {
+              id: "page.find",
+              ...shortcut(tn("shortcut.find"), "Mod+F"),
+              run: () => menuCommand.current("find"),
+            },
+            {
+              id: "page.findReplace",
+              ...shortcut(tn("shortcut.findReplace"), "Alt+Mod+F"),
+              run: () => menuCommand.current("findReplace"),
+            },
+            {
+              id: "agent.toggle",
+              title: tq(assistantOpen ? "command.agentClose" : "command.agentOpen"),
+              keywords: tq("keywords.agent"),
+              run: () => changeAssistantOpen(!assistantOpen),
+            },
+          ]
+        : []),
+      {
+        id: "library.search",
+        title: tq("command.searchLibrary"),
+        run: openLibrarySearch,
+      },
+      {
+        id: "sidebar.toggle",
+        ...shortcut(tn("shortcut.sidebar"), "Mod+\\"),
+        keywords: tq("keywords.sidebar"),
+        run: () => {
+          window.dispatchEvent(new Event(SIDEBAR_TOGGLE_EVENT));
+        },
+      },
+      ...(capabilities.tabs && info?.mode !== "browser"
+        ? [
+            {
+              id: "tab.new",
+              ...shortcut(tn("shortcut.newTab"), "Mod+T"),
+              run: () => menuCommand.current("newTab"),
+            },
+          ]
+        : []),
+      {
+        id: "view.recent",
+        title: tq("command.recent"),
+        run: () => menuCommand.current("projects"),
+      },
+      {
+        id: "view.settings",
+        title: tq("command.settings"),
+        run: () => menuCommand.current("settings"),
+      },
+      {
+        id: "view.docs",
+        title: tq("command.docs"),
+        run: () => menuCommand.current("docs"),
+      },
+      {
+        id: "view.shortcuts",
+        title: tq("command.shortcuts"),
+        run: () => menuCommand.current("shortcuts"),
+      },
+      {
+        id: "appearance.toggle",
+        title: tq(dark ? "command.themeLight" : "command.themeDark"),
+        keywords: tq("keywords.theme"),
+        run: () => appearance.setPreference(dark ? "light" : "dark"),
+      },
+      {
+        id: "language.switch",
+        title: tq("command.language", { name: LOCALE_NAMES[otherLocale] }),
+        keywords: tq("keywords.language"),
+        run: () => setLanguagePreference(otherLocale),
       },
     ];
   }
@@ -2734,7 +2866,7 @@ export default function Studio() {
     // Libraries without full-text search offer it on Recent only.
     else void navigate("projects").then(() => setTimeout(open, 50), report);
   }
-  openSearchRef.current = openLibrarySearch;
+  openSearchRef.current = () => setDialog({ type: "quickJump" });
   function showDirectoryCreationMenu(
     anchor: HTMLElement,
     point?: LibraryMenuPoint,
@@ -7134,6 +7266,23 @@ export default function Studio() {
               await refresh();
               setNotice(tn("shownNamed", { name: shown.name }));
             }}
+          />
+        )}
+        {dialog?.type === "quickJump" && (
+          <QuickJump
+            projects={projects}
+            pages={contents}
+            commands={quickJumpCommands()}
+            insert={
+              view === "page" &&
+              page.draft &&
+              editorControls?.documentId === page.draft.id
+                ? editorControls.insertComponent
+                : undefined
+            }
+            openDirectory={openProject}
+            onClose={closeDialog}
+            onError={report}
           />
         )}
         {dialog?.type === "shortcuts" && (

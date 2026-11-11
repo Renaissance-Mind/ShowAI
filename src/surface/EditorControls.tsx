@@ -37,6 +37,15 @@ export interface EditorControls {
   pageWidthMode: PageWidthMode;
   setPageWidthMode: (mode: PageWidthMode) => void;
   outlineSettings: () => void;
+  /**
+   * Puts a component into this page or board after the selected block, or at
+   * the end, through the same insertion path as the insert menus.
+   */
+  insertComponent: (
+    kind: string,
+    data: Record<string, unknown>,
+    component?: import("../components/custom/types").CompiledComponent,
+  ) => void;
 }
 
 export function EditorHistoryButtons({
