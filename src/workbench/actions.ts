@@ -59,7 +59,9 @@ import {
   assertExportDestination,
   exportPage,
   packagePage,
+  readingPageHtml,
 } from "../agent/exporter";
+import { printableHtml } from "../agent/print-page";
 import {
   PACKAGING_CHOICES,
   bundledResource,
@@ -249,6 +251,7 @@ export const workbenchActions = new Set([
   "dialog:openPage",
   "export:analyze",
   "export:page",
+  "export:printable",
   "export:site",
   "packaging:sync",
   "datasets:chooseFile",
@@ -1740,6 +1743,28 @@ export function createWorkbench(
       case "export:page": {
         const id = projectId(args),
           page = pageId(args);
+        if (args.format === "pdf") {
+          const record = await store.readPage(id, page);
+          const selection = await host.saveDialog({
+            title: tf("title.exportPage"),
+            defaultPath: `${filename(record.document.title)}.pdf`,
+            filters: [{ name: "PDF", extensions: ["pdf"] }],
+          });
+          if (selection.canceled || !selection.filePath) return null;
+          await assertExportDestination(store.root, id, selection.filePath);
+          const html = await readingPageHtml({
+            root: store.root,
+            projectId: id,
+            pageId: page,
+            ...packaging(args),
+          });
+          return rememberExport(
+            (await host.invoke("export:printPdf", {
+              html: printableHtml(html, { autoPrint: false }),
+              path: selection.filePath,
+            })) as { path: string; bytes: number },
+          );
+        }
         if (!["html", "json", "inline"].includes(required(args, "format")))
           throw new CoreError(
             "INVALID_DATA",
@@ -1789,6 +1814,19 @@ export function createWorkbench(
           out: selection.filePath,
           overwrite: true,
         }));
+      }
+      case "export:printable": {
+        // Browser hosts print through the browser: the page opens its print
+        // dialog, where people save it as PDF.
+        const html = await readingPageHtml({
+          root: store.root,
+          projectId: projectId(args),
+          pageId: pageId(args),
+          ...packaging(args),
+        });
+        return host.invoke("export:printable", {
+          html: printableHtml(html, { autoPrint: true }),
+        });
       }
       case "export:site": {
         const id = projectId(args);

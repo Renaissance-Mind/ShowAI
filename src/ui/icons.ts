@@ -77,6 +77,7 @@ export {
   FlaskConical,
   Focus,
   Folder,
+  FolderInput,
   FolderMinus,
   FolderOpen,
   FolderPlus,

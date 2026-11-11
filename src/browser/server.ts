@@ -404,6 +404,14 @@ export async function startBrowserServer(options: BrowserServerOptions) {
             notify("home");
             return info();
           }
+          case "export:printable": {
+            // One page to print, kept briefly under an unguessable address
+            // that the browser opens without the bearer header.
+            const id = randomUUID();
+            printables.set(id, String(args.html));
+            setTimeout(() => printables.delete(id), 120000).unref();
+            return { url: `/api/print/${id}` };
+          }
           case "media:reveal":
             // The action layer only passes paths it granted for the player.
             await openLocalPath(String(args.path), true);
@@ -471,6 +479,8 @@ export async function startBrowserServer(options: BrowserServerOptions) {
         ),
     };
   }
+  /** Pages waiting to be opened for printing, by one-time id. */
+  const printables = new Map<string, string>();
   let closed = false;
   const server = createServer((request, response) => {
     void handleRequest().catch((error) => {
@@ -510,6 +520,24 @@ export async function startBrowserServer(options: BrowserServerOptions) {
       const url = new URL(request.url ?? "/", origin);
       // A media element cannot send the bearer header; the unguessable grant
       // minted through an authenticated media:open call is the credential.
+      const printable = /^\/api\/print\/([0-9a-f-]{36})$/.exec(url.pathname);
+      if (printable && request.method === "GET") {
+        const html = printables.get(printable[1]);
+        printables.delete(printable[1]);
+        if (html === undefined) {
+          response.writeHead(404);
+          response.end();
+          return;
+        }
+        // The reader page runs its own scripts and sandboxed component frames.
+        response.setHeader(
+          "Content-Security-Policy",
+          "default-src 'self' data: blob:; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' blob:; style-src 'self' 'unsafe-inline' data:; img-src 'self' data: blob: https: http:; media-src 'self' data: blob: https: http:; font-src 'self' data:; connect-src 'self' data: blob:; frame-src 'self' about: data: blob:; frame-ancestors 'none'; object-src 'none'; base-uri 'none'; form-action 'none'",
+        );
+        response.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
+        response.end(html);
+        return;
+      }
       const media = /^\/api\/media\/([0-9a-f-]{36})$/.exec(url.pathname);
       if (media && (request.method === "GET" || request.method === "HEAD")) {
         const result = await localMediaResponse(

@@ -508,6 +508,41 @@ export async function assertExportDestination(
 }
 
 /** Produces deliverables from a stored project; never changes its authoring source. */
+/**
+ * The offline reader for one page in reading order, as text: what a PDF
+ * export prints. Components and the reader are bundled; nothing is written.
+ */
+export async function readingPageHtml(options: {
+  root: string;
+  projectId: string;
+  pageId: string;
+  packaging?: PackagingDecisions;
+  externalData?: "embed";
+}): Promise<string> {
+  const store = new FileStore(options.root);
+  const { packaged } = await packagePage(store, {
+    projectId: options.projectId,
+    pageId: options.pageId,
+    format: "html",
+    ...(options.packaging !== undefined
+      ? { packaging: options.packaging }
+      : {}),
+    ...(options.externalData ? { externalData: options.externalData } : {}),
+  });
+  const components = await resolveDocumentComponents(
+    store.root,
+    packaged.document,
+    options.projectId,
+  );
+  return buildPageHtml(
+    lockedDocument(packaged.document, components),
+    undefined,
+    components,
+    [],
+    "reading",
+  );
+}
+
 export async function exportPage(
   options: ExportOptions,
 ): Promise<ExportResult> {

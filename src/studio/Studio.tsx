@@ -67,6 +67,7 @@ import {
   CodeXml,
   Download,
   BookOpen,
+  FolderInput,
   FolderMinus,
   Globe,
   Package,
@@ -75,6 +76,7 @@ import {
   ChevronRight,
   Copy,
   FilePlus2,
+  FileDown,
   FileText,
   Folder,
   FolderOpen,
@@ -871,6 +873,8 @@ export default function Studio() {
   const [pageExportMenu, setPageExportMenu] = useState<HTMLElement | null>(
     null,
   );
+  /** A sidebar or directory page whose Export menu is open; else the open page. */
+  const [exportTarget, setExportTarget] = useState<LibraryTarget | null>(null);
   const [exportReceipt, setExportReceipt] = useState<{
     message: string;
     path: string;
@@ -2183,27 +2187,48 @@ export default function Studio() {
     return decisions;
   }
   async function exportPage(
-    format: "html" | "json" | "inline",
+    format: "html" | "json" | "inline" | "pdf",
     components: "bundled" | "remote" = "bundled",
     presentation?: "spatial" | "reading",
     reader?: "bundled" | "cdn",
+    target: { projectId: string; pageId: string } | null =
+      selectedProject && page.draft
+        ? { projectId: selectedProject, pageId: page.draft.id }
+        : null,
   ) {
-    if (!selectedProject || !page.draft) return;
+    if (!target) return;
+    // The browser saves a PDF from its own print dialog; the tab opens now,
+    // while the click still allows it, and shows the page once it is ready.
+    const browserPrint = format === "pdf" && info?.mode === "browser";
+    let printTab = browserPrint ? window.open("", "_blank") : null;
     setBusy(true);
     setContextMenu(null);
     try {
-      await saveOpenPage();
+      if (page.draft?.id === target.pageId) await saveOpenPage();
       const packaging = await packagingChoice(
-        selectedProject,
-        page.draft.id,
-        format,
+        target.projectId,
+        target.pageId,
+        format === "pdf" ? "html" : format,
       );
-      if (packaging === null) return;
+      if (packaging === null) {
+        printTab?.close();
+        return;
+      }
+      if (browserPrint) {
+        const { url } = await desktop.invoke<{ url: string }>(
+          "export:printable",
+          { ...target, ...(packaging ? { packaging } : {}) },
+        );
+        if (printTab) printTab.location.href = url;
+        else printTab = window.open(url, "_blank");
+        if (!printTab) throw new Error(t("printTabBlocked"));
+        resolveProblem(operation("op.exportPage"));
+        return;
+      }
       const result = await desktop.invoke<{ path: string } | null>(
         "export:page",
         {
-          projectId: selectedProject,
-          pageId: page.draft.id,
+          ...target,
           format,
           components,
           presentation,
@@ -2215,13 +2240,13 @@ export default function Studio() {
       if (result)
         setExportReceipt({ message: t("pageExported"), path: result.path });
     } catch (reason) {
+      printTab?.close();
+      const again = () =>
+        void exportPage(format, components, presentation, reader, target);
       report(reason, {
         action: operation("op.exportPage"),
-        retry: () => void exportPage(format, components, presentation, reader),
-        handlers: {
-          chooseLocation: () =>
-            void exportPage(format, components, presentation, reader),
-        },
+        retry: again,
+        handlers: { chooseLocation: again },
       });
     } finally {
       setBusy(false);
@@ -2312,6 +2337,19 @@ export default function Studio() {
           parentId: page.draft.parentId,
         }
       : null;
+  /** Duplicates a page from any of its menus and opens the copy. */
+  async function duplicatePage(target: LibraryTarget) {
+    if (page.draft?.id === target.id) await saveOpenPage();
+    const result = await desktop.invoke<LoadedPage>("pages:duplicate", {
+      projectId: target.projectId,
+      pageId: target.id,
+    });
+    setContents((current) =>
+      withCreatedPage(current, target.projectId, result),
+    );
+    await openPage(result.document.id, target.projectId);
+    await refreshProjects([target.projectId]);
+  }
   const showMenu = (
     target: LibraryTarget,
     anchor: HTMLElement,
@@ -2370,8 +2408,10 @@ export default function Studio() {
     ];
   }
   /** The grouped export menu shared by the top-bar ↗ button and the page 「…」 menu. */
-  function pageExportMenuItems(): LibraryContextMenuItem[] {
-    const target = activePageTarget();
+  function pageExportMenuItems(
+    target = activePageTarget(),
+  ): LibraryContextMenuItem[] {
+    const exported = target && { projectId: target.projectId, pageId: target.id };
     const common = t("exportGroup.common"),
       agents = t("exportGroup.agents"),
       advanced = t("exportGroup.advanced");
@@ -2382,7 +2422,15 @@ export default function Studio() {
         description: t("exportHtmlDetail"),
         icon: <ArrowUpRight size={15} />,
         disabled: busy,
-        onSelect: () => void exportPage("html"),
+        onSelect: () => void exportPage("html", "bundled", undefined, undefined, exported),
+      },
+      {
+        group: common,
+        label: t("exportPdf"),
+        icon: <FileDown size={15} />,
+        disabled: busy,
+        onSelect: () =>
+          void exportPage("pdf", "bundled", undefined, undefined, exported),
       },
       ...(capabilities.advancedPageExport
         ? [
@@ -2392,7 +2440,7 @@ export default function Studio() {
               description: t("exportReadingDetail"),
               icon: <BookOpen size={15} />,
               disabled: busy,
-              onSelect: () => void exportPage("html", "bundled", "reading"),
+              onSelect: () => void exportPage("html", "bundled", "reading", undefined, exported),
             },
             {
               group: agents,
@@ -2400,7 +2448,7 @@ export default function Studio() {
               description: t("exportSnippetDetail"),
               icon: <CodeXml size={15} />,
               disabled: busy,
-              onSelect: () => void exportPage("inline"),
+              onSelect: () => void exportPage("inline", "bundled", undefined, undefined, exported),
             },
           ]
         : []),
@@ -2446,7 +2494,7 @@ export default function Studio() {
               icon: <Globe size={15} />,
               disabled: busy,
               onSelect: () =>
-                void exportPage("html", "bundled", "reading", "cdn"),
+                void exportPage("html", "bundled", "reading", "cdn", exported),
             },
             {
               group: advanced,
@@ -2454,7 +2502,7 @@ export default function Studio() {
               description: t("exportWithPublishedDetail"),
               icon: <Globe size={15} />,
               disabled: busy,
-              onSelect: () => void exportPage("html", "remote"),
+              onSelect: () => void exportPage("html", "remote", undefined, undefined, exported),
             },
           ]
         : []),
@@ -2464,7 +2512,7 @@ export default function Studio() {
         description: t("downloadSourceDetail"),
         icon: <Download size={15} />,
         disabled: busy,
-        onSelect: () => void exportPage("json"),
+        onSelect: () => void exportPage("json", "bundled", undefined, undefined, exported),
       },
     ];
   }
@@ -6189,12 +6237,15 @@ export default function Studio() {
             </button>
           </div>
         )}
-        {pageExportMenu && view === "page" && page.draft && (
+        {pageExportMenu && (exportTarget || (view === "page" && page.draft)) && (
           <LibraryContextMenu
             anchor={pageExportMenu}
             label={t("exportMenuLabel")}
-            onClose={() => setPageExportMenu(null)}
-            items={pageExportMenuItems()}
+            onClose={() => {
+              setPageExportMenu(null);
+              setExportTarget(null);
+            }}
+            items={pageExportMenuItems(exportTarget ?? activePageTarget())}
           />
         )}
         {capabilities.exportSite && exportMenu && (
@@ -6544,39 +6595,46 @@ export default function Studio() {
                               );
                             },
                           },
+                        ]
+                      : []),
+                    ...(contextMenu.target.kind === "page"
+                      ? [
                           {
                             label: t("duplicatePage"),
                             icon: <Copy size={15} />,
-                            onSelect: action(async () => {
-                              await saveOpenPage();
-                              const result = await desktop.invoke<LoadedPage>(
-                                "pages:duplicate",
-                                {
-                                  projectId: contextMenu.target.projectId,
-                                  pageId: contextMenu.target.id,
-                                },
-                              );
-                              setContents((current) =>
-                                withCreatedPage(
-                                  current,
-                                  contextMenu.target.projectId,
-                                  result,
-                                ),
-                              );
-                              await openPage(
-                                result.document.id,
-                                contextMenu.target.projectId,
-                              );
-                              await refreshProjects([
-                                contextMenu.target.projectId,
-                              ]);
-                            }),
+                            separatorBefore: !contextMenu.pageTools,
+                            onSelect: action(() =>
+                              duplicatePage(contextMenu.target),
+                            ),
                           },
                           {
                             label: t("exportMenu"),
                             icon: <ArrowUpRight size={15} />,
-                            onSelect: () =>
-                              setPageExportMenu(contextMenu.anchor),
+                            onSelect: () => {
+                              setExportTarget(
+                                contextMenu.pageTools
+                                  ? null
+                                  : contextMenu.target,
+                              );
+                              setPageExportMenu(contextMenu.anchor);
+                            },
+                          },
+                        ]
+                      : []),
+                    ...(contextMenu.target.kind === "page" ||
+                    contextMenu.target.kind === "folder"
+                      ? [
+                          {
+                            label: t("moveTo"),
+                            icon: <FolderInput size={15} />,
+                            onSelect: () => {
+                              setContextMenu(null);
+                              setDialog({
+                                type: "batchPages",
+                                operation: "move",
+                                targets: [contextMenu.target],
+                              });
+                            },
                           },
                         ]
                       : []),

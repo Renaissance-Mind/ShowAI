@@ -61,6 +61,7 @@ import { localMediaResponse } from "../workbench/local-media";
 import { LOCAL_MEDIA_SCHEME } from "../components/custom/local-media-link";
 import { tabShortcut } from "../workbench/tab-shortcuts";
 import { MenuCommandQueue } from "./menu-queue";
+import { printHtmlToPdf } from "./print-pdf";
 import { AppUpdates, appUpdateActions } from "./app-updates";
 import { windowQuery, type WindowTarget } from "../workbench/window-target";
 import { parsePageLink } from "../portable/page-link.mjs";
@@ -779,6 +780,11 @@ async function nativeAction(
   window: BrowserWindow,
 ): Promise<unknown> {
   switch (action) {
+    case "export:printPdf":
+      return printHtmlToPdf(
+        String(args.html),
+        String(args.path),
+      );
     case "fs:reveal": {
       const id = projectId(args),
         page = text(args, "pageId", true);
