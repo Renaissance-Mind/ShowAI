@@ -82,6 +82,15 @@
   gap: 2px;
   flex-shrink: 0;
 }
+.studio-main-nav[data-labels] button {
+  gap: 4px;
+  padding-inline: 4px;
+}
+.studio-main-nav-label {
+  min-width: 0;
+  overflow: hidden;
+  font-size: 12px;
+}
 .studio-sidebar-back {
   display: flex;
   align-items: center;

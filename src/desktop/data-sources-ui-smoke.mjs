@@ -541,7 +541,8 @@ try {
   const out = join(output, "exports", "验收.html");
   await mkdir(dirname(out), { recursive: true });
   await answerDialogs(undefined, out);
-  await window.getByRole("button", { name: "导出", exact: true }).first().click();
+  await window.getByRole("button", { name: "页面操作", exact: true }).click();
+  await window.getByRole("menuitem", { name: /^导出/ }).first().click();
   await window.getByRole("menuitem", { name: /^HTML 网页/ }).first().click();
   const packaging = window.locator(".packaging-dialog");
   await packaging.waitFor();

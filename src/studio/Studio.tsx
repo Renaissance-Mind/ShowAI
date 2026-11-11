@@ -5383,34 +5383,6 @@ export default function Studio() {
                   : null
               }
             />
-            {capabilities.revealFiles && <button
-              className="studio-icon"
-              aria-label={t("revealPageFile")}
-              title={t("revealPageFile")}
-              onClick={action(() =>
-                desktop.invoke("fs:reveal", {
-                  projectId: selectedProject,
-                  pageId: page.draft!.id,
-                }),
-              )}
-            >
-              <FolderOpen size={16} />
-            </button>}
-            <button
-              className="studio-icon"
-              aria-label={tc("export")}
-              title={t("exportPage")}
-              aria-haspopup="menu"
-              disabled={busy}
-              onClick={(event) => {
-                const anchor = event.currentTarget;
-                setPageExportMenu((current) =>
-                  current === anchor ? null : anchor,
-                );
-              }}
-            >
-              <ArrowUpRight size={14} />
-            </button>
             <CommentsToggle
               documentId={page.draft.id}
               onOpen={() => changeAssistantOpen(false)}
@@ -6867,6 +6839,20 @@ export default function Studio() {
                               setPageExportMenu(contextMenu.anchor);
                             },
                           },
+                          ...(contextMenu.pageTools && capabilities.revealFiles
+                            ? [
+                                {
+                                  label: t("revealPageFile"),
+                                  icon: <FolderOpen size={15} />,
+                                  onSelect: action(() =>
+                                    desktop.invoke("fs:reveal", {
+                                      projectId: contextMenu.target.projectId,
+                                      pageId: contextMenu.target.id,
+                                    }),
+                                  ),
+                                },
+                              ]
+                            : []),
                         ]
                       : []),
                     ...(contextMenu.target.kind === "page" ||
