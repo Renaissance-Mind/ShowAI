@@ -97,6 +97,14 @@ dataset_write({projectId, action:"create", name:"全景 OKR", fromBlock:{pageId,
 - 解除绑定：`{type:"component.binding.remove", blockId, keep:"snapshot"}` 把当前显示的参数存为块的副本。
 - 删除：先用 `dataset_read` 的 `references` 查看本项目里使用它的页面，向用户确认（删除不能在应用中撤销）。`dataset_delete({projectId, datasetId, baseHash})` 只删除没有块使用的共享数据，已移到其他项目、仍指向它的页面也算在内；仍有使用时返回 `details.references`（每项带 projectId、pageId、blockIds）而不删除，由用户决定是否先在这些块上解除绑定：读取对应项目的页面后用 `component.binding.remove`。
 
+## 带类型的记录、关联与筛选
+
+数据库共享出来的数据是 `{columns, rows}`：columns 给每个字段定类型，rows 是带 id 的记录。字段类型、每种类型可用的筛选运算符和列设置写法用 `catalog_describe({projectId, kind:"component", id:"database", view:"guide"})` 的 `fieldTypes` 查询，其中也列出组件库里声明为字段类型的组件。
+
+- 关联：两份这样的数据之间用 relation 列连接，例如任务数据里加 `{"id":"project","name":"项目","type":"relation","relation":{"dataset":"projects","reverse":{"name":"任务"}}}`，记录里写项目记录 id 的列表 `["p1"]`。带 `reverse` 时，绑定 projects 的数据库会多出「任务」一列，列出指向每个项目的任务；这一列由软件计算，不写进 projects。
+- 汇总与公式：rollup 列对关联记录的某一字段计数、求和、求平均等；formula 列写 JavaScript 表达式，用 `prop("字段名")` 读取本记录的字段，在处理脚本的同一个沙箱里逐条计算。它们的值不存进 rows：写记录时不要给这些列写值；`page_read` 结果里块的 `$derived` 是计算出的快照，写入时不要带上它。表达式出错或互相引用时，该单元格显示错误原因。
+- 查询：`dataset_read({projectId, action:"read", datasetId, query:{filter, sorts, search}})` 返回符合条件的记录（含关联标题、汇总和公式结果），用 offset/limit 翻页；值不在顶层时加 `path` 指向 `{columns, rows}`。filter 是条件组 `{"join":"and","conditions":[{"column":"status","operator":"is","value":"进行中"},{"join":"or","conditions":[{"column":"due","operator":"within","value":{"direction":"next","days":7}},{"column":"hours","operator":"gt","value":10}]}]}`，最多嵌套一层；sorts 是 `[{"column":"due","direction":"asc"}]`。数据库视图的 `filter` 与 `sorts` 用同样的形状。
+
 ## 并发与冲突
 
 每次写入都带着它开始时的值。不同记录、同一记录的不同字段可以同时修改，自动合并；两处把同一字段改成不同的值才是冲突：写入返回 CONFLICT、什么都不写，`details.conflicts` 给出每个字段的 `path`、`base`、`mine`、`theirs`。重新读取，把每个字段的 `base`、`mine`、`theirs` 告诉用户，由用户决定保留哪个（意图明确时按用户这次的要求），再用新的 baseHash 写入；不要用旧读取的整份值覆盖。没有 id 的列表只能整体替换，几处同时改它会冲突，所以多人编辑的列表条目要有稳定 id。顺序调整按最后一次为准，不丢内容。

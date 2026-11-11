@@ -151,6 +151,7 @@ plugins/showai/scripts/cli.mjs
 !/docs/component-parameters.md
 !/docs/diagram-components.md
 !/plugins/showai/skills/create-component/references/parameter-contract.md
+!/plugins/showai/skills/create-component/references/database-field.md
 
 /dist-cloud-mcp/
 !/docs/cloud-mcp-deployment.md
@@ -220,6 +221,7 @@ plugins/showai/scripts/cli.mjs
 !/plugins/showai-claude/skills/create-component/SKILL.md
 !/plugins/showai-claude/skills/create-component/references/component-authoring.md
 !/plugins/showai-claude/skills/create-component/references/parameter-contract.md
+!/plugins/showai-claude/skills/create-component/references/database-field.md
 !/plugins/showai-claude/skills/create-template/SKILL.md
 !/plugins/showai-claude/skills/create-template/references/template-abstraction.md
 !/plugins/showai-claude/skills/create-template/references/template-creation.md
@@ -244,6 +246,7 @@ plugins/showai/scripts/cli.mjs
 !/plugins/showai-codex/skills/create-component/SKILL.md
 !/plugins/showai-codex/skills/create-component/references/component-authoring.md
 !/plugins/showai-codex/skills/create-component/references/parameter-contract.md
+!/plugins/showai-codex/skills/create-component/references/database-field.md
 !/plugins/showai-codex/skills/create-template/SKILL.md
 !/plugins/showai-codex/skills/create-template/references/template-abstraction.md
 !/plugins/showai-codex/skills/create-template/references/template-creation.md
@@ -266,6 +269,7 @@ plugins/showai/scripts/cli.mjs
 !/plugins-kimi/showai/skills/create-component/SKILL.md
 !/plugins-kimi/showai/skills/create-component/references/component-authoring.md
 !/plugins-kimi/showai/skills/create-component/references/parameter-contract.md
+!/plugins-kimi/showai/skills/create-component/references/database-field.md
 !/plugins-kimi/showai/skills/create-template/SKILL.md
 !/plugins-kimi/showai/skills/create-template/references/template-abstraction.md
 !/plugins-kimi/showai/skills/create-template/references/template-creation.md
