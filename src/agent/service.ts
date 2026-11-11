@@ -25,10 +25,7 @@ import {
   agentLabel,
   markAgentCreated,
 } from "../core/agent-created";
-import {
-  LibraryOperations,
-  type HistoryQuery,
-} from "../core/library-operations";
+import { LibraryOperations } from "../core/library-operations";
 import type { SearchOptions } from "../core/library-index";
 import { CoreError } from "../core/model";
 import {
@@ -897,130 +894,8 @@ export class AgentService extends CatalogService {
   private versioned() {
     return new LibraryOperations(this.store.root, this.projectId);
   }
-  async historicalResource(path: string, revision: string) {
-    throw new CoreError(
-      "INVALID_DATA",
-      "Content history and version restoration have been removed.",
-    );
-    return this.versioned().describePath(path, revision);
-  }
-  importedSnapshots(projectId: string, pageId?: string) {
-    throw new CoreError(
-      "INVALID_DATA",
-      "Content history and version restoration have been removed.",
-    );
-    return this.versioned().importedSnapshots(
-      this.requireProject(projectId),
-      pageId,
-    );
-  }
-  importedPage(
-    projectId: string,
-    pageId: string,
-    ref: { importId: string; snapshotId: string },
-  ) {
-    throw new CoreError(
-      "INVALID_DATA",
-      "Content history and version restoration have been removed.",
-    );
-    return this.versioned().importedPage(
-      this.requireProject(projectId),
-      pageId,
-      ref,
-    );
-  }
-  restoreImportedSnapshot(input: {
-    projectId: string;
-    pageId: string;
-    importId: string;
-    snapshotId: string;
-    baseRevision: string | null;
-  }) {
-    throw new CoreError(
-      "INVALID_DATA",
-      "Content history and version restoration have been removed.",
-    );
-    this.requireProject(input.projectId);
-    return this.mutation("Restore imported snapshot", [input], () =>
-      this.versioned().restoreImportedSnapshot(input),
-    );
-  }
-  history(input: HistoryQuery = {}) {
-    throw new CoreError(
-      "INVALID_DATA",
-      "Content history and version restoration have been removed.",
-    );
-    return this.versioned().history(input);
-  }
   search(input: SearchOptions) {
     return this.versioned().search(input);
-  }
-  compareHistory(
-    before: string,
-    after: string,
-    input: { projectId?: string; pageId?: string } = {},
-  ) {
-    throw new CoreError(
-      "INVALID_DATA",
-      "Content history and version restoration have been removed.",
-    );
-    return this.versioned().changes(before, after, input);
-  }
-  historicalPage(projectId: string, pageId: string, revision: string) {
-    throw new CoreError(
-      "INVALID_DATA",
-      "Content history and version restoration have been removed.",
-    );
-    return this.versioned().pageAt(
-      this.requireProject(projectId),
-      pageId,
-      revision,
-    );
-  }
-  historicalHtml(projectId: string, pageId: string, revision: string) {
-    throw new CoreError(
-      "INVALID_DATA",
-      "Content history and version restoration have been removed.",
-    );
-    return this.versioned().historicalHtml(
-      this.requireProject(projectId),
-      pageId,
-      revision,
-    );
-  }
-  importedHtml(
-    projectId: string,
-    pageId: string,
-    ref: { importId: string; snapshotId: string },
-  ) {
-    throw new CoreError(
-      "INVALID_DATA",
-      "Content history and version restoration have been removed.",
-    );
-    return this.versioned().importedHtml(
-      this.requireProject(projectId),
-      pageId,
-      ref,
-    );
-  }
-  restorePage(input: {
-    projectId: string;
-    pageId: string;
-    revision: string;
-    baseRevision: string;
-  }) {
-    throw new CoreError(
-      "INVALID_DATA",
-      "Content history and version restoration have been removed.",
-    );
-    this.requireProject(input.projectId);
-    return withChangeContext(
-      { ...changeContext(), restoredFrom: input.revision },
-      () =>
-        this.mutation("Restore page", [input], () =>
-          this.versioned().restorePage(input),
-        ),
-    );
   }
   pageMergePreview(input: {
     projectId: string;

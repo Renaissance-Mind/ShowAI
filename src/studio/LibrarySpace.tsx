@@ -7,6 +7,7 @@ import type {
   CleanupPlan,
   StorageCategory,
 } from "../core/library-maintenance";
+import type { IntegrityResult } from "../core/library-integrity";
 import { getLocale } from "../i18n";
 import { useTranslator } from "../i18n/react";
 import messages from "../i18n/messages/library";
@@ -26,6 +27,7 @@ export default function LibrarySpace({ home }: { home: string }) {
     [error, setError] = useState(""),
     [notice, setNotice] = useState("");
   const [archivePath, setArchivePath] = useState("");
+  const [integrity, setIntegrity] = useState<IntegrityResult | null>(null);
   const refresh = useCallback(
     async (projects = false) => {
       setStorage(
@@ -171,8 +173,60 @@ export default function LibrarySpace({ home }: { home: string }) {
             >
               {t("rebuildIndex")}
             </button>
+            <button
+              className="settings-button"
+              disabled={busy}
+              onClick={() =>
+                void run(async () => {
+                  setIntegrity(null);
+                  setIntegrity(
+                    await desktop.invoke<IntegrityResult>("library:integrity"),
+                  );
+                }, false)
+              }
+            >
+              {t("checkIntegrity")}
+            </button>
             {busy && <Loader2 size={15} className="studio-spin" />}
           </div>
+          {integrity?.ok && (
+            <p className="settings-help" role="status">
+              {t("integrity.ok", {
+                date: new Date(integrity.checkedAt).toLocaleString(getLocale()),
+              })}
+            </p>
+          )}
+          {integrity && !integrity.ok && (
+            <div className="library-space-integrity" role="alert">
+              <p>{t(`integrity.${integrity.problem}`)}</p>
+              <code>{integrity.message}</code>
+              <div className="library-space-actions">
+                <button
+                  className="settings-button"
+                  onClick={() =>
+                    void desktop
+                      .invoke("library:reveal", { path: "." })
+                      .catch((reason) => setError(errorMessage(reason)))
+                  }
+                >
+                  {t("integrity.reveal")}
+                </button>
+                <button
+                  className="settings-button"
+                  onClick={() =>
+                    void desktop
+                      .invoke("clipboard:write", {
+                        text: `${t(`integrity.${integrity.problem}`)}\n${integrity.message}\n${home}\n${integrity.checkedAt}`,
+                      })
+                      .then(() => setNotice(t("integrity.copied")))
+                      .catch((reason) => setError(errorMessage(reason)))
+                  }
+                >
+                  {t("integrity.copy")}
+                </button>
+              </div>
+            </div>
+          )}
           {plan && (
             <div className="library-space-plan">
               <p>

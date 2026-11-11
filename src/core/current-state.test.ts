@@ -9,7 +9,6 @@ import { SqliteLibrary } from "./sqlite-library";
 import { FileStore } from "./store";
 import { EditorDrafts } from "./editor-drafts";
 import { LibraryOperations } from "./library-operations";
-import { AgentService } from "../agent/service";
 import { encodeFile } from "./history-codec";
 import { mutateLibrary, withLibrarySnapshot } from "./library-runtime";
 
@@ -74,13 +73,6 @@ it("replaces local content without recording prior saves or building readers, wh
     db.close();
   }
   await library.verify();
-  expect(() =>
-    new AgentService({ root }).historicalPage(
-      project.id,
-      page.document.id,
-      other.revision!,
-    ),
-  ).toThrow(/removed/);
   const restored = await new FileStore(root).readPage(
     project.id,
     page.document.id,

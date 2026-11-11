@@ -58,7 +58,9 @@ import {
   assertExportDestination,
   exportPage,
   packagePage,
+  readingPageHtml,
 } from "../agent/exporter";
+import { printableHtml } from "../agent/print-page";
 import {
   PACKAGING_CHOICES,
   bundledResource,
@@ -66,7 +68,13 @@ import {
   syncPackagingPlan,
   type PackagingDecisions,
 } from "../core/packaging";
-import { assertId, CoreError, FileStore, folderVisible } from "../core/store";
+import {
+  assertId,
+  CoreError,
+  FileStore,
+  folderVisible,
+  type PurgeTarget,
+} from "../core/store";
 import type { PageRecord, ProjectBinding } from "../core/model";
 import { isDirectorySortBy } from "../core/directory-sort";
 import {
@@ -78,6 +86,7 @@ import {
   listDeletedEntries,
   updatePageState,
 } from "../core/page-lifecycle";
+import { checkLibraryIntegrity } from "../core/library-integrity";
 import {
   getComponent,
   blankDocument,
@@ -206,6 +215,8 @@ export const workbenchActions = new Set([
   "projects:remove",
   "library:deleted",
   "library:restore",
+  "library:purge",
+  "library:integrity",
   "sidebar:get",
   "sidebar:moveProject",
   "sidebar:moveEntry",
@@ -256,7 +267,9 @@ export const workbenchActions = new Set([
   "dialog:openPage",
   "export:analyze",
   "export:page",
+  "export:printable",
   "export:site",
+  "export:conversation",
   "packaging:sync",
   "datasets:chooseFile",
   "fs:reveal",
@@ -832,6 +845,8 @@ export function createWorkbench(
         return new LibraryMaintenance(store.root).archive(
           required(args, "out"),
         );
+      case "library:integrity":
+        return checkLibraryIntegrity(store.root);
       case "library:verifyArchive":
         return verifyLibraryArchive(required(args, "path"));
       case "library:prepareImport":
@@ -1074,6 +1089,38 @@ export function createWorkbench(
         return store.updateProject(projectId(args), { archived: true });
       case "library:deleted":
         return listDeletedEntries(store);
+      case "library:purge": {
+        if (!Array.isArray(args.items) || !args.items.length)
+          throw new CoreError("INVALID_DATA", "Choose the items to delete.");
+        const synced = new Set(
+          (await syncManager(store.root).configuration()).projects.map(
+            (item) => item.projectId,
+          ),
+        );
+        const targets = (args.items as Record<string, unknown>[]).map(
+          (item): PurgeTarget => {
+            const id = projectId(item);
+            if (item.kind === "project") {
+              if (synced.has(id))
+                throw new CoreError("CONFLICT", t("purgeSyncedProject"));
+              return { kind: "project", projectId: id };
+            }
+            if (item.kind === "folder")
+              return {
+                kind: "folder",
+                projectId: id,
+                folderId: assertId(required(item, "folderId")),
+              };
+            if (item.kind === "page")
+              return { kind: "page", projectId: id, pageId: pageId(item) };
+            throw new CoreError(
+              "INVALID_DATA",
+              "Choose a project, folder or page.",
+            );
+          },
+        );
+        return store.purgeArchived(targets);
+      }
       case "library:restore": {
         const kind = required(args, "kind");
         const id = projectId(args);
@@ -1718,6 +1765,28 @@ export function createWorkbench(
       case "export:page": {
         const id = projectId(args),
           page = pageId(args);
+        if (args.format === "pdf") {
+          const record = await store.readPage(id, page);
+          const selection = await host.saveDialog({
+            title: tf("title.exportPage"),
+            defaultPath: `${filename(record.document.title)}.pdf`,
+            filters: [{ name: "PDF", extensions: ["pdf"] }],
+          });
+          if (selection.canceled || !selection.filePath) return null;
+          await assertExportDestination(store.root, id, selection.filePath);
+          const html = await readingPageHtml({
+            root: store.root,
+            projectId: id,
+            pageId: page,
+            ...packaging(args),
+          });
+          return rememberExport(
+            (await host.invoke("export:printPdf", {
+              html: printableHtml(html, { autoPrint: false }),
+              path: selection.filePath,
+            })) as { path: string; bytes: number },
+          );
+        }
         if (!["html", "json", "inline"].includes(required(args, "format")))
           throw new CoreError(
             "INVALID_DATA",
@@ -1768,6 +1837,19 @@ export function createWorkbench(
           overwrite: true,
         }));
       }
+      case "export:printable": {
+        // Browser hosts print through the browser: the page opens its print
+        // dialog, where people save it as PDF.
+        const html = await readingPageHtml({
+          root: store.root,
+          projectId: projectId(args),
+          pageId: pageId(args),
+          ...packaging(args),
+        });
+        return host.invoke("export:printable", {
+          html: printableHtml(html, { autoPrint: true }),
+        });
+      }
       case "export:site": {
         const id = projectId(args);
         await store.listPages(id);
@@ -1785,6 +1867,31 @@ export function createWorkbench(
           out: selection.filePaths[0],
           overwrite: true,
         }));
+      }
+      case "export:conversation": {
+        // The Agent panel renders the Markdown from the conversation it shows,
+        // which may run on another device; this host only writes the file.
+        const id = projectId(args);
+        await store.readProject(id);
+        const markdown = args.markdown;
+        if (typeof markdown !== "string" || markdown.length > 20 * 1024 * 1024)
+          throw new CoreError(
+            "INVALID_DATA",
+            "markdown must be text of at most 20 MB.",
+          );
+        const selection = await host.saveDialog({
+          title: tf("title.exportConversation"),
+          defaultPath: `${filename(required(args, "title"))}.md`,
+          filters: [{ name: tf("filter.markdown"), extensions: ["md"] }],
+        });
+        if (selection.canceled || !selection.filePath) return null;
+        await assertExportDestination(store.root, id, selection.filePath);
+        await writeFile(selection.filePath, markdown, "utf8");
+        return rememberExport({
+          format: "markdown",
+          path: selection.filePath,
+          bytes: Buffer.byteLength(markdown),
+        });
       }
       case "export:reveal": {
         const path = required(args, "path");
@@ -1968,6 +2075,7 @@ export function createWorkbench(
     "projects:pin",
     "projects:remove",
     "library:restore",
+    "library:purge",
     "projects:group",
     "groups:create",
     "groups:rename",
@@ -2002,6 +2110,8 @@ export function createWorkbench(
   const dialogActions = new Set([
     "components:remove",
     "templates:remove",
+    // Commits its own transaction, then releases drafts and archived history.
+    "library:purge",
     "components:import",
     "workspace:resolve",
     "library:prepareImport",

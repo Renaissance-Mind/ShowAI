@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { Folder, Loader2 } from "../ui/icons";
+import { useEffect, useRef, useState } from "react";
+import { Folder, Loader2, Trash2 } from "../ui/icons";
 import Dialog from "./Dialog";
 import PageIcon from "../components/PageIcon";
 import { desktop, errorMessage } from "./bridge";
@@ -32,6 +32,18 @@ export function restoreItem(target: RestoreTarget) {
   });
 }
 
+/** Deletes items in the trash for good; content inside a folder or project goes with it. */
+export function purgeItems(targets: RestoreTarget[]) {
+  return desktop.invoke("library:purge", {
+    items: targets.map((target) => ({
+      kind: target.kind,
+      projectId: target.projectId,
+      ...(target.kind === "folder" ? { folderId: target.id } : {}),
+      ...(target.kind === "page" ? { pageId: target.id } : {}),
+    })),
+  });
+}
+
 const date = (value: string) =>
   new Intl.DateTimeFormat(getLocale(), {
     month: "short",
@@ -43,6 +55,7 @@ function RestoreList({
   items,
   busy,
   onRestore,
+  onPurge,
 }: {
   heading: string;
   items: {
@@ -55,6 +68,7 @@ function RestoreList({
   }[];
   busy: string;
   onRestore: (target: RestoreTarget, key: string) => void;
+  onPurge: (target: RestoreTarget) => void;
 }) {
   const t = useTranslator(navigationMessages);
   if (!items.length) return null;
@@ -91,6 +105,16 @@ function RestoreList({
               )}
               {t("restore")}
             </button>
+            <button
+              type="button"
+              className="studio-icon navigation-restore-purge"
+              disabled={!!busy}
+              aria-label={t("purgeNamed", { title: item.title })}
+              title={t("purgeNamed", { title: item.title })}
+              onClick={() => onPurge(item.target)}
+            >
+              <Trash2 size={15} />
+            </button>
           </li>
         ))}
       </ul>
@@ -101,15 +125,22 @@ function RestoreList({
 export function DeletedItemsDialog({
   onClose,
   onRestored,
+  onPurged,
 }: {
   onClose: () => void;
   onRestored: (target: RestoreTarget) => Promise<void>;
+  onPurged: (targets: RestoreTarget[]) => Promise<void>;
 }) {
   const t = useTranslator(navigationMessages);
   const tc = useTranslator(commonMessages);
   const [entries, setEntries] = useState<DeletedEntries | null>(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState("");
+  const [purging, setPurging] = useState<RestoreTarget[] | null>(null);
+  const [purgeBusy, setPurgeBusy] = useState(false);
+  const [purgeError, setPurgeError] = useState("");
+  const [purged, setPurged] = useState(0);
+  const list = useRef<HTMLDivElement>(null);
   const load = () =>
     desktop
       .invoke<DeletedEntries>("library:deleted")
@@ -117,6 +148,45 @@ export function DeletedItemsDialog({
   useEffect(() => {
     void load();
   }, []);
+  // The removed row held focus; the list keeps it once the confirmation closes.
+  useEffect(() => {
+    if (purged) list.current?.focus({ preventScroll: true });
+  }, [purged]);
+  const targets: RestoreTarget[] = entries
+    ? [
+        ...entries.projects.map((item) => ({
+          kind: "project" as const,
+          projectId: item.id,
+          title: item.name,
+        })),
+        ...entries.folders.map((item) => ({
+          kind: "folder" as const,
+          projectId: item.projectId,
+          id: item.id,
+          title: item.name,
+        })),
+        ...entries.pages.map((item) => ({
+          kind: "page" as const,
+          projectId: item.projectId,
+          id: item.id,
+          title: item.title || tc("untitled"),
+        })),
+      ]
+    : [];
+  const purge = () => {
+    if (!purging) return;
+    setPurgeBusy(true);
+    setPurgeError("");
+    void purgeItems(purging)
+      .then(async () => {
+        await load();
+        await onPurged(purging);
+        setPurging(null);
+        setPurged((count) => count + 1);
+      })
+      .catch((reason) => setPurgeError(errorMessage(reason)))
+      .finally(() => setPurgeBusy(false));
+  };
   const restore = (target: RestoreTarget, key: string) => {
     setBusy(key);
     setError("");
@@ -132,8 +202,22 @@ export function DeletedItemsDialog({
     !entries.folders.length &&
     !entries.pages.length;
   return (
-    <Dialog title={t("deleted.title")} onClose={onClose} wide>
-      <div className="navigation-restore">
+    <Dialog
+      title={t("deleted.title")}
+      onClose={onClose}
+      wide
+      headerActions={
+        <button
+          type="button"
+          className="studio-button small"
+          disabled={!!busy || !targets.length}
+          onClick={() => setPurging(targets)}
+        >
+          {t("emptyTrash")}
+        </button>
+      }
+    >
+      <div className="navigation-restore" ref={list} tabIndex={-1}>
         <p className="settings-help">{t("deleted.intro")}</p>
         {error && (
           <p className="studio-form-error" role="alert">
@@ -148,6 +232,7 @@ export function DeletedItemsDialog({
               heading={t("deleted.projects")}
               busy={busy}
               onRestore={restore}
+              onPurge={(target) => setPurging([target])}
               items={entries.projects.map((item) => ({
                 key: `project:${item.id}`,
                 title: item.name,
@@ -165,6 +250,7 @@ export function DeletedItemsDialog({
               heading={t("deleted.folders")}
               busy={busy}
               onRestore={restore}
+              onPurge={(target) => setPurging([target])}
               items={entries.folders.map((item) => ({
                 key: `folder:${item.projectId}:${item.id}`,
                 title: item.name,
@@ -186,6 +272,7 @@ export function DeletedItemsDialog({
               heading={t("deleted.pages")}
               busy={busy}
               onRestore={restore}
+              onPurge={(target) => setPurging([target])}
               items={entries.pages.map((item) => ({
                 key: `page:${item.projectId}:${item.id}`,
                 title: item.title || tc("untitled"),
@@ -206,6 +293,65 @@ export function DeletedItemsDialog({
           </>
         )}
       </div>
+      {purging && (
+        <Dialog
+          title={t(purging.length === 1 ? "purge.title" : "purge.emptyTitle")}
+          onClose={() => {
+            setPurging(null);
+            setPurgeError("");
+          }}
+          dismissible={!purgeBusy}
+        >
+          <div className="studio-form">
+            <p className="studio-delete-description">
+              {purging.length === 1
+                ? t(
+                    purging[0].kind === "page"
+                      ? "purge.page"
+                      : "purge.container",
+                    { title: purging[0].title },
+                  )
+                : t("purge.all", { count: purging.length })}
+              {t("purge.irreversible")}
+            </p>
+            {purging.length > 1 && (
+              <ul className="navigation-purge-list">
+                {purging.map((target) => (
+                  <li key={`${target.kind}:${target.projectId}:${"id" in target ? target.id : ""}`}>
+                    {target.title}
+                  </li>
+                ))}
+              </ul>
+            )}
+            {purgeError && (
+              <p className="studio-form-error" role="alert">
+                {purgeError}
+              </p>
+            )}
+            <footer>
+              <button
+                className="studio-button"
+                data-autofocus
+                disabled={purgeBusy}
+                onClick={() => {
+                  setPurging(null);
+                  setPurgeError("");
+                }}
+              >
+                {tc("cancel")}
+              </button>
+              <button
+                className="studio-button danger"
+                disabled={purgeBusy}
+                onClick={purge}
+              >
+                {purgeBusy && <Loader2 size={14} className="studio-spin" />}
+                {t("purge.confirm")}
+              </button>
+            </footer>
+          </div>
+        </Dialog>
+      )}
     </Dialog>
   );
 }

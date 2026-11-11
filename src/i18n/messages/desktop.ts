@@ -20,6 +20,11 @@ export default defineMessages("desktop", {
     "menu.pasteAndMatchStyle": "粘贴并匹配样式",
     "menu.delete": "删除",
     "menu.selectAll": "全选",
+    "menu.find": "查找",
+    "menu.findOpen": "查找…",
+    "menu.findReplace": "查找和替换…",
+    "menu.findNext": "查找下一个",
+    "menu.findPrevious": "查找上一个",
     "menu.view": "显示",
     "menu.refreshPage": "刷新当前页面",
     "menu.toggleDevTools": "开发者工具",
@@ -68,7 +73,7 @@ export default defineMessages("desktop", {
     "action.copyDetails": "复制详情",
     "action.wait": "继续等待",
     "startFailedDetail":
-      "内容库中的内容没有被修改。可以复制诊断信息或打开日志文件夹，在报告问题时附上。",
+      "内容库中的内容没有被修改。可以复制诊断信息、打开日志文件夹或内容库文件夹，在报告问题时附上。",
     "library.missingTitle": "找不到内容库",
     "library.unavailableTitle": "无法打开内容库",
     "library.missingDetail":
@@ -78,6 +83,7 @@ export default defineMessages("desktop", {
     "library.unavailableDetail":
       "无法打开内容库 {path}：{reason}\n\n原有内容没有被修改。可以检查文件夹权限后重新尝试，或选择其他位置。",
     "library.choose": "选择内容库位置…",
+    "library.reveal": "显示内容库文件夹",
     "library.useDefault": "使用默认位置 {path}",
     "library.chooseTitle": "选择 ShowAI 内容库",
     "settings.corruptTitle": "ShowAI 设置文件无法读取",
@@ -156,6 +162,11 @@ export default defineMessages("desktop", {
     "menu.pasteAndMatchStyle": "Paste and Match Style",
     "menu.delete": "Delete",
     "menu.selectAll": "Select All",
+    "menu.find": "Find",
+    "menu.findOpen": "Find…",
+    "menu.findReplace": "Find and Replace…",
+    "menu.findNext": "Find Next",
+    "menu.findPrevious": "Find Previous",
     "menu.view": "View",
     "menu.refreshPage": "Reload Current Page",
     "menu.toggleDevTools": "Developer Tools",
@@ -205,7 +216,7 @@ export default defineMessages("desktop", {
     "action.copyDetails": "Copy Details",
     "action.wait": "Keep Waiting",
     "startFailedDetail":
-      "Nothing in your library was changed. Copy the diagnostic information or open the log folder to attach them to a problem report.",
+      "Nothing in your library was changed. Copy the diagnostic information, or open the log or library folder, to attach them to a problem report.",
     "library.missingTitle": "Library not found",
     "library.unavailableTitle": "Couldn't open the library",
     "library.missingDetail":
@@ -215,6 +226,7 @@ export default defineMessages("desktop", {
     "library.unavailableDetail":
       "Couldn't open the library at {path}: {reason}\n\nYour content was not changed. Check the folder permissions and try again, or choose another location.",
     "library.choose": "Choose Library Location…",
+    "library.reveal": "Show Library Folder",
     "library.useDefault": "Use Default Location {path}",
     "library.chooseTitle": "Choose a ShowAI library",
     "settings.corruptTitle": "ShowAI couldn't read its settings",

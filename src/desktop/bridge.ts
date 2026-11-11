@@ -75,7 +75,11 @@ export type MenuCommand =
   | "about"
   | "reportProblem"
   | "copyDiagnostics"
-  | "shortcuts";
+  | "shortcuts"
+  | "find"
+  | "findReplace"
+  | "findNext"
+  | "findPrevious";
 
 /** A page whose changes could not be written when its window was closing. */
 export interface UnsavedPage {

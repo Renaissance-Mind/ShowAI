@@ -23,7 +23,7 @@
 }
 .navigation-restore-section li {
   display: grid;
-  grid-template-columns: 22px minmax(0, 1fr) auto;
+  grid-template-columns: 22px minmax(0, 1fr) auto auto;
   align-items: center;
   gap: 10px;
   padding: 6px 4px;
@@ -36,6 +36,22 @@
   display: inline-flex;
   justify-content: center;
   color: var(--muted);
+}
+.navigation-restore:focus {
+  outline: none;
+}
+.navigation-restore-purge:not(:disabled):hover,
+.navigation-restore-purge:focus-visible {
+  color: var(--danger);
+}
+.navigation-purge-list {
+  margin: 0;
+  padding: 0 0 0 18px;
+  max-height: 180px;
+  overflow: auto;
+  font-size: 13px;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
 }
 .navigation-restore-text {
   display: grid;

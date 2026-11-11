@@ -250,6 +250,82 @@ test("a conversation streams, persists and resumes the same Claude session", asy
   expect(reloaded.map((item) => item.turns.length)).toEqual([2]);
 });
 
+test("a renamed conversation keeps its title through later turns and reloads", async () => {
+  const project = await library.createProject({ name: "Rename test" });
+  const page = await library.createPage(project.id, { title: "Draft" });
+  const first = await host.send({
+    projectId: project.id,
+    prompt: "Summarise   the\nintroduction",
+    target: { kind: "page", pageId: page.document.id },
+  });
+  await settled(project.id, first.id);
+  expect(first.title).toBe("Summarise the introduction");
+
+  const renamed = (await host.action("agent:renameConversation", {
+    projectId: project.id,
+    id: first.id,
+    title: "  Intro   review ",
+  })) as { title: string };
+  expect(renamed.title).toBe("Intro review");
+  await expect(
+    host.action("agent:renameConversation", {
+      projectId: project.id,
+      id: first.id,
+      title: "   ",
+    }),
+  ).rejects.toThrow();
+
+  await host.send({
+    projectId: project.id,
+    conversationId: first.id,
+    prompt: "Shorter please",
+    target: { kind: "page", pageId: page.document.id },
+  });
+  const done = await settled(project.id, first.id);
+  expect(done.title).toBe("Intro review");
+  await host.conversations.settled(first.id);
+  const [reloaded] = await new ConversationStore(join(directory, "agent")).list(
+    project.id,
+  );
+  expect(reloaded.title).toBe("Intro review");
+});
+
+test("conversation search matches titles, requests and replies", async () => {
+  const project = await library.createProject({ name: "Search test" });
+  const page = await library.createPage(project.id, { title: "Notes" });
+  const a = await host.send({
+    projectId: project.id,
+    prompt: "Draft the budget table",
+    target: { kind: "page", pageId: page.document.id },
+  });
+  await settled(project.id, a.id);
+  const b = await host.send({
+    projectId: project.id,
+    prompt: "Translate the abstract",
+    target: { kind: "page", pageId: page.document.id },
+  });
+  await settled(project.id, b.id);
+  const search = async (query: string) =>
+    (
+      (await host.action("agent:conversations", {
+        projectId: project.id,
+        query,
+      })) as { id: string }[]
+    )
+      .map((item) => item.id)
+      .sort();
+  // Title and request text.
+  expect(await search("BUDGET")).toEqual([a.id]);
+  // Every word must occur, in any order.
+  expect(await search("abstract translate")).toEqual([b.id]);
+  // The fake Agent replies "Hello world" to both.
+  expect(await search("hello")).toEqual([a.id, b.id].sort());
+  expect(await search("budget abstract")).toEqual([]);
+  expect(await search("  ")).toEqual([a.id, b.id].sort());
+  // Full-width letters match their ASCII forms.
+  expect(await search("ｂｕｄｇｅｔ")).toEqual([a.id]);
+});
+
 test("undo restores the page only while it still matches the turn result", async () => {
   const project = await library.createProject({ name: "Undo test" });
   const page = await library.createPage(project.id, { title: "Before" });

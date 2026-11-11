@@ -174,6 +174,9 @@ export function shortcutGroups(options: {
       entries: [
         { keys: ["/"], label: n("shortcut.insert") },
         { keys: ["Mod+Z", "Shift+Mod+Z"], label: n("shortcut.editUndo") },
+        { keys: ["Mod+F"], label: n("shortcut.find") },
+        { keys: ["Alt+Mod+F"], label: n("shortcut.findReplace") },
+        { keys: ["Mod+G", "Shift+Mod+G"], label: n("shortcut.findStep") },
       ],
     },
     {

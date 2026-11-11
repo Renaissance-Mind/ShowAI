@@ -1,0 +1,104 @@
+.find-bar-anchor {
+  position: relative;
+  height: 0;
+  z-index: 30;
+}
+.find-bar {
+  position: absolute;
+  top: 8px;
+  right: 20px;
+  display: flex;
+  align-items: flex-start;
+  gap: 2px;
+  padding: 4px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--paper);
+  box-shadow: var(--shadow);
+  max-width: calc(100% - 24px);
+  box-sizing: border-box;
+  font-size: 13px;
+  animation: find-bar-in var(--duration-fast, 140ms) var(--ease-out, ease-out);
+}
+@keyframes find-bar-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+}
+.find-bar-rows {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+.find-bar .studio-icon {
+  flex-shrink: 0;
+}
+.find-bar-row {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 2px;
+}
+.find-bar-input {
+  flex: 1 1 160px;
+  width: 220px;
+  min-width: 0;
+  height: 28px;
+  padding: 0 8px;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+}
+.find-bar-input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+.find-bar-input::-webkit-search-cancel-button {
+  display: none;
+}
+.find-bar-count {
+  flex-shrink: 0;
+  min-width: 52px;
+  padding: 0 6px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  text-align: right;
+}
+.find-bar .studio-icon[data-active] {
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+.find-bar .studio-icon:disabled {
+  opacity: 0.4;
+}
+.find-bar-toggle {
+  align-self: stretch;
+  height: auto;
+}
+@media (max-width: 640px) {
+  .find-bar {
+    left: 12px;
+    right: 12px;
+  }
+  .find-bar-input {
+    width: auto;
+  }
+}
+::highlight(showai-find) {
+  background-color: #f6d36b80;
+  color: inherit;
+}
+::highlight(showai-find-current) {
+  background-color: #f0a33a;
+  color: #1c211e;
+}
+:root[data-theme="dark"] ::highlight(showai-find) {
+  background-color: #b9902c70;
+}

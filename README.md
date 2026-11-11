@@ -13,7 +13,7 @@
 **The evolving interface between humans and agents.** Your agent's answers become interfaces — interactive, archived, and evolving as you use them.
 
 - **Interactive** — agents answer with charts, calculators and diagrams you can adjust, compare and explore.
-- **Archived** — every interface is saved as your own page with full history; the agent continues from your edits, and you can export it for others.
+- **Archived** — every interface is saved as your own page in local versioned files; the agent continues from your edits, and you can export it for others.
 - **Evolving** — when an expression is missing, the agent builds a new component; pages that work become templates, so each round starts from a better place.
 
 https://github.com/user-attachments/assets/ecdccdec-1def-45a9-811f-121a7d07b906
@@ -78,7 +78,7 @@ As agents take on more work, the bottleneck moves from what agents can do to whe
 
 **Archived**
 
-- **Living Archive**: Output lands as versioned files in a local project bound to your source directory, with full history and conflict protection, ready to be continued, reused or broken into new material.
+- **Living Archive**: Output lands as versioned files in a local project bound to your source directory, with editor undo, retained drafts and conflict protection, ready to be continued, reused or broken into new material.
 - **Local-first, share when you want**: Fully usable with no account. Connect a self-hosted server for collaboration, or export an offline, interactive HTML file.
 
 **Evolving**

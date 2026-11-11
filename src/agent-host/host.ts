@@ -57,6 +57,8 @@ import type {
 } from "./types";
 import {
   ConversationStore,
+  conversationTitle,
+  matchesConversation,
   parseTarget,
   recap,
   summary,
@@ -1871,12 +1873,16 @@ export class AgentHost {
         return this.start(args);
       case "agent:send":
         return this.send(args);
-      case "agent:conversations":
+      case "agent:conversations": {
+        const query = z.string().max(200).optional().parse(args.query) ?? "";
         return (
           await this.conversations.list(
             assertId(z.string().parse(args.projectId)),
           )
-        ).map(summary);
+        )
+          .filter((item) => matchesConversation(item, query))
+          .map(summary);
+      }
       case "agent:conversation": {
         const conversation = await this.conversations.get(
           assertId(z.string().parse(args.projectId)),
@@ -1908,6 +1914,14 @@ export class AgentHost {
           assertId(z.string().parse(args.projectId)),
           z.string().uuid().parse(args.conversationId),
           z.string().uuid().parse(args.id),
+        );
+      case "agent:renameConversation":
+        return summary(
+          await this.conversations.rename(
+            assertId(z.string().parse(args.projectId)),
+            z.string().uuid().parse(args.id),
+            conversationTitle(args.title),
+          ),
         );
       case "agent:deleteConversation":
         await this.conversations.remove(
@@ -1967,6 +1981,7 @@ export const agentActions = new Set([
   "agent:conversation",
   "agent:turn",
   "agent:undo",
+  "agent:renameConversation",
   "agent:deleteConversation",
   "agent:cancel",
   "agent:readFile",

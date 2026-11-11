@@ -191,6 +191,15 @@ export function installBrowserBridge() {
         defaultName: `${name}${args.format === "json" ? ".showai.json" : ".html"}`,
       };
     }
+    if (action === "export:conversation")
+      dialogs[action] = {
+        title: t("title.exportConversation"),
+        kind: "save",
+        defaultName: `${String(args.title ?? "")
+          .trim()
+          .replace(/[<>:"/\\|?*\x00-\x1f]/g, "_")
+          .slice(0, 100) || "ShowAI"}.md`,
+      };
     if (action === "datasets:chooseFile")
       dialogs[action] =
         args.mode === "save"
