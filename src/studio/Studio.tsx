@@ -5261,6 +5261,9 @@ export default function Studio() {
             }}
             prefill={assistantPrefill}
             onPrefillUsed={() => setAssistantPrefill(null)}
+            onExported={(path) =>
+              setExportReceipt({ message: t("conversationExported"), path })
+            }
           >
           <main
             className={`studio-main${recordPeek.view ? " has-record-peek" : ""}`}

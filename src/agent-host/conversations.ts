@@ -175,6 +175,41 @@ export function summary(
   };
 }
 
+/** A conversation title as the person typed it, on one line. */
+export function conversationTitle(value: unknown) {
+  return z
+    .string()
+    .transform((title) => title.replace(/\s+/g, " ").trim())
+    .pipe(z.string().min(1).max(200))
+    .parse(value);
+}
+
+/**
+ * Whether every word of the query occurs in the conversation's title, its
+ * requests or its replies, ignoring case and character width. An empty query
+ * matches every conversation.
+ */
+export function matchesConversation(
+  conversation: AgentConversation,
+  query: string,
+) {
+  const fold = (value: string) => value.normalize("NFKC").toLocaleLowerCase();
+  const words = fold(query).split(/\s+/).filter(Boolean);
+  if (!words.length) return true;
+  const text = fold(
+    [
+      conversation.title,
+      ...conversation.turns.flatMap((turn) => [
+        turn.prompt,
+        ...turn.events
+          .filter((event) => event.type === "message")
+          .map((event) => event.text),
+      ]),
+    ].join("\n"),
+  );
+  return words.every((word) => text.includes(word));
+}
+
 /**
  * Conversations live per project under the host root. Writes for one
  * conversation are serialised; running turns persist at most once a second.
@@ -324,6 +359,13 @@ export class ConversationStore {
     return readOptional<ShowDocument>(
       this.basePath(projectId, conversationId, turnId),
     );
+  }
+  /** The title is only derived when a conversation starts, so a rename stays. */
+  async rename(projectId: string, id: string, title: string) {
+    const conversation = await this.get(projectId, id);
+    conversation.title = conversationTitle(title);
+    await this.save(conversation);
+    return conversation;
   }
   async remove(projectId: string, id: string) {
     const conversation = await this.get(projectId, id);

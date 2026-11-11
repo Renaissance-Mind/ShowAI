@@ -250,6 +250,7 @@ export const workbenchActions = new Set([
   "export:analyze",
   "export:page",
   "export:site",
+  "export:conversation",
   "packaging:sync",
   "datasets:chooseFile",
   "fs:reveal",
@@ -1807,6 +1808,31 @@ export function createWorkbench(
           out: selection.filePaths[0],
           overwrite: true,
         }));
+      }
+      case "export:conversation": {
+        // The Agent panel renders the Markdown from the conversation it shows,
+        // which may run on another device; this host only writes the file.
+        const id = projectId(args);
+        await store.readProject(id);
+        const markdown = args.markdown;
+        if (typeof markdown !== "string" || markdown.length > 20 * 1024 * 1024)
+          throw new CoreError(
+            "INVALID_DATA",
+            "markdown must be text of at most 20 MB.",
+          );
+        const selection = await host.saveDialog({
+          title: tf("title.exportConversation"),
+          defaultPath: `${filename(required(args, "title"))}.md`,
+          filters: [{ name: tf("filter.markdown"), extensions: ["md"] }],
+        });
+        if (selection.canceled || !selection.filePath) return null;
+        await assertExportDestination(store.root, id, selection.filePath);
+        await writeFile(selection.filePath, markdown, "utf8");
+        return rememberExport({
+          format: "markdown",
+          path: selection.filePath,
+          bytes: Buffer.byteLength(markdown),
+        });
       }
       case "export:reveal": {
         const path = required(args, "path");

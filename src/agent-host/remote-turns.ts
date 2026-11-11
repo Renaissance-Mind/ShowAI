@@ -3,7 +3,12 @@ import { join } from "node:path";
 import { readdir, rm } from "node:fs/promises";
 import type { AgentHost } from "./host";
 import type { AgentConversation, AgentTurn } from "./types";
-import { parseTarget, summary } from "./conversations";
+import {
+  conversationTitle,
+  matchesConversation,
+  parseTarget,
+  summary,
+} from "./conversations";
 import { readOptional, writeProtected } from "./storage";
 import { syncManager } from "../sync/manager";
 import { FileStore } from "../core/store";
@@ -300,7 +305,7 @@ export class RemoteTurns {
         conversation.updatedAt,
     };
   }
-  async list(projectId: string) {
+  async list(projectId: string, query = "") {
     await this.ready();
     const ids = new Set([
       ...(await this.host.conversations.list(projectId)).map((c) => c.id),
@@ -311,8 +316,27 @@ export class RemoteTurns {
     return (
       await Promise.all([...ids].map((id) => this.conversation(projectId, id)))
     )
+      .filter((conversation) => matchesConversation(conversation, query))
       .map(summary)
       .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+  }
+  /** Renames the stored conversation and the copies queued turns still carry. */
+  async rename(projectId: string, id: string, title: string) {
+    await this.ready();
+    const next = conversationTitle(title);
+    for (const job of this.jobs.values())
+      if (
+        job.conversation.projectId === projectId &&
+        job.conversation.id === id
+      ) {
+        job.conversation.title = next;
+        await this.save(job);
+      }
+    if (
+      (await this.host.conversations.list(projectId)).some((c) => c.id === id)
+    )
+      await this.host.conversations.rename(projectId, id, next);
+    return summary(await this.conversation(projectId, id));
   }
   async cancel(projectId: string, id: string) {
     await this.ready();
