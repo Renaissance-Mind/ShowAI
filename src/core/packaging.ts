@@ -13,7 +13,7 @@ import { readFile, stat } from "node:fs/promises";
 import { join } from "node:path";
 import { CAPACITY } from "../portable/capacity.mjs";
 import { readBinding } from "../datasets/binding.mjs";
-import { visitNodes } from "../surface/document.mjs";
+import { visitContentNodes } from "../surface/document.mjs";
 import { resourceDataUrl, resourceSlots } from "../portable/assets.mjs";
 import {
   DatasetStore,
@@ -339,7 +339,7 @@ function boundBlocks(
 ) {
   const blocks = new Map<string, PackagingBlock[]>();
   for (const page of pages)
-    visitNodes(page.document.content, (node) => {
+    visitContentNodes(page.document.content, (node) => {
       if (node.type !== "widget") return;
       const binding = readBinding(node.attrs?.data);
       const blockId = node.attrs?.id;

@@ -99,6 +99,51 @@ describe("self-contained image export", () => {
     ).toBe(src);
   });
 
+  it("embeds images in stepper steps and components nested in rich text", async () => {
+    const src = `${origin}/image.png`;
+    const document = validateDocument({
+      id: "step-images",
+      title: "Steps",
+      content: {
+        type: "doc",
+        content: [
+          {
+            type: "widget",
+            attrs: {
+              id: "steps",
+              kind: "stepper",
+              data: {
+                steps: [
+                  {
+                    title: "One",
+                    content: {
+                      type: "doc",
+                      content: [
+                        { type: "image", attrs: { src, alt: "Step image" } },
+                        {
+                          type: "widget",
+                          attrs: {
+                            id: "step-figure",
+                            kind: "image",
+                            data: { src, alt: "Figure" },
+                          },
+                        },
+                      ],
+                    },
+                  },
+                ],
+              },
+            },
+          },
+        ],
+      },
+    });
+    expect(externalImageUrls(document)).toEqual([src]);
+    const embedded = await embedDocumentImages(document);
+    expect(externalImageUrls(embedded)).toEqual([]);
+    expect(() => assertOfflineImages(embedded)).not.toThrow();
+  });
+
   it("embeds PDF files and video posters in nested containers without changing their source", async () => {
     const document = validateDocument({
       id: "files",

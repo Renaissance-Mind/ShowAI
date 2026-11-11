@@ -4,6 +4,7 @@ import { resourceMime } from "../components/blocks/research-contract.mjs";
 import { isImageIcon } from "../lib/page-icon.mjs";
 import { isSafeUrl, validateDocument } from "./validation.mjs";
 import { detachedRef, isLocalFileRef, localRefType } from "./local-files.mjs";
+import { widgetDocuments } from "../surface/document.mjs";
 
 /**
  * Every resource field of a document: page and container icons, image
@@ -65,12 +66,10 @@ export function resourceSlots(document, { components = false } = {}) {
       propSlots(data.props, "props", (object, key, field, kind) =>
         add(object, key, kind, blockId, field),
       );
-    if (
-      widget === "text" &&
-      data?.content &&
-      typeof data.content === "object"
-    )
-      visit(data.content, blockId);
+    // Rich text in component data (text, callout and toggle bodies, stepper
+    // steps); a library component's props are covered by propSlots.
+    if (widget && widget !== "custom")
+      for (const tree of widgetDocuments(data)) visit(tree, blockId);
     node.content?.forEach((child) => visit(child, blockId));
   };
   visit(document.content);
@@ -113,8 +112,8 @@ export function componentFileSlots(document) {
         0,
         true,
       );
-    if (widget === "text" && data?.content && typeof data.content === "object")
-      visit(data.content, blockId);
+    if (widget && widget !== "custom")
+      for (const tree of widgetDocuments(data)) visit(tree, blockId);
     node.content?.forEach((child) => visit(child, blockId));
   };
   visit(document.content);

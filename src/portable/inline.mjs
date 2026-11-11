@@ -2,6 +2,7 @@ import { CAPACITY, CapacityError } from "./capacity.mjs";
 import { randomUUID } from "node:crypto";
 import { gzipSync } from "node:zlib";
 import { inlineStyleSheet, scopeReaderCss } from "./inline-style.mjs";
+import { visitContentNodes } from "../surface/document.mjs";
 
 /** Inline hosts block network requests: every component must travel with the page. */
 export function assertInlineArtifact(artifact) {
@@ -10,17 +11,16 @@ export function assertInlineArtifact(artifact) {
       "Inline conversation pages must bundle all components; the host blocks remote component requests.",
     );
   const references = new Map();
-  const visit = (node) => {
-    if (node?.type === "widget" && node.attrs?.kind === "custom") {
-      const data = node.attrs.data;
-      references.set(
-        `${data?.componentId}@${data?.version}#${data?.integrity ?? data?.scope ?? "legacy"}`,
-        data,
-      );
-    }
-    node?.content?.forEach(visit);
-  };
-  visit(artifact?.document?.content);
+  if (artifact?.document?.content)
+    visitContentNodes(artifact.document.content, (node) => {
+      if (node.type === "widget" && node.attrs?.kind === "custom") {
+        const data = node.attrs.data;
+        references.set(
+          `${data?.componentId}@${data?.version}#${data?.integrity ?? data?.scope ?? "legacy"}`,
+          data,
+        );
+      }
+    });
   for (const [reference, ref] of references) {
     const candidates = artifact.components?.filter(
       (item) =>

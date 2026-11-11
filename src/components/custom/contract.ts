@@ -1,4 +1,5 @@
 import { CAPACITY, assertContent } from "../../portable/capacity.mjs";
+import { visitContentNodes } from "../../surface/document.mjs";
 import type { ShowDocument } from "../../types";
 import type {
   CompiledComponent,
@@ -112,11 +113,12 @@ export function readCustomBlockData(value: unknown): CustomBlockData {
   };
 }
 
+/** Every library component a document shows, including those nested in rich text. */
 export function collectCustomComponentRefs(
   document: ShowDocument,
 ): CustomComponentRef[] {
   const refs = new Map<string, CustomComponentRef>();
-  const visit = (node: typeof document.content) => {
+  visitContentNodes(document.content, (node) => {
     if (node.type === "widget" && node.attrs?.kind === "custom") {
       const { componentId, version, integrity, scope } = readCustomBlockData(
         node.attrs.data,
@@ -141,8 +143,6 @@ export function collectCustomComponentRefs(
         ref,
       );
     }
-    node.content?.forEach(visit);
-  };
-  visit(document.content);
+  });
   return [...refs.values()];
 }

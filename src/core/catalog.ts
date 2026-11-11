@@ -21,6 +21,7 @@ import {
   remapSurfaceIds,
   isSurface,
   upgradeDocument,
+  visitContentNodes,
 } from "../surface/document.mjs";
 import { createHash, randomUUID } from "node:crypto";
 import {
@@ -1058,7 +1059,7 @@ async function saveTemplateImpl(
       ...(bundle.document ?? {}),
       title: bundle.metadata.name,
     });
-    const visit = (node: ShowDocument["content"]) => {
+    visitContentNodes(skeleton.content, (node) => {
       const data = node.attrs?.data;
       if (node.type === "widget" && node.attrs?.kind === "custom" && data) {
         const binding = componentBindings.find(
@@ -1074,9 +1075,7 @@ async function saveTemplateImpl(
           };
         }
       }
-      node.content?.forEach(visit);
-    };
-    visit(skeleton.content);
+    });
     input = { ...input, ...bundle.metadata, document: skeleton };
   }
   const id = input.id ?? `template-${randomUUID()}`,
@@ -2784,12 +2783,14 @@ export async function resolveDocumentComponents(
     ]);
   const refs = collectCustomComponentRefs(document);
   const required = new Set<string>();
-  const requireContent = (node: ShowDocument["content"]) => {
-    if (node.type === "widget" && node.attrs?.kind === "custom")
+  // Content components are required; only a navigation renderer may fail.
+  const custom: ShowDocument["content"][] = [];
+  visitContentNodes(document.content, (node) => {
+    if (node.type === "widget" && node.attrs?.kind === "custom") {
+      custom.push(node);
       required.add(key(readCustomBlockData(node.attrs.data)));
-    node.content?.forEach(requireContent);
-  };
-  requireContent(document.content);
+    }
+  });
   const resolved = await Promise.all(
     refs.map(async (ref) => {
       const component = await getComponent(
@@ -2817,20 +2818,16 @@ export async function resolveDocumentComponents(
   const components = resolved.filter(
     (component): component is CompiledComponent => !!component,
   );
-  const visit = (node: typeof document.content) => {
-    if (node.type === "widget" && node.attrs?.kind === "custom") {
-      const data = readCustomBlockData(node.attrs.data);
-      const reference = key(data);
-      if (!schemas.has(reference))
-        throw new Error("A custom component reference was not resolved.");
-      const component = schemas.get(reference)!;
-      // A bound block keeps only its local props; the resolved props are checked when rendered.
-      if (!hasBinding(node.attrs.data))
-        assertProps(component.schema, data.props, component.documentation);
-    }
-    node.content?.forEach(visit);
-  };
-  visit(document.content);
+  for (const node of custom) {
+    const data = readCustomBlockData(node.attrs!.data);
+    const reference = key(data);
+    if (!schemas.has(reference))
+      throw new Error("A custom component reference was not resolved.");
+    const component = schemas.get(reference)!;
+    // A bound block keeps only its local props; the resolved props are checked when rendered.
+    if (!hasBinding(node.attrs!.data))
+      assertProps(component.schema, data.props, component.documentation);
+  }
   return components;
 }
 
@@ -2964,13 +2961,10 @@ export async function lockDocumentComponents(
 ): Promise<ShowDocument> {
   const copy = documentCopy(document);
   const selected = new Map<string, Promise<CompiledComponent>>();
-  const visit = async (node: ShowDocument["content"]): Promise<void> => {
+  const lock = async (node: ShowDocument["content"]): Promise<void> => {
     if (node.type === "widget" && node.attrs?.kind === "custom") {
       const data = node.attrs.data as Record<string, unknown>;
-      const ref = collectCustomComponentRefs({
-        ...copy,
-        content: { type: "doc", content: [node] },
-      })[0];
+      const ref = readCustomBlockData(data);
       const key = `${ref.componentId}@${ref.version}:${ref.integrity ?? ""}:${ref.scope ?? ""}`;
       let pending = selected.get(key);
       if (!pending) {
@@ -3007,9 +3001,19 @@ export async function lockDocumentComponents(
         throw new Error("Page outline renderer does not implement protocol 1.");
       assertProps(component.schema, ref.props, component.documentation);
     }
-    await Promise.all((node.content ?? []).map(visit));
   };
-  await visit(copy.content);
+  // Components nested in rich text are pinned like top-level ones. Nodes are
+  // collected before any is changed in place, and changing a node keeps the
+  // rich text inside its data, so every collected node stays in the copy.
+  const nodes: ShowDocument["content"][] = [];
+  visitContentNodes(copy.content, (node) => {
+    if (
+      (node.type === "widget" && node.attrs?.kind === "custom") ||
+      node.attrs?.outline?.renderer
+    )
+      nodes.push(node);
+  });
+  await Promise.all(nodes.map(lock));
   return copy;
 }
 

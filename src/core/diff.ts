@@ -26,6 +26,7 @@ import {
   isSurface,
   reconcileSurface,
   fillSurfaceLayout,
+  visitContentNodes,
   visitNodes,
 } from "../surface/document.mjs";
 import type {
@@ -41,7 +42,7 @@ import { canonicalJson } from "./canonical";
 
 /** Blocks bound to shared data must carry a complete, valid binding when saved. */
 function assertBindings(document: ShowDocument) {
-  visitNodes(document.content, (node) => {
+  visitContentNodes(document.content, (node) => {
     if (node.type !== "widget" || !readBinding(node.attrs?.data)) return;
     try {
       compileBinding(readBinding(node.attrs!.data));

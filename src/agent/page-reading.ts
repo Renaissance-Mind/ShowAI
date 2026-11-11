@@ -1,4 +1,5 @@
 import { agentCommentView } from "../core/comments";
+import { widgetDocuments } from "../surface/document.mjs";
 import {
   resolveDocumentDatasets,
   type BindingRead,
@@ -82,7 +83,11 @@ function outlineWindow(
   };
 }
 
-/** Ids of custom component blocks drawn by these compiled components. */
+/**
+ * Ids of the blocks that show custom components drawn by these compiled
+ * components. A component nested in rich text is shown by the block that
+ * holds the rich text, so that block is selected for rendering.
+ */
 function customBlocks(
   document: ShowDocument,
   components: { id: string; version: string; integrity: string }[],
@@ -90,8 +95,8 @@ function customBlocks(
   const wanted = new Set(
     components.map((item) => `${item.id}@${item.version}:${item.integrity}`),
   );
-  const ids: string[] = [];
-  const visit = (node: ShowDocument["content"]) => {
+  const ids = new Set<string>();
+  const visit = (node: ShowDocument["content"], owner?: string) => {
     if (node.type === "widget" && node.attrs?.kind === "custom") {
       const data = node.attrs.data as {
         componentId?: string;
@@ -99,12 +104,15 @@ function customBlocks(
         integrity?: string;
       };
       if (wanted.has(`${data.componentId}@${data.version}:${data.integrity}`))
-        ids.push(String(node.attrs.id));
+        ids.add(owner ?? String(node.attrs.id));
     }
-    node.content?.forEach(visit);
+    if (node.type === "widget")
+      for (const tree of widgetDocuments(node.attrs?.data))
+        visit(tree, owner ?? String(node.attrs?.id));
+    node.content?.forEach((child) => visit(child, owner));
   };
   visit(document.content);
-  return ids;
+  return [...ids];
 }
 const roles = [
   "button",

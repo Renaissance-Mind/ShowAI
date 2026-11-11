@@ -15,12 +15,12 @@ import { ContentLibrary as GitLibrary } from "./content-library";
 import { documentHash, canonicalJson } from "./diff";
 import type { ShowDocument } from "./model";
 import type { ChangeActor } from "./history-model";
-import { visitNodes } from "../surface/document.mjs";
+import { visitContentNodes } from "../surface/document.mjs";
 import {inkWireDraftCommitMetadataMatches} from "../surface/ink-wire.mjs";
 
 function committedDraftHash(document: ShowDocument): string {
   const normalized = structuredClone(document);
-  visitNodes(normalized.content, (node) => {
+  visitContentNodes(normalized.content, (node) => {
     if(node.type==="surface" && node.attrs?.kind==="board")delete node.attrs.inkState;
     const data = node.attrs?.data;
     // Catalog resolution adds a lookup scope; locking an exact revision removes it.

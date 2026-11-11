@@ -4,7 +4,7 @@ import {
   type BindingRead,
   type ExternalSnapshotReport,
 } from "../core/dataset-resolution";
-import { visitNodes } from "../surface/document.mjs";
+import { visitContentNodes, visitNodes } from "../surface/document.mjs";
 import { CAPACITY, assertBytes } from "../portable/capacity.mjs";
 import {
   access,
@@ -407,7 +407,7 @@ function lockedDocument(
   components: CompiledComponent[],
 ): ShowDocument {
   const copy = structuredClone(document);
-  const visit = (node: ShowDocument["content"]) => {
+  visitContentNodes(copy.content, (node) => {
     if (node.type === "widget" && node.attrs?.kind === "custom") {
       const data = node.attrs.data;
       const candidates = components.filter(
@@ -425,9 +425,7 @@ function lockedDocument(
         data: { ...data, integrity: candidates[0].integrity },
       };
     }
-    node.content?.forEach(visit);
-  };
-  visit(copy.content);
+  });
   return copy;
 }
 

@@ -7,7 +7,7 @@ import { PluginInstallError } from "../plugin/plugin-errors";
 import { ReadBaselines } from "../core/read-baselines";
 import { readBoard, type BoardReadInput } from "./board-reading";
 import { EditorDrafts } from "../core/editor-drafts";
-import { placeTemplate } from "../surface/document.mjs";
+import { placeTemplate, visitContentNodes } from "../surface/document.mjs";
 import { upgradeResource } from "../surface/containers.mjs";
 import { FileStore } from "../core/store";
 import { canonicalJson } from "../core/diff";
@@ -129,7 +129,7 @@ function rebindImportedComponents(
       component,
     ]),
   );
-  const visit = (node: typeof copy.content) => {
+  visitContentNodes(copy.content, (node) => {
     if (node.type === "widget" && node.attrs?.kind === "custom") {
       const data = node.attrs.data;
       const component = packages.get(`${data?.componentId}@${data?.version}`);
@@ -146,9 +146,7 @@ function rebindImportedComponents(
         };
       }
     }
-    node.content?.forEach(visit);
-  };
-  visit(copy.content);
+  });
   return copy;
 }
 

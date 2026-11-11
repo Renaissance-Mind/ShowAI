@@ -7,6 +7,7 @@ import { resourceForPath, type HistoryEntry } from "./history-model";
 import { withLibraryLock } from "./library-lock";
 import { CoreError } from "./model";
 import type { JSONContent } from "@tiptap/core";
+import { visitContentNodes, widgetDocuments } from "../surface/document.mjs";
 
 interface SearchRow {
   id: string;
@@ -79,7 +80,7 @@ function strings(value: unknown): string[] {
 }
 
 // Bump when extraction changes so existing indexes rebuild once.
-const EXTRACTION_VERSION = "3";
+const EXTRACTION_VERSION = "4";
 // Component data keys that configure identity, layout or style rather than carry reader text.
 const NON_TEXT_KEYS = new Set([
   "id",
@@ -508,6 +509,21 @@ export class LibraryIndex {
             integrity: data?.integrity,
             blockId: id,
           });
+          // Components inside its rich text are used by the page too; their
+          // text is already part of this block's search row.
+          for (const tree of widgetDocuments(data))
+            visitContentNodes(tree, (inner: JSONContent) => {
+              if (inner.type !== "widget") return;
+              edges.push({
+                source: path,
+                targetKind: "component",
+                targetId:
+                  inner.attrs?.data?.componentId ?? inner.attrs?.kind ?? "",
+                version: inner.attrs?.data?.version,
+                integrity: inner.attrs?.data?.integrity,
+                blockId: inner.attrs?.id,
+              });
+            });
         }
         // Lists and paragraphs don't add a location level; named containers and components do.
         const inner =
@@ -560,8 +576,8 @@ export class LibraryIndex {
           version: dependency.version,
           integrity: dependency.integrity,
         });
-      if (value.document?.content) {
-        const visit = (node: JSONContent) => {
+      if (value.document?.content)
+        visitContentNodes(value.document.content, (node: JSONContent) => {
           if (node.type === "widget" && node.attrs?.kind === "custom")
             edges.push({
               source: id,
@@ -571,10 +587,7 @@ export class LibraryIndex {
               integrity: node.attrs.data.integrity,
               blockId: node.attrs.id,
             });
-          node.content?.forEach(visit);
-        };
-        visit(value.document.content);
-      }
+        });
     } else if (owner.kind === "project")
       add(path, "project", value.name, strings(value.folders).join("\n"));
   }

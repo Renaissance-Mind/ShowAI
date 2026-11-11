@@ -7,7 +7,7 @@ import {
   type BindingIssue,
 } from "../datasets/binding.mjs";
 import { bindingEditable } from "../datasets/editable.mjs";
-import { visitNodes } from "../surface/document.mjs";
+import { visitContentNodes } from "../surface/document.mjs";
 import { formatPath } from "../datasets/operations.mjs";
 import type {
   DatasetReadStatus,
@@ -193,7 +193,7 @@ export async function resolveDocumentDatasets(
   options: { includeProps?: boolean; remember?: boolean } = {},
 ): Promise<{ document: ShowDocument; bindings: BindingRead[] }> {
   const bound: { node: ShowDocument["content"] }[] = [];
-  visitNodes(document.content, (node) => {
+  visitContentNodes(document.content, (node) => {
     if (node.type === "widget" && readBinding(node.attrs?.data))
       bound.push({ node });
   });
@@ -344,7 +344,7 @@ export async function resolveDocumentDatasets(
       read.error = error instanceof Error ? error.message : String(error);
     }
   }
-  visitNodes(snapshot.content, (node) => {
+  visitContentNodes(snapshot.content, (node) => {
     if (node.type !== "widget") return;
     const id = String(node.attrs?.id);
     if (replacements.has(id)) node.attrs!.data = replacements.get(id);
@@ -376,13 +376,13 @@ export function withDataNotices(
 ): ShowDocument {
   if (!notices.size) return resolved;
   const own = new Map<string, unknown>();
-  visitNodes(original.content, (node) => {
+  visitContentNodes(original.content, (node) => {
     const id = node.attrs?.id;
     if (node.type === "widget" && typeof id === "string" && notices.has(id))
       own.set(id, node.attrs!.data);
   });
   const copy = structuredClone(resolved);
-  visitNodes(copy.content, (node) => {
+  visitContentNodes(copy.content, (node) => {
     const id = node.attrs?.id;
     if (node.type !== "widget" || typeof id !== "string" || !own.has(id))
       return;

@@ -32,7 +32,7 @@ import { getComponent, lockDocumentComponents } from "../core/catalog";
 import { readCustomBlockData } from "../components/custom/contract";
 import { propsIssues, type PropsIssue } from "../components/custom/schema";
 import { canonicalJson } from "../core/canonical";
-import { visitNodes } from "../surface/document.mjs";
+import { visitContentNodes, visitNodes } from "../surface/document.mjs";
 import { pageEntries, valueDiffEntries } from "./page-diff-view";
 import type { JsonSchema } from "../components/custom/types";
 
@@ -815,7 +815,7 @@ export class DatasetService {
 
   /** Rejects saving shared props into a bound block's stored data. */
   assertBoundBlocks(document: ShowDocument) {
-    visitNodes(document.content, (node) => {
+    visitContentNodes(document.content, (node) => {
       if (node.type !== "widget") return;
       const binding = readBinding(node.attrs?.data);
       if (!binding) return;

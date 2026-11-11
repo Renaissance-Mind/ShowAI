@@ -33,7 +33,7 @@ import {
 import { assertProps } from "../components/custom/schema";
 import type { JsonSchema } from "../components/custom/types";
 import type { ShowDocument } from "./model";
-import { visitNodes } from "../surface/document.mjs";
+import { visitContentNodes } from "../surface/document.mjs";
 import {
   DEFAULT_REFRESH_SECONDS,
   DatasetSourceLinks,
@@ -246,7 +246,7 @@ export function datasetReferencesIn(
   datasetId: string,
 ): string[] {
   const blocks: string[] = [];
-  visitNodes(document.content, (node) => {
+  visitContentNodes(document.content, (node) => {
     if (node.type !== "widget") return;
     const binding = readBinding(node.attrs?.data);
     if (
