@@ -81,6 +81,16 @@ import { pageOf, shellToken, summarizeCatalog } from "./disclosure";
 import { getGuide } from "./guides";
 import { DatasetService } from "./dataset-service";
 import { pageDiffEntries } from "./page-diff-view";
+import { blockChanges } from "./page-receipt";
+import {
+  removeCatalogPackage,
+  type CatalogRemovalInput,
+} from "../core/catalog-removal";
+import {
+  duplicatePageDocument,
+  listDeletedEntries,
+  updatePageState,
+} from "../core/page-lifecycle";
 import {
   readPageView,
   type PageReadOptions,
@@ -144,6 +154,17 @@ function rebindImportedComponents(
   visit(copy.content);
   return copy;
 }
+
+/** Operations that cannot add or change a component reference or its props. */
+const REF_NEUTRAL_OPERATIONS = new Set<string>([
+  "block.text.set",
+  "block.remove",
+  "block.move",
+  "surface.reading-order.set",
+  "surface.view.save",
+  "surface.view.remove",
+  "diagram.arrange",
+]);
 
 /** CLI and MCP share operations; project-bound connections cannot mutate shared libraries. */
 /**
@@ -738,14 +759,18 @@ export class AgentService extends CatalogService {
         { currentHash: current.hash, currentRevision: current.revision },
       );
     }
-    return this.store.savePage(
-      this.requireProject(projectId),
+    const saved = await this.store.savePage(
+      project,
       pageId,
       document,
       baseHash,
       baseRevision,
       current,
     );
+    return {
+      ...saved,
+      changedBlocks: blockChanges(current.document, saved.document),
+    };
   }
   private async applyPageImpl(
     projectId: string,
@@ -808,11 +833,13 @@ export class AgentService extends CatalogService {
       input.operations,
       input.datasetBases,
     );
-    const document = await lockDocumentComponents(
-      this.store.root,
-      routed.document,
-      project,
-    );
+    // The stored page is locked already; these operations add no component
+    // refs or props, and applyOperations has normalized the result.
+    const document = input.operations.every((operation) =>
+      REF_NEUTRAL_OPERATIONS.has(operation?.type),
+    )
+      ? routed.document
+      : await lockDocumentComponents(this.store.root, routed.document, project);
     this.datasets.assertBoundBlocks(document);
     const saved = await this.store.savePage(
       project,
@@ -824,7 +851,11 @@ export class AgentService extends CatalogService {
     );
     // The same library transaction commits the page and its dataset writes.
     await routed.commit();
-    return { ...saved, ...routed.notes };
+    return {
+      ...saved,
+      ...routed.notes,
+      changedBlocks: blockChanges(current.document, saved.document),
+    };
   }
   async diffPage(projectId: string, pageId: string, sinceHash: string) {
     return this.store.diffPage(
@@ -1189,6 +1220,83 @@ export class AgentService extends CatalogService {
       return created;
     });
   }
+  /**
+   * Delete (archive), restore or pin a page; deleted pages stay restorable and
+   * appear in deletedEntries. Without baseHash the current version changes.
+   */
+  async updatePage(
+    projectId: string,
+    pageId: string,
+    fields: { archived?: boolean; pinned?: boolean },
+    base: { baseHash?: string; baseRevision?: string } = {},
+  ) {
+    if (fields.archived === undefined && fields.pinned === undefined)
+      throw new CoreError("INVALID_DATA", "Pass archived and/or pinned.");
+    const project = this.requireProject(projectId);
+    return this.mutation("Update page", [project, pageId, fields, base], () =>
+      updatePageState(this.store, project, pageId, fields, base),
+    );
+  }
+  /** A copy of a page with new block ids in the same folder; title defaults to "<title> copy". */
+  async duplicatePage(projectId: string, pageId: string, title?: string) {
+    const project = this.requireProject(projectId);
+    const document = await duplicatePageDocument(
+      this.store,
+      project,
+      pageId,
+      title,
+    );
+    return this.createPage(project, { document });
+  }
+  /**
+   * Remove a component or template revision (or every revision without
+   * version) unless a page, package or publication still uses it. Global and
+   * published revisions change the shared library, which a project-bound
+   * connection cannot do.
+   */
+  async removeCatalog(
+    projectId: string | undefined,
+    input: Omit<CatalogRemovalInput, "projectId">,
+  ) {
+    const scope = input.scope ?? "project";
+    if (scope !== "project")
+      this.requireSharedWrite("Removing a global or published revision");
+    const project =
+      scope === "project" ? this.requireProject(projectId) : undefined;
+    await openLibrary(this.store.root);
+    const context = changeContext();
+    // The removal checks uses through the index and then commits on its own.
+    return withChangeContext(
+      {
+        ...context,
+        requestFingerprint:
+          context.requestFingerprint ??
+          createHash("sha256")
+            .update(
+              canonicalJson({
+                name: "Remove catalog package",
+                input: { ...input, scope, projectId: project },
+                actor: context.actor,
+                channel: context.channel,
+              }),
+            )
+            .digest("hex"),
+      },
+      () =>
+        removeCatalogPackage(this.store.root, {
+          ...input,
+          scope,
+          projectId: project,
+        }),
+    );
+  }
+  /** Deleted projects, folders and pages that can be restored. */
+  deletedEntries() {
+    return listDeletedEntries(
+      this.store,
+      this.projectId ? [this.projectId] : undefined,
+    );
+  }
   async savePage(
     ...args: Parameters<AgentService["savePageImpl"]>
   ): ReturnType<AgentService["savePageImpl"]> {
@@ -1265,6 +1373,12 @@ const AGENT_GUIDANCE: Record<string, { nextStep: string; userMessage: string }> 
       nextStep:
         "Ask the user to decide as described in details, then call again with their decision.",
       userMessage: "ShowAI needs your decision before it continues.",
+    },
+    IN_USE: {
+      nextStep:
+        "Tell the user where it is used (details.uses: pages with blockIds, packages, publications). Move those blocks to another revision with page_apply component.ref.set, or remove them, then remove again; deleted pages count until their blocks change.",
+      userMessage:
+        "This is still used, so ShowAI did not remove it. Nothing was changed.",
     },
     CAPACITY_EXCEEDED: {
       nextStep:

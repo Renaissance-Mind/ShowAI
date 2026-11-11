@@ -42,6 +42,69 @@ import { supportInfo } from "./support";
 import { withHtmlLanguage, type Locale } from "../i18n";
 
 export const READ_VIEWS = ["structured", "image", "html"] as const;
+/** Source size above which a default read returns an outline window. */
+export const DEFAULT_READ_BYTES = 256 * 1024;
+const LARGE_OUTLINE_BLOCKS = 100;
+
+/**
+ * Outline items of the page's blocks [offset, offset+limit) with their nested
+ * items. Blocks are the children of the page's root container when it has one.
+ */
+function outlineWindow(
+  outline: OutlineItem[],
+  rootId: unknown,
+  offset: number,
+  limit: number | undefined,
+): {
+  outline: OutlineItem[];
+  blockCount: number;
+  paged: boolean;
+  nextOffset?: number;
+} {
+  const rooted = outline[0]?.depth === 0 && outline[0].id === rootId;
+  const level = rooted ? 1 : 0;
+  const blockCount = outline.filter((item) => item.depth === level).length;
+  if (limit === undefined && offset === 0)
+    return { outline, blockCount, paged: false };
+  const end = limit === undefined ? Infinity : offset + limit;
+  let index = -1;
+  const selected = outline.filter((item) => {
+    if (item.depth < level) return true;
+    if (item.depth === level) index++;
+    return index >= offset && index < end;
+  });
+  return {
+    outline: selected,
+    blockCount,
+    paged: true,
+    ...(end < blockCount ? { nextOffset: end } : {}),
+  };
+}
+
+/** Ids of custom component blocks drawn by these compiled components. */
+function customBlocks(
+  document: ShowDocument,
+  components: { id: string; version: string; integrity: string }[],
+): string[] {
+  const wanted = new Set(
+    components.map((item) => `${item.id}@${item.version}:${item.integrity}`),
+  );
+  const ids: string[] = [];
+  const visit = (node: ShowDocument["content"]) => {
+    if (node.type === "widget" && node.attrs?.kind === "custom") {
+      const data = node.attrs.data as {
+        componentId?: string;
+        version?: string;
+        integrity?: string;
+      };
+      if (wanted.has(`${data.componentId}@${data.version}:${data.integrity}`))
+        ids.push(String(node.attrs.id));
+    }
+    node.content?.forEach(visit);
+  };
+  visit(document.content);
+  return ids;
+}
 const roles = [
   "button",
   "checkbox",
@@ -103,7 +166,9 @@ export const pageReadSchema = z
     snapshotId: z.string().uuid().optional(),
     view: z.enum(READ_VIEWS).default("structured"),
     format: z.enum(["json", "markdown"]).default("json"),
-    detail: z.enum(["full", "outline"]).default("full"),
+    detail: z.enum(["full", "outline"]).optional(),
+    offset: z.number().int().nonnegative().optional(),
+    limit: z.number().int().min(1).max(1000).optional(),
     blockIds: z.array(z.string().min(1).max(200)).min(1).max(100).optional(),
     theme: z.enum(["light", "dark"]).default("light"),
     viewport: z
@@ -199,6 +264,12 @@ export type PageReadResult =
       dom?: ReadingCapture["dom"];
       image?: { width: number; height: number; mimeType: "image/png" };
       metadataPath?: string;
+      /** Outline windows: top-level block count and where the next window starts. */
+      blockCount?: number;
+      offset?: number;
+      nextOffset?: number;
+      /** What a default read of a large page left out, and how to fetch it. */
+      omitted?: { fields: string[]; reason: string; next: string };
     });
 
 function previewHtml(
@@ -261,13 +332,23 @@ export async function readPageView(
     );
   if (
     options.view !== "structured" &&
-    (options.detail !== "full" ||
+    (options.detail !== undefined ||
       options.format !== "json" ||
-      options.rendered !== undefined)
+      options.rendered !== undefined ||
+      options.offset !== undefined ||
+      options.limit !== undefined)
   )
     throw new CoreError(
       "INVALID_DATA",
-      "format/detail/rendered apply to structured reading only.",
+      "format/detail/rendered/offset/limit apply to structured reading only.",
+    );
+  if (
+    options.detail === "full" &&
+    (options.offset !== undefined || options.limit !== undefined)
+  )
+    throw new CoreError(
+      "INVALID_DATA",
+      'offset/limit page the outline; use them without detail:"full".',
     );
   const current = await store.readPage(projectId, pageId);
   const captured = options.snapshotId
@@ -288,6 +369,23 @@ export async function readPageView(
       "The page changed since the preceding read. Read the current structured view before continuing.",
       { currentHash: record.hash },
     );
+  // A default read of a large page answers with a window of its outline.
+  const sourceBytes =
+    options.view === "structured" &&
+    options.detail === undefined &&
+    !options.blockIds &&
+    !options.out &&
+    !options.snapshotId &&
+    !options.actions.length &&
+    options.rendered !== true
+      ? Buffer.byteLength(JSON.stringify(record.document))
+      : 0;
+  const large = sourceBytes > DEFAULT_READ_BYTES;
+  const detail =
+    options.detail ??
+    (large || options.offset !== undefined || options.limit !== undefined
+      ? "outline"
+      : "full");
   const document = options.blockIds
     ? selectDocumentBlocks(record.document, options.blockIds)
     : record.document;
@@ -300,7 +398,7 @@ export async function readPageView(
   const resources = await describeResources(resolved);
   const sourceOnly =
     options.view === "structured" &&
-    (options.detail === "outline" ||
+    (detail === "outline" ||
       options.rendered === false ||
       !!options.snapshotId);
   if (sourceOnly && options.actions.length)
@@ -354,17 +452,49 @@ export async function readPageView(
   };
   const { out: _out, overwrite: _overwrite, ...state } = options;
   const content = structuredContent(resolved);
-  if (options.view === "structured" && options.detail === "outline") {
-    const outlineMarkdown = `# ${identity.title}\n\n${content.outline.map((node) => `${"  ".repeat(node.depth)}- ${node.title || node.type} [${node.id}]`).join("\n")}`;
+  if (options.view === "structured" && detail === "outline") {
+    const window = outlineWindow(
+      content.outline,
+      resolved.content.attrs?.id,
+      options.offset ?? 0,
+      options.limit ?? (large ? LARGE_OUTLINE_BLOCKS : undefined),
+    );
+    const outlineMarkdown = `# ${identity.title}\n\n${window.outline.map((node) => `${"  ".repeat(node.depth)}- ${node.title || node.type} [${node.id}]`).join("\n")}`;
+    const paging = {
+      ...(window.paged
+        ? {
+            blockCount: window.blockCount,
+            offset: options.offset ?? 0,
+            ...(window.nextOffset !== undefined
+              ? { nextOffset: window.nextOffset }
+              : {}),
+          }
+        : {}),
+      ...(large
+        ? {
+            omitted: {
+              fields: ["document", "markdown", "computed"],
+              reason: `The page source is ${Math.ceil(sourceBytes / 1024)} KiB, over the ${DEFAULT_READ_BYTES / 1024} KiB default read, so this read lists its outline${window.nextOffset !== undefined ? ` (top-level blocks ${options.offset ?? 0}–${window.nextOffset - 1} of ${window.blockCount})` : ""}.`,
+              next: 'Read the blocks you need with blockIds (up to 100 ids from the outline), continue the outline with offset:nextOffset, or pass detail:"full" for the whole source in one reply; out writes it to a file on local connections.',
+            },
+          }
+        : {}),
+    };
     const result =
       options.format === "markdown"
         ? {
             ...identity,
             format: "markdown" as const,
             markdown: outlineMarkdown,
-            outline: content.outline,
+            outline: window.outline,
+            ...paging,
           }
-        : { ...identity, format: "outline" as const, outline: content.outline };
+        : {
+            ...identity,
+            format: "outline" as const,
+            outline: window.outline,
+            ...paging,
+          };
     if (options.out) {
       const target = await outputPath(
         store,
@@ -381,12 +511,30 @@ export async function readPageView(
     }
     return result;
   }
+  // A structured read renders only to obtain component readings, so it
+  // renders just those components unless actions need the whole page.
+  const readingBlocks =
+    options.view === "structured" &&
+    !options.blockIds &&
+    !options.actions.length
+      ? customBlocks(
+          resolved,
+          options.rendered === true
+            ? components
+            : components.filter((component) => component.reader === "readData"),
+        )
+      : undefined;
   const render =
     options.view !== "structured" ||
-    options.rendered === true ||
     options.actions.length > 0 ||
     (options.rendered !== false &&
-      components.some((component) => component.reader === "readData"));
+      (options.blockIds
+        ? options.rendered === true ||
+          components.some((component) => component.reader === "readData")
+        : !!readingBlocks?.length));
+  const renderBlockIds = readingBlocks?.length
+    ? readingBlocks
+    : options.blockIds;
   let capture: ReadingCapture | undefined;
   let path: string | undefined;
   const generated = join(
@@ -399,12 +547,14 @@ export async function readPageView(
     const locale = await appLocale(store.root);
     const html = previewHtml(
       await buildPageHtml(
-        resolved,
+        readingBlocks?.length
+          ? selectDocumentBlocks(resolved, readingBlocks)
+          : resolved,
         undefined,
         components,
         [],
         options.presentation,
-        options.blockIds ? { blockIds: options.blockIds } : undefined,
+        renderBlockIds ? { blockIds: renderBlockIds } : undefined,
         undefined,
       ),
       options,
@@ -423,7 +573,9 @@ export async function readPageView(
     await writeFile(path, html, "utf8");
     if (!(options.view === "html" && options.out))
       await recordReadingCache(store.root, path, html);
-    capture = await renderReading(path, options, locale);
+    capture = await renderReading(path, options, locale, {
+      image: options.view !== "structured",
+    });
   }
   const computed = capture?.components ?? [];
   const markdown =

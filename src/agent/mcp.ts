@@ -45,7 +45,8 @@ import { join } from "node:path";
 import { writePresentation } from "./presentation";
 import { syncManager } from "../sync/manager";
 import type { TemplateSelection } from "./template-workflow";
-import { compactMcpResult } from "./mcp-response";
+import { compactData, compactMcpResult } from "./mcp-response";
+import type { CatalogRemovalInput } from "../core/catalog-removal";
 import { boardReadSchema, type BoardReadResult } from "./board-reading";
 import { actionTool, strictToolInputs } from "./mcp-actions";
 import {
@@ -257,6 +258,7 @@ export function createMcpServer(options: {
       libraryAccess: options.projectAccess === "library",
       projectIds: options.workspaceProjectIds,
     }),
+    service,
     call,
   );
 
@@ -519,7 +521,7 @@ export function createMcpServer(options: {
     "page_save",
     {
       description:
-        "Save a full Page document with its baseHash; stale content returns CONFLICT.",
+        'Save a full Page document with its baseHash; stale content returns CONFLICT. Replies with a receipt (hash, revision, changedBlocks); response:"source" adds the saved document.',
       inputSchema: {
         ...changeSchema,
         pageId: z.string(),
@@ -528,7 +530,7 @@ export function createMcpServer(options: {
         baseRevision: z.string().optional(),
         components: z.array(jsonObject).max(100).optional(),
         remoteComponents: z.array(jsonObject).max(100).optional(),
-        response: z.enum(["full", "source", "receipt"]).default("full"),
+        response: z.enum(["full", "source", "receipt"]).default("receipt"),
       },
       annotations: { ...write, openWorldHint: true },
     },
@@ -544,20 +546,23 @@ export function createMcpServer(options: {
     }) =>
       call(
         async () =>
-          withOpenLink(
-            await service.savePage(
-              projectId,
-              pageId,
-              validateDocument(document),
-              baseHash,
-              components as unknown as CompiledComponent[] | undefined,
-              remoteComponents as unknown as
-                PublishedComponentLocator[] | undefined,
-              baseRevision,
+          compactData(
+            await withOpenLink(
+              await service.savePage(
+                projectId,
+                pageId,
+                validateDocument(document),
+                baseHash,
+                components as unknown as CompiledComponent[] | undefined,
+                remoteComponents as unknown as
+                  PublishedComponentLocator[] | undefined,
+                baseRevision,
+              ),
             ),
+            response,
           ),
         metadata,
-      ).then((result) => compactMcpResult(result, response)),
+      ),
   );
   const operationsSchema = z.array(jsonObject).max(1000);
   const applyShape = {
@@ -568,13 +573,13 @@ export function createMcpServer(options: {
     operations: operationsSchema.optional(),
     operationsFile: z.string().min(1).optional(),
     datasetBases: z.record(z.string(), z.string()).optional(),
-    response: z.enum(["full", "source", "receipt"]).default("full"),
+    response: z.enum(["full", "source", "receipt"]).default("receipt"),
   };
   const { operationsFile: _operationsFile, ...remoteApplyShape } = applyShape;
   register(
     "page_apply",
     {
-      description: `Apply operations by stable block id with the Page's baseHash. Insert components with {type:"component.insert",kind,data,parentId?,afterId?}, change their data with {type:"component.props.set",blockId,props} and switch a custom component to another revision with {type:"component.ref.set",blockId,version,integrity,componentId?} (keeps id and props). Other operations: guide authoring.${
+      description: `Apply operations by stable block id with the Page's baseHash. Insert components with {type:"component.insert",kind,data,parentId?,afterId?}, change their data with {type:"component.props.set",blockId,props} and switch a custom component to another revision with {type:"component.ref.set",blockId,version,integrity,componentId?} (keeps id and props). Other operations: guide authoring. Replies with a receipt whose changedBlocks.added lists new block ids; response:"source" adds the document.${
         localFiles ? " operationsFile reads the operations array from a JSON file." : ""
       }`,
       // Hosted connections keep operations required and accept no device path.
@@ -615,13 +620,16 @@ export function createMcpServer(options: {
               )
               .join("; ")}`,
           );
-        return service.applyPage(projectId, pageId, {
-          baseHash,
-          baseRevision,
-          operations: parsed.data as PageOperation[],
-          datasetBases,
-        });
-      }, metadata).then((result) => compactMcpResult(result, response)),
+        return compactData(
+          await service.applyPage(projectId, pageId, {
+            baseHash,
+            baseRevision,
+            operations: parsed.data as PageOperation[],
+            datasetBases,
+          }),
+          response,
+        );
+      }, metadata),
   );
   register(
     "page_diff",
@@ -953,8 +961,30 @@ export function createMcpServer(options: {
   const revisionId = z.string().optional();
   const revisionVersion = z.string();
   const catalogVersion = actionTool(
-    "Save a project-owned revision: fork an exact revision, or save a reviewed merge.",
+    "Save a project-owned revision (fork an exact revision, or save a reviewed merge), or remove a revision; remove without version removes every revision in that scope and refuses with IN_USE while pages, packages or publications use it.",
     {
+      remove: {
+        fields: {
+          ...changeSchema,
+          kind: z.enum(["component", "template"]),
+          id: z.string().min(1),
+          version: z.string().optional(),
+          scope: z.enum(["project", "global", "published"]).optional(),
+        },
+        run: ({ operationId, message, groupId, ...input }) =>
+          call(
+            () =>
+              service.removeCatalog(
+                projectId,
+                input as Omit<CatalogRemovalInput, "projectId">,
+              ),
+            {
+              operationId: operationId as string | undefined,
+              message: message as string | undefined,
+              groupId: groupId as string | undefined,
+            },
+          ),
+      },
       fork: {
         fields: {
           ...changeSchema,

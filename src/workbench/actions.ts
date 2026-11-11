@@ -7,7 +7,6 @@ import { prepareSavedInkResolution } from "../core/ink-wire-writer";
 import type { InkWireChoice } from "../surface/ink-wire.mjs";
 import { validatePageIcon } from "../lib/page-icon.mjs";
 import { translator } from "../i18n";
-import commonMessages from "../i18n/messages/common";
 import fileMessages from "../i18n/messages/files";
 import workbenchMessages from "../i18n/messages/workbench";
 import { PROJECT_SCOPE_LIMIT } from "../desktop/bridge";
@@ -70,13 +69,20 @@ import {
 import { assertId, CoreError, FileStore, folderVisible } from "../core/store";
 import type { PageRecord, ProjectBinding } from "../core/model";
 import { isDirectorySortBy } from "../core/directory-sort";
-import { deletedEntries } from "../core/deleted-entries";
+import {
+  removeCatalogPackage,
+  type RemovableScope,
+} from "../core/catalog-removal";
+import {
+  duplicatePageDocument,
+  listDeletedEntries,
+  updatePageState,
+} from "../core/page-lifecycle";
 import {
   getComponent,
   blankDocument,
   getTemplate,
   importComponent,
-  instantiateTemplate,
   instantiateTemplateRecord,
   promotePackage,
   forkPackage,
@@ -121,7 +127,6 @@ import {
 } from "./dataset-actions";
 
 const t = translator(workbenchMessages);
-const tc = translator(commonMessages);
 const tf = translator(fileMessages);
 
 export const workbenchActions = new Set([
@@ -234,11 +239,13 @@ export const workbenchActions = new Set([
   "templates:list",
   "templates:get",
   "templates:save",
+  "templates:remove",
   "components:list",
   "components:get",
   "components:import",
   "components:source",
   "components:save",
+  "components:remove",
   "components:createExample",
   "catalog:promote",
   "catalog:fork",
@@ -1065,24 +1072,8 @@ export function createWorkbench(
         });
       case "projects:remove":
         return store.updateProject(projectId(args), { archived: true });
-      case "library:deleted": {
-        const projects = await store.listProjects({ includeArchived: true });
-        return deletedEntries(
-          await Promise.all(
-            projects.map(async (project) => ({
-              project,
-              ...(project.archived
-                ? { folders: [], pages: [] }
-                : {
-                    folders: await store.listFolders(project.id, {
-                      includeArchived: true,
-                    }),
-                    pages: await store.listPages(project.id),
-                  }),
-            })),
-          ),
-        );
-      }
+      case "library:deleted":
+        return listDeletedEntries(store);
       case "library:restore": {
         const kind = required(args, "kind");
         const id = projectId(args);
@@ -1096,16 +1087,9 @@ export function createWorkbench(
           );
         if (kind !== "page")
           throw new CoreError("INVALID_DATA", "Choose a project, folder or page.");
-        const original = await store.readPage(id, pageId(args));
         return enrichPage(
           id,
-          await store.savePage(
-            id,
-            original.document.id,
-            { ...original.document, archived: false },
-            original.hash,
-            original.revision,
-          ),
+          await updatePageState(store, id, pageId(args), { archived: false }),
         );
       }
       case "folders:list":
@@ -1193,11 +1177,7 @@ export function createWorkbench(
           });
         const reference = pageReference(id, record, parseTarget(args.target));
         // page_diff can then compare the current page with this exact version.
-        await new ReadBaselines(store.root).remember(
-          id,
-          record,
-          `reference:${record.revision ?? record.hash}`,
-        );
+        await new ReadBaselines(store.root).remember(id, record);
         return reference;
       }
       case "pages:insertTemplate": {
@@ -1329,40 +1309,27 @@ export function createWorkbench(
         );
       }
       case "pages:duplicate": {
-        const id = projectId(args),
-          original = await store.readPage(id, pageId(args));
-        const parentId = (await store.listFolders(id)).some(
-          (folder) => folder.id === original.document.parentId,
-        )
-          ? original.document.parentId
-          : null;
+        const id = projectId(args);
         return enrichPage(
           id,
           await service.createPage(id, {
-            document: {
-              ...instantiateTemplate({
-                ...original.document,
-                title: t("pageCopyTitle", {
-                  title: original.document.title || tc("untitledPage"),
-                }),
-                archived: false,
-              }),
-              parentId,
-            },
+            document: await duplicatePageDocument(store, id, pageId(args)),
           }),
         );
       }
       case "pages:remove": {
-        const id = projectId(args),
-          original = await store.readPage(id, pageId(args));
+        const id = projectId(args);
         return enrichPage(
           id,
-          await store.savePage(
+          await updatePageState(
+            store,
             id,
-            original.document.id,
-            { ...original.document, archived: true },
-            text(args, "baseHash", true) ?? original.hash,
-            text(args, "baseRevision", true) ?? original.revision,
+            pageId(args),
+            { archived: true },
+            {
+              baseHash: text(args, "baseHash", true),
+              baseRevision: text(args, "baseRevision", true),
+            },
           ),
         );
       }
@@ -1600,6 +1567,17 @@ export function createWorkbench(
               version: ref.version,
               integrity: ref.integrity,
             });
+      }
+      case "components:remove":
+      case "templates:remove": {
+        const scope = text(args, "scope", true) ?? "project";
+        return removeCatalogPackage(store.root, {
+          kind: action === "components:remove" ? "component" : "template",
+          id: required(args, "id"),
+          version: text(args, "version", true),
+          scope: scope as RemovableScope,
+          ...(scope === "project" ? { projectId: projectId(args) } : {}),
+        });
       }
       case "catalog:fork": {
         const project = projectId(args);
@@ -2008,8 +1986,10 @@ export function createWorkbench(
     "pages:move",
     "pages:import",
     "templates:save",
+    "templates:remove",
     "components:import",
     "components:save",
+    "components:remove",
     "components:createExample",
     "catalog:promote",
     "catalog:fork",
@@ -2017,7 +1997,11 @@ export function createWorkbench(
     "catalog:verifyPublish",
     ...datasetMutationActions,
   ]);
+  // These run outside the shared transaction: dialogs wait for the person,
+  // and removals check the library index before their own transaction.
   const dialogActions = new Set([
+    "components:remove",
+    "templates:remove",
     "components:import",
     "workspace:resolve",
     "library:prepareImport",

@@ -629,6 +629,8 @@ test("native catalog guides insert Page and Board through the common component o
       operations,
       "--base-hash",
       page.hash,
+      "--response",
+      "source",
     ]);
   }
   const board = page.document.content.content.find(
@@ -696,7 +698,13 @@ test("real CLI binds sessions, detects user changes and rejects stale writes", a
     "--base-hash",
     read.hash,
   ]);
-  expect(changed.document.title).toBe("Manual revision");
+  // Saves reply with a receipt: identity, title and which blocks changed.
+  expect(changed).toMatchObject({
+    title: "Manual revision",
+    response: "receipt",
+    changedBlocks: { added: [], removed: [], page: true },
+  });
+  expect(changed.document).toBeUndefined();
   const diff = await run([
     "pages",
     "diff",
@@ -891,6 +899,8 @@ test("real CLI and MCP export selected components and repeat focused updates wit
     page.hash,
     "--input",
     ops,
+    "--response",
+    "source",
   ]);
   await run([
     ...args,
@@ -1326,6 +1336,8 @@ test("CLI discovers built-ins and roundtrips custom component artifacts to anoth
     operations,
     "--base-hash",
     page.hash,
+    "--response",
+    "source",
   ]);
   const output = await run([
     "export",

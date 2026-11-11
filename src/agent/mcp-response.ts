@@ -13,6 +13,30 @@ export function compactMcpResult(
     Array.isArray(data)
   )
     return result;
+  const selected = compactData(data, profile) as Record<string, unknown>;
+  return {
+    ...result,
+    content: result.content.map((item) =>
+      item.type === "text"
+        ? { ...item, text: JSON.stringify({ ok: true, data: selected }) }
+        : item,
+    ),
+    structuredContent: { ...result.structuredContent, data: selected },
+  };
+}
+
+/**
+ * The model-facing part of a tool result before it is serialized, so a receipt
+ * never pays for encoding the full document.
+ */
+export function compactData(data: unknown, profile: ResponseProfile): unknown {
+  if (
+    profile === "full" ||
+    !data ||
+    typeof data !== "object" ||
+    Array.isArray(data)
+  )
+    return data;
   const record = data as Record<string, unknown>;
   const fields = [
     "projectId",
@@ -48,6 +72,8 @@ export function compactMcpResult(
     "datasetSchemas",
     "datasetBases",
     "warnings",
+    "changedBlocks",
+    "omitted",
     "migration",
     "out",
   ];
@@ -68,13 +94,5 @@ export function compactMcpResult(
   if (profile === "source" && Array.isArray(record.bindings))
     selected.bindings = record.bindings;
   selected.response = profile;
-  return {
-    ...result,
-    content: result.content.map((item) =>
-      item.type === "text"
-        ? { ...item, text: JSON.stringify({ ok: true, data: selected }) }
-        : item,
-    ),
-    structuredContent: { ...result.structuredContent, data: selected },
-  };
+  return selected;
 }

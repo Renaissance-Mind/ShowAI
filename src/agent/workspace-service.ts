@@ -11,6 +11,7 @@ import { changeContext } from "../core/history-context";
 import { canonicalJson } from "../core/diff";
 import { LibraryOperations } from "../core/library-operations";
 import { EditorDrafts, type EditorDraftInput } from "../core/editor-drafts";
+import { listDeletedEntries } from "../core/page-lifecycle";
 import {
   importCompiledComponents,
   lockDocumentComponents,
@@ -59,6 +60,14 @@ export class WorkspaceService {
         )
         .digest("hex"),
     });
+  }
+  /** Restorable deleted items within this connection's projects. */
+  deleted() {
+    return listDeletedEntries(
+      this.store,
+      this.options.projectIds ??
+        (this.options.libraryAccess ? undefined : [this.projectId]),
+    );
   }
   folders(includeArchived = false) {
     return this.store.listFolders(this.project(), { includeArchived });

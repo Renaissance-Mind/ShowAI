@@ -111,6 +111,9 @@ GitHub／Google 登录由所选 ShowAI Server 的已配置登录方式提供。�
 | 读取真实目录                     | `organization_read({projectId,action:"folders",includeArchived?})` 返回文件夹 ID、parentId、图标、置顶与排序偏好；`pages_list({projectId,includeArchived:false})` 取活动页面，省略 includeArchived 保留包含归档页的兼容行为    |
 | 创建文件夹                       | `organization_update({projectId,action:"create_folder",name,icon?,parentId?})`；parentId 省略或 null 表示项目根目录                                                                                                            |
 | 更新文件夹                       | `organization_update({projectId,action:"update_folder",folderId,name?,icon?,pinned?,archived?})`；归档隐藏后代，恢复保留原层级                                                                                                 |
+| 删除、恢复、置顶 Page            | `organization_update({projectId,action:"update_page",pageId,archived?,pinned?,baseHash?,baseRevision?})`；`archived:true` 删除（进入已删除，可恢复），`archived:false` 恢复；不传 baseHash 时改当前版本，传了就同时传 baseRevision |
+| 复制 Page                        | `organization_update({projectId,action:"duplicate_page",pageId,title?})`；新页面在同一文件夹，块 ID 全部重新生成，标题默认为“原标题 副本”                                                                                       |
+| 查看可恢复的已删除内容           | `organization_read({projectId,action:"deleted"})` 列出已删除的项目、文件夹和页面；分别用 update_project、update_folder、update_page 的 `archived:false` 恢复                                                                     |
 | 在文件夹中创建 Page/Board        | `page_create({projectId,parentId:文件夹ID,title,kind?})`；内容树中的 Page/Board 容器不充当目录                                                                                                                                 |
 | 移动或排序条目                   | `organization_update({projectId,action:"move",kind:"page"或"folder",id,destinationProjectId?,parentId,relativeId?,placement?:"before"或"after",reorderOnly?,baseHash?,baseRevision?})`；parentId 是目标文件夹，null 表示根目录 |
 | 设置目录排序                     | `organization_update({projectId,action:"sort",parentId,sortBy:"name"或"createdAt"或"updatedAt"或"manual"})`；只影响该目录直接子项                                                                                              |
@@ -118,7 +121,7 @@ GitHub／Google 登录由所选 ShowAI Server 的已配置登录方式提供。�
 | 创建、改名或移除侧栏分组         | `organization_update({projectId,action:"create_group",name})`；`organization_update({projectId,action:"update_group",sidebarGroupId,name})`，name:null 移除分组并保留项目                                                      |
 | 项目分组和手动顺序               | `organization_update({projectId,action:"move_project",sectionId,relativeProjectId?,placement?})`；sectionId 是 projects、pinned 或真实侧栏分组 ID                                                                              |
 
-同项目内的页面改名、图标、收藏、归档、恢复和 parentId 修改，仍可使用 `page_apply` 的 `page.set`。字段里的 parentId 是目录 ID；块操作里的 parentId 是内容容器 ID。页面移动前读取完整当前源并传 baseHash/baseRevision；reorderOnly 只改同层顺序时无需页面内容版本。文件夹只支持项目内移动，不能移入自身或后代。新建或改动目录不会自动重组正文。
+页面改名、图标和 parentId 修改使用 `page_apply` 的 `page.set`；删除、恢复和置顶也可以这样改，`update_page` 更直接，回执只含页面状态。字段里的 parentId 是目录 ID；块操作里的 parentId 是内容容器 ID。页面移动前读取完整当前源并传 baseHash/baseRevision；reorderOnly 只改同层顺序时无需页面内容版本。文件夹只支持项目内移动，不能移入自身或后代。新建或改动目录不会自动重组正文。
 
 跨项目页面移动使用 `organization_update` 的 move，完整保留页面身份，并迁移其精确组件依赖。库连接允许本库项目之间移动；项目绑定连接只允许本项目。远程先从 `projects_list` 取得来源与目标 ID，两个项目都必须在当前授权内且可编辑；调用后检查 `synchronizations` 中的每个项目。远程依次同步目标与来源，中断时保留同步顺序并先恢复待办，不宣称跨两个项目具有服务器事务原子性。结果含错误或未同步状态时说明现状，不能创建另一份 Page 冒充移动成功。
 
