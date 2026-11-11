@@ -11,7 +11,6 @@ import {
   subscribeToBlocks,
 } from "./registry";
 import {
-  filterSortRows,
   parseChartData,
   safeImageUrl,
   safeUrl,
@@ -20,6 +19,7 @@ import {
 import { calculate } from "./Playground";
 import { validateDocument } from "../../portable/validation.mjs";
 import type { DatabaseColumn, DatabaseRow } from "./types";
+import { queryRecords } from "../../datasets/record-query.mjs";
 
 describe("interactive block data", () => {
   it("lists the primitive content components beside the rich-text entry", () => {
@@ -224,22 +224,13 @@ describe("interactive block data", () => {
     ];
     const original = structuredClone(rows);
     expect(
-      filterSortRows(
-        rows,
-        columns,
-        "",
-        { column: "status", value: "Open" },
-        { column: "count", direction: "asc" },
-      ).map((row) => row.id),
+      queryRecords(rows, columns, {
+        filter: { column: "status", value: "Open" },
+        sorts: [{ column: "count", direction: "asc" }],
+      }).map((row) => row.id),
     ).toEqual(["two", "one"]);
     expect(
-      filterSortRows(
-        rows,
-        columns,
-        "ALPHA",
-        { column: "", value: "" },
-        null,
-      ).map((row) => row.id),
+      queryRecords(rows, columns, { search: "ALPHA" }).map((row) => row.id),
     ).toEqual(["one"]);
     expect(rows).toEqual(original);
     const csv = toCsv(columns, [

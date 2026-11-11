@@ -4,7 +4,7 @@ import type {
   DatabaseColumn,
   DatabaseRow,
 } from "./types";
-import { getLocale, translator } from "../../i18n";
+import { translator } from "../../i18n";
 import messages from "../../i18n/messages/blockHelpers";
 
 const t = translator(messages);
@@ -83,42 +83,13 @@ export function parseChartData(value: string): {
   return { labels, series };
 }
 
-export function filterSortRows(
-  rows: DatabaseRow[],
+/** CSV of database rows; `cellText` writes each typed value (default: the stored text). */
+export function toCsv(
   columns: DatabaseColumn[],
-  query: string,
-  filter: { column: string; value: string },
-  sort: { column: string; direction: "asc" | "desc" } | null,
-): DatabaseRow[] {
-  const needle = query.trim().toLocaleLowerCase();
-  const result = rows.filter(
-    (row) =>
-      (!needle ||
-        columns.some((column) =>
-          String(row[column.id] ?? "")
-            .toLocaleLowerCase()
-            .includes(needle),
-        )) &&
-      (!filter.column || String(row[filter.column] ?? "") === filter.value),
-  );
-  if (!sort) return result;
-  const column = columns.find((item) => item.id === sort.column);
-  return result.sort((a, b) => {
-    const aValue = a[sort.column] ?? "",
-      bValue = b[sort.column] ?? "";
-    const comparison =
-      column?.type === "number"
-        ? Number(aValue) - Number(bValue)
-        : column?.type === "checkbox"
-          ? Number(Boolean(aValue)) - Number(Boolean(bValue))
-          : String(aValue).localeCompare(String(bValue), getLocale(), {
-              numeric: true,
-            });
-    return sort.direction === "asc" ? comparison : -comparison;
-  });
-}
-
-export function toCsv(columns: DatabaseColumn[], rows: DatabaseRow[]): string {
+  rows: DatabaseRow[],
+  cellText: (row: DatabaseRow, column: DatabaseColumn) => string = (row, column) =>
+    String(row[column.id] ?? ""),
+): string {
   const escape = (value: unknown) => {
     const content = String(value ?? "");
     // Preserve text when opened in spreadsheet software instead of evaluating formulas.
@@ -133,7 +104,7 @@ export function toCsv(columns: DatabaseColumn[], rows: DatabaseRow[]): string {
     [
       columns.map((column) => escape(column.name)).join(","),
       ...rows.map((row) =>
-        columns.map((column) => escape(row[column.id])).join(","),
+        columns.map((column) => escape(cellText(row, column))).join(","),
       ),
     ].join("\r\n")
   );

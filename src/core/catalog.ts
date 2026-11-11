@@ -68,6 +68,7 @@ import { builtinComponentCatalog } from "../components/catalog";
 import { validateComponentDocumentation } from "../components/custom/documentation";
 
 import { builtinSources, builtinExports } from "./builtin-sources";
+import { KIND_OPERATORS, VALUE_KINDS } from "../datasets/value-types.mjs";
 import { componentSandboxPolicy } from "../components/custom/sandbox-policy.mjs";
 import { diagramSourceFiles } from "../components/blocks/diagrams/templates";
 import { diagramAuthoringFiles } from "./diagram-authoring-files";
@@ -1323,9 +1324,53 @@ function record(value: unknown, label: string): Record<string, unknown> {
   assertJsonValue(value);
   return value as Record<string, unknown>;
 }
+/**
+ * The harness half of a database field type a component contributes: the
+ * kind its values project to and the operators it offers (a subset of that
+ * kind's). The cell half is the component's own React entry (the editor)
+ * and its named `field` export (format, project, sortKey, normalize).
+ */
+function databaseFieldContract(
+  value: unknown,
+): NonNullable<ComponentManifest["databaseField"]> {
+  const field = record(value, "databaseField");
+  for (const key of Object.keys(field))
+    if (!["protocol", "valueKind", "operators"].includes(key))
+      throw new Error(`databaseField.${key} is not a supported setting.`);
+  if (field.protocol !== 1)
+    throw new Error("databaseField.protocol must be 1.");
+  if (!VALUE_KINDS.includes(field.valueKind as never))
+    throw new Error(
+      `databaseField.valueKind must be one of ${VALUE_KINDS.join(", ")}.`,
+    );
+  const kind = field.valueKind as keyof typeof KIND_OPERATORS;
+  if (
+    field.operators !== undefined &&
+    (!Array.isArray(field.operators) ||
+      !field.operators.every((operator) =>
+        KIND_OPERATORS[kind].includes(operator as never),
+      ))
+  )
+    throw new Error(
+      `databaseField.operators must name operators of ${kind} values: ${KIND_OPERATORS[kind].join(", ")}.`,
+    );
+  return {
+    protocol: 1,
+    valueKind: kind,
+    ...(field.operators
+      ? { operators: [...new Set(field.operators as string[])] }
+      : {}),
+  } as NonNullable<ComponentManifest["databaseField"]>;
+}
 function manifestFrom(value: unknown): ComponentManifest {
   const item = record(value, "Component manifest");
-  if (item.role !== undefined || item.pageOutlineProtocol !== undefined) {
+  if (item.role === "database-field" || item.databaseField !== undefined) {
+    if (item.role !== "database-field" || item.pageOutlineProtocol !== undefined)
+      throw new Error(
+        "Database field type components declare role database-field and databaseField.",
+      );
+    databaseFieldContract(item.databaseField);
+  } else if (item.role !== undefined || item.pageOutlineProtocol !== undefined) {
     if (item.role !== "page-outline" || item.pageOutlineProtocol !== 1)
       throw new Error(
         "Page outline components require role page-outline and pageOutlineProtocol 1.",
@@ -1394,9 +1439,14 @@ function manifestFrom(value: unknown): ComponentManifest {
       ? { category: item.category as ComponentManifest["category"] }
       : {}),
     entry,
-    ...(item.role
-      ? { role: "page-outline" as const, pageOutlineProtocol: 1 as const }
-      : {}),
+    ...(item.role === "database-field"
+      ? {
+          role: "database-field" as const,
+          databaseField: databaseFieldContract(item.databaseField),
+        }
+      : item.role
+        ? { role: "page-outline" as const, pageOutlineProtocol: 1 as const }
+        : {}),
     ...(item.reader ? { reader: "readData" as const } : {}),
     scenarios: item.scenarios as string[],
     ...(item.documentation !== undefined
@@ -1541,7 +1591,9 @@ function compiledIntegrity(
 function runtimeSource(entry: string, reader = false): string {
   return `import React, {useState,useEffect} from 'react';import{createRoot}from'react-dom/client';import * as UserModule from ${JSON.stringify(entry)};import validate from 'showai:validator';const UserComponent=UserModule.default;
 const config=JSON.parse(document.getElementById('showai-component-data')?.textContent||'{}');const channel=config.channel;
-const send=(type,extra={})=>parent.postMessage({channel,type,...extra},'*');let update,outlineUpdate;
+const send=(type,extra={})=>parent.postMessage({channel,type,...extra},'*');let update,outlineUpdate,fieldUpdate;
+const plain=value=>JSON.parse(JSON.stringify(value===undefined?null:value));
+function fieldCalls(calls){const api=UserModule.field||{};return(Array.isArray(calls)?calls:[]).map(call=>{try{const fn=api[call.fn];if(typeof fn!=='function')return{missing:true};const value=fn(...call.args);if(value&&typeof value.then==='function')throw new Error(call.fn+' must be synchronous');return{value:plain(value)};}catch(error){return{error:String(error&&error.message||error)};}});}
 const validationMessage=()=>(validate.errors||[]).map(error=>(error.instancePath||error.params?.missingProperty||'data')+' '+error.message).join('; ');
 function check(props){if(validate(props))return true;send('showai:error',{message:validationMessage()});return false;}
 function reading(props){try{const read=UserModule['read'+'Data'];if(${reader}&&typeof read!=='function')throw new Error('Declared readData export is missing');const computed=typeof read==='function'?read(props):undefined;if(computed&&typeof computed.then==='function')throw new Error('readData must be synchronous');const visit=(value,depth=0)=>{if(depth>40)throw new Error('readData is nested too deeply');if(value===null||typeof value==='string'||typeof value==='boolean'||typeof value==='number'&&Number.isFinite(value))return;if(Array.isArray(value)){value.forEach(child=>visit(child,depth+1));return;}if(value&&typeof value==='object'&&Object.getPrototypeOf(value)===Object.prototype){Object.values(value).forEach(child=>visit(child,depth+1));return;}throw new Error('readData must contain only finite JSON values');};if(typeof read==='function')visit(computed);const encoded=JSON.stringify(computed);if(encoded&&new TextEncoder().encode(encoded).byteLength>65536)throw new Error('readData exceeds 64 KiB');window.__SHOWAI_COMPONENT_READING__={ready:true,status:typeof read==='function'?'computed':'raw',props,data:encoded===undefined?undefined:JSON.parse(encoded)};}catch(error){window.__SHOWAI_COMPONENT_READING__={ready:true,status:'error',props,error:String(error.message||error)};}}
@@ -1554,8 +1606,8 @@ const keepView=value=>{const issue=viewIssue(value);if(issue)throw new Error('on
 window.addEventListener('pagehide',sendView);
 const handOver=snapshot=>{const issue=contextIssue(snapshot);if(issue)throw new Error('onContext: '+issue);if(navigator.userActivation&&!navigator.userActivation.isActive)return false;send('showai:context',{snapshot:JSON.parse(JSON.stringify(snapshot))});return true;};
 const goTo=target=>{if(typeof target!=='string'&&(!target||typeof target!=='object'))throw new Error('goTo needs a page link, "#blockId" or {pageId, blockId}');if(navigator.userActivation&&!navigator.userActivation.isActive)return false;send('showai:navigate',{target:typeof target==='string'?target:{...target}});return true;};
-function App(){const[outline,setOutline]=useState(config.outline);outlineUpdate=setOutline;const[state,setState]=useState(()=>({data:config.props||{},readOnly:config.readOnly!==false,dataState:dataStateOf(config.dataState,config.readOnly!==false)}));const[conversation,setConversation]=useState({available:config.context===true,key:0,value:undefined});useEffect(()=>reading(state.data),[state.data]);update=(data,readOnly,available,dataState)=>{setConversation(c=>c.available===available?c:{...c,available});if(check(data)){setState({data,readOnly,dataState:dataStateOf(dataState,readOnly)});send('showai:valid')}};restore=value=>setConversation(c=>c.key?c:{...c,key:1,value});return React.createElement(UserComponent,{key:conversation.key,...state,...(outline?{props:state.data,outline,navigate:itemId=>send('showai:outline-action',{action:'navigate',itemId}),setBranchExpanded:(itemId,expanded)=>send('showai:outline-action',{action:'branch',itemId,expanded}),collapse:()=>send('showai:outline-action',{action:'collapse'})}:{}),onChange:state.readOnly?undefined:(data)=>{if(check(data)){setState(s=>({...s,data}));send('showai:change',{props:data});}},onContext:conversation.available?handOver:undefined,context:conversation.value,...(config.view===true?{viewState:config.viewState,onViewState:keepView}:{}),goTo});}
-window.addEventListener('message',event=>{if(event.source!==parent||event.data?.channel!==channel)return;if(event.data?.type==='showai:validate'){const valid=validate(event.data.props);send('showai:validation',{requestId:event.data.requestId,valid,message:valid?'':validationMessage()});return;}if(event.data?.type==='showai:outline')outlineUpdate?.(event.data.outline);if(event.data?.type==='showai:props')update?.(event.data.props,event.data.readOnly!==false,event.data.context===true,event.data.dataState);if(event.data?.type==='showai:context-restore'&&event.data.snapshot&&!contextIssue(event.data.snapshot))restore?.(event.data.snapshot);});
+function App(){const[outline,setOutline]=useState(config.outline);outlineUpdate=setOutline;const[field,setField]=useState(config.field);fieldUpdate=setField;const[state,setState]=useState(()=>({data:config.props||{},readOnly:config.readOnly!==false,dataState:dataStateOf(config.dataState,config.readOnly!==false)}));const[conversation,setConversation]=useState({available:config.context===true,key:0,value:undefined});useEffect(()=>reading(state.data),[state.data]);update=(data,readOnly,available,dataState)=>{setConversation(c=>c.available===available?c:{...c,available});if(check(data)){setState({data,readOnly,dataState:dataStateOf(dataState,readOnly)});send('showai:valid')}};restore=value=>setConversation(c=>c.key?c:{...c,key:1,value});return React.createElement(UserComponent,{key:conversation.key,...state,...(outline?{props:state.data,outline,navigate:itemId=>send('showai:outline-action',{action:'navigate',itemId}),setBranchExpanded:(itemId,expanded)=>send('showai:outline-action',{action:'branch',itemId,expanded}),collapse:()=>send('showai:outline-action',{action:'collapse'})}:{}),onChange:state.readOnly?undefined:(data)=>{if(check(data)){setState(s=>({...s,data}));send('showai:change',{props:data});}},...(field?{value:field.value,column:field.column,onValue:state.readOnly?undefined:value=>send('showai:field-value',{value:plain(value)}),onClose:()=>send('showai:field-close')}:{}),onContext:conversation.available?handOver:undefined,context:conversation.value,...(config.view===true?{viewState:config.viewState,onViewState:keepView}:{}),goTo});}
+window.addEventListener('message',event=>{if(event.source!==parent||event.data?.channel!==channel)return;if(event.data?.type==='showai:validate'){const valid=validate(event.data.props);send('showai:validation',{requestId:event.data.requestId,valid,message:valid?'':validationMessage()});return;}if(event.data?.type==='showai:outline')outlineUpdate?.(event.data.outline);if(event.data?.type==='showai:field')fieldUpdate?.(event.data.field);if(event.data?.type==='showai:field-call'){send('showai:field-result',{requestId:event.data.requestId,results:fieldCalls(event.data.calls)});return;}if(event.data?.type==='showai:props')update?.(event.data.props,event.data.readOnly!==false,event.data.context===true,event.data.dataState);if(event.data?.type==='showai:context-restore'&&event.data.snapshot&&!contextIssue(event.data.snapshot))restore?.(event.data.snapshot);});
 window.addEventListener('error',event=>send('showai:error',{message:event.message}));window.addEventListener('unhandledrejection',event=>send('showai:error',{message:String(event.reason?.message||event.reason)}));
 createRoot(document.getElementById('component-root')).render(React.createElement(App));
 new ResizeObserver(()=>send('showai:height',{height:Math.ceil(document.getElementById('component-root').getBoundingClientRect().height)+2})).observe(document.getElementById('component-root'));send('showai:ready');`;

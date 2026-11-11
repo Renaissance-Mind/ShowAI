@@ -120,8 +120,14 @@ export type ComponentCategory =
   | "other";
 
 export interface ComponentManifest {
-  role?: "page-outline";
+  role?: "page-outline" | "database-field";
   pageOutlineProtocol?: 1;
+  /** A database field type: the value kind and the operators it offers (role database-field). */
+  databaseField?: {
+    protocol: 1;
+    valueKind: import("../../datasets/value-types.mjs").ValueKind;
+    operators?: import("../../datasets/value-types.mjs").FilterOperator[];
+  };
   /** Versioned use/development contract. Older packages remain explicitly undocumented. */
   documentation?: import("./documentation").ComponentDocumentation;
   id: string;

@@ -1290,7 +1290,7 @@ export default function RichTextEditor({
       ...catalog.items
         .filter(
           (item) =>
-            ("kind" in item || item.role !== "page-outline") &&
+            ("kind" in item || !item.role) &&
             !("kind" in item && primitiveNodeTypes[item.kind]) &&
             (!("kind" in item && item.insertion) || !!onInsertNative),
         )

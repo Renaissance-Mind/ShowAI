@@ -1,4 +1,5 @@
 export declare const DATABASE_COLUMN_TYPES: readonly string[];
+export declare const OPTION_TONES: readonly string[];
 export declare const DATABASE_VIEWS: readonly string[];
 export declare const CALENDAR_MODES: readonly string[];
 export declare const MAX_HEATMAP_WEEKS: number;

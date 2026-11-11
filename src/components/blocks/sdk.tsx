@@ -53,3 +53,20 @@ export { WaterfallBlock as Waterfall } from "./Waterfall";
 export { EventTimelineBlock as EventTimeline } from "./EventTimeline";
 // Linked local files in resource props: a granted address in the workbench.
 export { useResource } from "../local-resources";
+// Typed records of shared data: the same value types, filter groups and sorts
+// the database uses, for components that show a filtered dataset.
+export {
+  queryRecords,
+  readFilter,
+  readSorts,
+  groupKeys,
+  validateFilter,
+} from "../../datasets/record-query.mjs";
+export {
+  OPERATORS,
+  KIND_OPERATORS,
+  valueTypeOf,
+  kindOf,
+  operatorsOf,
+  describeValueTypes,
+} from "../../datasets/value-types.mjs";

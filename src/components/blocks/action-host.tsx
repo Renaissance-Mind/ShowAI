@@ -30,6 +30,8 @@ export const BlockItemSources = createContext<ReadonlyMap<
 export interface BlockDataStateValue {
   status: "ok" | "stale" | "empty";
   editable: boolean | { paths: string[] };
+  /** The dataset whose records the block shows as its own, when it does. */
+  dataset?: string;
 }
 export const BlockDataState = createContext<BlockDataStateValue | null>(null);
 

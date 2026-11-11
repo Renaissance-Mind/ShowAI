@@ -9,6 +9,7 @@ import {
 import { getComponent } from "../core/catalog";
 import { readCustomBlockData } from "../components/custom/contract";
 import { syncManager } from "../sync/manager";
+import { evaluateFormulas, incomingRelations } from "../core/database-derive";
 
 /** Workbench actions for project datasets, shared by the desktop and browser hosts. */
 export const datasetActions = new Set([
@@ -23,6 +24,8 @@ export const datasetActions = new Set([
   "datasets:draftSave",
   "datasets:draftList",
   "datasets:draftRemove",
+  "datasets:formulas",
+  "datasets:incoming",
 ]);
 export const datasetMutationActions = new Set([
   "datasets:create",
@@ -67,6 +70,11 @@ export async function handleDatasetAction(
   const datasets = new DatasetStore(store);
   const projectId = id(args, "projectId");
   switch (action) {
+    // Database formulas run in the transform sandbox, outside the window.
+    case "datasets:formulas":
+      return evaluateFormulas(args.inputs);
+    case "datasets:incoming":
+      return incomingRelations(store, projectId, id(args, "datasetId"));
     case "datasets:list":
       return datasets.list(projectId);
     case "datasets:get": {

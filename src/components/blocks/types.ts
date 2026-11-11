@@ -44,7 +44,18 @@ export interface ChartData extends BlockData {
   unit?: string;
 }
 export type ColumnType =
-  "text" | "number" | "select" | "checkbox" | "url" | "date" | "page";
+  | "text"
+  | "number"
+  | "select"
+  | "checkbox"
+  | "url"
+  | "date"
+  | "page"
+  | "multiSelect"
+  | "relation"
+  | "formula"
+  | "rollup"
+  | "custom";
 export interface DatabaseColumn {
   id: string;
   name: string;
@@ -54,10 +65,32 @@ export interface DatabaseColumn {
   folder?: string;
   /** Page columns: the text column kept equal to the linked page's title. */
   titleColumn?: string;
+  /** Select and multi-select: a tone per option; others take one by position. */
+  colors?: Record<string, string>;
+  /** Relation columns: records of another dataset; reverseOf marks a derived reverse side. */
+  relation?: {
+    dataset: string;
+    project?: string;
+    reverse?: { name?: string };
+    reverseOf?: string;
+  };
+  /** Formula columns: a JavaScript expression over prop("Name"), and its value kind. */
+  formula?: { expression: string; kind?: string };
+  /** Rollup columns: aggregate a field of the records a relation column links. */
+  rollup?: { relation: string; column?: string; aggregate: string };
+  /** Custom columns: the field type component and its settings. */
+  component?: {
+    componentId: string;
+    version: string;
+    integrity?: string;
+    scope?: string;
+  };
+  config?: Record<string, unknown>;
 }
+export type DatabaseValue = string | number | boolean | string[];
 export interface DatabaseRow {
   id: string;
-  [key: string]: string | number | boolean;
+  [key: string]: DatabaseValue;
 }
 export interface DatabaseData extends BlockData {
   title: string;
@@ -75,8 +108,13 @@ export interface DatabaseView {
   name: string;
   type: DatabaseViewType;
   groupBy?: string;
+  /** Saved before sort lists; read as a one-item `sorts`. */
   sort?: { column: string; direction: "asc" | "desc" } | null;
-  filter?: { column: string; value: string };
+  sorts?: import("../../datasets/record-query.mjs").RecordSort[];
+  /** A filter group; a {column, value} filter saved earlier reads as one condition. */
+  filter?:
+    | import("../../datasets/record-query.mjs").FilterGroup
+    | import("../../datasets/record-query.mjs").LegacyFilter;
   /** Table widths in pixels by column id. */
   columnWidths?: Record<string, number>;
 }

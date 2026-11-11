@@ -1,3 +1,4 @@
+import { withDerivedDatabases } from "./database-derive";
 import {
   componentProps,
   readBinding,
@@ -197,7 +198,11 @@ export async function resolveDocumentDatasets(
     if (node.type === "widget" && readBinding(node.attrs?.data))
       bound.push({ node });
   });
-  if (!bound.length) return { document, bindings: [] };
+  if (!bound.length)
+    return {
+      document: await withDerivedDatabases(store, projectId, document),
+      bindings: [],
+    };
   const datasets = new DatasetStore(store);
   const records = new Map<string, Promise<DatasetRecord>>();
   const load = (project: string, id: string) => {
@@ -252,7 +257,9 @@ export async function resolveDocumentDatasets(
           read.source = { ...source, available: false };
         }
         read.warnings = unavailableWarnings(error);
-        const file = details.source ? sourceFileName(details.source) : undefined;
+        const file = details.source
+          ? sourceFileName(details.source)
+          : undefined;
         notices.set(blockId, {
           status: "empty",
           ...(details.name ? { dataset: details.name } : {}),
@@ -361,7 +368,25 @@ export async function resolveDocumentDatasets(
       if (value) await baselines.remember(key.split("/")[0], value);
     }
   }
-  return { document: snapshot, bindings };
+  // Bound databases read their reverse relations from the dataset they show.
+  const selfDatasets = new Map<string, string>();
+  for (const { node } of bound) {
+    const binding = readBinding(node.attrs!.data)!;
+    if (
+      node.attrs!.kind === "database" &&
+      (binding.project ?? projectId) === projectId
+    )
+      selfDatasets.set(String(node.attrs!.id ?? ""), binding.dataset);
+  }
+  return {
+    document: await withDerivedDatabases(
+      store,
+      projectId,
+      snapshot,
+      selfDatasets,
+    ),
+    bindings,
+  };
 }
 
 /**

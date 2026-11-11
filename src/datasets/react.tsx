@@ -76,6 +76,7 @@ import {
 import { AssistantContext } from "../components/assistant-context";
 import type { WarningAction } from "./warnings.mjs";
 import { requestPackaging } from "./packaging-request";
+import { DatabaseHostProvider } from "./database-host";
 import "./datasets.css";
 
 const closeText = translator(messages);
@@ -180,7 +181,9 @@ export function DatasetScope({
     <ScopeContext.Provider value={value}>
       <BoundWidgetHost.Provider value={host}>
         <LocalResourceUi.Provider value={resourceUi}>
-          {children}
+          <DatabaseHostProvider client={client} projectId={projectId}>
+            {children}
+          </DatabaseHostProvider>
         </LocalResourceUi.Provider>
       </BoundWidgetHost.Provider>
       {dialog &&
@@ -439,14 +442,22 @@ export function BoundWidget({
   const pageEditable = !readOnly && !!onChange && !scope?.readOnly;
   const locked = !pageEditable || blockEditable === false;
   const dataStatus = snapshot?.dataStatus ?? "ok";
+  // A block showing a dataset's own records names it (database reverse relations).
+  const ownDataset =
+    compiled?.props &&
+    !compiled.props.path.length &&
+    projectId === scope?.projectId
+      ? compiled.dataset
+      : undefined;
   const dataState = useMemo<BlockDataStateValue>(
     () => ({
       status: dataStatus,
       editable: locked ? false : blockEditable,
+      ...(ownDataset ? { dataset: ownDataset } : {}),
     }),
     // The paths are recomputed per render; compare them by value.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [dataStatus, locked, canonicalJson(blockEditable)],
+    [dataStatus, locked, canonicalJson(blockEditable), ownDataset],
   );
   const openSettings =
     scope && !scope.readOnly && onChange
@@ -609,7 +620,11 @@ export function BoundWidget({
                   label: t("chooseOther"),
                   primary: true,
                   onSelect: () =>
-                    scope.openDialog({ kind, data: unbound(), apply: onChange }),
+                    scope.openDialog({
+                      kind,
+                      data: unbound(),
+                      apply: onChange,
+                    }),
                 },
                 { label: t("unbind"), onSelect: () => onChange(unbound()) },
               ]
