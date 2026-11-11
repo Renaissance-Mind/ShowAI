@@ -1,6 +1,6 @@
 // The workbench's database host: related datasets through the window's
 // dataset sessions, reverse relations, formulas in the transform runtime and
-// field types that library components contribute (role database-field),
+// field types that library components contribute (contributes.databaseField),
 // whose `field` export runs in the same iframe sandbox as custom components.
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
@@ -249,7 +249,8 @@ function contributedField(
   ref: FieldComponentRef,
   evaluator: (config: Record<string, unknown>) => FieldEvaluator,
 ): ContributedField {
-  const kind = component.databaseField!.valueKind as ValueKind;
+  const field = component.contributes!.databaseField!;
+  const kind = field.valueKind as ValueKind;
   const configOf = (column: TypedField) =>
     ((column as { config?: Record<string, unknown> }).config ??
       component.defaultData) as Record<string, unknown>;
@@ -260,9 +261,7 @@ function contributedField(
   const valueType: ValueType = {
     type: "custom",
     kind,
-    ...(component.databaseField!.operators
-      ? { operators: component.databaseField!.operators }
-      : {}),
+    ...(field.operators ? { operators: field.operators } : {}),
     check: () => "",
     normalize: (value) => value,
     project: (value, column) => {
@@ -397,8 +396,7 @@ function createHost(
         ...(ref.integrity ? { integrity: ref.integrity } : {}),
       })
       .then((component) => {
-        if (component.role !== "database-field" || !component.databaseField)
-          return;
+        if (!component.contributes?.databaseField) return;
         compiled.set(key, component);
         bump();
       });
@@ -412,7 +410,7 @@ function createHost(
       })
       .then((items) => {
         const listed = items.filter(
-          (item) => "role" in item && item.role === "database-field",
+          (item) => !!item.contributes?.databaseField,
         );
         for (const item of listed)
           loadComponent({
@@ -429,7 +427,7 @@ function createHost(
             scope: item.scope,
           },
           name: item.name,
-          valueKind: item.databaseField!.valueKind,
+          valueKind: item.contributes!.databaseField!.valueKind,
           defaultConfig: {},
         }));
         bump();

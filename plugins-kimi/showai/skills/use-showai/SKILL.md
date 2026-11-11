@@ -17,7 +17,7 @@ Agent 通过 MCP 操作 ShowAI。App、网页、CLI 和 MCP 共用内容核心�
 | 查找、阅读或管理已有内容 | “上周那页在哪个项目里”“这个项目里有什么”“哪些页面引用了这一页”“把这三页移到新文件夹”“删掉那页，过几天再找回来”“删掉不用的组件版本”“页面接上这份 Excel” | 留在本 Skill，按 [按任务查找操作](references/tasks.md) 选工具；有 `showai.reference` 时先按 [用户引用](references/user-references.md) 读取它指向的内容 |
 | 从其他应用导入 | “把这个 Notion 导出导进来”“导入这份 Word”“以后要能导入 OPML” | 留在本 Skill，按 [导入与导入器](references/import.md) 先给计划、确认后导入；新格式写一个导入器保存到项目 |
 | 处理页面评论 | “处理这页的评论”“回复一下评论” | page_read 读出未解决的评论，按 [评论](references/authoring.md#评论) 逐条改页面、回复并解决 |
-| 做可复用组件 | “做一个组件”“改一下这个组件”“让正文里能 @ 提及同事” | [create-component](../create-component/SKILL.md) |
+| 做可复用组件或扩展工作台 | “做一个组件”“改一下这个组件”“让正文里能 @ 提及同事”“给 ⌘K 加一条命令”“数据库要一个评分字段” | 先看 [扩展点](references/extension-points.md) 确认要填入哪个位置，再按 [create-component](../create-component/SKILL.md) 制作；导入新格式见上一行 |
 | 做或提炼模板 | “存成模板”“做一个某类内容的模板” | [create-template](../create-template/SKILL.md) |
 | 边写边画、多端协作 | “在画布上一起画”“和 iPad 配对” | [collaborate-canvas](../collaborate-canvas/SKILL.md) |
 
@@ -56,6 +56,7 @@ Agent 通过 MCP 操作 ShowAI。App、网页、CLI 和 MCP 共用内容核心�
 - [用户引用与组件状态](references/user-references.md)：用户粘贴的 `showai.reference`、组件状态和控件取值。
 - [保存、冲突与页面差异](references/editing.md)。
 - [导入与导入器](references/import.md)：Notion、Word、Markdown 导入的计划与回执，以及新增一种格式的导入器。
+- [扩展点](references/extension-points.md)：快速跳转命令、@ 菜单、数据库字段类型、页面目录和导入器这几个可填入的位置，各由谁提供、填入者声明什么，以及用 `catalog_list({kind:"contribution"})` 一次查出已填入的内容。
 - [共享数据](references/shared-data.md)、[页面与 Board 阅读](references/page-reading.md)、[Board 对象编辑](references/board-authoring.md)、[容量与大文件](references/capacity.md)。
 - [宿主显示](references/host-display.md) 与 [当前宿主适配](references/host-adapter.md)：展示组件和页面前先读。
 - [连接配置](references/runtime.md) 与 [集成](references/integration.md)：连接、错误码、远程授权与反馈。

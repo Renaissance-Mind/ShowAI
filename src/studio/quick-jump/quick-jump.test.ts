@@ -300,9 +300,11 @@ describe("components and their commands", () => {
     defaultData: { text: "default" },
     propsSchema: {},
     examples: [{ name: "warning", data: { text: "careful" } }],
-    commands: [
-      { id: "warn", title: "Insert a warning card", run: { insert: { example: 0 } } },
-    ],
+    contributes: {
+      commands: [
+        { id: "warn", title: "Insert a warning card", run: { insert: { example: 0 } } },
+      ],
+    },
   } as CatalogComponent;
   const custom = {
     id: "standup",
@@ -315,19 +317,21 @@ describe("components and their commands", () => {
     entry: "index.tsx",
     updatedAt: time(1),
     examples: [],
-    commands: [
-      {
-        id: "today",
-        title: "Add today's standup",
-        keywords: ["daily"],
-        run: { insert: { props: { date: "today" } } },
-      },
-      {
-        id: "board",
-        title: "Open the team board",
-        run: { goTo: "showai://project/p1/page/a?blocks=b1" },
-      },
-    ],
+    contributes: {
+      commands: [
+        {
+          id: "today",
+          title: "Add today's standup",
+          keywords: ["daily"],
+          run: { insert: { props: { date: "today" } } },
+        },
+        {
+          id: "board",
+          title: "Open the team board",
+          run: { goTo: "showai://project/p1/page/a?blocks=b1" },
+        },
+      ],
+    },
   } as CatalogComponent;
 
   it("every component offers insertion and its declared commands through one path", () => {
@@ -342,6 +346,18 @@ describe("components and their commands", () => {
     // Without an editable page only navigation stays.
     expect(
       componentCommandItems([builtin, custom], false, "C").map((entry) => entry.title),
+    ).toEqual(["Open the team board"]);
+    // A component placed inside a line keeps its navigation commands only.
+    const inline = {
+      ...custom,
+      id: "status-tag",
+      contributes: {
+        mention: { prop: "label", input: "text" as const },
+        commands: custom.contributes!.commands,
+      },
+    } as CatalogComponent;
+    expect(
+      componentCommandItems([inline], true, "C").map((entry) => entry.title),
     ).toEqual(["Open the team board"]);
   });
 

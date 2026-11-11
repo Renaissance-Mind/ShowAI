@@ -75,7 +75,7 @@ import {
   removeContributedImporter,
   saveContributedImporter,
 } from "../core/importers/contributed";
-import { availableImporters, importerInfo, planImport, runImport } from "./import-service";
+import { planImport, runImport } from "./import-service";
 import { compactPlan, compactReport } from "./import-commands";
 
 // Capture tuning stays available to the service; agents use the defaults.
@@ -504,7 +504,7 @@ export function createMcpServer(options: {
     {
       description: `Create a Page or Board. Prefer blocks:[{kind,data}] in reading order, e.g. {kind:"text",data:{format:"markdown",content:"..."}}, and add more with page_apply component.insert.${
         localFiles
-          ? " import:{source, importer?, dryRun?} instead imports a file, folder or zip (absolute path; Notion, Word, Markdown or a library importer) into parentId; dryRun returns the plan. guide import."
+          ? " import:{source, importer?, dryRun?} imports a file, folder or zip path into parentId instead (guide import)."
           : ""
       }`,
       inputSchema: {
@@ -811,9 +811,9 @@ export function createMcpServer(options: {
     "catalog_list",
     {
       description:
-        "List component and template names, descriptions, scenarios and one-line props signatures. Defaults to built-ins plus this project's components; scope selects global/published/all; limit/cursor paginate. kind importer lists the importers.",
+        "List component and template names, descriptions, scenarios and one-line props signatures. Defaults to built-ins plus this project's components; scope selects global/published/all; limit/cursor paginate. kind contribution lists extension slots and what fills them.",
       inputSchema: {
-        kind: z.enum(["component", "template", "importer"]).optional(),
+        kind: z.enum(["component", "template", "contribution"]).optional(),
         scope: scopeSchema.optional(),
         query: z.string().optional(),
         limit: z.number().int().min(1).max(50).optional(),
@@ -824,13 +824,12 @@ export function createMcpServer(options: {
     },
     ({ kind, ...input }) =>
       call(async () => {
-        if (kind !== "importer")
-          return service.catalogList({ projectId, kind, ...input });
-        const { importers, problems } = await availableImporters(
-          service.store.root,
-          projectId,
-        );
-        return { importers: importers.map(importerInfo), problems };
+        if (kind === "contribution")
+          return service.catalogContributions({
+            projectId,
+            query: input.query,
+          });
+        return service.catalogList({ projectId, kind, ...input });
       }),
   );
   register(
@@ -1045,7 +1044,7 @@ export function createMcpServer(options: {
   const revisionId = z.string().optional();
   const revisionVersion = z.string();
   const catalogVersion = actionTool(
-    "Save a project-owned revision (fork an exact revision, or save a reviewed merge), or remove a revision; remove without version removes every revision in that scope and refuses with IN_USE while pages, packages or publications use it. importer saves an importer to this project (manifest = importer.json, script = importer.js; guide import).",
+    "Save a project-owned revision (fork an exact revision, or save a reviewed merge), or remove a revision; remove without version removes every revision in that scope and refuses with IN_USE while pages, packages or publications use it. importer saves an importer (guide import).",
     {
       importer: {
         fields: {

@@ -5,10 +5,7 @@ import {
   type MentionContext,
 } from "./mention-sources";
 import { slashMenuRows } from "../slash-menu-model";
-import {
-  typedDays,
-  validateMentionContract,
-} from "../../portable/mention-contract.mjs";
+import { typedDays } from "../../portable/mention-contract.mjs";
 import { markdownToRichText, validateRichTextData } from "./model.mjs";
 import { toMarkdown } from "../../lib/document";
 import { validateDocument } from "../../portable/validation.mjs";
@@ -80,13 +77,15 @@ describe("@ menu sources", () => {
       ...date,
       kind: "status-tag",
       name: "Status",
-      mention: {
-        prop: "label",
-        input: "options",
-        options: [
-          { label: "Blocked", value: "blocked", keywords: "stuck" },
-          { label: "Done", value: "done" },
-        ],
+      contributes: {
+        mention: {
+          prop: "label",
+          input: "options",
+          options: [
+            { label: "Blocked", value: "blocked", keywords: "stuck" },
+            { label: "Done", value: "done" },
+          ],
+        },
       },
     } as CatalogComponent;
     const items = rows("stuck", { components: [tag] });
@@ -113,19 +112,6 @@ describe("@ menu sources", () => {
     expect(rows("Ada").map((item) => item.group)).toContain("People");
     remove();
     expect(rows("Ada").map((item) => item.group)).not.toContain("People");
-  });
-  it("validates mention contracts", () => {
-    expect(() =>
-      validateMentionContract({ prop: "date", input: "time" }),
-    ).toThrow("mention.input");
-    expect(() =>
-      validateMentionContract(
-        { prop: "missing", input: "text" },
-        { type: "object", properties: { label: { type: "string" } } },
-      ),
-    ).toThrow("mention.prop");
-    expect(() => validateMentionContract({ prop: "a", input: "options" }))
-      .toThrow("needs options");
   });
 });
 

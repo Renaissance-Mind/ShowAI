@@ -37,10 +37,13 @@ import {
   describeValueTypes,
 } from "../datasets/value-types.mjs";
 import type {
+  BuiltinComponentMetadata,
   CatalogScope,
+  ComponentListing,
   SaveTemplateInput,
   TemplateRecord,
 } from "../components/custom/types";
+import { availableImporters } from "../core/importers/registry";
 /** Column settings each built-in field type takes, for Agents writing columns. */
 const DATABASE_FIELD_SETTINGS: Record<string, string> = {
   select:
@@ -238,6 +241,119 @@ export class CatalogService {
     };
   }
 
+  /**
+   * Every harness slot and what fills it in this project: quick jump
+   * commands, @ menu sources and database field types (components declaring
+   * manifest.contributes), page outline renderers, and importers. Built-ins
+   * appear with scope builtin, filling the slots the same way.
+   */
+  async catalogContributions(input: { projectId?: string; query?: string }) {
+    const projectId = this.catalogProject(input.projectId);
+    const query = input.query?.trim().toLocaleLowerCase();
+    const matches = (...texts: (string | undefined)[]) =>
+      !query ||
+      catalogQueryScore(texts.filter(Boolean).join("\n").toLocaleLowerCase(), query) > 0;
+    const components: (BuiltinComponentMetadata | ComponentListing)[] = [
+      ...listBuiltinComponents(),
+      ...(await listComponents(this.store.root, projectId, { scope: "all" })),
+    ];
+    const ref = (item: BuiltinComponentMetadata | ComponentListing) =>
+      "kind" in item
+        ? { kind: item.kind, name: item.name, scope: "builtin" as const }
+        : {
+            componentId: item.id,
+            name: item.name,
+            version: item.version,
+            integrity: item.integrity,
+            scope: item.scope,
+          };
+    const filled = <T,>(
+      pick: (item: BuiltinComponentMetadata | ComponentListing) => T | undefined,
+      text: (value: T) => string[],
+    ) =>
+      components.flatMap((item) => {
+        const value = pick(item);
+        return value !== undefined &&
+          matches(item.name, item.description, ..."kind" in item ? [item.kind] : [item.id], ...text(value))
+          ? [{ ...ref(item), value }]
+          : [];
+      });
+    const { importers, problems } = await availableImporters(
+      this.store.root,
+      projectId,
+    );
+    return {
+      slots: [
+        {
+          slot: "commands",
+          harness: "Quick jump (Cmd/Ctrl+K): search, ranking, running.",
+          declare: "manifest.contributes.commands",
+          guide: "component",
+          filledBy: filled(
+            (item) => item.contributes?.commands,
+            (commands) => commands.flatMap((command) => [command.title, ...(command.keywords ?? [])]),
+          ).map(({ value, ...item }) => ({
+            ...item,
+            commands: value.map((command) => ({
+              id: command.id,
+              title: command.title,
+              run: "insert" in command.run ? "insert" : "goTo",
+            })),
+          })),
+        },
+        {
+          slot: "mention",
+          harness: "The @ menu of rich text and the inlineWidget node inside a line.",
+          declare: "manifest.contributes.mention",
+          guide: "component",
+          filledBy: filled(
+            (item) => item.contributes?.mention,
+            (mention) => (mention.options ?? []).map((option) => option.label),
+          ).map(({ value, ...item }) => ({
+            ...item,
+            prop: value.prop,
+            input: value.input,
+          })),
+        },
+        {
+          slot: "databaseField",
+          harness: "Database columns: value kind, filters, sorts, exports; the cell runs in the component sandbox.",
+          declare: "manifest.contributes.databaseField and a named field export",
+          guide: "component",
+          filledBy: filled(
+            (item) => item.contributes?.databaseField,
+            (field) => [field.valueKind],
+          ).map(({ value, ...item }) => ({ ...item, valueKind: value.valueKind })),
+        },
+        {
+          slot: "pageOutline",
+          harness: "The page outline beside a page.",
+          declare: "manifest.role page-outline with pageOutlineProtocol 1",
+          guide: "component",
+          filledBy: filled(
+            (item) => ("role" in item && item.role === "page-outline" ? true : undefined),
+            () => [],
+          ).map(({ value: _value, ...item }) => item),
+        },
+        {
+          slot: "importer",
+          harness: "Import of files, folders and zips: plan, confirm, write, undo.",
+          declare: "packages/importers/ID with importer.json and importer.js (catalog_version action importer)",
+          guide: "import",
+          filledBy: importers
+            .filter((importer) => matches(importer.id, importer.name, importer.description))
+            .map((importer) => ({
+              importerId: importer.id,
+              name: importer.name,
+              scope: importer.origin,
+              extensions: importer.extensions,
+            })),
+          ...(problems.length ? { problems } : {}),
+        },
+      ],
+    };
+  }
+
   async componentContext(projectId?: string, knownRevision?: string) {
     const catalog = await this.catalogList({ projectId, kind: "component" });
     if (knownRevision === catalog.revision)
@@ -262,12 +378,12 @@ export class CatalogService {
 
   /**
    * The database's field types: built-ins with their value kind and filter
-   * operators, and those library components contribute (role database-field).
+   * operators, and those library components contribute (contributes.databaseField).
    */
   private async databaseFieldTypes(projectId?: string) {
     const contributed = (
       await listComponents(this.store.root, projectId, { scope: "all" })
-    ).filter((item) => item.role === "database-field");
+    ).filter((item) => !!item.contributes?.databaseField);
     return {
       builtin: describeValueTypes().map((type) => ({
         ...type,
@@ -284,13 +400,13 @@ export class CatalogService {
             integrity: item.integrity,
             scope: item.scope,
           },
-          kind: item.databaseField!.valueKind,
+          kind: item.contributes!.databaseField!.valueKind,
         },
         name: item.name,
-        kind: item.databaseField!.valueKind,
+        kind: item.contributes!.databaseField!.valueKind,
         operators:
-          item.databaseField!.operators ??
-          KIND_OPERATORS[item.databaseField!.valueKind],
+          item.contributes!.databaseField!.operators ??
+          KIND_OPERATORS[item.contributes!.databaseField!.valueKind],
       })),
       operators: OPERATORS,
       views: {

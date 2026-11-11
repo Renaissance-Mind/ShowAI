@@ -1,61 +1,7 @@
-// A component that declares `mention` in its contract appears in the @ menu
-// of rich text and is placed inside the line. The menu fills one string prop:
-// `input: "date"` offers today, tomorrow and typed dates (YYYY-MM-DD),
-// `input: "text"` offers what was typed, and `options` are fixed choices.
-// Shared by the catalog, component saves and the editor; no dependencies.
-
-export const MENTION_INPUTS = ["date", "text", "options"];
-const PROP = /^[A-Za-z_$][A-Za-z0-9_$-]{0,63}$/;
-
-/** The checked contract; throws with the field path when it is invalid. */
-export function validateMentionContract(value, schema) {
-  const fail = (message) => {
-    throw new Error(`mention${message}`);
-  };
-  if (!value || typeof value !== "object" || Array.isArray(value))
-    fail(" must be an object.");
-  for (const key of Object.keys(value))
-    if (!["prop", "input", "options"].includes(key))
-      fail(` does not take ${key}.`);
-  if (typeof value.prop !== "string" || !PROP.test(value.prop))
-    fail(".prop must name a top-level prop.");
-  if (!MENTION_INPUTS.includes(value.input))
-    fail(`.input must be one of ${MENTION_INPUTS.join(", ")}.`);
-  if (value.options !== undefined) {
-    if (!Array.isArray(value.options) || value.options.length > 50)
-      fail(".options must be an array of at most 50 choices.");
-    value.options.forEach((option, index) => {
-      if (
-        !option ||
-        typeof option !== "object" ||
-        typeof option.label !== "string" ||
-        !option.label.trim() ||
-        option.label.length > 200 ||
-        typeof option.value !== "string" ||
-        option.value.length > 1000 ||
-        (option.keywords !== undefined &&
-          (typeof option.keywords !== "string" ||
-            option.keywords.length > 500)) ||
-        Object.keys(option).some(
-          (key) => !["label", "value", "keywords"].includes(key),
-        )
-      )
-        fail(`.options[${index}] needs label and value text (and optional keywords).`);
-    });
-  }
-  if (value.input === "options" && !value.options?.length)
-    fail(' with input "options" needs options.');
-  if (schema !== undefined) {
-    const field = schema?.properties?.[value.prop];
-    const type = field?.type;
-    if (
-      !field ||
-      !(type === "string" || (Array.isArray(type) && type.includes("string")))
-    )
-      fail(".prop must be a string property of the props schema.");
-  }
-  return value;
-}
+// Days the @ menu offers for a component whose `contributes.mention` has
+// `input: "date"`: today, tomorrow and typed dates. The declaration itself is
+// validated with the other contributions (components/custom/contributions.ts).
+// Shared by the editor and the date component; no dependencies.
 
 /** YYYY-MM-DD of a local calendar day. */
 export function isoDay(date) {

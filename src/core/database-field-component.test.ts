@@ -30,11 +30,12 @@ const manifest = {
   description: "A 1–N star rating field for databases.",
   entry: "index.tsx",
   scenarios: ["Rate records in a database"],
-  role: "database-field",
-  databaseField: {
-    protocol: 1,
-    valueKind: "number",
-    operators: ["is", "gte", "lte", "isEmpty", "isNotEmpty"],
+  contributes: {
+    databaseField: {
+      protocol: 1,
+      valueKind: "number",
+      operators: ["is", "gte", "lte", "isEmpty", "isNotEmpty"],
+    },
   },
   defaultData: { max: 5 },
   examples: [{ name: "Five stars", data: { max: 5 } }],
@@ -68,7 +69,7 @@ export default function RatingEditor({ data, value, onValue, onClose }) {
 }`;
 
 describe("field types contributed by components", () => {
-  it("save with role database-field, list with their value kind and compile the field protocol", async () => {
+  it("save with contributes.databaseField, list with their value kind and compile the field protocol", async () => {
     const { home, projectId } = await library();
     const saved = await saveComponent(
       home,
@@ -76,17 +77,18 @@ describe("field types contributed by components", () => {
       projectId,
     );
     expect(saved).toMatchObject({
-      role: "database-field",
-      databaseField: { protocol: 1, valueKind: "number" },
+      contributes: { databaseField: { protocol: 1, valueKind: "number" } },
     });
+    expect(saved.role).toBeUndefined();
     expect(saved.html).toContain("showai:field-call");
     const [listed] = await listComponents(home, projectId);
     expect(listed).toMatchObject({
       id: "star-rating",
-      role: "database-field",
-      databaseField: {
-        valueKind: "number",
-        operators: ["is", "gte", "lte", "isEmpty", "isNotEmpty"],
+      contributes: {
+        databaseField: {
+          valueKind: "number",
+          operators: ["is", "gte", "lte", "isEmpty", "isNotEmpty"],
+        },
       },
     });
     const reloaded = await getComponent(
@@ -103,7 +105,10 @@ describe("field types contributed by components", () => {
       saveComponent(
         home,
         {
-          manifest: { ...manifest, databaseField } as ComponentManifest,
+          manifest: {
+            ...manifest,
+            contributes: { databaseField },
+          } as ComponentManifest,
           schema,
           source,
         },
@@ -111,7 +116,9 @@ describe("field types contributed by components", () => {
       );
     await expect(
       save({ protocol: 1, valueKind: "number", operators: ["contains"] }),
-    ).rejects.toThrow("operators of number values");
+    ).rejects.toThrow(
+      "contributes.databaseField.operators[0] must be an operator of number values",
+    );
     await expect(save({ protocol: 1, valueKind: "money" })).rejects.toThrow(
       "valueKind",
     );

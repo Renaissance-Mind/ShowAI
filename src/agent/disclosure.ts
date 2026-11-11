@@ -74,8 +74,10 @@ export interface CatalogSummary {
     state: "versioned" | "legacy" | "missing";
   };
   effects?: string[];
-  /** Quick jump commands the component declares in its contract. */
-  commands?: import("../components/custom/commands").ComponentCommand[];
+  /** The workbench slots the component fills (manifest.contributes). */
+  contributes?: import("../components/custom/contributions").ComponentContributions;
+  /** The component reads page references; exports carry them. */
+  pageReferences?: true;
   reuse?: "general" | "domain" | "content-specific" | "unclassified";
   documentationStatus?: "available" | "missing";
   /** Built-in components only: fit for show_component in a conversation column. */
@@ -129,9 +131,16 @@ export function catalogSearchText(value: object): string {
     add(section.instructions);
   }
   for (const related of records(item.related)) add(related.purpose);
-  for (const command of records(item.commands)) {
+  const contributes = item.contributes as
+    | import("../components/custom/contributions").ComponentContributions
+    | undefined;
+  for (const command of contributes?.commands ?? []) {
     add(command.title);
     add(command.keywords);
+  }
+  for (const option of contributes?.mention?.options ?? []) {
+    add(option.label);
+    add(option.keywords);
   }
   return text.join("\n").toLocaleLowerCase();
 }
@@ -244,11 +253,14 @@ export function summarizeCatalog(
                 (value): value is string => typeof value === "string",
               )
             : [],
-          ...(Array.isArray(item.commands) && item.commands.length
+          ...(item.contributes && typeof item.contributes === "object"
             ? {
-                commands:
-                  item.commands as import("../components/custom/commands").ComponentCommand[],
+                contributes:
+                  item.contributes as import("../components/custom/contributions").ComponentContributions,
               }
+            : {}),
+          ...(item.pageReferences === true
+            ? { pageReferences: true as const }
             : {}),
         }
       : {}),

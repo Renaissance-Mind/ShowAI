@@ -1,5 +1,5 @@
 // Sources of the @ menu in rich text. Pages are the one source the editor
-// owns; every component whose contract declares `mention` becomes a source,
+// owns; every component whose contract declares `contributes.mention` becomes a source,
 // and hosts can register more. The menu itself is the slash menu with a
 // second trigger.
 
@@ -7,11 +7,8 @@ import type { CatalogComponent } from "../../core/component-categories";
 import type { SlashEntry } from "../slash-menu-model";
 import type { LinkablePage } from "./environment";
 import { pageLink } from "../../portable/page-link.mjs";
-import {
-  isoDay,
-  typedDays,
-  type MentionContract,
-} from "../../portable/mention-contract.mjs";
+import { isoDay, typedDays } from "../../portable/mention-contract.mjs";
+import type { MentionContract } from "../custom/contributions";
 
 /** What choosing an entry puts at the @: a page link, or a component in the line. */
 export type MentionInsertion =
@@ -103,7 +100,7 @@ function formatDay(day: string, locale: string) {
   }).format(new Date(Date.UTC(year, month - 1, date)));
 }
 
-/** The source a component's `mention` contract describes. */
+/** The source a component's `contributes.mention` describes. */
 export function componentMentionSource(
   component: CatalogComponent,
   contract: MentionContract,
@@ -174,8 +171,8 @@ export function mentionEntries(
   const sources = [
     pageMentionSource,
     ...context.components.flatMap((component) =>
-      component.mention
-        ? [componentMentionSource(component, component.mention)]
+      component.contributes?.mention
+        ? [componentMentionSource(component, component.contributes.mention)]
         : [],
     ),
     ...registered.values(),

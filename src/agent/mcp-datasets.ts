@@ -40,6 +40,27 @@ type Call = (
 ) => Promise<CallToolResult>;
 
 /** Shared datasets: one value that several page blocks read and write. */
+const recordQuerySchema = z
+  .object({
+    filter: z.record(z.string(), z.unknown()).optional(),
+    sorts: z.array(z.record(z.string(), z.unknown())).max(10).optional(),
+    search: z.string().max(1000).optional(),
+  })
+  .strict();
+/** dataset_read query: {filter?, sorts?, search?}; filter and sorts are checked by the record query. */
+function recordQueryInput(value: unknown) {
+  const result = recordQuerySchema.safeParse(value);
+  if (!result.success)
+    throw new CoreError(
+      "INVALID_DATA",
+      "query " +
+        result.error.issues
+          .map((issue) => `${issue.path.join(".") || "query"} ${issue.message}`)
+          .join("; "),
+    );
+  return result.data as { filter?: unknown; sorts?: unknown; search?: string };
+}
+
 export function registerDatasetTools(
   register: McpServer["registerTool"],
   service: AgentService,
@@ -58,7 +79,7 @@ export function registerDatasetTools(
   const description = z.string().max(4000);
   const baseHash = z.string().min(1);
   const read = actionTool(
-    `Read shared datasets: list them, or read one's value, hash, status (ok/stale/empty), editable, warnings and the pages using it; path (e.g. a[id=o1].b) narrows the value. refresh:true fetches online data now. sinceHash (a hash you read earlier, e.g. from page_read datasetBases) returns record-level changes since then instead, paged with offset/limit. query {filter, sorts, search} on a database-shaped value ({columns, rows}) returns the matching records with derived values (relations, rollups, formulas), paged with offset/limit; filter is a group {join:and|or, conditions:[{column, operator, value?} | group]} as in a database view.${
+    `Read shared datasets: list them, or read one's value, hash, status (ok/stale/empty), editable, warnings and the pages using it; path (e.g. a[id=o1].b) narrows the value. refresh:true fetches online data now. sinceHash (e.g. from page_read datasetBases) returns record-level changes since then, paged with offset/limit. query {filter, sorts, search} reads a {columns, rows} value as records with derived values, filtered like a database view.${
       localFiles ? " out writes the value or comparison to a JSON file." : ""
     }`,
     {
@@ -74,14 +95,8 @@ export function registerDatasetTools(
           offset: z.number().int().nonnegative().optional(),
           limit: z.number().int().min(1).max(500).optional(),
           refresh: z.boolean().optional(),
-          query: z
-            .object({
-              filter: jsonObject.optional(),
-              sorts: z.array(jsonObject).max(10).optional(),
-              search: z.string().max(1000).optional(),
-            })
-            .strict()
-            .optional(),
+          // Checked in the handler, so the listed schema stays small.
+          query: jsonObject.optional(),
           ...(localFiles
             ? {
                 out: z.string().min(1).max(4096).optional(),
@@ -112,9 +127,7 @@ export function registerDatasetTools(
                 limit: limit as number | undefined,
                 full: out !== undefined,
                 refresh: refresh === true,
-                ...(query
-                  ? { query: query as { filter?: unknown; sorts?: unknown } }
-                  : {}),
+                ...(query ? { query: recordQueryInput(query) } : {}),
               },
             );
             if (out === undefined) return result;

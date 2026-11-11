@@ -120,14 +120,8 @@ export type ComponentCategory =
   | "other";
 
 export interface ComponentManifest {
-  role?: "page-outline" | "database-field";
+  role?: "page-outline";
   pageOutlineProtocol?: 1;
-  /** A database field type: the value kind and the operators it offers (role database-field). */
-  databaseField?: {
-    protocol: 1;
-    valueKind: import("../../datasets/value-types.mjs").ValueKind;
-    operators?: import("../../datasets/value-types.mjs").FilterOperator[];
-  };
   /** Versioned use/development contract. Older packages remain explicitly undocumented. */
   documentation?: import("./documentation").ComponentDocumentation;
   id: string;
@@ -137,16 +131,17 @@ export interface ComponentManifest {
   category?: ComponentCategory;
   scenarios: string[];
   effects?: string[];
-  /** Quick jump commands the component contributes to the workbench. */
-  commands?: import("./commands").ComponentCommand[];
+  /** The workbench slots the component fills: quick jump commands, the @ menu, database field types. */
+  contributes?: import("./contributions").ComponentContributions;
   /** Exact component revisions imported through showai:component/<id>. */
   dependencies?: PackageRevisionRef[];
   entry: string;
   /** Named, synchronous JSON read model evaluated in the component browser sandbox. */
   reader?: "readData";
-  /** Offers the component in the @ menu of rich text, placed inside the line. */
-  mention?: import("../../portable/mention-contract.mjs").MentionContract;
-  /** Reads page references (usePageReferences); exports then carry the page's references. */
+  /**
+   * Reads page references (usePageReferences): a capability of the
+   * component's own rendering, so exports carry the page's references.
+   */
   pageReferences?: true;
   defaultData: Record<string, unknown>;
   examples: ComponentExample[];
@@ -200,16 +195,14 @@ export interface BuiltinComponentMetadata {
   description: string;
   scenarios: string[];
   effects?: string[];
-  /** Quick jump commands, declared the same way as in a library manifest. */
-  commands?: import("./commands").ComponentCommand[];
+  /** Slots the component fills, declared and validated as in a library manifest. */
+  contributes?: import("./contributions").ComponentContributions;
   version?: string;
   defaultData: Record<string, unknown>;
   propsSchema: JsonSchema;
   examples: ComponentExample[];
   /** How the component fits a conversation column, measured at chat widths. */
   conversation?: InlineReadiness;
-  /** Offers the component in the @ menu of rich text, placed inside the line. */
-  mention?: import("../../portable/mention-contract.mjs").MentionContract;
   /** Reads page references (usePageReferences); exports then carry the page's references. */
   pageReferences?: true;
 }

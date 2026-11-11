@@ -9,7 +9,7 @@ import type { CompiledComponent } from "../../components/custom/types";
 import {
   commandProps,
   type ComponentCommand,
-} from "../../components/custom/commands";
+} from "../../components/custom/contributions";
 import {
   componentSlashEntry,
   insertsAsBlock,
@@ -289,8 +289,10 @@ type ComponentData = {
 };
 
 /**
- * Every catalog component offers to insert itself, and adds the commands its
- * contract declares. Built-in and library components take the same path.
+ * Every catalog component placed as a block offers to insert itself, and every
+ * component adds the commands its contract declares in contributes.commands
+ * (insert commands only when it is placed as a block). Built-in and library
+ * components take the same path.
  */
 export function componentCommandItems(
   components: readonly CatalogComponent[],
@@ -299,12 +301,12 @@ export function componentCommandItems(
 ): QuickJumpItem<ComponentData>[] {
   const items: QuickJumpItem<ComponentData>[] = [];
   for (const component of components) {
-    if (!insertsAsBlock(component)) continue;
+    const block = insertsAsBlock(component);
     const entry = componentSlashEntry(component, group, {
       name: componentDisplayName,
       description: componentDisplayDescription,
     });
-    if (canInsert)
+    if (canInsert && block)
       items.push({
         key: entry.id,
         title: entry.title,
@@ -312,8 +314,8 @@ export function componentCommandItems(
         icon: "component",
         data: { component },
       });
-    for (const command of component.commands ?? []) {
-      if ("insert" in command.run && !canInsert) continue;
+    for (const command of component.contributes?.commands ?? []) {
+      if ("insert" in command.run && !(canInsert && block)) continue;
       items.push({
         key: `${entry.id}:${command.id}`,
         title: command.title,

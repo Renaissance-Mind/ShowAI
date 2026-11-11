@@ -140,7 +140,7 @@ const rules: Partial<Record<GuideTopic, string[]>> = {
   ],
   import: [
     'page_create import:{source, importer?, dryRun:true} returns the plan without writing; the same call without dryRun imports into parentId and returns the report. source is an absolute path of a file, folder or zip on this device (local connections only).',
-    'catalog_list kind:"importer" lists built-in and contributed importers; catalog_describe kind:"importer" returns a contributed importer\'s manifest and script; catalog_version action:"importer" {manifest, script} saves one to this project (a new version replaces it; history keeps the old one) and action:"remove" kind:"importer" removes it.',
+    'catalog_list kind:"contribution" lists built-in and contributed importers (slot importer) beside the other extension slots; catalog_describe kind:"importer" returns a contributed importer\'s manifest and script; catalog_version action:"importer" {manifest, script} saves one to this project (a new version replaces it; history keeps the old one) and action:"remove" kind:"importer" removes it.',
   ],
   publish: [
     "Publication is separate from page saving and presentation. Only invoke available tools within their project scope. Global promotion, hosting and administrative registration require the explicit host/operator flow; do not invent a missing MCP tool.",

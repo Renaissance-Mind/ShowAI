@@ -6,7 +6,7 @@
 
 字段类型由一个组件包声明，分两半：
 
-- **值的部分**（ShowAI 负责筛选、排序和读取）：manifest 写 `role:"database-field"` 与 `databaseField:{protocol:1, valueKind, operators?}`。`valueKind` 说明值按哪种方式比较：`text`、`number`、`date`、`option`、`list` 或 `boolean`；`operators` 可选，从这种值的运算符中选出要提供的几个（完整列表见 fieldTypes 的 `operators`），省略时提供全部。入口文件命名导出 `field`：
+- **值的部分**（ShowAI 负责筛选、排序和读取）：manifest 写 `contributes.databaseField:{protocol:1, valueKind, operators?}`（与快速跳转命令、@ 菜单共用的 `contributes` 声明，见 [工作台位置](contributions.md)）。`valueKind` 说明值按哪种方式比较：`text`、`number`、`date`、`option`、`list` 或 `boolean`；`operators` 可选，从这种值的运算符中选出要提供的几个（完整列表见 fieldTypes 的 `operators`），省略时提供全部。入口文件命名导出 `field`：
   - `format(value, config)`：同步返回单元格显示的文字，或 `{text, tone}`，`tone` 取 gray、brown、orange、yellow、green、blue、purple、pink、red 之一，显示为带颜色的标签。表格、看板、列表、搜索和 CSV 导出都用它。
   - `project(value, config)`（可选）：同步返回按 `valueKind` 比较的值，例如数字、`YYYY-MM-DD` 日期或文字列表；筛选和排序用它。省略时直接按存储的值比较。
 - **单元格的部分**（数据库负责摆放）：入口的默认导出是编辑器，读者点击单元格时显示在单元格下方的小面板里。它收到 `data`（这一列的设置）、`value`（当前值）、`onValue(next)`（保存新值）和 `onClose()`（关闭面板）；只读时没有 `onValue`。
@@ -24,8 +24,9 @@
   "version": "1.0.0",
   "description": "数据库里的 1–N 星评分。",
   "entry": "index.tsx",
-  "role": "database-field",
-  "databaseField": { "protocol": 1, "valueKind": "number", "operators": ["is", "gte", "lte", "isEmpty", "isNotEmpty"] },
+  "contributes": {
+    "databaseField": { "protocol": 1, "valueKind": "number", "operators": ["is", "gte", "lte", "isEmpty", "isNotEmpty"] }
+  },
   "scenarios": ["给数据库记录打分"],
   "defaultData": { "max": 5 },
   "examples": [{ "name": "五星", "data": { "max": 5 } }]
@@ -66,7 +67,7 @@ export default function RatingEditor({ data, value, onValue, onClose }) {
 { "id": "rating", "name": "评分", "type": "custom", "component": { "componentId": "star-rating", "version": "1.0.0", "integrity": "sha256-…" }, "kind": "number", "config": { "max": 5 } }
 ```
 
-`kind` 抄写组件声明的 valueKind（fieldTypes 的 contributed 条目里已经写好整列的 column）。记录里这一列写数字。在工作台中也可以从类型菜单直接选这个类型。视图的筛选条件用 `databaseField.operators` 中的运算符，例如 `{"column":"rating","operator":"gte","value":4}`。
+`kind` 抄写组件声明的 valueKind（fieldTypes 的 contributed 条目里已经写好整列的 column）。记录里这一列写数字。在工作台中也可以从类型菜单直接选这个类型。视图的筛选条件用 `contributes.databaseField.operators` 中的运算符，例如 `{"column":"rating","operator":"gte","value":4}`。
 
 组件被删除、版本找不到或在导出的离线页面中，单元格只读显示存储的原值，数据不会丢失；这些地方以及 `dataset_read` 的 query 按列的 `kind` 筛选与排序存储的值，所以 `format`/`project` 不改变比较方式时结果与工作台一致。字段类型组件不会出现在插入组件的菜单里。
 

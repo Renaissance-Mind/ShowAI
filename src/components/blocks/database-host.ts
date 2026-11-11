@@ -38,7 +38,7 @@ export interface FieldEditorProps {
   onValue?: (value: unknown) => void;
   onClose: () => void;
 }
-/** A field type a library component contributes (role database-field). */
+/** A field type a library component contributes (contributes.databaseField). */
 export interface ContributedField {
   ref: FieldComponentRef;
   name: string;

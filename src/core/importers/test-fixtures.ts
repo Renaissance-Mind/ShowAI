@@ -128,6 +128,50 @@ Review notes.
   };
 }
 
+/**
+ * Two related Notion databases: Projects lists its tasks and Tasks names its
+ * project (a two-way relation, exported as one column on each side), with a
+ * multi-select of labels and a rollup exported as its computed number.
+ */
+export function notionRelationZip(): Uint8Array {
+  const ids = {
+    projects: "55555555555555555555555555555555",
+    tasks: "66666666666666666666666666666666",
+    launch: "77777777777777777777777777777777",
+    docs: "88888888888888888888888888888888",
+    write: "99999999999999999999999999999999",
+    test: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    publish: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  };
+  const projects = `Projects ${ids.projects}`;
+  const tasks = `Tasks ${ids.tasks}`;
+  const task = (title: string, id: string) =>
+    `${title} (${encodeURIComponent(projects)}/${encodeURIComponent(tasks)}/${encodeURIComponent(`${title} ${id}`)}.md)`;
+  const project = (title: string, id: string) =>
+    `${title} (../${encodeURIComponent(projects)}/${encodeURIComponent(`${title} ${id}`)}.md)`;
+  const text: Record<string, string> = {
+    [`${projects}_all.csv`]: `Name,Tasks,Open tasks
+Launch,"${task("Write", ids.write)}, ${task("Test", ids.test)}",2
+Docs,${task("Publish", ids.publish)},1
+`,
+    [`${projects}/Launch ${ids.launch}.md`]: "# Launch\n\nShip version one.\n",
+    [`${projects}/Docs ${ids.docs}.md`]: "# Docs\n\nWrite the guide.\n",
+    [`${projects}/${tasks}_all.csv`]: `Name,Project,Labels
+Write,${project("Launch", ids.launch)},"writing, review"
+Test,${project("Launch", ids.launch)},review
+Publish,${project("Docs", ids.docs)},"writing, release"
+`,
+    [`${projects}/${tasks}/Write ${ids.write}.md`]: "# Write\n\nDraft it.\n",
+    [`${projects}/${tasks}/Test ${ids.test}.md`]: "# Test\n\nCheck it.\n",
+    [`${projects}/${tasks}/Publish ${ids.publish}.md`]: "# Publish\n\nRelease it.\n",
+  };
+  return zipSync(
+    Object.fromEntries(
+      Object.entries(text).map(([path, value]) => [path, strToU8(value)]),
+    ),
+  );
+}
+
 /** Notion's download: a zip holding Export-…-Part-1.zip. */
 export function notionZip(): Uint8Array {
   const part = zipSync(notionFiles());

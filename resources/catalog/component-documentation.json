@@ -1161,7 +1161,7 @@
         },
         {
           "path": "columns",
-          "meaning": "列定义：唯一 id、显示 name、type=text/number/select/multiSelect/checkbox/url/date/page/relation/formula/rollup/custom。select 与 multiSelect 用 options 给出候选值，colors 可为选项指定颜色（gray/brown/orange/yellow/green/blue/purple/pink/red）；multiSelect 的值是选项列表。date 列的值是 YYYY-MM-DD 或空字符串；page 列的值是 showai://project/PROJECT/page/PAGE 页面链接或空字符串，可带 folder 与 titleColumn。relation 列用 relation.dataset 指向一份 {columns, rows} 形状的共享数据，值是该数据记录 id 的列表；加 relation.reverse:{name} 后，绑定该数据的数据库会多出一列反向关联。formula 列用 formula.expression 写 JavaScript 表达式，prop(\"属性名\") 读取本记录属性，在处理脚本沙箱中计算；formula.kind 决定筛选与排序方式。rollup 列对 relation 列关联记录的某一属性做 count/sum/average/min/max/unique/percentChecked。formula、rollup 和反向关联的值不保存在 rows 里。custom 列用 component 指向声明 role=database-field 的组件精确版本，config 是该组件的设置；组件不可用时只读显示原值。可用的字段类型（含组件提供的）见 catalog_describe 的 guide 视图 fieldTypes。"
+          "meaning": "列定义：唯一 id、显示 name、type=text/number/select/multiSelect/checkbox/url/date/page/relation/formula/rollup/custom。select 与 multiSelect 用 options 给出候选值，colors 可为选项指定颜色（gray/brown/orange/yellow/green/blue/purple/pink/red）；multiSelect 的值是选项列表。date 列的值是 YYYY-MM-DD 或空字符串；page 列的值是 showai://project/PROJECT/page/PAGE 页面链接或空字符串，可带 folder 与 titleColumn。relation 列用 relation.dataset 指向一份 {columns, rows} 形状的共享数据，值是该数据记录 id 的列表；加 relation.reverse:{name} 后，绑定该数据的数据库会多出一列反向关联。formula 列用 formula.expression 写 JavaScript 表达式，prop(\"属性名\") 读取本记录属性，在处理脚本沙箱中计算；formula.kind 决定筛选与排序方式。rollup 列对 relation 列关联记录的某一属性做 count/sum/average/min/max/unique/percentChecked。formula、rollup 和反向关联的值不保存在 rows 里。custom 列用 component 指向声明 contributes.databaseField 的组件精确版本，config 是该组件的设置；组件不可用时只读显示原值。可用的字段类型（含组件提供的）见 catalog_describe 的 guide 视图 fieldTypes。"
         },
         {
           "path": "rows",
@@ -1352,7 +1352,7 @@
         "日历只接收已搜索、筛选后的行；日期按 UTC 日序号计算，今天取读者本地日期。日历列选择与模式是阅读状态，初始值来自 calendar。"
       ],
       "extensionPoints": [
-        "字段类型：src/datasets/value-types.mjs 定义值类型（校验、规范化、比较、文本、分组、筛选运算符），database-field-ui.tsx 为每个类型提供单元格、编辑器与列设置；组件库组件声明 role=database-field 即可提供新字段类型。",
+        "字段类型：src/datasets/value-types.mjs 定义值类型（校验、规范化、比较、文本、分组、筛选运算符），database-field-ui.tsx 为每个类型提供单元格、编辑器与列设置；组件库组件在 manifest.contributes.databaseField 中声明即可提供新字段类型。",
         "视图：DatabaseViews.tsx 用 registerDatabaseView 注册表格、看板、列表与日历，新视图实现同一接口。",
         "筛选与排序：src/datasets/record-query.mjs 是工作台、阅读器、CLI 与 SDK 共用的纯函数模块。"
       ],
@@ -10823,7 +10823,7 @@
       "editing": {
         "data": ["只修改 date。"],
         "implementation": [
-          "新的提及类型做成声明 mention 的自定义组件，不修改这个组件。"
+          "新的提及类型做成声明 contributes.mention 的自定义组件，不修改这个组件。"
         ]
       }
     },
@@ -10839,9 +10839,9 @@
         }
       ],
       "architecture": [
-        "目录条目声明 mention: {prop:\"date\", input:\"date\"}，@ 菜单据此列出今天、明天与输入的日期；这与自定义组件在 manifest 中的声明相同。"
+        "目录条目声明 contributes.mention: {prop:\"date\", input:\"date\"}，@ 菜单据此列出今天、明天与输入的日期；这与自定义组件在 manifest 中的声明相同。"
       ],
-      "extensionPoints": ["其他可提及的内容按同一 mention 契约做成组件。"],
+      "extensionPoints": ["其他可提及的内容按同一 contributes.mention 声明做成组件。"],
       "invariants": ["日期按 UTC 日历日格式化，各时区显示同一天。"],
       "verification": [
         "在正文输入 @ 插入今天的日期，刷新后仍显示同一天；导出后检查显示。"

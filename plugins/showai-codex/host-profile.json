@@ -3,13 +3,14 @@
   "profile": "codex",
   "declaredHostDisplay": "codex-visualize",
   "commonVersion": "0.29.3",
-  "commonSha256": "f57bb3c9aa0814c66bb6f707ff413c843064b30a4a8c33ccb972e576f13a3efd",
+  "commonSha256": "83d823981e56709a484e7017ac3fe08a1526da5a2b580dda96d782c887a5eacc",
   "commonFiles": {
     "collaborate-canvas/SKILL.md": "1a21a0419504732c39821582e891721fa3e8deba4808bab19e737eca53a68c49",
-    "create-component/references/component-authoring.md": "316c6c3240c14d25339415a1d97bcc8c390deca85677d3c009a47cf749de4204",
-    "create-component/references/database-field.md": "67aacfd642393f72aa75d417fd409acab7a895acf2d6d0d75c26a4d46506fa31",
+    "create-component/references/component-authoring.md": "721d1bbfc24947820131522333551b5619f2f1f09ec8d19bddf9f76545b7fa8d",
+    "create-component/references/contributions.md": "07f27dbb32df7f37cdbc40a4c1d5fcad708c3a1400ac82260dd7b2597813db24",
+    "create-component/references/database-field.md": "f3257e723798cc783bdaa428bc5db785c759abb272c3143aec7dcf773f939c49",
     "create-component/references/parameter-contract.md": "43d17afee415316b22e3902c4a872911a1a57d7c7358c35646c0463e0cfe00bb",
-    "create-component/SKILL.md": "417afb8da1a45d5786ed5b7f673f2788ea40622ea066075846bee4ad925492be",
+    "create-component/SKILL.md": "31cf0648efd9b6ce42a9070879941ac04b8e5ca1e54f3f126f8e437f5975fe57",
     "create-template/references/template-abstraction.md": "a602c5d888fda4d1e23abe836605deed1fa2ab8711e375134b5642c79f9708cc",
     "create-template/references/template-creation.md": "b367292327c32582fd3aa48b7d066d41784ea8f26e9919384c4bc7609734d433",
     "create-template/SKILL.md": "7a35ae5562439f17d22fafc908a72ef7191a2809642b0c1ba113f8fac2694256",
@@ -20,15 +21,16 @@
     "use-showai/references/board-authoring.md": "06b7a1656926e15816002975d626434115e0ef4551581e12089186a7169e0a28",
     "use-showai/references/capacity.md": "87b855fa1ddc1721a4f6674f59d1103cd943fcd65c58f14bb417388e87f471d2",
     "use-showai/references/editing.md": "d65b2a085148ad5f09fa18a8eb39c622732dc3609e81e6ddb84511299da601b1",
+    "use-showai/references/extension-points.md": "4a2ef904ad08d824145f9f79476346b406b40a7880e0922d24e5367cf5d3438f",
     "use-showai/references/host-display.md": "6548e9bf4c0de9df2cfec81a46dbd6bd47e2c511d8f2398a63df2d1ec16e71bb",
-    "use-showai/references/import.md": "cd155c226fef658146b1c8fd69665dfbad4434a8adaa44e14aac7a81e53e54bb",
+    "use-showai/references/import.md": "725016a535766e0904f1e7ec19b09e99d12c2850e6bb60172f11cf4a76ac5140",
     "use-showai/references/integration.md": "e7e16787c97ebb6abf1a2e4b753a8a363546f31257d0e8beb5ae2a218ac85380",
     "use-showai/references/page-reading.md": "1b641803762103afeb5fbce25e954e70bf15cf867a9c664e8482856ffe01b8bd",
     "use-showai/references/runtime.md": "cc8910d2a349757d7db83224fef4d5f9561ec30201c52329cfcb1a9528c1a184",
     "use-showai/references/shared-data.md": "511242687180e2abaa2a1669eef8c9b2634a97bea7e6ffddfbc6b0e9d3514f40",
     "use-showai/references/tasks.md": "5dc9866a1b21f6d5c38a340caeea824a0bf81ec0a8ff50de3ec704d494e727b0",
     "use-showai/references/user-references.md": "e328b96eb23b5179b8c55af0d5361f0ccf2c42fac36cebbcdcd50447a37041dd",
-    "use-showai/SKILL.md": "13364a01dc8732087c390c20140ed3a164fd55c4c0b97c4c76e2199afe29999a"
+    "use-showai/SKILL.md": "1875799b359b8db5c36c94f79c8bf61dd632d95e670a94a5b34fefd478645bf8"
   },
   "adapterSha256": "81dc575de58880d9214858b212fbf8d1f13688f88aad6ab0bace2fe70e5cb95c"
 }

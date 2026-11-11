@@ -124,23 +124,9 @@ export default function Chapters({ data, goTo }) {
 
 验证时在工作台点击后确认打开了正确页面并高亮目标块，再用后退回到原页；导出网站时确认页间跳转打开对应文件。
 
-## 快速跳转命令
+## 填入工作台位置的组件
 
-工作台的快速跳转（⌘K / Ctrl+K）由宿主提供：输入框、排序以及页面、项目、工作台命令都属于宿主，组件不实现其中任何部分，也不进入阅读器。每个组件已经在这里提供“插入到当前页面”；组件还可以在 manifest 的 `commands` 中声明更多条目，保存新版本后它们就出现在快速跳转里，不需要改动 App。
-
-`commands` 是数组，最多 20 条，每条为 `{id, title, keywords?, run}`：`id` 用小写字母、数字和 `-`，在组件包内唯一；`title` 是读者看到的命令名，写成动作，例如“插入今日站会”；`keywords` 是可选的搜索词。`run` 只能二选一：
-
-- `{"insert": {"example": 0}}` 用第 0 个示例的数据插入组件，`{"insert": {"props": {…}}}` 用给定数据插入，两者都省略时用 defaultData。props 在保存时按 schema 与关系规则检查。插入命令只在打开可编辑的页面或白板时列出，组件插在选中块之后，没有选中时放在末尾。
-- `{"goTo": "showai://project/项目ID/page/页面ID?blocks=块ID"}` 打开页面并定位到块，效果与组件里调用 `goTo` 相同；命令不在任何页面中，所以要写完整的页面链接。
-
-```json
-"commands": [
-  { "id": "today", "title": "插入今日站会", "keywords": ["standup", "daily"], "run": { "insert": { "example": 0 } } },
-  { "id": "team-board", "title": "打开团队看板", "run": { "goTo": "showai://project/P/page/Q" } }
-]
-```
-
-命令属于不可变版本，修改命令需要保存新版本。准确字段以 `guide({topic:"component"})` 返回的 `input.commandsSchema` 为准；`catalog_describe` 的 summary 会列出组件声明的命令，`catalog_list` 的 query 也匹配命令标题和关键词。保存后在工作台按 ⌘K 输入命令名，确认它出现并按预期插入或跳转。
+组件要在快速跳转（⌘K）里提供命令、出现在正文的 @ 菜单中放进一行文字，或作为数据库字段类型时，在 manifest 的 `contributes` 中声明，写法与检查见 [工作台位置](contributions.md)。
 
 ## 读取页面之间的引用
 
@@ -148,7 +134,7 @@ export default function Chapters({ data, goTo }) {
 
 - `query` 为 `{direction?, pageId?, projectId?}`：`direction:"to"`（默认）列出引用这一页的页面，`"from"` 列出这一页引用的页面；省略 pageId 指组件所在的页面。
 - 返回 `{status, items, page, error?}`，page 是这些引用所属页面的 `{projectId, pageId}`。`status` 为 `loading`、`ready` 或 `unavailable`（当前查看处没有索引，如对话预览）。`items` 的每一项有 projectId、pageId、title、blockId（引用所在的块）、blockIds（引用指向的块）、kind（link、database、component）和 snippet（引用周围的文字）。打开某一项用 `goTo({projectId,pageId,blockId})`。
-- App 里内容库变化后结果自动更新。manifest 声明 `pageReferences: true` 时，导出的页面带上导出那一刻这一页的引用，组件在导出页中照常显示；不声明时导出页返回 `unavailable`，也不会带出其他页面的标题和文字。导出只带这一页一层的引用（引用它的页面与它引用的页面，各最多 200 条），读取其他页面的引用在导出页返回 `unavailable`；这些页面的标题和引用文字会随导出文件交给读者，交付前告诉用户。导出页里 `goTo` 打开其他页面的规则见「跳转到页面或组件」。
+- App 里内容库变化后结果自动更新。manifest 顶层声明 `pageReferences: true`（组件读取这项数据的能力，不属于 `contributes`）时，导出的页面带上导出那一刻这一页的引用，组件在导出页中照常显示；不声明时导出页返回 `unavailable`，也不会带出其他页面的标题和文字。导出只带这一页一层的引用（引用它的页面与它引用的页面，各最多 200 条），读取其他页面的引用在导出页返回 `unavailable`；这些页面的标题和引用文字会随导出文件交给读者，交付前告诉用户。导出页里 `goTo` 打开其他页面的规则见「跳转到页面或组件」。
 
 ```jsx
 import { usePageReferences } from "showai:components";
@@ -164,22 +150,6 @@ export default function Related({ goTo }) {
 ```
 
 引用是读取的结果，不写入组件 data，也不在 schema 中声明；在 `usage.interactions` 中把打开引用记为 `persistence: "none"`。验证时在另一页加入指向本页的链接，确认组件列出该页；改名、删除再恢复那一页后检查列表；导出页面后检查导出页显示同样的列表。
-
-## 放进一行文字的组件
-
-用户在正文输入 @ 时，菜单列出页面，以及每个在 manifest 中声明了 `mention` 的组件。内置的日期组件就是这样声明的：`"mention": {"prop": "date", "input": "date"}`。
-
-- `prop`：菜单填写的顶层 string 参数，schema 中必须存在。
-- `input`：`"date"` 列出今天、明天、昨天和输入的日期（YYYY-MM-DD）；`"text"` 用输入的文字；`"options"` 只列出固定选项。
-- `options`：可选的固定选项 `[{label, value, keywords?}]`，最多 50 个，value 写进 prop。
-
-manifest 中的写法：
-
-```json
-{ "id": "person", "name": "同事", "version": "1.0.0", "entry": "index.tsx", "defaultData": { "name": "" }, "mention": { "prop": "name", "input": "options", "options": [{ "label": "王芳", "value": "王芳", "keywords": "wangfang" }] } }
-```
-
-本项目可用的组件（项目、全局、已发布和内置组件）都会进入菜单。选项随组件版本保存，名单变化时保存新版本；名单需要经常变化时用 `input:"text"` 让用户直接输入。选中后组件以其余参数的 defaultData 加上这个值放进当前行，存为行内节点 `{type:"inlineWidget",attrs:{kind:"custom",data:{componentId,version,integrity,props}}}`；Markdown 中自定义组件写 `@[custom]{"componentId":"person","version":"1.0.0","integrity":"sha256-…","props":{"name":"王芳"}}`，内置组件写 `@[kind]{data}`。组件此时收到 `inline: true`，应渲染成一行文字中的内容：不用块级外边距和固定宽高，宽度随内容。宿主按组件报告的尺寸设置行内框架；修改仍通过 `onChange`。验证时在正文输入 @ 选中组件，检查它与前后文字同行、可编辑和只读时的样子以及导出页。
 
 ## 菜单与交互入口
 

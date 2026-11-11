@@ -114,9 +114,13 @@ export type SlashComponent = { name: string; description: string } & (
 export function insertsAsBlock(item: {
   kind?: string;
   role?: string;
-  mention?: unknown;
+  contributes?: { mention?: unknown; databaseField?: unknown };
 }) {
-  return !item.mention && (item.kind !== undefined || !item.role);
+  return (
+    !item.contributes?.mention &&
+    !item.contributes?.databaseField &&
+    (item.kind !== undefined || !item.role)
+  );
 }
 
 /**

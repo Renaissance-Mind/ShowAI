@@ -69,11 +69,10 @@ import { builtinComponentCatalog } from "../components/catalog";
 import { validateComponentDocumentation } from "../components/custom/documentation";
 import {
   commandProps,
-  validateComponentCommands,
-} from "../components/custom/commands";
+  validateContributions,
+} from "../components/custom/contributions";
 
 import { builtinSources, builtinExports } from "./builtin-sources";
-import { KIND_OPERATORS, VALUE_KINDS } from "../datasets/value-types.mjs";
 import { componentSandboxPolicy } from "../components/custom/sandbox-policy.mjs";
 import { diagramSourceFiles } from "../components/blocks/diagrams/templates";
 import { diagramAuthoringFiles } from "./diagram-authoring-files";
@@ -104,7 +103,6 @@ import { changeContext } from "./history-context";
 import { mergeValues } from "./catalog-merge";
 import { readCustomBlockData } from "../components/custom/contract";
 import { parameterRuleIssues } from "../portable/component-parameters.mjs";
-import { validateMentionContract } from "../portable/mention-contract.mjs";
 import { componentSignature } from "../portable/component-signature.mjs";
 import {
   assertJsonValue,
@@ -1329,53 +1327,14 @@ function record(value: unknown, label: string): Record<string, unknown> {
   assertJsonValue(value);
   return value as Record<string, unknown>;
 }
-/**
- * The harness half of a database field type a component contributes: the
- * kind its values project to and the operators it offers (a subset of that
- * kind's). The cell half is the component's own React entry (the editor)
- * and its named `field` export (format, project, sortKey, normalize).
- */
-function databaseFieldContract(
-  value: unknown,
-): NonNullable<ComponentManifest["databaseField"]> {
-  const field = record(value, "databaseField");
-  for (const key of Object.keys(field))
-    if (!["protocol", "valueKind", "operators"].includes(key))
-      throw new Error(`databaseField.${key} is not a supported setting.`);
-  if (field.protocol !== 1)
-    throw new Error("databaseField.protocol must be 1.");
-  if (!VALUE_KINDS.includes(field.valueKind as never))
-    throw new Error(
-      `databaseField.valueKind must be one of ${VALUE_KINDS.join(", ")}.`,
-    );
-  const kind = field.valueKind as keyof typeof KIND_OPERATORS;
-  if (
-    field.operators !== undefined &&
-    (!Array.isArray(field.operators) ||
-      !field.operators.every((operator) =>
-        KIND_OPERATORS[kind].includes(operator as never),
-      ))
-  )
-    throw new Error(
-      `databaseField.operators must name operators of ${kind} values: ${KIND_OPERATORS[kind].join(", ")}.`,
-    );
-  return {
-    protocol: 1,
-    valueKind: kind,
-    ...(field.operators
-      ? { operators: [...new Set(field.operators as string[])] }
-      : {}),
-  } as NonNullable<ComponentManifest["databaseField"]>;
-}
 function manifestFrom(value: unknown): ComponentManifest {
   const item = record(value, "Component manifest");
-  if (item.role === "database-field" || item.databaseField !== undefined) {
-    if (item.role !== "database-field" || item.pageOutlineProtocol !== undefined)
+  for (const key of ["commands", "mention", "databaseField"])
+    if (item[key] !== undefined)
       throw new Error(
-        "Database field type components declare role database-field and databaseField.",
+        `Component ${key} belongs in manifest.contributes.${key}.`,
       );
-    databaseFieldContract(item.databaseField);
-  } else if (item.role !== undefined || item.pageOutlineProtocol !== undefined) {
+  if (item.role !== undefined || item.pageOutlineProtocol !== undefined) {
     if (item.role !== "page-outline" || item.pageOutlineProtocol !== 1)
       throw new Error(
         "Page outline components require role page-outline and pageOutlineProtocol 1.",
@@ -1383,7 +1342,6 @@ function manifestFrom(value: unknown): ComponentManifest {
   }
   if (item.reader !== undefined && item.reader !== "readData")
     throw new Error("Component reader must name the readData export.");
-  if (item.mention !== undefined) validateMentionContract(item.mention);
   if (item.pageReferences !== undefined && item.pageReferences !== true)
     throw new Error("Component pageReferences must be true when present.");
   if (
@@ -1447,18 +1405,10 @@ function manifestFrom(value: unknown): ComponentManifest {
       ? { category: item.category as ComponentManifest["category"] }
       : {}),
     entry,
-    ...(item.role === "database-field"
-      ? {
-          role: "database-field" as const,
-          databaseField: databaseFieldContract(item.databaseField),
-        }
-      : item.role
-        ? { role: "page-outline" as const, pageOutlineProtocol: 1 as const }
-        : {}),
-    ...(item.reader ? { reader: "readData" as const } : {}),
-    ...(item.mention !== undefined
-      ? { mention: item.mention as ComponentManifest["mention"] }
+    ...(item.role
+      ? { role: "page-outline" as const, pageOutlineProtocol: 1 as const }
       : {}),
+    ...(item.reader ? { reader: "readData" as const } : {}),
     ...(item.pageReferences ? { pageReferences: true as const } : {}),
     scenarios: item.scenarios as string[],
     ...(item.documentation !== undefined
@@ -1474,8 +1424,12 @@ function manifestFrom(value: unknown): ComponentManifest {
     ...(item.effects !== undefined
       ? { effects: textList(item.effects, "Component effects") }
       : {}),
-    ...(item.commands !== undefined
-      ? { commands: validateComponentCommands(item.commands, examples.length) }
+    ...(item.contributes !== undefined
+      ? {
+          contributes: validateContributions(item.contributes, {
+            examples: examples.length,
+          }),
+        }
       : {}),
     ...(item.dependencies !== undefined
       ? { dependencies: componentDependencies(item.dependencies) }
@@ -1673,12 +1627,26 @@ export async function compilePackage(
     manifest.defaultData,
     ...manifest.examples.map((x) => x.data),
   ]);
-  if (manifest.mention) validateMentionContract(manifest.mention, schema);
+  if (manifest.contributes)
+    validateContributions(manifest.contributes, {
+      examples: manifest.examples.length,
+      schema,
+    });
+  if (manifest.role && manifest.contributes?.mention)
+    throw new Error(
+      "contributes.mention does not apply to a page outline renderer.",
+    );
+  if (manifest.role && manifest.contributes?.databaseField)
+    throw new Error(
+      "contributes.databaseField does not apply to a page outline renderer.",
+    );
   assertProps(schema, manifest.defaultData, manifest.documentation);
   manifest.examples.forEach((example) =>
     assertProps(schema, example.data, manifest.documentation),
   );
-  for (const command of manifest.commands ?? []) {
+  for (const [index, command] of (
+    manifest.contributes?.commands ?? []
+  ).entries()) {
     if (!("insert" in command.run) || !command.run.insert.props) continue;
     const issues = propsIssues(
       schema,
@@ -1687,7 +1655,7 @@ export async function compilePackage(
     );
     if (issues.length)
       throw new Error(
-        `Component command '${command.id}' props: ` +
+        `contributes.commands[${index}].run.insert.props (command '${command.id}') ` +
           issues.map((issue) => `${issue.path || "props"} ${issue.message}`).join("; "),
       );
   }

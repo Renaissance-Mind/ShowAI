@@ -19,6 +19,7 @@ import {
 import {
   docxFile,
   notionFiles,
+  notionRelationZip,
   notionZip,
 } from "../core/importers/test-fixtures";
 
@@ -194,11 +195,12 @@ test("a Notion export zip with a nested Part zip becomes folders, linked pages a
     ["Done", "checkbox"],
     ["Estimate", "number"],
     ["Link", "url"],
-    ["Tags", "text"],
+    ["Tags", "multiSelect"],
     ["Related", "text"],
     ["Page", "page"],
   ]);
   expect(value.columns[1].options).toEqual(["In progress", "Done"]);
+  expect(value.columns[7].options).toEqual(["design", "docs"]);
   expect(value.columns.at(-1)!.folder).toBe(tasksFolder.id);
   expect(value.rows).toEqual([
     {
@@ -209,7 +211,7 @@ test("a Notion export zip with a nested Part zip becomes folders, linked pages a
       p3: true,
       p4: 3,
       p5: "https://example.com/a",
-      p6: "design, docs",
+      p6: ["design", "docs"],
       p7: "Project Plan",
       page: link(spec.document.id),
     },
@@ -222,7 +224,7 @@ test("a Notion export zip with a nested Part zip becomes folders, linked pages a
       p3: false,
       p4: 1.5,
       p5: "https://example.com/b",
-      p6: "docs",
+      p6: ["docs"],
       page: link(review.document.id),
     },
     { id: "r3", title: "Ship", p1: "In progress", p3: false },
@@ -235,6 +237,64 @@ test("a Notion export zip with a nested Part zip becomes folders, linked pages a
       (folder) => folder.id === workspace.id,
     ),
   ).toBe(false);
+});
+
+test("Notion relations between exported databases become relation columns of record ids", async () => {
+  const zip = join(outside, "Relations.zip");
+  await writeFile(zip, notionRelationZip());
+  const target = { projectId, parentId: null };
+  const plan = await planImport(service, { path: zip }, target);
+  expect(plan.warnings).toEqual([]);
+  const report = await runImport(service, { path: zip }, target);
+  expect(report.problems).toEqual([]);
+  const read = async (title: string) => {
+    const page = await pageNamed(title);
+    const block = nodes(page.document.content).find(
+      (node) => node.type === "widget" && node.attrs?.kind === "database",
+    )!;
+    const id = block.attrs!.data.$binding.dataset as string;
+    const dataset = await service.datasetRead(projectId, id);
+    return {
+      id,
+      value: (dataset.dataset as { value: unknown }).value as {
+        columns: Record<string, unknown>[];
+        rows: Record<string, unknown>[];
+      },
+    };
+  };
+  const projects = await read("Projects");
+  const tasks = await read("Tasks");
+  const column = (value: typeof projects.value, name: string) =>
+    value.columns.find((item) => item.name === name)!;
+  expect(column(projects.value, "Tasks")).toMatchObject({
+    type: "relation",
+    relation: { dataset: tasks.id },
+  });
+  expect(column(tasks.value, "Project")).toMatchObject({
+    type: "relation",
+    relation: { dataset: projects.id },
+  });
+  expect(column(tasks.value, "Labels")).toMatchObject({
+    type: "multiSelect",
+    options: ["writing", "review", "release"],
+  });
+  // A rollup arrives as its computed value.
+  expect(column(projects.value, "Open tasks").type).toBe("number");
+  const id = (value: typeof projects.value, title: string) =>
+    value.rows.find((row) => row.title === title)!.id;
+  const tasksColumn = column(projects.value, "Tasks").id as string;
+  expect(
+    projects.value.rows.find((row) => row.title === "Launch")![tasksColumn],
+  ).toEqual([id(tasks.value, "Write"), id(tasks.value, "Test")]);
+  const projectColumn = column(tasks.value, "Project").id as string;
+  expect(
+    tasks.value.rows.find((row) => row.title === "Publish")![projectColumn],
+  ).toEqual([id(projects.value, "Docs")]);
+  // The records read back with the related titles the database shows.
+  const records = await service.datasetRead(projectId, projects.id, {
+    query: {},
+  });
+  expect(JSON.stringify(records)).toContain("Write");
 });
 
 test("the unzipped export folder imports the same way into a chosen folder", async () => {
@@ -531,12 +591,15 @@ test("an Agent saves an importer and imports through MCP, with a dry run first",
       script: TODO_IMPORTER.script,
     });
     expect(saved).toMatchObject({ id: "todo-lists", scope: "project" });
-    const listed = await call("catalog_list", { kind: "importer" });
+    const importers = async () =>
+      (
+        (await call("catalog_list", { kind: "contribution" })).slots as {
+          slot: string;
+          filledBy: { importerId: string; scope: string }[];
+        }[]
+      ).find((slot) => slot.slot === "importer")!.filledBy;
     expect(
-      listed.importers.map((item: { id: string; origin: string }) => [
-        item.id,
-        item.origin,
-      ]),
+      (await importers()).map((item) => [item.importerId, item.scope]),
     ).toEqual([
       ["todo-lists", "project"],
       ["notion", "builtin"],
@@ -567,9 +630,7 @@ test("an Agent saves an importer and imports through MCP, with a dry run first",
       kind: "importer",
       id: "todo-lists",
     });
-    expect(
-      (await call("catalog_list", { kind: "importer" })).importers,
-    ).toHaveLength(3);
+    expect(await importers()).toHaveLength(3);
   } finally {
     await client.close();
     await server.close();

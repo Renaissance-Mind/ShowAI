@@ -11974,9 +11974,11 @@
       "日期作为一行文字的一部分显示，读者按自己的语言看到同一天。",
       "编辑时点击日期即可更改。"
     ],
-    "mention": {
-      "prop": "date",
-      "input": "date"
+    "contributes": {
+      "mention": {
+        "prop": "date",
+        "input": "date"
+      }
     }
   },
   {

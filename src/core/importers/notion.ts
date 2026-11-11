@@ -446,12 +446,25 @@ function inferProperty(values: string[], rows: number): NotionProperty {
   return "text";
 }
 
+/** A relation column, resolved once every database of the export is read. */
+interface PendingRelation {
+  column: Record<string, unknown>;
+  /** Per row: the related page bases (undefined when a part named no page) and titles. */
+  cells: {
+    row: Record<string, unknown>;
+    targets: { base?: string; title: string }[];
+  }[];
+}
+
 interface DatabaseResult {
   value: {
     columns: Record<string, unknown>[];
     rows: Record<string, unknown>[];
   };
   headers: string[];
+  /** Row page base → record id. */
+  rowIds: Map<string, string>;
+  relations: PendingRelation[];
 }
 
 function databaseValue(
@@ -486,6 +499,7 @@ function databaseValue(
   ];
   const fillers: ((record: string[], row: Record<string, unknown>) => void)[] =
     [];
+  const relations: PendingRelation[] = [];
   let timed = 0;
   properties.slice(0, available).forEach((name, offset) => {
     const at = offset + 1;
@@ -501,6 +515,20 @@ function databaseValue(
       column.options = [
         ...new Set(values.map((v) => v.trim()).filter(Boolean)),
       ];
+    if (property === "multiSelect")
+      column.options = [
+        ...new Set(
+          values.flatMap((value) =>
+            value
+              .split(/,\s*/)
+              .map((part) => part.trim())
+              .filter(Boolean),
+          ),
+        ),
+      ];
+    const pending: PendingRelation | undefined =
+      property === "relation" ? { column, cells: [] } : undefined;
+    if (pending) relations.push(pending);
     columns.push(column);
     const ranged =
       property === "date" && values.some((value) => value.includes(" → "));
@@ -518,19 +546,33 @@ function databaseValue(
         row[id] = first.day;
         if (first.time) timed++;
         if (end && ranged) row[`${id}_end`] = notionDate(end)!.day;
-      } else if (property === "relation")
-        row[id] = raw
-          .split(/,\s*(?=[^,]*\.md\))/)
-          .map((part) => {
-            const match = RELATION.exec(part.trim());
-            return match
-              ? match[1] ||
-                  parseName(basename(decode(match[2]).replace(/\.md$/, "")))
-                    .title
-              : part;
-          })
-          .join(", ");
-      else row[id] = raw;
+      } else if (property === "multiSelect")
+        row[id] = [
+          ...new Set(
+            raw
+              .split(/,\s*/)
+              .map((part) => part.trim())
+              .filter(Boolean),
+          ),
+        ];
+      else if (property === "relation") {
+        // Written as related titles now; resolveRelations turns them into
+        // record ids when the pages are the rows of one database.
+        const targets = raw.split(/,\s*(?=[^,]*\.md\))/).map((part) => {
+          const match = RELATION.exec(part.trim());
+          if (!match) return { title: part };
+          const path = join(dirname(node.file.path), decode(match[2]));
+          return {
+            base: path?.replace(/\.md$/, ""),
+            title:
+              match[1] ||
+              parseName(basename(decode(match[2]).replace(/\.md$/, "")))
+                .title,
+          };
+        });
+        row[id] = targets.map((target) => target.title).join(", ");
+        pending!.cells.push({ row, targets });
+      } else row[id] = raw;
     });
   });
   if (timed)
@@ -552,6 +594,7 @@ function databaseValue(
     byTitle.set(title, [...(byTitle.get(title) ?? []), page.base]);
   }
   const matched = new Set<string>();
+  const rowIds = new Map<string, string>();
   const rows = kept.map((record, index) => {
     const title = (record[0] ?? "").trim();
     const row: Record<string, unknown> = { id: `r${index + 1}`, title };
@@ -559,18 +602,64 @@ function databaseValue(
     const page = byTitle.get(title)?.shift();
     if (page) {
       matched.add(page);
+      rowIds.set(page, row.id as string);
       row.page = importRef("page", page);
     }
     return row;
   });
   for (const page of rowPages)
-    if (!matched.has(page.base) && rows.length < MAX_ROWS)
+    if (!matched.has(page.base) && rows.length < MAX_ROWS) {
+      const id = `r${rows.length + 1}`;
+      rowIds.set(page.base, id);
       rows.push({
-        id: `r${rows.length + 1}`,
+        id,
         title: rowTitles.get(page.base) ?? page.title,
         page: importRef("page", page.base),
       });
-  return { value: { columns, rows }, headers };
+    }
+  return { value: { columns, rows }, headers, rowIds, relations };
+}
+
+/**
+ * A relation column becomes a relation to the database whose row pages its
+ * values name, holding those records' ids. When a value names something else
+ * (a plain page, another database's row in the same column, or nothing found
+ * in the export) the column stays text with the related titles.
+ */
+function resolveRelations(
+  databases: { base: string; result: DatabaseResult }[],
+  warnings: ImportWarning[],
+  source: (base: string) => string,
+) {
+  const rowOf = new Map<string, { database: string; id: string }>();
+  for (const { base, result } of databases)
+    for (const [page, id] of result.rowIds) rowOf.set(page, { database: base, id });
+  for (const { base, result } of databases)
+    for (const relation of result.relations) {
+      const targets = new Set<string>();
+      let resolved = true;
+      for (const cell of relation.cells)
+        for (const target of cell.targets) {
+          const row = target.base ? rowOf.get(target.base) : undefined;
+          if (row) targets.add(row.database);
+          else resolved = false;
+        }
+      if (!resolved || targets.size !== 1) {
+        relation.column.type = "text";
+        if (relation.cells.length)
+          warnings.push({
+            source: source(base),
+            message: `${String(relation.column.name)}: the related pages are not the rows of one database in this export, so the column keeps their titles as text.`,
+          });
+        continue;
+      }
+      const [database] = targets;
+      relation.column.relation = { dataset: importRef("dataset", database) };
+      for (const cell of relation.cells)
+        cell.row[relation.column.id as string] = [
+          ...new Set(cell.targets.map((target) => rowOf.get(target.base!)!.id)),
+        ];
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -664,6 +753,7 @@ async function convertNotion(input: ImportInput): Promise<ImportBundle> {
         splitTitle(await page.file.text(), page.title).title,
       );
 
+  const read: { base: string; result: DatabaseResult }[] = [];
   for (const [base, node] of [...exportIndex.databases].sort(([a], [b]) =>
     a.localeCompare(b),
   )) {
@@ -683,6 +773,7 @@ async function convertNotion(input: ImportInput): Promise<ImportBundle> {
     );
     for (const page of rowsOf.get(base) ?? [])
       rowHeaders.set(page.base, result.headers);
+    read.push({ base, result });
     bundle.datasets.push({ key: base, name: node.title, value: result.value });
     bundle.pages.push({
       key: base,
@@ -697,6 +788,11 @@ async function convertNotion(input: ImportInput): Promise<ImportBundle> {
       ],
     });
   }
+  resolveRelations(
+    read,
+    warnings,
+    (base) => exportIndex.databases.get(base)!.file.path,
+  );
   for (const [base, node] of [...exportIndex.pages].sort(([a], [b]) =>
     a.localeCompare(b),
   )) {

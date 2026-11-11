@@ -120,7 +120,7 @@ Discover only what you need:
   template import DIRECTORY --project PROJECT
   template export ID --project PROJECT --out NEW_DIRECTORY
   template context --project PROJECT [--templates ID[@VERSION],ID]
-  catalog list [--kind component|template] [--scope SCOPE] [--versions recommended|all] [--limit N --cursor CURSOR]
+  catalog list [--kind component|template|contribution] [--scope SCOPE] [--versions recommended|all] [--limit N --cursor CURSOR]
   catalog describe ID [--kind component|template] [--view VIEW]
   catalog describe ID --view parameters [--parameter-path PATH --parameter-offset N --parameter-limit N --known-hash HASH]
   catalog remove ID --kind component|template [--version VERSION] [--scope project|global|published]
@@ -1218,9 +1218,17 @@ async function runCliCommand(argv: string[]): Promise<unknown> {
       });
     }
     case "catalog": {
-      const kind = option(args, "kind") as "component" | "template" | undefined;
+      const listed = option(args, "kind");
+      if (action === "list" && listed === "contribution") {
+        requireCount(args, 2);
+        return service.catalogContributions({
+          projectId: option(args, "project") ?? (await project()),
+          query: option(args, "query"),
+        });
+      }
+      const kind = listed as "component" | "template" | undefined;
       if (kind && !["component", "template"].includes(kind))
-        throw new Error("--kind must be component or template.");
+        throw new Error("--kind must be component or template (list also takes contribution).");
       if (action === "list") {
         requireCount(args, 2);
         return service.catalogList({

@@ -85,24 +85,27 @@ export type NotionProperty =
   | "relation";
 
 /**
- * The ShowAI database column type of each Notion property. multiSelect and
- * relation are kept as text (relations show the related page titles) until
- * the database has those column types.
+ * The ShowAI database column type of each Notion property. A multi-select
+ * keeps its distinct values as options; a relation links the records of the
+ * database whose row pages it names, and stays text (the related titles) when
+ * its pages are not the rows of one database in the export. Formula and
+ * rollup properties arrive in the CSV as their computed values and are read
+ * like any other column, so they import as those values.
  */
 export const NOTION_PROPERTY_COLUMNS: Record<
   NotionProperty,
-  "text" | "number" | "select" | "checkbox" | "url" | "date"
+  "text" | "number" | "select" | "multiSelect" | "relation" | "checkbox" | "url" | "date"
 > = {
   title: "text",
   text: "text",
   number: "number",
   select: "select",
-  multiSelect: "text",
+  multiSelect: "multiSelect",
   checkbox: "checkbox",
   url: "url",
   email: "text",
   date: "date",
-  relation: "text",
+  relation: "relation",
 };
 
 /** Settings of the inference that turns CSV text into property kinds. */

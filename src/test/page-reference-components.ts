@@ -113,14 +113,16 @@ export function statusTagComponent(id = "status-tag"): ComponentSource {
       scenarios: ["Mark a sentence as todo, blocked or done."],
       defaultData: data,
       examples: [{ name: "Todo", data }],
-      mention: {
-        prop: "label",
-        input: "options",
-        options: [
-          { label: "Todo", value: "todo" },
-          { label: "Blocked", value: "blocked", keywords: "stuck" },
-          { label: "Done", value: "done" },
-        ],
+      contributes: {
+        mention: {
+          prop: "label",
+          input: "options",
+          options: [
+            { label: "Todo", value: "todo" },
+            { label: "Blocked", value: "blocked", keywords: "stuck" },
+            { label: "Done", value: "done" },
+          ],
+        },
       },
       documentation: {
         version: 2,
