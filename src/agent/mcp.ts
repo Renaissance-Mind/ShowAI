@@ -42,7 +42,7 @@ import { getMcpGuide } from "./mcp-guides";
 import { pageReadSchema, type PageReadResult } from "./page-reading";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
-import { writePresentation } from "./presentation";
+import { inlineReader, writePresentation } from "./presentation";
 import { syncManager } from "../sync/manager";
 import type { TemplateSelection } from "./template-workflow";
 import { compactData, compactMcpResult } from "./mcp-response";
@@ -1297,7 +1297,7 @@ export function createMcpServer(options: {
     "page_present",
     {
       description:
-        "Present a saved Page, or selected blocks inline, and return host delivery references. externalSnapshots lists embedded data from files outside the library; get the person's agreement before sharing those files.",
+        "Present a saved Page, or selected blocks inline, and return host delivery references. display.reader is the inline preview's reader; readerReason says why it loads from the CDN. externalSnapshots lists embedded data from files outside the library; get the person's agreement before sharing those files.",
       inputSchema: {
         pageId: z.string().min(1),
         blockIds: z.array(z.string().min(1)).min(1).optional(),
@@ -1345,6 +1345,7 @@ export function createMcpServer(options: {
             display: {
               resourceAttached: true,
               inlineAvailable: !!value.inline,
+              ...inlineReader(value),
               onlineAvailable: !!value.online,
               compactAvailable: !!value.compact,
               fullPageAvailable: true,

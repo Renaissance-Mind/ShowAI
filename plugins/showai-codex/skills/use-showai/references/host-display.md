@@ -14,7 +14,7 @@ showai_capabilities.presentation.declaredHostDisplay 回显连接声明，show_c
 
 delivery.inline 是可内嵌的阅读片段；delivery.html 是完整离线 HTML；delivery.source 是源内容。片段可有宿主拥有的本机路径，远程连接也可返回带期限的 URL。URL 不能当成本机 path；不通过本机文件操作读取远程服务端路径。
 
-inline 优先携带压缩后的本地阅读器；超出预算时才切换到在线阅读器。delivery.compact 与 delivery.online 只带页面数据和在线阅读器引用：compact 用于宿主的 HTML 展示工具，online 是独立网页。阅读器从 ShowAI 阅读器源、jsDelivr、unpkg 依次加载；没有控制台证据时不直接断言某个来源被拦截。display 的 available 字段仅说明文件或资源存在，不证明加载与交互正常。
+inline 优先携带压缩后的本地阅读器；超出预算时才切换到在线阅读器。page_present、render_document 与 show_component 的 display.reader 写明 inline 预览实际用的阅读器，切换到在线阅读器时 display.readerReason 给出原因、大小与上限；交给禁止联网的宿主前先看这两个字段。delivery.compact 与 delivery.online 只带页面数据和在线阅读器引用：compact 用于宿主的 HTML 展示工具，online 是独立网页。阅读器从 ShowAI 阅读器源、jsDelivr、unpkg 依次加载；没有控制台证据时不直接断言某个来源被拦截。display 的 available 字段仅说明文件或资源存在，不证明加载与交互正常。
 
 显式 page_export 的 reader:bundled 强制离线，inline 超出对话预算时直接报错，并给出大小与上限；reader:cdn 使用在线阅读器。不指定 reader 的 inline 导出超出预算时改用在线阅读器，结果的 reader 为 cdn，readerReason 写明原因、大小与上限；交付需要离线阅读的文件前先看这两个字段。加载失败时按绑定的宿主契约处理，并保留可用的离线文件。插件安装不会更新独立的软件运行时。
 

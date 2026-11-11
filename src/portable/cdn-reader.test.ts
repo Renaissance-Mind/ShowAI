@@ -18,6 +18,9 @@ import { presentPage } from "../agent/page-presentation";
 import { readFile, writeFile } from "node:fs/promises";
 import { randomBytes } from "node:crypto";
 import { startCdnHost } from "./cdn-test-host";
+import { Client } from "@modelcontextprotocol/sdk/client/index.js";
+import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
+import { createMcpServer } from "../agent/mcp";
 import components from "../../resources/catalog/components.json";
 
 // Like injectArtifactIntoHtml, keep the JSON inert inside its script element.
@@ -281,6 +284,8 @@ describe("CDN reader", () => {
       });
       expect(presented.inline).toContain("data-showai-inline-root");
       expect(presented.inline).not.toContain(host.origin);
+      expect(presented.reader).toBe("bundled");
+      expect(presented).not.toHaveProperty("readerReason");
       expect(presented.online).toContain("standalone:true");
       expect(presented.html).not.toContain(host.origin);
 
@@ -368,6 +373,37 @@ describe("CDN reader", () => {
         reader: "cdn",
         readerReason: { cause: "requested" },
       });
+      // page_present and render_document fall back the same way and say so.
+      const [left, right] = InMemoryTransport.createLinkedPair();
+      const server = createMcpServer({ root: home, projectId: project.id });
+      const client = new Client({ name: "cdn-reader-test", version: "1" });
+      await server.connect(right);
+      await client.connect(left);
+      try {
+        for (const [name, args] of [
+          ["page_present", { pageId: record.document.id }],
+          ["render_document", { document: doc }],
+        ] as const) {
+          const result = await client.callTool(
+            { name, arguments: args },
+            undefined,
+            { timeout: 240_000 },
+          );
+          expect(result.isError, JSON.stringify(result.content)).not.toBe(
+            true,
+          );
+          const { display } = (result.structuredContent as any).data;
+          expect(display, name).toMatchObject({
+            inlineAvailable: true,
+            reader: "cdn",
+            readerReason: { cause: "size", limitBytes: 1_000_000 },
+          });
+          expect(display.readerReason.bytes).toBeGreaterThan(1_000_000);
+        }
+      } finally {
+        await client.close();
+        await server.close();
+      }
     } finally {
       process.env = saved;
     }

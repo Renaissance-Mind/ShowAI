@@ -19,8 +19,11 @@ import {
   instantiateTemplateRecord,
 } from "../core/catalog";
 import { toCdnFragment, toCdnPage } from "../portable/cdn-fragment.mjs";
-import { cdnReaderUrls } from "../core/cdn-reader";
-import { conversationPreview } from "../core/conversation-preview";
+import { cdnReaderUrls, type ReaderMode } from "../core/cdn-reader";
+import {
+  conversationPreview,
+  type ReaderReason,
+} from "../core/conversation-preview";
 import {
   serializeArtifact,
   validateDocument,
@@ -486,14 +489,16 @@ export async function renderComponents(
 /**
  * The conversation preview carries its local reader when it fits the host;
  * a published CDN reader is used only when the compressed bundle is too large.
+ * reader and readerReason report which one the inline preview uses and why.
  */
 export async function inlinePresentation(html: string): Promise<{
   inline?: string;
   inlineError?: string;
+  reader?: ReaderMode;
+  readerReason?: ReaderReason;
 }> {
   try {
-    const { inline } = await conversationPreview(html);
-    return { inline };
+    return await conversationPreview(html);
   } catch (error) {
     if (
       !(error instanceof CapacityError) ||
@@ -504,6 +509,20 @@ export async function inlinePresentation(html: string): Promise<{
       inlineError: `${error.message} This is the conversation host budget; bundled previews are measured after compression and CDN previews carry page data, embedded images and custom components. The complete HTML and source are available. Select independently readable blockIds. If a single selected node still exceeds the budget, use the complete HTML delivery. Page saving and file export use separate budgets.`,
     };
   }
+}
+
+/** The reader of the inline preview, for a result's display field. */
+export function inlineReader(preview: {
+  inline?: string;
+  reader?: ReaderMode;
+  readerReason?: ReaderReason;
+}) {
+  return preview.inline && preview.reader
+    ? {
+        reader: preview.reader,
+        ...(preview.readerReason ? { readerReason: preview.readerReason } : {}),
+      }
+    : {};
 }
 
 /**
@@ -577,6 +596,7 @@ export async function writePresentation(
     },
     bytes: value.bytes,
     persistence: value.persistence,
+    ...(inline ? { display: inlineReader(value) } : {}),
     ...(value.inlineError ? { inlineError: value.inlineError } : {}),
   };
 }

@@ -17,6 +17,7 @@ import {
   renderComponents,
   showComponentSchema,
   compactPresentation,
+  inlineReader,
   SHOW_COMPONENT_LIMIT,
   SHOW_DELIVERIES,
 } from "./presentation";
@@ -596,6 +597,7 @@ export function registerPresentationTools(
             display: {
               resourceAttached: true,
               inlineAvailable: !!presentation.inline,
+              ...inlineReader(presentation),
               onlineAvailable: !!presentation.online,
               compactAvailable: !!presentation.compact,
               note: "The host displays the attached MCP Apps reader directly. Download URLs are for file delivery. If the execution sandbox cannot download them, use presentation_source when available.",
@@ -730,6 +732,7 @@ export function registerPresentationTools(
           display: {
             resourceAttached: true,
             inlineAvailable: !!shown.inline,
+            ...inlineReader(shown),
             imageAttached: !!image,
           },
           persistence: {

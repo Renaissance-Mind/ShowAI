@@ -36,7 +36,7 @@ import {
   mcpFailure,
   type Presentation,
 } from "./presentation-tools";
-import { inlinePresentation } from "./presentation";
+import { inlinePresentation, inlineReader } from "./presentation";
 import { serverBaseUrl } from "../sync/server-url";
 import { FileStore } from "../core/store";
 import type { CloudBrowserCheck } from "./cloud-browser-check";
@@ -558,6 +558,10 @@ export async function createMcpHttpApp(options: McpHttpOptions) {
                     },
                   });
                   data.delivery = delivery;
+                  // An inline export reports its reader itself; a preview
+                  // made from an html file says which reader it loads.
+                  if (args.format !== "inline" && preview.inline)
+                    data.display = inlineReader(preview);
                   if (preview.inlineError)
                     data.inlineError = preview.inlineError;
                 }
