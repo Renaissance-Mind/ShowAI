@@ -241,25 +241,11 @@ function TurnView({
           </div>
         ))}
         {turn.state === "running" && (
-          <p className="assistant-status" role="status">
-            <Loader2 size={13} className="studio-spin" aria-hidden="true" />
-            <span className="showai-text-shimmer">
-              {turn.events.length ? t("panel.running") : t("panel.connecting")}
-            </span>
-            <button
-              type="button"
-              disabled={pending.cancel}
-              aria-busy={pending.cancel}
-              onClick={onCancel}
-            >
-              {pending.cancel ? (
-                <Loader2 size={11} className="studio-spin" aria-hidden="true" />
-              ) : (
-                <Square size={11} aria-hidden="true" />
-              )}
-              {t("panel.stop")}
-            </button>
-          </p>
+          <RunningStatus
+            turn={turn}
+            stopping={pending.cancel}
+            onStop={onCancel}
+          />
         )}
         {turn.error &&
           turn.state !== "running" &&
@@ -329,6 +315,40 @@ function TurnView({
   );
 }
 
+/** A running turn with its Stop control, in the panel and the floating box. */
+function RunningStatus({
+  turn,
+  stopping,
+  onStop,
+}: {
+  turn: AgentTurn;
+  stopping: boolean;
+  onStop: () => void;
+}) {
+  const t = useTranslator(strings);
+  return (
+    <p className="assistant-status" role="status">
+      <Loader2 size={13} className="studio-spin" aria-hidden="true" />
+      <span className="showai-text-shimmer">
+        {turn.events.length ? t("panel.running") : t("panel.connecting")}
+      </span>
+      <button
+        type="button"
+        disabled={stopping}
+        aria-busy={stopping}
+        onClick={onStop}
+      >
+        {stopping ? (
+          <Loader2 size={11} className="studio-spin" aria-hidden="true" />
+        ) : (
+          <Square size={11} aria-hidden="true" />
+        )}
+        {t("panel.stop")}
+      </button>
+    </p>
+  );
+}
+
 /** What the floating box sent from its input, cleared from the drafts once sent. */
 interface TypedDraft {
   key: string;
@@ -342,6 +362,7 @@ function Composer({
   draftKey,
   pageTitle,
   busy,
+  running,
   error,
   notice,
   destination,
@@ -353,6 +374,8 @@ function Composer({
   draftKey: string;
   pageTitle?: string;
   busy: boolean;
+  /** The conversation's turn still working; the request waits in the input. */
+  running?: ReactNode;
   error: string;
   /** A failed send, shown with its next steps. */
   notice?: ReactNode;
@@ -416,7 +439,7 @@ function Composer({
       text.trim()
     ) {
       event.preventDefault();
-      sendText();
+      if (!busy && !running) sendText();
     }
   };
   const selection = target.kind !== "page";
@@ -453,7 +476,7 @@ function Composer({
             <button
               type="button"
               key={name}
-              disabled={busy}
+              disabled={busy || !!running}
               onClick={() => onSend(t(`quick.${name}Prompt`))}
             >
               {t(`quick.${name}`)}
@@ -473,7 +496,7 @@ function Composer({
           type="button"
           className="assistant-send"
           aria-label={t("panel.send")}
-          disabled={busy || !text.trim()}
+          disabled={busy || !!running || !text.trim()}
           onClick={sendText}
         >
           {busy ? (
@@ -483,6 +506,7 @@ function Composer({
           )}
         </button>
       </div>
+      {running}
       <footer>{destination}</footer>
       {error && (
         <p className="assistant-error" role="alert">
@@ -667,6 +691,13 @@ export default function AssistantWorkbench({
     setError("");
     setSendProblem(null);
   }, []);
+  /** Without a thread to show, the next request starts a new conversation. */
+  const leaveThread = useCallback((projectKey: string) => {
+    rememberedThreads.current.delete(projectKey);
+    setSelectedId(null);
+    setConversation(null);
+    markFresh(true, projectKey);
+  }, []);
   /** Opens a thread; with keepFresh it only loads behind a chosen new conversation. */
   const select = useCallback(async (projectKey: string, id: string, keepFresh = false) => {
     const selection = ++selectionGeneration.current;
@@ -678,15 +709,21 @@ export default function AssistantWorkbench({
     setSendProblem(null);
     setConversation(conversationCache.current.get(id) ?? null);
     const generation = executionGeneration.current;
-    const next = await desktop.invoke<AgentConversation>("agent:conversation", {
-      projectId: projectKey,
-      id,
-    });
-    if (
+    const current = () =>
       project.current === projectKey &&
       executionGeneration.current === generation &&
-      selectionGeneration.current === selection
-    ) {
+      selectionGeneration.current === selection;
+    const next = await desktop
+      .invoke<AgentConversation>("agent:conversation", {
+        projectId: projectKey,
+        id,
+      })
+      .catch((reason: unknown) => {
+        // The input stays usable: the next request starts a new conversation.
+        if (current()) leaveThread(projectKey);
+        throw reason;
+      });
+    if (current()) {
       conversationCache.current.set(id, next);
       setConversation(next);
       if (!keepFresh) markFresh(false, projectKey);
@@ -931,6 +968,19 @@ export default function AssistantWorkbench({
   const pending = (key: string) => sendingKeys.includes(key);
   const retryKey = (turn: AgentTurn) => `retry:${turn.conversationId}`;
   const cancelKey = (turnId: string) => `cancel:${turnId}`;
+  const stopTurn = (turn: AgentTurn) =>
+    act(() =>
+      guard(
+        cancelKey(turn.id),
+        () =>
+          desktop.invoke("agent:cancel", {
+            id: turn.id,
+            projectId: turn.projectId,
+            conversationId: turn.conversationId,
+          }),
+        true,
+      ),
+    );
   /** Sends a failed turn's request again in the same conversation. */
   const retryTurn = (turn: AgentTurn) =>
     guard(retryKey(turn), async () => {
@@ -1123,7 +1173,17 @@ export default function AssistantWorkbench({
           target={composer}
           draftKey={composerDraftKey(projectId, pageId, composer)}
           pageTitle={pageTitle}
-          busy={busy || (!fresh && !!running)}
+          busy={busy}
+          running={
+            !fresh &&
+            running && (
+              <RunningStatus
+                turn={running}
+                stopping={pending(cancelKey(running.id))}
+                onStop={stopTurn(running)}
+              />
+            )
+          }
           error={error}
           notice={sendNotice(false)}
           destination={destination}
@@ -1239,7 +1299,7 @@ export default function AssistantWorkbench({
                       id: conversation.id,
                     });
                     setConfirmDelete(false);
-                    setConversation(null);
+                    leaveThread(conversation.projectId);
                     const items = await loadSummaries(conversation.projectId);
                     if (items[0])
                       await select(conversation.projectId, items[0].id);
@@ -1316,18 +1376,7 @@ export default function AssistantWorkbench({
                     undo: pending(`undo:${turn.id}`),
                     retry: pending(retryKey(turn)),
                   }}
-                  onCancel={act(() =>
-                    guard(
-                      cancelKey(turn.id),
-                      () =>
-                        desktop.invoke("agent:cancel", {
-                          id: turn.id,
-                          projectId: turn.projectId,
-                          conversationId: turn.conversationId,
-                        }),
-                      true,
-                    ),
-                  )}
+                  onCancel={stopTurn(turn)}
                   onUndo={act(() =>
                     guard(`undo:${turn.id}`, async () => {
                       const next = await desktop.invoke<AgentConversation>(
