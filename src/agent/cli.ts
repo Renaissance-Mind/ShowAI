@@ -109,7 +109,7 @@ Discover only what you need:
   template import DIRECTORY --project PROJECT
   template export ID --project PROJECT --out NEW_DIRECTORY
   template context --project PROJECT [--templates ID[@VERSION],ID]
-  catalog list [--kind component|template] [--scope SCOPE] [--limit N --cursor CURSOR]
+  catalog list [--kind component|template] [--scope SCOPE] [--versions recommended|all] [--limit N --cursor CURSOR]
   catalog describe ID [--kind component|template] [--view VIEW]
   catalog describe ID --view parameters [--parameter-path PATH --parameter-offset N --parameter-limit N --known-hash HASH]
   catalog remove ID --kind component|template [--version VERSION] [--scope project|global|published]
@@ -225,6 +225,8 @@ function parseArguments(args: string[]): Arguments {
     "id",
     "url",
     "components",
+    "reader",
+    "versions",
     "integrity",
     "detail",
     "theme",

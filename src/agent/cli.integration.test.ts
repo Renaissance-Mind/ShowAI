@@ -753,6 +753,49 @@ test("real CLI binds sessions, detects user changes and rejects stale writes", a
   );
 });
 
+test("real CLI accepts the documented export --reader and catalog list --versions options", async () => {
+  const project = await run([
+    "projects",
+    "create",
+    "--name",
+    "Reader options",
+  ]);
+  const page = await run([
+    "pages",
+    "create",
+    "--project",
+    project.id,
+    "--title",
+    "Reader options",
+  ]);
+  const exported = await run([
+    "export",
+    "--project",
+    project.id,
+    "--page",
+    page.document.id,
+    "--format",
+    "html",
+    "--reader",
+    "bundled",
+    "--out",
+    join(home, "reader-option.html"),
+  ]);
+  expect(exported).toMatchObject({ reader: "bundled", requiresNetwork: false });
+  expect(exported.readerReason).toBeUndefined();
+  const listed = await run([
+    "catalog",
+    "list",
+    "--project",
+    project.id,
+    "--versions",
+    "all",
+    "--limit",
+    "1",
+  ]);
+  expect(listed.items).toHaveLength(1);
+});
+
 test("real CLI and MCP export selected components and repeat focused updates without changing the full page", async () => {
   const project = await run([
     "projects",
