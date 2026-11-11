@@ -84,6 +84,7 @@ export default defineMessages("feedback", {
     "report.githubOpened":
       "已在浏览器打开 GitHub 的问题表单。诊断信息已复制到剪贴板，请粘贴到「日志或截图（Logs or screenshots）」一栏。",
     "report.githubOpenedPlain": "已在浏览器打开 GitHub 的问题表单。",
+    "report.notOpened": "浏览器拦截了新窗口，内容仍保留在表单中",
     "report.copied": "已复制全文，可以粘贴到团队公布的任意渠道。",
     "report.needSummary": "请先填写「发生了什么」。",
     "report.failed": "没有完成：{message}",
@@ -180,6 +181,7 @@ export default defineMessages("feedback", {
     "report.githubOpened":
       "Opened the GitHub issue form in your browser. The diagnostics are on the clipboard; paste them into the “Logs or screenshots” field.",
     "report.githubOpenedPlain": "Opened the GitHub issue form in your browser.",
+    "report.notOpened": "The browser blocked the new window; the form still has your report",
     "report.copied":
       "Full report copied. Paste it into any channel the team announces.",
     "report.needSummary": "Describe what happened first.",
