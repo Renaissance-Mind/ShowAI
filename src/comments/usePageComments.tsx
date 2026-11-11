@@ -1,6 +1,7 @@
 import {
   useCallback,
   useEffect,
+  useId,
   useLayoutEffect,
   useMemo,
   useRef,
@@ -479,16 +480,20 @@ function BlockMarkers({
   label: (count: number) => string;
   onOpen: (threadId: string, rect: Rect) => void;
 }) {
-  const buttons = useRef(new Map<string, HTMLButtonElement>());
+  const layer = useId();
   useLayoutEffect(() => {
+    const button = (blockId: string) =>
+      window.document.querySelector<HTMLButtonElement>(
+        `[data-comment-layer="${CSS.escape(layer)}"] [data-comment-block="${CSS.escape(blockId)}"]`,
+      );
     let frame = 0;
     const paint = () => {
       const root = shell.current;
       const scroller = root?.closest(".studio-scroll") ?? root;
       const bounds = scroller?.getBoundingClientRect();
       for (const { blockId } of markers) {
-        const button = buttons.current.get(blockId);
-        if (!button) continue;
+        const marker = button(blockId);
+        if (!marker) continue;
         const target = root?.querySelector(anchorSelector(blockId));
         const rect = target?.getBoundingClientRect();
         const visible =
@@ -499,28 +504,32 @@ function BlockMarkers({
           rect.top <= bounds.bottom - 20 &&
           rect.right <= bounds.right + 4 &&
           rect.right >= bounds.left;
-        button.hidden = !visible;
+        marker.hidden = !visible;
         if (visible) {
-          button.style.left = `${Math.min(rect!.right + 4, bounds!.right - 30)}px`;
-          button.style.top = `${rect!.top}px`;
+          marker.style.left = `${Math.min(rect!.right + 4, bounds!.right - 30)}px`;
+          marker.style.top = `${rect!.top}px`;
         }
       }
       frame = requestAnimationFrame(paint);
     };
     paint();
-    return () => cancelAnimationFrame(frame);
+    return () => {
+      cancelAnimationFrame(frame);
+      // A hidden tab keeps this DOM without running effects; nothing may stay on screen.
+      for (const { blockId } of markers) {
+        const marker = button(blockId);
+        if (marker) marker.hidden = true;
+      }
+    };
   }, [markers.map((marker) => marker.blockId).join("\n")]);
   return createPortal(
-    <div className="comment-markers">
+    <div className="comment-markers" data-comment-layer={layer}>
       {markers.map(({ blockId, ids }) => (
         <button
           key={blockId}
           type="button"
           hidden
-          ref={(element) => {
-            if (element) buttons.current.set(blockId, element);
-            else buttons.current.delete(blockId);
-          }}
+          data-comment-block={blockId}
           className="comment-marker"
           aria-label={label(ids.length)}
           title={label(ids.length)}
@@ -563,7 +572,10 @@ function CommentPopover({
     window.addEventListener("pointerdown", pointerDown, true);
     element.current?.addEventListener("keydown", keyDown);
     const current = element.current;
+    if (current) current.hidden = false;
     return () => {
+      // Hidden with its tab, shown again when the tab returns.
+      if (current) current.hidden = true;
       window.removeEventListener("pointerdown", pointerDown, true);
       current?.removeEventListener("keydown", keyDown);
     };
