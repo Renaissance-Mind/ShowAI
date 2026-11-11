@@ -1803,10 +1803,17 @@ export function createWorkbench(
       case "dialog:openPage": {
         // The file (or, on macOS, the folder) an import reads; the extensions
         // are those of the importers this project can use.
-        const { importers } = await availableImporters(
+        const available = await availableImporters(
           store.root,
           args.projectId === undefined ? undefined : projectId(args),
         );
+        // A chosen importer offers only its own file types.
+        const chosen = text(args, "importer", true);
+        const importers = chosen
+          ? available.importers.filter((importer) => importer.id === chosen)
+          : available.importers;
+        if (chosen && !importers.length)
+          throw new CoreError("NOT_FOUND", `No importer ${chosen}.`);
         const result = await host.openDialog({
           title: tf("title.importPage"),
           properties:

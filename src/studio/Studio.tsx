@@ -285,6 +285,7 @@ import {
   useCatalogManager,
 } from "./CatalogManagement";
 import "./studio.css";
+import { modalOpen } from "../ui/modal";
 import {
   NoticeStack,
   ProblemNotice,
@@ -807,6 +808,10 @@ export default function Studio() {
     plan: StagedImportPlan;
     destination: string;
   } | null>(null);
+  // Importers this project can use, offered as quick jump commands.
+  const [importers, setImporters] = useState<
+    { id: string; name: string; extensions: string[] }[]
+  >([]);
   const [packagingDecision, setPackagingDecision] = useState<{
     plan: PackagingPlan;
     decide: (decisions: PackagingDecisions | null) => void;
@@ -1608,7 +1613,8 @@ export default function Studio() {
         event.isComposing ||
         event.keyCode === 229 ||
         event.defaultPrevented ||
-        dialogRef.current
+        dialogRef.current ||
+        modalOpen()
       )
         return;
       event.preventDefault();
@@ -2237,18 +2243,20 @@ export default function Studio() {
         ? { projectId: selectedProject, parentId: selectedFolder }
         : null,
     dropped?: { name: string; data: string }[],
+    importer?: string,
   ) {
     if (!directory) return;
     if (!(await page.flushOrDefer())) return draftHeld();
     const source =
       dropped ? { files: dropped } : await desktop.invoke<{ path: string } | null>(
         "dialog:openPage",
-        { projectId: directory.projectId },
+        { projectId: directory.projectId, ...(importer ? { importer } : {}) },
       );
     if (!source) return;
     const plan = await desktop.invoke<StagedImportPlan>("imports:plan", {
       ...directory,
       ...source,
+      ...(importer ? { importer } : {}),
     });
     const owner = projects.find((item) => item.id === directory.projectId);
     const folder =
@@ -2755,6 +2763,15 @@ export default function Studio() {
             },
           ]
         : []),
+      // Each importer is a command; "Import file…" above picks one by the file.
+      ...(selectedProject
+        ? importers.map((importer) => ({
+            id: `import.${importer.id}`,
+            title: tq("command.importWith", { name: importer.name }),
+            keywords: `${tq("keywords.import")} ${importer.extensions.join(" ")}`,
+            run: () => importPage(undefined, undefined, importer.id),
+          }))
+        : []),
       {
         id: "library.search",
         title: tq("command.searchLibrary"),
@@ -2872,7 +2889,16 @@ export default function Studio() {
     // Libraries without full-text search offer it on Recent only.
     else void navigate("projects").then(() => setTimeout(open, 50), report);
   }
-  openSearchRef.current = () => setDialog({ type: "quickJump" });
+  openSearchRef.current = () => {
+    setDialog({ type: "quickJump" });
+    if (selectedProject)
+      void desktop
+        .invoke<{ importers: { id: string; name: string; extensions: string[] }[] }>(
+          "imports:importers",
+          { projectId: selectedProject },
+        )
+        .then((result) => setImporters(result.importers), report);
+  };
   function showDirectoryCreationMenu(
     anchor: HTMLElement,
     point?: LibraryMenuPoint,

@@ -7,6 +7,7 @@ import type { CatalogComponent } from "../../core/component-categories";
 import type { SlashEntry } from "../slash-menu-model";
 import type { LinkablePage } from "./environment";
 import { pageLink } from "../../portable/page-link.mjs";
+import { rankByTitle } from "../title-match";
 import { isoDay, typedDays } from "../../portable/mention-contract.mjs";
 import type { MentionContract } from "../custom/contributions";
 
@@ -60,23 +61,23 @@ export function registerMentionSource(source: MentionSource) {
 }
 
 const PAGE_LIMIT = { recent: 8, matches: 20 };
-/** Pages of the project, recently changed first; never the page being edited. */
+/**
+ * Pages of the project ranked as quick jump ranks them (recently changed
+ * first without a query); never the page being edited.
+ */
 export const pageMentionSource: MentionSource = {
   id: "pages",
   label: (context) => context.labels.pages,
   search(context) {
-    const query = context.query.trim().toLocaleLowerCase();
+    const query = context.query.trim();
     const projectId = context.projectId;
     if (!projectId) return [];
-    return [...context.pages]
-      .filter(
-        (page) =>
-          page.id !== context.pageId &&
-          (!query || page.title.toLocaleLowerCase().includes(query)),
-      )
-      .sort((a, b) => (b.updatedAt ?? "").localeCompare(a.updatedAt ?? ""))
-      .slice(0, query ? PAGE_LIMIT.matches : PAGE_LIMIT.recent)
-      .map((page) => ({
+    return rankByTitle(
+      context.pages.filter((page) => page.id !== context.pageId),
+      query,
+      { title: (page) => page.title, updatedAt: (page) => page.updatedAt },
+      query ? PAGE_LIMIT.matches : PAGE_LIMIT.recent,
+    ).map((page) => ({
         id: `page:${projectId}/${page.id}`,
         title: page.title,
         keywords: page.id,

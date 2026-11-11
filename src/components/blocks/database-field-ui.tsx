@@ -17,6 +17,7 @@ import {
   recordTitle,
 } from "../../datasets/derived-fields.mjs";
 import { pageLink } from "../../portable/page-link.mjs";
+import { rankByTitle } from "../title-match";
 import type { PageLinkBridge } from "../page-links";
 import type { DatabaseHost } from "./database-host";
 import type { DerivedDatabase } from "./database-derived";
@@ -162,27 +163,51 @@ function Tags({
   );
 }
 
-/** A checkbox list of choices with optional search, for multi-select and relations. */
+interface Choice {
+  id: string;
+  label: string;
+  /** Orders choices without a query, recently changed first (pages). */
+  updatedAt?: string;
+}
+
+/**
+ * The picker of a cell: choices with optional search, ranked the way the @
+ * menu and quick jump rank pages. Checkboxes for multi-select and relations,
+ * radio buttons for a single page; leading choices (not set, new page) stay
+ * first and are never filtered.
+ */
 function ChoiceList({
   choices,
   selected,
   onToggle,
   search,
   render,
+  single,
+  leading = [],
 }: {
-  choices: { id: string; label: string }[];
+  choices: Choice[];
   selected: string[];
   onToggle: (id: string) => void;
   search?: string;
-  render?: (choice: { id: string; label: string }) => ReactNode;
+  render?: (choice: Choice) => ReactNode;
+  single?: boolean;
+  leading?: Choice[];
 }) {
   const [query, setQuery] = useState("");
-  const needle = query.trim().toLocaleLowerCase();
-  const shown = needle
-    ? choices.filter((choice) =>
-        choice.label.toLocaleLowerCase().includes(needle),
-      )
-    : choices;
+  const name = useId();
+  const ranked =
+    query.trim() || choices.some((choice) => choice.updatedAt)
+      ? rankByTitle(
+          choices,
+          query,
+          {
+            title: (choice) => choice.label,
+            updatedAt: (choice) => choice.updatedAt,
+          },
+          200,
+        )
+      : choices;
+  const shown = [...(query.trim() ? [] : leading), ...ranked];
   return (
     <>
       {search && (
@@ -200,7 +225,8 @@ function ChoiceList({
           <li key={choice.id}>
             <label>
               <input
-                type="checkbox"
+                type={single ? "radio" : "checkbox"}
+                name={single ? name : undefined}
                 checked={selected.includes(choice.id)}
                 autoFocus={!search && choice === shown[0]}
                 onChange={() => onToggle(choice.id)}
@@ -224,6 +250,8 @@ function PageCell({
   env,
 }: CellProps) {
   const t = useTranslator(messages);
+  const tf = useTranslator(fieldMessages);
+  const [open, setOpen] = useState(false);
   const pages = env.pages;
   const target = parsePageCell(value);
   const title = pageTitle(value, pages);
@@ -256,38 +284,43 @@ function PageCell({
     </a>
   );
   if (!editable || !pages) return link ?? <Placeholder />;
-  const missing =
-    target &&
-    !pages.pages.some(
-      (page) =>
-        pages.projectId === target.projectId && page.id === target.pageId,
-    );
+  const current = text(value);
   return (
     <div className="sb-cell-input-wrap">
-      <select
-        aria-label={column.name}
-        className="sb-cell-page"
-        value={text(value)}
-        onChange={(event) =>
-          event.target.value === NEW_PAGE
-            ? createPage?.()
-            : update(event.target.value)
+      <Popover
+        label={tf("chooseValues", { name: column.name })}
+        open={open}
+        setOpen={setOpen}
+        trigger={
+          target ? (
+            <span className="sb-cell-value">{title || t("linkedPage")}</span>
+          ) : (
+            <Placeholder />
+          )
         }
       >
-        <option value="">{t("notSet")}</option>
-        {createPage && <option value={NEW_PAGE}>{t("newPage")}</option>}
-        {pages.pages
-          .filter((page) => page.id !== pages.pageId)
-          .map((page) => (
-            <option
-              key={page.id}
-              value={pageLink({ projectId: pages.projectId, pageId: page.id })}
-            >
-              {page.title || t("untitled")}
-            </option>
-          ))}
-        {missing && <option value={String(value)}>{t("linkedPage")}</option>}
-      </select>
+        <ChoiceList
+          single
+          search={tf("searchPages")}
+          selected={[current]}
+          leading={[
+            { id: "", label: t("notSet") },
+            ...(createPage ? [{ id: NEW_PAGE, label: t("newPage") }] : []),
+          ]}
+          choices={pages.pages
+            .filter((page) => page.id !== pages.pageId)
+            .map((page) => ({
+              id: pageLink({ projectId: pages.projectId, pageId: page.id }),
+              label: page.title || t("untitled"),
+              ...(page.updatedAt ? { updatedAt: page.updatedAt } : {}),
+            }))}
+          onToggle={(id) => {
+            setOpen(false);
+            if (id === NEW_PAGE) createPage?.();
+            else update(id);
+          }}
+        />
+      </Popover>
       {link}
     </div>
   );

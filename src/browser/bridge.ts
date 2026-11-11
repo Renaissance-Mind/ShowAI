@@ -170,13 +170,22 @@ export function installBrowserBridge() {
             ? [
                 ...new Set(
                   (
-                    await request<{ importers: { extensions: string[] }[] }>(
+                    await request<{
+                      importers: { id: string; extensions: string[] }[];
+                    }>(
                       "invoke",
                       { action: "imports:importers", args: { projectId: args.projectId } },
                     )
-                  ).importers.flatMap((importer) =>
-                    importer.extensions.map((extension) => extension.slice(1)),
-                  ),
+                  ).importers
+                    // A chosen importer offers only its own file types.
+                    .filter(
+                      (importer) =>
+                        args.importer === undefined ||
+                        importer.id === args.importer,
+                    )
+                    .flatMap((importer) =>
+                      importer.extensions.map((extension) => extension.slice(1)),
+                    ),
                 ),
               ]
             : [],

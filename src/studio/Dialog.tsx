@@ -1,3 +1,4 @@
+import { topDialog } from "../ui/modal";
 import { useEffect, useRef, type ReactNode } from "react";
 import { X } from "../ui/icons";
 import { useTranslator } from "../i18n/react";
@@ -49,11 +50,7 @@ export default function Dialog({
     )?.focus();
     const handle = (event: KeyboardEvent) => {
       // A local file picker can sit above a component or publication dialog.
-      if (
-        panel.current !==
-        [...document.querySelectorAll('[role="dialog"]')].at(-1)
-      )
-        return;
+      if (panel.current !== topDialog()) return;
       if (event.key === "Escape") {
         if (
           panel.current?.contains(document.fullscreenElement) ||

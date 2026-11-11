@@ -18,6 +18,7 @@ import richTextNodeViews from "../components/rich-text/NodeViews.tsx?raw";
 import richTextComponent from "../components/rich-text/RichText.tsx?raw";
 import richTextEditor from "../components/rich-text/RichTextEditor.tsx?raw";
 import richTextMentionSources from "../components/rich-text/mention-sources.ts?raw";
+import titleMatchSource from "../components/title-match.ts?raw";
 import mentionContractSource from "../portable/mention-contract.mjs?raw";
 import retainedEditorContent from "../components/rich-text/RetainedEditorContent.tsx?raw";
 import richTextFormatControls from "../components/rich-text/FormatControls.tsx?raw";
@@ -264,6 +265,7 @@ const sources: Record<string, string> = {
   "rich-text/RichText.tsx": richTextComponent,
   "rich-text/RichTextEditor.tsx": richTextEditor,
   "rich-text/mention-sources.ts": richTextMentionSources,
+  "title-match.ts": titleMatchSource,
   "rich-text/RetainedEditorContent.tsx": retainedEditorContent,
   "rich-text/FormatControls.tsx": richTextFormatControls,
   "rich-text/format-controls.css": richTextFormatCss,
@@ -502,6 +504,10 @@ export const builtinSources: Record<string, string> = Object.fromEntries(
       .replaceAll(
         '"../page-references"',
         name.includes("/") ? '"../page-references"' : '"./page-references"',
+      )
+      .replaceAll(
+        '"../title-match"',
+        name.includes("/") ? '"../title-match"' : '"./title-match"',
       )
       .replaceAll(
         '"../../portable/mention-contract.mjs"',
