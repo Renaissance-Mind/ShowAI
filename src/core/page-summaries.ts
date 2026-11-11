@@ -2,7 +2,8 @@ import { createHash } from "node:crypto";
 import { join } from "node:path";
 import { ContentLibrary as GitLibrary } from "./content-library";
 import { atomicLibraryFile, readLibraryBytes } from "./library-files";
-import { parseArtifact } from "../portable/validation.mjs";
+import { parseArtifactConsumingDocument } from "../portable/validation.mjs";
+import { rememberStoredPage, storedPage, storedPageKey } from "./stored-pages";
 import { documentHash, indexBlocks, normalizeDocument } from "./diff";
 import type { PageSummary } from "./model";
 
@@ -90,16 +91,24 @@ async function build(library: GitLibrary, revision: string) {
   for (const path of paths) {
     const signature = pageSignatures.get(path)!;
     const prior = previous?.entries[path];
-    const document = loaded.has(path)
-      ? normalizeDocument(
-          parseArtifact(JSON.parse(loaded.get(path)!.toString("utf8")))
-            .document,
-          undefined,
-          { validated: true },
-        )
-      : undefined;
+    const bytes = loaded.get(path),
+      key = bytes && storedPageKey(bytes),
+      known = key ? storedPage(key) : undefined;
+    const document =
+      known?.document ??
+      (bytes
+        ? normalizeDocument(
+            parseArtifactConsumingDocument(JSON.parse(bytes.toString("utf8")))
+              .document,
+            undefined,
+            { validated: true },
+          )
+        : undefined);
     if (document && document.id !== path.split("/").at(-1)!.slice(0, -5))
       throw new Error("Page id differs from its filename.");
+    const hash = document && (known?.hash ?? documentHash(document));
+    if (key && !known && document)
+      rememberStoredPage(key, bytes.length, document, hash!);
     const summary = document
       ? {
           id: document.id,
@@ -107,7 +116,7 @@ async function build(library: GitLibrary, revision: string) {
           createdAt: document.createdAt,
           updatedAt: document.updatedAt,
           icon: document.icon,
-          hash: documentHash(document),
+          hash: hash!,
           blockCount: indexBlocks(document).size,
           parentId: document.parentId,
           favorite: document.favorite,

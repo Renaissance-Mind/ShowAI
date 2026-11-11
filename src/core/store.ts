@@ -19,7 +19,15 @@ import {
   sep,
 } from "node:path";
 import { randomUUID } from "node:crypto";
-import { parseArtifact, serializeArtifact } from "../portable/validation.mjs";
+import {
+  parseArtifactConsumingDocument,
+  serializeArtifact,
+} from "../portable/validation.mjs";
+import {
+  rememberStoredPage,
+  storedPage,
+  storedPageKey,
+} from "./stored-pages";
 import {
   applyOperations,
   diffDocuments,
@@ -334,9 +342,14 @@ export class FileStore {
     await this.safePath(path);
   }
 
-  private async readJson(path: string): Promise<unknown> {
+  /** The bytes of a file the content library manages, or undefined for others. */
+  private async readManaged(path: string): Promise<Buffer | undefined> {
     await this.safePath(path);
-    const managed = await readLibraryFile(this.root, path);
+    return readLibraryFile(this.root, path);
+  }
+
+  private async readJson(path: string): Promise<unknown> {
+    const managed = await this.readManaged(path);
     if (managed !== undefined) return JSON.parse(managed.toString("utf8"));
     let file;
     try {
@@ -1407,24 +1420,37 @@ export class FileStore {
     const name =
       state?.root === this.root ? logicalPath(this.root, path) : undefined;
     const staged = library && name ? state!.changes.get(name) : undefined;
-    const value = await this.readJson(path);
+    const bytes = await this.readManaged(path);
+    const key = bytes && storedPageKey(bytes),
+      known = key ? storedPage(key) : undefined;
     let document: ShowDocument;
-    try {
-      document = normalizeDocument(parseArtifact(value).document, undefined, {
-        validated: true,
-      });
-    } catch (error) {
-      if (error instanceof CoreError) throw error;
-      throw new CoreError(
-        "INVALID_DATA",
-        error instanceof Error ? error.message : "Invalid page artifact.",
-      );
+    if (known) document = known.document;
+    else {
+      // The parsed value is this read's own, so validation needs no copy of it.
+      const value = bytes
+        ? JSON.parse(bytes.toString("utf8"))
+        : await this.readJson(path);
+      try {
+        document = normalizeDocument(
+          parseArtifactConsumingDocument(value).document,
+          undefined,
+          { validated: true },
+        );
+      } catch (error) {
+        if (error instanceof CoreError) throw error;
+        throw new CoreError(
+          "INVALID_DATA",
+          error instanceof Error ? error.message : "Invalid page artifact.",
+        );
+      }
     }
     if (document.id !== pageId)
       throw new CoreError(
         "INVALID_DATA",
         `Page id does not match its filename: ${pageId}`,
       );
+    const hash = known?.hash ?? documentHash(document);
+    if (key && !known) rememberStoredPage(key, bytes.length, document, hash);
     const snapshot = libraryReadSnapshot.getStore();
     const pinned =
       state?.root === this.root
@@ -1444,7 +1470,7 @@ export class FileStore {
         : [];
     const record: PageRecord = {
       document,
-      hash: documentHash(document),
+      hash,
       path,
       ...(revision ? { revision } : {}),
       ...(workspaceConflicts.length ? { workspaceConflicts } : {}),
