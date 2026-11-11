@@ -26,6 +26,13 @@ import { componentDisplayName } from "../components/component-display";
 import { useTranslator } from "../i18n/react";
 import messages from "../i18n/messages/catalog";
 import { templateAgentPrompt } from "./template-actions";
+import managementMessages from "../i18n/messages/catalogManagement";
+import {
+  PackageActions,
+  PackageVersions,
+  type ActionStatus,
+  type CatalogManager,
+} from "./CatalogManagement";
 import "./catalog.css";
 import "./catalog-workspace.css";
 
@@ -96,6 +103,8 @@ export function TemplateDialog({
   onCreatePage,
   createUnavailable,
   onCopyPrompt,
+  manager,
+  owner,
 }: {
   record: LoadedTemplate;
   components: CompiledComponent[];
@@ -105,10 +114,17 @@ export function TemplateDialog({
   createUnavailable?: boolean;
   /** Workflow templates hand their exact ref to an agent through a prompt. */
   onCopyPrompt?: (prompt: string) => Promise<void>;
+  /** Present where the catalog can be changed. */
+  manager?: CatalogManager;
+  /** The project that owns a project revision, or the context project. */
+  owner?: string;
 }) {
   const t = useTranslator(messages);
+  const tm = useTranslator(managementMessages);
   const panelId = useId();
-  const [tab, setTab] = useState<"about" | "guides" | "usage">("about");
+  const [tab, setTab] = useState<"about" | "guides" | "usage" | "versions">(
+    "about",
+  );
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState<{
     error: boolean;
@@ -162,7 +178,7 @@ export function TemplateDialog({
         <span className="catalog-component-version">v{record.version}</span>
       }
       headerActions={
-        (onCreatePage || copyPrompt) && (
+        (onCreatePage || copyPrompt || manager) && (
           <>
             {createUnavailable && onCreatePage && (
               <span className="catalog-action-reason">
@@ -184,6 +200,15 @@ export function TemplateDialog({
                 {t("useTemplate")}
               </button>
             )}
+            {manager && (
+              <PackageActions
+                kind="template"
+                item={record}
+                owner={owner}
+                manager={manager}
+                onStatus={(next: ActionStatus) => setStatus(next)}
+              />
+            )}
           </>
         )
       }
@@ -204,6 +229,9 @@ export function TemplateDialog({
             ...(record.bundle
               ? [{ id: "guides" as const, label: t("tab.guides") }]
               : []),
+            ...(manager
+              ? [{ id: "versions" as const, label: tm("tab.versions") }]
+              : []),
           ]}
         />
       }
@@ -212,19 +240,25 @@ export function TemplateDialog({
         className="catalog-detail catalog-template-detail"
         role="tabpanel"
         id={panelId}
-        aria-label={t(
-          (
-            {
-              about: record.bundle ? "tab.overview" : "tab.preview",
-              guides: "tab.guides",
-              usage: "tab.usage",
-            } as const
-          )[tab],
-        )}
+        aria-label={
+          tab === "versions"
+            ? tm("tab.versions")
+            : t(
+                (
+                  {
+                    about: record.bundle ? "tab.overview" : "tab.preview",
+                    guides: "tab.guides",
+                    usage: "tab.usage",
+                  } as const
+                )[tab],
+              )
+        }
       >
         {status && (
           <p
-            className={status.error ? "studio-form-error" : "catalog-action-status"}
+            className={
+              status.error ? "studio-form-error" : "catalog-action-status"
+            }
             role={status.error ? "alert" : "status"}
           >
             {status.text}
@@ -241,6 +275,14 @@ export function TemplateDialog({
         )}
         {tab === "guides" && record.bundle && (
           <TemplateWorkflowView bundle={record.bundle} />
+        )}
+        {tab === "versions" && manager && (
+          <PackageVersions
+            kind="template"
+            item={record}
+            owner={owner}
+            manager={manager}
+          />
         )}
         {tab === "usage" && (
           <article className="catalog-reading-main">
@@ -321,6 +363,8 @@ export function ComponentDialog({
   onInsert,
   onClose,
   loadSource,
+  manager,
+  owner,
 }: {
   builtin?: BuiltinComponentMetadata;
   custom?: CompiledComponent;
@@ -332,12 +376,21 @@ export function ComponentDialog({
   onInsert: (kind: string, data: Record<string, unknown>) => Promise<void>;
   onClose: () => void;
   loadSource?: () => Promise<ComponentSource>;
+  /** Present where the catalog can be changed; custom components only. */
+  manager?: CatalogManager;
+  /** The project that owns a project revision, or the context project. */
+  owner?: string;
 }) {
   const t = useTranslator(messages);
+  const tm = useTranslator(managementMessages);
   const panelId = useId();
   const item = builtin ?? custom!;
   const schema = builtin?.propsSchema ?? custom?.schema ?? {};
-  const [tab, setTab] = useState<"about" | "guide" | "schema">("about");
+  const manage = custom ? manager : undefined;
+  const [tab, setTab] = useState<"about" | "guide" | "schema" | "versions">(
+    "about",
+  );
+  const [status, setStatus] = useState<ActionStatus>(null);
   const [example, setExample] = useState(
     builtin?.kind === "text" && item.examples.length > 1 ? 1 : 0,
   );
@@ -380,35 +433,51 @@ export function ComponentDialog({
             { id: "about", label: t("tab.preview") },
             { id: "guide", label: t("tab.usage") },
             { id: "schema", label: t("tab.parameters") },
+            ...(manage
+              ? [{ id: "versions" as const, label: tm("tab.versions") }]
+              : []),
           ]}
         />
       }
       headerActions={
-        (canInsert || insertUnavailable) && (
+        (canInsert || insertUnavailable || manage) && (
           <>
-            {!canInsert && (
-              <span className="catalog-action-reason">
-                {t("insertNeedsPage")}
-              </span>
+            {(canInsert || insertUnavailable) && (
+              <>
+                {!canInsert && (
+                  <span className="catalog-action-reason">
+                    {t("insertNeedsPage")}
+                  </span>
+                )}
+                <button
+                  type="button"
+                  className="studio-text-button"
+                  disabled={busy || !canInsert}
+                  title={canInsert ? undefined : t("insertNeedsPage")}
+                  onClick={() => void insert()}
+                >
+                  <Plus size={16} />
+                  {canInsert && insertPageTitle
+                    ? t("insertIntoNamedPage", {
+                        // Long titles stay readable in the header; the full title is the page's.
+                        title:
+                          insertPageTitle.length > 14
+                            ? `${insertPageTitle.slice(0, 13)}…`
+                            : insertPageTitle,
+                      })
+                    : t("insertIntoPage")}
+                </button>
+              </>
             )}
-            <button
-              type="button"
-              className="studio-text-button"
-              disabled={busy || !canInsert}
-              title={canInsert ? undefined : t("insertNeedsPage")}
-              onClick={() => void insert()}
-            >
-              <Plus size={16} />
-              {canInsert && insertPageTitle
-                ? t("insertIntoNamedPage", {
-                    // Long titles stay readable in the header; the full title is the page's.
-                    title:
-                      insertPageTitle.length > 14
-                        ? `${insertPageTitle.slice(0, 13)}…`
-                        : insertPageTitle,
-                  })
-                : t("insertIntoPage")}
-            </button>
+            {manage && (
+              <PackageActions
+                kind="component"
+                item={custom!}
+                owner={owner}
+                manager={manage}
+                onStatus={setStatus}
+              />
+            )}
           </>
         )
       }
@@ -417,16 +486,38 @@ export function ComponentDialog({
         className="studio-component-detail catalog-detail"
         role="tabpanel"
         id={panelId}
-        aria-label={t(
-          (
-            {
-              about: "tab.preview",
-              guide: "tab.usage",
-              schema: "tab.parameters",
-            } as const
-          )[tab],
-        )}
+        aria-label={
+          tab === "versions"
+            ? tm("tab.versions")
+            : t(
+                (
+                  {
+                    about: "tab.preview",
+                    guide: "tab.usage",
+                    schema: "tab.parameters",
+                  } as const
+                )[tab],
+              )
+        }
       >
+        {status && (
+          <p
+            className={
+              status.error ? "studio-form-error" : "catalog-action-status"
+            }
+            role={status.error ? "alert" : "status"}
+          >
+            {status.text}
+          </p>
+        )}
+        {tab === "versions" && manage && (
+          <PackageVersions
+            kind="component"
+            item={custom!}
+            owner={owner}
+            manager={manage}
+          />
+        )}
         {tab === "guide" && (
           <ComponentDocumentationView
             documentation={item.documentation}

@@ -134,6 +134,7 @@ import {
   datasetMutationActions,
   handleDatasetAction,
 } from "./dataset-actions";
+import { catalogReferences } from "./catalog-references";
 
 const t = translator(workbenchMessages);
 const tf = translator(fileMessages);
@@ -264,6 +265,8 @@ export const workbenchActions = new Set([
   "catalog:mergeSave",
   "catalog:preparePublish",
   "catalog:verifyPublish",
+  "catalog:references",
+  "catalog:capabilities",
   "dialog:openPage",
   "export:analyze",
   "export:page",
@@ -1673,6 +1676,27 @@ export function createWorkbench(
           out,
         });
       }
+      case "catalog:references": {
+        const kind = required(args, "kind");
+        if (kind !== "component" && kind !== "template")
+          throw new CoreError(
+            "INVALID_DATA",
+            "kind must be component or template.",
+          );
+        return catalogReferences(store, {
+          kind,
+          id: required(args, "id"),
+          version: text(args, "version", true),
+          integrity: text(args, "integrity", true),
+        });
+      }
+      case "catalog:capabilities":
+        // Catalog management actions some builds register later.
+        return {
+          remove:
+            workbenchActions.has("components:remove") &&
+            workbenchActions.has("templates:remove"),
+        };
       case "catalog:verifyPublish": {
         const project = await optionalProject(args);
         return verifyPublication(store.root, {

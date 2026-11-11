@@ -273,6 +273,11 @@ import {
   type CatalogCustomComponent,
 } from "../core/component-categories";
 import { TemplateDialog, ComponentDialog } from "./CatalogDialogs";
+import {
+  ImportComponentAction,
+  SaveTemplateAction,
+  useCatalogManager,
+} from "./CatalogManagement";
 import "./studio.css";
 import {
   NoticeStack,
@@ -3688,6 +3693,41 @@ export default function Studio() {
       setDialog({ type: "component", custom, projectId: owner });
   }
 
+  const catalogManager = useCatalogManager(capabilities.manageLibrary, {
+    projects,
+    projectId:
+      (view === "components"
+        ? componentProject !== "all"
+          ? componentProject
+          : null
+        : selectedProject) ?? undefined,
+    openPage:
+      page.draft && page.projectId
+        ? { projectId: page.projectId, pageId: page.draft.id }
+        : undefined,
+    flushPage: saveOpenPage,
+    changed: loadCatalog,
+    async openRevision(kind, item) {
+      if (kind === "component") {
+        await viewComponent(item as CatalogCustomComponent);
+        return;
+      }
+      const projectId = item.projectId ?? selectedProject ?? undefined;
+      const record = await desktop.invoke<LoadedTemplate>("templates:get", {
+        id: item.id,
+        version: item.version,
+        scope: item.scope,
+        integrity: item.integrity,
+        ...(projectId ? { projectId } : {}),
+      });
+      setDialog({ type: "template", record, projectId });
+    },
+    async showPage(projectId, pageId) {
+      setDialog(null);
+      await openPage(pageId, projectId);
+    },
+    closeDetail: closeDialog,
+  });
   const pickerLibrary = useMemo(
     () => ({
       list: () =>
@@ -5282,7 +5322,13 @@ export default function Studio() {
                   ))}
                 </select>
               </label>
+              {catalogManager && (
+                <ImportComponentAction manager={catalogManager} />
+              )}
             </>
+          )}
+          {view === "templates" && catalogManager && (
+            <SaveTemplateAction manager={catalogManager} />
           )}
         </div>
         {view === "page" && page.draft && (
@@ -7166,6 +7212,8 @@ export default function Studio() {
             components={dialog.record.components ?? []}
             onClose={closeDialog}
             {...templateDialogActions(dialog.record, dialog.projectId)}
+            manager={catalogManager}
+            owner={dialog.projectId ?? selectedProject ?? undefined}
           />
         )}
         {dialog?.type === "component" && (
@@ -7202,6 +7250,8 @@ export default function Studio() {
             insertUnavailable={dialog.custom?.role !== "page-outline"}
             onInsert={addBlock}
             onClose={closeDialog}
+            manager={catalogManager}
+            owner={dialog.projectId}
           />
         )}
       </div>
