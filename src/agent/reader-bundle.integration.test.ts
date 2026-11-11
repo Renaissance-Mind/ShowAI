@@ -214,6 +214,112 @@ test("nested regions and multi-page sites share the union of required native com
   expect(template).not.toContain('"g2-sankey"');
 });
 
+test("components nested in rich text and in container data are registered with their stylesheets", async () => {
+  const builtin = (kind: string) =>
+    components.find((item) => item.kind === kind)!.defaultData;
+  const doc = createResource(blankDocument());
+  doc.title = "Nested components";
+  doc.content.content = [
+    {
+      type: "widget",
+      attrs: {
+        id: "note",
+        kind: "text",
+        data: {
+          content: {
+            type: "doc",
+            content: [
+              {
+                type: "paragraph",
+                content: [{ type: "text", text: "The plan follows." }],
+              },
+              {
+                type: "widget",
+                attrs: {
+                  id: "nested-plan",
+                  kind: "roadmap",
+                  data: builtin("roadmap"),
+                },
+              },
+            ],
+          },
+        },
+      },
+    },
+    {
+      type: "widget",
+      attrs: {
+        id: "steps",
+        kind: "stepper",
+        data: {
+          steps: [
+            {
+              title: "Layers",
+              content: {
+                type: "doc",
+                content: [
+                  {
+                    type: "widget",
+                    attrs: {
+                      id: "nested-layers",
+                      kind: "layer-diagram",
+                      data: builtin("layer-diagram"),
+                    },
+                  },
+                ],
+              },
+            },
+          ],
+        },
+      },
+    },
+  ];
+  doc.surfaceViews[doc.content.attrs!.id].readingOrder = ["note", "steps"];
+  expect(readerKinds([doc])).toEqual([
+    "layer-diagram",
+    "roadmap",
+    "stepper",
+    "text",
+  ]);
+  const home = await mkdtemp(join(tmpdir(), "showai-nested-kinds-"));
+  try {
+    const store = new FileStore(home),
+      project = await store.createProject({ name: "Nested kinds" });
+    const record = await store.createPage(project.id, { document: doc });
+    const exported = await exportPage({
+      root: home,
+      projectId: project.id,
+      pageId: record.document.id,
+      format: "html",
+      out: join(home, "exports", "nested.html"),
+    });
+    const html = await readFile(exported.path, "utf8");
+    const kinds = JSON.parse(
+      html
+        .match(/name="showai-reader-kinds" content="([^"]+)"/)![1]
+        .replaceAll("&quot;", '"'),
+    );
+    expect(kinds).toEqual(expect.arrayContaining(["layer-diagram", "roadmap"]));
+    expect(html).toContain(".rm-block");
+    expect(html).toContain(".ly-block");
+    pages.set("/nested-kinds", html);
+    const page = await browser.newPage();
+    const errors: string[] = [];
+    page.on("pageerror", (error) => errors.push(error.message));
+    await page.goto(address + "/nested-kinds");
+    await page.getByText("The plan follows.", { exact: true }).waitFor();
+    await page.locator(".rm-block").first().waitFor();
+    await page.locator(".ly-block").first().waitFor();
+    await expect(page.locator(".sb-image-unavailable").count()).resolves.toBe(
+      0,
+    );
+    expect(errors).toEqual([]);
+    await page.close();
+  } finally {
+    await rm(home, { recursive: true, force: true });
+  }
+});
+
 test("small block selections export inline with only their renderers", async () => {
   const home = await mkdtemp(join(tmpdir(), "showai-inline-selection-"));
   try {

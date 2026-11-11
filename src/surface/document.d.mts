@@ -7,6 +7,12 @@ export function visitNodes(
   visitor: (node: JSONContent, parent: JSONContent | null) => void,
   parent?: JSONContent | null,
 ): void;
+export function widgetDocuments(data: unknown): JSONContent[];
+export function visitContentNodes(
+  node: JSONContent,
+  visitor: (node: JSONContent, parent: JSONContent | null) => void,
+  parent?: JSONContent | null,
+): void;
 export function assignSurfaceIds(
   document: ShowDocument,
   options?: { repairLegacy?: boolean },

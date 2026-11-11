@@ -14,6 +14,7 @@ import {
 import { homedir, tmpdir } from "node:os";
 import { dirname, join, posix } from "node:path";
 import { createHash, randomUUID } from "node:crypto";
+import { visitContentNodes, widgetDocuments } from "../surface/document.mjs";
 
 const cache = new Map();
 const archives = new Map();
@@ -120,13 +121,14 @@ async function writeReaderCache(directory, path, key, html) {
   }
 }
 
+/** Component kinds a page shows, including those nested in rich text. */
 export function readerKinds(documents) {
   const kinds = new Set();
-  const visit = (node) => {
-    if (node?.type === "widget") kinds.add(node.attrs?.kind);
-    node?.content?.forEach(visit);
-  };
-  for (const document of documents) visit(document.content);
+  for (const document of documents)
+    if (document.content)
+      visitContentNodes(document.content, (node) => {
+        if (node?.type === "widget") kinds.add(node.attrs?.kind);
+      });
   return [...kinds].filter((k) => typeof k === "string").sort();
 }
 const MATH_TEXT = /\$|\\\(|\\\[/;
@@ -264,6 +266,8 @@ const compilerIdentity = createHash("sha256")
       removeRanges.toString(),
       unusedRegistryRanges.toString(),
       readerKinds.toString(),
+      visitContentNodes.toString(),
+      widgetDocuments.toString(),
       readerOmissions.toString(),
     ]),
   )

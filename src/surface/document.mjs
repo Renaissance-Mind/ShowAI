@@ -18,6 +18,38 @@ export function visitNodes(node, visitor, parent = null) {
     node.content.forEach((child) => visitNodes(child, visitor, node));
 }
 
+const isRichDocument = (value) =>
+  value.type === "doc" && Array.isArray(value.content);
+/**
+ * Rich-text trees a component keeps in its data: a text block's content,
+ * callout and toggle bodies, stepper steps, a primitive's saved document.
+ * Their nodes, including nested components, are part of the page.
+ */
+export function widgetDocuments(data) {
+  const found = [];
+  const walk = (value) => {
+    if (!value || typeof value !== "object") return;
+    if (isRichDocument(value)) found.push(value);
+    else (Array.isArray(value) ? value : Object.values(value)).forEach(walk);
+  };
+  walk(data);
+  return found;
+}
+
+/**
+ * visitNodes that also enters the rich-text trees in component data, so it
+ * reaches every component the page shows. The parent of a tree's root is the
+ * component holding it.
+ */
+export function visitContentNodes(node, visitor, parent = null) {
+  visitor(node, parent);
+  if (node.type === "widget")
+    for (const tree of widgetDocuments(node.attrs?.data))
+      visitContentNodes(tree, visitor, node);
+  if (Array.isArray(node.content))
+    node.content.forEach((child) => visitContentNodes(child, visitor, node));
+}
+
 function stableId(seed) {
   let hash = 2166136261;
   for (const char of seed)
