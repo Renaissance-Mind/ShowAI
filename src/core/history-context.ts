@@ -6,6 +6,8 @@ export interface LibraryMutation {
   head: string | null;
   changes: FileChanges;
   expected: Map<string, string | null>;
+  /** Files this transaction read as committed at `head`, by path. */
+  read?: Map<string, Buffer>;
   origins?: Pick<
     ChangeContext,
     "restoredFrom" | "mergedFrom" | "externalConflictId" | "restoredSnapshot"

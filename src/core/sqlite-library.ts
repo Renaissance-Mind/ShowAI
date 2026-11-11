@@ -25,7 +25,7 @@ import {
 } from "./sqlite-reader";
 const compress = promisify(deflateRaw);
 import { CoreError } from "./model";
-import { encodeFile, nodePrefix } from "./history-codec";
+import { decodeFile, encodeFile, nodePrefix } from "./history-codec";
 import { holdsLibraryLock, withLibraryLock } from "./library-lock";
 import { libraryMutations } from "./history-context";
 import {
@@ -590,6 +590,7 @@ export class SqliteLibrary {
         head: await this.head(),
         changes: new Map<string, Buffer | null>(),
         expected: new Map<string, string | null>(),
+        read: new Map<string, Buffer>(),
         origins: {} as Pick<
           ChangeContext,
           | "restoredFrom"
@@ -714,6 +715,8 @@ export class SqliteLibrary {
           { ...context, ...state.origins },
           state.expected,
           response,
+          undefined,
+          state.head ? { revision: state.head, files: state.read } : undefined,
         );
         return { value, entry };
       } catch (error) {
@@ -1005,6 +1008,8 @@ export class SqliteLibrary {
     expected?: Map<string, string | null>,
     response?: ResponseDescriptor,
     allowedConflicts = new Set<string>(),
+    /** Files the transaction read as committed at a revision. */
+    read?: { revision: string; files: Map<string, Buffer> },
   ): Promise<HistoryEntry | null> {
     await this.recoverUnlocked();
     const parent = await this.head(),
@@ -1147,6 +1152,7 @@ export class SqliteLibrary {
         parents: parent ? [parent] : [],
       };
     const protection = new WorkspaceProtection(this);
+    if (read) protection.remember(read.revision, read.files);
     const before = await protection.baseline(
         record.paths,
         parent,
@@ -1169,6 +1175,25 @@ export class SqliteLibrary {
       Buffer.from(JSON.stringify(journal)),
     );
     await this.commit(entry, encoded, parent);
+    // The committed files decode from the objects just written, as a read of
+    // the new revision would decode them from the database.
+    const written = new Map<string, Buffer | null>();
+    for (const path of record.paths)
+      written.set(
+        path,
+        changes.get(path) === null
+          ? null
+          : await decodeFile(path, async (name) => {
+              const bytes = encoded.get(name);
+              if (!bytes)
+                throw new CoreError(
+                  "NOT_FOUND",
+                  `File missing in historical revision: ${name}`,
+                );
+              return bytes;
+            }),
+      );
+    protection.remember(revision, written);
     const conflicts = await protection.materialize(
       record.paths,
       revision,

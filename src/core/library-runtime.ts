@@ -174,13 +174,16 @@ export async function readLibraryFile(
       );
     return bytes;
   }
+  if (state?.root === library.root && state.head) {
+    const bytes = await library.readFile(name, state.head);
+    state.read?.set(name, bytes);
+    return bytes;
+  }
   return library.readFile(
     name,
-    state?.root === library.root
-      ? (state.head ?? undefined)
-      : libraryReadSnapshot.getStore()?.root === library.root
-        ? (libraryReadSnapshot.getStore()!.revision ?? undefined)
-        : undefined,
+    libraryReadSnapshot.getStore()?.root === library.root
+      ? (libraryReadSnapshot.getStore()!.revision ?? undefined)
+      : undefined,
   );
 }
 

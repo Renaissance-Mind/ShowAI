@@ -535,3 +535,46 @@ test("a page save stores the same objects as a full write while leaving unedited
   }
   await f.library.verify();
 });
+
+test("a save projects the committed decoding and still keeps external edits made before it", async () => {
+  const f = await fixture(),
+    library = new SqliteLibrary(f.root),
+    path = `projects/${f.project.id}/pages/${f.page.document.id}.json`,
+    projected = join(library.workspace, path);
+  // Stored assets are restored into the projection exactly as a read decodes them.
+  const artifact = JSON.parse((await library.readFile(path)).toString());
+  artifact.document.title = "data:image/png;base64,iVBORw0KGgo=";
+  await library.writeFiles(
+    new Map([[path, Buffer.from(JSON.stringify(artifact))]]),
+    { actor: { kind: "human" }, channel: "desktop" },
+  );
+  const committed = await library.readFile(path);
+  expect(await readFile(projected)).toEqual(committed);
+  expect(JSON.parse(committed.toString()).document.title).toBe(
+    artifact.document.title,
+  );
+  // The transaction's own read of the page is its comparison baseline, so an
+  // edit made to the workspace file beforehand is still captured.
+  const page = await f.store.readPage(f.project.id, f.page.document.id);
+  const external = JSON.parse(committed.toString());
+  external.document.title = "External version";
+  await writeFile(projected, JSON.stringify(external));
+  await expect(
+    f.store.savePage(
+      f.project.id,
+      f.page.document.id,
+      { ...page.document, title: "Mine" },
+      page.hash,
+      page.revision,
+    ),
+  ).rejects.toMatchObject({ code: "CONFLICT" });
+  expect(JSON.parse(await readFile(projected, "utf8")).document.title).toBe(
+    "External version",
+  );
+  expect(await library.readFile(path)).toEqual(committed);
+  expect(
+    (await new WorkspaceProtection(library).list(path)).some(
+      (record) => record.state === "unresolved",
+    ),
+  ).toBe(true);
+});
