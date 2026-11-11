@@ -6761,6 +6761,17 @@ export default function Studio() {
               await refreshProjects([target.projectId], { sidebar: true });
               setNotice(tn("restoredNamed", { title: target.title }));
             }}
+            onPurged={async (targets) => {
+              await refreshProjects(
+                [...new Set(targets.map((target) => target.projectId))],
+                { sidebar: true },
+              );
+              setNotice(
+                targets.length === 1
+                  ? tn("purgedNamed", { title: targets[0].title })
+                  : tn("purgedCount", { count: targets.length }),
+              );
+            }}
           />
         )}
         {dialog?.type === "hiddenProjects" && (
