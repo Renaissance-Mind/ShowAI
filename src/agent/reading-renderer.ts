@@ -249,10 +249,12 @@ function contentHeight() {
   return document.documentElement.scrollHeight + hidden;
 }
 
+/** `image: false` reads components and the DOM without a screenshot, so page height is unbounded. */
 export async function renderReading(
   htmlPath: string,
   options: ReadingOptions,
   locale?: Locale,
+  { image = true }: { image?: boolean } = {},
 ): Promise<ReadingCapture> {
   const { chromium } =
     require("playwright-core") as typeof import("playwright-core");
@@ -399,6 +401,15 @@ export async function renderReading(
           });
       }
     }
+    if (!image)
+      return {
+        png: Buffer.alloc(0),
+        width: 0,
+        height: 0,
+        capturedAt: new Date().toISOString(),
+        dom,
+        components,
+      };
     // The reader lays a Page out inside a 100dvh shell that scrolls on its
     // own, so a full-page screenshot of the document alone stops at the
     // viewport. Grow the viewport until that shell no longer scrolls.

@@ -44,6 +44,9 @@ import { assertExportDestination } from "./exporter";
 import type { ExportFormat } from "./exporter";
 import { runtimeInfo, registerRuntime } from "./runtime";
 import type { PageReadOptions } from "./page-reading";
+import { compactData, type ResponseProfile } from "./mcp-response";
+import { pageStateReceipt } from "./page-receipt";
+import type { PageRecord } from "../core/model";
 import { boardReadSchema, type BoardReadInput } from "./board-reading";
 import {
   describePublicResource,
@@ -76,6 +79,13 @@ Start with one project:
   projects bind PROJECT --harness HOST --session SESSION_ID
   pages list --project PROJECT
 
+Change pages (save and apply reply with a receipt; --response source adds the document):
+  pages save PAGE --project PROJECT --input DOCUMENT.json --base-hash HASH [--response receipt|source|full]
+  pages apply PAGE --project PROJECT --input operations.json --base-hash HASH [--response receipt|source|full]
+  pages delete|restore|pin|unpin PAGE --project PROJECT [--base-hash HASH]
+  pages duplicate PAGE --project PROJECT [--title TITLE]
+  pages deleted [--project PROJECT]   deleted projects, folders and pages that can be restored
+
 Shared datasets (one value that blocks on several pages read and write; see guide datasets):
   datasets list --project PROJECT
   datasets read DATASET --project PROJECT [--path 'objectives[id=o1]'] [--refresh]
@@ -100,6 +110,8 @@ Discover only what you need:
   catalog list [--kind component|template] [--scope SCOPE] [--limit N --cursor CURSOR]
   catalog describe ID [--kind component|template] [--view VIEW]
   catalog describe ID --view parameters [--parameter-path PATH --parameter-offset N --parameter-limit N --known-hash HASH]
+  catalog remove ID --kind component|template [--version VERSION] [--scope project|global|published]
+    Refuses while pages, packages or publications use it and lists where; built-ins cannot be removed.
 
 Display a full page or selected blocks:
   export --project PROJECT --page PAGE [--blocks ID,ID] --format html|inline --out PATH [--reader bundled|cdn]
@@ -110,7 +122,8 @@ Display a full page or selected blocks:
 Read one Page through structured data, an image or interactive HTML:
   boards read PAGE --project PROJECT [--board BOARD_NODE] [--state OPTIONS.json]
   pages read PAGE --project PROJECT [--view structured|image|html] [--blocks ID,ID]
-  pages read PAGE --project PROJECT --format markdown [--detail full|outline]
+  pages read PAGE --project PROJECT --format markdown [--detail full|outline] [--offset N --limit N]
+    A page source over 256 KiB reads as an outline window unless --detail full, --blocks or --out is given.
   pages read PAGE --project PROJECT --view image --theme dark --width 1000 --height 900 --out preview.png
   pages read PAGE --project PROJECT --view html [--state reading-state.json] --out preview.html
 
@@ -236,6 +249,8 @@ function parseArguments(args: string[]): Arguments {
     "refresh-seconds",
     "inputs",
     "script",
+    "response",
+    "offset",
   ]);
   for (let index = 0; index < args.length; index++) {
     const argument = args[index];
@@ -329,6 +344,14 @@ function binding(
           : {}),
       }
     : undefined;
+}
+
+/** pages save/apply reply with a receipt unless --response asks for the document. */
+function responseProfile(args: Arguments): ResponseProfile {
+  const value = option(args, "response") ?? "receipt";
+  if (!["receipt", "source", "full"].includes(value))
+    throw new Error("--response must be receipt, source or full.");
+  return value as ResponseProfile;
 }
 
 function requireCount(args: Arguments, min: number, max = min) {
@@ -823,6 +846,10 @@ async function runCliCommand(argv: string[]): Promise<unknown> {
         if (theme) readOptions.theme = theme as PageReadOptions["theme"];
         const blocks = option(args, "blocks");
         if (blocks) readOptions.blockIds = blocks.split(",");
+        for (const name of ["offset", "limit"] as const) {
+          const value = option(args, name);
+          if (value !== undefined) readOptions[name] = Number(value);
+        }
         const width = option(args, "width"),
           height = option(args, "height");
         if (width || height)
@@ -890,6 +917,36 @@ async function runCliCommand(argv: string[]): Promise<unknown> {
             ? { datasetBases: input.datasetBases as Record<string, string> }
             : {}),
         });
+      }
+      if (["delete", "restore", "pin", "unpin"].includes(action)) {
+        requireCount(args, 3);
+        return service.updatePage(
+          await project(),
+          id,
+          action === "delete" || action === "restore"
+            ? { archived: action === "delete" }
+            : { pinned: action === "pin" },
+          {
+            baseHash: option(args, "base-hash"),
+            baseRevision: option(args, "base-revision"),
+          },
+        );
+      }
+      if (action === "duplicate") {
+        requireCount(args, 3);
+        return service.duplicatePage(await project(), id, option(args, "title"));
+      }
+      if (action === "deleted") {
+        requireCount(args, 2);
+        const entries = await service.deletedEntries();
+        const only = option(args, "project");
+        return only
+          ? {
+              projects: entries.projects.filter((item) => item.id === only),
+              folders: entries.folders.filter((item) => item.projectId === only),
+              pages: entries.pages.filter((item) => item.projectId === only),
+            }
+          : entries;
       }
       if (action === "diff") {
         requireCount(args, 3);
@@ -1137,6 +1194,20 @@ async function runCliCommand(argv: string[]): Promise<unknown> {
               next: "Read the saved detail only when needed.",
             }
           : result;
+      }
+      if (action === "remove") {
+        requireCount(args, 3);
+        // Core explains why built-in and unknown scopes cannot be removed.
+        const scope = catalogScope(args) ?? "project";
+        return service.removeCatalog(
+          scope === "project" ? await project() : undefined,
+          {
+            kind: kind ?? "component",
+            id,
+            version: option(args, "version"),
+            scope: scope as "project" | "global" | "published",
+          },
+        );
       }
       if (action === "import") {
         requireCount(args, 2);
@@ -1498,7 +1569,17 @@ export async function runCli(argv: string[]): Promise<unknown> {
   const mutation =
     (command === "projects" &&
       ["current", "create", "bind"].includes(action)) ||
-    (command === "pages" && ["create", "save", "apply"].includes(action)) ||
+    (command === "pages" &&
+      [
+        "create",
+        "save",
+        "apply",
+        "delete",
+        "restore",
+        "pin",
+        "unpin",
+        "duplicate",
+      ].includes(action)) ||
     (command === "datasets" &&
       (["create", "apply", "link", "delete"].includes(action) ||
         (action === "transform" && !args.options["dry-run"]))) ||
@@ -1513,6 +1594,14 @@ export async function runCli(argv: string[]): Promise<unknown> {
       !!option(args, "revision"));
   if (!mutation || args.options.help)
     return withChangeContext(context, () => runCliCommand(argv));
+  // Page changes reply with receipts, made after the transaction has recorded the revision.
+  const profile =
+    command === "pages" && ["save", "apply"].includes(action)
+      ? responseProfile(args)
+      : undefined;
+  const stateChange =
+    command === "pages" &&
+    ["delete", "restore", "pin", "unpin", "duplicate"].includes(action);
   const requestFingerprint = createHash("sha256")
     .update(
       canonicalJson({
@@ -1521,6 +1610,7 @@ export async function runCli(argv: string[]): Promise<unknown> {
           ...args.options,
           "operation-id": undefined,
           json: undefined,
+          response: undefined,
         },
       }),
     )
@@ -1532,9 +1622,11 @@ export async function runCli(argv: string[]): Promise<unknown> {
     message: context.message ?? args.positional.join(" "),
   };
   const service = new AgentService({ root: option(args, "home") });
-  return withChangeContext(marked, () =>
+  const result = await withChangeContext(marked, () =>
     mutateLibrary(service.store.root, () => runCliCommand(argv), marked),
   );
+  if (stateChange) return pageStateReceipt(result as PageRecord);
+  return profile ? compactData(result, profile) : result;
 }
 
 function printHuman(value: unknown) {

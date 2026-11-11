@@ -270,7 +270,13 @@ export async function pinnedFileIdentity(
         : undefined;
   const name = logicalPath(home, path);
   if (!pinned || !name || pinned.changes?.has(name)) return undefined;
-  return (await revisionIndex(library, pinned.head)).objects.get(name);
+  if (!pinned.head) return undefined;
+  // A revision indexed already answers at once; otherwise ask for this one
+  // path instead of listing the whole library at a new revision.
+  const indexed = pathIndexes.get(`${library.root}\0${pinned.head}`);
+  if (indexed) return (await indexed).objects.get(name);
+  const [entry] = await library.treeEntries({ paths: [name] }, pinned.head);
+  return entry?.path === name ? entry.oid : undefined;
 }
 
 export async function libraryPaths(

@@ -150,7 +150,7 @@ description: 创作或修改要保存的作品：可交互报告、讲解页面�
 
 核对 `showai_capabilities.templateWorkflow.protocol` 为 `showai-template-workflow-v3`。老运行时返回 v2 时，template_context 只给出模板的 README，改用它提供的 `template_guide` 按阶段读取模板指南，并告诉用户运行时需要更新；不能声称仅安装 Skill 就升级了工具。
 
-新作品先按 use-showai 确定项目；只要规划或设计稿时也先确定项目，查模板需要它。续改已有作品时先 `page_read({projectId,pageId,rendered:false,response:"source"})` 读回原 Page，取它的 `templateContext`，并在记录目录中查找 presentation-plan.json 里写有这个 pageId 的记录；找到就沿用其中的读者简报、规划和设计稿，只重做受影响的部分；找不到时从页面本身和用户说明反推，新建一个记录文件夹：brief.md 标明内容是反推的，presentation-plan.json 只为本次要改的部分写节点和幕（含现有块的 blockIds），check_plan 与评审以这部分为准。
+新作品先按 use-showai 确定项目；只要规划或设计稿时也先确定项目，查模板需要它。续改已有作品时先 `page_read({projectId,pageId,rendered:false,response:"source"})` 读回原 Page，取它的 `templateContext`（源超过 256 KiB 的大页这样读只返回大纲窗口，要取 templateContext 时加 `detail:"full"`，本机连接也可用 `out` 写入文件再读），并在记录目录中查找 presentation-plan.json 里写有这个 pageId 的记录；找到就沿用其中的读者简报、规划和设计稿，只重做受影响的部分；找不到时从页面本身和用户说明反推，新建一个记录文件夹：brief.md 标明内容是反推的，presentation-plan.json 只为本次要改的部分写节点和幕（含现有块的 blockIds），check_plan 与评审以这部分为准。
 
 **查模板。** 每个新作品在理解意图之前调用一次 `catalog_list({kind:"template",projectId})`，按用户的请求和手上材料的类型（例如给了一篇论文）对照各模板的 scenarios，判断是否适用；选中的模板从第一个环节起就补充方法。用户指定模板时直接使用。用户要求空白，或没有合适的模板时，只按上面的流程制作，用 page_create 建页；需要查看模板上下文时 `template_context` 传 `templates:[]`，它会覆盖连接启动时带的默认模板。续改沿用 Page.templateContext 记下的精确版本，没有记录时不猜它原先用过哪个模板。内置模板升级后旧版本不再随运行时提供，按记下的版本读取报找不到时，改用同一模板的当前版本，并告诉用户模板版本变了。
 

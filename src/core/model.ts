@@ -316,7 +316,9 @@ export type CoreErrorCode =
   /** The data cannot be written: online data, a spreadsheet, or a stale copy. */
   | "READ_ONLY"
   /** The action needs the person's decision first; details describe it. */
-  | "CONFIRMATION_REQUIRED";
+  | "CONFIRMATION_REQUIRED"
+  /** Still referenced elsewhere; details.uses lists where. */
+  | "IN_USE";
 
 export class CoreError extends Error {
   readonly code: CoreErrorCode;

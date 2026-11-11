@@ -38,7 +38,7 @@
 
 ## 普通 Page 与交互
 
-普通 Page 内容分析和编辑使用 structured；format:markdown 用于正文与组件数据。长页先 detail:outline，再用 blockIds 选择局部，纯源用 rendered:false。
+普通 Page 内容分析和编辑使用 structured；format:markdown 用于正文与组件数据。长页先 detail:outline，再用 blockIds 选择局部，纯源用 rendered:false。源超过 256 KiB 的页面，不指定 detail、blockIds 或 out 的读取只返回大纲窗口（仍带整页的 hash 与 revision，可直接作为 page_apply 的基线；大纲每项有 id、type、title 与层级）：前 100 个顶层块及其子项、`blockCount`、`nextOffset`，以及说明省略了 document、markdown 与 computed 的 `omitted`。用 `offset:nextOffset`（可加 `limit`，最多 1000）继续看大纲，用 blockIds 读需要的块；确实需要整页时传 `detail:"full"`，本机连接也可以用 out 写入文件。结构化读取只为计算组件结果而渲染这些组件本身，所以页面再长也不受截图高度限制。
 
 颜色、布局、遮挡用 page_read 的 view:image，指定 viewport/theme 并保留 hash、组件引用和状态。截图覆盖整页或所选 blockIds 的完整高度，viewport（默认 1000×900）的 height 只决定初始布局；高于 16000 px 时报错，PNG 超过 8 MiB 时同样报错，这两种情况都改用更少的 blockIds 分几次截，并用 out 把图片写进文件。要看清文字时每段控制在约 3000 px 高，过高的图交给模型查看时会被缩小到难以辨认。截图只看到首屏时，先核对返回的 image.height，确认运行时是否已更新；交互用 view:html，先读真实可访问性快照，再按控件实际名称操作。actions 可重放 hover、click、fill、select、check、uncheck、drag；控件不存在或重名会报错。不同状态对比保持同一宽高和源版本。正式宿主交互验收遵循当前任务的官方浏览器/电脑操控规则，自动化读图与读取 HTML 源码不能代替操作验收。
 

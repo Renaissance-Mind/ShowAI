@@ -5,6 +5,8 @@ import { WorkspaceService } from "./workspace-service";
 import type { EditorDraftInput } from "../core/editor-drafts";
 import { validateDocument } from "../portable/validation.mjs";
 import { actionTool, type ToolAction } from "./mcp-actions";
+import type { AgentService } from "./service";
+import { pageStateReceipt } from "./page-receipt";
 
 export const organizationWriteTools = new Set([
   "organization_update",
@@ -27,6 +29,7 @@ export const draftTools = new Set([
 export function registerOrganizationTools(
   register: McpServer["registerTool"],
   service: WorkspaceService,
+  pages: Pick<AgentService, "updatePage" | "duplicatePage">,
   call: (
     handler: () => Promise<unknown>,
     metadata?: { operationId?: string; message?: string; groupId?: string },
@@ -53,6 +56,10 @@ export function registerOrganizationTools(
       fields: { includeArchived: z.boolean().optional() },
       run: ({ includeArchived }) =>
         call(() => service.folders(includeArchived as boolean | undefined)),
+    },
+    deleted: {
+      fields: {},
+      run: () => call(() => service.deleted()),
     },
   };
   const updateActions: Record<string, ToolAction> = {
@@ -112,6 +119,52 @@ export function registerOrganizationTools(
               pinned: pinned as boolean | undefined,
               archived: archived as boolean | undefined,
             }),
+          meta,
+        ),
+    },
+    update_page: {
+      fields: {
+        ...metadata,
+        pageId: id,
+        archived: z.boolean().optional(),
+        pinned: z.boolean().optional(),
+        baseHash: z.string().min(1).optional(),
+        baseRevision: z.string().min(1).optional(),
+      },
+      run: ({ pageId, archived, pinned, baseHash, baseRevision, ...meta }) =>
+        call(
+          async () =>
+            pageStateReceipt(
+              await pages.updatePage(
+                service.project(),
+                pageId as string,
+                {
+                  archived: archived as boolean | undefined,
+                  pinned: pinned as boolean | undefined,
+                },
+                {
+                  baseHash: baseHash as string | undefined,
+                  baseRevision: baseRevision as string | undefined,
+                },
+              ),
+              service.project(),
+            ),
+          meta,
+        ),
+    },
+    duplicate_page: {
+      fields: { ...metadata, pageId: id, title: name.optional() },
+      run: ({ pageId, title, ...meta }) =>
+        call(
+          async () =>
+            pageStateReceipt(
+              await pages.duplicatePage(
+                service.project(),
+                pageId as string,
+                title as string | undefined,
+              ),
+              service.project(),
+            ),
           meta,
         ),
     },
@@ -217,7 +270,7 @@ export function registerOrganizationTools(
     };
   }
   const organizationRead = actionTool(
-    "Read project folders or this connection's sidebar groups and project order.",
+    "Read project folders, deleted items that can be restored, or this connection's sidebar groups and project order.",
     readActions,
   );
   register(
@@ -230,7 +283,7 @@ export function registerOrganizationTools(
     organizationRead.handler,
   );
   const organizationUpdate = actionTool(
-    "Change folders, this project or the sidebar. parentId is a folder or null for the root; page moves need baseHash/baseRevision; sectionId is projects, pinned or a sidebar group; update_group with name:null removes it.",
+    "Change folders, pages, this project or the sidebar. archived:true deletes (restorable, listed by organization_read deleted), archived:false restores. parentId is a folder or null for the root; page moves need baseHash/baseRevision; sectionId is projects, pinned or a sidebar group; update_group with name:null removes it.",
     updateActions,
   );
   register(

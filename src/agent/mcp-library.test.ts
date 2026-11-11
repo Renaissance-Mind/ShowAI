@@ -105,7 +105,7 @@ test("library discovery is read-only; parallel project calls retain explicit ide
     baseHash: read.hash,
     baseRevision: read.revision,
   });
-  expect(saved.document.title).toBe(document.title);
+  expect(saved).toMatchObject({ title: document.title, response: "receipt" });
   const stale = await c.callTool({
     name: "page_save",
     arguments: {
@@ -566,6 +566,7 @@ test("presentation templates apply as independent native Pages, persist edits an
       pageId: first.document.id,
       baseHash: first.hash,
       baseRevision: first.revision,
+      response: "source",
       operations: [
         {
           type: "block.insert",
