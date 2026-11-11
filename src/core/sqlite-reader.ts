@@ -5,7 +5,7 @@ import { inflateRawSync } from "node:zlib";
 import { join, resolve } from "node:path";
 import { isMainThread } from "node:worker_threads";
 import { safeLibraryPath } from "./library-files";
-import { decodeFile, nodePrefix } from "./history-codec";
+import { decodeFileSync, nodePrefix } from "./history-codec";
 import { CoreError } from "./model";
 import { BackgroundWorker } from "./background-worker";
 
@@ -430,7 +430,7 @@ async function readWithin(db: DatabaseSync, home: string, request: Request) {
         byPath.set(String(row.path), unpack(row, String(row.path)));
     }
   }
-  const read = async (path: string) => {
+  const read = (path: string) => {
     assertSqlitePath(path);
     const cached = byPath.get(path);
     if (cached) return cached;
@@ -442,10 +442,6 @@ async function readWithin(db: DatabaseSync, home: string, request: Request) {
     return bytes;
   };
   return new Map(
-    await Promise.all(
-      request.paths.map(
-        async (path) => [path, await decodeFile(path, read)] as const,
-      ),
-    ),
+    request.paths.map((path) => [path, decodeFileSync(path, read)] as const),
   );
 }

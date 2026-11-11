@@ -25,7 +25,7 @@ import {
 } from "./sqlite-reader";
 const compress = promisify(deflateRaw);
 import { CoreError } from "./model";
-import { decodeFile, encodeFile, nodePrefix } from "./history-codec";
+import { decodeFileSync, encodeFile, nodePrefix } from "./history-codec";
 import { holdsLibraryLock, withLibraryLock } from "./library-lock";
 import { libraryMutations } from "./history-context";
 import {
@@ -1183,7 +1183,7 @@ export class SqliteLibrary {
         path,
         changes.get(path) === null
           ? null
-          : await decodeFile(path, async (name) => {
+          : decodeFileSync(path, (name) => {
               const bytes = encoded.get(name);
               if (!bytes)
                 throw new CoreError(
