@@ -10,7 +10,7 @@
 }
 ```
 
-快速跳转和 @ 菜单读取每个组件最新版本的声明，范围是本项目可用的组件（项目、全局、已发布和内置）；修改声明后保存新版本即生效，页面里已插入的旧版本不受影响。内置组件和不能在本项目重新发布的组件，用 `catalog_version({action:"fork"})` 复制成项目里的组件后再声明。
+快速跳转和 @ 菜单读取每个组件最新版本的声明（也就是 `catalog_list` 默认列出的版本），范围是本项目可用的组件（项目、全局、已发布和内置）；修改声明后保存新版本即生效，页面里已插入的旧版本不受影响。要给全局或已发布的组件加声明，用 `catalog_version({projectId, action:"fork", ref:{kind:"component", id, version, integrity, scope}, version:"新版本", id?:"新 id"})` 复制成本项目的组件，再修改它的 manifest 保存新版本；不传 id 时沿用原 id，菜单只列出本项目这一份。内置组件不能复制：用 `catalog_describe({kind:"component", id:内置 kind, view:"source"})` 取出它的组件包（入口直接渲染 showai:components 里的内置组件），换一个新 id 声明后保存；新 id 和内置组件会在菜单里各列一项。
 
 三项都可省略，可以同时声明 commands 与 mention，或 commands 与 databaseField；mention 与 databaseField 不能同时声明，因为字段类型组件的 props 是列的设置。声明属于不可变版本，修改后保存新版本。准确字段以 `guide({topic:"component"})` 返回的 `input.contributesSchema` 为准。保存时检查整个声明，错误统一写成 `contributes.<路径> <问题>`，例如 `contributes.commands[0].run.insert.example names a missing example`，按路径改正后重新保存。把 `commands`、`mention` 或 `databaseField` 写在 manifest 顶层会被拒绝。
 
@@ -43,6 +43,8 @@
 - `prop`：菜单填写的顶层 string 参数，schema 中必须存在。
 - `input`：`"date"` 列出今天、明天、昨天和输入的日期（YYYY-MM-DD）；`"text"` 用输入的文字；`"options"` 只列出固定选项。
 - `options`：可选的固定选项 `[{label, value, keywords?}]`，最多 50 个，value 写进 prop；`keywords` 与命令的一样是文字数组；`input:"options"` 时必填。
+
+下面是 manifest 的片段，完整的 manifest 还要有 description、scenarios、examples 和 documentation：
 
 ```json
 { "id": "person", "name": "同事", "version": "1.0.0", "entry": "index.tsx", "defaultData": { "name": "" },

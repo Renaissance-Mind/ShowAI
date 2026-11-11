@@ -317,11 +317,12 @@ describe("database rendering", () => {
     expect(html).toContain('data-database-record="true"');
     expect(html).toContain(`href="${link}"`);
   });
-  it("offers the project's other pages when editing a page cell", () => {
+  it("edits a page cell through the shared choice-list picker", () => {
     const html = render(records(), false);
-    expect(html).toContain('class="sb-cell-page"');
-    expect(html).toContain(">实验笔记</option>");
-    expect(html).not.toContain(">目录</option>");
+    // A picker trigger showing the linked page's title, beside its link.
+    expect(html).toContain('aria-label="选择文档"');
+    expect(html).toContain('<span class="sb-cell-value">实验笔记</span>');
+    expect(html).not.toContain('<select aria-label="文档"');
   });
   it("labels links outside the listed pages without guessing a title", () => {
     const html = render(records(), true, { ...bridge, projectId: "other" });

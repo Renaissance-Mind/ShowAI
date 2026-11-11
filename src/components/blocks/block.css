@@ -914,7 +914,7 @@
 }
 .sb-record-property .sb-cell-input,
 .sb-record-property .sb-cell-select,
-.sb-record-property .sb-cell-page {
+.sb-record-property .sb-cell-input-wrap > .sb-field-popover-root {
   width: 100%;
   min-width: 0;
 }
@@ -1063,15 +1063,10 @@
   color: var(--sb-text);
   max-width: 180px;
 }
-.sb-cell-page {
-  font-size: 11px !important;
-  border: 0;
-  background: transparent;
-  padding: 9px 4px 9px 12px;
+/* The page cell's picker fills the cell beside the open-page link. */
+.sb-cell-input-wrap > .sb-field-popover-root {
   min-width: 0;
   flex: 1;
-  outline-offset: -2px !important;
-  color: var(--sb-text);
 }
 .sb-cell-input-wrap > .sb-page-link {
   padding: 8px 10px 8px 4px;
