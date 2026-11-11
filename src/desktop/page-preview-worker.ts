@@ -32,7 +32,7 @@ port.on("message", ({ id, home, action, args }) => {
               snapshot.library,
               snapshot.revision,
             );
-            const tree = await snapshot.library.tree(snapshot.revision);
+            const tree = await snapshot.library.treeFiles(snapshot.revision);
             const paths = tree
               .map((entry) => entry.path)
               .filter((path) => /^projects\/[^/]+\/project\.json$/.test(path));
