@@ -173,11 +173,19 @@ describe("structural page merges", () => {
       ...arrayBase,
       comments: [{ ...arrayBase.comments[0], resolved: true }],
     };
+    // Comments merge per record: different fields of one comment combine.
+    const combined = previewPageMerge(arrayBase, a, b);
+    expect(combined.conflicts).toEqual([]);
+    expect(combined.document.comments).toMatchObject([
+      { text: "human", resolved: true },
+    ]);
+    const c = {
+      ...arrayBase,
+      comments: [{ ...arrayBase.comments[0], text: "agent" }],
+    };
     expect(
-      previewPageMerge(arrayBase, a, b).conflicts.some(
-        (conflict) => conflict.path === "/page/comments",
-      ),
-    ).toBe(true);
+      previewPageMerge(arrayBase, a, c).conflicts.map((conflict) => conflict.path),
+    ).toEqual(["/page/comments/comment/text"]);
   });
   it("resolves individual conflicts while retaining independent edits and source formatting", () => {
     const ours = applyOperations(base, [
