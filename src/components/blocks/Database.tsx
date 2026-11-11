@@ -1348,7 +1348,10 @@ export function DatabaseBlock({ data, onChange, readOnly }: BlockProps) {
                     />
                     <ColumnSettings
                       column={column}
-                      columns={draftColumns}
+                      columns={[
+                        ...draftColumns,
+                        ...shownColumns.slice(columns.length),
+                      ]}
                       contributed={contributed}
                       onChange={updateDraftColumn}
                     />
@@ -1418,7 +1421,7 @@ export function DatabaseBlock({ data, onChange, readOnly }: BlockProps) {
         )}
         {addingProperty && editable && view === "table" && (
           <AddProperty
-            columns={columns}
+            columns={shownColumns}
             contributed={contributed}
             onAdd={addProperty}
             onClose={() => {

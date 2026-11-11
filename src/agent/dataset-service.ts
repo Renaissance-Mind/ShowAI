@@ -152,8 +152,7 @@ export class DatasetService {
         error.nextStep = `Use the current value (dataset_read without sinceHash) and pass hash ${record.hash} as sinceHash next time.`;
         throw error;
       }
-      const path =
-        options.path === undefined ? [] : parsePath(options.path);
+      const path = options.path === undefined ? [] : parsePath(options.path);
       const entries = valueDiffEntries(
         valueAt(before, path),
         valueAt(record.dataset.value, path),
@@ -216,7 +215,11 @@ export class DatasetService {
       );
     const { filter, sorts = [], search } = options.query ?? {};
     if (filter !== undefined)
-      validateFilter(filter, "query.filter", table.columns.filter((c) => c.type !== "custom"));
+      validateFilter(
+        filter,
+        "query.filter",
+        table.columns.filter((c) => c.type !== "custom"),
+      );
     validateSorts(sorts, "query.sorts");
     const derived = await deriveDatabase(
       this.store,
@@ -224,7 +227,10 @@ export class DatasetService {
       table as unknown as Record<string, unknown>,
       path.length ? undefined : datasetId,
     );
-    const values = (derived?.values ?? {}) as Record<string, Record<string, unknown>>;
+    const values = (derived?.values ?? {}) as Record<
+      string,
+      Record<string, unknown>
+    >;
     const columns = [
       ...table.columns,
       ...((derived?.columns ?? []) as typeof table.columns),
@@ -261,7 +267,9 @@ export class DatasetService {
         total: table.rows.length,
         matched: matched.length,
         offset,
-        ...(offset + limit < matched.length ? { nextOffset: offset + limit } : {}),
+        ...(offset + limit < matched.length
+          ? { nextOffset: offset + limit }
+          : {}),
         ...(derived?.columns && (derived.columns as unknown[]).length
           ? { derivedColumns: derived.columns }
           : {}),
@@ -834,7 +842,9 @@ export class DatasetService {
                 });
                 // Other blocks bound to the same data are now checked against
                 // the new schema too; the person decides whether to upgrade them.
-                const upgraded = new Set(operations.map((item) => item.blockId));
+                const upgraded = new Set(
+                  operations.map((item) => item.blockId),
+                );
                 const others = (
                   await this.datasets.references(project, binding.dataset)
                 )
@@ -855,7 +865,9 @@ export class DatasetService {
                         (reference) =>
                           `${reference.title || reference.pageId} (${reference.blockIds.join(", ")})`,
                       )
-                      .join("; ")}. Writes from those blocks are checked against the new schema; tell the person and upgrade them with component.ref.set if they use this component.`,
+                      .join(
+                        "; ",
+                      )}. Writes from those blocks are checked against the new schema; tell the person and upgrade them with component.ref.set if they use this component.`,
                     references: others,
                   });
               }

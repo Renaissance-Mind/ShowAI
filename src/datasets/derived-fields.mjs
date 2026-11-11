@@ -288,7 +288,9 @@ export const FORMULA_SCRIPT = String.raw`function transform(inputs, helpers) {
     try {
       compiled[formula.id] = new Function("prop", "helpers", '"use strict"; return (' + formula.expression + "\n);");
     } catch (error) {
-      compiled[formula.id] = { error: String((error && error.message) || error) };
+      compiled[formula.id] = {
+        error: (error && error.name ? error.name + ": " : "") + String((error && error.message) || error),
+      };
     }
   }
   const byId = {};
@@ -325,7 +327,8 @@ export const FORMULA_SCRIPT = String.raw`function transform(inputs, helpers) {
       try {
         result[id] = clean(fn(prop, helpers));
       } catch (error) {
-        result[id] = { error: String((error && error.message) || error).slice(0, 300) };
+        const kind = error && error.name && error.name !== "Error" ? error.name + ": " : "";
+        result[id] = { error: (kind + String((error && error.message) || error)).slice(0, 300) };
       }
       values[id] = result[id];
     }

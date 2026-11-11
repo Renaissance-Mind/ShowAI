@@ -1,74 +1,74 @@
 /* Field types of the database: option tones, list cells, pickers, computed
    cells and the filter/sort editor. */
-.sb-tone-gray {
+.sb-block .sb-tone-gray {
   background: #ececea;
   color: #6b6b66;
 }
-.sb-tone-brown {
+.sb-block .sb-tone-brown {
   background: #f1e8e1;
   color: #8a6449;
 }
-.sb-tone-orange {
+.sb-block .sb-tone-orange {
   background: #fbe9da;
   color: #b05f1d;
 }
-.sb-tone-yellow {
+.sb-block .sb-tone-yellow {
   background: #f8f0d4;
   color: #8f7210;
 }
-.sb-tone-green {
+.sb-block .sb-tone-green {
   background: #e3f0e4;
   color: #3f7a4b;
 }
-.sb-tone-blue {
+.sb-block .sb-tone-blue {
   background: #e1ecf7;
   color: #3a6a9b;
 }
-.sb-tone-purple {
+.sb-block .sb-tone-purple {
   background: #ece6f6;
   color: #6e53a3;
 }
-.sb-tone-pink {
+.sb-block .sb-tone-pink {
   background: #f7e4ee;
   color: #a54b7b;
 }
-.sb-tone-red {
+.sb-block .sb-tone-red {
   background: #f9e1de;
   color: #b0423a;
 }
-:root[data-theme="dark"] .sb-tone-gray {
+:root[data-theme="dark"] .sb-block .sb-tone-gray {
   background: #3a3a38;
   color: #cfcfca;
 }
-:root[data-theme="dark"] .sb-tone-brown {
+:root[data-theme="dark"] .sb-block .sb-tone-brown {
   background: #45362c;
   color: #dcc2ad;
 }
-:root[data-theme="dark"] .sb-tone-orange {
+:root[data-theme="dark"] .sb-block .sb-tone-orange {
   background: #4d3423;
   color: #f0bd92;
 }
-:root[data-theme="dark"] .sb-tone-yellow {
+:root[data-theme="dark"] .sb-block .sb-tone-yellow {
   background: #46401f;
   color: #e6d48e;
 }
-:root[data-theme="dark"] .sb-tone-green {
+:root[data-theme="dark"] .sb-block .sb-tone-green {
   background: #2c4231;
   color: #a9d6b2;
 }
-:root[data-theme="dark"] .sb-tone-blue {
+:root[data-theme="dark"] .sb-block .sb-tone-blue {
   background: #2a3b4e;
   color: #a9c8ea;
 }
-:root[data-theme="dark"] .sb-tone-purple {
+:root[data-theme="dark"] .sb-block .sb-tone-purple {
   background: #3a3150;
   color: #cbb9ef;
 }
-:root[data-theme="dark"] .sb-tone-pink {
+:root[data-theme="dark"] .sb-block .sb-tone-pink {
   background: #4a2d3c;
   color: #eab3cf;
 }
-:root[data-theme="dark"] .sb-tone-red {
+:root[data-theme="dark"] .sb-block .sb-tone-red {
   background: #4d2b28;
   color: #f2aaa2;
 }

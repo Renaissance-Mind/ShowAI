@@ -43,14 +43,15 @@ import type {
 } from "../components/custom/types";
 /** Column settings each built-in field type takes, for Agents writing columns. */
 const DATABASE_FIELD_SETTINGS: Record<string, string> = {
-  select: "options: [text], colors?: {option: tone} (gray, brown, orange, yellow, green, blue, purple, pink, red)",
+  select:
+    "options: [text], colors?: {option: tone} (gray, brown, orange, yellow, green, blue, purple, pink, red)",
   multiSelect:
     "options: [text], colors?: {option: tone}; cell value is a list of options",
   page: "folder?: folder id, titleColumn?: text column id; value showai://project/P/page/G",
   relation:
     "relation: {dataset: DATASET_ID, reverse?: {name}}; value is a list of record ids of that dataset ({columns, rows}); reverse shows the links on blocks bound to the target dataset",
   formula:
-    "formula: {expression, kind?: text|number|date|boolean|list}; JavaScript expression over prop(\"Column name or id\"), run per record in the transform sandbox; errors and cycles show per cell",
+    'formula: {expression, kind?: text|number|date|boolean|list}; JavaScript expression over prop("Column name or id"), run per record in the transform sandbox; errors and cycles show per cell',
   rollup:
     "rollup: {relation: relation column id, column?: column id of the related records, aggregate: count|sum|average|min|max|unique|percentChecked}",
   date: "value YYYY-MM-DD or empty",
@@ -191,9 +192,7 @@ export class CatalogService {
     // Items matching more query terms come first; ties keep catalog order.
     const entries = recommended
       .filter((item) => matching.has(identity(item)))
-      .sort(
-        (a, b) => matching.get(identity(b))! - matching.get(identity(a))!,
-      )
+      .sort((a, b) => matching.get(identity(b))! - matching.get(identity(a))!)
       .map(catalogEntry);
     const revision = createHash("sha256")
       .update(
@@ -296,7 +295,8 @@ export class CatalogService {
       views: {
         filter:
           "{join:'and'|'or', conditions:[{column, operator, value?} | {join, conditions:[condition]}]}; one nested level, at most 50 conditions; operand shapes by OPERATORS: text, value, number, date (YYYY-MM-DD), range [from,to], relative {direction:'past'|'next', days}, list [ids or options], none.",
-        sorts: "[{column, direction:'asc'|'desc'}], at most 10, applied in order.",
+        sorts:
+          "[{column, direction:'asc'|'desc'}], at most 10, applied in order.",
         legacy:
           "Older views with filter {column, value} and sort {column, direction} still load; the workbench writes them as a filter group and sorts when the view changes.",
       },

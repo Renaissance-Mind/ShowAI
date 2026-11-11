@@ -34,9 +34,33 @@ const legacy = {
     },
   ],
   rows: [
-    { id: "a", name: "Alpha", status: "Todo", read: false, due: "2026-11-01", pages: 120, note: "" },
-    { id: "b", name: "Beta", status: "Done", read: true, due: "", pages: 80, note: "showai://project/p1/page/x1" },
-    { id: "c", name: "Gamma", status: "Done", read: true, due: "2026-10-01", pages: "", note: "" },
+    {
+      id: "a",
+      name: "Alpha",
+      status: "Todo",
+      read: false,
+      due: "2026-11-01",
+      pages: 120,
+      note: "",
+    },
+    {
+      id: "b",
+      name: "Beta",
+      status: "Done",
+      read: true,
+      due: "",
+      pages: 80,
+      note: "showai://project/p1/page/x1",
+    },
+    {
+      id: "c",
+      name: "Gamma",
+      status: "Done",
+      read: true,
+      due: "2026-10-01",
+      pages: "",
+      note: "",
+    },
   ],
   views: [
     {
@@ -47,7 +71,13 @@ const legacy = {
       filter: { column: "status", value: "Done" },
       columnWidths: { name: 300 },
     },
-    { id: "read", name: "Read", type: "board", groupBy: "status", filter: { column: "read", value: "true" } },
+    {
+      id: "read",
+      name: "Read",
+      type: "board",
+      groupBy: "status",
+      filter: { column: "read", value: "true" },
+    },
   ],
 };
 const columns = legacy.columns as DatabaseColumn[];
@@ -62,10 +92,14 @@ describe("data saved before field registries", () => {
       title: "Legacy",
       content: {
         type: "doc",
-        content: [{ type: "widget", attrs: { id: "db", kind: "database", data: copy } }],
+        content: [
+          { type: "widget", attrs: { id: "db", kind: "database", data: copy } },
+        ],
       },
     };
-    expect(validateDocument(document).content.content?.[0].attrs?.data).toEqual(legacy);
+    expect(validateDocument(document).content.content?.[0].attrs?.data).toEqual(
+      legacy,
+    );
   });
   it("keeps legacy views as they are until the view is edited", () => {
     const views = legacy.views as DatabaseView[];
@@ -134,7 +168,10 @@ describe("data saved before field registries", () => {
         join: "or",
         conditions: [
           { column: "status", operator: "is", value: "Done" },
-          { join: "and", conditions: [{ column: "gone", operator: "isEmpty" }] },
+          {
+            join: "and",
+            conditions: [{ column: "gone", operator: "isEmpty" }],
+          },
         ],
       },
       sorts: [{ column: "gone", direction: "asc" }],
@@ -148,7 +185,9 @@ describe("data saved before field registries", () => {
         conditions: [{ column: "status", operator: "is", value: "Done" }],
       },
     });
-    expect(readFilter(pruneViews([view], columns)[0].filter, columns)).not.toBeNull();
+    expect(
+      readFilter(pruneViews([view], columns)[0].filter, columns),
+    ).not.toBeNull();
   });
 });
 
@@ -156,11 +195,38 @@ describe("new field types in the contract", () => {
   const base = {
     columns: [
       { id: "name", name: "Name", type: "text" },
-      { id: "tags", name: "Tags", type: "multiSelect", options: ["a", "b"], colors: { a: "blue" } },
-      { id: "project", name: "Project", type: "relation", relation: { dataset: "projects", reverse: { name: "Tasks" } } },
-      { id: "count", name: "Count", type: "rollup", rollup: { relation: "project", aggregate: "count" } },
-      { id: "label", name: "Label", type: "formula", formula: { expression: 'prop("Name") + "!"' } },
-      { id: "rating", name: "Rating", type: "custom", component: { componentId: "star-rating", version: "1.0.0" }, config: { max: 5 } },
+      {
+        id: "tags",
+        name: "Tags",
+        type: "multiSelect",
+        options: ["a", "b"],
+        colors: { a: "blue" },
+      },
+      {
+        id: "project",
+        name: "Project",
+        type: "relation",
+        relation: { dataset: "projects", reverse: { name: "Tasks" } },
+      },
+      {
+        id: "count",
+        name: "Count",
+        type: "rollup",
+        rollup: { relation: "project", aggregate: "count" },
+      },
+      {
+        id: "label",
+        name: "Label",
+        type: "formula",
+        formula: { expression: 'prop("Name") + "!"' },
+      },
+      {
+        id: "rating",
+        name: "Rating",
+        type: "custom",
+        component: { componentId: "star-rating", version: "1.0.0" },
+        config: { max: 5 },
+      },
     ],
     rows: [{ id: "r", name: "x", tags: ["a"], project: ["p1"], rating: 4 }],
   };
@@ -173,26 +239,51 @@ describe("new field types in the contract", () => {
       change(data);
       return () => validateDatabaseData(data);
     };
-    expect(bad((d) => ((d.columns[1] as Record<string, unknown>).colors = { a: "teal" }))).toThrow(
-      "columns[1].colors.a",
-    );
-    expect(bad((d) => ((d.rows[0] as Record<string, unknown>).name = ["x"]))).toThrow(
-      "rows[0].name must be text",
-    );
-    expect(bad((d) => ((d.columns[3] as Record<string, unknown>).rollup = { relation: "name", aggregate: "count" }))).toThrow(
-      "must name a relation column",
-    );
-    expect(bad((d) => ((d.columns[3] as Record<string, unknown>).rollup = { relation: "project", aggregate: "sum" }))).toThrow(
-      "column is required",
-    );
-    expect(bad((d) => ((d.columns[0] as Record<string, unknown>).formula = { expression: "1" }))).toThrow(
-      "only belongs to formula",
-    );
-    expect(bad((d) => ((d.columns[2] as Record<string, unknown>).relation = {}))).toThrow(
-      "relation.dataset",
-    );
-    expect(bad((d) => ((d.columns[5] as Record<string, unknown>).component = { componentId: "Bad" }))).toThrow(
-      "columns[5].component",
-    );
+    expect(
+      bad(
+        (d) =>
+          ((d.columns[1] as Record<string, unknown>).colors = { a: "teal" }),
+      ),
+    ).toThrow("columns[1].colors.a");
+    expect(
+      bad((d) => ((d.rows[0] as Record<string, unknown>).name = ["x"])),
+    ).toThrow("rows[0].name must be text");
+    expect(
+      bad(
+        (d) =>
+          ((d.columns[3] as Record<string, unknown>).rollup = {
+            relation: "name",
+            aggregate: "count",
+          }),
+      ),
+    ).toThrow("must name a relation column");
+    expect(
+      bad(
+        (d) =>
+          ((d.columns[3] as Record<string, unknown>).rollup = {
+            relation: "project",
+            aggregate: "sum",
+          }),
+      ),
+    ).toThrow("column is required");
+    expect(
+      bad(
+        (d) =>
+          ((d.columns[0] as Record<string, unknown>).formula = {
+            expression: "1",
+          }),
+      ),
+    ).toThrow("only belongs to formula");
+    expect(
+      bad((d) => ((d.columns[2] as Record<string, unknown>).relation = {})),
+    ).toThrow("relation.dataset");
+    expect(
+      bad(
+        (d) =>
+          ((d.columns[5] as Record<string, unknown>).component = {
+            componentId: "Bad",
+          }),
+      ),
+    ).toThrow("columns[5].component");
   });
 });

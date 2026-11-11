@@ -303,12 +303,17 @@ function validateColumnConfig(column, columns, path) {
     if (!isRecord(rollup))
       fail(`${path}.rollup must be {relation, column?, aggregate}.`);
     keysOnly(rollup, ["relation", "column", "aggregate"], `${path}.rollup`);
+    // Reverse relations (rev-DATASET-COLUMN) are derived from other datasets.
     if (
-      !columns.some(
-        (item) => item.id === rollup.relation && item.type === "relation",
-      )
+      typeof rollup.relation !== "string" ||
+      (!rollup.relation.startsWith("rev-") &&
+        !columns.some(
+          (item) => item.id === rollup.relation && item.type === "relation",
+        ))
     )
-      fail(`${path}.rollup.relation must name a relation column.`);
+      fail(
+        `${path}.rollup.relation must name a relation column or a reverse relation (rev-DATASET-COLUMN).`,
+      );
     if (
       rollup.column !== undefined &&
       (typeof rollup.column !== "string" || rollup.column.length > 200)

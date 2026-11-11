@@ -10,12 +10,16 @@ const directories: string[] = [];
 async function library() {
   const home = await mkdtemp(join(tmpdir(), "showai-field-type-"));
   directories.push(home);
-  const projectId = (await new FileStore(home).createProject({ name: "Fields" })).id;
+  const projectId = (
+    await new FileStore(home).createProject({ name: "Fields" })
+  ).id;
   return { home, projectId };
 }
 afterEach(async () => {
   await Promise.all(
-    directories.splice(0).map((path) => rm(path, { recursive: true, force: true })),
+    directories
+      .splice(0)
+      .map((path) => rm(path, { recursive: true, force: true })),
   );
 });
 
@@ -27,7 +31,11 @@ const manifest = {
   entry: "index.tsx",
   scenarios: ["Rate records in a database"],
   role: "database-field",
-  databaseField: { protocol: 1, valueKind: "number", operators: ["is", "gte", "lte", "isEmpty", "isNotEmpty"] },
+  databaseField: {
+    protocol: 1,
+    valueKind: "number",
+    operators: ["is", "gte", "lte", "isEmpty", "isNotEmpty"],
+  },
   defaultData: { max: 5 },
   examples: [{ name: "Five stars", data: { max: 5 } }],
 } as unknown as ComponentManifest;
@@ -62,7 +70,11 @@ export default function RatingEditor({ data, value, onValue, onClose }) {
 describe("field types contributed by components", () => {
   it("save with role database-field, list with their value kind and compile the field protocol", async () => {
     const { home, projectId } = await library();
-    const saved = await saveComponent(home, { manifest, schema, source }, projectId);
+    const saved = await saveComponent(
+      home,
+      { manifest, schema, source },
+      projectId,
+    );
     expect(saved).toMatchObject({
       role: "database-field",
       databaseField: { protocol: 1, valueKind: "number" },
@@ -72,9 +84,17 @@ describe("field types contributed by components", () => {
     expect(listed).toMatchObject({
       id: "star-rating",
       role: "database-field",
-      databaseField: { valueKind: "number", operators: ["is", "gte", "lte", "isEmpty", "isNotEmpty"] },
+      databaseField: {
+        valueKind: "number",
+        operators: ["is", "gte", "lte", "isEmpty", "isNotEmpty"],
+      },
     });
-    const reloaded = await getComponent(home, "star-rating", "1.0.0", projectId);
+    const reloaded = await getComponent(
+      home,
+      "star-rating",
+      "1.0.0",
+      projectId,
+    );
     expect(reloaded.integrity).toBe(saved.integrity);
   }, 60000);
   it("reject a field contract that names other kinds' operators or no kind", async () => {
@@ -82,13 +102,21 @@ describe("field types contributed by components", () => {
     const save = (databaseField: unknown) =>
       saveComponent(
         home,
-        { manifest: { ...manifest, databaseField } as ComponentManifest, schema, source },
+        {
+          manifest: { ...manifest, databaseField } as ComponentManifest,
+          schema,
+          source,
+        },
         projectId,
       );
-    await expect(save({ protocol: 1, valueKind: "number", operators: ["contains"] })).rejects.toThrow(
-      "operators of number values",
+    await expect(
+      save({ protocol: 1, valueKind: "number", operators: ["contains"] }),
+    ).rejects.toThrow("operators of number values");
+    await expect(save({ protocol: 1, valueKind: "money" })).rejects.toThrow(
+      "valueKind",
     );
-    await expect(save({ protocol: 1, valueKind: "money" })).rejects.toThrow("valueKind");
-    await expect(save({ protocol: 2, valueKind: "number" })).rejects.toThrow("protocol");
+    await expect(save({ protocol: 2, valueKind: "number" })).rejects.toThrow(
+      "protocol",
+    );
   }, 60000);
 });
