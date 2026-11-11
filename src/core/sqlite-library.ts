@@ -25,7 +25,7 @@ import {
 } from "./sqlite-reader";
 const compress = promisify(deflateRaw);
 import { CoreError } from "./model";
-import { encodeFile, nodePrefix } from "./history-codec";
+import { decodeFileSync, encodeFile, nodePrefix } from "./history-codec";
 import { holdsLibraryLock, withLibraryLock } from "./library-lock";
 import { libraryMutations } from "./history-context";
 import {
@@ -419,6 +419,10 @@ export class SqliteLibrary {
   async tree(revision?: string): Promise<SqliteTreeEntry[]> {
     return readSqlite(this.root, { kind: "tree", revision });
   }
+  /** The tree without the stored nodes of split pages. */
+  async treeFiles(revision?: string): Promise<SqliteTreeEntry[]> {
+    return readSqlite(this.root, { kind: "tree", revision, nodes: false });
+  }
   /** The tree entries at exact paths and below directory prefixes. */
   async treeEntries(
     query: TreeQuery,
@@ -590,6 +594,7 @@ export class SqliteLibrary {
         head: await this.head(),
         changes: new Map<string, Buffer | null>(),
         expected: new Map<string, string | null>(),
+        read: new Map<string, Buffer>(),
         origins: {} as Pick<
           ChangeContext,
           | "restoredFrom"
@@ -714,6 +719,8 @@ export class SqliteLibrary {
           { ...context, ...state.origins },
           state.expected,
           response,
+          undefined,
+          state.head ? { revision: state.head, files: state.read } : undefined,
         );
         return { value, entry };
       } catch (error) {
@@ -1005,6 +1012,8 @@ export class SqliteLibrary {
     expected?: Map<string, string | null>,
     response?: ResponseDescriptor,
     allowedConflicts = new Set<string>(),
+    /** Files the transaction read as committed at a revision. */
+    read?: { revision: string; files: Map<string, Buffer> },
   ): Promise<HistoryEntry | null> {
     await this.recoverUnlocked();
     const parent = await this.head(),
@@ -1135,10 +1144,14 @@ export class SqliteLibrary {
         for (const [name, contents] of encodeFile(path, bytes))
           encoded.set(name, contents);
     }
+    const digests = new Map(
+      [...encoded].map(([path, bytes]) => [
+        path,
+        bytes === null ? null : sha(bytes),
+      ]),
+    );
     const files = Object.fromEntries(
-      [...encoded]
-        .sort(([a], [b]) => a.localeCompare(b))
-        .map(([path, bytes]) => [path, bytes === null ? null : sha(bytes)]),
+      [...digests].sort(([a], [b]) => a.localeCompare(b)),
     );
     const revision = sha(JSON.stringify({ record, parent, files })),
       entry: HistoryEntry = {
@@ -1147,6 +1160,7 @@ export class SqliteLibrary {
         parents: parent ? [parent] : [],
       };
     const protection = new WorkspaceProtection(this);
+    if (read) protection.remember(read.revision, read.files);
     const before = await protection.baseline(
         record.paths,
         parent,
@@ -1168,7 +1182,26 @@ export class SqliteLibrary {
       join(directory, "journal.json"),
       Buffer.from(JSON.stringify(journal)),
     );
-    await this.commit(entry, encoded, parent);
+    await this.commit(entry, encoded, parent, false, digests);
+    // The committed files decode from the objects just written, as a read of
+    // the new revision would decode them from the database.
+    const written = new Map<string, Buffer | null>();
+    for (const path of record.paths)
+      written.set(
+        path,
+        changes.get(path) === null
+          ? null
+          : decodeFileSync(path, (name) => {
+              const bytes = encoded.get(name);
+              if (!bytes)
+                throw new CoreError(
+                  "NOT_FOUND",
+                  `File missing in historical revision: ${name}`,
+                );
+              return bytes;
+            }),
+      );
+    protection.remember(revision, written);
     const conflicts = await protection.materialize(
       record.paths,
       revision,
@@ -1188,6 +1221,8 @@ export class SqliteLibrary {
     encoded: FileChanges,
     expectedHead: string | null,
     retainHistory = false,
+    /** SHA-256 of the encoded files, when the caller already computed them. */
+    digests?: Map<string, string | null>,
   ) {
     // Prepare compression before acquiring the database writer transaction.
     const prepared = new Map<
@@ -1202,7 +1237,7 @@ export class SqliteLibrary {
       assertPath(path);
       if (bytes === null) continue;
       const content = Buffer.from(bytes);
-      const id = sha(content),
+      const id = digests?.get(path) ?? sha(content),
         object = objects.get(id) ?? { id, bytes: content };
       objects.set(id, object);
       prepared.set(path, object);
@@ -1272,17 +1307,30 @@ export class SqliteLibrary {
         const insertBlob = db.prepare(
             "INSERT OR IGNORE INTO blobs VALUES(?,?,?,?,?)",
           ),
-          currentObject = db.prepare(
-            "SELECT oid FROM current_files WHERE path=?",
-          ),
           removeFile = db.prepare("DELETE FROM current_files WHERE path=?"),
           writeCurrent = db.prepare(
             "INSERT INTO current_files VALUES(?,?) ON CONFLICT(path) DO UPDATE SET oid=excluded.oid",
           );
-        // Only objects this commit stops referencing can become unused.
+        // Current objects of every written path, read in this writer transaction.
+        const current = new Map<string, string>(),
+          paths = [...encoded.keys()];
+        for (let offset = 0; offset < paths.length; offset += 500) {
+          const chunk = paths.slice(offset, offset + 500);
+          for (const row of db
+            .prepare(
+              `SELECT path,oid FROM current_files WHERE path IN(${chunk.map(() => "?").join(",")})`,
+            )
+            .all(...chunk))
+            current.set(String(row.path), String(row.oid));
+        }
+        // Only objects this commit stops referencing can become unused. Paths
+        // that already hold their object, such as a page's unedited nodes,
+        // need no write.
         const replaced = new Set<string>();
         for (const [path, bytes] of encoded) {
-          const object = prepared.get(path);
+          const object = prepared.get(path),
+            previous = current.get(path);
+          if (previous === object?.id) continue;
           if (object?.data)
             insertBlob.run(
               object.id,
@@ -1291,8 +1339,7 @@ export class SqliteLibrary {
               object.bytes.length,
               object.packed ? 1 : 0,
             );
-          const previous = currentObject.get(path)?.oid as string | undefined;
-          if (previous && previous !== object?.id) replaced.add(previous);
+          if (previous) replaced.add(previous);
           if (bytes === null) removeFile.run(path);
           else writeCurrent.run(path, object!.id);
         }

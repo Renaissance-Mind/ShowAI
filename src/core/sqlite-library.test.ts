@@ -19,6 +19,8 @@ import { migrateGitContent } from "./content-migration";
 import { FileStore } from "./store";
 import { withChangeContext } from "./history-context";
 import { WorkspaceProtection } from "./workspace-conflicts";
+import { encodeFile, nodePrefix } from "./history-codec";
+import { createHash } from "node:crypto";
 const clean: (() => Promise<unknown>)[] = [];
 afterEach(async () => {
   for (const done of clean.splice(0).reverse()) await done();
@@ -429,4 +431,150 @@ test("the first save after migration copies archived resource tokens once and in
   );
   expect(inspect().resources).not.toContain(projectPath);
   await sqlite.verify();
+});
+
+test("a page save stores the same objects as a full write while leaving unedited nodes in place", async () => {
+  const f = await fixture();
+  const path = `projects/${f.project.id}/pages/${f.page.document.id}.json`;
+  const paragraph = (id: string, text: string) => ({
+    type: "richText",
+    attrs: { id },
+    content: [
+      {
+        type: "paragraph",
+        attrs: { id: `${id}-text` },
+        content: [{ type: "text", text }],
+      },
+    ],
+  });
+  const root = f.page.document.content;
+  const withBlocks = (document: typeof f.page.document, blocks: unknown[]) =>
+    ({
+      ...document,
+      content: { ...root, content: blocks },
+      surfaceViews: {
+        [root.attrs!.id]: {
+          initial: null,
+          saved: [],
+          readingOrder: (blocks as { attrs: { id: string } }[]).map(
+            (block) => block.attrs.id,
+          ),
+        },
+      },
+    }) as never;
+  const first = await f.store.savePage(
+    f.project.id,
+    f.page.document.id,
+    withBlocks(
+      f.page.document,
+      ["a", "b", "c", "d"].map((id) => paragraph(id, `Text ${id}`)),
+    ),
+    f.page.hash,
+    f.page.revision,
+  );
+  const rows = () => {
+    const db = new DatabaseSync(join(f.root, "history", "content.sqlite"));
+    try {
+      return new Map(
+        (
+          db
+            .prepare(
+              "SELECT path,oid FROM current_files WHERE path=? OR (path>=? AND path<?)",
+            )
+            .all(path, nodePrefix(path), nodePrefix(path).slice(0, -1) + "0") as {
+            path: string;
+            oid: string;
+          }[]
+        ).map((row) => [row.path, row.oid]),
+      );
+    } finally {
+      db.close();
+    }
+  };
+  const objects = (bytes: Buffer) =>
+    new Map(
+      [...encodeFile(path, bytes)].map(([name, data]) => [
+        name,
+        createHash("sha256").update(data!).digest("hex"),
+      ]),
+    );
+  const before = rows();
+  // Edit one block, drop one and add one.
+  const content = first.document.content.content!;
+  const second = await f.store.savePage(
+    f.project.id,
+    f.page.document.id,
+    withBlocks(first.document, [
+      content[0],
+      paragraph("b", "Edited b"),
+      content[2],
+      paragraph("e", "Text e"),
+    ]),
+    first.hash,
+    first.revision,
+  );
+  const workspace = await readFile(second.path);
+  const after = rows();
+  // The stored rows are exactly the encoding of the saved file.
+  expect(after).toEqual(objects(workspace));
+  expect(await f.library.readFile(path)).toEqual(workspace);
+  for (const [name, oid] of before)
+    if (after.get(name) === oid) continue;
+    else if (name.endsWith(".json") && !after.has(name))
+      // The removed node and its object are gone.
+      expect(name.includes("/nodes/")).toBe(true);
+  const db = new DatabaseSync(join(f.root, "history", "content.sqlite"));
+  try {
+    for (const oid of new Set(before.values()))
+      if (![...after.values()].includes(oid))
+        expect(
+          db.prepare("SELECT 1 FROM blobs WHERE oid=?").get(oid),
+        ).toBeUndefined();
+  } finally {
+    db.close();
+  }
+  await f.library.verify();
+});
+
+test("a save projects the committed decoding and still keeps external edits made before it", async () => {
+  const f = await fixture(),
+    library = new SqliteLibrary(f.root),
+    path = `projects/${f.project.id}/pages/${f.page.document.id}.json`,
+    projected = join(library.workspace, path);
+  // Stored assets are restored into the projection exactly as a read decodes them.
+  const artifact = JSON.parse((await library.readFile(path)).toString());
+  artifact.document.title = "data:image/png;base64,iVBORw0KGgo=";
+  await library.writeFiles(
+    new Map([[path, Buffer.from(JSON.stringify(artifact))]]),
+    { actor: { kind: "human" }, channel: "desktop" },
+  );
+  const committed = await library.readFile(path);
+  expect(await readFile(projected)).toEqual(committed);
+  expect(JSON.parse(committed.toString()).document.title).toBe(
+    artifact.document.title,
+  );
+  // The transaction's own read of the page is its comparison baseline, so an
+  // edit made to the workspace file beforehand is still captured.
+  const page = await f.store.readPage(f.project.id, f.page.document.id);
+  const external = JSON.parse(committed.toString());
+  external.document.title = "External version";
+  await writeFile(projected, JSON.stringify(external));
+  await expect(
+    f.store.savePage(
+      f.project.id,
+      f.page.document.id,
+      { ...page.document, title: "Mine" },
+      page.hash,
+      page.revision,
+    ),
+  ).rejects.toMatchObject({ code: "CONFLICT" });
+  expect(JSON.parse(await readFile(projected, "utf8")).document.title).toBe(
+    "External version",
+  );
+  expect(await library.readFile(path)).toEqual(committed);
+  expect(
+    (await new WorkspaceProtection(library).list(path)).some(
+      (record) => record.state === "unresolved",
+    ),
+  ).toBe(true);
 });

@@ -87,7 +87,7 @@ export async function pagePreviewSnapshot(
   return withLibrarySnapshot(home, async () => {
     const snapshot = libraryReadSnapshot.getStore();
     if (!snapshot?.revision) return;
-    const tree = await snapshot.library.tree(snapshot.revision);
+    const tree = await snapshot.library.treeFiles(snapshot.revision);
     const page = `projects/${projectId}/pages/${pageId}`;
     const project = `projects/${projectId}/`;
     const paths = tree

@@ -102,6 +102,8 @@ export class WorkspaceProtection {
     string,
     { bytes: Buffer | null; hash: string | null }
   >();
+  /** Committed files the caller already holds, by revision; null marks an absent path. */
+  private known = new Map<string, Map<string, Buffer | null>>();
   constructor(
     readonly library: Pick<
       GitLibrary,
@@ -254,14 +256,42 @@ export class WorkspaceProtection {
     return conflicts;
   }
 
+  /**
+   * Records files as committed at a revision, read or written by the caller in
+   * the same writer transaction, so comparisons reuse them instead of reading.
+   */
+  remember(revision: string, files: Map<string, Buffer | null>) {
+    const known = this.known.get(revision) ?? new Map();
+    for (const [path, bytes] of files) known.set(path, bytes);
+    this.known.set(revision, known);
+  }
+
   /** Which of the paths the revision contains. */
   private async tracked(paths: string[], revision: string | null) {
-    return new Set(
-      (revision && paths.length
-        ? await this.library.treeEntries({ paths }, revision)
-        : []
-      ).map((entry) => entry.path),
-    );
+    const known = revision ? this.known.get(revision) : undefined;
+    const found = new Set(paths.filter((path) => known?.get(path)));
+    const unknown = paths.filter((path) => !known?.has(path));
+    if (revision && unknown.length)
+      for (const entry of await this.library.treeEntries(
+        { paths: unknown },
+        revision,
+      ))
+        found.add(entry.path);
+    return found;
+  }
+
+  /** Committed bytes of paths the revision contains. */
+  private async committed(paths: string[], revision: string) {
+    const known = this.known.get(revision);
+    const unread = paths.filter((path) => !known?.get(path));
+    const files = unread.length
+      ? await this.library.readFiles(unread, revision)
+      : new Map<string, Buffer>();
+    for (const path of paths) {
+      const bytes = known?.get(path);
+      if (bytes) files.set(path, bytes);
+    }
+    return files;
   }
 
   private async compare(paths: string[], revision: string | null) {
@@ -278,7 +308,7 @@ export class WorkspaceProtection {
         present = batch.filter((path) => tree.has(path));
       const committed =
         revision && present.length
-          ? await this.library.readFiles(present, revision)
+          ? await this.committed(present, revision)
           : new Map<string, Buffer>();
       for (const path of batch) {
         const actual = await readLibraryBytes(
@@ -343,7 +373,7 @@ export class WorkspaceProtection {
     before: Record<string, string | null>,
   ): Promise<WorkspaceConflict[]> {
     const tree = await this.tracked(paths, revision);
-    const files = await this.library.readFiles(
+    const files = await this.committed(
       paths.filter((path) => tree.has(path)),
       revision,
     );

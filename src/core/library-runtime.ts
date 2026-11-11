@@ -174,13 +174,16 @@ export async function readLibraryFile(
       );
     return bytes;
   }
+  if (state?.root === library.root && state.head) {
+    const bytes = await library.readFile(name, state.head);
+    state.read?.set(name, bytes);
+    return bytes;
+  }
   return library.readFile(
     name,
-    state?.root === library.root
-      ? (state.head ?? undefined)
-      : libraryReadSnapshot.getStore()?.root === library.root
-        ? (libraryReadSnapshot.getStore()!.revision ?? undefined)
-        : undefined,
+    libraryReadSnapshot.getStore()?.root === library.root
+      ? (libraryReadSnapshot.getStore()!.revision ?? undefined)
+      : undefined,
   );
 }
 
@@ -207,7 +210,8 @@ function revisionIndex(library: GitLibrary, head: string | null) {
     pathIndexes.set(key, index);
     return index;
   }
-  index = library.tree(head).then((entries) => {
+  // Page nodes are neither listed nor asked for by identity.
+  index = library.treeFiles(head).then((entries) => {
     const objects = new Map(entries.map((entry) => [entry.path, entry.oid]));
     const list = entries
       .map((entry) => entry.path)
@@ -247,7 +251,8 @@ async function currentPaths(home: string) {
 
 /**
  * Stored object identity of a file while a read snapshot or mutation pins the
- * revision; undefined when unpinned or when the mutation staged a new version.
+ * revision; undefined when unpinned, for a stored page node, or when the
+ * mutation staged a new version.
  */
 export async function pinnedFileIdentity(
   home: string,

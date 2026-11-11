@@ -5,7 +5,7 @@ import { inflateRawSync } from "node:zlib";
 import { join, resolve } from "node:path";
 import { isMainThread } from "node:worker_threads";
 import { safeLibraryPath } from "./library-files";
-import { decodeFile, nodePrefix } from "./history-codec";
+import { decodeFileSync, nodePrefix } from "./history-codec";
 import { CoreError } from "./model";
 import { BackgroundWorker } from "./background-worker";
 
@@ -45,8 +45,14 @@ export function selectTreeEntries<T extends { path: string }>(
       prefixes.some((prefix) => entry.path.startsWith(prefix)),
   );
 }
+/** Stored nodes of split pages: projects/<id>/pages/<id>/nodes/<name>. */
+export const pageNodePath = /^projects\/[^/]+\/pages\/[^/]+\/nodes\/[^/]+$/;
+// The same paths in SQL. Stored paths have no empty segments, so the glob
+// plus exactly five separators leaves no "/" inside any wildcard.
+const notPageNode = (column: string) =>
+  `NOT (${column} GLOB 'projects/*/pages/*/nodes/*' AND length(${column})-length(replace(${column},'/',''))=5)`;
 type Request = { session?: string } & (
-  | { kind: "tree"; revision?: string }
+  | { kind: "tree"; revision?: string; nodes?: false }
   | { kind: "entries"; revision?: string; query: TreeQuery }
   | { kind: "files"; revision?: string; paths: string[] }
   | { kind: "revisions"; revision?: string; paths: string[] }
@@ -279,22 +285,30 @@ async function readWithin(db: DatabaseSync, home: string, request: Request) {
     db.prepare("SELECT value FROM metadata WHERE key='head'").get()?.value ===
     selected;
   if (request.kind === "tree") {
-    const key = `${home}:${selected}`;
-    let tree = trees.get(key);
+    const full = trees.get(`${home}:${selected}`),
+      key = `${home}:${selected}${request.nodes === false ? ":files" : ""}`;
+    let tree =
+      trees.get(key) ??
+      (request.nodes === false
+        ? full?.filter((entry) => !pageNodePath.test(entry.path))
+        : undefined);
     if (!tree) {
+      const files = request.nodes === false;
       // Selecting blobs.bytes would walk each large object's overflow pages;
       // joining on the key alone reads only the blobs index.
       tree = (current
         ? db
             .prepare(
-              "SELECT f.path,f.oid FROM current_files f JOIN blobs b ON b.oid=f.oid ORDER BY f.path",
+              `SELECT f.path,f.oid FROM current_files f JOIN blobs b ON b.oid=f.oid${files ? ` WHERE ${notPageNode("f.path")}` : ""} ORDER BY f.path`,
             )
             .all()
         : db
             .prepare(
-              "SELECT p.path,c.oid FROM paths p JOIN changes c ON c.path=p.path AND c.sequence=(SELECT c2.sequence FROM changes c2 WHERE c2.path=p.path AND c2.sequence<=? ORDER BY c2.sequence DESC LIMIT 1) JOIN blobs b ON b.oid=c.oid WHERE c.oid IS NOT NULL ORDER BY p.path",
+              `SELECT p.path,c.oid FROM paths p JOIN changes c ON c.path=p.path AND c.sequence=(SELECT c2.sequence FROM changes c2 WHERE c2.path=p.path AND c2.sequence<=? ORDER BY c2.sequence DESC LIMIT 1) JOIN blobs b ON b.oid=c.oid WHERE c.oid IS NOT NULL${files ? ` AND ${notPageNode("p.path")}` : ""} ORDER BY p.path`,
             )
             .all(sequence)) as unknown as SqliteTreeEntry[];
+    }
+    if (!trees.has(key)) {
       trees.set(key, tree);
       if (trees.size > 8) trees.delete(trees.keys().next().value!);
     }
@@ -430,7 +444,7 @@ async function readWithin(db: DatabaseSync, home: string, request: Request) {
         byPath.set(String(row.path), unpack(row, String(row.path)));
     }
   }
-  const read = async (path: string) => {
+  const read = (path: string) => {
     assertSqlitePath(path);
     const cached = byPath.get(path);
     if (cached) return cached;
@@ -442,10 +456,6 @@ async function readWithin(db: DatabaseSync, home: string, request: Request) {
     return bytes;
   };
   return new Map(
-    await Promise.all(
-      request.paths.map(
-        async (path) => [path, await decodeFile(path, read)] as const,
-      ),
-    ),
+    request.paths.map((path) => [path, decodeFileSync(path, read)] as const),
   );
 }

@@ -32,8 +32,13 @@ function jsonEnvelope(path: string): boolean {
 /** Extract only actual data URLs. Slot locations avoid reserving keys in component props. */
 function encodeJson(value: unknown, files: FileChanges): Buffer {
   const assets: AssetSlot[] = [];
-  const visit = (value: unknown, pointer: string[]): unknown => {
+  // The location of the value being visited; copied only for a data URL.
+  const pointer: string[] = [];
+  // Returns the value itself unless it holds a data URL, so the JSON text of
+  // unchanged parts is that of the input.
+  const visit = (value: unknown): unknown => {
     if (typeof value === "string") {
+      if (!value.startsWith("data:")) return value;
       const match = value.match(
         /^data:([\w.+\/-]+);base64,([A-Za-z0-9+/]*={0,2})$/,
       );
@@ -42,35 +47,42 @@ function encodeJson(value: unknown, files: FileChanges): Buffer {
       if (bytes.toString("base64") !== match[2]) return value;
       const id = digest(bytes);
       files.set(`assets/${id}`, bytes);
-      assets.push({ pointer, id, mime: match[1] });
+      assets.push({ pointer: [...pointer], id, mime: match[1] });
       return `asset:${id}`;
     }
-    if (Array.isArray(value))
-      return value.map((entry, index) =>
-        visit(entry, [...pointer, String(index)]),
-      );
-    if (value && typeof value === "object")
-      return Object.fromEntries(
-        Object.entries(value).map(([key, entry]) => [
-          key,
-          visit(entry, [...pointer, key]),
-        ]),
-      );
+    if (Array.isArray(value)) {
+      let copy: unknown[] | undefined;
+      for (let index = 0; index < value.length; index++) {
+        pointer.push(String(index));
+        const entry = visit(value[index]);
+        pointer.pop();
+        if (entry !== value[index]) (copy ??= [...value])[index] = entry;
+      }
+      return copy ?? value;
+    }
+    if (value && typeof value === "object") {
+      let copy: Record<string, unknown> | undefined;
+      for (const [key, item] of Object.entries(value)) {
+        pointer.push(key);
+        const entry = visit(item);
+        pointer.pop();
+        if (entry !== item)
+          (copy ??= Object.fromEntries(Object.entries(value)))[key] = entry;
+      }
+      return copy ?? value;
+    }
     return value;
   };
   const envelope: JsonEnvelope = {
     format: "showai-stored-json",
     version: 1,
-    value: visit(value, []),
+    value: visit(value),
     assets,
   };
   return Buffer.from(JSON.stringify(envelope));
 }
 
-async function decodeJson(
-  bytes: Buffer,
-  read: (path: string) => Promise<Buffer>,
-): Promise<unknown> {
+function readEnvelope(bytes: Buffer): JsonEnvelope {
   const envelope = JSON.parse(bytes.toString("utf8")) as JsonEnvelope;
   if (
     envelope.format !== "showai-stored-json" ||
@@ -78,48 +90,65 @@ async function decodeJson(
     !Array.isArray(envelope.assets)
   )
     throw new CoreError("INVALID_DATA", "Invalid stored JSON object.");
-  let value = envelope.value;
-  for (const slot of envelope.assets) {
-    if (
-      !/^[a-f0-9]{64}$/.test(slot.id) ||
-      typeof slot.mime !== "string" ||
-      !Array.isArray(slot.pointer)
-    )
-      throw new CoreError("INVALID_DATA", "Invalid stored asset reference.");
-    const asset = await read(`assets/${slot.id}`);
-    if (digest(asset) !== slot.id)
-      throw new CoreError("INVALID_DATA", `Corrupt asset: ${slot.id}`);
-    const url = `data:${slot.mime};base64,${asset.toString("base64")}`;
-    if (!slot.pointer.length) {
-      value = url;
-      continue;
-    }
-    let parent = value as Record<string, unknown>;
-    for (const part of slot.pointer.slice(0, -1)) {
-      if (!parent || typeof parent !== "object" || !Object.hasOwn(parent, part))
-        throw new CoreError(
-          "INVALID_DATA",
-          "Stored asset location is missing.",
-        );
-      parent = parent[part] as Record<string, unknown>;
-    }
-    const key = slot.pointer.at(-1)!;
-    if (
-      !parent ||
-      !Object.hasOwn(parent, key) ||
-      parent[key] !== `asset:${slot.id}`
-    )
-      throw new CoreError(
-        "INVALID_DATA",
-        "Stored asset location differs from its reference.",
-      );
-    Object.defineProperty(parent, key, {
-      value: url,
-      writable: true,
-      enumerable: true,
-      configurable: true,
-    });
+  return envelope;
+}
+function assetPath(slot: AssetSlot): string {
+  if (
+    !/^[a-f0-9]{64}$/.test(slot.id) ||
+    typeof slot.mime !== "string" ||
+    !Array.isArray(slot.pointer)
+  )
+    throw new CoreError("INVALID_DATA", "Invalid stored asset reference.");
+  return `assets/${slot.id}`;
+}
+/** The value with the asset's data URL restored at the slot's location. */
+function restoreAsset(value: unknown, slot: AssetSlot, asset: Buffer): unknown {
+  if (digest(asset) !== slot.id)
+    throw new CoreError("INVALID_DATA", `Corrupt asset: ${slot.id}`);
+  const url = `data:${slot.mime};base64,${asset.toString("base64")}`;
+  if (!slot.pointer.length) return url;
+  let parent = value as Record<string, unknown>;
+  for (const part of slot.pointer.slice(0, -1)) {
+    if (!parent || typeof parent !== "object" || !Object.hasOwn(parent, part))
+      throw new CoreError("INVALID_DATA", "Stored asset location is missing.");
+    parent = parent[part] as Record<string, unknown>;
   }
+  const key = slot.pointer.at(-1)!;
+  if (
+    !parent ||
+    !Object.hasOwn(parent, key) ||
+    parent[key] !== `asset:${slot.id}`
+  )
+    throw new CoreError(
+      "INVALID_DATA",
+      "Stored asset location differs from its reference.",
+    );
+  Object.defineProperty(parent, key, {
+    value: url,
+    writable: true,
+    enumerable: true,
+    configurable: true,
+  });
+  return value;
+}
+async function decodeJson(
+  bytes: Buffer,
+  read: (path: string) => Promise<Buffer>,
+): Promise<unknown> {
+  const envelope = readEnvelope(bytes);
+  let value = envelope.value;
+  for (const slot of envelope.assets)
+    value = restoreAsset(value, slot, await read(assetPath(slot)));
+  return value;
+}
+function decodeJsonSync(
+  bytes: Buffer,
+  read: (path: string) => Buffer,
+): unknown {
+  const envelope = readEnvelope(bytes);
+  let value = envelope.value;
+  for (const slot of envelope.assets)
+    value = restoreAsset(value, slot, read(assetPath(slot)));
   return value;
 }
 
@@ -181,6 +210,41 @@ export function encodeFile(path: string, bytes: Buffer): FileChanges {
   return files;
 }
 
+/** The node an entry of a stored page refers to, or undefined for inline content. */
+function nodeReference(
+  entry: unknown,
+  depth: number,
+  visited: Set<string>,
+): string | undefined {
+  if (depth > 64)
+    throw new CoreError("INVALID_DATA", "Stored page is nested too deeply.");
+  const ref = entry as { node?: string };
+  if (!ref?.node) return undefined;
+  if (
+    typeof ref.node !== "string" ||
+    !ref.node ||
+    ref.node.length > 200 ||
+    visited.has(ref.node)
+  )
+    throw new CoreError(
+      "INVALID_DATA",
+      "Stored page contains a missing or repeated node.",
+    );
+  visited.add(ref.node);
+  return ref.node;
+}
+function checkNode(node: NodeValue, id: string) {
+  if (node.attrs?.id !== id)
+    throw new CoreError("INVALID_DATA", "Stored node identity differs.");
+}
+function pageMetadata(value: { document?: { content: unknown } }) {
+  if (!value.document)
+    throw new CoreError("INVALID_DATA", "Stored page metadata is missing.");
+  return value.document;
+}
+const pageFile = (path: string) =>
+  /^projects\/[^/]+\/pages\/[^/]+\.json$/.test(path);
+
 export async function decodeFile(
   path: string,
   read: (path: string) => Promise<Buffer>,
@@ -190,42 +254,56 @@ export async function decodeFile(
   const value = (await decodeJson(bytes, read)) as {
     document?: { content: unknown };
   };
-  if (/^projects\/[^/]+\/pages\/[^/]+\.json$/.test(path)) {
+  if (pageFile(path)) {
     const visited = new Set<string>();
     const expand = async (entry: unknown, depth: number): Promise<unknown> => {
-      if (depth > 64)
-        throw new CoreError(
-          "INVALID_DATA",
-          "Stored page is nested too deeply.",
-        );
-      const ref = entry as { node?: string };
-      if (!ref?.node) return entry;
-      if (
-        typeof ref.node !== "string" ||
-        !ref.node ||
-        ref.node.length > 200 ||
-        visited.has(ref.node)
-      )
-        throw new CoreError(
-          "INVALID_DATA",
-          "Stored page contains a missing or repeated node.",
-        );
-      visited.add(ref.node);
+      const id = nodeReference(entry, depth, visited);
+      if (id === undefined) return entry;
       const node = (await decodeJson(
-        await read(nodePath(path, ref.node)),
+        await read(nodePath(path, id)),
         read,
       )) as NodeValue;
-      if (node.attrs?.id !== ref.node)
-        throw new CoreError("INVALID_DATA", "Stored node identity differs.");
+      checkNode(node, id);
       if (node.content)
         node.content = (await Promise.all(
           node.content.map((child) => expand(child, depth + 1)),
         )) as NodeValue[];
       return node;
     };
-    if (!value.document)
-      throw new CoreError("INVALID_DATA", "Stored page metadata is missing.");
-    value.document.content = await expand(value.document.content, 0);
+    const document = pageMetadata(value);
+    document.content = await expand(document.content, 0);
+  }
+  return Buffer.from(JSON.stringify(value, null, 2) + "\n");
+}
+
+/**
+ * decodeFile for a reader that answers synchronously, without a promise per
+ * node. Nodes are read depth first; a valid page decodes to the same bytes.
+ */
+export function decodeFileSync(
+  path: string,
+  read: (path: string) => Buffer,
+): Buffer {
+  const bytes = read(path);
+  if (!jsonEnvelope(path)) return bytes;
+  const value = decodeJsonSync(bytes, read) as {
+    document?: { content: unknown };
+  };
+  if (pageFile(path)) {
+    const visited = new Set<string>();
+    const expand = (entry: unknown, depth: number): unknown => {
+      const id = nodeReference(entry, depth, visited);
+      if (id === undefined) return entry;
+      const node = decodeJsonSync(read(nodePath(path, id)), read) as NodeValue;
+      checkNode(node, id);
+      if (node.content)
+        node.content = node.content.map((child) =>
+          expand(child, depth + 1),
+        ) as NodeValue[];
+      return node;
+    };
+    const document = pageMetadata(value);
+    document.content = expand(document.content, 0);
   }
   return Buffer.from(JSON.stringify(value, null, 2) + "\n");
 }

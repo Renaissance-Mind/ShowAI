@@ -244,6 +244,9 @@ export async function storedBundles(
   return result;
 }
 
+/** How long an unreferenced stored copy is kept before collection. */
+export const BUNDLE_GRACE_MS = 24 * 60 * 60 * 1000;
+
 /**
  * Removes stored copies no project file refers to any more, after a grace
  * period that covers a synchronization still placing a new record.
@@ -286,7 +289,7 @@ export async function collectBundles(
   }
   const referenced = referencedBundles(files);
   const now = options.now ?? Date.now();
-  const grace = options.graceMs ?? 24 * 60 * 60 * 1000;
+  const grace = options.graceMs ?? BUNDLE_GRACE_MS;
   const removed: string[] = [];
   for (const item of stored)
     if (!referenced.has(item.hash) && now - item.modifiedAt >= grace) {

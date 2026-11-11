@@ -4,7 +4,11 @@ import { LibraryMaintenance } from "./library-maintenance";
 import { atomicLibraryFile, readLibraryBytes } from "./library-files";
 import { join } from "node:path";
 import { CoreError } from "./model";
-import { collectBundles } from "./dataset-bundles";
+import {
+  BUNDLE_GRACE_MS,
+  collectBundles,
+  storedBundles,
+} from "./dataset-bundles";
 import { FileStore } from "./store";
 export interface MaintenancePolicy {
   automatic: boolean;
@@ -73,6 +77,12 @@ export class MaintenanceScheduler {
   private stopped = false;
   private timer?: ReturnType<typeof setTimeout>;
   private pending?: Promise<void>;
+  /**
+   * The state a complete pass found nothing more to do in. The index, the
+   * collected copies and the object counts only change with the head, the
+   * stored copies, the policy, or a copy outliving its grace period.
+   */
+  private settled?: { head: string; state: string; at: number };
   constructor(
     readonly root: string,
     readonly onError: (error: unknown) => void = (error) =>
@@ -92,18 +102,38 @@ export class MaintenanceScheduler {
       this.changedAt = Date.now();
     }
     if (!head || Date.now() - this.changedAt < policy.idleMs) return;
+    const at = Date.now(),
+      bundles = await storedBundles(this.root),
+      state = JSON.stringify([
+        policy,
+        bundles.map((item) => [item.hash, item.modifiedAt]),
+      ]);
+    const settled = this.settled;
+    if (
+      settled?.head === head &&
+      settled.state === state &&
+      !bundles.some(
+        (item) =>
+          item.modifiedAt + BUNDLE_GRACE_MS > settled.at &&
+          item.modifiedAt + BUNDLE_GRACE_MS <= at,
+      )
+    )
+      return;
+    this.settled = undefined;
     await new IndexClient(this.root).synchronize();
     if (this.stopped || Date.now() - this.changedAt < policy.idleMs) return;
     // Synchronized copies of linked files no project refers to any more.
-    await collectBundles(new FileStore(this.root));
+    const removed = await collectBundles(new FileStore(this.root));
     if (this.stopped || Date.now() - this.changedAt < policy.idleMs) return;
     const objects = await library.objectStatistics();
     if (
       objects.packs < policy.minimumPacks &&
       objects.looseObjects < policy.minimumLooseObjects &&
       objects.looseBytes < policy.minimumLooseBytes
-    )
+    ) {
+      if (!removed.length) this.settled = { head, state, at };
       return;
+    }
     await new LibraryMaintenance(this.root).compact();
   }
   start() {

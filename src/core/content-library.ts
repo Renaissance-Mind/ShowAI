@@ -2,7 +2,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { CoreError } from "./model";
 import { SqliteLibrary } from "./sqlite-library";
-import type { TreeQuery } from "./sqlite-reader";
+import { pageNodePath, type TreeQuery } from "./sqlite-reader";
 import type { GitLibrary as LegacyLibrary } from "./git-library";
 import type { ChangeContext, FileChanges, HistoryEntry } from "./history-model";
 import type { WorkspaceConflict } from "./workspace-conflicts";
@@ -79,6 +79,19 @@ export class ContentLibrary {
   }
   async tree(revision?: string) {
     return (await this.backend()).tree(revision);
+  }
+  /** The tree without the stored nodes of split pages; their pages stay. */
+  async treeFiles(revision?: string) {
+    const backend = await this.backend();
+    return backend instanceof SqliteLibrary
+      ? backend.treeFiles(revision)
+      : (await backend.tree(revision)).filter(
+          (entry) => !pageNodePath.test(entry.path),
+        );
+  }
+  /** Whether the library stores content in SQLite rather than legacy Git. */
+  async sqlite() {
+    return (await this.backend()) instanceof SqliteLibrary;
   }
   /** The tree entries at exact paths and below directory prefixes ("dir/"). */
   async treeEntries(query: TreeQuery, revision?: string) {
