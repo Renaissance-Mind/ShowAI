@@ -6,6 +6,7 @@ import richTextExternalContent from "../components/rich-text/external-content.ts
 import richTextWidgetSelection from "../components/rich-text/widget-selection.ts?raw";
 import richTextAssistantSelection from "../components/rich-text/assistant-selection.ts?raw";
 import richTextRangeEdit from "../components/rich-text/text-range-edit.ts?raw";
+import richTextImageFiles from "../components/rich-text/image-files.ts?raw";
 import textSelectionModel from "../surface/text-selection-model.ts?raw";
 import selectionBridge from "../components/custom/selection-bridge.ts?raw";
 import selectionFrame from "../components/custom/useSelectionFrame.ts?raw";
@@ -229,6 +230,7 @@ const sources: Record<string, string> = {
   "rich-text/widget-selection.ts": richTextWidgetSelection,
   "rich-text/assistant-selection.ts": richTextAssistantSelection,
   "rich-text/text-range-edit.ts": richTextRangeEdit,
+  "rich-text/image-files.ts": richTextImageFiles,
   "surface/text-selection-model.ts": textSelectionModel,
   "custom/selection-bridge.ts": selectionBridge,
   "custom/useSelectionFrame.ts": selectionFrame,

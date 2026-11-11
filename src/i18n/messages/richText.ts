@@ -18,7 +18,6 @@ export default defineMessages("richText", {
     "notice.imageTypes": "支持 PNG、JPEG、GIF、WebP 和 AVIF 图片。",
     "notice.imageTooLarge": "「{name}」为 {size}，单个资源上限 {limit}。",
     "notice.imageUnreadable": "无法读取「{name}」，请重新选择图片。",
-    "notice.readCancelled": "读取已取消",
     dismissNotice: "关闭提示",
 
     "group.basic": "基础内容",
@@ -195,7 +194,6 @@ export default defineMessages("richText", {
     "notice.imageTooLarge":
       "“{name}” is {size}. Each resource can be at most {limit}.",
     "notice.imageUnreadable": "Couldn't read “{name}”. Choose the image again.",
-    "notice.readCancelled": "Reading was cancelled",
     dismissNotice: "Dismiss notice",
 
     "group.basic": "Basic blocks",

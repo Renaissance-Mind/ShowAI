@@ -1,6 +1,7 @@
 import type {NativeBoardControlHandle} from "./native-board-control";
 import {PortableCubicDrawingInput,PortableCubicPreview} from "./PortableCubicDrawingInput";
 import { isEditableDrawing } from "./portable-ink.mjs";
+import { readImageFile } from "../components/rich-text/image-files";
 import { LibraryContextMenu } from "../studio/LibraryContextMenu";
 import type { LibraryContextMenuItem } from "../studio/LibraryContextMenu";
 import type { SurfaceGeometryStore } from "./geometry-store";
@@ -127,7 +128,10 @@ interface Props {
   onDeleteSelection?: (ids: string[]) => void;
   onCopyObjects?: (ids: string[]) => BoardClip | null;
   onPasteObjects?: (
-    paste: { clip: BoardClip } | { text: string },
+    paste:
+      | { clip: BoardClip }
+      | { text: string }
+      | { image: { src: string; alt: string } },
     point: { x: number; y: number } | null,
   ) => string[] | void;
   onReorder?: (ids: string[], order: StackOrder) => void;
@@ -450,7 +454,7 @@ export default function PageSurface({
   /** Last pointer position over the Board, in client coordinates. */
   const pastePoint = useRef<{ x: number; y: number } | null>(null);
   const paste = (
-    value: { clip: BoardClip } | { text: string },
+    value: Parameters<NonNullable<typeof onPasteObjects>>[0],
     point = pastePoint.current &&
       controls.current.point(pastePoint.current.x, pastePoint.current.y),
   ) => {
@@ -458,6 +462,26 @@ export default function PageSurface({
     if (ids?.length) {
       board.selectIds(ids);
       focusRoot();
+    }
+  };
+  /** Keyboard and menu Paste: a Board copy, images as on pages, or text. */
+  const pasteContent = async (
+    text: string,
+    files: File[],
+    point = pastePoint.current &&
+      controls.current.point(pastePoint.current.x, pastePoint.current.y),
+  ) => {
+    let clip: unknown = null;
+    try {
+      clip = JSON.parse(text);
+    } catch {
+      /* Ordinary text becomes a text object. */
+    }
+    if (isBoardClip(clip)) return paste({ clip }, point);
+    if (!files.length) return text.trim() && paste({ text }, point);
+    for (const file of files) {
+      const read = await readImageFile(file);
+      if ("src" in read) paste({ image: { src: read.src, alt: file.name } }, point);
     }
   };
   const reorder = (ids: string[], order: StackOrder) =>
@@ -1748,18 +1772,14 @@ export default function PageSurface({
         }}
         onPaste={(event) => {
           if (!editable || !onPasteObjects || ownsText(event.target)) return;
-          const data =
-            event.clipboardData.getData(clipType) ||
-            event.clipboardData.getData("text/plain");
-          let clip: unknown = null;
-          try {
-            clip = JSON.parse(data);
-          } catch {
-            /* Ordinary text becomes a text object. */
-          }
           event.preventDefault();
-          if (isBoardClip(clip)) paste({ clip });
-          else if (data.trim()) paste({ text: data });
+          void pasteContent(
+            event.clipboardData.getData(clipType) ||
+              event.clipboardData.getData("text/plain"),
+            [...event.clipboardData.files].filter((file) =>
+              file.type.startsWith("image/"),
+            ),
+          );
         }}
         onKeyDownCapture={(event) => {
           const target = event.target as Element;
@@ -2028,10 +2048,25 @@ export default function PageSurface({
                       icon: <Clipboard size={14} />,
                       shortcut: "⌘V",
                       separatorBefore: true,
-                      disabled: !lastClip || !onPasteObjects,
-                      onSelect: () =>
-                        lastClip &&
-                        paste({ clip: lastClip }, objectMenu.insertion!),
+                      disabled: !onPasteObjects,
+                      onSelect: () => {
+                        const point = objectMenu.insertion!;
+                        void navigator.clipboard.read().then(
+                          async (items) => {
+                            const files: File[] = [];
+                            let text = "";
+                            for (const item of items)
+                              for (const type of item.types)
+                                if (type.startsWith("image/"))
+                                  files.push(new File([await item.getType(type)], type.replace("/", "."), { type }));
+                                else if (type === "text/plain")
+                                  text = await (await item.getType(type)).text();
+                            return pasteContent(text, files, point);
+                          },
+                          // Without clipboard access, the last Board copy still pastes.
+                          () => lastClip && paste({ clip: lastClip }, point),
+                        );
+                      },
                     },
                     {
                       label: t("menu.selectAll"),
