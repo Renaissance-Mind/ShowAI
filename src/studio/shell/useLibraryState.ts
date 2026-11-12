@@ -29,6 +29,9 @@ import {
   queueNavigationScope,
   refreshedContents,
   retainEqual,
+  savedPageMoved,
+  withSavedPage,
+  withSavedProjectTime,
 } from "../navigation-refresh";
 import { LibraryHistory, type LibraryChange } from "../library-history";
 import { writeNavigationCache } from "../navigation-cache";
@@ -39,9 +42,12 @@ import { applySidebarReorder, type SidebarReorder } from "../sidebar-reorder";
 import { readSidebarExpansion, sidebarExpansionKey } from "../sidebar-state";
 import { writerName } from "../external-change";
 import type { StudioFeedback } from "./useStudioFeedback";
+import type { RouteState } from "./useRouteState";
+import type { CatalogState } from "./useCatalogState";
 import {
   LOAD_LIBRARY,
   operation,
+  type PageState,
   type ProjectScan,
 } from "./types";
 
@@ -449,3 +455,89 @@ export function useLibraryState({
 }
 
 export type LibraryState = ReturnType<typeof useLibraryState>;
+
+/**
+ * Keeps the navigation and the catalogs current: changes on disk, this
+ * window's own saves, and the catalog a view or filter asks for.
+ */
+export function useLibraryUpdates({
+  feedback: { report },
+  library: { info, contents, setContents, setProjects, refresh },
+  route: { view },
+  catalog: { catalogLoaded, catalogScope, componentProject, loadCatalog },
+  page,
+}: {
+  feedback: Pick<StudioFeedback, "report">;
+  library: Pick<
+    LibraryState,
+    "info" | "contents" | "setContents" | "setProjects" | "refresh"
+  >;
+  route: Pick<RouteState, "view">;
+  catalog: Pick<
+    CatalogState,
+    "catalogLoaded" | "catalogScope" | "componentProject" | "loadCatalog"
+  >;
+  page: PageState;
+}) {
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout>;
+    let queued = emptyNavigationScope(),
+      catalog = false;
+    const unsubscribe = desktop.onChange((change) => {
+      queueNavigationScope(queued, change);
+      catalog ||= !!change.catalog;
+      clearTimeout(timer);
+      timer = setTimeout(() => {
+        const work = queued,
+          reloadCatalog = catalog;
+        queued = emptyNavigationScope();
+        catalog = false;
+        if (work.all || work.sidebar || work.ids.size)
+          void refresh({
+            type: "files",
+            home: change.home,
+            all: work.all,
+            sidebar: work.sidebar,
+            projectIds: [...work.ids],
+          }).catch(report);
+        if ((work.all || reloadCatalog) && catalogLoaded.current)
+          void loadCatalog().catch(report);
+      }, 250);
+    });
+    return () => {
+      clearTimeout(timer);
+      unsubscribe();
+    };
+  }, [refresh, loadCatalog, report]);
+  const contentsRef = useRef(contents);
+  contentsRef.current = contents;
+  // The host no longer echoes this window's own saves, so apply them here.
+  useEffect(
+    () =>
+      page.sessions.subscribeSaved((projectId, record) => {
+        if (savedPageMoved(contentsRef.current, projectId, record)) {
+          void refresh({
+            type: "files",
+            home: info?.home ?? "",
+            projectIds: [projectId],
+          }).catch(report);
+          return;
+        }
+        setContents((current) => withSavedPage(current, projectId, record));
+        setProjects((current) =>
+          withSavedProjectTime(current, projectId, record.document.updatedAt),
+        );
+      }),
+    [page.sessions, refresh, report, info?.home],
+  );
+  useEffect(() => {
+    if (["components", "templates"].includes(view) || catalogLoaded.current)
+      void loadCatalog().catch(report);
+  }, [
+    view === "components" || view === "templates",
+    catalogScope,
+    componentProject,
+    loadCatalog,
+    report,
+  ]);
+}
