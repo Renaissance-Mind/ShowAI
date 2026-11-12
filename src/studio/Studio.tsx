@@ -12,15 +12,12 @@ import { upgradeResource } from "../document/containers.mjs";
 import {
   useCallback,
   useEffect,
-  useMemo,
   useRef,
   useState,
   type DragEvent,
   type MouseEvent as ReactMouseEvent,
-  type ReactNode,
 } from "react";
 import {
-  ArrowLeft,
   ArrowUpRight,
   AtSign,
   Link2,
@@ -62,7 +59,6 @@ import {
   Keyboard,
   LifeBuoy,
   Presentation,
-  TriangleAlert,
 } from "../ui/icons";
 import type {
   ProjectSummary,
@@ -87,10 +83,8 @@ import {
 import { desktop } from "../host/bridge";
 import { usePage } from "./usePage";
 import {
-  LibraryRow,
   LibraryContextMenu,
   type LibraryMenuPoint,
-  type LibraryRowProps,
   type LibraryTarget,
 } from "./LibraryNavigation";
 import Dialog from "../ui/Dialog";
@@ -108,21 +102,12 @@ import PageIcon from "../components/PageIcon";
 import ProjectIcon from "./ProjectIcon";
 import PageIconDialog from "../components/PageIconDialog";
 import ExpandableSearch from "../components/ExpandableSearch";
-import ProjectSidebar from "./ProjectSidebar";
-import {
-  LibraryDragContext,
-} from "./LibraryDrag";
-import {
-  sortDirectoryItems,
-} from "../core/directory-sort";
-import SidebarNavigation from "./SidebarNavigation";
-import TemplateNavigation from "./TemplateNavigation";
 import {
   latestTemplateVersions,
   templateHasPage,
 } from "./template-catalog-model";
 import TemplateThumbnail from "./TemplateThumbnail";
-import RecentPages, { type RecentPage } from "./RecentPages";
+import RecentPages from "./RecentPages";
 import QuickJump from "./quick-jump/QuickJump";
 import Welcome from "./Welcome";
 import PluginUpdateNotice from "./PluginUpdateNotice";
@@ -130,7 +115,6 @@ import AppUpdateNotice from "./AppUpdateNotice";
 import { useAppUpdate } from "./useAppUpdate";
 import {
   BuiltinDocPage,
-  DocsNavigation,
   useBuiltinDocFolders,
 } from "./BuiltinDocs";
 import {
@@ -168,7 +152,7 @@ import findMessages from "../i18n/messages/find";
 import { FindBar } from "./find/FindBar";
 import { useFind } from "./find/useFind";
 import { useWindowFullscreen } from "./useWindowFullscreen";
-import { ComponentCatalog, ComponentNavigation } from "./ComponentCatalog";
+import { ComponentCatalog } from "./ComponentCatalog";
 import { TemplateDialog, ComponentDialog } from "./CatalogDialogs";
 import {
   ImportComponentAction,
@@ -194,7 +178,6 @@ import {
 import type { SearchResult } from "../core/library-index";
 import LibraryMigrationDialog from "./LibraryMigrationDialog";
 import {
-  SettingsNavigation,
   SettingsPanel,
 } from "./Settings";
 import {
@@ -241,6 +224,7 @@ import { useCatalogActions } from "./shell/useCatalogActions";
 import { useStudioWorkspace } from "./shell/useStudioWorkspace";
 import { useMenuItems } from "./shell/menus/useMenuItems";
 import { useStudioCommands } from "./shell/commands";
+import { StudioSidebar, useLibraryRows } from "./shell/StudioSidebar";
 
 
 const recentLoading = <div className="studio-welcome" aria-busy="true" />;
@@ -314,26 +298,17 @@ export default function Studio() {
     unreadableProjects,
     dismissedUnreadable,
     setDismissedUnreadable,
-    savedOrganization,
     organization,
-    pendingReorders,
     syncOverview,
-    projectSyncMarker,
     setContents,
     contents,
-    expandedProjects,
     setExpandedProjects,
-    expandedFolders,
     setExpandedFolders,
-    collapsedSections,
-    setCollapsedSections,
     libraryHistory,
     historyBusy,
     loadProjectContents,
     refresh,
     refreshProjects,
-    toggleProject,
-    folderPreferences,
     projectTarget,
     folderTarget,
     pageTarget,
@@ -377,8 +352,6 @@ export default function Studio() {
     catalogLoading,
     showTemplateVersions,
     setShowTemplateVersions,
-    templateType,
-    setTemplateType,
     catalogScope,
     setCatalogScope,
     componentProject,
@@ -393,7 +366,6 @@ export default function Studio() {
     setCatalogQueries,
     componentGroups,
     loadCatalog,
-    catalogTemplates,
     visibleTemplates,
   } = catalog;
   const dialogs = useDialogState();
@@ -499,7 +471,6 @@ export default function Studio() {
     openTargetClick,
     openDoc,
     locateCurrentPage,
-    leaveDetour,
     openProjectManagement,
   } = router;
   // A library the App just created gets its sample project once.
@@ -563,7 +534,6 @@ export default function Studio() {
     moveProject,
     updateTarget,
     deleteTarget,
-    unpinTarget,
   } = edits;
   const moves = useLibraryMoves({
     feedback,
@@ -652,96 +622,6 @@ export default function Studio() {
       false,
       true,
     );
-  }
-  // Each folder's sorted rows, computed once per project when its contents,
-  // order or pending reorders change rather than on every workbench render.
-  const sidebarChildren = useMemo(() => {
-    const cache = new Map<string, Map<string | null, LibraryTarget[]>>();
-    return (projectId: string, parentId: string | null): LibraryTarget[] => {
-      let byParent = cache.get(projectId);
-      if (!byParent) {
-        byParent = new Map();
-        cache.set(projectId, byParent);
-        const current = contents[projectId];
-        const folderIds = new Set(current?.folders.map((item) => item.id));
-        const groups = new Map<
-          string | null,
-          (Parameters<typeof sortDirectoryItems>[0][number] & {
-            target: LibraryTarget;
-          })[]
-        >();
-        const add = (
-          parent: string | null,
-          item: Parameters<typeof sortDirectoryItems>[0][number] & {
-            target: LibraryTarget;
-          },
-        ) => {
-          const group = groups.get(parent);
-          if (group) group.push(item);
-          else groups.set(parent, [item]);
-        };
-        for (const item of current?.folders ?? [])
-          add(item.parentId ?? null, {
-            ...item,
-            target: folderTarget(item, projectId),
-          });
-        for (const item of current?.pages ?? [])
-          add(item.parentId && folderIds.has(item.parentId) ? item.parentId : null, {
-            ...item,
-            name: item.title || tc("untitled"),
-            pinned: item.favorite,
-            target: pageTarget(item, projectId),
-          });
-        for (const [parent, items] of groups)
-          byParent.set(
-            parent,
-            sortDirectoryItems(
-              items,
-              folderPreferences(projectId, parent),
-              organization.entryOrder?.[projectId],
-            ).map((item) => item.target),
-          );
-      }
-      return byParent.get(parentId) ?? [];
-    };
-  }, [contents, projects, pendingReorders, organization, savedOrganization, info?.home, tc]);
-  function renderChildren(
-    projectId: string,
-    parentId: string | null = null,
-    depth = 0,
-  ): ReactNode {
-    if (depth > 30) return null;
-    if (!contents[projectId]) return null;
-    const targets = sidebarChildren(projectId, parentId);
-    return targets.map((target) => (
-      <div key={target.id}>
-        <LibraryRow
-          target={target}
-          active={
-            selectedProject === projectId &&
-            (target.kind === "page"
-              ? view === "page" && page.draft?.id === target.id
-              : view === "project" && selectedFolder === target.id)
-          }
-          expanded={
-            target.kind === "folder" ? !!expandedFolders[target.id] : undefined
-          }
-          onToggle={
-            target.kind === "folder"
-              ? rowToggle("folder", target.id)
-              : undefined
-          }
-          onOpen={openRow}
-          onMenu={showRowMenu}
-          onCommand={rowCommand}
-        />
-        {target.kind === "folder" && expandedFolders[target.id] && (
-          <div className="studio-tree-children">
-            {renderChildren(projectId, target.id, depth + 1)}
-          </div>
-        )}
-      </div>
-    ));
   }
   /** Page templates create a page here; workflow templates hand a prompt to an agent. */
   function templateDialogActions(record: LoadedTemplate, owner?: string) {
@@ -1053,83 +933,15 @@ export default function Studio() {
           },
         }
       : {};
-  // Stable row handlers let memoized LibraryRows skip unrelated Studio renders.
-  const rowHandlers = useRef({
-    openTargetClick,
-    showMenu,
-    toggleProject,
-    libraryKeyCommand,
-    unpinTarget,
-    pageTarget,
+  const rows = useLibraryRows({
+    feedback,
+    library,
+    dialogs,
+    menus,
+    router,
+    edits,
   });
-  rowHandlers.current = {
-    openTargetClick,
-    showMenu,
-    toggleProject,
-    libraryKeyCommand,
-    unpinTarget,
-    pageTarget,
-  };
-  const openRecent = useCallback(
-    (item: RecentPage, event: ReactMouseEvent<HTMLButtonElement>) =>
-      rowHandlers.current.openTargetClick(
-        rowHandlers.current.pageTarget(item, item.projectId),
-        event,
-      ),
-    [],
-  );
-  const showRecentMenu = useCallback(
-    (item: RecentPage, anchor: HTMLElement, point?: LibraryMenuPoint) =>
-      rowHandlers.current.showMenu(
-        rowHandlers.current.pageTarget(item, item.projectId),
-        anchor,
-        point,
-      ),
-    [],
-  );
-  const recentCommand = useCallback(
-    (item: RecentPage, command: "rename" | "delete") =>
-      rowHandlers.current.libraryKeyCommand(
-        rowHandlers.current.pageTarget(item, item.projectId),
-        command,
-      ),
-    [],
-  );
-  const beginProject = useCallback(() => setDialog({ type: "project" }), []);
-  const rowCommand = useCallback<NonNullable<LibraryRowProps["onCommand"]>>(
-    (target, command) => rowHandlers.current.libraryKeyCommand(target, command),
-    [],
-  );
-  const unpinRow = useCallback<NonNullable<LibraryRowProps["onUnpin"]>>(
-    (target) => rowHandlers.current.unpinTarget(target),
-    [],
-  );
-  const openRow = useCallback<LibraryRowProps["onOpen"]>(
-    (target, event) => rowHandlers.current.openTargetClick(target, event),
-    [],
-  );
-  const showRowMenu = useCallback<LibraryRowProps["onMenu"]>(
-    (target, anchor, point) =>
-      rowHandlers.current.showMenu(target, anchor, point),
-    [],
-  );
-  const rowToggles = useRef(new Map<string, () => void>());
-  const rowToggle = (kind: "project" | "folder", id: string) => {
-    const key = `${kind}:${id}`;
-    let toggle = rowToggles.current.get(key);
-    if (!toggle) {
-      toggle =
-        kind === "project"
-          ? () => void rowHandlers.current.toggleProject(id).catch(report)
-          : () =>
-              setExpandedFolders((current) => ({
-                ...current,
-                [id]: !current[id],
-              }));
-      rowToggles.current.set(key, toggle);
-    }
-    return toggle;
-  };
+  const { openRecent, showRecentMenu, recentCommand, beginProject } = rows;
   const welcomeView = (
     <Welcome
       info={info}
@@ -1177,145 +989,6 @@ export default function Studio() {
       }}
       onCreateProject={() => setDialog({ type: "project" })}
     />
-  );
-  const sidebarNavigation = (
-    <SidebarNavigation
-      current={
-        view === "projects"
-          ? "recent"
-          : view === "templates" ||
-              view === "components" ||
-              view === "settings"
-            ? view
-            : null
-      }
-      onSelect={(section) =>
-        void navigate(section === "recent" ? "projects" : section).catch(report)
-      }
-    />
-  );
-
-  const sidebarContent = (
-    <LibraryDragContext.Provider value={libraryDrag.bindings}>
-      {(view === "templates" ||
-        view === "components" ||
-        view === "settings") && (
-        <button
-          className="studio-sidebar-back"
-          aria-label={tn("backToPrevious")}
-          title={tn("backToPrevious")}
-          disabled={routing || workspace.switching}
-          onClick={action(leaveDetour)}
-        >
-          <ArrowLeft size={17} strokeWidth={1.7} aria-hidden="true" />
-          <span>{tc("back")}</span>
-        </button>
-      )}
-      {view === "settings" ? (
-        <SettingsNavigation
-          section={settingsSection}
-          onSelect={setSettingsSection}
-          platform={info?.platform}
-        />
-      ) : view === "templates" ? (
-        <TemplateNavigation
-          templates={catalogTemplates}
-          active={templateType}
-          onSelect={(type) => {
-            setTemplateType(type);
-            catalogScrollRef.current?.scrollTo({ top: 0 });
-          }}
-        />
-      ) : view === "components" ? (
-        <ComponentNavigation
-          groups={componentGroups}
-          active={componentCategory}
-          onSelect={(category) => {
-            setComponentCategory(category);
-            catalogScrollRef.current?.scrollTo({ top: 0 });
-          }}
-        />
-      ) : (
-        <ProjectSidebar
-          projects={projects}
-          organization={organization}
-          selectedProject={selectedProject}
-          collapsed={collapsedSections}
-          setCollapsed={setCollapsedSections}
-          onCreate={(groupId) => setDialog({ type: "project", groupId })}
-          onNew={(anchor) =>
-            setNewMenu((current) => (current === anchor ? null : anchor))
-          }
-          onMenu={(anchor) =>
-            setProjectsMenu((current) => (current === anchor ? null : anchor))
-          }
-          onManage={openProjectManagement}
-          onGroupMenu={(group, anchor) => setGroupMenu({ group, anchor })}
-          unreadable={unreadableProjects.map((item) => (
-            <button
-              key={item.directory}
-              type="button"
-              className="studio-unreadable-project"
-              title={item.message}
-              onClick={() => {
-                setDismissedUnreadable((current) =>
-                  current.filter((directory) => directory !== item.directory),
-                );
-                requestAnimationFrame(() =>
-                  document
-                    .getElementById(`unreadable-${item.directory}`)
-                    ?.focus(),
-                );
-              }}
-            >
-              <TriangleAlert size={14} aria-hidden="true" />
-              <span>{t("unreadableProject", { name: item.directory })}</span>
-            </button>
-          ))}
-          docs={
-            showDocs ? (
-              <DocsNavigation
-                activeId={view === "docs" ? (docPage?.id ?? null) : null}
-                onOpen={(id, event) => {
-                  event.preventDefault();
-                  void openDoc(
-                    id,
-                    "",
-                    clickDisposition(event, info?.platform === "darwin"),
-                  ).catch(report);
-                }}
-              />
-            ) : undefined
-          }
-          renderProject={(item) => (
-            <div key={item.id}>
-              <LibraryRow
-                target={projectTarget(item)}
-                marker={projectSyncMarker(item.id)}
-                cloud={syncOverview.bindings.has(item.id)}
-                active={
-                  selectedProject === item.id &&
-                  view === "project" &&
-                  !selectedFolder
-                }
-                expanded={!!expandedProjects[item.id]}
-                onToggle={rowToggle("project", item.id)}
-                onOpen={openRow}
-                onMenu={showRowMenu}
-                onCommand={rowCommand}
-                onUnpin={unpinRow}
-              />
-              {expandedProjects[item.id] && (
-                <div className="studio-tree-children">
-                  {renderChildren(item.id)}
-                </div>
-              )}
-            </div>
-          )}
-        />
-      )}
-      {sidebarNavigation}
-    </LibraryDragContext.Provider>
   );
   const topbar = (
     <div className="studio-topbar">
@@ -1866,7 +1539,21 @@ export default function Studio() {
             !!contextMenu?.anchor.closest(".studio-sidebar")
           }
           switchingTab={workspace.switching || routing}
-          navigation={sidebarContent}
+          navigation={
+            <StudioSidebar
+              feedback={feedback}
+              library={library}
+              route={route}
+              catalog={catalog}
+              dialogs={dialogs}
+              menus={menus}
+              router={router}
+              moves={moves}
+              rows={rows}
+              page={page}
+              workspace={workspace}
+            />
+          }
           canLocate={
             view === "page" &&
             !!page.draft &&
