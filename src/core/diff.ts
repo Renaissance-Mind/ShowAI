@@ -22,13 +22,8 @@ import { validateDocument } from "../portable/validation.mjs";
 import { rebaseCommentAnchors, validateComments } from "./comments";
 import { applyCommentOperation } from "./comment-operations";
 import { CoreError, PAGE_OPERATION_FIELDS } from "./model";
-import {
-  isSurface,
-  reconcileSurface,
-  fillSurfaceLayout,
-  visitContentNodes,
-  visitNodes,
-} from "../document/document.mjs";
+import { isSurface, reconcileSurface, fillSurfaceLayout } from "../document/document.mjs";
+import { walk } from "../document/walk.mjs";
 import type {
   FieldChange,
   JSONContent,
@@ -42,7 +37,7 @@ import { canonicalJson } from "./canonical";
 
 /** Blocks bound to shared data must carry a complete, valid binding when saved. */
 function assertBindings(document: ShowDocument) {
-  visitContentNodes(document.content, (node) => {
+  walk(document.content, (node) => {
     if (node.type !== "widget" || !readBinding(node.attrs?.data)) return;
     try {
       compileBinding(readBinding(node.attrs!.data));
@@ -52,7 +47,7 @@ function assertBindings(document: ShowDocument) {
         `Block ${node.attrs?.id ?? ""} $binding: ${error instanceof Error ? error.message : String(error)}`,
       );
     }
-  });
+  }, { scope: "content" });
 }
 
 /** Only document bookkeeping dates are excluded; dates in user data remain meaningful. */
@@ -97,19 +92,18 @@ export function normalizeDocument(
     };
     return canonicalJson(strip(node));
   };
-  const collectOld = (node: JSONContent) => {
-    if (
-      node.type !== "doc" &&
-      node.type !== "surface" &&
-      node.type !== "text" &&
-      typeof node.attrs?.id === "string"
-    ) {
-      const key = signature(node);
-      oldIds.set(key, [...(oldIds.get(key) ?? []), node.attrs.id]);
-    }
-    node.content?.forEach(collectOld);
-  };
-  if (previous) collectOld(previous.content);
+  if (previous)
+    walk(previous.content, (node) => {
+      if (
+        node.type !== "doc" &&
+        node.type !== "surface" &&
+        node.type !== "text" &&
+        typeof node.attrs?.id === "string"
+      ) {
+        const key = signature(node);
+        oldIds.set(key, [...(oldIds.get(key) ?? []), node.attrs.id]);
+      }
+    }, { scope: "tree" });
   const visit = (node: JSONContent, path: string) => {
     if (!["doc", "surface", "text"].includes(node.type ?? "")) {
       let id =
@@ -147,7 +141,7 @@ interface NodeEntry {
 
 export function indexBlocks(document: ShowDocument): Map<string, NodeEntry> {
   const blocks = new Map<string, NodeEntry>();
-  const walk = (parent: JSONContent, parentId: string | null) => {
+  const descend = (parent: JSONContent, parentId: string | null) => {
     let afterId: string | null = null;
     for (const node of parent.content ?? []) {
       if (node.type === "text") continue;
@@ -160,11 +154,11 @@ export function indexBlocks(document: ShowDocument): Map<string, NodeEntry> {
       if (blocks.has(id))
         throw new CoreError("INVALID_DATA", `Duplicate block id: ${id}`);
       blocks.set(id, { node, parentId, afterId });
-      walk(node, id);
+      descend(node, id);
       afterId = id;
     }
   };
-  walk(document.content, null);
+  descend(document.content, null);
   return blocks;
 }
 
@@ -628,9 +622,9 @@ export function applyOperations(
         for (const id of operation.view.targets) locate(id);
         const owner = viewOwner(operation.surfaceId),
           targets = new Set<string>();
-        visitNodes(owner, (node) => {
+        walk(owner, (node) => {
           if (node !== owner && node.attrs?.id) targets.add(node.attrs.id);
-        });
+        }, { scope: "tree" });
         if (operation.view.targets.some((id) => !targets.has(id)))
           throw new CoreError(
             "INVALID_DATA",
@@ -747,11 +741,12 @@ export function applyOperations(
       }
       case "block.move": {
         const target = locate(operation.blockId);
-        const contains = (node: JSONContent, id: string): boolean =>
-          node.attrs?.id === id ||
-          (node.content ?? []).some((child) => contains(child, id));
+        const inside = new Set<unknown>();
+        walk(target.node, (node) => {
+          inside.add(node.attrs?.id);
+        }, { scope: "tree" });
         if (
-          (operation.parentId && contains(target.node, operation.parentId)) ||
+          (operation.parentId && inside.has(operation.parentId)) ||
           operation.afterId === operation.blockId
         )
           throw new CoreError(

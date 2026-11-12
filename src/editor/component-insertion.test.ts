@@ -6,7 +6,7 @@ import { insertComponentAtText } from "../surface/component-insertion";
 import { createResource, createSurface } from "../document/containers.mjs";
 import { blankDocument } from "../core/catalog";
 import { validateDocument } from "../portable/validation.mjs";
-import { visitNodes } from "../document/document.mjs";
+import { walk } from "../document/walk.mjs";
 const schema = getSchema(createExtensions());
 const paragraph = (id: string, text: string) => ({
   type: "paragraph",
@@ -76,12 +76,11 @@ test("native insertion replaces an empty paragraph and splits nested list conten
   for (const fragment of [point.before, point.after])
     schema.nodeFromJSON({ type: "doc", content: fragment }).check();
   const ids: string[] = [];
-  visitNodes(
+  walk(
     { type: "doc", content: [...point.before, ...point.after] },
     (node) => {
       if (node.attrs?.id) ids.push(node.attrs.id);
-    },
-  );
+    }, { scope: "tree" });
   expect(new Set(ids).size).toBe(ids.length);
 });
 

@@ -32,7 +32,7 @@ import { selectDocumentBlocks } from "../portable/selection.mjs";
 import type { ComponentSource } from "../components/custom/types";
 import { assertProps } from "../components/custom/schema";
 import type { ShowDocument } from "../types";
-import { visitContentNodes } from "../document/document.mjs";
+import { walk } from "../document/walk.mjs";
 
 const object = z.record(z.string(), z.unknown());
 export const presentationSchema = {
@@ -258,12 +258,12 @@ function assertKnownKinds(document: ShowDocument) {
     "custom",
     ...listBuiltinComponents({ includeLegacy: true }).map((item) => item.kind),
   ]);
-  visitContentNodes(document.content, (node) => {
+  walk(document.content, (node) => {
     if ((node.type === "widget" || node.type === "inlineWidget") && !knownKinds.has(String(node.attrs?.kind)))
       throw new Error(
         `Unknown widget kind '${node.attrs?.kind}' at node '${node.attrs?.id ?? "unnamed"}'. Custom components use attrs.kind='custom' and attrs.data={componentId,version,props}. The component package ID is not a built-in widget kind.`,
       );
-  });
+  }, { scope: "content" });
 }
 
 /** Supplied sources compile in a temporary workspace. Saved library
@@ -304,7 +304,7 @@ async function renderDocumentArtifacts(
       projectId,
     );
     document = await lockDocumentComponents(home, document, projectId);
-    visitContentNodes(document.content, (node) => {
+    walk(document.content, (node) => {
       if ((node.type === "widget" || node.type === "inlineWidget") && node.attrs?.kind === "custom") {
         const reference = node.attrs.data;
         const component = components.find(
@@ -319,7 +319,7 @@ async function renderDocumentArtifacts(
           );
         assertProps(component.schema, reference.props, component.documentation);
       }
-    });
+    }, { scope: "content" });
     const html = options.component
       ? undefined
       : await buildPageHtml(document, undefined, components, [], "reading");

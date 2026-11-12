@@ -11,6 +11,7 @@
  */
 import type { JSONContent } from "@tiptap/core";
 import type { CommentAnchor, CommentAuthor, PageComment, ShowDocument } from "../types";
+import { walk } from "../document/walk.mjs";
 
 export type { CommentAnchor, CommentAuthor, PageComment };
 
@@ -50,16 +51,13 @@ export function textBlockText(node: JSONContent): string {
 export function blockIndex(document: ShowDocument) {
   const blocks = new Map<string, { node: JSONContent; order: number }>();
   let order = 0;
-  const visit = (node: JSONContent) => {
-    for (const child of node.content ?? []) {
-      if (child.type === "text") continue;
-      const id = child.attrs?.id;
-      if (typeof id === "string" && id && !blocks.has(id))
-        blocks.set(id, { node: child, order: order++ });
-      visit(child);
-    }
-  };
-  visit(document.content);
+  // Comment highlights render on the page tree, so anchors address its blocks.
+  walk(document.content, (node, { parent }) => {
+    if (!parent || node.type === "text") return;
+    const id = node.attrs?.id;
+    if (typeof id === "string" && id && !blocks.has(id))
+      blocks.set(id, { node, order: order++ });
+  }, { scope: "tree" });
   return blocks;
 }
 

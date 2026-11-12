@@ -8,7 +8,8 @@ import { PluginInstallError } from "../plugin/plugin-errors";
 import { ReadBaselines } from "../core/read-baselines";
 import { readBoard, type BoardReadInput } from "./board-reading";
 import { EditorDrafts } from "../core/editor-drafts";
-import { placeTemplate, visitContentNodes } from "../document/document.mjs";
+import { placeTemplate } from "../document/document.mjs";
+import { walk } from "../document/walk.mjs";
 import { upgradeResource } from "../document/containers.mjs";
 import { FileStore } from "../core/store";
 import { canonicalJson } from "../core/diff";
@@ -130,7 +131,7 @@ function rebindImportedComponents(
       component,
     ]),
   );
-  visitContentNodes(copy.content, (node) => {
+  walk(copy.content, (node) => {
     if ((node.type === "widget" || node.type === "inlineWidget") && node.attrs?.kind === "custom") {
       const data = node.attrs.data;
       const component = packages.get(`${data?.componentId}@${data?.version}`);
@@ -147,7 +148,7 @@ function rebindImportedComponents(
         };
       }
     }
-  });
+  }, { scope: "content" });
   return copy;
 }
 

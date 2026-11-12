@@ -9,7 +9,7 @@ import { openLibrary } from "../core/open-library";
 import { syncManager } from "../sync/manager";
 import { AgentService } from "./service";
 import { parseArtifact } from "../portable/validation.mjs";
-import { visitNodes } from "../document/document.mjs";
+import { walk } from "../document/walk.mjs";
 import type { ShowDocument } from "../core/model";
 
 let root: string;
@@ -31,10 +31,10 @@ async function ok(name: string, args: Record<string, unknown> = {}) {
 }
 function widget(document: ShowDocument, kind: string) {
   let found: any;
-  visitNodes(document.content, (node) => {
+  walk(document.content, (node) => {
     if (!found && node.type === "widget" && node.attrs?.kind === kind)
       found = node;
-  });
+  }, { scope: "tree" });
   return found;
 }
 const exists = (path: string) =>

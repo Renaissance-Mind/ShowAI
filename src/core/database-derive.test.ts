@@ -116,4 +116,44 @@ describe("derived snapshots for readers and Agents", () => {
       titles: { tasks: { t1: "Write", t2: "Test" } },
     });
   });
+  it("reach databases nested in a text block's rich text", async () => {
+    const { store, projectId, datasets } = await library();
+    await datasets.create(projectId, { id: "projects", name: "Projects", value: projects });
+    await datasets.create(projectId, { id: "tasks", name: "Tasks", value: tasks });
+    const database = {
+      type: "widget",
+      attrs: {
+        id: "nested-projects",
+        kind: "database",
+        data: {
+          title: "Projects",
+          $binding: { dataset: "projects", props: { local: ["title"] } },
+        },
+      },
+    };
+    const document = {
+      id: "page",
+      title: "Projects",
+      content: {
+        type: "doc",
+        content: [
+          {
+            type: "widget",
+            attrs: {
+              id: "note",
+              kind: "text",
+              data: { content: { type: "doc", content: [database] } },
+            },
+          },
+        ],
+      },
+    } as unknown as ShowDocument;
+    const resolved = await resolveDocumentDatasets(store, projectId, document);
+    const text = resolved.document.content.content![0].attrs!.data as {
+      content: { content: { attrs: { data: Record<string, unknown> } }[] };
+    };
+    expect(text.content.content[0].attrs.data.$derived).toMatchObject({
+      values: { p1: { "rev-tasks-project": ["t1"] }, p2: { "rev-tasks-project": ["t2"] } },
+    });
+  });
 });

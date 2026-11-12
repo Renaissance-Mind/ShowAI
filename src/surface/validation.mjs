@@ -14,7 +14,8 @@ import {
 import { labelCapable, MAX_LABEL_LENGTH } from "../document/drawing-label.mjs";
 import { validatePageOutline } from "../document/page-outline.mjs";
 import { isResource, fillResource, surfaceKind } from "../document/containers.mjs";
-import { fillSurfaceLayout, visitNodes } from "../document/document.mjs";
+import { fillSurfaceLayout } from "../document/document.mjs";
+import { walk } from "../document/walk.mjs";
 const reserved = new Set(["__proto__", "constructor", "prototype"]);
 const object = (value, label) => {
   if (!value || typeof value !== "object" || Array.isArray(value))
@@ -33,7 +34,7 @@ export function validateSurface(document) {
   if (isResource(document)) return validateResource(document);
   const ids = new Set(),
     nodes = new Map();
-  visitNodes(document.content, (node) => {
+  walk(document.content, (node) => {
     if (["surface", "text"].includes(node.type)) return;
     const id = node.attrs?.id;
     if (
@@ -50,7 +51,7 @@ export function validateSurface(document) {
       throw new Error(
         "Whiteboard positions belong in layout, not attrs.canvas.",
       );
-  });
+  }, { scope: "tree" });
   if (document.layout !== undefined) object(document.layout, "layout");
   fillSurfaceLayout(document);
   for (const [id, frame] of Object.entries(document.layout)) {
@@ -165,7 +166,7 @@ function validateResource(document) {
     nodes = new Map(),
     parents = new Map(),
     owners = new Map();
-  const walk = (node, parent, owner) => {
+  const descend = (node, parent, owner) => {
     if (node.type === "text") return;
     const id = node.attrs?.id;
     if (
@@ -291,9 +292,9 @@ function validateResource(document) {
       if (node.attrs.labelSize !== undefined)
         finite(node.attrs.labelSize, 8, 160, "drawing.labelSize");
     }
-    for (const child of node.content ?? []) walk(child, node, owner);
+    for (const child of node.content ?? []) descend(child, node, owner);
   };
-  walk(document.content, null, null);
+  descend(document.content, null, null);
   for (const [id, node] of nodes) {
     if (node.attrs?.bindings === undefined) continue;
     if (node.type !== "drawing" || node.attrs.tool !== "arrow")
@@ -460,9 +461,9 @@ function validateResource(document) {
     if (owner?.type !== "surface")
       throw new Error("View owner must be an existing surface.");
     const descendants = new Set();
-    visitNodes(owner, (node) => {
+    walk(owner, (node) => {
       if (node !== owner && node.attrs?.id) descendants.add(node.attrs.id);
-    });
+    }, { scope: "tree" });
     validateViews(
       views,
       descendants,

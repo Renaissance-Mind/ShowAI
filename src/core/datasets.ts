@@ -33,7 +33,7 @@ import {
 import { assertProps } from "../components/custom/schema";
 import type { JsonSchema } from "../components/custom/types";
 import type { ShowDocument } from "./model";
-import { visitContentNodes } from "../document/document.mjs";
+import { walk } from "../document/walk.mjs";
 import {
   DEFAULT_REFRESH_SECONDS,
   DatasetSourceLinks,
@@ -246,7 +246,7 @@ export function datasetReferencesIn(
   datasetId: string,
 ): string[] {
   const blocks: string[] = [];
-  visitContentNodes(document.content, (node) => {
+  walk(document.content, (node) => {
     if (node.type !== "widget") return;
     const binding = readBinding(node.attrs?.data);
     if (
@@ -255,7 +255,7 @@ export function datasetReferencesIn(
       typeof node.attrs?.id === "string"
     )
       blocks.push(node.attrs.id);
-  });
+  }, { scope: "content" });
   return blocks;
 }
 

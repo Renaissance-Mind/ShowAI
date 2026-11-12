@@ -71,11 +71,8 @@ import {
 } from "./editing";
 import { ownSourceValue } from "./source-runtime";
 
-import {
-  findSurfaceNode,
-  nodePaths,
-  visitNodes,
-} from "../document/document.mjs";
+import { findSurfaceNode, nodePaths } from "../document/document.mjs";
+import { walk } from "../document/walk.mjs";
 import {
   resourceNodes,
   surfaceKind,
@@ -1012,17 +1009,17 @@ function containerOptions(document: ShowDocument, id: string) {
   const excluded = new Set<string>();
   const target = findSurfaceNode(document, id)?.node;
   if (target)
-    visitNodes(target, (n) => {
+    walk(target, (n) => {
       if (n.attrs?.id) excluded.add(n.attrs.id);
-    });
+    }, { scope: "tree" });
   const result: JSONContent[] = [];
-  visitNodes(document.content, (node) => {
+  walk(document.content, (node) => {
     if (
       ["surface", "region"].includes(node.type ?? "") &&
       !excluded.has(node.attrs!.id)
     )
       result.push(node);
-  });
+  }, { scope: "tree" });
   if (target?.type === "drawing")
     return result.filter((node) => {
       let owner: JSONContent | undefined = node;

@@ -1,6 +1,8 @@
 import { createHash } from "node:crypto";
 import { CoreError } from "./model";
 import type { FileChanges } from "./history-model";
+import type { JSONContent } from "@tiptap/core";
+import { walk } from "../document/walk.mjs";
 
 interface AssetSlot {
   pointer: string[];
@@ -171,7 +173,9 @@ export function assertStorablePage(value: {
       "A stored page requires a ShowAI artifact.",
     );
   const ids = new Set<string>();
-  const visit = (node: NodeValue) => {
+  // Storage splits the tree into node files; documents held in component
+  // data stay inside their node, so only the tree needs stored identities.
+  walk(value.document.content as JSONContent, (node) => {
     if (node.type === "text") return;
     const id = node.attrs?.id;
     if (typeof id !== "string" || !id || id.length > 200 || ids.has(id))
@@ -180,9 +184,7 @@ export function assertStorablePage(value: {
         "Page nodes need unique stable identifiers before storage.",
       );
     ids.add(id);
-    node.content?.forEach(visit);
-  };
-  visit(value.document.content);
+  }, { scope: "tree" });
 }
 
 export function encodeFile(path: string, bytes: Buffer): FileChanges {

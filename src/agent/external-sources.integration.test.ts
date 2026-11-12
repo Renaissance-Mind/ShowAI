@@ -10,7 +10,7 @@ import { syncManager } from "../sync/manager";
 import { AgentService } from "./service";
 import { REMOTE_FETCH } from "../core/dataset-sources";
 import { CAPACITY } from "../portable/capacity.mjs";
-import { visitNodes } from "../document/document.mjs";
+import { walk } from "../document/walk.mjs";
 import { xlsxWorkbook } from "../test/xlsx";
 import { dataServer } from "../test/data-server";
 import type { ShowDocument } from "../core/model";
@@ -59,10 +59,10 @@ async function ok(
 }
 function widget(document: ShowDocument, kind: string) {
   let found: any;
-  visitNodes(document.content, (node) => {
+  walk(document.content, (node) => {
     if (!found && node.type === "widget" && node.attrs?.kind === kind)
       found = node;
-  });
+  }, { scope: "tree" });
   return found;
 }
 const exists = (path: string) =>

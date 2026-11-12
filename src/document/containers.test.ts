@@ -25,12 +25,8 @@ import {
   surfaceViews,
   insertResourceTemplate,
 } from "./containers.mjs";
-import {
-  findSurfaceNode,
-  remapSurfaceIds,
-  upgradeDocument,
-  visitNodes,
-} from "./document.mjs";
+import { findSurfaceNode, remapSurfaceIds, upgradeDocument } from "./document.mjs";
+import { walk } from "./walk.mjs";
 const directories: string[] = [];
 afterEach(async () => {
   await Promise.all(
@@ -239,9 +235,9 @@ describe("recursive Page and Board containers", () => {
     const copy = instantiateTemplate(doc);
     expect(copy.content.attrs!.id).not.toBe(doc.content.attrs!.id);
     const ids = new Set<string>();
-    visitNodes(copy.content, (node) => {
+    walk(copy.content, (node) => {
       if (node.attrs?.id) ids.add(node.attrs.id);
-    });
+    }, { scope: "tree" });
     for (const [id, views] of Object.entries(copy.surfaceViews!)) {
       expect(ids.has(id)).toBe(true);
       for (const view of views.saved)

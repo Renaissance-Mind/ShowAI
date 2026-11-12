@@ -30,6 +30,7 @@ import {
   type LocatedThread,
 } from "../core/comments";
 import type { PageComment, ShowDocument } from "../types";
+import { SKIP, walk } from "../document/walk.mjs";
 import { commentHighlights } from "./highlights";
 import { commentsStore, useCommentsStore } from "./comments-store";
 import { CommentInput, CommentThreadView, type ThreadActions } from "./CommentThread";
@@ -104,19 +105,17 @@ function editorTarget(
 
 /** The ancestor of a block that sits directly in a surface: what the editor's reveal can open. */
 function surfaceChild(document: ShowDocument, blockId: string): string {
-  let found = blockId;
-  const visit = (node: JSONContent, top: string | null): boolean =>
-    (node.content ?? []).some((child) => {
-      const id = typeof child.attrs?.id === "string" ? child.attrs.id : null;
-      const owner = node.type === "surface" ? id : top;
-      if (id === blockId) {
-        found = owner ?? blockId;
-        return true;
-      }
-      return visit(child, owner);
-    });
-  visit(document.content, null);
-  return found;
+  let found: string | undefined;
+  const tops = new Map<JSONContent, string | null>();
+  walk(document.content, (node, { parent }) => {
+    if (found !== undefined) return SKIP;
+    if (!parent) return;
+    const id = typeof node.attrs?.id === "string" ? node.attrs.id : null;
+    const top = parent.type === "surface" ? id : (tops.get(parent) ?? null);
+    tops.set(node, top);
+    if (id === blockId) found = top ?? blockId;
+  }, { scope: "tree" });
+  return found ?? blockId;
 }
 
 function placement(rect: Rect, width: number) {

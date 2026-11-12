@@ -12,7 +12,7 @@ import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { createMcpServer } from "./mcp";
 import { AgentService } from "./service";
 import { componentWidgetData, getComponent } from "../core/catalog";
-import { visitNodes } from "../document/document.mjs";
+import { walk } from "../document/walk.mjs";
 import type { ShowDocument } from "../core/model";
 
 let home: string, projectId: string, service: AgentService;
@@ -90,9 +90,9 @@ async function cli(...args: string[]): Promise<Record<string, any>> {
 }
 const ids = (document: ShowDocument) => {
   const found: string[] = [];
-  visitNodes(document.content, (node: { attrs?: { id?: string } }) => {
+  walk(document.content, (node: { attrs?: { id?: string } }) => {
     if (node.attrs?.id) found.push(node.attrs.id);
-  });
+  }, { scope: "tree" });
   return found;
 };
 const text = (document: ShowDocument) => JSON.stringify(document.content);

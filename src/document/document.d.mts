@@ -2,17 +2,6 @@ import type { JSONContent } from "@tiptap/core";
 import type { ShowDocument, WhiteboardPage } from "../types";
 export function isSurface(document: ShowDocument): document is WhiteboardPage;
 export function artifactVersion(document: ShowDocument): 1 | 2 | 3;
-export function visitNodes(
-  node: JSONContent,
-  visitor: (node: JSONContent, parent: JSONContent | null) => void,
-  parent?: JSONContent | null,
-): void;
-export function widgetDocuments(data: unknown): JSONContent[];
-export function visitContentNodes(
-  node: JSONContent,
-  visitor: (node: JSONContent, parent: JSONContent | null) => void,
-  parent?: JSONContent | null,
-): void;
 export function assignSurfaceIds(
   document: ShowDocument,
   options?: { repairLegacy?: boolean },

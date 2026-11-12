@@ -8,7 +8,7 @@ import { createMcpServer } from "./mcp";
 import { openLibrary } from "../core/open-library";
 import { syncManager } from "../sync/manager";
 import { AgentService } from "./service";
-import { visitNodes } from "../document/document.mjs";
+import { walk } from "../document/walk.mjs";
 import { xlsxWorkbook } from "../test/xlsx";
 import type { ShowDocument } from "../core/model";
 
@@ -226,9 +226,9 @@ test("a transform over a spreadsheet, a CSV file and project data feeds a chart"
   const pageId = page.document.id;
   let found: any;
   const first = await ok("page_read", { pageId, rendered: false });
-  visitNodes((first.document as ShowDocument).content, (node) => {
+  walk((first.document as ShowDocument).content, (node) => {
     if (node.type === "widget" && node.attrs?.kind === "chart") found = node;
-  });
+  }, { scope: "tree" });
   await ok("page_apply", {
     pageId,
     baseHash: first.hash,

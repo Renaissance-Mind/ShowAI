@@ -33,7 +33,8 @@ import {
   promotePackage,
   packageRevisionRef,
 } from "./catalog";
-import { upgradeDocument, visitNodes } from "../document/document.mjs";
+import { upgradeDocument } from "../document/document.mjs";
+import { walk } from "../document/walk.mjs";
 import { FileStore } from "./store";
 import type { ComponentManifest } from "../components/custom/types";
 
@@ -258,9 +259,9 @@ it("expands composed whiteboard parts with stable source ids and remapped layout
   expect(expanded.content.type).toBe("surface");
   expect(expanded.content.content).toHaveLength(2);
   const ids: string[] = [];
-  visitNodes(expanded.content, (node) => {
+  walk(expanded.content, (node) => {
     if (node.attrs?.id) ids.push(node.attrs.id);
-  });
+  }, { scope: "tree" });
   expect(new Set(ids).size).toBe(ids.length);
   expect(expanded.views!.saved).toHaveLength(2);
   expect(expanded.views!.initial).toBe(expanded.views!.saved[0].id);

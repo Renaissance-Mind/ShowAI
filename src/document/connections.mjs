@@ -1,4 +1,5 @@
 import { pickShape } from "./drawing-geometry.mjs";
+import { walk } from "./walk.mjs";
 import {
   frameAnchor,
   frameHeight,
@@ -10,11 +11,9 @@ import {
 
 export function indexSurfaceTree(content) {
   const index = new Map();
-  const walk = (node, parent) => {
+  walk(content, (node, { parent }) => {
     if (node.attrs?.id) index.set(node.attrs.id, { node, parent });
-    for (const child of node.content ?? []) walk(child, node);
-  };
-  walk(content, null);
+  }, { scope: "tree" });
   return index;
 }
 export function arrowEndpoints(node, frame) {

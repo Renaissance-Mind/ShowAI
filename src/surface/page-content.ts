@@ -1,7 +1,8 @@
 import type { JSONContent } from "@tiptap/core";
 import type { ShowDocument } from "../types";
 import { ownSourceValue } from "./source-runtime";
-import { remapSurfaceIds, visitNodes } from "../document/document.mjs";
+import { remapSurfaceIds } from "../document/document.mjs";
+import { walk } from "../document/walk.mjs";
 import { createSurface } from "../document/containers.mjs";
 import { translator } from "../i18n";
 import messages from "../i18n/messages/surface";
@@ -41,9 +42,9 @@ export function toPageEditor(
     )
   ) {
     const ids = new Set<string>();
-    visitNodes(document.content, (child) => {
+    walk(document.content, (child) => {
       if (child.attrs?.id) ids.add(child.attrs.id);
-    });
+    }, { scope: "content" });
     let id = `page-tail-${tailId.slice(0, 170)}`;
     while (ids.has(id)) id += "-copy";
     let paragraphId = `${id}-paragraph`;
@@ -96,9 +97,9 @@ function decodePageEditor(
     if (original.attrs!.id !== node.attrs!.id) {
       if (!source) throw new Error(t("error.embedNeedsSource"));
       const ids = new Set<string>();
-      visitNodes(original, (child) => {
+      walk(original, (child) => {
         if (child.attrs?.id) ids.add(child.attrs.id);
-      });
+      }, { scope: "tree" });
       const wrapper = createSurface("page");
       wrapper.content = [original];
       let index = 0;

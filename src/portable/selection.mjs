@@ -2,7 +2,8 @@ import {
   remapPageOutline,
   pageOutlineNodes,
 } from "../document/page-outline.mjs";
-import { reconcileSurface, visitNodes } from "../document/document.mjs";
+import { reconcileSurface } from "../document/document.mjs";
+import { walk } from "../document/walk.mjs";
 import { validateDocument } from "./validation.mjs";
 
 /** Project a page into selected subtrees and the containers needed to render them. */
@@ -16,10 +17,10 @@ export function selectDocumentBlocks(source, blockIds) {
     throw new Error("Block selection requires non-empty, unique block ids.");
   const document = structuredClone(source);
   const available = new Set();
-  visitNodes(document.content, (node) => {
+  walk(document.content, (node) => {
     if (node.attrs?.id && !["doc", "text"].includes(node.type))
       available.add(node.attrs.id);
-  });
+  }, { scope: "tree" });
   const missing = blockIds.filter((id) => !available.has(id));
   if (missing.length)
     throw new Error(
@@ -53,12 +54,12 @@ export function selectDocumentBlocks(source, blockIds) {
         views.initial = null;
     else document.views.initial = null;
   }
-  visitNodes(document.content, (node) => {
+  walk(document.content, (node) => {
     if (node.attrs?.outline)
       node.attrs.outline = remapPageOutline(
         node.attrs.outline,
         new Map([...pageOutlineNodes(node).keys()].map((id) => [id, id])),
       );
-  });
+  }, { scope: "tree" });
   return validateDocument(document);
 }

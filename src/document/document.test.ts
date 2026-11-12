@@ -25,15 +25,8 @@ import {
   captureDeletion,
   restoreDeletion,
 } from "../surface/editing";
-import {
-  artifactVersion,
-  placeTemplate,
-  findSurfaceNode,
-  linearContent,
-  remapSurfaceIds,
-  upgradeDocument,
-  visitNodes,
-} from "./document.mjs";
+import { artifactVersion, placeTemplate, findSurfaceNode, linearContent, remapSurfaceIds, upgradeDocument } from "./document.mjs";
+import { walk } from "./walk.mjs";
 
 const paragraph = (id: string, text: string) => ({
   type: "paragraph",
@@ -172,9 +165,9 @@ describe("whiteboard page model", () => {
     expect(inserted.content.content).toHaveLength(4);
     expect(inserted.views!.initial).toBe("source-view");
     const ids: string[] = [];
-    visitNodes(inserted.content, (node) => {
+    walk(inserted.content, (node) => {
       if (node.attrs?.id) ids.push(node.attrs.id);
-    });
+    }, { scope: "tree" });
     expect(new Set(ids).size).toBe(ids.length);
     expect(validateDocument(inserted).views!.saved).toHaveLength(2);
     expect(
@@ -308,9 +301,9 @@ describe("whiteboard page model", () => {
       expect(copy.views!.initial).not.toBe("reference");
       expect(copy.views!.saved[0].targets).not.toContain("side-text");
       const ids = new Set<string>();
-      visitNodes(copy.content, (node) => {
+      walk(copy.content, (node) => {
         if (node.attrs?.id) ids.add(node.attrs.id);
-      });
+      }, { scope: "tree" });
       expect(copy.views!.saved[0].targets.every((id) => ids.has(id))).toBe(
         true,
       );

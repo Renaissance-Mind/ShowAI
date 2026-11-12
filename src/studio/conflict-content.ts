@@ -3,6 +3,16 @@ import recoveryMessages from "../i18n/messages/recovery";
 import type { JSONContent } from "@tiptap/core";
 import type { ShowDocument } from "../types";
 import type { PageMergeConflict } from "../core/page-merge";
+import { walk } from "../document/walk.mjs";
+
+/** Merge conflicts name nodes of the page tree. */
+function treeNode(root: JSONContent, id: string): JSONContent | undefined {
+  let found: JSONContent | undefined;
+  walk(root, (node) => {
+    if (!found && node.attrs?.id === id) found = node;
+  }, { scope: "tree" });
+  return found;
+}
 
 const textTypes = new Set([
   "doc",
@@ -54,10 +64,8 @@ export function conflictNodeLabel(
     ? conflict.path.split("/")[2]
     : null;
   if (!id) return null;
-  const find = (node: JSONContent): JSONContent | undefined =>
-    node.attrs?.id === id ? node : node.content?.map(find).find(Boolean);
   for (const document of documents) {
-    const node = find(document.content);
+    const node = treeNode(document.content, id);
     if (!node) continue;
     const label =
       node.attrs?.name ||
@@ -76,13 +84,9 @@ export function conflictDisplayValue(
   document: ShowDocument,
 ): string {
   const t = translator(recoveryMessages);
-  const find = (id: string, node: JSONContent): JSONContent | undefined =>
-    node.attrs?.id === id
-      ? node
-      : node.content?.map((child) => find(id, child)).find(Boolean);
   const nodeName = (id: unknown, index: number) => {
     const node =
-      typeof id === "string" ? find(id, document.content) : undefined;
+      typeof id === "string" ? treeNode(document.content, id) : undefined;
     return (
       node?.attrs?.name ||
       (node && conflictText(node)?.trim().split("\n")[0]) ||

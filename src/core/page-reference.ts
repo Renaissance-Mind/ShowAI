@@ -2,7 +2,7 @@ import type { JSONContent } from "@tiptap/core";
 import type { AgentTarget } from "../agent-host/types";
 import type { CanvasReference } from "../surface/agent-reference";
 import type { ShowDocument } from "../types";
-import { visitNodes } from "../document/document.mjs";
+import { walk } from "../document/walk.mjs";
 import { richTextDocument } from "../components/rich-text/model.mjs";
 import { plainText } from "../lib/document";
 
@@ -62,16 +62,13 @@ function collectLabels(node: JSONContent, labels: string[]) {
 export function addressableIds(document: ShowDocument, ids: string[]) {
   const nodes = new Map<string, JSONContent>();
   const owners = new Map<string, string>();
-  visitNodes(document.content, (node) => {
+  walk(document.content, (node, { owner }) => {
     const id = node.attrs?.id;
     if (typeof id !== "string" || ["doc", "text"].includes(node.type ?? ""))
       return;
-    nodes.set(id, node);
-    for (const child of richTextChildren(node))
-      visitNodes(child, (inner) => {
-        if (typeof inner.attrs?.id === "string") owners.set(inner.attrs.id, id);
-      });
-  });
+    if (!owner) nodes.set(id, node);
+    else if (typeof owner.attrs?.id === "string") owners.set(id, owner.attrs.id);
+  }, { scope: "content" });
   const resolved: string[] = [];
   const missing: string[] = [];
   for (const id of ids) {

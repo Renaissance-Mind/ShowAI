@@ -8,7 +8,7 @@ import {
   type BindingIssue,
 } from "../datasets/binding.mjs";
 import { bindingEditable } from "../datasets/editable.mjs";
-import { visitContentNodes } from "../document/document.mjs";
+import { walk } from "../document/walk.mjs";
 import { formatPath } from "../datasets/operations.mjs";
 import type {
   DatasetReadStatus,
@@ -194,10 +194,10 @@ export async function resolveDocumentDatasets(
   options: { includeProps?: boolean; remember?: boolean } = {},
 ): Promise<{ document: ShowDocument; bindings: BindingRead[] }> {
   const bound: { node: ShowDocument["content"] }[] = [];
-  visitContentNodes(document.content, (node) => {
+  walk(document.content, (node) => {
     if (node.type === "widget" && readBinding(node.attrs?.data))
       bound.push({ node });
-  });
+  }, { scope: "content" });
   if (!bound.length)
     return {
       document: await withDerivedDatabases(store, projectId, document),
@@ -351,7 +351,7 @@ export async function resolveDocumentDatasets(
       read.error = error instanceof Error ? error.message : String(error);
     }
   }
-  visitContentNodes(snapshot.content, (node) => {
+  walk(snapshot.content, (node) => {
     if (node.type !== "widget") return;
     const id = String(node.attrs?.id);
     if (replacements.has(id)) node.attrs!.data = replacements.get(id);
@@ -360,7 +360,7 @@ export async function resolveDocumentDatasets(
         ...(node.attrs!.data as Record<string, unknown>),
         [DATA_NOTICE_KEY]: notices.get(id),
       };
-  });
+  }, { scope: "content" });
   if (options.remember) {
     const baselines = new DatasetBaselines(store.root);
     for (const [key, record] of records) {
@@ -401,13 +401,13 @@ export function withDataNotices(
 ): ShowDocument {
   if (!notices.size) return resolved;
   const own = new Map<string, unknown>();
-  visitContentNodes(original.content, (node) => {
+  walk(original.content, (node) => {
     const id = node.attrs?.id;
     if (node.type === "widget" && typeof id === "string" && notices.has(id))
       own.set(id, node.attrs!.data);
-  });
+  }, { scope: "content" });
   const copy = structuredClone(resolved);
-  visitContentNodes(copy.content, (node) => {
+  walk(copy.content, (node) => {
     const id = node.attrs?.id;
     if (node.type !== "widget" || typeof id !== "string" || !own.has(id))
       return;
@@ -415,6 +415,6 @@ export function withDataNotices(
       ...structuredClone(own.get(id) as Record<string, unknown>),
       [DATA_NOTICE_KEY]: notices.get(id),
     };
-  });
+  }, { scope: "content" });
   return copy;
 }

@@ -1,12 +1,7 @@
 import { bindingParent } from "./geometry.mjs";
 import { reconcileConnections } from "./connections.mjs";
-import {
-  assignSurfaceIds,
-  findSurfaceNode,
-  visitNodes,
-  upgradeDocument,
-  remapSurfaceIds,
-} from "./document.mjs";
+import { assignSurfaceIds, findSurfaceNode, upgradeDocument, remapSurfaceIds } from "./document.mjs";
+import { walk } from "./walk.mjs";
 
 export const isResource = (document) =>
   document.content?.type === "surface" &&
@@ -63,7 +58,7 @@ export function fillResource(document) {
   document.layout = { ...(document.layout ?? {}) };
   document.surfaceViews = { ...(document.surfaceViews ?? {}) };
   if (document.views === undefined) delete document.views;
-  visitNodes(document.content, (parent) => {
+  walk(document.content, (parent) => {
     if (!["surface", "region"].includes(parent.type)) return;
     if (
       parent.type === "surface" &&
@@ -105,7 +100,7 @@ export function fillResource(document) {
         right = Math.max(right, frame.x + frame.width + 48);
       }
     }
-  });
+  }, { scope: "tree" });
   return document;
 }
 /** Adapts old documents without changing source bytes. Old whiteboards keep their positions. */
@@ -114,9 +109,9 @@ export function upgradeResource(source, { includeTitle = true } = {}) {
   if (isResource(page)) return fillResource(page);
   const rootId = (() => {
     const ids = new Set();
-    visitNodes(page.content, (n) => {
+    walk(page.content, (n) => {
       if (n.attrs?.id) ids.add(n.attrs.id);
-    });
+    }, { scope: "content" });
     const base = `surface-${page.id.slice(0, 150)}`;
     let id = base,
       suffix = 0;
@@ -127,9 +122,9 @@ export function upgradeResource(source, { includeTitle = true } = {}) {
     assignSurfaceIds(page, { repairLegacy: true });
     const layout = {};
     const ids = new Set();
-    visitNodes(page.content, (node) => {
+    walk(page.content, (node) => {
       if (node.attrs?.id) ids.add(node.attrs.id);
-    });
+    }, { scope: "content" });
     const content = (page.content.content ?? []).map((node) => {
       if (!node.attrs?.canvas) return node;
       const frame = node.attrs.canvas;
@@ -193,9 +188,9 @@ export function upgradeResource(source, { includeTitle = true } = {}) {
       return fillResource(page);
     }
     const ids = new Set();
-    visitNodes(page.content, (node) => {
+    walk(page.content, (node) => {
       if (node.attrs?.id) ids.add(node.attrs.id);
-    });
+    }, { scope: "content" });
     let boardId = `${rootId}-board`;
     while (ids.has(boardId)) boardId += "-copy";
     page.content.attrs = { id: boardId, kind: "board", name: "Board" };
@@ -224,12 +219,12 @@ export function reconcileResource(document) {
   fillResource(document);
   const nodes = new Map(),
     parents = new Map();
-  visitNodes(document.content, (node, parent) => {
+  walk(document.content, (node, { parent }) => {
     if (node.attrs?.id) {
       nodes.set(node.attrs.id, node);
       parents.set(node.attrs.id, parent);
     }
-  });
+  }, { scope: "tree" });
   for (const [id, frame] of Object.entries(document.layout)) {
     const node = nodes.get(id);
     if (!node || node === document.content) {
@@ -259,9 +254,9 @@ export function reconcileResource(document) {
       continue;
     }
     const local = new Set();
-    visitNodes(container, (node) => {
+    walk(container, (node) => {
       if (node.attrs?.id) local.add(node.attrs.id);
-    });
+    }, { scope: "tree" });
     const roots = (container.content ?? []).map((node) => node.attrs.id);
     const rootIds = new Set(roots);
     const before = document.surfaceViews[id];

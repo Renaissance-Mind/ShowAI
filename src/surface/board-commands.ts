@@ -9,7 +9,8 @@ import {
   type ArrowBindings,
   transformedBindings,
 } from "../document/connections.mjs";
-import { reconcileSurface, visitNodes } from "../document/document.mjs";
+import { reconcileSurface } from "../document/document.mjs";
+import { walk } from "../document/walk.mjs";
 
 /** One logical transform, with untouched nodes and frames retaining identity. */
 export function transformObjects<T extends ShowDocument>(
@@ -47,10 +48,10 @@ export function transformObjects<T extends ShowDocument>(
     else delete attrs.bindings;
     replace.set(id, { ...node, attrs });
   }
-  const walk = (node: JSONContent): JSONContent => {
+  const descend = (node: JSONContent): JSONContent => {
     if (replace.has(node.attrs?.id)) return replace.get(node.attrs!.id)!;
     if (!node.content) return node;
-    const content = node.content.map(walk);
+    const content = node.content.map(descend);
     return content.some((child, i) => child !== node.content![i])
       ? { ...node, content }
       : node;
@@ -58,7 +59,7 @@ export function transformObjects<T extends ShowDocument>(
   return reconcileSurface(
     {
       ...source,
-      content: replace.size ? walk(source.content) : source.content,
+      content: replace.size ? descend(source.content) : source.content,
       layout: { ...source.layout, ...frames },
       surfaceViews: { ...source.surfaceViews },
     },
@@ -141,13 +142,13 @@ export function copyObjects(source: ShowDocument, ids: string[]): BoardClip {
   const layout: BoardClip["layout"] = {},
     surfaceViews: BoardClip["surfaceViews"] = {};
   for (const node of nodes)
-    visitNodes(node, (child) => {
+    walk(node, (child) => {
       const id = child.attrs?.id;
       if (!id) return;
       if (source.layout?.[id]) layout[id] = structuredClone(source.layout[id]);
       if (source.surfaceViews?.[id])
         surfaceViews[id] = structuredClone(source.surfaceViews[id]);
-    });
+    }, { scope: "tree" });
   return {
     format: "showai-board-clip",
     version: 1,
@@ -186,15 +187,15 @@ export function pasteObjects<T extends ShowDocument>(
     copies = clip.nodes.map((node) => structuredClone(node)),
     roots = new Set(copies.map((node) => node.attrs!.id as string));
   for (const copy of copies)
-    visitNodes(copy, (node) => {
+    walk(copy, (node) => {
       if (node.attrs?.id) {
         const id = crypto.randomUUID();
         mapping.set(node.attrs.id, id);
         node.attrs = { ...node.attrs, id };
       }
-    });
+    }, { scope: "tree" });
   for (const copy of copies)
-    visitNodes(copy, (node) => {
+    walk(copy, (node) => {
       if (!node.attrs?.bindings) return;
       const bindings: ArrowBindings = {};
       for (const key of ["start", "end"] as const) {
@@ -204,7 +205,7 @@ export function pasteObjects<T extends ShowDocument>(
       }
       if (Object.keys(bindings).length) node.attrs.bindings = bindings;
       else delete node.attrs.bindings;
-    });
+    }, { scope: "tree" });
   document.layout ??= {};
   document.surfaceViews ??= {};
   for (const [old, id] of mapping) {
@@ -297,10 +298,10 @@ export function reorderObjects<T extends ShowDocument>(
   }
   if (next.every((node, i) => node === parent.content![i])) return source;
   const parentId = parent.attrs!.id;
-  const walk = (node: JSONContent): JSONContent => {
+  const descend = (node: JSONContent): JSONContent => {
     if (node.attrs?.id === parentId) return { ...node, content: next };
     if (!node.content) return node;
-    const content = node.content.map(walk);
+    const content = node.content.map(descend);
     return content.some((child, i) => child !== node.content![i])
       ? { ...node, content }
       : node;
@@ -308,7 +309,7 @@ export function reorderObjects<T extends ShowDocument>(
   return reconcileSurface(
     {
       ...source,
-      content: walk(source.content),
+      content: descend(source.content),
       layout: { ...source.layout },
       surfaceViews: { ...source.surfaceViews },
     },
@@ -543,11 +544,11 @@ export function removeObjects<T extends ShowDocument>(
   ids: string[],
 ): T {
   const selected = new Set(ids);
-  const walk = (node: JSONContent): JSONContent => {
+  const descend = (node: JSONContent): JSONContent => {
     if (!node.content) return node;
     const content = node.content
       .filter((child) => !selected.has(child.attrs?.id))
-      .map(walk);
+      .map(descend);
     return content.length !== node.content.length ||
       content.some((child, i) => child !== node.content![i])
       ? { ...node, content }
@@ -556,7 +557,7 @@ export function removeObjects<T extends ShowDocument>(
   return reconcileSurface(
     {
       ...source,
-      content: walk(source.content),
+      content: descend(source.content),
       layout: { ...source.layout },
       surfaceViews: { ...source.surfaceViews },
     },

@@ -1,5 +1,5 @@
 import { CAPACITY, assertContent } from "../../portable/capacity.mjs";
-import { visitContentNodes } from "../../document/document.mjs";
+import { walk } from "../../document/walk.mjs";
 import type { ShowDocument } from "../../types";
 import type {
   CompiledComponent,
@@ -118,7 +118,7 @@ export function collectCustomComponentRefs(
   document: ShowDocument,
 ): CustomComponentRef[] {
   const refs = new Map<string, CustomComponentRef>();
-  visitContentNodes(document.content, (node) => {
+  walk(document.content, (node) => {
     if ((node.type === "widget" || node.type === "inlineWidget") && node.attrs?.kind === "custom") {
       const { componentId, version, integrity, scope } = readCustomBlockData(
         node.attrs.data,
@@ -143,6 +143,6 @@ export function collectCustomComponentRefs(
         ref,
       );
     }
-  });
+  }, { scope: "content" });
   return [...refs.values()];
 }

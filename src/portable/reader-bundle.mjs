@@ -14,7 +14,7 @@ import {
 import { homedir, tmpdir } from "node:os";
 import { dirname, join, posix } from "node:path";
 import { createHash, randomUUID } from "node:crypto";
-import { visitContentNodes, widgetDocuments } from "../document/document.mjs";
+import { walk, widgetDocuments } from "../document/walk.mjs";
 
 const cache = new Map();
 const archives = new Map();
@@ -126,10 +126,10 @@ export function readerKinds(documents) {
   const kinds = new Set();
   for (const document of documents)
     if (document.content)
-      visitContentNodes(document.content, (node) => {
+      walk(document.content, (node) => {
         if (node?.type === "widget" || node?.type === "inlineWidget")
           kinds.add(node.attrs?.kind);
-      });
+      }, { scope: "content" });
   return [...kinds].filter((k) => typeof k === "string").sort();
 }
 const MATH_TEXT = /\$|\\\(|\\\[/;
@@ -267,7 +267,7 @@ const compilerIdentity = createHash("sha256")
       removeRanges.toString(),
       unusedRegistryRanges.toString(),
       readerKinds.toString(),
-      visitContentNodes.toString(),
+      walk.toString(),
       widgetDocuments.toString(),
       readerOmissions.toString(),
     ]),

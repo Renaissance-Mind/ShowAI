@@ -1,6 +1,7 @@
 import { CoreError } from "./model";
 import type { FileStore } from "./store";
 import type { ShowDocument } from "../types";
+import { walk } from "../document/walk.mjs";
 import { DatasetStore } from "./datasets";
 import { runTransform } from "./dataset-transform";
 import {
@@ -190,16 +191,15 @@ export async function withDerivedDatabases(
   selfDatasets: Map<string, string> = new Map(),
 ): Promise<ShowDocument> {
   const targets: Record<string, unknown>[] = [];
-  const visit = (node: ShowDocument["content"]) => {
+  // Databases nested in rich text show derived values too.
+  walk(document.content, (node) => {
     if (
       node.type === "widget" &&
       node.attrs?.kind === "database" &&
       isObject(node.attrs.data)
     )
       targets.push(node.attrs as Record<string, unknown>);
-    node.content?.forEach(visit);
-  };
-  visit(document.content);
+  }, { scope: "content" });
   if (!targets.length) return document;
   let changed = false;
   const derived = new Map<Record<string, unknown>, Record<string, unknown>>();
@@ -220,7 +220,7 @@ export async function withDerivedDatabases(
   const copy = structuredClone(document);
   const order = [...targets];
   let index = 0;
-  const assign = (node: ShowDocument["content"]) => {
+  walk(copy.content, (node) => {
     if (
       node.type === "widget" &&
       node.attrs?.kind === "database" &&
@@ -230,8 +230,6 @@ export async function withDerivedDatabases(
       if (snapshot)
         node.attrs.data = { ...node.attrs.data, [DERIVED_KEY]: snapshot };
     }
-    node.content?.forEach(assign);
-  };
-  assign(copy.content);
+  }, { scope: "content" });
   return copy;
 }

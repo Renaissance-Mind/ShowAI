@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import { join } from "node:path";
 import { atomicRename } from "./atomic-rename";
 import { diffDocuments } from "./diff";
+import { walk } from "../document/walk.mjs";
 import type { ChangeActor, ChangeContext } from "./history-model";
 import type { ShowDocument } from "./model";
 import { assertId } from "./store";
@@ -73,12 +74,10 @@ export function summarizeChange(before: ShowDocument, after: ShowDocument) {
   const changes = diffDocuments(before, after);
   const order = new Map<string, number>();
   let index = 0;
-  const visit = (node: { attrs?: Record<string, unknown> | null; content?: unknown[] }) => {
+  walk(after.content, (node) => {
     const id = node.attrs?.id;
     if (typeof id === "string" && !order.has(id)) order.set(id, index++);
-    for (const child of (node.content ?? []) as (typeof node)[]) visit(child);
-  };
-  visit(after.content as Parameters<typeof visit>[0]);
+  }, { scope: "tree" });
   const present = new Set<string>();
   let removed = 0,
     page = 0;

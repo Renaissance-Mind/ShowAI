@@ -1,4 +1,5 @@
 import { shareNativeSource } from "./structural-share.mjs";
+import { walk } from "./walk.mjs";
 import { remapPageOutline } from "./page-outline.mjs";
 import {
   isResource,
@@ -12,44 +13,6 @@ export const isSurface = (document) => document.content?.type === "surface";
 export const artifactVersion = (document) =>
   isResource(document) ? 3 : isSurface(document) ? 2 : 1;
 
-export function visitNodes(node, visitor, parent = null) {
-  visitor(node, parent);
-  if (Array.isArray(node.content))
-    node.content.forEach((child) => visitNodes(child, visitor, node));
-}
-
-const isRichDocument = (value) =>
-  value.type === "doc" && Array.isArray(value.content);
-/**
- * Rich-text trees a component keeps in its data: a text block's content,
- * callout and toggle bodies, stepper steps, a primitive's saved document.
- * Their nodes, including nested components, are part of the page.
- */
-export function widgetDocuments(data) {
-  const found = [];
-  const walk = (value) => {
-    if (!value || typeof value !== "object") return;
-    if (isRichDocument(value)) found.push(value);
-    else (Array.isArray(value) ? value : Object.values(value)).forEach(walk);
-  };
-  walk(data);
-  return found;
-}
-
-/**
- * visitNodes that also enters the rich-text trees in component data, so it
- * reaches every component the page shows. The parent of a tree's root is the
- * component holding it.
- */
-export function visitContentNodes(node, visitor, parent = null) {
-  visitor(node, parent);
-  if (node.type === "widget")
-    for (const tree of widgetDocuments(node.attrs?.data))
-      visitContentNodes(tree, visitor, node);
-  if (Array.isArray(node.content))
-    node.content.forEach((child) => visitContentNodes(child, visitor, node));
-}
-
 function stableId(seed) {
   let hash = 2166136261;
   for (const char of seed)
@@ -59,12 +22,12 @@ function stableId(seed) {
 
 export function assignSurfaceIds(document, { repairLegacy = false } = {}) {
   const used = new Set();
-  visitNodes(document.content, (node) => {
+  walk(document.content, (node) => {
     if (node.attrs?.id) used.add(node.attrs.id);
-  });
+  }, { scope: "content" });
   const seen = new Set();
   const reserved = new Set(["__proto__", "prototype", "constructor"]);
-  const walk = (node, path) => {
+  const descend = (node, path) => {
     const previous = node.attrs?.id;
     if (
       (!["surface", "doc", "text"].includes(node.type) ||
@@ -79,22 +42,22 @@ export function assignSurfaceIds(document, { repairLegacy = false } = {}) {
     }
     if (node.attrs?.id) seen.add(node.attrs.id);
     if (Array.isArray(node.content)) {
-      const content = node.content.map((child, index) => walk(child, `${path}/${index}`));
+      const content = node.content.map((child, index) => descend(child, `${path}/${index}`));
       if (content.some((child, index) => child !== node.content[index]))
         node = { ...node, content };
     }
     return node;
   };
-  const content = walk(document.content, "");
+  const content = descend(document.content, "");
   if (content !== document.content) document.content = content;
   return document;
 }
 
 export function findSurfaceNode(document, id) {
   let result;
-  visitNodes(document.content, (node, parent) => {
+  walk(document.content, (node, { parent }) => {
     if (node.attrs?.id === id) result = { node, parent };
-  });
+  }, { scope: "tree" });
   return result;
 }
 
@@ -102,7 +65,7 @@ export function fillSurfaceLayout(document) {
   if (isResource(document)) return fillResource(document);
   if (!isSurface(document)) return document;
   document.layout ??= {};
-  const walk = (parent) => {
+  const descend = (parent) => {
     let right = 0;
     for (const node of parent.content ?? []) {
       const id = node.attrs?.id;
@@ -125,10 +88,10 @@ export function fillSurfaceLayout(document) {
           document.layout[id].x + document.layout[id].width + 64,
         );
       }
-      if (node.type === "region") walk(node);
+      if (node.type === "region") descend(node);
     }
   };
-  walk(document.content);
+  descend(document.content);
   document.views ??= {
     initial: null,
     saved: [],
@@ -145,9 +108,9 @@ export function upgradeDocument(source, { includeTitle = true } = {}) {
   const nodes = document.content.content ?? [];
   const body = nodes.filter((node) => !node.attrs?.canvas);
   const used = new Set();
-  visitNodes(document.content, (node) => {
+  walk(document.content, (node) => {
     if (node.attrs?.id) used.add(node.attrs.id);
-  });
+  }, { scope: "content" });
   const unique = (name) => {
     let id = stableId(`${document.id}:${name}`);
     while (used.has(id)) id += "-copy";
@@ -221,10 +184,10 @@ function reconcileSurfaceDocument(source, { clone = true } = {}) {
   if (!isSurface(document)) return document;
   const ids = new Set(),
     regions = new Set();
-  visitNodes(document.content, (node) => {
+  walk(document.content, (node) => {
     if (node.attrs?.id) ids.add(node.attrs.id);
     if (node.type === "region") regions.add(node.attrs.id);
-  });
+  }, { scope: "tree" });
   for (const id of Object.keys(document.layout)) {
     if (!ids.has(id)) delete document.layout[id];
     else if (!regions.has(id)) {
@@ -288,7 +251,7 @@ export function linearContent(document) {
 export function remapSurfaceIds(source, nextId = () => crypto.randomUUID()) {
   const document = structuredClone(source),
     mapping = new Map();
-  visitNodes(document.content, (node) => {
+  walk(document.content, (node) => {
     if (
       ["doc", "text"].includes(node.type) ||
       (node.type === "surface" && !isResource(document))
@@ -298,8 +261,8 @@ export function remapSurfaceIds(source, nextId = () => crypto.randomUUID()) {
       id = nextId();
     if (old) mapping.set(old, id);
     node.attrs = { ...node.attrs, id };
-  });
-  visitNodes(document.content, (node) => {
+  }, { scope: "tree" });
+  walk(document.content, (node) => {
     if (node.attrs?.outline) node.attrs.outline = remapPageOutline(node.attrs.outline, mapping, nextId);
     if (!node.attrs?.bindings) return;
     const bindings = {};
@@ -310,7 +273,7 @@ export function remapSurfaceIds(source, nextId = () => crypto.randomUUID()) {
     }
     if (Object.keys(bindings).length) node.attrs.bindings = bindings;
     else delete node.attrs.bindings;
-  });
+  }, { scope: "tree" });
   if (isSurface(document)) {
     document.layout = Object.fromEntries(
       Object.entries(document.layout ?? {}).map(([id, value]) => [
@@ -363,12 +326,12 @@ export function remapSurfaceIds(source, nextId = () => crypto.randomUUID()) {
 
 export function nodePaths(document) {
   const paths = {};
-  const walk = (node, ancestors) => {
+  const inside = new Map();
+  walk(document.content, (node, { parent }) => {
+    const ancestors = parent ? inside.get(parent) : [];
     if (node.attrs?.id) paths[node.attrs.id] = ancestors;
-    const next = node.attrs?.id ? [...ancestors, node.attrs.id] : ancestors;
-    node.content?.forEach((child) => walk(child, next));
-  };
-  walk(document.content, []);
+    inside.set(node, node.attrs?.id ? [...ancestors, node.attrs.id] : ancestors);
+  }, { scope: "tree" });
   return paths;
 }
 

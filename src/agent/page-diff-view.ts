@@ -7,6 +7,7 @@ import {
 import { diffDocuments } from "../core/diff";
 import type { JSONContent, PageDiff, ShowDocument } from "../core/model";
 import { isResource } from "../document/containers.mjs";
+import { walk } from "../document/walk.mjs";
 
 /**
  * Record-level page comparison for Agents. The core diff reports changed
@@ -157,14 +158,10 @@ function metadata(document: ShowDocument): Record<string, unknown> {
 
 function nodes(document: ShowDocument): Map<string, JSONContent> {
   const found = new Map<string, JSONContent>();
-  const walk = (node: JSONContent) => {
-    for (const child of node.content ?? []) {
-      if (child.type === "text") continue;
-      if (typeof child.attrs?.id === "string") found.set(child.attrs.id, child);
-      walk(child);
-    }
-  };
-  walk(document.content);
+  walk(document.content, (node, { parent }) => {
+    if (parent && node.type !== "text" && typeof node.attrs?.id === "string")
+      found.set(node.attrs.id, node);
+  }, { scope: "tree" });
   return found;
 }
 

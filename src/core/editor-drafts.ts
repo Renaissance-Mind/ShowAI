@@ -15,12 +15,12 @@ import { ContentLibrary as GitLibrary } from "./content-library";
 import { documentHash, canonicalJson } from "./diff";
 import type { ShowDocument } from "./model";
 import type { ChangeActor } from "./history-model";
-import { visitContentNodes } from "../document/document.mjs";
+import { walk } from "../document/walk.mjs";
 import {inkWireDraftCommitMetadataMatches} from "../surface/ink-wire.mjs";
 
 function committedDraftHash(document: ShowDocument): string {
   const normalized = structuredClone(document);
-  visitContentNodes(normalized.content, (node) => {
+  walk(normalized.content, (node) => {
     if(node.type==="surface" && node.attrs?.kind==="board")delete node.attrs.inkState;
     const data = node.attrs?.data;
     // Catalog resolution adds a lookup scope; locking an exact revision removes it.
@@ -32,7 +32,7 @@ function committedDraftHash(document: ShowDocument): string {
       /^sha256-[a-f0-9]{64}$/.test(data.integrity)
     )
       delete data.scope;
-  });
+  }, { scope: "content" });
   return documentHash(normalized);
 }
 

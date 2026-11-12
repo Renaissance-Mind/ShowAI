@@ -7,7 +7,7 @@ import { resourceForPath, type HistoryEntry } from "./history-model";
 import { withLibraryLock } from "./library-lock";
 import { CoreError } from "./model";
 import type { JSONContent } from "@tiptap/core";
-import { visitContentNodes, widgetDocuments } from "../document/document.mjs";
+import { walk } from "../document/walk.mjs";
 import {
   boundDatabaseEdges,
   declaredPageFields,
@@ -729,9 +729,8 @@ export class LibraryIndex {
           });
           // Components inside its rich text are used by the page too; their
           // text is already part of this block's search row.
-          for (const tree of widgetDocuments(data))
-            visitContentNodes(tree, (inner: JSONContent) => {
-              if (inner.type !== "widget") return;
+          walk(node, (inner: JSONContent) => {
+              if (inner === node || inner.type !== "widget") return;
               edges.push({
                 source: path,
                 targetKind: "component",
@@ -741,7 +740,7 @@ export class LibraryIndex {
                 integrity: inner.attrs?.data?.integrity,
                 blockId: inner.attrs?.id,
               });
-            });
+            }, { scope: "content" });
         }
         // Lists and paragraphs don't add a location level; named containers and components do.
         const inner =
@@ -795,7 +794,7 @@ export class LibraryIndex {
           integrity: dependency.integrity,
         });
       if (value.document?.content)
-        visitContentNodes(value.document.content, (node: JSONContent) => {
+        walk(value.document.content, (node: JSONContent) => {
           if ((node.type === "widget" || node.type === "inlineWidget") && node.attrs?.kind === "custom")
             edges.push({
               source: id,
@@ -805,7 +804,7 @@ export class LibraryIndex {
               integrity: node.attrs.data.integrity,
               blockId: node.attrs.id,
             });
-        });
+        }, { scope: "content" });
     } else if (owner.kind === "project")
       add(path, "project", value.name, strings(value.folders).join("\n"));
   }

@@ -11,7 +11,7 @@ import { AgentService } from "./service";
 import { dataServer } from "../test/data-server";
 import { localFileRef } from "../portable/local-files.mjs";
 import { parseArtifact } from "../portable/validation.mjs";
-import { visitNodes } from "../document/document.mjs";
+import { walk } from "../document/walk.mjs";
 import type { ShowDocument } from "../core/model";
 
 // A real 1×1 PNG, served online and stored as a local file.
@@ -40,9 +40,9 @@ async function ok(name: string, args: Record<string, unknown> = {}) {
 }
 function widgets(document: ShowDocument, kind: string) {
   const found: any[] = [];
-  visitNodes(document.content, (node) => {
+  walk(document.content, (node) => {
     if (node.type === "widget" && node.attrs?.kind === kind) found.push(node);
-  });
+  }, { scope: "tree" });
   return found;
 }
 
@@ -176,9 +176,9 @@ test("pages keep linked local files, report them, and exports embed them next to
   ).document;
   const encoded = `data:image/png;base64,${png.toString("base64")}`;
   const images: any[] = [];
-  visitNodes(source.content, (node) => {
+  walk(source.content, (node) => {
     if (node.type === "image") images.push(node);
-  });
+  }, { scope: "tree" });
   expect(images[0].attrs.src).toBe(encoded);
   const gallery = widgets(source, "gallery")[0].attrs.data.images;
   expect(gallery.map((item: any) => item.src)).toEqual([

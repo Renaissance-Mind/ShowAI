@@ -4,7 +4,18 @@ import { resourceMime } from "../components/blocks/research-contract.mjs";
 import { isImageIcon } from "../lib/page-icon.mjs";
 import { isSafeUrl, validateDocument } from "./validation.mjs";
 import { detachedRef, isLocalFileRef, localRefType } from "./local-files.mjs";
-import { widgetDocuments } from "../document/document.mjs";
+import { SKIP, walk } from "../document/walk.mjs";
+
+/** The id of a node or of its nearest identified ancestor, across held documents. */
+function nearestIds() {
+  const ids = new Map();
+  return (node, parent) => {
+    const id =
+      typeof node.attrs?.id === "string" ? node.attrs.id : ids.get(parent);
+    ids.set(node, id);
+    return id;
+  };
+}
 
 /**
  * Every resource field of a document: page and container icons, image
@@ -19,9 +30,9 @@ export function resourceSlots(document, { components = false } = {}) {
   const add = (object, key, kind, blockId, field) =>
     slots.push({ object, key, kind, blockId, field });
   if (isImageIcon(document.icon)) add(document, "icon", "image", undefined, "icon");
-  const visit = (node, owner) => {
-    const blockId =
-      typeof node.attrs?.id === "string" ? node.attrs.id : owner;
+  const nearest = nearestIds();
+  walk(document.content, (node, { parent }) => {
+    const blockId = nearest(node, parent);
     const data = node.attrs?.data;
     const widget = node.type === "widget" ? node.attrs?.kind : undefined;
     if (node.type === "surface" && isImageIcon(node.attrs?.icon))
@@ -67,12 +78,9 @@ export function resourceSlots(document, { components = false } = {}) {
         add(object, key, kind, blockId, field),
       );
     // Rich text in component data (text, callout and toggle bodies, stepper
-    // steps); a library component's props are covered by propSlots.
-    if (widget && widget !== "custom")
-      for (const tree of widgetDocuments(data)) visit(tree, blockId);
-    node.content?.forEach((child) => visit(child, blockId));
-  };
-  visit(document.content);
+    // steps) is walked; a library component's props are covered by propSlots.
+    if (widget === "custom") return SKIP;
+  }, { scope: "content" });
   return slots;
 }
 
@@ -99,12 +107,13 @@ function propSlots(value, path, add, depth = 0, any = false) {
  */
 export function componentFileSlots(document) {
   const slots = [];
-  const visit = (node, owner) => {
-    const blockId =
-      typeof node.attrs?.id === "string" ? node.attrs.id : owner;
+  const nearest = nearestIds();
+  walk(document.content, (node, { parent }) => {
+    const blockId = nearest(node, parent);
     const data = node.attrs?.data;
     const widget = node.type === "widget" ? node.attrs?.kind : undefined;
-    if (widget === "custom" && data?.props)
+    if (widget !== "custom") return;
+    if (data?.props)
       propSlots(
         data.props,
         "props",
@@ -112,11 +121,8 @@ export function componentFileSlots(document) {
         0,
         true,
       );
-    if (widget && widget !== "custom")
-      for (const tree of widgetDocuments(data)) visit(tree, blockId);
-    node.content?.forEach((child) => visit(child, blockId));
-  };
-  visit(document.content);
+    return SKIP;
+  }, { scope: "content" });
   return slots;
 }
 

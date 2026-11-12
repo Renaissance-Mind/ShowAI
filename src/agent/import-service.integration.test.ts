@@ -8,7 +8,7 @@ import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { createMcpServer } from "./mcp";
 import { openLibrary } from "../core/open-library";
 import { syncManager } from "../sync/manager";
-import { visitNodes } from "../document/document.mjs";
+import { walk } from "../document/walk.mjs";
 import { AgentService } from "./service";
 import { planImport, runImport } from "./import-service";
 import {
@@ -43,9 +43,9 @@ afterAll(async () => {
 
 const nodes = (content: JSONContent) => {
   const found: JSONContent[] = [];
-  visitNodes(content, (node: JSONContent) => {
+  walk(content, (node: JSONContent) => {
     found.push(node);
-  });
+  }, { scope: "tree" });
   return found;
 };
 async function pageNamed(title: string, parentId?: string | null) {

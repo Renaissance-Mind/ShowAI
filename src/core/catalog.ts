@@ -17,12 +17,8 @@ import {
   createResource,
   insertResourceTemplate,
 } from "../document/containers.mjs";
-import {
-  remapSurfaceIds,
-  isSurface,
-  upgradeDocument,
-  visitContentNodes,
-} from "../document/document.mjs";
+import { remapSurfaceIds, isSurface, upgradeDocument } from "../document/document.mjs";
+import { walk } from "../document/walk.mjs";
 import { createHash, randomUUID } from "node:crypto";
 import {
   componentAuthoringIndex,
@@ -1064,7 +1060,7 @@ async function saveTemplateImpl(
       ...(bundle.document ?? {}),
       title: bundle.metadata.name,
     });
-    visitContentNodes(skeleton.content, (node) => {
+    walk(skeleton.content, (node) => {
       const data = node.attrs?.data;
       if ((node.type === "widget" || node.type === "inlineWidget") && node.attrs?.kind === "custom" && data) {
         const binding = componentBindings.find(
@@ -1080,7 +1076,7 @@ async function saveTemplateImpl(
           };
         }
       }
-    });
+    }, { scope: "content" });
     input = { ...input, ...bundle.metadata, document: skeleton };
   }
   const id = input.id ?? `template-${randomUUID()}`,
@@ -2836,12 +2832,12 @@ export async function resolveDocumentComponents(
   const required = new Set<string>();
   // Content components are required; only a navigation renderer may fail.
   const custom: ShowDocument["content"][] = [];
-  visitContentNodes(document.content, (node) => {
+  walk(document.content, (node) => {
     if ((node.type === "widget" || node.type === "inlineWidget") && node.attrs?.kind === "custom") {
       custom.push(node);
       required.add(key(readCustomBlockData(node.attrs.data)));
     }
-  });
+  }, { scope: "content" });
   const resolved = await Promise.all(
     refs.map(async (ref) => {
       const component = await getComponent(
@@ -3057,14 +3053,14 @@ export async function lockDocumentComponents(
   // collected before any is changed in place, and changing a node keeps the
   // rich text inside its data, so every collected node stays in the copy.
   const nodes: ShowDocument["content"][] = [];
-  visitContentNodes(copy.content, (node) => {
+  walk(copy.content, (node) => {
     if (
       ((node.type === "widget" || node.type === "inlineWidget") &&
         node.attrs?.kind === "custom") ||
       node.attrs?.outline?.renderer
     )
       nodes.push(node);
-  });
+  }, { scope: "content" });
   await Promise.all(nodes.map(lock));
   return copy;
 }
@@ -3092,11 +3088,11 @@ export async function instantiateTemplateRecord(
     if (depth > 16) throw new Error("Template composition exceeds 16 levels.");
     const active = new Set(ancestors).add(identity);
     const documents: ShowDocument[] = [];
-    const count = (node: ShowDocument["content"]) => {
-      if (++expandedNodes > 12000)
-        throw new Error("Expanded template exceeds 12000 nodes.");
-      node.content?.forEach(count);
-    };
+    const count = (root: ShowDocument["content"]) =>
+      walk(root, () => {
+        if (++expandedNodes > 12000)
+          throw new Error("Expanded template exceeds 12000 nodes.");
+      }, { scope: "tree" });
     if (!template.composition) {
       count(template.document.content);
       return structuredClone(template.document);

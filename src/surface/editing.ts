@@ -1,12 +1,8 @@
 import type { JSONContent } from "@tiptap/core";
 import type { ShowDocument } from "../types";
 import type { LayoutMode, NodeLayout } from "../document/types";
-import {
-  findSurfaceNode,
-  reconcileSurface,
-  upgradeDocument,
-  visitNodes,
-} from "../document/document.mjs";
+import { findSurfaceNode, reconcileSurface, upgradeDocument } from "../document/document.mjs";
+import { walk } from "../document/walk.mjs";
 import { translator } from "../i18n";
 import messages from "../i18n/messages/surface";
 import { isOwnedSource, ownSourceValue } from "./source-runtime";
@@ -75,7 +71,7 @@ export function editNode(
   options: NodeEditOptions = {},
 ) {
   let changed = false;
-  const walk = (node: JSONContent): JSONContent => {
+  const descend = (node: JSONContent): JSONContent => {
     if (node.attrs?.id === id) {
       const copy = options.attributesOnly
         ? { ...node, attrs: { ...node.attrs } }
@@ -85,12 +81,12 @@ export function editNode(
       return ownSourceValue(copy);
     }
     if (!node.content) return node;
-    const children = node.content.map(walk);
+    const children = node.content.map(descend);
     return children.some((child, index) => child !== node.content![index])
       ? { ...node, content: children }
       : node;
   };
-  const content = walk(source.content);
+  const content = descend(source.content);
   if (!changed) return source;
   return finishEdit(source, { ...source, content }, options);
 }
@@ -104,10 +100,10 @@ export function replaceChildren(
 ) {
   const selected = new Set(ids);
   let changed = false;
-  const walk = (node: JSONContent): JSONContent => {
+  const descend = (node: JSONContent): JSONContent => {
     if (node.attrs?.id !== parentId) {
       if (!node.content) return node;
-      const content = node.content.map(walk);
+      const content = node.content.map(descend);
       return content.some((child, index) => child !== node.content![index])
         ? { ...node, content }
         : node;
@@ -128,7 +124,7 @@ export function replaceChildren(
     changed = true;
     return { ...node, content: next };
   };
-  const content = walk(source.content);
+  const content = descend(source.content);
   return changed ? finishEdit(source, { ...source, content }, options) : source;
 }
 
@@ -178,9 +174,9 @@ export function moveNode<T extends ShowDocument>(
   )
     throw new Error(t("error.cannotMove"));
   const descendants = new Set<string>();
-  visitNodes(target.node, (node) => {
+  walk(target.node, (node) => {
     if (node.attrs?.id) descendants.add(node.attrs.id);
-  });
+  }, { scope: "tree" });
   if (parentId && descendants.has(parentId))
     throw new Error(t("error.regionIntoSelf"));
   target.parent.content = target.parent.content!.filter(
@@ -219,17 +215,17 @@ export function regionOptions(document: ShowDocument, excludedId?: string) {
   const excluded = new Set<string>();
   const node = excludedId && findSurfaceNode(document, excludedId)?.node;
   if (node)
-    visitNodes(node, (item) => {
+    walk(node, (item) => {
       if (item.attrs?.id) excluded.add(item.attrs.id);
-    });
+    }, { scope: "tree" });
   const result: { id: string; name: string }[] = [];
-  visitNodes(document.content, (item) => {
+  walk(document.content, (item) => {
     if (item.type === "region" && !excluded.has(item.attrs!.id))
       result.push({
         id: item.attrs!.id,
         name: item.attrs?.name || t("node.region"),
       });
-  });
+  }, { scope: "tree" });
   return result;
 }
 
@@ -247,9 +243,9 @@ export function captureDeletion(
   const target = findSurfaceNode(document, id);
   if (!target?.parent) return;
   const ids = new Set<string>();
-  visitNodes(target.node, (node) => {
+  walk(target.node, (node) => {
     if (node.attrs?.id) ids.add(node.attrs.id);
-  });
+  }, { scope: "tree" });
   return {
     node: structuredClone(target.node),
     parentId: target.parent.type === "surface" ? null : target.parent.attrs!.id,
@@ -270,9 +266,9 @@ export function restoreDeletion(source: ShowDocument, deleted: DeletedNode) {
   parent.content.splice(deleted.index, 0, structuredClone(deleted.node));
   Object.assign(document.layout!, deleted.layout);
   const restoredIds = new Set<string>();
-  visitNodes(deleted.node, (node) => {
+  walk(deleted.node, (node) => {
     if (node.attrs?.id) restoredIds.add(node.attrs.id);
-  });
+  }, { scope: "tree" });
   for (const previous of deleted.views.saved) {
     const targets = previous.targets.filter((id) => restoredIds.has(id));
     if (!targets.length) continue;

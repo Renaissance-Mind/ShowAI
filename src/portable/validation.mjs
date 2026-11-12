@@ -7,6 +7,7 @@ import { validatePageIcon } from "../lib/page-icon.mjs";
 import { parsePageLink } from "./page-link.mjs";
 import { isLocalResourceRef } from "./local-files.mjs";
 import { artifactVersion, assignSurfaceIds } from "../document/document.mjs";
+import { walk } from "../document/walk.mjs";
 import { validateSurface } from "../surface/validation.mjs";
 import {
   MAX_STEPS,
@@ -972,15 +973,13 @@ function validateDocumentValue(value, independent, observer, inputCapacity) {
   );
   if (canvasIds.size) {
     const seen = new Set();
-    const checkCanvasIds = (node) => {
+    walk(document.content, (node) => {
       const id = node.attrs?.id;
       if (canvasIds.has(id)) {
         if (seen.has(id)) throw new Error(`Duplicate canvas id: ${id}.`);
         seen.add(id);
       }
-      node.content?.forEach(checkCanvasIds);
-    };
-    checkCanvasIds(document.content);
+    }, { scope: "tree" });
   }
   const now = new Date().toISOString();
   for (const key of ["createdAt", "updatedAt"])
@@ -1097,12 +1096,10 @@ function validateComponents(input) {
 function validateSelection(selection, document) {
   object(selection, "selection");
   const ids = new Set();
-  const visit = (node) => {
+  walk(document.content, (node) => {
     if (node.attrs?.id && !["doc", "text"].includes(node.type))
       ids.add(node.attrs.id);
-    node.content?.forEach(visit);
-  };
-  visit(document.content);
+  }, { scope: "tree" });
   const blocks = selection.blockIds;
   if (
     !Array.isArray(blocks) ||

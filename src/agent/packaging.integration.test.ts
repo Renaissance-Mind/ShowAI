@@ -12,7 +12,7 @@ import { dataServer } from "../test/data-server";
 import { xlsxWorkbook } from "../test/xlsx";
 import { localFileRef } from "../portable/local-files.mjs";
 import { parseArtifact } from "../portable/validation.mjs";
-import { visitNodes } from "../document/document.mjs";
+import { walk } from "../document/walk.mjs";
 import type { ShowDocument } from "../core/model";
 
 // A real 1×1 PNG, served online and stored as a local file.
@@ -40,10 +40,10 @@ async function ok(name: string, args: Record<string, unknown> = {}) {
 }
 function widget(document: ShowDocument, kind: string) {
   let found: any;
-  visitNodes(document.content, (node) => {
+  walk(document.content, (node) => {
     if (!found && node.type === "widget" && node.attrs?.kind === kind)
       found = node;
-  });
+  }, { scope: "tree" });
   return found;
 }
 
@@ -259,11 +259,11 @@ test("an export lists every item with its size and carries what the person chose
   });
   expect(widget(source, "chart").attrs.data.labels).toEqual(["1月", "2月"]);
   const images: string[] = [];
-  visitNodes(source.content, (node) => {
+  walk(source.content, (node) => {
     if (node.type === "image") images.push(node.attrs!.src as string);
     if (node.type === "widget" && node.attrs?.kind === "image")
       images.push(node.attrs.data.src);
-  });
+  }, { scope: "tree" });
   expect(images).toEqual([
     `data:image/png;base64,${png.toString("base64")}`,
     `data:image/png;base64,${png.toString("base64")}`,

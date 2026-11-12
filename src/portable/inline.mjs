@@ -2,7 +2,7 @@ import { CAPACITY, CapacityError } from "./capacity.mjs";
 import { randomUUID } from "node:crypto";
 import { gzipSync } from "node:zlib";
 import { inlineStyleSheet, scopeReaderCss } from "./inline-style.mjs";
-import { visitContentNodes } from "../document/document.mjs";
+import { walk } from "../document/walk.mjs";
 
 /** Inline hosts block network requests: every component must travel with the page. */
 export function assertInlineArtifact(artifact) {
@@ -12,7 +12,7 @@ export function assertInlineArtifact(artifact) {
     );
   const references = new Map();
   if (artifact?.document?.content)
-    visitContentNodes(artifact.document.content, (node) => {
+    walk(artifact.document.content, (node) => {
       if ((node.type === "widget" || node.type === "inlineWidget") && node.attrs?.kind === "custom") {
         const data = node.attrs.data;
         references.set(
@@ -20,7 +20,7 @@ export function assertInlineArtifact(artifact) {
           data,
         );
       }
-    });
+    }, { scope: "content" });
   for (const [reference, ref] of references) {
     const candidates = artifact.components?.filter(
       (item) =>

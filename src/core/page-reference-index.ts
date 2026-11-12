@@ -1,5 +1,5 @@
 import type { JSONContent } from "@tiptap/core";
-import { visitContentNodes } from "../document/document.mjs";
+import { walk } from "../document/walk.mjs";
 import { parsePageLink } from "../portable/page-link.mjs";
 import { parsePageCell } from "../components/blocks/database-contract.mjs";
 import { parameterValues } from "../portable/component-parameters.mjs";
@@ -125,7 +125,7 @@ export function pageReferenceEdges(
       snippet,
     });
   };
-  visitContentNodes(document.content, (node: JSONContent, parent) => {
+  walk(document.content, (node: JSONContent, { parent }) => {
     const above = parent ? holders.get(parent) : undefined;
     const id = typeof node.attrs?.id === "string" ? node.attrs.id : null;
     const holder =
@@ -187,7 +187,7 @@ export function pageReferenceEdges(
           ),
         );
       }
-  });
+  }, { scope: "content" });
   return edges;
 }
 

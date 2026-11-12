@@ -3,7 +3,8 @@ import { blankDocument, listBuiltinComponents } from "../core/catalog";
 import { createResource } from "../document/containers.mjs";
 import { insertComponent } from "./component-insertion";
 import { applyOperations } from "../core/diff";
-import { findSurfaceNode, visitNodes } from "../document/document.mjs";
+import { findSurfaceNode } from "../document/document.mjs";
+import { walk } from "../document/walk.mjs";
 import {
   validateDocument,
   serializeArtifact,
@@ -144,9 +145,9 @@ describe("unified component insertion", () => {
     );
     const second = insertComponent(first.document, null, "page", data);
     const ids: string[] = [];
-    visitNodes(second.document.content, (node) => {
+    walk(second.document.content, (node) => {
       if (node.attrs?.id) ids.push(node.attrs.id);
-    });
+    }, { scope: "tree" });
     expect(new Set(ids).size).toBe(ids.length);
     expect(() => validateDocument(second.document)).not.toThrow();
     expect(

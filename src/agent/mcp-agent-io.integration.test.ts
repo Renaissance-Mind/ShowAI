@@ -10,7 +10,7 @@ import { openLibrary } from "../core/open-library";
 import { syncManager } from "../sync/manager";
 import { AgentService } from "./service";
 import { componentWidgetData, saveComponent } from "../core/catalog";
-import { visitNodes } from "../document/document.mjs";
+import { walk } from "../document/walk.mjs";
 import type { ShowDocument } from "../core/model";
 
 /**
@@ -72,10 +72,10 @@ async function failed(
 }
 function custom(document: ShowDocument) {
   let found: any;
-  visitNodes(document.content, (node) => {
+  walk(document.content, (node) => {
     if (!found && node.type === "widget" && node.attrs?.kind === "custom")
       found = node;
-  });
+  }, { scope: "tree" });
   return found;
 }
 

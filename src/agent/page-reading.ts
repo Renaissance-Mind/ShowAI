@@ -1,5 +1,5 @@
 import { agentCommentView } from "../core/comments";
-import { widgetDocuments } from "../document/document.mjs";
+import { walk } from "../document/walk.mjs";
 import {
   resolveDocumentDatasets,
   type BindingRead,
@@ -96,7 +96,7 @@ function customBlocks(
     components.map((item) => `${item.id}@${item.version}:${item.integrity}`),
   );
   const ids = new Set<string>();
-  const visit = (node: ShowDocument["content"], owner?: string) => {
+  walk(document.content, (node, { owner }) => {
     if ((node.type === "widget" || node.type === "inlineWidget") && node.attrs?.kind === "custom") {
       const data = node.attrs.data as {
         componentId?: string;
@@ -104,14 +104,9 @@ function customBlocks(
         integrity?: string;
       };
       if (wanted.has(`${data.componentId}@${data.version}:${data.integrity}`))
-        ids.add(owner ?? String(node.attrs.id));
+        ids.add(String((owner ?? node).attrs?.id));
     }
-    if (node.type === "widget")
-      for (const tree of widgetDocuments(node.attrs?.data))
-        visit(tree, owner ?? String(node.attrs?.id));
-    node.content?.forEach((child) => visit(child, owner));
-  };
-  visit(document.content);
+  }, { scope: "content" });
   return [...ids];
 }
 const roles = [

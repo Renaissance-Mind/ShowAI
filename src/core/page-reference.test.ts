@@ -80,6 +80,69 @@ describe("page references", () => {
     expect(missing).toEqual(["gone"]);
   });
 
+  it("maps text in a stepper step and a component nested in rich text to the outer block", () => {
+    const paragraph = (id: string) => ({
+      type: "paragraph",
+      attrs: { id },
+      content: text(id),
+    });
+    const nested = {
+      ...document,
+      content: {
+        type: "surface",
+        attrs: { id: "root", kind: "page" },
+        content: [
+          {
+            type: "widget",
+            attrs: {
+              id: "steps",
+              kind: "stepper",
+              data: {
+                steps: [
+                  {
+                    title: "One",
+                    content: { type: "doc", content: [paragraph("in-step")] },
+                  },
+                ],
+              },
+            },
+          },
+          {
+            type: "widget",
+            attrs: {
+              id: "outer",
+              kind: "text",
+              data: {
+                content: {
+                  type: "doc",
+                  content: [
+                    {
+                      type: "widget",
+                      attrs: {
+                        id: "callout",
+                        kind: "callout",
+                        data: {
+                          content: {
+                            type: "doc",
+                            content: [paragraph("deep")],
+                          },
+                        },
+                      },
+                    },
+                  ],
+                },
+              },
+            },
+          },
+        ],
+      },
+    } as unknown as ShowDocument;
+    expect(addressableIds(nested, ["in-step", "callout", "deep"])).toMatchObject({
+      ids: ["steps", "outer"],
+      missing: [],
+    });
+  });
+
   it("references a text selection with its text as labels", () => {
     const reference = pageReference("project-1", record, {
       kind: "text",

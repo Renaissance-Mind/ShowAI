@@ -15,12 +15,8 @@ import type { ShowDocument } from "../types";
 import type { JSONContent } from "@tiptap/core";
 import { validateDocument } from "../portable/validation.mjs";
 import { CAPACITY, CapacityError } from "../portable/capacity.mjs";
-import {
-  findSurfaceNode,
-  visitNodes,
-  nodePaths,
-  reconcileSurface,
-} from "../document/document.mjs";
+import { findSurfaceNode, nodePaths, reconcileSurface } from "../document/document.mjs";
+import { walk } from "../document/walk.mjs";
 import { buildPageHtml } from "./exporter";
 import { injectReadingOptions } from "./reading-preview";
 import { appLocale } from "../core/app-language";
@@ -326,9 +322,9 @@ function scopedBoard(document: ShowDocument, boardId: string) {
     );
   const content = structuredClone(entry.node),
     ids = new Set<string>();
-  visitNodes(content, (node) => {
+  walk(content, (node) => {
     if (node.attrs?.id) ids.add(node.attrs.id);
-  });
+  }, { scope: "tree" });
   const projection = {
     ...document,
     title: "",
@@ -489,10 +485,10 @@ async function createSnapshot(
       direct.map((el) => el.bounds),
     );
     const pageIds: string[] = [];
-    visitNodes(scoped.document.content, (node) => {
+    walk(scoped.document.content, (node) => {
       if (node.type === "surface" && node.attrs?.kind === "page")
         pageIds.push(node.attrs.id);
-    });
+    }, { scope: "tree" });
     await writeCache(store.root, id, "source.json", Buffer.from(source));
     await writeCache(store.root, id, "frozen.html", Buffer.from(frozen.html));
     // A detailed photograph can exceed the attachment limit even on a small Board.
@@ -632,16 +628,16 @@ function rawNode(document: ShowDocument, snapshot: Snapshot, nodeId: string) {
     throw new CoreError("NOT_FOUND", "The node is outside the captured Board.");
   const node = findSurfaceNode(document, nodeId)!.node,
     ids = new Set<string>();
-  visitNodes(node, (n) => {
+  walk(node, (n) => {
     if (n.attrs?.id) ids.add(n.attrs.id);
-  });
+  }, { scope: "tree" });
   const external = new Set<string>();
-  visitNodes(node, (n) => {
+  walk(node, (n) => {
     for (const binding of Object.values(n.attrs?.bindings ?? {}) as {
       targetId: string;
     }[])
       if (!ids.has(binding.targetId)) external.add(binding.targetId);
-  });
+  }, { scope: "tree" });
   return {
     node: structuredClone(node),
     layout: Object.fromEntries(

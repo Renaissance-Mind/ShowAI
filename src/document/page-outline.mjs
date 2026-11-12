@@ -1,4 +1,5 @@
 /** Portable Page outline contract. Derived trees never become stored page content. */
+import { SKIP, walk } from "./walk.mjs";
 export const PAGE_OUTLINE_PROTOCOL = 1;
 const reserved = new Set(["__proto__", "prototype", "constructor"]);
 const object = (value) =>
@@ -19,14 +20,14 @@ export function defaultPageOutline() {
     width: 220,
   };
 }
+/** Headings the outline can list: the Page's own tree, not nested surfaces or component bodies. */
 export function pageOutlineNodes(page) {
   const nodes = new Map();
-  function visit(node) {
+  walk(page, (node, { parent }) => {
+    if (!parent) return;
     if (node.attrs?.id) nodes.set(node.attrs.id, node);
-    if (["surface", "widget", "stepper"].includes(node.type)) return;
-    node.content?.forEach(visit);
-  }
-  page.content?.forEach(visit);
+    if (["surface", "widget", "stepper"].includes(node.type)) return SKIP;
+  }, { scope: "tree" });
   return nodes;
 }
 export function validatePageOutline(value, page) {

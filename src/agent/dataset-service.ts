@@ -32,7 +32,7 @@ import { getComponent, lockDocumentComponents } from "../core/catalog";
 import { readCustomBlockData } from "../components/custom/contract";
 import { propsIssues, type PropsIssue } from "../components/custom/schema";
 import { canonicalJson } from "../core/canonical";
-import { visitContentNodes, visitNodes } from "../document/document.mjs";
+import { walk } from "../document/walk.mjs";
 import { pageEntries, valueDiffEntries } from "./page-diff-view";
 import type { JsonSchema } from "../components/custom/types";
 import { recordTable } from "../datasets/derived-fields.mjs";
@@ -68,10 +68,10 @@ type BindingOperation = Extract<
 
 function findWidget(document: ShowDocument, blockId: string): JSONContent {
   let found: JSONContent | undefined;
-  visitNodes(document.content, (node) => {
+  walk(document.content, (node) => {
     if (!found && node.type !== "text" && node.attrs?.id === blockId)
       found = node;
-  });
+  }, { scope: "tree" });
   if (!found)
     throw new CoreError("NOT_FOUND", `Block ${blockId} does not exist.`);
   if (found.type !== "widget")
@@ -915,20 +915,20 @@ export class DatasetService {
 
   private boundIn(document: ShowDocument, blockId: string): boolean {
     let bound = false;
-    visitNodes(document.content, (node) => {
+    walk(document.content, (node) => {
       if (
         node.type === "widget" &&
         node.attrs?.id === blockId &&
         readBinding(node.attrs?.data)
       )
         bound = true;
-    });
+    }, { scope: "tree" });
     return bound;
   }
 
   /** Rejects saving shared props into a bound block's stored data. */
   assertBoundBlocks(document: ShowDocument) {
-    visitContentNodes(document.content, (node) => {
+    walk(document.content, (node) => {
       if (node.type !== "widget") return;
       const binding = readBinding(node.attrs?.data);
       if (!binding) return;
@@ -948,7 +948,7 @@ export class DatasetService {
         invalidData(
           `Block ${node.attrs?.id} takes ${extra.join(", ")} from dataset ${binding.dataset}. Change them with component.props.set (page_apply) or dataset_write(action:apply) instead of storing them in the page.`,
         );
-    });
+    }, { scope: "content" });
   }
 }
 

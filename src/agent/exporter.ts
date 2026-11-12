@@ -4,7 +4,7 @@ import {
   type BindingRead,
   type ExternalSnapshotReport,
 } from "../core/dataset-resolution";
-import { visitContentNodes, visitNodes } from "../document/document.mjs";
+import { walk } from "../document/walk.mjs";
 import { listBuiltinComponents } from "../core/catalog";
 import { LibraryOperations } from "../core/library-operations";
 import { versionedLibrary } from "../core/library-runtime";
@@ -161,12 +161,13 @@ export function formatBytes(bytes: number): string {
   return `${(bytes / 1024 / 1024).toFixed(2)} MB`;
 }
 
-/** Ids of the blocks an exported (possibly partial) document contains. */
-function blockIdsOf(document: ShowDocument): string[] {
+/** Ids of the blocks an exported (possibly partial) document contains,
+ * including components nested in their rich text. */
+export function blockIdsOf(document: ShowDocument): string[] {
   const ids: string[] = [];
-  visitNodes(document.content, (node) => {
+  walk(document.content, (node) => {
     if (typeof node.attrs?.id === "string") ids.push(node.attrs.id);
-  });
+  }, { scope: "content" });
   return ids;
 }
 
@@ -424,7 +425,7 @@ async function referenceSnapshot(
       .map((item) => item.kind),
   );
   let reads = false;
-  visitContentNodes(document.content, (node) => {
+  walk(document.content, (node) => {
     if (reads || (node.type !== "widget" && node.type !== "inlineWidget"))
       return;
     const kind = node.attrs?.kind;
@@ -438,7 +439,7 @@ async function referenceSnapshot(
             component.id === data?.componentId &&
             component.version === data?.version,
         ));
-  });
+  }, { scope: "content" });
   if (!reads || !versionedLibrary(root)) return undefined;
   const { to, from, pages } = await new LibraryOperations(root).pageReferences(
     projectId,
@@ -454,7 +455,7 @@ function lockedDocument(
   components: CompiledComponent[],
 ): ShowDocument {
   const copy = structuredClone(document);
-  visitContentNodes(copy.content, (node) => {
+  walk(copy.content, (node) => {
     if (
       (node.type === "widget" || node.type === "inlineWidget") &&
       node.attrs?.kind === "custom"
@@ -475,7 +476,7 @@ function lockedDocument(
         data: { ...data, integrity: candidates[0].integrity },
       };
     }
-  });
+  }, { scope: "content" });
   return copy;
 }
 
