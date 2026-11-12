@@ -41,3 +41,15 @@ export function assertOwnedSourceDocumentCapacity(body:ShowDocument):import("./c
 
 /** Read-only presence check, never a caller-provided proof. */
 export function hasSourceSnapshotCapacity(body:unknown):boolean;
+export function validateSubtree(
+  node: unknown,
+  context: {
+    path: string;
+    parentPath: string;
+    parentType: string;
+    depth: number;
+    count: number;
+    surface: boolean;
+    resource: boolean;
+  },
+): number;

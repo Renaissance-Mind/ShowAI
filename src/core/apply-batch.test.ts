@@ -86,6 +86,17 @@ function fixture(): ShowDocument {
       parentId: "board",
       node: { type: "drawing", attrs: { id: "free", tool: "rectangle" } },
     },
+    {
+      type: "block.insert",
+      node: { type: "region", attrs: { id: "region", name: "Region" }, content: [paragraph("in-region", "Region text")] },
+    },
+    { type: "surface.create", kind: "page", name: "Sub page", nodeId: "sub" },
+    // Enough blocks that a check of the touched block differs from a whole-page one.
+    ...Array.from({ length: 120 }, (_, index) => ({
+      type: "block.insert",
+      node: paragraph(`bulk-${index}`, `Bulk paragraph ${index} `.repeat(4)),
+    })),
+    { type: "comment", text: "On a quote", quote: "Bulk paragraph 3" },
   ] as PageOperation[]);
 }
 
@@ -95,19 +106,21 @@ function pools(document: ShowDocument) {
     paragraphs: string[] = [],
     boardChildren: string[] = [],
     shapes: string[] = [],
-    roots: string[] = [];
+    roots: string[] = [],
+    regionChildren: string[] = [];
   walk(document.content, (node, { parent, host }) => {
     const id = node.attrs?.id;
     if (typeof id !== "string" || node === document.content) return;
     all.push(id);
     if (node.type === "paragraph" || node.type === "heading") paragraphs.push(id);
     if (!host && parent === document.content) roots.push(id);
+    if (!host && parent?.attrs?.id === "region") regionChildren.push(id);
     if (!host && parent?.attrs?.id === "board") {
       boardChildren.push(id);
       if (node.type === "drawing" && node.attrs?.tool !== "arrow") shapes.push(id);
     }
   }, { scope: "content" });
-  return { all, paragraphs, boardChildren, shapes, roots };
+  return { all, paragraphs, boardChildren, shapes, roots, regionChildren };
 }
 
 function generate(next: () => number, document: ShowDocument, step: number): PageOperation {
@@ -117,8 +130,43 @@ function generate(next: () => number, document: ShowDocument, step: number): Pag
   const id = () => pick(ids.all, "missing");
   const root = document.content.attrs!.id as string;
   const fresh = `n${step}-${Math.floor(next() * 1000)}`;
+  const block = () =>
+    pick(
+      [
+        paragraph(next() < 0.5 ? fresh : undefined, `Inserted ${step}`),
+        { type: "heading", attrs: { level: 3 }, content: text(`Heading ${step}`) },
+        { type: "bulletList", content: [{ type: "listItem", content: [paragraph(undefined, "Item")] }] },
+        // Invalid in themselves: an unsupported attribute, an empty list, empty text.
+        { type: "paragraph", attrs: { color: "#123456" }, content: text("Coloured") },
+        { type: "bulletList", content: [] },
+        { type: "paragraph", content: [{ type: "text", text: "" }] },
+        // An id that already exists.
+        paragraph(pick(ids.all, "p1"), "Repeated id"),
+        { type: "widget", attrs: { kind: "custom", data: { componentId: "value-slider", version: "1.0.0", integrity: integrity("d"), props: { label: "New" } } } },
+      ] as JSONContent[],
+      paragraph(undefined, "x"),
+    );
   const kinds = [
     () => ({ type: "block.text.set", blockId: pick(ids.paragraphs, "p1"), text: `Text ${step}` }),
+    () => ({ type: "block.text.set", blockId: pick(ids.paragraphs, "p1"), text: next() < 0.3 ? "" : `Bulk paragraph 3 then ${step}` }),
+    () => ({ type: "block.insert", node: block(), ...(next() < 0.5 ? { afterId: pick(ids.roots, null) } : {}) }),
+    () => ({ type: "block.insert", parentId: "region", node: block(), ...(next() < 0.5 ? { afterId: pick(ids.regionChildren, null) } : {}) }),
+    () => ({ type: "block.insert", parentId: "sub", node: block() }),
+    () => ({
+      type: "component.insert",
+      kind: pick(["text", "callout", "divider", "custom", "chart-missing"], "text"),
+      data: pick(
+        [
+          { format: "plain", content: `Component ${step}` },
+          { content: `Callout ${step}` },
+          {},
+          { componentId: "value-slider", version: "1.0.0", integrity: integrity("e"), props: { label: "C" } },
+        ],
+        {},
+      ),
+      ...(next() < 0.2 ? { parentId: pick(["region", "sub", "board"], "region") } : {}),
+      ...(next() < 0.3 ? { afterId: pick(ids.roots, null) } : {}),
+    }),
     () => ({ type: "block.attrs.set", blockId: id(), attrs: { color: "#336699" } }),
     () => ({
       type: "block.insert",
@@ -227,10 +275,10 @@ function comparable(outcome: Outcome) {
 
 describe("batch equals sequential", () => {
   const base = fixture();
-  for (let seed = 1; seed <= 160; seed++)
+  for (let seed = 1; seed <= 400; seed++)
     test(`seed ${seed}`, () => {
       const next = random(seed);
-      const length = 1 + Math.floor(next() * 6);
+      const length = 1 + Math.floor(next() * 14);
       const operations: PageOperation[] = [];
       let preview = base;
       for (let step = 0; step < length; step++) {

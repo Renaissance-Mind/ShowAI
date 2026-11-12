@@ -746,57 +746,7 @@ function validateNode(value, path, counter, depth = 0, parentType = null) {
     );
   }
   const children = node.content ?? [];
-  const blockTypes = [
-    "richText",
-    "paragraph",
-    "heading",
-    "mathBlock",
-    "blockquote",
-    "bulletList",
-    "orderedList",
-    "taskList",
-    "codeBlock",
-    "horizontalRule",
-    "image",
-    "table",
-    "callout",
-    "toggle",
-    "stepper",
-    "widget",
-  ];
-  const allowed = {
-    doc: blockTypes,
-    surface: [
-      ...blockTypes,
-      "region",
-      "richText",
-      ...(counter.resource ? ["surface", "drawing"] : []),
-    ],
-    region: [
-      ...blockTypes,
-      "region",
-      "richText",
-      ...(counter.resource ? ["surface", "drawing"] : []),
-    ],
-    richText: blockTypes,
-    paragraph: ["text", "hardBreak", "mathInline", "inlineWidget"],
-    heading: ["text", "hardBreak", "mathInline", "inlineWidget"],
-    codeBlock: ["text"],
-    blockquote: blockTypes,
-    callout: blockTypes,
-    toggle: blockTypes,
-    stepper: ["step"],
-    step: blockTypes,
-    bulletList: ["listItem"],
-    orderedList: ["listItem"],
-    listItem: blockTypes,
-    taskList: ["taskItem"],
-    taskItem: blockTypes,
-    table: ["tableRow"],
-    tableRow: ["tableCell", "tableHeader"],
-    tableCell: blockTypes,
-    tableHeader: blockTypes,
-  }[node.type];
+  const allowed = childTypes(node.type, counter.resource);
   if (allowed && children.some((child) => !allowed.includes(child.type)))
     throw new Error(`${path} contains an invalid child block.`);
   if (node.type === "stepper" && children.length > MAX_STEPS)
@@ -831,6 +781,85 @@ function validateNode(value, path, counter, depth = 0, parentType = null) {
     children.some((child) => child.marks?.length)
   )
     throw new Error(`${path} cannot contain formatted code.`);
+}
+
+/** Block types a node of this type may hold, or undefined when unrestricted. */
+function childTypes(type, resource) {
+  const blockTypes = [
+    "richText",
+    "paragraph",
+    "heading",
+    "mathBlock",
+    "blockquote",
+    "bulletList",
+    "orderedList",
+    "taskList",
+    "codeBlock",
+    "horizontalRule",
+    "image",
+    "table",
+    "callout",
+    "toggle",
+    "stepper",
+    "widget",
+  ];
+  return {
+    doc: blockTypes,
+    surface: [
+      ...blockTypes,
+      "region",
+      "richText",
+      ...(resource ? ["surface", "drawing"] : []),
+    ],
+    region: [
+      ...blockTypes,
+      "region",
+      "richText",
+      ...(resource ? ["surface", "drawing"] : []),
+    ],
+    richText: blockTypes,
+    paragraph: ["text", "hardBreak", "mathInline", "inlineWidget"],
+    heading: ["text", "hardBreak", "mathInline", "inlineWidget"],
+    codeBlock: ["text"],
+    blockquote: blockTypes,
+    callout: blockTypes,
+    toggle: blockTypes,
+    stepper: ["step"],
+    step: blockTypes,
+    bulletList: ["listItem"],
+    orderedList: ["listItem"],
+    listItem: blockTypes,
+    taskList: ["taskItem"],
+    taskItem: blockTypes,
+    table: ["tableRow"],
+    tableRow: ["tableCell", "tableHeader"],
+    tableCell: blockTypes,
+    tableHeader: blockTypes,
+  }[type];
+}
+
+/**
+ * The node checks validateDocument applies to one subtree of a valid page,
+ * run on the subtree alone: JSON shape and depth, every node rule, the
+ * page-wide node count (`count` nodes outside it) and the child types its
+ * parent allows. Throws the error the whole-page check would throw for the
+ * subtree; relations to the rest of the page (ids, layout, views,
+ * bindings, capacity) are the caller's to check.
+ */
+export function validateSubtree(node, context) {
+  const depth = context.depth;
+  validateJson(node, context.path, 1 + 2 * depth);
+  const counter = {
+    count: context.count,
+    surface: context.surface,
+    resource: context.resource,
+    capacityMayGrow: false,
+  };
+  validateNode(node, context.path, counter, depth, context.parentType);
+  const allowed = childTypes(context.parentType, context.resource);
+  if (allowed && !allowed.includes(node.type))
+    throw new Error(`${context.parentPath} contains an invalid child block.`);
+  return counter.count - context.count;
 }
 
 /** The same timestamp rule is used for full documents and the source owner's

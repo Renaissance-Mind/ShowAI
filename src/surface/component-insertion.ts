@@ -49,6 +49,33 @@ export function nativeComponentDocument(
   });
 }
 /**
+ * The block a component that is not a native container becomes, and the
+ * frame it gets in a container: rich text, a primitive's native nodes, or
+ * a widget holding a copy of the data.
+ */
+export function componentBlock(
+  kind: string,
+  data: Record<string, unknown>,
+): { node: JSONContent; frame: NodeLayout } {
+  if (kind === "text")
+    return { node: createRichTextNode(data), frame: { x: 0, y: 0, width: 640 } };
+  if (primitiveNodeTypes[kind])
+    return {
+      node: data.document
+        ? createRichTextNode({ content: data.document, format: "richtext" })
+        : primitiveContentNode(kind, data, crypto.randomUUID()),
+      frame: { x: 0, y: 0, width: 640 },
+    };
+  return {
+    node: {
+      type: "widget",
+      attrs: { id: crypto.randomUUID(), kind, data: structuredClone(data) },
+    },
+    frame: { x: 0, y: 0, width: 640 },
+  };
+}
+
+/**
  * Every catalog item enters the same insertion path; containers remain native nodes.
  * An omitted afterId appends, null inserts first, and an id inserts after that sibling.
  */
@@ -85,15 +112,7 @@ export function insertComponent(
       `A step holds content blocks; insert ${kind} into a Page or Board instead.`,
     );
   let node: JSONContent, frame: NodeLayout;
-  if (kind === "text") {
-    node = createRichTextNode(data);
-    frame = { x: 0, y: 0, width: 640 };
-  } else if (primitiveNodeTypes[kind]) {
-    node = data.document
-      ? createRichTextNode({ content: data.document, format: "richtext" })
-      : primitiveContentNode(kind, data, crypto.randomUUID());
-    frame = { x: 0, y: 0, width: 640 };
-  } else if (definition?.insertion) {
+  if (definition?.insertion) {
     const incoming = remapSurfaceIds(nativeComponentDocument(kind, data));
     node = incoming.content;
     Object.assign(document.layout, incoming.layout);
@@ -109,13 +128,7 @@ export function insertComponent(
       height: 460,
       heightMode: surfaceKind(node) === "page" && !free ? "auto" : "fixed",
     };
-  } else {
-    node = {
-      type: "widget",
-      attrs: { id: crypto.randomUUID(), kind, data: structuredClone(data) },
-    };
-    frame = { x: 0, y: 0, width: 640 };
-  }
+  } else ({ node, frame } = componentBlock(kind, data));
   const free =
     (parent.type === "surface" && surfaceKind(parent) === "board") ||
     (parent.type === "region" &&

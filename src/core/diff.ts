@@ -25,6 +25,12 @@ import { CoreError, PAGE_OPERATION_FIELDS } from "./model";
 import { isSurface, reconcileSurface, fillSurfaceLayout } from "../document/document.mjs";
 import { walk } from "../document/walk.mjs";
 import { addressNode, mapNodes, updateNode } from "../document/update.mjs";
+import {
+  applyIncrementally,
+  batchState,
+  incrementalCandidate,
+  type BatchState,
+} from "./apply-incremental";
 import type {
   FieldChange,
   JSONContent,
@@ -326,10 +332,13 @@ function operationError(error: unknown, index: number, type: unknown) {
 }
 
 /**
- * Apply operations in order. Each one is applied to the result of the
- * previous one and completed, reconciled, validated and normalized before
- * the next, exactly as separate page_apply calls would be; the first
- * failure names its operation by index.
+ * Apply operations in order. The result, or the failure and its operation
+ * index, is the one separate page_apply calls would give: each operation is
+ * applied to the result of the previous one and completed, reconciled,
+ * validated and normalized before the next. Block inserts and text edits on
+ * a reconciled container page take the incremental path in
+ * apply-incremental.ts, which checks only the touched block and falls back
+ * to the full step whenever it cannot vouch for the same result.
  */
 export function applyOperations(
   document: ShowDocument,
@@ -342,6 +351,32 @@ export function applyOperations(
       "INVALID_DATA",
       "Expected at most 1000 page operations.",
     );
+  let current = document;
+  // Incremental steps work in place on a private result of a full step.
+  let state: BatchState | undefined;
+  let fresh = false;
+  for (const [offset, operation] of operations.entries()) {
+    if (fresh && incrementalCandidate(operation)) {
+      state ??= batchState(current);
+      fresh = false;
+    }
+    if (state && incrementalCandidate(operation) && applyIncrementally(state, operation)) {
+      current = state.document;
+      continue;
+    }
+    current = applyOperation(current, operation, firstIndex + offset);
+    state = undefined;
+    fresh = true;
+  }
+  return current;
+}
+
+/** applyOperations with every operation applied by a full step. */
+export function applyOperationsStepwise(
+  document: ShowDocument,
+  operations: PageOperation[],
+  firstIndex = 0,
+): ShowDocument {
   let current = document;
   for (const [offset, operation] of operations.entries())
     current = applyOperation(current, operation, firstIndex + offset);

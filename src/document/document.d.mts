@@ -35,3 +35,4 @@ export function placeTemplate(
 export function isReconciledSurface(
   document: import("../types").ShowDocument,
 ): boolean;
+export function stableId(seed: string): string;

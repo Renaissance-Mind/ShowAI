@@ -14,7 +14,8 @@ export const isSurface = (document) => document.content?.type === "surface";
 export const artifactVersion = (document) =>
   isResource(document) ? 3 : isSurface(document) ? 2 : 1;
 
-function stableId(seed) {
+/** The deterministic id assignSurfaceIds gives a node from its position. */
+export function stableId(seed) {
   let hash = 2166136261;
   for (const char of seed)
     hash = Math.imul(hash ^ char.charCodeAt(0), 16777619);
