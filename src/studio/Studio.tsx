@@ -2,22 +2,15 @@ import RemoteMcpApprovalDialog from "./RemoteMcpApprovalDialog";
 import MergeDialog from "./MergeDialog";
 import { trackDesktopPreviewActivity } from "./preview-work";
 import { revealSidebarRow } from "./sidebar-locate";
-import type { ProjectSyncRequest } from "./SyncSettings";
 import {
   PACKAGING_EVENT,
   type PackagingRequest,
 } from "../datasets/packaging-request";
 import accountFlowMessages from "../i18n/messages/accountFlow";
-import { coalescedTask } from "../lib/coalesced-task";
 import {
   emptyNavigationScope,
   folderSubtree,
-  libraryChange,
   queueNavigationScope,
-  mergeNavigationProjects,
-  refreshedContents,
-  retainEqual,
-  mergeNavigationScope,
   savedPageMoved,
   withCreatedFolder,
   withCreatedPage,
@@ -30,13 +23,12 @@ import {
 } from "./navigation-refresh";
 import { LatestRequest } from "./latest-request";
 import {
-  LibraryHistory,
   reverseMoves,
   type LibraryChange,
   type LibraryPlace,
 } from "./library-history";
-import { readNavigationCache, writeNavigationCache } from "./navigation-cache";
-import { applyLibraryMove, type LibraryContents } from "./library-move";
+import { readNavigationCache } from "./navigation-cache";
+import { applyLibraryMove } from "./library-move";
 import { ComponentLibraryContext } from "../components/ComponentLibrary";
 import { insertComponent } from "../surface/component-insertion";
 import { useAppearancePreference } from "../design/appearance-preference";
@@ -44,7 +36,6 @@ import { artifactVersion, findSurfaceNode } from "../document/document.mjs";
 import { upgradeResource } from "../document/containers.mjs";
 import {
   useCallback,
-  useDeferredValue,
   useEffect,
   useMemo,
   useRef,
@@ -91,9 +82,6 @@ import {
   MoreHorizontal,
   Sparkles,
   ListOrdered,
-  LayoutList,
-  LayoutGrid,
-  Grid2X2,
   Undo2,
   Redo2,
   Plus,
@@ -111,13 +99,9 @@ import {
 } from "../ui/icons";
 import type {
   ProjectSummary,
-  PageSummary,
   FolderMetadata,
-  ProjectGroup,
   SidebarOrganization,
-  DirectoryPreferences,
   DirectorySortBy,
-  UnreadableProject,
 } from "../core/model";
 import { orderSidebarProjects } from "../core/sidebar-order";
 import type {
@@ -126,9 +110,7 @@ import type {
   MenuCommand,
 } from "../host/protocol";
 import type {
-  BuiltinComponentMetadata,
   CompiledComponent,
-  ComponentCategory,
   TemplateMetadata,
   CatalogReadOptions,
   ComponentSource,
@@ -139,7 +121,6 @@ import { useDatabaseRecordPeek } from "./useDatabaseRecordPeek";
 import {
   EditorHistoryButtons,
   containerMenuItems,
-  type EditorControls,
 } from "../surface/EditorControls";
 import {
   IMPORT_DROP_LIMIT,
@@ -147,7 +128,6 @@ import {
 } from "./page-import";
 import { FIND_COMPONENT_EVENT } from "../components/blocks/ComponentStatus";
 import { desktop, errorMessage } from "../host/bridge";
-import { workbenchCapabilities } from "./capabilities";
 import { usePage, type LoadedPage } from "./usePage";
 import {
   LibraryRow,
@@ -168,12 +148,10 @@ import {
 } from "./PackagingDialog";
 import { formatSize } from "../lib/format-size";
 import PageThumbnail from "./PageThumbnail";
-import FolderThumbnail, { type FolderThumbnailEntry } from "./FolderThumbnail";
+import FolderThumbnail from "./FolderThumbnail";
 import {
   BatchPagesDialog,
   DirectorySelectionBar,
-  useDirectoryPageSelection,
-  useDirectoryMarquee,
   type PageDestination,
 } from "./DirectoryPageSelection";
 import PageIcon from "../components/PageIcon";
@@ -186,25 +164,19 @@ import {
   useLibraryDragController,
   type LibraryDrop,
 } from "./LibraryDrag";
-import { placeSidebarItem } from "../core/sidebar-order";
 import {
   directoryEntries,
   directorySortOptions,
   sortDirectoryItems,
 } from "../core/directory-sort";
-import { applySidebarReorder, type SidebarReorder } from "./sidebar-reorder";
-import { readSidebarExpansion, sidebarExpansionKey } from "./sidebar-state";
 import SidebarNavigation from "./SidebarNavigation";
-import TemplateNavigation, {
-  matchesTemplateType,
-  type TemplateType,
-} from "./TemplateNavigation";
+import TemplateNavigation from "./TemplateNavigation";
 import {
   latestTemplateVersions,
   templateHasPage,
 } from "./template-catalog-model";
 import TemplateThumbnail from "./TemplateThumbnail";
-import RecentPages, { recentPages, type RecentPage } from "./RecentPages";
+import RecentPages, { type RecentPage } from "./RecentPages";
 import { newMenuDestination, type CreationChoice } from "./new-menu";
 import QuickJump, { type WorkbenchCommand } from "./quick-jump/QuickJump";
 import quickJumpMessages from "../i18n/messages/quickJump";
@@ -216,7 +188,6 @@ import {
   BuiltinDocPage,
   DocsNavigation,
   useBuiltinDocFolders,
-  useBuiltinDocTitle,
 } from "./BuiltinDocs";
 import {
   builtinDocLink,
@@ -233,7 +204,6 @@ import {
   focusSaveBanner,
 } from "./SaveProblem";
 import { largestBlock } from "./save-problem";
-import { useSyncOverview } from "./useSyncOverview";
 import syncMessages from "../i18n/messages/sync";
 import WorkspaceTabs, { WorkspaceHistory } from "./WorkspaceTabs";
 import { WorkspaceSwipeNavigation } from "./WorkspaceSwipeNavigation";
@@ -267,11 +237,9 @@ import { commandKey, tabShortcut } from "../workbench/tab-shortcuts";
 import type { TabCommand } from "../host/protocol";
 import { useWindowFullscreen } from "./useWindowFullscreen";
 import { ComponentCatalog, ComponentNavigation } from "./ComponentCatalog";
-import {
-  groupComponents,
-  type ComponentFilter,
-  type CatalogComponent,
-  type CatalogCustomComponent,
+import type {
+  CatalogComponent,
+  CatalogCustomComponent,
 } from "../core/component-categories";
 import { TemplateDialog, ComponentDialog } from "./CatalogDialogs";
 import {
@@ -290,11 +258,6 @@ import {
   configureProblemRedaction,
   configureProblemPlatform,
   revealLabel,
-  labelProblem,
-  useProblemQueue,
-  useToasts,
-  type ReportOptions,
-  type ToastOptions,
   REPORT_PROBLEM_EVENT,
   type ReportProblemDetail,
 } from "../problems";
@@ -310,7 +273,6 @@ import LibraryMigrationDialog from "./LibraryMigrationDialog";
 import {
   SettingsNavigation,
   SettingsPanel,
-  type SettingsSection,
 } from "./Settings";
 import {
   getLocale,
@@ -329,7 +291,7 @@ import {
   flashBlocks,
   locateBlocks,
 } from "./ExternalChangeNotice";
-import { authorName, writerName } from "./external-change";
+import { authorName } from "./external-change";
 import AssistantWorkbench from "./assistant/AssistantWorkbench";
 import { CommentsPanel, CommentsToggle } from "../comments/CommentsPanel";
 import { referenceHeading } from "./assistant/targets";
@@ -347,11 +309,6 @@ import {
   type NavigationModifiers,
   type NavigationTarget,
 } from "../document/page-link.mjs";
-import { useSlidingIndicator } from "./useSlidingIndicator";
-import {
-  componentDisplayDescription,
-  componentDisplayName,
-} from "../components/component-display";
 import {
   DeleteDialog,
   FolderDialog,
@@ -361,15 +318,19 @@ import {
 } from "./shell/LibraryDialogs";
 import {
   DraftHeld,
-  LOAD_LIBRARY,
   operation,
-  type Catalog,
   type DialogState,
   type LoadedTemplate,
-  type ProjectScan,
   type View,
 } from "./shell/types";
 import { focusAssistantInput, focusPageTitle } from "./shell/focus";
+import { useStudioFeedback } from "./shell/useStudioFeedback";
+import { useLibraryState } from "./shell/useLibraryState";
+import { useRouteState } from "./shell/useRouteState";
+import { useCatalogState } from "./shell/useCatalogState";
+import { useDialogState, useSaveConflictDialog } from "./shell/useDialogState";
+import { useMenuState } from "./shell/menus/useMenuState";
+import { useDirectory } from "./shell/useDirectory";
 
 
 const recentLoading = <div className="studio-welcome" aria-busy="true" />;
@@ -398,10 +359,7 @@ export default function Studio() {
   useEffect(() => {
     trackDesktopPreviewActivity();
   }, []);
-  const receivingInvite = useRef(false);
-  const [syncNavigationKey, setSyncNavigationKey] = useState(0);
   const accountFlow = useTranslator(accountFlowMessages);
-  const [syncRequest, setSyncRequest] = useState<ProjectSyncRequest>();
   const t = useTranslator(studioMessages);
   const tc = useTranslator(commonMessages);
   const tfind = useTranslator(findMessages);
@@ -411,9 +369,6 @@ export default function Studio() {
   const tq = useTranslator(quickJumpMessages);
   const tshell = useTranslator(shellMessages);
   const tfeedback = useTranslator(feedbackMessages);
-  // 关于与反馈 opens on its report form or diagnostics preview on request.
-  const [feedbackRequest, setFeedbackRequest] = useState<FeedbackRequest>();
-  const feedbackRequestId = useRef(0);
   const tps = useTranslator(pageSessionMessages);
   useEffect(() => {
     const wake = () => {
@@ -431,124 +386,161 @@ export default function Studio() {
       window.removeEventListener("online", wake);
     };
   }, []);
-  const [navigationUpdating, setNavigationUpdating] = useState(true);
-  const [workspaceReady, setWorkspaceReady] = useState(false);
-  const [routing, setRouting] = useState(false);
-  const routingRef = useRef(false);
-  const catalogLoaded = useRef(false);
-  const [catalogLoading, setCatalogLoading] = useState(true);
   const windowFullscreen = useWindowFullscreen();
-  const [info, setInfo] = useState<DesktopInfo | null>(null);
-  const capabilities = workbenchCapabilities(info?.platform);
-  const externalChangesAvailable =
-    capabilities.externalChanges && info?.libraryVersion === 2;
-  // Built-in documentation; the website workbench publishes its own instead.
-  const [docPage, setDocPage] = useState<{ id: string; hash: string } | null>(
-    null,
-  );
-  const docsAvailable = !!info && info.builtinDocs !== false;
-  const showDocs = docsAvailable;
-  const docTitle = useBuiltinDocTitle();
+  const feedback = useStudioFeedback();
+  const {
+    toasts,
+    setNotice,
+    problemQueue,
+    notifyWithUndo,
+    report,
+    resolveProblem,
+    draftHeld,
+    action,
+  } = feedback;
+  const library = useLibraryState(feedback);
+  const {
+    navigationUpdating,
+    info,
+    setInfo,
+    capabilities,
+    externalChangesAvailable,
+    projects,
+    setProjects,
+    unreadableProjects,
+    dismissedUnreadable,
+    setDismissedUnreadable,
+    savedOrganization,
+    setOrganization,
+    organization,
+    pendingReorders,
+    setPendingReorders,
+    reorderQueue,
+    sidebarRevision,
+    reorderCount,
+    syncOverview,
+    projectSyncMarker,
+    setContents,
+    setPendingLibraryMove,
+    contents,
+    expandedProjects,
+    setExpandedProjects,
+    expandedFolders,
+    setExpandedFolders,
+    collapsedSections,
+    setCollapsedSections,
+    sidebarHome,
+    libraryHistory,
+    historyBusy,
+    refreshLibraryHistory,
+    rememberLibraryChange,
+    loadProjectContents,
+    refresh,
+    refreshProjects,
+    expandFolderPath,
+    toggleProject,
+    folderPreferences,
+    projectTarget,
+    folderTarget,
+    pageTarget,
+  } = library;
+  const route = useRouteState({ info, capabilities });
+  const {
+    receivingInvite,
+    syncNavigationKey,
+    setSyncNavigationKey,
+    syncRequest,
+    setSyncRequest,
+    feedbackRequest,
+    setFeedbackRequest,
+    feedbackRequestId,
+    workspaceReady,
+    setWorkspaceReady,
+    routing,
+    setRouting,
+    routingRef,
+    docPage,
+    setDocPage,
+    showDocs,
+    docTitle,
+    selectedProject,
+    setSelectedProject,
+    selectedFolder,
+    setSelectedFolder,
+    view,
+    setView,
+    settingsSection,
+    setSettingsSection,
+    query,
+    setQuery,
+    searchLibrary,
+    setSearchLibrary,
+    deferredQuery,
+    restoredSearch,
+    revealNode,
+    setRevealNode,
+    editorControls,
+    setEditorControls,
+    handleRevealHandled,
+    catalogScrollRef,
+    selectedRef,
+    selectedFolderRef,
+  } = route;
   const locale = useLocale();
-  const [projects, setProjects] = useState<ProjectSummary[]>([]);
-  const [unreadableProjects, setUnreadableProjects] = useState<
-    UnreadableProject[]
-  >([]);
-  const [dismissedUnreadable, setDismissedUnreadable] = useState<string[]>([]);
-  const [savedOrganization, setOrganization] = useState<SidebarOrganization>({
-    groups: [],
-    projectGroups: {},
-  });
-  const [pendingReorders, setPendingReorders] = useState<
-    (SidebarReorder & { token: number; home: string })[]
-  >([]);
-  const reorderQueue = useRef(Promise.resolve());
-  const sidebarRevision = useRef(0);
-  const reorderCount = useRef(0);
-  const organization = useMemo(
-    () =>
-      pendingReorders
-        .filter((move) => move.home === info?.home)
-        .reduce(applySidebarReorder, savedOrganization),
-    [pendingReorders, savedOrganization, info?.home],
-  );
-  useEffect(
-    () =>
-      desktop.onBeforeClose(async () => {
-        await reorderQueue.current;
-        return true;
-      }, "sidebar"),
-    [],
-  );
-  const [groupMenu, setGroupMenu] = useState<{
-    group: ProjectGroup;
-    anchor: HTMLElement;
-  } | null>(null);
-  const [selectedProject, setSelectedProject] = useState<string | null>(null);
-  // Sync state for project rows, the page header and workbench banners.
-  const syncOverview = useSyncOverview(info?.home);
-  const syncReadOnly = syncOverview.loaded
-    ? syncOverview.markers.get(selectedProject ?? "") === "readOnly"
-    : undefined;
   const ts = useTranslator(syncMessages);
-  const projectSyncMarker = (projectId: string) => {
-    const marker = syncOverview.markers.get(projectId);
-    if (!marker) return undefined;
-    const binding = syncOverview.bindings.get(projectId);
-    return {
-      label: ts(
-        marker === "readOnly"
-          ? "marker.readOnly"
-          : marker === "signIn"
-            ? "marker.signIn"
-            : "marker.unsynced",
-      ),
-      title: binding?.error,
-      tone: marker === "readOnly" ? ("muted" as const) : ("warning" as const),
-    };
-  };
-  const selectedMarker = selectedProject
-    ? projectSyncMarker(selectedProject)
-    : undefined;
-  const [savedContents, setContents] = useState<LibraryContents>({});
-  const [pendingLibraryMove, setPendingLibraryMove] = useState<{
-    home: string;
-    drop: LibraryDrop;
-  } | null>(null);
-  const contents = useMemo(
-    () =>
-      pendingLibraryMove && pendingLibraryMove.home === info?.home
-        ? applyLibraryMove(savedContents, pendingLibraryMove.drop)
-        : savedContents,
-    [savedContents, pendingLibraryMove, info?.home],
-  );
-  const [selectedFolder, setSelectedFolder] = useState<string | null>(null);
-  const [expandedProjects, setExpandedProjects] = useState<
-    Record<string, boolean>
-  >({});
-  const [expandedFolders, setExpandedFolders] = useState<
-    Record<string, boolean>
-  >({});
-  const [collapsedSections, setCollapsedSections] = useState<
-    Record<string, boolean>
-  >({});
-  const sidebarHome = useRef<string | null>(null);
-  const expandedRef = useRef(expandedProjects);
-  expandedRef.current = expandedProjects;
-  const pages = selectedProject ? (contents[selectedProject]?.pages ?? []) : [];
-  const folders = selectedProject
-    ? (contents[selectedProject]?.folders ?? [])
-    : [];
-  const [view, setView] = useState<View>(() =>
-    new URLSearchParams(location.search).has("invite")
-      ? "settings"
-      : "projects",
-  );
   const appUpdate = useAppUpdate();
-  const [settingsSection, setSettingsSection] = useState<SettingsSection>(() =>
-    new URLSearchParams(location.search).has("invite") || !capabilities.manageLibrary
-      ? "sync" : "general",
-  );
+  const {
+    catalogLoaded,
+    catalogLoading,
+    showTemplateVersions,
+    setShowTemplateVersions,
+    templateType,
+    setTemplateType,
+    catalogScope,
+    setCatalogScope,
+    componentProject,
+    setComponentProject,
+    componentProjectRef,
+    componentFilter,
+    setComponentFilter,
+    componentSourceTabs,
+    componentCategory,
+    setComponentCategory,
+    catalogQueries,
+    setCatalogQueries,
+    componentGroups,
+    loadCatalog,
+    catalogTemplates,
+    visibleTemplates,
+  } = useCatalogState(route);
+  const dialogs = useDialogState();
+  const { dialog, setDialog, dialogRef, closeDialog } = dialogs;
+  const menus = useMenuState();
+  const {
+    groupMenu,
+    setGroupMenu,
+    directoryView,
+    viewMenu,
+    setViewMenu,
+    viewOptions,
+    viewIcon,
+    chooseDirectoryView,
+    directoryViewControl,
+    contextMenu,
+    setContextMenu,
+    projectsMenu,
+    setProjectsMenu,
+    newMenu,
+    setNewMenu,
+    exportMenu,
+    setExportMenu,
+    exportSiteButton,
+    pageExportMenu,
+    setPageExportMenu,
+    exportTarget,
+    setExportTarget,
+    showMenu,
+  } = menus;
   useEffect(() => {
     const host = window as Window & { showaiPendingInvite?: string };
     const receive = (event?: Event) => {
@@ -663,33 +655,6 @@ export default function Studio() {
     window.addEventListener(FIND_COMPONENT_EVENT, find);
     return () => window.removeEventListener(FIND_COMPONENT_EVENT, find);
   });
-  const [templates, setTemplates] = useState<TemplateMetadata[]>([]);
-  const [showTemplateVersions, setShowTemplateVersions] = useState(false);
-  const [templateType, setTemplateType] = useState<TemplateType>("all");
-  const [catalog, setCatalog] = useState<Catalog>({ builtin: [], custom: [] });
-  const [catalogScope, setCatalogScope] =
-    useState<CatalogReadOptions["scope"]>("all");
-  const catalogScopeRef = useRef(catalogScope);
-  catalogScopeRef.current = catalogScope;
-  const [query, setQuery] = useState("");
-  const [searchLibrary, setSearchLibrary] = useState(false);
-  // Lists filter on the deferred query so typing stays responsive.
-  const deferredQuery = useDeferredValue(query);
-  // A history entry brings back the search it was left with; other view
-  // changes start without one.
-  const restoredSearch = useRef<{
-    view: View;
-    query: string;
-    library: boolean;
-  } | null>(null);
-  useEffect(() => {
-    const restored =
-      restoredSearch.current?.view === view ? restoredSearch.current : null;
-    restoredSearch.current = null;
-    setSearchLibrary(restored?.library ?? false);
-    setQuery(restored?.query ?? "");
-  }, [view]);
-  const [dialog, setDialog] = useState<DialogState>(null);
   const [importPlan, setImportPlan] = useState<{
     plan: StagedImportPlan;
     destination: string;
@@ -712,137 +677,22 @@ export default function Studio() {
     plan: PackagingPlan;
     decide: (decisions: PackagingDecisions | null) => void;
   } | null>(null);
-  const dialogRef = useRef(dialog);
   const creatingPage = useRef(false);
-  dialogRef.current = dialog;
-  const toasts = useToasts();
-  const { show: showToast, clear: clearToasts } = toasts;
-  /** L1 toast; an empty message clears transient toasts. */
-  const setNotice = useCallback(
-    (message: string, options?: ToastOptions) => {
-      if (message) showToast(message, options);
-      else clearToasts();
-    },
-    [showToast, clearToasts],
-  );
-  const problemQueue = useProblemQueue();
-  // Undoable notices: the toast carries a 撤销 action and stays 10 s.
-  const notifyWithUndo = (message: string, run: () => Promise<unknown>) => {
-    showToast(message, {
-      kind: "success",
-      duration: 10000,
-      action: { label: tn("undo"), onSelect: () => void run().catch(report) },
-    });
-  };
   const [busy, setBusy] = useState(false);
-  const [revealNode, setRevealNode] = useState<string | null>(null);
-  const [editorControls, setEditorControls] = useState<EditorControls | null>(
-    null,
-  );
   const activeSurface = useRef<{ pageId: string; surfaceId: string } | null>(
     null,
   );
-  const [directoryView, setDirectoryView] = useState<
-    "list" | "small" | "medium" | "large"
-  >(() => {
-    const saved = localStorage.getItem("showai:directory-view");
-    return saved === "small" || saved === "medium" || saved === "large"
-      ? saved
-      : "list";
-  });
-  const [viewMenu, setViewMenu] = useState<HTMLElement | null>(null);
-  const viewOptions = ["list", "small", "medium", "large"] as const;
-  const viewIcon = (mode: typeof directoryView) =>
-    mode === "list" ? (
-      <LayoutList size={16} />
-    ) : mode === "small" ? (
-      <LayoutGrid size={16} />
-    ) : (
-      <Grid2X2 size={mode === "large" ? 20 : 16} />
-    );
-  const chooseDirectoryView = (mode: typeof directoryView) => {
-    setDirectoryView(mode);
-    localStorage.setItem("showai:directory-view", mode);
-  };
-  const directoryViewControl = (): LibraryContextMenuItem => ({
-    label: t("directoryView"),
-    icon: <LayoutGrid size={15} />,
-    control: (
-      <div
-        className="directory-view-switch"
-        role="group"
-        aria-label={t("directoryView")}
-      >
-        {viewOptions.map((mode) => (
-          <button
-            key={mode}
-            type="button"
-            title={t(`view.${mode}`)}
-            aria-label={t(`view.${mode}`)}
-            aria-pressed={directoryView === mode}
-            onClick={() => chooseDirectoryView(mode)}
-          >
-            {viewIcon(mode)}
-          </button>
-        ))}
-      </div>
-    ),
-  });
-  const [contextMenu, setContextMenu] = useState<{
-    target: LibraryTarget;
-    anchor: HTMLElement;
-    point?: LibraryMenuPoint;
-    pageTools?: boolean;
-    creationOnly?: boolean;
-    /** The directory's selected entries, acted on together. */
-    selection?: boolean;
-  } | null>(null);
-  const [projectsMenu, setProjectsMenu] = useState<HTMLElement | null>(null);
-  const [newMenu, setNewMenu] = useState<HTMLElement | null>(null);
   const [externalChangeCount, setExternalChangeCount] = useState(0);
-  const [exportMenu, setExportMenu] = useState<HTMLElement | null>(null);
-  const exportSiteButton = useRef<HTMLButtonElement>(null);
-  const [fileDrop, setFileDrop] = useState(false);
   const [assistantPrefill, setAssistantPrefill] = useState<{
     key: string;
     pageId: string;
     text: string;
   } | null>(null);
-  const [pageExportMenu, setPageExportMenu] = useState<HTMLElement | null>(
-    null,
-  );
-  /** A sidebar or directory page whose Export menu is open; else the open page. */
-  const [exportTarget, setExportTarget] = useState<LibraryTarget | null>(null);
   const [exportReceipt, setExportReceipt] = useState<{
     message: string;
     path: string;
   } | null>(null);
   const appearance = useAppearancePreference();
-  const [componentProject, setComponentProject] = useState("all");
-  const componentProjectRef = useRef(componentProject);
-  componentProjectRef.current = componentProject;
-  const [componentFilter, setComponentFilter] =
-    useState<ComponentFilter>("all");
-  const componentSourceTabs = useSlidingIndicator<HTMLElement>(componentFilter);
-  const [componentCategory, setComponentCategory] =
-    useState<ComponentCategory | null>(null);
-  const [catalogQueries, setCatalogQueries] = useState({
-    components: "",
-    templates: "",
-  });
-  const componentGroups = useMemo(
-    () =>
-      groupComponents(catalog, componentFilter).map((group) => ({
-        ...group,
-        items: group.items.filter((item) =>
-          `${item.name} ${item.description} ${componentDisplayName(item)} ${componentDisplayDescription(item)}`
-            .toLowerCase()
-            .includes(catalogQueries.components.toLowerCase()),
-        ),
-      })),
-    [catalog, componentFilter, catalogQueries.components],
-  );
-  const catalogScrollRef = useRef<HTMLDivElement>(null);
   const page = usePage(info?.home);
   const activePageId = page.draft?.id;
   // Built-in docs are read-only pages: find works there without replace.
@@ -865,6 +715,12 @@ export default function Studio() {
       ].find((shell) => shell.getClientRects().length > 0) ?? null,
     [],
   );
+  const { deferConflict } = useSaveConflictDialog({
+    route,
+    page,
+    dialogs,
+    feedback,
+  });
   const handleActiveSurfaceChange = useCallback(
     (surfaceId: string) => {
       if (activePageId)
@@ -872,103 +728,30 @@ export default function Studio() {
     },
     [activePageId],
   );
-  const handleRevealHandled = useCallback(() => setRevealNode(null), []);
-  const shownSaveFailure = useRef("");
-  // A conflict the person dismissed stays closed (its banner remains) until a
-  // later save attempt fails again or another conflict appears.
-  const deferredSaveFailure = useRef("");
-  const saveFailureIdentity = () =>
-    JSON.stringify([
-      selectedProject,
-      page.draft?.id,
-      page.conflictId,
-      page.saveFailureAttempt,
-    ]);
-  useEffect(() => {
-    if (
-      view !== "page" ||
-      page.status !== "conflict" ||
-      page.reviewingConflict ||
-      !page.draft ||
-      !selectedProject
-    )
-      return;
-    const key = JSON.stringify([
-      selectedProject,
-      page.draft.id,
-      page.conflictId,
-      page.mergeBase,
-      page.error,
-      page.saveFailureAttempt,
-    ]);
-    if (
-      shownSaveFailure.current === key ||
-      deferredSaveFailure.current === saveFailureIdentity()
-    )
-      return;
-    shownSaveFailure.current = key;
-    if (page.conflictId)
-      setDialog({
-        type: "externalConflict",
-        id: page.conflictId,
-        saveFailure: true,
-      });
-    else if (page.mergeBase)
-      setDialog({
-        type: "merge",
-        projectId: selectedProject,
-        document: structuredClone(page.draft),
-        baseRevision: page.mergeBase,
-        saveFailure: true,
-      });
-  }, [
-    view,
-    selectedProject,
-    page.status,
-    page.reviewingConflict,
-    page.draft,
-    page.conflictId,
-    page.mergeBase,
-    page.error,
-    page.saveFailureAttempt,
-  ]);
-  const project = projects.find((item) => item.id === selectedProject);
-  const selectedRef = useRef(selectedProject);
-  selectedRef.current = selectedProject;
-  const selectedFolderRef = useRef(selectedFolder);
-  selectedFolderRef.current = selectedFolder;
   const initialized = useRef(false);
-  const closeDialog = useCallback(() => setDialog(null), []);
 
-  const { report: queueProblem, resolve: resolveProblem } = problemQueue;
-  /**
-   * Shows a failed operation in the problem queue. Pass the operation name
-   * (`{ action: te("op.exportSite") }`) so the title says what failed; a
-   * later success of the same operation clears it via resolveProblem.
-   */
-  const report = useCallback(
-    (error: unknown, options?: ReportOptions) => {
-      // An action refused over an unresolved draft answers next to the action;
-      // the conflict banner already holds the notice stack.
-      if (error instanceof DraftHeld)
-        showToast(error.message, { kind: "warning", duration: 6000 });
-      else queueProblem(error, options);
-    },
-    [queueProblem, showToast],
-  );
-  // Dismissing a conflict dialog defers the decision: the unsaved edits stay
-  // in the local draft and the save-conflict banner reopens the dialog.
-  const deferConflict = () => {
-    deferredSaveFailure.current = saveFailureIdentity();
-    closeDialog();
-    void page.retainDraft().catch((error: unknown) =>
-      report(error, { safety: "windowOnly" }),
-    );
-  };
   useEffect(() => {
     configureProblemRedaction(info?.home ? { library: info.home } : {});
   }, [info?.home]);
   useEffect(() => configureProblemPlatform(info?.platform), [info?.platform]);
+  const directory = useDirectory({ library, route, dialogs, menus });
+  const {
+    syncReadOnly,
+    selectedMarker,
+    pages,
+    folders,
+    fileDrop,
+    setFileDrop,
+    project,
+    recent,
+    currentFolder,
+    visibleEntries,
+    folderThumbnailEntries,
+    pageSelection,
+    directoryMarquee,
+    selectedPageTargets,
+    breadcrumbFolders,
+  } = directory;
   useEffect(() => {
     if (view !== "page") return;
     const refreshPage = () => {
@@ -992,156 +775,6 @@ export default function Studio() {
       window.removeEventListener("keydown", key, true);
     };
   }, [view, page.reloadCurrent, report]);
-  const loadProjectContents = useCallback(async (id: string) => {
-    const [nextPages, nextFolders] = await Promise.all([
-      desktop.invoke<PageSummary[]>("pages:list", { projectId: id }),
-      desktop.invoke<FolderMetadata[]>("folders:list", { projectId: id }),
-    ]);
-    const next = { pages: nextPages, folders: nextFolders };
-    setContents((current) => ({ ...current, [id]: next }));
-    return next;
-  }, []);
-  const navigationScope = useRef(emptyNavigationScope());
-  // Counts library switches; a refresh started before one discards its reads.
-  const libraryGeneration = useRef(0);
-  useEffect(
-    () =>
-      desktop.onChange((change) => {
-        if (change.type === "home") libraryGeneration.current++;
-      }),
-    [],
-  );
-  const navigationState = useRef({ projects, organization: savedOrganization });
-  navigationState.current = { projects, organization: savedOrganization };
-  const refreshNavigation = useMemo(
-    () =>
-      coalescedTask(async () => {
-        const requested = navigationScope.current;
-        navigationScope.current = emptyNavigationScope();
-        try {
-          const revision = sidebarRevision.current;
-          const generation = libraryGeneration.current;
-          const appInfo = await desktop.invoke<DesktopInfo>("app:info");
-          const scope = { expectedHome: appInfo.home };
-          const changedHome = sidebarHome.current !== appInfo.home;
-          const full = requested.all || changedHome;
-          const [scanned, sidebar] = await Promise.all([
-            full || requested.ids.size
-              ? desktop.invoke<ProjectScan>("projects:scan", {
-                  ...scope,
-                  ...(full ? {} : { projectIds: [...requested.ids] }),
-                })
-              : Promise.resolve({ projects: [], unreadable: [] } as ProjectScan),
-            full || requested.sidebar
-              ? desktop.invoke<SidebarOrganization>("sidebar:get", scope)
-              : Promise.resolve(navigationState.current.organization),
-          ]);
-          if (generation !== libraryGeneration.current) return;
-          if (changedHome) {
-            libraryHistory.current.clear();
-            refreshLibraryHistory((value) => value + 1);
-            const saved = readSidebarExpansion(appInfo.home);
-            sidebarHome.current = appInfo.home;
-            expandedRef.current = saved.projects;
-            setExpandedProjects(saved.projects);
-            setExpandedFolders(saved.folders);
-            setCollapsedSections(saved.collapsedSections);
-          }
-          setInfo((current) => retainEqual(current, appInfo));
-          const next = scanned.projects;
-          if (full || requested.ids.size)
-            setUnreadableProjects((current) =>
-              retainEqual(
-                current,
-                full
-                  ? scanned.unreadable
-                  : [
-                      ...current.filter(
-                        (item) => !requested.ids.has(item.directory),
-                      ),
-                      ...scanned.unreadable,
-                    ],
-              ),
-            );
-          const nextProjects = mergeNavigationProjects(
-            navigationState.current.projects,
-            next,
-            full ? undefined : requested.ids,
-          );
-          navigationState.current.projects = nextProjects;
-          setProjects(nextProjects);
-          if (
-            changedHome ||
-            (revision === sidebarRevision.current && !reorderCount.current)
-          ) {
-            setOrganization((current) => retainEqual(current, sidebar));
-            navigationState.current.organization = sidebar;
-          }
-          setNavigationUpdating(false);
-          performance.clearMarks("showai:navigation-current");
-          performance.mark("showai:navigation-current");
-          try {
-            writeNavigationCache(localStorage, {
-              home: appInfo.home,
-              projects: nextProjects,
-              organization: sidebar,
-            });
-          } catch (error) {
-            console.warn("Could not cache the project list", error);
-          }
-          // Folders come with the scan; only pages are read per project.
-          const nextContents = await Promise.all(
-            next.map(async (project) => ({
-              project,
-              pages: await desktop.invoke<PageSummary[]>("pages:list", {
-                projectId: project.id,
-                expectedHome: appInfo.home,
-              }),
-            })),
-          );
-          if (generation !== libraryGeneration.current) return;
-          setContents((current) =>
-            refreshedContents(current, nextContents, {
-              full,
-              ids: requested.ids,
-            }),
-          );
-        } catch (error) {
-          // A failed scoped read must remain pending when another change asks for a retry.
-          mergeNavigationScope(navigationScope.current, requested);
-          // The failure is reported; the list must not look like it is still loading.
-          setNavigationUpdating(false);
-          throw error;
-        }
-      }),
-    [],
-  );
-  const refresh = useCallback(
-    (change?: DesktopChange) => {
-      queueNavigationScope(navigationScope.current, change);
-      return refreshNavigation().then(
-        (value) => {
-          resolveProblem(LOAD_LIBRARY);
-          return value;
-        },
-        (error: unknown) => {
-          throw labelProblem(error, {
-            action: operation("op.loadLibrary"),
-            key: LOAD_LIBRARY,
-          });
-        },
-      );
-    },
-    [refreshNavigation, resolveProblem],
-  );
-  /** Confirms an operation by reading only the projects it changed. */
-  const refreshProjects = (
-    projectIds: string[],
-    options?: { sidebar?: boolean; pageIds?: string[] },
-  ) =>
-    info?.home
-      ? refresh(libraryChange(info.home, projectIds, options))
-      : refresh();
   /** Before an action on the open page itself: it must be saved, conflict or not. */
   async function saveOpenPage() {
     if (!(await page.flush())) throw new DraftHeld(t("resolveDraftFirst"));
@@ -1239,95 +872,6 @@ export default function Studio() {
     info && capabilities.manageLibrary ? info.home : null,
     refresh,
     report,
-  );
-  const loadCatalog = useMemo(
-    () => {
-      const load = coalescedTask(async () => {
-        const id = selectedRef.current;
-        const requestedScope = catalogScopeRef.current;
-        const scope = {
-          ...(id ? { projectId: id } : {}),
-          scope: requestedScope,
-        };
-        const requestedProject = componentProjectRef.current;
-        const loadComponents = async (): Promise<CatalogComponent[]> => {
-          if (requestedProject !== "all") {
-            const project = (
-              await desktop.invoke<ProjectScan>("projects:scan")
-            ).projects.find((item) => item.id === requestedProject);
-            if (!project) {
-              componentProjectRef.current = "all";
-              setComponentProject("all");
-              return [];
-            }
-            const items = await desktop.invoke<CatalogComponent[]>(
-              "components:list",
-              { projectId: requestedProject, scope: "all" },
-            );
-            return items.map((item) =>
-              !("kind" in item) && item.scope === "project"
-                ? {
-                    ...item,
-                    projectId: requestedProject,
-                    projectName: project?.name,
-                  }
-                : item,
-            );
-          }
-          const [shared, allProjects] = await Promise.all([
-            desktop.invoke<CatalogComponent[]>("components:list", {
-              scope: "all",
-            }),
-            desktop
-              .invoke<ProjectScan>("projects:scan")
-              .then((scan) => scan.projects),
-          ]);
-          const local = await Promise.all(
-            allProjects.map(async (project) => {
-              const items = await desktop.invoke<CatalogCustomComponent[]>(
-                "components:list",
-                { projectId: project.id, scope: "project" },
-              );
-              return items.map((item) => ({
-                ...item,
-                projectId: project.id,
-                projectName: project.name,
-              }));
-            }),
-          );
-          return [...shared, ...local.flat()];
-        };
-        const [nextTemplates, nextCatalog] = await Promise.all([
-          desktop.invoke<TemplateMetadata[]>("templates:list", scope),
-          loadComponents(),
-        ]);
-        if (
-          selectedRef.current !== id ||
-          catalogScopeRef.current !== requestedScope ||
-          componentProjectRef.current !== requestedProject
-        )
-          return;
-        catalogLoaded.current = true;
-        setTemplates(nextTemplates);
-        setCatalog({
-          builtin: nextCatalog.filter(
-            (item): item is BuiltinComponentMetadata => "kind" in item,
-          ),
-          custom: nextCatalog.filter(
-            (item): item is CatalogCustomComponent => !("kind" in item),
-          ),
-        });
-      });
-      return async () => {
-        setCatalogLoading(true);
-        try {
-          await load();
-        } finally {
-          setCatalogLoading(false);
-        }
-      };
-    },
-    [],
   );
 
   useEffect(() => {
@@ -1446,17 +990,6 @@ export default function Studio() {
   ]);
 
   useEffect(() => {
-    if (!info || sidebarHome.current !== info.home) return;
-    localStorage.setItem(
-      sidebarExpansionKey(info.home),
-      JSON.stringify({
-        projects: expandedProjects,
-        folders: expandedFolders,
-        collapsedSections,
-      }),
-    );
-  }, [info?.home, expandedProjects, expandedFolders, collapsedSections]);
-  useEffect(() => {
     if (!exportReceipt) return;
     const timer = setTimeout(() => setExportReceipt(null), 10000);
     return () => clearTimeout(timer);
@@ -1545,11 +1078,6 @@ export default function Studio() {
     };
   }, [externalChangesAvailable, !!dialog, info?.home]);
 
-  /** A page that could not keep its edits holds navigation; say so instead of doing nothing. */
-  function draftHeld(): false {
-    report(new DraftHeld(t("resolveDraftFirst")));
-    return false;
-  }
   // Navigation runs one request at a time; a click made meanwhile wins over
   // the one still loading, and runs as soon as it settles.
   const routes = useRef<{
@@ -1892,14 +1420,6 @@ export default function Studio() {
     });
     setContextMenu(null);
     setDialog({ type: "newPage", projectId, parentId, templates: choices });
-  }
-  function expandFolderPath(items: FolderMetadata[], parentId: string | null) {
-    const expanded: Record<string, boolean> = {};
-    while (parentId && !expanded[parentId]) {
-      expanded[parentId] = true;
-      parentId = items.find((item) => item.id === parentId)?.parentId ?? null;
-    }
-    setExpandedFolders((current) => ({ ...current, ...expanded }));
   }
   /** Scroll the navigation to the open page, expanding whatever hides it. */
   async function locateCurrentPage() {
@@ -2299,43 +1819,6 @@ export default function Studio() {
       setBusy(false);
     }
   }
-  const projectTarget = (item: ProjectSummary): LibraryTarget => ({
-    kind: "project",
-    projectId: item.id,
-    id: item.id,
-    title: item.name,
-    icon: item.icon,
-    pinned: !!item.pinned,
-    parentId: null,
-  });
-  const folderTarget = (
-    item: FolderMetadata,
-    projectId: string,
-  ): LibraryTarget => ({
-    kind: "folder",
-    projectId,
-    id: item.id,
-    title: item.name,
-    icon: item.icon,
-    pinned: !!item.pinned,
-    parentId: item.parentId ?? null,
-  });
-  const pageTarget = (item: PageSummary, projectId: string): LibraryTarget => ({
-    kind: "page",
-    projectId,
-    id: item.id,
-    title: item.title || tc("untitled"),
-    icon: item.icon,
-    pinned: !!item.favorite,
-    parentId: item.parentId ?? null,
-    ...(item.agentCreated
-      ? {
-          agentCreated: item.agentCreated.label
-            ? writerName(item.agentCreated.label)
-            : "Agent",
-        }
-      : {}),
-  });
   const activePageTarget = (): LibraryTarget | null =>
     page.draft && page.projectId
       ? {
@@ -2361,19 +1844,6 @@ export default function Studio() {
     await openPage(result.document.id, target.projectId);
     await refreshProjects([target.projectId]);
   }
-  const showMenu = (
-    target: LibraryTarget,
-    anchor: HTMLElement,
-    point?: LibraryMenuPoint,
-    pageTools = false,
-    creationOnly = false,
-    selection = false,
-  ) =>
-    setContextMenu((current) =>
-      !point && current?.anchor === anchor && current.target.id === target.id
-        ? null
-        : { target, anchor, point, pageTools, creationOnly, selection },
-    );
   /** Creates one kind of content in a project or folder. */
   function runCreation(
     choice: CreationChoice,
@@ -2816,52 +2286,6 @@ export default function Studio() {
       record,
     });
   }
-  async function toggleProject(id: string) {
-    if (!expandedProjects[id]) await loadProjectContents(id);
-    setExpandedProjects((current) => ({ ...current, [id]: !current[id] }));
-  }
-  function folderPreferences(
-    projectId: string,
-    parentId: string | null,
-  ): DirectoryPreferences {
-    const current = contents[projectId];
-    const saved =
-      parentId === null
-        ? projects.find((item) => item.id === projectId)
-        : current?.folders.find((item) => item.id === parentId);
-    let preferences: DirectoryPreferences = saved ?? {};
-    for (const move of pendingReorders.filter(
-      (move) =>
-        move.home === info?.home &&
-        move.projectId === projectId &&
-        move.parentId === parentId,
-    )) {
-      const entries = directoryEntries(
-        current?.folders ?? [],
-        current?.pages ?? [],
-      ).filter((item) => item.parentId === parentId);
-      if (
-        !entries.some((item) => item.id === move.id) ||
-        (move.relativeId &&
-          !entries.some((item) => item.id === move.relativeId))
-      )
-        continue;
-      preferences = {
-        sortBy: "manual",
-        manualOrder: placeSidebarItem(
-          sortDirectoryItems(
-            entries,
-            preferences,
-            savedOrganization.entryOrder?.[projectId],
-          ).map((item) => item.id),
-          move.id,
-          move.relativeId,
-          move.placement,
-        ),
-      };
-    }
-    return preferences;
-  }
   async function changeDirectorySort(
     target: LibraryTarget,
     sortBy: DirectorySortBy,
@@ -2939,15 +2363,6 @@ export default function Studio() {
     }));
   }
   const movingLibrary = useRef(false);
-  // Cmd+Z in the library reverses moves, deletions and renames, newest first.
-  const libraryHistory = useRef<LibraryHistory>(null!);
-  libraryHistory.current ??= new LibraryHistory();
-  const historyBusy = useRef(false);
-  const [, refreshLibraryHistory] = useState(0);
-  function rememberLibraryChange(entry: LibraryChange) {
-    libraryHistory.current.record(entry);
-    refreshLibraryHistory((value) => value + 1);
-  }
   function inverseLibraryDrop(drop: LibraryDrop): LibraryDrop {
     const source = drop.source;
     const siblings =
@@ -3839,10 +3254,6 @@ export default function Studio() {
     [selectedProject],
   );
   const loading = !info && !problemQueue.problems.length;
-  const recent = useMemo(
-    () => recentPages(projects, contents),
-    [projects, contents],
-  );
   // A sample project the person removed is never offered again.
   const seededSamples =
     sampleProject.samples?.state === "seeded" ? sampleProject.samples : null;
@@ -3859,94 +3270,6 @@ export default function Studio() {
     workspaceReady &&
     !!info &&
     !recent.some((item) => item.projectId !== sampleProjectId);
-  const catalogTemplates = (
-    showTemplateVersions ? templates : latestTemplateVersions(templates)
-  )
-    .slice()
-    .sort((a, b) => {
-      const priority = (item: TemplateMetadata) =>
-        item.scope === "project"
-          ? -3
-          : item.workflow && item.id !== "system-presentation"
-            ? -2
-            : item.id === "system-presentation"
-              ? 2
-              : 0;
-      return priority(a) - priority(b);
-    });
-  const visibleTemplates = catalogTemplates.filter(
-    (item) =>
-      matchesTemplateType(item, templateType) &&
-      `${item.name} ${item.description}`
-        .toLowerCase()
-        .includes(catalogQueries.templates.toLowerCase()),
-  );
-  const folderIds = new Set(folders.map((item) => item.id));
-  const currentFolder = folders.find((item) => item.id === selectedFolder);
-  const filteredPages = pages.filter(
-    (item) =>
-      item.title.toLowerCase().includes(deferredQuery.toLowerCase()) &&
-      (deferredQuery ||
-        (item.parentId && folderIds.has(item.parentId)
-          ? item.parentId
-          : null) === selectedFolder),
-  );
-  const filteredFolders = folders.filter(
-    (item) =>
-      item.name.toLowerCase().includes(deferredQuery.toLowerCase()) &&
-      (deferredQuery || (item.parentId ?? null) === selectedFolder),
-  );
-  const visibleEntries = sortDirectoryItems(
-    [
-      ...filteredFolders.map((item) => ({
-        target: folderTarget(item, selectedProject!),
-        hash: "",
-        name: item.name,
-        pinned: item.pinned,
-        createdAt: item.createdAt,
-        updatedAt: item.updatedAt,
-      })),
-      ...filteredPages.map((item) => ({
-        target: pageTarget(item, selectedProject!),
-        hash: item.hash,
-        name: item.title || tc("untitled"),
-        pinned: item.favorite,
-        createdAt: item.createdAt,
-        updatedAt: item.updatedAt,
-      })),
-    ].map((item) => ({ ...item, id: item.target.id })),
-    selectedProject ? folderPreferences(selectedProject, selectedFolder) : {},
-    organization.entryOrder?.[selectedProject ?? ""],
-  );
-  const folderChildren = new Map<string, ReturnType<typeof directoryEntries>>();
-  if (view === "project" && directoryView !== "list")
-    for (const item of directoryEntries(folders, pages)) {
-      const parent = item.parentId ?? "";
-      if (!folderChildren.has(parent)) folderChildren.set(parent, []);
-      folderChildren.get(parent)!.push(item);
-    }
-  /** A folder's first entries, in its own order, for its card preview. */
-  function folderThumbnailEntries(folderId: string): FolderThumbnailEntry[] {
-    return sortDirectoryItems(
-      folderChildren.get(folderId) ?? [],
-      folderPreferences(selectedProject!, folderId),
-      organization.entryOrder?.[selectedProject!],
-    )
-      .slice(0, 3)
-      .map(({ kind, id, updatedAt, hash }) => ({ kind, id, updatedAt, hash }));
-  }
-  const pageSelection = useDirectoryPageSelection(
-    JSON.stringify([info?.home, view, selectedProject, selectedFolder, deferredQuery]),
-    visibleEntries.map((item) => item.id),
-  );
-  const directoryMarquee = useDirectoryMarquee(
-    pageSelection,
-    JSON.stringify([info?.home, view, selectedProject, selectedFolder, deferredQuery]),
-    view === "project" && !dialog,
-  );
-  const selectedPageTargets = visibleEntries
-    .filter((item) => pageSelection.ids.includes(item.id))
-    .map((item) => item.target);
   function beginBatchPages(operation: "move" | "delete") {
     if (!selectedPageTargets.length) return;
     setContextMenu(null);
@@ -4148,17 +3471,6 @@ export default function Studio() {
     view === "docs" ? (docPage?.id ?? null) : null,
   );
   const docMeta = view === "docs" && docPage ? docTitle(docPage.id) : null;
-  const breadcrumbFolders: FolderMetadata[] = [];
-  let breadcrumbFolder = currentFolder;
-  while (
-    breadcrumbFolder &&
-    !breadcrumbFolders.some((item) => item.id === breadcrumbFolder!.id)
-  ) {
-    breadcrumbFolders.unshift(breadcrumbFolder);
-    breadcrumbFolder = folders.find(
-      (item) => item.id === breadcrumbFolder!.parentId,
-    );
-  }
   const heading =
     view === "projects"
       ? t("heading.recent")
@@ -4510,9 +3822,6 @@ export default function Studio() {
     () => desktop.onMenuCommand((command) => menuCommand.current(command)),
     [],
   );
-  const action = (operation: () => Promise<unknown>) => () => {
-    void operation().catch(report);
-  };
   // An external write just installed into the open page: outline what changed.
   const externalChange = view === "page" ? page.externalChange : undefined;
   useEffect(() => {
