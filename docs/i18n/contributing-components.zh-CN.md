@@ -23,7 +23,7 @@
 | 目录条目 | `resources/catalog/components.json`                     | 注册表默认数据、`catalog_list`、用 Ajv 校验 `propsSchema` 与示例 |
 | 使用说明 | `resources/catalog/component-documentation.json`        | `catalog_describe` 的指南与参数视图，Agent 写数据前读取          |
 
-数据契约是不依赖任何包的校验函数，出错时给出准确的字段路径，例如 `items[3].depends[0]`。它要在没有 React 和打包器的环境中运行，所以不导入任何模块。`propsSchema` 为 Agent 和 Ajv 描述同一份数据，两者需要保持一致。
+数据契约是不依赖任何包的校验函数，出错时给出准确的字段路径，例如 `items[3].depends[0]`。它要在没有 React 和打包器的环境中运行，内容库和 Agent 服务也会导入它，所以只能导入其他数据契约、`src/contract`、`src/document`、`src/lib` 以及不依赖 DOM 和 React 的包，`src/layering.test.ts` 会检查这一点。`propsSchema` 为 Agent 和 Ajv 描述同一份数据，两者需要保持一致。
 
 G2 图表和外部图示家族各有自己的流程。`g2.json` 中的 G2 条目及其导出由 `node scripts/generate-g2-components.mjs` 根据 `src/components/blocks/g2/` 生成，它们的使用说明条目则手工编写。图示家族使用 `diagrams.json`、`diagram-documentation.json` 和 `src/components/blocks/diagrams/`，见[图示组件](diagram-components.zh-CN.md)。`text`、`table`、`stepper` 等基础组件位于 `primitives.json` 和 `Primitives.tsx`，很少新增。
 
