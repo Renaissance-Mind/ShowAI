@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { findComponent, indexComponents } from "./component-index";
-import type { CompiledComponent } from "./types";
+import type { CompiledComponent } from "../../contract/types";
 
 function component(
   integrity: string,

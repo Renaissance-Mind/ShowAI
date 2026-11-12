@@ -13,7 +13,7 @@ import {
 import { validateDocument } from "../portable/validation.mjs";
 import { createResource } from "../document/containers.mjs";
 import { defaultPageOutline } from "../document/page-outline.mjs";
-import type { CompiledComponent } from "../components/custom/types";
+import type { CompiledComponent } from "../contract/types";
 import type { ShowDocument } from "../types";
 
 let home: string, projectId: string;

@@ -3,7 +3,7 @@ import type {
   EditablePackage,
   MergeConflict,
   PackageRevisionRef,
-} from "../components/custom/types";
+} from "../contract/types";
 
 export type PackageKind = "component" | "template";
 

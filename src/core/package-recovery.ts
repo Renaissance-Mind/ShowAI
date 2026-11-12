@@ -25,7 +25,7 @@ import type {
   ComponentManifest,
   ComponentSource,
   TemplateRecord,
-} from "../components/custom/types";
+} from "../contract/types";
 const packagePath =
   /^(?:projects\/([^/]+)\/)?packages\/(?:published\/)?(components|templates)\/([a-z][a-z0-9-]*)\/([^/]+)\/(.+)$/;
 const retainedSourcePath =

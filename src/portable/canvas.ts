@@ -3,7 +3,7 @@ import { newDocument } from "../lib/document";
 import { CANVAS_KEY } from "../lib/canvas";
 import { embedDocumentImages } from "./assets.mjs";
 import { loadRemoteComponents } from "./remote.mjs";
-import { collectCustomComponentRefs } from "../components/custom/contract";
+import { collectCustomComponentRefs } from "../contract/contract";
 import {
   findComponent,
   indexComponents,

@@ -35,7 +35,7 @@ import { renderReading, type ReadingCapture } from "./reading-renderer";
 import { describeResources, type ResourceRead } from "../core/local-resources";
 import type { ShowDocument } from "../types";
 
-import { collectCustomComponentRefs } from "../components/custom/contract";
+import { collectCustomComponentRefs } from "../contract/contract";
 import { loadBoardSnapshot } from "./board-reading";
 import { injectReadingOptions } from "./reading-preview";
 import { appLocale } from "../core/app-language";

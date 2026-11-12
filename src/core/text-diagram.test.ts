@@ -14,7 +14,7 @@ import { importComponent, resolveDocumentComponents } from "./catalog";
 import { FileStore } from "./store";
 import { ContentLibrary } from "./content-library";
 import { EditorDrafts } from "./editor-drafts";
-import { validateComponentDocumentation } from "../components/custom/documentation";
+import { validateComponentDocumentation } from "../contract/documentation";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import TextDiagram, {

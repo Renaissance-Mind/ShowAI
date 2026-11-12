@@ -1,4 +1,4 @@
-import type { JsonSchema } from "../components/custom/types";
+import type { JsonSchema } from "../contract/types";
 import type { MessageKey } from "../i18n";
 import { useTranslator } from "../i18n/react";
 import messages from "../i18n/messages/catalog";

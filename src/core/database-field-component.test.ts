@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { getComponent, listComponents, saveComponent } from "./catalog";
 import { FileStore } from "./store";
-import type { ComponentManifest } from "../components/custom/types";
+import type { ComponentManifest } from "../contract/types";
 
 const directories: string[] = [];
 async function library() {

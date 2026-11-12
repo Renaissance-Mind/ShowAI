@@ -28,7 +28,7 @@ import {
 } from "../document/connections.mjs";
 import type { EditorControls } from "./EditorControls";
 import { AdditionalComponentsProvider } from "../components/custom/CustomBlock";
-import type { CompiledComponent } from "../components/custom/types";
+import type { CompiledComponent } from "../contract/types";
 import { flushSync, createPortal } from "react-dom";
 import { ComponentSlashMenu } from "../components/ComponentSlashMenu";
 import { RegisterComponentContext } from "../components/useComponentCatalog";

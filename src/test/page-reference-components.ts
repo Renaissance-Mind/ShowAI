@@ -1,4 +1,4 @@
-import type { ComponentSource } from "../components/custom/types";
+import type { ComponentSource } from "../contract/types";
 
 /**
  * A custom component that declares a page-reference field and reads the

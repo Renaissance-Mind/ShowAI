@@ -1,5 +1,5 @@
 import { canonicalJson } from "./canonical";
-import type { MergeConflict } from "../components/custom/types";
+import type { MergeConflict } from "../contract/types";
 
 const equal = (left: unknown, right: unknown) =>
   left === undefined || right === undefined

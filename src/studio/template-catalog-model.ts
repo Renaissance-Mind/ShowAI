@@ -1,4 +1,4 @@
-import type { TemplateMetadata } from "../components/custom/types";
+import type { TemplateMetadata } from "../contract/types";
 
 export function latestTemplateVersions(items: TemplateMetadata[]) {
   const newest = new Map<string, TemplateMetadata>();

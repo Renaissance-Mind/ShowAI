@@ -38,7 +38,7 @@ import type {
   ComponentSource,
   EditablePackage,
   SaveTemplateInput,
-} from "../components/custom/types";
+} from "../contract/types";
 import { CoreError, type PageOperation } from "../core/model";
 import type { PublishedComponentLocator } from "../core/publication";
 import { CATALOG_VIEWS } from "./disclosure";

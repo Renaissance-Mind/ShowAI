@@ -18,7 +18,7 @@ import {
 import type {
   ComponentSource,
   ComponentManifest,
-} from "../components/custom/types";
+} from "../contract/types";
 /** Recovery proposes the next patch version of the bundled fixture. */
 const nextPatch = (version: string) =>
   version.replace(/(\d+)$/, (patch) => String(Number(patch) + 1));

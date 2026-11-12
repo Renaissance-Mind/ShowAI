@@ -7,7 +7,7 @@ import {measureNativeSync} from "../surface/native-perf";
 import { coalescedTask } from "../lib/coalesced-task";
 import type { JSONContent } from "@tiptap/core";
 import type { PageRecord } from "../core/model";
-import type { CompiledComponent } from "../components/custom/types";
+import type { CompiledComponent } from "../contract/types";
 import type { ShowDocument } from "../types";
 import type { EditorDraftRecord } from "../core/editor-drafts";
 import {pageContentKey,pageDraftNeedsRecovery,type RetainedPageDraft} from "./page-draft-recovery";

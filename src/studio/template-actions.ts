@@ -1,4 +1,4 @@
-import type { TemplateMetadata } from "../components/custom/types";
+import type { TemplateMetadata } from "../contract/types";
 import { translator } from "../i18n";
 import messages from "../i18n/messages/catalog";
 

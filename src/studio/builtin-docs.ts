@@ -1,5 +1,5 @@
 import manifest from "../../resources/docs/manifest.json";
-import type { CompiledComponent } from "../components/custom/types";
+import type { CompiledComponent } from "../contract/types";
 import type { Locale } from "../i18n";
 import type { ShowDocument } from "../types";
 

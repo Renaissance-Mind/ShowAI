@@ -17,7 +17,7 @@ import {
   validateDocument,
 } from "../portable/validation.mjs";
 import { selectDocumentBlocks } from "../portable/selection.mjs";
-import { collectCustomComponentRefs } from "../components/custom/contract";
+import { collectCustomComponentRefs } from "../contract/contract";
 import { mergePageContent } from "../core/page-merge-model";
 import {
   buildPageOutline,

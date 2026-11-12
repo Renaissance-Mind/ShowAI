@@ -6,14 +6,14 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { injectComponentBootstrap } from "../components/custom/contract";
+import { injectComponentBootstrap } from "../contract/contract";
 import { InlineComponent } from "../components/custom/InlineComponent";
 import { useInlineComponentHost } from "../components/custom/CustomBlock";
 import {
   componentSandboxPolicy,
   withoutPackagePolicies,
-} from "../components/custom/sandbox-policy.mjs";
-import type { CompiledComponent } from "../components/custom/types";
+} from "../contract/sandbox-policy.mjs";
+import type { CompiledComponent } from "../contract/types";
 import { appearanceTokens, installSandboxTheme } from "../design/sandbox-theme";
 import type { PageOutlineComponentProps } from "../document/page-outline.mjs";
 

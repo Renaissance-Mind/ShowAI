@@ -5,11 +5,11 @@ import type {
 } from "../../core/model";
 import type { SearchResult } from "../../core/library-index";
 import type { CatalogComponent } from "../../core/component-categories";
-import type { CompiledComponent } from "../../components/custom/types";
+import type { CompiledComponent } from "../../contract/types";
 import {
   commandProps,
   type ComponentCommand,
-} from "../../components/custom/contributions";
+} from "../../contract/contributions";
 import {
   componentSlashEntry,
   insertsAsBlock,

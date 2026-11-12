@@ -2,7 +2,7 @@ import type {
   BuiltinComponentMetadata,
   ComponentCategory,
   ComponentListing,
-} from "../components/custom/types";
+} from "../contract/types";
 
 export const componentCategories = [
   { id: "text", label: "文本" },

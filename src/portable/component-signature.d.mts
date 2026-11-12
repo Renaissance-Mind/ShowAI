@@ -1,4 +1,4 @@
-import type { JsonSchema } from "../components/custom/types";
+import type { JsonSchema } from "../contract/types";
 /** Default character limit of a component signature line. */
 export const COMPONENT_SIGNATURE_LIMIT: 320;
 /**

@@ -1,6 +1,6 @@
 import { createContext } from "react";
 import type { AssistantRequest } from "./rich-text/environment";
-import type { ComponentContextSnapshot } from "./custom/component-context.mjs";
+import type { ComponentContextSnapshot } from "../contract/component-context.mjs";
 
 export type { AssistantRequest };
 export type AssistantAnchor = AssistantRequest["anchor"];

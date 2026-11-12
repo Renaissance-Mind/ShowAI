@@ -1,5 +1,5 @@
 import { mergeValues, type MergeChoices } from "./catalog-merge";
-import type { MergeConflict } from "../components/custom/types";
+import type { MergeConflict } from "../contract/types";
 import type { PageComment } from "../types";
 
 /**

@@ -13,7 +13,7 @@ import { Download, Moon, MoreHorizontal, Printer, Sun } from "../ui/icons";
 import { parseArtifact, serializeArtifact } from "./validation.mjs";
 import type { ShowArtifact, ShowDocument } from "../types";
 import { loadRemoteComponents } from "./remote.mjs";
-import type { CompiledComponent } from "../components/custom/types";
+import type { CompiledComponent } from "../contract/types";
 import { SurfaceReader } from "./SurfaceReader";
 import { CustomComponentsProvider } from "../components/custom/CustomBlock";
 import {

@@ -1,4 +1,4 @@
-import { COMPONENT_PARAMETER_CAPABILITIES } from "../portable/component-parameters.mjs";
+import { COMPONENT_PARAMETER_CAPABILITIES } from "../contract/component-parameters.mjs";
 import { cdnReaderOrigins, cdnReaderUrls } from "../core/cdn-reader";
 import { workRecordsLocation } from "../core/work-records";
 import { CAPACITY } from "../portable/capacity.mjs";

@@ -1,5 +1,5 @@
 import conversationFit from "../../resources/catalog/inline-readiness.json";
-import type { InlineReadiness } from "../components/custom/types";
+import type { InlineReadiness } from "../contract/types";
 import { resolveDocumentDatasets } from "./dataset-resolution";
 import { FileStore } from "./store";
 import { hasBinding } from "../datasets/binding.mjs";
@@ -23,12 +23,12 @@ import { createHash, randomUUID } from "node:crypto";
 import {
   componentAuthoringIndex,
   componentAuthoringGuide,
-} from "../components/custom/authoring";
+} from "../contract/authoring";
 import { createRequire } from "node:module";
 import {
   componentContextIssue,
   componentViewStateIssue,
-} from "../components/custom/component-context.mjs";
+} from "../contract/component-context.mjs";
 import { canEdit, componentDataState } from "../datasets/editable.mjs";
 import { existsSync, readFileSync, realpathSync } from "node:fs";
 import {
@@ -61,15 +61,15 @@ import {
   LEGACY_TEMPLATE_STAGES,
   SYSTEM_TEMPLATE_ID,
 } from "../portable/template-bundle.mjs";
-import { builtinComponentCatalog } from "../components/catalog";
-import { validateComponentDocumentation } from "../components/custom/documentation";
+import { builtinComponentCatalog } from "../contract/catalog";
+import { validateComponentDocumentation } from "../contract/documentation";
 import {
   commandProps,
   validateContributions,
-} from "../components/custom/contributions";
+} from "../contract/contributions";
 
 import { builtinSources, builtinExports } from "./builtin-sources";
-import { componentSandboxPolicy } from "../components/custom/sandbox-policy.mjs";
+import { componentSandboxPolicy } from "../contract/sandbox-policy.mjs";
 import { diagramSourceFiles } from "../components/blocks/diagrams/templates";
 import { diagramAuthoringFiles } from "./diagram-authoring-files";
 import {
@@ -97,22 +97,22 @@ import { atomicLibraryFile, readLibraryBytes } from "./library-files";
 import { libraryMutations } from "./history-context";
 import { changeContext } from "./history-context";
 import { mergeValues } from "./catalog-merge";
-import { readCustomBlockData } from "../components/custom/contract";
-import { parameterRuleIssues } from "../portable/component-parameters.mjs";
+import { readCustomBlockData } from "../contract/contract";
+import { parameterRuleIssues } from "../contract/component-parameters.mjs";
 import { componentSignature } from "../portable/component-signature.mjs";
 import {
   assertJsonValue,
   assertProps,
   assertParameterDefinition,
   propsIssues,
-} from "../components/custom/schema";
+} from "../contract/schema";
 import {
   COMPONENT_DATA_MARKER,
   COMPONENT_ID,
   COMPONENT_VERSION,
   collectCustomComponentRefs,
   componentWidgetData as browserComponentWidgetData,
-} from "../components/custom/contract";
+} from "../contract/contract";
 import type {
   BuiltinComponentMetadata,
   CatalogScope,
@@ -132,7 +132,7 @@ import type {
   EditablePackage,
   PackageMergeInput,
   PackageMergePreview,
-} from "../components/custom/types";
+} from "../contract/types";
 import { componentCategories, componentCategory } from "./component-categories";
 
 export type {
@@ -150,7 +150,7 @@ export type {
   EditablePackage,
   PackageMergeInput,
   PackageMergePreview,
-} from "../components/custom/types";
+} from "../contract/types";
 
 /** Agent discovery adds conversation fit; the reader bundle never needs it. */
 export function listBuiltinComponents({

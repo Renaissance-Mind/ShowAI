@@ -1,10 +1,10 @@
 import { z } from "zod";
-import { parsePageLink } from "../../portable/page-link.mjs";
-import { KIND_OPERATORS, VALUE_KINDS } from "../../datasets/value-types.mjs";
+import { parsePageLink } from "../portable/page-link.mjs";
+import { KIND_OPERATORS, VALUE_KINDS } from "../datasets/value-types.mjs";
 import type {
   FilterOperator,
   ValueKind,
-} from "../../datasets/value-types.mjs";
+} from "../datasets/value-types.mjs";
 
 /**
  * What a component contributes to the slots the workbench offers, declared in

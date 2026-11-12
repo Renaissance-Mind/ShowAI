@@ -134,7 +134,7 @@ import type {
   TemplateRecord,
   CatalogReadOptions,
   ComponentSource,
-} from "../components/custom/types";
+} from "../contract/types";
 import { PageWorkspace } from "./PageWorkspace";
 import DatabaseRecordPeek from "./DatabaseRecordPeek";
 import { useDatabaseRecordPeek } from "./useDatabaseRecordPeek";

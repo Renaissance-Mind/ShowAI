@@ -1,5 +1,5 @@
-import type { ComponentDocumentation } from "../components/custom/documentation";
-import type { JsonSchema } from "../components/custom/types";
+import type { ComponentDocumentation } from "../contract/documentation";
+import type { JsonSchema } from "../contract/types";
 import { translator, type MessageKey } from "../i18n";
 import { useTranslator } from "../i18n/react";
 import messages from "../i18n/messages/catalog";

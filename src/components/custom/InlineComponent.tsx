@@ -5,7 +5,7 @@ import * as ClientRuntime from "react-dom/client";
 import * as JsxRuntime from "react/jsx-runtime";
 import * as JsxDevRuntime from "react/jsx-dev-runtime";
 import { useEffect, useRef, useState } from "react";
-import type { CompiledComponent } from "./types";
+import type { CompiledComponent } from "../../contract/types";
 import type { PageOutlineComponentProps } from "../../document/page-outline.mjs";
 import { ComponentStatus } from "../blocks/ComponentStatus";
 import { isValidationMessage, readableValidation } from "./validation-messages";
@@ -14,7 +14,7 @@ import messages from "../../i18n/messages/customComponents";
 import {
   componentContextIssue,
   type ComponentContextSnapshot,
-} from "./component-context.mjs";
+} from "../../contract/component-context.mjs";
 import {
   navigationTarget,
   requestNavigation,

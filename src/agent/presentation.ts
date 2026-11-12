@@ -29,8 +29,8 @@ import {
   validateDocument,
 } from "../portable/validation.mjs";
 import { selectDocumentBlocks } from "../portable/selection.mjs";
-import type { ComponentSource } from "../components/custom/types";
-import { assertProps } from "../components/custom/schema";
+import type { ComponentSource } from "../contract/types";
+import { assertProps } from "../contract/schema";
 import type { ShowDocument } from "../types";
 import { walk } from "../document/walk.mjs";
 

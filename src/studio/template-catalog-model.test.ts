@@ -1,6 +1,6 @@
 import { expect, test } from "vitest";
 import { latestTemplateVersions } from "./template-catalog-model";
-import type { TemplateMetadata } from "../components/custom/types";
+import type { TemplateMetadata } from "../contract/types";
 
 test("latest cards retain scopes and conflicting identities, and prefer stable numeric versions", () => {
   const items = [

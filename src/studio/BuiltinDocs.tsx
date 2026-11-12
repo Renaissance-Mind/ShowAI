@@ -8,7 +8,7 @@ import {
 } from "react";
 import PageIcon from "../components/PageIcon";
 import { CustomComponentsProvider } from "../components/custom/CustomBlock";
-import type { CompiledComponent } from "../components/custom/types";
+import type { CompiledComponent } from "../contract/types";
 import SurfaceEditor from "../surface/SurfaceEditor";
 import type { ShowDocument } from "../types";
 import { useLocale, useTranslator } from "../i18n/react";

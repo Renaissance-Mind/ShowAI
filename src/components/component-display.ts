@@ -1,6 +1,6 @@
 import { getLocale, translator } from "../i18n";
 import messages from "../i18n/messages/catalog";
-import type { ComponentCategory } from "./custom/types";
+import type { ComponentCategory } from "../contract/types";
 
 /** Built-in metadata has a `kind`; custom components are identified by `id`. */
 type DisplayItem = { name: string; description: string } & (

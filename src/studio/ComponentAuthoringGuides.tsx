@@ -4,8 +4,8 @@ import { downloadFile } from "../components/blocks/helpers";
 import {
   componentAuthoringIndex,
   componentAuthoringGuide,
-} from "../components/custom/authoring";
-import type { ComponentSource } from "../components/custom/types";
+} from "../contract/authoring";
+import type { ComponentSource } from "../contract/types";
 import { componentAuthoringContent } from "./component-authoring-content";
 import { errorMessage } from "./bridge";
 import "./component-authoring-guides.css";

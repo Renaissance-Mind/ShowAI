@@ -1,4 +1,4 @@
-import { CAPACITY, assertContent } from "../../portable/capacity.mjs";
+import { CAPACITY, assertContent } from "../portable/capacity.mjs";
 import Ajv from "ajv";
 import {
   assertParameterContract,
@@ -6,7 +6,7 @@ import {
   schemaParameters,
   parameterPath,
   parameterValues,
-} from "../../portable/component-parameters.mjs";
+} from "./component-parameters.mjs";
 import type { ComponentDocumentation } from "./documentation";
 import type { ValidateFunction } from "ajv";
 import type { JsonSchema } from "./types";

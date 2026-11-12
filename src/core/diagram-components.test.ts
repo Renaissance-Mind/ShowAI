@@ -12,8 +12,8 @@ import { componentCategory } from "./component-categories";
 import {
   assertProps,
   assertParameterDefinition,
-} from "../components/custom/schema";
-import { validateComponentDocumentation } from "../components/custom/documentation";
+} from "../contract/schema";
+import { validateComponentDocumentation } from "../contract/documentation";
 import {
   diagramTemplates,
   validateDiagramData,

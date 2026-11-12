@@ -10,7 +10,7 @@ import {
 import type {
   EditablePackage,
   PackageMergePreview,
-} from "../components/custom/types";
+} from "../contract/types";
 import { useTranslator } from "../i18n/react";
 import messages from "../i18n/messages/catalogManagement";
 import catalogMessages from "../i18n/messages/catalog";

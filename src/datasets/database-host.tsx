@@ -13,15 +13,15 @@ import {
   type FieldEditorProps,
   type FieldTypeListing,
 } from "../components/blocks/database-host";
-import { injectComponentBootstrap } from "../components/custom/contract";
+import { injectComponentBootstrap } from "../contract/contract";
 import {
   componentSandboxPolicy,
   withoutPackagePolicies,
-} from "../components/custom/sandbox-policy.mjs";
+} from "../contract/sandbox-policy.mjs";
 import type {
   CompiledComponent,
   ComponentListing,
-} from "../components/custom/types";
+} from "../contract/types";
 import { appearanceTokens, installSandboxTheme } from "../design/sandbox-theme";
 import { useAppearanceTheme } from "../design/useAppearanceTheme";
 import { recordTable, type RecordTable } from "./derived-fields.mjs";

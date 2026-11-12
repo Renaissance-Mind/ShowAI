@@ -86,7 +86,7 @@ import {
   type CanvasReference,
 } from "../../surface/agent-reference";
 import { agentTarget } from "./targets";
-import { componentContextLimits } from "../../components/custom/component-context.mjs";
+import { componentContextLimits } from "../../contract/component-context.mjs";
 
 const agentNames = localAgentNames;
 /** Starting points for an empty page; a chip fills the input for review. */

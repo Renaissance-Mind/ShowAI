@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Loader2, ImageOff } from "../ui/icons";
 import { SurfaceReader } from "../portable/SurfaceReader";
 import { CustomComponentsProvider } from "../components/custom/CustomBlock";
-import type { TemplateMetadata } from "../components/custom/types";
+import type { TemplateMetadata } from "../contract/types";
 import type { LoadedTemplate } from "./CatalogDialogs";
 import CatalogPreview from "./CatalogPreview";
 import { desktop, errorMessage } from "./bridge";

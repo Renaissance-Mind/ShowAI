@@ -53,7 +53,7 @@ import type {
   PackageMergeInput,
   PackageRevisionRef,
   SaveTemplateInput,
-} from "../components/custom/types";
+} from "../contract/types";
 import { exportPage, type ExportFormat } from "./exporter";
 import {
   importCompiledComponents,

@@ -1,7 +1,7 @@
 import { expect, test } from "vitest";
-import sliderManifest from "../../../resources/catalog/value-slider/manifest.json";
-import ganttManifest from "../../../resources/catalog/task-gantt/manifest.json";
-import { builtinComponentCatalog } from "../catalog";
+import sliderManifest from "../../resources/catalog/value-slider/manifest.json";
+import ganttManifest from "../../resources/catalog/task-gantt/manifest.json";
+import { builtinComponentCatalog } from "./catalog";
 import { validateComponentDocumentation } from "./documentation";
 
 test("every shipped component has a usable versioned contract, including retained legacy renderers", () => {

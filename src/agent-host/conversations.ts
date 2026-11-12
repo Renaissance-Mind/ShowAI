@@ -14,7 +14,7 @@ import { referenceInstructions } from "../surface/agent-reference";
 import {
   componentContextIssue,
   componentContextLimits,
-} from "../components/custom/component-context.mjs";
+} from "../contract/component-context.mjs";
 import { translator } from "../i18n";
 import agentHostMessages from "../i18n/messages/agentHost";
 

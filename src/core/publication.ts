@@ -33,7 +33,7 @@ import {
 import type {
   PackageBundle,
   PackageRevisionRef,
-} from "../components/custom/types";
+} from "../contract/types";
 import type { ShowDocument } from "../types";
 import type {
   PreparedPublication,

@@ -6,8 +6,8 @@ import {
 import { resourceForPath } from "../core/history-model";
 import { CoreError } from "../core/model";
 import type { SqliteTreeEntry } from "../core/sqlite-reader";
-import { collectCustomComponentRefs } from "../components/custom/contract";
-import type { CustomComponentRef } from "../components/custom/types";
+import { collectCustomComponentRefs } from "../contract/contract";
+import type { CustomComponentRef } from "../contract/types";
 import type { ShowDocument } from "../types";
 
 /** Compile against immutable input bytes after releasing the library's writer lease. */

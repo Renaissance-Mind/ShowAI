@@ -1,4 +1,4 @@
-import { readCustomBlockData } from "../components/custom/contract";
+import { readCustomBlockData } from "../contract/contract";
 import { ManualOutlineEditor } from "./ManualOutlineEditor";
 import { useContext, useEffect, useMemo, useRef, useState } from "react";
 import type { JSONContent } from "@tiptap/core";

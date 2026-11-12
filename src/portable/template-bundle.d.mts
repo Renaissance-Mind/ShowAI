@@ -1,4 +1,4 @@
-import type { ComponentSource } from "../components/custom/types";
+import type { ComponentSource } from "../contract/types";
 import type { ShowDocument } from "../types";
 /** Stage keys declared by schemaVersion 3 bundles. */
 export type StagedTemplateStage = "intent" | "material" | "logic" | "design";

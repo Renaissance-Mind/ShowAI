@@ -7,7 +7,7 @@ import { reconcileSurface, stableId } from "../document/document.mjs";
 import { walk, widgetDocuments } from "../document/walk.mjs";
 import { validateSubtree } from "../portable/validation.mjs";
 import { CAPACITY, measureContent } from "../portable/capacity.mjs";
-import { builtinComponent } from "../components/catalog";
+import { builtinComponent } from "../contract/catalog";
 import { componentBlock } from "../surface/component-insertion";
 
 /**

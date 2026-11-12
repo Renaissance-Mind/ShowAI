@@ -3,7 +3,7 @@ import { diagramAuthoringFiles } from "../core/diagram-authoring-files";
 import {
   componentAuthoringIndex,
   componentAuthoringGuide,
-} from "../components/custom/authoring";
+} from "../contract/authoring";
 import { validateRichTextData } from "../components/rich-text/model.mjs";
 import { componentAuthoringContent } from "./component-authoring-content";
 

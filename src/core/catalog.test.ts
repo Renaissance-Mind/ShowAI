@@ -36,7 +36,7 @@ import {
 import { upgradeDocument } from "../document/document.mjs";
 import { walk } from "../document/walk.mjs";
 import { FileStore } from "./store";
-import type { ComponentManifest } from "../components/custom/types";
+import type { ComponentManifest } from "../contract/types";
 
 const directories: string[] = [];
 const projectIds = new Map<string, string>();

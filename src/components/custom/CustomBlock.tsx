@@ -5,7 +5,7 @@ import { installIconTooltips } from "../../ui/icon-tooltip.mjs";
 import {
   componentSandboxPolicyFor,
   withoutPackagePolicies,
-} from "./sandbox-policy.mjs";
+} from "../../contract/sandbox-policy.mjs";
 import { localMediaSource } from "./local-media-link";
 import { frameResource } from "../local-resources";
 import { isLocalResourceRef } from "../../portable/local-files.mjs";
@@ -30,8 +30,8 @@ import {
   readViewportLock,
   writeViewportLock,
 } from "../blocks/ViewportLock";
-import { injectComponentBootstrap, readCustomBlockData } from "./contract";
-import type { CompiledComponent } from "./types";
+import { injectComponentBootstrap, readCustomBlockData } from "../../contract/contract";
+import type { CompiledComponent } from "../../contract/types";
 import { InlineComponent } from "./InlineComponent";
 import { findComponent, indexComponents } from "./component-index";
 import { installComponentLinks, openComponentLink } from "./external-links";
@@ -44,7 +44,7 @@ import { AssistantContext } from "../assistant-context";
 import {
   componentContextIssue,
   componentViewStateIssue,
-} from "./component-context.mjs";
+} from "../../contract/component-context.mjs";
 import { useReaderStateScope } from "../../surface/reader-state";
 import {
   navigationTarget,

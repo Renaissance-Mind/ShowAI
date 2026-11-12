@@ -3,7 +3,7 @@ import type {
   CatalogScope,
   JsonSchema,
   PackageRevisionRef,
-} from "../components/custom/types";
+} from "../contract/types";
 import { componentSignature } from "../portable/component-signature.mjs";
 
 export const CATALOG_VIEWS = [
@@ -75,13 +75,13 @@ export interface CatalogSummary {
   };
   effects?: string[];
   /** The workbench slots the component fills (manifest.contributes). */
-  contributes?: import("../components/custom/contributions").ComponentContributions;
+  contributes?: import("../contract/contributions").ComponentContributions;
   /** The component reads page references; exports carry them. */
   pageReferences?: true;
   reuse?: "general" | "domain" | "content-specific" | "unclassified";
   documentationStatus?: "available" | "missing";
   /** Built-in components only: fit for show_component in a conversation column. */
-  conversation?: import("../components/custom/types").InlineReadiness;
+  conversation?: import("../contract/types").InlineReadiness;
   workflow?: {
     format: 1;
     stages?: string[];
@@ -132,7 +132,7 @@ export function catalogSearchText(value: object): string {
   }
   for (const related of records(item.related)) add(related.purpose);
   const contributes = item.contributes as
-    | import("../components/custom/contributions").ComponentContributions
+    | import("../contract/contributions").ComponentContributions
     | undefined;
   for (const command of contributes?.commands ?? []) {
     add(command.title);
@@ -217,7 +217,7 @@ export function summarizeCatalog(
           reuse:
             (
               item.documentation as
-                | import("../components/custom/documentation").ComponentDocumentation
+                | import("../contract/documentation").ComponentDocumentation
                 | undefined
             )?.reuse.kind ?? "unclassified",
           ...(kind === "component"
@@ -245,7 +245,7 @@ export function summarizeCatalog(
           typeof item.conversation === "object"
             ? {
                 conversation:
-                  item.conversation as import("../components/custom/types").InlineReadiness,
+                  item.conversation as import("../contract/types").InlineReadiness,
               }
             : {}),
           effects: Array.isArray(item.effects)
@@ -256,7 +256,7 @@ export function summarizeCatalog(
           ...(item.contributes && typeof item.contributes === "object"
             ? {
                 contributes:
-                  item.contributes as import("../components/custom/contributions").ComponentContributions,
+                  item.contributes as import("../contract/contributions").ComponentContributions,
               }
             : {}),
           ...(item.pageReferences === true

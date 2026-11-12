@@ -4,11 +4,11 @@ import {
   parameterRuleIssues,
   parameterPath,
   schemaParameters,
-} from "../../portable/component-parameters.mjs";
+} from "./component-parameters.mjs";
 import { assertProps, assertParameterDefinition } from "./schema";
 import { validateComponentDocumentation } from "./documentation";
-import { parameterComponent } from "../../test/parameter-component";
-import { builtinComponentCatalog } from "../catalog";
+import { parameterComponent } from "../test/parameter-component";
+import { builtinComponentCatalog } from "./catalog";
 
 test("generated reference preserves schema constraints, semantics and distinguishes initialization from fallback", () => {
   const source = parameterComponent(),

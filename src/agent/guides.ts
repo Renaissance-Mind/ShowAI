@@ -1,12 +1,12 @@
-import { COMPONENT_PARAMETER_CAPABILITIES } from "../portable/component-parameters.mjs";
+import { COMPONENT_PARAMETER_CAPABILITIES } from "../contract/component-parameters.mjs";
 import { z } from "zod";
-import { componentDocumentationSchema } from "../components/custom/documentation";
-import { contributionsSchema } from "../components/custom/contributions";
+import { componentDocumentationSchema } from "../contract/documentation";
+import { contributionsSchema } from "../contract/contributions";
 import { TOOL_CHANGES } from "./tool-changes";
 import {
   componentAuthoringIndexSchema,
   componentAuthoringGuideSchema,
-} from "../components/custom/authoring";
+} from "../contract/authoring";
 
 export const GUIDE_TOPICS = [
   "presentation",

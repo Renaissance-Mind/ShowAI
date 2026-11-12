@@ -3,7 +3,7 @@ import type {
   CatalogComponent,
   CatalogCustomComponent,
 } from "../core/component-categories";
-import type { CompiledComponent } from "./custom/types";
+import type { CompiledComponent } from "../contract/types";
 export interface ComponentLibrary {
   list: () => Promise<CatalogComponent[]>;
   read: (item: CatalogCustomComponent) => Promise<CompiledComponent>;

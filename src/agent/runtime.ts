@@ -1,4 +1,4 @@
-import { COMPONENT_PARAMETER_CAPABILITIES } from "../portable/component-parameters.mjs";
+import { COMPONENT_PARAMETER_CAPABILITIES } from "../contract/component-parameters.mjs";
 import { CAPACITY } from "../portable/capacity.mjs";
 import { access, mkdir, readFile, writeFile, rename } from "node:fs/promises";
 import { randomUUID } from "node:crypto";

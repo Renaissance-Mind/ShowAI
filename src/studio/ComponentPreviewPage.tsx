@@ -3,9 +3,9 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import type {
   BuiltinComponentMetadata,
   CompiledComponent,
-} from "../components/custom/types";
+} from "../contract/types";
 import { CustomComponentsProvider } from "../components/custom/CustomBlock";
-import { componentWidgetData } from "../components/custom/contract";
+import { componentWidgetData } from "../contract/contract";
 import { Widget } from "../components/blocks/Widget";
 import { desktop, errorMessage } from "./bridge";
 import { translator } from "../i18n";

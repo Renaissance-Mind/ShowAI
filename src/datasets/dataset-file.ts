@@ -4,8 +4,8 @@
 // same rules on the same files.
 
 import { CAPACITY, assertContent } from "../portable/capacity.mjs";
-import { assertProps } from "../components/custom/schema";
-import type { JsonSchema } from "../components/custom/types";
+import { assertProps } from "../contract/schema";
+import type { JsonSchema } from "../contract/types";
 import { canonicalJson } from "../core/canonical";
 import { assertId } from "../core/identifier";
 import { CoreError } from "../core/model";

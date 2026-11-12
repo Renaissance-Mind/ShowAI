@@ -29,13 +29,13 @@ import { CoreError } from "../core/model";
 import type { FileStore } from "../core/store";
 import type { PageOperation, ShowDocument, JSONContent } from "../core/model";
 import { getComponent, lockDocumentComponents } from "../core/catalog";
-import { readCustomBlockData } from "../components/custom/contract";
-import { propsIssues, type PropsIssue } from "../components/custom/schema";
+import { readCustomBlockData } from "../contract/contract";
+import { propsIssues, type PropsIssue } from "../contract/schema";
 import { canonicalJson } from "../core/canonical";
 import { walk } from "../document/walk.mjs";
 import { addressNode } from "../document/update.mjs";
 import { pageEntries, valueDiffEntries } from "./page-diff-view";
-import type { JsonSchema } from "../components/custom/types";
+import type { JsonSchema } from "../contract/types";
 import { recordTable } from "../datasets/derived-fields.mjs";
 import {
   queryRecords,

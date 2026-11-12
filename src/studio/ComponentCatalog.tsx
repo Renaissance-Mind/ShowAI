@@ -12,7 +12,7 @@ import {
   Type,
   Workflow,
 } from "../ui/icons";
-import type { ComponentCategory } from "../components/custom/types";
+import type { ComponentCategory } from "../contract/types";
 import {
   componentCategoryLabel,
   componentDisplayDescription,

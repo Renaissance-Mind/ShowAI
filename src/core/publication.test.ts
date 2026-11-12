@@ -32,7 +32,7 @@ import {
 import { assertExportDestination, exportPage } from "../agent/exporter";
 import { parseArtifact } from "../portable/validation.mjs";
 import { publicationUrl } from "../portable/remote.mjs";
-import type { PackageRevisionRef } from "../components/custom/types";
+import type { PackageRevisionRef } from "../contract/types";
 
 const roots: string[] = [],
   servers: Server[] = [];

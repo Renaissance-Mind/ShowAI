@@ -17,7 +17,7 @@ import {
   componentSandboxPolicy,
   componentSandboxPolicyFor,
   withoutPackagePolicies,
-} from "../components/custom/sandbox-policy.mjs";
+} from "../contract/sandbox-policy.mjs";
 
 const page = (content: unknown[]) => ({
   id: "page",

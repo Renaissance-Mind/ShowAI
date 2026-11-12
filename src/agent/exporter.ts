@@ -35,7 +35,7 @@ import { resolveDocumentComponents } from "../core/catalog";
 import { resolvePublishedComponents } from "../core/publication";
 import { publicationRefKey } from "../portable/remote.mjs";
 import type { PublishedComponentLocator } from "../portable/publication-types";
-import type { CompiledComponent } from "../components/custom/types";
+import type { CompiledComponent } from "../contract/types";
 import { externalResourceUrls } from "../portable/assets.mjs";
 import {
   withLocalResources,

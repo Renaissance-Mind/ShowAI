@@ -10,7 +10,7 @@ import { defaultPython, generateDiagram } from "./diagram-authoring-runner.js";
 import {
   componentAuthoringIndex,
   componentAuthoringGuide,
-} from "../components/custom/authoring";
+} from "../contract/authoring";
 import { listDiagramTemplates } from "../components/blocks/diagrams/templates";
 import { CAPACITY } from "../portable/capacity.mjs";
 import {

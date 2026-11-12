@@ -1,4 +1,4 @@
-import type { ComponentSource } from "../components/custom/types";
+import type { ComponentSource } from "../contract/types";
 export function parameterComponent(id = "region-reader"): ComponentSource {
   const schema = {
     type: "object",

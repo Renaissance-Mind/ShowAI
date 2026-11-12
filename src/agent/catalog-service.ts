@@ -18,7 +18,7 @@ import {
 import {
   componentParameterReference,
   parameterPath,
-} from "../portable/component-parameters.mjs";
+} from "../contract/component-parameters.mjs";
 import {
   describeCommand,
   catalogQueryScore,
@@ -42,7 +42,7 @@ import type {
   ComponentListing,
   SaveTemplateInput,
   TemplateRecord,
-} from "../components/custom/types";
+} from "../contract/types";
 import { availableImporters } from "../core/importers/registry";
 /** Column settings each built-in field type takes, for Agents writing columns. */
 const DATABASE_FIELD_SETTINGS: Record<string, string> = {

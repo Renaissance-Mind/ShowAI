@@ -1,7 +1,7 @@
 import type {
   CompiledComponent,
   PackageRevisionRef,
-} from "../components/custom/types";
+} from "../contract/types";
 import type { PublishedComponentLocator } from "./publication-types";
 export const MAX_PUBLICATION_BUNDLE_BYTES: number;
 export function publicationRefKey(ref: PackageRevisionRef): string;

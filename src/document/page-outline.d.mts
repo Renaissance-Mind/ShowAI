@@ -1,5 +1,5 @@
 import type { JSONContent } from "@tiptap/core";
-import type { CustomBlockData } from "../components/custom/types";
+import type { CustomBlockData } from "../contract/types";
 export const PAGE_OUTLINE_PROTOCOL: 1;
 export interface ManualOutlineEntry {
   id: string;

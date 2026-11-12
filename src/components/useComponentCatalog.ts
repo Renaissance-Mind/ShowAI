@@ -1,13 +1,13 @@
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { ComponentLibraryContext } from "./ComponentLibrary";
 import { useAvailableComponents } from "./custom/CustomBlock";
-import type { CompiledComponent } from "./custom/types";
+import type { CompiledComponent } from "../contract/types";
 import {
   latestComponentVersions,
   type CatalogComponent,
 } from "../core/component-categories";
-import { readBuiltinComponentCatalog } from "./catalog";
-import { componentWidgetData } from "./custom/contract";
+import { readBuiltinComponentCatalog } from "../contract/catalog";
+import { componentWidgetData } from "../contract/contract";
 import { translator } from "../i18n";
 import {
   componentDisplayDescription,

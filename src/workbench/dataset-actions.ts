@@ -7,7 +7,7 @@ import {
   type DatasetDocument,
 } from "../core/datasets";
 import { getComponent } from "../core/catalog";
-import { readCustomBlockData } from "../components/custom/contract";
+import { readCustomBlockData } from "../contract/contract";
 import { syncManager } from "../sync/manager";
 import { evaluateFormulas, incomingRelations } from "../core/database-derive";
 

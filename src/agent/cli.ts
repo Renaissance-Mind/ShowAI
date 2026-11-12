@@ -39,7 +39,7 @@ import type {
   PackageMergeInput,
   PackageRevisionRef,
   SaveTemplateInput,
-} from "../components/custom/types";
+} from "../contract/types";
 import type { PublishedComponentLocator } from "../core/publication";
 import { CATALOG_VIEWS, type CatalogView } from "./disclosure";
 import { assertExportDestination } from "./exporter";

@@ -139,8 +139,8 @@ import type {
   PackageMergeInput,
   EditablePackage,
   SaveTemplateInput,
-} from "../components/custom/types";
-import type { ComponentManifest, JsonSchema } from "../components/custom/types";
+} from "../contract/types";
+import type { ComponentManifest, JsonSchema } from "../contract/types";
 import type { DesktopInfo } from "../desktop/bridge";
 import { DatasetSourceLinks } from "../core/dataset-sources";
 import {

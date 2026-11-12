@@ -21,7 +21,7 @@ const PACKAGES: Record<string, "value" | "type"> = {
 const EXCEPTIONS: Record<string, string> = {
   "document/drawing-geometry.mjs → ../surface/portable-ink.mjs":
     "hit tests and bounds of portable ink strokes need the ink formats, which stay in surface this round",
-  "document/page-outline.d.mts → ../components/custom/types":
+  "document/page-outline.d.mts → ../contract/types":
     "type only: an outline renderer is stored as a custom component reference",
 };
 

@@ -17,7 +17,7 @@ import {
 } from "../document/containers.mjs";
 import { createHash } from "node:crypto";
 import { compileBinding, readBinding } from "../datasets/binding.mjs";
-import { readCustomBlockData } from "../components/custom/contract";
+import { readCustomBlockData } from "../contract/contract";
 import { validateDocument } from "../portable/validation.mjs";
 import { rebaseCommentAnchors, validateComments } from "./comments";
 import { applyCommentOperation } from "./comment-operations";

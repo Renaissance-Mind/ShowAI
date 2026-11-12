@@ -3,7 +3,7 @@ import type { WebContents } from "electron";
 import type {
   BuiltinComponentMetadata,
   CompiledComponent,
-} from "../components/custom/types";
+} from "../contract/types";
 import {
   mkdir,
   readFile,

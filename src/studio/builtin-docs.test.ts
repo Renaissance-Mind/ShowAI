@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { builtinComponent } from "../components/catalog";
+import { builtinComponent } from "../contract/catalog";
 import {
   findComponent,
   indexComponents,

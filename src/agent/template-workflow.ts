@@ -10,7 +10,7 @@ import type {
   CatalogScope,
   PackageRevisionRef,
   TemplateRecord,
-} from "../components/custom/types";
+} from "../contract/types";
 
 export interface TemplateSelection {
   id: string;

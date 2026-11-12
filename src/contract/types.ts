@@ -1,4 +1,4 @@
-import type { ShowDocument } from "../../types";
+import type { ShowDocument } from "../types";
 import type { JSONContent } from "@tiptap/core";
 
 export type CatalogScope = "builtin" | "global" | "published" | "project";
@@ -72,8 +72,8 @@ export interface TemplateMetadata {
     format: 1;
     /** Only staged bundles (schemaVersion 1–3) declared stages; kept for their integrity. */
     stages?: (
-      | import("../../portable/template-bundle.mjs").StagedTemplateStage
-      | import("../../portable/template-bundle.mjs").LegacyTemplateStage
+      | import("../portable/template-bundle.mjs").StagedTemplateStage
+      | import("../portable/template-bundle.mjs").LegacyTemplateStage
     )[];
     components: { id: string; ref: PackageRevisionRef }[];
   };
@@ -82,7 +82,7 @@ export interface TemplateMetadata {
 export interface TemplateRecord extends TemplateMetadata {
   document: ShowDocument;
   composition?: TemplatePart[];
-  bundle?: import("../../portable/template-bundle.mjs").TemplateBundleSource;
+  bundle?: import("../portable/template-bundle.mjs").TemplateBundleSource;
 }
 
 export interface SaveTemplateInput {
@@ -90,7 +90,7 @@ export interface SaveTemplateInput {
   version?: string;
   name?: string;
   description?: string;
-  bundle?: import("../../portable/template-bundle.mjs").TemplateBundleSource;
+  bundle?: import("../portable/template-bundle.mjs").TemplateBundleSource;
   document?: ShowDocument;
   scenarios?: string[];
   contentGuide?: { title: string; instructions: string[] }[];
@@ -265,4 +265,4 @@ export type {
   PageOutlineComponentProps,
   PageOutlineItem,
   PageOutlineData,
-} from "../../document/page-outline.mjs";
+} from "../document/page-outline.mjs";

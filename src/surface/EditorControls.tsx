@@ -44,7 +44,7 @@ export interface EditorControls {
   insertComponent: (
     kind: string,
     data: Record<string, unknown>,
-    component?: import("../components/custom/types").CompiledComponent,
+    component?: import("../contract/types").CompiledComponent,
   ) => void;
 }
 

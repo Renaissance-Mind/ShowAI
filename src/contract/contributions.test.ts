@@ -3,9 +3,9 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { commandProps, validateContributions } from "./contributions";
-import { listComponents, saveComponent } from "../../core/catalog";
-import { FileStore } from "../../core/store";
-import { readBuiltinComponentCatalog } from "../catalog";
+import { listComponents, saveComponent } from "../core/catalog";
+import { FileStore } from "../core/store";
+import { readBuiltinComponentCatalog } from "./catalog";
 import type { ComponentManifest } from "./types";
 
 const commandsOf = (commands: unknown, examples = 1) =>

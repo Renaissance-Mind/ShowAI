@@ -1,4 +1,4 @@
-import type { PackageRevisionRef } from "../components/custom/types";
+import type { PackageRevisionRef } from "../contract/types";
 
 export interface PublishedComponentLocator {
   ref: PackageRevisionRef & { kind: "component" };

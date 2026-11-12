@@ -2,7 +2,7 @@ import type { JSONContent } from "@tiptap/core";
 import type {
   CompiledComponent,
   PackageRevisionRef,
-} from "./components/custom/types";
+} from "./contract/types";
 import type { PublishedComponentLocator } from "./portable/publication-types";
 import type { NodeLayout, PageViews } from "./document/types";
 

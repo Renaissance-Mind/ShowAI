@@ -1,6 +1,6 @@
 // Days the @ menu offers for a component whose `contributes.mention` has
 // `input: "date"`: today, tomorrow and typed dates. The declaration itself is
-// validated with the other contributions (components/custom/contributions.ts).
+// validated with the other contributions (contract/contributions.ts).
 // Shared by the editor and the date component; no dependencies.
 
 /** YYYY-MM-DD of a local calendar day. */

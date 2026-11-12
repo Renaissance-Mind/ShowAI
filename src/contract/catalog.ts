@@ -5,8 +5,8 @@ import g2 from "../../resources/catalog/g2.json";
 import diagrams from "../../resources/catalog/diagrams.json";
 import diagramDocumentation from "../../resources/catalog/diagram-documentation.json";
 import documentation from "../../resources/catalog/component-documentation.json";
-import type { ComponentDocumentation } from "./custom/documentation";
-import type { BuiltinComponentMetadata } from "./custom/types";
+import type { ComponentDocumentation } from "./documentation";
+import type { BuiltinComponentMetadata } from "./types";
 /** Shared discovery data for the workspace, standalone editor and Agent. */
 export function builtinComponentCatalog({
   includeLegacy = false,

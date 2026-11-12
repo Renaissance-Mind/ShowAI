@@ -8,7 +8,7 @@ import {
   validateMindmapData,
   type MindmapData,
 } from "./mindmap-contract.mjs";
-import { builtinComponent } from "../catalog";
+import { builtinComponent } from "../../contract/catalog";
 import { insertComponent } from "../../surface/component-insertion";
 import { createSurface } from "../../document/containers.mjs";
 import { validateDocument } from "../../portable/validation.mjs";

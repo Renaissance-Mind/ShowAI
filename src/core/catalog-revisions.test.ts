@@ -32,7 +32,7 @@ import type {
   ComponentManifest,
   PackageRevisionRef,
   TemplateRecord,
-} from "../components/custom/types";
+} from "../contract/types";
 
 const manifest: ComponentManifest = {
   id: "counter",

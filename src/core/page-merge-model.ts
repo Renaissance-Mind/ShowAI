@@ -8,7 +8,7 @@ import {
 } from "./catalog-merge";
 import { validateDocument } from "../portable/validation.mjs";
 import type { ShowDocument } from "./model";
-import type { MergeConflict } from "../components/custom/types";
+import type { MergeConflict } from "../contract/types";
 import { finishInkPageMerge, InkWireError, prepareInkPageMerge } from "../surface/ink-wire.mjs";
 import { mergeComments } from "./comment-merge";
 

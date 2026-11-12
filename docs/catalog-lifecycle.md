@@ -53,4 +53,4 @@ The default library is `~/.showai`, overridable by `SHOWAI_HOME`. Project packag
 
 Legacy `user` packages appear as `global`; old flat templates read as `0.0.0-legacy`. Derive and lock legacy dependencies before promotion/publication. Original fingerprints remain intact.
 
-Implementation entrypoints: [catalog](../src/core/catalog.ts), [merge](../src/core/catalog-merge.ts), [publication](../src/core/publication.ts), [package types](../src/components/custom/types.ts) and [node contract](../src/components/custom/contract.ts).
+Implementation entrypoints: [catalog](../src/core/catalog.ts), [merge](../src/core/catalog-merge.ts), [publication](../src/core/publication.ts), [package types](../src/contract/types.ts) and [node contract](../src/contract/contract.ts).

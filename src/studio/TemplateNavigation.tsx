@@ -1,5 +1,5 @@
 import { FileText, FlaskConical, LayoutTemplate } from "../ui/icons";
-import type { TemplateMetadata } from "../components/custom/types";
+import type { TemplateMetadata } from "../contract/types";
 import { useTranslator } from "../i18n/react";
 import messages from "../i18n/messages/templates";
 import "./template-navigation.css";

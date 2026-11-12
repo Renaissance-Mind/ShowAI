@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import type { BuiltinComponentMetadata } from "./custom/types";
+import type { BuiltinComponentMetadata } from "../contract/types";
 import { Widget } from "./blocks/Widget";
 import { nativeComponentDocument } from "../surface/component-insertion";
 import { remapSurfaceIds } from "../document/document.mjs";

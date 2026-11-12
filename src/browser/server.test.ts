@@ -32,7 +32,7 @@ import type { LibraryStorage } from "../core/library-maintenance";
 import type { DesktopInfo, DesktopResponse } from "../desktop/bridge";
 import type { LoadedPage } from "../studio/usePage";
 import { blankDocument } from "../core/catalog";
-import type { CompiledComponent } from "../components/custom/types";
+import type { CompiledComponent } from "../contract/types";
 import type { ProjectMetadata } from "../core/model";
 import type { ConnectorSettings } from "../agent-host/remote-connector";
 import { readAppLanguage } from "../core/app-language";

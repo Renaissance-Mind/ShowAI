@@ -3,7 +3,7 @@ import {
   COMPONENT_SIGNATURE_LIMIT,
   componentSignature,
 } from "./component-signature.mjs";
-import { builtinComponentCatalog } from "../components/catalog";
+import { builtinComponentCatalog } from "../contract/catalog";
 
 const chart = {
   type: "object",

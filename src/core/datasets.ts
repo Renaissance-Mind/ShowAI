@@ -30,8 +30,8 @@ import {
   readLibraryFile,
   versionedLibrary,
 } from "./library-runtime";
-import { assertProps } from "../components/custom/schema";
-import type { JsonSchema } from "../components/custom/types";
+import { assertProps } from "../contract/schema";
+import type { JsonSchema } from "../contract/types";
 import type { ShowDocument } from "./model";
 import { walk } from "../document/walk.mjs";
 import {

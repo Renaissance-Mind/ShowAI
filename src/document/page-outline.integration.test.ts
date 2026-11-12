@@ -18,7 +18,7 @@ import { defaultPageOutline } from "./page-outline.mjs";
 import { startBrowserServer } from "../browser/server";
 import { buildPageHtml } from "../agent/exporter";
 import type { ContainerDocument } from "../types";
-import type { CompiledComponent } from "../components/custom/types";
+import type { CompiledComponent } from "../contract/types";
 
 let directory: string,
   home: string,

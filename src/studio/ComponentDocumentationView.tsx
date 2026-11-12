@@ -1,6 +1,6 @@
 import { useId, useRef, useState, type ReactNode } from "react";
-import type { ComponentDocumentation } from "../components/custom/documentation";
-import type { ComponentSource } from "../components/custom/types";
+import type { ComponentDocumentation } from "../contract/documentation";
+import type { ComponentSource } from "../contract/types";
 import ComponentAuthoringGuides from "./ComponentAuthoringGuides";
 import { useTranslator } from "../i18n/react";
 import messages from "../i18n/messages/catalog";

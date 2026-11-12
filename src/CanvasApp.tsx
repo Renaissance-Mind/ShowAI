@@ -36,7 +36,7 @@ import {
   saveCanvasArtifact,
 } from "./portable/canvas";
 import { CustomComponentsProvider } from "./components/custom/CustomBlock";
-import type { CompiledComponent } from "./components/custom/types";
+import type { CompiledComponent } from "./contract/types";
 import { downloadFile, newDocument, toMarkdown } from "./lib/document";
 import { parseMarkdown } from "./lib/markdown";
 import type { ShowArtifact, ShowDocument } from "./types";

@@ -192,4 +192,4 @@ flowchart TD
 
 ## 实现入口
 
-类型定义位于 [`types.ts`](../../src/components/custom/types.ts)，页面组件引用定义位于 [`contract.ts`](../../src/components/custom/contract.ts)。目录、版本、闭包和实例化在 [`catalog.ts`](../../src/core/catalog.ts)；三方比较在 [`catalog-merge.ts`](../../src/core/catalog-merge.ts)；发布准备、网址校验和校验记录在 [`publication.ts`](../../src/core/publication.ts)。
+类型定义位于 [`types.ts`](../../src/contract/types.ts)，页面组件引用定义位于 [`contract.ts`](../../src/contract/contract.ts)。目录、版本、闭包和实例化在 [`catalog.ts`](../../src/core/catalog.ts)；三方比较在 [`catalog-merge.ts`](../../src/core/catalog-merge.ts)；发布准备、网址校验和校验记录在 [`publication.ts`](../../src/core/publication.ts)。

@@ -24,7 +24,7 @@ import {
   type ImporterInfo,
 } from "../core/importers/types";
 import type { AgentService } from "./service";
-import type { CompiledComponent } from "../components/custom/types";
+import type { CompiledComponent } from "../contract/types";
 import type { PublishedComponentLocator } from "../core/publication";
 
 // The import harness: whatever importer filled the slot, the bundle it

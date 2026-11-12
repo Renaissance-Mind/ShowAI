@@ -9,7 +9,7 @@ import type { LinkablePage } from "./environment";
 import { pageLink } from "../../portable/page-link.mjs";
 import { rankByTitle } from "../title-match";
 import { isoDay, typedDays } from "../../portable/mention-contract.mjs";
-import type { MentionContract } from "../custom/contributions";
+import type { MentionContract } from "../../contract/contributions";
 
 /** What choosing an entry puts at the @: a page link, or a component in the line. */
 export type MentionInsertion =

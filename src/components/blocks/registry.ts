@@ -136,7 +136,7 @@ const diagramRenderers = {
   ),
 };
 import { CustomBlock } from "../custom/CustomBlock";
-import { readCustomBlockData } from "../custom/contract";
+import { readCustomBlockData } from "../../contract/contract";
 import type { BlockData, BlockDefinition, BlockRegistration } from "./types";
 
 export type {

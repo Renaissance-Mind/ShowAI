@@ -21,13 +21,13 @@ import {
   serializeArtifact,
   validateDocument,
 } from "../portable/validation.mjs";
-import { collectCustomComponentRefs } from "../components/custom/contract";
+import { collectCustomComponentRefs } from "../contract/contract";
 import { validatePackageBundle, lockDocumentComponents } from "./catalog";
 import type {
   CompiledComponent,
   PackageRevisionRef,
   TemplateRecord,
-} from "../components/custom/types";
+} from "../contract/types";
 import type { LibraryImportReport } from "./library-import";
 import { isCurrentSyncPath } from "../sync/protocol";
 import {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { EditablePackage } from "../components/custom/types";
+import type { EditablePackage } from "../contract/types";
 import {
   applyMergeChoices,
   compareVersions,

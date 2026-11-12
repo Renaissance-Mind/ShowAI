@@ -10,7 +10,7 @@ import { insertComponent } from "../../surface/component-insertion";
 import { findSurfaceNode } from "../../document/document.mjs";
 import { validateDocument } from "../../portable/validation.mjs";
 import { structuredContent } from "../../agent/page-structured";
-import { builtinComponent } from "../catalog";
+import { builtinComponent } from "../../contract/catalog";
 import { RichTextNode } from "./RichTextView";
 
 const data = {

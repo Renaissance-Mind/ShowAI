@@ -6,7 +6,7 @@ import { Widget } from "./Widget";
 import { blankDocument } from "../../core/catalog";
 import { insertComponent } from "../../surface/component-insertion";
 import { validateDocument } from "../../portable/validation.mjs";
-import { builtinComponent } from "../catalog";
+import { builtinComponent } from "../../contract/catalog";
 import Ajv from "ajv";
 
 const content = {

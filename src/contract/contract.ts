@@ -1,6 +1,6 @@
-import { CAPACITY, assertContent } from "../../portable/capacity.mjs";
-import { walk } from "../../document/walk.mjs";
-import type { ShowDocument } from "../../types";
+import { CAPACITY, assertContent } from "../portable/capacity.mjs";
+import { walk } from "../document/walk.mjs";
+import type { ShowDocument } from "../types";
 import type {
   CompiledComponent,
   CustomBlockData,

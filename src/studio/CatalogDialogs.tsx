@@ -1,14 +1,14 @@
 import { useId, useState } from "react";
 import { BuiltinPreview } from "../components/BuiltinPreview";
 import { CustomComponentsProvider } from "../components/custom/CustomBlock";
-import { componentWidgetData } from "../components/custom/contract";
+import { componentWidgetData } from "../contract/contract";
 import type {
   BuiltinComponentMetadata,
   CompiledComponent,
   ComponentSource,
   RelatedPackage,
   TemplateRecord,
-} from "../components/custom/types";
+} from "../contract/types";
 import { Widget } from "../components/blocks/Widget";
 import { SurfaceReader } from "../portable/SurfaceReader";
 import { BookOpen, Sparkles, Layers, Plus, Copy } from "../ui/icons";

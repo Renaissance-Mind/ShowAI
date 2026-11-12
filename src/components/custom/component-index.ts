@@ -1,4 +1,4 @@
-import type { CompiledComponent, CustomComponentRef } from "./types";
+import type { CompiledComponent, CustomComponentRef } from "../../contract/types";
 import { translator } from "../../i18n";
 import messages from "../../i18n/messages/customComponents";
 
