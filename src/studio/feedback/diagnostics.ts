@@ -9,7 +9,7 @@ import type { AgentHostStatus } from "../../agent-host/types";
 import type { AgentConnectionRecord } from "../../agent/mcp-connections";
 import type { RuntimeRegistrationStatus } from "../../agent/runtime";
 import { redact } from "../../core/redact";
-import type { DesktopInfo } from "../../desktop/bridge";
+import type { DesktopInfo } from "../../host/protocol";
 import { getLocale } from "../../i18n";
 import type { PluginInstallation } from "../../plugin/desktop-install";
 import type { SyncConfiguration } from "../../sync/protocol";

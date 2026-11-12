@@ -17,11 +17,8 @@ import { fileURLToPath } from "node:url";
 import { createHash, randomUUID } from "node:crypto";
 import { CoreError } from "../core/store";
 import { errorResult } from "../agent/service";
-import type {
-  DesktopChange,
-  DesktopResponse,
-  PagePreviewCapture,
-} from "./bridge";
+import type { DesktopChange, DesktopResponse } from "../host/protocol";
+import type { PagePreviewCapture } from "../studio/PagePreviewPage";
 import { translator } from "../i18n";
 import messages from "../i18n/messages/desktop";
 import type { LoadedPage } from "../studio/usePage";

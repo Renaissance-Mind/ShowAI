@@ -1,5 +1,4 @@
 import { contextBridge, ipcRenderer } from "electron";
-import type { TabCommand } from "../workbench/tab-shortcuts";
 import {
   type AppUpdateState,
   type CloseResult,
@@ -9,7 +8,8 @@ import {
   type DesktopWindowState,
   type MenuCommand,
   type ShowAIBridge,
-} from "./bridge";
+  type TabCommand,
+} from "../host/protocol";
 import { closeReporter, type CloseListenerEntry } from "./close-report";
 
 if (process.isMainFrame) {

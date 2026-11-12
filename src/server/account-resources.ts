@@ -2,7 +2,7 @@ import { identifier, plainText, SyncError } from "../sync/protocol";
 import type { AccountResource } from "../sync/accounts";
 import { serverBaseUrl } from "../sync/server-url";
 import type { AccountSession, AccountHubOptions } from "./account-hub";
-import { AccountCipher } from "./account-crypto";
+import { AccountCipher } from "../sync/account-crypto";
 import { audit, liveSession } from "./security";
 import type { MetadataStore } from "./storage";
 

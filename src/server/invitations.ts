@@ -10,7 +10,7 @@ import {
 import type { MetadataStore } from "./storage";
 import type { AuthUser } from "./accounts";
 import { audit, liveSession } from "./security";
-import type { AccountCipher } from "./account-crypto";
+import type { AccountCipher } from "../sync/account-crypto";
 interface Invite {
   project_id: string;
   role: ProjectRole;

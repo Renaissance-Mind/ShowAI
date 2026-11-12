@@ -23,7 +23,7 @@ import type {
   ProjectSummary,
   ShowDocument,
 } from "../core/model";
-import { PROJECT_SCOPE_LIMIT } from "../desktop/bridge";
+import { PROJECT_SCOPE_LIMIT } from "../host/protocol";
 
 it("merges resource scopes and only falls back to the whole library for unscoped changes", () => {
   const scope = emptyNavigationScope();

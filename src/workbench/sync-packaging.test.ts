@@ -9,7 +9,7 @@ import { openLibrary } from "../core/open-library";
 import { DatasetStore } from "../core/datasets";
 import type { PackagingPlan } from "../core/packaging";
 import { createWorkbench } from "./actions";
-import type { DesktopInfo } from "../desktop/bridge";
+import type { DesktopInfo } from "../host/protocol";
 import {
   PACKAGING_EVENT,
   datasetPackagingItem,

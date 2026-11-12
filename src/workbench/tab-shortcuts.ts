@@ -1,4 +1,4 @@
-export type TabCommand = "new" | "close" | "next" | "previous";
+import type { TabCommand } from "../host/protocol";
 
 /** The command modifier: ⌘ alone on macOS, where Ctrl+letter edits text; Ctrl elsewhere. */
 export function commandKey(

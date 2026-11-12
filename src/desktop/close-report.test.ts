@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { closeBlockers, closeReporter, describeBlocker } from "./close-report";
-import type { CloseResult } from "./bridge";
+import type { CloseResult } from "../host/protocol";
 
 const entry = (
   source: "pages" | "datasets" | "assistant" | "sidebar" | "workbench",

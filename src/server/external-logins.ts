@@ -1,6 +1,6 @@
 import { hash, plainText, token, SyncError } from "../sync/protocol";
 import { serverEndpoint } from "../sync/server-url";
-import { AccountCipher, base64url, unbase64url } from "./account-crypto";
+import { AccountCipher, base64url, unbase64url } from "../sync/account-crypto";
 import type { AccountSession } from "./account-hub";
 import type { AccountOptions, AuthUser } from "./accounts";
 import { Sessions } from "./sessions";

@@ -115,7 +115,7 @@ import type {
   DesktopResponse,
   MenuCommand,
   UnsavedPage,
-} from "./bridge";
+} from "../host/protocol";
 
 const t = translator(desktopMessages);
 const directory = dirname(fileURLToPath(import.meta.url));

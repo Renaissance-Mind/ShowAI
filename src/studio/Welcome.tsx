@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type MouseEvent } from "react";
-import type { DesktopInfo } from "../desktop/bridge";
+import type { DesktopInfo } from "../host/protocol";
 import type { SampleState } from "../core/onboarding";
 import { useTranslator } from "../i18n/react";
 import messages from "../i18n/messages/onboarding";

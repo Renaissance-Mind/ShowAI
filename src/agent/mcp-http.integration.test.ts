@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { createHash, randomBytes } from "node:crypto";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
-import { AccountCipher } from "../server/account-crypto";
+import { AccountCipher } from "../sync/account-crypto";
 import { hash } from "../sync/protocol";
 import { createServer } from "node:http";
 import { chromium } from "playwright-core";

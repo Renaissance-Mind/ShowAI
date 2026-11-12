@@ -124,7 +124,7 @@ import type {
   DesktopInfo,
   DesktopChange,
   MenuCommand,
-} from "../desktop/bridge";
+} from "../host/protocol";
 import type { ShowDocument } from "../types";
 import type {
   BuiltinComponentMetadata,
@@ -266,11 +266,8 @@ import {
 import findMessages from "../i18n/messages/find";
 import { FindBar } from "./find/FindBar";
 import { useFind } from "./find/useFind";
-import {
-  commandKey,
-  tabShortcut,
-  type TabCommand,
-} from "../workbench/tab-shortcuts";
+import { commandKey, tabShortcut } from "../workbench/tab-shortcuts";
+import type { TabCommand } from "../host/protocol";
 import { useWindowFullscreen } from "./useWindowFullscreen";
 import { ComponentCatalog, ComponentNavigation } from "./ComponentCatalog";
 import {

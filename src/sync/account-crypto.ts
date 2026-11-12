@@ -1,4 +1,4 @@
-import { canonical, SyncError } from "../sync/protocol";
+import { canonical, SyncError } from "./protocol";
 
 const encoder = new TextEncoder();
 export function base64url(bytes: Uint8Array): string {

@@ -6,7 +6,7 @@ import type {
 } from "../plugin/desktop-install";
 import type { RuntimeRegistrationStatus } from "../agent/runtime";
 import type { AgentConnectionRecord } from "../agent/mcp-connections";
-import type { DesktopInfo } from "../desktop/bridge";
+import type { DesktopInfo } from "../host/protocol";
 import {
   launchSnippet,
   runtimeMcpLaunch,

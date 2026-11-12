@@ -7,7 +7,7 @@ import { openLibrary } from "../core/open-library";
 import { syncManager } from "../sync/manager";
 import { createWorkbench } from "./actions";
 import { notionZip } from "../core/importers/test-fixtures";
-import type { DesktopInfo } from "../desktop/bridge";
+import type { DesktopInfo } from "../host/protocol";
 
 let home: string;
 let input: string;

@@ -29,7 +29,7 @@ import { pageToken } from "./bridge";
 import { AgentService } from "../agent/service";
 import { ContentLibrary as GitLibrary } from "../core/content-library";
 import type { LibraryStorage } from "../core/library-maintenance";
-import type { DesktopInfo, DesktopResponse } from "../desktop/bridge";
+import type { DesktopInfo, DesktopResponse } from "../host/protocol";
 import type { LoadedPage } from "../studio/usePage";
 import { blankDocument } from "../core/catalog";
 import type { CompiledComponent } from "../contract/types";

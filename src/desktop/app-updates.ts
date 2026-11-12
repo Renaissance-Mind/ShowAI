@@ -2,7 +2,7 @@ import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { app, autoUpdater as nativeUpdater } from "electron";
 import { autoUpdater, type ProgressInfo, type UpdateInfo } from "electron-updater";
-import type { AppUpdateState } from "./bridge";
+import type { AppUpdateState } from "../host/protocol";
 import type { LogLevel } from "./main-log";
 
 const FIRST_CHECK_DELAY_MS = 20_000;

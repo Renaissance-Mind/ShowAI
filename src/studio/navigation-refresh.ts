@@ -1,4 +1,4 @@
-import { PROJECT_SCOPE_LIMIT, type DesktopChange } from "../desktop/bridge";
+import { PROJECT_SCOPE_LIMIT, type DesktopChange } from "../host/protocol";
 import type {
   FolderMetadata,
   PageRecord,

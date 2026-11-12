@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import type { AppUpdateState } from "../desktop/bridge";
+import type { AppUpdateState } from "../host/protocol";
 import { useTranslator } from "../i18n/react";
 import messages from "../i18n/messages/feedback";
 import { errorMessage } from "../host/bridge";

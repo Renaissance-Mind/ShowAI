@@ -13,7 +13,7 @@ import { LibraryMaintenance } from "../core/library-maintenance";
 import { encodeFile } from "../core/history-codec";
 import { createWorkbench } from "./actions";
 import type { DeletedEntries } from "../core/deleted-entries";
-import type { DesktopInfo } from "../desktop/bridge";
+import type { DesktopInfo } from "../host/protocol";
 import type { FolderMetadata, PageRecord, ProjectSummary } from "../core/model";
 
 let home: string;

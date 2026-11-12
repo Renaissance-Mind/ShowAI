@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { closeAllowed } from "./desktop/bridge";
+import { closeAllowed } from "./host/protocol";
 import { isChunkLoadError } from "./AppErrorBoundary";
 
 describe("app shell errors", () => {

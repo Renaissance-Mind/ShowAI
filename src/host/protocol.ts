@@ -1,6 +1,8 @@
 import type { Locale } from "../i18n";
-import type { TabCommand } from "../workbench/tab-shortcuts";
 export const PROJECT_SCOPE_LIMIT = 1000;
+
+/** Tab commands the native menu and keyboard shortcuts send to the workbench. */
+export type TabCommand = "new" | "close" | "next" | "previous";
 
 export interface DesktopError {
   code: string;
@@ -173,14 +175,6 @@ export interface DesktopChange {
 
 export interface DesktopWindowState {
   fullScreen: boolean;
-}
-
-/** Private data delivered only to the background page capture frame. */
-export interface PagePreviewCapture {
-  id: string;
-  theme: string;
-  padding: number;
-  record: import("../studio/usePage").LoadedPage;
 }
 
 export type DesktopAppearance = "light" | "dark";

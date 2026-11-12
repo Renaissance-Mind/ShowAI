@@ -14,7 +14,7 @@ import type {
   SignedIdentity,
 } from "../sync/accounts";
 import { serverBaseUrl } from "../sync/server-url";
-import { AccountCipher, sign, signingKeys, verify } from "./account-crypto";
+import { AccountCipher, sign, signingKeys, verify } from "../sync/account-crypto";
 import type { AuthUser } from "./accounts";
 import { Sessions } from "./sessions";
 import { audit, liveSession, rateLimit } from "./security";

@@ -21,7 +21,7 @@ import {
   type ResolvedResource,
   type AccountResource,
 } from "./accounts";
-import { verify } from "../server/account-crypto";
+import { verify } from "./account-crypto";
 import { serverFetch as fetch } from "./server-fetch";
 import { translator } from "../i18n";
 import syncEngineMessages from "../i18n/messages/syncEngine";

@@ -7,7 +7,7 @@ import type {
   CloseResult,
   CloseSource,
   UnsavedPage,
-} from "./bridge";
+} from "../host/protocol";
 
 /** A listener that has not answered by then is reported as LISTENER_TIMEOUT. */
 export const CLOSE_LISTENER_TIMEOUT_MS = 15000;

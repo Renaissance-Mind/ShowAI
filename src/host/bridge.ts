@@ -7,9 +7,9 @@ import type {
   DesktopChange,
   DesktopWindowState,
   MenuCommand,
-} from "../desktop/bridge";
+  TabCommand,
+} from "./protocol";
 import type { Locale } from "../i18n";
-import type { TabCommand } from "../workbench/tab-shortcuts";
 export interface DesktopBridge {
   onPreviewCapture?(listener: (action: "load" | "clear") => void): () => void;
   previewReady?(id: string, error?: string): void;

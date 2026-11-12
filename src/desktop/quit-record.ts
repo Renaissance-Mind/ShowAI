@@ -1,7 +1,7 @@
 import { mkdir, rename, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { randomUUID } from "node:crypto";
-import type { CloseBlocker } from "./bridge";
+import type { CloseBlocker } from "../host/protocol";
 
 /**
  * Machine-readable record of windows that refused to close, next to the main

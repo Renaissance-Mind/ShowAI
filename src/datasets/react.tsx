@@ -14,7 +14,7 @@ import { desktop, errorMessage } from "../host/bridge";
 import { useTranslator } from "../i18n/react";
 import { translator } from "../i18n";
 import messages from "../i18n/messages/datasets";
-import type { CloseResult } from "../desktop/bridge";
+import type { CloseResult } from "../host/protocol";
 import { Database } from "../ui/icons";
 import {
   BlockActionHost,

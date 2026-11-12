@@ -9,7 +9,7 @@ import { validatePageIcon } from "../lib/page-icon.mjs";
 import { translator } from "../i18n";
 import fileMessages from "../i18n/messages/files";
 import workbenchMessages from "../i18n/messages/workbench";
-import { PROJECT_SCOPE_LIMIT } from "../desktop/bridge";
+import { PROJECT_SCOPE_LIMIT } from "../host/protocol";
 import { syncManager } from "../sync/manager";
 import { remoteSaveOrigin } from "../core/remote-save-conflict";
 import {
@@ -141,7 +141,7 @@ import type {
   SaveTemplateInput,
 } from "../contract/types";
 import type { ComponentManifest, JsonSchema } from "../contract/types";
-import type { DesktopInfo } from "../desktop/bridge";
+import type { DesktopInfo } from "../host/protocol";
 import { DatasetSourceLinks } from "../core/dataset-sources";
 import {
   datasetActions,

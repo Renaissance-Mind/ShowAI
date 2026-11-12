@@ -6,7 +6,7 @@ import { AgentService } from "../agent/service";
 import { openLibrary } from "../core/open-library";
 import { createWorkbench, type OpenDialogOptions } from "./actions";
 import { localFileRef } from "../document/local-files.mjs";
-import type { DesktopInfo } from "../desktop/bridge";
+import type { DesktopInfo } from "../host/protocol";
 
 let home: string;
 let files: string;

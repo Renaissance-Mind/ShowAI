@@ -1,5 +1,5 @@
 import { useEffect, useId, useState } from "react";
-import type { DesktopInfo } from "../../desktop/bridge";
+import type { DesktopInfo } from "../../host/protocol";
 import { getLocale } from "../../i18n";
 import { useTranslator } from "../../i18n/react";
 import messages from "../../i18n/messages/feedback";

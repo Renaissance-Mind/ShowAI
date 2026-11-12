@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { supportChannels } from "../../core/support-channels";
-import type { DesktopInfo } from "../../desktop/bridge";
+import type { DesktopInfo } from "../../host/protocol";
 import {
   clearProblemLog,
   recentProblems,

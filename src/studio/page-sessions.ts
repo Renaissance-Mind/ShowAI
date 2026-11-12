@@ -3,7 +3,7 @@ import type {
   CloseResult,
   DesktopChange,
   UnsavedPage,
-} from "../desktop/bridge";
+} from "../host/protocol";
 import { serializeArtifact } from "../portable/validation.mjs";
 import {
   createPageSession,

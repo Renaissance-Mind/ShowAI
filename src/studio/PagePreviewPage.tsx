@@ -1,9 +1,17 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import PageThumbnailContent from "./PageThumbnailContent";
-import type { PagePreviewCapture } from "../desktop/bridge";
+import type { LoadedPage } from "./usePage";
 import { desktop, errorMessage } from "../host/bridge";
 import "./studio.css";
 import "./catalog-workspace.css";
+
+/** Private data delivered only to the background page capture frame. */
+export interface PagePreviewCapture {
+  id: string;
+  theme: string;
+  padding: number;
+  record: LoadedPage;
+}
 
 /** Only the capture window receives this page's data; the directory gets a PNG. */
 export default function PagePreviewPage() {

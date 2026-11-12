@@ -8,7 +8,7 @@ import type {
   CloseSource,
   DesktopChange,
   DesktopResponse,
-} from "../desktop/bridge";
+} from "../host/protocol";
 import { closeReporter, type CloseListenerEntry } from "../desktop/close-report";
 import type { LoadedPage } from "../studio/usePage";
 import { translator } from "../i18n";

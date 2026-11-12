@@ -14,7 +14,7 @@ import {
   Sun,
   Globe,
 } from "../ui/icons";
-import type { DesktopInfo } from "../desktop/bridge";
+import type { DesktopInfo } from "../host/protocol";
 import type { AppearancePreference } from "../design/appearance-preference";
 import {
   isLanguagePreference,

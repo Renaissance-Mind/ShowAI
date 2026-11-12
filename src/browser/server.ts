@@ -49,7 +49,7 @@ import {
   required,
   text,
 } from "../workbench/actions";
-import type { DesktopChange, DesktopInfo } from "../desktop/bridge";
+import type { DesktopChange, DesktopInfo } from "../host/protocol";
 import { openLocalPath, systemVersion } from "./system";
 import { localMediaResponse } from "../workbench/local-media";
 import { windowQuery } from "../workbench/window-target";

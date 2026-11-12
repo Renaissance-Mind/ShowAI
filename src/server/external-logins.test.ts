@@ -6,7 +6,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { startSyncServer } from "./node";
 import { token } from "../sync/protocol";
-import { base64url } from "./account-crypto";
+import { base64url } from "../sync/account-crypto";
 import { googleIdentity, providerJson } from "./external-logins";
 
 test("Google relay requires its own credential and rejects unlisted callbacks before forwarding", async () => {

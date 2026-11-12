@@ -6,7 +6,7 @@ import { AgentService } from "../agent/service";
 import { openLibrary } from "../core/open-library";
 import { createWorkbench } from "./actions";
 import type { DeletedEntries } from "../core/deleted-entries";
-import type { DesktopInfo } from "../desktop/bridge";
+import type { DesktopInfo } from "../host/protocol";
 import type { FolderMetadata, PageSummary, ProjectSummary } from "../core/model";
 
 let home: string;

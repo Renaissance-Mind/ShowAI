@@ -3,7 +3,7 @@ import type { AgentConnectionRecord } from "../../agent/mcp-connections";
 import { appIconForTheme } from "../../design/app-icon";
 import { useAppearanceTheme } from "../../design/useAppearanceTheme";
 import { supportChannels } from "../../core/support-channels";
-import type { DesktopInfo } from "../../desktop/bridge";
+import type { DesktopInfo } from "../../host/protocol";
 import type { PluginInstallation } from "../../plugin/desktop-install";
 import { getLocale } from "../../i18n";
 import { useTranslator } from "../../i18n/react";
