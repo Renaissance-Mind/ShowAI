@@ -13,7 +13,6 @@ import {
   useEffect,
   useRef,
   useState,
-  type DragEvent,
 } from "react";
 import {
   ArrowUpRight,
@@ -26,9 +25,7 @@ import {
   Globe,
   Package,
   PanelsTopLeft,
-  Check,
   Copy,
-  FilePlus2,
   FileText,
   Folder,
   FolderOpen,
@@ -38,9 +35,6 @@ import {
   PinOff,
   Trash2,
   LayoutTemplate,
-  Loader2,
-  MoreHorizontal,
-  Sparkles,
   Plus,
   ArchiveRestore,
   Cloud,
@@ -62,7 +56,6 @@ import type {
   CompiledComponent,
   ComponentSource,
 } from "../contract/types";
-import { PageWorkspace } from "./PageWorkspace";
 import DatabaseRecordPeek from "./DatabaseRecordPeek";
 import { useDatabaseRecordPeek } from "./useDatabaseRecordPeek";
 import {
@@ -72,35 +65,25 @@ import { desktop } from "../host/bridge";
 import { usePage } from "./usePage";
 import {
   LibraryContextMenu,
-  type LibraryMenuPoint,
 } from "./LibraryNavigation";
 import Dialog from "../ui/Dialog";
 import ImportDialog from "./ImportDialog";
 import {
   PackagingDialog,
 } from "./PackagingDialog";
-import PageThumbnail from "./PageThumbnail";
-import FolderThumbnail from "./FolderThumbnail";
 import {
   BatchPagesDialog,
   DirectorySelectionBar,
 } from "./DirectoryPageSelection";
-import PageIcon from "../components/PageIcon";
 import PageIconDialog from "../components/PageIconDialog";
 import {
   latestTemplateVersions,
   templateHasPage,
 } from "./template-catalog-model";
-import TemplateThumbnail from "./TemplateThumbnail";
-import RecentPages from "./RecentPages";
 import QuickJump from "./quick-jump/QuickJump";
-import Welcome from "./Welcome";
 import PluginUpdateNotice from "./PluginUpdateNotice";
 import AppUpdateNotice from "./AppUpdateNotice";
 import { useAppUpdate } from "./useAppUpdate";
-import {
-  BuiltinDocPage,
-} from "./BuiltinDocs";
 import {
   WELCOME_DOC,
 } from "./builtin-docs";
@@ -120,13 +103,11 @@ import {
 import {
   clientIsMac,
   formatShortcut,
-  isDeleteShortcut,
 } from "./keyboard-shortcuts";
 import findMessages from "../i18n/messages/find";
 import { FindBar } from "./find/FindBar";
 import { useFind } from "./find/useFind";
 import { useWindowFullscreen } from "./useWindowFullscreen";
-import { ComponentCatalog } from "./ComponentCatalog";
 import { TemplateDialog, ComponentDialog } from "./CatalogDialogs";
 import "./studio.css";
 import {
@@ -140,12 +121,6 @@ import {
   WorkspaceConflictsDialog,
 } from "./RecoveryDialogs";
 import LibraryMigrationDialog from "./LibraryMigrationDialog";
-import {
-  SettingsPanel,
-} from "./Settings";
-import {
-  getLocale,
-} from "../i18n";
 import { useTranslator } from "../i18n/react";
 import commonMessages from "../i18n/messages/common";
 import studioMessages from "../i18n/messages/studio";
@@ -189,29 +164,9 @@ import {
   StudioNotices,
   useExternalChangeCount,
 } from "./shell/StudioNotices";
+import { StudioViews } from "./shell/StudioViews";
 
 
-const recentLoading = <div className="studio-welcome" aria-busy="true" />;
-
-function shortDate(value: string) {
-  return new Intl.DateTimeFormat(getLocale(), {
-    month: "short",
-    day: "numeric",
-  }).format(new Date(value));
-}
-function Scope({ value }: { value: string }) {
-  const t = useTranslator(studioMessages);
-  const key = (
-    {
-      builtin: "scope.builtin",
-      global: "scope.global",
-      published: "scope.published",
-      user: "scope.global",
-      project: "scope.project",
-    } as const
-  )[value];
-  return <span className="studio-tag">{key ? t(key) : value}</span>;
-}
 
 export default function Studio() {
   useEffect(() => {
@@ -241,14 +196,7 @@ export default function Studio() {
   }, []);
   const windowFullscreen = useWindowFullscreen();
   const feedback = useStudioFeedback();
-  const {
-    toasts,
-    setNotice,
-    problemQueue,
-    notifyWithUndo,
-    report,
-    action,
-  } = feedback;
+  const { toasts, setNotice, notifyWithUndo, report, action } = feedback;
   const library = useLibraryState(feedback);
   const {
     navigationUpdating,
@@ -261,52 +209,31 @@ export default function Studio() {
     syncOverview,
     setContents,
     contents,
-    setExpandedProjects,
     setExpandedFolders,
     refresh,
     refreshProjects,
     projectTarget,
-    folderTarget,
-    pageTarget,
   } = library;
   const route = useRouteState({ info, capabilities });
   const {
-    syncNavigationKey,
-    syncRequest,
     setSyncRequest,
-    feedbackRequest,
     workspaceReady,
     routing,
     docPage,
     showDocs,
     docTitle,
     selectedProject,
-    setSelectedProject,
     selectedFolder,
-    setSelectedFolder,
     view,
     settingsSection,
     setSettingsSection,
-    deferredQuery,
-    revealNode,
     setRevealNode,
     editorControls,
-    setEditorControls,
-    handleRevealHandled,
     catalogScrollRef,
-    selectedRef,
   } = route;
   const appUpdate = useAppUpdate();
   const catalog = useCatalogState(route);
-  const {
-    catalogLoading,
-    componentProject,
-    componentCategory,
-    catalogQueries,
-    componentGroups,
-    loadCatalog,
-    visibleTemplates,
-  } = catalog;
+  const { componentProject, loadCatalog } = catalog;
   const dialogs = useDialogState();
   const { dialog, setDialog, dialogRef, closeDialog } = dialogs;
   const menus = useMenuState();
@@ -331,7 +258,6 @@ export default function Studio() {
     setPageExportMenu,
     exportTarget,
     setExportTarget,
-    showMenu,
   } = menus;
   const [assistantPrefill, setAssistantPrefill] = useState<{
     key: string;
@@ -374,13 +300,9 @@ export default function Studio() {
   const directory = useDirectory({ library, route, dialogs, menus });
   const {
     syncReadOnly,
-    fileDrop,
-    setFileDrop,
-    project,
     recent,
     currentFolder,
     visibleEntries,
-    folderThumbnailEntries,
     pageSelection,
     directoryMarquee,
   } = directory;
@@ -402,7 +324,6 @@ export default function Studio() {
     openPage,
     locateAssistantTarget,
     openTarget,
-    openTargetClick,
     openDoc,
     locateCurrentPage,
     openProjectManagement,
@@ -431,14 +352,11 @@ export default function Studio() {
     packagingDecision,
     busy,
     setExportReceipt,
-    handleActiveSurfaceChange,
     copyPageReference,
     copyPageLink,
-    beginNewPage,
     createPage,
     createLinkedPage,
     renameLinkedPage,
-    createPageForAgent,
     importFinished,
     exportSite,
     activePageTarget,
@@ -446,7 +364,6 @@ export default function Studio() {
     runCreation,
     beginPageIcon,
     addBlock,
-    importDroppedFiles,
   } = pageActions;
   const edits = useLibraryEdits({
     feedback,
@@ -459,7 +376,6 @@ export default function Studio() {
   });
   const {
     beginRename,
-    libraryKeyCommand,
     beginDelete,
     moveProject,
     updateTarget,
@@ -485,7 +401,7 @@ export default function Studio() {
     router,
     page,
   });
-  const { viewComponent, catalogManager, pickerLibrary } = catalogActions;
+  const { catalogManager, pickerLibrary } = catalogActions;
   const workbench = useStudioWorkspace({
     feedback,
     library,
@@ -512,21 +428,6 @@ export default function Studio() {
     dialogOpen: !!dialog,
     home: info?.home,
   });
-  function showDirectoryCreationMenu(
-    anchor: HTMLElement,
-    point?: LibraryMenuPoint,
-  ) {
-    if (!project || (selectedFolder && !currentFolder)) return;
-    showMenu(
-      currentFolder
-        ? folderTarget(currentFolder, project.id)
-        : projectTarget(project),
-      anchor,
-      point,
-      false,
-      true,
-    );
-  }
   /** Page templates create a page here; workflow templates hand a prompt to an agent. */
   function templateDialogActions(record: LoadedTemplate, owner?: string) {
     const projectId =
@@ -550,7 +451,6 @@ export default function Studio() {
         desktop.invoke<void>("clipboard:write", { text: prompt }),
     };
   }
-  const loading = !info && !problemQueue.problems.length;
   // A sample project the person removed is never offered again.
   const seededSamples =
     sampleProject.samples?.state === "seeded" ? sampleProject.samples : null;
@@ -679,7 +579,7 @@ export default function Studio() {
     appearance,
     assistant,
   });
-  const { helpDoc, openFeedback, quickJumpCommands } = commands;
+  const { openFeedback, quickJumpCommands } = commands;
   // An external write just installed into the open page: outline what changed.
   const externalChange = view === "page" ? page.externalChange : undefined;
   useEffect(() => {
@@ -730,33 +630,6 @@ export default function Studio() {
     busy ||
     !!syncReadOnly ||
     (!!selectedFolder && !currentFolder);
-  const carriesFiles = (event: DragEvent) =>
-    event.dataTransfer.types.includes("Files");
-  // Files dropped on the directory view import like 「添加内容 → 导入文件…」.
-  const directoryFileDrop =
-    view === "project" && project && !contentCreationDisabled
-      ? {
-          "data-file-drop": true,
-          onDragOver: (event: DragEvent) => {
-            if (!carriesFiles(event)) return;
-            event.preventDefault();
-            event.dataTransfer.dropEffect = "copy";
-            setFileDrop(true);
-          },
-          onDragLeave: (event: DragEvent) => {
-            if (!event.currentTarget.contains(event.relatedTarget as Node))
-              setFileDrop(false);
-          },
-          onDrop: (event: DragEvent) => {
-            if (!carriesFiles(event)) return;
-            event.preventDefault();
-            setFileDrop(false);
-            void importDroppedFiles([...event.dataTransfer.files]).catch(
-              report,
-            );
-          },
-        }
-      : {};
   const rows = useLibraryRows({
     feedback,
     library,
@@ -765,55 +638,6 @@ export default function Studio() {
     router,
     edits,
   });
-  const { openRecent, showRecentMenu, recentCommand, beginProject } = rows;
-  const welcomeView = (
-    <Welcome
-      info={info}
-      samples={sampleProjectId ? sampleProject.samples : null}
-      preparing={sampleProject.preparing}
-      onOpenSample={(projectId, pageId, event) => {
-        const item = contents[projectId]?.pages.find(
-          (entry) => entry.id === pageId,
-        );
-        openTargetClick(
-          item
-            ? pageTarget(item, projectId)
-            : {
-                kind: "page",
-                projectId,
-                id: pageId,
-                title: tc("untitled"),
-                pinned: false,
-                parentId: null,
-              },
-          event,
-        );
-      }}
-      onOpenAgentSettings={() => {
-        setSettingsSection("agent");
-        void navigate("settings").catch(report);
-      }}
-      onStartPrompt={
-        sampleProjectId
-          ? async (text) => {
-              // Only the built-in Agent can take it: write it on a new page of the sample project.
-              const pageId = await createPage("blank", undefined, "page", {
-                projectId: sampleProjectId,
-                parentId: null,
-              });
-              if (!pageId) return;
-              setAssistantPrefill({ key: crypto.randomUUID(), pageId, text });
-              changeAssistantOpen(true);
-            }
-          : undefined
-      }
-      onOpenPluginSettings={() => {
-        setSettingsSection("plugins");
-        void navigate("settings").catch(report);
-      }}
-      onCreateProject={() => setDialog({ type: "project" })}
-    />
-  );
   return (
     <ComponentLibraryContext.Provider value={pickerLibrary}>
       <div
@@ -1001,488 +825,28 @@ export default function Studio() {
                 />
               </div>
             )}
-            <div
-              ref={catalogScrollRef}
-              tabIndex={view === "project" ? -1 : undefined}
-              onKeyDown={(event) => {
-                if (
-                  view !== "project" || dialog ||
-                  (event.target as HTMLElement).closest(
-                    "input,textarea,[contenteditable=true]",
-                  )
-                ) return;
-                if (
-                  (event.metaKey || event.ctrlKey) &&
-                  event.key.toLowerCase() === "a"
-                ) {
-                  event.preventDefault();
-                  pageSelection.selectAll();
-                } else if (
-                  pageSelection.ids.length &&
-                  isDeleteShortcut(event, clientIsMac())
-                ) {
-                  event.preventDefault();
-                  beginBatchPages("delete");
-                }
-              }}
-              onPointerDown={directoryMarquee.onPointerDown}
-              onClickCapture={directoryMarquee.onClickCapture}
-              className={`studio-scroll${(view === "page" && page.draft) || (view === "docs" && docPage && docPage.id !== WELCOME_DOC) ? " has-page-surface" : ""}`}
-                onContextMenu={(event) => {
-                  if (event.defaultPrevented || view !== "project" || !project)
-                    return;
-                  if ((event.target as HTMLElement).closest("button,input,a"))
-                    return;
-                  event.preventDefault();
-                  showMenu(
-                    currentFolder
-                      ? folderTarget(currentFolder, project.id)
-                      : projectTarget(project),
-                    event.currentTarget,
-                    { x: event.clientX, y: event.clientY },
-                    false,
-                    false,
-                    pageSelection.ids.length > 0,
-                  );
-                }}
-            >
-              <PageWorkspace
-                sessions={page.sessions}
-                visible={view === "page" && !!page.draft}
-                readOnly={syncReadOnly}
-                revealId={revealNode}
-                onControlsChange={setEditorControls}
-                onActiveSurfaceChange={handleActiveSurfaceChange}
-                onRevealHandled={handleRevealHandled}
-                linkablePages={contents}
-                onCopyLink={(target) => void copyPageLink(target).catch(report)}
-                onCreateLinkedPage={createLinkedPage}
-                onRenameLinkedPage={renameLinkedPage}
-                onOpenRecord={recordPeek.open}
-                onCloseRecord={recordPeek.closeSource}
-                recordPeek={recordPeek.state}
-                onEditIcon={action(async () => {
-                  const target = activePageTarget();
-                  if (target) await beginPageIcon(target);
-                })}
-              />
-              {loading && (
-                <div className="studio-loading">
-                  <Loader2 size={24} className="studio-spin" />
-                </div>
-              )}
-              {view === "settings" ? (
-                <SettingsPanel
-                  key={syncNavigationKey}
-                  section={settingsSection}
-                    syncRequest={syncRequest}
-                    onOpenProject={async (id) => {
-                      await refreshProjects([id], { sidebar: true });
-                      await openProject(id);
-                    }}
-                  info={info}
-                  appearance={appearance.preference}
-                  theme={appearance.theme}
-                  onAppearanceChange={appearance.setPreference}
-                  onMigrate={() => setDialog({ type: "migration" })}
-                  onOpenShortcuts={() => setDialog({ type: "shortcuts" })}
-                  feedbackRequest={feedbackRequest}
-                  onOpenDocs={() => void helpDoc("").catch(report)}
-                  onOpenFaq={() =>
-                    void helpDoc("agent-troubleshooting").catch(report)
-                  }
-                  onChooseHome={action(async () => {
-                    if (!(await page.prepareClose())) return;
-                    const next = await desktop.invoke<DesktopInfo | null>(
-                      "settings:chooseHome",
-                    );
-                    if (next) {
-                      await page.clear();
-                      setInfo(next);
-                      setSelectedProject(null);
-                      selectedRef.current = null;
-                      setSelectedFolder(null);
-                      setContents({});
-                      setExpandedProjects({});
-                      setExpandedFolders({});
-                      await refresh();
-                      await loadCatalog();
-                      setNotice(t("librarySwitched"));
-                    }
-                  })}
-                  onCopyHome={action(async () => {
-                    if (!info) return;
-                    await desktop.invoke("clipboard:write", {
-                      text: info.home,
-                    });
-                    setNotice(t("libraryPathCopied"));
-                  })}
-                  onCopyConfig={action(async () => {
-                    if (!info) return;
-                    await desktop.invoke("clipboard:write", {
-                      text: JSON.stringify(info.cli, null, 2),
-                    });
-                    setNotice(t("launchConfigCopied"));
-                  })}
-                />
-              ) : view === "docs" && docPage ? (
-                docPage.id === WELCOME_DOC ? (
-                  <div className="studio-library">{welcomeView}</div>
-                ) : (
-                  <BuiltinDocPage
-                    id={docPage.id}
-                    hash={docPage.hash}
-                    onOpenDoc={(id, hash, newTab) =>
-                      void openDoc(id, hash, newTab ? "tab" : "current").catch(
-                        report,
-                      )
-                    }
-                  />
-                )
-              ) : view === "page" && page.draft ? null : (
-                <div
-                  className={`studio-library${view === "components" ? " studio-component-library" : ""}`}
-                  {...directoryFileDrop}
-                >
-                  {fileDrop && view === "project" && project && (
-                    <div className="studio-file-drop" role="status">
-                      {t("dropImport", {
-                        title: currentFolder?.name ?? project.name,
-                      })}
-                    </div>
-                  )}
-                  {view === "projects" && (
-                    <RecentPages
-                      pages={recent}
-                      query={deferredQuery}
-                      onOpen={openRecent}
-                      onMenu={showRecentMenu}
-                      onCommand={recentCommand}
-                      onCreateProject={beginProject}
-                      welcome={
-                        !workspaceReady
-                          ? recentLoading
-                          : welcoming && !showDocs
-                            ? welcomeView
-                            : undefined
-                      }
-                    />
-                  )}
-                  {view === "project" && (
-                    <>
-                      {visibleEntries.length || !deferredQuery ? (
-                          <div
-                            className="studio-page-list"
-                            data-view={directoryView}
-                            data-selecting={pageSelection.active || undefined}
-                          >
-                          {visibleEntries.map(({ target, updatedAt, hash }) => (
-                            <div
-                              key={target.id}
-                                {...(!pageSelection.active ? libraryDrag.bindings.row(target, false) : {})}
-                                data-library-id={target.id}
-                                data-selectable
-                              className={`studio-page-list-row${pageSelection.ids.includes(target.id) ? " selected" : ""}`}
-                              onContextMenu={(event) => {
-                                event.preventDefault();
-                                const anchor =
-                                  event.currentTarget.querySelector<HTMLElement>(
-                                    ".studio-row-menu",
-                                  );
-                                if (anchor)
-                                  showMenu(
-                                    target,
-                                    anchor,
-                                    { x: event.clientX, y: event.clientY },
-                                    false,
-                                    false,
-                                    pageSelection.ids.includes(target.id),
-                                  );
-                              }}
-                              onKeyDown={(event) => {
-                                const deleting = isDeleteShortcut(
-                                  event,
-                                  clientIsMac(),
-                                );
-                                if (deleting && pageSelection.ids.length) {
-                                  event.preventDefault();
-                                  event.stopPropagation();
-                                  beginBatchPages("delete");
-                                  return;
-                                }
-                                if (event.key === "F2" || deleting) {
-                                  event.preventDefault();
-                                  libraryKeyCommand(
-                                    target,
-                                    event.key === "F2" ? "rename" : "delete",
-                                  );
-                                  return;
-                                }
-                                if (
-                                  event.key !== "ContextMenu" &&
-                                  !(event.shiftKey && event.key === "F10")
-                                )
-                                  return;
-                                event.preventDefault();
-                                const anchor =
-                                  event.currentTarget.querySelector<HTMLElement>(
-                                    ".studio-row-menu",
-                                  );
-                                if (anchor) showMenu(target, anchor);
-                              }}
-                            >
-                              <button
-                                type="button"
-                                role="checkbox"
-                                aria-checked={pageSelection.ids.includes(target.id)}
-                                aria-label={t("selectPage", { title: target.title })}
-                                className="studio-page-checkbox"
-                                onPointerDown={(event) => event.stopPropagation()}
-                                onClick={(event) => pageSelection.toggle(target.id, event.shiftKey)}
-                              >
-                                <Check size={12} strokeWidth={3} />
-                              </button>
-                                {directoryView !== "list" &&
-                                  (target.kind === "page" ? (
-                                    <PageThumbnail
-                                      projectId={target.projectId}
-                                      pageId={target.id}
-                                      updatedAt={updatedAt}
-                                      hash={hash}
-                                    />
-                                  ) : (
-                                    <FolderThumbnail
-                                      projectId={target.projectId}
-                                      entries={folderThumbnailEntries(target.id)}
-                                    />
-                                  ))}
-                              <button
-                                className="studio-page-list-open"
-                                data-open-page={
-                                  target.kind === "page" ? target.id : undefined
-                                }
-                                data-open-project={
-                                  target.kind === "page"
-                                    ? target.projectId
-                                    : undefined
-                                }
-                                onClick={(event) => {
-                                  if (pageSelection.active)
-                                    pageSelection.toggle(target.id, event.shiftKey);
-                                  else openTargetClick(target, event);
-                                }}
-                                onAuxClick={(event) => {
-                                  if (event.button === 1)
-                                    openTargetClick(target, event);
-                                }}
-                              >
-                                  {directoryView !== "list" && (
-                                    <span className="studio-thumbnail-space" />
-                                  )}
-                                <span className="studio-page-list-icon">
-                                  {target.kind === "folder" ? (
-                                    <PageIcon
-                                      value={target.icon}
-                                      size={19}
-                                      fallback={<Folder size={19} />}
-                                    />
-                                  ) : (
-                                    <PageIcon
-                                      value={
-                                        target.kind === "page"
-                                          ? target.icon
-                                          : ""
-                                      }
-                                      size={19}
-                                    />
-                                  )}
-                                </span>
-                                <strong>{target.title}</strong>
-                                {target.pinned && (
-                                  <Pin size={12} aria-label={t("pinned")} />
-                                )}
-                                <time>{shortDate(updatedAt)}</time>
-                              </button>
-                              <button
-                                className="studio-icon studio-row-menu"
-                                aria-label={t("itemActions", {
-                                  title: target.title,
-                                })}
-                                aria-haspopup="menu"
-                                onClick={(event) =>
-                                  showMenu(target, event.currentTarget)
-                                }
-                              >
-                                <MoreHorizontal size={17} />
-                              </button>
-                            </div>
-                          ))}
-                          {!deferredQuery && !pageSelection.active && (
-                            <div className="studio-page-list-row studio-page-list-add">
-                              <button
-                                type="button"
-                                className="studio-page-list-open"
-                                aria-label={t("addContentHint")}
-                                aria-haspopup="menu"
-                                title={t("addContentHint")}
-                                disabled={contentCreationDisabled}
-                                onClick={(event) =>
-                                  showDirectoryCreationMenu(
-                                    event.currentTarget,
-                                    event.detail
-                                      ? { x: event.clientX, y: event.clientY }
-                                      : undefined,
-                                  )
-                                }
-                              >
-                                <Plus
-                                  size={directoryView === "list" ? 18 : 28}
-                                  strokeWidth={1.5}
-                                  aria-hidden="true"
-                                />
-                              </button>
-                            </div>
-                          )}
-                        </div>
-                      ) : null}
-                      {!visibleEntries.length && (
-                        <div className="studio-empty">
-                          <FilePlus2 size={30} strokeWidth={1.2} />
-                          <h2>
-                            {deferredQuery
-                              ? t("noMatchingContent")
-                              : currentFolder
-                                ? t("folderEmpty")
-                                : t("projectEmpty")}
-                          </h2>
-                          {!deferredQuery && <p>{t("emptyHint")}</p>}
-                          {!deferredQuery && project && (
-                            <div
-                              className="studio-empty-actions"
-                              role="group"
-                              aria-label={tn("emptyActions")}
-                            >
-                              <button
-                                type="button"
-                                className="studio-button"
-                                disabled={contentCreationDisabled}
-                                onClick={action(() =>
-                                  createPage("blank", undefined, "page", {
-                                    projectId: project.id,
-                                    parentId: selectedFolder,
-                                  }, true),
-                                )}
-                              >
-                                <FileText size={15} aria-hidden="true" />
-                                {tn("newPage")}
-                              </button>
-                              <button
-                                type="button"
-                                className="studio-button primary"
-                                disabled={contentCreationDisabled}
-                                onClick={action(() =>
-                                  createPageForAgent({
-                                    projectId: project.id,
-                                    parentId: selectedFolder,
-                                  }),
-                                )}
-                              >
-                                <Sparkles size={15} aria-hidden="true" />
-                                {tn("newPageForAgent")}
-                              </button>
-                              <button
-                                type="button"
-                                className="studio-button"
-                                disabled={contentCreationDisabled}
-                                onClick={action(() =>
-                                  beginNewPage(project.id, selectedFolder),
-                                )}
-                              >
-                                <LayoutTemplate size={15} aria-hidden="true" />
-                                {tn("newFromTemplate")}
-                              </button>
-                            </div>
-                          )}
-                        </div>
-                      )}
-                    </>
-                  )}
-                  {view === "templates" && (
-                    <>
-                      <div className="studio-template-grid">
-                        {visibleTemplates.map((item) => (
-                          <button
-                            className="studio-template-card studio-template-open"
-                            key={`${item.scope}:${item.id}:${item.version}:${item.integrity}`}
-                            aria-label={t("viewTemplate", {
-                              name: item.name,
-                              version: item.version,
-                              scope: item.scope,
-                            })}
-                            aria-haspopup="dialog"
-                            onClick={action(async () => {
-                              const record =
-                                await desktop.invoke<LoadedTemplate>(
-                                  "templates:get",
-                                  {
-                                    id: item.id,
-                                    version: item.version,
-                                    scope: item.scope,
-                                    integrity: item.integrity,
-                                    ...(selectedProject
-                                      ? { projectId: selectedProject }
-                                      : {}),
-                                  },
-                                );
-                              setDialog({
-                                type: "template",
-                                record,
-                              });
-                            })}
-                          >
-                            <TemplateThumbnail
-                              item={item}
-                              projectId={selectedProject ?? undefined}
-                            />
-                            <h2>{item.name}</h2>
-                            <p>{item.description}</p>
-                            <div className="template-card-metadata">
-                              <Scope value={item.scope} />
-                              <span>v{item.version}</span>
-                            </div>
-                          </button>
-                        ))}
-                      </div>
-                      {!visibleTemplates.length && (
-                        <div className="studio-empty">
-                          <LayoutTemplate size={30} strokeWidth={1.2} />
-                          <h2>
-                            {catalogQueries.templates
-                              ? t("noMatchingTemplates")
-                              : t("noTemplates")}
-                          </h2>
-                        </div>
-                      )}
-                    </>
-                  )}
-                  {view === "components" && (
-                    <ComponentCatalog
-                      groups={componentGroups}
-                      loading={catalogLoading}
-                      browser={
-                        !!info && "mode" in info && info.mode === "browser"
-                      }
-                      showProjectNames={componentProject === "all"}
-                      query={catalogQueries.components}
-                      category={componentCategory}
-                        onOpen={(item) =>
-                          void viewComponent(item).catch(report)
-                        }
-                    />
-                  )}
-                </div>
-              )}
-            </div>
+            <StudioViews
+              feedback={feedback}
+              library={library}
+              route={route}
+              catalog={catalog}
+              catalogActions={catalogActions}
+              dialogs={dialogs}
+              menus={menus}
+              directory={directory}
+              router={router}
+              pageActions={pageActions}
+              edits={edits}
+              moves={moves}
+              rows={rows}
+              page={page}
+              commands={commands}
+              appearance={appearance}
+              recordPeek={recordPeek}
+              welcome={{ sampleProject, sampleProjectId, welcoming }}
+              assistant={assistant}
+              contentCreationDisabled={contentCreationDisabled}
+            />
             {recordPeek.view && <DatabaseRecordPeek
               peek={recordPeek}
               sessions={page.sessions}
