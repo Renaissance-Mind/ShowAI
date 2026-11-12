@@ -1,4 +1,4 @@
-import { shareNativeSource } from "./native-source-delta.mjs";
+import { shareNativeSource } from "./structural-share.mjs";
 import { remapPageOutline } from "./page-outline.mjs";
 import {
   isResource,

@@ -16,7 +16,7 @@ import {
   validateDocument,
 } from "../portable/validation.mjs";
 import { selectDocumentBlocks } from "../portable/selection.mjs";
-import { addNode, moveNode, removeNode, editNode } from "./editing";
+import { addNode, moveNode, removeNode, editNode } from "../surface/editing";
 import {
   createResource,
   createSurface,

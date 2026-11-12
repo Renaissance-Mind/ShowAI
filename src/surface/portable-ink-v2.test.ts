@@ -18,13 +18,13 @@ import {
   validateInkInput,
   validateInkFragments,
 } from "./ink-input-contract.mjs";
-import { shapeHit, shapeIntersectsPolygon } from "./drawing-geometry.mjs";
+import { shapeHit, shapeIntersectsPolygon } from "../document/drawing-geometry.mjs";
 import { validateCubicInk } from "./portable-ink-v2.mjs";
 import type { PortableInkV2 } from "./portable-ink.mjs";
 import { validateDocument } from "../portable/validation.mjs";
 import type { ShowDocument } from "../types";
 import { blankDocument } from "../core/catalog";
-import { createResource } from "./containers.mjs";
+import { createResource } from "../document/containers.mjs";
 import { addNode } from "./editing";
 export function curve(): PortableInkV2 {
   return {

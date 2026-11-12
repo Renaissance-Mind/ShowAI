@@ -8,7 +8,7 @@ import g2 from "../../resources/catalog/g2.json";
 import components from "../../resources/catalog/components.json";
 import diagrams from "../../resources/catalog/diagrams.json";
 import { blankDocument } from "../core/catalog";
-import { createResource, createSurface } from "../surface/containers.mjs";
+import { createResource, createSurface } from "../document/containers.mjs";
 import { addNode } from "../surface/editing";
 import { FileStore } from "../core/store";
 import { buildPageHtml, buildReaderTemplate, exportPage } from "./exporter";

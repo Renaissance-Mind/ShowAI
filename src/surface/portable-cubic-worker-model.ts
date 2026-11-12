@@ -22,7 +22,7 @@ import {
   DEFAULT_OUTLINE_TOLERANCE,
 } from "./portable-ink-v2.mjs";
 import type { PortableInkV2 } from "./portable-ink.mjs";
-import type { NodeLayout } from "./types";
+import type { NodeLayout } from "../document/types";
 import type { JSONContent } from "@tiptap/core";
 import {
   captureOwnedJSON,

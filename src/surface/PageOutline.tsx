@@ -22,7 +22,7 @@ import {
   type OutlineViewState,
   type PageOutlineComponentProps,
   type PageOutlineItem,
-} from "./page-outline.mjs";
+} from "../document/page-outline.mjs";
 import "./page-outline.css";
 
 export function ReadingIndex({

@@ -3,7 +3,7 @@ import {expect,it} from "vitest";
 import {parseArtifact,parseArtifactConsumingDocument,parseArtifactWithValidatedDocument} from "./validation.mjs";
 import {SourceRuntimeOwner,cloneSourceValue,type SourceSnapshotDelta} from "../surface/source-runtime";
 import {blankDocument} from "../core/catalog";
-import {createResource} from "../surface/containers.mjs";
+import {createResource} from "../document/containers.mjs";
 import type {ShowDocument} from "../types";
 
 it("keeps complete artifact wrapper validation around an actual registry-held body",()=>{

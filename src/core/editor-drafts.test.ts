@@ -9,7 +9,7 @@ import { ContentLibrary as GitLibrary } from "./content-library";
 import { FileStore } from "./store";
 import type { EditorDraftInput } from "./editor-drafts";
 import {blankDocument} from "./catalog";
-import {createResource} from "../surface/containers.mjs";
+import {createResource} from "../document/containers.mjs";
 import {addNode} from "../surface/editing";
 import {createPortableInk} from "../surface/portable-ink.mjs";
 import type {ShowDocument} from "./model";

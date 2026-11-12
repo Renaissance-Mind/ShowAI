@@ -1,6 +1,6 @@
 import {flushPortableInputs,portableInputsPending,stopPortableInputs} from "../surface/portable-input-scope";
 import {flushHistoryTravels,historyTravelsPending,historyTravelsRunning,historyTravelFailure,observeHistoryTravels,stopHistoryTravels,settleHistoryTravels,retireRecoveredHistoryTravels} from "../surface/history-travel-queue";
-import {shareNativeSource} from "../surface/native-source-delta.mjs";
+import {shareNativeSource} from "../document/structural-share.mjs";
 import {OwnedSourceSession,createSourceTransport,sourceSessionFor} from "../surface/source-client";
 import {isOwnedSource,type SourceSnapshotDelta} from "../surface/source-runtime";
 import {measureNativeSync} from "../surface/native-perf";

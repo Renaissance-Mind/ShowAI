@@ -18,7 +18,7 @@ import {
   type NativePageOutline,
   type ManualOutlineEntry,
   type PageOutlineItem,
-} from "./page-outline.mjs";
+} from "../document/page-outline.mjs";
 
 export function OutlineSettings({
   page,

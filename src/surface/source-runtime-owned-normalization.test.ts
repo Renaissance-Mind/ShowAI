@@ -2,7 +2,7 @@ import { expect, it } from "vitest";
 import { blankDocument } from "../core/catalog";
 import { parseArtifact } from "../portable/validation.mjs";
 import { CAPACITY } from "../portable/capacity.mjs";
-import { createResource } from "./containers.mjs";
+import { createResource } from "../document/containers.mjs";
 import { createPortableInk } from "./portable-ink.mjs";
 import {
   SourceRuntimeOwner,

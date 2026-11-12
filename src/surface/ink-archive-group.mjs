@@ -2,9 +2,6 @@ import { inkFramePose } from "./portable-ink.mjs";
 /** A lossless container for independently editable strokes from one native archive.
  * Its extent is the children's coordinate space; the outer frame can scale/rotate
  * without rewriting any child samples or their original archive provenance. */
-export function inkArchiveGroup(node) {
-  return node?.type === "region" ? (node.attrs?.inkArchiveGroup ?? null) : null;
-}
 export function validateInkArchiveGroup(node) {
   const value = node?.attrs?.inkArchiveGroup;
   if (value === undefined) return null;

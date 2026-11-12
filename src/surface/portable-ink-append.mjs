@@ -1,4 +1,4 @@
-import { isResource, surfaceViews } from "./containers.mjs";
+import { isResource, surfaceViews } from "../document/containers.mjs";
 
 const record = (value) =>
   value !== null && typeof value === "object" && !Array.isArray(value);

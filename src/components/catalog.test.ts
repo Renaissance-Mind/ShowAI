@@ -5,7 +5,7 @@ import {
   readBuiltinComponentCatalog,
 } from "./catalog";
 import { insertComponent } from "../surface/component-insertion";
-import { createResource } from "../surface/containers.mjs";
+import { createResource } from "../document/containers.mjs";
 import { blankDocument } from "../core/catalog";
 
 describe("built-in component catalog sharing", () => {

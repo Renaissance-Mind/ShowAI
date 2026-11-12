@@ -1,5 +1,5 @@
 import type { JSONContent } from "@tiptap/core";
-import type { NodeLayout } from "./types";
+import type { NodeLayout } from "../document/types";
 import type { PortableInk } from "./portable-ink.mjs";
 export const INK_OPERATION_FORMAT: "showai-ink-operation-v1";
 export const INK_CHECKPOINT_FORMAT: "showai-ink-checkpoint-v1";

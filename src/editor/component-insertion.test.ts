@@ -3,10 +3,10 @@ import { getSchema } from "@tiptap/core";
 import { createExtensions } from "./extensions";
 import { splitForComponent } from "./component-insertion";
 import { insertComponentAtText } from "../surface/component-insertion";
-import { createResource, createSurface } from "../surface/containers.mjs";
+import { createResource, createSurface } from "../document/containers.mjs";
 import { blankDocument } from "../core/catalog";
 import { validateDocument } from "../portable/validation.mjs";
-import { visitNodes } from "../surface/document.mjs";
+import { visitNodes } from "../document/document.mjs";
 const schema = getSchema(createExtensions());
 const paragraph = (id: string, text: string) => ({
   type: "paragraph",

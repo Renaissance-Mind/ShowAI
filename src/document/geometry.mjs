@@ -1,4 +1,7 @@
-import { inkArchiveGroup } from "./ink-archive-group.mjs";
+/** The lossless native-archive container marker on a region, or null. */
+export function inkArchiveGroup(node) {
+  return node?.type === "region" ? (node.attrs?.inkArchiveGroup ?? null) : null;
+}
 // ShowAI native geometry. Parent-local coordinates; no editor/DOM dependency.
 export const radians = (degrees = 0) => (degrees * Math.PI) / 180;
 export function rotatePoint(point, center, degrees = 0) {

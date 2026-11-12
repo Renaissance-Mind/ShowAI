@@ -11,10 +11,10 @@ import {
   parseArtifact,
 } from "../../portable/validation.mjs";
 import { RichTextNode } from "./RichTextView";
-import { createResource } from "../../surface/containers.mjs";
+import { createResource } from "../../document/containers.mjs";
 import { blankDocument } from "../../core/catalog";
 import { insertComponent } from "../../surface/component-insertion";
-import { findSurfaceNode } from "../../surface/document.mjs";
+import { findSurfaceNode } from "../../document/document.mjs";
 import { applyOperations } from "../../core/diff";
 
 const fixtures = {

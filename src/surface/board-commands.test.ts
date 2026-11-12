@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { blankDocument } from "../core/catalog";
-import { createResource, createSurface } from "./containers.mjs";
+import { createResource, createSurface } from "../document/containers.mjs";
 import { addNode } from "./editing";
 import {
   adoptIntoRegion,
@@ -15,9 +15,9 @@ import {
   transformObjects,
   ungroupRegion,
 } from "./board-commands";
-import { connectionAnchor } from "./connections.mjs";
-import { findSurfaceNode } from "./document.mjs";
-import { arrowPath, pickShape, smoothPath } from "./drawing-geometry.mjs";
+import { connectionAnchor } from "../document/connections.mjs";
+import { findSurfaceNode } from "../document/document.mjs";
+import { arrowPath, pickShape, smoothPath } from "../document/drawing-geometry.mjs";
 import { validateDocument } from "../portable/validation.mjs";
 import { gridSpacing } from "./useSurfaceViewport";
 import {

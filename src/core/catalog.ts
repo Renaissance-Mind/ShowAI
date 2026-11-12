@@ -16,13 +16,13 @@ import {
   isResource,
   createResource,
   insertResourceTemplate,
-} from "../surface/containers.mjs";
+} from "../document/containers.mjs";
 import {
   remapSurfaceIds,
   isSurface,
   upgradeDocument,
   visitContentNodes,
-} from "../surface/document.mjs";
+} from "../document/document.mjs";
 import { createHash, randomUUID } from "node:crypto";
 import {
   componentAuthoringIndex,

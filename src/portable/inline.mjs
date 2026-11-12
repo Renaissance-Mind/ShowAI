@@ -2,7 +2,7 @@ import { CAPACITY, CapacityError } from "./capacity.mjs";
 import { randomUUID } from "node:crypto";
 import { gzipSync } from "node:zlib";
 import { inlineStyleSheet, scopeReaderCss } from "./inline-style.mjs";
-import { visitContentNodes } from "../surface/document.mjs";
+import { visitContentNodes } from "../document/document.mjs";
 
 /** Inline hosts block network requests: every component must travel with the page. */
 export function assertInlineArtifact(artifact) {

@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { blankDocument } from "./catalog";
 import { InkOperationJournal } from "./ink-operation-journal";
 import { inkCheckpointFromDocument, inkWireDocumentFromCheckpoint, inkWireEditPlans, inkWireImportCheckpoints, stampInkDocument, inkWireResolutionCandidates, inkWireConflicts } from "../surface/ink-wire.mjs";
-import { createResource } from "../surface/containers.mjs";
+import { createResource } from "../document/containers.mjs";
 import { addNode } from "../surface/editing";
 import { createPortableInk } from "../surface/portable-ink.mjs";
 import { mergePageContent } from "./page-merge-model";

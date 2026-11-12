@@ -1,17 +1,15 @@
-import {
-  inkArchiveGroup,
-  flattenInkArchiveChild,
-} from "./ink-archive-group.mjs";
+import { flattenInkArchiveChild } from "./ink-archive-group.mjs";
+import { inkArchiveGroup } from "../document/geometry.mjs";
 import type { JSONContent } from "@tiptap/core";
 import type { ShowDocument } from "../types";
-import type { NodeLayout } from "./types";
+import type { NodeLayout } from "../document/types";
 import { canonicalJson } from "../core/canonical";
 import {
   indexSurfaceTree,
   type ArrowBindings,
   transformedBindings,
-} from "./connections.mjs";
-import { reconcileSurface, visitNodes } from "./document.mjs";
+} from "../document/connections.mjs";
+import { reconcileSurface, visitNodes } from "../document/document.mjs";
 
 /** One logical transform, with untouched nodes and frames retaining identity. */
 export function transformObjects<T extends ShowDocument>(

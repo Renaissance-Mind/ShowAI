@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { validateNativeInk } from "./native-ink.mjs";
 import { parseArtifact } from "../portable/validation.mjs";
-import { reconcileSurface } from "./document.mjs";
+import { reconcileSurface } from "../document/document.mjs";
 import { transformObjects, duplicateObjects } from "./board-commands";
 import { encodeFile, decodeFile } from "../core/history-codec";
 import fixture from "./native-ink-fixture.json";

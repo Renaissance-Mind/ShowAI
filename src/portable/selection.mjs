@@ -1,8 +1,8 @@
 import {
   remapPageOutline,
   pageOutlineNodes,
-} from "../surface/page-outline.mjs";
-import { reconcileSurface, visitNodes } from "../surface/document.mjs";
+} from "../document/page-outline.mjs";
+import { reconcileSurface, visitNodes } from "../document/document.mjs";
 import { validateDocument } from "./validation.mjs";
 
 /** Project a page into selected subtrees and the containers needed to render them. */

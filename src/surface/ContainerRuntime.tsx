@@ -1,7 +1,7 @@
 import {readBoardToolPreferences,saveBoardToolPreferences,boardStyleKey,boardToolPreferencesChanged,boardToolPreferencesKey} from "./board-tool-preferences";
 import { PageOutline, PageOutlinePrint } from "./PageOutline";
 import { OutlineSettings } from "./OutlineSettings";
-import type { OutlineViewState } from "./page-outline.mjs";
+import type { OutlineViewState } from "../document/page-outline.mjs";
 import outlineMessages from "../i18n/messages/pageOutline";
 import {isEditableDrawing} from "./portable-ink.mjs";
 import { TextSelectionScope } from "./TextSelectionScope";
@@ -25,7 +25,7 @@ import {
   arrowEndpoints,
   arrowFromEndpoints,
   bindingAtPoint,
-} from "./connections.mjs";
+} from "../document/connections.mjs";
 import type { EditorControls } from "./EditorControls";
 import { AdditionalComponentsProvider } from "../components/custom/CustomBlock";
 import type { CompiledComponent } from "../components/custom/types";
@@ -33,8 +33,8 @@ import { flushSync, createPortal } from "react-dom";
 import { ComponentSlashMenu } from "../components/ComponentSlashMenu";
 import { RegisterComponentContext } from "../components/useComponentCatalog";
 import { insertComponent } from "./component-insertion";
-import { labelCapable, labelFitHeight } from "./drawing-label.mjs";
-import { tidyFrames } from "./diagram.mjs";
+import { labelCapable, labelFitHeight } from "../document/drawing-label.mjs";
+import { tidyFrames } from "../document/diagram.mjs";
 import {
   createContext,
   useContext,
@@ -54,7 +54,7 @@ import type {
   BoardTool,
   NodeLayout,
   PageWidthMode,
-} from "./types";
+} from "../document/types";
 import {
   SurfaceContent,
   hasDefaultName,
@@ -75,13 +75,13 @@ import {
   findSurfaceNode,
   nodePaths,
   visitNodes,
-} from "./document.mjs";
+} from "../document/document.mjs";
 import {
   resourceNodes,
   surfaceKind,
   surfaceViews,
   wrapSurface,
-} from "./containers.mjs";
+} from "../document/containers.mjs";
 import "./containers.css";
 import PageIcon from "../components/PageIcon";
 import PageIconDialog from "../studio/PageIconDialog";

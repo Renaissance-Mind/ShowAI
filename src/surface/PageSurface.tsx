@@ -17,8 +17,8 @@ import { BoardGestureInput } from "./BoardGestureInput";
 import { DrawingInput } from "./Drawing";
 import { boardEditDescription, boardToolForKey } from "./board-tools";
 import type { JSONContent } from "@tiptap/core";
-import type { BoardTool, BoardDrawingTool, DrawingStyle } from "./types";
-import { findSurfaceNode } from "./document.mjs";
+import type { BoardTool, BoardDrawingTool, DrawingStyle } from "../document/types";
+import { findSurfaceNode } from "../document/document.mjs";
 import { BoardStyleControls, LabelSizeSelect } from "./BoardStyleControls";
 import { DockableBoardToolbar } from "./DockableBoardToolbar";
 import { BoardMinimap } from "./BoardMinimap";
@@ -33,7 +33,7 @@ import {
 import { MAX_ZOOM, MIN_ZOOM } from "./model";
 import { flushSync } from "react-dom";
 import { fingerNavigatesBoard, isBoardShape } from "./board-input.mjs";
-import { labelCapable } from "./drawing-label.mjs";
+import { labelCapable } from "../document/drawing-label.mjs";
 import { useTranslator } from "../i18n/react";
 import commonMessages from "../i18n/messages/common";
 import messages from "../i18n/messages/surface";
@@ -102,7 +102,7 @@ import {
   ViewportLockButton,
 } from "../components/blocks/ViewportLock";
 import { ObjectContext, type ObjectActions } from "./SurfaceObject";
-import type { NodeLayout, PageViews, SavedView } from "./types";
+import type { NodeLayout, PageViews, SavedView } from "../document/types";
 import "./surface.css";
 import { CanvasReferencePicker } from "./CanvasReferencePicker";
 import { useReaderStateScope } from "./reader-state";

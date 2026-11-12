@@ -23,13 +23,13 @@ import {
 import type { ShowDocument, ContainerDocument } from "../types";
 import { Widget } from "../components/blocks/Widget";
 import { ContainerRuntime, type ContainerViewState } from "./ContainerRuntime";
-import { isResource, upgradeResource } from "./containers.mjs";
+import { isResource, upgradeResource } from "../document/containers.mjs";
 import { editNode, replaceChildren, detachBlock } from "./editing";
 import {
   findSurfaceNode,
   reconcileSurface,
   isReconciledSurface,
-} from "./document.mjs";
+} from "../document/document.mjs";
 import type { ContentRenderProps } from "./SurfaceContent";
 import type { JSONContent } from "@tiptap/core";
 import type { RichTextHost } from "../components/rich-text/RichText";

@@ -1,12 +1,12 @@
 import type { JSONContent } from "@tiptap/core";
 import type { ShowDocument } from "../types";
-import type { LayoutMode, NodeLayout } from "./types";
+import type { LayoutMode, NodeLayout } from "../document/types";
 import {
   findSurfaceNode,
   reconcileSurface,
   upgradeDocument,
   visitNodes,
-} from "./document.mjs";
+} from "../document/document.mjs";
 import { translator } from "../i18n";
 import messages from "../i18n/messages/surface";
 import { isOwnedSource, ownSourceValue } from "./source-runtime";

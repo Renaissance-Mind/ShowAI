@@ -20,7 +20,7 @@ import {
   visitNodes,
   nodePaths,
   reconcileSurface,
-} from "../surface/document.mjs";
+} from "../document/document.mjs";
 import { buildPageHtml } from "./exporter";
 import { injectReadingOptions } from "./reading-preview";
 import { appLocale } from "../core/app-language";

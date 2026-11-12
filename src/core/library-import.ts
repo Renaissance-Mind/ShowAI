@@ -6,7 +6,7 @@ import { ContentLibrary as GitLibrary } from "./content-library";
 import { FileStore, assertId } from "./store";
 import { CoreError } from "./model";
 import { documentHash, normalizeDocument, canonicalJson } from "./diff";
-import { upgradeResource } from "../surface/containers.mjs";
+import { upgradeResource } from "../document/containers.mjs";
 import { parseArtifact, serializeArtifact } from "../portable/validation.mjs";
 import {
   importCompiledComponents,

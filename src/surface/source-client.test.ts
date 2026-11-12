@@ -1,7 +1,7 @@
 import {expect,it} from "vitest";
 import {OwnedSourceSession,sourceSnapshotFor,diffOwnedSource,type SourceRuntimeTransport} from "./source-client";
 import {SourceRuntimeOwner,ownSourceValue,cloneSourceValue,type SourceSnapshotDelta} from "./source-runtime";
-import {createResource} from "./containers.mjs";
+import {createResource} from "../document/containers.mjs";
 import {blankDocument} from "../core/catalog";
 import type {ShowDocument} from "../types";
 function fixture(){const owner=new SourceRuntimeOwner(),scopeHome=crypto.randomUUID(),projectId=crypto.randomUUID(),document=createResource(blankDocument(),"board");

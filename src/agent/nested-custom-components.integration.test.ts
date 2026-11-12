@@ -9,7 +9,7 @@ import {
   componentWidgetData,
   importComponent,
 } from "../core/catalog";
-import { createResource } from "../surface/containers.mjs";
+import { createResource } from "../document/containers.mjs";
 import { FileStore } from "../core/store";
 import { AgentService } from "./service";
 import { LibraryOperations } from "../core/library-operations";

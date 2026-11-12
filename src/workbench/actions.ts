@@ -24,7 +24,7 @@ import {
   createResource,
   wrapSurface,
   surfaceKind,
-} from "../surface/containers.mjs";
+} from "../document/containers.mjs";
 import { writeFile, stat, realpath } from "node:fs/promises";
 import { localMediaGrants, localMediaPath } from "./local-media";
 import {

@@ -40,8 +40,8 @@ import { applyLibraryMove, type LibraryContents } from "./library-move";
 import { ComponentLibraryContext } from "../components/ComponentLibrary";
 import { insertComponent } from "../surface/component-insertion";
 import { useAppearancePreference } from "../design/appearance-preference";
-import { artifactVersion, findSurfaceNode } from "../surface/document.mjs";
-import { upgradeResource } from "../surface/containers.mjs";
+import { artifactVersion, findSurfaceNode } from "../document/document.mjs";
+import { upgradeResource } from "../document/containers.mjs";
 import {
   useCallback,
   useDeferredValue,

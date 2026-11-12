@@ -265,4 +265,4 @@ export type {
   PageOutlineComponentProps,
   PageOutlineItem,
   PageOutlineData,
-} from "../../surface/page-outline.mjs";
+} from "../../document/page-outline.mjs";

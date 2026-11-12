@@ -66,7 +66,7 @@ test("nested rich text links retain every word and safe marks while unsafe targe
   expect(repairEditorLinks(result.document).document).toBe(result.document);
 });
 
-import {createResource} from './containers.mjs';
+import {createResource} from '../document/containers.mjs';
 import {addNode} from './editing';
 import {createPortableInk} from './portable-ink.mjs';
 import {stampInkDocument} from './ink-wire.mjs';

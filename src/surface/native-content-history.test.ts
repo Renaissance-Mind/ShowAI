@@ -1,8 +1,8 @@
 import {expect,it} from "vitest";
 import {blankDocument} from "../core/catalog";
-import {createResource} from "./containers.mjs";
+import {createResource} from "../document/containers.mjs";
 import {addNode,editNode} from "./editing";
-import {findSurfaceNode} from "./document.mjs";
+import {findSurfaceNode} from "../document/document.mjs";
 import {nativeContentHistoryStages} from "./native-content-history";
 import type {ShowDocument} from "../types";
 

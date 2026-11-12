@@ -1,13 +1,14 @@
 import {expect,it} from "vitest";
-import {applyNativeSourceDelta,diffNativeSource,shareNativeSource,type NativeSourceEdit} from "./native-source-delta.mjs";
-import {createResource} from "./containers.mjs";
+import {applyNativeSourceDelta,diffNativeSource,type NativeSourceEdit} from "./native-source-delta.mjs";
+import {shareNativeSource} from "../document/structural-share.mjs";
+import {createResource} from "../document/containers.mjs";
 import {blankDocument} from "../core/catalog";
 import {addNode} from "./editing";
 import {createPortableInk} from "./portable-ink.mjs";
 import {stampInkDocument,inkWireConflicts,inkCheckpointFromDocument,inkWireDocumentFromCheckpoint} from "./ink-wire.mjs";
 import {InkOperationReplica,createInkOperation} from "./ink-operations.mjs";
 import {mergePageContent} from "../core/page-merge-model";
-import {findSurfaceNode,isReconciledSurface,reconcileSurface} from "./document.mjs";
+import {findSurfaceNode,isReconciledSurface,reconcileSurface} from "../document/document.mjs";
 import {mergeNativeDocumentReceipt,nativeDocumentBodiesEqual} from "./native-document-content";
 import type {ShowDocument} from "../types";
 function freeze<T>(value:T):T{

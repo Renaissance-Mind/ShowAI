@@ -1,4 +1,4 @@
-import type { BoardTool } from "./types";
+import type { BoardTool } from "../document/types";
 import type { MessageKey, Translator } from "../i18n";
 import type messages from "../i18n/messages/surface";
 

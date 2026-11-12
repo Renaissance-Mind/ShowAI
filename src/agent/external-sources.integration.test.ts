@@ -10,7 +10,7 @@ import { syncManager } from "../sync/manager";
 import { AgentService } from "./service";
 import { REMOTE_FETCH } from "../core/dataset-sources";
 import { CAPACITY } from "../portable/capacity.mjs";
-import { visitNodes } from "../surface/document.mjs";
+import { visitNodes } from "../document/document.mjs";
 import { xlsxWorkbook } from "../test/xlsx";
 import { dataServer } from "../test/data-server";
 import type { ShowDocument } from "../core/model";

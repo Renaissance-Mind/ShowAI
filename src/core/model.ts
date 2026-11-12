@@ -1,10 +1,10 @@
 import type { JSONContent } from "@tiptap/core";
 import type { ShowDocument } from "../types";
-import type { NodeLayout, SavedView } from "../surface/types";
+import type { NodeLayout, SavedView } from "../document/types";
 import type {
   DiagramDirection,
   DiagramInsertInput,
-} from "../surface/diagram.mjs";
+} from "../document/diagram.mjs";
 
 export type { ShowArtifact, ShowDocument } from "../types";
 export type { JSONContent } from "@tiptap/core";

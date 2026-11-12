@@ -11,7 +11,7 @@ import {
   importComponent,
   componentWidgetData,
 } from "../core/catalog";
-import { createResource } from "../surface/containers.mjs";
+import { createResource } from "../document/containers.mjs";
 import { buildPageHtml } from "../agent/exporter";
 import { toInlineFragment } from "./inline.mjs";
 it("renders a packed reader with an actual compiled component inside an opaque offline host", async () => {

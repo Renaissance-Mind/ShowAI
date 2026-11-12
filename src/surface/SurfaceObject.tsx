@@ -3,9 +3,9 @@ import {
   drawingBounds,
   geometryFrame,
   frameFromGeometry,
-} from "./drawing-geometry.mjs";
+} from "../document/drawing-geometry.mjs";
 import type { JSONContent } from "@tiptap/core";
-import { resizeFrame, frameHeight, frameBounds } from "./geometry.mjs";
+import { resizeFrame, frameHeight, frameBounds } from "../document/geometry.mjs";
 import type { BoardGesture } from "./useBoardInteraction";
 import { BlockActionHost } from "../components/blocks/action-host";
 import type { MessageKey } from "../i18n";
@@ -26,7 +26,7 @@ import {
   Settings2,
   Maximize2,
 } from "../ui/icons";
-import type { NodeLayout } from "./types";
+import type { NodeLayout } from "../document/types";
 import { isBoardShape } from "./board-input.mjs";
 
 import { ObjectContext } from "./object-context";

@@ -1,7 +1,7 @@
 import { isEditableDrawing } from "./portable-ink.mjs";
 import type { JSONContent } from "@tiptap/core";
 import { useState } from "react";
-import type { BoardTool, DrawingStyle } from "./types";
+import type { BoardTool, DrawingStyle } from "../document/types";
 import { useTranslator } from "../i18n/react";
 import messages from "../i18n/messages/surface";
 import { useToolbarDock } from "./DockableBoardToolbar";
@@ -11,7 +11,7 @@ import {
   DEFAULT_LABEL_SIZE,
   LABEL_SIZES,
   labelCapable,
-} from "./drawing-label.mjs";
+} from "../document/drawing-label.mjs";
 
 function StrokeWidthSlider({
   width,

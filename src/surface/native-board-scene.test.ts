@@ -1,6 +1,6 @@
 import {describe,it,expect} from "vitest";
 import {nativeBoardScenePatch,resolveNativeBoardScene} from "./native-board-scene.mjs";
-import {reconcileSurface} from "./document.mjs";
+import {reconcileSurface} from "../document/document.mjs";
 import {createPortableInk} from "./portable-ink.mjs";
 import type {ShowDocument} from "../types";
 

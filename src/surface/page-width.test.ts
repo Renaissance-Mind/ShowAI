@@ -14,9 +14,9 @@ import {
 import { SurfaceReader } from "../portable/SurfaceReader";
 import { PageContent } from "../portable/PageContent";
 import { ContainerRuntime } from "./ContainerRuntime";
-import { createResource, createSurface } from "./containers.mjs";
+import { createResource, createSurface } from "../document/containers.mjs";
 import { addNode, editNode } from "./editing";
-import { findSurfaceNode } from "./document.mjs";
+import { findSurfaceNode } from "../document/document.mjs";
 
 const directories: string[] = [];
 afterEach(async () => {

@@ -32,7 +32,7 @@ import { selectDocumentBlocks } from "../portable/selection.mjs";
 import type { ComponentSource } from "../components/custom/types";
 import { assertProps } from "../components/custom/schema";
 import type { ShowDocument } from "../types";
-import { visitContentNodes } from "../surface/document.mjs";
+import { visitContentNodes } from "../document/document.mjs";
 
 const object = z.record(z.string(), z.unknown());
 export const presentationSchema = {

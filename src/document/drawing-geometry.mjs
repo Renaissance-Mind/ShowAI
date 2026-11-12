@@ -14,7 +14,7 @@ import {
   portableNodeHit,
   portableNodeBounds,
   portableInkGeometry,
-} from "./portable-ink.mjs";
+} from "../surface/portable-ink.mjs";
 
 /** A lasso selects enclosed paint and any contour touched by its trace. */
 export function shapeIntersectsPolygon(node, frame, polygon, tolerance = 0) {

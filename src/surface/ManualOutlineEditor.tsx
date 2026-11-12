@@ -9,7 +9,7 @@ import {
 } from "../ui/icons";
 import { useTranslator } from "../i18n/react";
 import messages from "../i18n/messages/pageOutline";
-import { pageOutlineNodes, type ManualOutlineEntry } from "./page-outline.mjs";
+import { pageOutlineNodes, type ManualOutlineEntry } from "../document/page-outline.mjs";
 export function ManualOutlineEditor({
   page,
   entries,

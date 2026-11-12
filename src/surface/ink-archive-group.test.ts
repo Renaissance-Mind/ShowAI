@@ -4,9 +4,9 @@ import { ungroupRegion } from "./board-commands";
 import { inkFramePose } from "./portable-ink.mjs";
 import { blankDocument } from "../core/catalog";
 import { normalizeDocument } from "../core/diff";
-import { createResource } from "./containers.mjs";
+import { createResource } from "../document/containers.mjs";
 import { addNode } from "./editing";
-import { objectCapabilities } from "./geometry.mjs";
+import { objectCapabilities } from "../document/geometry.mjs";
 import { createPortableInk, isInkNode } from "./portable-ink.mjs";
 import {
   validateInkArchiveGroup,

@@ -1,8 +1,8 @@
 import { useMemo, type CSSProperties } from "react";
-import { upgradeResource } from "../surface/containers.mjs";
+import { upgradeResource } from "../document/containers.mjs";
 import { ContainerRuntime } from "../surface/ContainerRuntime";
 import { PageContent } from "../portable/PageContent";
-import { frameBounds } from "../surface/geometry.mjs";
+import { frameBounds } from "../document/geometry.mjs";
 import { SurfaceReader } from "../portable/SurfaceReader";
 import { CustomComponentsProvider } from "../components/custom/CustomBlock";
 import CatalogPreview from "./CatalogPreview";

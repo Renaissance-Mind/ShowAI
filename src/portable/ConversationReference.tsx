@@ -10,7 +10,7 @@ import {
   type PageReference,
 } from "../core/page-reference";
 import { paintedTextSelection } from "../surface/text-selection";
-import { findSurfaceNode } from "../surface/document.mjs";
+import { findSurfaceNode } from "../document/document.mjs";
 import { useTranslator } from "../i18n/react";
 import messages from "../i18n/messages/reader";
 

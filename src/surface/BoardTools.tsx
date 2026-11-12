@@ -13,7 +13,7 @@ import {
   Type,
 } from "../ui/icons";
 import { boardToolKeys, boardToolShortcut, boardTools } from "./board-tools";
-import type { BoardTool } from "./types";
+import type { BoardTool } from "../document/types";
 import "./board-tools.css";
 import { useTranslator } from "../i18n/react";
 import messages from "../i18n/messages/surface";

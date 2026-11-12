@@ -14,7 +14,7 @@ import {
 import { homedir, tmpdir } from "node:os";
 import { dirname, join, posix } from "node:path";
 import { createHash, randomUUID } from "node:crypto";
-import { visitContentNodes, widgetDocuments } from "../surface/document.mjs";
+import { visitContentNodes, widgetDocuments } from "../document/document.mjs";
 
 const cache = new Map();
 const archives = new Map();
@@ -540,7 +540,7 @@ async function compileReader(archivePath, archive, kinds, omits = []) {
             loader: "ts",
           };
         // Frame tidying is an edit command; its graph layout would only add weight.
-        if (args.path === "src/surface/diagram.mjs")
+        if (args.path === "src/document/diagram.mjs")
           return {
             contents:
               'export function tidyFrames() { throw new Error("Readers never edit."); }',

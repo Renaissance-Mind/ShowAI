@@ -4,17 +4,17 @@ import {
   reconcileConnections,
   transformedBindings,
   indexSurfaceTree,
-} from "../surface/connections.mjs";
+} from "../document/connections.mjs";
 import { insertComponent } from "../surface/component-insertion";
-import { completeDrawings } from "../surface/drawing-completion.mjs";
-import { insertDiagram, tidyFrames } from "../surface/diagram.mjs";
+import { completeDrawings } from "../document/drawing-completion.mjs";
+import { insertDiagram, tidyFrames } from "../document/diagram.mjs";
 import {
   isResource,
   upgradeResource,
   createSurface,
   wrapSurface,
   surfaceViews,
-} from "../surface/containers.mjs";
+} from "../document/containers.mjs";
 import { createHash } from "node:crypto";
 import { compileBinding, readBinding } from "../datasets/binding.mjs";
 import { readCustomBlockData } from "../components/custom/contract";
@@ -28,7 +28,7 @@ import {
   fillSurfaceLayout,
   visitContentNodes,
   visitNodes,
-} from "../surface/document.mjs";
+} from "../document/document.mjs";
 import type {
   FieldChange,
   JSONContent,

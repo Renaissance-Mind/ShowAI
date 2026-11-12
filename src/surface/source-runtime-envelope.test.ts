@@ -1,6 +1,6 @@
 import {expect,it} from "vitest";
 import {blankDocument} from "../core/catalog";
-import {createResource} from "./containers.mjs";
+import {createResource} from "../document/containers.mjs";
 import {appendNewPortableInk} from "./portable-ink-append.mjs";
 import {longCubicInputFixture} from "./cubic-ink-chunks.fixture.mjs";
 import {diffNativeSource} from "./native-source-delta.mjs";

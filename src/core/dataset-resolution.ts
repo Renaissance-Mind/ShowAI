@@ -8,7 +8,7 @@ import {
   type BindingIssue,
 } from "../datasets/binding.mjs";
 import { bindingEditable } from "../datasets/editable.mjs";
-import { visitContentNodes } from "../surface/document.mjs";
+import { visitContentNodes } from "../document/document.mjs";
 import { formatPath } from "../datasets/operations.mjs";
 import type {
   DatasetReadStatus,

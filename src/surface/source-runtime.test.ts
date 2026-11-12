@@ -7,7 +7,7 @@ import {addNode} from "./editing";
 import {expect,it} from "vitest";
 import {SourceRuntimeOwner,cloneSourceValue,ownSourceValue,isOwnedSource,type SourceSnapshotDelta,type SourceSnapshotRef,normalizeSourceDocument} from "./source-runtime";
 import {blankDocument} from "../core/catalog";
-import {createResource} from "./containers.mjs";
+import {createResource} from "../document/containers.mjs";
 import type {ShowDocument} from "../types";
 const source=()=>createResource(blankDocument(),"board") as ShowDocument;
 const actualScope=(document:ShowDocument)=>({homeId:"actual-home",projectId:"actual-project",pageId:document.id});

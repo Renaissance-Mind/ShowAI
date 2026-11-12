@@ -1,9 +1,9 @@
 import { expect, it } from "vitest";
 import { blankDocument } from "../core/catalog";
-import { createResource, createSurface } from "./containers.mjs";
+import { createResource, createSurface } from "../document/containers.mjs";
 import { addNode } from "./editing";
 import { applyInkUpdate, inkNodes } from "./inline-ink";
-import { polygonContains } from "./lasso";
+import { polygonContains } from "../document/lasso.mjs";
 
 it("merges a completed native stroke into the latest Board while retaining shapes and nested ink", () => {
   let document = createResource(blankDocument(), "board");

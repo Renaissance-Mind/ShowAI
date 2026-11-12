@@ -14,7 +14,7 @@ import {
 } from "./capacity.mjs";
 import { longCubicInputFixture } from "../surface/cubic-ink-chunks.fixture.mjs";
 import { parseArtifactConsumingForSourceSnapshot } from "./validation.mjs";
-import { createResource } from "../surface/containers.mjs";
+import { createResource } from "../document/containers.mjs";
 import { blankDocument } from "../core/catalog";
 
 const plain = (value: unknown) => JSON.parse(JSON.stringify(value));

@@ -4,7 +4,7 @@ import { resourceMime } from "../components/blocks/research-contract.mjs";
 import { isImageIcon } from "../lib/page-icon.mjs";
 import { isSafeUrl, validateDocument } from "./validation.mjs";
 import { detachedRef, isLocalFileRef, localRefType } from "./local-files.mjs";
-import { widgetDocuments } from "../surface/document.mjs";
+import { widgetDocuments } from "../document/document.mjs";
 
 /**
  * Every resource field of a document: page and container icons, image

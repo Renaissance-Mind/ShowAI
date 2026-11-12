@@ -2,7 +2,7 @@ import { SurfaceGeometryStore } from "./geometry-store";
 import { describe, expect, it } from "vitest";
 import { blankDocument } from "../core/catalog";
 import { applyOperations } from "../core/diff";
-import { createResource, createSurface } from "./containers.mjs";
+import { createResource, createSurface } from "../document/containers.mjs";
 import { addNode, moveNode, removeNode } from "./editing";
 import {
   canCommitBoardGesture,
@@ -15,12 +15,12 @@ import {
   arrowEndpoints,
   indexSurfaceTree,
   reconcileConnections,
-} from "./connections.mjs";
+} from "../document/connections.mjs";
 import {
   findSurfaceNode,
   remapSurfaceIds,
   reconcileSurface,
-} from "./document.mjs";
+} from "../document/document.mjs";
 import {
   validateDocument,
   serializeArtifact,
@@ -40,7 +40,7 @@ import {
   createSnapIndex,
   snapFrame,
   snapResizeFrame,
-} from "./geometry.mjs";
+} from "../document/geometry.mjs";
 
 const fixture = () => {
   let doc = createResource(blankDocument(), "board");

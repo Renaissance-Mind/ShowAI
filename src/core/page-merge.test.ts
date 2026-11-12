@@ -1,4 +1,4 @@
-import { findSurfaceNode } from "../surface/document.mjs";
+import { findSurfaceNode } from "../document/document.mjs";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";

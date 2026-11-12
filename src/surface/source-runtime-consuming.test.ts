@@ -1,7 +1,7 @@
 import {expect,it} from "vitest";
 import {CAPACITY} from "../portable/capacity.mjs";
 import {blankDocument} from "../core/catalog";
-import {createResource} from "./containers.mjs";
+import {createResource} from "../document/containers.mjs";
 import {mergePageContent} from "../core/page-merge-model";
 import {SourceRuntimeOwner,type SourceSnapshotDelta,type SourceSnapshotRef} from "./source-runtime";
 import type {ShowDocument} from "../types";

@@ -1,14 +1,15 @@
 import {freezeOwnedJSON,isOwnedJSON,ownedJSONMetrics,capturedContentSummary,captureOwnedJSON,parseOwnedJSON} from "../portable/owned-json.mjs";
 import type {ShowDocument} from "../types";
 import {assertContent,CapacityError,nonResourceReplacementDoesNotGrow} from "../portable/capacity.mjs";
-import {reconcileSurface,artifactVersion} from "./document.mjs";
+import {reconcileSurface,artifactVersion} from "../document/document.mjs";
 import {parseArtifact,parseArtifactForSourceSnapshot,parseArtifactConsumingForSourceSnapshot,shareSourceSnapshotDocument,inheritSourceSnapshotTimestampCapacity,assertOwnedSourceDocumentCapacity,isDocumentTimestamp} from "../portable/validation.mjs";
 import {mergePageContent,canCommitPageMerge,type PageMergeConflict} from "../core/page-merge-model";
 import {inkWireResolutionCandidates} from "./ink-wire.mjs";
 import {nativeContentHistoryStages,type NativeContentHistoryAction} from "./native-content-history";
 import {nativeDocumentBodiesEqual} from "./native-document-content";
 import {appendPortableInkFromSource} from "./portable-ink-append.mjs";
-import {applyCapturedSourceDelta,applyNativeSourceDelta,diffNativeSource,shareNativeSource,type NativeSourceEdit} from "./native-source-delta.mjs";
+import {applyCapturedSourceDelta,applyNativeSourceDelta,diffNativeSource,type NativeSourceEdit} from "./native-source-delta.mjs";
+import {shareNativeSource} from "../document/structural-share.mjs";
 
 export interface SourceScope {homeId:string;projectId:string;pageId:string}
 export interface SourceSnapshotRef {

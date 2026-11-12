@@ -9,7 +9,7 @@ import { openLibrary } from "../core/open-library";
 import { syncManager } from "../sync/manager";
 import { AgentService } from "./service";
 import { parseArtifact } from "../portable/validation.mjs";
-import { visitNodes } from "../surface/document.mjs";
+import { visitNodes } from "../document/document.mjs";
 import type { ShowDocument } from "../core/model";
 
 let root: string;

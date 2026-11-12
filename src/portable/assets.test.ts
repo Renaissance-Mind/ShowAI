@@ -9,7 +9,7 @@ import {
   externalResourceUrls,
 } from "./assets.mjs";
 import { validateDocument } from "./validation.mjs";
-import { upgradeResource, createSurface } from "../surface/containers.mjs";
+import { upgradeResource, createSurface } from "../document/containers.mjs";
 
 // A real HTTP fixture serves a valid raster image so the network-to-file path is exercised.
 const png = Buffer.from(

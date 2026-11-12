@@ -4,7 +4,7 @@ import { createElement } from "react";
 import PageIcon from "../components/PageIcon";
 import { isImageIcon, validatePageIcon } from "./page-icon.mjs";
 import { validateDocument } from "../portable/validation.mjs";
-import { upgradeResource, createSurface } from "../surface/containers.mjs";
+import { upgradeResource, createSurface } from "../document/containers.mjs";
 
 const raster = "data:image/png;base64," + "a".repeat(20000);
 describe("Page icons", () => {

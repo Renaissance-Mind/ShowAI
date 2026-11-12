@@ -6,7 +6,7 @@ import {
 } from "../datasets/operations.mjs";
 import { diffDocuments } from "../core/diff";
 import type { JSONContent, PageDiff, ShowDocument } from "../core/model";
-import { isResource } from "../surface/containers.mjs";
+import { isResource } from "../document/containers.mjs";
 
 /**
  * Record-level page comparison for Agents. The core diff reports changed

@@ -3,7 +3,7 @@ import {createHash} from 'node:crypto';
 import {createElement} from 'react';
 import {renderToStaticMarkup} from 'react-dom/server';
 import InkConflictInspector from './InkConflictInspector';
-import {createResource} from './containers.mjs';
+import {createResource} from '../document/containers.mjs';
 import {blankDocument} from '../core/catalog';
 import {addNode} from './editing';
 import {createPortableInk} from './portable-ink.mjs';

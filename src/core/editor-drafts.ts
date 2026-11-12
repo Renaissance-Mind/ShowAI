@@ -15,7 +15,7 @@ import { ContentLibrary as GitLibrary } from "./content-library";
 import { documentHash, canonicalJson } from "./diff";
 import type { ShowDocument } from "./model";
 import type { ChangeActor } from "./history-model";
-import { visitContentNodes } from "../surface/document.mjs";
+import { visitContentNodes } from "../document/document.mjs";
 import {inkWireDraftCommitMetadataMatches} from "../surface/ink-wire.mjs";
 
 function committedDraftHash(document: ShowDocument): string {

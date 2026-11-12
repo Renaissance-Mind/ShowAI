@@ -2,7 +2,7 @@ import { expect, it } from "vitest";
 import { blankDocument } from "../core/catalog";
 import { canCommitPageMerge, mergePageContent } from "../core/page-merge-model";
 import { normalizeDocument } from "../core/diff";
-import { createResource, createSurface } from "./containers.mjs";
+import { createResource, createSurface } from "../document/containers.mjs";
 import { addNode } from "./editing";
 import { createPortableInk } from "./portable-ink.mjs";
 import { canonicalInkJSON } from "./ink-operations.mjs";

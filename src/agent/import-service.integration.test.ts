@@ -8,7 +8,7 @@ import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { createMcpServer } from "./mcp";
 import { openLibrary } from "../core/open-library";
 import { syncManager } from "../sync/manager";
-import { visitNodes } from "../surface/document.mjs";
+import { visitNodes } from "../document/document.mjs";
 import { AgentService } from "./service";
 import { planImport, runImport } from "./import-service";
 import {

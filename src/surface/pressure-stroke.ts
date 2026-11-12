@@ -1,5 +1,5 @@
-import type { Point } from "./geometry.mjs";
-import { smoothPath } from "./drawing-geometry.mjs";
+import type { Point } from "../document/geometry.mjs";
+import { smoothPath } from "../document/drawing-geometry.mjs";
 
 /** A pressure stroke shares the saved centerline and keeps mouse strokes uniform. */
 export function pressureOutline(points: Point[], width: number) {

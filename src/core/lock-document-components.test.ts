@@ -11,8 +11,8 @@ import {
   saveComponent,
 } from "./catalog";
 import { validateDocument } from "../portable/validation.mjs";
-import { createResource } from "../surface/containers.mjs";
-import { defaultPageOutline } from "../surface/page-outline.mjs";
+import { createResource } from "../document/containers.mjs";
+import { defaultPageOutline } from "../document/page-outline.mjs";
 import type { CompiledComponent } from "../components/custom/types";
 import type { ShowDocument } from "../types";
 

@@ -13,12 +13,12 @@ import {
 } from "../components/rich-text/extensions";
 import { editorNodeJSON } from "../editor/node-json";
 import { validateDocument } from "../portable/validation.mjs";
-import { createResource, createSurface } from "./containers.mjs";
+import { createResource, createSurface } from "../document/containers.mjs";
 import {
   findSurfaceNode,
   isReconciledSurface,
   reconcileSurface,
-} from "./document.mjs";
+} from "../document/document.mjs";
 import { editNode, replaceChildren } from "./editing";
 import { pageEditorNodes } from "./PageEditorNodes";
 import { fromPageEditorDraft, toPageEditor } from "./page-content";

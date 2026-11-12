@@ -4,7 +4,7 @@ import type {
   PackageRevisionRef,
 } from "./components/custom/types";
 import type { PublishedComponentLocator } from "./portable/publication-types";
-import type { NodeLayout, PageViews } from "./surface/types";
+import type { NodeLayout, PageViews } from "./document/types";
 
 export interface ShowPage {
   id: string;

@@ -7,8 +7,8 @@ import {
   type PickCandidate,
   shapeIntersects,
   shapeIntersectsPolygon,
-} from "./drawing-geometry.mjs";
-import { overlappingPageAnnotations } from "./page-annotations";
+} from "../document/drawing-geometry.mjs";
+import { overlappingPageAnnotations } from "../document/page-annotations";
 import { flushSync } from "react-dom";
 import { canCommitBoardGesture, boardSelectionScope } from "./board-commands";
 import type { SurfaceGeometryStore } from "./geometry-store";
@@ -21,7 +21,7 @@ import {
   type RefObject,
 } from "react";
 import type { ShowDocument } from "../types";
-import type { NodeLayout } from "./types";
+import type { NodeLayout } from "../document/types";
 import type { Camera } from "./model";
 import {
   createSnapIndex,
@@ -36,8 +36,8 @@ import {
   snapResizeFrame,
   type SnapIndex,
   type Point,
-} from "./geometry.mjs";
-import { boundEndpoints, indexSurfaceTree } from "./connections.mjs";
+} from "../document/geometry.mjs";
+import { boundEndpoints, indexSurfaceTree } from "../document/connections.mjs";
 import { translator } from "../i18n";
 import messages from "../i18n/messages/surface";
 

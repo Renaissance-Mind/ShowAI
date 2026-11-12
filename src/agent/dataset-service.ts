@@ -32,7 +32,7 @@ import { getComponent, lockDocumentComponents } from "../core/catalog";
 import { readCustomBlockData } from "../components/custom/contract";
 import { propsIssues, type PropsIssue } from "../components/custom/schema";
 import { canonicalJson } from "../core/canonical";
-import { visitContentNodes, visitNodes } from "../surface/document.mjs";
+import { visitContentNodes, visitNodes } from "../document/document.mjs";
 import { pageEntries, valueDiffEntries } from "./page-diff-view";
 import type { JsonSchema } from "../components/custom/types";
 import { recordTable } from "../datasets/derived-fields.mjs";

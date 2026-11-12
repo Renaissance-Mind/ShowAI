@@ -13,7 +13,7 @@ import { readFile, stat } from "node:fs/promises";
 import { join } from "node:path";
 import { CAPACITY } from "../portable/capacity.mjs";
 import { readBinding } from "../datasets/binding.mjs";
-import { visitContentNodes } from "../surface/document.mjs";
+import { visitContentNodes } from "../document/document.mjs";
 import { resourceDataUrl, resourceSlots } from "../portable/assets.mjs";
 import {
   DatasetStore,

@@ -1,6 +1,6 @@
 import { expect, it } from "vitest";
 import { blankDocument } from "../core/catalog";
-import { createResource } from "./containers.mjs";
+import { createResource } from "../document/containers.mjs";
 import { addNode } from "./editing";
 import { createPortableInk } from "./portable-ink.mjs";
 import { bootstrapInkOperation, createInkOperation, materializeInkOperations } from "./ink-operations.mjs";

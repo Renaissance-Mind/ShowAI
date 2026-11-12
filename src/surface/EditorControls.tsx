@@ -8,7 +8,7 @@ import {
   Columns3,
   ListTree,
 } from "../ui/icons";
-import type { PageWidthMode } from "./types";
+import type { PageWidthMode } from "../document/types";
 import { PageWidthSwitch } from "./PageWidthSwitch";
 import {
   LibraryContextMenu,

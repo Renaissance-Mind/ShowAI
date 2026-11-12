@@ -3,7 +3,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { createElement } from "react";
 import { PortableInkPaths } from "./PortableInkPaths";
 import { createPortableInk, portableInkGeometry, portableNodeBounds, portableNodeFragments, portableNodeHit } from "./portable-ink.mjs";
-import { drawingBounds, shapeHit } from "./drawing-geometry.mjs";
+import { drawingBounds, shapeHit } from "../document/drawing-geometry.mjs";
 
 function stroke() {
   const primary = createPortableInk([{x:10,y:30},{x:50,y:30}], 8, [100,100], "marker", false);

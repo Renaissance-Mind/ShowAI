@@ -2,7 +2,7 @@ import { useMemo } from "react";
 import type { BuiltinComponentMetadata } from "./custom/types";
 import { Widget } from "./blocks/Widget";
 import { nativeComponentDocument } from "../surface/component-insertion";
-import { remapSurfaceIds } from "../surface/document.mjs";
+import { remapSurfaceIds } from "../document/document.mjs";
 import { SurfaceReader } from "../portable/SurfaceReader";
 import { useAppearanceTheme } from "../design/useAppearanceTheme";
 export function BuiltinPreview({

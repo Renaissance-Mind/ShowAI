@@ -1,12 +1,9 @@
 import {usePreparedCubic} from "./PortableCubicContext";
-import {
-  inkArchiveGroup,
-  inkArchiveGroupLayout,
-} from "./ink-archive-group.mjs";
+import { inkArchiveGroupLayout } from "./ink-archive-group.mjs";
 import { useConnectionGeometry } from "./useConnectionGeometry";
-import { objectCapabilities } from "./geometry.mjs";
+import { inkArchiveGroup, objectCapabilities } from "../document/geometry.mjs";
 import { Drawing } from "./Drawing";
-import { isResource, resourceNodes, surfaceKind } from "./containers.mjs";
+import { isResource, resourceNodes, surfaceKind } from "../document/containers.mjs";
 import {
   memo,
   useContext,
@@ -19,7 +16,7 @@ import {
 import type { JSONContent } from "@tiptap/core";
 import type { ShowDocument } from "../types";
 import { ObjectContext, SurfaceObject } from "./SurfaceObject";
-import { orderedSurfaceNodes } from "./document.mjs";
+import { orderedSurfaceNodes } from "../document/document.mjs";
 import { translator } from "../i18n";
 import { useTranslator } from "../i18n/react";
 import messages from "../i18n/messages/surface";

@@ -6,7 +6,7 @@ import {SurfaceContent} from './SurfaceContent';
 import {ObjectContext,type ObjectActions} from './SurfaceObject';
 import {NativeInkPreview} from './NativeInkPreview';
 import {createPortableInk} from './portable-ink.mjs';
-import {createResource} from './containers.mjs';
+import {createResource} from '../document/containers.mjs';
 import {blankDocument} from '../core/catalog';
 import type {ShowDocument} from '../types';
 import fixture from './native-ink-fixture.json';

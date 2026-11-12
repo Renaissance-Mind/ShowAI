@@ -3,7 +3,7 @@ import {createHash} from 'node:crypto';
 import {canonicalInkJSON,inkOperationDigest,installInkDigestProvider,InkOperationReplica,createInkOperation} from './ink-operations.mjs';
 import {createPortableInk} from './portable-ink.mjs';
 import {blankDocument} from '../core/catalog';
-import {createResource} from './containers.mjs';
+import {createResource} from '../document/containers.mjs';
 import {addNode} from './editing';
 import {canCommitPageMerge,mergePageContent} from '../core/page-merge-model';
 import {inkCheckpointFromDocument,inkWireDeltaFromReplica,inkWireDocumentFromCheckpoint,stampInkDocument} from './ink-wire.mjs';

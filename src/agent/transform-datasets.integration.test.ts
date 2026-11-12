@@ -8,7 +8,7 @@ import { createMcpServer } from "./mcp";
 import { openLibrary } from "../core/open-library";
 import { syncManager } from "../sync/manager";
 import { AgentService } from "./service";
-import { visitNodes } from "../surface/document.mjs";
+import { visitNodes } from "../document/document.mjs";
 import { xlsxWorkbook } from "../test/xlsx";
 import type { ShowDocument } from "../core/model";
 

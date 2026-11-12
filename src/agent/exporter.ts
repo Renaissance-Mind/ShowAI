@@ -4,7 +4,7 @@ import {
   type BindingRead,
   type ExternalSnapshotReport,
 } from "../core/dataset-resolution";
-import { visitContentNodes, visitNodes } from "../surface/document.mjs";
+import { visitContentNodes, visitNodes } from "../document/document.mjs";
 import { listBuiltinComponents } from "../core/catalog";
 import { LibraryOperations } from "../core/library-operations";
 import { versionedLibrary } from "../core/library-runtime";

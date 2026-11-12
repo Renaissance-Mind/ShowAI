@@ -4,7 +4,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { Drawing } from "./Drawing";
 import { finishBoardDrawing } from "./board-drawing.mjs";
 import { blankDocument } from "../core/catalog";
-import { createResource } from "./containers.mjs";
+import { createResource } from "../document/containers.mjs";
 import { addNode } from "./editing";
 import { parseArtifact, serializeArtifact } from "../portable/validation.mjs";
 import { BoardStyleControls } from "./BoardStyleControls";

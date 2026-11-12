@@ -115,6 +115,7 @@ const scanned = [
   "src/CanvasApp.tsx",
   "src/studio",
   "src/editor",
+  "src/document",
   "src/surface",
   "src/workbench",
   "src/ui",

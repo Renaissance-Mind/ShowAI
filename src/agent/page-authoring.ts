@@ -1,5 +1,5 @@
 import { applyOperations } from "../core/diff";
-import { createResource } from "../surface/containers.mjs";
+import { createResource } from "../document/containers.mjs";
 import type { ShowDocument } from "../core/model";
 /** The shared shallow authoring path used by MCP page_create and native hosts. */
 export function blocksDocument(

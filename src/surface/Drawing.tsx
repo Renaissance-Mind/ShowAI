@@ -1,10 +1,10 @@
-import type { SnapIndex, SnapGuide } from "./geometry.mjs";
+import type { SnapIndex, SnapGuide } from "../document/geometry.mjs";
 import {
   arrowPath,
   creationPoints,
   smoothPath,
   snapCreation,
-} from "./drawing-geometry.mjs";
+} from "../document/drawing-geometry.mjs";
 import { finishBoardDrawing } from "./board-drawing.mjs";
 import {
   DEFAULT_LABEL_SIZE,
@@ -12,7 +12,7 @@ import {
   labelBox,
   labelCapable,
   labelPadding,
-} from "./drawing-label.mjs";
+} from "../document/drawing-label.mjs";
 import { pressureOutline } from "./pressure-stroke";
 import { isPortableInk, isInkNode } from "./portable-ink.mjs";
 import { PortableInkPaths } from "./PortableInkPaths";
@@ -30,7 +30,7 @@ import {
   type PointerEvent,
 } from "react";
 import type { JSONContent } from "@tiptap/core";
-import type { BoardDrawingTool, DrawingTool, NodeLayout } from "./types";
+import type { BoardDrawingTool, DrawingTool, NodeLayout } from "../document/types";
 import type { Camera } from "./model";
 import "./native-ink.css";
 import { useTranslator } from "../i18n/react";

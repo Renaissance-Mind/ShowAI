@@ -1,8 +1,9 @@
+import { validateInkArchiveGroup } from "./ink-archive-group.mjs";
 import {
-  validateInkArchiveGroup,
+  objectCapabilities,
+  bindingParent,
   inkArchiveGroup,
-} from "./ink-archive-group.mjs";
-import { objectCapabilities, bindingParent } from "./geometry.mjs";
+} from "../document/geometry.mjs";
 import { validateNativeInk } from "./native-ink.mjs";
 import { isPortableInk } from "./portable-ink.mjs";
 import { validateInkWireState } from "./ink-wire.mjs";
@@ -10,10 +11,10 @@ import {
   validateInkFragments,
   validateInkInput,
 } from "./ink-input-contract.mjs";
-import { labelCapable, MAX_LABEL_LENGTH } from "./drawing-label.mjs";
-import { validatePageOutline } from "./page-outline.mjs";
-import { isResource, fillResource, surfaceKind } from "./containers.mjs";
-import { fillSurfaceLayout, visitNodes } from "./document.mjs";
+import { labelCapable, MAX_LABEL_LENGTH } from "../document/drawing-label.mjs";
+import { validatePageOutline } from "../document/page-outline.mjs";
+import { isResource, fillResource, surfaceKind } from "../document/containers.mjs";
+import { fillSurfaceLayout, visitNodes } from "../document/document.mjs";
 const reserved = new Set(["__proto__", "constructor", "prototype"]);
 const object = (value, label) => {
   if (!value || typeof value !== "object" || Array.isArray(value))

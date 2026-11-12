@@ -8,7 +8,7 @@ import { FileStore } from "../core/store";
 import { startSyncServer } from "../server/node";
 import { hash } from "./protocol";
 import { eventProtocol, eventCapability } from "./events";
-import { reconcileResource } from "../surface/containers.mjs";
+import { reconcileResource } from "../document/containers.mjs";
 
 const cleanup: (() => Promise<unknown>)[] = [];
 afterEach(async () => {

@@ -24,7 +24,7 @@ import {
   editNode,
   captureDeletion,
   restoreDeletion,
-} from "./editing";
+} from "../surface/editing";
 import {
   artifactVersion,
   placeTemplate,

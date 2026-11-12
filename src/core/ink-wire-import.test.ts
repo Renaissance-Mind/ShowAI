@@ -6,7 +6,7 @@ import { blankDocument } from "./catalog";
 import { InkOperationJournal } from "./ink-operation-journal";
 import { InkOperationReplica, materializeInkOperations, replayInkJournalEvents } from "../surface/ink-operations.mjs";
 import { inkCheckpointFromDocument, inkWireConflicts, inkWireDocumentFromCheckpoint, stampInkDocument } from "../surface/ink-wire.mjs";
-import { createResource } from "../surface/containers.mjs";
+import { createResource } from "../document/containers.mjs";
 import { addNode } from "../surface/editing";
 import { createPortableInk } from "../surface/portable-ink.mjs";
 import type { ShowDocument } from "../types";

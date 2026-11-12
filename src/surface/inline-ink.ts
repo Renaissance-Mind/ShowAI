@@ -1,8 +1,8 @@
 import type { JSONContent } from "@tiptap/core";
 import type { ShowDocument } from "../types";
 import type { PageMergeResult } from "../core/page-merge-model";
-import type { NodeLayout } from "./types";
-import { findSurfaceNode } from "./document.mjs";
+import type { NodeLayout } from "../document/types";
+import { findSurfaceNode } from "../document/document.mjs";
 import { isInkNode } from "./portable-ink.mjs";
 import { mergeValues } from "../core/catalog-merge";
 export class InkEditConflict extends Error {
@@ -75,7 +75,7 @@ export interface InkCommand {
   clearSelection?: boolean;
   selection?: string[];
   layouts?: Record<string,NodeLayout>;
-  primitive?: {id:string;tool:string;style?:import("./types").DrawingStyle;start:{x:number;y:number};end:{x:number;y:number}};
+  primitive?: {id:string;tool:string;style?:import("../document/types").DrawingStyle;start:{x:number;y:number};end:{x:number;y:number}};
   activate?: string;
   shapeGesture?: {
     id: string;

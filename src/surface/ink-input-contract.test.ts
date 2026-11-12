@@ -2,7 +2,7 @@ import { expect, it } from "vitest";
 import { createPortableInk } from "./portable-ink.mjs";
 import { normalizeDocument } from "../core/diff";
 import { blankDocument } from "../core/catalog";
-import { createResource } from "./containers.mjs";
+import { createResource } from "../document/containers.mjs";
 import { addNode } from "./editing";
 import { validateInkFragments, validateInkInput } from "./ink-input-contract.mjs";
 import type { ShowDocument } from "../types";

@@ -2,7 +2,7 @@ import type { JSONContent } from "@tiptap/core";
 import type { AgentTarget } from "../agent-host/types";
 import type { CanvasReference } from "../surface/agent-reference";
 import type { ShowDocument } from "../types";
-import { visitNodes } from "../surface/document.mjs";
+import { visitNodes } from "../document/document.mjs";
 import { richTextDocument } from "../components/rich-text/model.mjs";
 import { plainText } from "../lib/document";
 

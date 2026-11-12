@@ -32,7 +32,7 @@ it("runs the actual source owner in a real Node worker with independently cloned
    const id=String(++next),receive=(message:any)=>{if(message.id!==id)return;worker!.off("message",receive);if(message.ok)resolve(message.data);else reject(Object.assign(new Error(message.error.message),message.error))};
    worker!.on("message",receive);worker!.once("error",reject);worker!.postMessage({id,request:value});
   });
-  const {blankDocument}=await import("./catalog"),{createResource}=await import("../surface/containers.mjs");
+  const {blankDocument}=await import("./catalog"),{createResource}=await import("../document/containers.mjs");
   const document=createResource(blankDocument(),"board"),scope={homeId:"node-worker-home",projectId:"node-worker-project",pageId:document.id};
   const seeded=await request({kind:"seed",scope,document,proof:"normalized",leaseId:"current"});
   const snapshot=await request({kind:"resolve",ref:seeded.next});snapshot.document.title="outside mutation";

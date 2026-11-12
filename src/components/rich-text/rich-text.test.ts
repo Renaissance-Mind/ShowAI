@@ -13,9 +13,9 @@ import {
   markdownToRichText,
   validateRichTextData,
 } from "./model.mjs";
-import { createResource } from "../../surface/containers.mjs";
+import { createResource } from "../../document/containers.mjs";
 import { insertComponent } from "../../surface/component-insertion";
-import { findSurfaceNode } from "../../surface/document.mjs";
+import { findSurfaceNode } from "../../document/document.mjs";
 import {
   parseArtifact,
   serializeArtifact,

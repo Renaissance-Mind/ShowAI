@@ -1,11 +1,6 @@
 import type { JSONContent } from "@tiptap/core";
-import type { NodeLayout } from "./types";
-export interface InkArchiveGroup {
-  version: 1;
-  extent: [number, number];
-  sourceDrawing: string;
-}
-export function inkArchiveGroup(node: JSONContent): InkArchiveGroup | null;
+import type { NodeLayout } from "../document/types";
+import type { InkArchiveGroup } from "../document/geometry.mjs";
 export function validateInkArchiveGroup(
   node: JSONContent,
 ): InkArchiveGroup | null;

@@ -5,16 +5,16 @@ import {
 } from "../components/rich-text/model.mjs";
 import type { JSONContent } from "@tiptap/core";
 import type { ShowDocument } from "../types";
-import type { NodeLayout } from "./types";
+import type { NodeLayout } from "../document/types";
 import { builtinComponent } from "../components/catalog";
 import { translator } from "../i18n";
 import messages from "../i18n/messages/surface";
-import { createSurface, upgradeResource, surfaceKind } from "./containers.mjs";
+import { createSurface, upgradeResource, surfaceKind } from "../document/containers.mjs";
 import {
   findSurfaceNode,
   reconcileSurface,
   remapSurfaceIds,
-} from "./document.mjs";
+} from "../document/document.mjs";
 
 const t = translator(messages);
 import { validateDocument } from "../portable/validation.mjs";

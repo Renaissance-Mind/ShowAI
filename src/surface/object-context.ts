@@ -1,5 +1,5 @@
 import { createContext } from "react";
-import type { NodeLayout } from "./types";
+import type { NodeLayout } from "../document/types";
 import type { SurfaceGeometryStore } from "./geometry-store";
 import type { BoardInteraction } from "./useBoardInteraction";
 

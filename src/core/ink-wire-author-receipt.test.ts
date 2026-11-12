@@ -6,7 +6,7 @@ import { blankDocument } from "./catalog";
 import { InkOperationJournal } from "./ink-operation-journal";
 import { InkOperationReplica, canonicalInkJSON, inkOperationDigest } from "../surface/ink-operations.mjs";
 import { inkCheckpointFromDocument, inkWireHydrateAuthorBaseline, inkWireAuthorReceipt, inkWireEditPlans, inkWireImportCheckpoints, inkWireDocumentFromCheckpoint, stampInkDocument } from "../surface/ink-wire.mjs";
-import { createResource } from "../surface/containers.mjs";
+import { createResource } from "../document/containers.mjs";
 import { addNode } from "../surface/editing";
 import { mergePageContent } from "./page-merge-model";
 import { createPortableInk } from "../surface/portable-ink.mjs";

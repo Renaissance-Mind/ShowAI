@@ -1,7 +1,7 @@
 import { useEffect, useRef } from "react";
 import type { RefObject } from "react";
 import type { ShowDocument } from "../types";
-import { findSurfaceNode } from "./document.mjs";
+import { findSurfaceNode } from "../document/document.mjs";
 import { inkNodes } from "./inline-ink";
 import { inkUIRegions } from "./ink-ui-regions";
 import type { InkCommand } from "./inline-ink";

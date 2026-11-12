@@ -2,8 +2,8 @@ import {OwnedSourceSession,createSourceTransport} from "./surface/source-client"
 import {flushPortableInputs,portableInputsPending,stopPortableInputs} from "./surface/portable-input-scope";
 import {flushHistoryTravels,historyTravelsPending,stopHistoryTravels} from "./surface/history-travel-queue";
 import { CAPACITY, formatBytes } from "./portable/capacity.mjs";
-import { linearContent } from "./surface/document.mjs";
-import { upgradeResource } from "./surface/containers.mjs";
+import { linearContent } from "./document/document.mjs";
+import { upgradeResource } from "./document/containers.mjs";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ArrowUpRight,

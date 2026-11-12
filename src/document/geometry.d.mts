@@ -1,6 +1,12 @@
 import type { JSONContent } from "@tiptap/core";
 import type { NodeLayout } from "./types";
-import type { Camera } from "./model";
+type Camera = { x: number; y: number; scale: number };
+export interface InkArchiveGroup {
+  version: 1;
+  extent: [number, number];
+  sourceDrawing: string;
+}
+export function inkArchiveGroup(node: JSONContent): InkArchiveGroup | null;
 export interface Point {
   pressure?: number;
   x: number;

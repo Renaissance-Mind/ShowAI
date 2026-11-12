@@ -33,7 +33,7 @@ import {
 import { assertProps } from "../components/custom/schema";
 import type { JsonSchema } from "../components/custom/types";
 import type { ShowDocument } from "./model";
-import { visitContentNodes } from "../surface/document.mjs";
+import { visitContentNodes } from "../document/document.mjs";
 import {
   DEFAULT_REFRESH_SECONDS,
   DatasetSourceLinks,

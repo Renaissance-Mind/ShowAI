@@ -1,8 +1,8 @@
 import type { JSONContent } from "@tiptap/core";
 import type { ShowDocument } from "../types";
 import { ownSourceValue } from "./source-runtime";
-import { remapSurfaceIds, visitNodes } from "./document.mjs";
-import { createSurface } from "./containers.mjs";
+import { remapSurfaceIds, visitNodes } from "../document/document.mjs";
+import { createSurface } from "../document/containers.mjs";
 import { translator } from "../i18n";
 import messages from "../i18n/messages/surface";
 

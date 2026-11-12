@@ -1,5 +1,5 @@
 import type { JSONContent } from "@tiptap/core";
-import { visitContentNodes } from "../surface/document.mjs";
+import { visitContentNodes } from "../document/document.mjs";
 import { parsePageLink } from "../portable/page-link.mjs";
 import { parsePageCell } from "../components/blocks/database-contract.mjs";
 import { parameterValues } from "../portable/component-parameters.mjs";

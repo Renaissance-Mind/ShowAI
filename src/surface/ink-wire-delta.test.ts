@@ -2,7 +2,7 @@ import {expect,it} from 'vitest';
 import {performance} from 'node:perf_hooks';
 import {blankDocument} from '../core/catalog';
 import {normalizeDocument} from '../core/diff';
-import {createResource} from './containers.mjs';
+import {createResource} from '../document/containers.mjs';
 import {addNode} from './editing';
 import {createPortableInk} from './portable-ink.mjs';
 import {InkOperationReplica,canonicalInkJSON,createInkOperation,validateInkCheckpoint,type InkOperationChange} from './ink-operations.mjs';

@@ -1,12 +1,12 @@
 import { validateReferenceSnapshot } from "./reference-snapshot.mjs";
 import {freezeOwnedJSON,isOwnedJSON,captureOwnedJSON,capturedContentSummary,shareCapturedJSON} from "./owned-json.mjs";
-import {shareNativeSource} from "../surface/native-source-delta.mjs";
+import {shareNativeSource} from "../document/structural-share.mjs";
 import { validateInkArchiveGroup } from "../surface/ink-archive-group.mjs";
-import { isResource } from "../surface/containers.mjs";
+import { isResource } from "../document/containers.mjs";
 import { validatePageIcon } from "../lib/page-icon.mjs";
 import { parsePageLink } from "./page-link.mjs";
 import { isLocalResourceRef } from "./local-files.mjs";
-import { artifactVersion, assignSurfaceIds } from "../surface/document.mjs";
+import { artifactVersion, assignSurfaceIds } from "../document/document.mjs";
 import { validateSurface } from "../surface/validation.mjs";
 import {
   MAX_STEPS,

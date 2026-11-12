@@ -1,13 +1,13 @@
 import type { JSONContent } from "@tiptap/core";
 import type { ShowDocument } from "../types";
-import type { NodeLayout } from "./types";
+import type { NodeLayout } from "../document/types";
 import {
   arrowFromEndpoints,
   boundEndpoints,
   indexSurfaceTree,
   reconcileConnections,
   type SurfaceIndex,
-} from "./connections.mjs";
+} from "../document/connections.mjs";
 
 /** DOM measurements are transient. Only an explicit editor command materializes hints. */
 export class SurfaceGeometryStore {

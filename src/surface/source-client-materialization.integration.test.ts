@@ -5,7 +5,7 @@ import {join,resolve} from "node:path";
 import {Worker} from "node:worker_threads";
 import {build} from "esbuild";
 import {OwnedSourceSession,type SourceRuntimeTransport} from "./source-client";
-import {createResource} from "./containers.mjs";
+import {createResource} from "../document/containers.mjs";
 import {blankDocument} from "../core/catalog";
 import {appendNewPortableInk} from "./portable-ink-append.mjs";
 import {longCubicInputFixture} from "./cubic-ink-chunks.fixture.mjs";

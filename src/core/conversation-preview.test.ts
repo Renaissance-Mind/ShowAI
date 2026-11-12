@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { randomBytes } from "node:crypto";
 import { buildPageHtml } from "../agent/exporter";
 import { blankDocument } from "./catalog";
-import { createResource } from "../surface/containers.mjs";
+import { createResource } from "../document/containers.mjs";
 import { conversationPreview } from "./conversation-preview";
 import { compactPresentation } from "../agent/presentation";
 

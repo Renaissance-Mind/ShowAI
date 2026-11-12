@@ -1,8 +1,8 @@
 import { expect, it } from "vitest";
 import { blankDocument } from "../core/catalog";
 import { addNode, editNode } from "./editing";
-import { createResource } from "./containers.mjs";
-import { findSurfaceNode } from "./document.mjs";
+import { createResource } from "../document/containers.mjs";
+import { findSurfaceNode } from "../document/document.mjs";
 import { rebaseHistorySnapshots } from "./history-rebase";
 import type { ShowDocument } from "../types";
 function fixture() {

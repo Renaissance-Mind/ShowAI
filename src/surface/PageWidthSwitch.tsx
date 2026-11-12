@@ -1,4 +1,4 @@
-import type { PageWidthMode } from "./types";
+import type { PageWidthMode } from "../document/types";
 import "./page-width.css";
 import { useTranslator } from "../i18n/react";
 import messages from "../i18n/messages/surface";

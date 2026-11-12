@@ -1,5 +1,5 @@
 import { agentCommentView } from "../core/comments";
-import { widgetDocuments } from "../surface/document.mjs";
+import { widgetDocuments } from "../document/document.mjs";
 import {
   resolveDocumentDatasets,
   type BindingRead,

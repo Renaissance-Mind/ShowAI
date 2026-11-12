@@ -1,4 +1,4 @@
-import type { BoardTool, DrawingStyle } from "./types";
+import type { BoardTool, DrawingStyle } from "../document/types";
 
 export const boardToolPreferencesKey = "showai:board-tools:v1";
 export const boardToolPreferencesChanged = "showai:board-tools-changed";

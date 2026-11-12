@@ -1,6 +1,6 @@
 import { useMemo, type ReactNode } from "react";
 import type { ShowDocument } from "../types";
-import { upgradeResource } from "../surface/containers.mjs";
+import { upgradeResource } from "../document/containers.mjs";
 import { ContainerRuntime } from "../surface/ContainerRuntime";
 import { PageContent } from "./PageContent";
 export function SurfaceReader({

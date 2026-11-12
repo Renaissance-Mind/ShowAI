@@ -12,7 +12,7 @@ import { dataServer } from "../test/data-server";
 import { xlsxWorkbook } from "../test/xlsx";
 import { localFileRef } from "../portable/local-files.mjs";
 import { parseArtifact } from "../portable/validation.mjs";
-import { visitNodes } from "../surface/document.mjs";
+import { visitNodes } from "../document/document.mjs";
 import type { ShowDocument } from "../core/model";
 
 // A real 1×1 PNG, served online and stored as a local file.

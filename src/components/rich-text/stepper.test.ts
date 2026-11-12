@@ -7,7 +7,7 @@ import { validatePrimitiveData } from "../blocks/primitive-contract.mjs";
 import { Widget } from "../blocks/Widget";
 import { blankDocument } from "../../core/catalog";
 import { insertComponent } from "../../surface/component-insertion";
-import { findSurfaceNode } from "../../surface/document.mjs";
+import { findSurfaceNode } from "../../document/document.mjs";
 import { validateDocument } from "../../portable/validation.mjs";
 import { structuredContent } from "../../agent/page-structured";
 import { builtinComponent } from "../catalog";

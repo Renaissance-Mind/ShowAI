@@ -1,7 +1,7 @@
 import {expect,it} from "vitest";
 import {blankDocument} from "../core/catalog";
 import {mergePageContent} from "../core/page-merge-model";
-import {createResource} from "./containers.mjs";
+import {createResource} from "../document/containers.mjs";
 import {normalizeSourceDocument,SourceRuntimeOwner,type SourceSnapshotDelta,type SourceSnapshotRef} from "./source-runtime";
 import type {ShowDocument} from "../types";
 const resolve=(owner:SourceRuntimeOwner,ref:SourceSnapshotRef)=>(owner.execute({kind:"resolve",ref}) as {document:ShowDocument}).document;

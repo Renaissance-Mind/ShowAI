@@ -12,7 +12,7 @@ import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { createMcpServer } from "./mcp";
 import { AgentService } from "./service";
 import { componentWidgetData, getComponent } from "../core/catalog";
-import { visitNodes } from "../surface/document.mjs";
+import { visitNodes } from "../document/document.mjs";
 import type { ShowDocument } from "../core/model";
 
 let home: string, projectId: string, service: AgentService;

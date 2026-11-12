@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { remapSurfaceIds } from "../surface/document.mjs";
+import { remapSurfaceIds } from "../document/document.mjs";
 import { validateDocument } from "../portable/validation.mjs";
 import type { ShowDocument } from "./model";
 const documentCopy = (document: ShowDocument) =>

@@ -10,7 +10,7 @@ import { openLibrary } from "../core/open-library";
 import { syncManager } from "../sync/manager";
 import { AgentService } from "./service";
 import { componentWidgetData, saveComponent } from "../core/catalog";
-import { visitNodes } from "../surface/document.mjs";
+import { visitNodes } from "../document/document.mjs";
 import type { ShowDocument } from "../core/model";
 
 /**

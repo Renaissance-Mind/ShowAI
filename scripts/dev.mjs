@@ -64,6 +64,7 @@ const readerCache = developmentCache(root, directory, "reader", {
     "src/portable",
     "src/components/blocks",
     "src/components/custom",
+    "src/document",
     "src/surface",
     "resources/catalog",
   ],

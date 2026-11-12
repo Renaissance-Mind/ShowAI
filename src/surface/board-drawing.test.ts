@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { finishBoardDrawing } from "./board-drawing.mjs";
-import { createResource } from "./containers.mjs";
+import { createResource } from "../document/containers.mjs";
 import { blankDocument } from "../core/catalog";
 import { addNode } from "./editing";
 import {
@@ -8,7 +8,7 @@ import {
   serializeArtifact,
   validateDocument,
 } from "../portable/validation.mjs";
-import { findSurfaceNode } from "./document.mjs";
+import { findSurfaceNode } from "../document/document.mjs";
 
 const style = { color: "#123456", fillColor: "#ffccaa", strokeWidth: 7 };
 const gesture = {

@@ -7,7 +7,7 @@ import { resourceForPath, type HistoryEntry } from "./history-model";
 import { withLibraryLock } from "./library-lock";
 import { CoreError } from "./model";
 import type { JSONContent } from "@tiptap/core";
-import { visitContentNodes, widgetDocuments } from "../surface/document.mjs";
+import { visitContentNodes, widgetDocuments } from "../document/document.mjs";
 import {
   boundDatabaseEdges,
   declaredPageFields,

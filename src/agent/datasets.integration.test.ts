@@ -10,7 +10,7 @@ import { syncManager } from "../sync/manager";
 import { AgentService } from "./service";
 import { componentWidgetData, saveComponent } from "../core/catalog";
 import { parseArtifact } from "../portable/validation.mjs";
-import { visitNodes } from "../surface/document.mjs";
+import { visitNodes } from "../document/document.mjs";
 import type { ShowDocument } from "../core/model";
 
 let root: string;

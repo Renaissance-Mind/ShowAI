@@ -2,7 +2,7 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { ContainerRuntime } from "./ContainerRuntime";
-import { createResource } from "./containers.mjs";
+import { createResource } from "../document/containers.mjs";
 import { blankDocument } from "../core/catalog";
 import { finishBoardDrawing } from "./board-drawing.mjs";
 import { addNode } from "./editing";

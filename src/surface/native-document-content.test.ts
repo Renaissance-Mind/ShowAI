@@ -1,6 +1,6 @@
 import {expect,it} from "vitest";
 import {blankDocument} from "../core/catalog";
-import {createResource} from "./containers.mjs";
+import {createResource} from "../document/containers.mjs";
 import {nativeDocumentContentKey,nativeDocumentBodiesEqual,mergeNativeDocumentReceipt,mergeNativeProjectionReceipt} from "./native-document-content";
 
 it("timestamps and JSON object key order do not create another native editor mutation",()=>{
@@ -20,7 +20,7 @@ import {addNode,editNode} from "./editing";
 import {createPortableInk} from "./portable-ink.mjs";
 import {stampInkDocument,inkWireConflicts} from "./ink-wire.mjs";
 import {mergePageContent,canCommitPageMerge} from "../core/page-merge-model";
-import {findSurfaceNode} from "./document.mjs";
+import {findSurfaceNode} from "../document/document.mjs";
 import type {ShowDocument} from "../types";
 function source(){
  let page=createResource(blankDocument(),"board") as ShowDocument;

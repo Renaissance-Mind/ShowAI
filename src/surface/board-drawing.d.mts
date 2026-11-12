@@ -1,6 +1,6 @@
 import type { JSONContent } from "@tiptap/core";
-import type { BoardTool, DrawingStyle, NodeLayout } from "./types";
-import type { Point, SnapIndex } from "./geometry.mjs";
+import type { BoardTool, DrawingStyle, NodeLayout } from "../document/types";
+import type { Point, SnapIndex } from "../document/geometry.mjs";
 export function finishBoardDrawing(
   tool: BoardTool,
   style: DrawingStyle,

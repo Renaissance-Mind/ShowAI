@@ -1,9 +1,9 @@
 import { describe, it, expect } from "vitest";
 import { blankDocument, listBuiltinComponents } from "../core/catalog";
-import { createResource } from "./containers.mjs";
+import { createResource } from "../document/containers.mjs";
 import { insertComponent } from "./component-insertion";
 import { applyOperations } from "../core/diff";
-import { findSurfaceNode, visitNodes } from "./document.mjs";
+import { findSurfaceNode, visitNodes } from "../document/document.mjs";
 import {
   validateDocument,
   serializeArtifact,

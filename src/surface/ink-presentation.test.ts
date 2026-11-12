@@ -3,7 +3,7 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { SurfaceContent } from "./SurfaceContent";
 import { Widget } from "../components/blocks/Widget";
-import { createResource } from "./containers.mjs";
+import { createResource } from "../document/containers.mjs";
 import { blankDocument } from "../core/catalog";
 import fixture from "./native-ink-fixture.json";
 

@@ -1,5 +1,5 @@
-import { creationPoints, snapCreation } from "./drawing-geometry.mjs";
-import { pointsBounds } from "./geometry.mjs";
+import { creationPoints, snapCreation } from "../document/drawing-geometry.mjs";
+import { pointsBounds } from "../document/geometry.mjs";
 import { createPortableInk } from "./portable-ink.mjs";
 
 /** Release coordinates are authoritative even if no move/paint frame was delivered. */

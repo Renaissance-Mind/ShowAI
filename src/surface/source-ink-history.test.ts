@@ -7,7 +7,7 @@ import {build} from "esbuild";
 import {SourceRuntimeOwner,cloneSourceValue,type SourceSnapshotDelta,type SourceSnapshotRef,type SourceInkHistoryResult,type SourceRuntimeResponse,type SourceRuntimeRequest} from "./source-runtime";
 import {OwnedSourceSession,sourceSnapshotFor,type SourceRuntimeTransport} from "./source-client";
 import {appendNewPortableInk} from "./portable-ink-append.mjs";
-import {createResource} from "./containers.mjs";
+import {createResource} from "../document/containers.mjs";
 import {blankDocument} from "../core/catalog";
 import type {ShowDocument} from "../types";
 import type {JSONContent} from "@tiptap/core";

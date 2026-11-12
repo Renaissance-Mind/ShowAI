@@ -3,7 +3,7 @@ import { mkdtemp, rm, cp, readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { blankDocument } from "./catalog";
-import { createResource } from "../surface/containers.mjs";
+import { createResource } from "../document/containers.mjs";
 import { FileStore } from "./store";
 import { InkOperationJournal } from "./ink-operation-journal";
 import { mergePageContent } from "./page-merge-model";

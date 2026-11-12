@@ -6,7 +6,7 @@ import * as JsxRuntime from "react/jsx-runtime";
 import * as JsxDevRuntime from "react/jsx-dev-runtime";
 import { useEffect, useRef, useState } from "react";
 import type { CompiledComponent } from "./types";
-import type { PageOutlineComponentProps } from "../../surface/page-outline.mjs";
+import type { PageOutlineComponentProps } from "../../document/page-outline.mjs";
 import { ComponentStatus } from "../blocks/ComponentStatus";
 import { isValidationMessage, readableValidation } from "./validation-messages";
 import { useTranslator } from "../../i18n/react";

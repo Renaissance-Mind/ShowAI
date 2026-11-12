@@ -5,7 +5,7 @@ import {useEffect,useRef,useState,type RefObject} from "react";
 import type {ShowDocument} from "../types";
 import type {JSONContent} from "@tiptap/core";
 import type {Camera} from "./model";
-import type {NodeLayout} from "./types";
+import type {NodeLayout} from "../document/types";
 import {clientMatrix,matrixValues,measureNativeBoard} from "./board-native-projection";
 import {nativeBoardUIRegions} from "./ink-ui-regions";
 import {finishBoardDrawing} from "./board-drawing.mjs";

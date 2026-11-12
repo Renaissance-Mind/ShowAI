@@ -1,7 +1,7 @@
 import {expect,it} from "vitest";
 import {CAPACITY,measureContent} from "../portable/capacity.mjs";
 import {blankDocument} from "../core/catalog";
-import {createResource} from "./containers.mjs";
+import {createResource} from "../document/containers.mjs";
 import {SourceRuntimeOwner,type SourceSnapshotDelta} from "./source-runtime";
 import type {ShowDocument} from "../types";
 function fixture(){

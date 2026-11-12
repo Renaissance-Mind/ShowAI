@@ -10,7 +10,7 @@ import {
 } from "./mindmap-contract.mjs";
 import { builtinComponent } from "../catalog";
 import { insertComponent } from "../../surface/component-insertion";
-import { createSurface } from "../../surface/containers.mjs";
+import { createSurface } from "../../document/containers.mjs";
 import { validateDocument } from "../../portable/validation.mjs";
 const map = (): MindmapData => ({
   nodes: [

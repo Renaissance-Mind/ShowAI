@@ -15,7 +15,7 @@ import { finishBoardDrawing } from "./board-drawing.mjs";
 import { applyInkUpdate } from "./inline-ink";
 import { transformObjects, duplicateObjects } from "./board-commands";
 import { parseArtifact } from "../portable/validation.mjs";
-import { reconcileSurface } from "./document.mjs";
+import { reconcileSurface } from "../document/document.mjs";
 import { mergePageContent } from "../core/page-merge-model";
 
 const ink = () =>

@@ -15,7 +15,7 @@ import {
 } from "../components/custom/sandbox-policy.mjs";
 import type { CompiledComponent } from "../components/custom/types";
 import { appearanceTokens, installSandboxTheme } from "../design/sandbox-theme";
-import type { PageOutlineComponentProps } from "./page-outline.mjs";
+import type { PageOutlineComponentProps } from "../document/page-outline.mjs";
 
 const json = (value: unknown) =>
   JSON.stringify(value)

@@ -33,7 +33,7 @@ import {
   promotePackage,
   packageRevisionRef,
 } from "./catalog";
-import { upgradeDocument, visitNodes } from "../surface/document.mjs";
+import { upgradeDocument, visitNodes } from "../document/document.mjs";
 import { FileStore } from "./store";
 import type { ComponentManifest } from "../components/custom/types";
 

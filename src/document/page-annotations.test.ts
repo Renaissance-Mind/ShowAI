@@ -1,7 +1,7 @@
 import { expect, it } from "vitest";
 import { overlappingPageAnnotations } from "./page-annotations";
 import { arrowEndpoints, bindingAtPoint, reconcileConnections } from "./connections.mjs";
-import { transformObjects } from "./board-commands";
+import { transformObjects } from "../surface/board-commands";
 import type { ShowDocument } from "../types";
 
 it("carries crossing and contained strokes and leaves locked/distant strokes", () => {

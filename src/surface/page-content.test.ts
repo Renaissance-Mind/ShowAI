@@ -3,7 +3,7 @@ import { getSchema, type JSONContent } from "@tiptap/core";
 import { createExtensions } from "../editor/extensions";
 import { pageEditorNodes } from "./PageEditorNodes";
 import { toPageEditor, fromPageEditor, fromPageEditorDraft } from "./page-content";
-import { createResource } from "./containers.mjs";
+import { createResource } from "../document/containers.mjs";
 import { blankDocument } from "../core/catalog";
 import { validateDocument } from "../portable/validation.mjs";
 

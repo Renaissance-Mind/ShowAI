@@ -15,7 +15,7 @@ import {
 } from "./comments";
 import { mergePageContent } from "./page-merge-model";
 import { withChangeContext } from "./history-context";
-import { createResource } from "../surface/containers.mjs";
+import { createResource } from "../document/containers.mjs";
 import { blankDocument } from "./catalog";
 import type { PageComment, ShowDocument } from "../types";
 

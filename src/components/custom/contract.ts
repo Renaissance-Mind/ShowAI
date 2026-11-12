@@ -1,5 +1,5 @@
 import { CAPACITY, assertContent } from "../../portable/capacity.mjs";
-import { visitContentNodes } from "../../surface/document.mjs";
+import { visitContentNodes } from "../../document/document.mjs";
 import type { ShowDocument } from "../../types";
 import type {
   CompiledComponent,
