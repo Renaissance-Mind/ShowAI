@@ -34,17 +34,20 @@ describe("Shape labels", () => {
       },
       { type: "surface.layout.set", nodeId: "box", layout: { x: 0, y: 0, width: 200, height: 90 } },
     ]);
+    // Operations apply one after another: the insert completes the shape at
+    // the size its label needs, and the later frame scales that extent.
     expect(attrs(document, "box")).toMatchObject({
       label: "API 服务\n鉴权",
       labelSize: 22,
       color: "#252629",
       strokeWidth: 2,
-      extent: [200, 90],
+      extent: [160, 74],
       points: [
         { x: 0, y: 0 },
-        { x: 200, y: 90 },
+        { x: 160, y: 74 },
       ],
     });
+    expect(document.layout!.box).toMatchObject({ x: 0, y: 0, width: 200, height: 90 });
     const parsed = parseArtifact(serializeArtifact(document)) as {
       document: ShowDocument;
     };

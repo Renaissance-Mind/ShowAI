@@ -299,8 +299,7 @@ export function diffDocuments(
 
 /**
  * Operations that reconcile the surface or read the frames and geometry of
- * other objects. Drawings added earlier in the batch are completed before
- * them, as they would be by a separate apply.
+ * other objects. Incomplete drawings are completed before them.
  */
 const GEOMETRY_OPERATIONS = new Set<string>([
   "component.insert",
@@ -326,6 +325,12 @@ function operationError(error: unknown, index: number, type: unknown) {
   return wrapped;
 }
 
+/**
+ * Apply operations in order. Each one is applied to the result of the
+ * previous one and completed, reconciled, validated and normalized before
+ * the next, exactly as separate page_apply calls would be; the first
+ * failure names its operation by index.
+ */
 export function applyOperations(
   document: ShowDocument,
   operations: PageOperation[],
@@ -337,6 +342,18 @@ export function applyOperations(
       "INVALID_DATA",
       "Expected at most 1000 page operations.",
     );
+  let current = document;
+  for (const [offset, operation] of operations.entries())
+    current = applyOperation(current, operation, firstIndex + offset);
+  return current;
+}
+
+function applyOperation(
+  document: ShowDocument,
+  operation: PageOperation,
+  index: number,
+): ShowDocument {
+  const operations = [operation];
   let draft = structuredClone(document);
   const transformedIds = new Set<string>();
   // Frames the caller set explicitly; others are automatic placeholders that
@@ -975,17 +992,7 @@ export function applyOperations(
         );
     }
   };
-  for (const [offset, operation] of operations.entries()) {
-    try {
-      applyOne(operation);
-    } catch (error) {
-      throw operationError(
-        error,
-        firstIndex + offset,
-        (operation as { type?: unknown } | null)?.type,
-      );
-    }
-  }
+  const finish = (): ShowDocument => {
   completeDraftDrawings();
   // Validate caller-supplied references before intentional structural cleanup.
   const structural =
@@ -1029,4 +1036,16 @@ export function applyOperations(
   }
   // Anchored comments follow their text through these operations.
   return rebaseCommentAnchors(document, normalizeDocument(draft, document));
+  };
+  try {
+    applyOne(operation);
+    return finish();
+  } catch (error) {
+    // Completion and validation failures belong to the operation too.
+    throw operationError(
+      error,
+      index,
+      (operation as { type?: unknown } | null)?.type,
+    );
+  }
 }
