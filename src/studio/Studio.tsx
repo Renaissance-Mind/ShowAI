@@ -1,7 +1,6 @@
 import RemoteMcpApprovalDialog from "./RemoteMcpApprovalDialog";
 import MergeDialog from "./MergeDialog";
 import { trackDesktopPreviewActivity } from "./preview-work";
-import accountFlowMessages from "../i18n/messages/accountFlow";
 import {
   withCreatedFolder,
   withLibraryEntry,
@@ -16,32 +15,8 @@ import {
 } from "react";
 import {
   ArrowUpRight,
-  AtSign,
-  Link2,
-  AppWindow,
-  Search,
-  FolderInput,
-  FolderMinus,
-  Globe,
-  Package,
-  PanelsTopLeft,
-  Copy,
   FileText,
-  Folder,
-  FolderOpen,
-  FolderPlus,
-  Pencil,
-  Pin,
-  PinOff,
-  Trash2,
   LayoutTemplate,
-  Plus,
-  ArchiveRestore,
-  Cloud,
-  EyeOff,
-  FileDiff,
-  Keyboard,
-  LifeBuoy,
   Presentation,
 } from "../ui/icons";
 import type {
@@ -58,14 +33,8 @@ import type {
 } from "../contract/types";
 import DatabaseRecordPeek from "./DatabaseRecordPeek";
 import { useDatabaseRecordPeek } from "./useDatabaseRecordPeek";
-import {
-  containerMenuItems,
-} from "../surface/EditorControls";
 import { desktop } from "../host/bridge";
 import { usePage } from "./usePage";
-import {
-  LibraryContextMenu,
-} from "./LibraryNavigation";
 import Dialog from "../ui/Dialog";
 import ImportDialog from "./ImportDialog";
 import {
@@ -102,9 +71,7 @@ import {
 } from "./LibraryNavigationDialogs";
 import {
   clientIsMac,
-  formatShortcut,
 } from "./keyboard-shortcuts";
-import findMessages from "../i18n/messages/find";
 import { FindBar } from "./find/FindBar";
 import { useFind } from "./find/useFind";
 import { useWindowFullscreen } from "./useWindowFullscreen";
@@ -115,7 +82,6 @@ import {
   configureProblemRedaction,
   configureProblemPlatform,
 } from "../problems";
-import feedbackMessages from "../i18n/messages/feedback";
 import {
   ExternalConflictDialog,
   WorkspaceConflictsDialog,
@@ -165,6 +131,7 @@ import {
   useExternalChangeCount,
 } from "./shell/StudioNotices";
 import { StudioViews } from "./shell/StudioViews";
+import { StudioMenus } from "./shell/menus/StudioMenus";
 
 
 
@@ -172,12 +139,9 @@ export default function Studio() {
   useEffect(() => {
     trackDesktopPreviewActivity();
   }, []);
-  const accountFlow = useTranslator(accountFlowMessages);
   const t = useTranslator(studioMessages);
   const tc = useTranslator(commonMessages);
-  const tfind = useTranslator(findMessages);
   const tn = useTranslator(navigationMessages);
-  const tfeedback = useTranslator(feedbackMessages);
   useEffect(() => {
     const wake = () => {
       if (document.visibilityState === "visible" && navigator.onLine)
@@ -196,7 +160,7 @@ export default function Studio() {
   }, []);
   const windowFullscreen = useWindowFullscreen();
   const feedback = useStudioFeedback();
-  const { toasts, setNotice, notifyWithUndo, report, action } = feedback;
+  const { toasts, setNotice, report, action } = feedback;
   const library = useLibraryState(feedback);
   const {
     navigationUpdating,
@@ -216,7 +180,6 @@ export default function Studio() {
   } = library;
   const route = useRouteState({ info, capabilities });
   const {
-    setSyncRequest,
     workspaceReady,
     routing,
     docPage,
@@ -237,28 +200,7 @@ export default function Studio() {
   const dialogs = useDialogState();
   const { dialog, setDialog, dialogRef, closeDialog } = dialogs;
   const menus = useMenuState();
-  const {
-    groupMenu,
-    setGroupMenu,
-    directoryView,
-    viewMenu,
-    setViewMenu,
-    viewOptions,
-    viewIcon,
-    chooseDirectoryView,
-    contextMenu,
-    setContextMenu,
-    projectsMenu,
-    setProjectsMenu,
-    newMenu,
-    setNewMenu,
-    exportMenu,
-    setExportMenu,
-    pageExportMenu,
-    setPageExportMenu,
-    exportTarget,
-    setExportTarget,
-  } = menus;
+  const { groupMenu, contextMenu, projectsMenu, newMenu } = menus;
   const [assistantPrefill, setAssistantPrefill] = useState<{
     key: string;
     pageId: string;
@@ -323,10 +265,8 @@ export default function Studio() {
     openProject,
     openPage,
     locateAssistantTarget,
-    openTarget,
     openDoc,
     locateCurrentPage,
-    openProjectManagement,
   } = router;
   // A library the App just created gets its sample project once.
   const sampleProject = useSampleProject(
@@ -358,9 +298,6 @@ export default function Studio() {
     createLinkedPage,
     renameLinkedPage,
     importFinished,
-    exportSite,
-    activePageTarget,
-    duplicatePage,
     runCreation,
     beginPageIcon,
     addBlock,
@@ -374,13 +311,7 @@ export default function Studio() {
     router,
     page,
   });
-  const {
-    beginRename,
-    beginDelete,
-    moveProject,
-    updateTarget,
-    deleteTarget,
-  } = edits;
+  const { moveProject, updateTarget, deleteTarget } = edits;
   const moves = useLibraryMoves({
     feedback,
     library,
@@ -557,13 +488,6 @@ export default function Studio() {
     moves,
     workspace,
   });
-  const {
-    creationMenuItems,
-    pageExportMenuItems,
-    newMenuItems,
-    directorySortMenuItems,
-    projectOrderMenuItems,
-  } = menuItems;
   const commands = useStudioCommands({
     feedback,
     library,
@@ -579,7 +503,7 @@ export default function Studio() {
     appearance,
     assistant,
   });
-  const { openFeedback, quickJumpCommands } = commands;
+  const { quickJumpCommands } = commands;
   // An external write just installed into the open page: outline what changed.
   const externalChange = view === "page" ? page.externalChange : undefined;
   useEffect(() => {
@@ -901,449 +825,24 @@ export default function Studio() {
           library={library}
           pageActions={pageActions}
         />
-        {pageExportMenu && (exportTarget || (view === "page" && page.draft)) && (
-          <LibraryContextMenu
-            anchor={pageExportMenu}
-            label={t("exportMenuLabel")}
-            onClose={() => {
-              setPageExportMenu(null);
-              setExportTarget(null);
-            }}
-            items={pageExportMenuItems(exportTarget ?? activePageTarget())}
-          />
-        )}
-        {capabilities.exportSite && exportMenu && (
-          <LibraryContextMenu
-            anchor={exportMenu}
-            label={t("siteExportMode")}
-            onClose={() => setExportMenu(null)}
-            items={[
-              {
-                label: t("exportOffline"),
-                icon: <Package size={15} />,
-                onSelect: () => void exportSite("bundled"),
-              },
-              {
-                label: t("exportOnline"),
-                icon: <Globe size={15} />,
-                onSelect: () => void exportSite("remote"),
-              },
-            ]}
-          />
-        )}
-        {projectsMenu && (
-          <LibraryContextMenu
-            anchor={projectsMenu}
-            label={t("projectListActions")}
-            onClose={() => setProjectsMenu(null)}
-            items={[
-              {
-                label: accountFlow("projects.title"),
-                icon: <FolderOpen size={15} />,
-                onSelect: openProjectManagement,
-              },
-              {
-                label: t("newProject"),
-                icon: <FolderPlus size={15} />,
-                onSelect: () => setDialog({ type: "project" }),
-              },
-              {
-                label: t("newGroup"),
-                icon: <FolderPlus size={15} />,
-                onSelect: () => setDialog({ type: "group" }),
-              },
-              {
-                label: tn("deletedItems"),
-                icon: <ArchiveRestore size={15} />,
-                separatorBefore: true,
-                onSelect: () => setDialog({ type: "deletedItems" }),
-              },
-              {
-                label: tn("hiddenProjects"),
-                icon: <EyeOff size={15} />,
-                onSelect: () => setDialog({ type: "hiddenProjects" }),
-              },
-              ...(externalChangesAvailable
-                ? [
-                    {
-                      label: externalChangeCount
-                        ? tn("externalChangesCount", {
-                            count: externalChangeCount,
-                          })
-                        : tn("externalChanges"),
-                      icon: <FileDiff size={15} />,
-                      onSelect: () => setDialog({ type: "workspaceConflicts" }),
-                    },
-                  ]
-                : []),
-              {
-                label: tn("keyboardShortcuts"),
-                icon: <Keyboard size={15} />,
-                onSelect: () => setDialog({ type: "shortcuts" }),
-              },
-              {
-                label: tfeedback("helpAndFeedback"),
-                icon: <LifeBuoy size={15} />,
-                onSelect: () => openFeedback.current("about"),
-              },
-            ]}
-          />
-        )}
-        {newMenu && (
-          <LibraryContextMenu
-            anchor={newMenu}
-            label={tn("newMenu")}
-            onClose={() => setNewMenu(null)}
-            items={newMenuItems()}
-          />
-        )}
-        {groupMenu && (
-          <LibraryContextMenu
-            anchor={groupMenu.anchor}
-            label={t("groupActions", { name: groupMenu.group.name })}
-            onClose={() => setGroupMenu(null)}
-            items={[
-              {
-                label: t("newProject"),
-                icon: <Plus size={15} />,
-                onSelect: () =>
-                  setDialog({ type: "project", groupId: groupMenu.group.id }),
-              },
-              {
-                label: t("renameGroup"),
-                icon: <Pencil size={15} />,
-                onSelect: () =>
-                  setDialog({ type: "group", group: groupMenu.group }),
-              },
-              {
-                label: t("removeGroup"),
-                icon: <Trash2 size={15} />,
-                separatorBefore: true,
-                onSelect: action(async () => {
-                  await desktop.invoke("groups:remove", {
-                    groupId: groupMenu.group.id,
-                  });
-                  await refreshProjects([], { sidebar: true });
-                  setNotice(t("groupRemoved"));
-                }),
-              },
-            ]}
-          />
-        )}
-        {viewMenu && (
-          <LibraryContextMenu
-            anchor={viewMenu}
-            label={t("directoryView")}
-            onClose={() => setViewMenu(null)}
-            items={viewOptions.map((mode) => ({
-              label: t(`view.${mode}`),
-              icon: viewIcon(mode),
-              checked: directoryView === mode,
-              onSelect: () => chooseDirectoryView(mode),
-            }))}
-          />
-        )}
-        {contextMenu && (
-          <LibraryContextMenu
-            anchor={contextMenu.anchor}
-            portalRoot={
-              contextMenu.anchor.closest<HTMLElement>(".expandable-search") ??
-              undefined
-            }
-            point={contextMenu.point}
-            label={
-              contextMenu.selection
-                ? t("pageSelectionActions")
-                : contextMenu.creationOnly
-                  ? t("addContent")
-                  : t("itemActions", { title: contextMenu.target.title })
-            }
-            onClose={() => setContextMenu(null)}
-            items={
-              contextMenu.selection
-                ? [
-                    {
-                      label: t("move"),
-                      icon: <Folder size={15} />,
-                      onSelect: () => beginBatchPages("move"),
-                    },
-                    {
-                      label: tc("delete"),
-                      icon: <Trash2 size={15} />,
-                      danger: true,
-                      separatorBefore: true,
-                      onSelect: () => beginBatchPages("delete"),
-                    },
-                  ]
-                : contextMenu.creationOnly
-                ? creationMenuItems(contextMenu.target)
-                : [
-                    ...(capabilities.tabs && !contextMenu.pageTools ? [
-                    {
-                      label: t("openInNewTab"),
-                      icon: <PanelsTopLeft size={15} />,
-                      shortcut:
-                        info?.platform === "darwin"
-                          ? t("cmdClick")
-                          : t("ctrlClick"),
-                      disabled:
-                        !workspaceReady || routing || workspace.switching,
-                      onSelect: action(() =>
-                        openTarget(contextMenu.target, "tab"),
-                      ),
-                    },
-                    ] : []),
-                    ...(capabilities.windows ? [
-                    {
-                      label: t("openInNewWindow"),
-                      icon: <AppWindow size={15} />,
-                      shortcut: t("shiftClick"),
-                      disabled:
-                        !workspaceReady || routing || workspace.switching,
-                      onSelect: action(() =>
-                        openTarget(contextMenu.target, "window"),
-                      ),
-                    },
-                    ] : []),
-                    ...(contextMenu.target.kind === "page"
-                      ? [
-                          {
-                            // Like copying a link, for Agents outside ShowAI.
-                            label: tc("copyReference"),
-                            icon: <AtSign size={15} />,
-                            onSelect: action(() =>
-                              copyPageReference(contextMenu.target.projectId, {
-                                kind: "page",
-                                pageId: contextMenu.target.id,
-                              }),
-                            ),
-                          },
-                          {
-                            label: tc("copyLink"),
-                            icon: <Link2 size={15} />,
-                            onSelect: action(() =>
-                              copyPageLink({
-                                projectId: contextMenu.target.projectId,
-                                pageId: contextMenu.target.id,
-                                blockIds: [],
-                              }),
-                            ),
-                          },
-                        ]
-                      : []),
-                    {
-                      label: tc("rename"),
-                      separatorBefore: true,
-                      icon: <Pencil size={15} />,
-                      shortcut: "F2",
-                      onSelect: () => beginRename(contextMenu.target),
-                    },
-                    ...(contextMenu.target.kind === "page"
-                      ? [
-                          {
-                            label: t("setIcon"),
-                            icon: <FileText size={15} />,
-                            onSelect:
-                              contextMenu.pageTools &&
-                              editorControls?.documentId ===
-                                contextMenu.target.id &&
-                              !editorControls.nested
-                                ? editorControls.setIcon
-                                : action(() =>
-                                    beginPageIcon(contextMenu.target),
-                                  ),
-                          },
-                        ]
-                      : []),
-                    {
-                      label: contextMenu.target.pinned ? t("unpin") : t("pin"),
-                      icon: contextMenu.target.pinned ? (
-                        <PinOff size={15} />
-                      ) : (
-                        <Pin size={15} />
-                      ),
-                      onSelect: action(() =>
-                        updateTarget(contextMenu.target, {
-                          pinned: !contextMenu.target.pinned,
-                        }),
-                      ),
-                    },
-                    ...directorySortMenuItems(contextMenu.target),
-                    ...projectOrderMenuItems(contextMenu.target),
-                    ...(contextMenu.target.kind === "project"
-                      ? [
-                          ...(["sync", "share"] as const).map((intent) => ({
-                            label: accountFlow(
-                              intent === "share" ? "share" : "useOnDevices",
-                            ),
-                            icon:
-                              intent === "share" ? (
-                                <Globe size={15} />
-                              ) : (
-                                <Cloud size={15} />
-                              ),
-                            onSelect: action(async () => {
-                              const projectId = contextMenu.target.projectId;
-                              await settleOpenPage();
-                              setSyncRequest({
-                                projectId,
-                                intent,
-                                key: Date.now(),
-                              });
-                              setSettingsSection("sync");
-                              await navigate("settings");
-                            }),
-                          })),
-                          {
-                            label: accountFlow("hide"),
-                            icon: <EyeOff size={15} />,
-                            onSelect: action(async () => {
-                              const { projectId, title } = contextMenu.target;
-                              await settleOpenPage();
-                              await desktop.invoke("sync:projectVisibility", {
-                                projectId,
-                                visible: false,
-                              });
-                              if (selectedProject === projectId)
-                                await navigate("projects");
-                              await refreshProjects([projectId], { sidebar: true });
-                              notifyWithUndo(
-                                tn("hiddenNamed", { name: title }),
-                                async () => {
-                                  await desktop.invoke(
-                                    "sync:projectVisibility",
-                                    { projectId, visible: true },
-                                  );
-                                  await refreshProjects([projectId], {
-                                    sidebar: true,
-                                  });
-                                  setNotice(tn("shownNamed", { name: title }));
-                                },
-                              );
-                            }),
-                          },
-                          {
-                            label: t("moveToGroup"),
-                            icon: <Folder size={15} />,
-                            onSelect: () =>
-                              setDialog({
-                                type: "moveProject",
-                                projectId: contextMenu.target.projectId,
-                              }),
-                          },
-                          ...(organization.projectGroups[
-                            contextMenu.target.projectId
-                          ]
-                            ? [
-                                {
-                                  label: t("removeFromGroup"),
-                                  icon: <FolderMinus size={15} />,
-                                  onSelect: action(() =>
-                                    moveProject(
-                                      contextMenu.target.projectId,
-                                      null,
-                                    ),
-                                  ),
-                                },
-                              ]
-                            : []),
-                        ]
-                      : []),
-                    ...(contextMenu.pageTools &&
-                    editorControls?.documentId === contextMenu.target.id
-                      ? containerMenuItems(
-                          editorControls,
-                          editorControls.nested,
-                        ).map((item, index) => ({
-                          ...item,
-                          separatorBefore:
-                            item.separatorBefore ||
-                            (editorControls.nested && index === 0),
-                        }))
-                      : []),
-                    ...(contextMenu.pageTools
-                      ? [
-                          {
-                            label: tfind("bar"),
-                            icon: <Search size={15} />,
-                            shortcut: formatShortcut("Mod+F", clientIsMac()),
-                            onSelect: () => {
-                              setContextMenu(null);
-                              find.run(
-                                syncReadOnly || page.record?.readOnly
-                                  ? "open"
-                                  : "replace",
-                              );
-                            },
-                          },
-                        ]
-                      : []),
-                    ...(contextMenu.target.kind === "page"
-                      ? [
-                          {
-                            label: t("duplicatePage"),
-                            icon: <Copy size={15} />,
-                            separatorBefore: !contextMenu.pageTools,
-                            onSelect: action(() =>
-                              duplicatePage(contextMenu.target),
-                            ),
-                          },
-                          {
-                            label: t("exportMenu"),
-                            icon: <ArrowUpRight size={15} />,
-                            onSelect: () => {
-                              setExportTarget(
-                                contextMenu.pageTools
-                                  ? null
-                                  : contextMenu.target,
-                              );
-                              setPageExportMenu(contextMenu.anchor);
-                            },
-                          },
-                          ...(contextMenu.pageTools && capabilities.revealFiles
-                            ? [
-                                {
-                                  label: t("revealPageFile"),
-                                  icon: <FolderOpen size={15} />,
-                                  onSelect: action(() =>
-                                    desktop.invoke("fs:reveal", {
-                                      projectId: contextMenu.target.projectId,
-                                      pageId: contextMenu.target.id,
-                                    }),
-                                  ),
-                                },
-                              ]
-                            : []),
-                        ]
-                      : []),
-                    ...(contextMenu.target.kind === "page" ||
-                    contextMenu.target.kind === "folder"
-                      ? [
-                          {
-                            label: t("moveTo"),
-                            icon: <FolderInput size={15} />,
-                            onSelect: () => {
-                              setContextMenu(null);
-                              setDialog({
-                                type: "batchPages",
-                                operation: "move",
-                                targets: [contextMenu.target],
-                              });
-                            },
-                          },
-                        ]
-                      : []),
-                    {
-                      label: tc("delete"),
-                      icon: <Trash2 size={15} />,
-                      danger: true,
-                      separatorBefore: true,
-                      onSelect: () => beginDelete(contextMenu.target),
-                    },
-                  ]
-            }
-          />
-        )}
+        <StudioMenus
+          feedback={feedback}
+          library={library}
+          route={route}
+          dialogs={dialogs}
+          menus={menus}
+          menuItems={menuItems}
+          directory={directory}
+          router={router}
+          pageActions={pageActions}
+          edits={edits}
+          moves={moves}
+          commands={commands}
+          page={page}
+          workspace={workspace}
+          find={find}
+          externalChangeCount={externalChangeCount}
+        />
         {importPlan && (
           <ImportDialog
             plan={importPlan.plan}
