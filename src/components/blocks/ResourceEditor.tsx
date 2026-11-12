@@ -18,7 +18,7 @@ import { useLocalFileChooser } from "../local-resources";
 import {
   isLocalFileRef,
   localRefName,
-} from "../../portable/local-files.mjs";
+} from "../../document/local-files.mjs";
 
 export function ResourceEditor({
   kind,

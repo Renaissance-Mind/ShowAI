@@ -4,7 +4,7 @@ import { BlockActions, BlockActionHost } from "./action-host";
 import { useTranslator } from "../../i18n/react";
 import messages from "../../i18n/messages/blocks";
 import { NoteText } from "./NoteText";
-import { plainNotes } from "./note-markup.mjs";
+import { plainNotes } from "../../document/note-markup.mjs";
 
 // Default titles that built-in components save into documents; a caption that
 // still matches one of them is hidden.

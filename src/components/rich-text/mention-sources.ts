@@ -6,7 +6,7 @@
 import type { CatalogComponent } from "../../core/component-categories";
 import type { SlashEntry } from "../slash-menu-model";
 import type { LinkablePage } from "./environment";
-import { pageLink } from "../../portable/page-link.mjs";
+import { pageLink } from "../../document/page-link.mjs";
 import { rankByTitle } from "../title-match";
 import { isoDay, typedDays } from "../../portable/mention-contract.mjs";
 import type { MentionContract } from "../../contract/contributions";

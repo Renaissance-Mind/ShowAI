@@ -1,4 +1,4 @@
-import { richTextDocument } from "../components/rich-text/model.mjs";
+import { richTextDocument } from "../document/rich-text.mjs";
 import type { JSONContent } from "@tiptap/core";
 import type { ShowDocument } from "../types";
 export interface OutlineItem {

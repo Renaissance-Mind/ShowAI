@@ -3,7 +3,7 @@ import { marked } from "marked";
 import { resourceMime } from "../components/blocks/research-contract.mjs";
 import { isImageIcon } from "../lib/page-icon.mjs";
 import { isSafeUrl, validateDocument } from "./validation.mjs";
-import { detachedRef, isLocalFileRef, localRefType } from "./local-files.mjs";
+import { detachedRef, isLocalFileRef, localRefType } from "../document/local-files.mjs";
 import { SKIP, walk } from "../document/walk.mjs";
 
 /** The id of a node or of its nearest identified ancestor, across held documents. */

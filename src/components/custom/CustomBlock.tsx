@@ -8,7 +8,7 @@ import {
 } from "../../contract/sandbox-policy.mjs";
 import { localMediaSource } from "./local-media-link";
 import { frameResource } from "../local-resources";
-import { isLocalResourceRef } from "../../portable/local-files.mjs";
+import { isLocalResourceRef } from "../../document/local-files.mjs";
 import { useAppearanceTheme } from "../../design/useAppearanceTheme";
 import {
   appearanceTokens,
@@ -50,7 +50,7 @@ import {
   navigationTarget,
   parsePageLink,
   requestNavigation,
-} from "../../portable/page-link.mjs";
+} from "../../document/page-link.mjs";
 import { BindingBasisContext } from "../../datasets/basis";
 import {
   PageReferenceContext,

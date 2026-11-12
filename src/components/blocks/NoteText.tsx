@@ -1,4 +1,4 @@
-import { noteSegments } from "./note-markup.mjs";
+import { noteSegments } from "../../document/note-markup.mjs";
 import { installNoteBubbles } from "./note-bubble";
 
 /** Installs the note controller for anchors written outside React, such as SVG markup. */

@@ -15,6 +15,11 @@ interface ImportRecord {
 const PACKAGES: Record<string, "value" | "type"> = {
   "@dagrejs/dagre": "value",
   "@tiptap/core": "type",
+  // Markdown and formula syntax of rich text (rich-text.mjs, markdown-math.mjs).
+  marked: "value",
+  katex: "value",
+  // richTextStyle returns a CSSProperties object.
+  react: "type",
 };
 
 /** Imports that still leave the layer, keyed by importing file and specifier. */

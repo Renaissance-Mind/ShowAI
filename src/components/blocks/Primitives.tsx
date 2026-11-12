@@ -1,6 +1,6 @@
 import type { BlockProps } from "./types";
 import { RichText } from "../rich-text/RichText";
-import { primitiveContentNode } from "../rich-text/model.mjs";
+import { primitiveContentNode } from "../../document/rich-text.mjs";
 import { validatePrimitiveData } from "./primitive-contract.mjs";
 export { validatePrimitiveData };
 export { RichText as TextBlock } from "../rich-text/RichText";

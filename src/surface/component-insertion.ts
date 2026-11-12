@@ -2,7 +2,7 @@ import {
   primitiveContentNode,
   primitiveNodeTypes,
   createRichTextNode,
-} from "../components/rich-text/model.mjs";
+} from "../document/rich-text.mjs";
 import type { JSONContent } from "@tiptap/core";
 import type { ShowDocument } from "../types";
 import type { NodeLayout } from "../document/types";

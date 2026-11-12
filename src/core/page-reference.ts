@@ -3,7 +3,7 @@ import type { AgentTarget } from "../agent-host/types";
 import type { CanvasReference } from "../surface/agent-reference";
 import type { ShowDocument } from "../types";
 import { walk } from "../document/walk.mjs";
-import { richTextDocument } from "../components/rich-text/model.mjs";
+import { richTextDocument } from "../document/rich-text.mjs";
 import { plainText } from "../lib/document";
 
 /** A person's explicit pointer at saved page content, handed to an Agent

@@ -135,7 +135,7 @@
           "purpose": "组件定义的文字设置、选中菜单、悬停菜单和编辑交互。"
         },
         {
-          "path": "src/components/rich-text/model.mjs",
+          "path": "src/document/rich-text.mjs",
           "purpose": "共享内容树、校验和旧 Markdown/plain 输入转换。"
         },
         {

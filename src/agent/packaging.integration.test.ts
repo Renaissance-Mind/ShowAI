@@ -10,7 +10,7 @@ import { syncManager } from "../sync/manager";
 import { AgentService } from "./service";
 import { dataServer } from "../test/data-server";
 import { xlsxWorkbook } from "../test/xlsx";
-import { localFileRef } from "../portable/local-files.mjs";
+import { localFileRef } from "../document/local-files.mjs";
 import { parseArtifact } from "../portable/validation.mjs";
 import { walk } from "../document/walk.mjs";
 import type { ShowDocument } from "../core/model";

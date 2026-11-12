@@ -16,7 +16,7 @@ import {
   ROLLUP_AGGREGATES,
   recordTitle,
 } from "../../datasets/derived-fields.mjs";
-import { pageLink } from "../../portable/page-link.mjs";
+import { pageLink } from "../../document/page-link.mjs";
 import { rankByTitle } from "../title-match";
 import type { PageLinkBridge } from "../page-links";
 import type { DatabaseHost } from "./database-host";

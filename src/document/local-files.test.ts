@@ -10,9 +10,9 @@ import {
   localRefType,
 } from "./local-files.mjs";
 import { localFilePath } from "../core/local-resources";
-import { validateDocument } from "./validation.mjs";
+import { validateDocument } from "../portable/validation.mjs";
 import { validateResearchData } from "../components/blocks/research-contract.mjs";
-import { validateRichTextData } from "../components/rich-text/model.mjs";
+import { validateRichTextData } from "./rich-text.mjs";
 import {
   componentSandboxPolicy,
   componentSandboxPolicyFor,

@@ -3,7 +3,7 @@ import { useState } from "react";
 import { NativeInkPreview } from "../../surface/NativeInkPreview";
 import { safeImageUrl } from "../blocks/helpers";
 import { LocalResourceNotice, useResource } from "../local-resources";
-import { richTextStyle } from "./model.mjs";
+import { richTextStyle } from "../../document/rich-text.mjs";
 import { useTranslator } from "../../i18n/react";
 import messages from "../../i18n/messages/media";
 import commonMessages from "../../i18n/messages/common";

@@ -1,7 +1,7 @@
 import type { MouseEvent } from "react";
 import type { BlockProps } from "./types";
 import { usePageReferences } from "../page-references";
-import { pageLink, requestNavigation } from "../../portable/page-link.mjs";
+import { pageLink, requestNavigation } from "../../document/page-link.mjs";
 import { useTranslator } from "../../i18n/react";
 import messages from "../../i18n/messages/pageMention";
 import "./page-mention.css";

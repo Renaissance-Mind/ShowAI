@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { JSONContent } from "@tiptap/core";
-import { normalizeContentTree, readContentTree } from "./model.mjs";
+import { normalizeContentTree, readContentTree } from "./rich-text.mjs";
 
 const paragraph = (text: string): JSONContent => ({
   type: "paragraph",

@@ -354,7 +354,7 @@ import {
   type NavigationDetail,
   type NavigationModifiers,
   type NavigationTarget,
-} from "../portable/page-link.mjs";
+} from "../document/page-link.mjs";
 import { useSlidingIndicator } from "./useSlidingIndicator";
 import {
   componentDisplayDescription,

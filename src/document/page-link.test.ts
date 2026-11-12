@@ -6,7 +6,7 @@ import {
   parsePageLink,
   requestNavigation,
 } from "./page-link.mjs";
-import { isSafeUrl, validateDocument } from "./validation.mjs";
+import { isSafeUrl, validateDocument } from "../portable/validation.mjs";
 import { repairEditorLinks } from "../surface/editor-links.mjs";
 import type { ShowDocument } from "../types";
 

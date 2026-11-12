@@ -10,8 +10,8 @@ import {
   textNotes,
 } from "./note-markup.mjs";
 import { mathHtml } from "./markdown-math.mjs";
-import { NoteText } from "./NoteText";
-import { noteHtml } from "./note-bubble";
+import { NoteText } from "../components/blocks/NoteText";
+import { noteHtml } from "../components/blocks/note-bubble";
 
 describe("hover notes", () => {
   it("parses [label]{note} with formulas and balanced braces", () => {

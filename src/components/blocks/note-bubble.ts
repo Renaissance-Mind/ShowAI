@@ -1,4 +1,4 @@
-import { mathHtml } from "./markdown-math.mjs";
+import { mathHtml } from "../../document/markdown-math.mjs";
 import "./katex.css";
 import "./note.css";
 

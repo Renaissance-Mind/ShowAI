@@ -21,7 +21,7 @@ import { getLocale } from "../../i18n";
 import { useTranslator } from "../../i18n/react";
 import messages from "../../i18n/messages/chart";
 import { NoteSvgText, NoteText, noteProps } from "./NoteText";
-import { plainNotes, textNotes } from "./note-markup.mjs";
+import { plainNotes, textNotes } from "../../document/note-markup.mjs";
 import { isIndexList, useReaderState } from "../../surface/reader-state";
 
 const charWidth = (char: string) => (char.charCodeAt(0) > 0x2e80 ? 10 : 5.6);

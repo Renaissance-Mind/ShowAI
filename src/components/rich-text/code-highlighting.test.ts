@@ -7,7 +7,7 @@ import {
   highlightCode,
 } from "./code-highlighting";
 import { RichTextNode } from "./RichTextView";
-import { markdownToRichText } from "./model.mjs";
+import { markdownToRichText } from "../../document/rich-text.mjs";
 import {
   parseArtifact,
   serializeArtifact,

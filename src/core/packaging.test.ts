@@ -22,7 +22,7 @@ import { logicalPath } from "./library-runtime";
 import { withChangeContext } from "./history-context";
 import { AgentService } from "../agent/service";
 import { syncManager } from "../sync/manager";
-import { localFileRef } from "../portable/local-files.mjs";
+import { localFileRef } from "../document/local-files.mjs";
 import { CAPACITY } from "../portable/capacity.mjs";
 
 let root: string;

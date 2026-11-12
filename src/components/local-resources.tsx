@@ -15,7 +15,7 @@ import {
   isLocalFileRef,
   localRefName,
   type LocalResourceKind,
-} from "../portable/local-files.mjs";
+} from "../document/local-files.mjs";
 import { localMediaUrl } from "./custom/local-media-link";
 import { CAPACITY } from "../portable/capacity.mjs";
 import { useTranslator } from "../i18n/react";

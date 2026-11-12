@@ -1,4 +1,4 @@
-import { validateRichTextData } from "../rich-text/model.mjs";
+import { validateRichTextData } from "../../document/rich-text.mjs";
 import { validateNativeInk } from "../../surface/native-ink.mjs";
 
 /** Most steps one stepper holds; the editor's hiding rules cover this many. */

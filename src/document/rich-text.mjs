@@ -1,13 +1,13 @@
 import { Marked } from "marked";
-import { mathExtensions } from "../blocks/markdown-math.mjs";
+import { mathExtensions } from "./markdown-math.mjs";
 import {
   NOTE_MAX,
   annotateLatex,
   invalidNoteMark,
   noteMarkdownExtension,
-} from "../blocks/note-markup.mjs";
-import { parsePageLink } from "../../portable/page-link.mjs";
-import { isLocalResourceRef } from "../../portable/local-files.mjs";
+} from "./note-markup.mjs";
+import { parsePageLink } from "./page-link.mjs";
+import { isLocalResourceRef } from "./local-files.mjs";
 
 // ==text== is the common Markdown highlight syntax (Obsidian, Typora, many AI
 // outputs). Its content must not start or end with a space, so `a == b` stays text.

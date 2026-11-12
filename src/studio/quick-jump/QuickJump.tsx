@@ -26,7 +26,7 @@ import {
 } from "../../components/slash-menu-model";
 import { flushSync } from "react-dom";
 import { componentWidgetData } from "../../contract/contract";
-import { requestNavigation } from "../../portable/page-link.mjs";
+import { requestNavigation } from "../../document/page-link.mjs";
 import type { SearchResult } from "../../core/library-index";
 import type { ProjectSummary } from "../../core/model";
 import type { EditorControls } from "../../surface/EditorControls";

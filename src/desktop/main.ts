@@ -64,7 +64,7 @@ import { MenuCommandQueue } from "./menu-queue";
 import { printHtmlToPdf } from "./print-pdf";
 import { AppUpdates, appUpdateActions } from "./app-updates";
 import { windowQuery, type WindowTarget } from "../workbench/window-target";
-import { parsePageLink } from "../portable/page-link.mjs";
+import { parsePageLink } from "../document/page-link.mjs";
 import { AgentService, errorResult } from "../agent/service";
 import { MaintenanceScheduler } from "../core/maintenance-scheduler";
 import { syncManager } from "../sync/manager";

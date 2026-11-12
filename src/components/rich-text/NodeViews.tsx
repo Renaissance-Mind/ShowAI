@@ -3,8 +3,8 @@ import { ownSourceValue } from "../../surface/source-runtime";
 import { isTextPointerTarget } from "../../surface/text-selection";
 import { clearWidgetSelection } from "./widget-selection";
 import { ImageContent } from "./ImageContent";
-import { richTextStyle } from "./model.mjs";
-import { mathHtml } from "../blocks/markdown-math.mjs";
+import { richTextStyle } from "../../document/rich-text.mjs";
+import { mathHtml } from "../../document/markdown-math.mjs";
 import { installNoteBubbles } from "../blocks/note-bubble";
 import {
   useCallback,

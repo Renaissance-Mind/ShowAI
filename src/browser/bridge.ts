@@ -2,7 +2,7 @@ import { chooseLocalPath, type FileDialogOptions } from "./FileDialog";
 import {
   LOCAL_FILE_TYPES,
   type LocalResourceKind,
-} from "../portable/local-files.mjs";
+} from "../document/local-files.mjs";
 import type {
   CloseResult,
   CloseSource,

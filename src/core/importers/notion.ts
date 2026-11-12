@@ -1,4 +1,4 @@
-import { LOCAL_FILE_TYPES } from "../../portable/local-files.mjs";
+import { LOCAL_FILE_TYPES } from "../../document/local-files.mjs";
 import { normalizeDate } from "../../components/blocks/database-contract.mjs";
 import { parseDelimited } from "../dataset-sources";
 import { CoreError } from "../model";

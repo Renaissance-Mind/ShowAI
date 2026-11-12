@@ -35,7 +35,7 @@ import richTextTableActions from "../components/rich-text/TableSelectionActions.
 import richTextCss from "../components/rich-text/editor.css?raw";
 import richTextEnvironment from "../components/rich-text/environment.tsx?raw";
 import richTextExtensions from "../components/rich-text/extensions.ts?raw";
-import richTextModel from "../components/rich-text/model.mjs?raw";
+import richTextModel from "../document/rich-text.mjs?raw";
 import richTextHighlight from "../components/rich-text/reading-highlight.ts?raw";
 import sharedSelectionToolbar from "../editor/SelectionToolbar.tsx?raw";
 import sharedSelectionToolbarCss from "../editor/selection-toolbar.css?raw";
@@ -65,8 +65,8 @@ import objectContext from "../surface/object-context.ts?raw";
 import nativeInkCss from "../surface/native-ink.css?raw";
 import capacity from "../portable/capacity.mjs?raw";
 import ownedJson from "../portable/owned-json.mjs?raw";
-import pageLinkSource from "../portable/page-link.mjs?raw";
-import localFilesSource from "../portable/local-files.mjs?raw";
+import pageLinkSource from "../document/page-link.mjs?raw";
+import localFilesSource from "../document/local-files.mjs?raw";
 import localResourcesSource from "../components/local-resources.tsx?raw";
 import pageReferencesSource from "../components/page-references.tsx?raw";
 import localMediaLinkSource from "../components/custom/local-media-link.ts?raw";
@@ -102,8 +102,8 @@ import references from "../components/blocks/References.tsx?raw";
 import resourceEditor from "../components/blocks/ResourceEditor.tsx?raw";
 import researchContract from "../components/blocks/research-contract.mjs?raw";
 import researchCss from "../components/blocks/research-media.css?raw";
-import math from "../components/blocks/markdown-math.mjs?raw";
-import noteMarkup from "../components/blocks/note-markup.mjs?raw";
+import math from "../document/markdown-math.mjs?raw";
+import noteMarkup from "../document/note-markup.mjs?raw";
 import noteBubble from "../components/blocks/note-bubble.ts?raw";
 import noteCss from "../components/blocks/note.css?raw";
 import noteText from "../components/blocks/NoteText.tsx?raw";
@@ -281,7 +281,7 @@ const sources: Record<string, string> = {
   "rich-text/editor.css": richTextCss,
   "rich-text/environment.tsx": richTextEnvironment,
   "rich-text/extensions.ts": richTextExtensions,
-  "rich-text/model.mjs": richTextModel,
+  "document/rich-text.mjs": richTextModel,
   "rich-text/reading-highlight.ts": richTextHighlight,
   "editor/SelectionToolbar.tsx": sharedSelectionToolbar,
   "editor/selection-toolbar.css": sharedSelectionToolbarCss,
@@ -312,9 +312,9 @@ const sources: Record<string, string> = {
   "native-ink.css": nativeInkCss,
   "capacity.mjs": capacity,
   "owned-json.mjs": ownedJson,
-  "page-link.mjs": pageLinkSource,
+  "document/page-link.mjs": pageLinkSource,
   "mention-contract.mjs": mentionContractSource,
-  "local-files.mjs": localFilesSource,
+  "document/local-files.mjs": localFilesSource,
   "local-resources.tsx": localResourcesSource,
   "page-references.tsx": pageReferencesSource,
   "custom/local-media-link.ts": localMediaLinkSource,
@@ -350,8 +350,8 @@ const sources: Record<string, string> = {
   "ResourceEditor.tsx": resourceEditor,
   "research-contract.mjs": researchContract,
   "research-media.css": researchCss,
-  "markdown-math.mjs": math,
-  "note-markup.mjs": noteMarkup,
+  "document/markdown-math.mjs": math,
+  "document/note-markup.mjs": noteMarkup,
   "note-bubble.ts": noteBubble,
   "note.css": noteCss,
   "NoteText.tsx": noteText,
@@ -490,12 +490,10 @@ export const builtinSources: Record<string, string> = Object.fromEntries(
       // Harness modules (src/datasets) sit beside the blocks in the SDK.
       .replaceAll('"../../datasets/', '"./')
       .replaceAll('"../portable/owned-json.mjs"', '"./owned-json.mjs"')
-      .replaceAll('"../portable/local-files.mjs"', '"./local-files.mjs"')
-      .replaceAll(
-        '"../../portable/local-files.mjs"',
-        name.startsWith("rich-text/")
-          ? '"../local-files.mjs"'
-          : '"./local-files.mjs"',
+      // Document format modules (src/document) sit in document/ of the SDK.
+      .replace(
+        /(["'])(?:\.\.\/)+document\//g,
+        `$1${"../".repeat(name.split("/").length - 1) || "./"}document/`,
       )
       .replaceAll(
         '"../local-resources"',
@@ -514,12 +512,6 @@ export const builtinSources: Record<string, string> = Object.fromEntries(
         name.startsWith("rich-text/")
           ? '"../mention-contract.mjs"'
           : '"./mention-contract.mjs"',
-      )
-      .replaceAll(
-        '"../../portable/page-link.mjs"',
-        name.startsWith("rich-text/")
-          ? '"../page-link.mjs"'
-          : '"./page-link.mjs"',
       )
       .replaceAll(
         '"../../portable/capacity.mjs"',

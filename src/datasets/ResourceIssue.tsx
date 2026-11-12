@@ -2,7 +2,7 @@ import { useCallback } from "react";
 import { useTranslator } from "../i18n/react";
 import messages from "../i18n/messages/datasets";
 import { desktop } from "../studio/bridge";
-import { isDetachedRef } from "../portable/local-files.mjs";
+import { isDetachedRef } from "../document/local-files.mjs";
 import {
   useLocalFileChooser,
   type LocalResourceIssueProps,

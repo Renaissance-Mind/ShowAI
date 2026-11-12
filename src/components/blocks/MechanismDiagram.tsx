@@ -13,7 +13,7 @@ import type {
 import { BlockHeader, blockLabel } from "./shared";
 import { InlineMarkup } from "./InlineMarkup";
 import { NoteSvgText, noteProps } from "./NoteText";
-import { plainNotes } from "./note-markup.mjs";
+import { plainNotes } from "../../document/note-markup.mjs";
 import { useTranslator } from "../../i18n/react";
 import messages from "../../i18n/messages/mechanismDiagram";
 import { isIndex, useReaderState } from "../../surface/reader-state";

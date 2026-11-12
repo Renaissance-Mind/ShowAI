@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { parsePageLink } from "../portable/page-link.mjs";
+import { parsePageLink } from "../document/page-link.mjs";
 import { KIND_OPERATORS, VALUE_KINDS } from "../datasets/value-types.mjs";
 import type {
   FilterOperator,

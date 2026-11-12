@@ -5,14 +5,14 @@ import {
   primitiveNodeTypes,
   primitiveContentNode,
   readContentTree,
-} from "./model.mjs";
+} from "../../document/rich-text.mjs";
 import { readImageFile } from "./image-files";
 import {
   navigationTarget,
   pageLink,
   parsePageLink,
   requestNavigation,
-} from "../../portable/page-link.mjs";
+} from "../../document/page-link.mjs";
 import { translator } from "../../i18n";
 import { useLocale, useTranslator } from "../../i18n/react";
 import commonMessages from "../../i18n/messages/common";
@@ -23,7 +23,7 @@ import messages from "../../i18n/messages/richText";
 import noteMessages from "../../i18n/messages/richTextNotes";
 import mediaMessages from "../../i18n/messages/media";
 import { useLocalFileChooser } from "../local-resources";
-import { isLocalResourceRef } from "../../portable/local-files.mjs";
+import { isLocalResourceRef } from "../../document/local-files.mjs";
 import ExpandableSearch from "../ExpandableSearch";
 import { SlashMenuItems, useSlashMenu } from "../SlashMenuItems";
 import {
@@ -122,7 +122,7 @@ import {
   NOTE_MAX,
   annotateLatex,
   outerLatexNote,
-} from "../blocks/note-markup.mjs";
+} from "../../document/note-markup.mjs";
 import "./editor.css";
 
 const initialSelections = new WeakSet<Editor>();

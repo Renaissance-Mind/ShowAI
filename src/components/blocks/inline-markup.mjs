@@ -2,8 +2,8 @@
 // ==highlight==, `code`, [label](href) and hover notes [label]{note}. Parsing is pure so contracts,
 // the CLI and the portable reader agree on what counts as a link or a note;
 // rendering never uses raw HTML.
-import { findNote, plainNotes } from "./note-markup.mjs";
-import { parsePageLink } from "../../portable/page-link.mjs";
+import { findNote, plainNotes } from "../../document/note-markup.mjs";
+import { parsePageLink } from "../../document/page-link.mjs";
 
 const INLINE =
   /\*\*(.+?)\*\*|`([^`]+)`|\[([^\]]+)\]\(([^)\s]+)\)|==([^=\s](?:[^=]*?[^=\s])?)==/g;

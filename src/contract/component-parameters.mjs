@@ -555,7 +555,7 @@ export function parameterRuleIssues(data, rules = []) {
           );
       }
     } else if (rule.kind === "page") {
-      // The same form as portable/page-link.mjs; empty means no page.
+      // The same form as document/page-link.mjs; empty means no page.
       for (const entry of collect(rule.path))
         if (
           entry.value !== "" &&

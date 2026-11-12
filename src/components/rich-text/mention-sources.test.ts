@@ -6,7 +6,7 @@ import {
 } from "./mention-sources";
 import { slashMenuRows } from "../slash-menu-model";
 import { typedDays } from "../../portable/mention-contract.mjs";
-import { markdownToRichText, validateRichTextData } from "./model.mjs";
+import { markdownToRichText, validateRichTextData } from "../../document/rich-text.mjs";
 import { toMarkdown } from "../../lib/document";
 import { validateDocument } from "../../portable/validation.mjs";
 import type { CatalogComponent } from "../../core/component-categories";

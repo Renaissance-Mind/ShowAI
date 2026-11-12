@@ -1,5 +1,5 @@
 import { CAPACITY } from "../../portable/capacity.mjs";
-import { isLocalResourceRef } from "../../portable/local-files.mjs";
+import { isLocalResourceRef } from "../../document/local-files.mjs";
 const formats = {
   video: ["video/mp4", "video/webm", "video/ogg", "video/quicktime"],
   audio: [

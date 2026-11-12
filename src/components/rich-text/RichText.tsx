@@ -18,7 +18,7 @@ import {
   richTextDocument,
   validateRichTextData,
   richTextStyle,
-} from "./model.mjs";
+} from "../../document/rich-text.mjs";
 import "../blocks/katex.css";
 import { installNoteBubbles } from "../blocks/note-bubble";
 

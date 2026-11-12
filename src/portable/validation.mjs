@@ -4,8 +4,8 @@ import {shareNativeSource} from "../document/structural-share.mjs";
 import { validateInkArchiveGroup } from "../surface/ink-archive-group.mjs";
 import { isResource } from "../document/containers.mjs";
 import { validatePageIcon } from "../lib/page-icon.mjs";
-import { parsePageLink } from "./page-link.mjs";
-import { isLocalResourceRef } from "./local-files.mjs";
+import { parsePageLink } from "../document/page-link.mjs";
+import { isLocalResourceRef } from "../document/local-files.mjs";
 import { artifactVersion, assignSurfaceIds } from "../document/document.mjs";
 import { walk } from "../document/walk.mjs";
 import { validateSurface } from "../surface/validation.mjs";
@@ -42,7 +42,7 @@ const BINDING_KEY = "$binding";
 import {
   NOTE_MAX,
   invalidNoteMark,
-} from "../components/blocks/note-markup.mjs";
+} from "../document/note-markup.mjs";
 // Shared by the browser importer and the dependency-free artifact command.
 import { validateRemoteComponents } from "./remote.mjs";
 import {

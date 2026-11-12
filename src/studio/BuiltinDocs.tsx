@@ -24,7 +24,7 @@ import { errorMessage } from "./bridge";
 import {
   NAVIGATE_EVENT,
   type NavigationDetail,
-} from "../portable/page-link.mjs";
+} from "../document/page-link.mjs";
 import {
   builtinDocLink,
   builtinDocPath,

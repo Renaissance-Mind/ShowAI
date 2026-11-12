@@ -6,7 +6,7 @@ import { ContentLibrary } from "../core/content-library";
 import { FileStore } from "../core/store";
 import { componentWidgetData, saveComponent } from "../core/catalog";
 import { validateDocument, parseArtifact } from "../portable/validation.mjs";
-import { localFileRef } from "../portable/local-files.mjs";
+import { localFileRef } from "../document/local-files.mjs";
 import { analyzeExport, exportPage } from "./exporter";
 import { presentPage } from "./page-presentation";
 import type { ShowDocument } from "../core/model";

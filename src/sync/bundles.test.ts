@@ -17,7 +17,7 @@ import {
   syncPackagingPlan,
 } from "../core/packaging";
 import { AgentService } from "../agent/service";
-import { localFileRef } from "../portable/local-files.mjs";
+import { localFileRef } from "../document/local-files.mjs";
 
 vi.setConfig({ testTimeout: 60_000, hookTimeout: 60_000 });
 const actions: (() => Promise<unknown>)[] = [];

@@ -1,5 +1,5 @@
 import type { JSONContent } from "@tiptap/core";
-import { markdownToRichText } from "../components/rich-text/model.mjs";
+import { markdownToRichText } from "../document/rich-text.mjs";
 
 /** Resolve upstream Markdown links for display without changing the stored original. */
 export function componentAuthoringContent(

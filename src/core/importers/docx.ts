@@ -1,6 +1,6 @@
 import type { JSONContent } from "@tiptap/core";
 import { CAPACITY } from "../../portable/capacity.mjs";
-import { NOTE_MAX } from "../../components/blocks/note-markup.mjs";
+import { NOTE_MAX } from "../../document/note-markup.mjs";
 import { CoreError } from "../model";
 import { bufferAccess, readZipEntry, zipEntries, type ZipEntry } from "./zip";
 import {

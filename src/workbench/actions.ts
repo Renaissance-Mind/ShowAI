@@ -32,7 +32,7 @@ import {
   isLocalFileRef,
   localFileRef,
   type LocalResourceKind,
-} from "../portable/local-files.mjs";
+} from "../document/local-files.mjs";
 import { join, resolve, dirname, relative, isAbsolute } from "node:path";
 import { randomUUID, createHash } from "node:crypto";
 import { changeContext, withChangeContext } from "../core/history-context";

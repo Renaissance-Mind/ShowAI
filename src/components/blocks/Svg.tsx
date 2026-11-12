@@ -5,7 +5,7 @@ import { sanitizeSvg } from "./svg-sanitize";
 import { BlockHeader, EmptyState, blockLabel } from "./shared";
 import { InlineMarkup } from "./InlineMarkup";
 import { installNotes } from "./NoteText";
-import { plainNotes } from "./note-markup.mjs";
+import { plainNotes } from "../../document/note-markup.mjs";
 import { useTranslator } from "../../i18n/react";
 import messages from "../../i18n/messages/svg";
 import "./drawing-palette.css";

@@ -7,7 +7,7 @@ import type { BlockProps } from "./types";
 import { useTranslator } from "../../i18n/react";
 import messages from "../../i18n/messages/references";
 import { LocalResourceNotice, useResource } from "../local-resources";
-import { isLocalResourceRef } from "../../portable/local-files.mjs";
+import { isLocalResourceRef } from "../../document/local-files.mjs";
 
 export function BookmarkBlock({ data, onChange, readOnly }: BlockProps) {
   const t = useTranslator(messages);

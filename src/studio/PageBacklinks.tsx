@@ -1,7 +1,7 @@
 import { useEffect, useId, useRef, useState } from "react";
 import PageIcon from "../components/PageIcon";
 import { usePageReferences } from "../components/page-references";
-import { requestNavigation } from "../portable/page-link.mjs";
+import { requestNavigation } from "../document/page-link.mjs";
 import { useTranslator } from "../i18n/react";
 import messages from "../i18n/messages/mentions";
 import commonMessages from "../i18n/messages/common";

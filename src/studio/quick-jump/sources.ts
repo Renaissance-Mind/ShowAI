@@ -18,7 +18,7 @@ import {
   componentDisplayDescription,
   componentDisplayName,
 } from "../../components/component-display";
-import { parsePageLink } from "../../portable/page-link.mjs";
+import { parsePageLink } from "../../document/page-link.mjs";
 import type { QuickJumpItem, QuickJumpSource } from "./registry";
 
 /** An action the workbench already has, offered as a command. */

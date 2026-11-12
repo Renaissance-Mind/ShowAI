@@ -2,7 +2,7 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { Widget } from "./Widget";
-import { mathMarkdown } from "./markdown-math.mjs";
+import { mathMarkdown } from "../../document/markdown-math.mjs";
 import { safeResourceUrl, validateResearchData } from "./research-contract.mjs";
 import { validateDocument } from "../../portable/validation.mjs";
 

@@ -4,7 +4,7 @@ import {
   componentAuthoringIndex,
   componentAuthoringGuide,
 } from "../contract/authoring";
-import { validateRichTextData } from "../components/rich-text/model.mjs";
+import { validateRichTextData } from "../document/rich-text.mjs";
 import { componentAuthoringContent } from "./component-authoring-content";
 
 test("every full upstream authoring guide displays as valid native text with resolved links", () => {

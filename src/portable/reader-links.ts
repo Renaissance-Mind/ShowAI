@@ -4,7 +4,7 @@ import {
   parsePageLink,
   type NavigationDetail,
   type NavigationTarget,
-} from "./page-link.mjs";
+} from "../document/page-link.mjs";
 
 /** Written into each page of a site export: the project and each page's file. */
 export interface SiteRoutes {

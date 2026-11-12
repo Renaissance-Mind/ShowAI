@@ -20,7 +20,7 @@ import {
   localRefName,
   localRefType,
   type LocalResourceKind,
-} from "../portable/local-files.mjs";
+} from "../document/local-files.mjs";
 import type { ShowDocument } from "../types";
 
 /** Absolute local path of a `file:` reference, an absolute path or `~/…`. */

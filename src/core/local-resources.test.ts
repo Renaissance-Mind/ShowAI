@@ -8,7 +8,7 @@ import {
   withLocalResources,
 } from "./local-resources";
 import { CAPACITY } from "../portable/capacity.mjs";
-import { localFileRef } from "../portable/local-files.mjs";
+import { localFileRef } from "../document/local-files.mjs";
 import { validateDocument } from "../portable/validation.mjs";
 import type { ShowDocument } from "../types";
 

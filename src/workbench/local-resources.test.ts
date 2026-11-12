@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { AgentService } from "../agent/service";
 import { openLibrary } from "../core/open-library";
 import { createWorkbench, type OpenDialogOptions } from "./actions";
-import { localFileRef } from "../portable/local-files.mjs";
+import { localFileRef } from "../document/local-files.mjs";
 import type { DesktopInfo } from "../desktop/bridge";
 
 let home: string;

@@ -41,7 +41,7 @@ import { usePropertyReorder } from "./database-reorder";
 import { useColumnResize } from "./database-column-resize";
 import { useDatabaseViewMotion } from "./database-view-motion";
 import { databaseRecordTargets } from "./database-records";
-import { pageLink } from "../../portable/page-link.mjs";
+import { pageLink } from "../../document/page-link.mjs";
 import { usePageLinks } from "../page-links";
 import { getLocale } from "../../i18n";
 import { useTranslator } from "../../i18n/react";

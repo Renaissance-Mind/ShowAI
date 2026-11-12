@@ -116,6 +116,7 @@ const scanned = [
   "src/studio",
   "src/editor",
   "src/document",
+  "src/contract",
   "src/surface",
   "src/workbench",
   "src/ui",
@@ -139,7 +140,7 @@ const exemptFiles: Record<string, string> = {
     "data validation messages shared with the CLI/MCP",
   "src/components/blocks/primitive-contract.mjs":
     "data validation messages shared with the CLI/MCP",
-  "src/components/rich-text/model.mjs":
+  "src/document/rich-text.mjs":
     "rich-text validation shared with the CLI/MCP and the saved default node name",
 };
 

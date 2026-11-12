@@ -3,8 +3,8 @@ import { changeContext, withChangeContext } from "../core/history-context";
 import { mutateLibrary } from "../core/library-runtime";
 import { CoreError } from "../core/model";
 import { CAPACITY } from "../portable/capacity.mjs";
-import { LOCAL_FILE_TYPES } from "../portable/local-files.mjs";
-import { pageLink } from "../portable/page-link.mjs";
+import { LOCAL_FILE_TYPES } from "../document/local-files.mjs";
+import { pageLink } from "../document/page-link.mjs";
 import { validateDocument } from "../portable/validation.mjs";
 import {
   openImportFiles,

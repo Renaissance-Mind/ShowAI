@@ -12,7 +12,7 @@ import {
   createRichTextNode,
   markdownToRichText,
   validateRichTextData,
-} from "./model.mjs";
+} from "../../document/rich-text.mjs";
 import { createResource } from "../../document/containers.mjs";
 import { insertComponent } from "../../surface/component-insertion";
 import { findSurfaceNode } from "../../document/document.mjs";

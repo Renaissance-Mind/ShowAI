@@ -35,7 +35,7 @@ import {
 import {
   isLocalResourceRef,
   localRefName,
-} from "../../portable/local-files.mjs";
+} from "../../document/local-files.mjs";
 
 interface GalleryImage {
   id: string;

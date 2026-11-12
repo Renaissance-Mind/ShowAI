@@ -18,7 +18,7 @@ import {
 import {
   navigationTarget,
   requestNavigation,
-} from "../../portable/page-link.mjs";
+} from "../../document/page-link.mjs";
 
 interface MountedComponent {
   update(

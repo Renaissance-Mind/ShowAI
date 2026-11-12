@@ -1,5 +1,5 @@
 import { CapacityError } from "../portable/capacity.mjs";
-import { richTextDocument } from "../components/rich-text/model.mjs";
+import { richTextDocument } from "../document/rich-text.mjs";
 import {
   reconcileConnections,
   transformedBindings,

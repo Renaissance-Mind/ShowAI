@@ -4,7 +4,7 @@ import {EditorState} from "@tiptap/pm/state";
 import { renderToStaticMarkup } from "react-dom/server";
 import { createElement } from "react";
 import { createExtensions } from "./extensions";
-import { primitiveContentNode, normalizeContentTree } from "./model.mjs";
+import { primitiveContentNode, normalizeContentTree } from "../../document/rich-text.mjs";
 import {
   validateDocument,
   serializeArtifact,

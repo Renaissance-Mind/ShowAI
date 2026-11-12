@@ -1,5 +1,5 @@
-import { richTextStyle } from "./model.mjs";
-import { parsePageLink } from "../../portable/page-link.mjs";
+import { richTextStyle } from "../../document/rich-text.mjs";
+import { parsePageLink } from "../../document/page-link.mjs";
 import { translator } from "../../i18n";
 import messages from "../../i18n/messages/richText";
 import { Extension, mergeAttributes, Node, Mark } from "@tiptap/core";

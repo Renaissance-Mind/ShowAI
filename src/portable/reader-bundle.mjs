@@ -502,7 +502,7 @@ async function compileReader(archivePath, archive, kinds, omits = []) {
             loader: "js",
           };
         // Without "]{" or \note anywhere on the page, parsing finds nothing.
-        if (omitNotes && args.path === "src/components/blocks/note-markup.mjs")
+        if (omitNotes && args.path === "src/document/note-markup.mjs")
           return {
             contents: [
               "export const NOTE_MAX = 1000;",

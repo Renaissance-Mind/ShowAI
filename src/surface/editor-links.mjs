@@ -1,6 +1,6 @@
 import { isSafeUrl } from "../portable/validation.mjs";
 import { validateCubicInk } from "./portable-ink-v2.mjs";
-import { richTextDocument } from "../components/rich-text/model.mjs";
+import { richTextDocument } from "../document/rich-text.mjs";
 
 // These are closed payload envelopes in the canonical model, not arbitrary
 // widget data identified by a coincidental key. Their internals contain numeric

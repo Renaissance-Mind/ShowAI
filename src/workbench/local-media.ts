@@ -9,7 +9,7 @@ import {
   LOCAL_FILE_TYPES,
   localRefName,
   type LocalResourceKind,
-} from "../portable/local-files.mjs";
+} from "../document/local-files.mjs";
 
 /**
  * Types the workbench can show: the player opens video, audio and images,

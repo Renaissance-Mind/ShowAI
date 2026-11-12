@@ -1,6 +1,6 @@
 import type { JSONContent } from "@tiptap/core";
 import { walk } from "../document/walk.mjs";
-import { parsePageLink } from "../portable/page-link.mjs";
+import { parsePageLink } from "../document/page-link.mjs";
 import { parsePageCell } from "../components/blocks/database-contract.mjs";
 import { parameterValues } from "../contract/component-parameters.mjs";
 import { readBinding } from "../datasets/binding.mjs";
