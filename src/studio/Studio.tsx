@@ -21,8 +21,6 @@ import {
 } from "react";
 import {
   ArrowLeft,
-  ArrowUp,
-  ArrowDown,
   ArrowUpRight,
   AtSign,
   Link2,
@@ -30,9 +28,6 @@ import {
   Blocks,
   Settings2,
   Search,
-  CodeXml,
-  Download,
-  BookOpen,
   FolderInput,
   FolderMinus,
   Globe,
@@ -42,7 +37,6 @@ import {
   ChevronRight,
   Copy,
   FilePlus2,
-  FileDown,
   FileText,
   Folder,
   FolderOpen,
@@ -55,7 +49,6 @@ import {
   Loader2,
   MoreHorizontal,
   Sparkles,
-  ListOrdered,
   Undo2,
   Redo2,
   Plus,
@@ -75,12 +68,9 @@ import type {
   ProjectSummary,
   FolderMetadata,
   SidebarOrganization,
-  DirectorySortBy,
 } from "../core/model";
-import { orderSidebarProjects } from "../core/sidebar-order";
 import type {
   DesktopInfo,
-  MenuCommand,
 } from "../host/protocol";
 import type {
   CompiledComponent,
@@ -102,7 +92,6 @@ import {
   type LibraryMenuPoint,
   type LibraryRowProps,
   type LibraryTarget,
-  type LibraryContextMenuItem,
 } from "./LibraryNavigation";
 import Dialog from "../ui/Dialog";
 import ImportDialog from "./ImportDialog";
@@ -124,7 +113,6 @@ import {
   LibraryDragContext,
 } from "./LibraryDrag";
 import {
-  directorySortOptions,
   sortDirectoryItems,
 } from "../core/directory-sort";
 import SidebarNavigation from "./SidebarNavigation";
@@ -135,9 +123,7 @@ import {
 } from "./template-catalog-model";
 import TemplateThumbnail from "./TemplateThumbnail";
 import RecentPages, { type RecentPage } from "./RecentPages";
-import { newMenuDestination, type CreationChoice } from "./new-menu";
-import QuickJump, { type WorkbenchCommand } from "./quick-jump/QuickJump";
-import quickJumpMessages from "../i18n/messages/quickJump";
+import QuickJump from "./quick-jump/QuickJump";
 import Welcome from "./Welcome";
 import PluginUpdateNotice from "./PluginUpdateNotice";
 import AppUpdateNotice from "./AppUpdateNotice";
@@ -148,13 +134,12 @@ import {
   useBuiltinDocFolders,
 } from "./BuiltinDocs";
 import {
-  builtinDocLink,
   builtinDocs,
   DOCS_HOME,
   WELCOME_DOC,
 } from "./builtin-docs";
 import { useSampleProject } from "./sample-project";
-import AutoHideSidebar, { SIDEBAR_TOGGLE_EVENT } from "./AutoHideSidebar";
+import AutoHideSidebar from "./AutoHideSidebar";
 import {
   DiscardDraftDialog,
   SaveFailureBanner,
@@ -182,8 +167,6 @@ import {
 import findMessages from "../i18n/messages/find";
 import { FindBar } from "./find/FindBar";
 import { useFind } from "./find/useFind";
-import { commandKey, tabShortcut } from "../workbench/tab-shortcuts";
-import type { TabCommand } from "../host/protocol";
 import { useWindowFullscreen } from "./useWindowFullscreen";
 import { ComponentCatalog, ComponentNavigation } from "./ComponentCatalog";
 import { TemplateDialog, ComponentDialog } from "./CatalogDialogs";
@@ -192,7 +175,6 @@ import {
   SaveTemplateAction,
 } from "./CatalogManagement";
 import "./studio.css";
-import { modalOpen } from "../ui/modal";
 import {
   NoticeStack,
   ProblemNotice,
@@ -202,10 +184,7 @@ import {
   configureProblemRedaction,
   configureProblemPlatform,
   revealLabel,
-  REPORT_PROBLEM_EVENT,
-  type ReportProblemDetail,
 } from "../problems";
-import type { FeedbackRequest } from "./feedback/AboutFeedback";
 import feedbackMessages from "../i18n/messages/feedback";
 import {
   LibrarySearchResults,
@@ -220,15 +199,11 @@ import {
 } from "./Settings";
 import {
   getLocale,
-  LOCALE_NAMES,
-  LOCALES,
-  setLanguagePreference,
 } from "../i18n";
 import { useLocale, useTranslator } from "../i18n/react";
 import commonMessages from "../i18n/messages/common";
 import studioMessages from "../i18n/messages/studio";
 import assistantMessages from "../i18n/messages/assistant";
-import shellMessages from "../i18n/messages/appShell";
 import pageSessionMessages from "../i18n/messages/pageSession";
 import {
   ExternalChangeNotice,
@@ -247,6 +222,7 @@ import {
 } from "./shell/LibraryDialogs";
 import {
   operation,
+  type AssistantControl,
   type LoadedTemplate,
   type WorkspaceTabs as Workspace,
 } from "./shell/types";
@@ -263,6 +239,8 @@ import { useLibraryEdits } from "./shell/useLibraryEdits";
 import { useLibraryMoves } from "./shell/useLibraryMoves";
 import { useCatalogActions } from "./shell/useCatalogActions";
 import { useStudioWorkspace } from "./shell/useStudioWorkspace";
+import { useMenuItems } from "./shell/menus/useMenuItems";
+import { useStudioCommands } from "./shell/commands";
 
 
 const recentLoading = <div className="studio-welcome" aria-busy="true" />;
@@ -297,8 +275,6 @@ export default function Studio() {
   const tfind = useTranslator(findMessages);
   const ta = useTranslator(assistantMessages);
   const tn = useTranslator(navigationMessages);
-  const tq = useTranslator(quickJumpMessages);
-  const tshell = useTranslator(shellMessages);
   const tfeedback = useTranslator(feedbackMessages);
   const tps = useTranslator(pageSessionMessages);
   useEffect(() => {
@@ -368,8 +344,6 @@ export default function Studio() {
     syncRequest,
     setSyncRequest,
     feedbackRequest,
-    setFeedbackRequest,
-    feedbackRequestId,
     workspaceReady,
     routing,
     docPage,
@@ -394,7 +368,6 @@ export default function Studio() {
     handleRevealHandled,
     catalogScrollRef,
     selectedRef,
-    selectedFolderRef,
   } = route;
   const locale = useLocale();
   const ts = useTranslator(syncMessages);
@@ -435,7 +408,6 @@ export default function Studio() {
     viewOptions,
     viewIcon,
     chooseDirectoryView,
-    directoryViewControl,
     contextMenu,
     setContextMenu,
     projectsMenu,
@@ -530,29 +502,6 @@ export default function Studio() {
     leaveDetour,
     openProjectManagement,
   } = router;
-  useEffect(() => {
-    if (view !== "page") return;
-    const refreshPage = () => {
-      void page.reloadCurrent().catch(report);
-    };
-    const key = (event: KeyboardEvent) => {
-      if (
-        commandKey(event, clientIsMac()) &&
-        !event.altKey &&
-        event.key.toLowerCase() === "r"
-      ) {
-        event.preventDefault();
-        event.stopPropagation();
-        if (!event.repeat) refreshPage();
-      }
-    };
-    const unsubscribe = desktop.onRefreshPage(refreshPage);
-    window.addEventListener("keydown", key, true);
-    return () => {
-      unsubscribe();
-      window.removeEventListener("keydown", key, true);
-    };
-  }, [view, page.reloadCurrent, report]);
   // A library the App just created gets its sample project once.
   const sampleProject = useSampleProject(
     info && capabilities.manageLibrary ? info.home : null,
@@ -574,8 +523,6 @@ export default function Studio() {
   const {
     importPlan,
     setImportPlan,
-    importers,
-    loadImporters,
     packagingDecision,
     busy,
     exportReceipt,
@@ -592,7 +539,6 @@ export default function Studio() {
     createPageForAgent,
     importPage,
     importFinished,
-    exportPage,
     exportSite,
     activePageTarget,
     duplicatePage,
@@ -614,7 +560,6 @@ export default function Studio() {
     beginRename,
     libraryKeyCommand,
     beginDelete,
-    changeDirectorySort,
     moveProject,
     updateTarget,
     deleteTarget,
@@ -632,9 +577,7 @@ export default function Studio() {
     page,
   });
   const {
-    movingLibrary,
     replayLibraryChange,
-    dropLibraryItem,
     libraryDrag,
     beginBatchPages,
     applyBatchPages,
@@ -669,56 +612,6 @@ export default function Studio() {
           ? `${docTitle(docPage.id).title} — ShowAI`
           : "ShowAI";
   }, [view, page.draft?.title, tc, docPage?.id]);
-  useEffect(() => {
-    const handle = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setContextMenu(null);
-      if (
-        commandKey(event, clientIsMac()) &&
-        !event.altKey &&
-        !event.shiftKey &&
-        event.key.toLowerCase() === "n"
-      ) {
-        event.preventDefault();
-        // An open dialog keeps what was typed into it.
-        if (dialogRef.current) return;
-        if (selectedRef.current)
-          void beginNewPage(
-            selectedRef.current,
-            selectedFolderRef.current,
-          ).catch(report);
-        else setDialog({ type: "project" });
-      }
-    };
-    window.addEventListener("keydown", handle);
-    return () => window.removeEventListener("keydown", handle);
-  }, []);
-  const openSearchRef = useRef<() => void>(() => {});
-  useEffect(() => {
-    const search = (event: KeyboardEvent) => {
-      if (
-        !commandKey(event, clientIsMac()) ||
-        event.altKey ||
-        event.shiftKey ||
-        event.key.toLowerCase() !== "k" ||
-        event.isComposing ||
-        event.keyCode === 229 ||
-        event.defaultPrevented ||
-        dialogRef.current ||
-        modalOpen()
-      )
-        return;
-      event.preventDefault();
-      openSearchRef.current();
-    };
-    // The desktop Help menu and Settings → About open the shortcut overview.
-    const shortcuts = () => setDialog({ type: "shortcuts" });
-    window.addEventListener("keydown", search);
-    window.addEventListener("showai:open-shortcuts", shortcuts);
-    return () => {
-      window.removeEventListener("keydown", search);
-      window.removeEventListener("showai:open-shortcuts", shortcuts);
-    };
-  }, []);
   // External edits are listed only while some are waiting for a decision.
   useEffect(() => {
     if (!externalChangesAvailable || dialog) return;
@@ -745,359 +638,6 @@ export default function Studio() {
     };
   }, [externalChangesAvailable, !!dialog, info?.home]);
 
-  /**
-   * Content that can be created in a project or folder. Without a target, each
-   * entry first opens the new-project dialog and then creates in that project.
-   */
-  function creationMenuItems(
-    target: LibraryTarget | null,
-  ): LibraryContextMenuItem[] {
-    const directory = target && {
-      projectId: target.projectId,
-      parentId: target.kind === "folder" ? target.id : target.parentId,
-    };
-    const select = (choice: CreationChoice) =>
-      directory
-        ? action(() => runCreation(choice, directory))
-        : () => setDialog({ type: "project", then: choice });
-    return [
-      {
-        label: t("create.folder"),
-        icon: <FolderPlus size={15} />,
-        command: "new.folder",
-        onSelect: select("folder"),
-      },
-      {
-        label: t("create.page"),
-        icon: <FileText size={15} />,
-        command: "new.page",
-        onSelect: select("page"),
-      },
-      {
-        label: t("create.board"),
-        icon: <Presentation size={15} />,
-        command: "new.board",
-        onSelect: select("board"),
-      },
-      {
-        label: tn("newPageForAgent"),
-        icon: <Sparkles size={15} />,
-        command: "new.agentPage",
-        onSelect: select("agentPage"),
-      },
-      {
-        label: t("create.fromTemplate"),
-        icon: <FilePlus2 size={15} />,
-        separatorBefore: true,
-        command: "new.template",
-        onSelect: select("template"),
-      },
-      {
-        label: t("create.import"),
-        icon: <Upload size={15} />,
-        command: "new.import",
-        onSelect: select("import"),
-      },
-    ];
-  }
-  /** The grouped export menu shared by the top-bar ↗ button and the page 「…」 menu. */
-  function pageExportMenuItems(
-    target = activePageTarget(),
-  ): LibraryContextMenuItem[] {
-    const exported = target && { projectId: target.projectId, pageId: target.id };
-    const common = t("exportGroup.common"),
-      agents = t("exportGroup.agents"),
-      advanced = t("exportGroup.advanced");
-    return [
-      {
-        group: common,
-        label: t("exportHtml"),
-        command: "export.html",
-        description: t("exportHtmlDetail"),
-        icon: <ArrowUpRight size={15} />,
-        disabled: busy,
-        onSelect: () => void exportPage("html", "bundled", undefined, undefined, exported),
-      },
-      {
-        group: common,
-        label: t("exportPdf"),
-        command: "export.pdf",
-        icon: <FileDown size={15} />,
-        disabled: busy,
-        onSelect: () =>
-          void exportPage("pdf", "bundled", undefined, undefined, exported),
-      },
-      ...(capabilities.advancedPageExport
-        ? [
-            {
-              group: common,
-              label: t("exportReadingShort"),
-        command: "export.reading",
-              description: t("exportReadingDetail"),
-              icon: <BookOpen size={15} />,
-              disabled: busy,
-              onSelect: () => void exportPage("html", "bundled", "reading", undefined, exported),
-            },
-            {
-              group: agents,
-              label: t("exportSnippetShort"),
-        command: "export.snippet",
-              description: t("exportSnippetDetail"),
-              icon: <CodeXml size={15} />,
-              disabled: busy,
-              onSelect: () => void exportPage("inline", "bundled", undefined, undefined, exported),
-            },
-          ]
-        : []),
-      ...(target
-        ? [
-            {
-              group: common,
-              label: tc("copyLink"),
-              command: "page.copyLink",
-              description: t("copyPageLinkDetail"),
-              icon: <Link2 size={15} />,
-              onSelect: action(() =>
-                copyPageLink({
-                  projectId: target.projectId,
-                  pageId: target.id,
-                  blockIds: [],
-                }),
-              ),
-            },
-          ]
-        : []),
-      ...(target
-        ? [
-            {
-              group: agents,
-              label: tc("copyReference"),
-              command: "page.copyReference",
-              description: t("copyPageReferenceDetail"),
-              icon: <AtSign size={15} />,
-              onSelect: action(() =>
-                copyPageReference(target.projectId, {
-                  kind: "page",
-                  pageId: target.id,
-                }),
-              ),
-            },
-          ]
-        : []),
-      ...(capabilities.advancedPageExport
-        ? [
-            {
-              group: advanced,
-              label: t("exportOnlinePageShort"),
-        command: "export.online",
-              description: t("exportOnlinePageDetail"),
-              icon: <Globe size={15} />,
-              disabled: busy,
-              onSelect: () =>
-                void exportPage("html", "bundled", "reading", "cdn", exported),
-            },
-            {
-              group: advanced,
-              label: t("exportWithPublished"),
-        command: "export.published",
-              description: t("exportWithPublishedDetail"),
-              icon: <Globe size={15} />,
-              disabled: busy,
-              onSelect: () => void exportPage("html", "remote", undefined, undefined, exported),
-            },
-          ]
-        : []),
-      {
-        group: advanced,
-        label: tc("downloadSource"),
-        command: "export.source",
-        description: t("downloadSourceDetail"),
-        icon: <Download size={15} />,
-        disabled: busy,
-        onSelect: () => void exportPage("json", "bundled", undefined, undefined, exported),
-      },
-    ];
-  }
-  /**
-   * The sidebar's New menu: content, then a new project. Content goes to the
-   * open writable project, else the most recently used writable project, else
-   * a project created first.
-   */
-  function newMenuItems(): LibraryContextMenuItem[] {
-    const readOnly = (id: string) => syncOverview.markers.get(id) === "readOnly";
-    const context =
-      (view === "project" || view === "page") && project
-        ? {
-            projectId: project.id,
-            target: currentFolder
-              ? folderTarget(currentFolder, project.id)
-              : projectTarget(project),
-          }
-        : null;
-    const destination = newMenuDestination(context, projects, readOnly);
-    const target =
-      destination.kind === "context"
-        ? destination.target
-        : destination.kind === "recent"
-          ? projectTarget(destination.project)
-          : null;
-    // A selected folder that is still loading would put content one level too high.
-    const disabled =
-      !workspaceReady ||
-      routing ||
-      workspace.switching ||
-      busy ||
-      (destination.kind === "context" && !!selectedFolder && !currentFolder);
-    return [
-      ...creationMenuItems(target).map((item) => ({ ...item, disabled })),
-      {
-        label: tn("newProject"),
-        command: "new.project",
-        icon: <FolderPlus size={15} />,
-        separatorBefore: true,
-        onSelect: () => setDialog({ type: "project" }),
-      },
-    ];
-  }
-  function quickJumpCommands(): WorkbenchCommand[] {
-    const fromMenu = (items: LibraryContextMenuItem[]) =>
-      items.flatMap((item) =>
-        item.command && item.onSelect
-          ? [
-              {
-                id: item.command,
-                title: item.command.startsWith("export.")
-                  ? tq("command.export", { format: item.label })
-                  : item.command === "new.folder"
-                    ? tq("command.newFolder")
-                    : item.command === "new.page"
-                      ? tq("command.newPage")
-                      : item.command === "new.board"
-                        ? tq("command.newBoard")
-                        : item.label,
-                ...(item.disabled ? { disabled: true } : {}),
-                run: item.onSelect,
-              },
-            ]
-          : [],
-      );
-    const pageOpen = view === "page" && !!page.draft;
-    const dark = appearance.theme === "dark";
-    const otherLocale = LOCALES.find((locale) => locale !== getLocale())!;
-    const shortcut = (label: string, keys: string) => ({ title: label, shortcut: keys });
-    return [
-      ...fromMenu(newMenuItems()),
-      ...(pageOpen ? fromMenu(pageExportMenuItems()) : []),
-      ...(pageOpen
-        ? [
-            {
-              id: "page.find",
-              ...shortcut(tn("shortcut.find"), "Mod+F"),
-              run: () => menuCommand.current("find"),
-            },
-            {
-              id: "page.findReplace",
-              ...shortcut(tn("shortcut.findReplace"), "Alt+Mod+F"),
-              run: () => menuCommand.current("findReplace"),
-            },
-            {
-              id: "agent.toggle",
-              title: tq(assistantOpen ? "command.agentClose" : "command.agentOpen"),
-              keywords: tq("keywords.agent"),
-              run: () => changeAssistantOpen(!assistantOpen),
-            },
-          ]
-        : []),
-      // Each importer is a command; "Import file…" above picks one by the file.
-      ...(selectedProject
-        ? importers.map((importer) => ({
-            id: `import.${importer.id}`,
-            title: tq("command.importWith", { name: importer.name }),
-            keywords: `${tq("keywords.import")} ${importer.extensions.join(" ")}`,
-            run: () => importPage(undefined, undefined, importer.id),
-          }))
-        : []),
-      {
-        id: "library.search",
-        title: tq("command.searchLibrary"),
-        run: openLibrarySearch,
-      },
-      {
-        id: "sidebar.toggle",
-        ...shortcut(tn("shortcut.sidebar"), "Mod+\\"),
-        keywords: tq("keywords.sidebar"),
-        run: () => {
-          window.dispatchEvent(new Event(SIDEBAR_TOGGLE_EVENT));
-        },
-      },
-      ...(capabilities.tabs && info?.mode !== "browser"
-        ? [
-            {
-              id: "tab.new",
-              ...shortcut(tn("shortcut.newTab"), "Mod+T"),
-              run: () => menuCommand.current("newTab"),
-            },
-          ]
-        : []),
-      {
-        id: "view.recent",
-        title: tq("command.recent"),
-        run: () => menuCommand.current("projects"),
-      },
-      {
-        id: "view.settings",
-        title: tq("command.settings"),
-        run: () => menuCommand.current("settings"),
-      },
-      {
-        id: "view.docs",
-        title: tq("command.docs"),
-        run: () => menuCommand.current("docs"),
-      },
-      {
-        id: "view.shortcuts",
-        title: tq("command.shortcuts"),
-        run: () => menuCommand.current("shortcuts"),
-      },
-      {
-        id: "appearance.toggle",
-        title: tq(dark ? "command.themeLight" : "command.themeDark"),
-        keywords: tq("keywords.theme"),
-        run: () => appearance.setPreference(dark ? "light" : "dark"),
-      },
-      {
-        id: "language.switch",
-        title: tq("command.language", { name: LOCALE_NAMES[otherLocale] }),
-        keywords: tq("keywords.language"),
-        run: () => setLanguagePreference(otherLocale),
-      },
-    ];
-  }
-  function openLibrarySearch() {
-    if (view === "templates" || view === "components") {
-      document
-        .querySelector<HTMLInputElement>(".catalog-list-search input")
-        ?.focus();
-      return;
-    }
-    const open = () => {
-      setSearchLibrary(true);
-      document
-        .querySelector<HTMLButtonElement>(
-          ".studio-topbar .expandable-search-trigger",
-        )
-        ?.click();
-    };
-    if (document.querySelector(".studio-topbar .expandable-search-trigger"))
-      open();
-    // Libraries without full-text search offer it on Recent only.
-    else void navigate("projects").then(() => setTimeout(open, 50), report);
-  }
-  openSearchRef.current = () => {
-    setDialog({ type: "quickJump" });
-    // A library importer saved since the project opened shows up too.
-    loadImporters();
-  };
   function showDirectoryCreationMenu(
     anchor: HTMLElement,
     point?: LibraryMenuPoint,
@@ -1112,65 +652,6 @@ export default function Studio() {
       false,
       true,
     );
-  }
-  function directorySortMenuItems(
-    target: LibraryTarget,
-  ): LibraryContextMenuItem[] {
-    if (target.kind === "page") return [];
-    const preferences = folderPreferences(
-      target.projectId,
-      target.kind === "folder" ? target.id : null,
-    );
-    const sortBy = preferences.sortBy ?? "updatedAt";
-    const options: { value: DirectorySortBy }[] = [
-      ...directorySortOptions,
-      ...(sortBy === "manual" || preferences.manualOrder?.length
-        ? [{ value: "manual" as const }]
-        : []),
-    ];
-    return [
-      directoryViewControl(),
-      ...options.map((option, index) => ({
-      label: t(`sort.${option.value}`),
-      checked: option.value === sortBy,
-      icon:
-        option.value === sortBy ? (
-          <Check size={15} />
-        ) : (
-          <ListOrdered size={15} />
-        ),
-      separatorBefore: index === 0,
-      onSelect: action(() => changeDirectorySort(target, option.value)),
-      })),
-    ];
-  }
-  function projectOrderMenuItems(target: LibraryTarget) {
-    if (target.kind !== "project") return [];
-    const sectionFor = (item: ProjectSummary) =>
-      item.pinned
-        ? "pinned"
-        : (organization.projectGroups[item.id] ?? "projects");
-    const project = projects.find((item) => item.id === target.id);
-    if (!project) return [];
-    const sectionId = sectionFor(project);
-    const siblings = orderSidebarProjects(
-      projects,
-      organization.projectOrder,
-    ).filter((item) => sectionFor(item) === sectionId);
-    const index = siblings.findIndex((item) => item.id === target.id);
-    return ([-1, 1] as const).map((direction) => ({
-      label: t(direction < 0 ? "moveProjectUp" : "moveProjectDown"),
-      icon: direction < 0 ? <ArrowUp size={15} /> : <ArrowDown size={15} />,
-      disabled: !siblings[index + direction] || movingLibrary.current,
-      onSelect: action(() =>
-        dropLibraryItem({
-          source: target,
-          sectionId,
-          relativeId: siblings[index + direction]?.id,
-          placement: direction < 0 ? "before" : "after",
-        }),
-      ),
-    }));
   }
   // Each folder's sorted rows, computed once per project when its contents,
   // order or pending reorders change rather than on every workbench render.
@@ -1378,151 +859,46 @@ export default function Studio() {
       return;
     void openDoc(WELCOME_DOC).catch(report);
   }, [workspaceReady, info, welcoming, showDocs, view, routing]);
-  useEffect(() => {
-    if (!capabilities.tabs) return;
-    const command = (command: TabCommand) => {
-      if (dialogRef.current || !workspaceReady) return;
-      const index = workspace.tabs.findIndex(
-        (tab) => tab.id === workspace.activeId,
-      );
-      // Like other Mac apps, closing the last tab closes the window.
-      if (
-        command === "close" &&
-        workspace.tabs.length === 1 &&
-        info?.mode === "desktop"
-      ) {
-        window.close();
-        return;
-      }
-      const operation =
-        command === "new"
-          ? workspace.add
-          : command === "close"
-            ? () => workspace.close()
-            : () =>
-                workspace.select(
-                  workspace.tabs[
-                    (index +
-                      (command === "next" ? 1 : workspace.tabs.length - 1)) %
-                      workspace.tabs.length
-                  ].id,
-                );
-      void operation().catch(report);
-    };
-    const key = (event: KeyboardEvent) => {
-      const shortcut = tabShortcut(event, clientIsMac());
-      if (!shortcut || event.defaultPrevented || dialogRef.current) return;
-      event.preventDefault();
-      event.stopPropagation();
-      if (!event.repeat) command(shortcut);
-    };
-    const unsubscribe = desktop.onTabCommand(command);
-    window.addEventListener("keydown", key, true);
-    return () => {
-      unsubscribe();
-      window.removeEventListener("keydown", key, true);
-    };
-  }, [workspace, workspaceReady, report, capabilities.tabs, info?.mode]);
-  // Native menu items carry out the same actions as the workbench controls.
-  const menuCommand = useRef<(command: MenuCommand) => void>(() => {});
-  const helpDoc = (slug: string) => {
-    const url = `https://showai.renaissancemind.ai/doc${slug ? `/${slug}` : ""}`;
-    const link = builtinDocLink(url);
-    if (showDocs && link) return openDoc(link.pageId, link.hash);
-    window.open(url, "_blank");
-    return Promise.resolve(true);
+  const assistant: AssistantControl = {
+    assistantOpen,
+    changeAssistantOpen,
+    setAssistantPrefill,
   };
-  const openFeedback = useRef<
-    (view: FeedbackRequest["view"], context?: ReportProblemDetail) => void
-  >(() => {});
-  openFeedback.current = (view, context) => {
-    setFeedbackRequest({ id: ++feedbackRequestId.current, view, context });
-    setSettingsSection("about");
-    void navigate("settings").catch(report);
-  };
-  // 报告问题 from notices, the Agent and the Help menu all end in 关于与反馈.
-  useEffect(() => {
-    const reportProblem = (event: CustomEvent<ReportProblemDetail>) => {
-      event.preventDefault();
-      openFeedback.current("report", event.detail);
-    };
-    const feedback = (event: Event) => {
-      event.preventDefault();
-      const detail = (event as CustomEvent<{ view?: string } | undefined>)
-        .detail;
-      openFeedback.current(detail?.view === "about" ? "about" : "report");
-    };
-    const diagnostics = (event: Event) => {
-      event.preventDefault();
-      openFeedback.current("diagnostics");
-    };
-    window.addEventListener(REPORT_PROBLEM_EVENT, reportProblem);
-    window.addEventListener("showai:open-feedback", feedback);
-    window.addEventListener("showai:copy-diagnostics", diagnostics);
-    return () => {
-      window.removeEventListener(REPORT_PROBLEM_EVENT, reportProblem);
-      window.removeEventListener("showai:open-feedback", feedback);
-      window.removeEventListener("showai:copy-diagnostics", diagnostics);
-    };
-  }, []);
-  menuCommand.current = (command) => {
-    const doc = helpDoc;
-    // The feedback listeners above take these events; otherwise use the About page.
-    const unhandled = (name: string, detail?: unknown) =>
-      window.dispatchEvent(new CustomEvent(name, { cancelable: true, detail }));
-    const about = () => {
-      setSettingsSection("about");
-      return navigate("settings");
-    };
-    const operations: Record<MenuCommand, () => Promise<unknown> | void> = {
-      newProject: () => setDialog({ type: "project" }),
-      newPage: () =>
-        dialogRef.current
-          ? undefined
-          : selectedRef.current
-            ? beginNewPage(selectedRef.current, selectedFolderRef.current)
-            : setDialog({ type: "project" }),
-      newTab: () => {
-        if (capabilities.tabs && workspaceReady) return workspace.add();
-      },
-      import: () =>
-        selectedProject ? importPage() : setDialog({ type: "project" }),
-      export: () => {
-        if (view === "page" && page.draft) return exportPage("html");
-        if (view === "project" && exportSiteButton.current)
-          setExportMenu(exportSiteButton.current);
-      },
-      settings: () => navigate("settings"),
-      projects: () => navigate("projects"),
-      docs: () => doc(""),
-      faq: () => doc("agent-troubleshooting"),
-      about,
-      reportProblem: () => {
-        if (unhandled("showai:open-feedback", { source: "menu" })) return about();
-      },
-      copyDiagnostics: async () => {
-        if (!unhandled("showai:copy-diagnostics") || !window.showai?.diagnostics)
-          return;
-        await desktop.invoke("clipboard:write", {
-          text: await window.showai.diagnostics(),
-        });
-        setNotice(tshell("diagnostics.copied"));
-      },
-      shortcuts: () => {
-        unhandled("showai:open-shortcuts");
-      },
-      find: () => void find.run("open"),
-      findReplace: () => void find.run("replace"),
-      findNext: () => void find.run("next"),
-      findPrevious: () => void find.run("previous"),
-    };
-    if (dialogRef.current && command !== "copyDiagnostics") return;
-    void Promise.resolve(operations[command]?.()).catch(report);
-  };
-  useEffect(
-    () => desktop.onMenuCommand((command) => menuCommand.current(command)),
-    [],
-  );
+  const menuItems = useMenuItems({
+    feedback,
+    library,
+    route,
+    dialogs,
+    menus,
+    directory,
+    pageActions,
+    edits,
+    moves,
+    workspace,
+  });
+  const {
+    creationMenuItems,
+    pageExportMenuItems,
+    newMenuItems,
+    directorySortMenuItems,
+    projectOrderMenuItems,
+  } = menuItems;
+  const commands = useStudioCommands({
+    feedback,
+    library,
+    route,
+    dialogs,
+    menus,
+    router,
+    pageActions,
+    menuItems,
+    page,
+    workspace,
+    find,
+    appearance,
+    assistant,
+  });
+  const { helpDoc, openFeedback, quickJumpCommands } = commands;
   // An external write just installed into the open page: outline what changed.
   const externalChange = view === "page" ? page.externalChange : undefined;
   useEffect(() => {
