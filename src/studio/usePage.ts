@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useSyncExternalStore } from "react";
 import type { JSONContent } from "@tiptap/core";
 import type { ShowDocument } from "../types";
-import { desktop } from "./bridge";
+import { desktop } from "../host/bridge";
 import { PageSessions } from "./page-sessions";
 import { saveNow } from "./page-session";
 import type { LoadedPage, PageSnapshot, SaveStatus } from "./page-session";

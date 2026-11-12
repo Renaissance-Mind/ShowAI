@@ -4,8 +4,8 @@
  * problem notice: what happened, whether content is safe, why, what to do,
  * and the original text as technical details.
  */
-import { translator, type MessageKey } from "../../i18n";
-import messages from "../../i18n/messages/errors";
+import { translator, type MessageKey } from "../i18n";
+import messages from "../i18n/messages/errors";
 
 const t = translator(messages);
 

@@ -1,12 +1,12 @@
 import { useRef, useState, type ReactNode } from "react";
-import PageIcon from "../components/PageIcon";
+import PageIcon from "./PageIcon";
 import {
   isImageIcon,
   MAX_ICON_LENGTH,
   validatePageIcon,
 } from "../lib/page-icon.mjs";
-import Dialog from "./Dialog";
-import { errorMessage } from "./bridge";
+import Dialog from "../ui/Dialog";
+import { errorMessage } from "../host/bridge";
 import "./page-icon.css";
 import { translator } from "../i18n";
 import { useTranslator } from "../i18n/react";

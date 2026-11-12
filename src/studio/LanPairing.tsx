@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
-import { desktop, errorCode, errorMessage } from "./bridge";
-import Dialog from "./Dialog";
+import { desktop, errorCode, errorMessage } from "../host/bridge";
+import Dialog from "../ui/Dialog";
 import { visibleInterval } from "./visible-interval";
 import { Laptop, Tablet, Link2, Loader2, RefreshCw } from "../ui/icons";
 import { translator } from "../i18n";

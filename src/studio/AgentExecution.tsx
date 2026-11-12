@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from "react";
-import { desktop, errorMessage } from "./bridge";
+import { desktop, errorMessage } from "../host/bridge";
 import type { AgentDestination } from "../agent-host/remote-protocol";
 import type { ConnectorSettings } from "../agent-host/remote-connector";
 import { translator } from "../i18n";

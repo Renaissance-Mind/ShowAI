@@ -8,9 +8,9 @@ import {
 } from "react";
 import type { LibraryMenuPoint } from "./LibraryNavigation";
 import { ArrowRight, FileText } from "../ui/icons";
-import Dialog from "./Dialog";
+import Dialog from "../ui/Dialog";
 import ConflictPagePreview from "./ConflictPagePreview";
-import { desktop, errorMessage } from "./bridge";
+import { desktop, errorMessage } from "../host/bridge";
 import type { PageChange } from "../core/model";
 import type { SearchResult } from "../core/library-index";
 import type { ShowDocument } from "../types";

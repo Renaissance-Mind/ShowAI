@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { desktop, errorMessage } from "./bridge";
+import { desktop, errorMessage } from "../host/bridge";
 import { visibleInterval } from "./visible-interval";
 import type { SyncConfiguration, ProjectConnection } from "../sync/protocol";
 

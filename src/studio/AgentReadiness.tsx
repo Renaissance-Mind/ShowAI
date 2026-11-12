@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import type { AgentHostStatus } from "../agent-host/types";
 import type { PluginHost } from "../plugin/desktop-install";
-import { desktop, errorMessage } from "./bridge";
+import { desktop, errorMessage } from "../host/bridge";
 import { remoteExecution } from "./AgentExecution";
 import { useTranslator } from "../i18n/react";
 import messages from "../i18n/messages/onboarding";
@@ -9,8 +9,8 @@ import assistantMessages from "../i18n/messages/assistant";
 import { ExternalLink, Flag, Loader2, RefreshCw, Settings2 } from "../ui/icons";
 import feedbackMessages from "../i18n/messages/feedback";
 import { redact } from "../core/redact";
-import { dispatchReportProblem } from "./problems/report-event";
-import { problemRedaction } from "./problems/redaction";
+import { dispatchReportProblem } from "../problems/report-event";
+import { problemRedaction } from "../problems/redaction";
 import "./onboarding.css";
 
 export const AGENT_HOSTS_GUIDE = "https://showai.renaissancemind.ai/doc/agent-hosts";

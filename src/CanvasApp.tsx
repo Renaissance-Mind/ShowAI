@@ -16,7 +16,7 @@ import {
   X,
 } from "./ui/icons";
 import SurfaceEditor from "./surface/SurfaceEditor";
-import { LibraryMenuControl } from "./studio/LibraryContextMenu";
+import { LibraryMenuControl } from "./ui/LibraryContextMenu";
 import {
   EditorHistoryButtons,
   containerMenuItems,

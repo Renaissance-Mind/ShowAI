@@ -20,7 +20,7 @@ import onboardingMessages from "../i18n/messages/onboarding";
 import settingsMessages from "../i18n/messages/settings";
 import { PendingNotice } from "../ui/PendingNotice";
 import { Copy, ExternalLink, RefreshCw } from "../ui/icons";
-import { desktop, errorMessage } from "./bridge";
+import { desktop, errorMessage } from "../host/bridge";
 import {
   pluginActionBlocked,
   pluginActionLabel,

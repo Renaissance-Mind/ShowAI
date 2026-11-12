@@ -10,8 +10,8 @@ import { useTranslator } from "../i18n/react";
 import studioMessages from "../i18n/messages/studio";
 import commonMessages from "../i18n/messages/common";
 import { Folder, Loader2, Trash2, X } from "../ui/icons";
-import { desktop, errorMessage } from "./bridge";
-import Dialog from "./Dialog";
+import { desktop, errorMessage } from "../host/bridge";
+import Dialog from "../ui/Dialog";
 import type { LibraryTarget } from "./LibraryNavigation";
 import { marqueeIds, type MarqueeBounds } from "./directory-marquee";
 

@@ -13,7 +13,7 @@ import {
   type ReactNode,
 } from "react";
 import { createPortal } from "react-dom";
-import "./library-row.css";
+import "./context-menu.css";
 
 export interface LibraryMenuPoint {
   x: number;

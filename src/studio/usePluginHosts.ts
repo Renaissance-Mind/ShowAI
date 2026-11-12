@@ -7,7 +7,7 @@ import type {
 import type { RuntimeRegistrationStatus } from "../agent/runtime";
 import { getLocale, translator } from "../i18n";
 import messages from "../i18n/messages/pluginInstall";
-import { desktop, errorCode, errorMessage } from "./bridge";
+import { desktop, errorCode, errorMessage } from "../host/bridge";
 
 export const pluginHostNames: Record<PluginHost, string> = {
   codex: "Codex",

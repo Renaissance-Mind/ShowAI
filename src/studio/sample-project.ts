@@ -3,7 +3,7 @@ import type { SampleState } from "../core/onboarding";
 import type { AgentConnectionRecord } from "../agent/mcp-connections";
 import { getLocale, translator, type Locale } from "../i18n";
 import messages from "../i18n/messages/onboarding";
-import { desktop, errorCode, errorMessage } from "./bridge";
+import { desktop, errorCode, errorMessage } from "../host/bridge";
 
 export const SAMPLE_KEYS = ["kyoto", "attention", "foldable"] as const;
 export type SampleKey = (typeof SAMPLE_KEYS)[number];

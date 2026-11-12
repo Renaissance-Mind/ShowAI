@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { Folder, Loader2, Trash2 } from "../ui/icons";
-import Dialog from "./Dialog";
+import Dialog from "../ui/Dialog";
 import PageIcon from "../components/PageIcon";
-import { desktop, errorMessage } from "./bridge";
+import { desktop, errorMessage } from "../host/bridge";
 import { getLocale } from "../i18n";
 import { useTranslator } from "../i18n/react";
 import navigationMessages from "../i18n/messages/navigation";

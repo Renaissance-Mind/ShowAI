@@ -12,7 +12,7 @@ import {
   problemFacts,
   type ProblemDescription,
   type ProblemSafety,
-} from "./problems";
+} from "../problems";
 
 const t = translator(pageSessionMessages);
 const common = translator(commonMessages);

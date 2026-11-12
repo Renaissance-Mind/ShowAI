@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { desktop } from "../studio/bridge";
+import { desktop } from "../host/bridge";
 import type { CommentAuthor } from "../types";
 
 interface SyncStatus {

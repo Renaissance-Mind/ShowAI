@@ -14,8 +14,8 @@ import type {
   RemoteMcpProvider,
   RemoteMcpStatus,
 } from "../remote-mcp/types";
-import { desktop, errorMessage } from "./bridge";
-import Dialog from "./Dialog";
+import { desktop, errorMessage } from "../host/bridge";
+import Dialog from "../ui/Dialog";
 import ChatgptConnectionGuide from "./ChatgptConnectionGuide";
 import cloudflareLogo from "./assets/connection-brands/cloudflare.svg";
 import tailscaleLight from "./assets/connection-brands/tailscale-light.svg";

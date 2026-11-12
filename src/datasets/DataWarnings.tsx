@@ -1,7 +1,7 @@
 import { useEffect, useId, useRef, useState } from "react";
 import { useTranslator } from "../i18n/react";
 import messages from "../i18n/messages/datasets";
-import { errorMessage } from "../studio/bridge";
+import { errorMessage } from "../host/bridge";
 import { CircleAlert, Info, TriangleAlert } from "../ui/icons";
 import type { WarningAction, WarningLevel } from "./warnings.mjs";
 import { topLevel, type WarningEntry } from "./warning-entries";

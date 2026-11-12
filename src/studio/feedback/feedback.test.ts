@@ -7,7 +7,7 @@ import {
   clearProblemLog,
   recentProblems,
   recordProblem,
-} from "../problems/problem-log";
+} from "../../problems/problem-log";
 import { formatDiagnostics, platformLine, versionLine } from "./diagnostics";
 import { ISSUE_EDITIONS, issueUrl, reportText } from "./issue-url";
 

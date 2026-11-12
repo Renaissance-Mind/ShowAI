@@ -4,8 +4,8 @@ import { getLocale } from "../../i18n";
 import { useTranslator } from "../../i18n/react";
 import messages from "../../i18n/messages/feedback";
 import { Check, Copy, ExternalLink, X } from "../../ui/icons";
-import { desktop, errorMessage } from "../bridge";
-import type { ReportProblemDetail } from "../problems/report-event";
+import { desktop, errorMessage } from "../../host/bridge";
+import type { ReportProblemDetail } from "../../problems/report-event";
 import { gatherDiagnostics, platformLine, versionLine } from "./diagnostics";
 import {
   DiagnosticsPreview,

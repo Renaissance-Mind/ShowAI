@@ -11,13 +11,13 @@ import {
   Trash2,
   Upload,
 } from "../ui/icons";
-import { desktop, errorMessage } from "./bridge";
+import { desktop, errorMessage } from "../host/bridge";
 import {
   exactRef,
   type PackageKind,
   type RevisionItem,
 } from "./catalog-management";
-import { LibraryContextMenu } from "./LibraryContextMenu";
+import { LibraryContextMenu } from "../ui/LibraryContextMenu";
 
 const panels = () => import("./CatalogManagementPanels");
 const ForkDialog = lazy(() =>

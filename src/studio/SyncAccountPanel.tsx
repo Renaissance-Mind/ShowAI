@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Copy, Monitor } from "../ui/icons";
-import { desktop } from "./bridge";
+import { desktop } from "../host/bridge";
 import ServiceLogin from "./ServiceLogin";
 import LoginMethods from "./LoginMethods";
 import type { ServerConnection } from "../sync/protocol";

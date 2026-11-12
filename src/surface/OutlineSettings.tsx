@@ -2,7 +2,7 @@ import { readCustomBlockData } from "../contract/contract";
 import { ManualOutlineEditor } from "./ManualOutlineEditor";
 import { useContext, useEffect, useMemo, useRef, useState } from "react";
 import type { JSONContent } from "@tiptap/core";
-import Dialog from "../studio/Dialog";
+import Dialog from "../ui/Dialog";
 import {
   useComponentCatalog,
   RegisterComponentContext,

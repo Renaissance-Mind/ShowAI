@@ -20,7 +20,7 @@ import type {
   CatalogPageReference,
   CatalogReferences,
 } from "../workbench/catalog-references";
-import { errorMessage } from "./bridge";
+import { errorMessage } from "../host/bridge";
 import {
   applyMergeChoices,
   conflictLabel,
@@ -34,7 +34,7 @@ import {
   type PackageKind,
   type RevisionItem,
 } from "./catalog-management";
-import Dialog from "./Dialog";
+import Dialog from "../ui/Dialog";
 import "./catalog-management.css";
 import type { CatalogManager } from "./CatalogManagement";
 type Listed = RevisionItem & { projectId?: string };

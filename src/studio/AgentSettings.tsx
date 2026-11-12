@@ -10,7 +10,7 @@ import {
   Square,
   Trash2,
 } from "../ui/icons";
-import { desktop, errorMessage } from "./bridge";
+import { desktop, errorMessage } from "../host/bridge";
 import type {
   AgentHostStatus,
   AgentSettings as Configuration,

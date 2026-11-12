@@ -1,4 +1,4 @@
-import { redact } from "../../core/redact";
+import { redact } from "../core/redact";
 import { problemRedaction } from "./redaction";
 
 /** One problem the workbench showed or someone asked to report. */

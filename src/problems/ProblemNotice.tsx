@@ -15,8 +15,8 @@ import {
   type ReactNode,
 } from "react";
 import { problemReportText } from "./report-text";
-import { useTranslator } from "../../i18n/react";
-import messages from "../../i18n/messages/errors";
+import { useTranslator } from "../i18n/react";
+import messages from "../i18n/messages/errors";
 import {
   Check,
   CircleAlert,
@@ -26,7 +26,7 @@ import {
   Info,
   TriangleAlert,
   X,
-} from "../../ui/icons";
+} from "../ui/icons";
 import {
   actionLabel,
   safetyText,

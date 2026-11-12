@@ -6,7 +6,7 @@ import {
   type KeyboardEvent,
 } from "react";
 import type { AgentConversationSummary } from "../../agent-host/types";
-import { desktop, errorMessage } from "../bridge";
+import { desktop, errorMessage } from "../../host/bridge";
 import { useTranslator } from "../../i18n/react";
 import strings from "../../i18n/messages/assistant";
 import { ChevronDown, Plus, Search } from "../../ui/icons";

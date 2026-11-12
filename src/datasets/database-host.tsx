@@ -32,7 +32,7 @@ import {
   type ValueType,
 } from "./value-types.mjs";
 import type { DatasetClient, DatasetSession } from "./client";
-import { desktop } from "../studio/bridge";
+import { desktop } from "../host/bridge";
 
 const json = (value: unknown) =>
   JSON.stringify(value)

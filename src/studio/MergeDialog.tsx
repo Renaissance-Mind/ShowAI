@@ -6,9 +6,9 @@ import {
   FileText,
   Loader2,
 } from "../ui/icons";
-import Dialog from "./Dialog";
+import Dialog from "../ui/Dialog";
 import ConflictPagePreview from "./ConflictPagePreview";
-import { desktop, errorMessage } from "./bridge";
+import { desktop, errorMessage } from "../host/bridge";
 import { mergePageContent } from "../core/page-merge-model";
 import type { MergeChoices } from "../core/catalog-merge";
 import type { PageMergeConflict, PageMergePreview } from "../core/page-merge";

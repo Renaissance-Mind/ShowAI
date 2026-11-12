@@ -38,10 +38,10 @@ import {
   type ManagedProject,
   type ProjectAccount,
 } from "./managed-projects";
-import { desktop, errorMessage } from "./bridge";
-import Dialog from "./Dialog";
+import { desktop, errorMessage } from "../host/bridge";
+import Dialog from "../ui/Dialog";
 import AccountLogin from "./AccountLogin";
-import { LibraryContextMenu } from "./LibraryContextMenu";
+import { LibraryContextMenu } from "../ui/LibraryContextMenu";
 
 type DownloadState = {
   connectionId: string;

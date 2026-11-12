@@ -19,10 +19,10 @@ import {
   Info,
   Loader2,
 } from "../../ui/icons";
-import { desktop, errorMessage } from "../bridge";
+import { desktop, errorMessage } from "../../host/bridge";
 import { workbenchCapabilities } from "../capabilities";
 import { verifyState } from "../PluginInstallSettings";
-import type { ReportProblemDetail } from "../problems/report-event";
+import type { ReportProblemDetail } from "../../problems/report-event";
 import { pluginHostNames, usePluginHosts } from "../usePluginHosts";
 import { useAppUpdate } from "../useAppUpdate";
 import { AGENT_TROUBLESHOOTING } from "../AgentReadiness";

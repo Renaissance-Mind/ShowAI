@@ -7,7 +7,7 @@ import type {
 import { CustomComponentsProvider } from "../components/custom/CustomBlock";
 import { componentWidgetData } from "../contract/contract";
 import { Widget } from "../components/blocks/Widget";
-import { desktop, errorMessage } from "./bridge";
+import { desktop, errorMessage } from "../host/bridge";
 import { translator } from "../i18n";
 import messages from "../i18n/messages/catalog";
 import "./component-preview.css";

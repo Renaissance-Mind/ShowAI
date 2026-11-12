@@ -11,7 +11,7 @@ import type { CompiledComponent } from "../contract/types";
 import type { ShowDocument } from "../types";
 import type { EditorDraftRecord } from "../core/editor-drafts";
 import {pageContentKey,pageDraftNeedsRecovery,type RetainedPageDraft} from "./page-draft-recovery";
-import { errorCode, errorMessage } from "./bridge";
+import { errorCode, errorMessage } from "../host/bridge";
 import { translator } from "../i18n";
 import commonMessages from "../i18n/messages/common";
 import pageSessionMessages from "../i18n/messages/pageSession";

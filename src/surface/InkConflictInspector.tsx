@@ -3,7 +3,7 @@ import {measureNativeSync} from "./native-perf";
 import { useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import type { ShowDocument } from "../types";
-import { desktop, errorMessage } from "../studio/bridge";
+import { desktop, errorMessage } from "../host/bridge";
 import { useTranslator } from "../i18n/react";
 import messages from "../i18n/messages/inkConflicts";
 import { nativeDocumentBodiesEqual } from "./native-document-content";

@@ -7,7 +7,7 @@ import {
 } from "react";
 import { Search, Focus, Expand } from "../ui/icons";
 import { previewColumns, previewFit, previewZoom } from "./preview-geometry";
-import { errorMessage } from "./bridge";
+import { errorMessage } from "../host/bridge";
 import { useTranslator } from "../i18n/react";
 import messages from "../i18n/messages/catalog";
 

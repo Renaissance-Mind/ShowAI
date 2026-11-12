@@ -3,7 +3,7 @@ import type {
   PageReferenceItem,
   PageReferenceSource,
 } from "../components/page-references";
-import { desktop } from "./bridge";
+import { desktop } from "../host/bridge";
 
 /**
  * Reference queries of the workbench around one page. Answers come from the

@@ -81,7 +81,7 @@ import {
 } from "../document/containers.mjs";
 import "./containers.css";
 import PageIcon from "../components/PageIcon";
-import PageIconDialog from "../studio/PageIconDialog";
+import PageIconDialog from "../components/PageIconDialog";
 import { PageWidthSwitch } from "./PageWidthSwitch";
 import { BoardTools } from "./BoardTools";
 import { useTranslator } from "../i18n/react";

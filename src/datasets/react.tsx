@@ -10,7 +10,7 @@ import {
   type ReactNode,
 } from "react";
 import { createPortal } from "react-dom";
-import { desktop, errorMessage } from "../studio/bridge";
+import { desktop, errorMessage } from "../host/bridge";
 import { useTranslator } from "../i18n/react";
 import { translator } from "../i18n";
 import messages from "../i18n/messages/datasets";
@@ -57,7 +57,7 @@ import {
   ProblemNotice,
   bindProblemActions,
   describeError,
-} from "../studio/problems";
+} from "../problems";
 import { BoundWidgetHost } from "./widget-host";
 import { LocalResourceUi } from "../components/local-resources";
 import { ResourceIssue } from "./ResourceIssue";

@@ -15,13 +15,13 @@ import {
   TriangleAlert,
 } from "../../ui/icons";
 import { useTranslator } from "../../i18n/react";
-import type { ProblemDescription } from "../../studio/problems/describe";
+import type { ProblemDescription } from "../../problems/describe";
 import messages from "../../i18n/messages/componentStatus";
 import widgetMessages from "../../i18n/messages/widget";
 import type { AssistantBridge } from "../assistant-context";
 // Direct module imports keep the reader bundle free of the workbench notice UI.
-import { dispatchReportProblem } from "../../studio/problems/report-event";
-import { problemReportText } from "../../studio/problems/report-text";
+import { dispatchReportProblem } from "../../problems/report-event";
+import { problemReportText } from "../../problems/report-text";
 import { downloadFile } from "./helpers";
 import "./component-status.css";
 

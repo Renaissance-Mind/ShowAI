@@ -585,7 +585,7 @@ async function compileReader(archivePath, archive, kinds, omits = []) {
         )
           return { contents: "{}", loader: "json" };
         // The icon picker opens only in editable pages.
-        if (args.path === "src/studio/PageIconDialog.tsx")
+        if (args.path === "src/components/PageIconDialog.tsx")
           return {
             contents:
               "export default function PageIconDialog() { return null; }",

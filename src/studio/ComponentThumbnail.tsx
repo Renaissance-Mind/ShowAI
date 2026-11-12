@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { ImageOff, Loader2 } from "../ui/icons";
 import type { CatalogComponent } from "../core/component-categories";
-import { desktop, errorMessage } from "./bridge";
+import { desktop, errorMessage } from "../host/bridge";
 import type { AppearanceTheme } from "../design/useAppearanceTheme";
 import { componentDisplayName } from "../components/component-display";
 import { useTranslator } from "../i18n/react";

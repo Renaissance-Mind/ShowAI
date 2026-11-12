@@ -3,7 +3,7 @@ import { Copy } from "../ui/icons";
 import { useTranslator } from "../i18n/react";
 import messages from "../i18n/messages/remoteMcp";
 import { oauthSetupValues } from "../remote-mcp/client-setup";
-import Dialog from "./Dialog";
+import Dialog from "../ui/Dialog";
 
 export default function ChatgptConnectionGuide({
   endpoint,

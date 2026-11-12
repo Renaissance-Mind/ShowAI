@@ -1,5 +1,5 @@
 import { useSyncExternalStore } from "react";
-import { desktop } from "../bridge";
+import { desktop } from "../../host/bridge";
 import { translator } from "../../i18n";
 import persistMessages from "../../i18n/messages/assistantPersist";
 import { createDraftStore, type ComposerDraft } from "./draft-store";

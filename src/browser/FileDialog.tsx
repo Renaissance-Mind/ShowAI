@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { ArrowUp, File, Folder, Loader2, Plus } from "../ui/icons";
-import Dialog from "../studio/Dialog";
-import { errorMessage } from "../studio/bridge";
+import Dialog from "../ui/Dialog";
+import { errorMessage } from "../host/bridge";
 import messages from "../i18n/messages/files";
 import common from "../i18n/messages/common";
 import { useTranslator } from "../i18n/react";

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Loader2, RefreshCw } from "../ui/icons";
-import { desktop, errorMessage } from "./bridge";
-import Dialog from "./Dialog";
+import { desktop, errorMessage } from "../host/bridge";
+import Dialog from "../ui/Dialog";
 import type {
   LibraryStorage,
   CleanupPlan,

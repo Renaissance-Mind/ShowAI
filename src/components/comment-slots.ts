@@ -1,6 +1,6 @@
 import { createContext, type ReactNode } from "react";
 import type { Editor } from "@tiptap/core";
-import type { LibraryContextMenuItem } from "../studio/LibraryContextMenu";
+import type { LibraryContextMenuItem } from "../ui/LibraryContextMenu";
 
 /** Comment actions joined to existing menus. Provided by the workbench editor; absent in readers and exports. */
 export interface CommentSlots {

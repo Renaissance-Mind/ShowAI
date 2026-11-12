@@ -14,9 +14,9 @@ import { getLocale } from "../../i18n";
 import type { PluginInstallation } from "../../plugin/desktop-install";
 import type { SyncConfiguration } from "../../sync/protocol";
 import { agentReadiness } from "../AgentReadiness";
-import { desktop, errorCode, errorMessage } from "../bridge";
+import { desktop, errorCode, errorMessage } from "../../host/bridge";
 import { verifyState } from "../PluginInstallSettings";
-import { recentProblems, type LoggedProblem } from "../problems/problem-log";
+import { recentProblems, type LoggedProblem } from "../../problems/problem-log";
 import { pluginHostNames } from "../usePluginHosts";
 
 export const DIAGNOSTIC_LOG_LINES = 200;

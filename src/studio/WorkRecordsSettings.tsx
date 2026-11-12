@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Folder } from "../ui/icons";
-import { desktop, errorMessage } from "./bridge";
+import { desktop, errorMessage } from "../host/bridge";
 import { useTranslator } from "../i18n/react";
 import messages from "../i18n/messages/settings";
 import type { WorkRecordsLocation } from "../core/work-records";

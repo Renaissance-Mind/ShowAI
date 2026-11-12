@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import Dialog from "../studio/Dialog";
-import { formatSize } from "../studio/PackagingDialog";
-import { errorMessage } from "../studio/bridge";
+import Dialog from "../ui/Dialog";
+import { formatSize } from "../lib/format-size";
+import { errorMessage } from "../host/bridge";
 import { useTranslator } from "../i18n/react";
 import messages from "../i18n/messages/datasets";
 import { ExternalLink } from "../ui/icons";

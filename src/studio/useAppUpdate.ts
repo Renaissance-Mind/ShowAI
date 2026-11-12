@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import type { AppUpdateState } from "../desktop/bridge";
-import { desktop } from "./bridge";
+import { desktop } from "../host/bridge";
 
 export type AppUpdateAction =
   | "appUpdate:check"

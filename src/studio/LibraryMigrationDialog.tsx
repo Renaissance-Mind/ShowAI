@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Loader2, Check } from "../ui/icons";
-import Dialog from "./Dialog";
-import { desktop, errorMessage } from "./bridge";
+import Dialog from "../ui/Dialog";
+import { desktop, errorMessage } from "../host/bridge";
 import type { LibraryImportReport } from "../core/library-import";
 import { translator } from "../i18n";
 import { useTranslator } from "../i18n/react";

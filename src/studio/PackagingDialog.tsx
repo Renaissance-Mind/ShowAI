@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import Dialog from "./Dialog";
+import Dialog from "../ui/Dialog";
+import { formatSize } from "../lib/format-size";
 import { useTranslator } from "../i18n/react";
 import commonMessages from "../i18n/messages/common";
 import messages from "../i18n/messages/packaging";
@@ -28,12 +29,6 @@ const CARRYING = new Set<PackagingChoice>([
   "inputs",
   "both",
 ]);
-
-export function formatSize(bytes: number) {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / 1024 / 1024).toFixed(bytes < 10 * 1024 * 1024 ? 2 : 1)} MB`;
-}
 
 /** Bytes an item adds with a choice (as core/packaging counts them). */
 function choiceBytes(item: PackagingItem, choice: PackagingChoice) {

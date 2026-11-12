@@ -1,7 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import PageThumbnailContent from "./PageThumbnailContent";
 import type { PagePreviewCapture } from "../desktop/bridge";
-import { desktop, errorMessage } from "./bridge";
+import { desktop, errorMessage } from "../host/bridge";
 import "./studio.css";
 import "./catalog-workspace.css";
 

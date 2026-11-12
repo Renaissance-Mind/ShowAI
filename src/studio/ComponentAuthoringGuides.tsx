@@ -7,7 +7,7 @@ import {
 } from "../contract/authoring";
 import type { ComponentSource } from "../contract/types";
 import { componentAuthoringContent } from "./component-authoring-content";
-import { errorMessage } from "./bridge";
+import { errorMessage } from "../host/bridge";
 import "./component-authoring-guides.css";
 import { useTranslator } from "../i18n/react";
 import messages from "../i18n/messages/catalog";

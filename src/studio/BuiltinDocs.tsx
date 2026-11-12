@@ -20,7 +20,7 @@ import {
   FolderOpen,
   Loader2,
 } from "../ui/icons";
-import { errorMessage } from "./bridge";
+import { errorMessage } from "../host/bridge";
 import {
   NAVIGATE_EVENT,
   type NavigationDetail,

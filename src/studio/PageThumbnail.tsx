@@ -1,5 +1,5 @@
 import { memo, startTransition, useEffect, useRef, useState } from "react";
-import { desktop, errorMessage } from "./bridge";
+import { desktop, errorMessage } from "../host/bridge";
 import { ImageOff } from "../ui/icons";
 import { useTranslator } from "../i18n/react";
 import messages from "../i18n/messages/catalog";

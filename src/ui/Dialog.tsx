@@ -1,6 +1,6 @@
-import { topDialog } from "../ui/modal";
+import { topDialog } from "./modal";
 import { useEffect, useRef, type ReactNode } from "react";
-import { X } from "../ui/icons";
+import { X } from "./icons";
 import { useTranslator } from "../i18n/react";
 import studioMessages from "../i18n/messages/studio";
 

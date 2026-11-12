@@ -12,7 +12,7 @@ import {
   Plus,
   Sparkles,
 } from "../ui/icons";
-import { desktop, errorMessage } from "./bridge";
+import { desktop, errorMessage } from "../host/bridge";
 import AgentBrandIcon from "./AgentBrandIcon";
 import {
   PluginError,

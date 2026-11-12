@@ -26,7 +26,7 @@ import type {
   AgentTarget,
   AgentTurn,
 } from "../../agent-host/types";
-import { desktop, errorMessage } from "../bridge";
+import { desktop, errorMessage } from "../../host/bridge";
 import { MacPairingPrompt } from "../LanPairing";
 import { AgentExecutionPicker, remoteExecution } from "../AgentExecution";
 import type { Translator } from "../../i18n";
@@ -52,7 +52,7 @@ import {
 import { downloadAgentFile } from "./message-links";
 import { ConversationSwitcher } from "./ConversationSwitcher";
 import { conversationMarkdown } from "./conversation-markdown";
-import { LibraryContextMenu } from "../LibraryContextMenu";
+import { LibraryContextMenu } from "../../ui/LibraryContextMenu";
 import "./assistant.css";
 import { useAssistantDrafts } from "./useAssistantDrafts";
 import { composerDraftKey } from "./draft-store";

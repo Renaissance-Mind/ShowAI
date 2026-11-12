@@ -1,4 +1,4 @@
-import { redact } from "../../core/redact";
+import { redact } from "../core/redact";
 import type { ProblemDescription } from "./describe";
 import { problemRedaction } from "./redaction";
 

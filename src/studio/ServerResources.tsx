@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { desktop, errorMessage } from "./bridge";
+import { desktop, errorMessage } from "../host/bridge";
 import type { ResolvedResource } from "../sync/accounts";
 import type { ServerConnection } from "../sync/protocol";
 import type { AgentHostStatus, ModelSource } from "../agent-host/types";

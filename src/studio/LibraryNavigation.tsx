@@ -12,7 +12,7 @@ import {
 import "./library-row.css";
 import PageIcon from "../components/PageIcon";
 import ProjectIcon from "./ProjectIcon";
-import type { LibraryMenuPoint } from "./LibraryContextMenu";
+import type { LibraryMenuPoint } from "../ui/LibraryContextMenu";
 import { useLibraryDrag } from "./LibraryDrag";
 import { useTranslator } from "../i18n/react";
 import commonMessages from "../i18n/messages/common";
@@ -261,4 +261,4 @@ export {
   type LibraryContextMenuItem,
   type LibraryContextMenuProps,
   type LibraryMenuPoint,
-} from "./LibraryContextMenu";
+} from "../ui/LibraryContextMenu";

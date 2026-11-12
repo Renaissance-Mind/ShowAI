@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
-import { desktop, errorMessage } from "./bridge";
-import Dialog from "./Dialog";
+import { desktop, errorMessage } from "../host/bridge";
+import Dialog from "../ui/Dialog";
 import { visibleInterval } from "./visible-interval";
 import { useTranslator } from "../i18n/react";
 import messages from "../i18n/messages/remoteMcp";

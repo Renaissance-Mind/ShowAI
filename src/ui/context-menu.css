@@ -1,0 +1,41 @@
+.studio-context-menu-shortcut {
+  margin-left: auto;
+  padding-left: 16px;
+  color: var(--muted);
+  font-size: 11px;
+  white-space: nowrap;
+}
+.studio-context-menu-control {
+  padding: 8px;
+  min-width: 0;
+}
+.studio-context-menu-control-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  font-size: 13px;
+  line-height: 20px;
+}
+.studio-context-menu-control-label > svg {
+  color: var(--muted);
+  flex-shrink: 0;
+}
+.studio-context-menu-group {
+  padding: 6px 8px 2px;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 16px;
+}
+.studio-context-menu-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.studio-context-menu-description {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 16px;
+  white-space: normal;
+  max-width: 260px;
+}

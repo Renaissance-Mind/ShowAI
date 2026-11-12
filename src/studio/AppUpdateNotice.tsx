@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import type { AppUpdateState } from "../desktop/bridge";
 import { useTranslator } from "../i18n/react";
 import messages from "../i18n/messages/feedback";
-import { errorMessage } from "./bridge";
+import { errorMessage } from "../host/bridge";
 import type { AppUpdateAction } from "./useAppUpdate";
 import "./plugin-update-notice.css";
 

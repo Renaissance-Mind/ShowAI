@@ -8,10 +8,10 @@ import {
   RefreshCw,
   X,
 } from "../ui/icons";
-import { desktop, errorMessage } from "./bridge";
+import { desktop, errorMessage } from "../host/bridge";
 import { coalescedTask } from "../lib/coalesced-task";
 import { retainEqual } from "./navigation-refresh";
-import Dialog from "./Dialog";
+import Dialog from "../ui/Dialog";
 import SyncDashboard, {
   type SyncMember,
   type SyncInvite,

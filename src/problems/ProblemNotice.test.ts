@@ -1,7 +1,7 @@
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { setLocale } from "../../i18n";
+import { setLocale } from "../i18n";
 import { describeError } from "./describe";
 import { NoticeStack, ProblemNotice } from "./ProblemNotice";
 

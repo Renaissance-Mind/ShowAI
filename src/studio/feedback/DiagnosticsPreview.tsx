@@ -3,7 +3,7 @@ import type { DesktopInfo } from "../../desktop/bridge";
 import { useTranslator } from "../../i18n/react";
 import messages from "../../i18n/messages/feedback";
 import { Loader2 } from "../../ui/icons";
-import { errorMessage } from "../bridge";
+import { errorMessage } from "../../host/bridge";
 import { gatherDiagnostics } from "./diagnostics";
 
 /** The log lives in the desktop App's main process; the browser has none. */

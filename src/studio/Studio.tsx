@@ -148,7 +148,7 @@ import {
   acceptsImport,
 } from "./page-import";
 import { FIND_COMPONENT_EVENT } from "../components/blocks/ComponentStatus";
-import { desktop, errorMessage } from "./bridge";
+import { desktop, errorMessage } from "../host/bridge";
 import { workbenchCapabilities } from "./capabilities";
 import { usePage, type LoadedPage } from "./usePage";
 import {
@@ -159,16 +159,16 @@ import {
   type LibraryTarget,
   type LibraryContextMenuItem,
 } from "./LibraryNavigation";
-import Dialog from "./Dialog";
+import Dialog from "../ui/Dialog";
 import ImportDialog, { type StagedImportPlan } from "./ImportDialog";
 import importMessages from "../i18n/messages/imports";
 import type { ImportReport } from "../agent/import-service";
 import {
   PackagingDialog,
-  formatSize,
   type PackagingDecisions,
   type PackagingPlan,
 } from "./PackagingDialog";
+import { formatSize } from "../lib/format-size";
 import PageThumbnail from "./PageThumbnail";
 import FolderThumbnail, { type FolderThumbnailEntry } from "./FolderThumbnail";
 import {
@@ -180,7 +180,7 @@ import {
 } from "./DirectoryPageSelection";
 import PageIcon from "../components/PageIcon";
 import ProjectIcon from "./ProjectIcon";
-import PageIconDialog from "./PageIconDialog";
+import PageIconDialog from "../components/PageIconDialog";
 import ExpandableSearch from "../components/ExpandableSearch";
 import ProjectSidebar from "./ProjectSidebar";
 import {
@@ -303,7 +303,7 @@ import {
   type ToastOptions,
   REPORT_PROBLEM_EVENT,
   type ReportProblemDetail,
-} from "./problems";
+} from "../problems";
 import type { FeedbackRequest } from "./feedback/AboutFeedback";
 import feedbackMessages from "../i18n/messages/feedback";
 import errorMessages from "../i18n/messages/errors";

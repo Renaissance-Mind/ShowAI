@@ -3,7 +3,7 @@ import { AtSign, KeyRound, Loader2, RotateCcw, UserRound } from "../ui/icons";
 import { useTranslator } from "../i18n/react";
 import messages from "../i18n/messages/accountFlow";
 import syncMessages from "../i18n/messages/sync";
-import { desktop, errorMessage } from "./bridge";
+import { desktop, errorMessage } from "../host/bridge";
 import ServiceLogin from "./ServiceLogin";
 import github from "./assets/connection-brands/github.svg";
 import google from "./assets/connection-brands/google.svg";

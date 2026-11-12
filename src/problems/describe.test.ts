@@ -2,10 +2,10 @@ import { mkdtemp, rm, writeFile, chmod } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { errorResult } from "../../agent/service";
-import { CoreError } from "../../core/model";
-import { CapacityError } from "../../portable/capacity.mjs";
-import { setLocale } from "../../i18n";
+import { errorResult } from "../agent/service";
+import { CoreError } from "../core/model";
+import { CapacityError } from "../portable/capacity.mjs";
+import { setLocale } from "../i18n";
 import {
   actionLabel,
   configureProblemPlatform,

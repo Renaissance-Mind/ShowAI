@@ -16,7 +16,7 @@ import {
   problemReportText,
   type ProblemAction,
   type ProblemDescription,
-} from "../problems";
+} from "../../problems";
 import {
   AGENT_HOSTS_GUIDE,
   AGENT_TROUBLESHOOTING,

@@ -6,7 +6,7 @@ import { ReportProblemForm } from "./studio/feedback/ReportProblemForm";
 import {
   dispatchReportProblem,
   type ReportProblemDetail,
-} from "./studio/problems/report-event";
+} from "./problems/report-event";
 
 const t = translator(messages);
 

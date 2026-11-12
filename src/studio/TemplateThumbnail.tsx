@@ -5,7 +5,7 @@ import { CustomComponentsProvider } from "../components/custom/CustomBlock";
 import type { TemplateMetadata } from "../contract/types";
 import type { LoadedTemplate } from "./CatalogDialogs";
 import CatalogPreview from "./CatalogPreview";
-import { desktop, errorMessage } from "./bridge";
+import { desktop, errorMessage } from "../host/bridge";
 import { useTranslator } from "../i18n/react";
 import messages from "../i18n/messages/catalog";
 const cache = new Map<string, Promise<LoadedTemplate>>();

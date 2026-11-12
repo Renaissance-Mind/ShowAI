@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { Loader2 } from "../ui/icons";
-import Dialog from "./Dialog";
-import { desktop, errorMessage } from "./bridge";
-import { formatSize } from "./PackagingDialog";
+import Dialog from "../ui/Dialog";
+import { desktop, errorMessage } from "../host/bridge";
+import { formatSize } from "../lib/format-size";
 import { useTranslator } from "../i18n/react";
 import messages from "../i18n/messages/imports";
 import type {
