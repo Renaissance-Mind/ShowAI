@@ -24,6 +24,7 @@ import {
   valueAt,
 } from "./operations.mjs";
 import { valueTypeOf } from "./value-types.mjs";
+import { mapNodes } from "../document/update.mjs";
 
 export const BINDING_KEY = "$binding";
 export const MAX_COLLECTIONS = 20;
@@ -1003,6 +1004,7 @@ export function retargetBindings(
   destinationProjectId,
 ) {
   let changed = false;
+  // Components nested in rich text keep their bindings too.
   const visit = (node) => {
     let next = node;
     const binding =
@@ -1023,13 +1025,8 @@ export function retargetBindings(
         };
       }
     }
-    if (Array.isArray(next?.content)) {
-      const content = next.content.map(visit);
-      if (content.some((child, index) => child !== next.content[index]))
-        next = { ...next, content };
-    }
     return next;
   };
-  const content = visit(document.content);
+  const content = mapNodes(document.content, visit, { scope: "content" });
   return changed ? { ...document, content } : document;
 }

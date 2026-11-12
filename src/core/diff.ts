@@ -24,6 +24,7 @@ import { applyCommentOperation } from "./comment-operations";
 import { CoreError, PAGE_OPERATION_FIELDS } from "./model";
 import { isSurface, reconcileSurface, fillSurfaceLayout } from "../document/document.mjs";
 import { walk } from "../document/walk.mjs";
+import { addressNode, mapNodes, updateNode } from "../document/update.mjs";
 import type {
   FieldChange,
   JSONContent,
@@ -366,12 +367,12 @@ export function applyOperations(
       );
     }
   };
-  const locate = (
+  const inTree = (
     id: string,
-  ): { parent: JSONContent; index: number; node: JSONContent } => {
+  ): { parent: JSONContent; index: number; node: JSONContent } | undefined => {
     const visit = (
       parent: JSONContent,
-    ): ReturnType<typeof locate> | undefined => {
+    ): ReturnType<typeof inTree> | undefined => {
       for (const [index, node] of (parent.content ?? []).entries()) {
         if (node.type !== "text" && node.attrs?.id === id)
           return { parent, index, node };
@@ -379,9 +380,57 @@ export function applyOperations(
         if (found) return found;
       }
     };
-    const found = visit(draft.content);
+    return visit(draft.content);
+  };
+  /** A block inside a document a component holds (its rich text, a step). */
+  const nested = (id: string) => {
+    try {
+      const found = addressNode(draft.content, id);
+      return found?.host ? found : undefined;
+    } catch (error) {
+      throw new CoreError(
+        "INVALID_DATA",
+        `${error instanceof Error ? error.message : String(error)} Read the page again after saving it: saving gives repeated ids inside component content distinct ids.`,
+      );
+    }
+  };
+  const nestedLabel = (found: NonNullable<ReturnType<typeof nested>>) => {
+    const owner = String(found.owner?.attrs?.id ?? "");
+    const host = String(found.host?.attrs?.id ?? "");
+    return host && host !== owner
+      ? `component ${host} inside block ${owner}`
+      : `block ${owner}`;
+  };
+  /** Blocks of the page tree: frames, views, containers and order. */
+  const locate = (
+    id: string,
+  ): { parent: JSONContent; index: number; node: JSONContent } => {
+    const found = inTree(id);
+    if (found) return found;
+    const inner = nested(id);
+    if (inner)
+      throw new CoreError(
+        "INVALID_DATA",
+        `Block ${id} is nested in the content of ${nestedLabel(inner)}. This operation works on blocks of the page tree; change the nested block itself with block.replace, block.remove, block.attrs.set, block.text.set, component.props.set or component.ref.set, or change ${String(inner.owner?.attrs?.id ?? "")} as a whole.`,
+      );
+    throw new CoreError("NOT_FOUND", `Block ${id} does not exist.`);
+  };
+  /** Any addressable block, including blocks nested in component content. */
+  const target = (id: string): JSONContent => {
+    const found = inTree(id) ?? nested(id);
     if (!found) throw new CoreError("NOT_FOUND", `Block ${id} does not exist.`);
-    return found;
+    return found.node;
+  };
+  /** Replace a block by id; nested blocks are written back into the data of their component. */
+  const edit = (id: string, change: (node: JSONContent) => JSONContent) => {
+    const found = inTree(id);
+    if (found) {
+      found.parent.content![found.index] = change(found.node);
+      return;
+    }
+    if (!nested(id))
+      throw new CoreError("NOT_FOUND", `Block ${id} does not exist.`);
+    draft.content = updateNode(draft.content, id, change, { scope: "content" });
   };
   const viewOwner = (id?: string) => {
     const node =
@@ -469,6 +518,13 @@ export function applyOperations(
     if (GEOMETRY_OPERATIONS.has(operation.type)) completeDraftDrawings();
     switch (operation.type) {
       case "component.insert": {
+        // Components go into the page tree; a nested parent is refused by name.
+        if (
+          operation.parentId &&
+          operation.parentId !== draft.content.attrs?.id &&
+          !inTree(operation.parentId)
+        )
+          locate(operation.parentId);
         const placeholder = isResource(draft)
           ? placeholderOf(operation.parentId)
           : undefined;
@@ -720,12 +776,31 @@ export function applyOperations(
         break;
       }
       case "block.remove": {
-        const target = locate(operation.blockId);
-        target.parent.content!.splice(target.index, 1);
+        const found = inTree(operation.blockId);
+        if (found) {
+          found.parent.content!.splice(found.index, 1);
+          break;
+        }
+        const inner = nested(operation.blockId);
+        if (!inner)
+          throw new CoreError(
+            "NOT_FOUND",
+            `Block ${operation.blockId} does not exist.`,
+          );
+        draft.content = mapNodes(
+          draft.content,
+          (node) =>
+            node === inner.parent
+              ? {
+                  ...node,
+                  content: node.content!.filter((child) => child !== inner.node),
+                }
+              : node,
+          { scope: "content" },
+        );
         break;
       }
       case "block.replace": {
-        const target = locate(operation.blockId);
         if (
           ["text", "doc"].includes(operation.node.type ?? "") ||
           (operation.node.type === "surface" && !isResource(draft))
@@ -736,7 +811,7 @@ export function applyOperations(
           );
         const node = structuredClone(operation.node);
         node.attrs = { ...node.attrs, id: operation.blockId };
-        target.parent.content![target.index] = node;
+        edit(operation.blockId, () => node);
         break;
       }
       case "block.move": {
@@ -768,16 +843,17 @@ export function applyOperations(
             "INVALID_DATA",
             "Block attributes cannot change a stable id.",
           );
-        const node = locate(operation.blockId).node;
-        const attrs = { ...node.attrs, ...operation.attrs };
-        // Like a JSON merge patch, null removes an attribute.
-        for (const [key, value] of Object.entries(operation.attrs))
-          if (value === null) delete attrs[key];
-        node.attrs = attrs;
+        edit(operation.blockId, (node) => {
+          const attrs = { ...node.attrs, ...operation.attrs };
+          // Like a JSON merge patch, null removes an attribute.
+          for (const [key, value] of Object.entries(operation.attrs))
+            if (value === null) delete attrs[key];
+          return { ...node, attrs };
+        });
         break;
       }
       case "component.props.set": {
-        const node = locate(operation.blockId).node;
+        const node = target(operation.blockId);
         const data = node.attrs?.data;
         // Images, text, tables and steppers are native nodes, not widgets.
         if (node.type !== "widget")
@@ -798,17 +874,20 @@ export function applyOperations(
             "component.props.set requires a component block and a props object.",
           );
         const props = structuredClone(operation.props);
-        node.attrs = {
-          ...node.attrs,
-          data:
-            node.attrs!.kind === "custom"
-              ? { ...data, props: { ...data.props, ...props } }
-              : { ...data, ...props },
-        };
+        edit(operation.blockId, (current) => ({
+          ...current,
+          attrs: {
+            ...current.attrs,
+            data:
+              current.attrs!.kind === "custom"
+                ? { ...data, props: { ...data.props, ...props } }
+                : { ...data, ...props },
+          },
+        }));
         break;
       }
       case "component.ref.set": {
-        const node = locate(operation.blockId).node;
+        const node = target(operation.blockId);
         const data = node.attrs?.data;
         if (
           node.type !== "widget" ||
@@ -852,25 +931,26 @@ export function applyOperations(
             `component.ref.set on ${operation.blockId}: ${error instanceof Error ? error.message : String(error)} Use componentId, version and integrity exactly as a component_save or catalog receipt returns them.`,
           );
         }
-        node.attrs = { ...node.attrs, data: next };
+        edit(operation.blockId, (current) => ({
+          ...current,
+          attrs: { ...current.attrs, data: next },
+        }));
         break;
       }
       case "comment":
         draft.comments = applyCommentOperation(draft, operation);
         break;
       case "block.text.set": {
-        const node = locate(operation.blockId).node;
+        const node = target(operation.blockId);
         if (node.type === "richText" && typeof operation.text === "string") {
           const previousId = node.content?.[0]?.attrs?.id;
-          node.content = richTextDocument({
+          const content = richTextDocument({
             content: operation.text,
             format: "plain",
           }).content;
-          if (previousId && node.content?.[0])
-            node.content[0].attrs = {
-              ...node.content[0].attrs,
-              id: previousId,
-            };
+          if (previousId && content?.[0])
+            content[0].attrs = { ...content[0].attrs, id: previousId };
+          edit(operation.blockId, (current) => ({ ...current, content }));
           break;
         }
         if (
@@ -881,9 +961,11 @@ export function applyOperations(
             "INVALID_DATA",
             "Text replacement requires a paragraph, heading, or code block.",
           );
-        node.content = operation.text
-          ? [{ type: "text", text: operation.text }]
-          : [];
+        const text = operation.text;
+        edit(operation.blockId, (current) => ({
+          ...current,
+          content: text ? [{ type: "text", text }] : [],
+        }));
         break;
       }
       default:

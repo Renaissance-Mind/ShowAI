@@ -186,6 +186,7 @@ export function pasteObjects<T extends ShowDocument>(
   const mapping = new Map<string, string>(),
     copies = clip.nodes.map((node) => structuredClone(node)),
     roots = new Set(copies.map((node) => node.attrs!.id as string));
+  // Blocks nested in a copied component's content get fresh ids too.
   for (const copy of copies)
     walk(copy, (node) => {
       if (node.attrs?.id) {
@@ -193,7 +194,7 @@ export function pasteObjects<T extends ShowDocument>(
         mapping.set(node.attrs.id, id);
         node.attrs = { ...node.attrs, id };
       }
-    }, { scope: "tree" });
+    }, { scope: "content" });
   for (const copy of copies)
     walk(copy, (node) => {
       if (!node.attrs?.bindings) return;

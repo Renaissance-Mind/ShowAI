@@ -1,5 +1,6 @@
 import { shareNativeSource } from "./structural-share.mjs";
 import { walk } from "./walk.mjs";
+import { mapNodes } from "./update.mjs";
 import { remapPageOutline } from "./page-outline.mjs";
 import {
   isResource,
@@ -48,7 +49,31 @@ export function assignSurfaceIds(document, { repairLegacy = false } = {}) {
     }
     return node;
   };
-  const content = descend(document.content, "");
+  const tree = descend(document.content, "");
+  // Documents components hold: page operations address their blocks by id,
+  // so a component without an id gets one and an id that repeats one seen
+  // before (in the tree or an earlier held document, as after copying a text
+  // block) gets a new one. Tree ids keep precedence.
+  const nestedSeen = new Set();
+  let position = 0;
+  const content = mapNodes(tree, (node, { owner }) => {
+    if (!owner || ["doc", "text"].includes(node.type)) return node;
+    const previous = node.attrs?.id;
+    const at = position++;
+    if (
+      previous
+        ? !seen.has(previous) && !nestedSeen.has(previous)
+        : node.type !== "widget" && node.type !== "inlineWidget"
+    ) {
+      if (previous) nestedSeen.add(previous);
+      return node;
+    }
+    let id = stableId(`${document.id}:${owner.attrs?.id}:${at}`);
+    while (used.has(id)) id += "-copy";
+    used.add(id);
+    nestedSeen.add(id);
+    return { ...node, attrs: { ...node.attrs, id } };
+  }, { scope: "content" });
   if (content !== document.content) document.content = content;
   return document;
 }
@@ -274,6 +299,13 @@ export function remapSurfaceIds(source, nextId = () => crypto.randomUUID()) {
     if (Object.keys(bindings).length) node.attrs.bindings = bindings;
     else delete node.attrs.bindings;
   }, { scope: "tree" });
+  // Blocks inside documents components hold get fresh ids too, so a placed
+  // copy never repeats the ids of the original.
+  document.content = mapNodes(document.content, (node, { owner }) =>
+    owner && node.attrs?.id && !["doc", "text"].includes(node.type)
+      ? { ...node, attrs: { ...node.attrs, id: nextId() } }
+      : node,
+  { scope: "content" });
   if (isSurface(document)) {
     document.layout = Object.fromEntries(
       Object.entries(document.layout ?? {}).map(([id, value]) => [

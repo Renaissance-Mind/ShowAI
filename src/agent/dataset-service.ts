@@ -33,6 +33,7 @@ import { readCustomBlockData } from "../components/custom/contract";
 import { propsIssues, type PropsIssue } from "../components/custom/schema";
 import { canonicalJson } from "../core/canonical";
 import { walk } from "../document/walk.mjs";
+import { addressNode } from "../document/update.mjs";
 import { pageEntries, valueDiffEntries } from "./page-diff-view";
 import type { JsonSchema } from "../components/custom/types";
 import { recordTable } from "../datasets/derived-fields.mjs";
@@ -66,12 +67,14 @@ type BindingOperation = Extract<
   { type: "component.binding.set" | "component.binding.remove" }
 >;
 
+/** A component block, in the page tree or nested in another component's content. */
 function findWidget(document: ShowDocument, blockId: string): JSONContent {
   let found: JSONContent | undefined;
-  walk(document.content, (node) => {
-    if (!found && node.type !== "text" && node.attrs?.id === blockId)
-      found = node;
-  }, { scope: "tree" });
+  try {
+    found = addressNode(document.content, blockId)?.node;
+  } catch (error) {
+    invalidData(error instanceof Error ? error.message : String(error));
+  }
   if (!found)
     throw new CoreError("NOT_FOUND", `Block ${blockId} does not exist.`);
   if (found.type !== "widget")
@@ -922,7 +925,7 @@ export class DatasetService {
         readBinding(node.attrs?.data)
       )
         bound = true;
-    }, { scope: "tree" });
+    }, { scope: "content" });
     return bound;
   }
 
