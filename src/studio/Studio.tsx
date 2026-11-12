@@ -125,13 +125,11 @@ import type {
   DesktopChange,
   MenuCommand,
 } from "../host/protocol";
-import type { ShowDocument } from "../types";
 import type {
   BuiltinComponentMetadata,
   CompiledComponent,
   ComponentCategory,
   TemplateMetadata,
-  TemplateRecord,
   CatalogReadOptions,
   ComponentSource,
 } from "../contract/types";
@@ -248,7 +246,6 @@ import {
 import {
   detourReturnOffset,
   type WorkspaceEntry,
-  type WorkspaceView,
 } from "./workspace-tabs";
 import navigationMessages from "../i18n/messages/navigation";
 import {
@@ -303,8 +300,6 @@ import {
 } from "../problems";
 import type { FeedbackRequest } from "./feedback/AboutFeedback";
 import feedbackMessages from "../i18n/messages/feedback";
-import errorMessages from "../i18n/messages/errors";
-import { translator } from "../i18n";
 import {
   LibrarySearchResults,
   ExternalConflictDialog,
@@ -364,132 +359,18 @@ import {
   NameDialog,
   ProjectDialog,
 } from "./shell/LibraryDialogs";
+import {
+  DraftHeld,
+  LOAD_LIBRARY,
+  operation,
+  type Catalog,
+  type DialogState,
+  type LoadedTemplate,
+  type ProjectScan,
+  type View,
+} from "./shell/types";
+import { focusAssistantInput, focusPageTitle } from "./shell/focus";
 
-type View = WorkspaceView;
-type Catalog = {
-  builtin: BuiltinComponentMetadata[];
-  custom: CatalogCustomComponent[];
-};
-type LoadedTemplate = TemplateRecord & {
-  components?: CompiledComponent[];
-  previewDocument?: ShowDocument;
-};
-type DialogState =
-  | { type: "workspaceConflicts" }
-  | { type: "migration" }
-  | {
-      type: "merge";
-      projectId: string;
-      document: ShowDocument;
-      baseRevision: string;
-      saveFailure?: boolean;
-    }
-  | { type: "externalConflict"; id: string; saveFailure?: boolean }
-  | { type: "discardDraft" }
-  | {
-      type: "project";
-      project?: ProjectSummary;
-      groupId?: string;
-      /** Created in the new project once it exists. */
-      then?: CreationChoice;
-    }
-  | { type: "group"; group?: ProjectGroup; projectId?: string }
-  | { type: "moveProject"; projectId: string }
-  | {
-      type: "batchPages";
-      operation: "move" | "delete";
-      targets: LibraryTarget[];
-    }
-  | {
-      type: "newPage";
-      projectId: string;
-      parentId: string | null;
-      templates: TemplateMetadata[];
-    }
-  | {
-      type: "folder";
-      projectId: string;
-      parentId: string | null;
-      /** Present when editing an existing folder's name and icon. */
-      target?: LibraryTarget;
-    }
-  | {
-      type: "pageIcon";
-      target: LibraryTarget;
-      value: string;
-      record: LoadedPage;
-    }
-  | { type: "rename"; target: LibraryTarget }
-  | { type: "delete"; target: LibraryTarget }
-  | { type: "deletedItems" }
-  | { type: "hiddenProjects" }
-  | { type: "shortcuts" }
-  | { type: "quickJump" }
-  | {
-      type: "template";
-      record: LoadedTemplate;
-      projectId?: string;
-    }
-  | {
-      type: "component";
-      projectId?: string;
-      builtin?: BuiltinComponentMetadata;
-      custom?: CompiledComponent;
-    }
-  | null;
-
-type ProjectScan = {
-  projects: ProjectSummary[];
-  unreadable: UnreadableProject[];
-};
-/** Operation names for problem titles; read the locale on each call. */
-const operation = translator(errorMessages);
-const LOAD_LIBRARY = "loadLibrary";
-/** The Agent panel mounts its input after opening; focus it once it can take text. */
-/** The open page holds edits it could not save, so the requested action did not run. */
-class DraftHeld extends Error {}
-function focusAssistantInput(started = Date.now()) {
-  const input = document.querySelector<HTMLTextAreaElement>(
-    ".assistant-input textarea",
-  );
-  if (input && !input.disabled) {
-    input.focus();
-    return;
-  }
-  if (Date.now() - started < 3000)
-    window.setTimeout(() => focusAssistantInput(started), 100);
-}
-
-/**
- * A blank page the person just made takes its title first. The page mounts
- * after the view switches, and a closing dialog or the editor's own focus
- * restore can move focus once more, so this keeps trying until the title has
- * held focus for two checks in a row. Boards have no body title and use the
- * title field in the top bar.
- */
-function focusPageTitle(
-  isShown: () => boolean,
-  started = Date.now(),
-  held = 0,
-) {
-  if (!isShown() || Date.now() - started > 1500) return;
-  const usable = (selector: string) =>
-    [
-      ...document.querySelectorAll<HTMLTextAreaElement | HTMLInputElement>(
-        selector,
-      ),
-    ].find((element) => !element.disabled && element.offsetParent !== null);
-  const title =
-    usable(".studio-scroll textarea.studio-page-heading-title") ??
-    usable(".studio-topbar .studio-page-title-input");
-  const focused = !!title && document.activeElement === title;
-  if (title && !focused) title.focus();
-  if (focused && held >= 1) return;
-  window.setTimeout(
-    () => focusPageTitle(isShown, started, focused ? held + 1 : 0),
-    100,
-  );
-}
 
 const recentLoading = <div className="studio-welcome" aria-busy="true" />;
 
