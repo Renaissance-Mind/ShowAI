@@ -1,0 +1,102 @@
+ShowAI — interactive pages shared by people and Agents.
+
+Local browser workbench (same files as the desktop app and CLI):
+  serve [--home PATH] [--port PORT] [--no-open]
+
+Independent presentation (no personal project or synchronization required):
+  public list [--kind component|template] [--query TEXT]
+  public describe ID [--kind component|template] [--view guide|schema|examples|source]
+  render --input INPUT_JSON --out PAGE.html [--overwrite]
+  render --template TEMPLATE_ID --title TITLE --out PAGE.html
+
+MCP connections:
+  mcp [--project PROJECT] [--templates ID[@VERSION],ID] [--presentation-directory PATH]
+  mcp --public
+  mcp serve --state DIRECTORY --public-url HTTPS_ORIGIN [--sync-server SERVER_ORIGIN] [--port 8789]
+
+Start with one project:
+  runtime info | runtime register
+  projects current [--source-directory PROJECT_DIRECTORY] [--project ID]
+  projects list
+  projects create --name NAME [--harness HOST --session SESSION_ID]
+  projects bind PROJECT --harness HOST --session SESSION_ID
+  pages list --project PROJECT
+
+Change pages (save and apply reply with a receipt; --response source adds the document):
+  pages save PAGE --project PROJECT --input DOCUMENT.json --base-hash HASH [--base-revision REVISION] [--response receipt|source|full]
+  pages apply PAGE --project PROJECT --input operations.json --base-hash HASH [--base-revision REVISION] [--response receipt|source|full]
+    In a versioned library --base-revision defaults to the revision returned by the last pages read with that hash.
+  pages delete|restore|pin|unpin PAGE --project PROJECT [--base-hash HASH]
+  pages duplicate PAGE --project PROJECT [--title TITLE]
+  pages deleted [--project PROJECT]   deleted projects, folders and pages that can be restored
+
+Shared datasets (one value that blocks on several pages read and write; see guide datasets):
+  datasets list --project PROJECT
+  datasets read DATASET --project PROJECT [--path 'objectives[id=o1]'] [--refresh]
+  datasets read DATASET --project PROJECT --query QUERY.json   {filter, sorts, search} over {columns, rows}
+  datasets create --project PROJECT --name NAME --input VALUE_OR_FROM_BLOCK.json
+  datasets apply DATASET --project PROJECT --input operations.json --base-hash HASH
+  datasets link [DATASET] --project PROJECT --file /abs/data.json|.csv|.tsv|.xlsx [--name NAME] [--use file|dataset] [--input VALUE.json]
+  datasets link [DATASET] --project PROJECT --url https://host/data.json|.csv|.tsv|.xlsx [--format FORMAT] [--refresh-seconds 300] [--name NAME] [--use file]
+  datasets link DATASET --project PROJECT --embed [--base-hash HASH]
+    Keeps the value in a file outside the library (linked on this device) or reads online data
+    (read-only; .xlsx files too); --embed copies it back; read --refresh fetches online data now.
+  datasets transform [DATASET] --project PROJECT [--name NAME] [--inputs INPUTS.json] [--script transform.js] [--base-hash HASH] [--dry-run]
+    A read-only dataset computed by a script from other datasets; INPUTS.json is { name: DATASET_ID };
+    the script defines function transform(inputs, helpers). --base-hash changes DATASET's definition;
+    --dry-run runs the script and returns its output without saving.
+  datasets delete DATASET --project PROJECT --base-hash HASH
+
+Import from other apps (a file, a folder or a zip; see guide import):
+  import PATH --project PROJECT [--folder FOLDER] [--importer ID] [--dry-run]
+    Notion "Markdown & CSV" exports (zip or folder), Word .docx, Markdown/text and ShowAI exports, or an
+    importer saved in the library. --dry-run returns the plan (folders, pages, databases, attachments,
+    warnings) and writes nothing; the import reports each item it could not write.
+  importers list [--project PROJECT]
+  importers save DIRECTORY [--scope global|project --project PROJECT]   DIRECTORY holds importer.json and importer.js
+  importers remove ID [--scope global|project --project PROJECT]
+
+Discover only what you need:
+  guide [workspace|reading|authoring|containers|document|datasets|catalog|component|templates|versions|recovery|sync|export|publish|import]
+  template import DIRECTORY --project PROJECT
+  template export ID --project PROJECT --out NEW_DIRECTORY
+  template context --project PROJECT [--templates ID[@VERSION],ID]
+  catalog list [--kind component|template|contribution] [--scope SCOPE] [--versions recommended|all] [--limit N --cursor CURSOR]
+  catalog describe ID [--kind component|template] [--view VIEW]
+  catalog describe ID --view parameters [--parameter-path PATH --parameter-offset N --parameter-limit N --known-hash HASH]
+  catalog remove ID --kind component|template [--version VERSION] [--scope project|global|published]
+    Refuses while pages, packages or publications use it and lists where; built-ins cannot be removed.
+
+Display a full page or selected blocks:
+  export --project PROJECT --page PAGE [--blocks ID,ID] --format html|inline --out PATH [--reader bundled|cdn]
+    html defaults to an offline page; --reader cdn writes a small online page. inline carries its reader and
+    loads it from the CDN only past the conversation size limit (reported in readerReason); --reader bundled fails instead.
+    Pages with files of this device stop with the packaging plan (items, sizes, choices); pass the person's
+    choices with --packaging DECISIONS.json ({itemId: choice}), or --external-data embed for everything that fits.
+
+Read one Page through structured data, an image or interactive HTML:
+  boards read PAGE --project PROJECT [--board BOARD_NODE] [--state OPTIONS.json]
+  pages read PAGE --project PROJECT [--view structured|image|html] [--blocks ID,ID]
+  pages read PAGE --project PROJECT --format markdown [--detail full|outline] [--offset N --limit N]
+    A page source over 256 KiB reads as an outline window unless --detail full, --blocks or --out is given.
+  pages read PAGE --project PROJECT --view image --theme dark --width 1000 --height 900 --out preview.png
+  pages read PAGE --project PROJECT --view html [--state reading-state.json] --out preview.html
+  pages read PAGE --project PROJECT --references to|from|both
+    Adds references: pages linking to this page (to, backlinks) and pages it links to (from),
+    each with the block holding the reference and the text around it.
+
+Versioned libraries: library init | verify | compact
+  library stats | cleanup-plan [--older-than-days DAYS] | cleanup PLAN_ID
+  library rebuild-index | policy [--automatic true|false]
+  library archive --out ABSOLUTE_NEW_DIRECTORY | verify-archive ARCHIVE_DIRECTORY
+  library import --source OLD_PATH --home NEW_OR_SAME_PATH
+  library activate IMPORT_ID --home PATH
+  library migrate --home PATH (prepare, verify and activate in place; retain originals)
+  library imports --home PATH
+  search --query TEXT [--project ID] [--kind page|component|template|project|source]
+  workspace merge PAGE --project ID --input DRAFT --base-revision BASE [--revision CURRENT_TO_SAVE]
+  workspace conflicts [--project ID] | conflict CONFLICT_ID | resolve CONFLICT_ID --resolution discard|import|merge
+Shared: --home PATH, --project ID, --json, --help.
+Project defaults to the host project directory (Git root of cwd); --project overrides it.
+Shared promotion/registration is explicit.
+Use showai guide TOPIC for exact authoring, versioning and delivery commands.

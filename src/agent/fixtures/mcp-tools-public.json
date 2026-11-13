@@ -1,0 +1,387 @@
+[
+  {
+    "name": "guide",
+    "description": "Read a focused ShowAI authoring or integration guide.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "topic": {
+          "type": "string",
+          "enum": [
+            "presentation",
+            "integration",
+            "workspace",
+            "authoring",
+            "reading",
+            "document",
+            "datasets",
+            "whiteboard",
+            "containers",
+            "catalog",
+            "component",
+            "templates",
+            "template-extraction",
+            "versions",
+            "recovery",
+            "sync",
+            "export",
+            "publish",
+            "import",
+            "migrations"
+          ]
+        },
+        "knownHash": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      },
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
+    "name": "showai_capabilities",
+    "description": "Return this connection's ShowAI capabilities.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {},
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "openWorldHint": false
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    },
+    "_meta": {
+      "securitySchemes": [
+        {
+          "type": "noauth"
+        }
+      ]
+    }
+  },
+  {
+    "name": "public_catalog_list",
+    "description": "List public component and template names, descriptions, scenarios and one-line props signatures; limit/cursor paginate.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": [
+            "component",
+            "template"
+          ]
+        },
+        "query": {
+          "type": "string"
+        },
+        "limit": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 50
+        },
+        "cursor": {
+          "type": "string"
+        }
+      },
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "openWorldHint": false
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    },
+    "_meta": {
+      "securitySchemes": [
+        {
+          "type": "noauth"
+        }
+      ]
+    }
+  },
+  {
+    "name": "public_catalog_describe",
+    "description": "Read a public component's guide, schema, examples or source, or a public template whole (view guide: README and every guide) or its source.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "version": {
+          "type": "string"
+        },
+        "integrity": {
+          "type": "string",
+          "pattern": "^sha256-[a-f0-9]{64}$"
+        },
+        "kind": {
+          "type": "string",
+          "enum": [
+            "component",
+            "template"
+          ]
+        },
+        "view": {
+          "type": "string",
+          "enum": [
+            "summary",
+            "guide",
+            "development",
+            "parameters",
+            "schema",
+            "examples",
+            "source",
+            "dependencies",
+            "full"
+          ]
+        },
+        "parameterPath": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 500
+        },
+        "parameterOffset": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "parameterLimit": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 50
+        },
+        "knownHash": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "file": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "openWorldHint": false
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    },
+    "_meta": {
+      "securitySchemes": [
+        {
+          "type": "noauth"
+        }
+      ]
+    }
+  },
+  {
+    "name": "render_document",
+    "description": "Render a complete standalone document from public components/templates or supplied sources without saving it.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "document": {
+          "description": "Complete ShowAI document. Custom nodes are {type:'widget',attrs:{id,kind:'custom',data:{componentId,version,props}}}.",
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {}
+        },
+        "templateId": {
+          "description": "Public template ID.",
+          "type": "string"
+        },
+        "templateVersion": {
+          "type": "string"
+        },
+        "templateIntegrity": {
+          "type": "string",
+          "pattern": "^sha256-[a-f0-9]{64}$"
+        },
+        "title": {
+          "type": "string",
+          "maxLength": 300
+        },
+        "componentSources": {
+          "description": "Unsaved component packages (manifest, schema, source, files, assets).",
+          "maxItems": 20,
+          "type": "array",
+          "items": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {}
+          }
+        },
+        "blockIds": {
+          "description": "Node IDs to show inline; HTML and source keep the full document.",
+          "minItems": 1,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      },
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "openWorldHint": false
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    },
+    "_meta": {
+      "securitySchemes": [
+        {
+          "type": "noauth"
+        }
+      ],
+      "ui": {
+        "resourceUri": "ui://showai/reader-v3.html"
+      },
+      "openai/outputTemplate": "ui://showai/reader-v3.html",
+      "openai/toolInvocation/invoking": "正在生成 ShowAI 页面",
+      "openai/toolInvocation/invoked": "ShowAI 页面已就绪"
+    }
+  },
+  {
+    "name": "show_component",
+    "description": "Show 1–5 components in the conversation without saving. kind/data match page_apply component.insert, so the same component can later be saved in a Page.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "description": "Component kind, e.g. chart, flowchart or custom.",
+          "type": "string",
+          "minLength": 1
+        },
+        "data": {
+          "description": "Component data as in component.insert; custom components use {componentId,version,props}.",
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {}
+        },
+        "blocks": {
+          "description": "Several components in order, each {kind,data}, instead of kind/data.",
+          "minItems": 1,
+          "maxItems": 5,
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "minLength": 1
+              },
+              "data": {
+                "type": "object",
+                "propertyNames": {
+                  "type": "string"
+                },
+                "additionalProperties": {}
+              }
+            },
+            "required": [
+              "kind",
+              "data"
+            ]
+          }
+        },
+        "projectId": {
+          "description": "Project whose saved custom components to resolve.",
+          "type": "string",
+          "minLength": 1
+        },
+        "componentSources": {
+          "description": "Unsaved component packages (manifest, schema, source, files, assets).",
+          "maxItems": 5,
+          "type": "array",
+          "items": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {}
+          }
+        },
+        "title": {
+          "description": "Accessible name and host card title.",
+          "type": "string",
+          "maxLength": 300
+        },
+        "delivery": {
+          "description": "auto follows the plugin's declared host display.",
+          "type": "string",
+          "enum": [
+            "auto",
+            "mcp-app",
+            "fragment-file",
+            "compact",
+            "image"
+          ]
+        },
+        "theme": {
+          "description": "Theme for image delivery.",
+          "type": "string",
+          "enum": [
+            "light",
+            "dark"
+          ]
+        }
+      },
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "openWorldHint": false
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    },
+    "_meta": {
+      "securitySchemes": [
+        {
+          "type": "noauth"
+        }
+      ],
+      "ui": {
+        "resourceUri": "ui://showai/component-v1.html"
+      },
+      "openai/outputTemplate": "ui://showai/component-v1.html",
+      "openai/toolInvocation/invoking": "正在生成 ShowAI 组件",
+      "openai/toolInvocation/invoked": "ShowAI 组件已就绪"
+    }
+  }
+]

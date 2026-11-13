@@ -1,0 +1,3535 @@
+[
+  {
+    "name": "dataset_read",
+    "description": "Read shared datasets: list them, or read one's value, hash, status (ok/stale/empty), editable, warnings and the pages using it; path (e.g. a[id=o1].b) narrows the value. refresh:true fetches online data now. sinceHash (e.g. from page_read datasetBases) returns record-level changes since then, paged with offset/limit. query {filter, sorts, search} reads a {columns, rows} value as records with derived values, filtered like a database view. out writes the value or comparison to a JSON file. Actions: list{}; read{datasetId,path?,sinceHash?,offset?,limit?,refresh?,query?,out?,overwrite?}.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "action": {
+          "type": "string",
+          "enum": [
+            "list",
+            "read"
+          ]
+        },
+        "datasetId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "path": {
+          "anyOf": [
+            {
+              "maxItems": 64,
+              "type": "array",
+              "items": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          {
+                            "type": "number"
+                          }
+                        ]
+                      }
+                    },
+                    "required": [
+                      "id"
+                    ],
+                    "additionalProperties": false
+                  }
+                ]
+              }
+            },
+            {
+              "type": "string",
+              "maxLength": 2000
+            }
+          ]
+        },
+        "sinceHash": {
+          "type": "string",
+          "minLength": 1
+        },
+        "offset": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "limit": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 500
+        },
+        "refresh": {
+          "type": "boolean"
+        },
+        "query": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {}
+        },
+        "out": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4096
+        },
+        "overwrite": {
+          "type": "boolean"
+        },
+        "projectId": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "action"
+      ],
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "openWorldHint": false
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
+    "name": "dataset_write",
+    "description": "Change shared datasets (guide datasets). create: value, or fromBlock {pageId,blockId,baseHash} to share and bind a block's props. apply: read baseHash + operations {op:\"set\",path,value}, {op:\"remove\",path}, {op:\"insert\",path:list,value,after?}, {op:\"move\",path:item,after}; path selects records by id ([id=t1]). link url: online json/csv/tsv/xlsx, read-only. transform: read-only data from script \"function transform(inputs, helpers)\", inputs {name:datasetId}; dryRun:true runs it unsaved. link path: value in a local json/csv/tsv file (xlsx read-only); path:null copies it back. *File fields read from a file. Actions: create{name,datasetId?,description?,value?,valueFile?,schema?,fromBlock?}; apply{datasetId,baseHash,operations?,operationsFile?,name?,description?,schema?}; link{datasetId?,path?,url?,format?,refreshSeconds?,use?,name?,description?,value?,valueFile?,schema?,baseHash?}; transform{datasetId?,baseHash?,name?,description?,schema?,inputs?,script?,scriptFile?,dryRun?}.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "action": {
+          "type": "string",
+          "enum": [
+            "create",
+            "apply",
+            "link",
+            "transform"
+          ]
+        },
+        "operationId": {
+          "type": "string",
+          "maxLength": 1000
+        },
+        "message": {
+          "type": "string",
+          "maxLength": 4000
+        },
+        "groupId": {
+          "type": "string",
+          "maxLength": 1000
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "datasetId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "description": {
+          "anyOf": [
+            {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 4000
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 4000
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          ]
+        },
+        "value": {
+          "anyOf": [
+            {},
+            {}
+          ]
+        },
+        "valueFile": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4096
+        },
+        "schema": {
+          "anyOf": [
+            {
+              "anyOf": [
+                {
+                  "type": "object",
+                  "propertyNames": {
+                    "type": "string"
+                  },
+                  "additionalProperties": {}
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            {
+              "anyOf": [
+                {
+                  "type": "object",
+                  "propertyNames": {
+                    "type": "string"
+                  },
+                  "additionalProperties": {}
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          ]
+        },
+        "fromBlock": {
+          "type": "object",
+          "properties": {
+            "pageId": {
+              "type": "string",
+              "minLength": 1
+            },
+            "blockId": {
+              "type": "string",
+              "minLength": 1
+            },
+            "baseHash": {
+              "type": "string",
+              "minLength": 1
+            },
+            "baseRevision": {
+              "type": "string"
+            },
+            "local": {
+              "maxItems": 200,
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          },
+          "required": [
+            "pageId",
+            "blockId",
+            "baseHash"
+          ],
+          "additionalProperties": false
+        },
+        "baseHash": {
+          "type": "string",
+          "minLength": 1
+        },
+        "operations": {
+          "maxItems": 5000,
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "op": {
+                "type": "string",
+                "enum": [
+                  "set",
+                  "remove",
+                  "insert",
+                  "move"
+                ]
+              },
+              "path": {
+                "anyOf": [
+                  {
+                    "maxItems": 64,
+                    "type": "array",
+                    "items": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "anyOf": [
+                                {
+                                  "type": "string",
+                                  "minLength": 1
+                                },
+                                {
+                                  "type": "number"
+                                }
+                              ]
+                            }
+                          },
+                          "required": [
+                            "id"
+                          ],
+                          "additionalProperties": false
+                        }
+                      ]
+                    }
+                  },
+                  {
+                    "type": "string",
+                    "maxLength": 2000
+                  }
+                ]
+              },
+              "value": {},
+              "before": {},
+              "absent": {
+                "type": "boolean",
+                "const": true
+              },
+              "after": {
+                "type": [
+                  "string",
+                  "number",
+                  "null"
+                ]
+              },
+              "index": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "from": {
+                "type": [
+                  "string",
+                  "number",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "op",
+              "path"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "operationsFile": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4096
+        },
+        "path": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 4096
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "url": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 2048
+        },
+        "format": {
+          "type": "string",
+          "enum": [
+            "json",
+            "csv",
+            "tsv",
+            "xlsx"
+          ]
+        },
+        "refreshSeconds": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 86400
+        },
+        "use": {
+          "type": "string",
+          "enum": [
+            "file",
+            "dataset"
+          ]
+        },
+        "inputs": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64
+          },
+          "additionalProperties": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "project": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 128
+                  },
+                  "dataset": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 128
+                  }
+                },
+                "required": [
+                  "project",
+                  "dataset"
+                ],
+                "additionalProperties": false
+              }
+            ]
+          }
+        },
+        "script": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 262144
+        },
+        "scriptFile": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4096
+        },
+        "dryRun": {
+          "type": "boolean"
+        },
+        "projectId": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "action"
+      ],
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "openWorldHint": false
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
+    "name": "dataset_delete",
+    "description": "Delete a dataset that no block uses; otherwise fails with details.references.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "operationId": {
+          "type": "string",
+          "maxLength": 1000
+        },
+        "message": {
+          "type": "string",
+          "maxLength": 4000
+        },
+        "groupId": {
+          "type": "string",
+          "maxLength": 1000
+        },
+        "datasetId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "baseHash": {
+          "type": "string",
+          "minLength": 1
+        },
+        "projectId": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "datasetId",
+        "baseHash"
+      ],
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": true,
+      "openWorldHint": false
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
+    "name": "organization_read",
+    "description": "Read project folders, deleted items that can be restored, or this connection's sidebar groups and project order. Actions: folders{includeArchived?}; deleted{}.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "action": {
+          "type": "string",
+          "enum": [
+            "folders",
+            "deleted"
+          ]
+        },
+        "includeArchived": {
+          "type": "boolean"
+        },
+        "projectId": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "action"
+      ],
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "openWorldHint": false
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
+    "name": "organization_update",
+    "description": "Change folders, pages, this project or the sidebar. archived:true deletes (restorable, listed by organization_read deleted), archived:false restores. parentId is a folder or null for the root; page moves need baseHash/baseRevision; sectionId is projects, pinned or a sidebar group; update_group with name:null removes it. Actions: create_folder{name,icon?,parentId?}; update_folder{folderId,name?,icon?,pinned?,archived?}; update_project{name?,icon?,pinned?,archived?}; update_page{pageId,archived?,pinned?,baseHash?,baseRevision?}; duplicate_page{pageId,title?}; sort{parentId,sortBy}; move{kind,id,destinationProjectId?,parentId,relativeId?,placement?,reorderOnly?,baseHash?,baseRevision?}.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "action": {
+          "type": "string",
+          "enum": [
+            "create_folder",
+            "update_folder",
+            "update_project",
+            "update_page",
+            "duplicate_page",
+            "sort",
+            "move"
+          ]
+        },
+        "operationId": {
+          "type": "string",
+          "maxLength": 1000
+        },
+        "message": {
+          "type": "string",
+          "maxLength": 4000
+        },
+        "groupId": {
+          "type": "string",
+          "maxLength": 1000
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1000
+        },
+        "icon": {
+          "type": "string"
+        },
+        "parentId": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "folderId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "pinned": {
+          "type": "boolean"
+        },
+        "archived": {
+          "type": "boolean"
+        },
+        "pageId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "baseHash": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1
+            },
+            {
+              "type": "string",
+              "minLength": 1
+            }
+          ]
+        },
+        "baseRevision": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1
+            },
+            {
+              "type": "string",
+              "minLength": 1
+            }
+          ]
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1000
+        },
+        "sortBy": {
+          "type": "string",
+          "enum": [
+            "name",
+            "createdAt",
+            "updatedAt",
+            "manual"
+          ]
+        },
+        "kind": {
+          "type": "string",
+          "enum": [
+            "page",
+            "folder"
+          ]
+        },
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "destinationProjectId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "relativeId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "placement": {
+          "type": "string",
+          "enum": [
+            "before",
+            "after"
+          ]
+        },
+        "reorderOnly": {
+          "type": "boolean"
+        },
+        "projectId": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "action"
+      ],
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "openWorldHint": false
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
+    "name": "catalog_references",
+    "description": "Find where a component or template is referenced in this project's pages and packages; version/integrity narrow the target.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": [
+            "component",
+            "template"
+          ]
+        },
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "version": {
+          "type": "string"
+        },
+        "integrity": {
+          "type": "string"
+        },
+        "projectId": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "kind",
+        "id"
+      ],
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "openWorldHint": false
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
+    "name": "draft_read",
+    "description": "Read editor drafts in this project's connection workspace; drafts are not formal content and do not sync. Actions: list{clientId?,resourceId?,kind?}; read{draftId}.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "action": {
+          "type": "string",
+          "enum": [
+            "list",
+            "read"
+          ]
+        },
+        "clientId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "resourceId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "kind": {
+          "type": "string",
+          "enum": [
+            "page",
+            "component",
+            "template"
+          ]
+        },
+        "draftId": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "projectId": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "action"
+      ],
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "openWorldHint": false
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
+    "name": "draft_write",
+    "description": "Save an editable draft, or complete a page draft after saving its exact content. Actions: save{kind,clientId,resourceId,content?,baseRevision?,baseContent?,title?,sequence?}; complete{draftId,generation,revision}.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "action": {
+          "type": "string",
+          "enum": [
+            "save",
+            "complete"
+          ]
+        },
+        "kind": {
+          "type": "string",
+          "enum": [
+            "page",
+            "component",
+            "template"
+          ]
+        },
+        "clientId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1000
+        },
+        "resourceId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "content": {},
+        "baseRevision": {
+          "type": "string"
+        },
+        "baseContent": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {}
+        },
+        "title": {
+          "type": "string"
+        },
+        "sequence": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "draftId": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "generation": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "revision": {
+          "type": "string",
+          "minLength": 1
+        },
+        "projectId": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "action"
+      ],
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "openWorldHint": false
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
+    "name": "draft_remove",
+    "description": "Discard a reviewed draft generation; a newer generation returns CONFLICT.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "draftId": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "generation": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "projectId": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "draftId",
+        "generation"
+      ],
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": true,
+      "openWorldHint": false
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
+    "name": "guide",
+    "description": "Read a focused ShowAI guide; without topic, list the guides.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "topic": {
+          "type": "string",
+          "enum": [
+            "presentation",
+            "integration",
+            "workspace",
+            "authoring",
+            "reading",
+            "document",
+            "datasets",
+            "whiteboard",
+            "containers",
+            "catalog",
+            "component",
+            "templates",
+            "template-extraction",
+            "versions",
+            "recovery",
+            "sync",
+            "export",
+            "publish",
+            "import",
+            "migrations"
+          ]
+        },
+        "knownHash": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      },
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "openWorldHint": false
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
+    "name": "template_context",
+    "description": "Read the selected templates whole for this task: README, every guide and the template component index, with exact refs. templates:[] records only the system workflow ref.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "templates": {
+          "maxItems": 8,
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "version": {
+                "type": "string"
+              },
+              "integrity": {
+                "type": "string"
+              },
+              "scope": {
+                "type": "string",
+                "enum": [
+                  "builtin",
+                  "project",
+                  "global",
+                  "published"
+                ]
+              }
+            },
+            "required": [
+              "id"
+            ]
+          }
+        },
+        "knownHash": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "componentOffset": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "componentLimit": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 50
+        },
+        "projectId": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "openWorldHint": false
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
+    "name": "project_context",
+    "description": "Return the project and its compact component index (names, descriptions, scenarios, props signatures) with the index revision.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "knownCatalogRevision": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "projectId": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "openWorldHint": false
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
+    "name": "pages_list",
+    "description": "List pages with titles, IDs and hashes.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "includeArchived": {
+          "type": "boolean"
+        },
+        "projectId": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "openWorldHint": false
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
+    "name": "page_read",
+    "description": "Read a Page as structured JSON/Markdown (default), a PNG image, or html (DOM, accessibility tree and an interactive file; actions run interactions). detail:\"outline\" lists block IDs; blockIds selects blocks. out (absolute path) writes the source, markdown, image or html to a file and returns only its path, sha256, hash and revision.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "pageId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "snapshotId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "view": {
+          "default": "structured",
+          "type": "string",
+          "enum": [
+            "structured",
+            "image",
+            "html"
+          ]
+        },
+        "format": {
+          "default": "json",
+          "type": "string",
+          "enum": [
+            "json",
+            "markdown"
+          ]
+        },
+        "detail": {
+          "type": "string",
+          "enum": [
+            "full",
+            "outline"
+          ]
+        },
+        "offset": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "limit": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1000
+        },
+        "blockIds": {
+          "minItems": 1,
+          "maxItems": 100,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          }
+        },
+        "theme": {
+          "default": "light",
+          "type": "string",
+          "enum": [
+            "light",
+            "dark"
+          ]
+        },
+        "viewport": {
+          "default": {
+            "width": 1000,
+            "height": 900
+          },
+          "type": "object",
+          "properties": {
+            "width": {
+              "type": "integer",
+              "minimum": 320,
+              "maximum": 2560
+            },
+            "height": {
+              "type": "integer",
+              "minimum": 240,
+              "maximum": 2160
+            }
+          },
+          "required": [
+            "width",
+            "height"
+          ],
+          "additionalProperties": false
+        },
+        "presentation": {
+          "default": "reading",
+          "type": "string",
+          "enum": [
+            "reading",
+            "spatial"
+          ]
+        },
+        "actions": {
+          "default": [],
+          "maxItems": 20,
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": [
+                  "click",
+                  "hover",
+                  "fill",
+                  "select",
+                  "check",
+                  "uncheck",
+                  "drag"
+                ]
+              },
+              "blockId": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 200
+              },
+              "selector": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 500
+              },
+              "role": {
+                "type": "string",
+                "enum": [
+                  "button",
+                  "checkbox",
+                  "combobox",
+                  "textbox",
+                  "slider",
+                  "link",
+                  "tab",
+                  "menuitem"
+                ]
+              },
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 500
+              },
+              "value": {
+                "type": "string",
+                "maxLength": 4000
+              },
+              "dx": {
+                "type": "number",
+                "minimum": -2560,
+                "maximum": 2560
+              },
+              "dy": {
+                "type": "number",
+                "minimum": -2160,
+                "maximum": 2160
+              }
+            },
+            "required": [
+              "type"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "draft": {
+          "default": false,
+          "type": "boolean"
+        },
+        "rendered": {
+          "type": "boolean"
+        },
+        "expectedHash": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "out": {
+          "type": "string",
+          "minLength": 1
+        },
+        "overwrite": {
+          "default": false,
+          "type": "boolean"
+        },
+        "references": {
+          "type": "string",
+          "enum": [
+            "to",
+            "from",
+            "both"
+          ]
+        },
+        "response": {
+          "default": "full",
+          "type": "string",
+          "enum": [
+            "full",
+            "source",
+            "receipt"
+          ]
+        },
+        "projectId": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "pageId"
+      ],
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "openWorldHint": false
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
+    "name": "board_read",
+    "description": "Read a Board: a full image for small boards, otherwise an overview with overlapping tiles and element/Page indexes. Pass the returned snapshotId with mode tile/region/element/source for details. boardId selects a Board inside a Page.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "pageId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "boardId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "snapshotId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "mode": {
+          "default": "visual",
+          "type": "string",
+          "enum": [
+            "visual",
+            "tile",
+            "region",
+            "element",
+            "source"
+          ]
+        },
+        "tileIds": {
+          "minItems": 1,
+          "maxItems": 8,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^T[1-9][0-9]*$"
+          }
+        },
+        "tileId": {
+          "type": "string",
+          "pattern": "^T[1-9][0-9]*$"
+        },
+        "nodeId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "rectPx": {
+          "type": "object",
+          "properties": {
+            "x": {
+              "type": "number"
+            },
+            "y": {
+              "type": "number"
+            },
+            "width": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "height": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            }
+          },
+          "required": [
+            "x",
+            "y",
+            "width",
+            "height"
+          ],
+          "additionalProperties": false
+        },
+        "pointPx": {
+          "type": "object",
+          "properties": {
+            "x": {
+              "type": "number"
+            },
+            "y": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "x",
+            "y"
+          ],
+          "additionalProperties": false
+        },
+        "detail": {
+          "default": "both",
+          "type": "string",
+          "enum": [
+            "image",
+            "source",
+            "both"
+          ]
+        },
+        "scale": {
+          "type": "number",
+          "minimum": 0.1,
+          "maximum": 4
+        },
+        "cursor": {
+          "default": 0,
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "pageOffset": {
+          "default": 0,
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "elementOffset": {
+          "default": 0,
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "expectedHash": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "state": {
+          "type": "object",
+          "properties": {
+            "cameras": {
+              "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
+              "additionalProperties": {
+                "type": "object",
+                "properties": {
+                  "x": {
+                    "type": "number"
+                  },
+                  "y": {
+                    "type": "number"
+                  },
+                  "scale": {
+                    "type": "number",
+                    "minimum": 0.1,
+                    "maximum": 4
+                  }
+                },
+                "required": [
+                  "x",
+                  "y",
+                  "scale"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "pageScrolls": {
+              "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
+              "additionalProperties": {
+                "type": "object",
+                "properties": {
+                  "x": {
+                    "type": "number",
+                    "minimum": 0
+                  },
+                  "y": {
+                    "type": "number",
+                    "minimum": 0
+                  }
+                },
+                "required": [
+                  "x",
+                  "y"
+                ],
+                "additionalProperties": false
+              }
+            }
+          },
+          "additionalProperties": false
+        },
+        "draftDocument": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {}
+        },
+        "projectId": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "pageId"
+      ],
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "openWorldHint": false
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
+    "name": "page_create",
+    "description": "Create a Page or Board. Prefer blocks:[{kind,data}] in reading order, e.g. {kind:\"text\",data:{format:\"markdown\",content:\"...\"}}, and add more with page_apply component.insert. import:{source, importer?, dryRun?} imports a file, folder or zip path into parentId instead (guide import).",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "operationId": {
+          "type": "string",
+          "maxLength": 1000
+        },
+        "message": {
+          "type": "string",
+          "maxLength": 4000
+        },
+        "groupId": {
+          "type": "string",
+          "maxLength": 1000
+        },
+        "import": {
+          "type": "object",
+          "properties": {
+            "source": {
+              "type": "string",
+              "minLength": 1
+            },
+            "importer": {
+              "type": "string",
+              "minLength": 1
+            },
+            "dryRun": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "source"
+          ]
+        },
+        "title": {
+          "type": "string"
+        },
+        "kind": {
+          "type": "string",
+          "enum": [
+            "page",
+            "board"
+          ]
+        },
+        "parentId": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "blocks": {
+          "maxItems": 100,
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "minLength": 1
+              },
+              "data": {
+                "type": "object",
+                "propertyNames": {
+                  "type": "string"
+                },
+                "additionalProperties": {}
+              }
+            },
+            "required": [
+              "kind",
+              "data"
+            ]
+          }
+        },
+        "document": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {}
+        },
+        "components": {
+          "maxItems": 100,
+          "type": "array",
+          "items": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {}
+          }
+        },
+        "remoteComponents": {
+          "maxItems": 100,
+          "type": "array",
+          "items": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {}
+          }
+        },
+        "projectId": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "openWorldHint": true
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
+    "name": "page_save",
+    "description": "Save a full Page document with its baseHash; stale content returns CONFLICT. Replies with a receipt (hash, revision, changedBlocks); response:\"source\" adds the saved document.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "operationId": {
+          "type": "string",
+          "maxLength": 1000
+        },
+        "message": {
+          "type": "string",
+          "maxLength": 4000
+        },
+        "groupId": {
+          "type": "string",
+          "maxLength": 1000
+        },
+        "pageId": {
+          "type": "string"
+        },
+        "document": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {}
+        },
+        "baseHash": {
+          "type": "string",
+          "minLength": 1
+        },
+        "baseRevision": {
+          "type": "string"
+        },
+        "components": {
+          "maxItems": 100,
+          "type": "array",
+          "items": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {}
+          }
+        },
+        "remoteComponents": {
+          "maxItems": 100,
+          "type": "array",
+          "items": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {}
+          }
+        },
+        "response": {
+          "default": "receipt",
+          "type": "string",
+          "enum": [
+            "full",
+            "source",
+            "receipt"
+          ]
+        },
+        "projectId": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "pageId",
+        "document",
+        "baseHash"
+      ],
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "openWorldHint": true
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
+    "name": "page_apply",
+    "description": "Apply operations by stable block id with the Page's baseHash. Insert components with {type:\"component.insert\",kind,data,parentId?,afterId?}, change their data with {type:\"component.props.set\",blockId,props} and switch a custom component to another revision with {type:\"component.ref.set\",blockId,version,integrity,componentId?} (keeps id and props). Comment with {type:\"comment\",text,blockId?,quote?} or {type:\"comment\",threadId,text?,resolved?}; page_read returns open comments. Other operations: guide authoring. Replies with a receipt whose changedBlocks.added lists new block ids; response:\"source\" adds the document. operationsFile reads the operations array from a JSON file.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "operationId": {
+          "type": "string",
+          "maxLength": 1000
+        },
+        "message": {
+          "type": "string",
+          "maxLength": 4000
+        },
+        "groupId": {
+          "type": "string",
+          "maxLength": 1000
+        },
+        "pageId": {
+          "type": "string"
+        },
+        "baseHash": {
+          "type": "string",
+          "minLength": 1
+        },
+        "baseRevision": {
+          "type": "string"
+        },
+        "operations": {
+          "maxItems": 1000,
+          "type": "array",
+          "items": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {}
+          }
+        },
+        "operationsFile": {
+          "type": "string",
+          "minLength": 1
+        },
+        "datasetBases": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "response": {
+          "default": "receipt",
+          "type": "string",
+          "enum": [
+            "full",
+            "source",
+            "receipt"
+          ]
+        },
+        "projectId": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "pageId",
+        "baseHash"
+      ],
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "openWorldHint": false
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
+    "name": "page_diff",
+    "description": "Compare a Page with an earlier read hash or revision: one entry per record-level change (lists of records by id), long values summarized, paged with offset/nextOffset; blockIds narrows it. out writes every entry unabridged to a JSON file.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "pageId": {
+          "type": "string"
+        },
+        "sinceHash": {
+          "type": "string",
+          "minLength": 1
+        },
+        "blockIds": {
+          "minItems": 1,
+          "maxItems": 200,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "offset": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "limit": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 500
+        },
+        "out": {
+          "type": "string",
+          "minLength": 1
+        },
+        "overwrite": {
+          "type": "boolean"
+        },
+        "projectId": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "pageId",
+        "sinceHash"
+      ],
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "openWorldHint": false
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
+    "name": "page_export",
+    "description": "Export a Page as HTML, an inline conversation fragment or a static site at out; blockIds exports part of it. Files of this device (or data computed from them) return CONFIRMATION_REQUIRED with details.packaging (items, sizes, choices); repeat with packaging {itemId: choice} after the person decides.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "pageId": {
+          "type": "string"
+        },
+        "blockIds": {
+          "minItems": 1,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "format": {
+          "type": "string",
+          "enum": [
+            "html",
+            "inline",
+            "site"
+          ]
+        },
+        "presentation": {
+          "type": "string",
+          "enum": [
+            "spatial",
+            "reading"
+          ]
+        },
+        "components": {
+          "type": "string",
+          "enum": [
+            "bundled",
+            "remote"
+          ]
+        },
+        "reader": {
+          "type": "string",
+          "enum": [
+            "bundled",
+            "cdn"
+          ]
+        },
+        "out": {
+          "type": "string",
+          "minLength": 1
+        },
+        "overwrite": {
+          "type": "boolean"
+        },
+        "packaging": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {
+            "type": "string",
+            "enum": [
+              "bundle",
+              "skip",
+              "keep-url",
+              "result",
+              "inputs",
+              "both",
+              "embed"
+            ]
+          }
+        },
+        "externalData": {
+          "type": "string",
+          "const": "embed"
+        },
+        "projectId": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "format",
+        "out"
+      ],
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "openWorldHint": false
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
+    "name": "catalog_list",
+    "description": "List component and template names, descriptions, scenarios and one-line props signatures. Defaults to built-ins plus this project's components; scope selects global/published/all; limit/cursor paginate. kind contribution lists extension slots and what fills them.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": [
+            "component",
+            "template",
+            "contribution"
+          ]
+        },
+        "scope": {
+          "type": "string",
+          "enum": [
+            "builtin",
+            "global",
+            "published",
+            "project",
+            "all"
+          ]
+        },
+        "query": {
+          "type": "string"
+        },
+        "limit": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 50
+        },
+        "cursor": {
+          "type": "string"
+        },
+        "versions": {
+          "type": "string",
+          "enum": [
+            "recommended",
+            "all"
+          ]
+        },
+        "projectId": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "openWorldHint": false
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
+    "name": "catalog_describe",
+    "description": "Describe a component or template. view: summary (default), guide (use contract, schema, example), parameters (paged by parameterPath/offset/limit), development, examples, dependencies, source or full. With view source, out (absolute folder) writes the component's whole package there for editing and component_save directory.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "kind": {
+          "type": "string",
+          "enum": [
+            "component",
+            "template",
+            "importer"
+          ]
+        },
+        "scope": {
+          "type": "string",
+          "enum": [
+            "builtin",
+            "global",
+            "published",
+            "project",
+            "all"
+          ]
+        },
+        "version": {
+          "type": "string"
+        },
+        "integrity": {
+          "type": "string"
+        },
+        "view": {
+          "type": "string",
+          "enum": [
+            "summary",
+            "guide",
+            "development",
+            "parameters",
+            "schema",
+            "examples",
+            "source",
+            "dependencies",
+            "full"
+          ]
+        },
+        "parameterPath": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 500
+        },
+        "parameterOffset": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "parameterLimit": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 50
+        },
+        "knownHash": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "file": {
+          "type": "string"
+        },
+        "out": {
+          "type": "string",
+          "minLength": 1
+        },
+        "overwrite": {
+          "type": "boolean"
+        },
+        "projectId": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "openWorldHint": false
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
+    "name": "component_save",
+    "description": "Save component source as a new immutable revision in this project: source inline, or directory, the absolute path of a package folder on this device (manifest.json, props.schema.json, entry and files), read without copying it into the call. Same contract for both; legacy:true imports an old package without manifest.documentation.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "operationId": {
+          "type": "string",
+          "maxLength": 1000
+        },
+        "message": {
+          "type": "string",
+          "maxLength": 4000
+        },
+        "groupId": {
+          "type": "string",
+          "maxLength": 1000
+        },
+        "source": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {}
+        },
+        "directory": {
+          "type": "string",
+          "minLength": 1
+        },
+        "legacy": {
+          "type": "boolean"
+        },
+        "projectId": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "openWorldHint": false
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
+    "name": "template_apply",
+    "description": "Create a resource from a template, or insert it into pageId with its baseHash/baseRevision and optional parentId.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "operationId": {
+          "type": "string",
+          "maxLength": 1000
+        },
+        "message": {
+          "type": "string",
+          "maxLength": 4000
+        },
+        "groupId": {
+          "type": "string",
+          "maxLength": 1000
+        },
+        "templateId": {
+          "type": "string"
+        },
+        "templates": {
+          "maxItems": 8,
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "version": {
+                "type": "string"
+              },
+              "integrity": {
+                "type": "string"
+              },
+              "scope": {
+                "type": "string",
+                "enum": [
+                  "builtin",
+                  "project",
+                  "global",
+                  "published"
+                ]
+              }
+            },
+            "required": [
+              "id"
+            ]
+          }
+        },
+        "pageId": {
+          "type": "string"
+        },
+        "baseHash": {
+          "type": "string"
+        },
+        "baseRevision": {
+          "type": "string"
+        },
+        "parentId": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "scope": {
+          "type": "string",
+          "enum": [
+            "builtin",
+            "global",
+            "published",
+            "project"
+          ]
+        },
+        "version": {
+          "type": "string"
+        },
+        "integrity": {
+          "type": "string"
+        },
+        "projectId": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "templateId"
+      ],
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "openWorldHint": false
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
+    "name": "template_save",
+    "description": "Create an immutable project template from pageId or input:{bundle:{format:1,files,assets?}}; bundled components are compiled and registered.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "operationId": {
+          "type": "string",
+          "maxLength": 1000
+        },
+        "message": {
+          "type": "string",
+          "maxLength": 4000
+        },
+        "groupId": {
+          "type": "string",
+          "maxLength": 1000
+        },
+        "pageId": {
+          "type": "string"
+        },
+        "input": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {}
+        },
+        "projectId": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "input"
+      ],
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "openWorldHint": false
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
+    "name": "catalog_version",
+    "description": "Save a project-owned revision (fork an exact revision, or save a reviewed merge), or remove a revision; remove without version removes every revision in that scope and refuses with IN_USE while pages, packages or publications use it. importer saves an importer (guide import). Actions: importer{manifest,script}; remove{kind,id,version?,scope?}; fork{ref,id?,version,name?}; merge{base,ours,theirs,id?,version,resolved}.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "action": {
+          "type": "string",
+          "enum": [
+            "importer",
+            "remove",
+            "fork",
+            "merge"
+          ]
+        },
+        "operationId": {
+          "type": "string",
+          "maxLength": 1000
+        },
+        "message": {
+          "type": "string",
+          "maxLength": 4000
+        },
+        "groupId": {
+          "type": "string",
+          "maxLength": 1000
+        },
+        "manifest": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {}
+        },
+        "script": {
+          "type": "string",
+          "minLength": 1
+        },
+        "kind": {
+          "type": "string",
+          "enum": [
+            "component",
+            "template",
+            "importer"
+          ]
+        },
+        "id": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1
+            },
+            {
+              "type": "string"
+            }
+          ]
+        },
+        "version": {
+          "type": "string"
+        },
+        "scope": {
+          "type": "string",
+          "enum": [
+            "project",
+            "global",
+            "published"
+          ]
+        },
+        "ref": {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "component",
+                "template"
+              ]
+            },
+            "id": {
+              "type": "string"
+            },
+            "version": {
+              "type": "string"
+            },
+            "integrity": {
+              "type": "string"
+            },
+            "scope": {
+              "type": "string",
+              "enum": [
+                "builtin",
+                "global",
+                "published",
+                "project"
+              ]
+            },
+            "projectId": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "id",
+            "version",
+            "integrity"
+          ]
+        },
+        "name": {
+          "type": "string"
+        },
+        "base": {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "component",
+                "template"
+              ]
+            },
+            "id": {
+              "type": "string"
+            },
+            "version": {
+              "type": "string"
+            },
+            "integrity": {
+              "type": "string"
+            },
+            "scope": {
+              "type": "string",
+              "enum": [
+                "builtin",
+                "global",
+                "published",
+                "project"
+              ]
+            },
+            "projectId": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "id",
+            "version",
+            "integrity"
+          ]
+        },
+        "ours": {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "component",
+                "template"
+              ]
+            },
+            "id": {
+              "type": "string"
+            },
+            "version": {
+              "type": "string"
+            },
+            "integrity": {
+              "type": "string"
+            },
+            "scope": {
+              "type": "string",
+              "enum": [
+                "builtin",
+                "global",
+                "published",
+                "project"
+              ]
+            },
+            "projectId": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "id",
+            "version",
+            "integrity"
+          ]
+        },
+        "theirs": {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "component",
+                "template"
+              ]
+            },
+            "id": {
+              "type": "string"
+            },
+            "version": {
+              "type": "string"
+            },
+            "integrity": {
+              "type": "string"
+            },
+            "scope": {
+              "type": "string",
+              "enum": [
+                "builtin",
+                "global",
+                "published",
+                "project"
+              ]
+            },
+            "projectId": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "id",
+            "version",
+            "integrity"
+          ]
+        },
+        "resolved": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {}
+        },
+        "projectId": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "action"
+      ],
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "openWorldHint": false
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
+    "name": "catalog_merge_preview",
+    "description": "Preview a three-way merge without writing; view:\"source\" returns the candidate and conflict values.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "base": {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "component",
+                "template"
+              ]
+            },
+            "id": {
+              "type": "string"
+            },
+            "version": {
+              "type": "string"
+            },
+            "integrity": {
+              "type": "string"
+            },
+            "scope": {
+              "type": "string",
+              "enum": [
+                "builtin",
+                "global",
+                "published",
+                "project"
+              ]
+            },
+            "projectId": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "id",
+            "version",
+            "integrity"
+          ]
+        },
+        "ours": {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "component",
+                "template"
+              ]
+            },
+            "id": {
+              "type": "string"
+            },
+            "version": {
+              "type": "string"
+            },
+            "integrity": {
+              "type": "string"
+            },
+            "scope": {
+              "type": "string",
+              "enum": [
+                "builtin",
+                "global",
+                "published",
+                "project"
+              ]
+            },
+            "projectId": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "id",
+            "version",
+            "integrity"
+          ]
+        },
+        "theirs": {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "component",
+                "template"
+              ]
+            },
+            "id": {
+              "type": "string"
+            },
+            "version": {
+              "type": "string"
+            },
+            "integrity": {
+              "type": "string"
+            },
+            "scope": {
+              "type": "string",
+              "enum": [
+                "builtin",
+                "global",
+                "published",
+                "project"
+              ]
+            },
+            "projectId": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "id",
+            "version",
+            "integrity"
+          ]
+        },
+        "view": {
+          "type": "string",
+          "enum": [
+            "summary",
+            "source"
+          ]
+        },
+        "projectId": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "base",
+        "ours",
+        "theirs"
+      ],
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "openWorldHint": false
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
+    "name": "publication_prepare",
+    "description": "Prepare local static publication files from exact refs.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "refs": {
+          "minItems": 1,
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "component",
+                  "template"
+                ]
+              },
+              "id": {
+                "type": "string"
+              },
+              "version": {
+                "type": "string"
+              },
+              "integrity": {
+                "type": "string"
+              },
+              "scope": {
+                "type": "string",
+                "enum": [
+                  "builtin",
+                  "global",
+                  "published",
+                  "project"
+                ]
+              },
+              "projectId": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "kind",
+              "id",
+              "version",
+              "integrity"
+            ]
+          }
+        },
+        "out": {
+          "type": "string"
+        },
+        "projectId": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "refs",
+        "out"
+      ],
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "openWorldHint": false
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
+    "name": "publication_list",
+    "description": "List verified publication references in the local shared library.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "limit": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 50
+        },
+        "cursor": {
+          "type": "string"
+        },
+        "projectId": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "openWorldHint": false
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
+    "name": "library_search",
+    "description": "Search this project's pages, containers and component/template descriptions and source; returns node locations.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "query": {
+          "type": "string"
+        },
+        "kind": {
+          "type": "string",
+          "enum": [
+            "page",
+            "component",
+            "template",
+            "project",
+            "source"
+          ]
+        },
+        "limit": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 50
+        },
+        "cursor": {
+          "type": "string"
+        },
+        "projectId": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "query"
+      ],
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "openWorldHint": false
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
+    "name": "page_merge_preview",
+    "description": "Compare a local draft, its base and the current Page.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "pageId": {
+          "type": "string"
+        },
+        "baseRevision": {
+          "type": "string"
+        },
+        "document": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {}
+        },
+        "projectId": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "pageId",
+        "baseRevision",
+        "document"
+      ],
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "openWorldHint": false
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
+    "name": "page_merge_save",
+    "description": "Save a reviewed merged Page, rechecking the current revision.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "operationId": {
+          "type": "string",
+          "maxLength": 1000
+        },
+        "message": {
+          "type": "string",
+          "maxLength": 4000
+        },
+        "groupId": {
+          "type": "string",
+          "maxLength": 1000
+        },
+        "pageId": {
+          "type": "string"
+        },
+        "baseRevision": {
+          "type": "string"
+        },
+        "currentRevision": {
+          "type": "string"
+        },
+        "document": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {}
+        },
+        "projectId": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "pageId",
+        "baseRevision",
+        "currentRevision",
+        "document"
+      ],
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "openWorldHint": false
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
+    "name": "workspace_conflict",
+    "description": "Read retained external file changes in this project: list them, or read one with its formal and baseline versions. Actions: list{}; read{id}.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "action": {
+          "type": "string",
+          "enum": [
+            "list",
+            "read"
+          ]
+        },
+        "id": {
+          "type": "string"
+        },
+        "projectId": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "action"
+      ],
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "openWorldHint": false
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
+    "name": "workspace_resolve",
+    "description": "Resolve an external change by discard, page import or reviewed merge (preserved snapshots remain available), or recover an external package change as an editable local draft and restore the immutable version. Actions: resolve{id,resolution,document?}; recover_package{id,clientId}.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "action": {
+          "type": "string",
+          "enum": [
+            "resolve",
+            "recover_package"
+          ]
+        },
+        "operationId": {
+          "type": "string",
+          "maxLength": 1000
+        },
+        "message": {
+          "type": "string",
+          "maxLength": 4000
+        },
+        "groupId": {
+          "type": "string",
+          "maxLength": 1000
+        },
+        "id": {
+          "type": "string"
+        },
+        "resolution": {
+          "type": "string",
+          "enum": [
+            "discard",
+            "import",
+            "merge"
+          ]
+        },
+        "document": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {}
+        },
+        "clientId": {
+          "type": "string"
+        },
+        "projectId": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "action"
+      ],
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "openWorldHint": false
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
+    "name": "project_sync_status",
+    "description": "Return synchronization status for this project.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "projectId": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "openWorldHint": false
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
+    "name": "project_sync",
+    "description": "Synchronize this connected project and return status, error and remoteHead. packaging {itemId: bundle|skip} first stores the person's choice of which files of this device travel with it.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "packaging": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {
+            "type": "string",
+            "enum": [
+              "bundle",
+              "skip"
+            ]
+          }
+        },
+        "projectId": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "openWorldHint": false
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
+    "name": "page_present",
+    "description": "Present a saved Page, or selected blocks inline, and return host delivery references. display.reader is the inline preview's reader; readerReason says why it loads from the CDN. externalSnapshots lists embedded data from files outside the library; get the person's agreement before sharing those files.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "pageId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "blockIds": {
+          "minItems": 1,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "projectId": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "pageId"
+      ],
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "openWorldHint": false
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    },
+    "_meta": {
+      "ui": {
+        "resourceUri": "ui://showai/reader-v3.html"
+      },
+      "openai/outputTemplate": "ui://showai/reader-v3.html",
+      "openai/toolInvocation/invoking": "正在生成 ShowAI 页面",
+      "openai/toolInvocation/invoked": "ShowAI 页面已就绪"
+    }
+  },
+  {
+    "name": "showai_capabilities",
+    "description": "Return this connection's ShowAI capabilities.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {},
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "openWorldHint": false
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    },
+    "_meta": {
+      "securitySchemes": [
+        {
+          "type": "noauth"
+        }
+      ]
+    }
+  },
+  {
+    "name": "public_catalog_list",
+    "description": "List public component and template names, descriptions, scenarios and one-line props signatures; limit/cursor paginate.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": [
+            "component",
+            "template"
+          ]
+        },
+        "query": {
+          "type": "string"
+        },
+        "limit": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 50
+        },
+        "cursor": {
+          "type": "string"
+        }
+      },
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "openWorldHint": false
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    },
+    "_meta": {
+      "securitySchemes": [
+        {
+          "type": "noauth"
+        }
+      ]
+    }
+  },
+  {
+    "name": "public_catalog_describe",
+    "description": "Read a public component's guide, schema, examples or source, or a public template whole (view guide: README and every guide) or its source.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "version": {
+          "type": "string"
+        },
+        "integrity": {
+          "type": "string",
+          "pattern": "^sha256-[a-f0-9]{64}$"
+        },
+        "kind": {
+          "type": "string",
+          "enum": [
+            "component",
+            "template"
+          ]
+        },
+        "view": {
+          "type": "string",
+          "enum": [
+            "summary",
+            "guide",
+            "development",
+            "parameters",
+            "schema",
+            "examples",
+            "source",
+            "dependencies",
+            "full"
+          ]
+        },
+        "parameterPath": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 500
+        },
+        "parameterOffset": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "parameterLimit": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 50
+        },
+        "knownHash": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "file": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "openWorldHint": false
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    },
+    "_meta": {
+      "securitySchemes": [
+        {
+          "type": "noauth"
+        }
+      ]
+    }
+  },
+  {
+    "name": "render_document",
+    "description": "Render a complete standalone document from public components/templates or supplied sources without saving it.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "document": {
+          "description": "Complete ShowAI document. Custom nodes are {type:'widget',attrs:{id,kind:'custom',data:{componentId,version,props}}}.",
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {}
+        },
+        "templateId": {
+          "description": "Public template ID.",
+          "type": "string"
+        },
+        "templateVersion": {
+          "type": "string"
+        },
+        "templateIntegrity": {
+          "type": "string",
+          "pattern": "^sha256-[a-f0-9]{64}$"
+        },
+        "title": {
+          "type": "string",
+          "maxLength": 300
+        },
+        "componentSources": {
+          "description": "Unsaved component packages (manifest, schema, source, files, assets).",
+          "maxItems": 20,
+          "type": "array",
+          "items": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {}
+          }
+        },
+        "blockIds": {
+          "description": "Node IDs to show inline; HTML and source keep the full document.",
+          "minItems": 1,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      },
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "openWorldHint": false
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    },
+    "_meta": {
+      "securitySchemes": [
+        {
+          "type": "noauth"
+        }
+      ],
+      "ui": {
+        "resourceUri": "ui://showai/reader-v3.html"
+      },
+      "openai/outputTemplate": "ui://showai/reader-v3.html",
+      "openai/toolInvocation/invoking": "正在生成 ShowAI 页面",
+      "openai/toolInvocation/invoked": "ShowAI 页面已就绪"
+    }
+  },
+  {
+    "name": "show_component",
+    "description": "Show 1–5 components in the conversation without saving. kind/data match page_apply component.insert, so the same component can later be saved in a Page.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "description": "Component kind, e.g. chart, flowchart or custom.",
+          "type": "string",
+          "minLength": 1
+        },
+        "data": {
+          "description": "Component data as in component.insert; custom components use {componentId,version,props}.",
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {}
+        },
+        "blocks": {
+          "description": "Several components in order, each {kind,data}, instead of kind/data.",
+          "minItems": 1,
+          "maxItems": 5,
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "minLength": 1
+              },
+              "data": {
+                "type": "object",
+                "propertyNames": {
+                  "type": "string"
+                },
+                "additionalProperties": {}
+              }
+            },
+            "required": [
+              "kind",
+              "data"
+            ]
+          }
+        },
+        "projectId": {
+          "description": "Project whose saved custom components to resolve.",
+          "type": "string",
+          "minLength": 1
+        },
+        "componentSources": {
+          "description": "Unsaved component packages (manifest, schema, source, files, assets).",
+          "maxItems": 5,
+          "type": "array",
+          "items": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {}
+          }
+        },
+        "title": {
+          "description": "Accessible name and host card title.",
+          "type": "string",
+          "maxLength": 300
+        },
+        "delivery": {
+          "description": "auto follows the plugin's declared host display.",
+          "type": "string",
+          "enum": [
+            "auto",
+            "mcp-app",
+            "fragment-file",
+            "compact",
+            "image"
+          ]
+        },
+        "theme": {
+          "description": "Theme for image delivery.",
+          "type": "string",
+          "enum": [
+            "light",
+            "dark"
+          ]
+        }
+      },
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "openWorldHint": false
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    },
+    "_meta": {
+      "securitySchemes": [
+        {
+          "type": "noauth"
+        }
+      ],
+      "ui": {
+        "resourceUri": "ui://showai/component-v1.html"
+      },
+      "openai/outputTemplate": "ui://showai/component-v1.html",
+      "openai/toolInvocation/invoking": "正在生成 ShowAI 组件",
+      "openai/toolInvocation/invoked": "ShowAI 组件已就绪"
+    }
+  }
+]
