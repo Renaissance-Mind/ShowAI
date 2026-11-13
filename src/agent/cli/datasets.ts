@@ -1,6 +1,14 @@
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
-import type { AgentService } from "../service";
+import {
+  datasetApply,
+  datasetCreate,
+  datasetDelete,
+  datasetLink,
+  datasetList,
+  datasetRead,
+  datasetTransform,
+} from "../operations/datasets";
 import {
   flag,
   hiddenText,
@@ -16,47 +24,56 @@ export const datasetCommands: CommandDeclaration[] = [
   {
     command: "datasets",
     actions: ["list"],
+    operation: datasetList,
     help: ["datasets list --project PROJECT"],
-    async run(args, { service, project }) {
+    async input(args) {
       requireCount(args, 2);
-      return service.datasetList(await project());
+      return {};
     },
   },
   {
     command: "datasets",
     actions: ["read"],
+    operation: datasetRead,
     options: { path: text, refresh: flag, query: text },
+    fields: {
+      datasetId: "DATASET",
+      path: "--path",
+      refresh: "--refresh",
+      query: "--query",
+    },
     help: [
       "datasets read DATASET --project PROJECT [--path 'objectives[id=o1]'] [--refresh]",
       "datasets read DATASET --project PROJECT --query QUERY.json   {filter, sorts, search} over {columns, rows}",
     ],
-    async run(args, { service, project, id }) {
+    async input(args, { id }) {
       requireCount(args, 3);
       const query = option(args, "query");
-      return service.datasetRead(await project(), id, {
+      return {
+        datasetId: id,
         path: option(args, "path"),
         refresh: !!args.options.refresh,
-        ...(query
-          ? {
-              query: (await readJson(query)) as {
-                filter?: unknown;
-                sorts?: unknown;
-                search?: string;
-              },
-            }
-          : {}),
-      });
+        ...(query ? { query: await readJson(query) } : {}),
+      };
     },
   },
   {
     command: "datasets",
     actions: ["create"],
+    operation: datasetCreate,
     options: { name: text, input: text, description: hiddenText },
-    access: "write",
+    fields: {
+      name: "--name",
+      description: "--description",
+      datasetId: "--input",
+      value: "--input",
+      schema: "--input",
+      fromBlock: "--input",
+    },
     help: [
       "datasets create --project PROJECT --name NAME --input VALUE_OR_FROM_BLOCK.json",
     ],
-    async run(args, { service, project }) {
+    async input(args) {
       requireCount(args, 2);
       const input = option(args, "input")
         ? await readJson(option(args, "input")!)
@@ -65,24 +82,35 @@ export const datasetCommands: CommandDeclaration[] = [
         throw new Error(
           "--input must contain { value } or { fromBlock: { pageId, blockId, baseHash, local? } }.",
         );
-      return service.datasetCreate(await project(), {
-        ...(input as Record<string, unknown>),
+      // The file may name the new dataset's id.
+      const { id: datasetId, ...value } = input as Record<string, unknown>;
+      return {
+        ...value,
+        ...(datasetId !== undefined ? { datasetId } : {}),
         name: option(args, "name", true)!,
         ...(option(args, "description")
           ? { description: option(args, "description") }
           : {}),
-      } as Parameters<AgentService["datasetCreate"]>[1]);
+      };
     },
   },
   {
     command: "datasets",
     actions: ["apply"],
+    operation: datasetApply,
     options: { input: text, "base-hash": text },
-    access: "write",
+    fields: {
+      datasetId: "DATASET",
+      baseHash: "--base-hash",
+      operations: "--input",
+      name: "--input",
+      description: "--input",
+      schema: "--input",
+    },
     help: [
       "datasets apply DATASET --project PROJECT --input operations.json --base-hash HASH",
     ],
-    async run(args, { service, project, id }) {
+    async input(args, { id }) {
       requireCount(args, 3);
       const input = await readJson(option(args, "input", true)!);
       const body = Array.isArray(input) ? { operations: input } : input;
@@ -94,15 +122,17 @@ export const datasetCommands: CommandDeclaration[] = [
         throw new Error(
           "Expected a JSON array of dataset operations, or { operations: [...], name?, description? }.",
         );
-      return service.datasetApply(await project(), id, {
+      return {
+        datasetId: id,
         ...(body as { operations: unknown[] }),
         baseHash: option(args, "base-hash", true)!,
-      });
+      };
     },
   },
   {
     command: "datasets",
     actions: ["link"],
+    operation: datasetLink,
     options: {
       file: text,
       url: text,
@@ -115,7 +145,18 @@ export const datasetCommands: CommandDeclaration[] = [
       "base-hash": text,
       description: hiddenText,
     },
-    access: "write",
+    fields: {
+      datasetId: "DATASET",
+      path: "--file",
+      url: "--url",
+      format: "--format",
+      refreshSeconds: "--refresh-seconds",
+      use: "--use",
+      name: "--name",
+      description: "--description",
+      value: "--input",
+      baseHash: "--base-hash",
+    },
     help: [
       "datasets link [DATASET] --project PROJECT --file /abs/data.json|.csv|.tsv|.xlsx [--name NAME] [--use file|dataset] [--input VALUE.json]",
       "datasets link [DATASET] --project PROJECT --url https://host/data.json|.csv|.tsv|.xlsx [--format FORMAT] [--refresh-seconds 300] [--name NAME] [--use file]",
@@ -123,16 +164,17 @@ export const datasetCommands: CommandDeclaration[] = [
       "  Keeps the value in a file outside the library (linked on this device) or reads online data",
       "  (read-only; .xlsx files too); --embed copies it back; read --refresh fetches online data now.",
     ],
-    async run(args, { service, project }) {
+    async input(args) {
       requireCount(args, 2, 3);
       const dataset = args.positional[2];
       if (args.options.embed) {
         if (!dataset) throw new Error("datasets link --embed needs DATASET.");
-        return service.datasetEmbed(
-          await project(),
-          dataset,
-          option(args, "base-hash"),
-        );
+        // A null path copies the linked value back into the library.
+        return {
+          datasetId: dataset,
+          path: null,
+          baseHash: option(args, "base-hash"),
+        };
       }
       const use = option(args, "use");
       if (use !== undefined && !["file", "dataset"].includes(use))
@@ -144,14 +186,12 @@ export const datasetCommands: CommandDeclaration[] = [
       const file = option(args, "file");
       if (!url === !file) throw new Error("Give either --file or --url.");
       const refresh = option(args, "refresh-seconds");
-      return service.datasetLink(await project(), {
+      return {
         ...(dataset ? { datasetId: dataset } : {}),
         ...(file ? { path: resolve(file) } : { url: url! }),
         ...(refresh !== undefined ? { refreshSeconds: Number(refresh) } : {}),
-        ...(format
-          ? { format: format as "json" | "csv" | "tsv" | "xlsx" }
-          : {}),
-        ...(use ? { use: use as "file" | "dataset" } : {}),
+        ...(format ? { format } : {}),
+        ...(use ? { use } : {}),
         ...(option(args, "name") ? { name: option(args, "name") } : {}),
         ...(option(args, "description")
           ? { description: option(args, "description") }
@@ -159,18 +199,28 @@ export const datasetCommands: CommandDeclaration[] = [
         ...(option(args, "input")
           ? { value: await readJson(option(args, "input")!) }
           : {}),
-      });
+      };
     },
   },
   {
     command: "datasets",
     actions: ["transform"],
+    operation: datasetTransform,
     options: {
       name: text,
       inputs: text,
       script: text,
       "base-hash": text,
       description: hiddenText,
+    },
+    fields: {
+      datasetId: "DATASET",
+      baseHash: "--base-hash",
+      name: "--name",
+      description: "--description",
+      inputs: "--inputs",
+      script: "--script",
+      dryRun: "--dry-run",
     },
     access: (args) => (args.options["dry-run"] ? "read" : "write"),
     help: [
@@ -179,7 +229,7 @@ export const datasetCommands: CommandDeclaration[] = [
       "  the script defines function transform(inputs, helpers). --base-hash changes DATASET's definition;",
       "  --dry-run runs the script and returns its output without saving.",
     ],
-    async run(args, { service, project }) {
+    async input(args) {
       requireCount(args, 2, 3);
       const dataset = args.positional[2];
       const inputs = option(args, "inputs")
@@ -187,45 +237,39 @@ export const datasetCommands: CommandDeclaration[] = [
         : undefined;
       const scriptPath = option(args, "script");
       const definition = {
-        ...(inputs ? { inputs: inputs as Record<string, string> } : {}),
+        ...(inputs ? { inputs } : {}),
         ...(scriptPath
           ? { script: await readFile(resolve(scriptPath), "utf8") }
           : {}),
       };
       if (args.options["dry-run"])
-        return service.datasetTryTransform(await project(), {
+        return {
           ...(dataset ? { datasetId: dataset } : {}),
           ...definition,
-        });
+          dryRun: true,
+        };
       const baseHash = option(args, "base-hash");
-      return service.datasetTransform(await project(), {
-        ...(dataset
-          ? baseHash
-            ? { datasetId: dataset }
-            : { id: dataset }
-          : {}),
+      return {
+        ...(dataset ? { datasetId: dataset } : {}),
         ...(baseHash ? { baseHash } : {}),
         ...(option(args, "name") ? { name: option(args, "name") } : {}),
         ...(option(args, "description")
           ? { description: option(args, "description") }
           : {}),
         ...definition,
-      });
+      };
     },
   },
   {
     command: "datasets",
     actions: ["delete"],
+    operation: datasetDelete,
     options: { "base-hash": text },
-    access: "write",
+    fields: { datasetId: "DATASET", baseHash: "--base-hash" },
     help: ["datasets delete DATASET --project PROJECT --base-hash HASH"],
-    async run(args, { service, project, id }) {
+    async input(args, { id }) {
       requireCount(args, 3);
-      return service.datasetDelete(
-        await project(),
-        id,
-        option(args, "base-hash", true)!,
-      );
+      return { datasetId: id, baseHash: option(args, "base-hash", true)! };
     },
   },
 ];

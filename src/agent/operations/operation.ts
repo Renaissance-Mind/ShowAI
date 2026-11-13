@@ -29,7 +29,10 @@ export const operation = <Shape extends z.ZodRawShape>(
 ) => declaration;
 
 /** Fields of an operation's input in the given order, e.g. for a tool schema. */
-export function pick<Shape extends z.ZodRawShape, Key extends keyof Shape>(
+export function pick<
+  Shape extends z.ZodRawShape,
+  const Key extends keyof Shape,
+>(
   shape: Shape,
   keys: readonly Key[],
 ): Pick<Shape, Key> {
