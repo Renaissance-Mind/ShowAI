@@ -1,4 +1,4 @@
-import { datasetWriteTools } from "./mcp-datasets";
+import { datasetWriteTools } from "./mcp-tools/datasets";
 import {
   CAPACITY,
   CapacityError,
@@ -30,7 +30,7 @@ import {
   organizationWriteTools,
   sidebarOperations,
   draftTools,
-} from "./mcp-organization";
+} from "./mcp-tools/organization";
 import {
   mcpSuccess,
   mcpFailure,

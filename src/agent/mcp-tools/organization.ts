@@ -1,12 +1,9 @@
 import { z } from "zod";
-import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
-import { WorkspaceService } from "./workspace-service";
-import type { EditorDraftInput } from "../core/editor-drafts";
-import { validateDocument } from "../portable/validation.mjs";
-import { actionTool, type ToolAction } from "./mcp-actions";
-import type { AgentService } from "./service";
-import { pageStateReceipt } from "./page-receipt";
+import type { EditorDraftInput } from "../../core/editor-drafts";
+import { validateDocument } from "../../portable/validation.mjs";
+import type { ToolAction } from "../mcp-actions";
+import { pageStateReceipt } from "../page-receipt";
+import type { ToolConnection, ToolDeclaration } from "./tool";
 
 export const organizationWriteTools = new Set([
   "organization_update",
@@ -26,31 +23,25 @@ export const draftTools = new Set([
   "draft_remove",
 ]);
 
-export function registerOrganizationTools(
-  register: McpServer["registerTool"],
-  service: WorkspaceService,
-  pages: Pick<AgentService, "updatePage" | "duplicatePage">,
-  call: (
-    handler: () => Promise<unknown>,
-    metadata?: { operationId?: string; message?: string; groupId?: string },
-  ) => Promise<CallToolResult>,
-) {
-  const id = z.string().min(1).max(128);
-  const metadata = {
-    operationId: z.string().max(1000).optional(),
-    message: z.string().max(4000).optional(),
-    groupId: z.string().max(1000).optional(),
-  };
-  const read = {
-    readOnlyHint: true,
-    destructiveHint: false,
-    openWorldHint: false,
-  };
-  const write = { ...read, readOnlyHint: false };
-  const name = z.string().trim().min(1).max(1000);
-  const groupName = name.nullable();
-  const parentId = id.nullable();
-  const placement = z.enum(["before", "after"]);
+const id = z.string().min(1).max(128);
+const metadata = {
+  operationId: z.string().max(1000).optional(),
+  message: z.string().max(4000).optional(),
+  groupId: z.string().max(1000).optional(),
+};
+const name = z.string().trim().min(1).max(1000);
+const groupName = name.nullable();
+const parentId = id.nullable();
+const placement = z.enum(["before", "after"]);
+const draftId = z.string().regex(/^[a-f0-9]{64}$/);
+const generation = z.string().uuid();
+
+/** Folder, page, project and sidebar actions of organization_read and _update. */
+function organizationActions({
+  workspace: service,
+  service: pages,
+  call,
+}: ToolConnection) {
   const readActions: Record<string, ToolAction> = {
     folders: {
       fields: { includeArchived: z.boolean().optional() },
@@ -269,53 +260,45 @@ export function registerOrganizationTools(
         ),
     };
   }
-  const organizationRead = actionTool(
-    "Read project folders, deleted items that can be restored, or this connection's sidebar groups and project order.",
-    readActions,
-  );
-  register(
-    "organization_read",
-    {
-      description: organizationRead.description,
-      inputSchema: organizationRead.inputSchema,
-      annotations: read,
-    },
-    organizationRead.handler,
-  );
-  const organizationUpdate = actionTool(
-    "Change folders, pages, this project or the sidebar. archived:true deletes (restorable, listed by organization_read deleted), archived:false restores. parentId is a folder or null for the root; page moves need baseHash/baseRevision; sectionId is projects, pinned or a sidebar group; update_group with name:null removes it.",
-    updateActions,
-  );
-  register(
-    "organization_update",
-    {
-      description: organizationUpdate.description,
-      inputSchema: organizationUpdate.inputSchema,
-      annotations: write,
-    },
-    organizationUpdate.handler,
-  );
-  register(
-    "catalog_references",
-    {
-      description:
-        "Find where a component or template is referenced in this project's pages and packages; version/integrity narrow the target.",
-      inputSchema: {
-        kind: z.enum(["component", "template"]),
-        id: z.string().min(1),
-        version: z.string().optional(),
-        integrity: z.string().optional(),
-      },
-      annotations: read,
-    },
-    ({ kind, id: target, version, integrity }) =>
+  return { readActions, updateActions };
+}
+
+/** Folders, pages, the project and the sidebar; references; editor drafts. */
+export const organizationTools: ToolDeclaration[] = [
+  {
+    name: "organization_read",
+    access: "read",
+    summary:
+      "Read project folders, deleted items that can be restored, or this connection's sidebar groups and project order.",
+    actions: (connection) => organizationActions(connection).readActions,
+  },
+  {
+    name: "organization_update",
+    access: "write",
+    summary:
+      "Change folders, pages, this project or the sidebar. archived:true deletes (restorable, listed by organization_read deleted), archived:false restores. parentId is a folder or null for the root; page moves need baseHash/baseRevision; sectionId is projects, pinned or a sidebar group; update_group with name:null removes it.",
+    actions: (connection) => organizationActions(connection).updateActions,
+  },
+  {
+    name: "catalog_references",
+    access: "read",
+    description:
+      "Find where a component or template is referenced in this project's pages and packages; version/integrity narrow the target.",
+    input: () => ({
+      kind: z.enum(["component", "template"]),
+      id: z.string().min(1),
+      version: z.string().optional(),
+      integrity: z.string().optional(),
+    }),
+    run: ({ workspace: service, call }, { kind, id: target, version, integrity }) =>
       call(() => service.references(kind, target, { version, integrity })),
-  );
-  const draftId = z.string().regex(/^[a-f0-9]{64}$/);
-  const generation = z.string().uuid();
-  const draftRead = actionTool(
-    "Read editor drafts in this project's connection workspace; drafts are not formal content and do not sync.",
-    {
+  },
+  {
+    name: "draft_read",
+    access: "read",
+    summary:
+      "Read editor drafts in this project's connection workspace; drafts are not formal content and do not sync.",
+    actions: ({ workspace: service, call }) => ({
       list: {
         fields: {
           clientId: z.string().min(1).optional(),
@@ -331,20 +314,14 @@ export function registerOrganizationTools(
         fields: { draftId },
         run: ({ draftId }) => call(() => service.readDraft(draftId as string)),
       },
-    },
-  );
-  register(
-    "draft_read",
-    {
-      description: draftRead.description,
-      inputSchema: draftRead.inputSchema,
-      annotations: read,
-    },
-    draftRead.handler,
-  );
-  const draftWrite = actionTool(
-    "Save an editable draft, or complete a page draft after saving its exact content.",
-    {
+    }),
+  },
+  {
+    name: "draft_write",
+    access: "write",
+    summary:
+      "Save an editable draft, or complete a page draft after saving its exact content.",
+    actions: ({ workspace: service, call }) => ({
       save: {
         fields: {
           kind: z.enum(["page", "component", "template"]),
@@ -381,26 +358,16 @@ export function registerOrganizationTools(
             ),
           ),
       },
-    },
-  );
-  register(
-    "draft_write",
-    {
-      description: draftWrite.description,
-      inputSchema: draftWrite.inputSchema,
-      annotations: write,
-    },
-    draftWrite.handler,
-  );
-  register(
-    "draft_remove",
-    {
-      description:
-        "Discard a reviewed draft generation; a newer generation returns CONFLICT.",
-      inputSchema: { draftId, generation },
-      annotations: { ...write, destructiveHint: true },
-    },
-    ({ draftId, generation }) =>
+    }),
+  },
+  {
+    name: "draft_remove",
+    access: "write",
+    hints: { destructiveHint: true },
+    description:
+      "Discard a reviewed draft generation; a newer generation returns CONFLICT.",
+    input: () => ({ draftId, generation }),
+    run: ({ workspace: service, call }, { draftId, generation }) =>
       call(() => service.removeDraft(draftId, generation)),
-  );
-}
+  },
+];

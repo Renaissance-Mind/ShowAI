@@ -1,13 +1,11 @@
-import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
-import type { AgentService } from "./service";
-import { actionTool, type ToolAction } from "./mcp-actions";
-import { assertLocalPath, fileReceipt, inlineOrFile } from "./local-files";
+import type { ToolAction } from "../mcp-actions";
+import { assertLocalPath, fileReceipt, inlineOrFile } from "../local-files";
 import { readFile, writeFile } from "node:fs/promises";
-import { CAPACITY } from "../portable/capacity.mjs";
-import { CoreError } from "../core/model";
-import { TRANSFORM_LIMITS } from "../core/dataset-transform";
+import { CAPACITY } from "../../portable/capacity.mjs";
+import { CoreError } from "../../core/model";
+import { TRANSFORM_LIMITS } from "../../core/dataset-transform";
+import { changeSchema, type ToolConnection, type ToolDeclaration } from "./tool";
 
 export const datasetWriteTools = new Set<string>([
   "dataset_write",
@@ -34,11 +32,6 @@ const operation = z
   })
   .strict();
 
-type Call = (
-  handler: () => Promise<unknown>,
-  metadata?: { operationId?: string; message?: string; groupId?: string },
-) => Promise<CallToolResult>;
-
 /** Shared datasets: one value that several page blocks read and write. */
 const recordQuerySchema = z
   .object({
@@ -63,28 +56,20 @@ function recordQueryInput(value: unknown) {
   return result.data as { filter?: unknown; sorts?: unknown; search?: string };
 }
 
-export function registerDatasetTools(
-  register: McpServer["registerTool"],
-  service: AgentService,
-  projectId: string,
-  call: Call,
-  annotations: {
-    readOnly: Record<string, boolean>;
-    write: Record<string, boolean>;
-  },
-  changeSchema: z.ZodRawShape,
-  /** Linking reads and writes files of the connected device. */
-  localFiles: boolean,
-) {
-  const datasetId = z.string().min(1).max(128);
-  const datasetName = z.string().min(1).max(200);
-  const description = z.string().max(4000);
-  const baseHash = z.string().min(1);
-  const read = actionTool(
-    `Read shared datasets: list them, or read one's value, hash, status (ok/stale/empty), editable, warnings and the pages using it; path (e.g. a[id=o1].b) narrows the value. refresh:true fetches online data now. sinceHash (e.g. from page_read datasetBases) returns record-level changes since then, paged with offset/limit. query {filter, sorts, search} reads a {columns, rows} value as records with derived values, filtered like a database view.${
-      localFiles ? " out writes the value or comparison to a JSON file." : ""
-    }`,
-    {
+const datasetId = z.string().min(1).max(128);
+const datasetName = z.string().min(1).max(200);
+const description = z.string().max(4000);
+const baseHash = z.string().min(1);
+// Large values and operation lists can come from a JSON file on this device.
+const filePath = z.string().min(1).max(4096).optional();
+
+function readActions({
+  service,
+  projectId,
+  call,
+  localFiles,
+}: ToolConnection): Record<string, ToolAction> {
+  return {
       list: {
         fields: {},
         run: () => call(() => service.datasetList(projectId)),
@@ -157,19 +142,15 @@ export function registerDatasetTools(
             };
           }),
       },
-    },
-  );
-  register(
-    "dataset_read",
-    {
-      description: read.description,
-      inputSchema: read.inputSchema,
-      annotations: annotations.readOnly,
-    },
-    read.handler,
-  );
-  // Large values and operation lists can come from a JSON file on this device.
-  const filePath = z.string().min(1).max(4096).optional();
+  };
+}
+
+function writeActions({
+  service,
+  projectId,
+  call,
+  localFiles,
+}: ToolConnection): Record<string, ToolAction> {
   const valueFile: z.ZodRawShape = localFiles ? { valueFile: filePath } : {};
   const operationsFile: z.ZodRawShape = localFiles
     ? { operationsFile: filePath }
@@ -435,39 +416,48 @@ export function registerDatasetTools(
         });
       }, metadata),
   };
-  const write = actionTool(
-    `Change shared datasets (guide datasets). create: value, or fromBlock {pageId,blockId,baseHash} to share and bind a block's props. apply: read baseHash + operations {op:"set",path,value}, {op:"remove",path}, {op:"insert",path:list,value,after?}, {op:"move",path:item,after}; path selects records by id ([id=t1]). link url: online json/csv/tsv/xlsx, read-only. transform: read-only data from script "function transform(inputs, helpers)", inputs {name:datasetId}; dryRun:true runs it unsaved.${
+  return actions;
+}
+
+/** Shared datasets: one value that several page blocks read and write. */
+export const datasetTools: ToolDeclaration[] = [
+  {
+    name: "dataset_read",
+    access: "read",
+    summary: ({
+      localFiles,
+    }) => `Read shared datasets: list them, or read one's value, hash, status (ok/stale/empty), editable, warnings and the pages using it; path (e.g. a[id=o1].b) narrows the value. refresh:true fetches online data now. sinceHash (e.g. from page_read datasetBases) returns record-level changes since then, paged with offset/limit. query {filter, sorts, search} reads a {columns, rows} value as records with derived values, filtered like a database view.${
+      localFiles ? " out writes the value or comparison to a JSON file." : ""
+    }`,
+    actions: readActions,
+  },
+  {
+    name: "dataset_write",
+    access: "write",
+    summary: ({
+      localFiles,
+    }) => `Change shared datasets (guide datasets). create: value, or fromBlock {pageId,blockId,baseHash} to share and bind a block's props. apply: read baseHash + operations {op:"set",path,value}, {op:"remove",path}, {op:"insert",path:list,value,after?}, {op:"move",path:item,after}; path selects records by id ([id=t1]). link url: online json/csv/tsv/xlsx, read-only. transform: read-only data from script "function transform(inputs, helpers)", inputs {name:datasetId}; dryRun:true runs it unsaved.${
       localFiles
         ? " link path: value in a local json/csv/tsv file (xlsx read-only); path:null copies it back. *File fields read from a file."
         : ""
     }`,
-    actions,
-  );
-  register(
-    "dataset_write",
-    {
-      description: write.description,
-      inputSchema: write.inputSchema,
-      annotations: annotations.write,
-    },
-    write.handler,
-  );
-  register(
-    "dataset_delete",
-    {
-      description:
-        "Delete a dataset that no block uses; otherwise fails with details.references.",
-      inputSchema: {
-        ...changeSchema,
-        datasetId: z.string().min(1),
-        baseHash: z.string().min(1),
-      },
-      annotations: { ...annotations.write, destructiveHint: true },
-    },
-    ({ datasetId, baseHash, ...metadata }) =>
+    actions: writeActions,
+  },
+  {
+    name: "dataset_delete",
+    access: "write",
+    hints: { destructiveHint: true },
+    description:
+      "Delete a dataset that no block uses; otherwise fails with details.references.",
+    input: () => ({
+      ...changeSchema,
+      datasetId: z.string().min(1),
+      baseHash: z.string().min(1),
+    }),
+    run: ({ service, projectId, call }, { datasetId, baseHash, ...metadata }) =>
       call(
         () => service.datasetDelete(projectId, datasetId, baseHash),
         metadata,
       ),
-  );
-}
+  },
+];
