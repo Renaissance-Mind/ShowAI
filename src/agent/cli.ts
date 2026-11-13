@@ -14,7 +14,7 @@ import {
   type Arguments,
   type CommandDeclaration,
 } from "./cli/command";
-import { findCommand, parseArguments } from "./cli/commands";
+import { checkOptions, findCommand, parseArguments } from "./cli/commands";
 import { cliHelp } from "./cli/help";
 
 // The command line: words and options are parsed against the command
@@ -70,6 +70,7 @@ async function runCliCommand(
 export async function runCli(argv: string[]): Promise<unknown> {
   const args = parseArguments(argv);
   const declaration = findCommand(args.positional);
+  if (declaration) checkOptions(args, declaration);
   const context = commandContext(args);
   const [command, action] = args.positional;
   if (
