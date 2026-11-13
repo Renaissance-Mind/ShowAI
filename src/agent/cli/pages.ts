@@ -1,9 +1,19 @@
 import { readFile } from "node:fs/promises";
-import type { PageOperation, PageRecord } from "../../core/model";
+import type { PageRecord } from "../../core/model";
 import type { PageReadOptions } from "../page-reading";
 import { compactData } from "../mcp-response";
 import { pageStateReceipt } from "../page-receipt";
-import { boardReadSchema, type BoardReadInput } from "../board-reading";
+import type { BoardReadInput } from "../board-reading";
+import {
+  boardRead,
+  pageApply,
+  pageCreate,
+  pageDuplicate,
+  pageList,
+  pageRead,
+  pageSave,
+  pageUpdate,
+} from "../operations/pages";
 import {
   hiddenFlag,
   hiddenText,
@@ -19,11 +29,18 @@ import {
   responseProfile,
 } from "./inputs";
 
+const documentFields = {
+  document: "--input",
+  components: "--input",
+  remoteComponents: "--input",
+};
+
 /** Page reading and changes: pages *, boards read. */
 export const pageCommands: CommandDeclaration[] = [
   {
     command: "boards",
     actions: ["read"],
+    operation: boardRead,
     options: {
       state: text,
       board: text,
@@ -34,10 +51,20 @@ export const pageCommands: CommandDeclaration[] = [
       tile: hiddenText,
       scale: hiddenText,
     },
+    fields: {
+      pageId: "PAGE",
+      boardId: "--board",
+      snapshotId: "--snapshot",
+      mode: "--mode",
+      nodeId: "--node",
+      tileIds: "--tiles",
+      tileId: "--tile",
+      scale: "--scale",
+    },
     help: [
       "boards read PAGE --project PROJECT [--board BOARD_NODE] [--state OPTIONS.json]",
     ],
-    async run(args, { service, project, id }) {
+    async input(args, { id }) {
       requireCount(args, 3);
       const state = option(args, "state");
       const input: BoardReadInput = state
@@ -59,11 +86,7 @@ export const pageCommands: CommandDeclaration[] = [
         ...(tileId ? { tileId } : {}),
         ...(scale ? { scale: Number(scale) } : {}),
       });
-      return service.readBoard(
-        await project(),
-        id,
-        boardReadSchema.parse(input),
-      );
+      return { pageId: id, ...input };
     },
   },
   {
@@ -76,31 +99,42 @@ export const pageCommands: CommandDeclaration[] = [
   {
     command: "pages",
     actions: ["list"],
+    operation: pageList,
     help: ["pages list --project PROJECT"],
-    async run(args, { service, project }) {
+    async input(args) {
       requireCount(args, 2);
-      return service.listPages(await project());
+      return {};
     },
   },
   {
     command: "pages",
     actions: ["create"],
+    operation: pageCreate,
     options: { title: text, kind: text, input: text },
-    access: "write",
-    async run(args, { service, project }) {
+    fields: { title: "--title", kind: "--kind", ...documentFields },
+    async input(args) {
       requireCount(args, 2);
-      return service.createPage(await project(), {
+      // An artifact file also carries its format and presentation; the page takes the rest.
+      const artifact = option(args, "input")
+        ? await readDocument(option(args, "input")!)
+        : undefined;
+      return {
         title: option(args, "title"),
-        kind: option(args, "kind") as "page" | "board" | undefined,
-        ...(option(args, "input")
-          ? await readDocument(option(args, "input")!)
+        kind: option(args, "kind"),
+        ...(artifact
+          ? {
+              document: artifact.document,
+              components: artifact.components,
+              remoteComponents: artifact.remoteComponents,
+            }
           : {}),
-      });
+      };
     },
   },
   {
     command: "pages",
     actions: ["read"],
+    operation: pageRead,
     options: {
       view: text,
       blocks: text,
@@ -121,6 +155,26 @@ export const pageCommands: CommandDeclaration[] = [
       overwrite: hiddenFlag,
       "base-hash": hiddenText,
     },
+    fields: {
+      pageId: "PAGE",
+      view: "--view",
+      format: "--format",
+      detail: "--detail",
+      offset: "--offset",
+      limit: "--limit",
+      blockIds: "--blocks",
+      theme: "--theme",
+      viewport: "--width/--height",
+      presentation: "--presentation",
+      actions: "--state",
+      draft: "--draft",
+      rendered: "--rendered",
+      snapshotId: "--snapshot",
+      expectedHash: "--base-hash",
+      out: "--out",
+      overwrite: "--overwrite",
+      references: "--references",
+    },
     help: [
       "pages read PAGE --project PROJECT [--view structured|image|html] [--blocks ID,ID]",
       "pages read PAGE --project PROJECT --format markdown [--detail full|outline] [--offset N --limit N]",
@@ -131,7 +185,7 @@ export const pageCommands: CommandDeclaration[] = [
       "  Adds references: pages linking to this page (to, backlinks) and pages it links to (from),",
       "  each with the block holding the reference and the text around it.",
     ],
-    async run(args, { service, project, id }) {
+    async input(args, { id }) {
       requireCount(args, 3);
       const state = option(args, "state")
         ? await readJson(option(args, "state")!)
@@ -188,14 +242,20 @@ export const pageCommands: CommandDeclaration[] = [
       if (out) readOptions.out = out;
       const hash = option(args, "base-hash");
       if (hash) readOptions.expectedHash = hash;
-      return service.readPage(await project(), id, readOptions);
+      return { pageId: id, ...readOptions };
     },
   },
   {
     command: "pages",
     actions: ["save"],
+    operation: pageSave,
     options: { input: text, "base-hash": text, "base-revision": text },
-    access: "write",
+    fields: {
+      pageId: "PAGE",
+      baseHash: "--base-hash",
+      baseRevision: "--base-revision",
+      ...documentFields,
+    },
     // Page changes reply with receipts, made after the transaction has recorded the revision.
     result(args) {
       const profile = responseProfile(args);
@@ -204,27 +264,33 @@ export const pageCommands: CommandDeclaration[] = [
     help: [
       "pages save PAGE --project PROJECT --input DOCUMENT.json --base-hash HASH [--base-revision REVISION] [--response receipt|source|full]",
     ],
-    async run(args, { service, project, id }) {
+    async input(args, { service, project, id }) {
       requireCount(args, 3);
       const input = await readDocument(option(args, "input", true)!);
       const projectId = await project();
       const baseHash = option(args, "base-hash", true)!;
-      return service.savePage(
-        projectId,
-        id,
-        input.document,
+      return {
+        pageId: id,
+        document: input.document,
         baseHash,
-        input.components,
-        input.remoteComponents,
-        await readRevision(service, args, projectId, id, baseHash),
-      );
+        components: input.components,
+        remoteComponents: input.remoteComponents,
+        baseRevision: await readRevision(service, args, projectId, id, baseHash),
+      };
     },
   },
   {
     command: "pages",
     actions: ["apply"],
+    operation: pageApply,
     options: { input: text, "base-hash": text, "base-revision": text },
-    access: "write",
+    fields: {
+      pageId: "PAGE",
+      baseHash: "--base-hash",
+      baseRevision: "--base-revision",
+      operations: "--input",
+      datasetBases: "--input",
+    },
     result(args) {
       const profile = responseProfile(args);
       return (value) => compactData(value, profile);
@@ -233,7 +299,7 @@ export const pageCommands: CommandDeclaration[] = [
       "pages apply PAGE --project PROJECT --input operations.json --base-hash HASH [--base-revision REVISION] [--response receipt|source|full]",
       "  In a versioned library --base-revision defaults to the revision returned by the last pages read with that hash.",
     ],
-    async run(args, { service, project, id }) {
+    async input(args, { service, project, id }) {
       requireCount(args, 3);
       const input = await readJson(option(args, "input", true)!);
       const operations = Array.isArray(input)
@@ -247,57 +313,55 @@ export const pageCommands: CommandDeclaration[] = [
         );
       const projectId = await project();
       const baseHash = option(args, "base-hash", true)!;
-      return service.applyPage(projectId, id, {
+      return {
+        pageId: id,
         baseHash,
-        baseRevision: await readRevision(
-          service,
-          args,
-          projectId,
-          id,
-          baseHash,
-        ),
-        operations: operations as PageOperation[],
+        baseRevision: await readRevision(service, args, projectId, id, baseHash),
+        operations,
         ...(input &&
         typeof input === "object" &&
         !Array.isArray(input) &&
         "datasetBases" in input
-          ? { datasetBases: input.datasetBases as Record<string, string> }
+          ? { datasetBases: input.datasetBases }
           : {}),
-      });
+      };
     },
   },
   {
     command: "pages",
     actions: ["delete", "restore", "pin", "unpin"],
+    operation: pageUpdate,
     options: { "base-hash": text, "base-revision": hiddenText },
-    access: "write",
+    fields: {
+      pageId: "PAGE",
+      baseHash: "--base-hash",
+      baseRevision: "--base-revision",
+    },
     result: () => (value) => pageStateReceipt(value as PageRecord),
     help: ["pages delete|restore|pin|unpin PAGE --project PROJECT [--base-hash HASH]"],
-    async run(args, { service, project, action, id }) {
+    async input(args, { action, id }) {
       requireCount(args, 3);
-      return service.updatePage(
-        await project(),
-        id,
-        action === "delete" || action === "restore"
+      return {
+        pageId: id,
+        ...(action === "delete" || action === "restore"
           ? { archived: action === "delete" }
-          : { pinned: action === "pin" },
-        {
-          baseHash: option(args, "base-hash"),
-          baseRevision: option(args, "base-revision"),
-        },
-      );
+          : { pinned: action === "pin" }),
+        baseHash: option(args, "base-hash"),
+        baseRevision: option(args, "base-revision"),
+      };
     },
   },
   {
     command: "pages",
     actions: ["duplicate"],
+    operation: pageDuplicate,
     options: { title: text },
-    access: "write",
+    fields: { pageId: "PAGE", title: "--title" },
     result: () => (value) => pageStateReceipt(value as PageRecord),
     help: ["pages duplicate PAGE --project PROJECT [--title TITLE]"],
-    async run(args, { service, project, id }) {
+    async input(args, { id }) {
       requireCount(args, 3);
-      return service.duplicatePage(await project(), id, option(args, "title"));
+      return { pageId: id, title: option(args, "title") };
     },
   },
   {

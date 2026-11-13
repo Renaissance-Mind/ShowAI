@@ -3,6 +3,8 @@ import type { EditorDraftInput } from "../../core/editor-drafts";
 import { validateDocument } from "../../portable/validation.mjs";
 import type { ToolAction } from "../mcp-actions";
 import { pageStateReceipt } from "../page-receipt";
+import type { PageRecord } from "../../core/model";
+import { pageDuplicate, pageUpdate } from "../operations/pages";
 import type { ToolConnection, ToolDeclaration } from "./tool";
 
 export const organizationWriteTools = new Set([
@@ -114,46 +116,32 @@ function organizationActions({
         ),
     },
     update_page: {
-      fields: {
-        ...metadata,
-        pageId: id,
-        archived: z.boolean().optional(),
-        pinned: z.boolean().optional(),
-        baseHash: z.string().min(1).optional(),
-        baseRevision: z.string().min(1).optional(),
-      },
+      fields: { ...metadata, ...pageUpdate.input },
       run: ({ pageId, archived, pinned, baseHash, baseRevision, ...meta }) =>
         call(
           async () =>
             pageStateReceipt(
-              await pages.updatePage(
-                service.project(),
-                pageId as string,
-                {
-                  archived: archived as boolean | undefined,
-                  pinned: pinned as boolean | undefined,
-                },
-                {
-                  baseHash: baseHash as string | undefined,
-                  baseRevision: baseRevision as string | undefined,
-                },
-              ),
+              (await pageUpdate.run(
+                { service: pages, projectId: service.project() },
+                { pageId, archived, pinned, baseHash, baseRevision } as Parameters<
+                  typeof pageUpdate.run
+                >[1],
+              )) as PageRecord,
               service.project(),
             ),
           meta,
         ),
     },
     duplicate_page: {
-      fields: { ...metadata, pageId: id, title: name.optional() },
+      fields: { ...metadata, ...pageDuplicate.input },
       run: ({ pageId, title, ...meta }) =>
         call(
           async () =>
             pageStateReceipt(
-              await pages.duplicatePage(
-                service.project(),
-                pageId as string,
-                title as string | undefined,
-              ),
+              (await pageDuplicate.run(
+                { service: pages, projectId: service.project() },
+                { pageId, title } as Parameters<typeof pageDuplicate.run>[1],
+              )) as PageRecord,
               service.project(),
             ),
           meta,

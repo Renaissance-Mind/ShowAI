@@ -1,5 +1,6 @@
 import type { ChangeContext } from "../../core/history-model";
 import type { AgentService } from "../service";
+import { parseInput, type Operation } from "../operations/operation";
 
 /** The words and options of one command line. */
 export interface Arguments {
@@ -57,7 +58,42 @@ export interface CommandDeclaration {
   help?: readonly string[];
   /** Other commands (keys) that this declaration's help lines also describe. */
   covers?: readonly string[];
-  run(args: Arguments, scope: CommandScope): Promise<unknown>;
+  /**
+   * The shared operation this command runs (see ../operations). Its access
+   * applies unless the command declares its own.
+   */
+  operation?: Operation<any>;
+  /** The operation's input from the arguments, before the operation validates it. */
+  input?(args: Arguments, scope: CommandScope): Promise<Record<string, unknown>>;
+  /** How the command spells each input field, for validation errors. */
+  fields?: Record<string, string>;
+  /** Commands without an operation run their own handler. */
+  run?(args: Arguments, scope: CommandScope): Promise<unknown>;
+}
+
+/** Runs a command: its handler, or its operation with validated input. */
+export async function runCommand(
+  declaration: CommandDeclaration,
+  args: Arguments,
+  scope: CommandScope,
+) {
+  if (declaration.run) return declaration.run(args, scope);
+  const shared = declaration.operation!;
+  const input = parseInput(
+    shared,
+    await declaration.input!(args, scope),
+    declaration.fields,
+  );
+  return shared.run(
+    { service: scope.service, projectId: await scope.project() },
+    input,
+  );
+}
+
+/** Whether a command writes: its own declaration, else its operation's. */
+export function commandAccess(declaration: CommandDeclaration, args: Arguments) {
+  const access = declaration.access ?? declaration.operation?.access;
+  return typeof access === "function" ? access(args) : access;
 }
 
 /** "pages save", "mcp", "public *". */

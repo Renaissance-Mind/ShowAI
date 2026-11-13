@@ -8,8 +8,10 @@ import { openLibrary } from "../core/open-library";
 import { followAppLanguage } from "../core/app-language";
 import { AgentService, errorResult, type FailedOperation } from "./service";
 import {
+  commandAccess,
   commandContext,
   option,
+  runCommand,
   unknownCommand,
   type Arguments,
   type CommandDeclaration,
@@ -64,7 +66,7 @@ async function runCliCommand(
   };
   if (args.options.help) return service.guide(HELP_TOPICS[command]);
   if (!declaration) throw unknownCommand(args);
-  return declaration.run(args, { service, project, action, id });
+  return runCommand(declaration, args, { service, project, action, id });
 }
 
 export async function runCli(argv: string[]): Promise<unknown> {
@@ -83,10 +85,7 @@ export async function runCli(argv: string[]): Promise<unknown> {
     // The browser workbench sets its own language; other commands speak the App's.
     if (command !== "serve") await followAppLanguage(root);
   }
-  const access =
-    typeof declaration?.access === "function"
-      ? declaration.access(args)
-      : declaration?.access;
+  const access = declaration && commandAccess(declaration, args);
   // Writes run in one recorded transaction unless the handler records its own.
   const mutation = access === "write" && !declaration?.ownTransaction;
   if (!mutation || args.options.help)

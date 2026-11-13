@@ -4,10 +4,7 @@ import { join } from "node:path";
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
 import { CAPACITY, CapacityError } from "../../portable/capacity.mjs";
-import { validateDocument } from "../../portable/validation.mjs";
-import type { CompiledComponent } from "../../contract/types";
-import { CoreError, type PageOperation } from "../../core/model";
-import type { PublishedComponentLocator } from "../../core/publication";
+import { CoreError } from "../../core/model";
 import {
   conversationHandoff,
   hostDisplay,
@@ -17,10 +14,10 @@ import {
   withConversation,
 } from "../presentation-tools";
 import { presentPage } from "../page-presentation";
-import { pageReadSchema, type PageReadResult } from "../page-reading";
+import type { PageReadResult } from "../page-reading";
 import { inlineReader, writePresentation } from "../presentation";
 import { compactData, compactMcpResult } from "../mcp-response";
-import { boardReadSchema, type BoardReadResult } from "../board-reading";
+import type { BoardReadResult } from "../board-reading";
 import { assertLocalPath, fileReceipt, inlineOrFile } from "../local-files";
 import {
   DIFF_DEFAULT_LIMIT,
@@ -29,7 +26,18 @@ import {
 } from "../page-diff-view";
 import { planImport, runImport } from "../import-service";
 import { compactPlan, compactReport } from "../import-commands";
-import { changeSchema, jsonObject, type ToolDeclaration } from "./tool";
+import { pick } from "../operations/operation";
+import {
+  boardRead,
+  pageApply,
+  pageCreate,
+  pageExport,
+  pageList,
+  pageOperationsSchema,
+  pageRead,
+  pageSave,
+} from "../operations/pages";
+import { changeSchema, type ToolDeclaration } from "./tool";
 
 // Capture tuning stays available to the service; agents use the defaults.
 const boardTuning = {
@@ -42,17 +50,17 @@ const boardTuning = {
   imageScope: true,
   theme: true,
 } as const;
-const operationsSchema = z.array(jsonObject).max(1000);
+const operationsSchema = pageOperationsSchema;
 const applyShape = {
   ...changeSchema,
-  pageId: z.string(),
-  baseHash: z.string().min(1),
-  baseRevision: z.string().optional(),
+  ...pick(pageApply.input, ["pageId", "baseHash", "baseRevision"]),
   operations: operationsSchema.optional(),
   operationsFile: z.string().min(1).optional(),
-  datasetBases: z.record(z.string(), z.string()).optional(),
+  datasetBases: pageApply.input.datasetBases,
   response: z.enum(["full", "source", "receipt"]).default("receipt"),
 };
+const { pageId: _pageId, ...readShape } = pageRead.input;
+const { out: _out, overwrite: _overwrite, ...remoteReadShape } = readShape;
 const { operationsFile: _operationsFile, ...remoteApplyShape } = applyShape;
 
 /** Reading, creating, changing, comparing and exporting pages. */
@@ -61,9 +69,9 @@ export const pageTools: ToolDeclaration[] = [
     name: "pages_list",
     access: "read",
     description: "List pages with titles, IDs and hashes.",
-    input: () => ({ includeArchived: z.boolean().optional() }),
-    run: ({ service, projectId, call }, { includeArchived }) =>
-      call(() => service.store.listPages(projectId, { includeArchived })),
+    input: () => pageList.input,
+    run: ({ service, projectId, call }, input) =>
+      call(() => pageList.run({ service, projectId }, input)),
   },
   {
     name: "page_read",
@@ -75,17 +83,18 @@ export const pageTools: ToolDeclaration[] = [
           : ""
       }`,
     input: ({ localFiles }) => ({
-      pageId: z.string().min(1),
-      ...(localFiles
-        ? pageReadSchema.shape
-        : pageReadSchema.omit({ out: true, overwrite: true }).shape),
+      pageId: pageRead.input.pageId,
+      ...(localFiles ? readShape : remoteReadShape),
       response: z.enum(["full", "source", "receipt"]).default("full"),
     }),
     run: ({ service, projectId, call }, { pageId, response, ...readOptions }) =>
       call(async () => {
         const out = (readOptions as { out?: string }).out;
         if (out !== undefined) assertLocalPath(out, "out");
-        return service.readPage(projectId, pageId, readOptions);
+        return pageRead.run(
+          { service, projectId },
+          { pageId, ...readOptions } as Parameters<typeof pageRead.run>[1],
+        );
       }).then(async (result) => {
         if (!("data" in result.structuredContent)) return result;
         const data = result.structuredContent.data as PageReadResult;
@@ -143,12 +152,18 @@ export const pageTools: ToolDeclaration[] = [
     access: "read",
     description:
       "Read a Board: a full image for small boards, otherwise an overview with overlapping tiles and element/Page indexes. Pass the returned snapshotId with mode tile/region/element/source for details. boardId selects a Board inside a Page.",
-    input: () => ({
-      pageId: z.string().min(1),
-      ...boardReadSchema.omit(boardTuning).shape,
-    }),
-    run: ({ service, projectId, call }, { pageId, ...input }) =>
-      call(() => service.readBoard(projectId, pageId, input)).then(
+    input: () => {
+      const shape: Partial<typeof boardRead.input> = { ...boardRead.input };
+      for (const key of Object.keys(boardTuning)) delete shape[key as keyof typeof boardTuning];
+      return shape as z.ZodRawShape;
+    },
+    run: ({ service, projectId, call }, input) =>
+      call(() =>
+        boardRead.run(
+          { service, projectId },
+          input as Parameters<typeof boardRead.run>[1],
+        ),
+      ).then(
         async (result) => {
           if (!("data" in result.structuredContent)) return result;
           const data = result.structuredContent.data as BoardReadResult;
@@ -204,16 +219,7 @@ export const pageTools: ToolDeclaration[] = [
               .optional(),
           }
         : {}),
-      title: z.string().optional(),
-      kind: z.enum(["page", "board"]).optional(),
-      parentId: z.string().min(1).nullable().optional(),
-      blocks: z
-        .array(z.object({ kind: z.string().min(1), data: jsonObject }))
-        .max(100)
-        .optional(),
-      document: jsonObject.optional(),
-      components: z.array(jsonObject).max(100).optional(),
-      remoteComponents: z.array(jsonObject).max(100).optional(),
+      ...pageCreate.input,
     }),
     run: (
       { service, projectId, call, withOpenLink },
@@ -248,16 +254,10 @@ export const pageTools: ToolDeclaration[] = [
               );
         }
         return withOpenLink(
-          await service.createPage(projectId, {
-            title,
-            kind,
-            parentId,
-            blocks,
-            ...(document ? { document: validateDocument(document) } : {}),
-            components: components as unknown as CompiledComponent[] | undefined,
-            remoteComponents: remoteComponents as unknown as
-              PublishedComponentLocator[] | undefined,
-          }),
+          await pageCreate.run(
+            { service, projectId },
+            { title, kind, parentId, blocks, document, components, remoteComponents },
+          ),
         );
       }, metadata),
   },
@@ -269,12 +269,7 @@ export const pageTools: ToolDeclaration[] = [
       'Save a full Page document with its baseHash; stale content returns CONFLICT. Replies with a receipt (hash, revision, changedBlocks); response:"source" adds the saved document.',
     input: () => ({
       ...changeSchema,
-      pageId: z.string(),
-      document: jsonObject,
-      baseHash: z.string().min(1),
-      baseRevision: z.string().optional(),
-      components: z.array(jsonObject).max(100).optional(),
-      remoteComponents: z.array(jsonObject).max(100).optional(),
+      ...pageSave.input,
       response: z.enum(["full", "source", "receipt"]).default("receipt"),
     }),
     run: (
@@ -294,15 +289,16 @@ export const pageTools: ToolDeclaration[] = [
         async () =>
           compactData(
             await withOpenLink(
-              await service.savePage(
-                projectId,
-                pageId,
-                validateDocument(document),
-                baseHash,
-                components as unknown as CompiledComponent[] | undefined,
-                remoteComponents as unknown as
-                  PublishedComponentLocator[] | undefined,
-                baseRevision,
+              await pageSave.run(
+                { service, projectId },
+                {
+                  pageId,
+                  document,
+                  baseHash,
+                  baseRevision,
+                  components,
+                  remoteComponents,
+                },
               ),
             ),
             response,
@@ -356,12 +352,10 @@ export const pageTools: ToolDeclaration[] = [
               .join("; ")}`,
           );
         return compactData(
-          await service.applyPage(projectId, pageId, {
-            baseHash,
-            baseRevision,
-            operations: parsed.data as PageOperation[],
-            datasetBases,
-          }),
+          await pageApply.run(
+            { service, projectId },
+            { pageId, baseHash, baseRevision, operations: parsed.data, datasetBases },
+          ),
           response,
         );
       }, metadata),
@@ -433,23 +427,20 @@ export const pageTools: ToolDeclaration[] = [
     access: "write",
     description:
       "Export a Page as HTML, an inline conversation fragment or a static site at out; blockIds exports part of it. Files of this device (or data computed from them) return CONFIRMATION_REQUIRED with details.packaging (items, sizes, choices); repeat with packaging {itemId: choice} after the person decides.",
-    input: () => ({
-      pageId: z.string().optional(),
-      blockIds: z.array(z.string().min(1)).min(1).optional(),
-      format: z.enum(["html", "inline", "site"]),
-      presentation: z.enum(["spatial", "reading"]).optional(),
-      components: z.enum(["bundled", "remote"]).optional(),
-      reader: z.enum(["bundled", "cdn"]).optional(),
-      out: z.string().min(1),
-      overwrite: z.boolean().optional(),
-      packaging: z
-        .record(
-          z.string(),
-          z.enum(["bundle", "skip", "keep-url", "result", "inputs", "both", "embed"]),
-        )
-        .optional(),
-      externalData: z.literal("embed").optional(),
-    }),
+    // Exports of earlier revisions and imported snapshots stay on the CLI.
+    input: () =>
+      pick(pageExport.input, [
+        "pageId",
+        "blockIds",
+        "format",
+        "presentation",
+        "components",
+        "reader",
+        "out",
+        "overwrite",
+        "packaging",
+        "externalData",
+      ]),
     run: (
       { service, projectId, call },
       {
@@ -466,8 +457,7 @@ export const pageTools: ToolDeclaration[] = [
       },
     ) =>
       call(() =>
-        service.export({
-          projectId,
+        pageExport.run({ service, projectId }, {
           pageId,
           blockIds,
           format,

@@ -1,7 +1,7 @@
 import { resolve } from "node:path";
-import type { PackagingChoice } from "../../core/packaging";
 import { parseArtifact } from "../../portable/validation.mjs";
-import { assertExportDestination, type ExportFormat } from "../exporter";
+import { assertExportDestination } from "../exporter";
+import { pageExport } from "../operations/pages";
 import {
   describePublicResource,
   publicCatalog,
@@ -100,6 +100,23 @@ export const presentationCommands: CommandDeclaration[] = [
   },
   {
     command: "export",
+    operation: pageExport,
+    // Writes files outside the library; the export records nothing.
+    ownTransaction: true,
+    fields: {
+      pageId: "--page",
+      blockIds: "--blocks",
+      format: "--format",
+      presentation: "--presentation",
+      components: "--components",
+      reader: "--reader",
+      out: "--out",
+      overwrite: "--overwrite",
+      packaging: "--packaging",
+      externalData: "--external-data",
+      revision: "--revision",
+      importedSnapshot: "--import/--snapshot",
+    },
     options: {
       page: text,
       blocks: text,
@@ -121,13 +138,12 @@ export const presentationCommands: CommandDeclaration[] = [
       "  Pages with files of this device stop with the packaging plan (items, sizes, choices); pass the person's",
       "  choices with --packaging DECISIONS.json ({itemId: choice}), or --external-data embed for everything that fits.",
     ],
-    async run(args, { service, project }) {
+    async input(args) {
       requireCount(args, 1);
       const format = option(args, "format", true);
       if (!["html", "inline", "site"].includes(format!))
         throw new Error("--format must be html, inline or site.");
-      return service.export({
-        projectId: await project(),
+      return {
         pageId: option(args, "page"),
         ...(Object.hasOwn(args.options, "blocks")
           ? {
@@ -136,7 +152,7 @@ export const presentationCommands: CommandDeclaration[] = [
                 .map((id) => id.trim()),
             }
           : {}),
-        format: format as ExportFormat,
+        format,
         out: option(args, "out", true)!,
         overwrite: !!args.options.overwrite,
         components: componentMode(args),
@@ -150,13 +166,10 @@ export const presentationCommands: CommandDeclaration[] = [
               },
             }
           : {}),
-        presentation: option(args, "presentation") as
-          "spatial" | "reading" | undefined,
+        presentation: option(args, "presentation"),
         ...(option(args, "packaging")
           ? {
-              packaging: (await readJson(
-                option(args, "packaging", true)!,
-              )) as Record<string, PackagingChoice>,
+              packaging: await readJson(option(args, "packaging", true)!),
             }
           : {}),
         ...(option(args, "external-data")
@@ -168,7 +181,7 @@ export const presentationCommands: CommandDeclaration[] = [
               })(),
             }
           : {}),
-      });
+      };
     },
   },
 ];
