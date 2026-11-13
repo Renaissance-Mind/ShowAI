@@ -1,0 +1,331 @@
+import { readFile } from "node:fs/promises";
+import type { PageOperation, PageRecord } from "../../core/model";
+import type { PageReadOptions } from "../page-reading";
+import { compactData } from "../mcp-response";
+import { pageStateReceipt } from "../page-receipt";
+import { boardReadSchema, type BoardReadInput } from "../board-reading";
+import {
+  hiddenFlag,
+  hiddenText,
+  option,
+  requireCount,
+  text,
+  type CommandDeclaration,
+} from "./command";
+import {
+  readDocument,
+  readJson,
+  readRevision,
+  responseProfile,
+} from "./inputs";
+
+/** Page reading and changes: pages *, boards read. */
+export const pageCommands: CommandDeclaration[] = [
+  {
+    command: "boards",
+    actions: ["read"],
+    options: {
+      state: text,
+      board: text,
+      snapshot: hiddenText,
+      mode: hiddenText,
+      node: hiddenText,
+      tiles: hiddenText,
+      tile: hiddenText,
+      scale: hiddenText,
+    },
+    help: [
+      "boards read PAGE --project PROJECT [--board BOARD_NODE] [--state OPTIONS.json]",
+    ],
+    async run(args, { service, project, id }) {
+      requireCount(args, 3);
+      const state = option(args, "state");
+      const input: BoardReadInput = state
+        ? JSON.parse(await readFile(state, "utf8"))
+        : {};
+      const boardId = option(args, "board"),
+        snapshotId = option(args, "snapshot"),
+        mode = option(args, "mode"),
+        nodeId = option(args, "node"),
+        tiles = option(args, "tiles"),
+        tileId = option(args, "tile"),
+        scale = option(args, "scale");
+      Object.assign(input, {
+        ...(boardId ? { boardId } : {}),
+        ...(snapshotId ? { snapshotId } : {}),
+        ...(mode ? { mode } : {}),
+        ...(nodeId ? { nodeId } : {}),
+        ...(tiles ? { tileIds: tiles.split(",") } : {}),
+        ...(tileId ? { tileId } : {}),
+        ...(scale ? { scale: Number(scale) } : {}),
+      });
+      return service.readBoard(
+        await project(),
+        id,
+        boardReadSchema.parse(input),
+      );
+    },
+  },
+  {
+    command: "boards",
+    actions: ["*"],
+    async run() {
+      throw new Error("Use boards read PAGE.");
+    },
+  },
+  {
+    command: "pages",
+    actions: ["list"],
+    help: ["pages list --project PROJECT"],
+    async run(args, { service, project }) {
+      requireCount(args, 2);
+      return service.listPages(await project());
+    },
+  },
+  {
+    command: "pages",
+    actions: ["create"],
+    options: { title: text, kind: text, input: text },
+    access: "write",
+    async run(args, { service, project }) {
+      requireCount(args, 2);
+      return service.createPage(await project(), {
+        title: option(args, "title"),
+        kind: option(args, "kind") as "page" | "board" | undefined,
+        ...(option(args, "input")
+          ? await readDocument(option(args, "input")!)
+          : {}),
+      });
+    },
+  },
+  {
+    command: "pages",
+    actions: ["read"],
+    options: {
+      view: text,
+      blocks: text,
+      format: text,
+      detail: text,
+      offset: text,
+      limit: text,
+      theme: text,
+      width: text,
+      height: text,
+      out: text,
+      state: text,
+      references: text,
+      presentation: hiddenText,
+      rendered: hiddenText,
+      snapshot: hiddenText,
+      draft: hiddenFlag,
+      overwrite: hiddenFlag,
+      "base-hash": hiddenText,
+    },
+    help: [
+      "pages read PAGE --project PROJECT [--view structured|image|html] [--blocks ID,ID]",
+      "pages read PAGE --project PROJECT --format markdown [--detail full|outline] [--offset N --limit N]",
+      "  A page source over 256 KiB reads as an outline window unless --detail full, --blocks or --out is given.",
+      "pages read PAGE --project PROJECT --view image --theme dark --width 1000 --height 900 --out preview.png",
+      "pages read PAGE --project PROJECT --view html [--state reading-state.json] --out preview.html",
+      "pages read PAGE --project PROJECT --references to|from|both",
+      "  Adds references: pages linking to this page (to, backlinks) and pages it links to (from),",
+      "  each with the block holding the reference and the text around it.",
+    ],
+    async run(args, { service, project, id }) {
+      requireCount(args, 3);
+      const state = option(args, "state")
+        ? await readJson(option(args, "state")!)
+        : {};
+      if (!state || typeof state !== "object" || Array.isArray(state))
+        throw new Error(
+          "--state must contain Page reading options such as actions, viewport and draft.",
+        );
+      const readOptions: PageReadOptions = { ...state };
+      const view = option(args, "view");
+      if (view) readOptions.view = view as PageReadOptions["view"];
+      const format = option(args, "format");
+      if (format) readOptions.format = format as PageReadOptions["format"];
+      const detail = option(args, "detail");
+      if (detail) readOptions.detail = detail as PageReadOptions["detail"];
+      const references = option(args, "references");
+      if (references) {
+        if (!["to", "from", "both"].includes(references))
+          throw new Error("--references must be to, from or both.");
+        readOptions.references = references as PageReadOptions["references"];
+      }
+      const theme = option(args, "theme");
+      if (theme) readOptions.theme = theme as PageReadOptions["theme"];
+      const blocks = option(args, "blocks");
+      if (blocks) readOptions.blockIds = blocks.split(",");
+      for (const name of ["offset", "limit"] as const) {
+        const value = option(args, name);
+        if (value !== undefined) readOptions[name] = Number(value);
+      }
+      const width = option(args, "width"),
+        height = option(args, "height");
+      if (width || height)
+        readOptions.viewport = {
+          width: width ? Number(width) : (readOptions.viewport?.width ?? 1000),
+          height: height
+            ? Number(height)
+            : (readOptions.viewport?.height ?? 900),
+        };
+      const presentation = option(args, "presentation");
+      if (presentation)
+        readOptions.presentation =
+          presentation as PageReadOptions["presentation"];
+      const rendered = option(args, "rendered");
+      const snapshotId = option(args, "snapshot");
+      if (snapshotId) readOptions.snapshotId = snapshotId;
+      if (rendered) {
+        if (!["true", "false"].includes(rendered))
+          throw new Error("--rendered must be true or false.");
+        readOptions.rendered = rendered === "true";
+      }
+      if (args.options.draft) readOptions.draft = true;
+      if (args.options.overwrite) readOptions.overwrite = true;
+      const out = option(args, "out");
+      if (out) readOptions.out = out;
+      const hash = option(args, "base-hash");
+      if (hash) readOptions.expectedHash = hash;
+      return service.readPage(await project(), id, readOptions);
+    },
+  },
+  {
+    command: "pages",
+    actions: ["save"],
+    options: { input: text, "base-hash": text, "base-revision": text },
+    access: "write",
+    // Page changes reply with receipts, made after the transaction has recorded the revision.
+    result(args) {
+      const profile = responseProfile(args);
+      return (value) => compactData(value, profile);
+    },
+    help: [
+      "pages save PAGE --project PROJECT --input DOCUMENT.json --base-hash HASH [--base-revision REVISION] [--response receipt|source|full]",
+    ],
+    async run(args, { service, project, id }) {
+      requireCount(args, 3);
+      const input = await readDocument(option(args, "input", true)!);
+      const projectId = await project();
+      const baseHash = option(args, "base-hash", true)!;
+      return service.savePage(
+        projectId,
+        id,
+        input.document,
+        baseHash,
+        input.components,
+        input.remoteComponents,
+        await readRevision(service, args, projectId, id, baseHash),
+      );
+    },
+  },
+  {
+    command: "pages",
+    actions: ["apply"],
+    options: { input: text, "base-hash": text, "base-revision": text },
+    access: "write",
+    result(args) {
+      const profile = responseProfile(args);
+      return (value) => compactData(value, profile);
+    },
+    help: [
+      "pages apply PAGE --project PROJECT --input operations.json --base-hash HASH [--base-revision REVISION] [--response receipt|source|full]",
+      "  In a versioned library --base-revision defaults to the revision returned by the last pages read with that hash.",
+    ],
+    async run(args, { service, project, id }) {
+      requireCount(args, 3);
+      const input = await readJson(option(args, "input", true)!);
+      const operations = Array.isArray(input)
+        ? input
+        : input && typeof input === "object" && "operations" in input
+          ? input.operations
+          : undefined;
+      if (!Array.isArray(operations))
+        throw new Error(
+          "Expected a JSON array of operations, or { operations: [...] }.",
+        );
+      const projectId = await project();
+      const baseHash = option(args, "base-hash", true)!;
+      return service.applyPage(projectId, id, {
+        baseHash,
+        baseRevision: await readRevision(
+          service,
+          args,
+          projectId,
+          id,
+          baseHash,
+        ),
+        operations: operations as PageOperation[],
+        ...(input &&
+        typeof input === "object" &&
+        !Array.isArray(input) &&
+        "datasetBases" in input
+          ? { datasetBases: input.datasetBases as Record<string, string> }
+          : {}),
+      });
+    },
+  },
+  {
+    command: "pages",
+    actions: ["delete", "restore", "pin", "unpin"],
+    options: { "base-hash": text, "base-revision": hiddenText },
+    access: "write",
+    result: () => (value) => pageStateReceipt(value as PageRecord),
+    help: ["pages delete|restore|pin|unpin PAGE --project PROJECT [--base-hash HASH]"],
+    async run(args, { service, project, action, id }) {
+      requireCount(args, 3);
+      return service.updatePage(
+        await project(),
+        id,
+        action === "delete" || action === "restore"
+          ? { archived: action === "delete" }
+          : { pinned: action === "pin" },
+        {
+          baseHash: option(args, "base-hash"),
+          baseRevision: option(args, "base-revision"),
+        },
+      );
+    },
+  },
+  {
+    command: "pages",
+    actions: ["duplicate"],
+    options: { title: text },
+    access: "write",
+    result: () => (value) => pageStateReceipt(value as PageRecord),
+    help: ["pages duplicate PAGE --project PROJECT [--title TITLE]"],
+    async run(args, { service, project, id }) {
+      requireCount(args, 3);
+      return service.duplicatePage(await project(), id, option(args, "title"));
+    },
+  },
+  {
+    command: "pages",
+    actions: ["deleted"],
+    help: [
+      "pages deleted [--project PROJECT]   deleted projects, folders and pages that can be restored",
+    ],
+    async run(args, { service }) {
+      requireCount(args, 2);
+      const entries = await service.deletedEntries();
+      const only = option(args, "project");
+      return only
+        ? {
+            projects: entries.projects.filter((item) => item.id === only),
+            folders: entries.folders.filter((item) => item.projectId === only),
+            pages: entries.pages.filter((item) => item.projectId === only),
+          }
+        : entries;
+    },
+  },
+  {
+    command: "pages",
+    actions: ["diff"],
+    options: { since: text },
+    async run(args, { service, project, id }) {
+      requireCount(args, 3);
+      return service.diffPage(await project(), id, option(args, "since", true)!);
+    },
+  },
+];
