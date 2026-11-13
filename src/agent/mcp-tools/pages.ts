@@ -68,6 +68,7 @@ export const pageTools: ToolDeclaration[] = [
   {
     name: "pages_list",
     access: "read",
+    operation: pageList,
     description: "List pages with titles, IDs and hashes.",
     input: () => pageList.input,
     run: ({ service, projectId, call }, input) =>
@@ -76,6 +77,7 @@ export const pageTools: ToolDeclaration[] = [
   {
     name: "page_read",
     access: "read",
+    operation: pageRead,
     description: ({ localFiles }) =>
       `Read a Page as structured JSON/Markdown (default), a PNG image, or html (DOM, accessibility tree and an interactive file; actions run interactions). detail:"outline" lists block IDs; blockIds selects blocks.${
         localFiles
@@ -150,6 +152,7 @@ export const pageTools: ToolDeclaration[] = [
   {
     name: "board_read",
     access: "read",
+    operation: boardRead,
     description:
       "Read a Board: a full image for small boards, otherwise an overview with overlapping tiles and element/Page indexes. Pass the returned snapshotId with mode tile/region/element/source for details. boardId selects a Board inside a Page.",
     input: () => {
@@ -199,6 +202,7 @@ export const pageTools: ToolDeclaration[] = [
   {
     name: "page_create",
     access: "write",
+    operation: pageCreate,
     hints: { openWorldHint: true },
     description: ({ localFiles }) =>
       `Create a Page or Board. Prefer blocks:[{kind,data}] in reading order, e.g. {kind:"text",data:{format:"markdown",content:"..."}}, and add more with page_apply component.insert.${
@@ -264,6 +268,7 @@ export const pageTools: ToolDeclaration[] = [
   {
     name: "page_save",
     access: "write",
+    operation: pageSave,
     hints: { openWorldHint: true },
     description:
       'Save a full Page document with its baseHash; stale content returns CONFLICT. Replies with a receipt (hash, revision, changedBlocks); response:"source" adds the saved document.',
@@ -309,6 +314,7 @@ export const pageTools: ToolDeclaration[] = [
   {
     name: "page_apply",
     access: "write",
+    operation: pageApply,
     description: ({ localFiles }) =>
       `Apply operations by stable block id with the Page's baseHash. Insert components with {type:"component.insert",kind,data,parentId?,afterId?}, change their data with {type:"component.props.set",blockId,props} and switch a custom component to another revision with {type:"component.ref.set",blockId,version,integrity,componentId?} (keeps id and props). Comment with {type:"comment",text,blockId?,quote?} or {type:"comment",threadId,text?,resolved?}; page_read returns open comments. Other operations: guide authoring. Replies with a receipt whose changedBlocks.added lists new block ids; response:"source" adds the document.${
         localFiles ? " operationsFile reads the operations array from a JSON file." : ""
@@ -425,6 +431,7 @@ export const pageTools: ToolDeclaration[] = [
   {
     name: "page_export",
     access: "write",
+    operation: pageExport,
     description:
       "Export a Page as HTML, an inline conversation fragment or a static site at out; blockIds exports part of it. Files of this device (or data computed from them) return CONFIRMATION_REQUIRED with details.packaging (items, sizes, choices); repeat with packaging {itemId: choice} after the person decides.",
     // Exports of earlier revisions and imported snapshots stay on the CLI.

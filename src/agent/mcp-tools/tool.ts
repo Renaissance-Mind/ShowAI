@@ -14,6 +14,7 @@ import type { TemplateSelection } from "../template-workflow";
 import type { AgentService, errorResult } from "../service";
 import type { WorkspaceService } from "../workspace-service";
 import { actionTool, type ToolAction } from "../mcp-actions";
+import type { Operation } from "../operations/operation";
 
 export type Access = "read" | "write";
 
@@ -85,6 +86,8 @@ interface ToolBase {
 }
 /** A tool with one input schema and handler. */
 export interface PlainTool extends ToolBase {
+  /** The shared operation the handler runs, if any (see ../operations). */
+  operation?: Operation<any>;
   description: string | ((connection: ToolConnection) => string);
   input(connection: ToolConnection): z.ZodRawShape;
   run(
@@ -97,6 +100,8 @@ export interface PlainTool extends ToolBase {
 export interface ActionToolDeclaration extends ToolBase {
   summary: string | ((connection: ToolConnection) => string);
   actions(connection: ToolConnection): Record<string, ToolAction>;
+  /** The shared operation each action runs, by action name. */
+  operations?: Record<string, Operation<any>>;
 }
 export type ToolDeclaration = PlainTool | ActionToolDeclaration;
 

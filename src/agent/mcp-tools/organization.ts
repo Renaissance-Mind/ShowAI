@@ -263,6 +263,7 @@ export const organizationTools: ToolDeclaration[] = [
   {
     name: "organization_update",
     access: "write",
+    operations: { update_page: pageUpdate, duplicate_page: pageDuplicate },
     summary:
       "Change folders, pages, this project or the sidebar. archived:true deletes (restorable, listed by organization_read deleted), archived:false restores. parentId is a folder or null for the root; page moves need baseHash/baseRevision; sectionId is projects, pinned or a sidebar group; update_group with name:null removes it.",
     actions: (connection) => organizationActions(connection).updateActions,

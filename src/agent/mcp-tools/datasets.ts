@@ -261,6 +261,7 @@ export const datasetTools: ToolDeclaration[] = [
   {
     name: "dataset_read",
     access: "read",
+    operations: { list: datasetList, read: datasetRead },
     summary: ({
       localFiles,
     }) => `Read shared datasets: list them, or read one's value, hash, status (ok/stale/empty), editable, warnings and the pages using it; path (e.g. a[id=o1].b) narrows the value. refresh:true fetches online data now. sinceHash (e.g. from page_read datasetBases) returns record-level changes since then, paged with offset/limit. query {filter, sorts, search} reads a {columns, rows} value as records with derived values, filtered like a database view.${
@@ -271,6 +272,12 @@ export const datasetTools: ToolDeclaration[] = [
   {
     name: "dataset_write",
     access: "write",
+    operations: {
+      create: datasetCreate,
+      apply: datasetApply,
+      link: datasetLink,
+      transform: datasetTransform,
+    },
     summary: ({
       localFiles,
     }) => `Change shared datasets (guide datasets). create: value, or fromBlock {pageId,blockId,baseHash} to share and bind a block's props. apply: read baseHash + operations {op:"set",path,value}, {op:"remove",path}, {op:"insert",path:list,value,after?}, {op:"move",path:item,after}; path selects records by id ([id=t1]). link url: online json/csv/tsv/xlsx, read-only. transform: read-only data from script "function transform(inputs, helpers)", inputs {name:datasetId}; dryRun:true runs it unsaved.${
@@ -283,6 +290,7 @@ export const datasetTools: ToolDeclaration[] = [
   {
     name: "dataset_delete",
     access: "write",
+    operation: datasetDelete,
     hints: { destructiveHint: true },
     description:
       "Delete a dataset that no block uses; otherwise fails with details.references.",
