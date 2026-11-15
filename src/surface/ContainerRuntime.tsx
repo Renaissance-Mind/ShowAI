@@ -1,5 +1,6 @@
 import {readBoardToolPreferences,saveBoardToolPreferences,boardStyleKey,boardToolPreferencesChanged,boardToolPreferencesKey} from "./board-tool-preferences";
 import { PageOutline, PageOutlinePrint } from "./PageOutline";
+import { BlockMenuExtensionContext } from "../components/rich-text/environment";
 import { OutlineSettings } from "./OutlineSettings";
 import type { OutlineViewState } from "../document/page-outline.mjs";
 import outlineMessages from "../i18n/messages/pageOutline";
@@ -453,6 +454,12 @@ export function ContainerRuntime({
       }),
     );
   return (
+    <BlockMenuExtensionContext.Provider value={runtime.readOnly ? null : (blockId, close) =>
+      findSurfaceNode(current.current, blockId)?.node.type === "region" ? (
+        <button type="button" onClick={() => { close(); select(blockId); inspect(blockId); }}>
+          {t("region.settings")}
+        </button>
+      ) : null}>
     <AdditionalComponentsProvider components={loadedComponents}>
       <RegisterComponentContext.Provider value={registerComponent}>
         <Context.Provider value={runtime}>
@@ -819,6 +826,18 @@ export function ContainerRuntime({
                       />
                     </label>
                   )}
+                  {selectedEntry.node.type === "region" && frame?.mode === "grid" && (
+                    <>
+                      <label>{t("inspector.minColumnWidth")}
+                        <input type="number" min={120} max={1200} aria-label={t("inspector.minColumnWidth")} value={frame.minColumnWidth ?? 320}
+                          onChange={event => { const value = Number(event.target.value); if (Number.isFinite(value) && value >= 120 && value <= 1200) updateFrame({ ...frame, minColumnWidth: value }); }} />
+                      </label>
+                      <label>{t("inspector.columnGap")}
+                        <input type="number" min={0} max={160} aria-label={t("inspector.columnGap")} value={frame.gap ?? 24}
+                          onChange={event => { const value = Number(event.target.value); if (Number.isFinite(value) && value >= 0 && value <= 160) updateFrame({ ...frame, gap: value }); }} />
+                      </label>
+                    </>
+                  )}
                   {frame &&
                     !(
                       selectedEntry.node.type === "drawing" &&
@@ -994,6 +1013,7 @@ export function ContainerRuntime({
         </Context.Provider>
       </RegisterComponentContext.Provider>
     </AdditionalComponentsProvider>
+    </BlockMenuExtensionContext.Provider>
   );
 }
 function InspectorOutlet({

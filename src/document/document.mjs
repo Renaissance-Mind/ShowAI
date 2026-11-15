@@ -217,8 +217,8 @@ function reconcileSurfaceDocument(source, { clone = true } = {}) {
   for (const id of Object.keys(document.layout)) {
     if (!ids.has(id)) delete document.layout[id];
     else if (!regions.has(id)) {
-      const { mode, columns, gap, ...frame } = document.layout[id];
-      if (mode !== undefined || columns !== undefined || gap !== undefined)
+      const { mode, columns, gap, minColumnWidth, ...frame } = document.layout[id];
+      if (mode !== undefined || columns !== undefined || gap !== undefined || minColumnWidth !== undefined)
         document.layout[id] = frame;
     }
   }

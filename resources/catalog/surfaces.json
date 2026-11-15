@@ -161,5 +161,119 @@
         }
       }
     ]
+  },
+  {
+    "kind": "region",
+    "name": "布局容器",
+    "description": "不显示标题或外框的原生布局容器，组合文字、图像与组件；按可用宽度自动减少列数。",
+    "scenarios": [
+      "把图与解释、并列方案或若干组件组织在同一个布局中。",
+      "在桌面多栏、手机单栏之间自适应，也适用于嵌套窄列。"
+    ],
+    "effects": [
+      "只呈现子内容，没有标题条、背景和额外内边距。",
+      "列数是上限；空间不足时按每列最小宽度换行，保持内容顺序。",
+      "保留原生 region 和子节点 ID，复用现有设置、选中和右键动作。"
+    ],
+    "version": "1.0.0",
+    "insertion": {
+      "nodeType": "region"
+    },
+    "defaultData": {
+      "mode": "grid",
+      "columns": 2,
+      "gap": 24,
+      "minColumnWidth": 320
+    },
+    "propsSchema": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "maxLength": 200
+        },
+        "mode": {
+          "enum": [
+            "flow",
+            "grid",
+            "free"
+          ],
+          "default": "grid"
+        },
+        "columns": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 12,
+          "default": 2
+        },
+        "gap": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 160,
+          "default": 24
+        },
+        "minColumnWidth": {
+          "type": "number",
+          "minimum": 120,
+          "maximum": 1200,
+          "default": 320
+        },
+        "blocks": {
+          "type": "array",
+          "maxItems": 200,
+          "items": {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "minLength": 1
+              },
+              "data": {
+                "type": "object"
+              }
+            },
+            "required": [
+              "kind",
+              "data"
+            ],
+            "additionalProperties": false
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "examples": [
+      {
+        "name": "双栏图文",
+        "request": "把图与解释放在同一个布局容器，窄屏自动排成单列。",
+        "data": {
+          "columns": 2,
+          "minColumnWidth": 320,
+          "gap": 24,
+          "blocks": [
+            {
+              "kind": "text",
+              "data": {
+                "format": "markdown",
+                "content": "### 方案 A\n\n这里可以放图、表或其他组件。"
+              }
+            },
+            {
+              "kind": "text",
+              "data": {
+                "format": "markdown",
+                "content": "### 方案 B\n\n对应的解释随容器宽度换行排列。"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "空白纵向分组",
+        "data": {
+          "mode": "flow"
+        }
+      }
+    ]
   }
 ]

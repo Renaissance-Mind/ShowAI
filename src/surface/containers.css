@@ -131,7 +131,7 @@
   .surface-layout-flow
   > .surface-object.is-region
   > .surface-object-content {
-  padding: 14px 20px;
+  padding: 0;
 }
 .container-menu {
   position: relative;

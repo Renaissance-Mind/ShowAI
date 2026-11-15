@@ -18,6 +18,7 @@ import {
 
 const t = translator(messages);
 import { validateDocument } from "../portable/validation.mjs";
+import { validateRegionData, type RegionData } from "../document/region.mjs";
 
 export function nativeComponentDocument(
   kind: string,
@@ -26,6 +27,10 @@ export function nativeComponentDocument(
   const definition = builtinComponent(kind);
   if (!definition?.insertion)
     throw new Error(`Component ${kind} is not a native container.`);
+  if (definition.insertion.nodeType === "region") {
+    const page = validateDocument({ id: crypto.randomUUID(), title: "", content: createSurface("page") });
+    return insertComponent(page, null, kind, data).document;
+  }
   if (
     Object.keys(data).some(
       (key) => !["title", "content", "layout", "surfaceViews"].includes(key),
@@ -113,6 +118,12 @@ export function insertComponent(
     );
   let node: JSONContent, frame: NodeLayout;
   if (definition?.insertion) {
+    if (definition.insertion.nodeType === "region") {
+      validateRegionData(data);
+      const config = data as RegionData;
+      node = { type: "region", attrs: { id: crypto.randomUUID(), name: config.name ?? "" }, content: [] };
+      frame = { x: 0, y: 0, width: 760, mode: config.mode ?? "grid", columns: config.columns ?? 2, gap: config.gap ?? 24, minColumnWidth: config.minColumnWidth ?? 320 };
+    } else {
     const incoming = remapSurfaceIds(nativeComponentDocument(kind, data));
     node = incoming.content;
     Object.assign(document.layout, incoming.layout);
@@ -128,6 +139,7 @@ export function insertComponent(
       height: 460,
       heightMode: surfaceKind(node) === "page" && !free ? "auto" : "fixed",
     };
+    }
   } else ({ node, frame } = componentBlock(kind, data));
   const free =
     (parent.type === "surface" && surfaceKind(parent) === "board") ||
@@ -183,6 +195,12 @@ export function insertComponent(
     ...siblings.slice(index),
   ];
   if (!inStep) document.layout[node.attrs!.id] = frame;
+  if (kind === "region") {
+    let result = reconcileSurface(document);
+    for (const block of (data.blocks ?? []) as StepBlock[])
+      result = insertComponent(result, node.attrs!.id, block.kind, block.data).document;
+    return { document: result, nodeId: String(node.attrs!.id) };
+  }
   return {
     document: reconcileSurface(document),
     nodeId: node.attrs!.id as string,

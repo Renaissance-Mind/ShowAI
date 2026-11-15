@@ -1,4 +1,5 @@
 import {usePreparedCubic} from "./PortableCubicContext";
+import { regionGridStyle } from "../document/region.mjs";
 import { inkArchiveGroupLayout } from "./ink-archive-group.mjs";
 import { useConnectionGeometry } from "./useConnectionGeometry";
 import { inkArchiveGroup, objectCapabilities } from "../document/geometry.mjs";
@@ -269,10 +270,7 @@ const ContentNode = memo(
           mode === "grid" ? (
             <div
               className="surface-layout-grid"
-              style={{
-                gridTemplateColumns: `repeat(${frame?.columns ?? 2}, minmax(0, 1fr))`,
-                gap: frame?.gap ?? 24,
-              }}
+              style={regionGridStyle(frame)}
             >
               {items}
               {empty}

@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useContext, useState } from "react";
+import { BlockMenuExtensionContext } from "./environment";
 import type { Editor } from "@tiptap/core";
 import { useTranslator } from "../../i18n/react";
 import messages from "../../i18n/messages/primitives";
@@ -32,6 +33,7 @@ export function ContentNodeActions({
   onDone?: () => void;
 }) {
   const t = useTranslator(messages);
+  const hostActions = useContext(BlockMenuExtensionContext);
   const [copyStatus, setCopyStatus] = useState("");
   const node = editor.state.doc.nodeAt(position);
   if (!node || !editor.isEditable) return null;
@@ -104,6 +106,7 @@ export function ContentNodeActions({
   }
   return (
     <div className="content-node-fields">
+      {typeof node.attrs.id === "string" && hostActions?.(node.attrs.id, () => onDone?.())}
       {type === "image" && (
         <>
           {field("src", t("imageSrc"))}

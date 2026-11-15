@@ -471,7 +471,7 @@ export async function renderComponents(
     document: rendered.document,
     // The exact versions to keep when the same blocks are saved in a Page.
     components: (rendered.document.content.content ?? []).map((node) => {
-      const kind = String(node.attrs?.kind);
+      const kind = node.type === "region" ? "region" : String(node.attrs?.kind);
       if (kind !== "custom") return { kind };
       const { componentId, version, integrity } = node.attrs?.data ?? {};
       return { kind, componentId, version, integrity };

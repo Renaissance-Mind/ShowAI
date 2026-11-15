@@ -6,6 +6,12 @@
 
 应用模板用 template_apply（空白 Page，绑定本轮固定引用）；空白路径用 page_create，只传标题和少量（一到几个）`blocks:[{kind,data}]`，不手写整棵 document。按设计稿的幕顺序填入真实内容：导语、图形或组件、图注与要点；新增内容用 page_apply 的 `component.insert`，一次插入一到几个组件，例如 `operations:[{type:"component.insert",kind:"text",data:{format:"markdown",content:"..."},afterId:"上一块ID"}]`。`blocks` 与 `component.insert` 的 kind/data 相同：data 就是该组件的参数，文字统一用 `{kind:"text",data:{format:"markdown",content}}`；afterId 省略时追加到末尾，为 null 时放在最前；要放进容器内部时加 parentId，值为该容器的块 ID；放进 stepper 的某一步时 parentId 是那一步（outline 中 type 为 step）的 ID，新建 stepper 时直接用 steps[].blocks 放入各步组件。page_create 返回含块 ID 的完整 document 与 hash/revision；page_apply 的回执带 hash/revision 和 `changedBlocks.added`（新插入块的 ID），按顺序追加时省略 afterId 即可，需要新块作锚点时用 added 里的 ID。每幕完成后记录实现它的 blockIds。
 
+## 布局容器
+
+`region` 是标准目录里的原生布局组件，不绘制标题条、背景或外框。用 `component.insert` 的 `kind:"region"` 创建，data 可含 `mode:"grid"`、`columns:2`、`gap:24`、`minColumnWidth:320` 与 `blocks:[{kind,data}]`。每个直接子组件是一格，同一格中的多个对象可放进 `mode:"flow"` 的嵌套 region。列数是上限：320px 最小列宽与24px间距需要664px才能显示两列；不足时在当前容器里换成一列，不依赖窗口是否叫“手机”。名字只用于定位，不显示为内容。
+
+用户可从已有内容块菜单进入“布局设置”，白板沿用对象设置。旧 region 无需转换。`component.props.set` 通过原 ID 更新 name、mode、columns、gap、minColumnWidth；子内容通过 `component.insert` 的 parentId 或 block.move/remove 编辑，不用 props.set 替换 blocks。布局检查用 `page_read` 的固定视口与 inspect，分别核对宽屏、窄屏和嵌套列。先读 `catalog_describe` 的 region guide/parameters 确认当前运行时支持。
+
 ## 选择组件与参数
 
 索引条目的 signature 一行给出组件参数的字段与类型，内置组件对应 data，自定义组件对应 data.props；用它判断适配、准备数据和核对顶层必填项，嵌套字段的必填与含义以 parameters 为准。选择组件后读其精确 guide，再按当前材料用 parameters 的 parameterPath 查字段含义、约束与例子；只在需要原始结构时读 schema。模板组件采用 template_context 返回的 componentId/version/integrity，不把局部名字当内置 kind。guide 返回 authoringReference 时沿用精确引用读取制作索引，流程见 [组件设计](../../create-component/references/component-authoring.md)。现有数据调整或组合够用时复用；设计稿中确认的缺口进入 [create-component](../../create-component/SKILL.md)。编辑 Board 的绘画、对象属性、布局或连接时读 [Board 对象编辑](board-authoring.md)。需要具体操作时才读 guide authoring/containers/document 等技术说明。

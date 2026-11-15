@@ -61,7 +61,7 @@ export function validateSurface(document) {
     if (
       Object.keys(frame).some(
         (key) =>
-          !["x", "y", "width", "height", "mode", "columns", "gap"].includes(
+          !["x", "y", "width", "height", "mode", "columns", "gap", "minColumnWidth"].includes(
             key,
           ),
       )
@@ -86,7 +86,7 @@ export function validateSurface(document) {
       throw new Error(`Invalid region layout: ${id}.`);
     if (
       nodes.get(id).type !== "region" &&
-      (frame.columns !== undefined || frame.gap !== undefined)
+      (frame.columns !== undefined || frame.gap !== undefined || frame.minColumnWidth !== undefined)
     )
       throw new Error(`Only regions can define columns and gap: ${id}.`);
     if (frame.columns !== undefined) {
@@ -95,6 +95,7 @@ export function validateSurface(document) {
         throw new Error("Grid columns must be an integer.");
     }
     if (frame.gap !== undefined) finite(frame.gap, 0, 160, `layout.${id}.gap`);
+    if (frame.minColumnWidth !== undefined) finite(frame.minColumnWidth, 120, 1200, `layout.${id}.minColumnWidth`);
   }
   validateViews(
     document.views,
@@ -371,6 +372,7 @@ function validateResource(document) {
             "mode",
             "columns",
             "gap",
+            "minColumnWidth",
             "locked",
           ].includes(key),
       )
@@ -441,7 +443,7 @@ function validateResource(document) {
       );
     if (
       node.type !== "region" &&
-      ["mode", "columns", "gap"].some((key) => frame[key] !== undefined)
+      ["mode", "columns", "gap", "minColumnWidth"].some((key) => frame[key] !== undefined)
     )
       throw new Error("Only regions can define mode, columns and gap.");
     if (
@@ -455,6 +457,7 @@ function validateResource(document) {
         throw new Error("Columns must be an integer.");
     }
     if (frame.gap !== undefined) finite(frame.gap, 0, 160, "gap");
+    if (frame.minColumnWidth !== undefined) finite(frame.minColumnWidth, 120, 1200, "minColumnWidth");
   }
   for (const [id, views] of Object.entries(document.surfaceViews)) {
     const owner = nodes.get(id);

@@ -177,7 +177,7 @@ export function readBuiltinComponentSource(kind: string): ComponentSource {
   const item = describeBuiltinComponent(kind);
   if (item.insertion)
     throw new Error(
-      "Page and Board use native container editing. Insert the component to edit its content and layout, or save it as a template.",
+      "Page, Board and layout regions use native container editing. Insert the component to edit its content and layout, or save it as a template.",
     );
   const exported = builtinExports[kind];
   if (!exported) throw new Error(`No editable source for ${kind}.`);

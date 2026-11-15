@@ -57,6 +57,7 @@ export const builtinCategories: Record<string, ComponentCategory> = {
   "diagram-design": "flow",
   "fireworks-tech-graph": "flow",
   mindmap: "flow",
+  region: "surface",
   page: "surface",
   board: "surface",
 };

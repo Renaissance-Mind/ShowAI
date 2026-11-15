@@ -319,6 +319,7 @@ function validateAttrs(attrs, path, permitted, surfaceIcon = false) {
 }
 
 function validateWidgetData(kind, data, path) {
+  if (kind === "region") throw new Error(`${path}: region is a native layout container; use component.insert instead of a widget.`);
   if (Object.hasOwn(data, BINDING_KEY)) {
     // The block stores a dataset binding and its own values; the component
     // props are resolved from the dataset and checked where they are rendered.

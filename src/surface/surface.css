@@ -541,11 +541,6 @@
   padding-left: 0;
   padding-right: 0;
 }
-@media (max-width: 640px) {
-  .surface-reading .surface-layout-grid {
-    grid-template-columns: 1fr !important;
-  }
-}
 .surface-empty-region {
   min-height: 88px;
   width: 100%;
@@ -1152,3 +1147,15 @@ html[data-native="ios"] .board-resize-handle {
   left: 0;
   top: 0;
 }
+
+/* Layout containers add no visible frame, label, background or inset. */
+.surface-object.is-region:not(.is-ink-archive-group) {
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+.container-page .surface-layout-flow > .surface-object.is-region > .surface-object-content,
+.surface-object.is-region:not(.is-ink-archive-group) > .surface-object-content {
+  padding: 0;
+}
+.surface-layout-grid > * { min-width: 0; }

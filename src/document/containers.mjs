@@ -236,6 +236,7 @@ export function reconcileResource(document) {
     if (node.type !== "region") {
       delete next.mode;
       delete next.columns;
+      delete next.minColumnWidth;
       delete next.gap;
     }
     if (node.type !== "surface") delete next.heightMode;

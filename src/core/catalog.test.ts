@@ -322,6 +322,7 @@ describe("compiled React packages", () => {
       "fireworks-tech-graph",
       "page",
       "board",
+      "region",
     ]);
     expect(
       builtins.every((item) => item.propsSchema && item.scenarios.length),

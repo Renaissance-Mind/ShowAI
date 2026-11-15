@@ -25,6 +25,7 @@ export interface NodeLayout {
   heightMode?: "fixed" | "auto";
   mode?: LayoutMode;
   columns?: number;
+  minColumnWidth?: number;
   gap?: number;
   /** Protects the frame from pointer moves and resizes in the editor. */
   locked?: true;

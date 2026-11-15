@@ -188,7 +188,7 @@ export interface ComponentSource {
 
 export interface BuiltinComponentMetadata {
   documentation?: import("./documentation").ComponentDocumentation;
-  insertion?: { nodeType: "surface"; surfaceKind: "page" | "board" };
+  insertion?: { nodeType: "surface"; surfaceKind: "page" | "board" } | { nodeType: "region" };
   kind: string;
   replacedBy?: string;
   name: string;

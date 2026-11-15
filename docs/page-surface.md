@@ -199,3 +199,9 @@ Moving an arrow alone with `surface.layout.set` clears bindings; moving it with 
 Templates retain trees, frames and views and remap identities together on application. Partial export includes selected descendants and necessary ancestors. Standalone HTML preserves reading, Board navigation and expansion. `--presentation reading` projects the selected root Board into reading order. Printing preserves embedded Board geometry; export an inner Page separately for complete linear reading.
 
 v1/v2 inputs adapt without rewriting on read. The first managed v3 save retains original bytes under `migrations/<resource-id>/original-v1.json` or `original-v2.json` and existing snapshots. Managed resources reject downgrades. See [Artifact format](artifact-format.md).
+
+## Layout component
+
+The catalog's `region` component inserts a native layout container, with no title bar, background, frame or inset. `component.insert` accepts `data:{mode:"grid",columns:2,gap:24,minColumnWidth:320,blocks:[{kind,data}]}`. Each direct child is one grid item; nest a flow region to group several components in one cell. Columns are a maximum, not a fixed mobile layout. With the defaults, two columns need 664 CSS px; below that, the same children appear in one column in source order. The rule uses container width, so it also applies to sidebars and nested columns.
+
+`component.props.set` updates the region's name and layout parameters without changing its ID or children. Existing regions work without migration and default to a 320 px minimum column width. Saved layout frames may set `minColumnWidth` (120–1200 px); resizing only changes presentation, not the stored maximum column count. Use Layout settings in the existing block menu (object settings on Boards); no persistent container header is drawn. Page/Board remain the containers for independent reading or spatial viewports.

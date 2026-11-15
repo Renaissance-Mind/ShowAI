@@ -10921,5 +10921,117 @@
         "在另一页加入指向本页的链接，确认列表出现该页与周围文字；改名、删除、恢复后检查列表；导出后检查快照。"
       ]
     }
+  },
+  "region": {
+    "version": 1,
+    "reuse": {
+      "kind": "general",
+      "boundaries": [
+        "布局容器只负责组合与排列，不规定子内容的意义；子内容可以是任意现有组件。",
+        "原生容器不需要React副本，不新增视口或独立滚动。"
+      ]
+    },
+    "usage": {
+      "purpose": "把已有组件组成无额外显示的流式或响应式多栏布局。",
+      "structure": [
+        "保存为原生region节点；子组件在content中，排列参数在document.layout[regionId]中。",
+        "name仅用于定位和无障碍名称，不绘制标题。",
+        "grid使用实际容器宽度，最大列数由columns给定，最小列宽由minColumnWidth给定；一列也放不下时使用当前可用宽度。"
+      ],
+      "inputs": [
+        {
+          "path": "name",
+          "meaning": "可选内部名称，默认空字符串；不显示标题条。"
+        },
+        {
+          "path": "mode",
+          "meaning": "省略为grid；flow纵向排列；grid自适应多栏；free为已有自由布局，用surface.layout.set安排子对象。"
+        },
+        {
+          "path": "columns",
+          "meaning": "grid最多列数，整数1–12，默认2；不会强制窄屏维持此列数。"
+        },
+        {
+          "path": "minColumnWidth",
+          "meaning": "grid每列最小宽度，CSS px，120–1200，默认320；实际容器不足两列时自动单栏。不要求组件预先声明尺寸。"
+        },
+        {
+          "path": "gap",
+          "meaning": "grid行列间距，CSS px，0–160，默认24。"
+        },
+        {
+          "path": "blocks",
+          "meaning": "创建时可选子组件列表，每项{kind,data}；默认空。每个直接子组件是一个网格项；同列的多个对象用mode:flow的嵌套region组合。嵌套region最多16层，每层最多200项。"
+        }
+      ],
+      "recipes": [
+        {
+          "title": "一次插入图文双栏",
+          "steps": [
+            "component.insert使用kind:region，data中设置columns/minColumnWidth/gap和blocks。",
+            "默认320px与24px间距时，容器至少664px才容得下两列。",
+            "用page_read capture:viewport和inspect测完整页面；比较1440、600以及窄于手机的嵌套列。"
+          ],
+          "exampleIndex": 0
+        },
+        {
+          "title": "修改已有布局容器",
+          "steps": [
+            "读取页面，保留hash/revision及region ID。",
+            "component.props.set可更新name、mode、columns、gap、minColumnWidth；不接受blocks替换。",
+            "子内容通过component.insert(parentId=regionId)及block.move/remove修改，保留稳定ID。旧region无需迁移即可使用这些入口。"
+          ]
+        }
+      ],
+      "interactions": [
+        {
+          "action": "内容块菜单 → 布局设置（白板沿用对象设置）",
+          "effect": "沿用宿主设置与操作；布局本身不显示标题条。",
+          "persistence": "view"
+        },
+        {
+          "action": "调整窗口或父容器宽度",
+          "effect": "只改变当前呈现列数，不改写保存的columns和子内容顺序。",
+          "persistence": "view"
+        }
+      ],
+      "constraints": [
+        "不能把region存成普通widget；使用component.insert由宿主生成原生节点。",
+        "分栏最小宽度不能保证任意内容都可读；用布局测量与截图检查子组件。",
+        "block.move、surface.layout.set仍可操作原生region；页面、导出、预览采用同一布局规则。"
+      ],
+      "editing": {
+        "data": [
+          "布局参数通过component.props.set；结构通过原生子节点操作。"
+        ],
+        "implementation": [
+          "共享regionGridStyle决定CSS布局；SurfaceContent渲染，SurfaceObject不显示region标题条。"
+        ]
+      }
+    },
+    "development": {
+      "entryPoints": [
+        {
+          "path": "src/document/region.mjs",
+          "purpose": "校验输入和生成容器响应式网格样式。"
+        },
+        {
+          "path": "src/surface/component-insertion.ts",
+          "purpose": "标准组件入口转换成原生region，复用子组件插入。"
+        }
+      ],
+      "architecture": [
+        "保留现有原生region，父级保存外框，容器保存子节点。"
+      ],
+      "extensionPoints": [
+        "复用原生布局和设置菜单，不增加独立工具栏。"
+      ],
+      "invariants": [
+        "不改变子内容顺序或稳定ID；只读布局不写入。"
+      ],
+      "verification": [
+        "真实组件插入、保存重读、桌面与窄屏、嵌套容器、离线导出。"
+      ]
+    }
   }
 }

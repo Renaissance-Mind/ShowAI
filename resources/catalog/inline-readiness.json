@@ -262,5 +262,8 @@
   "backlinks": {
     "status": "limited",
     "note": "对话中没有内容库索引，只显示导出时附带的引用。"
+  },
+  "region": {
+    "status": "ready"
   }
 }

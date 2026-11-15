@@ -40,7 +40,7 @@ export function BuiltinPreview({
     >
       <SurfaceReader
         document={document}
-        heading={
+        heading={component.kind === "region" ? undefined :
           <h2 style={{ fontSize: 24, margin: 0 }}>
             {String(data.title ?? component.name)}
           </h2>

@@ -6,6 +6,10 @@ import { translator } from "../../i18n";
 import messages from "../../i18n/messages/richText";
 
 const t = translator(messages);
+/** Native host actions join the existing block menu, not a second toolbar. */
+export const BlockMenuExtensionContext = createContext<
+  ((blockId: string, close: () => void) => ReactNode) | null
+>(null);
 /** What an editor hands to the workbench Agent: stable block ids, optional text and an anchor rect. */
 export interface AssistantRequest {
   kind: "text" | "blocks";

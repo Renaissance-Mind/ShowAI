@@ -6,6 +6,7 @@ import {
   indexSurfaceTree,
 } from "../document/connections.mjs";
 import { insertComponent } from "../surface/component-insertion";
+import { validateRegionData } from "../document/region.mjs";
 import { completeDrawings } from "../document/drawing-completion.mjs";
 import { insertDiagram, tidyFrames } from "../document/diagram.mjs";
 import {
@@ -906,6 +907,17 @@ function applyOperation(
       }
       case "component.props.set": {
         const node = target(operation.blockId);
+        if (node.type === "region") {
+          validateRegionData(operation.props);
+          if (operation.props.blocks !== undefined)
+            throw new CoreError("INVALID_DATA", "Change region children with component.insert or block operations; props.set only updates layout/name.");
+          const { name, ...layout } = operation.props;
+          const frame = draft.layout?.[operation.blockId];
+          if (!frame) throw new CoreError("INVALID_DATA", "Region has no layout frame.");
+          draft.layout![operation.blockId] = { ...frame, ...layout };
+          if (name !== undefined) edit(operation.blockId, current => ({ ...current, attrs: { ...current.attrs, name } }));
+          break;
+        }
         const data = node.attrs?.data;
         // Images, text, tables and steppers are native nodes, not widgets.
         if (node.type !== "widget")
@@ -1036,6 +1048,7 @@ function applyOperation(
       (operation) =>
         (operation.type === "surface.layout.set" &&
           Object.hasOwn(operation.layout, "mode")) ||
+        (operation.type === "component.props.set" && Object.hasOwn(operation.props, "mode")) ||
         [
           "block.remove",
           "block.replace",

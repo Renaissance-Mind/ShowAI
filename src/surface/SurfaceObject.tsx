@@ -454,7 +454,7 @@ export function SurfaceObject({
             ↻
           </button>
         )}
-      {((!actions.readOnly && chrome && !board && !archiveGroup) ||
+      {!region && ((!actions.readOnly && chrome && !board && !archiveGroup) ||
         (actions.readOnly && container && mount)) && (
         <div className="surface-object-header" data-surface-ui>
           {actions.readOnly ? (

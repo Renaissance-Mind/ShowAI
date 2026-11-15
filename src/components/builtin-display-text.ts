@@ -376,6 +376,7 @@ export const builtinEnglish: BuiltinDisplayText = {
     description:
       "12 Fireworks Tech Graph styles that keep the original SVG and semantic links, with text editing, full SVG/HTML import and offline export.",
   },
+  region: { name: "Layout", description: "A frameless native layout container that groups components and reduces columns as its available width shrinks." },
   page: {
     name: "Page",
     description:

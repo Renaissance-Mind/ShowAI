@@ -829,7 +829,7 @@ export class CatalogService {
               steps: [
                 "Read schema and examples for initial content.",
                 "Insert this component with component.insert and the destination parentId, using the current page hash.",
-                "Edit or nest its content directly, expand it, or save it as a template for reuse.",
+                native.nodeType === "region" ? "Edit layout with component.props.set and children with native block operations; the layout has no visible heading." : "Edit or nest its content directly, expand it, or save it as a template for reuse.",
               ],
             }
           : {
