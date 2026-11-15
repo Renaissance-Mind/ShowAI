@@ -1,5 +1,4 @@
 export interface DateData {
-  /** YYYY-MM-DD */
   date: string;
 }
 export interface BacklinksData {

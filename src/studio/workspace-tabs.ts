@@ -3,7 +3,6 @@ import sidebarMessages from "../i18n/messages/sidebar";
 
 const t = translator(sidebarMessages);
 
-/** `docs` is a built-in documentation page: no project, `pageId` names the page. */
 export type WorkspaceView =
   | "projects"
   | "project"
@@ -25,7 +24,6 @@ export interface WorkspaceEntry {
   title: string;
   icon?: string;
   scrollTop: number;
-  /** The search typed in this location; Back returns to the same results. */
   query?: string;
   searchLibrary?: boolean;
 }
@@ -91,7 +89,6 @@ export function sameEntry(a: WorkspaceEntry, b: WorkspaceEntry) {
   );
 }
 
-/** Navigation belongs to the selected tab; branching discards only its forward history. */
 export function visitWorkspace(
   state: WorkspaceTabsState,
   entry: WorkspaceEntry,
@@ -139,10 +136,6 @@ export function closeWorkspaceTab(state: WorkspaceTabsState, id: string) {
   };
 }
 
-/**
- * Drops history entries for deleted pages, folders or projects from every tab.
- * A tab keeps its nearest earlier entry; a tab with nothing left shows Recent.
- */
 export function pruneWorkspace(
   state: WorkspaceTabsState,
   gone: (location: WorkspaceLocation) => boolean,
@@ -168,7 +161,6 @@ export function pruneWorkspace(
   return changed ? { ...state, tabs } : state;
 }
 
-/** Points history entries at the project their pages and folders moved to. */
 export function relocateWorkspace(
   state: WorkspaceTabsState,
   moved: (location: WorkspaceLocation) => boolean,
@@ -190,7 +182,6 @@ export function relocateWorkspace(
   return changed ? { ...state, tabs } : state;
 }
 
-/** Move an existing tab without changing its identity, history or selection. */
 export function moveWorkspaceTab(
   state: WorkspaceTabsState,
   id: string,
@@ -207,7 +198,6 @@ export function moveWorkspaceTab(
   return { ...state, tabs };
 }
 
-/** Session data is window-local and scoped to the content library. */
 export function parseWorkspaceTabs(
   bytes: string | null,
 ): WorkspaceTabsState | undefined {
@@ -284,13 +274,8 @@ export function parseWorkspaceTabs(
   return { tabs: state.tabs, activeId: state.activeId };
 }
 
-/** Templates, components and settings are side trips from the library. */
 const detourViews = new Set<WorkspaceView>(["templates", "components", "settings"]);
 
-/**
- * The history offset that "Back" in templates, components or settings takes:
- * the nearest earlier entry outside those views, or null when the tab began there.
- */
 export function detourReturnOffset(tab: WorkspaceTab): number | null {
   for (let index = tab.cursor - 1; index >= 0; index--)
     if (!detourViews.has(tab.entries[index].location.view))

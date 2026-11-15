@@ -2,7 +2,6 @@ import type { JsonSchema } from "../contract/types";
 import type { MessageKey } from "../i18n";
 import { useTranslator } from "../i18n/react";
 import messages from "../i18n/messages/catalog";
-// Catalog-namespace keys, translated at render.
 const appearanceLabels: Record<string, MessageKey<typeof messages>> = {
   fontFamily: "appearance.fontFamily",
   fontSize: "appearance.fontSize",

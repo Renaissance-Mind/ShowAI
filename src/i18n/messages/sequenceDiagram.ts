@@ -1,6 +1,5 @@
 import { defineMessages } from "../index";
 
-// Sequence diagram built-in.
 export default defineMessages("sequenceDiagram", {
   "zh-CN": {
     title: "时序图",

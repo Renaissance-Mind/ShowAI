@@ -1,4 +1,3 @@
-/** Loopback control channel for reusing the same source development app. */
 export function developmentControl(origin, state, focus, next, hide) {
   return (request, response) => {
     const path = new URL(request.url ?? "/", origin).pathname;

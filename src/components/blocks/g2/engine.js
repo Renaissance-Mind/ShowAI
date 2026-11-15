@@ -85,7 +85,6 @@ function chartInteractions(interaction) {
     : (interaction ?? {});
 }
 
-/** Only gestures changed by the reading lock require a lock control. */
 export function hasG2ViewportInteraction(spec) {
   const interaction = chartInteractions(spec.interaction);
   const enabled = (value) =>
@@ -99,10 +98,6 @@ export function hasG2ViewportInteraction(spec) {
     return enabled(interaction[type]);
   });
 }
-/**
- * G repaints every chart on every animation frame. A rendered chart far from
- * the viewport parks those frames and resumes them before it scrolls back in.
- */
 function viewportFrames(container) {
   let visible = true;
   let next = 0;
@@ -283,7 +278,6 @@ export function createG2Context(container, chartType, data, locked = false) {
         ...spec.scale,
         color: { ...spec.scale.color, range: palette, palette: undefined },
       };
-    // Composite marks own their axes. Adding x/y guides changes their layout.
     if (
       spec.axis !== false &&
       ![
@@ -351,7 +345,6 @@ export function createG2Context(container, chartType, data, locked = false) {
       task.then(
         () => {
           renders.delete(task);
-          // The first render and its animation always run to completion.
           if (!disposed) frames?.attach(this.getContext().canvas);
         },
         (error) => {

@@ -291,8 +291,6 @@ export class ShowAIAgentGateway extends DurableObject {
     return this.cloud(request);
   }
   async cloud(request) {
-    // A deployment can replace the monitor continuation after the process exits.
-    // The container state remains authoritative; do not retain an idle-upgrade gate.
     if (this.quiescing && !this.ctx.container.running) this.quiescing = false;
     if (this.quiescing)
       return json(
@@ -320,7 +318,6 @@ export class ShowAIAgentGateway extends DurableObject {
         },
       });
     this.observeContainer();
-    // Running tasks renew activity themselves, even when the iPad disconnects.
     await container.setInactivityTimeout(15 * 60 * 1000);
     const port = container.getTcpPort(8790);
     let ready = false;
@@ -330,8 +327,6 @@ export class ShowAIAgentGateway extends DurableObject {
         const health = await port.fetch("http://container/health", {
           signal: AbortSignal.timeout(1000),
         });
-        // Only the operator health route can reach this path. Preserve startup
-        // diagnostics there; user requests receive the public readiness error.
         if (new URL(request.url).pathname === "/health") {
           if (
             request.headers.get("x-showai-upgrade-idle") === "1" &&
@@ -434,8 +429,6 @@ const directory='/state/agent-host/remote-turns',jobs=fs.existsSync(directory)?f
                 (!status.restore ||
                   status.taskAdmission !== "checkpointed-before-start"))
             ) {
-              // No task can be admitted before readiness. Only reconstructed
-              // cache files are discarded; the encrypted committed head remains.
               await container.destroy();
               return json(
                 {
@@ -470,14 +463,10 @@ const directory='/state/agent-host/remote-turns',jobs=fs.existsSync(directory)?f
           return response;
         }
       } catch {
-        /* Container is still booting. */
       }
       await new Promise((r) => setTimeout(r, 250));
     }
     if (!ready) {
-      // This flag is forwarded only by the master-key-protected operator route.
-      // Recovery replaces an unresponsive ephemeral runtime; encrypted committed
-      // state and durable task receipts remain in R2 for the next boot.
       if (
         request.headers.get("x-showai-recover-startup") === "1" &&
         !this.cloudCalls

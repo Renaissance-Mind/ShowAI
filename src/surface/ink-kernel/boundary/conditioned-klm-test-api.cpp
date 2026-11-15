@@ -1,4 +1,3 @@
-// Test-only ABI; never included in a shipped module/provenance.
 #include "conditioned-klm.hpp"
 using namespace showai_boundary;
 extern "C" uint32_t sack_fixture(uint32_t fixture,void*memory,uint32_t bytes,uint32_t*output,uint32_t capacity){

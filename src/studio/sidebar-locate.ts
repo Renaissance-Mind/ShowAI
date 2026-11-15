@@ -1,6 +1,4 @@
-/** Row class while the located page is highlighted; see library-row.css. */
 export const locateHighlightClass = "is-located";
-/** Matches the highlight animation; the sidebar stays revealed as long. */
 export const locateHighlightDuration = 1600;
 export const locateHoldDuration = locateHighlightDuration + 400;
 
@@ -8,21 +6,14 @@ export interface ScrollContainerMetrics {
   scrollTop: number;
   clientHeight: number;
   scrollHeight: number;
-  /** Viewport top of the container, as getBoundingClientRect reports it. */
   top: number;
 }
 
 export interface RowMetrics {
-  /** Viewport top of the row, as getBoundingClientRect reports it. */
   top: number;
   height: number;
 }
 
-/**
- * Scroll offset that puts the row in the middle of its container. Rows near
- * either end settle at that end instead, since the container cannot scroll
- * further.
- */
 export function centeredScrollTop(
   container: ScrollContainerMetrics,
   row: RowMetrics,
@@ -33,10 +24,6 @@ export function centeredScrollTop(
   return Math.round(Math.max(0, Math.min(limit, centered)));
 }
 
-/**
- * Scrolls the sidebar so the page's row sits in the middle and flashes it.
- * False when the row is not rendered, for example before its folders expand.
- */
 export function revealSidebarRow(
   scope: ParentNode,
   target: { projectId: string; pageId: string },
@@ -47,9 +34,6 @@ export function revealSidebarRow(
   const row = main?.closest<HTMLElement>(".studio-tree-row");
   const container = row?.closest<HTMLElement>(".studio-sidebar-projects");
   if (!row || !container) return false;
-  // Folders that just expanded move scroll anchoring in the next rendering
-  // update; measuring after that frame keeps the adjustment from landing on
-  // top of this scroll.
   requestAnimationFrame(() =>
     requestAnimationFrame(() => {
       if (!row.isConnected) return;
@@ -71,7 +55,6 @@ export function revealSidebarRow(
       });
     }),
   );
-  // Re-adding the class within one frame would not restart the animation.
   row.classList.remove(locateHighlightClass);
   void row.offsetWidth;
   row.classList.add(locateHighlightClass);
@@ -83,7 +66,6 @@ export function revealSidebarRow(
   const onAnimationEnd = (event: AnimationEvent) => {
     if (event.target === row) finish();
   };
-  // Reduced motion or a replaced row would otherwise leave the class behind.
   const timer = window.setTimeout(finish, locateHighlightDuration + 200);
   row.addEventListener("animationend", onAnimationEnd);
   return true;

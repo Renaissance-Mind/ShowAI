@@ -71,12 +71,10 @@ const LIMITS: {
   { key: "step", label: "step" },
   { key: "value", label: "initial" },
 ];
-// Slider and stepper carry a numeric range; toggle and choice do not.
 const ranged = (input: Parameter) =>
   ["slider", "stepper"].includes(inputType(input));
 const swatch = (color: string | undefined, index: number) =>
   color ?? `var(--pg-c${(index % 8) + 1})`;
-// Steps such as 0.1 accumulate binary error; trim to a stable display value.
 const tidy = (value: number) => Number(value.toFixed(10));
 
 export function calculate(inputs: number[], operation: string): number {
@@ -108,7 +106,6 @@ export function PlaygroundBlock({ data, onChange, readOnly }: BlockProps) {
   const editable = Boolean(onChange && !readOnly);
   const legacy = isLegacyPlayground(data);
   const locale = getLocale();
-  // Formulas compile once per data change; data reaching here was validated by the host.
   const compiled = useMemo(() => {
     try {
       return { formulas: compilePlayground(data), problem: "" };
@@ -166,7 +163,6 @@ export function PlaygroundBlock({ data, onChange, readOnly }: BlockProps) {
           (ranged(input) &&
             (![input.min, input.max, input.value].every(Number.isFinite) ||
               input.min >= input.max ||
-              // A stepper may omit its step and count by 1.
               (input.step !== undefined || inputType(input) === "slider"
                 ? !Number.isFinite(input.step) || input.step <= 0
                 : false))),
@@ -183,7 +179,6 @@ export function PlaygroundBlock({ data, onChange, readOnly }: BlockProps) {
           }
         : input,
     );
-    // The editor covers the legacy fields; formulas, outputs and the rest are carried over untouched.
     const next = legacy
       ? { ...data, ...draft, inputs: nextInputs }
       : { ...data, title: draft.title, inputs: nextInputs };
@@ -701,7 +696,6 @@ function ChoiceInput({
 }) {
   const options = input.options ?? [];
   const group = useRef<HTMLDivElement>(null);
-  // Radio-group keyboard model: arrows move and select, only the checked option is tabbable.
   const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
     const delta = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 }[
       event.key
@@ -872,7 +866,6 @@ function Ranking({
   const list = useRef<HTMLOListElement>(null);
   const positions = useRef(new Map<string, number>());
   const order = ranked.map((entry) => entry.item.id).join("\u0000");
-  // FLIP: rows slide from their previous position when the order changes.
   useLayoutEffect(() => {
     const rows = [
       ...(list.current?.querySelectorAll<HTMLElement>("[data-rank-id]") ?? []),

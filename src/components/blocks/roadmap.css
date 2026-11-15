@@ -1,7 +1,3 @@
-/* roadmap: a reading view of a dated plan. Neutral colors follow the design tokens;
- * owner colors come from the data and tint bars by status. */
-/* Page typography reaches into blocks at 0,2,1; this baseline (0,2,2) clears it
- * for structural elements, and the rules below (0,3,0) set this block's own values. */
 .sb-block.rm-block :is(h3, h4, p, ul, ol, li, pre):not(svg) {
   margin: 0;
 }
@@ -14,7 +10,6 @@
   background: none;
   color: inherit;
 }
-/* Doubled class so the shared .sb-block font and size do not override these. */
 .sb-block.rm-block {
   --rm-text: var(--text, #222222);
   --rm-muted: var(--muted, #6a6a6a);
@@ -56,7 +51,6 @@
   outline-offset: 2px;
 }
 
-/* ---------------------------------------------------------------- head */
 .sb-block.rm-block .rm-head {
   display: flex;
   flex-wrap: wrap;
@@ -124,7 +118,6 @@
   white-space: nowrap;
 }
 
-/* ---------------------------------------------------------------- tools */
 .sb-block.rm-block .rm-tools {
   display: flex;
   flex-wrap: wrap;
@@ -205,7 +198,6 @@
   color: var(--rm-text);
   font-weight: 600;
 }
-/* Status swatches use the neutral idle color; bars use the owner color. */
 .sb-block.rm-block .rm-swatch {
   --rm-c: var(--rm-idle);
   display: inline-block;
@@ -232,7 +224,6 @@
   background: color-mix(in srgb, var(--rm-bad) 18%, var(--rm-paper));
 }
 
-/* ---------------------------------------------------------------- chart */
 .sb-block.rm-block .rm-scroll {
   position: relative;
 }
@@ -446,7 +437,6 @@
   border-color: var(--rm-bad);
   color: var(--rm-text);
 }
-/* Progress turns the striped bar solid up to the share already done. */
 .sb-block.rm-block .rm-progress {
   position: absolute;
   inset: 0 auto 0 0;
@@ -498,7 +488,6 @@
   font-weight: 600;
 }
 
-/* ---------------------------------------------------------------- detail */
 .sb-block.rm-block .rm-detail {
   margin-top: 22px;
   border-top: 1px solid var(--rm-line);

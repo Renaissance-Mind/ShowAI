@@ -75,7 +75,6 @@ beforeAll(async () => {
   ).dataset.id;
 });
 afterAll(async () => {
-  // Drain save/draft timers before removing the real library they still write to.
   for (const session of sessions) await session.prepareClose();
   await syncManager(root).stop();
   await rm(root, { recursive: true, force: true });
@@ -139,11 +138,9 @@ test("a field changed in two windows is held with both values until chosen", asy
   const held = b.getSnapshot().conflicts;
   expect(held).toHaveLength(1);
   expect(held[0]).toMatchObject({ mine: "改写指南", theirs: "写使用指南" });
-  // The other change of the same window was merged and saved.
   const saved = await new DatasetStore(store).read(projectId, datasetId);
   expect(valueAt(saved.dataset.value, task("t2", "title"))).toBe("终审");
   expect(valueAt(saved.dataset.value, task("t1", "title"))).toBe("写使用指南");
-  // The held version survives a reload of the window.
   await new Promise((resolve) => setTimeout(resolve, 300));
   const reloaded = await ready(
     new DatasetClient(transport, "window-d").session(projectId, datasetId),
@@ -167,7 +164,6 @@ test("unsaved writes are restored in the same window and offered to others", asy
     },
   ]);
   await new Promise((resolve) => setTimeout(resolve, 300));
-  // The window closes before saving; its draft remains.
   const again = await ready(
     new DatasetClient(transport, "window-e").session(projectId, datasetId),
   );
@@ -203,7 +199,6 @@ test("undo writes back the previous value and does not override newer edits else
       task("t1", "due"),
     ),
   ).toBe(before);
-  // Redo after someone else changed the field is a held conflict, not an overwrite.
   const b = await ready(
     new DatasetClient(transport, "window-i").session(projectId, datasetId),
   );
@@ -221,7 +216,6 @@ test("undo writes back the previous value and does not override newer edits else
 });
 
 test("closing names shared data whose writes can be neither saved nor kept", async () => {
-  // The library refuses writes (for example a read-only or full disk).
   let refuse = false;
   const failing = {
     invoke: <T>(action: string, args: Record<string, unknown> = {}) => {
@@ -290,7 +284,6 @@ test("a session reports stale and empty reads with their warnings, and recovers 
       warnings: [{ code: "SOURCE_MISSING", actions: ["retry", "link-file"] }],
     });
 
-    // Without a value read here the dataset is empty, and says why.
     await rm(join(root, "local", "dataset-cache", projectId, `${linked.dataset.id}.json`));
     const empty = client.session(projectId, linked.dataset.id);
     await empty.refresh({ retry: true });
@@ -310,7 +303,6 @@ test("a session reports stale and empty reads with their warnings, and recovers 
       warnings: [],
     });
 
-    // A spreadsheet stays read-only when a later read finds it unchanged.
     const xlsx = join(outside, "budget.xlsx");
     await writeFile(xlsx, xlsxWorkbook([{ name: "预算", rows: [["id"], ["b1"]] }]));
     const sheet = (await transport.invoke("datasets:link", {

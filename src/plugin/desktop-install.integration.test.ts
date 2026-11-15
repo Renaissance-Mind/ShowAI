@@ -8,7 +8,6 @@ import { createInterface } from "node:readline";
 import { DesktopPluginInstaller, hostExecutable } from "./desktop-install";
 import { registerRuntime, type RuntimeLaunch } from "../agent/runtime";
 
-/** Asks a Codex app-server on the disposable CODEX_HOME how many ShowAI tools it loaded. */
 async function codexServerTools() {
   const codex = await hostExecutable("codex");
   expect(codex).toBeTruthy();
@@ -41,8 +40,6 @@ async function codexServerTools() {
   }
 }
 
-// Opt in with a task-owned output directory and a real registered runtime.
-// Runs the installed official CLIs with disposable user configuration; no mocks.
 const output = process.env.SHOWAI_PLUGIN_TEST_OUTPUT;
 const config = process.env.SHOWAI_PLUGIN_TEST_RUNTIME;
 describe.skipIf(!output || !config)(
@@ -103,7 +100,6 @@ describe.skipIf(!output || !config)(
         home = join(root, `library-${host}`);
         cli = { ...cli, env: { ...cli.env, SHOWAI_HOME: home } };
         await registerRuntime(home, cli);
-        // Another library makes the installed copy outdated until it is updated.
         expect(await state()).toMatchObject({ enabled: true, current: false });
         const changed = await installer.install(host);
         expect(changed.version).not.toBe(first.version);
@@ -147,7 +143,6 @@ describe.skipIf(!output || !config)(
         );
         expect(server.command).not.toBe("node");
         expect(server.env.SHOWAI_HOME).toBe(home);
-        // Pinned to this App's runtime, not to whichever App last registered in the library.
         const record = JSON.parse(
           await readFile(server.env.SHOWAI_RUNTIME_CONFIG, "utf8"),
         );
@@ -225,7 +220,6 @@ describe.skipIf(!output || !config)(
               (shown.structuredContent as any).data.warnings.join(" "),
             ).toMatch(/compact fragment|CDN reader/);
           }
-          // Codex itself must load the server, not only a client that reads mcp.json directly.
           const loaded =
             host === "codex" ? await codexServerTools() : undefined;
           if (host === "codex") expect(loaded).toBe(tools.tools.length);
@@ -265,7 +259,6 @@ describe.skipIf(!output || !config)(
       });
     });
     test("deepseek stages a bundle whose MCP row starts without Node on PATH", async () => {
-      // Harness installs the bundle itself; a profile linking the staged path counts as installed.
       const profile = join(root, "dsh/profiles/desktop");
       await mkdir(profile, { recursive: true });
       await writeFile(
@@ -289,7 +282,6 @@ describe.skipIf(!output || !config)(
         installedPath: first.installedPath,
         current: true,
       });
-      // A newer App bundle leaves the staged files stale until they are prepared again.
       const probe = join(bundle, "skills/update-probe.txt");
       await writeFile(probe, "newer bundle\n");
       try {

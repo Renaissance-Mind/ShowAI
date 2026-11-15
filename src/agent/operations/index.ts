@@ -9,7 +9,6 @@ const isOperation = (value: unknown): value is Operation =>
   "run" in value &&
   "input" in value;
 
-/** Every shared operation, by domain module. */
 export const OPERATIONS: readonly Operation[] = [pages, datasets].flatMap(
   (domain) => Object.values(domain).filter(isOperation),
 );

@@ -8,10 +8,6 @@ export type AppUpdateAction =
   | "appUpdate:install"
   | "appUpdate:setAutomatic";
 
-/**
- * In-app update state of the desktop App, shared by every window through the
- * main process. Null outside the desktop App.
- */
 export function useAppUpdate() {
   const [state, setState] = useState<AppUpdateState | null>(null);
   useEffect(() => {
@@ -20,7 +16,6 @@ export function useAppUpdate() {
     const stop = desktop.onAppUpdate((next) => setState(next));
     desktop.invoke<AppUpdateState>("appUpdate:state").then(
       (initial) => {
-        // A pushed change may arrive before the first answer.
         if (!stopped) setState((current) => current ?? initial);
       },
       (reason: unknown) => console.error("ShowAI update state", reason),

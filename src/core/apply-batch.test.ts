@@ -6,11 +6,6 @@ import { CoreError, type PageOperation, type ShowDocument } from "./model";
 import { createResource } from "../document/containers.mjs";
 import { walk } from "../document/walk.mjs";
 
-/**
- * applyOperations(document, operations) gives what applying the operations
- * one at a time gives, each on the previous result: the same document, or a
- * failure at the same operation index.
- */
 
 function random(seed: number) {
   let state = seed >>> 0;
@@ -91,7 +86,6 @@ function fixture(): ShowDocument {
       node: { type: "region", attrs: { id: "region", name: "Region" }, content: [paragraph("in-region", "Region text")] },
     },
     { type: "surface.create", kind: "page", name: "Sub page", nodeId: "sub" },
-    // Enough blocks that a check of the touched block differs from a whole-page one.
     ...Array.from({ length: 120 }, (_, index) => ({
       type: "block.insert",
       node: paragraph(`bulk-${index}`, `Bulk paragraph ${index} `.repeat(4)),
@@ -100,7 +94,6 @@ function fixture(): ShowDocument {
   ] as PageOperation[]);
 }
 
-/** Ids present now, by role, so generated operations mostly address real nodes. */
 function pools(document: ShowDocument) {
   const all: string[] = [],
     paragraphs: string[] = [],
@@ -136,11 +129,9 @@ function generate(next: () => number, document: ShowDocument, step: number): Pag
         paragraph(next() < 0.5 ? fresh : undefined, `Inserted ${step}`),
         { type: "heading", attrs: { level: 3 }, content: text(`Heading ${step}`) },
         { type: "bulletList", content: [{ type: "listItem", content: [paragraph(undefined, "Item")] }] },
-        // Invalid in themselves: an unsupported attribute, an empty list, empty text.
         { type: "paragraph", attrs: { color: "#123456" }, content: text("Coloured") },
         { type: "bulletList", content: [] },
         { type: "paragraph", content: [{ type: "text", text: "" }] },
-        // An id that already exists.
         paragraph(pick(ids.all, "p1"), "Repeated id"),
         { type: "widget", attrs: { kind: "custom", data: { componentId: "value-slider", version: "1.0.0", integrity: integrity("d"), props: { label: "New" } } } },
       ] as JSONContent[],
@@ -257,7 +248,6 @@ function failure(error: unknown): Outcome {
   return { index: index === undefined ? -1 : Number(index), code: error.code, message: error.message };
 }
 
-/** Random ids and clock times differ between runs; their order of appearance does not. */
 function comparable(outcome: Outcome) {
   if (!("document" in outcome)) return outcome;
   const { createdAt: _c, updatedAt: _u, ...rest } = outcome.document;

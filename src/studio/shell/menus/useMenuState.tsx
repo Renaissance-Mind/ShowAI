@@ -9,7 +9,6 @@ import type {
 import { useTranslator } from "../../../i18n/react";
 import studioMessages from "../../../i18n/messages/studio";
 
-/** Which workbench menu is open and where, and how the directory lays out its entries. */
 export function useMenuState() {
   const t = useTranslator(studioMessages);
   const [groupMenu, setGroupMenu] = useState<{
@@ -68,7 +67,6 @@ export function useMenuState() {
     point?: LibraryMenuPoint;
     pageTools?: boolean;
     creationOnly?: boolean;
-    /** The directory's selected entries, acted on together. */
     selection?: boolean;
   } | null>(null);
   const [projectsMenu, setProjectsMenu] = useState<HTMLElement | null>(null);
@@ -78,7 +76,6 @@ export function useMenuState() {
   const [pageExportMenu, setPageExportMenu] = useState<HTMLElement | null>(
     null,
   );
-  /** A sidebar or directory page whose Export menu is open; else the open page. */
   const [exportTarget, setExportTarget] = useState<LibraryTarget | null>(null);
   const showMenu = (
     target: LibraryTarget,

@@ -92,9 +92,7 @@ export type {
   TransformInput,
 } from "../datasets/dataset-file";
 
-/** How the value of a transform dataset was computed. */
 export interface TransformReadInfo {
-  /** sha256 of the script. */
   scriptHash: string;
   inputs: Record<
     string,
@@ -106,9 +104,7 @@ export interface TransformReadInfo {
       status: DatasetReadStatus;
     }
   >;
-  /** Milliseconds of the run that produced the value. */
   lastRunMs?: number;
-  /** When that run happened. */
   ranAt?: string;
 }
 
@@ -117,41 +113,24 @@ export interface DatasetRecord {
   hash: string;
   revision?: string;
   path: string;
-  /** The linked file the value was read from (for a stale value, as last read). */
   external?: ExternalFileState;
-  /** The online data the value was fetched from (for a stale value, as last fetched). */
   remote?: RemoteSourceState;
-  /**
-   * The copy of another device's linked file that synchronization carried
-   * here (source.bundle); read when this device links no file of its own.
-   */
   bundled?: BundledCopyState;
-  /**
-   * ok: the value was read now (online data: within its refresh interval).
-   * stale: the source cannot be read; the value is the last one read on
-   * this device, from cachedAt, and cannot be written.
-   */
   status: Exclude<DatasetReadStatus, "empty">;
-  /** Whether writes are accepted: library data and JSON/CSV/TSV files. */
   editable: Editable;
-  /** Why the value is stale; empty when status is ok. */
   warnings: DatasetWarning[];
   cachedAt?: string;
-  /** A transform dataset: its inputs as read and its last run. */
   transform?: TransformReadInfo;
 }
-/** A synchronized copy of a linked file, as read on a device without the file. */
 export interface BundledCopyState {
   hash: string;
   format: SourceFormat;
   bytes: number;
   updatedAt?: string;
 }
-/** An external source as listed: linked on this device and readable, or why not. */
 export type DatasetSourceSummary = DatasetSource & {
   path?: string;
   bytes?: number;
-  /** Read from the synchronized copy of another device's file. */
   bundled?: boolean;
   available: boolean;
   error?: string;
@@ -167,7 +146,6 @@ export interface DatasetSummary {
   bytes: number;
   origin?: DatasetDocument["origin"];
   source?: DatasetSourceSummary;
-  /** A transform dataset: the datasets it is computed from. */
   transform?: { inputs: Record<string, TransformInput> };
   status: DatasetReadStatus;
   editable: Editable;
@@ -185,13 +163,7 @@ export interface DatasetApplyInput {
   operations: unknown[];
   name?: string;
   description?: string | null;
-  /** Replaces the JSON Schema every write must satisfy; null removes it. */
   schema?: JsonSchema | null;
-  /**
-   * The value the writer read. Operations without a `before` take their
-   * starting value from it, and coarse replacements split into per-field
-   * writes, so the write merges with changes made since.
-   */
   base?: unknown;
 }
 export interface DatasetApplyResult {
@@ -205,7 +177,6 @@ export function datasetHash(dataset: DatasetDocument): string {
   return createHash("sha256").update(canonicalJson(content)).digest("hex");
 }
 
-/** The project and dataset an input of a transform in projectId reads. */
 export function transformInput(
   input: TransformInput,
   projectId: string,
@@ -218,14 +189,8 @@ export function transformInput(
 const sha256 = (text: string) =>
   createHash("sha256").update(text).digest("hex");
 
-/** Origin of a transform's last good output in local/dataset-cache. */
 const TRANSFORM_ORIGIN = "transform";
 
-/**
- * Outputs (or failures) of the last run of each transform in this process,
- * keyed by library, project and dataset; a run is reused while its inputs
- * and script are unchanged.
- */
 const transformRuns = new Map<
   string,
   {
@@ -238,7 +203,6 @@ const transformRuns = new Map<
 >();
 const MAX_REMEMBERED_RUNS = 64;
 
-/** Blocks bound to a dataset, by page. */
 export function datasetReferencesIn(
   document: ShowDocument,
   pageProjectId: string,
@@ -259,7 +223,6 @@ export function datasetReferencesIn(
   return blocks;
 }
 
-/** The dataset as stored in the library: an external dataset keeps no value. */
 function storedDataset(dataset: DatasetDocument): Omit<
   DatasetDocument,
   "value"
@@ -271,7 +234,6 @@ function storedDataset(dataset: DatasetDocument): Omit<
   return stored;
 }
 
-/** Checks a value for a dataset, naming where it came from on failure. */
 function assertDatasetValue(
   value: unknown,
   schema: JsonSchema | undefined,
@@ -295,7 +257,6 @@ function assertDatasetValue(
   }
 }
 
-/** The warning code a failed source read carries, and its readable cause. */
 function problemOf(error: unknown): { problem: string; reason: WarningCode } {
   if (error instanceof CoreError)
     return {
@@ -333,10 +294,6 @@ function sourceUnavailable(
   return error;
 }
 
-/**
- * The warning of a source that could not be read. `cachedAt` names the
- * stale value shown instead; without it the dataset has no value here.
- */
 export function unavailableWarning(
   error: CoreError,
   cachedAt?: string,
@@ -359,16 +316,11 @@ export function unavailableWarning(
   );
 }
 
-/**
- * The warnings of a dataset without a value: the source's, or for a
- * transform every reason its inputs or script gave none.
- */
 export function unavailableWarnings(error: CoreError): DatasetWarning[] {
   const warnings = (error.details as { warnings?: DatasetWarning[] })?.warnings;
   return warnings?.length ? warnings : [unavailableWarning(error)];
 }
 
-/** Rejects writes to read-only data before anything is changed. */
 function readOnly(dataset: DatasetDocument): CoreError {
   if (dataset.transform) {
     const message = `Dataset "${dataset.name}" is computed by a transform script from ${Object.keys(dataset.transform.inputs).join(", ")}; its value is read-only. Change the inputs, or the script with dataset_write(action:transform).`;
@@ -401,10 +353,6 @@ function readOnly(dataset: DatasetDocument): CoreError {
   return error;
 }
 
-/**
- * Throws unless a read can be the base of a write: read-only sources are
- * READ_ONLY, a stale value is SOURCE_UNAVAILABLE.
- */
 export function assertWritable(record: DatasetRecord): void {
   if (record.dataset.transform) throw readOnly(record.dataset);
   if (record.status === "stale") {
@@ -424,7 +372,6 @@ export function assertWritable(record: DatasetRecord): void {
   if (record.editable === false) throw readOnly(record.dataset);
 }
 
-/** A transform dataset without a value: none of its inputs or runs gave one. */
 function transformUnavailable(
   dataset: DatasetDocument,
   warnings: DatasetWarning[],
@@ -446,39 +393,25 @@ function transformUnavailable(
 
 interface LoadedDataset {
   record: DatasetRecord;
-  /** The external file as read, for a write that replaces it. */
   read?: ExternalRead;
-  /** The synchronized copy as read, for a write that replaces it. */
   bundle?: { layout: FileLayout; format: SourceFormat };
 }
 
-/** Cache origin of values read from a synchronized copy. */
 const bundleOrigin = (source: FileSource) => `bundle:${source.format}`;
 
 const later = (a: string, b?: string) => (b && b > a ? b : a);
 
 export interface DatasetLinkInput {
-  /** An existing dataset to link; omitted creates a new dataset. */
   datasetId?: string;
-  /** New dataset id (creation only). */
   id?: string;
   name?: string;
   description?: string;
   schema?: JsonSchema;
-  /** Absolute path of a file outside the library; or give url. */
   path?: string;
-  /** http(s) address of online data (read-only); or give path. */
   url?: string;
-  /** Online data: seconds before a read fetches again (0 = only on refresh). */
   refreshSeconds?: number;
   format?: SourceFormat;
-  /**
-   * "file" adopts the file's content as the value; "dataset" writes the
-   * current value (or `value` when creating) into a new file. An existing
-   * file is never overwritten.
-   */
   use?: "file" | "dataset";
-  /** The value of a new dataset whose file does not exist yet. */
   value?: unknown;
   origin?: DatasetDocument["origin"];
 }
@@ -518,7 +451,6 @@ export class DatasetStore {
     );
   }
 
-  /** The stored dataset file, without reading an external source. */
   private async stored(
     projectId: string,
     datasetId: string,
@@ -535,7 +467,6 @@ export class DatasetStore {
     return { dataset: validateDataset(value, datasetId), path };
   }
 
-  /** Reads the linked file of an external dataset and keeps the value as last good. */
   private async readFile(
     projectId: string,
     dataset: DatasetDocument,
@@ -577,10 +508,6 @@ export class DatasetStore {
     return read;
   }
 
-  /**
-   * The synchronized copy of another device's linked file, for a device that
-   * links no file of its own; keeps the value as last good.
-   */
   private async readBundled(
     projectId: string,
     dataset: DatasetDocument,
@@ -636,7 +563,6 @@ export class DatasetStore {
     };
   }
 
-  /** Why this device's file and its synchronized copy disagree, if they do. */
   private async bundleWarnings(
     projectId: string,
     dataset: DatasetDocument,
@@ -657,11 +583,6 @@ export class DatasetStore {
     ];
   }
 
-  /**
-   * Online data: the cached value while it is younger than the refresh
-   * interval, otherwise fetched again (conditionally, when the last response
-   * named an ETag or Last-Modified).
-   */
   private async readUrl(
     projectId: string,
     dataset: DatasetDocument,
@@ -687,7 +608,6 @@ export class DatasetStore {
         Date.now() - Date.parse(cached.failure?.at ?? cached.readAt) <
           interval * 1000)
     ) {
-      // A failed fetch is not retried on every read; the last value stays stale.
       if (cached.failure)
         throw sourceUnavailable(
           dataset,
@@ -739,19 +659,12 @@ export class DatasetStore {
     return { value, state: state(entry) };
   }
 
-  /**
-   * The dataset with its current value. With `fallback`, an external source
-   * that cannot be read returns the last value read on this device as
-   * stale; without a cached value (or without fallback) it throws
-   * SOURCE_UNAVAILABLE. Writes load without fallback.
-   */
   private async load(
     projectId: string,
     datasetId: string,
     options: {
       fallback?: boolean;
       refresh?: boolean;
-      /** Transforms being computed, as project/dataset; reaching one again is a cycle. */
       visiting?: Set<string>;
     } = {},
   ): Promise<LoadedDataset> {
@@ -801,7 +714,6 @@ export class DatasetStore {
       }
       const linked = await this.links.get(projectId, stored.id);
       if (!linked) {
-        // Another device's file, as synchronization carried it here.
         const copy = await this.readBundled(projectId, stored);
         const dataset = {
           ...stored,
@@ -847,7 +759,6 @@ export class DatasetStore {
         throw error;
       const linked = (error.details?.source as { path?: string } | undefined)
         ?.path;
-      // An unlinked file was read here only from its synchronized copy.
       const cached =
         source.kind === "url" || linked
           ? await this.cache.read(
@@ -893,7 +804,6 @@ export class DatasetStore {
     }
   }
 
-  /** The inputs of a transform as read now, and why any of them has no value. */
   private async readInputs(
     projectId: string,
     datasetId: string,
@@ -963,11 +873,6 @@ export class DatasetStore {
     return { values, inputs, warnings, stale, empty, failure };
   }
 
-  /**
-   * The value of a transform dataset: its script run on its inputs, reused
-   * while neither changed. An input without a value, or a failing run, gives
-   * the last good output of this device marked stale (with `fallback`).
-   */
   private async compute(
     projectId: string,
     stored: DatasetDocument,
@@ -1010,7 +915,6 @@ export class DatasetStore {
         transform: info(run),
       };
     };
-    /** The last good output, stale, or no value at all. */
     const lastGood = async (problems: DatasetWarning[]) => {
       const cached = options.fallback
         ? await this.cache.read(projectId, stored.id, TRANSFORM_ORIGIN)
@@ -1116,11 +1020,6 @@ export class DatasetStore {
     });
   }
 
-  /**
-   * The dataset with its current value; an unreadable external source gives
-   * its last value read on this device (status stale). `refresh` fetches
-   * online data now instead of within its refresh interval.
-   */
   async read(
     projectId: string,
     datasetId: string,
@@ -1152,7 +1051,6 @@ export class DatasetStore {
       try {
         record = (await this.load(projectId, id, { fallback: true })).record;
       } catch (error) {
-        // A missing or broken source without a cached value still lists the dataset.
         if (!(
           error instanceof CoreError && error.code === "SOURCE_UNAVAILABLE"
         ))
@@ -1284,7 +1182,6 @@ export class DatasetStore {
         value: cloneValue(input.value),
       });
       await this.write(path, dataset, null);
-      // The committing transaction attaches the new revision.
       return {
         dataset,
         hash: datasetHash(dataset),
@@ -1312,12 +1209,6 @@ export class DatasetStore {
       );
   }
 
-  /**
-   * Keeps a dataset's value outside the library: creates a dataset from a
-   * file or online data, moves an existing dataset's value into a new file,
-   * replaces it with a file's or address's content, or links this device's
-   * copy of an external dataset's file.
-   */
   async link(
     projectId: string,
     input: DatasetLinkInput,
@@ -1435,7 +1326,6 @@ export class DatasetStore {
             `Dataset "${stored.dataset.name}" is computed by a transform script. Copy its output into the library with dataset_write(action:link, path:null), or create another dataset for the file.`,
           );
         const previous = stored.dataset.source;
-        // Other devices link their own copy of the same file format.
         if (previous?.kind === "file" && !online && previous.format !== format)
           throw new CoreError(
             "INVALID_DATA",
@@ -1471,7 +1361,6 @@ export class DatasetStore {
         );
         wroteFile = true;
       }
-      // Another link of the same file keeps the project's packaging choice.
       const kept: DatasetSource =
         source.kind === "file" &&
         base.source?.kind === "file" &&
@@ -1515,10 +1404,7 @@ export class DatasetStore {
           dataset,
           stored ? ((await this.revision(stored.path)) ?? null) : null,
         );
-      // Online data needs no device link; a file link it replaces is dropped.
       await this.links.set(projectId, id, online ? null : path!);
-      // The newly linked file counts as changed against the copy the project
-      // shares, so this device shares it next (see reconcileBundle).
       await this.agreements.set(
         datasetBundleKey(projectId, id),
         kept.kind === "file" && kept.bundle?.hash
@@ -1552,10 +1438,6 @@ export class DatasetStore {
     });
   }
 
-  /**
-   * Rejects inputs that are missing or that are computed from the dataset
-   * itself, directly or through other transforms.
-   */
   private async assertInputs(
     projectId: string,
     datasetId: string,
@@ -1605,12 +1487,6 @@ export class DatasetStore {
     await walk(transform.inputs, self, [self]);
   }
 
-  /**
-   * Creates a transform dataset, or changes the script, inputs, name,
-   * description or schema of one (baseHash: its hash as read). The new
-   * definition is stored like any dataset change; the value is computed
-   * when it is read.
-   */
   async defineTransform(
     projectId: string,
     input: {
@@ -1728,7 +1604,6 @@ export class DatasetStore {
         return { created: creating, changed: true };
       },
     );
-    // The value of the new definition, as any reader computes it.
     const record = await this.load(projectId, id, { fallback: true })
       .then((loaded) => loaded.record)
       .catch((error) => {
@@ -1741,10 +1616,6 @@ export class DatasetStore {
       : { ...result, warnings: record.warnings };
   }
 
-  /**
-   * Runs a script on inputs without saving anything: the inputs and script
-   * given, or the stored definition of datasetId for those omitted.
-   */
   async tryTransform(
     projectId: string,
     input: {
@@ -1798,11 +1669,6 @@ export class DatasetStore {
     return { ...result, inputs: read.inputs, warnings: read.warnings };
   }
 
-  /**
-   * Copies an external dataset's current value (or a transform's output)
-   * into the library and stops reading the file or running the script; the
-   * file itself is left as it is.
-   */
   async embed(
     projectId: string,
     datasetId: string,
@@ -1847,12 +1713,6 @@ export class DatasetStore {
     });
   }
 
-  /**
-   * Applies operations to the current value. Each write is checked against
-   * the value its author started from; different records and fields merge.
-   * With conflicts nothing is written and the conflicts are returned, or
-   * thrown as CONFLICT with `throwOnConflict`.
-   */
   async apply(
     projectId: string,
     datasetId: string,
@@ -1876,8 +1736,6 @@ export class DatasetStore {
       );
     return this.files.lock(`dataset-${projectId}-${datasetId}`, async () => {
       await this.files.readProject(projectId);
-      // Read-only data refuses value changes before its source is read;
-      // renaming it (or changing its schema) still works from a stale read.
       const { dataset: stored } = await this.stored(projectId, datasetId);
       const readOnlySource =
         !!stored.transform ||
@@ -1934,8 +1792,6 @@ export class DatasetStore {
       let external = current.external;
       let bundled = current.bundled;
       if (loaded.bundle) {
-        // An edit of another device's file goes into a new synchronized
-        // copy; that device writes it into its file.
         if (valueChanged) {
           const bytes = Buffer.from(
             serializeSource(
@@ -1975,7 +1831,6 @@ export class DatasetStore {
       } else if (loaded.read) {
         const { read } = loaded;
         if (valueChanged) {
-          // Serializing first rejects values the file format cannot hold.
           const text = serializeSource(
             dataset.value,
             read.state.format,
@@ -2008,7 +1863,6 @@ export class DatasetStore {
     });
   }
 
-  /** The stored definition of a dataset, without reading its source. */
   async definition(
     projectId: string,
     datasetId: string,
@@ -2016,11 +1870,6 @@ export class DatasetStore {
     return (await this.stored(projectId, assertId(datasetId))).dataset;
   }
 
-  /**
-   * Chooses whether synchronization carries a copy of a linked file to the
-   * project's other devices. Turning it off drops the copy's record; the
-   * other devices then show the dataset as not bundled.
-   */
   async setBundle(
     projectId: string,
     datasetId: string,
@@ -2054,14 +1903,6 @@ export class DatasetStore {
     return { changed };
   }
 
-  /**
-   * Brings this device's linked file and the project's synchronized copy
-   * together. A file changed here is shared as a new copy (published); a
-   * copy edited on another device is written into the unchanged file
-   * (written-back); when both changed, the file is kept and the conflict is
-   * reported on reads (WRITE_CONFLICT) until the file changes again.
-   * `publish: false` leaves a changed file for the next synchronization.
-   */
   async reconcileBundle(
     projectId: string,
     datasetId: string,
@@ -2121,7 +1962,6 @@ export class DatasetStore {
         return { state: "unchanged", hash: current, bytes: file.size };
       }
       const sharedChanged = shared !== undefined && shared !== agreed?.hash;
-      // A conflict ends when the file changes again: the person combined both.
       const fileChanged =
         current !== agreed?.hash &&
         (!agreed?.conflict || current !== agreed.conflict.file);
@@ -2148,7 +1988,6 @@ export class DatasetStore {
         await this.agreements.set(key, { hash, base: hash, at: now });
         return { state: "published", hash, bytes: file.size };
       }
-      // An edit made on top of what this file last shared or received.
       const derived =
         !bundle!.base ||
         bundle!.base === agreed?.hash ||
@@ -2175,21 +2014,18 @@ export class DatasetStore {
     });
   }
 
-  /** Pages of the library whose blocks are bound to this dataset. */
   async references(
     projectId: string,
     datasetId: string,
     scope: "library" | "project" = "library",
   ): Promise<DatasetReference[]> {
     const references: DatasetReference[] = [];
-    // Pages moved to other projects keep their binding; deletion checks them all.
     const projects =
       scope === "project"
         ? [{ id: projectId }]
         : await this.store.listProjects();
     for (const project of projects) {
       for (const page of await this.store.listPages(project.id)) {
-        // Only pages that mention the id can bind it; skip parsing the rest.
         const path = this.store.pagePath(project.id, page.id);
         const bytes =
           (await readLibraryFile(this.root, path)) ??
@@ -2216,10 +2052,6 @@ export class DatasetStore {
     return references;
   }
 
-  /**
-   * Deletes an unused dataset; bound blocks must be detached first. An
-   * external dataset's file is kept; only its link is removed.
-   */
   async remove(
     projectId: string,
     datasetId: string,
@@ -2250,8 +2082,6 @@ export class DatasetStore {
     return this.files.lock(`dataset-${projectId}-${datasetId}`, async () => {
       const stored = await this.stored(projectId, datasetId);
       const storedHash = datasetHash(stored.dataset);
-      // An unreadable source still lets the dataset be deleted by the hash
-      // listed for it: its stale value's, or the stored file's.
       const current = await this.load(projectId, datasetId, { fallback: true })
         .then(({ record }) => record)
         .catch((error) => {
@@ -2288,10 +2118,6 @@ export class DatasetStore {
   }
 }
 
-/**
- * Values of datasets as they were read, by content hash, so a later write
- * that names its baseHash merges with changes made since. Bounded like a cache.
- */
 export class DatasetBaselines {
   constructor(readonly home: string) {}
   private directory() {
@@ -2305,8 +2131,6 @@ export class DatasetBaselines {
   private slot(projectId: string, datasetId: string) {
     const context = changeContext();
     const actor = context.actor;
-    // A real Agent session is one reader across its connections; anything
-    // else is one reader per MCP connection (or per actor outside MCP).
     const reader =
       actor.sessionId || !context.readerId
         ? [actor.kind, actor.harness, actor.sessionId]
@@ -2319,7 +2143,6 @@ export class DatasetBaselines {
         .digest("hex")}.json`,
     );
   }
-  /** The value this actor (Agent session or editor) read last, if remembered. */
   async latest(
     projectId: string,
     datasetId: string,
@@ -2334,7 +2157,6 @@ export class DatasetBaselines {
     return value === undefined ? undefined : { hash, value };
   }
   async remember(projectId: string, record: DatasetRecord): Promise<void> {
-    // A stale value is not the source's; no write may merge from it.
     if (record.status !== "ok") return;
     const actor = changeContext().actor;
     await atomicLibraryFile(
@@ -2414,7 +2236,6 @@ export class DatasetBaselines {
   }
 }
 
-/** Accepts the dataset file of an imported or migrated page artifact unchanged. */
 export function parseDatasetFile(
   source: string,
   expectedId?: string,
@@ -2432,19 +2253,12 @@ export interface DatasetDraft {
   clientId: string;
   projectId: string;
   datasetId: string;
-  /** The dataset hash the pending writes started from. */
   baseHash: string;
-  /** Unsaved writes; each carries its starting value. */
   pending: DatasetOperation[];
-  /** Writes that conflicted and wait for a decision. */
   held: (DatasetConflict & { id: string })[];
   savedAt: string;
 }
 
-/**
- * Unsaved and conflicting dataset writes of an editor window, kept on disk
- * until they are saved or explicitly discarded.
- */
 export class DatasetDrafts {
   constructor(readonly home: string) {}
   private directory() {

@@ -105,7 +105,6 @@ describe("Board editing commands", () => {
     expect(node.attrs!.points[1]).toEqual({ x: 300, y: 50 });
     expect(node.attrs!.strokeWidth).toBe(2);
     expect(validateDocument(resized)).toBeTruthy();
-    // A pure move keeps the drawing's identity.
     const moved = transformObjects(doc, {
       a: { x: 30, y: 420, width: 100, height: 50 },
     });
@@ -164,7 +163,6 @@ describe("Board editing commands", () => {
     expect(alignOffsets(boxes, "bottom").c).toEqual({ x: 0, y: 50 });
     expect(alignOffsets(boxes, "center").a.x).toBe(200);
     const spaced = alignOffsets(boxes, "distribute-x");
-    // Gap = (500 - 250) / 2 = 125: b starts at 225.
     expect(spaced.b.x).toBe(75);
     expect(spaced.a.x).toBe(0);
     expect(alignOffsets({ a: boxes.a }, "left")).toEqual({});
@@ -186,7 +184,6 @@ describe("Board editing commands", () => {
       "arrow",
     ]);
     expect(grouped.document.layout.a).toMatchObject({ x: 0, y: 0 });
-    // Connections between grouped objects survive the move.
     expect(
       findSurfaceNode(grouped.document, "arrow")!.node.attrs!.bindings,
     ).toBeTruthy();
@@ -234,7 +231,6 @@ describe("Board geometry helpers", () => {
       x: 0.5,
       y: 0,
     });
-    // On an edge away from its middle, the exact point is kept.
     expect(connectionAnchor(frame, { x: 20, y: 0 })).toEqual({ x: 0.1, y: 0 });
   });
   it("treats free regions as hollow so overlapped objects stay reachable", () => {

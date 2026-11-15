@@ -44,7 +44,6 @@ import {
 } from "../datasets/record-query.mjs";
 import { deriveDatabase } from "../core/database-derive";
 
-/** Side effects of component.ref.set that the save receipt reports. */
 export interface ComponentRefNotes {
   datasetSchemas?: {
     datasetId: string;
@@ -67,7 +66,6 @@ type BindingOperation = Extract<
   { type: "component.binding.set" | "component.binding.remove" }
 >;
 
-/** A component block, in the page tree or nested in another component's content. */
 function findWidget(document: ShowDocument, blockId: string): JSONContent {
   let found: JSONContent | undefined;
   try {
@@ -94,10 +92,8 @@ function invalidData(
   throw error;
 }
 
-/** Dry runs return outputs up to this size whole. */
 const DRY_RUN_PREVIEW_BYTES = 64 * 1024;
 
-/** Agent-facing dataset operations, and routing of page writes to bound blocks. */
 export class DatasetService {
   readonly datasets: DatasetStore;
   constructor(readonly store: FileStore) {
@@ -117,9 +113,7 @@ export class DatasetService {
       offset?: number;
       limit?: number;
       full?: boolean;
-      /** Fetch online data now instead of within its refresh interval. */
       refresh?: boolean;
-      /** Filter group, sort list and search over a {columns, rows} value. */
       query?: { filter?: unknown; sorts?: unknown; search?: string };
     } = {},
   ) {
@@ -132,7 +126,6 @@ export class DatasetService {
       refresh: options.refresh,
     });
     const baselines = new DatasetBaselines(this.store.root);
-    // The earlier version is looked up before this read is remembered.
     const before =
       options.sinceHash === undefined
         ? undefined
@@ -191,11 +184,6 @@ export class DatasetService {
     };
   }
 
-  /**
-   * Records of a database-shaped value ({columns, rows}) that pass a filter
-   * group, in sort order, with derived values (relations, rollups, formulas)
-   * and the reverse relation columns of other datasets.
-   */
   private async query(
     projectId: string,
     datasetId: string,
@@ -373,7 +361,6 @@ export class DatasetService {
       ]),
       projectId,
     );
-    // The hash check above ran in this transaction, so the page revision read with it is current.
     const saved = await this.store.savePage(
       projectId,
       pageId,
@@ -403,12 +390,10 @@ export class DatasetService {
     });
   }
 
-  /** Keeps a dataset's value in a file outside the library (see DatasetStore.link). */
   link(projectId: string, input: DatasetLinkInput) {
     return this.datasets.link(projectId, input);
   }
 
-  /** Creates or changes a transform dataset (see DatasetStore.defineTransform). */
   transform(
     projectId: string,
     input: Parameters<DatasetStore["defineTransform"]>[1],
@@ -416,10 +401,6 @@ export class DatasetService {
     return this.datasets.defineTransform(projectId, input);
   }
 
-  /**
-   * Runs a transform script without saving it. Outputs larger than
-   * DRY_RUN_PREVIEW_BYTES return their first bytes as text.
-   */
   async tryTransform(
     projectId: string,
     input: Parameters<DatasetStore["tryTransform"]>[1],
@@ -440,7 +421,6 @@ export class DatasetService {
     };
   }
 
-  /** Copies an external dataset's value into the library and stops reading its file. */
   embed(projectId: string, datasetId: string, baseHash?: string) {
     return this.datasets.embed(projectId, datasetId, { baseHash });
   }
@@ -449,7 +429,6 @@ export class DatasetService {
     return this.datasets.remove(projectId, datasetId, { baseHash });
   }
 
-  /** The value the writer of a bound block last read. */
   private async basis(
     projectId: string,
     record: DatasetRecord,
@@ -469,8 +448,6 @@ export class DatasetService {
           ? record.dataset.value
           : latest.value;
     }
-    // Each MCP connection (and CLI run) is its own reader, so a read made in
-    // another connection only counts when its hash is passed explicitly.
     const name = bases && Object.hasOwn(bases, key) ? key : record.dataset.id;
     const error = new CoreError(
       "MISSING_BASELINE",
@@ -491,11 +468,6 @@ export class DatasetService {
     throw error;
   }
 
-  /**
-   * Applies page operations; component.props.set on a bound block writes the
-   * dataset, component.binding.set/remove change the binding. Returns the new
-   * page document and commits dataset writes in the caller's transaction.
-   */
   async applyPageOperations(
     projectId: string,
     document: ShowDocument,
@@ -506,7 +478,6 @@ export class DatasetService {
     commit: () => Promise<void>;
     notes: ComponentRefNotes;
   }> {
-    // Malformed entries reach applyOperations, which names them by index.
     const bindingOps = (operation: PageOperation) =>
       operation?.type === "component.binding.set" ||
       operation?.type === "component.binding.remove" ||
@@ -530,7 +501,6 @@ export class DatasetService {
       };
     let working = document;
     let batch: PageOperation[] = [];
-    // Index of batch[0] in the caller's operations, for error messages.
     let batchStart = 0;
     const flush = () => {
       if (batch.length) working = applyOperations(working, batch, batchStart);
@@ -570,7 +540,6 @@ export class DatasetService {
         }
         await load(compiled.project ?? projectId, compiled.dataset);
         let props = componentProps(kind, node.attrs!.data);
-        // Shared keys come from the dataset now; stale copies in the block are dropped.
         if (compiled.props)
           props = Object.fromEntries(
             Object.entries(props).filter(([key]) =>
@@ -629,7 +598,6 @@ export class DatasetService {
         const kind = String(node.attrs!.kind);
         const project = binding.project ?? projectId;
         const { key, record } = await load(project, binding.dataset);
-        // Read-only and stale data refuse edits before anything is merged.
         assertWritable(record);
         const basis = await this.basis(project, record, bases);
         const basisProps = resolveBinding(kind, node.attrs!.data, basis).props;
@@ -721,12 +689,6 @@ export class DatasetService {
     };
   }
 
-  /**
-   * component.ref.set keeps props and bindings, so the props a block shows
-   * (resolved from its dataset when bound) must satisfy the new revision.
-   * A props dataset whose schema was derived from the previous revision
-   * follows the block to the new revision in the same save.
-   */
   private async checkComponentRefs(
     projectId: string,
     before: ShowDocument,
@@ -843,8 +805,6 @@ export class DatasetService {
                   from: `${previous.componentId}@${previous.version}`,
                   to: `${component.id}@${component.version}`,
                 });
-                // Other blocks bound to the same data are now checked against
-                // the new schema too; the person decides whether to upgrade them.
                 const upgraded = new Set(
                   operations.map((item) => item.blockId),
                 );
@@ -929,7 +889,6 @@ export class DatasetService {
     return bound;
   }
 
-  /** Rejects saving shared props into a bound block's stored data. */
   assertBoundBlocks(document: ShowDocument) {
     walk(document.content, (node) => {
       if (node.type !== "widget") return;

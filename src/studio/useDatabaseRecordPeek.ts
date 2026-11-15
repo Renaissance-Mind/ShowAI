@@ -21,7 +21,6 @@ type OwnedRequest = OpenRecordRequest & {
   returnFocus: HTMLElement | null;
 };
 
-/** Presentation state only. Documents and their recovery stay in PageSessions. */
 export function useDatabaseRecordPeek({
   sessions,
   home,

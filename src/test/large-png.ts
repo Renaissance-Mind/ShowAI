@@ -1,7 +1,6 @@
 import { randomBytes } from "node:crypto";
 import { deflateSync } from "node:zlib";
 
-/** A valid incompressible raster, exercising file, decoder and compression paths together. */
 export function largePng(width: number, height: number): Buffer {
   const chunk = (name: string, data: Buffer) => {
     const body = Buffer.concat([Buffer.from(name), data]);

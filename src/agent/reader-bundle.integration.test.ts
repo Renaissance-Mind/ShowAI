@@ -365,7 +365,6 @@ test("small block selections export inline with only their renderers", async () 
         type: "widget",
         attrs: { id: "ov-scene", kind: "scene-3d", data: builtin("scene-3d") },
       },
-      // Unselected heavy renderers must not reach the selection's reader.
       ...diagrams.map((item) => ({
         type: "widget",
         attrs: { id: item.kind, kind: item.kind, data: item.defaultData },
@@ -406,7 +405,6 @@ test("small block selections export inline with only their renderers", async () 
         html: await readFile(out + "-full.html", "utf8"),
       };
     };
-    // Three.js alone is about 570 KB minified, so the 3D scene gets a larger full-HTML budget.
     for (const [name, blockIds, budget, htmlBudget] of [
       ["chart", ["mon-metrics", "mon-entropy"], 600_000, 1_500_000],
       ["flowchart", ["ov-flow"], 750_000, 1_500_000],

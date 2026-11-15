@@ -4,8 +4,6 @@ const findSurfaceNode = (document, id) => {
   return node ? {node} : undefined;
 };
 
-/** Transfer changed object payloads with a complete hierarchy. Nested surfaces
- * are independently editable objects; regions share their enclosing camera. */
 export function nativeBoardScenePatch(document, boardId, previous) {
   const board = findSurfaceNode(document, boardId)?.node;
   if (!board || board.attrs?.kind !== "board") throw new Error("Native Board no longer exists");
@@ -33,8 +31,6 @@ export function nativeBoardScenePatch(document, boardId, previous) {
   return {document:{...document,content:replace(document.content)},nodes};
 }
 
-/** Resolving references uses the last acknowledged source, never a queued or
- * optimistic frame. Missing baselines reject the whole frame atomically. */
 export function resolveNativeBoardScene(patch, previous) {
   const retained = new Map();
   const visit = node => {

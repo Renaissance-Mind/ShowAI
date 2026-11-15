@@ -1,7 +1,6 @@
 #ifndef SHOWAI_BOUNDARY_GRAPH_TEST_API_HPP
 #define SHOWAI_BOUNDARY_GRAPH_TEST_API_HPP
 #include "graph.hpp"
-// Tests only. The production owner/lease API does not accept this transport.
 extern "C" uint32_t sabt_graph(const uint32_t*ranges,uint32_t path_count,const SAInkPathCommand*commands,uint32_t command_count,const double*queries,uint32_t query_count,void*memory,uint32_t bytes,uint64_t work_limit,uint32_t*output,uint32_t capacity,int32_t*metadata){
     if(!ranges||!path_count||path_count>8||!commands||command_count>2048||!queries||query_count>128||!output||!metadata||!memory||((uintptr_t)ranges&3u)||((uintptr_t)commands&7u)||((uintptr_t)queries&7u)||((uintptr_t)output&3u)||((uintptr_t)metadata&3u))return SA_INK_INVALID;
     const void*objects[6]={ranges,commands,queries,memory,output,metadata};uint64_t sizes[6]={uint64_t(path_count)*8,uint64_t(command_count)*sizeof(SAInkPathCommand),uint64_t(query_count)*32,bytes,uint64_t(capacity)*4,32};

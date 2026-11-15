@@ -43,7 +43,6 @@ test("real fetch bodies repair corrupt caches, verify SHA256 and clean up reject
   await writeFile(join(directory, asset.name), "truncated cached archive");
   const archive = await downloadGitAsset(asset, directory);
   assert.equal(digest(await readFile(archive)), asset.checksum);
-  // The verified cache succeeds even when a subsequent download URL is unusable.
   assert.equal(await downloadGitAsset({ ...asset, url: "invalid URL" }, directory), archive);
   await rm(archive);
   await assert.rejects(downloadGitAsset({ ...asset, checksum: digest("different expected bytes") }, directory), /SHA256 mismatch/);

@@ -22,7 +22,6 @@ export type RestoreTarget =
   | { kind: "folder"; projectId: string; id: string; title: string }
   | { kind: "page"; projectId: string; id: string; title: string };
 
-/** Deleting archives an item; restoring clears the flag through one action. */
 export function restoreItem(target: RestoreTarget) {
   return desktop.invoke("library:restore", {
     kind: target.kind,
@@ -32,7 +31,6 @@ export function restoreItem(target: RestoreTarget) {
   });
 }
 
-/** Deletes items in the trash for good; content inside a folder or project goes with it. */
 export function purgeItems(targets: RestoreTarget[]) {
   return desktop.invoke("library:purge", {
     items: targets.map((target) => ({
@@ -148,7 +146,6 @@ export function DeletedItemsDialog({
   useEffect(() => {
     void load();
   }, []);
-  // The removed row held focus; the list keeps it once the confirmation closes.
   useEffect(() => {
     if (purged) list.current?.focus({ preventScroll: true });
   }, [purged]);
@@ -448,7 +445,6 @@ export function ShortcutsDialog({
   windows,
   onClose,
 }: {
-  /** The browser workbench: shortcuts the browser keeps for itself are left out. */
   browser?: boolean;
   tabs: boolean;
   windows: boolean;

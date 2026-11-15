@@ -11,7 +11,6 @@ import {
 import { validateDocument } from "./validation.mjs";
 import { upgradeResource, createSurface } from "../document/containers.mjs";
 
-// A real HTTP fixture serves a valid raster image so the network-to-file path is exercised.
 const png = Buffer.from(
   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=",
   "base64",

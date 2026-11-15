@@ -9,7 +9,6 @@ import type { WorkspaceConflict } from "./workspace-conflicts";
 import { retainActivatedGit } from "./content-migration-journal";
 import { withLibraryLock } from "./library-lock";
 
-/** Storage-independent library contract. New libraries have no Git runtime. */
 export class ContentLibrary {
   readonly root: string;
   readonly workspace: string;
@@ -66,10 +65,6 @@ export class ContentLibrary {
   async head() {
     return (await this.backend()).head();
   }
-  /**
-   * Run reads against one committed state. SQLite holds a read transaction, so
-   * saves from any process proceed meanwhile; legacy Git storage keeps the lease.
-   */
   async readSnapshot<T>(
     action: (revision: string | null) => Promise<T>,
   ): Promise<T> {
@@ -80,7 +75,6 @@ export class ContentLibrary {
   async tree(revision?: string) {
     return (await this.backend()).tree(revision);
   }
-  /** The tree without the stored nodes of split pages; their pages stay. */
   async treeFiles(revision?: string) {
     const backend = await this.backend();
     return backend instanceof SqliteLibrary
@@ -89,11 +83,9 @@ export class ContentLibrary {
           (entry) => !pageNodePath.test(entry.path),
         );
   }
-  /** Whether the library stores content in SQLite rather than legacy Git. */
   async sqlite() {
     return (await this.backend()) instanceof SqliteLibrary;
   }
-  /** The tree entries at exact paths and below directory prefixes ("dir/"). */
   async treeEntries(query: TreeQuery, revision?: string) {
     return (await this.backend()).treeEntries(query, revision);
   }
@@ -196,11 +188,6 @@ export class ContentLibrary {
   async verify() {
     return (await this.backend()).verify();
   }
-  /**
-   * Releases what permanently deleted paths still hold: their archived
-   * history and the shared assets nothing else embeds. Any write moves Git
-   * storage to SQLite first, so only SQLite keeps either here.
-   */
   async releaseDeleted(paths: string[]) {
     const backend = await this.backend();
     if (!(backend instanceof SqliteLibrary)) return;

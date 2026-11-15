@@ -134,14 +134,11 @@ function parseRecord(message: string): ChangeRecord {
   return value;
 }
 
-// Git objects and revision trees are immutable. Bound reuse across store instances
-// without caching HEAD, working files, conflicts or mutable operation state.
 const treeReads = new Map<string, Promise<TreeEntry[]>>();
 const objectReads = new Map<string, Buffer>();
 let objectBytes = 0;
 const objectBudget = 32 * 1024 * 1024;
 
-/** Git is authoritative. Working files and indexes are recoverable projections. */
 export class GitLibrary {
   readonly root: string;
   readonly repository: string;
@@ -335,7 +332,6 @@ export class GitLibrary {
     return selected;
   }
 
-  /** The tree entries at exact paths and below directory prefixes ("dir/"). */
   async treeEntries(query: TreeQuery, revision?: string): Promise<TreeEntry[]> {
     assertTreeQuery(query);
     return selectTreeEntries(await this.tree(revision), query);
@@ -412,7 +408,6 @@ export class GitLibrary {
         const key = `${this.repository}:${id}`;
         const previous = objectReads.get(key);
         if (previous) objectBytes -= previous.length;
-        // Detach slices from the full cat-file response before retaining them.
         const retained = Buffer.from(bytes);
         objectReads.set(key, retained);
         objectBytes += retained.length;
@@ -514,7 +509,6 @@ export class GitLibrary {
   async readFile(path: string, revision?: string): Promise<Buffer> {
     return (await this.readFiles([path], revision)).get(path)!;
   }
-  /** One-time migration reads immutable encoded objects without reserializing them. */
   async encodedFiles(
     paths: string[],
     revision: string,
@@ -933,8 +927,6 @@ export class GitLibrary {
         );
       return this.readFile(path, parent);
     });
-    // Content-addressed runtimes are shared. Avoid rewriting an unchanged reader
-    // or its dependency files on every keystroke save.
     const existingObjects = new Map(
       existing.map((entry) => [entry.path, entry.oid]),
     );
@@ -972,7 +964,6 @@ export class GitLibrary {
         ).values(),
       ],
     };
-    // Validate the same metadata shape we accept when reading historical commits.
     parseRecord(changeMessage(record));
     if (!changes.size) return null;
     const encoded: FileChanges = new Map();
@@ -999,7 +990,6 @@ export class GitLibrary {
       join(transaction, "journal.json"),
       Buffer.from(JSON.stringify(journal)),
     );
-    // Persist incoming edits as recoverable drafts before touching the committed head.
     for (const [path, bytes] of changes)
       if (bytes !== null)
         await this.atomicFile(join(transaction, "input", path), bytes);
@@ -1130,8 +1120,6 @@ export class GitLibrary {
         throw error;
       });
       if (journalBytes === null) {
-        // The journal is durable before inputs or refs are touched. A killed
-        // preparation may leave its directory or a temporary journal behind.
         const drafts = join(this.root, "local", "drafts");
         await mkdir(drafts, { recursive: true });
         await rename(
@@ -1276,8 +1264,6 @@ export class GitLibrary {
             "The resolution must update its conflicted resource.",
           );
       }
-      // The external bytes are safely retained. Restore the canonical projection
-      // before recovering interrupted commits or applying the validated resolution.
       const target = join(this.workspace, conflict.path);
       if (current !== null) await this.atomicFile(target, current);
       else {
@@ -1338,7 +1324,6 @@ export class GitLibrary {
     );
   }
 
-  /** Import under one writer lease. Every input remains recoverable through normal journals. */
   async replayImported(
     entries:
       | Iterable<{ changes: FileChanges; context: ChangeContext }>

@@ -1,6 +1,5 @@
 import { defineMessages } from "../index";
 
-// Shared data (datasets) bound to page blocks.
 export default defineMessages("datasets", {
   "zh-CN": {
     shared: "共享数据",

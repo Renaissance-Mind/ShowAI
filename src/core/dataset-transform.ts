@@ -12,14 +12,9 @@ import releaseSync from "@jitl/quickjs-wasmfile-release-sync";
 import { TRANSFORM_LIMITS } from "../datasets/dataset-file";
 import { TRANSFORM_HELPERS_SOURCE } from "./dataset-transform-helpers";
 
-// Transform datasets compute their value with a script an Agent wrote. The
-// script runs in QuickJS compiled to WebAssembly: each run gets a fresh
-// runtime with only the ECMAScript built-ins and the helpers (no files,
-// network, timers or host objects), a memory limit and a deadline.
 
 export { TRANSFORM_LIMITS };
 
-/** The file name errors of the script point at. */
 const SCRIPT_FILE = "transform.js";
 
 export type TransformRun =
@@ -32,11 +27,6 @@ export type TransformRun =
       ms: number;
     };
 
-/**
- * The WebAssembly file of QuickJS. Bundles resolve it from the node_modules
- * next to them (source checkout, dist-runtime); the packaged desktop main
- * process from the runtime shipped in its resources.
- */
 async function wasmBinary(): Promise<ArrayBuffer> {
   const bases = [import.meta.url];
   const resources = (process as { resourcesPath?: string }).resourcesPath;
@@ -65,11 +55,6 @@ async function wasmBinary(): Promise<ArrayBuffer> {
 
 let compiled: Promise<WebAssembly.Module> | undefined;
 let quickjs: Promise<QuickJSWASMModule> | undefined;
-/**
- * The QuickJS engine. A run that exhausted its memory can leave the engine
- * unable to free its runtime; that engine is dropped and the next run
- * instantiates a new one from the compiled module.
- */
 function engine(): Promise<QuickJSWASMModule> {
   if (!quickjs) {
     const wasm = (compiled ??= wasmBinary().then((bytes) =>
@@ -92,7 +77,6 @@ interface ErrorDump {
   stack?: string;
 }
 
-/** A readable message of a sandbox error and the script line it points at. */
 function describe(dump: unknown): {
   name: string;
   message: string;
@@ -113,15 +97,10 @@ function describe(dump: unknown): {
   return { name, message, ...(match ? { line: Number(match[1]) } : {}) };
 }
 
-/**
- * Runs transform(inputs, helpers) of the script on JSON inputs. Failures of
- * the script and invalid output are results, not exceptions.
- */
 export async function runTransform(
   script: string,
   inputs: Record<string, unknown>,
   options: {
-    /** The function the script defines and the run calls; default transform. */
     entry?: string;
     limits?: Partial<
       Pick<typeof TRANSFORM_LIMITS, "memoryBytes" | "timeoutMs" | "outputBytes">
@@ -206,8 +185,6 @@ export async function runTransform(
       };
     return { ok: true, value: JSON.parse(json), ms: elapsed() };
   } catch (error) {
-    // Recursion can exhaust the host's stack before QuickJS's own limit;
-    // the engine it interrupted is not reused.
     if (!(error instanceof RangeError)) throw error;
     broken = true;
     return {
@@ -224,8 +201,6 @@ export async function runTransform(
       runtime.dispose();
       if (broken && quickjs === engineInUse) quickjs = undefined;
     } catch {
-      // QuickJS aborts freeing a runtime that ran out of memory; the
-      // engine instance is discarded with everything it allocated.
       if (quickjs === engineInUse) quickjs = undefined;
     }
   }

@@ -50,10 +50,6 @@ function Scope({ value }: { value: string }) {
   return <span className="studio-tag">{key ? t(key) : value}</span>;
 }
 
-/**
- * The scrolling content of the workbench: the open page, settings,
- * documentation, recent pages, the open directory and the catalogs.
- */
 export function StudioViews({
   feedback,
   library,
@@ -172,7 +168,6 @@ export function StudioViews({
   const loading = !info && !problemQueue.problems.length;
   const carriesFiles = (event: DragEvent) =>
     event.dataTransfer.types.includes("Files");
-  // Files dropped on the directory view import like 「添加内容 → 导入文件…」.
   const directoryFileDrop =
     view === "project" && project && !contentCreationDisabled
       ? {
@@ -227,7 +222,6 @@ export function StudioViews({
       onStartPrompt={
         sampleProjectId
           ? async (text) => {
-              // Only the built-in Agent can take it: write it on a new page of the sample project.
               const pageId = await createPage("blank", undefined, "page", {
                 projectId: sampleProjectId,
                 parentId: null,

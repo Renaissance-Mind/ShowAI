@@ -64,14 +64,12 @@ function PageContent({
   onActiveSurfaceChange: (id: string) => void;
   onRevealHandled: () => void;
   onEditIcon: () => void;
-  /** Loaded pages of each project, offered as link targets. */
   linkablePages: Record<string, { pages: LinkablePage[] } | undefined>;
   onCopyLink: (target: {
     projectId: string;
     pageId: string;
     blockIds: string[];
   }) => void;
-  /** Creates a page for a component on this page, such as a database record. */
   onCreateLinkedPage?: (input: {
     projectId: string;
     hostPageId: string;
@@ -79,7 +77,6 @@ function PageContent({
     folderId?: string;
     folderName: string;
   }) => Promise<{ pageId: string; folderId: string }>;
-  /** Renames a page for a component on this page, such as a database record. */
   onRenameLinkedPage?: (input: {
     projectId: string;
     pageId: string;
@@ -104,9 +101,6 @@ function PageContent({
   const pageId = state.draft?.id;
   const pages =
     (projectId ? linkablePages[projectId]?.pages : undefined) ?? noPages;
-  // Each save lists the project's pages again. The bridge reads the list
-  // through a getter so its identity, and every component's environment,
-  // survives saves; components that show the list subscribe.
   const latestPages = useRef(pages);
   latestPages.current = pages;
   const pageListeners = useRef(new Set<() => void>());
@@ -210,8 +204,6 @@ function PageContent({
   );
   const editors = useContext(WorkspaceEditorContext);
   useLayoutEffect(() => {
-    // A page opened from a sidebar or directory row leaves focus on that row,
-    // so its F2 and Delete keep acting on the row.
     const restore = () => {
       if (!document.activeElement?.closest("[data-library-id]"))
         editors?.restoreFocus();
@@ -306,10 +298,6 @@ const PageView = memo(function PageView({
   );
 });
 
-/**
- * Hidden views keep their state and disconnect global effects and observers.
- * Views render only when their own data changes, not with every workbench render.
- */
 export function PageWorkspace({
   sessions,
   visible,

@@ -1,5 +1,3 @@
-// Shared error presentation: describe a thrown value, show it with
-// ProblemNotice, queue workbench problems, and redact details for reports.
 export {
   describeError,
   problemFacts,

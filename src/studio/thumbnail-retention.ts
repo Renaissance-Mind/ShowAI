@@ -1,4 +1,3 @@
-/** Keep recently viewed previews warm without retaining every visited renderer. */
 export class ThumbnailRetention {
   private entries = new Map<
     symbol,
@@ -17,7 +16,6 @@ export class ThumbnailRetention {
     }
     for (const [oldest, entry] of this.entries) {
       if (this.entries.size <= this.limit) break;
-      // A large viewport may need more than the retention limit.
       if (entry.visible) continue;
       this.entries.delete(oldest);
       entry.release();

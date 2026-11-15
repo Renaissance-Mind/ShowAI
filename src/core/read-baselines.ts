@@ -14,13 +14,6 @@ function digest(json: string) {
   return createHash("sha256").update(json).digest("hex");
 }
 
-/**
- * Page versions that sessions and people read, kept as a bounded cache so a
- * later diff can compare against them. Each version is stored once under a
- * name derived from its page and hash, with a small alias per revision, so a
- * lookup opens at most two files and a repeated read of an unchanged page
- * rewrites nothing.
- */
 export class ReadBaselines {
   constructor(readonly home: string) {}
   private directory() {
@@ -46,7 +39,6 @@ export class ReadBaselines {
     const pageId = record.document.id;
     const path = this.documentPath(projectId, pageId, record.hash);
     const now = new Date();
-    // The same version keeps its file; refreshing its time keeps it in the cache.
     const kept = await utimes(path, now, now).then(
       () => true,
       (error: NodeJS.ErrnoException) => {
@@ -79,7 +71,6 @@ export class ReadBaselines {
     await this.prune();
   }
 
-  /** Keeps the most recently used versions and aliases. */
   private async prune() {
     const names = await readdir(this.directory());
     for (const [pattern, limit] of [
@@ -100,7 +91,6 @@ export class ReadBaselines {
     }
   }
 
-  /** The document of the version with this hash or revision, if still kept. */
   async read(
     projectId: string,
     pageId: string,
@@ -119,7 +109,6 @@ export class ReadBaselines {
       : undefined;
   }
 
-  /** The revision of the most recent read that returned this hash, if kept. */
   async revision(
     projectId: string,
     pageId: string,
@@ -141,7 +130,6 @@ export class ReadBaselines {
     );
     if (!bytes) return undefined;
     const record = JSON.parse(bytes.toString());
-    // A damaged or hand-edited file is not a baseline.
     if (
       record.projectId === projectId &&
       record.pageId === pageId &&

@@ -8,7 +8,6 @@ export interface DshStageReceipt {
   path: string;
   version: string;
   home: string;
-  /** The stdio MCP server written into the bundle's showai-mcp row. */
   server: {
     command: string;
     args: string[];
@@ -39,6 +38,5 @@ export interface DshProfileState {
 export declare function inspectDshProfile(options: {
   target?: string;
   home?: string;
-  /** Skill names the bundle ships; same-name user skills shadow them. */
   skillNames?: string[];
 }): Promise<DshProfileState>;

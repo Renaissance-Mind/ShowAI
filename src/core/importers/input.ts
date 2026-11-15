@@ -9,7 +9,6 @@ import {
   type RandomAccess,
 } from "./zip";
 
-/** Most files one input may list, and the largest single file read. */
 export const INPUT_LIMITS = {
   files: 100_000,
   fileBytes: 512 * 1024 * 1024,
@@ -48,7 +47,6 @@ function tooLarge(path: string, size: number) {
     );
 }
 
-/** The files of a zip, with nested zips (e.g. Notion's Part-1.zip) expanded in place. */
 async function zipFiles(
   access: RandomAccess,
   prefix: string,
@@ -134,7 +132,6 @@ export interface OpenedInput extends ImportInput {
   close(): Promise<void>;
 }
 
-/** Opens a file, a folder or a zip on this device as an import input. */
 export async function openImportPath(path: string): Promise<OpenedInput> {
   const info = await lstat(path);
   const name = basename(path);
@@ -173,7 +170,6 @@ export async function openImportPath(path: string): Promise<OpenedInput> {
   return { name, kind: "file", files, problems, close: async () => {} };
 }
 
-/** Files handed over without a device path (e.g. dropped in a browser). */
 export async function openImportFiles(
   items: { name: string; bytes: Uint8Array }[],
 ): Promise<OpenedInput> {

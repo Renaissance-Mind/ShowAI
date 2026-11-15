@@ -1,15 +1,8 @@
-// Immutable updates over page content, including documents components hold
-// in their data. Untouched branches keep their identity. No DOM dependencies.
 import { walk } from "./walk.mjs";
 
 const isRichDocument = (value) =>
   value.type === "doc" && Array.isArray(value.content);
 
-/**
- * Component data with each held rich-text document replaced by
- * `map(document)`. Finds the same documents as widgetDocuments, in the same
- * order; data whose documents all come back unchanged is returned as is.
- */
 export function mapWidgetDocuments(data, map) {
   const step = (value) => {
     if (!value || typeof value !== "object") return value;
@@ -32,13 +25,6 @@ export function mapWidgetDocuments(data, map) {
 
 const SCOPES = new Set(["tree", "content"]);
 
-/**
- * Rebuild `root` with `map(node, { host, owner })` applied to every node in
- * the scope, parents first; the children of the returned node are mapped
- * next. `map` returns the node itself to keep it. With scope "content", a
- * changed node inside a component's held document is written back into that
- * component's data, and every ancestor on the way up is copied once.
- */
 export function mapNodes(root, map, options) {
   const scope = options?.scope;
   if (!SCOPES.has(scope))
@@ -63,7 +49,6 @@ export function mapNodes(root, map, options) {
   return step(root, options.host ?? null, options.owner ?? options.host ?? null);
 }
 
-/** Every identified node with this id in the scope, with its walk context. */
 export function findNodes(root, id, options) {
   const found = [];
   walk(root, (node, context) => {
@@ -73,12 +58,6 @@ export function findNodes(root, id, options) {
   return found;
 }
 
-/**
- * The node page operations address by `id`: a node of the page tree when
- * one has the id (the root included), otherwise the one node with the id
- * inside documents components hold. Undefined when no node has it; throws
- * when only nested nodes have it and there are several.
- */
 export function addressNode(root, id) {
   const found = findNodes(root, id, { scope: "content" });
   const tree = found.find((match) => !match.host);
@@ -90,12 +69,6 @@ export function addressNode(root, id) {
   return found[0];
 }
 
-/**
- * `root` with the one node named `id` replaced by `update(node)`. With scope
- * "content" the node may sit in a document a component holds; the change is
- * written back into that component's data. Throws when the id names no node
- * or several.
- */
 export function updateNode(root, id, update, options) {
   const found = findNodes(root, id, options);
   if (found.length !== 1)

@@ -46,7 +46,6 @@ function category(name: string): Category {
   return "actions";
 }
 
-// This is the application's shared export list, never a second list of icons.
 const catalog = Object.entries(icons).map(([name, Icon]) => ({
   name,
   Icon,

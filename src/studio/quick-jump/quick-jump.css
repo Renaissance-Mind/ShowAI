@@ -1,4 +1,3 @@
-/* Quick jump sits high in the window so results grow downward without moving the input. */
 .quick-jump-shade {
   align-items: flex-start;
   padding-top: min(14vh, 120px);

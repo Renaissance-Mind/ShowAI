@@ -18,7 +18,6 @@ it("shows consecutive gestures immediately and replays remaining gestures after 
   expect(
     [first, second].reduce(applySidebarReorder, saved).entryOrder?.project,
   ).toEqual(["nested", "b", "c", "a"]);
-  // The first write failed; remove just that gesture and retain the second.
   expect(
     [second].reduce(applySidebarReorder, saved).entryOrder?.project,
   ).toEqual(["nested", "a", "b", "c"]);

@@ -9,12 +9,6 @@ import { CoreError } from "../core/model";
 import { mcpFailure } from "./presentation-tools";
 import { actionRegistry, installToolCompatibility } from "./mcp-compat";
 
-/**
- * Every tool rejects arguments outside its schema instead of the SDK's silent
- * stripping, including after decorators replace the parameters. Calls in a
- * recent earlier tool shape are translated and receive the current form, and
- * argument errors are structured (see mcp-compat).
- */
 export function strictToolInputs<T extends McpServer>(server: T): T {
   const tools = new Map<string, RegisteredTool>();
   installToolCompatibility(server, tools);
@@ -32,7 +26,6 @@ export function strictToolInputs<T extends McpServer>(server: T): T {
     const update = tool.update.bind(tool);
     tool.update = (updates) => {
       update(updates);
-      // remove() renames to null; keep the compatibility layer's view current.
       if (updates.name !== undefined && updates.name !== name) {
         tools.delete(name);
         if (updates.name) tools.set(updates.name, tool);
@@ -47,7 +40,6 @@ export function strictToolInputs<T extends McpServer>(server: T): T {
 }
 
 export interface ToolAction {
-  /** Fields this action accepts; anything else is rejected. */
   fields: z.ZodRawShape;
   run(input: Record<string, unknown>): Promise<CallToolResult>;
 }
@@ -57,14 +49,8 @@ const required = (schema: z.ZodType): z.ZodType =>
   schema instanceof z.ZodOptional
     ? required(schema.unwrap() as z.ZodType)
     : schema;
-// Change metadata is accepted where listed but omitted from the action summary.
 const unlisted = new Set(["operationId", "message", "groupId"]);
 
-/**
- * One tool for related operations of the same permission class. The advertised
- * schema is the union of action fields; each call is validated against exactly
- * its action's fields.
- */
 export function actionTool(
   summary: string,
   actions: Record<string, ToolAction>,
@@ -77,10 +63,8 @@ export function actionTool(
       if (key === "action")
         throw new Error(`${action} cannot declare an action field.`);
       const empty = (schema as z.ZodType).safeParse(undefined);
-      // Defaults would be filled in for actions that do not accept the field.
       if (empty.success && empty.data !== undefined)
         throw new Error(`${action}.${key} cannot have a default.`);
-      // The advertised field is optional anyway; X and X.nullable() advertise once.
       const list = variants.get(key) ?? [];
       const variant = required(schema as z.ZodType);
       if (!list.includes(variant)) list.push(variant);

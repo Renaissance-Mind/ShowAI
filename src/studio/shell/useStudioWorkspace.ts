@@ -12,10 +12,6 @@ import type { MenuState } from "./menus/useMenuState";
 import type { DirectoryState } from "./useDirectory";
 import type { PageState, WorkspaceTabs } from "./types";
 
-/**
- * The workspace tabs and their history: the entry this view records, and how
- * a tab's entry is shown again.
- */
 export function useStudioWorkspace({
   feedback: { report, draftHeld },
   library: {
@@ -92,7 +88,6 @@ export function useStudioWorkspace({
   >;
   directory: Pick<DirectoryState, "project" | "currentFolder">;
   page: PageState;
-  /** Hands the tabs to the router and actions created before them. */
   workspaceRef: RefObject<WorkspaceTabs>;
 }) {
   const t = useTranslator(studioMessages);
@@ -169,7 +164,6 @@ export function useStudioWorkspace({
           ? await page.prepare(target.projectId, target.pageId)
           : await page.prepareClear();
       if (!show) {
-        // Superseded switches end quietly; a page that could not keep its edits says so.
         if (page.status === "error") draftHeld();
         return null;
       }
@@ -198,7 +192,6 @@ export function useStudioWorkspace({
         setProjectsMenu(null);
         setGroupMenu(null);
         setExportMenu(null);
-        // The entry's search comes back with it, so Back shows the same results.
         const search = {
           view: target.view,
           query: entry.query ?? "",

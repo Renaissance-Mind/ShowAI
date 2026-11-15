@@ -15,7 +15,6 @@ export const pluginHostNames: Record<PluginHost, string> = {
   deepseek: "DeepSeek Harness",
 };
 
-/** Host names as one phrase in the interface language ("Codex and Claude Code"). */
 export function pluginHostList(hosts: PluginHost[]) {
   return new Intl.ListFormat(getLocale(), {
     style: "long",
@@ -23,7 +22,6 @@ export function pluginHostList(hosts: PluginHost[]) {
   }).format(hosts.map((host) => pluginHostNames[host]));
 }
 
-/** Label key (pluginInstall messages) of the install action for one host. */
 export function pluginActionLabel(
   host: PluginInstallation,
   home?: string | null,
@@ -39,7 +37,6 @@ export function pluginActionLabel(
       : ("install" as const);
 }
 
-/** Codex or Claude Code already runs the plugin this App would install; nothing to do. */
 export function pluginUpToDate(
   host: PluginInstallation,
   home?: string | null,
@@ -52,7 +49,6 @@ export function pluginUpToDate(
   );
 }
 
-/** The installed plugin is bound to another library than the App's current one. */
 export function pluginLibraryMismatch(
   host: PluginInstallation,
   home: string | null | undefined,
@@ -62,10 +58,6 @@ export function pluginLibraryMismatch(
   );
 }
 
-/**
- * Welcome text key (onboarding messages) for a host: detection, then plugin
- * state, refined by the host's own login check when the Agent scan has one.
- */
 export function pluginHostState(
   host: PluginInstallation,
   auth?: "ready" | "missing" | "unknown",
@@ -91,15 +83,10 @@ export function pluginHostState(
       : ("connect.found" as const);
 }
 
-/** The host must exist and own the ShowAI plugin identity before installing. */
 export function pluginActionBlocked(host: PluginInstallation) {
   return !host.executable || !!host.error || !!host.otherSources.length;
 }
 
-/**
- * The host runs the App's plugin, but from an earlier App, another library or a
- * moved App. Hosts without the plugin or with another source are left alone.
- */
 export function pluginNeedsUpdate(host: PluginInstallation) {
   return (
     !pluginActionBlocked(host) &&
@@ -109,7 +96,6 @@ export function pluginNeedsUpdate(host: PluginInstallation) {
   );
 }
 
-/** Localized text of a plugin error code; the host CLI's own output stays in technical details. */
 export function pluginErrorText(
   reason: unknown,
   host?: PluginHost,
@@ -128,7 +114,6 @@ export function pluginErrorText(
       host: name,
       version: String(data?.minimumVersion ?? ""),
     });
-  // An unknown code falls back to the namespaced key; show the original message then.
   if (!localized || localized.startsWith("pluginInstall.")) return { message: raw };
   const output = typeof data?.output === "string" ? data.output : "";
   return { message: localized, details: [raw, output].filter(Boolean).join("\n\n") };
@@ -139,11 +124,6 @@ export interface PluginBatchResult {
   failed: { host: PluginHost; message: string }[];
 }
 
-/**
- * Plugin detection and installation shared by Settings → Plugins and the welcome,
- * served by the desktop App or the local browser server. `home` is null where the
- * host CLIs are unreachable (iPad); nothing is scanned then.
- */
 export function usePluginHosts(home: string | null) {
   const [hosts, setHosts] = useState<PluginInstallation[]>([]);
   const [scanned, setScanned] = useState(false);
@@ -201,7 +181,6 @@ export function usePluginHosts(home: string | null) {
       setError("");
       setReceipt(null);
       try {
-        // 修复并重新连接: register this App first, then bind the plugin to this library.
         if (options.repairRuntime)
           setRuntime(
             await desktop.invoke<RuntimeRegistrationStatus>(
@@ -239,7 +218,6 @@ export function usePluginHosts(home: string | null) {
       if (mounted.current) setBusy(null);
     }
   }, [fail]);
-  /** A host executable chosen by hand; an empty path returns to detection. */
   const setPath = useCallback(
     async (host: PluginHost, path: string) => {
       setBusy(host);
@@ -258,7 +236,6 @@ export function usePluginHosts(home: string | null) {
     },
     [fail],
   );
-  /** Updates hosts one at a time; the App installs a single plugin at once. */
   const updateAll = useCallback(async (targets: PluginHost[]) => {
     setBusy("all");
     setError("");
@@ -272,7 +249,6 @@ export function usePluginHosts(home: string | null) {
           });
           result.updated.push(host);
         } catch (reason) {
-          // Each host is updated independently; one failure must not stop the others.
           result.failed.push({
             host,
             message: pluginErrorText(reason, host).message,

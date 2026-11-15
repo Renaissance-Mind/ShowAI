@@ -11,7 +11,6 @@ import { readCustomBlockData } from "../contract/contract";
 import { syncManager } from "../sync/manager";
 import { evaluateFormulas, incomingRelations } from "../core/database-derive";
 
-/** Workbench actions for project datasets, shared by the desktop and browser hosts. */
 export const datasetActions = new Set([
   "datasets:list",
   "datasets:get",
@@ -70,7 +69,6 @@ export async function handleDatasetAction(
   const datasets = new DatasetStore(store);
   const projectId = id(args, "projectId");
   switch (action) {
-    // Database formulas run in the transform sandbox, outside the window.
     case "datasets:formulas":
       return evaluateFormulas(args.inputs);
     case "datasets:incoming":
@@ -83,7 +81,6 @@ export async function handleDatasetAction(
           refresh: args.refresh === true,
         })
         .catch((error: unknown) => {
-          // A dataset without a value says why, as warnings the block can act on.
           if (error instanceof CoreError && error.code === "SOURCE_UNAVAILABLE")
             error.details = {
               ...error.details,
@@ -92,7 +89,6 @@ export async function handleDatasetAction(
           throw error;
         });
       const readOnly = await readOnlyProject(store, projectId);
-      // A stale value can equal the last one read; its state still changed.
       if (args.ifHash === record.hash && record.status === "ok")
         return { unchanged: true, hash: record.hash, readOnly };
       return { ...record, readOnly, ...(readOnly ? { editable: false } : {}) };
@@ -107,7 +103,6 @@ export async function handleDatasetAction(
       let schema: DatasetDocument["schema"];
       let origin: DatasetDocument["origin"];
       if (args.fromComponent !== undefined) {
-        // The shared keys of a custom component stay valid for that component.
         const ref = readCustomBlockData({
           ...(args.fromComponent as object),
           props: {},

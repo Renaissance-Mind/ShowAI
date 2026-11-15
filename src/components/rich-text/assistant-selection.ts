@@ -1,6 +1,5 @@
 import type { Node } from "@tiptap/pm/model";
 
-/** Exclude a following paragraph whose content starts exactly at the selection end. */
 export function selectionBlockIds(doc: Node, from: number, to: number) {
   const inner: string[] = [];
   const outer: string[] = [];

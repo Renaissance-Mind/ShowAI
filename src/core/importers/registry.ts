@@ -5,14 +5,12 @@ import { markdownImporter } from "./markdown";
 import { notionImporter } from "./notion";
 import type { ImportInput, Importer, ImporterInfo } from "./types";
 
-/** Importers shipped with ShowAI; contributed ones are found in the library. */
 export const BUILTIN_IMPORTERS: Importer[] = [
   notionImporter,
   wordImporter,
   markdownImporter,
 ];
 
-/** Every importer a project can use: its own, the library's, then built-ins. */
 export async function availableImporters(
   home: string,
   projectId?: string,
@@ -36,10 +34,6 @@ export const importerInfo = (importer: Importer): ImporterInfo => ({
   origin: importer.origin,
 });
 
-/**
- * The importer for an input: the one named, or the most confident one. A
- * contributed importer wins a tie, so an Agent can take over a format.
- */
 export async function chooseImporter(
   input: ImportInput,
   importers: Importer[],

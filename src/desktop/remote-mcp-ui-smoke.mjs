@@ -1,4 +1,3 @@
-// Real hidden Electron acceptance for the remote connection wizard. No mocked bridge/provider.
 import assert from "node:assert/strict";
 import {createServer} from "node:http";
 import {createHash, randomBytes} from "node:crypto";

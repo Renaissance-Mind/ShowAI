@@ -4,12 +4,6 @@ import { CoreError } from "../core/model";
 import { CAPACITY } from "../portable/capacity.mjs";
 import { assertLocalPath, readJsonInput } from "./local-files";
 
-/**
- * Checks a component package folder before it is compiled, so that a broken
- * manifest or schema is reported with its file, line and column. The compiler
- * then reads the same folder with its own package limits (source bytes, file
- * count, assets, no symbolic links).
- */
 export async function inspectComponentDirectory(
   directory: string,
 ): Promise<Record<string, unknown>> {
@@ -69,11 +63,6 @@ export async function inspectComponentDirectory(
   return manifest as Record<string, unknown>;
 }
 
-/**
- * Writes an editable component package to a folder on this device, the
- * counterpart of component_save directory: manifest.json, props.schema.json,
- * the entry and every text file and asset of the package.
- */
 export async function writeComponentDirectory(
   directory: string,
   source: {
@@ -105,7 +94,6 @@ export async function writeComponentDirectory(
     entries.set(path, Buffer.from(text, "utf8"));
   for (const [path, encoded] of Object.entries(source.assets ?? {}))
     entries.set(path, Buffer.from(encoded, "base64"));
-  // Stored package files keep their exact text; built-ins carry only objects.
   const missing = (path: string, contents: () => Buffer) => {
     if (!entries.has(path)) entries.set(path, contents());
   };

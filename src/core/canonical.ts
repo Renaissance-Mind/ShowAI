@@ -1,4 +1,3 @@
-/** Stable JSON for browser and host logic; missing scalars retain the historical null form. */
 export function canonicalJson(value: unknown): string {
   if (Array.isArray(value)) return `[${value.map(canonicalJson).join(",")}]`;
   if (value !== null && typeof value === "object")

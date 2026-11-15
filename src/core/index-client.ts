@@ -3,7 +3,6 @@ import type { LibraryIndex, SearchOptions } from "./library-index";
 const worker = new BackgroundWorker();
 const invoke = <T>(home: string, action: string, args: unknown) =>
   worker.invoke<T>(home, action, args);
-/** CPU-heavy parsing, tokenisation and SQLite work stays outside the app's main thread. */
 export class IndexClient {
   constructor(readonly home: string) {}
   search(input: SearchOptions): ReturnType<LibraryIndex["search"]> {

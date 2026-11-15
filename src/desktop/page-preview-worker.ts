@@ -26,8 +26,6 @@ port.on("message", ({ id, home, action, args }) => {
         const data = await withLibrarySnapshot(home, async () => {
           const snapshot = libraryReadSnapshot.getStore();
           if (snapshot?.revision) {
-            // Read the projection and project metadata in batches instead of
-            // taking thousands of filesystem/path checks under the library lease.
             const summaries = await pageSummaries(
               snapshot.library,
               snapshot.revision,

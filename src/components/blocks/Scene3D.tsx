@@ -53,7 +53,6 @@ import {
   useResetOnChange,
 } from "../../surface/reader-state";
 
-// Objects without a color take one from this palette, chosen to read on light and dark grounds.
 const PALETTE = [
   "#4f7cac",
   "#d1784c",
@@ -72,7 +71,6 @@ type Bound = {
   scale: Vector3;
   bindings: Scene3dBinding[];
 };
-// `lift` raises a label along world up, so labels stay above rotated shapes.
 type Anchor = { object: Object3D; local: Vector3; lift: number };
 type Built = { root: Group; bound: Bound[]; anchors: Anchor[] };
 type Engine = {
@@ -146,7 +144,6 @@ function geometry(object: Scene3dObject) {
   return undefined;
 }
 
-/** Builds the declared objects; anchors follow the order of sceneLabels(). */
 function buildScene(data: Scene3dData): Built {
   const root = new Group();
   const bound: Bound[] = [];
@@ -185,7 +182,6 @@ function buildScene(data: Scene3dData): Built {
     if (shape) {
       node.add(new Mesh(shape, material(object, inherited, colorIndex)));
       shape.computeBoundingSphere();
-      // Mesh labels sit just above the shape so they do not cover it.
       const sphere = shape.boundingSphere!;
       labelAt = sphere.center.clone();
       lift =
@@ -197,7 +193,6 @@ function buildScene(data: Scene3dData): Built {
       const direction = to.clone().sub(from);
       const length = direction.length();
       direction.normalize();
-      // A solid shaft and head stay visible at any zoom, unlike 1px lines.
       const radius = Math.min(Math.max(length * 0.01, 0.015), 0.06);
       const head = Math.min(radius * 8, length * 0.3);
       const arrow = new Group();
@@ -274,7 +269,6 @@ function applyBindings(built: Built, values: Record<string, number>) {
       MathUtils.degToRad(rotation.y),
       MathUtils.degToRad(rotation.z),
     );
-    // Avoid a degenerate matrix when a binding drives scale through zero.
     item.object.scale.set(
       Math.abs(scale.x) < 1e-4 ? 1e-4 : scale.x,
       Math.abs(scale.y) < 1e-4 ? 1e-4 : scale.y,
@@ -296,7 +290,6 @@ function disposeTree(object: Object3D) {
   });
 }
 
-/** Resolves a CSS custom property to a color Three.js can parse. */
 function cssColor(element: Element, name: string, fallback: string) {
   const value = getComputedStyle(element).getPropertyValue(name).trim();
   if (!value) return fallback;
@@ -307,7 +300,6 @@ function cssColor(element: Element, name: string, fallback: string) {
   return context.fillStyle;
 }
 
-// Narrow stages widen the vertical field of view so the horizontal framing holds.
 const FRAME_ASPECT = 1.6;
 function fitFieldOfView(engine: Engine) {
   const { camera, baseFov } = engine;
@@ -369,7 +361,6 @@ const initialValues = (parameters: Scene3dParameter[]) =>
 const formatValue = (value: number, step = 1) =>
   value.toFixed(Math.min(4, Math.max(0, -Math.floor(Math.log10(step)))));
 
-/** Smoothly sweeps start → max → min → start. */
 function demoValue(
   parameter: Scene3dParameter,
   start: number,
@@ -429,7 +420,6 @@ export function Scene3DBlock({ data: raw }: BlockProps) {
   ]);
   const cameraKey = JSON.stringify(data.camera ?? null);
 
-  // New parameter definitions restart from their declared values.
   useResetOnChange(parametersKey, () => {
     setValues(initialValues(parameters));
     setDemo(null);
@@ -455,7 +445,6 @@ export function Scene3DBlock({ data: raw }: BlockProps) {
     };
   }, []);
 
-  // One renderer, camera and controller per block; content is rebuilt separately.
   useEffect(() => {
     const host = viewport.current!;
     let renderer: WebGLRenderer;
@@ -538,7 +527,6 @@ export function Scene3DBlock({ data: raw }: BlockProps) {
       setError(t("webglFailed", { error: "WebGL context lost" }));
     };
     renderer.domElement.addEventListener("webglcontextlost", lost);
-    // WebGL canvases do not print reliably; print a still of the current view instead.
     const print = () => {
       renderer.render(scene, camera);
       try {
@@ -549,7 +537,6 @@ export function Scene3DBlock({ data: raw }: BlockProps) {
     };
     window.addEventListener("beforeprint", print);
     engine.current = current;
-    // A fresh engine (e.g. after a StrictMode remount) needs its camera placed again.
     placed.current = "";
     return () => {
       window.removeEventListener("beforeprint", print);
@@ -614,7 +601,6 @@ export function Scene3DBlock({ data: raw }: BlockProps) {
     }
     if (data.axes) current.helpers.push(new AxesHelper(extent * 0.75));
     current.helpers.forEach((helper) => current.scene.add(helper));
-    // A theme change only recolors helpers; it keeps the reader's view.
     const placement = JSON.stringify([sceneKey, cameraKey, resets]);
     if (placed.current !== placement) {
       placed.current = placement;

@@ -103,7 +103,6 @@
     transition: none;
   }
 }
-/* The placeholder is a translucent copy in normal flow; siblings truly reflow. */
 .library-drag-placeholder {
   opacity: 0.24;
   pointer-events: none;
@@ -142,7 +141,6 @@
 .library-drag-active [data-library-id] {
   will-change: transform;
 }
-/* The located row flashes, then settles back into its usual state. */
 .studio-tree-row.is-located {
   animation: studio-tree-row-locate 1.6s ease-out;
 }

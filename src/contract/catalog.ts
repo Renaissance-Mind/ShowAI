@@ -7,7 +7,6 @@ import diagramDocumentation from "../../resources/catalog/diagram-documentation.
 import documentation from "../../resources/catalog/component-documentation.json";
 import type { ComponentDocumentation } from "./documentation";
 import type { BuiltinComponentMetadata } from "./types";
-/** Shared discovery data for the workspace, standalone editor and Agent. */
 export function builtinComponentCatalog({
   includeLegacy = false,
 }: { includeLegacy?: boolean } = {}) {
@@ -29,8 +28,6 @@ export function builtinComponentCatalog({
   return includeLegacy ? items : items.filter((item) => !item.replacedBy);
 }
 
-// One shared copy for workbench readers, by kind. Its users only read it;
-// insertion copies default data before changing it.
 let byKind: Map<string, BuiltinComponentMetadata> | undefined;
 let current: readonly BuiltinComponentMetadata[] | undefined;
 const shared = () =>
@@ -40,16 +37,11 @@ const shared = () =>
       item,
     ]),
   ));
-/**
- * The current built-in catalog as one shared list. Callers that change an
- * item, such as inserting its default data, copy that part first.
- */
 export function readBuiltinComponentCatalog(): readonly BuiltinComponentMetadata[] {
   return (current ??= [...shared().values()].filter(
     (item) => !item.replacedBy,
   ));
 }
-/** A built-in component's shared metadata, including legacy kinds. */
 export function builtinComponent(
   kind: string,
 ): Readonly<BuiltinComponentMetadata> | undefined {

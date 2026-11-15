@@ -2,23 +2,9 @@ import { describe, expect, test } from "vitest";
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
 
-// Layers of src, lowest first. A module may import its own layer and the layers
-// below it. Imports that still point upward are pinned in RATCHET.
-//
-// The order is the one the code satisfies today: the page tree model
-// (document) is the base and the content library stores it; the component
-// contract sits between them because core validates and catalogs components.
-// The server implements the sync protocol, so it sits above core and sync.
-// components/custom holds the frame runtime (CustomBlock, InlineComponent),
-// which renders with block helpers, text selection and local resources, so it
-// sits with the presentation; its contract is src/contract. Agent access sits
-// below the workbench: the desktop and browser hosts start the Agent services
-// and the workbench shows their state.
 const LAYERS: readonly (readonly [string, readonly string[]])[] = [
   ["shared", ["types.ts", "lib", "i18n", "ui", "design", "host"]],
   ["document", ["document"]],
-  // Built-in block contracts (components/blocks/**/*contract.mjs) and their
-  // helpers also belong here; see isBuiltinContract.
   ["contract", ["contract"]],
   ["library", ["core", "sync"]],
   ["server", ["server"]],
@@ -54,27 +40,17 @@ const LAYERS: readonly (readonly [string, readonly string[]])[] = [
   ],
 ];
 
-/** Pure helpers of built-in contracts, importable wherever the contracts are. */
 const BUILTIN_CONTRACT_HELPERS = [
-  // Inline markup of the doc-browse and doc-reference contracts.
   "components/blocks/inline-markup.mjs",
   "components/blocks/inline-markup.d.mts",
 ];
 
-// Pattern matches that are generated source text inside strings, not imports.
 const NOT_IMPORTS = [
-  // The nested component wrapper compiled for a package's entry file.
   "core/catalog.ts → ./${owner.manifest.entry.replace(/^\\.\\//, ",
-  // Stub module source the reader bundle substitutes for widget messages.
   "portable/reader-bundle.mjs → ../../i18n",
   "portable/reader-bundle.mjs → ../../i18n/messages/widget",
 ];
 
-// Imports that point to a higher layer, keyed by importing directory and
-// imported module: [number of import statements, reason]. Adding an import
-// fails; removing one fails until its count or entry is lowered, so the list
-// only shrinks. Type-only imports count: a type ties a module to the layer
-// that owns it as much as a value does.
 const CAPACITY = "content byte and depth limits; portable/capacity.mjs is a format rule that stays in portable this round";
 const VALIDATION = "page validation; portable/validation.mjs is a format rule that stays in portable this round";
 const DATASET_FORMAT = "the library stores and resolves shared data in the formats src/datasets defines";
@@ -143,28 +119,20 @@ const RATCHET: Record<string, readonly [number, string]> = {
   "types.ts → portable/reference-snapshot.mjs": [1, "type only (import() query): reference snapshots stored with pages"],
 };
 
-// The SDK source tables ship component sources as text (`?raw`) into the
-// component sandbox, which compiles them with its own module map. Shipping
-// source text is not a code dependency, so these imports are their own
-// category and never count against the layers.
 const SHIPPED_SOURCE_TABLES = [
   "core/builtin-sources.ts",
   "core/g2-builtin-sources.ts",
   "core/diagram-builtin-sources.ts",
 ];
 
-/** npm packages the document layer may use, and whether values may be imported. */
 const DOCUMENT_PACKAGES: Record<string, "value" | "type"> = {
   "@dagrejs/dagre": "value",
   "@tiptap/core": "type",
-  // Markdown and formula syntax of rich text (rich-text.mjs, markdown-math.mjs).
   marked: "value",
   katex: "value",
-  // richTextStyle returns a CSSProperties object.
   react: "type",
 };
 
-/** Imports that still leave the document layer, keyed by importing file and specifier. */
 const DOCUMENT_EXCEPTIONS: Record<string, string> = {
   "document/drawing-geometry.mjs → ../surface/portable-ink.mjs":
     "hit tests and bounds of portable ink strokes need the ink formats, which stay in surface this round",
@@ -172,14 +140,12 @@ const DOCUMENT_EXCEPTIONS: Record<string, string> = {
     "type only: an outline renderer is stored as a custom component reference",
 };
 
-/** npm packages the contract layer and the built-in contracts may use. */
 const CONTRACT_PACKAGES: Record<string, "value" | "type"> = {
   ajv: "value",
   zod: "value",
   "@tiptap/core": "type",
 };
 
-/** Imports that leave the contract layer or a built-in contract, by file and specifier. */
 const CONTRACT_EXCEPTIONS: Record<string, string> = {
   "contract/contract.ts → ../portable/capacity.mjs":
     "byte and depth limits of stored content; capacity.mjs stays in portable this round",
@@ -201,7 +167,6 @@ const CONTRACT_EXCEPTIONS: Record<string, string> = {
     "byte limits of embedded research media; capacity.mjs stays in portable this round",
 };
 
-/** Modules in src/surface that the library, runtime, agent and portable layers import. */
 const SURFACE_IMPORTS_FROM_LOWER_LAYERS = [
   "surface/ContainerRuntime.tsx",
   "surface/NativeInkPreview.tsx",
@@ -254,9 +219,6 @@ interface ImportRecord {
   typeOnly: boolean;
 }
 
-// TypeScript 7 ships no compiler API, so imports are read with patterns that
-// cover every form this codebase uses: static, re-export, side effect,
-// dynamic and import() type queries.
 function imports(file: string): ImportRecord[] {
   const text = readFileSync(file, "utf8")
     .replace(/\/\*[\s\S]*?\*\//g, "")
@@ -291,13 +253,11 @@ function resolveRelative(file: string, specifier: string) {
   return match === undefined ? null : target + match;
 }
 
-/** A built-in block's validator, kept beside its component but importable from below. */
 const isBuiltinContract = (module: string) =>
   /^components\/blocks\/(?:[\w-]+\/)*(?:[\w-]+-)?contract\.(?:mjs|d\.mts)$/.test(
     module,
   ) || BUILTIN_CONTRACT_HELPERS.includes(module);
 
-/** importing directory: a top-level directory or file, or a part of components. */
 function area(module: string) {
   const parts = module.split("/");
   if (parts.length === 1) return module;
@@ -321,7 +281,6 @@ function layerIndex(module: string) {
   return layerOfArea.get(area(module))?.index;
 }
 
-/** Relative imports of non-test files under `roots` that land inside src. */
 function sourceImports(roots: string[]) {
   return roots.flatMap((root) =>
     files(join(src, root)).flatMap((file) =>
@@ -336,7 +295,6 @@ function sourceImports(roots: string[]) {
   );
 }
 
-/** Checks one layer's own imports against its packages and exceptions. */
 function closedLayer(
   modules: (module: string) => boolean,
   allowed: (target: string) => boolean,
@@ -401,7 +359,6 @@ describe("source layers", () => {
     const expected = Object.fromEntries(
       Object.entries(RATCHET).map(([key, [count]]) => [key, count]),
     );
-    // Report keys in ratchet form so a removal is one edit.
     const lines = (map: Record<string, number>) =>
       Object.entries(map)
         .map(([key, count]) => `${key}: ${count}`)
@@ -430,7 +387,6 @@ describe("document layer", () => {
       DOCUMENT_EXCEPTIONS,
     );
     expect(violations).toEqual([]);
-    // An exception nobody needs any more is removed, so the list stays minimal.
     expect(used).toEqual(Object.keys(DOCUMENT_EXCEPTIONS).sort());
   });
 
@@ -440,8 +396,6 @@ describe("document layer", () => {
         .map((record) => record.target && name(record.target))
         .filter((target): target is string => !!target?.startsWith("surface/")),
     );
-    // Adding a surface import to these layers is a deliberate decision: list
-    // it here. Removing one shortens the list.
     expect([...surface].sort()).toEqual([...SURFACE_IMPORTS_FROM_LOWER_LAYERS].sort());
   });
 });
@@ -451,7 +405,6 @@ describe("component contract", () => {
     ["contract", "document", "lib"].includes(area(target)) ||
     target === "types.ts" ||
     isBuiltinContract(target) ||
-    // Built-in component metadata (contract/catalog.ts).
     /^\.\.\/resources\/catalog\/[\w-]+\.json$/.test(target);
 
   test("src/contract imports only the contract, document, lib and pure packages", () => {
@@ -498,7 +451,6 @@ describe("component contract", () => {
         (target): target is string =>
           !!target?.startsWith("components/custom/"),
       );
-    // The component runtime (custom blocks in a frame) is not the contract.
     expect([...new Set(reached)].sort()).toEqual(
       ["components/custom/CustomBlock.tsx", "components/custom/component-index.ts"],
     );

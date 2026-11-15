@@ -236,7 +236,6 @@ try {
           }
         }
       } catch {
-        // request() records every HTTP or transport failure in the report.
       }
       await sleep(limits.pollingMs);
     }
@@ -292,7 +291,6 @@ try {
         });
         edits++;
       } catch {
-        // Failed edits are reported and never included in successful visibility.
       }
     }
   };

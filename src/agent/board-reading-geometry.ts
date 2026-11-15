@@ -100,7 +100,6 @@ export function boardTile(
     },
   };
 }
-/** Compact row intervals avoid materializing a million empty windows on sparse boards. */
 export function occupiedTiles(
   grid: BoardGrid,
   bounds: BoardRect,

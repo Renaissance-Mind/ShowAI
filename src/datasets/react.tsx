@@ -80,7 +80,6 @@ import { DatabaseHostProvider } from "./database-host";
 import "./datasets.css";
 
 const closeText = translator(messages);
-/** The window close answer: allowed, or which shared data would lose writes and why. */
 async function datasetCloseResult(client: DatasetClient): Promise<CloseResult> {
   const problems = await client.closeProblems();
   if (!problems.length) return true;
@@ -106,7 +105,6 @@ async function datasetCloseResult(client: DatasetClient): Promise<CloseResult> {
 }
 
 let shared: DatasetClient | undefined;
-/** The window's dataset client, connected to the host and its change events. */
 export function workbenchDatasetClient(): DatasetClient | undefined {
   if (typeof window === "undefined" || !window.showai) return undefined;
   if (!shared) {
@@ -135,16 +133,13 @@ export interface DatasetScopeValue {
   readOnly: boolean;
   openDialog: (request: DatasetDialogRequest) => void;
 }
-/** Resource fields with linked local files show their problems with the reading layer's warnings. */
 const resourceUi = { Issue: ResourceIssue };
 
 const ScopeContext = createContext<DatasetScopeValue | null>(null);
 export const useDatasetScope = () => useContext(ScopeContext);
 
-/** Event a block menu sends to open the shared data dialog for its component. */
 export const SHARED_DATA_EVENT = "showai:shared-data";
 
-/** Page-level provider: bound blocks of this page read their datasets through it. */
 export function DatasetScope({
   projectId,
   pageId,
@@ -167,8 +162,6 @@ export function DatasetScope({
   );
   useEffect(() => {
     if (!value || readOnly) return;
-    // The block menu of page flow lives in the packaged editor and asks through an
-    // event. Only the visible page is connected: hidden pages disconnect effects.
     const open = (event: Event) => {
       const detail = (event as CustomEvent<DatasetDialogRequest | null>).detail;
       event.preventDefault();
@@ -229,7 +222,6 @@ export function useDatasetSnapshot(
   );
 }
 
-/** A short readable label for a field path: the nearest record's title and the field. */
 export function describePath(value: unknown, path: DataPath): string {
   for (let end = path.length; end > 0; end--) {
     const record = valueAt(value, path.slice(0, end));
@@ -252,11 +244,6 @@ interface Basis {
   key?: string;
 }
 
-/**
- * Renders a block whose props come from a dataset. The component receives
- * ordinary props and onChange; changes are split into dataset writes and
- * the block's own values.
- */
 export function BoundWidget({
   kind,
   data,
@@ -290,7 +277,6 @@ export function BoundWidget({
   const [expanded, setExpanded] = useState(false);
   const wrapper = useRef<HTMLDivElement>(null);
   const ready = snapshot?.status === "ready";
-  // Read-only sources, transforms and stale values keep the block's own parts editable.
   const writable = !snapshot?.readOnly;
   const resolved = useMemo(() => {
     if (!compiled || !ready) return undefined;
@@ -301,7 +287,6 @@ export function BoundWidget({
     } catch (error) {
       return { error: errorMessage(error) };
     }
-    // `compiled` derives from data; nonce re-sends props a component changed locally.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [kind, data, snapshot?.value, ready, writable, nonce]);
   const resolvedProps =
@@ -313,7 +298,6 @@ export function BoundWidget({
         : undefined,
     [kind, data, resolvedProps],
   );
-  // Recent props and the dataset values they came from: the basis of later changes.
   const bases = useRef<Basis[]>([]);
   useEffect(() => {
     if (!resolvedProps || bases.current.at(-1)?.props === resolvedProps) return;
@@ -351,7 +335,6 @@ export function BoundWidget({
       const current = latest.current;
       if (!session || !current.resolvedProps || !current.snapshot) return;
       const nextProps = componentProps(kind, nextData);
-      // A sandboxed component names the props it changed; others changed the latest render.
       const claimed = reported.current;
       reported.current = undefined;
       let basis: Basis | undefined = bases.current.at(-1);
@@ -361,7 +344,6 @@ export function BoundWidget({
           bases.current.find(
             (entry) => (entry.key ??= canonicalJson(entry.props)) === key,
           ) ??
-          // Unknown basis: the oldest retained one never overwrites a newer change.
           bases.current[0];
       }
       if (!basis)
@@ -401,7 +383,6 @@ export function BoundWidget({
     const timer = setTimeout(() => setNotice(""), 8000);
     return () => clearTimeout(timer);
   }, [notice]);
-  // Undo inside the block reverts this window's last shared data change.
   useEffect(() => {
     const root = wrapper.current;
     if (!root || !session || readOnly) return;
@@ -442,7 +423,6 @@ export function BoundWidget({
   const pageEditable = !readOnly && !!onChange && !scope?.readOnly;
   const locked = !pageEditable || blockEditable === false;
   const dataStatus = snapshot?.dataStatus ?? "ok";
-  // A block showing a dataset's own records names it (database reverse relations).
   const ownDataset =
     compiled?.props &&
     !compiled.props.path.length &&
@@ -455,7 +435,6 @@ export function BoundWidget({
       editable: locked ? false : blockEditable,
       ...(ownDataset ? { dataset: ownDataset } : {}),
     }),
-    // The paths are recomputed per render; compare them by value.
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [dataStatus, locked, canonicalJson(blockEditable), ownDataset],
   );
@@ -492,7 +471,6 @@ export function BoundWidget({
               retry: !!session,
               "open-file": !!scope,
               "ask-agent": pageEditable,
-              // Synchronization carries copies of linked files only.
               packaging:
                 !!openSettings &&
                 !!snapshot.source &&
@@ -547,12 +525,10 @@ export function BoundWidget({
           );
           return;
         }
-        // Without a conversation in this window, the request goes to another Agent.
         await desktop.invoke("clipboard:write", { text: prompt });
         return "copied";
       }
       case "packaging":
-        // Without sync here, the block's dialog holds the file's choice.
         if (!requestPackaging(projectId, datasetId) && onChange)
           scope.openDialog({ kind, data, apply: onChange, focus: "bundle" });
         return;
@@ -596,7 +572,6 @@ export function BoundWidget({
     );
   else if (snapshot.status === "missing") {
     const id = compiled?.dataset ?? "";
-    // Without the dataset, the block keeps only its own (local) props.
     const unbound = () =>
       withComponentProps(kind, data, componentProps(kind, data), null);
     body = (
@@ -790,13 +765,8 @@ export function BoundWidget({
   );
 }
 
-/** Kinds that are page content rather than component data. */
 const contentKinds = new Set(["text", "divider"]);
 
-/**
- * The shared data command in a Board object's selection actions. Page-flow
- * blocks reach the same dialog from their block menu.
- */
 export function SharedDataAction({
   kind,
   data,
@@ -830,7 +800,6 @@ export function SharedDataAction({
   );
 }
 
-/** Whether a page block of this kind can open the shared data dialog. */
 export function sharesData(kind: string) {
   return !contentKinds.has(kind);
 }

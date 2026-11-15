@@ -54,7 +54,6 @@ function validPath(path: string) {
       .every((part) => part !== "" && part !== "." && part !== "..")
   );
 }
-/** Private encrypted checkpoints. A head is committed only after every referenced chunk exists. */
 export class CloudState {
   private previous = new Set<string>();
   private tail: Promise<unknown> = Promise.resolve();
@@ -134,8 +133,6 @@ export class CloudState {
       )
         throw new Error("Invalid cloud state file.");
       paths.add(file.path);
-      // Process leases and other ephemeral files from older checkpoints must
-      // also be excluded on restore, even if a container reuses the same PID.
       if (this.options.ignore?.(file.path)) {
         this.options.onRestoreProgress?.(++completed, manifest.files.length);
         return;
@@ -159,8 +156,6 @@ export class CloudState {
           this.previous.add(hash);
         }
         if (length !== file.size) throw new Error("Cloud state size mismatch.");
-        // The committed object-store head is authoritative. These reconstructed
-        // files are an ephemeral cache, so a per-file disk flush adds no recovery durability.
       } finally {
         await handle.close();
       }
@@ -186,7 +181,6 @@ export class CloudState {
         }
         if (!entry.isFile())
           throw new Error("Cloud state cannot contain special files.");
-        // SQLite reconstructs shared-memory coordination from its database and WAL.
         if (entry.name.endsWith(".sqlite-shm")) continue;
         if (this.options.snapshotSqlite && entry.name.endsWith(".sqlite-wal"))
           continue;
@@ -241,8 +235,6 @@ export class CloudState {
       }
     };
     try {
-      // Capture immutable encrypted bytes while the caller holds its write lock.
-      // Object storage latency must not block edits or project synchronization.
       if (capture) await capture(() => visit(this.root));
       else await visit(this.root);
       await batches([...uploads], async (hash) => {
@@ -262,7 +254,6 @@ export class CloudState {
   }
   run(operation: () => Promise<Response>, checkpoint: () => void) {
     const next = this.tail.then(async () => {
-      // Retry a failed checkpoint before accepting another mutation.
       if (this.dirty) {
         checkpoint();
         await this.save();

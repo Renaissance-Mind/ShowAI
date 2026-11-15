@@ -1,5 +1,3 @@
-// Adapted from https://github.com/antvis/G2/blob/v5/site/docs/charts/bubble-map.en.mdx
-// See ../../UPSTREAM-LICENSE.txt for upstream license.
 import { feature } from "topojson-client";
 
 export default async function draw(context) {
@@ -20,12 +18,11 @@ export default async function draw(context) {
       londonBoroughs.objects.boroughs,
     ).features;
 
-    // Add simulated population and GDP data to centroid data
     const bubbleData = londonCentroids.map((d, index) => ({
       ...d,
-      name: d.name || `Area ${index + 1}`, // Ensure each data point has a name
-      population: Math.floor(Math.random() * 500000) + 100000, // 100K-600K population
-      gdp: Math.floor(Math.random() * 50000) + 20000, // 20K-70K GDP
+      name: d.name || `Area ${index + 1}`,
+      population: Math.floor(Math.random() * 500000) + 100000,
+      gdp: Math.floor(Math.random() * 50000) + 20000,
       category: ["Business", "Residential", "Industrial", "Mixed"][
         Math.floor(Math.random() * 4)
       ],

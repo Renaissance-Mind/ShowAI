@@ -96,7 +96,6 @@ export function constrainToolbarPoint(
   };
 }
 
-/** Enter only near an edge; a slightly wider release band prevents jitter. */
 export function toolbarSnapTarget(
   point: { x: number; y: number },
   bounds: { width: number; height: number },
@@ -135,7 +134,6 @@ export interface ToolbarRect {
   width: number;
   height: number;
 }
-/** The primary strip and its joined secondary strip, in surface coordinates. */
 export function toolbarPanelRect(
   center: { x: number; y: number },
   size: { width: number; height: number },
@@ -169,7 +167,6 @@ export function toolbarEdgeGap(
     bottom: bounds.height - rect.y - rect.height,
   }[edge];
 }
-/** Snap when any part of the panel reaches an edge band, independent of the grab point. */
 export function toolbarRectSnapTarget(
   rect: ToolbarRect,
   bounds: { width: number; height: number },

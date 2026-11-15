@@ -46,7 +46,6 @@ const permissions: Record<ProjectRole, SyncKey> = {
 };
 const inviteUseOptions = [1, 5, 25, 100];
 
-/** Renders a translated sentence with its `{name}` placeholder in bold. */
 function withStrong(template: string, name: string) {
   const [before, after = ""] = template.split("{name}");
   return (

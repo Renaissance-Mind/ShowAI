@@ -10,7 +10,6 @@ function json(bytes: Uint8Array): Record<string, unknown> {
       "INVALID_DEPENDENCY",
       "Invalid dependency metadata.",
     );
-  // Server objects are history-codec envelopes; decoded client files are plain JSON.
   if (data.format === "showai-stored-json") {
     if (
       data.version !== 1 ||
@@ -29,7 +28,6 @@ function json(bytes: Uint8Array): Record<string, unknown> {
   return data;
 }
 
-/** Readers are shared only by a fully verified immutable identity and an owned binding. */
 export async function validateReaderClosure(
   paths: Iterable<string>,
   projectId: string,
@@ -107,7 +105,6 @@ export async function validateReaderClosure(
   }
 }
 
-/** Publication rejects package graphs that escape their received project depot. */
 export async function validatePackageClosure(
   paths: Iterable<string>,
   projectId: string,

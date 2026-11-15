@@ -24,7 +24,6 @@ test("Agent output uses the App's recorded language unless SHOWAI_LANGUAGE pins 
   const library = await mkdtemp(join(tmpdir(), "showai-app-language-"));
   libraries.push(library);
   vi.stubEnv("SHOWAI_LANGUAGE", "");
-  // An Agent started from an English shell, before the App recorded anything.
   setLocale("en");
   expect(await appLocale(library)).toBe("en");
   await recordAppLanguage(library, "zh-CN");

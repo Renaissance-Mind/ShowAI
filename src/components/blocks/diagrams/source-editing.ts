@@ -3,7 +3,6 @@ import messages from "../../../i18n/messages/diagram";
 
 const t = translator(messages);
 
-/** Parse inert SVG only. HTML scripts and hosted resources never enter the app DOM. */
 export function svgSource(source: string): string {
   const container = source.search(
     /\bclass\s*=\s*["'][^"']*\bdiagram-container\b/i,
@@ -67,7 +66,6 @@ export function replaceDiagramLabels(source: string, labels: string[]): string {
     const previous = element.textContent;
     if (previous === labels[i]) return;
     element.textContent = labels[i];
-    // Archify's finder and accessible names use the same authored node labels.
     for (
       let node: Element | null = element;
       node && node !== doc.documentElement;
@@ -103,7 +101,6 @@ export function replaceDiagramLabels(source: string, labels: string[]): string {
         if (title.textContent === previous) title.textContent = labels[i];
     }
   });
-  // XML textContent escaping preserves <, &, quotes and literal replacement tokens.
   const next = new XMLSerializer().serializeToString(doc.documentElement);
   return source.replace(original, () => next);
 }

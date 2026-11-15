@@ -30,10 +30,6 @@ export async function findViewerTemplate(explicit?: string): Promise<string> {
     "The ShowAI viewer is missing. Build the application first or set SHOWAI_VIEWER to the bundled viewer.html.",
   );
 }
-/**
- * Which reader build renders pages: the archive integrity and build time let
- * an Agent tell whether a long-running session still renders older code.
- */
 export async function readerIdentity(explicit?: string) {
   const full = await findViewerTemplate(explicit);
   const archive = join(dirname(full), "reader-source.json");

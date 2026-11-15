@@ -121,7 +121,6 @@
   top: calc(50% - 9px);
   color: var(--subtle);
 }
-/* A skeleton sweep stands in for the spinner while a preview renders. */
 @media (prefers-reduced-motion: no-preference) {
   :is(.component-card-preview, .template-card-preview):has(
       > .component-preview-loading

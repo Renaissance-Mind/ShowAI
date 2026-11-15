@@ -55,7 +55,6 @@ function reference(path: string, href: string) {
   };
 }
 
-/** No arbitrary filesystem reads: every source and reference is a bundled allowlist entry. */
 export function mcpSkillGuide(
   options: {
     skill?: string;

@@ -1,7 +1,6 @@
 #ifndef SHOWAI_BOUNDARY_CORRESPONDENCE_TEST_HPP
 #define SHOWAI_BOUNDARY_CORRESPONDENCE_TEST_HPP
 #include "owner.hpp"
-// Test-only exact curve transport; no helper export enters the production ABI.
 extern "C" uint32_t sabt_correspondence(uint32_t fixture,void*memory,uint32_t bytes,uint32_t*output,uint32_t capacity){
  using namespace showai_boundary;if(fixture>8||!memory||((uintptr_t)memory&15u)||!output||((uintptr_t)output&3u)||!capacity||memory_overlap(memory,bytes,output,uint64_t(capacity)*4))return SA_INK_INVALID;
  PolynomialContext c;if(!c.numbers.initialize(memory,bytes,1000000000ull))return c.numbers.status;c.polynomial.max_operations=5000000;Vector<uint32_t>staged(c.numbers);

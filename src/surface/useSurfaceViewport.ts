@@ -23,7 +23,6 @@ import {
 
 const t = translator(messages);
 
-/** Zoom changes every gesture frame; only the zoom controls subscribe to it. */
 export interface ViewportScale {
   get(): number;
   subscribe(listener: () => void): () => void;
@@ -64,7 +63,6 @@ const interactive = (target: EventTarget | null) =>
       'button, a, input, textarea, select, summary, [role="slider"], iframe, [data-surface-gesture="own"], .react-flow',
     ));
 
-/** Embedded controls and scroll areas keep the whole gesture, including its tail. */
 function ownsWheel(
   target: EventTarget | null,
   boundary: HTMLElement,
@@ -93,7 +91,6 @@ function ownsWheel(
   )
     return true;
   if (!locked && target.closest(".react-flow")) return true;
-  // Pinch and Ctrl/Command zoom belong to the Board unless a control claims it.
   if (zoom) return false;
   for (
     let element: Element | null = target;
@@ -101,8 +98,6 @@ function ownsWheel(
     element = element.parentElement
   ) {
     const style = getComputedStyle(element);
-    // Only a scroller that can still move in this direction keeps the gesture;
-    // at its end the Board continues panning.
     if (
       Math.abs(x) > Math.abs(y) &&
       /auto|scroll/.test(style.overflowX) &&
@@ -128,20 +123,15 @@ interface PanGesture {
   anchor: SurfaceAnchor | null;
   delta: { x: number; y: number };
   released: boolean;
-  /** Discrete wheel steps land exactly where they scroll; no snap afterwards. */
   stepped?: boolean;
 }
 
 export interface SurfaceViewportOptions {
-  /** Reading views keep the gentle region snap; editing pans and zooms freely. */
   reading?: boolean;
-  /** Keep content fixed on screen when the viewport's own box moves or resizes. */
   anchorScreen?: boolean;
-  /** Dragging anywhere pans, like holding Space. */
   panMode?: { current: boolean };
 }
 
-/** Dot spacing stays readable at every zoom by stepping in powers of four. */
 export function gridSpacing(scale: number) {
   let size = 24 * scale;
   while (size < 12) size *= 4;
@@ -197,7 +187,6 @@ export function useSurfaceViewport(
       (!(target instanceof Element) ||
         !target.closest("[data-input-surface]") ||
         target.closest("[data-input-surface]") === root);
-    /** A nested active Board keeps its own wheel; Page cards only keep scrolls they can perform. */
     const nestedBoard = (target: EventTarget | null) => {
       for (
         let element = target instanceof Element ? target : null;
@@ -255,7 +244,6 @@ export function useSurfaceViewport(
     });
     const regions = (): SurfaceRegion[] => {
       const base = world.getBoundingClientRect(),
-        // Client rects include every ancestor Board's zoom as well as our own.
         scale = camera.current.scale * outerScale();
       return [...world.querySelectorAll<HTMLElement>("[data-surface-id]")]
         .filter(
@@ -309,7 +297,6 @@ export function useSurfaceViewport(
           }),
         );
       } catch {
-        /* Personal view state is disposable; content uses the normal save path. */
       }
     };
     if (storageKey) {
@@ -341,7 +328,6 @@ export function useSurfaceViewport(
             previousAnchor = saved.anchor;
         }
       } catch {
-        /* Ignore unavailable or invalid personal view state. */
       }
     }
     const targetRegion = (id: string): SurfaceRegion | undefined => {
@@ -372,11 +358,7 @@ export function useSurfaceViewport(
       const transform = `translate3d(${c.x}px, ${c.y}px, 0) scale(${c.scale})`;
       const previousTransform = world.style.transform;
       world.style.transform = transform;
-      // CSSOM normalizes values such as the translate3d z coordinate from 0
-      // to 0px. Compare serialized values on both sides so a layout refresh
-      // does not announce a camera move and hide the live native ink.
       const changed = world.style.transform !== previousTransform;
-      // Selection chrome and the dot grid read these to stay screen-sized.
       if (root.style.getPropertyValue("--board-zoom") !== String(c.scale))
         root.style.setProperty("--board-zoom", String(c.scale));
       const grid = gridSpacing(c.scale);
@@ -387,9 +369,7 @@ export function useSurfaceViewport(
           gridLayer.style.setProperty("--board-grid-size", `${grid}px`);
         gridLayer.style.transform = `translate3d(${c.x % grid}px, ${c.y % grid}px, 0)`;
       }
-      // Only the zoom controls subscribe; objects read the camera directly.
       scale.set(c.scale);
-      // Followers measure the committed transform in this frame, not the previous camera.
       if (changed)
         root.dispatchEvent(
           new Event("showai:viewport-change", { bubbles: true }),
@@ -456,8 +436,6 @@ export function useSurfaceViewport(
       }
       if (gesture) gesture.released = true;
       const visible = snapAt(camera.current);
-      // Content edits/resize may change geometry. Refresh resistance without
-      // dragging the user's camera along with a moving or resizing card.
       setAnchor(visible ? { ...visible.anchor, x: camera.current.x } : null);
       paint();
     };
@@ -542,7 +520,6 @@ export function useSurfaceViewport(
       current.released ||= next.released;
       camera.current = next.camera;
       if (current.released && current.anchor) {
-        // Once free, continue 1:1 from where the resisted pull is displayed.
         current.anchor = null;
         current.origin = {
           ...next.camera,
@@ -598,8 +575,6 @@ export function useSurfaceViewport(
       moveTo(
         {
           x: root.clientWidth / 2 - ((minX + maxX) / 2) * scale,
-          // Center what fits between the header and the toolbar; tall content
-          // starts at its top.
           y:
             height <= area.bottom - area.top
               ? (area.top + area.bottom) / 2 - ((minY + maxY) / 2) * scale
@@ -636,7 +611,6 @@ export function useSurfaceViewport(
       setAnchor(null);
       camera.current = zoomAt(camera.current, point, value);
       paint();
-      // Zooming never snaps afterwards: the point under the cursor stays put.
       idle = window.setTimeout(remember, GESTURE_IDLE);
     };
     const panBy = (x: number, y: number) => {
@@ -701,8 +675,6 @@ export function useSurfaceViewport(
       );
       const zooming = event.ctrlKey || event.metaKey;
       const now = performance.now();
-      // The layer that receives a gesture's first event keeps all of it,
-      // including trackpad momentum that slides other content under the cursor.
       if (now - lastWheel > GESTURE_IDLE)
         nestedGesture =
           !objectGesture &&
@@ -723,13 +695,10 @@ export function useSurfaceViewport(
         return;
       }
       if (objectGesture) {
-        // Panning under a dragged object keeps the object under the pointer.
         panBy(-delta.x / outerScale(), -delta.y / outerScale());
         return;
       }
       if (!gesture) gesture = beginPan();
-      // A mouse wheel notch is a deliberate step, not a pull against the
-      // reading anchor.
       if (
         event.deltaMode !== 0 ||
         (Math.abs(event.deltaY) >= 50 && Number.isInteger(event.deltaY))
@@ -797,7 +766,6 @@ export function useSurfaceViewport(
         return;
       if (springFrame || gesture) interrupt();
       const target = event.target as Element;
-      // The hand tool pans from any content, but never from the toolbar.
       if (
         handTool &&
         target.closest("[data-surface-ui]") &&
@@ -1018,7 +986,6 @@ export function useSurfaceViewport(
           y: camera.current.y + y,
         });
       }
-      // Command/Ctrl with these keys stays with the application's own zoom.
       if (
         ["+", "=", "-"].includes(event.key) &&
         !event.metaKey &&
@@ -1036,8 +1003,6 @@ export function useSurfaceViewport(
         fit();
       }
     };
-    // Space also pans while the pointer rests over the Board and focus is
-    // elsewhere on the page, as long as no field or control would lose a keystroke.
     const windowKeydown = (event: KeyboardEvent) => {
       if (
         event.code !== "Space" ||
@@ -1086,14 +1051,10 @@ export function useSurfaceViewport(
       scroll.scrollTop = 0;
       scroll.scrollLeft = 0;
       if (!enabledRef.current) return;
-      // Editor transactions may request scroll while a region is being revealed.
-      // The camera owns that transition; a real pointer/key event interrupts it.
       if (springFrame) {
         paint();
         return;
       }
-      // Browser find, caret navigation and focus still request native scroll.
-      // Keep those movements in the same camera coordinates as pointer gestures.
       interrupt();
       camera.current = {
         ...camera.current,
@@ -1108,8 +1069,6 @@ export function useSurfaceViewport(
         optionsRef.current.anchorScreen &&
         entries.some((entry) => entry.target === root)
       ) {
-        // A sidebar opening or closing moves the viewport; the content stays
-        // where it was on screen instead of jumping under the pointer.
         const next = root.getBoundingClientRect(),
           ratio = outerScale();
         const dx = (placement.left - next.left) / ratio,

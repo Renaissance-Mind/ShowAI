@@ -82,8 +82,6 @@
     display: none;
   }
 }
-/* Placed just before the frame: covers its reserved area while it loads and
-   only fades in after a short delay, so fast loads show nothing. */
 .sb-diagram-pending {
   position: relative;
   height: 0;

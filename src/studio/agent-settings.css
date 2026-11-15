@@ -552,7 +552,6 @@
   margin-top: 14px;
 }
 
-/* Settings headings share one typographic level; the chat picker stays compact. */
 .studio-settings .agent-settings > .agent-execution-picker {
   padding: 0;
   margin-bottom: 30px;

@@ -1,27 +1,11 @@
-/**
- * Errors raised inside a sandboxed component frame. Readable parameter
- * validation lives in ./validation-messages so readers can leave it out.
- *
- * The frame and the host share only a random per-instance channel. The host
- * accepts a report when it comes from its own iframe window on that channel
- * and has the expected shape; everything else is ignored.
- */
-
 export const FRAME_RUNTIME_ERROR = "showai:runtime-error";
 
 export interface FrameRuntimeError {
-  /** `error`: thrown while rendering or in a handler; `rejection`: an unhandled promise. */
   kind: "error" | "rejection";
   message: string;
   stack?: string;
 }
 
-/**
- * Installed into the frame before the component script (stringified, so it
- * must stay self-contained). React reports uncaught render errors as window
- * `error` events, so render failures, handler errors and rejections all pass
- * here. The capture listener runs before the component runtime's own one.
- */
 export function installFrameErrorReporter(channel: string) {
   let sent = 0;
   const report = (
@@ -36,7 +20,6 @@ export function installFrameErrorReporter(channel: string) {
         error ||
         "",
     ).slice(0, 2000);
-    // Browser layout notices are not component failures.
     if (!message || /^ResizeObserver loop/.test(message) || sent >= 20) return;
     sent++;
     parent.postMessage(
@@ -66,7 +49,6 @@ export function installFrameErrorReporter(channel: string) {
   );
 }
 
-/** A runtime error report from this instance's frame, or null for anything else. */
 export function readFrameRuntimeError(
   event: { source: unknown; data: unknown },
   frame: unknown,
@@ -93,7 +75,6 @@ export function readFrameRuntimeError(
   };
 }
 
-/** Whether a legacy `showai:error` repeats a runtime error already reported. */
 export function repeatsRuntimeError(
   message: string,
   error: FrameRuntimeError | null,

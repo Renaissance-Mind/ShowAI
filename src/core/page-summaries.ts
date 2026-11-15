@@ -22,7 +22,6 @@ const snapshots = new Map<string, Promise<Record<string, Entry>>>();
 const digest = (value: unknown) =>
   createHash("sha256").update(JSON.stringify(value)).digest("hex");
 
-/** A disposable projection. Page reads and writes still inspect the actual workspace. */
 export async function pageSummaries(
   library: GitLibrary,
   revision: string,
@@ -59,8 +58,6 @@ async function build(library: GitLibrary, revision: string) {
       previous = undefined;
   }
   if (previous?.revision === revision) return previous.entries;
-  // A page's resource revision changes with every commit that writes the page,
-  // its nodes or its reader, so the node rows themselves are not needed.
   const pages = (await library.treeFiles(revision)).filter((entry) =>
     /^projects\/[^/]+\/pages\/[^/.]+\.json$/.test(entry.path),
   );
@@ -118,7 +115,6 @@ async function build(library: GitLibrary, revision: string) {
           archived: document.archived,
         }
       : prior!.summary;
-    // Even A → B → A must retain its latest resource revision, not an old hash match.
     const resourceRevision = revisions.get(path);
     entries[path] = {
       signature,

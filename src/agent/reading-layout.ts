@@ -1,4 +1,3 @@
-/** Executed inside the reader. No component declarations or document writes. */
 export function measureReadingLayout(input: { blockIds?: string[] }) {
   const round = (value: number) => Math.round(value * 100) / 100;
   const rect = (r: {
@@ -19,7 +18,6 @@ export function measureReadingLayout(input: { blockIds?: string[] }) {
   )) {
     const id =
       el.getAttribute("data-block-id") || el.getAttribute("data-surface-id");
-    // The outermost owner keeps padding and the frame; nested renderers may repeat its id.
     if (id && !elements.has(id)) elements.set(id, el);
   }
   const ids = input.blockIds ?? [...elements.keys()].slice(0, 200);
@@ -44,7 +42,6 @@ export function measureReadingLayout(input: { blockIds?: string[] }) {
         hidden = true;
       if (ancestor === el) continue;
       const r = ancestor.getBoundingClientRect();
-      // Client area excludes borders and scrollbars. Account for CSS scale on the owner.
       const sx =
         ancestor instanceof HTMLElement && ancestor.offsetWidth
           ? r.width / ancestor.offsetWidth

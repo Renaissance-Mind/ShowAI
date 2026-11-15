@@ -58,7 +58,6 @@ const componentToolMeta = {
   "openai/toolInvocation/invoked": "ShowAI 组件已就绪",
 };
 
-/** What the installing plugin declares about its host; harness names prove nothing. */
 export const HOST_DISPLAYS = {
   "mcp-app": "mcp-app",
   "codex-visualize": "fragment-file",
@@ -76,13 +75,8 @@ export function hostDisplay(value = process.env.SHOWAI_HOST_DISPLAY) {
     );
   return value as HostDisplay;
 }
-/** A model copies compact text into its reply; larger fragments are not passed this way. */
 const COMPACT_BYTES = 32 * 1024;
 
-/**
- * What a host whose model writes the HTML itself should do with a presented
- * page. Without this the model treats page_present as already displayed.
- */
 export function conversationHandoff(
   compact: string | undefined,
   blockIds: string[] | undefined,
@@ -97,8 +91,6 @@ export function conversationHandoff(
       mode: "unavailable",
       next: `This runtime has no CDN reader, so the page cannot be shown in the conversation. Give the person ${saved ? "openUrl" : "the html file"} and say that the inline view is unavailable.`,
     };
-  // Without a fragment but with a reader, the page data itself (usually
-  // embedded images) is over the conversation budget.
   const bytes = compact ? Buffer.byteLength(compact) : undefined;
   if (compact && bytes! <= COMPACT_BYTES)
     return {
@@ -115,13 +107,11 @@ export function conversationHandoff(
       : `The whole ${saved ? "page" : "document"} is too large to show in the conversation. Call ${tool} again with blockIds for the one to three blocks the person most needs to see${saved ? ' (page_read detail:"outline" lists them)' : ""}, show that fragment, and give ${saved ? "openUrl" : "the html file"} for the whole ${saved ? "page" : "document"}.`,
   };
 }
-/** Spreads a handoff into a tool result only when the host needs one. */
 export function withConversation(
   conversation: ReturnType<typeof conversationHandoff>,
 ) {
   return conversation ? { conversation } : {};
 }
-/** Fragment files are conversation previews, not deliverables; only recent ones are kept. */
 const KEPT_FRAGMENTS = 20;
 
 async function keepRecentFragments(directory: string) {
@@ -148,9 +138,6 @@ async function captureComponents(html: string, theme: "light" | "dark") {
   const directory = await mkdtemp(join(tmpdir(), "showai-show-image-"));
   try {
     const path = join(directory, "component.html");
-    // The image shows what the conversation fragment shows. Without these
-    // overrides the root Page is viewport-high and scrolls its components
-    // inside it, so the capture would end at the viewport.
     await writeFile(
       path,
       html.replace(
@@ -162,7 +149,6 @@ async function captureComponents(html: string, theme: "light" | "dark") {
     return await renderReading(
       path,
       {
-        // A short viewport lets the full-page capture end where the components end.
         viewport: { width: 760, height: 240 },
         view: "image",
         format: "json",
@@ -179,7 +165,6 @@ async function captureComponents(html: string, theme: "light" | "dark") {
     await rm(directory, { recursive: true, force: true });
   }
 }
-/** Legacy service receipts include CLI navigation hints. They are not Agent commands. */
 export function mcpData(data: unknown): unknown {
   if (!data || typeof data !== "object" || Array.isArray(data)) return data;
   const value = { ...(data as Record<string, unknown>) };
@@ -240,12 +225,10 @@ export function registerPresentationTools(
     privateProjects?: boolean;
     projectAccess?: "library" | "project";
     boundProjectId?: string;
-    /** Read-only access to saved components; undefined on public connections. */
     componentLibrary?: {
       root: string;
       resolveProject(projectId?: string): Promise<string | undefined>;
     };
-    /** Parent directory for fragment-file previews of show_component. */
     previewDirectory?: string;
     hostDisplay?: HostDisplay;
   },
@@ -263,7 +246,6 @@ export function registerPresentationTools(
     readerResourceUri,
     { mimeType: "text/html;profile=mcp-app" },
     async () => {
-      // Conversation previews import the CDN reader; hosts block other origins.
       const domains = cdnReaderOrigins(await cdnReaderUrls());
       return {
         contents: [
@@ -349,7 +331,6 @@ export function registerPresentationTools(
             "component.props.set",
             "component.ref.set",
           ],
-          // Large arguments and results through files on the device running ShowAI.
           localFiles: {
             available:
               options.privateProjects !== false && options.transport !== "http",
@@ -368,7 +349,6 @@ export function registerPresentationTools(
           },
           pageDiff: { entries: "record", paged: true },
           migrations: { guide: "migrations" },
-          // Stage records of a work stay on the device running the Agent.
           workRecords:
             options.transport !== "http" && options.componentLibrary
               ? {
@@ -703,7 +683,6 @@ export function registerPresentationTools(
           await mkdir(dirname(path), { recursive: true });
           await writeFile(path, shown.inline!, "utf8");
           await keepRecentFragments(directory);
-          // Same field as page_present, so file-reading host adapters handle both.
           delivery = {
             mode,
             inline: path,

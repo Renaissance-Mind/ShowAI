@@ -21,7 +21,6 @@ import { componentMode, objectInput, readJson, readerMode } from "./inputs";
 
 const usePublic = () => new Error("Use public list or public describe ID.");
 
-/** Public resources, independent presentations and page exports. */
 export const presentationCommands: CommandDeclaration[] = [
   {
     command: "public",
@@ -101,7 +100,6 @@ export const presentationCommands: CommandDeclaration[] = [
   {
     command: "export",
     operation: pageExport,
-    // Writes files outside the library; the export records nothing.
     ownTransaction: true,
     fields: {
       pageId: "--page",

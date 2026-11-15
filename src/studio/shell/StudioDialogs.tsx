@@ -60,7 +60,6 @@ import {
 } from "./LibraryDialogs";
 import { operation, type LoadedTemplate, type PageState } from "./types";
 
-/** The open workbench dialog, with the import and export dialogs that run beside it. */
 export function StudioDialogs({
   feedback: { setNotice, report },
   library: {
@@ -116,7 +115,6 @@ export function StudioDialogs({
   const t = useTranslator(studioMessages);
   const tc = useTranslator(commonMessages);
   const tn = useTranslator(navigationMessages);
-  /** Page templates create a page here; workflow templates hand a prompt to an agent. */
   function templateDialogActions(record: LoadedTemplate, owner?: string) {
     const projectId =
       owner ??
@@ -478,8 +476,6 @@ export function StudioDialogs({
             );
             setDialog(null);
             if (dialog.groupId) await moveProject(result.id, dialog.groupId);
-            // The creation receipt is not a navigation summary (no dates or
-            // pages), so the sidebar gets the project from a scoped refresh.
             await refreshProjects([result.id], { sidebar: true });
             await openProject(result.id);
             if (dialog.then)

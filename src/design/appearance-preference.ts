@@ -4,7 +4,6 @@ import type { AppearanceTheme } from "./useAppearanceTheme";
 export type AppearancePreference = "system" | AppearanceTheme;
 export const APPEARANCE_KEY = "showai:appearance";
 
-/** A missing or unknown saved value follows the system, like a first launch. */
 export function readAppearancePreference(
   saved: string | null,
 ): AppearancePreference {
@@ -22,7 +21,6 @@ export function resolveAppearance(
     : preference;
 }
 
-/** The workbench preference and the theme it resolves to as the system changes. */
 export function useAppearancePreference() {
   const [preference, setPreference] = useState<AppearancePreference>(() =>
     readAppearancePreference(localStorage.getItem(APPEARANCE_KEY)),

@@ -92,8 +92,6 @@ it("moves a real retained Editor between hosts, preserves undo/selection and Act
     await a
       .getByRole("button", { name: "Switch Page host A", exact: true })
       .click();
-    // Move away from the previous paragraph click so PM interprets this as a
-    // new single click rather than its retained double/triple-click sequence.
     await text
       .locator("p")
       .first()
@@ -109,8 +107,6 @@ it("moves a real retained Editor between hosts, preserves undo/selection and Act
     expect(await a.locator("[data-publication-host]").innerText()).toBe(
       "expanded",
     );
-    // Activity must preserve connected node views, including their own component
-    // state and an iframe draft, rather than recreating the editor's view.
     await a
       .getByRole("button", { name: "Node view count 0", exact: true })
       .click();

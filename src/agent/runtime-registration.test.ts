@@ -82,7 +82,6 @@ test("startup keeps another valid app of the same or a newer version", async () 
     { written: false, reason: "newer" },
   );
   expect((await registered(home)).launch.args[0]).toBe(other.args[0]);
-  // 修复登记 replaces it explicitly.
   await registerRuntime(home, self, "development");
   expect((await runtimeRegistrationStatus(home, self)).state).toBe("current");
 });
@@ -93,7 +92,6 @@ test("startup replaces an older, unreachable or development registration", async
   expect(await registerRuntimeOnStartup(home, self, "development")).toMatchObject(
     { written: true, state: "current" },
   );
-  // The registered App was moved or deleted.
   await writeRegistration(home, other, {
     launch: launch(join(root, "moved/cli.mjs")),
     channel: "packaged",
@@ -104,12 +102,10 @@ test("startup replaces an older, unreachable or development registration", async
   expect((await registerRuntimeOnStartup(home, self, "packaged")).written).toBe(
     true,
   );
-  // A development build of the same version gives way to the installed App.
   await registerRuntime(home, other, "development");
   expect((await registerRuntimeOnStartup(home, self, "packaged")).written).toBe(
     true,
   );
-  // But a development build does not replace an installed App.
   await registerRuntime(home, other, "packaged");
   expect(
     (await registerRuntimeOnStartup(home, self, "development")).written,

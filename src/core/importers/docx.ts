@@ -18,12 +18,7 @@ import type {
   Importer,
 } from "./types";
 
-// Word documents (.docx): headings, paragraphs, character formatting, links,
-// nested lists, tables with merged cells, images and footnotes become rich
-// text and image components. Page breaks carry no meaning on a page and are
-// left out; comments are not page content and are reported.
 
-/** Most nodes one rich text block holds (its contract allows 12,000). */
 const NODES_PER_BLOCK = 8000;
 const IMAGE_TYPES: Record<string, string> = {
   png: "image/png",
@@ -136,7 +131,6 @@ async function imageNode(
   };
 }
 
-/** The inline content of a paragraph; images come back separately. */
 async function inline(
   parent: XmlElement,
   context: Context,
@@ -292,7 +286,6 @@ async function table(
   element: XmlElement,
   context: Context,
 ): Promise<JSONContent> {
-  // Cells by grid column, so vertical merges can find the cell they continue.
   const grid: { cell: JSONContent; column: number }[][] = [];
   for (const row of elements(element, "w:tr")) {
     const header = !!child(child(row, "w:trPr"), "w:tblHeader");
@@ -303,7 +296,6 @@ async function table(
       const span = Number(child(properties, "w:gridSpan")?.attrs["w:val"] ?? 1);
       const merge = child(properties, "w:vMerge");
       if (merge && merge.attrs["w:val"] !== "restart") {
-        // Continues the cell above in this grid column.
         for (let above = grid.length - 1; above >= 0; above--) {
           const owner = grid[above].find((item) => item.column === column);
           if (owner) {
@@ -360,7 +352,6 @@ const isParagraph = (item: Paragraph | JSONContent): item is Paragraph =>
   (item as Paragraph).kind === "paragraph" &&
   Array.isArray((item as Paragraph).images);
 
-/** Paragraph runs with numbering become nested bullet and ordered lists. */
 function withLists(items: (Paragraph | JSONContent)[]): JSONContent[] {
   const out: JSONContent[] = [];
   let stack: JSONContent[] = [];
@@ -531,7 +522,6 @@ async function convertDocx(file: {
     }
   };
   if (body) await visit(body);
-  // The title: document properties, a Title paragraph, or the first heading.
   const plain = (item: Paragraph) =>
     item.content
       .map((node) => node.text ?? "")
@@ -569,8 +559,6 @@ async function convertDocx(file: {
       })),
     });
   }
-  // Top-level images are image components; text is split into blocks of a
-  // size the rich text contract accepts.
   const blocks: ImportBlock[] = [];
   let run: JSONContent[] = [];
   let size = 0;

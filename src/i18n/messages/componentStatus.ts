@@ -1,6 +1,5 @@
 import { defineMessages } from "../index";
 
-// The workbench component status card; readers use a lighter stand-in.
 export default defineMessages("componentStatus", {
   "zh-CN": {
     "status.crashed": "「{name}」组件运行出错",

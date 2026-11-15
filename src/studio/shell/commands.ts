@@ -32,10 +32,6 @@ import type { PageActions } from "./usePageActions";
 import type { MenuItems } from "./menus/useMenuItems";
 import type { AssistantControl, PageState, WorkspaceTabs } from "./types";
 
-/**
- * Keyboard shortcuts, native menu commands, quick jump commands and the
- * feedback entry points: each carries out the same action as its control.
- */
 export function useStudioCommands({
   feedback: { setNotice, report },
   library: { info, capabilities },
@@ -136,7 +132,6 @@ export function useStudioCommands({
         event.key.toLowerCase() === "n"
       ) {
         event.preventDefault();
-        // An open dialog keeps what was typed into it.
         if (dialogRef.current) return;
         if (selectedRef.current)
           void beginNewPage(
@@ -167,7 +162,6 @@ export function useStudioCommands({
       event.preventDefault();
       openSearchRef.current();
     };
-    // The desktop Help menu and Settings → About open the shortcut overview.
     const shortcuts = () => setDialog({ type: "shortcuts" });
     window.addEventListener("keydown", search);
     window.addEventListener("showai:open-shortcuts", shortcuts);
@@ -193,12 +187,10 @@ export function useStudioCommands({
     };
     if (document.querySelector(".studio-topbar .expandable-search-trigger"))
       open();
-    // Libraries without full-text search offer it on Recent only.
     else void navigate("projects").then(() => setTimeout(open, 50), report);
   }
   openSearchRef.current = () => {
     setDialog({ type: "quickJump" });
-    // A library importer saved since the project opened shows up too.
     loadImporters();
   };
   useEffect(() => {
@@ -208,7 +200,6 @@ export function useStudioCommands({
       const index = workspace.tabs.findIndex(
         (tab) => tab.id === workspace.activeId,
       );
-      // Like other Mac apps, closing the last tab closes the window.
       if (
         command === "close" &&
         workspace.tabs.length === 1 &&
@@ -246,7 +237,6 @@ export function useStudioCommands({
       window.removeEventListener("keydown", key, true);
     };
   }, [workspace, workspaceReady, report, capabilities.tabs, info?.mode]);
-  // Native menu items carry out the same actions as the workbench controls.
   const menuCommand = useRef<(command: MenuCommand) => void>(() => {});
   const helpDoc = (slug: string) => {
     const url = `https://showai.renaissancemind.ai/doc${slug ? `/${slug}` : ""}`;
@@ -263,7 +253,6 @@ export function useStudioCommands({
     setSettingsSection("about");
     void navigate("settings").catch(report);
   };
-  // 报告问题 from notices, the Agent and the Help menu all end in 关于与反馈.
   useEffect(() => {
     const reportProblem = (event: CustomEvent<ReportProblemDetail>) => {
       event.preventDefault();
@@ -290,7 +279,6 @@ export function useStudioCommands({
   }, []);
   menuCommand.current = (command) => {
     const doc = helpDoc;
-    // The feedback listeners above take these events; otherwise use the About page.
     const unhandled = (name: string, detail?: unknown) =>
       window.dispatchEvent(new CustomEvent(name, { cancelable: true, detail }));
     const about = () => {
@@ -404,7 +392,6 @@ export function useStudioCommands({
             },
           ]
         : []),
-      // Each importer is a command; "Import file…" above picks one by the file.
       ...(selectedProject
         ? importers.map((importer) => ({
             id: `import.${importer.id}`,

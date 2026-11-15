@@ -5,25 +5,19 @@ import type { JSONRPCMessage } from "@modelcontextprotocol/sdk/types.js";
 import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
 import { atomicRename } from "../core/atomic-rename";
 
-/** When an MCP client (Claude Code, Codex…) first and last reached this library. */
 export interface AgentConnectionRecord {
   client: string;
   version?: string;
-  /** Plugin version of the latest connection (SHOWAI_PLUGIN_VERSION from the plugin launcher). */
   pluginVersion?: string;
-  /** Plugin version that made the latest tool call. */
   callPluginVersion?: string;
   firstConnectedAt: string;
   lastConnectedAt: string;
   firstCallAt?: string;
   lastCallAt?: string;
-  /** Only a launcher failure was recorded; the connection times are that failure's. */
   neverConnected?: true;
-  /** Latest launcher failure of this client, written before the MCP handshake. */
   lastFailure?: AgentConnectionFailure;
 }
 
-/** Written by plugins/showai/mcp/launch.mjs when it cannot start the runtime. Already redacted. */
 export interface AgentConnectionFailure {
   code: string;
   message: string;
@@ -33,7 +27,6 @@ export interface AgentConnectionFailure {
 }
 
 const directory = (root: string) => join(root, "local", "agent-connections");
-// launch.mjs names failure records the same way with a "-failure" suffix.
 function fileName(client: string) {
   const slug = client
     .toLowerCase()
@@ -96,7 +89,6 @@ export async function readAgentConnections(
       at,
     };
     const record = records.get(client);
-    // A host that never connected still appears with its failure.
     records.set(
       client,
       record
@@ -113,7 +105,6 @@ export async function readAgentConnections(
   return [...records.values()];
 }
 
-/** Records the connection before the MCP server sees each message. Call before connect. */
 export function recordConnections(transport: Transport, root: string) {
   const recorder = new McpConnectionRecorder(root);
   const next = transport.onmessage;
@@ -124,11 +115,6 @@ export function recordConnections(transport: Transport, root: string) {
   return recorder;
 }
 
-/**
- * Observes one stdio MCP connection: `initialize` names the client, the first
- * `tools/call` proves the host actually used ShowAI. Records are local library
- * state, written outside the request path; a failed write never affects MCP.
- */
 export class McpConnectionRecorder {
   private client?: { name: string; version?: string };
   private called = false;
@@ -154,7 +140,6 @@ export class McpConnectionRecorder {
     }
   }
 
-  /** Resolves after every observed event has been written. */
   flush() {
     return this.queue;
   }

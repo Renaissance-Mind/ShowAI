@@ -15,7 +15,6 @@ export interface ProjectGrant {
   user: { id: string; name: string };
   upstreamToken: string;
   projectIds: string[];
-  /** Omitted on old grants, which remain limited to their selected projects. */
   projectAccess?: "selected" | "account";
   scopes: string[];
 }
@@ -49,7 +48,6 @@ type Flow = {
     url: string;
   };
 };
-/** A desktop-owned policy; never supplied by an HTTP caller. */
 export interface LocalMcpAuthorization {
   access?: "all" | "selected";
   createProject?(name: string, operationId?: string): Promise<unknown>;
@@ -166,7 +164,6 @@ export async function upstream<T>(
   return result as T;
 }
 
-/** OAuth authorization-code + S256 PKCE, backed by existing ShowAI Server accounts and explicit project consent. */
 export class McpAuthorization {
   readonly resource: string;
   private constructor(
@@ -418,11 +415,7 @@ export class McpAuthorization {
         headers: {
           "content-type": "text/html; charset=utf-8",
           "cache-control": "no-store",
-          // Same-origin keeps the real Origin on these form posts (no-referrer
-          // makes browsers send Origin: null) without leaking a Referer elsewhere.
           "referrer-policy": "same-origin",
-          // form-action also governs the redirect after consent, so allow the
-          // client's registered redirect origin alongside this page.
           "content-security-policy": `default-src 'none'; style-src 'unsafe-inline'; form-action 'self' ${new URL(flow.redirect).origin}; frame-ancestors 'none'`,
           "set-cookie": `showai_oauth=${flowId}; Path=/oauth; HttpOnly; SameSite=Lax; Max-Age=600${this.url.startsWith("https:") ? "; Secure" : ""}`,
         },
@@ -557,8 +550,6 @@ export class McpAuthorization {
             csrf: token(),
             attempts: 0,
           };
-        // The device owner explicitly chooses full-library access in the App;
-        // the consent page and token response disclose its complete scope.
         if (this.local?.access === "all") flow.scopes = [...scopeNames];
         if (
           this.local &&
@@ -668,7 +659,6 @@ export class McpAuthorization {
             )
               return this.form(flowId, flow, localT("auth.invalid"));
             if (desktopApproval) {
-              // Consume after async policy lookup, before issuing anything. Parallel polls cannot mint two grants.
               if (!this.get<Flow>("flow", flowId))
                 throw new AuthorizationError(
                   "Authorization was already completed.",
@@ -788,9 +778,6 @@ export class McpAuthorization {
                 this.put("flow", flowId, flow, 10 * 60_000);
                 return this.form(flowId, flow);
               }
-              // The server binds provider logins to this window with a one-time
-              // completion code; an empty field only checks status so it never
-              // spends one of the server's limited code attempts.
               const completionCode = String(input.completionCode ?? "").trim();
               const result = await upstream<{
                 status?: string;

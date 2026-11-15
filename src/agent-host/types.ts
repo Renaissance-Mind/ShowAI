@@ -36,7 +36,6 @@ export interface LocalAgent {
   callable: boolean | null;
   testedAt?: string;
 }
-/** Install step the UI localizes; `progress` keeps the host-language text. */
 export type RuntimeStage =
   | "absent"
   | "fetching"
@@ -45,7 +44,6 @@ export type RuntimeStage =
   | "installed"
   | "upToDate"
   | "failed";
-/** Why an SDK install failed, for a localized reason and the right advice. */
 export type RuntimeFailureCode =
   | "network"
   | "registry"
@@ -60,16 +58,10 @@ export interface RuntimeStatus {
   root: string;
   error?: string;
   stage?: RuntimeStage;
-  /** Bytes received / expected while downloading both packages. */
   received?: number;
   total?: number;
   failure?: RuntimeFailureCode;
 }
-/**
- * Classified reason a built-in Agent run (or a send) failed. The UI chooses
- * its summary and actions by `code`; `detail` keeps the redacted original
- * text (stderr, provider message) for the collapsed technical details.
- */
 export type AgentProblemCode =
   | "no_model_source"
   | "source_removed"
@@ -89,16 +81,11 @@ export type AgentProblemCode =
   | "unknown";
 export interface AgentProblem {
   code: AgentProblemCode;
-  /** One sentence in the host language; the UI prefers its own text for `code`. */
   summary: string;
-  /** Original text, redacted and truncated. */
   detail?: string;
   exitCode?: number;
-  /** Provider HTTP status for gateway failures. */
   status?: number;
-  /** The source signs in with a ChatGPT plan rather than an API key. */
   chatgpt?: boolean;
-  /** Display name of the source or local Agent involved. */
   name?: string;
 }
 export interface AgentEvent {
@@ -127,11 +114,9 @@ export interface AgentTask {
     title: string;
     options: { id: string; name: string; kind: string }[];
   }[];
-  /** Summary text kept for older readers; `problem` carries the classification. */
   error?: string;
   problem?: AgentProblem;
 }
-/** What the user pointed at when sending a turn. Ids are stable page block ids. */
 export interface AgentTarget {
   kind: "page" | "text" | "blocks" | "board";
   pageId?: string;
@@ -139,10 +124,8 @@ export interface AgentTarget {
   blockIds?: string[];
   text?: string;
   reference?: import("../surface/agent-reference").CanvasReference;
-  /** Exploration state components handed to this message; never saved to the page. */
   components?: AgentComponentContext[];
 }
-/** The model-visible part of a component's onContext snapshot. */
 export interface AgentComponentContext {
   blockId: string;
   componentId?: string;
@@ -150,7 +133,6 @@ export interface AgentComponentContext {
   label?: string;
   model: unknown;
 }
-/** One user request and the Agent run that answered it. */
 export interface AgentTurn extends AgentTask {
   conversationId: string;
   prompt: string;
@@ -158,12 +140,10 @@ export interface AgentTurn extends AgentTask {
   pageTitle?: string;
   baseHash?: string;
   resultHash?: string;
-  /** Whether this turn's MCP actually wrote the focused page. */
   wrotePage?: boolean;
   changedBlockIds?: string[];
   undone?: boolean;
 }
-/** A project-scoped Agent conversation; execution settings stay fixed for its lifetime. */
 export interface AgentConversation {
   id: string;
   projectId: string;
@@ -177,7 +157,6 @@ export interface AgentConversation {
   createdAt: string;
   updatedAt: string;
   turns: AgentTurn[];
-  /** Set in responses when the conversation could not be written to disk. */
   persistError?: string;
 }
 export interface AgentConversationSummary {

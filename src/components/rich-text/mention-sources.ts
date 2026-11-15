@@ -1,8 +1,3 @@
-// Sources of the @ menu in rich text. Pages are the one source the editor
-// owns; every component whose contract declares `contributes.mention` becomes a source,
-// and hosts can register more. The menu itself is the slash menu with a
-// second trigger.
-
 import type { CatalogComponent } from "../../core/component-categories";
 import type { SlashEntry } from "../slash-menu-model";
 import type { LinkablePage } from "./environment";
@@ -11,28 +6,23 @@ import { rankByTitle } from "../title-match";
 import { isoDay, typedDays } from "../../portable/mention-contract.mjs";
 import type { MentionContract } from "../../contract/contributions";
 
-/** What choosing an entry puts at the @: a page link, or a component in the line. */
 export type MentionInsertion =
   | { type: "link"; href: string; text: string }
   | {
       type: "component";
       component: CatalogComponent;
-      /** The top-level prop that receives `value`. */
       prop: string;
       value: string;
     };
 
 export interface MentionEntry {
-  /** Stable across openings, for the recent list. */
   id: string;
   title: string;
   keywords: string;
-  /** A short second line, such as a formatted date. */
   detail?: string;
   insertion: MentionInsertion;
 }
 
-/** Everything a source may look at; it never reads the editor itself. */
 export interface MentionContext {
   query: string;
   projectId?: string;
@@ -52,7 +42,6 @@ export interface MentionSource {
 }
 
 const registered = new Map<string, MentionSource>();
-/** Adds a source to every @ menu; returns its removal. */
 export function registerMentionSource(source: MentionSource) {
   registered.set(source.id, source);
   return () => {
@@ -61,10 +50,6 @@ export function registerMentionSource(source: MentionSource) {
 }
 
 const PAGE_LIMIT = { recent: 8, matches: 20 };
-/**
- * Pages of the project ranked as quick jump ranks them (recently changed
- * first without a query); never the page being edited.
- */
 export const pageMentionSource: MentionSource = {
   id: "pages",
   label: (context) => context.labels.pages,
@@ -101,7 +86,6 @@ function formatDay(day: string, locale: string) {
   }).format(new Date(Date.UTC(year, month - 1, date)));
 }
 
-/** The source a component's `contributes.mention` describes. */
 export function componentMentionSource(
   component: CatalogComponent,
   contract: MentionContract,
@@ -169,7 +153,6 @@ export function componentMentionSource(
   };
 }
 
-/** Rows for the @ menu: pages, component sources, then registered sources. */
 export function mentionEntries(
   context: MentionContext,
 ): (SlashEntry & { entry: MentionEntry })[] {

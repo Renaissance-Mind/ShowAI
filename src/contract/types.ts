@@ -9,7 +9,6 @@ export interface PackageRevisionRef {
   id: string;
   version: string;
   integrity: string;
-  /** Selection hints; identity is kind/id/version/integrity. */
   scope?: CatalogScope;
   projectId?: string;
 }
@@ -70,7 +69,6 @@ export interface TemplateMetadata {
   legacy?: boolean;
   workflow?: {
     format: 1;
-    /** Only staged bundles (schemaVersion 1–3) declared stages; kept for their integrity. */
     stages?: (
       | import("../portable/template-bundle.mjs").StagedTemplateStage
       | import("../portable/template-bundle.mjs").LegacyTemplateStage
@@ -108,7 +106,6 @@ export interface ComponentExample {
   description?: string;
 }
 
-/** User packages contain manifest.json, props.schema.json and a local React entry. */
 export type ComponentCategory =
   | "text"
   | "image"
@@ -122,7 +119,6 @@ export type ComponentCategory =
 export interface ComponentManifest {
   role?: "page-outline";
   pageOutlineProtocol?: 1;
-  /** Versioned use/development contract. Older packages remain explicitly undocumented. */
   documentation?: import("./documentation").ComponentDocumentation;
   id: string;
   name: string;
@@ -131,17 +127,10 @@ export interface ComponentManifest {
   category?: ComponentCategory;
   scenarios: string[];
   effects?: string[];
-  /** The workbench slots the component fills: quick jump commands, the @ menu, database field types. */
   contributes?: import("./contributions").ComponentContributions;
-  /** Exact component revisions imported through showai:component/<id>. */
   dependencies?: PackageRevisionRef[];
   entry: string;
-  /** Named, synchronous JSON read model evaluated in the component browser sandbox. */
   reader?: "readData";
-  /**
-   * Reads page references (usePageReferences): a capability of the
-   * component's own rendering, so exports carry the page's references.
-   */
   pageReferences?: true;
   defaultData: Record<string, unknown>;
   examples: ComponentExample[];
@@ -153,13 +142,11 @@ export interface ComponentMetadata extends ComponentManifest {
   scope: CatalogScope;
   integrity: string;
   updatedAt: string;
-  /** One-line type summary of the props schema, derived when the package is projected. */
   signature?: string;
   parents?: PackageRevisionRef[];
   mergeBase?: PackageRevisionRef;
 }
 
-/** Catalog listing entry; read the component for its default and example data. */
 export interface ComponentListing extends Omit<
   ComponentMetadata,
   "defaultData" | "examples"
@@ -167,11 +154,9 @@ export interface ComponentListing extends Omit<
   examples: Omit<ComponentExample, "data">[];
 }
 
-/** Browser-safe portable payload; a page stores only the component reference and props. */
 export interface CompiledComponent extends ComponentMetadata {
   html: string;
   schema: JsonSchema;
-  /** Mount code for an already sandboxed conversation host; never used by desktop. */
   inline?: { script: string; styles: string };
 }
 
@@ -180,7 +165,6 @@ export interface ComponentSource {
   schema: JsonSchema;
   source: string;
   files: Record<string, string>;
-  /** Base64-encoded local images/fonts preserved when saving an edited version. */
   assets?: Record<string, string>;
   parents?: PackageRevisionRef[];
   mergeBase?: PackageRevisionRef;
@@ -195,15 +179,12 @@ export interface BuiltinComponentMetadata {
   description: string;
   scenarios: string[];
   effects?: string[];
-  /** Slots the component fills, declared and validated as in a library manifest. */
   contributes?: import("./contributions").ComponentContributions;
   version?: string;
   defaultData: Record<string, unknown>;
   propsSchema: JsonSchema;
   examples: ComponentExample[];
-  /** How the component fits a conversation column, measured at chat widths. */
   conversation?: InlineReadiness;
-  /** Reads page references (usePageReferences); exports then carry the page's references. */
   pageReferences?: true;
 }
 
@@ -252,7 +233,6 @@ export interface PackageMergePreview extends PackageMergeInput {
   conflicts: MergeConflict[];
 }
 
-/** The only SDK available to custom React components. No host or filesystem API. */
 export interface CustomComponentProps<
   T extends Record<string, unknown> = Record<string, unknown>,
 > {

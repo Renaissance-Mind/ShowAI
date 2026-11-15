@@ -75,7 +75,6 @@ import fixture from './native-ink-fixture.json';
 const unsafe=()=>({type:'text',text:'Kept visible text',marks:[{type:'bold'},{type:'link',attrs:{href:'javascript:alert(1)'}}]});
 function inkBoard(count=32){
  const points=Array.from({length:count},(_,i)=>({x:i%30,y:i%20,pressure:.5})),ink=createPortableInk(points,2,[40,30]);
- // These are real version1 fields produced by historical native upcasts.
  ink.seed=42;ink.createdAt=123;ink.sourceDrawing=fixture.node.attrs.data.nativeInk.drawing;
  const configuration={version:1,mode:0,width:2,creationZoom:1,fitTolerance:.2,flattenTolerance:.1,positionWindow:.01,jitterWindow:.01,forceBackward:0,forceForward:0,forceTime:0,minimumFraction:.1,maximumFraction:1,curveBlend:.5,estimateTimeout:.01};
  const input={format:'showai-input-v1',sourceID:'source',configuration,raw:points.map((point,i)=>[point.x,point.y,i/120,.5,0,1.5,0,0,0,0]),curves:[{points:[1,2,5,3,15,8,20,10],firstRaw:0,lastRaw:count-1,steps:10}],fragmentCount:2,compositeOpacity:1,composite:'single-opacity-coverage'};

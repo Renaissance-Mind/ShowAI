@@ -42,12 +42,10 @@ export async function readLibraryBytes(
   return (await readLibraryFileState(root, path))?.bytes ?? null;
 }
 
-/** File identity that changes whenever a file is replaced or rewritten. */
 export function fileIdentity(info: Stats): string {
   return `${info.dev}:${info.ino}:${info.size}:${info.mtimeMs}:${info.ctimeMs}`;
 }
 
-/** The file's bytes and the identity of the file they were read from. */
 export async function readLibraryFileState(
   root: string,
   path: string,

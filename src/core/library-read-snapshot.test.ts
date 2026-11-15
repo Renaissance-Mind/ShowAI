@@ -31,7 +31,6 @@ function gate() {
   });
   return { open, closed };
 }
-/** Settles within the time a read takes, far below the 30 s lease wait. */
 function promptly<T>(work: Promise<T>) {
   return Promise.race([
     work,
@@ -84,7 +83,6 @@ it("keeps an older snapshot from reporting a newer save's workspace files as an 
       page.hash,
       page.revision,
     );
-    // The workspace already holds the newer save; the snapshot still reads the older state.
     expect(JSON.parse(await readFile(page.path, "utf8")).document.title).toBe(
       "After",
     );
@@ -122,7 +120,6 @@ it("confirms a workspace difference under the lease, so a save still writing its
     settled = true;
   });
   await new Promise((resolve) => setTimeout(resolve, 200));
-  // The difference sends the scan to the lease, where the writer still works.
   expect(settled).toBe(false);
   held.open();
   await writer;
@@ -162,7 +159,6 @@ it("releases the read transaction when the action fails", async () => {
       throw new Error("reader failed");
     }),
   ).rejects.toThrow("reader failed");
-  // A save and a fresh read after the failure see each other's state.
   await store.savePage(
     project.id,
     page.document.id,
@@ -207,7 +203,6 @@ it("leaves a file of a save still writing its workspace to that save, without th
     held.open();
     await holder;
   }
-  // Once no save claims the file, the same difference is an external edit.
   await rm(journal, { recursive: true });
   expect(await scanWorkspaceResources(library, project.id)).toHaveLength(1);
 });

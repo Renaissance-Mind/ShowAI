@@ -1,11 +1,3 @@
-/**
- * Shared problem presentation (audit levels L1–L4):
- *   toast  – L1, short notice with at most one action
- *   banner – L2, attached to a page, component, project row or conversation
- *   dialog – L3, content of a dialog the caller owns
- *   page   – L4, recovery page (crash, library unavailable)
- * Parts: 发生了什么 / 内容是否安全 / 原因 / 操作 / 技术详情 (collapsed, 复制详情) / 报告问题.
- */
 import {
   Children,
   isValidElement,
@@ -43,14 +35,9 @@ export interface ProblemAction {
   label: string;
   onSelect: () => void;
   primary?: boolean;
-  /** Destructive actions always render last; confirm them in the handler. */
   destructive?: boolean;
 }
 
-/**
- * Keeps the suggested actions the caller can perform, in suggestion order.
- * The first becomes primary unless the caller marks one.
- */
 export function bindProblemActions(
   suggested: readonly ProblemActionId[],
   handlers: Partial<Record<ProblemActionId, () => void>>,
@@ -61,7 +48,6 @@ export function bindProblemActions(
   });
 }
 
-/** One primary, at most two secondary, destructive last. */
 export function arrangeProblemActions(actions: readonly ProblemAction[]) {
   const safe = actions.filter((item) => !item.destructive);
   const destructive = actions.filter((item) => item.destructive);
@@ -74,7 +60,6 @@ export function arrangeProblemActions(actions: readonly ProblemAction[]) {
     ...safe.filter((_, index) => index !== primaryIndex),
     ...destructive,
   ].slice(0, 3);
-  // A destructive action is never dropped in favour of a later safe one.
   if (destructive.length && !ordered.some((item) => item.destructive))
     ordered.splice(ordered.length - 1, 1, destructive[0]);
   return ordered.map((item, index) => ({
@@ -102,16 +87,11 @@ export interface ProblemNoticeProps {
   level?: ProblemLevel;
   tone?: ProblemTone;
   actions?: readonly ProblemAction[];
-  /** Banners and toasts show a close button when given. */
   onDismiss?: () => void;
-  /** How many times the same problem occurred. */
   count?: number;
-  /** Hide 报告问题, e.g. for expected conditions such as a busy library. */
   reportable?: boolean;
-  /** Hide 技术详情 when the notice already says everything the details hold. */
   details?: boolean;
   className?: string;
-  /** Ordering inside a NoticeStack; higher shows first. */
   "data-priority"?: number;
 }
 
@@ -220,8 +200,6 @@ export function ProblemNotice({
       </div>
     </details>
   );
-  // A banner runs the title, safety and cause together as one line of text
-  // with the actions beside it; the other levels stack them.
   if (level === "banner")
     return (
       <div
@@ -271,11 +249,6 @@ export function ProblemNotice({
   );
 }
 
-/**
- * One position, many notices: shows the highest-priority child (children
- * declare `data-priority`, higher first; ties keep their order) and folds the
- * rest under 「还有 N 项」.
- */
 export function NoticeStack({ children }: { children: ReactNode }) {
   const t = useTranslator(messages);
   const [open, setOpen] = useState(false);
@@ -318,7 +291,6 @@ export interface ToastItem {
   action?: { label: string; onSelect: () => void };
 }
 
-/** Bottom-centre toasts; warnings stay until dismissed. */
 export function ToastViewport({
   toasts,
   onDismiss,

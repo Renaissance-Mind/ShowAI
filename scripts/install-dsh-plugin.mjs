@@ -1,5 +1,4 @@
 #!/usr/bin/env node
-// Stage the ShowAI bundle for DeepSeek Harness from source and report what Harness still needs.
 import { execFile } from "node:child_process";
 import { readFile, readdir } from "node:fs/promises";
 import { homedir } from "node:os";

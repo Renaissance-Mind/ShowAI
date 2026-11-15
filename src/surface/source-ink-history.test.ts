@@ -95,8 +95,6 @@ it("rejects changed actual response ordering before issuing any UI body proof an
   requests.push(request);const response=f.owner.execute(request);
   if(request.kind!=="historyAppendInk")return response;
   const actual=response as SourceInkHistoryResult;
-  // Fault injection changes a real owner's reply, never fabricates the owner
-  // or substitutes the actual graph registration under test.
   return{...actual,entries:[...actual.entries].reverse()};
  }};
  const session=new OwnedSourceSession(f.scope.projectId,f.document.id,transport),initial=session.replace(f.document);await session.barrier();

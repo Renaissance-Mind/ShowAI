@@ -5,7 +5,6 @@ import type { ShowDocument } from "../types";
 import type { PageMergeConflict } from "../core/page-merge";
 import { walk } from "../document/walk.mjs";
 
-/** Merge conflicts name nodes of the page tree. */
 function treeNode(root: JSONContent, id: string): JSONContent | undefined {
   let found: JSONContent | undefined;
   walk(root, (node) => {
@@ -34,7 +33,6 @@ const textTypes = new Set([
   "tableHeader",
 ]);
 
-/** Only unwrap known rich text. Arbitrary component data must remain inspectable. */
 export function conflictText(value: unknown): string | null {
   if (typeof value === "string") return value;
   if (Array.isArray(value)) {
@@ -77,7 +75,6 @@ export function conflictNodeLabel(
   return null;
 }
 
-/** Present source values as user content, never as serialized application state. */
 export function conflictDisplayValue(
   value: unknown,
   path: string,

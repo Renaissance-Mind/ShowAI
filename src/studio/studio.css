@@ -383,8 +383,6 @@ button.studio-tree-chevron:hover {
   padding: 30px 42px 64px;
   animation: showai-fade-in var(--duration-base) var(--ease-out);
 }
-/* A page or tab that comes into view fades in where it stands. Hidden tabs
- * keep their content with display: none, so showing one replays this. */
 .studio-scroll > .surface-editor-shell,
 .studio-scroll > .studio-builtin-doc {
   animation: showai-fade-in var(--duration-base) var(--ease-out);
@@ -817,7 +815,6 @@ button.studio-tree-chevron:hover {
   background: var(--accent-soft);
   color: var(--accent);
 }
-/* useSlidingIndicator: one highlight slides between tabs. */
 [data-indicator] {
   position: relative;
   isolation: isolate;
@@ -1292,7 +1289,6 @@ button.studio-tree-chevron:hover {
   padding: 50px;
   text-align: center;
   color: var(--muted);
-  /* Fast loads finish before the indicator appears. */
   animation: showai-fade-in var(--duration-base) var(--ease-out) 200ms both;
 }
 .studio-spin {
@@ -1303,8 +1299,6 @@ button.studio-tree-chevron:hover {
     transform: rotate(360deg);
   }
 }
-/* Views enter partly visible: when the first frames are late (a cold start or a
-   busy main thread), the content is already there instead of a blank pane. */
 @keyframes studio-enter {
   from {
     opacity: 0.4;
@@ -1556,8 +1550,6 @@ button.studio-tree-chevron:hover {
 .studio-page-list[data-view="large"] .studio-page-list-add .studio-page-list-open {
   min-height: calc(210px + 76px);
 }
-/* Documents keep their natural height and may flow into columns; a board
-   becomes a stage sized to its content plus a margin (see PageThumbnail). */
 .studio-page-thumbnail .catalog-preview-content > .container-workspace {
   height: auto;
 }
@@ -1574,7 +1566,6 @@ button.studio-tree-chevron:hover {
 .catalog-preview-content[data-columns] {
   column-rule: 3px solid var(--line);
 }
-/* Folder previews: a tinted ground with the first entries fanned like sheets. */
 .studio-folder-thumbnail {
   position: absolute;
   top: 12px;
@@ -1627,7 +1618,6 @@ button.studio-tree-chevron:hover {
 .studio-folder-thumbnail[data-sheets="2"] .studio-folder-sheet[data-position="1"] {
   transform: translateX(-24%) rotate(-6deg);
 }
-/* Hovering the card spreads the fan and lifts the front sheet. */
 .studio-page-list-row:hover .studio-folder-sheet {
   box-shadow:
     0 0 0 1px color-mix(in srgb, var(--brand-accent) 18%, var(--line)),
@@ -1754,7 +1744,6 @@ button.studio-tree-chevron:hover {
   color: var(--muted);
   margin-right: auto;
 }
-/* Selection checks: a ring that fills with a tick. */
 .studio-page-checkbox {
   display: flex;
   align-items: center;
@@ -1832,7 +1821,6 @@ button.studio-tree-chevron:hover {
     transition: none;
   }
 }
-/* Page toolbar button with a visible text label (the Agent panel toggle). */
 .studio-icon.studio-icon-labeled {
   width: auto;
   gap: 5px;
@@ -1879,7 +1867,6 @@ button.studio-tree-chevron:hover {
   white-space: nowrap;
 }
 
-/* Save state beside the page title (A22) and save banners (B4, B9). */
 .studio-save-state {
   display: inline-flex;
   flex: none;
@@ -1920,7 +1907,6 @@ button.studio-save-state.is-failed:hover {
   }
 }
 
-/* Project folders that could not be read (B13). */
 .studio-unreadable-project {
   display: flex;
   align-items: center;
@@ -1964,7 +1950,6 @@ button.studio-save-state.is-failed:hover {
   max-width: none;
 }
 
-/* Sync state after a sidebar row title; workbench only, so not in library-row.css. */
 .studio-tree-marker {
   flex: 0 1 auto;
   min-width: 2.5em;

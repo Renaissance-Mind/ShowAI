@@ -1,49 +1,28 @@
-// References between pages, read through one public SDK call by built-in and
-// custom components alike. The workbench answers from the live library
-// index, a component frame asks its host page, and an exported page answers
-// from the snapshot the export wrote for that page.
-
 import { createContext, useContext, useEffect, useState } from "react";
 
-/** One reference between two pages, as seen from the page that was asked about. */
 export interface PageReferenceItem {
-  /** The other page: the referring page for "to", the referenced page for "from". */
   projectId: string;
   pageId: string;
   title: string;
   icon?: string;
-  /** The block on the referring page that holds the reference. */
   blockId: string | null;
-  /** Blocks the reference points at on the referenced page. */
   blockIds: string[];
   kind: "link" | "database" | "component";
-  /** Text around the reference. */
   snippet: string;
-  /** "from" only: the referenced page is deleted or absent. */
   missing?: true;
 }
 export interface PageReferenceQuery {
-  /** "to": pages referring to the page (backlinks). "from": pages it refers to. */
   direction?: "to" | "from";
-  /** Another page; omitted means the page holding the component. */
   pageId?: string;
   projectId?: string;
 }
 export interface PageReferencesView {
-  /** loading: asked. ready: items are current. unavailable: no index behind this view. */
   status: "loading" | "ready" | "unavailable";
   items: PageReferenceItem[];
-  /**
-   * Distinct pages in this direction across the whole index. items lists at
-   * most 200 references, so count pages with this rather than with items.
-   */
   pages: number;
-  /** The page the items belong to, when known. */
   page?: { projectId: string; pageId: string };
-  /** Why the host could not read the references. */
   error?: string;
 }
-/** The host answering reference queries around a page. */
 export interface PageReferenceSource {
   page: { projectId: string; pageId: string };
   read(query: {
@@ -51,7 +30,6 @@ export interface PageReferenceSource {
     pageId: string;
     direction: "to" | "from";
   }): Promise<{ items: PageReferenceItem[]; pages: number } | null>;
-  /** Calls the listener when references may have changed. */
   subscribe(listener: () => void): () => void;
 }
 
@@ -60,7 +38,6 @@ export const PageReferenceContext = createContext<PageReferenceSource | null>(
 );
 
 const ID = /^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/;
-/** Checks a query from component code; hosts never trust a frame either. */
 export function readPageReferenceQuery(value: unknown): PageReferenceQuery {
   const query = (value ?? {}) as Record<string, unknown>;
   if (typeof query !== "object" || Array.isArray(query))
@@ -85,7 +62,6 @@ export function readPageReferenceQuery(value: unknown): PageReferenceQuery {
   return query as PageReferenceQuery;
 }
 
-/** Resolves a query against the page holding the component. */
 export function pageReferenceTarget(
   source: PageReferenceSource,
   query: PageReferenceQuery,
@@ -97,7 +73,6 @@ export function pageReferenceTarget(
   } as const;
 }
 
-/** The channel of the component frame this code runs in, if any. */
 function frameChannel(): string | undefined {
   if (typeof document === "undefined" || window.parent === window) return;
   const config = document.getElementById("showai-component-data")?.textContent;
@@ -146,7 +121,6 @@ function askHost(
           : { status: "unavailable", items: [], pages: 0 },
       );
     };
-    // A host page without an index never answers.
     const timer = setTimeout(
       () => finish({ status: "unavailable", items: [], pages: 0 }),
       10000,
@@ -159,11 +133,6 @@ function askHost(
   });
 }
 
-/**
- * Pages referring to a page ("to", backlinks) or referred to by it ("from"),
- * with the holding block and surrounding text. Without pageId it reads the
- * page holding the component. The result follows changes to the library.
- */
 export function usePageReferences(
   query: PageReferenceQuery = {},
 ): PageReferencesView {
@@ -188,7 +157,6 @@ export function usePageReferences(
           (next) => current && setView(next),
         );
       load();
-      // The host tells the frame when references may have changed.
       const changed = (event: MessageEvent) => {
         if (
           event.source === window.parent &&

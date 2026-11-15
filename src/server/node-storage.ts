@@ -216,7 +216,6 @@ export class DiskObjects implements ObjectStore {
       await file.close();
     }
     await atomicRename(temporary, path);
-    // Windows cannot fsync a directory handle; the object itself is flushed above.
     if (process.platform !== "win32") {
       const directory = await open(folder, "r");
       try {

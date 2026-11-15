@@ -1,5 +1,3 @@
-/** Include ancestor CSS transforms; WebKit SVG screen matrices omit some
- * ancestor scales. Camera inversion happens once at content/layout changes. */
 import {measureNativeSync} from "./native-perf";
 import type {ShowDocument} from "../types";
 import {inkFramePose} from "./portable-ink.mjs";

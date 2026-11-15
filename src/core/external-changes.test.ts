@@ -101,6 +101,5 @@ it("keeps the newest five snapshots per page and drops them after a day", async 
       now + EXTERNAL_CHANGE_TTL_MS + 100,
     ),
   ).toEqual([]);
-  // Expired snapshots leave no file behind.
   expect(await readdir(join(root, "local", "external-changes", "project-1"))).toEqual([]);
 });

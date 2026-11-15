@@ -2,14 +2,12 @@ import { useSyncExternalStore } from "react";
 import type { LocatedThread } from "../core/comments";
 import type { CommentAuthor, PageComment } from "../types";
 
-/** What a mounted page editor offers the comments panel and its toggle. */
 export interface PageCommentsController {
   documentId: string;
   readOnly: boolean;
   author: CommentAuthor;
   threads(): LocatedThread[];
   change(update: (comments: PageComment[]) => PageComment[]): void;
-  /** Scroll to the thread's anchor and flash it. */
   reveal(threadId: string): void;
 }
 
@@ -57,7 +55,6 @@ export const commentsStore = {
       set({ controllers: next });
     };
   },
-  /** The page's comments changed (an edit, an undo, a save from elsewhere). */
   changed: () => set({}),
 };
 

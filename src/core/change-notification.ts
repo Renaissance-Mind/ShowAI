@@ -1,7 +1,6 @@
 import { relative, sep } from "node:path";
 import type { DesktopChange } from "../host/protocol";
 
-/** Preserve resource identity through the file watcher debounce. */
 export function changedResources(
   home: string,
   paths: Iterable<string>,

@@ -1,6 +1,5 @@
 import { defineMessages } from "../index";
 
-// Shared block helpers: viewport lock, table alignment controls and chart data checks.
 export default defineMessages("blockHelpers", {
   "zh-CN": {
     "viewportLock.readFailed": "无法读取阅读锁状态：{error}",

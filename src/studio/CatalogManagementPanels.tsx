@@ -1,4 +1,3 @@
-// Catalog management dialogs and the versions panel, loaded when first opened.
 import {
   useEffect,
   useId,
@@ -120,7 +119,6 @@ function ProjectSelect({
   );
 }
 
-/** Revisions of every package of a kind visible from a project, tagged with their owner. */
 async function listRevisions(
   manager: CatalogManager,
   kind: PackageKind,
@@ -137,7 +135,6 @@ async function listRevisions(
     );
 }
 
-/** The detail dialog's menu: copy, promote, publish and delete this revision. */
 export function ForkDialog({
   kind,
   item,
@@ -595,7 +592,6 @@ export function RemoveDialog({
   );
 }
 
-/** The versions tab: every revision, where each is used, and merging from the origin. */
 export function PackageVersions({
   kind,
   item,
@@ -992,7 +988,6 @@ function PackageMergeDialog({
   );
 }
 
-/** The component list's import action: a component package folder into a project. */
 export function ImportComponentDialog({
   manager,
   onClose,
@@ -1090,7 +1085,6 @@ export function ImportComponentDialog({
   );
 }
 
-/** The template list's save action: an existing page becomes a new template or version. */
 export function SaveTemplateDialog({
   manager,
   onClose,
@@ -1145,7 +1139,6 @@ export function SaveTemplateDialog({
       current = false;
     };
   }, [projectId]);
-  // One entry per template package, showing its newest revision.
   const existing = useMemo(
     () =>
       [...new Set(templates.map((item) => item.id))].map(

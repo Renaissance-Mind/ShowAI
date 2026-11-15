@@ -146,7 +146,6 @@ const rules: Partial<Record<GuideTopic, string[]>> = {
     "Publication is separate from page saving and presentation. Only invoke available tools within their project scope. Global promotion, hosting and administrative registration require the explicit host/operator flow; do not invent a missing MCP tool.",
   ],
 };
-/** MCP guides share model facts, but never send shell command recipes to Agents. */
 export function getMcpGuide(topic?: string, knownHash?: string) {
   if (topic === "presentation") return systemPresentationGuide(knownHash);
   if (!topic)

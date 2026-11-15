@@ -3,7 +3,6 @@ export interface PageLinkTarget {
   pageId: string;
   blockIds: string[];
 }
-/** Missing IDs mean the page that holds the request. */
 export interface NavigationTarget {
   projectId?: string;
   pageId?: string;

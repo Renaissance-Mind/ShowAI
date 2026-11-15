@@ -1,7 +1,3 @@
-// Shared contract for the database built-in: validation plus the date math the
-// calendar and heatmap views share. It runs in the workbench, the CLI and the
-// portable reader. Value types, record queries and derived fields come from
-// the harness modules in src/datasets, which every bound component shares.
 import {
   VALUE_KINDS,
   formatDay,
@@ -35,7 +31,6 @@ export const DATABASE_COLUMN_TYPES = [
   "rollup",
   "custom",
 ];
-/** Tones of select and multi-select options, shared with the board and calendar. */
 export const OPTION_TONES = [
   "gray",
   "brown",
@@ -47,7 +42,6 @@ export const OPTION_TONES = [
   "pink",
   "red",
 ];
-/** Column types whose values are lists of texts. */
 const LIST_TYPES = new Set(["multiSelect", "relation", "custom"]);
 export const DATABASE_VIEWS = ["table", "board", "list", "calendar"];
 export const MAX_DATABASE_VIEWS = 20;
@@ -55,13 +49,11 @@ export const MIN_COLUMN_WIDTH = 80;
 export const MAX_COLUMN_WIDTH = 1200;
 export const CALENDAR_MODES = ["month", "week", "heatmap"];
 export const MAX_HEATMAP_WEEKS = 53;
-// A record spanning longer than this is drawn on its first day only.
 export const MAX_SPAN_DAYS = 366;
 
 const DAY_MS = 86400000;
 const ID = /^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/;
 export { parseDay, formatDay, localDay, normalizeDate, parsePageCell };
-/** 0 = Sunday … 6 = Saturday. */
 export function weekdayOf(day) {
   return new Date(day * DAY_MS).getUTCDay();
 }
@@ -70,7 +62,6 @@ export function startOfWeek(day, weekStartsOn = 1) {
   return day - ((weekdayOf(day) - weekStartsOn + 7) % 7);
 }
 
-/** "H:MM" or "HH:MM" (up to 24:00) to minutes after midnight, or null. */
 export function parseTime(value) {
   if (typeof value !== "string") return null;
   const match = /^(\d{1,2}):(\d{2})$/.exec(value.trim());
@@ -200,7 +191,6 @@ function validateViews(views, columns) {
       validateFilter(
         view.filter,
         `${path}.filter`,
-        // A contributed type's operators are its kind's (or fewer); without a kind, unchecked.
         columns.filter((column) => column.type !== "custom" || column.kind),
       );
     if (view.sorts !== undefined) validateSorts(view.sorts, `${path}.sorts`);
@@ -230,7 +220,6 @@ const keysOnly = (value, allowed, path) => {
     if (!allowed.includes(key))
       fail(`${path}.${key} is not a supported setting.`);
 };
-/** Settings that belong to one column type: options, relation, formula, rollup, component. */
 function validateColumnConfig(column, columns, path) {
   const only = (key, types) => {
     if (column[key] !== undefined && !types.includes(column.type))
@@ -307,7 +296,6 @@ function validateColumnConfig(column, columns, path) {
     if (!isRecord(rollup))
       fail(`${path}.rollup must be {relation, column?, aggregate}.`);
     keysOnly(rollup, ["relation", "column", "aggregate"], `${path}.rollup`);
-    // Reverse relations (rev-DATASET-COLUMN) are derived from other datasets.
     if (
       typeof rollup.relation !== "string" ||
       (!rollup.relation.startsWith("rev-") &&
@@ -358,7 +346,6 @@ function validateColumnConfig(column, columns, path) {
   }
 }
 
-/** Validate database data; old data without date columns, page columns or views stays valid. */
 export function validateDatabaseData(data) {
   if (!isObject(data)) fail("Component data must be an object.");
   for (const key of ["title", "description", "groupBy"])
@@ -464,10 +451,6 @@ export function validateDatabaseData(data) {
   return data;
 }
 
-/**
- * Turn rows into dated entries. Rows without a valid start date are skipped; an
- * end date before the start, or a span past MAX_SPAN_DAYS, collapses to one day.
- */
 export function calendarEntries(rows, settings) {
   const entries = [];
   for (const row of rows) {
@@ -503,7 +486,6 @@ export function calendarEntries(rows, settings) {
   );
 }
 
-/** Entries overlapping each day of [from, to], keyed by day number. */
 export function entriesByDay(entries, from, to) {
   const days = new Map();
   for (let day = from; day <= to; day += 1) days.set(day, []);
@@ -517,7 +499,6 @@ export function entriesByDay(entries, from, to) {
   return days;
 }
 
-/** Assign side-by-side lanes to timed entries of one day so overlaps stay readable. */
 export function timeLanes(entries) {
   const lanes = [];
   const placed = entries
@@ -532,12 +513,6 @@ export function timeLanes(entries) {
   return { placed, laneCount: Math.max(1, lanes.length) };
 }
 
-/**
- * Heatmap of N whole weeks ending with the week of `endDay`. With a done column
- * only checked records count. Streaks count consecutive active days ending at
- * `today` — the reference day, normally the reader's date — or the day before
- * while that day is still open, within the window.
- */
 export function heatmapSummary(entries, options) {
   const weekStartsOn = options.weekStartsOn ?? 1;
   const weeks = options.weeks ?? 12;

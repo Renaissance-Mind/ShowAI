@@ -1,6 +1,5 @@
 import type { ProjectSummary } from "../core/model";
 
-/** What the sidebar New menu can make inside a project or folder. */
 export type CreationChoice =
   | "folder"
   | "page"
@@ -10,14 +9,10 @@ export type CreationChoice =
   | "import";
 
 export type NewMenuDestination<Target> =
-  /** The open project or folder takes the new content. */
   | { kind: "context"; target: Target }
-  /** No writable project is open: the most recently used one takes it. */
   | { kind: "recent"; project: ProjectSummary }
-  /** No writable project exists: a new project is made first. */
   | { kind: "newProject" };
 
-/** The writable, unarchived project used most recently. */
 export function recentWritableProject(
   projects: ProjectSummary[],
   readOnly: (projectId: string) => boolean,
@@ -30,10 +25,6 @@ export function recentWritableProject(
   return best;
 }
 
-/**
- * Where the New menu's page, board and folder entries create content. The
- * menu always offers them; only their destination changes.
- */
 export function newMenuDestination<Target>(
   context: { target: Target; projectId: string } | null,
   projects: ProjectSummary[],

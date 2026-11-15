@@ -172,7 +172,6 @@ describe("interactive block data", () => {
     expect(html).toContain("页面其他内容不受影响，组件数据已保留。");
     expect(html).toContain("null");
     expect(html).toContain("下载组件数据");
-    // Readers get the same card without the data dump and download.
     const reader = renderToStaticMarkup(
       createElement(Widget, {
         kind: "playground",

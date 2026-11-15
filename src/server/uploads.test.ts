@@ -448,7 +448,6 @@ test("a crashed upload's reservation and an abandoned resumable task stop blocki
   cleanups.push(async () => db.close());
   const crashed = Buffer.from("left behind by a reset"),
     crashedDigest = await hash(crashed);
-  // A reset between admission and publication leaves only the reservation.
   await db.run(
     "INSERT INTO storage_reservations(id,project_id,user_id,kind,digest,bytes,created_at) VALUES('stale',?,?,'object',?,?,?)",
     [
@@ -466,7 +465,6 @@ test("a crashed upload's reservation and an abandoned resumable task stop blocki
   );
   expect(uploaded.status).toBe(200);
   await uploaded.arrayBuffer();
-  // Another account abandoned a resumable task for the same object a day ago.
   const large = Buffer.alloc(uploadPartBytes + 1, 7),
     largeDigest = await hash(large);
   const begun = await f.request(

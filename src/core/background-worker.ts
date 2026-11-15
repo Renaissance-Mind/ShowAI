@@ -4,7 +4,6 @@ import { randomUUID } from "node:crypto";
 import { fileURLToPath } from "node:url";
 import { CoreError } from "./model";
 
-/** A separate execution queue per workload; idle workers do not keep a host alive. */
 export class BackgroundWorker {
   constructor(
     private readonly idleMs = 15000,

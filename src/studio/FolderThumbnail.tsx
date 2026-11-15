@@ -9,11 +9,6 @@ export interface FolderThumbnailEntry {
   hash?: string;
 }
 
-/**
- * A folder's preview: its first entries as a small fan of sheets on a tinted
- * ground that sets folders apart from pages. The first entry stands in front;
- * subfolders appear as folder sheets, so a card loads at most three pages.
- */
 export default memo(
   function FolderThumbnail({
     projectId,

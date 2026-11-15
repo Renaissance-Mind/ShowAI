@@ -5,9 +5,6 @@
 namespace showai_boundary {
 inline bool memory_overlap(const void*a,uint64_t an,const void*b,uint64_t bn){uint64_t x=(uintptr_t)a,y=(uintptr_t)b;if((!a&&an)||(!b&&bn)||an>UINTPTR_MAX-x||bn>UINTPTR_MAX-y)return true;return an&&bn&&x<y+bn&&y<x+an;}
 inline bool zero_bytes(const void*p,uint32_t count){const auto*b=(const uint8_t*)p;for(uint32_t i=0;i<count;i++)if(b[i])return false;return true;}
-// Spatial-index ordering uses binary64 arithmetic; require the public target's
-// defined nearest/gradual mode rather than silently accepting altered FP state.
-// Exact Integer/Rational operations themselves remain independent of FP mode.
 inline bool graph_fp_mode(){volatile double large=9007199254740992.0,one=1.0,half=1.5;volatile double a=large+one,b=-large-one,c=large+half,d=-large-half;if(a!=9007199254740992.0||b!=-9007199254740992.0||c!=9007199254740994.0||d!=-9007199254740994.0)return false;uint64_t bits=1;double input;copy_bytes(&input,&bits,8);volatile double tiny=input;volatile double sum=tiny+tiny;double result=sum;copy_bytes(&bits,&result,8);return bits==2;}
 inline bool equal_double(double a,double b){uint64_t x,y;copy_bytes(&x,&a,8);copy_bytes(&y,&b,8);return x==y;}
 inline bool same_source(const Graph&g,const SABoundaryPath*paths,uint32_t path_count,const SABoundarySourceBlock*sources,uint32_t source_count,const SAInkPathCommand*commands,uint32_t command_count){
@@ -32,8 +29,6 @@ struct alignas(16) Owner{
     bool begin(){if(busy)return false;busy=1;math.numbers.begin_work(budget.max_limb_operations);math.polynomial.operations=0;math.polynomial.max_operations=budget.max_polynomial_operations;math.numbers.peak_bytes=math.numbers.live_bytes;return true;}
     bool valid(SABoundaryLease lease)const{return !lease.reserved&&lease.owner==uint64_t((uintptr_t)this)&&lease.epoch==name&&lease.slot<slots.size()&&slots[lease.slot].references&&slots[lease.slot].generation==lease.generation&&slots[lease.slot].snapshot.valid();}
     SABoundaryLease lease(uint32_t slot)const{return{uint64_t((uintptr_t)this),name,slot,slots[slot].generation,0};}
-    // Owner is noncopyable; this registry is unique. Lifecycle cleanup must
-    // remain possible after arithmetic failure, without Vector::unique/allocate.
     LeaseSlot&edit_slot(uint32_t slot){return const_cast<LeaseSlot&>(static_cast<const Owner*>(this)->slots[slot]);}
     void drop(uint32_t slot){auto&s=edit_slot(slot);if(!--s.references){s.snapshot={};s.report={};}}
     bool external_memory(const void*p,uint64_t bytes)const{return !memory_overlap(p,bytes,this,sizeof(Owner))&&!memory_overlap(p,bytes,math.numbers.memory,backing_bytes);}

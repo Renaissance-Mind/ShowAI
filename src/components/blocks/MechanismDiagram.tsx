@@ -39,7 +39,6 @@ type Route = {
   ends: [Box, Box];
 };
 
-// SVG text cannot wrap, so labels are measured with the page font.
 let context: CanvasRenderingContext2D | null | undefined;
 function measure(value: string, size: number, mono = false, weight = 400) {
   if (context === undefined)
@@ -56,7 +55,6 @@ function measure(value: string, size: number, mono = false, weight = 400) {
     width += /[\u2e80-\uffff]/.test(char) ? size : size * (mono ? 0.62 : 0.58);
   return width;
 }
-/** Up to two lines; the second ends with an ellipsis when it still overflows. */
 function wrap(value: string, max: number, size: number, weight = 400) {
   const chars = Array.from(plainNotes(value));
   const lines: string[] = [];
@@ -124,7 +122,6 @@ function chooseSides(a: Box, b: Box): [Side, Side] {
     return by > ay ? ["bottom", "top"] : ["top", "bottom"];
   return [bx > ax ? "right" : "left", by > ay ? "top" : "bottom"];
 }
-/** A side point; `center` moves it off the middle, e.g. into the span two boxes share. */
 function anchor(box: Box, side: Side, offset: number, center?: number): Point {
   const x = (center ?? box.x + box.w / 2) + offset;
   const y = (center ?? box.y + box.h / 2) + offset;
@@ -133,7 +130,6 @@ function anchor(box: Box, side: Side, offset: number, center?: number): Point {
   if (side === "left") return { x: box.x, y };
   return { x: box.x + box.w, y };
 }
-/** The middle of the span two boxes share along an axis, so the link runs straight. */
 function shared(a: Box, b: Box, vertical: boolean) {
   const start = vertical ? Math.max(a.x, b.x) : Math.max(a.y, b.y);
   const end = vertical
@@ -156,10 +152,6 @@ function orthogonal(a: Point, sa: Side, b: Point, sb: Side): Point[] {
     ? [a, { x: b.x, y: a.y }, b]
     : [a, { x: a.x, y: b.y }, b];
 }
-/**
- * Where a link label goes: the middle of the longest segment that can hold the
- * label; on a link too short for it, beside the link outside both boxes.
- */
 function labelPoint(route: Route, width: number): Point {
   let best: { length: number; mid: Point; vertical: boolean } | null = null;
   let longest = { length: -1, mid: route.points[0], vertical: false };
@@ -181,7 +173,6 @@ function labelPoint(route: Route, width: number): Point {
     : { x: longest.mid.x, y: Math.min(a.y, b.y) - 18 };
 }
 
-/** Geometry for every element, computed once so steps never move anything. */
 function arrange(model: MechanismData) {
   const boxes = new Map<string, Box>();
   for (const node of model.nodes) {
@@ -199,7 +190,6 @@ function arrange(model: MechanismData) {
     const [from, to] = chooseSides(boxes.get(link.from)!, boxes.get(link.to)!);
     return [link.fromSide ?? from, link.toSide ?? to] as [Side, Side];
   });
-  // Links sharing a node side are spread along it instead of overlapping.
   const groups = new Map<string, number[]>();
   links.forEach((link, index) => {
     for (const [end, node] of [
@@ -228,7 +218,6 @@ function arrange(model: MechanismData) {
       horizontal(sa) === horizontal(sb)
         ? shared(from, to, !horizontal(sa))
         : undefined;
-    // A straight link keeps one offset at both ends so it stays straight.
     const spread =
       center === undefined
         ? undefined
@@ -316,7 +305,6 @@ function Diagram({
   const routeFor = new Map(
     layout.routes.map((route) => [route.link.id, route]),
   );
-  // Labels shown together are nudged upward until they no longer overlap.
   const placed = new Map<string, Point>();
   const taken: Box[] = [];
   const clashes = (box: Box) =>
@@ -605,11 +593,6 @@ function NodeShape({
   );
 }
 
-/**
- * Objects on a grid with the state they hold, the links between them and
- * steps that change only what differs. The layout is computed once, so every
- * step shows the same picture with different highlights.
- */
 export function MechanismDiagramBlock({ data }: BlockProps) {
   const t = useTranslator(messages);
   const model = data as unknown as MechanismData;
@@ -704,7 +687,6 @@ export function MechanismDiagramBlock({ data }: BlockProps) {
           </div>
         )}
       </div>
-      {/* Printed pages cannot step through, so every step is drawn in turn. */}
       {steps.length > 0 && (
         <div className="md-print">
           {steps.map((item, index) => (

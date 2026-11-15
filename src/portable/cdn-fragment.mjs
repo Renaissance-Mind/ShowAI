@@ -3,7 +3,6 @@ import { CAPACITY, CapacityError } from "./capacity.mjs";
 import { assertInlineArtifact } from "./inline.mjs";
 import { publicationUrl } from "./remote.mjs";
 
-/** Reader entry URLs in the order the loader tries them. */
 function readerSources({ readerUrl, readerUrls }) {
   const urls = (readerUrls ?? [readerUrl]).map((value) =>
     publicationUrl(value),
@@ -18,7 +17,6 @@ function readerSources({ readerUrl, readerUrls }) {
   return urls;
 }
 
-/** Reads the page and language from a page built by injectArtifactIntoHtml. */
 function pageData(html) {
   const source = html.match(
     /<script\b[^>]*\bid=["']showai-data["'][^>]*>([\s\S]*?)<\/script>/i,
@@ -27,9 +25,6 @@ function pageData(html) {
     throw new Error("The page has no ShowAI data to display.");
   const artifact = JSON.parse(source);
   const lang = html.match(/<html\b[^>]*\slang=["']([\w-]+)["']/i)?.[1];
-  // The page travels inside the loader, so hosts that drop or rewrite
-  // data-only script elements still receive it. Escaping "<" keeps it inert
-  // inside <script> without changing its values.
   const data = JSON.stringify(artifact)
     .replace(/</g, "\\u003c")
     .replace(/\u2028/g, "\\u2028")
@@ -37,15 +32,6 @@ function pageData(html) {
   return { artifact, lang, data };
 }
 
-/**
- * A classic script that imports the first reachable reader and mounts the
- * page. Classic scripts with import() run in hosts that accept only classic
- * inline scripts while still loading the reader's ES modules. A delayed
- * backup races a slow primary and starts at once when the source before it
- * fails, e.g. one a host's script policy blocks; only the winning module
- * mounts the page.
- * The total wait is bounded, and pending startup timers are cleared.
- */
 function loader(id, data, urls, lang, standalone) {
   const failed = lang?.startsWith("zh")
     ? "无法加载 ShowAI 阅读器："
@@ -59,11 +45,6 @@ function loader(id, data, urls, lang, standalone) {
 const placeholder = (lang) =>
   `<p data-showai-placeholder style="margin:0;padding:24px 0;color:#888;font:14px/1.5 system-ui,sans-serif">${lang?.startsWith("zh") ? "正在加载 ShowAI 页面…" : "Loading the ShowAI page…"}</p>`;
 
-/**
- * Writes a conversation fragment that carries only the page and imports the
- * reader from a static host. Reader URLs name the entry module of a CDN build
- * (scripts/build-cdn-reader.mjs); pin them to an immutable version.
- */
 export function toCdnFragment(
   html,
   { readerUrl, readerUrls, id = `showai-${randomUUID()}` } = {},
@@ -85,11 +66,6 @@ export function toCdnFragment(
   return fragment;
 }
 
-/**
- * Writes a complete HTML page that loads the reader from a static host. Page
- * data, custom components and embedded images stay in the file; the reader
- * and built-in components come from the CDN, so opening it needs network.
- */
 export function toCdnPage(
   html,
   { readerUrl, readerUrls, id = `showai-${randomUUID()}` } = {},

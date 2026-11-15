@@ -67,7 +67,6 @@ function revision(value: string): string {
   return value;
 }
 
-/** A package revision's stored record and the files under its root. */
 interface LocatedPackage {
   root: string;
   kind: "components" | "templates";
@@ -82,7 +81,6 @@ interface DependencyContext {
   validated: Set<string>;
 }
 
-/** Shared versioned operations for CLI, MCP and both workbench hosts. */
 export class LibraryOperations {
   readonly library: GitLibrary;
   readonly store: FileStore;
@@ -159,7 +157,6 @@ export class LibraryOperations {
       projectId: this.project(input.projectId),
     });
   }
-  /** Backlinks (to) and outgoing references (from) of a page; a bound connection sees its own project only. */
   pageReferences(
     projectId: string,
     pageId: string,
@@ -212,11 +209,6 @@ export class LibraryOperations {
     return { before, after, paths };
   }
 
-  /**
-   * Revision state one dependency resolution reads, shareable by several
-   * resolutions at the same revision: its tree, each package revision found
-   * with its files, and the bundles already validated.
-   */
   private async dependencyContext(
     sourceRevision: string,
   ): Promise<DependencyContext> {
@@ -246,7 +238,6 @@ export class LibraryOperations {
       templates: TemplateRecord[] = [],
       files = new Map<string, Buffer>(),
       visited = new Set<string>();
-    /** The stored revision a reference names and the files under its root. */
     const locate = async (ref: PackageRevisionRef): Promise<LocatedPackage> => {
       const kind = ref.kind === "component" ? "components" : "templates",
         filename = ref.kind === "component" ? "compiled.json" : "template.json";
@@ -299,7 +290,6 @@ export class LibraryOperations {
       const key = `${ref.kind}:${ref.id}@${ref.version}:${ref.integrity}`;
       if (visited.has(key)) return;
       visited.add(key);
-      // Where a reference resolves depends only on it and this project.
       const located = `${projectId}\0${key}`;
       let resolution = context.packages.get(located);
       if (!resolution) {
@@ -309,7 +299,6 @@ export class LibraryOperations {
       const found = await resolution;
       for (const dependency of found.record.dependencies ?? [])
         await walk(dependency, depth + 1);
-      // Exact immutable identities can coexist with same-name current versions.
       const target = `projects/${projectId}/packages/historical/${found.kind}/${ref.integrity}`;
       for (const [path, bytes] of found.sourceFiles)
         files.set(`${target}/${path.slice(found.root.length + 1)}`, bytes);
@@ -333,7 +322,6 @@ export class LibraryOperations {
       templates.map((item) => `${item.id}@${item.version}:${item.integrity}`),
     ]);
     for (const root of refs) {
-      // The same root over the same stored records validates the same way.
       const bundle = JSON.stringify([projectId, root, included]);
       if (context.validated.has(bundle)) continue;
       validatePackageBundle({
@@ -348,13 +336,11 @@ export class LibraryOperations {
     return { components, files };
   }
 
-  /** Current project content and its precise shared dependencies; history stays local. */
   async projectFiles(
     projectId: string,
     sourceRevision: string,
   ): Promise<Map<string, Buffer>> {
     const project = this.project(projectId)!;
-    // Pages share one tree and resolve each package revision once.
     const context = await this.dependencyContext(sourceRevision);
     const paths = context.tree
       .map((entry) => entry.path)
@@ -402,7 +388,6 @@ export class LibraryOperations {
     }
     const metadataPath = `projects/${project}/project.json`;
     const metadata = JSON.parse(files.get(metadataPath)!.toString());
-    // Host paths and Agent directory bindings remain device-local.
     delete metadata.sourceDirectory;
     delete metadata.binding;
     delete metadata.bindings;
@@ -632,8 +617,6 @@ export class LibraryOperations {
       !/^[a-f0-9]{64}$/.test(ref.snapshotId)
     )
       throw new CoreError("INVALID_DATA", "Invalid imported snapshot path.");
-    // Imported snapshots are immutable files in the current state; the import
-    // revision itself is superseded by later saves and no longer readable.
     return this.library.readSnapshot(async (current) => {
       if (!current)
         throw new CoreError("NOT_FOUND", "The content library is empty.");
@@ -792,7 +775,6 @@ export class LibraryOperations {
       ),
     );
   }
-  /** External edits recorded so far; saves record them before writing a file. */
   async conflicts(projectId?: string) {
     const project = this.project(projectId);
     return (await new WorkspaceProtection(this.library).list()).filter(
@@ -801,7 +783,6 @@ export class LibraryOperations {
         (!project || item.path.startsWith(`projects/${project}/`)),
     );
   }
-  /** Compares one project's pages and packages with the workspace on request. */
   async scanConflicts(projectId: string) {
     await scanWorkspaceResources(this.library, this.project(projectId)!);
     return this.conflicts(projectId);

@@ -72,7 +72,6 @@
 .studio-tab-drag-active * {
   user-select: none !important;
 }
-/* The dragged tab keeps its slot as a translucent placeholder while siblings reflow. */
 .studio-tab[data-dragging] {
   opacity: 0.24;
 }

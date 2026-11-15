@@ -87,7 +87,6 @@ const stamp = (ms: number) => {
   const d = new Date(ms);
   return `${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
 };
-// Small metrics such as a loss need more decimals than counts and hours.
 const number = (value: number) =>
   value.toLocaleString(getLocale(), {
     maximumFractionDigits: Math.abs(value) < 10 ? 3 : 1,
@@ -142,13 +141,11 @@ function Scatter({
     ...scored.map((e) => e.score as number),
     ...(model.metric.baseline === undefined ? [] : [model.metric.baseline]),
   ];
-  // Padding scales with the data so small metrics (a loss of 2.1) keep a readable range.
   const span = values.length ? Math.max(...values) - Math.min(...values) : 0;
   const pad = span * 0.1 || Math.abs(values[0] ?? 0) * 0.05 || 1;
   const lo = values.length ? Math.min(...values) - pad : 0;
   const hi = values.length ? Math.max(...values) + pad : 1;
   const x = (ms: number) => m.l + ((ms - t0) / (t1 - t0)) * (width - m.l - m.r);
-  // Better scores are always drawn higher, so "lower is better" flips the axis.
   const y = (v: number) =>
     m.t + (higher ? 1 - (v - lo) / (hi - lo) : (v - lo) / (hi - lo)) * plotH;
   const laneY = m.t + plotH + lane / 2 + 6;
@@ -179,7 +176,6 @@ function Scatter({
     }
   }
   const ticks: number[] = [];
-  // A "nice" step of 1, 2 or 5 × 10^n giving about five gridlines.
   const raw = (hi - lo) / 5 || 1;
   const magnitude = Math.pow(10, Math.floor(Math.log10(raw)));
   const tickStep =
@@ -628,7 +624,6 @@ export function ExperimentTrackerBlock({ data }: BlockProps) {
   const frontierBest = frontier.length
     ? model.experiments.find((e) => e.id === frontier[frontier.length - 1])
     : undefined;
-  // Positive gain always means better, whichever direction the metric runs.
   const gain =
     frontierBest && model.metric.baseline !== undefined
       ? ((frontierBest.score as number) - model.metric.baseline) *

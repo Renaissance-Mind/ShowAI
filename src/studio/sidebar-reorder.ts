@@ -10,7 +10,6 @@ export interface SidebarReorder {
   placement?: "before" | "after";
 }
 
-/** Replay pending gestures over the latest confirmed order, including after a failed save. */
 export function applySidebarReorder(
   organization: SidebarOrganization,
   move: SidebarReorder,

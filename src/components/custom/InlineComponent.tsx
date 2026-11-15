@@ -41,14 +41,9 @@ interface InlineModule {
   ): MountedComponent;
 }
 
-/** The conversation reader listens for this; detail.result settles its delivery. */
 export const conversationContextEvent = "showai:conversation-context";
-// Handed-over states return to their block if the reader mounts it again.
 const handedOver = new Map<string, ComponentContextSnapshot>();
 
-/** Only the portable reader enables this inside an existing conversation sandbox.
- * Shadow DOM isolates styling; the host iframe is the JavaScript security boundary.
- */
 export function InlineComponent({
   component,
   data,
@@ -113,7 +108,6 @@ export function InlineComponent({
       jsx: JsxRuntime,
       jsxDev: JsxDevRuntime,
     };
-    // Only a conversation host that accepts model context offers onContext.
     const owner = container.current.closest<HTMLElement>(
       "[data-block-id],[data-surface-id]",
     );
@@ -141,7 +135,6 @@ export function InlineComponent({
       );
       return true;
     };
-    // The reader around the component follows page links and in-page targets.
     const goTo = (value: unknown) => {
       const target = navigationTarget(value);
       if (!target)
@@ -164,8 +157,6 @@ export function InlineComponent({
       });
     };
     const script = document.createElement("script");
-    // This is a normal inline script in the host's pre-existing sandbox. It never
-    // enters the desktop document, and neither eval nor arbitrary HTML is used.
     script.textContent = `(()=>{${component.inline.script}\nglobalThis[${JSON.stringify(callbackKey)}](ShowAIInlineComponent);})();`;
     try {
       host.appendChild(script);

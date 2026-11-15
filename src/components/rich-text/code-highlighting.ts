@@ -1,6 +1,5 @@
 import { common, createLowlight } from "lowlight";
 
-// One grammar registry for editable code, reading and exported pages.
 const lowlight = createLowlight(common);
 
 export const codeLanguages = lowlight.listLanguages();
@@ -15,9 +14,6 @@ export function supportsCodeLanguage(language?: string | null): boolean {
 
 type Tokens = ReturnType<typeof lowlight.highlight>["children"];
 
-// ProseMirror decorations are flat. Give each leaf its nearest syntax scope so
-// nested expressions (e.g. keywords inside template strings) get the same color
-// in the editor and reader, without inheriting conflicting outer token classes.
 function flattenTokens(nodes: Tokens, classes: string[] = []): Tokens {
   return nodes.flatMap((node): Tokens => {
     if (node.type === "text") {
@@ -50,8 +46,6 @@ export function highlightCode(code: string, language?: string | null) {
   return { ...tree, children: flattenTokens(tree.children) };
 }
 
-// Tiptap normally guesses the language for missing/unknown labels. Keep those
-// blocks plain, just like the reader, and resolve aliases/case in one place.
 export const codeHighlighter = {
   listLanguages: () => codeLanguages,
   registered: supportsCodeLanguage,

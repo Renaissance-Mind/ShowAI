@@ -52,7 +52,6 @@ const isSplit = (value: unknown): value is number =>
   value >= STRUCTURE_SPLIT.min &&
   value <= STRUCTURE_SPLIT.max;
 
-/** Blank lines separate paragraphs; a paragraph whose lines all start with "- " is a list. */
 function Paragraphs({ source }: { source: string }) {
   return source
     .trim()
@@ -148,7 +147,6 @@ function CodePanel({
       next === "copied" ? 1500 : 4000,
     );
   };
-  // Where the clipboard is unavailable (sandboxed reader), select the code for a manual copy.
   const selectCode = () => {
     const selection = window.getSelection();
     if (ref.current && selection) {
@@ -198,7 +196,6 @@ function CodePanel({
   );
 }
 
-/** Selection and open set at load: the initial path and its ancestors open, else nodes marked open. */
 function initialView({ items, roots }: Outline, initial?: string) {
   const open = new Set<string>();
   for (const item of items.values())
@@ -218,7 +215,6 @@ function initialView({ items, roots }: Outline, initial?: string) {
   return { selected, open };
 }
 
-/** Every node expanded with its summary, for print and static reading. */
 function PrintOutline({
   paths,
   outline,
@@ -289,21 +285,18 @@ export function StructureBrowserBlock({ data }: BlockProps) {
     >,
   ) =>
     setSaved((current) => {
-      // initialView types its selection as present; an empty outline has none.
       const next = action({
         selected: current.selected as string,
         open: new Set(current.open),
       });
       return { selected: next.selected, open: [...next.open] };
     });
-  // Reading state restarts when the instance's structure or initial path changes.
   useResetOnChange(
     JSON.stringify([[...items.keys()], model.initial ?? null]),
     () => setView(() => initialView(outline, model.initial)),
   );
   const { selected, open } = view;
 
-  // The tree width the reader drags to is their own reading state; null follows the data.
   const baseSplit = isSplit(model.split)
     ? clampSplit(model.split)
     : STRUCTURE_SPLIT.fallback;
@@ -384,7 +377,6 @@ export function StructureBrowserBlock({ data }: BlockProps) {
     return out;
   }, [items, roots, open]);
 
-  // Keyboard moves keep focus on the selected row (roving tabindex).
   const rows = useRef(new Map<string, HTMLDivElement>());
   const fromKeyboard = useRef(false);
   useLayoutEffect(() => {
@@ -502,7 +494,6 @@ export function StructureBrowserBlock({ data }: BlockProps) {
                     }
                     onClick={(event) => {
                       if (!item.children.length) return;
-                      // The chevron only expands or collapses; selection stays.
                       event.stopPropagation();
                       setView((state) => {
                         const next = new Set(state.open);

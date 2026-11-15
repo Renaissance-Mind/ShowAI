@@ -83,7 +83,6 @@ it("records held-open windows and disappears once nothing is held", async () => 
     [1, "kept-open"],
     [2, "kept-open"],
   ]);
-  // The first refusal time is kept while the window stays held.
   expect(second.windows[0].since).toBe(first.windows[0].since);
   await record.delete(2);
   expect(

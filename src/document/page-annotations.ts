@@ -4,7 +4,6 @@ import { indexSurfaceTree } from "./connections.mjs";
 import { frameBounds } from "./geometry.mjs";
 import { shapeIntersects } from "./drawing-geometry.mjs";
 
-/** Only sibling annotations share a Page's coordinate system. Locked ink stays put. */
 export function overlappingPageAnnotations(
   document: ShowDocument,
   moving: string[],

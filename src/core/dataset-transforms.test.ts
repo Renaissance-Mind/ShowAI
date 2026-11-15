@@ -61,7 +61,6 @@ describe("transform datasets", () => {
       inputs: { numbers: { datasetId: "numbers", status: "ok" } },
     });
     expect(typeof first.transform!.lastRunMs).toBe("number");
-    // Unchanged inputs reuse the run.
     const again = await datasets.read(projectId, "total");
     expect(again.transform!.ranAt).toBe(first.transform!.ranAt);
     expect(again.hash).toBe(first.hash);
@@ -73,13 +72,11 @@ describe("transform datasets", () => {
     const changed = await datasets.read(projectId, "total");
     expect(changed.dataset.value).toEqual({ total: 30 });
     expect(changed.transform!.ranAt).not.toBe(first.transform!.ranAt);
-    // A new process reuses the cached output of the same inputs and script.
     const fresh = await new DatasetStore(new FileStore(datasets.root)).read(
       projectId,
       "total",
     );
     expect(fresh.transform!.ranAt).toBe(changed.transform!.ranAt);
-    // Writing the output is refused; renaming changes only the definition.
     await expect(
       datasets.apply(projectId, "total", {
         baseHash: changed.hash,
@@ -131,12 +128,10 @@ describe("transform datasets", () => {
         script: "function transform() { return 1; }",
       }),
     ).rejects.toMatchObject({ code: "INVALID_DATA" });
-    // A synchronized definition can still close a cycle; reads report it.
     const path = datasets.path(projectId, "t1");
     const stored = JSON.parse(await readFile(path, "utf8")) as DatasetDocument;
     stored.transform!.inputs = { t2: "t2" };
     await writeFile(path, JSON.stringify(stored));
-    // t2 is computed from t1's last good output, marked stale.
     const stale = await datasets.read(projectId, "t2");
     expect(stale).toMatchObject({
       status: "stale",
@@ -150,7 +145,6 @@ describe("transform datasets", () => {
     expect(
       stale.warnings.map((warning) => warning.message).join(" "),
     ).toContain("cycle");
-    // Without last good outputs there is no value.
     await datasets.cache.remove(projectId, "t1");
     await datasets.cache.remove(projectId, "t2");
     const error = await datasets
@@ -223,7 +217,6 @@ describe("change propagation", () => {
     expect(await datasetDependents(store, [`${projectId}/a`])).toEqual([
       `${projectId}/t1`,
     ]);
-    // A transform defined later is found from the change that wrote it.
     await datasets.defineTransform(projectId, {
       id: "t2",
       name: "T2",

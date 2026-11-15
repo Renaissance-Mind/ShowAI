@@ -1,6 +1,3 @@
-// Adapted from https://github.com/antvis/G2/blob/v5/site/docs/charts/stem-leaf.en.mdx
-// License notices: resources/licenses/g2-runtime.json.
-
 export default async function draw(context) {
   const { Chart, asset, fetch } = context;
   const G2 = { Chart };
@@ -10,13 +7,11 @@ export default async function draw(context) {
     autoFit: true,
   });
 
-  // Single group data
   const rawData = [
     65, 67, 69, 71, 72, 73, 74, 75, 76, 78, 79, 81, 82, 83, 85, 87, 89, 92, 93,
     95,
   ];
 
-  // Process single-direction stem-and-leaf plot data
   function processSingleStemLeaf(data) {
     const stemMap = new Map();
 
@@ -29,19 +24,17 @@ export default async function draw(context) {
       stemMap.get(stem).push(leaf);
     });
 
-    // Sort leaves
     Array.from(stemMap.values()).forEach((leaves) => {
       leaves.sort((a, b) => a - b);
     });
 
-    const stems = Array.from(stemMap.keys()).sort((a, b) => b - a); // Sort from large to small
+    const stems = Array.from(stemMap.keys()).sort((a, b) => b - a);
     const chartData = [];
 
     stems.forEach((stem, index) => {
       const yPos = index;
       const leaves = stemMap.get(stem);
 
-      // Add stem
       chartData.push({
         x: 0.4,
         y: yPos,
@@ -52,7 +45,6 @@ export default async function draw(context) {
         fontWeight: "bold",
       });
 
-      // Add leaves
       leaves.forEach((leaf, i) => {
         chartData.push({
           x: 0.47 + i * 0.04,
@@ -90,7 +82,6 @@ export default async function draw(context) {
           textBaseline: "middle",
         },
       },
-      // Add separator line using lineX method
       {
         type: "lineX",
         data: [0.45],

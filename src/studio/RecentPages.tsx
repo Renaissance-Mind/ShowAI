@@ -20,7 +20,6 @@ import { clientIsMac, isDeleteShortcut } from "./keyboard-shortcuts";
 import "./external-change.css";
 
 const translate = translator(sidebarMessages);
-/** Rows rendered at first and added each time the list nears its end. */
 const ROW_STEP = 200;
 const absoluteTimeFormats = new Map<string, Intl.DateTimeFormat>();
 
@@ -86,10 +85,6 @@ export function recentPages(
     );
 }
 
-/**
- * Recently updated pages across projects. Rows render in steps as the list
- * scrolls, and a parent re-render with the same props does not render it again.
- */
 export default memo(function RecentPages({
   pages,
   query,
@@ -101,7 +96,6 @@ export default memo(function RecentPages({
 }: {
   pages: RecentPage[];
   query: string;
-  /** First-run content shown instead of the list until the library has pages of its own. */
   welcome?: ReactNode;
   onOpen: (page: RecentPage, event: MouseEvent<HTMLButtonElement>) => void;
   onMenu: (
@@ -109,7 +103,6 @@ export default memo(function RecentPages({
     anchor: HTMLElement,
     point?: LibraryMenuPoint,
   ) => void;
-  /** F2 renames and Delete (⌘⌫ on macOS) deletes, as the context menu does. */
   onCommand: (page: RecentPage, command: "rename" | "delete") => void;
   onCreateProject: () => void;
 }) {
@@ -139,7 +132,6 @@ export default memo(function RecentPages({
   useEffect(() => {
     const element = end.current;
     if (!more || !element) return;
-    // Observing again after each step also covers a list still shorter than the view.
     const observer = new IntersectionObserver(
       ([entry]) => {
         if (entry.isIntersecting) setLimit((value) => value + ROW_STEP);

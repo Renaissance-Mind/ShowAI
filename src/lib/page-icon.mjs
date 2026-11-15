@@ -1,4 +1,3 @@
-/** Page icons keep the existing string format: text, a web image, or raster data. */
 export const MAX_ICON_LENGTH = 1_000_000;
 export function isImageIcon(value) {
   if (typeof value !== "string") return false;

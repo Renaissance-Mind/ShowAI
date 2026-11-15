@@ -364,7 +364,6 @@ function parentFolder(args: Record<string, unknown>): string | null {
     : assertId(required(args, "parentId"));
 }
 
-/** An import source: a path on this device, or files handed over as base64 (drops). */
 function importSource(args: Record<string, unknown>): ImportSource {
   if (args.path !== undefined) return { path: required(args, "path") };
   const files = args.files;
@@ -438,10 +437,6 @@ function readerDelivery(
     throw new CoreError("INVALID_DATA", "Choose the bundled or cdn reader.");
   return args.reader;
 }
-/**
- * The person's packaging decisions {itemId: choice}; "embed" in
- * externalData carries everything that fits.
- */
 function packaging(args: Record<string, unknown>): {
   packaging?: PackagingDecisions;
   externalData?: "embed";
@@ -489,11 +484,6 @@ export interface WorkbenchHost {
   invoke(action: string, args: Record<string, unknown>): Promise<unknown>;
 }
 
-/**
- * Files exported by this host process; the export notice may reveal only these.
- * One store per process, like local media grants, because each action call
- * creates its own workbench.
- */
 const exportedPaths = new Set<string>();
 export function rememberExport<T>(result: T): T {
   const path = (result as { path?: unknown } | null)?.path;
@@ -553,8 +543,6 @@ export function createWorkbench(
   ) {
     return withLibrarySnapshot(store.root, async () => {
       const record = await store.readPage(id, page);
-      // A deleted page, or one inside a deleted folder or project, opens
-      // again only after it is restored from Deleted items.
       const project = await store.readProject(id);
       const parentId = record.document.parentId;
       if (
@@ -616,7 +604,6 @@ export function createWorkbench(
     const library = record.revision ? versionedLibrary(store.root) : null;
     return {
       ...record,
-      // Names the writer of this version for external-write notices and conflicts.
       ...(library
         ? { changedBy: changeAuthor(await library.entryAt(record.revision!)) }
         : {}),
@@ -1011,8 +998,6 @@ export function createWorkbench(
         return projects.filter((project) => !hidden.has(project.id));
       }
       case "projects:scan": {
-        // Like projects:list, but a project that cannot be read is reported
-        // beside the others instead of failing the whole list.
         const scanned = await store.scanProjects({
           includeArchived: args.includeArchived === true,
           projectIds: projectScope(args),
@@ -1074,7 +1059,6 @@ export function createWorkbench(
             baseRevision: text(args, "baseRevision", true),
           },
           async (document) => {
-            // Shared data stays in its project; bindings name it explicitly.
             document = retargetBindings(document, source, destination);
             const locked = await lockDocumentComponents(
               store.root,
@@ -1258,7 +1242,6 @@ export function createWorkbench(
       case "pages:markSeen":
         return clearAgentCreated(store.root, projectId(args), pageId(args));
       case "pages:reference": {
-        // The editor saved first; pin the version the person is looking at.
         const id = projectId(args);
         const record = await store.readPage(id, pageId(args));
         const expected = text(args, "expectedHash", true);
@@ -1268,7 +1251,6 @@ export function createWorkbench(
             currentRevision: record.revision,
           });
         const reference = pageReference(id, record, parseTarget(args.target));
-        // page_diff can then compare the current page with this exact version.
         await new ReadBaselines(store.root).remember(id, record);
         return reference;
       }
@@ -1466,7 +1448,6 @@ export function createWorkbench(
         return { importers: importers.map(importerInfo), problems };
       }
       case "imports:plan": {
-        // The plan the person confirms; the source stays staged for the run.
         const id = projectId(args);
         const source = importSource(args);
         const plan = await planImport(
@@ -1787,7 +1768,6 @@ export function createWorkbench(
         });
       }
       case "catalog:capabilities":
-        // Catalog management actions some builds register later.
         return {
           remove:
             workbenchActions.has("components:remove") &&
@@ -1801,13 +1781,10 @@ export function createWorkbench(
         });
       }
       case "dialog:openPage": {
-        // The file (or, on macOS, the folder) an import reads; the extensions
-        // are those of the importers this project can use.
         const available = await availableImporters(
           store.root,
           args.projectId === undefined ? undefined : projectId(args),
         );
-        // A chosen importer offers only its own file types.
         const chosen = text(args, "importer", true);
         const importers = chosen
           ? available.importers.filter((importer) => importer.id === chosen)
@@ -1837,7 +1814,6 @@ export function createWorkbench(
         return { path: result.filePaths[0] };
       }
       case "export:analyze": {
-        // The packaging plan an export would carry, with sizes and the last choices.
         const id = projectId(args);
         const page = text(args, "pageId", true);
         const format = text(args, "format", true);
@@ -1853,7 +1829,6 @@ export function createWorkbench(
         });
       }
       case "packaging:sync": {
-        // What synchronization carries to the project's other devices.
         const id = projectId(args);
         const decisions = packaging(args).packaging;
         if (!decisions) return syncPackagingPlan(store, id);
@@ -1864,7 +1839,6 @@ export function createWorkbench(
       case "datasets:chooseFile": {
         const id = projectId(args);
         await store.readProject(id);
-        // Spreadsheets are read-only sources: they can be linked, not written.
         const filters = [
           args.mode === "save"
             ? {
@@ -1941,7 +1915,6 @@ export function createWorkbench(
         if (selection.canceled || !selection.filePath) return null;
         await assertExportDestination(store.root, id, selection.filePath);
         if (format === "json") {
-          // Like HTML exports, the file carries what the packaging plan chose.
           const { packaged } = await packagePage(store, {
             projectId: id,
             pageId: page,
@@ -1971,8 +1944,6 @@ export function createWorkbench(
         }));
       }
       case "export:printable": {
-        // Browser hosts print through the browser: the page opens its print
-        // dialog, where people save it as PDF.
         const html = await readingPageHtml({
           root: store.root,
           projectId: projectId(args),
@@ -2002,8 +1973,6 @@ export function createWorkbench(
         }));
       }
       case "export:conversation": {
-        // The Agent panel renders the Markdown from the conversation it shows,
-        // which may run on another device; this host only writes the file.
         const id = projectId(args);
         await store.readProject(id);
         const markdown = args.markdown;
@@ -2033,7 +2002,6 @@ export function createWorkbench(
             "NOT_FOUND",
             "Only files exported in this session can be revealed. Export the page again.",
           );
-        // The host reveals a path the action layer vouches for, like granted media.
         return host.invoke("media:reveal", { path });
       }
       case "fs:reveal":
@@ -2043,12 +2011,10 @@ export function createWorkbench(
       case "media:open":
         return localMediaGrants.grant(args.path);
       case "media:resolve": {
-        // A resource field shows its linked file; the grant is reused per file.
         const ref = required(args, "ref");
         const kind = resourceKind(args);
         if (!isLocalFileRef(ref))
           throw new CoreError("INVALID_DATA", "ref must be a file: reference.");
-        // Another device's file shows its synchronized copy (read-only).
         const grant = await localMediaGrants
           .grant(ref, { reuse: true })
           .catch(async (error) => {
@@ -2067,7 +2033,6 @@ export function createWorkbench(
         return shown;
       }
       case "media:chooseFile": {
-        // Links original files to a resource field instead of embedding them.
         const kind = resourceKind(args);
         const extensions = Object.entries(LOCAL_FILE_TYPES)
           .filter(([, type]) => type.kind === kind)
@@ -2095,8 +2060,6 @@ export function createWorkbench(
         return { files };
       }
       case "library:reveal": {
-        // Reveals a location inside this library only, e.g. the folder a save
-        // could not write; a missing target shows its nearest existing parent.
         const root = await realpath(store.root);
         let target = resolve(root, required(args, "path"));
         const inside = (path: string) => {
@@ -2116,8 +2079,6 @@ export function createWorkbench(
         return host.invoke("media:reveal", { path: target });
       }
       case "datasets:revealSource": {
-        // Shows the file this device links for an external dataset; a missing
-        // file shows its nearest existing folder.
         const id = projectId(args);
         await store.readProject(id);
         const linked = await new DatasetSourceLinks(store.root).get(
@@ -2142,8 +2103,6 @@ export function createWorkbench(
       }
       case "media:reveal": {
         if (args.ref !== undefined) {
-          // A linked resource shows its file, or its nearest existing folder
-          // when the file has moved.
           let target = localMediaPath(required(args, "ref"));
           while (
             dirname(target) !== target &&
@@ -2239,18 +2198,14 @@ export function createWorkbench(
     "catalog:verifyPublish",
     ...datasetMutationActions,
   ]);
-  // These run outside the shared transaction: dialogs wait for the person,
-  // and removals check the library index before their own transaction.
   const dialogActions = new Set([
     "components:remove",
     "templates:remove",
-    // Commits its own transaction, then releases drafts and archived history.
     "library:purge",
     "components:import",
     "workspace:resolve",
     "library:prepareImport",
     "library:activateImport",
-    // Writes folders, datasets and then each page in its own transaction.
     "imports:run",
   ]);
   return (action: string, args: Record<string, unknown>): Promise<unknown> => {

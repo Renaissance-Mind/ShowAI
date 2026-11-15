@@ -1,21 +1,3 @@
-// Which parts of a bound block can be changed. A block reads `true` (all of
-// it), `false` (nothing) or `{ paths }`: the writable paths of its props,
-// with "!" marking read-only parts inside them. Path forms:
-//
-//   "*"                       every top-level prop that is not an item list
-//   "title"                   one top-level prop
-//   "rows[*]"                 the items of rows (add, change, remove)
-//   "!rows[id=task:*].title"  not the title of items whose id starts with "task:"
-//   "!rows[id=task:t1].title" not the title of the item with id "task:t1"
-//
-// Items mapped from a dataset collection have ids "<collection key>:<id>",
-// so one "!" path per collection covers all of its records.
-
-/**
- * The editable value of a resolved binding (see binding.mjs resolveBinding):
- * mapped fields follow the dataset (`resolved.writable`), derived fields are
- * never writable, the block's own items and fields always are.
- */
 export function bindingEditable(resolved) {
   const { compiled, projected, writable } = resolved;
   const intoKeys = [
@@ -23,7 +5,6 @@ export function bindingEditable(resolved) {
   ];
   const shared = (key) => !!compiled.props && !compiled.props.local.has(key);
   const paths = [];
-  // Without a props mapping every other prop is the block's own.
   if (writable || !compiled.props) paths.push("*");
   else
     for (const key of compiled.props.local)
@@ -41,7 +22,6 @@ export function bindingEditable(resolved) {
       for (const field of fixed)
         exceptions.push(`!${into}[id=${collection.key}:*].${field}`);
     }
-    // Records without a stable id cannot be written even when the dataset can.
     if (writable)
       for (const item of projected.values())
         if (item.into === into && !item.source)
@@ -53,10 +33,6 @@ export function bindingEditable(resolved) {
   return { paths: [...paths, ...exceptions] };
 }
 
-/**
- * Whether a prop, an item of an item list, or one field of that item can be
- * changed under `editable`. Self-contained: component frames embed it.
- */
 export function canEdit(editable, prop, itemId, field) {
   if (editable === true) return true;
   if (!editable || typeof editable !== "object") return false;
@@ -82,12 +58,6 @@ export function canEdit(editable, prop, itemId, field) {
   return true;
 }
 
-/**
- * The dataState prop of a component: `value` from the host message (absent
- * from older hosts), with canEdit bound to its editable value. A read-only
- * block can change nothing. Self-contained like canEdit, which component
- * frames pass in as `check`.
- */
 export function componentDataState(value, readOnly, check = canEdit) {
   const known =
     value &&

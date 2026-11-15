@@ -11,11 +11,6 @@ import { DataEmptyState, type RunWarningAction } from "./DataWarnings";
 import { resourceEntry } from "./warning-entries";
 import "./datasets.css";
 
-/**
- * The workbench's warning surface for a linked local file a resource field
- * cannot show: link another file (stored in the field), show where the file
- * was, or ask again once it is back.
- */
 export function ResourceIssue({ view, kind, onReplace }: LocalResourceIssueProps) {
   const t = useTranslator(messages);
   const chooseFiles = useLocalFileChooser();

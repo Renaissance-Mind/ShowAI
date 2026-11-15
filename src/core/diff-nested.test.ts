@@ -26,7 +26,6 @@ const paragraph = (id: string, text: string) => ({
   content: [{ type: "text", text }],
 });
 
-/** A text block holding a paragraph and a callout that holds a component. */
 function nestedPage(): ShowDocument {
   const page = createResource(blankDocument());
   page.title = "Nested";

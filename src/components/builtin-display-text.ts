@@ -1,6 +1,5 @@
 import type { BuiltinDisplayText } from "./component-display";
 
-/** English names and descriptions of built-in components, keyed by kind. */
 export const builtinEnglish: BuiltinDisplayText = {
   text: {
     name: "Rich text",
@@ -389,7 +388,6 @@ export const builtinEnglish: BuiltinDisplayText = {
   },
 };
 
-// G2 charts all share the same editing capabilities.
 const g2Suffix = " Edit the data, theme and interactions.";
 for (const [kind, text] of Object.entries(builtinEnglish))
   if (kind.startsWith("g2-")) text.description += g2Suffix;

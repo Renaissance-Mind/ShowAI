@@ -1,7 +1,6 @@
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 
-/** Terminate only a test-owned child, including its Electron subprocesses. */
 export async function stopTestProcess(child) {
   if (child.exitCode !== null || child.signalCode !== null) return;
   let stopError;

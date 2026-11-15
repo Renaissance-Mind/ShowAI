@@ -1,4 +1,3 @@
-/** Private host lifecycle: retain iframe state while pausing animation work. */
 export function installComponentActivity(channel: string) {
   let active = true;
   const request = window.requestAnimationFrame.bind(window);

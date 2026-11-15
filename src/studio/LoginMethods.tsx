@@ -8,7 +8,6 @@ type LoginMethod = {
   email: string | null;
   created_at: string;
 };
-/** Bound external login methods, so an unfamiliar one can be removed. */
 export default function LoginMethods({
   connectionId,
   revision,
@@ -34,7 +33,6 @@ export default function LoginMethods({
   }
   useEffect(() => {
     setError("");
-    // Servers without login method management simply hide this list.
     void load().catch(() => setMethods(null));
   }, [connectionId, revision]);
   if (!methods?.length) return null;

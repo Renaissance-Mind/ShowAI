@@ -1,5 +1,3 @@
-// Shared contract for the step-guide and command-reference built-ins.
-// Validation runs in the workbench, the CLI and the portable reader, so it stays dependency-free.
 import { plainInline } from "./inline-markup.mjs";
 
 export { plainInline };
@@ -194,9 +192,7 @@ export function validateDocReferenceData(kind, data) {
   return data;
 }
 
-// ---------------------------------------------------------------- step timeline
 
-/** Active and waiting minutes plus the end of the last segment. */
 export function stepTimeline(steps) {
   let active = 0;
   let wait = 0;
@@ -210,7 +206,6 @@ export function stepTimeline(steps) {
   return { active, wait, total };
 }
 
-/** Axis ticks in minutes, spaced so a ribbon carries about four to eight labels. */
 export function timelineTicks(total) {
   if (!(total > 0)) return [];
   const step =
@@ -221,14 +216,11 @@ export function timelineTicks(total) {
   return ticks;
 }
 
-// ---------------------------------------------------------------- command search
 
-/** Lower-cased, de-duplicated search terms. */
 export function searchTerms(query) {
   return [...new Set(query.toLowerCase().split(/\s+/).filter(Boolean))];
 }
 
-/** A command matches when every term appears in its command, summary or parameters. */
 export function commandMatches(command, terms) {
   const haystack = [
     command.command,
@@ -238,7 +230,6 @@ export function commandMatches(command, terms) {
   return terms.every((term) => haystack.some((value) => value.includes(term)));
 }
 
-/** Merged [start, end) ranges where any term occurs, case-insensitively. */
 export function matchRanges(source, terms) {
   const lower = source.toLowerCase();
   const found = [];

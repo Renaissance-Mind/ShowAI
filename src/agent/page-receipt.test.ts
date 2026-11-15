@@ -27,7 +27,6 @@ test("receipts name added, removed, changed and moved blocks", () => {
     paragraph("e", "new"),
     paragraph("d", "four"),
   ]);
-  // b is gone and e is new; d only shifted, so it did not move.
   expect(blockChanges(before, after)).toEqual({
     added: ["e"],
     removed: ["b"],

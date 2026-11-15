@@ -435,7 +435,6 @@ describe("persistent project, folder, and page organization", () => {
       templatePath: resolve("dist-portable/portable.html"),
     };
     expect((await exportPage(options)).pageIds).toContain(hidden.document.id);
-    // Page links between exported pages resolve through this list.
     const routes =
       /<script type="application\/json" id="showai-site">(.*?)<\/script>/.exec(
         await readFile(join(out, "index.html"), "utf8"),

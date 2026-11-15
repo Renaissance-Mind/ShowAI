@@ -7,12 +7,9 @@ import type { LogLevel } from "./main-log";
 
 const FIRST_CHECK_DELAY_MS = 20_000;
 const CHECK_INTERVAL_MS = 6 * 60 * 60 * 1000;
-// Squirrel normally terminates ShowAI within a second. If it does not, a
-// normal quit still installs the update and relaunches, as Squirrel is armed.
 const INSTALL_FALLBACK_MS = 20_000;
 const EXIT_FALLBACK_MS = 10_000;
 
-/** Renderer actions handled by AppUpdates.action. */
 export const appUpdateActions = new Set([
   "appUpdate:state",
   "appUpdate:check",
@@ -21,19 +18,12 @@ export const appUpdateActions = new Set([
   "appUpdate:install",
 ]);
 
-/** First line of an updater error; GitHub failures append whole response bodies. */
 function shortError(error: unknown): string {
   const text = error instanceof Error ? error.message : String(error);
   const line = text.split("\n", 1)[0]!.trim();
   return line.length > 300 ? `${line.slice(0, 299)}…` : line;
 }
 
-/**
- * Release builds check the GitHub release feed named in Resources/app-update.yml,
- * download a newer version in the background and install it when ShowAI quits
- * or when the person restarts from the notice. Development and source builds
- * (the local stable App is packaged without a feed) report `supported: false`.
- */
 export class AppUpdates {
   private state: AppUpdateState;
   private timer?: ReturnType<typeof setInterval>;
@@ -86,8 +76,6 @@ export class AppUpdates {
     autoUpdater.on("download-progress", (progress: ProgressInfo) =>
       this.set({ phase: "downloading", percent: Math.floor(progress.percent) }),
     );
-    // On macOS, Squirrel copies the download from electron-updater before it
-    // can install; restarting earlier quits without installing.
     autoUpdater.on("update-downloaded", (info: UpdateInfo) =>
       this.set(
         process.platform === "darwin"
@@ -100,7 +88,6 @@ export class AppUpdates {
         this.set({ phase: "ready", error: undefined }),
       );
     autoUpdater.on("error", (error: Error) => {
-      // A downloaded update stays installable even when a later check fails.
       if (this.state.phase === "ready") return;
       this.set({ phase: "failed", error: shortError(error) });
     });
@@ -110,7 +97,6 @@ export class AppUpdates {
     return this.state;
   }
 
-  /** Starts the background schedule; checks run only while automatic updates are on. */
   start(): void {
     if (!this.state.supported) return;
     setTimeout(() => {
@@ -157,27 +143,20 @@ export class AppUpdates {
     return this.state;
   }
 
-  /** The restart button asks ShowAI to quit; windows still save before it does. */
   requestInstall(quit: () => void): void {
     if (this.state.phase !== "ready") return;
     this.installRequested = true;
     quit();
   }
 
-  /** A window kept ShowAI open; the next ordinary quit installs without relaunching. */
   cancelInstall(): void {
     this.installRequested = false;
   }
 
-  /**
-   * Called once every window has closed and services have stopped. Returns
-   * true when the updater takes over quitting and relaunches the new version.
-   */
   finishQuit(quit: () => void): boolean {
     if (!this.installRequested || this.state.phase !== "ready") return false;
     const log = this.options.log;
     log("info", `Installing ShowAI ${this.state.version} and relaunching.`);
-    // Windows are closed and services stopped, so exiting cannot lose work.
     const exit = () => {
       quit();
       setTimeout(() => {

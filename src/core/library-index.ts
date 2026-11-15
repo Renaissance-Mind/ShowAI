@@ -41,35 +41,25 @@ export interface ReferenceEdge {
   integrity?: string;
   blockId?: string;
 }
-/** One reference between pages, as seen from the page that was asked about. */
 export interface PageReferenceItem {
-  /** The other page: the referring page for `to`, the referenced page for `from`. */
   projectId: string;
   pageId: string;
   title: string;
   icon?: string;
-  /** The block on the referring page that holds the reference. */
   blockId: string | null;
-  /** Blocks the reference points at on the referenced page. */
   blockIds: string[];
   kind: PageReferenceEdge["kind"];
   snippet: string;
-  /** `from` only: the referenced page is deleted or absent. */
   missing?: true;
 }
 export interface PageReferences {
-  /** Pages that refer to this page (backlinks), most recently changed first. */
   to: PageReferenceItem[];
-  /** Pages this page refers to, in page order. */
   from: PageReferenceItem[];
-  /** References in each direction; more than listed when the limit cut the list. */
   total: { to: number; from: number };
-  /** Distinct pages in each direction, counted over every reference. */
   pages: { to: number; from: number };
   revision: string | null;
 }
 export interface PageReferenceOptions {
-  /** Only references whose other page is in this project. */
   scope?: string;
   direction?: "to" | "from" | "both";
   limit?: number;
@@ -82,7 +72,6 @@ export interface SearchOptions {
   cursor?: string;
 }
 
-/** CJK unigram/bigram tokens support short Chinese searches alongside Unicode words. */
 function cjkTokens(text: string, query = false): string[] {
   const result: string[] = [];
   for (const group of text.match(
@@ -120,9 +109,7 @@ function strings(value: unknown): string[] {
     : [];
 }
 
-// Bump when extraction changes so existing indexes rebuild once.
 const EXTRACTION_VERSION = "5";
-// Component data keys that configure identity, layout or style rather than carry reader text.
 const NON_TEXT_KEYS = new Set([
   "id",
   "parentId",
@@ -161,21 +148,18 @@ const isRichDocument = (value: unknown): value is JSONContent =>
   typeof value === "object" &&
   (value as JSONContent).type === "doc" &&
   Array.isArray((value as JSONContent).content);
-/** Text of a rich-text tree, one line per block, without node types or IDs. */
 function richText(node: JSONContent): string {
   if (node.type === "text") return node.text ?? "";
   const children = node.content ?? [];
   const inline = children.every((child) => child.type === "text");
   return children.map(richText).join(inline ? "" : "\n");
 }
-/** Markdown reduced to its words, so snippets don't show markup. */
 function markdownText(value: string): string {
   return value
     .replace(/^\s{0,3}(?:#{1,6}\s+|>\s?|[-*+]\s+|\d+\.\s+)/gm, "")
     .replace(/!?\[([^\]]*)\]\([^)]*\)/g, "$1")
     .replace(/(\*\*|__|~~|`)/g, "");
 }
-/** Reader-visible text of component data: labels, cells, notes and links, not styling or structure. */
 function readableText(value: unknown, markdown = false): string[] {
   if (typeof value === "string") {
     if (/^(?:data:|asset:)/.test(value)) return [];
@@ -194,7 +178,6 @@ function readableText(value: unknown, markdown = false): string[] {
   }
   return [];
 }
-/** Headings inside text data, in order; the first names the block, the last opens the next section. */
 function dataHeadings(data: unknown): string[] {
   const content = (data as { content?: unknown } | undefined)?.content;
   if (isRichDocument(content))
@@ -218,10 +201,8 @@ interface PageRow {
   archived: boolean;
   updatedAt: string;
 }
-// A saved component version never changes, so its declared page fields stay valid.
 const declaredFields = new Map<string, string[]>();
 
-/** Every table is a rebuildable projection of a named committed revision. */
 export class LibraryIndex {
   readonly library: GitLibrary;
   readonly path: string;
@@ -274,8 +255,6 @@ export class LibraryIndex {
 
   async synchronize(force = false): Promise<string | null> {
     await this.library.manifest();
-    // The index has its own lease and reads one committed library state, so
-    // rebuilding it never holds back saves or reads of the library itself.
     return withLibraryLock(
       this.library.root,
       () =>
@@ -298,8 +277,6 @@ export class LibraryIndex {
         return revision;
       const incremental = !force && signaturesReady;
       const history: HistoryEntry[] = [];
-      // SQLite libraries sign each page by its resource revision, which
-      // changes with any of its nodes, instead of listing every node.
       const sqlite = await this.library.sqlite();
       const tree = revision
         ? await (sqlite
@@ -357,7 +334,6 @@ export class LibraryIndex {
           )
         : allPaths;
       const reload = new Set(changed);
-      // Pages showing a shared dataset's rows hold its page cells.
       if (incremental) {
         const dependents = db.prepare(
           "SELECT source FROM page_datasets WHERE dataset=?",
@@ -380,7 +356,6 @@ export class LibraryIndex {
         pageEdges: { source: string; edge: PageReferenceEdge }[] = [],
         bound: { source: string; database: BoundDatabase }[] = [];
       const pageFields = await this.componentPageFields(revision, allPaths);
-      // Read bounded batches; the resulting index always names this exact revision.
       for (let offset = 0; offset < paths.length; offset += 32) {
         const batch = await this.library.readFiles(
           paths.slice(offset, offset + 32),
@@ -398,8 +373,6 @@ export class LibraryIndex {
             bound,
           );
       }
-      // Page cells of databases whose rows live in a shared dataset, read from
-      // each dataset once.
       const datasetPath = (database: BoundDatabase) =>
         `projects/${database.projectId}/datasets/${database.datasetId}.json`;
       const needed = [
@@ -582,11 +555,6 @@ export class LibraryIndex {
     }
   }
 
-  /**
-   * Page-reference fields of the component versions in this revision. A page
-   * resolves its project's version first, then global and published ones,
-   * like the catalog.
-   */
   private async componentPageFields(
     revision: string | null,
     paths: string[],
@@ -680,7 +648,6 @@ export class LibraryIndex {
         (database) => bound.push({ source: path, database }),
       ))
         pageEdges.push({ source: path, edge });
-      // `section` is the nearest preceding heading, which names unnamed native text blocks.
       const visit = (
         node: JSONContent,
         ancestors: string[],
@@ -727,8 +694,6 @@ export class LibraryIndex {
             integrity: data?.integrity,
             blockId: id,
           });
-          // Components inside its rich text are used by the page too; their
-          // text is already part of this block's search row.
           walk(node, (inner: JSONContent) => {
               if (inner === node || inner.type !== "widget") return;
               edges.push({
@@ -742,7 +707,6 @@ export class LibraryIndex {
               });
             }, { scope: "content" });
         }
-        // Lists and paragraphs don't add a location level; named containers and components do.
         const inner =
           named !== undefined || node.type === "widget"
             ? [...ancestors, String(title)]
@@ -758,7 +722,6 @@ export class LibraryIndex {
       };
       visit(document.content, [document.title]);
     } else if (owner.kind === "component" || owner.kind === "template") {
-      // Compiled execution code is retained for rendering, but descriptive search does not index it.
       if (!/\/(?:manifest|compiled|template)\.json$/.test(path)) return;
       const metadata = Object.fromEntries(
         Object.entries(value).filter(([key]) =>
@@ -945,7 +908,6 @@ export class LibraryIndex {
     }
   }
 
-  /** References to and from one page, with the block holding each and its surrounding text. */
   async pageReferences(
     projectId: string,
     pageId: string,

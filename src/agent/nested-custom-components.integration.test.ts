@@ -46,7 +46,6 @@ afterAll(async () => {
   await rm(home, { recursive: true, force: true });
 });
 
-/** A text block and a stepper step that each hold a library component. */
 function nestedPage(data: Record<string, unknown>) {
   const doc = createResource(blankDocument());
   doc.title = "Nested custom components";
@@ -122,13 +121,11 @@ test("library components inside rich text are locked, bundled and rendered offli
     project.id,
     { document: nestedPage(unpinned) },
   );
-  // Saving pins the nested reference like a top-level one.
   expect(nestedCustom(record.document)).toMatchObject({
     componentId: slider.id,
     version: slider.version,
     integrity: slider.integrity,
   });
-  // "Where is this component used" counts the nested blocks.
   const used = await new LibraryOperations(home, project.id).references(
     "component",
     slider.id,
@@ -149,7 +146,6 @@ test("library components inside rich text are locked, bundled and rendered offli
     JSON.parse(await readFile(exported.sourcePaths[0], "utf8")),
   );
   expect(source.components?.map((item) => item.id)).toEqual([slider.id]);
-  // A conversation preview requires the nested component's inline runtime.
   expect(() => assertInlineArtifact({ ...source, components: [] })).toThrow(
     /value-slider@1\.2\.0/,
   );
@@ -159,7 +155,6 @@ test("library components inside rich text are locked, bundled and rendered offli
   page.on("pageerror", (error) => errors.push(error.message));
   await page.goto(address + "/nested");
   await page.getByText("Adjust the threshold.", { exact: true }).waitFor();
-  // Standalone pages run library components in sandboxed frames.
   for (const label of ["Threshold in text", "Threshold in step"])
     await expect
       .poll(

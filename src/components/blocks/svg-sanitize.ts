@@ -3,12 +3,6 @@ import { SVG_ELEMENTS, safeSvgHref, safeSvgUrls } from "./svg-contract.mjs";
 const ELEMENTS = new Set(SVG_ELEMENTS);
 const SVG_NS = "http://www.w3.org/2000/svg";
 
-/**
- * Parses SVG source with the browser, keeps only drawing elements and safe
- * attributes, prefixes ids so several figures on one page cannot collide, and
- * turns data-note attributes into hover-note anchors. Returns null when the
- * source does not parse as an <svg> document.
- */
 export function sanitizeSvg(
   source: string,
   prefix: string,
@@ -73,7 +67,6 @@ export function sanitizeSvg(
   root.removeAttribute("width");
   root.removeAttribute("height");
   root.setAttribute("role", "img");
-  // A labelledby name keeps the host icon tooltip from covering the figure.
   root.setAttribute("aria-labelledby", labelledBy);
   root.setAttribute("class", "sv-figure");
   return { markup: new XMLSerializer().serializeToString(root), notes };

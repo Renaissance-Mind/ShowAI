@@ -31,11 +31,9 @@ test("counts escaped UTF-8 structure, distinct decoded resources and repeated re
       }),
     ),
   );
-  // Embedded code cannot claim the whole-string extraction used by storage.
   expect(measureContent({ code: `<img src="${url}">` }).resourceBytes).toBe(0);
   expect(() => base64Bytes("AB==")).toThrow("canonical");
   expect(() => base64Bytes("A==")).toThrow("base64");
-  // Existing permissive URLs that storage cannot extract remain ordinary structure.
   const legacy = { src: "data:image/png;base64,AB==" };
   expect(measureContent(legacy).resourceBytes).toBe(0);
   expect(measureContent(legacy).structureBytes).toBe(
@@ -85,13 +83,11 @@ test("single resource and decoded aggregate guards are independent of structure"
   expect(() => assertContent({ src: tooLarge })).toThrow(
     "Single resource (decoded)",
   );
-  // Each file is valid, the combined decoded page is too large.
   const resources = [0, 1, 2].map(
     (byte) =>
       `data:image/png;base64,${Buffer.alloc(43 * 1024 * 1024, byte).toString("base64")}`,
   );
   expect(() => assertContent(resources)).toThrow("Page resources");
-  // Deduplication does not make hundreds of MiB of repeated encoded references free to export.
   expect(() => assertContent(Array(5).fill(resources[0]))).toThrow(
     "Authoring JSON",
   );

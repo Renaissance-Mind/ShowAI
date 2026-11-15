@@ -63,7 +63,7 @@ describe("basic table alignment", () => {
       }),
     );
     expect(html.match(/text-align:center/g)).toHaveLength(2);
-    expect(html.match(/text-align:right/g)).toHaveLength(5); // section, two headers, two values
+    expect(html.match(/text-align:right/g)).toHaveLength(5);
     expect(html).not.toContain("table-alignment-buttons");
     expect(html).toContain("true");
     expect(() =>

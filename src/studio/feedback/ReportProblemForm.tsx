@@ -34,22 +34,14 @@ function timeText(at: string) {
   });
 }
 
-/**
- * The report form of 关于与反馈. Arriving from a problem notice, the Agent or
- * the crash page, the source, code and time are filled in and can be removed.
- * Nothing leaves the App by itself: 在 GitHub 提交 opens a prefilled issue in
- * the browser, and 复制全文 is for any other channel.
- */
 export function ReportProblemForm({
   info: givenInfo,
   context: initialContext,
   onContextChange,
   onBack,
 }: {
-  /** Undefined: the form reads App information itself (crash page). */
   info?: DesktopInfo | null;
   context?: ReportProblemDetail;
-  /** Called when the attached problem is removed or the report is submitted. */
   onContextChange?: (context: ReportProblemDetail | undefined) => void;
   onBack?: () => void;
 }) {
@@ -70,7 +62,6 @@ export function ReportProblemForm({
       stopped = true;
     };
   }, [givenInfo]);
-  // What was typed survives leaving Settings until it is submitted.
   const [kind, setKind] = useSessionDraft<ReportKind>(
     "feedback.report.kind",
     "problem",
@@ -153,8 +144,6 @@ export function ReportProblemForm({
         "_blank",
       );
       if (opened) opened.opener = null;
-      // The desktop App hands web links to the system browser and returns no
-      // window; in a browser, no window means a blocked pop-up.
       else if (draft.mode !== "desktop") throw new Error(t("report.notOpened"));
       setKind("problem");
       setSummary("");

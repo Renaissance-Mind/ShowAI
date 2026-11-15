@@ -1,6 +1,5 @@
 import { crc32 } from "node:zlib";
 
-/** A cell written into a test workbook; dates use the built-in date format. */
 export type WorkbookCell = string | number | boolean | Date | null;
 
 const escape = (text: string) =>
@@ -17,7 +16,6 @@ function column(index: number): string {
   return name;
 }
 
-/** An uncompressed ZIP archive of the given entries. */
 function zip(entries: { name: string; data: Buffer }[]): Buffer {
   const locals: Buffer[] = [];
   const centrals: Buffer[] = [];
@@ -55,7 +53,6 @@ function zip(entries: { name: string; data: Buffer }[]): Buffer {
   return Buffer.concat([...locals, directory, end]);
 }
 
-/** A real .xlsx workbook (Office Open XML) with one worksheet per entry. */
 export function xlsxWorkbook(
   sheets: { name: string; rows: WorkbookCell[][] }[],
 ): Buffer {
@@ -119,7 +116,6 @@ export function xlsxWorkbook(
   parts.forEach((part, index) => {
     files[`xl/worksheets/sheet${index + 1}.xml`] = part;
   });
-  // Shared strings are collected while the worksheets are written.
   files["xl/sharedStrings.xml"] =
     `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <sst xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" count="${strings.length}" uniqueCount="${strings.length}">${strings

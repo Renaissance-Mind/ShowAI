@@ -172,8 +172,6 @@ export async function verify(
       ["verify"],
     );
   } catch {
-    // Public JWKs are untrusted request input; malformed curve points are a
-    // validation error, while failures reading the server vault still surface.
     throw new SyncError(
       400,
       "INVALID_IDENTITY_KEY",

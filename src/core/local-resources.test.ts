@@ -61,7 +61,6 @@ describe("local resources of a page", () => {
         { blockId: "custom", field: "props.shots[0].src" },
       ],
     });
-    // Unsupported types such as notes.txt are not resources.
     expect(resources[1]).toMatchObject({
       id: "file:~/missing-clip.mp4",
       kind: "video",
@@ -103,13 +102,11 @@ describe("local resources of a page", () => {
       `data:image/png;base64,${Buffer.from("png").toString("base64")}`,
     );
     expect(video.attrs.data.src).toBe("file:large.mp4");
-    // Component props follow the same choice; useResource reads the embedded data.
     expect(custom.attrs.data.props.src).toBe(image.attrs.src);
     expect(copy.resources.map((item) => [item.name, item.choice])).toEqual([
       ["small.png", "embed"],
       ["large.mp4", "skip"],
     ]);
-    // The source document is unchanged.
     expect((document.content.content as any[])[0].attrs.src).toBe(smallRef);
 
     const skipped = await withLocalResources(document, { [smallRef]: "skip" });

@@ -242,9 +242,6 @@ export class AccountHub {
       prepared.push({ binding, descriptor, previous });
     }
     if (!prepared.length) return { ok: true };
-    // Validate the entire group before writing. One guarded INSERT handles every
-    // peer, so malformed later entries, concurrent identity changes or the cap
-    // cannot leave only part of a requested group bound.
     const rows = prepared.map(({ binding, descriptor, previous }) => ({
       serverId: descriptor.identity.serverId,
       userId: descriptor.identity.user.id,

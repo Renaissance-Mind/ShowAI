@@ -302,14 +302,11 @@ export async function* chatResponse(
   });
 }
 
-/** A task-scoped loopback gateway keeps provider secrets outside the Codex child process. */
 export async function startModelGateway(
   source: ModelSource,
   credential: (force?: boolean) => Promise<string>,
 ) {
   const secret = randomBytes(32).toString("hex");
-  // The latest provider failure, so the host can classify the run by status
-  // instead of parsing the text Codex reports for it.
   let lastFailure: GatewayFailure | undefined;
   const server = createServer((request, response) => {
     const run = async () => {
@@ -373,8 +370,6 @@ export async function startModelGateway(
         upstream = await send(true);
       }
       if (!upstream.ok) {
-        // Preserve actionable provider errors without reflecting arbitrary HTML
-        // or credentials returned by a proxy/provider.
         let detail: { message?: string; code?: string } = {};
         if (
           upstream.headers.get("content-type")?.includes("application/json")
@@ -404,7 +399,6 @@ export async function startModelGateway(
                   detail.code = error.code;
               }
             } catch {
-              // A malformed provider error still retains the original status.
             } finally {
               await reader.cancel();
             }

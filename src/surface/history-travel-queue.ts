@@ -63,8 +63,6 @@ export async function flushHistoryTravels(
   owner: OwnedSourceSession | undefined,
 ) {
   if (!owner) return;
-  // A second click accepted while the first trip was awaited belongs to this
-  // same persistence barrier. Never confuse its queue with history rebase work.
   while (true) {
     const queues = [...(owners.get(owner)?.queues ?? [])];
     await Promise.all(queues.map((queue) => queue.flush()));
@@ -77,9 +75,6 @@ export function stopHistoryTravels(owner: OwnedSourceSession | undefined) {
   value.accepting = false;
   for (const queue of value.queues) queue.stop();
 }
-/** Only the explicit recovery path may retire failed commands, after saving
- * the actual recovery draft and reading a fresh authoritative backend body.
- * It does not retry an inverse whose durable result may already exist. */
 export async function retireRecoveredHistoryTravels(owner: OwnedSourceSession) {
   stopHistoryTravels(owner);
   const value = state(owner);
@@ -90,9 +85,6 @@ export async function retireRecoveredHistoryTravels(owner: OwnedSourceSession) {
   for (const listener of value.listeners) listener();
 }
 
-/** Accepted Undo/Redo requests are serialized from preflush through history
- * consumption and latestChange. This queue must never contain historyTail or
- * join itself from an internal Native publication save. */
 export class HistoryTravelQueue {
   private tail: Promise<void> = Promise.resolve();
   private count = 0;
@@ -125,8 +117,6 @@ export class HistoryTravelQueue {
     const work = (domain?.tail ?? this.tail).then(operation);
     this.tail = work;
     if (domain) domain.tail = work;
-    // Observe without converting failure into success. Later accepted requests
-    // fail with the same original error and cannot inverse the same old edge.
     void work.then(
       () => {
         this.count--;
@@ -156,9 +146,6 @@ export class HistoryTravelQueue {
     this.accepting = false;
   }
   private lifecycle = 0;
-  /** A hidden Activity disconnects the editor's effects without unmounting
-   * it; reconnecting reopens the same queue so its history stays usable. A
-   * stopped or disposed owner still rejects every request in enqueue. */
   open() {
     this.lifecycle++;
     this.accepting = true;

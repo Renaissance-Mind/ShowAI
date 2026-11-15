@@ -17,7 +17,6 @@ import type { RouteState } from "./useRouteState";
 import type { DialogControl } from "./useDialogState";
 import type { MenuState } from "./menus/useMenuState";
 
-/** The selected project and folder as the directory shows them, with its page selection. */
 export function useDirectory({
   library: {
     info,
@@ -114,7 +113,6 @@ export function useDirectory({
       if (!folderChildren.has(parent)) folderChildren.set(parent, []);
       folderChildren.get(parent)!.push(item);
     }
-  /** A folder's first entries, in its own order, for its card preview. */
   function folderThumbnailEntries(folderId: string): FolderThumbnailEntry[] {
     return sortDirectoryItems(
       folderChildren.get(folderId) ?? [],

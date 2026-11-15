@@ -40,7 +40,6 @@ export function WidgetView({
     editor,
     selector: ({ editor: current }) => current.isEditable,
   });
-  // A stable callback lets the memoized widget skip renders of this view.
   const latest = useRef({ editor, updateAttributes });
   latest.current = { editor, updateAttributes };
   const onChange = useCallback((data: Record<string, unknown>) => {
@@ -99,7 +98,6 @@ export function WidgetView({
         const position = getPos();
         if (typeof position !== "number") return;
         editor.commands.setNodeSelection(position);
-        // The atom owns the click; ProseMirror must not move its selection to nearby text.
         event.stopPropagation();
       }}
     >
@@ -173,7 +171,6 @@ export function ToggleView({ node, updateAttributes, editor }: NodeViewProps) {
     editor,
     selector: ({ editor: current }) => current.isEditable,
   });
-  // Editing saves the open state into the page; reading keeps it for this reader.
   const [editingOpen, setOpen] = useState(Boolean(node.attrs.open));
   useEffect(() => setOpen(Boolean(node.attrs.open)), [node.attrs.open]);
   const [readingOpen, setReadingOpen] = useReaderState(
@@ -245,12 +242,9 @@ export function StepperView({ node, editor, getPos }: NodeViewProps) {
     for (let k = 0; k < index; k += 1) pos += node.child(k).nodeSize;
     return pos;
   };
-  // A caret moved into another step (arrow keys, search, undo) opens that step.
   useEffect(() => {
     const follow = () => {
       const pos = getPos();
-      // Read the stepper from the current document: this runs before React
-      // re-renders the view with the updated node.
       const stepper =
         typeof pos === "number" ? editor.state.doc.nodeAt(pos) : null;
       if (!stepper || stepper.type.name !== "stepper") return;
@@ -282,7 +276,6 @@ export function StepperView({ node, editor, getPos }: NodeViewProps) {
       });
       return current;
     });
-  // A new step takes the caret so typing continues inside it.
   const add = () => {
     edit((tr) => {
       const { schema } = editor.state;
@@ -310,7 +303,6 @@ export function StepperView({ node, editor, getPos }: NodeViewProps) {
       const target = current + delta;
       const step = node.child(current);
       const from = stepPos(current);
-      // Moving later lands after the following step; earlier, before the previous one.
       const at =
         delta < 0
           ? stepPos(target)
@@ -431,7 +423,6 @@ export function ImageView({ node, editor, updateAttributes }: NodeViewProps) {
   );
 }
 
-/** A component inside a line of text, such as a date mention. */
 export function InlineWidgetView({
   node,
   updateAttributes,

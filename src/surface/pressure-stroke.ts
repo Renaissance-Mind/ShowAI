@@ -1,7 +1,6 @@
 import type { Point } from "../document/geometry.mjs";
 import { smoothPath } from "../document/drawing-geometry.mjs";
 
-/** A pressure stroke shares the saved centerline and keeps mouse strokes uniform. */
 export function pressureOutline(points: Point[], width: number) {
   const sides = points.map((point, index) => {
     const before = points[Math.max(0, index - 1)],

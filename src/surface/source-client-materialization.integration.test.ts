@@ -44,16 +44,12 @@ it("materializes an actual worker publication once while keeping stale, semantic
   expect(session.apply(prepared.sourceSnapshot)).toBeNull();expect(session.document).toBe(local);
   expect(session.apply(prepared.sourceSnapshot,{publish:false,baseDocument:before})).toBe(oldTarget);
   expect(session.document).toBe(local);await session.barrier();
-  // One exact worker ref can back distinct semantic history roots. Its bytes
-  // are not permission to reuse a projection built on another UI base object.
   const semantic=session.snapshot(before);await session.reference(semantic);
   const separate=session.apply(prepared.sourceSnapshot,{publish:false,baseDocument:semantic})!;
   expect(separate).not.toBe(oldTarget);expect(separate).toEqual(oldTarget);
   expect(session.document).toBe(local);
   const another=new OwnedSourceSession(scope.projectId,raw.id,{...transport,scope:async()=>({...scope,homeId:directory+"/another-owner"}),close:undefined});const other=another.replace(before);await another.barrier();
   expect(()=>session!.apply(prepared.sourceSnapshot,{publish:false,baseDocument:other})).toThrow(/exact registered|not owned/);
-  // Same real Worker/source service, separate client ownership. Do not close
-  // it through another's transport while the original session is active.
   await another.dispose();
  }finally{await session?.dispose().catch(()=>{});await worker?.terminate();await rm(directory,{recursive:true,force:true})}
 });

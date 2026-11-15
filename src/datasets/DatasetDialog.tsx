@@ -27,9 +27,7 @@ import { datasetPackagingItem } from "./packaging-request";
 export interface DatasetDialogRequest {
   kind: string;
   data: Record<string, unknown>;
-  /** Stores new block data through the editor, as one undoable change. */
   apply: (data: Record<string, unknown>) => void;
-  /** A part of the dialog to show first: the linked file's synchronization choice. */
   focus?: "bundle";
 }
 interface Summary {
@@ -48,7 +46,6 @@ interface Summary {
 }
 
 
-/** Asks the host for a data file; null when the person cancels. */
 async function chooseDataFile(
   scope: DatasetScopeValue,
   projectId: string,
@@ -62,10 +59,6 @@ async function chooseDataFile(
   return result?.path ?? null;
 }
 
-/**
- * Asks for a data file and links it to a dataset on this device; false when
- * the person cancels. `replace` makes library data read the file instead.
- */
 export async function linkDataFile(
   scope: DatasetScopeValue,
   projectId: string,
@@ -83,15 +76,9 @@ export async function linkDataFile(
   return true;
 }
 
-/** Bytes the item adds to synchronization when it carries a copy. */
 const carried = (item: PackagingItem, choice = item.choice) =>
   choice === "bundle" ? (item.bytes ?? 0) : 0;
 
-/**
- * Whether synchronization carries a copy of the linked file to the
- * project's other devices (source.bundle.sync), with the file's size and
- * the limits of one file and of the project.
- */
 function SyncCopy({
   scope,
   projectId,
@@ -135,7 +122,6 @@ function SyncCopy({
     ) : null;
   const on = item.choice === "bundle";
   const limit = plan.limits.totalBytes;
-  // What the project would carry with this file added.
   const withFile = plan.bytes - carried(item) + (item.bytes ?? 0);
   const overTotal = !on && withFile > limit;
   const problem = item.tooLarge
@@ -200,7 +186,6 @@ function SyncCopy({
   );
 }
 
-/** Where a bound dataset keeps its value, and moving it to or from a file. */
 function SourceSection({
   scope,
   projectId,
@@ -223,7 +208,6 @@ function SourceSection({
     setBusy(true);
     setError("");
     try {
-      // Unsaved edits are written first, so the file receives them.
       if (snapshot?.status === "ready" && !(await session.flush()))
         throw new Error(t("sourceUnsaved"));
       await action();
@@ -237,7 +221,6 @@ function SourceSection({
   const link = (mode: "open" | "save") =>
     run(async () => {
       if (mode === "open") {
-        // Choosing a file for library data replaces it with the file's content.
         await linkDataFile(scope, projectId, datasetId, {
           name: snapshot?.name,
           replace: !source,
@@ -390,7 +373,6 @@ function useSnapshot(
   return snapshot;
 }
 
-/** Binding with the block's settings that stay local; shared keys are dropped from the block. */
 function bound(
   kind: string,
   data: Record<string, unknown>,
@@ -686,7 +668,6 @@ function BindChoices({
         ? (component?.name ?? String(request.data.componentId))
         : request.kind,
   );
-  // Default keys stay local even before the block has them, such as views added later.
   const [local, setLocal] = useState<string[]>(defaultLocalKeys(request.kind));
   const [datasets, setDatasets] = useState<Summary[] | null>(null);
   const [chosen, setChosen] = useState<string>();

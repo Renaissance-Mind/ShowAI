@@ -164,7 +164,6 @@ describe("roadmap contract", () => {
     expect(html).toContain("rm-today");
     expect(html).toContain("上线");
     expect(html).toContain("全部测试通过。");
-    // The selected task's neighbours are outlined.
     expect(html.match(/is-related/g)?.length).toBeGreaterThanOrEqual(2);
     expect(html).toContain("rm-tone-blocked");
   });
@@ -231,7 +230,6 @@ describe("waterfall contract", () => {
     expect(html).toContain("+0.4 s");
     expect(html).toContain("71%");
     expect(html).toContain("wf-warn");
-    // With upIsGood false, a decrease uses the favourable tone.
     expect(html).toMatch(/wf-bar wf-tone-good is-active/);
   });
 });

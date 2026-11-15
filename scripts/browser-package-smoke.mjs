@@ -146,7 +146,6 @@ try {
   });
   assert.equal(shutdown.status, 200);
   assert.equal(await exit, 0);
-  // The bundled CLI continues to operate after the UI service has stopped.
   const pages = await run(["pages", "list", "--project", project.id]);
   assert.equal(pages[0].id, page.document.id);
   await mkdir("artifacts", { recursive: true });

@@ -39,8 +39,6 @@ test('actual private Swift submodule and Apple partial-link resolve the factory 
     const bridge = join(temporary, 'bridge.cpp');
     writeFileSync(bridge, '#include "include/stroke-plan-private.h"\nextern "C" void actualBridge(void*p,const SAInkStrokeSegment*s,const SAInkStrokeOptions*o,SAInkPathCommand*c,SAInkStrokeResult*r){showai_private_stroke_plan_initialize(p,showai_private_stroke_plan_bytes(),s,1,o);showai_private_stroke_plan_counts(p,r);showai_private_stroke_plan_build(p,c,1,r);showai_private_stroke_plan_destroy(p); }\n');
     writeFileSync(swift, 'import ShowAIInkKernel.PrivateStrokePlan\nfunc actualFactorySize() -> UInt32 { showai_private_stroke_plan_bytes() }\n');
-    // Compile the real Swift import to object: a syntax-only C test misses a
-    // missing explicit submodule, and a direct link misses ld-r localization.
     for (const [sdk, target, platform] of [['iphonesimulator', 'arm64-apple-ios17.0-simulator', 'ios-simulator'], ['iphoneos', 'arm64-apple-ios17.0', 'ios']]) {
       const sysroot = execFileSync('xcrun', ['--sdk', sdk, '--show-sdk-path'], { encoding: 'utf8' }).trim();
       const version = execFileSync('xcrun', ['--sdk', sdk, '--show-sdk-version'], { encoding: 'utf8' }).trim();

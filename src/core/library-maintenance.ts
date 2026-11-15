@@ -308,7 +308,6 @@ export class LibraryMaintenance {
       group.allocatedBytes += file.allocatedBytes;
       group.files++;
     }
-    // Retained original folders may no longer have an entry in the current tree.
     for (const project of projects.values()) {
       if (!project.retained) continue;
       const original = await readLibraryBytes(

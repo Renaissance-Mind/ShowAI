@@ -1,6 +1,5 @@
 import { app, type BrowserWindow } from "electron";
 
-/** Window presentation belongs to this process; it is never saved in user settings. */
 export class DesktopPresentation {
   constructor(
     public background: boolean,

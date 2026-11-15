@@ -87,7 +87,6 @@ describe("close reports", () => {
     release();
     expect((await second).allow).toBe(true);
     expect(calls).toBe(1);
-    // A finished call is not reused: the next request asks again.
     const third = report([slow]);
     await new Promise((done) => setTimeout(done, 0));
     release();

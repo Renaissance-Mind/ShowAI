@@ -196,7 +196,6 @@ export async function describePublicResource(
   });
 }
 
-/** Rendering has no personal-library or synchronization dependency. Only this invocation's temporary workspace is removed. */
 export async function renderPresentation(raw: PresentationInput) {
   const input = z.object(presentationSchema).parse(raw);
   if (input.document && input.templateId)
@@ -266,8 +265,6 @@ function assertKnownKinds(document: ShowDocument) {
   }, { scope: "content" });
 }
 
-/** Supplied sources compile in a temporary workspace. Saved library
- * components are read in place; the library is never written. */
 interface ComponentOrigin {
   componentSources?: ComponentSource[];
   library?: { root: string; projectId?: string };
@@ -277,7 +274,6 @@ async function renderDocumentArtifacts(
   input: ShowDocument,
   options: ComponentOrigin & {
     blockIds?: string[];
-    /** A conversation component preview: the whole document is shown without reader chrome. */
     component?: boolean;
   },
 ) {
@@ -347,7 +343,6 @@ async function renderDocumentArtifacts(
       title: document.title,
       document,
       components,
-      // A component preview is its own whole document.
       html: html ?? inlineHtml,
       inlineHtml,
       source: JSON.stringify(
@@ -424,8 +419,6 @@ export type ShowComponentInput = z.infer<
   z.ZodObject<typeof showComponentSchema>
 >;
 
-/** Shows components in a conversation. The document is built exactly like
- * page_create blocks, so the same {kind,data} can later be saved unchanged. */
 export async function renderComponents(
   raw: ShowComponentInput,
   library?: { root: string; projectId?: string },
@@ -469,7 +462,6 @@ export async function renderComponents(
     warnings,
     title: input.title,
     document: rendered.document,
-    // The exact versions to keep when the same blocks are saved in a Page.
     components: (rendered.document.content.content ?? []).map((node) => {
       const kind = node.type === "region" ? "region" : String(node.attrs?.kind);
       if (kind !== "custom") return { kind };
@@ -483,11 +475,6 @@ export async function renderComponents(
   };
 }
 
-/**
- * The conversation preview carries its local reader when it fits the host;
- * a published CDN reader is used only when the compressed bundle is too large.
- * reader and readerReason report which one the inline preview uses and why.
- */
 export async function inlinePresentation(html: string): Promise<{
   inline?: string;
   inlineError?: string;
@@ -508,7 +495,6 @@ export async function inlinePresentation(html: string): Promise<{
   }
 }
 
-/** The reader of the inline preview, for a result's display field. */
 export function inlineReader(preview: {
   inline?: string;
   reader?: ReaderMode;
@@ -522,10 +508,6 @@ export function inlineReader(preview: {
     : {};
 }
 
-/**
- * A few-kilobyte preview fragment that loads the published reader, for hosts
- * where the model writes the HTML itself; undefined without a CDN reader.
- */
 export async function compactPresentation(html: string) {
   const urls = await cdnReaderUrls();
   if (!urls) return undefined;
@@ -537,7 +519,6 @@ export async function compactPresentation(html: string) {
   }
 }
 
-/** A complete page that loads the CDN reader, or undefined without one. */
 export async function onlinePresentation(html: string) {
   const urls = await cdnReaderUrls();
   return urls ? toCdnPage(html, { readerUrls: urls }) : undefined;
@@ -564,7 +545,6 @@ export async function writePresentation(
     ...(compact ? [[compact, value.compact!] as [string, string]] : []),
   ];
   await mkdir(dirname(html), { recursive: true });
-  // Fail before writing if any output already exists; replacement is explicit.
   if (!overwrite) {
     const { access } = await import("node:fs/promises");
     for (const [path] of outputs)

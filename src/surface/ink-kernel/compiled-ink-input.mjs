@@ -13,8 +13,6 @@ const configFields = ['width', 'creationZoom', 'fitTolerance', 'flattenTolerance
 const pointFields = ['x', 'y', 'time', 'force', 'azimuth', 'altitude'];
 const snapshotFields = ['actualCount', 'predictedCount', 'curveCount', 'finalizedCurves', 'firstChangedCurve', 'sampleCount', 'fragmentCount', 'finished', 'filteredPoints', 'fitEvaluations', 'generation'];
 
-/** A persistent input instance owns memory separately from stateless geometry
- * preparation. Scratch resets cannot overwrite its retained actual samples. */
 export class CompiledInkInput {
   constructor(options = {}, initialCapacity = 1024) {
     this.kernel = new CompiledInkKernel(); this.api = this.kernel.api;

@@ -1,12 +1,8 @@
 import { noteSegments } from "../../document/note-markup.mjs";
 import { installNoteBubbles } from "./note-bubble";
 
-/** Installs the note controller for anchors written outside React, such as SVG markup. */
 export const installNotes = () => installNoteBubbles();
 
-/** Props that turn any element into a hover-note anchor. */
-// Bundlers may drop bare side-effect imports of shared modules, so every
-// anchor installs the (idempotent) document controller explicitly.
 export const noteProps = (note: string, focusable = true) => {
   installNoteBubbles();
   return {
@@ -16,17 +12,11 @@ export const noteProps = (note: string, focusable = true) => {
   };
 };
 
-/**
- * Plain text whose `[label]{note}` parts show their note on hover, focus or
- * tap. Everything else stays literal text, so titles, labels and custom
- * component fields can opt in without accepting other markup.
- */
 export function NoteText({
   text,
   focusable = true,
 }: {
   text: unknown;
-  /** False inside buttons and links, which already take focus. */
   focusable?: boolean;
 }) {
   return (
@@ -44,7 +34,6 @@ export function NoteText({
   );
 }
 
-/** The same text inside SVG: annotated parts become tspans. */
 export function NoteSvgText({ text }: { text: unknown }) {
   return (
     <>

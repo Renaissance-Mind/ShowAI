@@ -10,5 +10,4 @@ export interface PageWrite {
   afterHash: string;
 }
 
-/** Captures exact page baselines inside the writer's transaction, never watcher snapshots. */
 export const pageWriteCapture = new AsyncLocalStorage<PageWrite[]>();

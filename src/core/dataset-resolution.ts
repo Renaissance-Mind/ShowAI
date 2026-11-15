@@ -25,7 +25,6 @@ import { CoreError } from "./model";
 import type { FileStore } from "./store";
 import type { ShowDocument } from "./model";
 
-/** How a bound block of a page resolved, as reported to Agents and readers. */
 export interface BindingRead {
   blockId: string;
   kind: string;
@@ -34,27 +33,14 @@ export interface BindingRead {
   name?: string;
   hash?: string;
   revision?: string;
-  /** The props the component renders, when requested. */
   props?: Record<string, unknown>;
-  /** Items of collection mappings, by target prop. */
   mapped?: Record<string, number>;
-  /** Source record path of each mapped item (when props are included). */
   sources?: Record<string, string>;
   issues: BindingIssue[];
   error?: string;
-  /**
-   * ok: current data; stale: the source cannot be read and the props show
-   * the last value read on this device; empty: no data (see warnings/error).
-   */
   status: DatasetReadStatus;
-  /**
-   * What edits of the block can change: true, false, or { paths } when only
-   * part of it can (see datasets/editable.mjs): e.g. mapped fields of a
-   * read-only dataset next to the block's own items and fields.
-   */
   editable: Editable;
   warnings: DatasetWarning[];
-  /** The dataset reads a file or online data outside the library (see dataset-sources). */
   source?: {
     kind?: "file" | "url";
     format: string;
@@ -62,35 +48,21 @@ export interface BindingRead {
     path?: string;
     url?: string;
     bytes?: number;
-    /** Read from the synchronized copy of another device's file. */
     bundled?: boolean;
-    /** False when the source cannot be read now (status stale or empty). */
     available: boolean;
   };
-  /**
-   * The dataset is computed by a transform script from these datasets
-   * ("projectId/datasetId" by input name); its values are read-only.
-   */
   transform?: { inputs: Record<string, string> };
-  /** Bytes the resolved snapshot adds to the block's stored data. */
   snapshotBytes?: number;
 }
 
-/**
- * What a reader shows for a bound block without data: the dataset name and
- * only the file name of its source, never a path of this device.
- */
 export interface DataNotice {
   status: "empty";
   dataset?: string;
   file?: string;
-  /** The person left the data out of this copy (packaging skip). */
   omitted?: true;
 }
-/** Block data key of a DataNotice in resolved (rendered, exported) documents. */
 export const DATA_NOTICE_KEY = "$dataState";
 
-/** The last segment of a path or address, without query or fragment. */
 export function sourceFileName(source: {
   name?: string;
   path?: string;
@@ -107,7 +79,6 @@ export function sourceFileName(source: {
   return undefined;
 }
 
-/** One external dataset whose snapshot an export would embed. */
 export interface ExternalSnapshot {
   projectId: string;
   datasetId: string;
@@ -115,15 +86,9 @@ export interface ExternalSnapshot {
   format: string;
   path?: string;
   url?: string;
-  /** Size of the linked file (or online data) when it was read. */
   fileBytes?: number;
-  /** JSON bytes the export adds for this dataset, over all its blocks. */
   snapshotBytes: number;
   blocks: { pageId: string; blockId: string }[];
-  /**
-   * False when the source cannot be read: with status stale the blocks are
-   * exported with the last value read on this device, otherwise without data.
-   */
   available: boolean;
   status: DatasetReadStatus;
   error?: string;
@@ -133,10 +98,6 @@ export interface ExternalSnapshotReport {
   snapshotBytes: number;
 }
 
-/**
- * Aggregates the external datasets of resolved pages, optionally limited to
- * selected blocks, so the person can decide before their data is embedded.
- */
 export function externalSnapshotReport(
   pages: { pageId: string; bindings: BindingRead[]; blockIds?: string[] }[],
 ): ExternalSnapshotReport {
@@ -182,11 +143,6 @@ export function externalSnapshotReport(
 const jsonBytes = (value: unknown) =>
   Buffer.byteLength(JSON.stringify(value ?? null));
 
-/**
- * Resolves every bound block of a document. The returned document carries the
- * resolved props in place of the bindings (a snapshot for rendering and
- * export); unavailable datasets leave the block bound and report an error.
- */
 export async function resolveDocumentDatasets(
   store: FileStore,
   projectId: string,
@@ -333,7 +289,6 @@ export async function resolveDocumentDatasets(
         record.dataset.value,
       );
       replacements.set(blockId, snapshot);
-      // What the dataset adds beyond the block's own values (its binding settings aside).
       if (origin || record.transform)
         read.snapshotBytes = Math.max(
           0,
@@ -368,7 +323,6 @@ export async function resolveDocumentDatasets(
       if (value) await baselines.remember(key.split("/")[0], value);
     }
   }
-  // Bound databases read their reverse relations from the dataset they show.
   const selfDatasets = new Map<string, string>();
   for (const { node } of bound) {
     const binding = readBinding(node.attrs!.data)!;
@@ -389,11 +343,6 @@ export async function resolveDocumentDatasets(
   };
 }
 
-/**
- * A resolved document in which the given blocks show the name-only notice
- * instead of their data: the block keeps its own values and binding, as
- * for a dataset without data (used when an export leaves data out).
- */
 export function withDataNotices(
   resolved: ShowDocument,
   original: ShowDocument,

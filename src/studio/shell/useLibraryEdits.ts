@@ -22,7 +22,6 @@ import type { MenuState } from "./menus/useMenuState";
 import type { StudioRouter } from "./useStudioRouter";
 import { DraftHeld, operation, type PageState } from "./types";
 
-/** Renaming, re-iconing, pinning, sorting, grouping and deleting library items. */
 export function useLibraryEdits({
   feedback: { report, notifyWithUndo },
   library: {
@@ -76,7 +75,6 @@ export function useLibraryEdits({
 }) {
   const t = useTranslator(studioMessages);
   const tn = useTranslator(navigationMessages);
-  // A deletion's toast reverses it through the library history.
   const undoLibraryChange = (entry: LibraryChange) =>
     undoLibraryRef.current(entry);
   function beginRename(target: LibraryTarget) {
@@ -97,7 +95,6 @@ export function useLibraryEdits({
           : { type: "rename", target },
     );
   }
-  /** F2 and Delete on a focused sidebar or folder row. */
   function libraryKeyCommand(
     target: LibraryTarget,
     command: "rename" | "delete",
@@ -107,7 +104,6 @@ export function useLibraryEdits({
     if (command === "rename") beginRename(target);
     else beginDelete(target);
   }
-  /** A page is deleted at once with Undo in the toast; a folder or project is confirmed first. */
   function beginDelete(target: LibraryTarget) {
     setContextMenu(null);
     if (target.kind === "page")
@@ -133,7 +129,6 @@ export function useLibraryEdits({
     await desktop.invoke("projects:group", { projectId, groupId });
     await refreshProjects([projectId], { sidebar: true });
   }
-  /** The name, icon and pin an item has in loaded navigation, to undo a change. */
   function currentFields(target: LibraryTarget): LibraryEntryFields {
     if (target.kind === "project") {
       const item = projects.find((project) => project.id === target.projectId);
@@ -159,7 +154,6 @@ export function useLibraryEdits({
       pinned: !!item?.favorite,
     };
   }
-  /** Shows a name, icon or pin change in the sidebar at once; the returned function takes it back. */
   function showFields(target: LibraryTarget, fields: LibraryEntryFields) {
     const before = currentFields(target);
     const apply = (values: LibraryEntryFields) => {
@@ -191,11 +185,6 @@ export function useLibraryEdits({
         ) as LibraryEntryFields,
       );
   }
-  /**
-   * Renames, re-icons or pins one item. The sidebar shows the change and the
-   * dialog closes before the library confirms it; a failure takes the change
-   * back and is reported. A page being edited takes the change in its editor.
-   */
   async function updateTarget(
     target: LibraryTarget,
     change: { name?: string; icon?: string; pinned?: boolean },
@@ -206,7 +195,6 @@ export function useLibraryEdits({
         ? page.sessions.sessionFor(target.projectId, target.id)
         : undefined;
     const active = page.sessions.getSnapshot().active;
-    // A page with unsaved edits saves them first; a conflict there needs a decision.
     if (retained === active && retained) await saveOpenPage();
     else if (retained && !(await retained.flush()))
       throw new DraftHeld(t("resolveDraftFirst"));
@@ -275,7 +263,6 @@ export function useLibraryEdits({
     });
     return true;
   }
-  /** Ids a deletion removes: the page, the folder with everything in it, or the whole project. */
   function deletionScope(target: LibraryTarget): {
     project?: boolean;
     folders: Set<string>;
@@ -287,12 +274,6 @@ export function useLibraryEdits({
       return { folders: new Set(), pages: new Set([target.id]) };
     return folderSubtree(contents, target.projectId, target.id);
   }
-  /**
-   * Deletes one item. Pages it holds that are open anywhere save first; their
-   * editors close, their tab history falls back, and the item leaves the
-   * sidebar before the library confirms. Deleting archives, so the toast and
-   * Cmd+Z restore it.
-   */
   async function deleteTarget(
     target: LibraryTarget,
     options: { close?: () => void; record?: boolean; notify?: boolean } = {},

@@ -13,8 +13,6 @@ import type strings from "../../i18n/messages/assistant";
 
 type Translate = Translator<(typeof strings)["catalogs"]["zh-CN"]>;
 
-/** The one target shape behind "Ask AI" sends and copied references, so both
- * name the same blocks, Board and position for the same selection. */
 export function agentTarget(
   pageId: string | null,
   target: AssistantTarget | null,
@@ -36,7 +34,6 @@ export function agentTarget(
   };
 }
 
-/** The first line of a copied reference, written for the person pasting it. */
 export function referenceHeading(t: Translate, reference: PageReference) {
   const params = {
     title: reference.title || t("pageReference.untitled"),

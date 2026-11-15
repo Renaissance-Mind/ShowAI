@@ -19,13 +19,11 @@ import { openLibrary } from "../core/open-library";
 import { recordConnections } from "./mcp-connections";
 import { mcpChangeContext } from "./mcp-actor";
 
-/** Explicit project identities, no mutable connection-wide "current project". */
 export function createLibraryMcpServer(options: {
   root: string;
   presentationDirectory?: string;
 }) {
   const service = new AgentService({ root: options.root });
-  // One dataset reader for the whole connection, across its per-call servers.
   const inherited = { ...changeContext(), readerId: randomUUID() };
   const call = async (action: () => Promise<unknown>) => {
     try {
@@ -86,7 +84,6 @@ export function createLibraryMcpServer(options: {
               ...options,
               projectId,
               projectAccess: "library",
-              // The per-call server is never connected; it writes as this connection's client.
               sourceContext: mcpChangeContext(
                 inherited,
                 server.server.getClientVersion(),
@@ -169,7 +166,6 @@ export async function startLibraryMcp(
   const transport = new StdioServerTransport(process.stdin, process.stdout, {
     maxBufferSize: CAPACITY.authoringRequestBytes,
   });
-  // Lets Settings → Plugins confirm that the host reached this library.
   recordConnections(transport, options.root);
   await createLibraryMcpServer(options).connect(transport);
   process.stderr.write(

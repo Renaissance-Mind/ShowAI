@@ -1,4 +1,3 @@
-/* Text that carries a hover note: rich text, inline markup, labels and KaTeX parts. */
 [data-showai-note] {
   cursor: help;
   text-decoration-line: underline;
@@ -13,13 +12,10 @@
   outline: none;
   background: color-mix(in srgb, #3979bf 14%, transparent);
 }
-/* KaTeX lays parts out as inline blocks, where text decoration does not reach. */
 .katex [data-showai-note] {
   text-decoration: none;
   border-bottom: 1.5px dotted color-mix(in srgb, currentColor 55%, transparent);
 }
-/* KaTeX stacks layout boxes and strokes (radicals, braces) over the parts they
-   enclose; in a formula with notes only the annotated parts take the pointer. */
 .katex:has([data-showai-note]) * {
   pointer-events: none;
 }

@@ -20,7 +20,6 @@ async function library() {
   return { root, home };
 }
 
-/** Connects like a host: initialize, list tools, call the only tool. */
 async function connect(home: string, env: Record<string, string> = {}) {
   const client = new Client({ name: "claude-code", version: "9.9.9" });
   await client.connect(
@@ -46,7 +45,6 @@ test("a missing registration still completes the handshake with one diagnostic t
   const { home } = await library();
   const { tools, result, error, instructions } = await connect(home);
   expect(tools.map((tool) => tool.name)).toEqual(["showai_connection_problem"]);
-  // One small tool keeps the host's plugin tool budget.
   expect(JSON.stringify(tools).length).toBeLessThan(600);
   expect(instructions).toContain("showai_connection_problem");
   expect(result.isError).toBe(true);
@@ -57,7 +55,6 @@ test("a missing registration still completes the handshake with one diagnostic t
   expect(error.support.reportUrl).toBe(
     "https://github.com/Renaissance-Mind/ShowAI/issues/new",
   );
-  // The failure is recorded for Settings → Plugins, without the person's home path.
   const [record] = await readAgentConnections(home);
   expect(record).toMatchObject({
     client: "claude-code",
@@ -91,7 +88,6 @@ test("an invalid registration and a library mismatch have their own codes", asyn
 
 test("a runtime without the plugin's tool protocol is reported as outdated", async () => {
   const { root, home } = await library();
-  // An earlier ShowAI build: its runtime info lacks the merged tool surface.
   const old = join(root, "old-runtime.mjs");
   await writeFile(
     old,
@@ -111,7 +107,6 @@ test("a runtime without the plugin's tool protocol is reported as outdated", asy
   expect(error.code).toBe("RUNTIME_OUTDATED");
   expect(error.detail).toContain("0.1.0");
   expect(error.detail).toContain("merged tool surface");
-  // The probe is cached by the runtime files; a replaced runtime is probed again.
   await expect(
     readFile(join(home, "local/agent-runtime-probe.json"), "utf8"),
   ).resolves.toContain('"key"');
@@ -145,7 +140,6 @@ test("a moved runtime is reported as unavailable", async () => {
 
 test("a runtime whose probe exits silently reports the exit code", async () => {
   const { root, home } = await library();
-  // A probe that dies without stderr used to surface only "Command failed".
   const broken = join(root, "broken-runtime.mjs");
   await writeFile(broken, "process.exit(3);");
   await writeFile(

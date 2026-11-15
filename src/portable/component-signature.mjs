@@ -1,12 +1,3 @@
-/**
- * One-line type summaries of component props schemas for catalog entries.
- *
- * A signature is informational: page data stays a named JSON object and the
- * schema remains the validation source of truth. The text is deterministic for
- * a given id and schema, never contains a line break and never exceeds the
- * limit. Required fields come first; nested structures collapse to `{…}` and
- * trailing fields drop to `…` when the line would be too long.
- */
 export const COMPONENT_SIGNATURE_LIMIT = 320;
 const MAX_DEPTH = 3;
 const ENUM_MEMBERS = 6;
@@ -50,7 +41,6 @@ function clip(text, limit) {
   return text.length <= limit ? text : `${text.slice(0, limit - 1)}…`;
 }
 
-/** A root `$ref` into the schema's own definitions is followed; nested refs print their name. */
 function rootSchema(schema) {
   let current = schema;
   const seen = new Set();
@@ -201,7 +191,6 @@ function refName(ref) {
   return name && name !== "#" ? name : "any";
 }
 
-/** A `|` outside brackets, braces, parentheses and quotes makes the text a union. */
 function topLevelUnion(text) {
   let depth = 0;
   let quote = "";

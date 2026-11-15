@@ -13,7 +13,6 @@ int main(){std::vector<uint64_t>arena(16*1024*1024/8);PolynomialContext c;c.numb
  auto common=gcd(p*(t*t+Polynomial::scalar(c,1)),p*(t+Polynomial::scalar(c,3)));if(common.degree()!=2)return 5;for(int i=0;i<=2;i++)if(q(common[i])!=q(monic(p)[i]))return 6;
  Vector<Polynomial>A(c.numbers),B(c.numbers);A.push_back(t);A.push_back(Polynomial::scalar(c,1));B.push_back(Polynomial::scalar(c,-1));B.push_back(Polynomial::scalar(c,1));auto r=resultant(A,B)+(t+Polynomial::scalar(c,1));if(!r.zero()||c.numbers.status)return 7;
  auto sequence=sturm(p);if(count_open(sequence,Q(0),Q(1))!=2)return 8;
- // Arena COW: mutable scratch copies cannot overwrite retained coefficients.
  auto retained=p,scratch=p;const Q before=retained[0];scratch.coefficients[0]+=Q(1);if(retained[0]!=before||scratch[0]==before)return 9;
  }
  if(c.numbers.live_bytes)return 10;std::printf("BOUNDARY_POLYNOMIAL_ROOT_RESULTANT_OK poly=%llu limbs=%llu peak=%llu\n",(unsigned long long)c.polynomial.operations,(unsigned long long)c.numbers.work,(unsigned long long)c.numbers.peak_bytes);}

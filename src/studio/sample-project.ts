@@ -13,9 +13,6 @@ export const SAMPLE_ICONS: Record<SampleKey, string> = {
   foldable: "📱",
 };
 
-// Page sources exported in the `.showai.json` format with their compiled
-// component dependencies (resources/samples/sources.json records provenance).
-// Each file is its own lazy chunk, loaded only when a new library is set up.
 const sources: Record<
   Locale,
   Record<SampleKey, () => Promise<{ default: string }>>
@@ -41,10 +38,6 @@ export interface Onboarding {
   connections: AgentConnectionRecord[];
 }
 
-/**
- * Reads the library's first-run state and creates its sample project once.
- * Only libraries the App itself created are `pending`; others stay untouched.
- */
 export function useSampleProject(
   home: string | null,
   onCreated: () => Promise<unknown>,
@@ -60,7 +53,6 @@ export function useSampleProject(
       const current = await desktop
         .invoke<Onboarding>("agent:onboarding")
         .catch((reason) => {
-          // Hosts without the App's library runtime, such as the website workbench, have no first-run state.
           if (errorCode(reason) === "UNAVAILABLE") return null;
           throw reason;
         });

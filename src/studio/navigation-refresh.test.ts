@@ -192,7 +192,6 @@ it("confirms an operation on known projects without reading the whole library", 
   expect(scope.all).toBe(false);
   expect(scope.sidebar).toBe(true);
   expect([...scope.ids]).toEqual(["a"]);
-  // A caller that names no projects still reads everything.
   queueNavigationScope(scope);
   expect(scope.all).toBe(true);
 });
@@ -309,9 +308,6 @@ it("shows renames, new items and deletions in loaded navigation", () => {
 });
 
 it("a refresh after folders were created elsewhere carries them with the pages they hold", () => {
-  // The window knows project p with one page and no folders. An import from
-  // the CLI then created two nested folders holding a new page, while p is
-  // neither expanded nor open in this window.
   const time = "2026-11-12T00:00:00.000Z";
   const folder = (id: string, parentId: string | null) =>
     ({ id, name: id, parentId, createdAt: time, updatedAt: time }) as FolderMetadata;
@@ -333,14 +329,11 @@ it("a refresh after folders were created elsewhere carries them with the pages t
     { full: scope.all, ids: scope.ids },
   );
   expect(next.p).toEqual({ pages, folders });
-  // Every page's folder is known, so none is drawn at the top level.
   const known = new Set(next.p.folders.map((item) => item.id));
   expect(
     next.p.pages.every((item) => !item.parentId || known.has(item.parentId)),
   ).toBe(true);
-  // Projects outside the change keep what they had.
   expect(next.q).toBe(current.q);
-  // Undoing the import removes the folders in the next refresh.
   const undone = refreshedContents(
     next,
     [{ project: project([], 1), pages: [pageIn("start", null)] }],

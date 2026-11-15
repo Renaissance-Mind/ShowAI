@@ -1,6 +1,3 @@
-/* Shared drawing palette for the svg and mechanism-diagram built-ins.
- * Every tone has a strong colour (lines, arrows, solid marks), a soft fill and
- * an ink for text on that fill; the dark theme swaps all three. */
 .sb-block.dw-palette {
   --dw-ink: var(--sb-text);
   --dw-muted: var(--sb-muted);

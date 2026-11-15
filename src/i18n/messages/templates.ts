@@ -1,6 +1,5 @@
 import { defineMessages } from "../index";
 
-// Template catalog: type navigation, outlines and template guides.
 export default defineMessages("templates", {
   "zh-CN": {
     types: "类型",

@@ -10,8 +10,6 @@ import { createPageSession, type LoadedPage, type PageSession } from "./page-ses
 import { authorName } from "./external-change";
 import type { ShowDocument } from "../types";
 
-// The real workbench actions and library on disk; arguments and results pass
-// through JSON like the desktop and browser bridges.
 let root: string;
 let invoke: <T>(action: string, args?: Record<string, unknown>) => Promise<T>;
 let calls: string[];
@@ -137,7 +135,6 @@ it("names the Agent, counts its changed blocks and undoes it through a normal sa
   expect(authorName(change.author)).toBe("Codex");
   expect(paragraphs(session.getSnapshot().draft!).p2).toBe("two by Codex");
 
-  // The person keeps typing elsewhere; undo must not take that back.
   session.edit({ content: withText(session.getSnapshot().draft!, "p1", "one, edited").content });
   calls.length = 0;
   expect(await session.undoExternalChange()).toBe("merged");
@@ -157,7 +154,6 @@ it("never overwrites a newer write that arrived after the noticed one", async ()
   await externalWrite("p2", "two by Codex");
   await session.refresh();
   await until(() => session.getSnapshot().externalChange, "notice");
-  // Lands on disk while the notice is open, before the window refreshes.
   await externalWrite("p3", "three, newer");
   expect(await session.undoExternalChange()).toBe("merged");
   expect(session.getSnapshot().status).not.toBe("conflict");
@@ -184,7 +180,6 @@ it("restores the notice and its snapshot after the page is reopened, and 知道�
 });
 
 it("keeps unsaved typing when an external write lands: merged elsewhere, kept on the same block", async () => {
-  // Typing stays unsaved until the explicit flush below.
   await session.dispose();
   session = createPageSession({ clientId: "typing", invoke, saveDelayMs: 60_000, draftDelayMs: 60_000 });
   await session.open(project, page.document.id);
@@ -202,8 +197,6 @@ it("keeps unsaved typing when an external write lands: merged elsewhere, kept on
   session.edit({ content: withText(session.getSnapshot().draft!, "p1", "one + typing UNSAVED").content });
   await externalWrite("p1", "one rewritten by Codex");
   await session.refresh();
-  // Either merged with the unsaved keystrokes or held as a conflict draft
-  // naming the writer; unsaved input is never replaced silently.
   const state = session.getSnapshot();
   expect(paragraphs(state.draft!).p1).toContain("UNSAVED");
   if (state.status === "conflict") expect(state.error).toContain("Codex");

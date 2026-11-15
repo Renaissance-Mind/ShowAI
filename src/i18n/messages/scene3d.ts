@@ -1,6 +1,5 @@
 import { defineMessages } from "../index";
 
-// 3D scene built-in.
 export default defineMessages("scene3d", {
   "zh-CN": {
     title: "3D 场景",

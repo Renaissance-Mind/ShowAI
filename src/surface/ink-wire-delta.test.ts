@@ -93,8 +93,6 @@ it('keeps delta bytes and measured append+projection work independent of unrelat
   latency.sort((a,b)=>a-b);times.push(latency[Math.floor(latency.length*.9)]);
  }
  expect(Math.abs(sizes[1]-sizes[0])).toBeLessThan(80);expect(knownCounts).toEqual([1,1]);
- // Actual CPU measurements, with headroom for shared CI hosts. A regression
- // walking half a million unrelated samples exceeds this incremental budget.
  expect(times[1]).toBeLessThan(Math.max(25,times[0]*5));
  console.info('sparse ink projection scaling',JSON.stringify({unrelatedStrokeCounts:[16,256],samplesPerStroke:2000,p90Milliseconds:times,deltaBytes:sizes,requiredDescriptors:knownCounts}));
 },30000);

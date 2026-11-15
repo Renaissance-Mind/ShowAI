@@ -8,10 +8,8 @@ export interface SyncOverviewState {
   projects: ProjectConnection[];
   connections: Connection[];
 }
-/** What a project row or page header says about sync, if anything. */
 export type SyncMarker = "unsynced" | "signIn" | "readOnly";
 
-/** Consecutive failed status reads before the workbench shows a marker. */
 export const SYNC_STATUS_FAILURE_THRESHOLD = 3;
 
 export function syncMarker(
@@ -32,7 +30,6 @@ export function syncMarker(
   return undefined;
 }
 
-/** Connections whose sign-in expired while projects still sync through them. */
 export function expiredConnections(state: SyncOverviewState) {
   const expired = new Map<string, string[]>();
   for (const project of state.projects)
@@ -48,10 +45,6 @@ export function expiredConnections(state: SyncOverviewState) {
   }));
 }
 
-/**
- * Reads the sync state for the workbench every few seconds. Failed reads are
- * counted so a persistent problem shows a marker instead of only the console.
- */
 export function useSyncOverview(home?: string) {
   const [state, setState] = useState<SyncOverviewState | null>(null);
   const [failures, setFailures] = useState(0);
@@ -64,8 +57,6 @@ export function useSyncOverview(home?: string) {
       desktop.invoke<SyncOverviewState>("sync:status").then(
         (next) => {
           if (!active) return;
-          // Every poll returns a new object; only a changed status may
-          // re-render the workbench, which would otherwise stall scrolling.
           const value = {
             projects: next.projects,
             connections: next.connections,

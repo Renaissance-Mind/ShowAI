@@ -1,7 +1,5 @@
 import { SyncError } from "./protocol";
 
-/** Upload identities are immutable digests or durable task/part IDs. Retrying
- * them after an ambiguous transport failure cannot publish a second revision. */
 export async function retryUpload<T>(operation: () => Promise<T>): Promise<T> {
   for (let attempt = 0; ; attempt++) {
     try {
@@ -15,7 +13,6 @@ export async function retryUpload<T>(operation: () => Promise<T>): Promise<T> {
           : error instanceof TypeError ||
             (error instanceof Error &&
               ["AbortError", "TimeoutError"].includes(error.name));
-      // Busy servers recover within seconds; allow about half a minute.
       if (!transient || attempt >= 8) throw error;
       await new Promise((resolve) =>
         setTimeout(

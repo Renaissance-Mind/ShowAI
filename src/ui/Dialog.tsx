@@ -35,7 +35,6 @@ export default function Dialog({
   close.current = dismissible ? onClose : () => {};
   useEffect(() => {
     const previous = document.activeElement as HTMLElement;
-    // A confirmation marks its action with data-autofocus, so Enter confirms it.
     (initialFocus === "container"
       ? panel.current
       : (panel.current?.querySelector<HTMLElement>(
@@ -49,7 +48,6 @@ export default function Dialog({
         panel.current)
     )?.focus();
     const handle = (event: KeyboardEvent) => {
-      // A local file picker can sit above a component or publication dialog.
       if (panel.current !== topDialog()) return;
       if (event.key === "Escape") {
         if (

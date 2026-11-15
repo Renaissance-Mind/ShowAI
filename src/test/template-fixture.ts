@@ -4,11 +4,6 @@ import {
   TEMPLATE_SCHEMA_VERSION,
   type TemplateBundleSource,
 } from "../portable/template-bundle.mjs";
-/**
- * A current (schemaVersion 4) folder whose guides are read whole. format
- * "staged" builds a schemaVersion 3 four-stage bundle and "legacy" a six-stage
- * schemaVersion 1 bundle, both still readable.
- */
 export function templateFixture(
   id = "guided-example",
   component = true,

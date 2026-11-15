@@ -1,5 +1,4 @@
 import { desktopTestEnvironment } from "../../scripts/desktop-test-env.mjs";
-// Supplementary real Electron regression; UI acceptance also uses the official computer tool.
 import assert from "node:assert/strict";
 import {
   mkdir,
@@ -241,7 +240,6 @@ try {
   const scroll = page.locator(".studio-scroll");
   const bounds = await scroll.boundingBox();
   if (!process.env.SHOWAI_TEST_LOAD_ONLY) {
-    // Selection stays usable while the first background captures are being generated.
     await page.mouse.move(bounds.x + 18, bounds.y + 12);
     await page.mouse.down();
     await page.mouse.move(
@@ -253,7 +251,6 @@ try {
     assert.ok(await page.locator(".studio-page-list .selected").count());
     await page.keyboard.press("Escape");
     assert.equal(await page.locator(".studio-page-list .selected").count(), 0);
-    // Cancel while the pointer is still down: transient DOM highlights must clear.
     await page.mouse.move(bounds.x + 18, bounds.y + 12);
     await page.mouse.down();
     await page.mouse.move(
@@ -338,8 +335,6 @@ try {
   assert.ok(first.startsWith("data:image/png;base64,"));
   result.checks.push("Persistent raster cache returns the same image");
   if (process.env.SHOWAI_TEST_EXPECT_WARM) {
-    // Continuous background warming may still be active; let its current shot
-    // finish while admission is paused before inspecting the empty capture shells.
     await invoke("pages:thumbnailActivity", { paused: true });
     if (process.env.SHOWAI_TEST_EXPECT_PERSISTENT) {
       await app.evaluate(async ({ BrowserWindow }) => {

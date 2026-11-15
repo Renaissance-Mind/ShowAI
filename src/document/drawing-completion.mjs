@@ -11,7 +11,6 @@ const strokeDefaults = {
   arrow: 2,
 };
 
-/** The edge midpoint of `frame` that faces `toward`, as a normalized anchor. */
 export function facingAnchor(frame, toward) {
   const height = frameHeight(frame) || 1;
   const dx = (toward.x - (frame.x + frame.width / 2)) / (frame.width || 1),
@@ -30,14 +29,6 @@ const localExtent = (points) => [
   Math.max(1, ...points.map((p) => p.y)),
 ];
 
-/**
- * Fill the drawing fields an author may omit, using what was supplied:
- * default color and stroke, shape geometry from its frame (or a frame sized to
- * its label), freehand extents from points, and arrow anchors facing the other
- * endpoint. `framed` holds ids whose frame the author set explicitly; other
- * frames are placeholders from automatic placement. Run before validation; bound
- * arrow geometry is resolved afterwards by reconcileConnections.
- */
 export function completeDrawings(document, { framed, fresh }) {
   const layout = (document.layout ??= {});
   const index = indexSurfaceTree(document.content);
@@ -116,7 +107,6 @@ export function completeDrawings(document, { framed, fresh }) {
       attrs.extent ??= localExtent(attrs.points);
       if (!explicit) sized(id, attrs.extent[0], attrs.extent[1]);
     } else if (targetFrame("start") && targetFrame("end")) {
-      // Core resolves bound geometry; a minimal placeholder satisfies validation.
       attrs.extent ??= [1, 1];
       attrs.points = [
         { x: 0, y: 0 },

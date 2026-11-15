@@ -219,7 +219,6 @@ export class AccountResources {
     const secret = supplied
       ? await this.cipher.seal(await this.context(user.id, id), supplied)
       : previous!.secret;
-    // Identical publication retries do not rotate or overwrite a refresh token.
     if (previous && publication && previous.publication_id === publication) {
       if (previous.request_hash !== requestHash)
         throw new SyncError(
@@ -329,9 +328,6 @@ export class AccountResources {
         "RESOURCE_BUSY",
         "授权正在其他请求中刷新，请稍后重试。",
       );
-    // The durable lease is not stolen after a timeout: a crashed HTTP exchange
-    // may already have rotated the provider's refresh token. Reauthorization
-    // resolves that uncertainty instead of starting a second refresh owner.
     const response = await fetch(
       "https://auth.openai.com/api/accounts/oauth/token",
       {
@@ -348,8 +344,6 @@ export class AccountResources {
     );
     if (!response.ok) {
       await response.body?.cancel();
-      // A known rejection consumed no successful response. Clearing this lease
-      // still requires explicit reauthorization for invalid provider grants.
       await this.db.run(
         "UPDATE account_resources SET refresh_lease=NULL,refresh_started_at=NULL WHERE user_id=? AND id=? AND refresh_lease=?",
         [user.id, id, lease],

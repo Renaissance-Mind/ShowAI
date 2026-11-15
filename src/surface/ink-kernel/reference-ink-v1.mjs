@@ -1,5 +1,3 @@
-// Independent JavaScript v1 oracle retained for compiled-kernel regression tests.
-/** Portable brush v1. This module has no DOM, platform or storage dependencies. */
 export const PORTABLE_INK_FORMAT = "showai-ink-v1";
 export const isEditableDrawing = (node) =>
   node?.type === "drawing" &&
@@ -71,8 +69,6 @@ export function inkModelPoses(document, boardId, previous = {}) {
   board?.content?.forEach((node) => visit(node, true));
   return { poses, nested, complete };
 }
-/** Transfer only changed ink payloads; the small hierarchy names every current stroke.
- * Previous is the last native-acknowledged model, never a merely queued frame. */
 export function inkScenePatch(document, boardId, previous) {
   const collect = (doc) => {
     const found = new Map();
@@ -209,7 +205,6 @@ export function validatePortableInk(ink) {
     ) < 1e-12
   )
     throw new Error("Invalid portable ink transform.");
-  // x, y, time, nib width, nib height, opacity, force, azimuth, altitude.
   if (
     !Array.isArray(ink.samples) ||
     !ink.samples.length ||
@@ -318,7 +313,6 @@ function support(p, width, nx, ny) {
     ey = (ry * ry * y) / d;
   return { x: ex * c - ey * s, y: ex * s + ey * c };
 }
-/** One filled contour prevents translucent marker segments darkening at joins. */
 export function portableInkGeometry(
   ink,
   strokeWidth = ink.width,
@@ -362,7 +356,6 @@ export function portableInkGeometry(
       ?.map((c) => c[0] + " " + c.slice(1).map(n).join(" "))
       .join(" "),
   };
-  // Do not accumulate every width visited by a slider.
   widths.clear();
   widths.set(key, result);
   return result;

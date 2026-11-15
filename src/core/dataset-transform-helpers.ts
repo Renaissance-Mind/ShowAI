@@ -1,14 +1,3 @@
-// Source evaluated inside every transform sandbox before the script. It
-// defines the `helpers` argument of transform(inputs, helpers): spreadsheet
-// conveniences for the workbook shape {sheets: [{name, rows}]} that linked
-// .xlsx files read as. Rows and columns are 0-based indices; cell references
-// use the spreadsheet's A1 notation. It also checks the returned output, so
-// a value JSON cannot hold is reported with its path.
-//
-// The source evaluates to {run, output}: run(text) parses the inputs and calls
-// the script's transform; output() returns the result as JSON text or throws
-// an error named OutputInvalid.
-
 export const TRANSFORM_HELPERS_SOURCE = String.raw`(function () {
   "use strict";
   function fail(message) {

@@ -168,7 +168,6 @@ describe("publication and component delivery", () => {
     expect((await listPublishedComponents(f.home))[0].ref.integrity).toBe(
       f.component.integrity,
     );
-    // The current state entry describes the single commit that published both.
     const latest = await library.entryAt((await library.head())!);
     expect(latest.parents).toEqual([before]);
     expect(
@@ -527,7 +526,6 @@ describe("publication and component delivery", () => {
       await writeFile(file, original);
       server.state.cors = false;
       await page.reload();
-      // Readers see what to do; the CORS reason stays in the technical details.
       const cors = page
         .getByRole("alert")
         .filter({ hasText: "此部分内容暂时无法加载" });

@@ -5,7 +5,6 @@ import { validatePrimitiveData } from "./primitive-contract.mjs";
 export { validatePrimitiveData };
 export { RichText as TextBlock } from "../rich-text/RichText";
 
-/** Compatibility entrypoints use the same content tree, editor and reader as Pages. */
 function ContentBlock({
   kind,
   data,

@@ -35,7 +35,6 @@ export default function PageHeading({
     const observer = new ResizeObserver(([entry]) => {
       if (entry.contentRect.width === width) return;
       width = entry.contentRect.width;
-      // Height writes inside this observer can trigger WebKit's resize loop check.
       if (!scheduled)
         scheduled = requestAnimationFrame(() => {
           scheduled = 0;

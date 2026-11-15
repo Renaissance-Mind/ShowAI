@@ -139,7 +139,6 @@ describe("database contract", () => {
     expect(parseTime("9:30")).toBe(570);
     expect(parseTime("24:00")).toBe(1440);
     expect(parseTime("9:75")).toBeNull();
-    // 2026-10-18 is a Sunday.
     expect(formatDay(startOfWeek(day("2026-10-18"), 1))).toBe("2026-10-12");
     expect(formatDay(startOfWeek(day("2026-10-18"), 0))).toBe("2026-10-18");
   });
@@ -221,7 +220,6 @@ describe("calendar entries", () => {
       weeks: 3,
       countDone: true,
     });
-    // Oct 1 is not done, Oct 4 and Oct 8 are empty.
     expect(wide.longest).toBe(3);
     expect(wide.current).toBe(0);
   });
@@ -286,7 +284,6 @@ describe("database calendar view", () => {
     expect(html).toContain("sb-dbc-chip is-done");
     expect(html).toContain('aria-pressed="true"');
     expect(html).toContain("sb-dbc-agenda");
-    // Read-only pages never offer to add records.
     expect(html).not.toContain("sb-dbc-add");
   });
 

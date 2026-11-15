@@ -9,8 +9,6 @@ import messages from "../i18n/messages/inkConflicts";
 import { nativeDocumentBodiesEqual } from "./native-document-content";
 import { inkWireResolutionCandidates } from "./ink-wire.mjs";
 
-/** The prepare request may race any editor field, including metadata outside
- * the canvas. Only the storage acknowledgement timestamp is non-authoring. */
 export async function acceptPreparedInkResolution(preparation:Promise<{baseline:ShowDocument;document:ShowDocument}>,
   getDocument:()=>ShowDocument,onResolve:(document:ShowDocument)=>void,staleMessage:string){
   const prepared=await preparation;
@@ -18,8 +16,6 @@ export async function acceptPreparedInkResolution(preparation:Promise<{baseline:
   onResolve(prepared.document);
 }
 
-/** One badge within the existing inspector; all choices become real persisted
- * author events before the owning PageSession performs its normal CAS save. */
 export default function InkConflictInspector({ document, projectId, host, beforeResolve, getDocument, onResolve, readOnly = false }: {
   document: ShowDocument;
   projectId?: string;

@@ -60,13 +60,10 @@ export interface BrowserServerOptions {
   webRoot: string;
   cliEntry: string;
   settingsPath: string;
-  /** Verification hosts may leave the shared Agent launch registration untouched. */
   registerAgentRuntime?: boolean;
-  /** Only the source development launcher supplies this loopback frontend. */
   development?: { origin: string; token: string; sourceCommit?: string };
 }
 
-/** Loopback-only host for the exact same workbench actions used by Electron. */
 export async function startBrowserServer(options: BrowserServerOptions) {
   if (options.development) {
     const frontend = new URL(options.development.origin);
@@ -98,12 +95,9 @@ export async function startBrowserServer(options: BrowserServerOptions) {
   }
   let store = new FileStore(fixedHome ?? savedHome);
   let service = new AgentService({ root: store.root });
-  // Known once a workbench reports its language; until then the server only has the system one.
   let workbenchLocale: Locale | undefined;
   const token = options.development?.token ?? randomBytes(32).toString("hex");
   const webRoot = await realpath(options.webRoot);
-  // The built frontend records the commit it came from; the development
-  // launcher passes the checkout commit it started this backend from.
   const sourceCommit =
     /<meta name="showai-source" content="([^"]+)"/.exec(
       await readFile(join(webRoot, "index.html"), "utf8").catch(
@@ -117,7 +111,6 @@ export async function startBrowserServer(options: BrowserServerOptions) {
     "unknown";
   const osVersion = await systemVersion();
   const clients = new Map<ServerResponse, string>();
-  // A browser tab already holds the record of its own save; skip that echo for it.
   const ownWrites = new OwnWrites();
   const clientId = (value: unknown) =>
     typeof value === "string" && /^[\w-]{1,100}$/.test(value) ? value : "";
@@ -152,8 +145,6 @@ export async function startBrowserServer(options: BrowserServerOptions) {
     const echoes = await ownWrites.echoes(batch);
     if (root !== store.root) return;
     const change = changedResources(root, batch);
-    // Transforms computed from changed datasets refresh in every tab,
-    // including the one whose own write changed their input.
     const dependents = change.datasets?.length
       ? await datasetDependents(store, change.datasets)
       : [];
@@ -184,7 +175,6 @@ export async function startBrowserServer(options: BrowserServerOptions) {
       );
   }
   let presence: InstanceHandle | undefined;
-  /** Lets dev:status and Agents see every App serving this library. */
   async function announce() {
     await presence?.remove();
     presence = await publishInstance(store.root, {
@@ -205,10 +195,8 @@ export async function startBrowserServer(options: BrowserServerOptions) {
     store = new FileStore(home);
     ownWrites.clear();
     await openLibrary(store.root);
-    // Agent reads of this library render in the language the workbench shows.
     if (workbenchLocale) await recordAppLanguage(store.root, workbenchLocale);
     await sources?.close();
-    // Linked external files of datasets refresh the blocks bound to them.
     sources = watchDatasetSources(store.root, (datasets) =>
       notify("files", {
         type: "files",
@@ -280,8 +268,6 @@ export async function startBrowserServer(options: BrowserServerOptions) {
         ? join(process.cwd(), "plugins/showai")
         : resolve(dirname(options.cliEntry), "../assets/agent-plugin"),
   });
-  // The local server runs on the person's machine, so it installs plugins through
-  // the host CLIs exactly like the desktop App (Windows and Linux have only this mode).
   const assets = (name: string) =>
     options.development
       ? join(process.cwd(), "plugins", name === "agent-plugin" ? "showai" : "dsh-showai")
@@ -385,7 +371,6 @@ export async function startBrowserServer(options: BrowserServerOptions) {
             await new FileStore(home).listProjects();
             await watcher.close();
             clearTimeout(timer);
-            // Only a library that actually opens is remembered for the next launch.
             const previous = store.root;
             try {
               await useHome(home);
@@ -405,15 +390,12 @@ export async function startBrowserServer(options: BrowserServerOptions) {
             return info();
           }
           case "export:printable": {
-            // One page to print, kept briefly under an unguessable address
-            // that the browser opens without the bearer header.
             const id = randomUUID();
             printables.set(id, String(args.html));
             setTimeout(() => printables.delete(id), 120000).unref();
             return { url: `/api/print/${id}` };
           }
           case "media:reveal":
-            // The action layer only passes paths it granted for the player.
             await openLocalPath(String(args.path), true);
             return null;
           case "app:openPageWindow":
@@ -463,7 +445,6 @@ export async function startBrowserServer(options: BrowserServerOptions) {
       parent: dirname(path),
       separator: sep,
       shortcuts: [
-        // The picker labels shortcuts by id in the workbench language.
         { id: "home", name: "Home", path: homedir() },
         { id: "library", name: "Library", path: store.root },
         ...(hasDownloads
@@ -479,7 +460,6 @@ export async function startBrowserServer(options: BrowserServerOptions) {
         ),
     };
   }
-  /** Pages waiting to be opened for printing, by one-time id. */
   const printables = new Map<string, string>();
   let closed = false;
   const server = createServer((request, response) => {
@@ -508,7 +488,6 @@ export async function startBrowserServer(options: BrowserServerOptions) {
       response.setHeader("X-Content-Type-Options", "nosniff");
       response.setHeader("X-Frame-Options", "DENY");
       response.setHeader("Referrer-Policy", "no-referrer");
-      // Reject DNS rebinding and cross-origin websites before touching local files.
       if (
         request.headers.host !== new URL(origin).host ||
         (request.headers.origin && request.headers.origin !== origin)
@@ -518,8 +497,6 @@ export async function startBrowserServer(options: BrowserServerOptions) {
         return;
       }
       const url = new URL(request.url ?? "/", origin);
-      // A media element cannot send the bearer header; the unguessable grant
-      // minted through an authenticated media:open call is the credential.
       const printable = /^\/api\/print\/([0-9a-f-]{36})$/.exec(url.pathname);
       if (printable && request.method === "GET") {
         const html = printables.get(printable[1]);
@@ -529,7 +506,6 @@ export async function startBrowserServer(options: BrowserServerOptions) {
           response.end();
           return;
         }
-        // The reader page runs its own scripts and sandboxed component frames.
         response.setHeader(
           "Content-Security-Policy",
           "default-src 'self' data: blob:; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' blob:; style-src 'self' 'unsafe-inline' data:; img-src 'self' data: blob: https: http:; media-src 'self' data: blob: https: http:; font-src 'self' data:; connect-src 'self' data: blob:; frame-src 'self' about: data: blob:; frame-ancestors 'none'; object-src 'none'; base-uri 'none'; form-action 'none'",
@@ -614,7 +590,6 @@ export async function startBrowserServer(options: BrowserServerOptions) {
           await mkdir(path);
           data = { path };
         } else if (url.pathname === "/api/locale") {
-          // Server-side messages and exports follow the workbench language.
           if (input.locale !== "zh-CN" && input.locale !== "en")
             throw new CoreError("INVALID_DATA", "Unknown language.");
           setLocale(input.locale);
@@ -681,7 +656,6 @@ export async function startBrowserServer(options: BrowserServerOptions) {
         response.end(request.method === "HEAD" ? undefined : html);
         return;
       }
-      // Only distribution assets are served; the content library is never a static root.
       if (
         !/^\/(?:assets\/[^/]+|showai-icon\.svg|favicon\.ico)$/.test(
           url.pathname,
@@ -757,7 +731,6 @@ export async function startBrowserServer(options: BrowserServerOptions) {
     throw new Error("Missing local server address.");
   if (!origin) {
     origin = `http://127.0.0.1:${address.port}`;
-    // The address is known only now; the record names it for dev:status.
     await announce();
   }
   return {

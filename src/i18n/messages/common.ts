@@ -1,7 +1,5 @@
 import { defineMessages } from "../index";
 
-// Short, context-free labels reused across the workbench. Strings whose wording
-// depends on where they appear belong in that area's own namespace.
 export default defineMessages("common", {
   "zh-CN": {
     cancel: "取消",

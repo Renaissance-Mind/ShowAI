@@ -28,7 +28,6 @@ it("lists readable projects and reports a damaged one by directory", async () =>
     path: store.projectPath(broken.id),
   });
   expect(scan.unreadable[0].message).toBeTruthy();
-  // Callers that need every project still see the failure.
   await expect(store.listProjects()).rejects.toThrow();
   expect(
     (await store.scanProjects({ projectIds: [good.id] })).unreadable,

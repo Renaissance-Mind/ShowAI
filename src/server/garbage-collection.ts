@@ -126,8 +126,6 @@ export class GarbageCollection {
         continue;
       }
       if (apply) {
-        // All histories and durable references are inspected under the exclusive
-        // freeze. Object deletion never advances a project head.
         if (!temporary && item.key.includes("/objects/"))
           await this.db.run(
             "DELETE FROM objects WHERE project_id=? AND digest=?",

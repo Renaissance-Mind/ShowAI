@@ -31,7 +31,6 @@ test("registered launches tell open Apps from their CLI and MCP children", () =>
     launchRole(`${development.command} /repo/.showai-dev/desktop-5173/desktop`, development),
     "app",
   );
-  // Every development desktop shares the Electron binary; only its own directory matches.
   assert.equal(
     launchRole(`${development.command} /repo/.showai-dev/desktop-5763/desktop`, development),
     undefined,
@@ -54,7 +53,6 @@ test("dev:status lists every instance of a library and which one is registered",
   const folder = join(root, ".showai-dev", "desktop-5999");
   await mkdir(join(folder, "runtime", "scripts"), { recursive: true });
   await mkdir(home, { recursive: true });
-  // Stand-ins: a launcher whose command names dev.mjs and its desktop backend.
   await writeFile(join(folder, "desktop"), "setInterval(() => {}, 1e6);\n");
   const launcher = idle(["-e", "setInterval(() => {}, 1e6)", "dev.mjs"]);
   const backend = idle([join(folder, "desktop")]);
@@ -95,7 +93,6 @@ test("dev:status lists every instance of a library and which one is registered",
       channel: "development",
     }),
   );
-  // This test process plays a browser edition serving the same library.
   const presence = await publishInstance(home, {
     mode: "browser",
     channel: "packaged",
@@ -126,7 +123,6 @@ test("dev:status lists every instance of a library and which one is registered",
     ["MULTIPLE_INSTANCES"],
   );
   assert.match(result.warnings[0].message, /development desktop :5999/);
-  // Stopping the registered App leaves a registration nobody serves.
   backend.kill();
   await once(backend, "exit");
   const later = await libraryInstances({ root, home });

@@ -1,4 +1,3 @@
-/** The page source embedded by an HTML export (`showai-data` or a `showai-*-data` script). */
 export function htmlArtifactSource(html: string): string {
   const scripts = html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script\s*>/gi);
   let fallback = "";

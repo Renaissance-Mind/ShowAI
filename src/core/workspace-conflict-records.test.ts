@@ -30,16 +30,13 @@ test("listed conflict records follow every rewrite of their files, including res
   await protection.resolve(captured.id, "discard", null);
   expect(await states()).toEqual([[captured.id, "resolved"]]);
   expect(await states()).toEqual([[captured.id, "resolved"]]);
-  // The same external bytes on the same base reuse the id of the resolved record.
   const again = await protection.capture(path, null, observed, true);
   expect(again.id).toBe(captured.id);
   expect(await states()).toEqual([[captured.id, "unresolved"]]);
-  // An in-place rewrite by another process is seen as well.
   const file = join(root, "local", "conflicts", captured.id, "conflict.json");
   const record = JSON.parse(await readFile(file, "utf8"));
   await writeFile(file, JSON.stringify({ ...record, state: "resolved" }));
   expect(await states()).toEqual([[captured.id, "resolved"]]);
-  // Returned records are copies; changing one leaves the next listing intact.
   (await protection.list())[0].state = "unresolved";
   expect(await states()).toEqual([[captured.id, "resolved"]]);
   await writeFile(file, JSON.stringify({ ...record, version: 2 }));

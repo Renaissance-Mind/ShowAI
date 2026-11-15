@@ -22,8 +22,6 @@ export interface CubicInkGeometry {
   chunks: CubicInkChunk[];
   bounds: { x: number; y: number; width: number; height: number };
 }
-/** Fixed128 source partition, one paint. 1M aggregate commands/100k leaves,
- * 100k commands per actual derived block. No source points are discarded. */
 export function cubicInkGeometry(
   ink: PortableInkV2,
   width?: number,

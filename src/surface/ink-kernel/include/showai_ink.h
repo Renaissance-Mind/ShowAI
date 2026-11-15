@@ -24,15 +24,11 @@ typedef struct { uint32_t operation, reserved; double values[6]; } SAInkPathComm
 typedef struct { uint32_t inside, reserved; double distance; } SAInkHit;
 
 uint32_t sa_ink_abi_version(void);
-/* Offsets expose POD layout to WebAssembly hosts without compiler assumptions. */
 uint32_t sa_ink_sizeof_sample(void);
 uint32_t sa_ink_sizeof_style(void);
 uint32_t sa_ink_sizeof_command(void);
 uint32_t sa_ink_sizeof_hit(void);
 
-/* All buffers belong to the caller. Errors never return partial geometry.
- * A range emits each sample ellipse followed by its preceding segment quad,
- * including the segment crossing start-1 -> start when start is nonzero. */
 SAInkStatus sa_ink_geometry_counts(const SAInkSample *samples, uint32_t sample_count,
                                  uint32_t start, uint32_t length, SAInkCounts *counts);
 SAInkStatus sa_ink_resolve_samples(const SAInkSample *samples, uint32_t sample_count,
@@ -43,26 +39,18 @@ SAInkStatus sa_ink_build(const SAInkSample *samples, uint32_t sample_count,
                         SAInkContour *contours, uint32_t contour_capacity,
                         SAInkVertex *vertices, uint32_t vertex_capacity,
                         SAInkBounds *bounds);
-/* Bounds match portableInkBounds: sample ellipses, minimum dimension 1.
- * Bridge quads and masks do not change this persisted-layout definition. */
 SAInkStatus sa_ink_bounds(const SAInkSample *samples, uint32_t sample_count,
                          const SAInkStyle *style, SAInkBounds *bounds);
 
-/* Mask commands remain authoritative and separately stencil-renderable. This
- * flattening matches v1 browser hit testing (32 steps per quadratic/cubic). */
 SAInkStatus sa_ink_mask_counts(const SAInkPathCommand *commands, uint32_t command_count, SAInkCounts *counts);
 SAInkStatus sa_ink_flatten_mask(const SAInkPathCommand *commands, uint32_t command_count,
                                const double *affine, SAInkPoint *points, uint32_t point_capacity,
                                SAInkContour *contours, uint32_t contour_capacity);
-/* A null mask_contours pointer means no mask. A non-null empty mask clips all. */
 SAInkStatus sa_ink_hit(const SAInkPoint *points, uint32_t point_count,
                      const SAInkContour *contours, uint32_t contour_count,
                      const SAInkPoint *mask_points, uint32_t mask_point_count,
                      const SAInkContour *mask_contours, uint32_t mask_contour_count,
                      double x, double y, SAInkHit *hit);
-/* Exact capsule hit against retained polygons intersected with a nonzero mask.
- * scratch holds mask/paint edge crossing parameters (mask_points+points+2);
- * required capacity is reported; no fixed subdivision of fast eraser motion. */
 SAInkStatus sa_ink_segment_hit(const SAInkPoint *points, uint32_t point_count,
                              const SAInkContour *contours, uint32_t contour_count,
                              const SAInkPoint *mask_points, uint32_t mask_point_count,

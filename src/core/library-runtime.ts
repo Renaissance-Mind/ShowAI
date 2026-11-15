@@ -72,7 +72,6 @@ export async function mutateLibrary<T>(
     const root = resolve(home);
     if (legacyMutations.getStore() === root) return action();
     const result = await withLibraryLock(root, async () => {
-      // Activation may have completed while this writer waited for its lease.
       if (versionedLibrary(root)) return { migrated: true as const };
       return {
         migrated: false as const,
@@ -107,7 +106,6 @@ export async function mutateLibrary<T>(
     error.recovery = { action: "read-compare-save" };
     throw error;
   }
-  // A saved page or dataset record, possibly inside a dataset apply result.
   const savedRecord = (value: unknown) =>
     !!value &&
     typeof value === "object" &&
@@ -199,7 +197,6 @@ const emptyIndex: PathIndex = {
   directories: new Set(),
   objects: new Map(),
 };
-/** Trees of committed revisions never change; most path checks reuse one index. */
 const pathIndexes = new Map<string, Promise<PathIndex>>();
 function revisionIndex(library: GitLibrary, head: string | null) {
   if (!head) return Promise.resolve(emptyIndex);
@@ -210,7 +207,6 @@ function revisionIndex(library: GitLibrary, head: string | null) {
     pathIndexes.set(key, index);
     return index;
   }
-  // Page nodes are neither listed nor asked for by identity.
   index = library.treeFiles(head).then((entries) => {
     const objects = new Map(entries.map((entry) => [entry.path, entry.oid]));
     const list = entries
@@ -249,11 +245,6 @@ async function currentPaths(home: string) {
   };
 }
 
-/**
- * Stored object identity of a file while a read snapshot or mutation pins the
- * revision; undefined when unpinned, for a stored page node, or when the
- * mutation staged a new version.
- */
 export async function pinnedFileIdentity(
   home: string,
   path: string,
@@ -271,8 +262,6 @@ export async function pinnedFileIdentity(
   const name = logicalPath(home, path);
   if (!pinned || !name || pinned.changes?.has(name)) return undefined;
   if (!pinned.head) return undefined;
-  // A revision indexed already answers at once; otherwise ask for this one
-  // path instead of listing the whole library at a new revision.
   const indexed = pathIndexes.get(`${library.root}\0${pinned.head}`);
   if (indexed) return (await indexed).objects.get(name);
   const [entry] = await library.treeEntries({ paths: [name] }, pinned.head);
@@ -330,7 +319,6 @@ export async function libraryFileInfo(
   if (changes?.size) {
     for (const [path, bytes] of changes)
       if (bytes !== null && path.startsWith(prefix)) directory = true;
-    // Staged deletions may remove every committed file below this directory.
     if (!directory && index.directories.has(name))
       directory = index.list.some(
         (path) => path.startsWith(prefix) && changes.get(path) !== null,

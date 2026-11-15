@@ -20,7 +20,6 @@ it("runs the latest click after the running one and skips the clicks in between"
     gate.run(false, async (current) => {
       events.push(`start ${id}`);
       await wait;
-      // A newer request arrived: this one does not show its result.
       if (!current()) return false;
       opened.push(id);
       return true;
@@ -49,6 +48,5 @@ it("shows a request that nothing superseded and passes failures through", async 
       throw new Error("read failed");
     }),
   ).rejects.toThrow("read failed");
-  // A failure frees the gate for the next request.
   expect(await gate.run(0, async () => 3)).toBe(3);
 });

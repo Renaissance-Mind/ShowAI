@@ -1,11 +1,6 @@
 import { createHash } from "node:crypto";
 import type { ShowDocument } from "./model";
 
-/**
- * Parsing, validating and hashing stored page bytes always yields the same
- * document, so recent results are kept by the digest of those bytes. Callers
- * receive copies and may change them freely.
- */
 const pages = new Map<
   string,
   { document: ShowDocument; hash: string; bytes: number }
@@ -27,7 +22,6 @@ export function storedPage(
   return { document: structuredClone(page.document), hash: page.hash };
 }
 
-/** Keeps the document parsed from the bytes behind `key`; call before changing it. */
 export function rememberStoredPage(
   key: string,
   bytes: number,

@@ -3,13 +3,10 @@ import { toInlineFragment } from "../portable/inline.mjs";
 import { toCdnFragment } from "../portable/cdn-fragment.mjs";
 import { cdnReaderUrls, type ReaderMode } from "./cdn-reader";
 
-/** Why a page loads its reader online instead of carrying it. */
 export interface ReaderReason {
   cause: "requested" | "size";
   message: string;
-  /** Size of the bundled fragment that did not fit (cause "size"). */
   bytes?: number;
-  /** The conversation host's limit for that fragment (cause "size"). */
   limitBytes?: number;
 }
 
@@ -21,7 +18,6 @@ export const REQUESTED_CDN: ReaderReason = Object.freeze({
 const tooLarge =(error: unknown): error is CapacityError =>
   error instanceof CapacityError && error.kind === "Compressed chat preview";
 
-/** Deliver the page's local reader first; network loading is a size fallback. */
 export async function conversationPreview(
   html: string,
   requested?: ReaderMode,

@@ -42,7 +42,6 @@ export interface LegacyFile {
   path: string;
   bytes: number;
   sha256: string;
-  /** Observed filesystem time; neither a verified edit time nor a history order. */
   observedModifiedAt: string;
   kind: "content" | "snapshot" | "auxiliary" | "draft";
 }
@@ -95,7 +94,6 @@ interface ImportInstallation {
   manifest: LibraryManifest;
 }
 
-/** A content inventory never reads or imports application launch configuration. */
 async function inventory(root: string) {
   const files: LegacyFile[] = [],
     directories: string[] = [],
@@ -211,7 +209,6 @@ function migratedDocument(bytes: Buffer, projectId: string, pageId: string) {
   };
 }
 
-/** Prepare, verify, then publish the format marker last. Original files remain untouched. */
 export class LibraryImport {
   readonly root: string;
   constructor(destination: string) {
@@ -379,8 +376,6 @@ export class LibraryImport {
           throw error;
         },
       );
-      // Retained originals are immutable; after activation, later saves
-      // supersede the import revision, so read the current state instead.
       const retained = `imports/${id}/originals/${entry.sha256}.gz`;
       gzip = staged
         ? await prepared.readFile(retained, report.revision)
@@ -441,7 +436,6 @@ export class LibraryImport {
         stage = join(directory, "library"),
         library = new GitLibrary(stage);
       const manifest = await library.initialize();
-      // Exact raw bytes are retained independently of normalized page objects.
       for (const file of observed.files) {
         const path = join(directory, "originals", `${file.sha256}.gz`);
         if (!(await readLibraryBytes(this.root, path)))
@@ -520,7 +514,6 @@ export class LibraryImport {
           const store = new FileStore(stage),
             projectList = await store.listProjects();
           projects = projectList.length;
-          // Validate raw package integrity and all current page dependency closures.
           for (const projectId of [
             undefined,
             ...projectList.map((item) => item.id),
@@ -799,7 +792,6 @@ export class LibraryImport {
             await this.original(id, file.path),
           );
       }
-      // Publication is atomic. All canonical source files remain at their original locations.
       await atomicLibraryFile(
         this.root,
         join(this.root, "library.json"),

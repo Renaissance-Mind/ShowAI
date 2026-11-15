@@ -9,7 +9,6 @@ const escapeHtml = (value: string) =>
       ]!,
   );
 
-/** Match the Markdown component's code text without adding a serializer newline. */
 export function renderMarkdownCode({ text, lang }: Tokens.Code): string {
   const language = lang?.trim().split(/\s+/)[0];
   const attribute = language ? ` class="language-${escapeHtml(language)}"` : "";

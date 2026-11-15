@@ -1,9 +1,3 @@
-/**
- * Runs one navigation at a time. A request made while another runs waits for
- * it; only the latest waiting request runs, and earlier waiting requests
- * resolve with their fallback. The running request can ask whether a newer
- * one has arrived and skip showing its result.
- */
 export class LatestRequest {
   private running = false;
   private ticket = 0;

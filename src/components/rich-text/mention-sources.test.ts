@@ -134,7 +134,6 @@ describe("inline components in rich text", () => {
     ]);
     validateRichTextData({ format: "richtext", content: doc });
     expect(toMarkdown(paragraph)).toContain('@[date]{"date":"2026-11-20"}');
-    // Text that only resembles the syntax stays text.
     const plain = markdownToRichText(String.raw`see @[date]{"date": 2026`).content![0]
       .content!;
     expect(plain.every((node) => node.type === "text")).toBe(true);

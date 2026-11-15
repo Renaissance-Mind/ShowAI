@@ -11,8 +11,6 @@
   color: var(--text);
   font: 13px/1.5 var(--font-ui, var(--font-sans, system-ui, sans-serif));
 }
-/* Opening and closing slide the panel in from the right edge while the page
- * narrows, the same way the sidebar shell changes width. */
 .assistant-panel {
   --assistant-travel: min(var(--assistant-width), 50vw);
 }
@@ -51,7 +49,6 @@
   flex: 0 0 auto;
   -webkit-app-region: no-drag;
 }
-/* The header's conversation list opens over the threads and messages below. */
 .assistant-header {
   position: relative;
   z-index: 3;
@@ -446,7 +443,6 @@
   gap: 4px 2px;
   min-width: 0;
 }
-/* Component states can carry long labels; they shorten instead of pushing chips out. */
 .assistant-form-target .assistant-chip {
   min-width: 0;
 }
@@ -595,7 +591,6 @@
     display: none !important;
   }
 }
-/* Narrow windows: the panel floats over the page instead of squeezing it. */
 @media (max-width: 760px) {
   .assistant-panel {
     position: fixed;
@@ -956,7 +951,6 @@
   border-radius: 50%;
   background: var(--accent);
 }
-/* Empty conversation: Agent status, starting prompts and the selection hint. */
 .assistant-start {
   display: flex;
   flex-direction: column;

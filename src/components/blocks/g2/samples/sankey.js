@@ -1,6 +1,3 @@
-// Adapted from https://github.com/antvis/G2/blob/v5/site/docs/charts/sankey.en.mdx
-// License notices: resources/licenses/g2-runtime.json.
-
 export default async function draw(context) {
   const { Chart, asset, fetch } = context;
   const G2 = { Chart };
@@ -19,7 +16,6 @@ export default async function draw(context) {
       transform: [
         {
           type: "custom",
-          // A readable subset of the official energy dataset for this style preview.
           callback: (data) => ({
             links: [...data].sort((a, b) => b.value - a.value).slice(0, 12),
           }),

@@ -165,7 +165,6 @@ test("failed and unchanged MCP writes do not create undo records", async () => {
 test("undo preserves a human baseline even when the Agent returns to the turn's initial hash", async () => {
   const f = await fixture();
   const original = await f.read();
-  // A human edits after the turn starts, before the Agent's first write.
   const human = await new AgentService({
     root: f.host.options.library().root,
   }).applyPage(f.turn.projectId, f.turn.pageId!, {

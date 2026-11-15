@@ -366,8 +366,6 @@ async function verifyPublicationImpl(
       locator: { url, sha256: file.sha256, bytes: file.bytes.byteLength },
     });
   }
-  // Merge once so the catalog can preflight every immutable slot before writing.
-  // No verified receipt is written until every transport and semantic check passes.
   const componentEntries = new Map<
     string,
     PackageBundle["components"][number]

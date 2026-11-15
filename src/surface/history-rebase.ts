@@ -4,9 +4,6 @@ import { mergePageContent } from "../core/page-merge-model";
 interface History<T> { past: T[]; future: T[]; group: string; at: number }
 const contentKey = (document: ShowDocument) => JSON.stringify([document.content, document.layout, document.surfaceViews, document.icon, document.comments]);
 
-/** Rebase local undo/redo ownership over a foreign source receipt. Native
- * receipts enter current state before their parent echo, so they need the
- * same rebase as external document props at this boundary. */
 export function rebaseHistorySnapshots<T extends ShowDocument, A>(history: History<T>, actions: Map<T, A>, before: T, incoming: T): void {
   const rebased = new Map<T, T | null>(), incomingKey = contentKey(incoming);
   const rebase = (snapshot: T): T | null => {

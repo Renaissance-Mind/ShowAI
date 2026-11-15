@@ -55,8 +55,6 @@ export function WorkspaceConflictsDialog({
       active.current = false;
     };
   }, [load]);
-  // Saves record external edits before overwriting a file; this compares the
-  // rest of one project on request.
   async function check() {
     setChecking(true);
     setError("");
@@ -466,7 +464,6 @@ export function ExternalConflictDialog({
 }: {
   id: string;
   onClose: () => void;
-  /** Closing without a decision (Escape, ×, 稍后); the draft stays. */
   onDismiss?: () => void;
   onResolved: () => Promise<void>;
   projectId?: string;
@@ -609,8 +606,6 @@ export function ExternalConflictDialog({
                 </div>
               </div>
             ) : tab === "compare" ? (
-              // Three names only: your changes (the unsaved draft, else the saved
-              // version), the changes made elsewhere, and the version before both.
               <div className="history-conflict-values">
                 <div>
                   <h3>{t("savedVersion")}</h3>

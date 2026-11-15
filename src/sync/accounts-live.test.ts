@@ -119,7 +119,6 @@ test.skipIf(!fixturePath)(
       await expect(
         accountRequest({ ...b, token: issued.token }, "/api/me"),
       ).rejects.toMatchObject({ status: 401 });
-      // Original per-service credentials remain independent of the binding.
       expect(
         (await accountRequest<{ serverId: string }>(b, "/api/me")).serverId,
       ).toBe(b.serverId);

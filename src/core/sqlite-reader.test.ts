@@ -52,7 +52,6 @@ it("reads current content and per-resource tokens through changes, removals and 
   expect(JSON.parse((await a.readFile(path, third)).toString()).value).toBe(
     "A",
   );
-  // Superseded states are not retained.
   await expect(a.readFile(path, second)).rejects.toMatchObject({
     code: "NOT_FOUND",
   });

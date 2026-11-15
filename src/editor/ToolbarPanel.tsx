@@ -1,7 +1,6 @@
 import { useLayoutEffect, useRef, type ReactNode } from "react";
 import "./toolbar-panel.css";
 
-/** Secondary controls stay in the owning toolbar's DOM and keyboard scope. */
 export function ToolbarPanel({
   children,
   className = "",

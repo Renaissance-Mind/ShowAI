@@ -1,7 +1,6 @@
 import { validateRichTextData } from "../../document/rich-text.mjs";
 import { validateNativeInk } from "../../surface/native-ink.mjs";
 
-/** Most steps one stepper holds; the editor's hiding rules cover this many. */
 export const MAX_STEPS = 12;
 export function validatePrimitiveData(kind, data) {
   if (kind !== "text" && data.document) {
@@ -111,7 +110,6 @@ export function validatePrimitiveData(kind, data) {
   }
 }
 
-/** A null column override inherits the table's alignment. */
 export function tableColumnAlignment(data, column) {
   return data.columnAlignments?.[column] ?? data.align ?? "left";
 }

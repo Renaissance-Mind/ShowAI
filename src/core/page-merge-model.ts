@@ -27,7 +27,6 @@ export interface PageMergeConflict {
   path: string;
   kind: "value" | "text" | "structure";
   reason?: string;
-  /** Fully retained ink variants may travel in the canonical page in-place. */
   domain?: "ink";
   retained?: boolean;
   ink?: { boardId?: string; strokeId?: string; field: string };
@@ -86,7 +85,6 @@ function textContent(
   return { text: items.map((item) => item.text).join(""), marks };
 }
 
-/** Order is separate from node identity; divergent moves stay explicit conflicts. */
 function mergeOrder(
   base: string[],
   ours: string[],
@@ -189,7 +187,6 @@ export function mergePageContent(
   const b = flatten(base),
     o = flatten(ours),
     t = flatten(theirs);
-  // Comments merge per record; see comment-merge.
   const comments = mergeComments(
     b.fields.comments as ShowDocument["comments"],
     o.fields.comments as ShowDocument["comments"],
@@ -387,7 +384,6 @@ export function mergePageContent(
     }
     document = validateDocument(document);
   } catch (error) {
-    // A structurally invalid merge remains a visible conflict and an intact local draft.
     conflicts.push({
       path: "/structure",
       kind: "structure",

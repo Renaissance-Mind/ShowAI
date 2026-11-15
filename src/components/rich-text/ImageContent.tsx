@@ -9,11 +9,6 @@ import messages from "../../i18n/messages/media";
 import commonMessages from "../../i18n/messages/common";
 import "../blocks/research-media.css";
 
-/**
- * Shown instead of an image that failed to load or whose address is not
- * allowed, following the media block's failure notice: what happened, and
- * the original address to open or copy.
- */
 function ImageUnavailable({
   src,
   blocked,
@@ -54,13 +49,11 @@ function ImageUnavailable({
   );
 }
 
-/** Image content has one presentation in editable documents, SDK blocks and exports. */
 export function ImageContent({
   attrs,
   onSourceChange,
 }: {
   attrs: NonNullable<JSONContent["attrs"]>;
-  /** Replaces the image source, e.g. with another linked file; absent when read-only. */
   onSourceChange?: (src: string) => void;
 }) {
   const [failed, setFailed] = useState("");

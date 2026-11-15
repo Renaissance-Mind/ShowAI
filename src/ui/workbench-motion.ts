@@ -1,12 +1,3 @@
-/**
- * Continuity for the workbench's shared surfaces. Menus, dialogs, popovers and
- * toasts unmount the moment their owner drops them, and library rows are
- * replaced by React as lists change. This layer watches those removals and
- * insertions once for the whole workbench: a removed overlay is replaced by
- * an inert snapshot that plays its exit, and list rows animate from their
- * previous place. It is installed by the workbench only, so the portable
- * reader and exported pages carry none of it.
- */
 import {
   exitKeyframes,
   motionDuration,
@@ -20,9 +11,7 @@ import {
 interface ExitRule {
   selector: string;
   style: ExitStyle;
-  /** The visible panel inside a backdrop, which pops while the backdrop fades. */
   panel?: { selector: string; style: ExitStyle };
-  /** A new element of the same kind replaces a leaving one at once. */
   replaces?: boolean;
 }
 
@@ -53,11 +42,9 @@ export const EXIT_RULES: readonly ExitRule[] = [
 
 const ROW_SELECTOR =
   ".studio-tree-row[data-library-id], .studio-page-list-row[data-library-id]";
-/** Scroll containers whose rows keep their place across changes. */
 const LIST_SELECTOR = ".studio-sidebar-projects, .studio-page-list";
 const GHOST = "data-exit-ghost";
 
-/** The removed element itself, or the overlay inside a thin wrapper around it. */
 export function findExit(node: Element) {
   let current: Element | null = node;
   for (let depth = 0; current && depth < 3; depth++) {
@@ -69,7 +56,6 @@ export function findExit(node: Element) {
   return null;
 }
 
-/** A copy that looks like the removed element but takes no part in the page. */
 function snapshot(element: Element) {
   const copy = element.cloneNode(true) as HTMLElement;
   copy.setAttribute(GHOST, "");
@@ -83,7 +69,6 @@ function snapshot(element: Element) {
     node.removeAttribute("data-autofocus");
     node.removeAttribute("data-library-id");
     node.removeAttribute("autofocus");
-    // CSS entrance animations would replay on the copy.
     node.style.animation = "none";
     node.style.transition = "none";
   }
@@ -95,7 +80,6 @@ export class ExitLayer {
 
   constructor(private doc: Document) {}
 
-  /** Plays the exit of an element that was just removed from `parent`. */
   exit(removed: Element, parent: Node, next: Node | null) {
     const found = findExit(removed);
     if (!found || !parent.isConnected) return;
@@ -124,7 +108,6 @@ export class ExitLayer {
     animations[0].finished.then(remove, remove);
   }
 
-  /** A new menu or dialog of the same kind takes over from a leaving one. */
   replace(added: Element) {
     const rule = findExit(added)?.rule;
     if (!rule?.replaces) return;
@@ -146,7 +129,6 @@ function followPath(root: HTMLElement, path: number[]) {
   return node;
 }
 
-/** Keeps library rows in place visually while React rearranges them. */
 export class ListMotion {
   private layouts = new WeakMap<Element, Map<string, RowBox>>();
   private running = new Map<Element, Animation>();
@@ -165,7 +147,6 @@ export class ListMotion {
     return rows;
   }
 
-  /** Row boxes in the list's content coordinates, without in-flight transforms. */
   private measure(list: Element, rows: Map<string, HTMLElement>) {
     const origin = list.getBoundingClientRect();
     const boxes = new Map<string, RowBox>();
@@ -191,7 +172,6 @@ export class ListMotion {
     return boxes;
   }
 
-  /** Records the current layout so the next change can animate from it. */
   remember(list: Element) {
     this.layouts.set(list, this.measure(list, this.rows(list)));
   }
@@ -201,10 +181,8 @@ export class ListMotion {
     const rows = this.rows(list);
     const after = this.measure(list, rows);
     this.layouts.set(list, after);
-    // Dragging previews its own layout; the drop lands without a second pass.
     if (!before || this.doc.querySelector(".library-drag-ghost")) return;
     if (prefersReducedMotion(this.doc.defaultView!)) return;
-    // The part of the list inside the window, in the list's content coordinates.
     const origin = list.getBoundingClientRect();
     const height = this.doc.documentElement.clientHeight;
     const plan = planRowMotion(before, after, {
@@ -242,7 +220,6 @@ export class ListMotion {
     animation.finished.then(done, done);
   }
 
-  /** Removed rows fade where they were while their neighbours close the gap. */
   private leave(
     list: Element,
     keys: string[],
@@ -292,7 +269,6 @@ export class ListMotion {
   }
 }
 
-/** Installs exit snapshots and list motion for one workbench document. */
 export function installWorkbenchMotion(doc: Document) {
   const exits = new ExitLayer(doc);
   const lists = new ListMotion(doc);
@@ -314,7 +290,6 @@ export function installWorkbenchMotion(doc: Document) {
       }
       for (const node of record.removedNodes) {
         if (!(node instanceof Element) || node.hasAttribute(GHOST)) continue;
-        // A node that React moved is connected again by now.
         if (!node.isConnected) exits.exit(node, record.target, record.nextSibling);
         touch(record.target, node);
       }

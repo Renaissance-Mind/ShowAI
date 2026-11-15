@@ -41,7 +41,6 @@ import {
 } from "../session-draft";
 import "./feedback.css";
 
-/** What opened 关于与反馈: the page itself, the report form or the diagnostics preview. */
 export interface FeedbackRequest {
   id: number;
   view: "about" | "report" | "diagnostics";
@@ -106,7 +105,6 @@ function InfoRow({ label, value }: { label: string; value: string }) {
   );
 }
 
-/** Release builds: the update state with its next step, and automatic updates. */
 function UpdateRows() {
   const t = useTranslator(messages);
   const { state, run } = useAppUpdate();
@@ -170,7 +168,6 @@ function UpdateRows() {
   );
 }
 
-/** Install state and the latest connection result of each Agent host. */
 function PluginRows({ home }: { home: string }) {
   const t = useTranslator(messages);
   const plugins = usePluginHosts(home);
@@ -250,11 +247,6 @@ function PluginRows({ home }: { home: string }) {
   );
 }
 
-/**
- * Settings → 关于与反馈: app information that can be copied line by line,
- * where to get help, and redacted diagnostics. The browser workbench shows
- * the same page without the desktop-only log actions.
- */
 export function AboutFeedback({
   info,
   request,
@@ -263,13 +255,11 @@ export function AboutFeedback({
 }: {
   info: DesktopInfo | null;
   request?: FeedbackRequest;
-  /** Absent where the built-in documentation is not available. */
   onOpenDocs?: () => void;
   onOpenFaq?: () => void;
 }) {
   const t = useTranslator(messages);
   const appIcon = appIconForTheme(useAppearanceTheme());
-  // Returning to this section shows the report form as it was left.
   const [shownView, setView] = useSessionDraft<"about" | "report">(
     "feedback.view",
     "about",
@@ -277,7 +267,6 @@ export function AboutFeedback({
   const [shownContext, setContext] = useSessionDraft<
     ReportProblemDetail | undefined
   >("feedback.context", undefined);
-  // Each request opens once; coming back later keeps what the user did since.
   const opening =
     request && readSessionDraft("feedback.request", 0) !== request.id
       ? request
@@ -323,7 +312,6 @@ export function AboutFeedback({
       return window.showai.exportDiagnostics(text).then((result) => {
         if (result) done(t("diag.exported", { path: result.path }));
       });
-    // Browser workbench: the browser saves the file in its download folder.
     const link = document.createElement("a");
     link.href = URL.createObjectURL(
       new Blob([text], { type: "text/plain;charset=utf-8" }),

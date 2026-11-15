@@ -1,7 +1,6 @@
 import { applyOperations } from "../core/diff";
 import { createResource } from "../document/containers.mjs";
 import type { ShowDocument } from "../core/model";
-/** The shared shallow authoring path used by MCP page_create and native hosts. */
 export function blocksDocument(
   blocks: { kind: string; data: Record<string, unknown> }[],
   title = "未命名页面",
@@ -24,7 +23,6 @@ export function blocksDocument(
     },
     kind,
   );
-  // The blocks replace the empty starter text a new Page carries.
   for (const starter of blank.content.content ?? [])
     delete blank.layout?.[starter.attrs?.id];
   blank.content.content = [];

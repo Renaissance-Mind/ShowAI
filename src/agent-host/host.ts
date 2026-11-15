@@ -165,7 +165,6 @@ export function isolatedEnvironment(
     if (process.env[name]) env[name] = process.env[name]!;
   return env;
 }
-/** Embedded tasks receive a separately configured project-bound MCP. */
 export async function copyEmbeddedPlugin(source: string, destination: string) {
   await cp(source, destination, { recursive: true, force: true });
   await rm(join(destination, "mcp.json"), { force: true });
@@ -559,8 +558,6 @@ export class AgentHost {
             pending.secret = { ...latest, kind: "chatgpt" };
             await writeProtected(transferPath, pending);
           }
-          // Suspend the local refresh owner before contacting the hosted vault.
-          // An unknown HTTP outcome keeps this durable transfer for a retry.
           await writeProtected(
             join(this.options.root, "credentials", id + ".json"),
             {
@@ -767,7 +764,6 @@ export class AgentHost {
       task.events.splice(0, task.events.length - 400);
     this.touch(task);
   }
-  /** Running conversation turns persist their events incrementally. */
   private touch(task: AgentTask) {
     const conversation =
       "conversationId" in task
@@ -987,7 +983,6 @@ export class AgentHost {
       });
     return task;
   }
-  /** Backends that continue their own session receive only the new request. */
   private resumable(conversation: AgentConversation) {
     return (
       !!conversation.threadId &&
@@ -996,7 +991,6 @@ export class AgentHost {
         conversation.localAgent === "claude")
     );
   }
-  /** Conversations whose next turn is being prepared and is not yet recorded as running. */
   private starting = new Set<string>();
   async send(
     args: {
@@ -1007,8 +1001,6 @@ export class AgentHost {
     },
     reserved?: { turnId: string },
   ): Promise<AgentConversation> {
-    // Preparing a turn awaits several reads before the turn is recorded, so a
-    // second request for the same conversation is refused from the first moment.
     const conversationId = args.conversationId
       ? z.string().uuid().parse(args.conversationId)
       : undefined;
@@ -1139,7 +1131,6 @@ export class AgentHost {
             false,
             resumable ? conversation.threadId : undefined,
           );
-    // Record the page result before the state leaves "running"; pollers stop at that point.
     void run
       .then(
         () =>
@@ -1211,11 +1202,6 @@ export class AgentHost {
       );
     return conversation;
   }
-  /**
-   * The source an API conversation runs with. A new conversation without one
-   * means no model source was ever chosen; an existing conversation whose
-   * source is gone keeps its own explanation.
-   */
   private async conversationSource(
     conversation: AgentConversation,
     fresh: boolean,
@@ -1230,7 +1216,6 @@ export class AgentHost {
         fresh || !conversation.sourceId ? "no_model_source" : "source_removed",
     });
   }
-  /** Classifies a failed run; the original text stays in `problem.detail`. */
   private problem(
     error: Error,
     task: AgentTask,
@@ -1252,7 +1237,6 @@ export class AgentHost {
         .join("\n"),
     });
   }
-  /** Restore the focused page to its state before this turn, if nothing changed since. */
   async undoTurn(projectId: string, conversationId: string, turnId: string) {
     const conversation = await this.conversations.get(
       projectId,
@@ -1308,7 +1292,6 @@ export class AgentHost {
       args: [...cli.args, "mcp", "--project", projectId],
       env: {
         ...cli.env,
-        // Keeps built-in runs out of the host plugin connection records.
         SHOWAI_MCP_CLIENT: "builtin",
         ...(task && "conversationId" in task
           ? {
@@ -1380,8 +1363,6 @@ export class AgentHost {
         test,
       );
     } catch (error) {
-      // Provider statuses seen by the gateway explain the run better than
-      // the text Codex reports after its own retries.
       const failure = gateway.failure();
       if (failure && !signal.aborted && !(error instanceof AgentFailure))
         throw gatewayProblem(failure, { chatgpt, name: source.name });
@@ -1516,7 +1497,6 @@ export class AgentHost {
     }
     if (!agent?.path) throw new Error(t("task.agentMissing"));
     if (agentId === "codex") {
-      // `exec resume` takes no --sandbox/--cd; the same settings go through config and cwd.
       const args = threadId
         ? [
             "exec",
@@ -1542,8 +1522,6 @@ export class AgentHost {
           `mcp_servers.showai=${tomlTable(this.mcp(cli, task.projectId, task))}`,
         );
       if (threadId) args.push(threadId);
-      // The prompt goes through stdin: with the page context it can exceed
-      // the 32,767-character Windows command line.
       args.push("-");
       let complete = false;
       const result = await execute(agent.path, args, {
@@ -1570,8 +1548,6 @@ export class AgentHost {
       return;
     }
     if (agentId === "claude") {
-      // Without a prompt argument, print mode reads the prompt from stdin;
-      // with the page context it can exceed the Windows command line.
       const args = [
         "-p",
         "--output-format",
@@ -1579,7 +1555,6 @@ export class AgentHost {
         "--verbose",
         "--include-partial-messages",
       ];
-      // Claude Code stores sessions per cwd; a conversation keeps one workspace.
       if (!test) {
         if (threadId) args.push("--resume", threadId);
         else {
@@ -1899,7 +1874,6 @@ export class AgentHost {
         );
         const turn = conversation.turns.find((item) => item.id === args.id);
         if (!turn) throw new Error(t("conversation.notFound"));
-        // A finished turn reports whether its final write reached disk.
         if (turn.state !== "running")
           await this.conversations.settled(conversation.id);
         const persistError = this.conversations.persistFailure(conversation.id);
@@ -1987,7 +1961,6 @@ export const agentActions = new Set([
   "agent:readFile",
   "agent:permission",
 ]);
-/** A local Agent that exited non-zero, or quit without finishing the turn. */
 function exitFailure(
   result: { code: number; stderr: string },
   name: string,
@@ -2004,7 +1977,6 @@ function exitFailure(
       : { code: "unknown", summary: incomplete, name, detail: result.stderr },
   );
 }
-/** `mcp__showai__page_apply` reads as `showai · page_apply`. */
 function toolLabel(name: string) {
   const match = /^mcp__([^_]+(?:_[^_]+)*?)__(.+)$/.exec(name);
   return match ? `${match[1]} · ${match[2]}` : name;

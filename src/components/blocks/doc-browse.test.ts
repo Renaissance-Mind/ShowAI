@@ -136,7 +136,6 @@ describe("structure browser contract", () => {
 describe("structure browser rendering", () => {
   it("opens the initial path, shows its detail and never needs onChange", () => {
     const html = render(StructureBrowserBlock, structure());
-    // The ancestor is expanded and the initial node is the only tab stop.
     expect(html).toMatch(
       /aria-selected="false" aria-expanded="true"[^>]*>.*?data</,
     );
@@ -150,7 +149,6 @@ describe("structure browser rendering", () => {
     );
     expect(html).toContain("&quot;status&quot;: &quot;paid&quot;");
     expect(html).toContain("复制示例：status");
-    // Collapsed nodes are absent from the tree but present in the print outline.
     const tree = html.slice(0, html.indexOf('class="stb-detail"'));
     expect(tree).toContain("docs/");
     expect(tree).not.toContain("readme.md");
@@ -256,7 +254,6 @@ describe("card grid", () => {
     expect(html).toContain("cg-tone-teal");
     expect(html).toContain("cg-tone-brand");
     expect(html).toContain('data-columns="2"');
-    // Data that skipped validation still never becomes a script link.
     const bad = cards();
     bad.cards[0].href = "javascript:alert(1)";
     expect(render(CardGridBlock, bad)).not.toContain("javascript:");

@@ -25,7 +25,6 @@ const context = {
 };
 const bytes = (value: string) => Buffer.from(value);
 
-// Neighbours that a naive prefix match would confuse: a/ vs ab/, a.json vs a/.
 const files = [
   "projects/p/conflicts/a/record.json",
   "projects/p/conflicts/a/input.json",
@@ -55,7 +54,6 @@ async function expectSameEntries(
   const all = [...queries, ...extra];
   const identity = (entries: { path: string; oid: string }[]) =>
     entries.map(({ path, oid }) => ({ path, oid }));
-  // Queried before the full tree is read, then again once the reader cached it.
   const queried = [];
   for (const query of all)
     queried.push(identity(await library.treeEntries(query, revision)));
@@ -91,7 +89,6 @@ test("targeted tree entries match the full tree at the current revision, includi
     { paths: [pagePath], prefixes: [nodePrefix(pagePath)] },
     { prefixes: [`projects/${project.id}/`] },
   ]);
-  // A deletion leaves neither the path nor the prefix entries.
   await library.writeFiles(
     new Map([["projects/p/conflicts/a/record.json", null]]),
     context,
@@ -138,7 +135,6 @@ test("targeted tree entries match the full tree of retained historical revisions
   await migrateGitContent(root);
   const library = new ContentLibrary(root);
   expect((await library.manifest()).storage).toBe("sqlite");
-  // The retained archive answers from its change rows; the head from current files.
   await expectSameEntries(library, first);
   await expectSameEntries(library, second);
   expect(
@@ -154,7 +150,6 @@ test("targeted tree entries match the full tree of retained historical revisions
   ]);
 });
 
-// Paths shaped like stored page nodes only in part, which treeFiles keeps.
 const nodeLike = [
   "projects/p/pages/x/nodes/abc.json",
   "projects/p/pages/x/sub/nodes/abc.json",
@@ -184,7 +179,6 @@ test("the tree without page nodes is the full tree less exactly those rows", asy
   );
   await migrateGitContent(root);
   const library = new ContentLibrary(root);
-  // A stored page, split into node rows.
   const storedPage = (id: string) =>
     Buffer.from(
       JSON.stringify({
@@ -211,7 +205,6 @@ test("the tree without page nodes is the full tree less exactly those rows", asy
     context,
   );
   const head = (await library.head())!;
-  // Read from SQL first, then filtered from the cached full tree.
   const files = identity(await library.treeFiles(head));
   const tree = await library.tree(head);
   expect(tree.length).toBeGreaterThan(files.length);
@@ -226,7 +219,6 @@ test("the tree without page nodes is the full tree less exactly those rows", asy
   const next = (await library.head())!;
   const full = await library.tree(next);
   expect(identity(await library.treeFiles(next))).toEqual(withoutNodes(full));
-  // A retained historical revision answers from its change rows.
   expect(identity(await library.treeFiles(archived))).toEqual(
     withoutNodes(await library.tree(archived)),
   );
@@ -276,7 +268,6 @@ test("page summaries and search follow an edit that changes only a page node", a
   const index = new LibraryIndex(root);
   expect((await store.listPages(project.id))[0].hash).toBe(saved.hash);
   expect((await index.search({ query: "alpha" })).total).toBe(1);
-  // The same artifact with one text changed: only that node's object differs.
   const path = `projects/${project.id}/pages/${page.document.id}.json`;
   const skeleton = async () =>
     (await library.treeFiles()).find((entry) => entry.path === path)!.oid;

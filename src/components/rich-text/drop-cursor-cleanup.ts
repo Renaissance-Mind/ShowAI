@@ -10,10 +10,6 @@ export const DropCursorCleanup = Extension.create({
           const document = view.dom.ownerDocument;
           const window = document.defaultView;
           const clear = () => {
-            // The stock drop cursor only listens inside the editor. Block handles
-            // live outside it, and our drop capture handler stops propagation.
-            // Use its dragleave lifecycle to clear both the overlay and position
-            // before a drop transaction can redraw the old indicator.
             const event = document.createEvent("Event");
             event.initEvent("dragleave", false, false);
             view.dom.dispatchEvent(event);

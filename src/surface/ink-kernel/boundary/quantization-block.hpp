@@ -2,16 +2,8 @@
 #define SHOWAI_BOUNDARY_QUANTIZATION_BLOCK_HPP
 #include "quantization.hpp"
 namespace showai_boundary {
-// An internal mathematical staging primitive, not a public lease/authority API.
-// The state owner must resolve the actual source lease and its vertex records,
-// and supply the retained anchors for that exact snapshot. These records keep
-// endpoint bits alive with every derived arc; no consumer-owned integer grants
-// authority. Budget admission/commit across multiple blocks belongs to the state
-// owner. The full cold exporter remains available separately.
 struct BoundaryQuantizedAnchorPair {
     Record<BoundaryQuantizedVertex>a,b;
-    // Actual current endpoint topology, independent of the anchor's immutable
-    // original representative metadata after a proved vertex alias/union.
     uint32_t vertex_a=no_index,vertex_b=no_index;
 };
 struct BoundaryQuantizedArc {

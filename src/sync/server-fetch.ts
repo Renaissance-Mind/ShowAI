@@ -7,8 +7,6 @@ const t = translator(syncEngineMessages);
 
 let dispatcher: Agent | undefined;
 
-/** Reuse bounded connections for sync and account requests. TLS negotiates HTTP/2
- * where available; ordinary HTTP/1.1 Linux deployments use the same handler. */
 export async function serverFetch(
   input: string | URL,
   init?: RequestInit,
@@ -42,8 +40,6 @@ export async function serverFetch(
           : undefined;
   const method = (init?.method ?? "GET").toUpperCase();
   const url = new URL(input);
-  // These POSTs only inspect authority and immutable content references. Other
-  // POSTs (login, grants, refresh and publication) must never be auto-retried.
   const inspection =
     method === "POST" &&
     /\/api\/projects\/(?:heads|[^/]+\/objects\/check)$/.test(url.pathname);
@@ -58,8 +54,6 @@ export async function serverFetch(
     idempotent: inspection || method === "GET" || method === "HEAD",
   }).catch((error: unknown) => {
     if (init?.signal?.aborted) throw init.signal.reason;
-    // The translated sentence is shown; the transport's own text stays in
-    // the cause for technical details.
     throw new TypeError(t("network.failed"), { cause: error });
   });
   if (

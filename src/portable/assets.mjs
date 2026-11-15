@@ -6,7 +6,6 @@ import { isSafeUrl, validateDocument } from "./validation.mjs";
 import { detachedRef, isLocalFileRef, localRefType } from "../document/local-files.mjs";
 import { SKIP, walk } from "../document/walk.mjs";
 
-/** The id of a node or of its nearest identified ancestor, across held documents. */
 function nearestIds() {
   const ids = new Map();
   return (node, parent) => {
@@ -17,14 +16,6 @@ function nearestIds() {
   };
 }
 
-/**
- * Every resource field of a document: page and container icons, image
- * nodes, image/gallery/bookmark/video-poster images, rich-text images, and
- * video, audio and PDF files. Each slot names its object and key so a copy
- * can be rewritten, the resource kind, and the nearest block id.
- * `components` also lists local file references inside custom component
- * props (strings naming a supported file type).
- */
 export function resourceSlots(document, { components = false } = {}) {
   const slots = [];
   const add = (object, key, kind, blockId, field) =>
@@ -77,17 +68,11 @@ export function resourceSlots(document, { components = false } = {}) {
       propSlots(data.props, "props", (object, key, field, kind) =>
         add(object, key, kind, blockId, field),
       );
-    // Rich text in component data (text, callout and toggle bodies, stepper
-    // steps) is walked; a library component's props are covered by propSlots.
     if (widget === "custom") return SKIP;
   }, { scope: "content" });
   return slots;
 }
 
-/**
- * Local file references among a custom component's props, by JSON path:
- * those naming a supported file type, or every `file:` string with `any`.
- */
 function propSlots(value, path, add, depth = 0, any = false) {
   if (depth > 40 || !value || typeof value !== "object") return;
   for (const [key, item] of Object.entries(value)) {
@@ -100,11 +85,6 @@ function propSlots(value, path, add, depth = 0, any = false) {
   }
 }
 
-/**
- * Every `file:` string inside custom component props, whatever file it
- * names, with its block and JSON path. A copy for readers without this
- * device rewrites each of them, so no location on this device leaves it.
- */
 export function componentFileSlots(document) {
   const slots = [];
   const nearest = nearestIds();
@@ -135,7 +115,6 @@ const fileSlots = (document) =>
     .filter((slot) => slot.kind !== "image")
     .map((slot) => [slot.object, slot.key, slot.kind]);
 
-/** Web addresses in resource fields; embedded data and local references are not web addresses. */
 const isWebAddress = (url) => !url.startsWith("data:") && !isLocalFileRef(url);
 export function externalResourceUrls(document) {
   return [
@@ -166,7 +145,6 @@ export function assertOfflineImages(document) {
     );
 }
 
-/** Downloads a web resource of a kind into a data: address (at most one resource budget). */
 export async function resourceDataUrl(url, kind = "image") {
   if (!isSafeUrl(url, kind === "image"))
     throw new Error(`Unsupported resource URL: ${url}`);
@@ -219,7 +197,6 @@ export async function resourceDataUrl(url, kind = "image") {
     bytes.set(chunk, offset);
     offset += chunk.length;
   }
-  // Bounded chunks avoid apply() argument limits for larger images.
   let binary = "";
   for (let index = 0; index < bytes.length; index += 32768)
     binary += String.fromCharCode(...bytes.subarray(index, index + 32768));
@@ -235,7 +212,6 @@ export async function embedDocumentImages(document) {
   ]) {
     const url = object[key];
     if (url.startsWith("data:")) continue;
-    // A standalone copy cannot reach this device's files; it keeps the name.
     if (isLocalFileRef(url)) {
       object[key] = detachedRef(url);
       continue;

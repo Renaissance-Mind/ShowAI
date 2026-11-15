@@ -8,9 +8,7 @@ export type DatasetOperation =
       op: "set";
       path: DataPath;
       value: unknown;
-      /** The value the writer started from; a different current value conflicts. */
       before?: unknown;
-      /** The writer started from a missing value. */
       absent?: true;
     }
   | { op: "remove"; path: DataPath; before?: unknown }
@@ -18,7 +16,6 @@ export type DatasetOperation =
       op: "insert";
       path: DataPath;
       value: unknown;
-      /** Insert after this record id; null inserts first; omitted appends. */
       after?: string | number | null;
       index?: number;
     }

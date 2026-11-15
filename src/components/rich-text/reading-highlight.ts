@@ -1,7 +1,6 @@
 import Highlight from "@tiptap/extension-highlight";
 import type { Attributes } from "@tiptap/core";
 
-/** Store the colour and coverage mode without an inline full-height background. */
 export const ReadingHighlight = Highlight.extend({
   addAttributes() {
     const attributes: Attributes = {

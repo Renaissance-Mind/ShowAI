@@ -7,7 +7,6 @@ import messages from "../i18n/messages/mentions";
 import commonMessages from "../i18n/messages/common";
 import "./page-backlinks.css";
 
-/** The count of pages referring to this page, opening their list. */
 export default function PageBacklinks() {
   const t = useTranslator(messages);
   const tc = useTranslator(commonMessages);
@@ -15,7 +14,6 @@ export default function PageBacklinks() {
   const [open, setOpen] = useState(false);
   const root = useRef<HTMLDivElement>(null);
   const list = useId();
-  // The index counts every referring page; the list stops at 200 references.
   const count = references.pages;
   useEffect(() => {
     if (!open) return;

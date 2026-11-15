@@ -1,6 +1,5 @@
 import { defineMessages } from "../index";
 
-// Errors and generated names from shared workbench actions (desktop main and browser server).
 export default defineMessages("workbench", {
   "zh-CN": {
     chooseProjectVisibility: "请选择项目是否在本设备显示。",

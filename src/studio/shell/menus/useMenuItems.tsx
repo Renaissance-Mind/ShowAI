@@ -41,7 +41,6 @@ import type { LibraryMoves } from "../useLibraryMoves";
 import type { MenuState } from "./useMenuState";
 import type { WorkspaceTabs } from "../types";
 
-/** Menu entries shared by the workbench menus, the native menu and quick jump. */
 export function useMenuItems({
   feedback: { action },
   library: {
@@ -103,10 +102,6 @@ export function useMenuItems({
   const t = useTranslator(studioMessages);
   const tc = useTranslator(commonMessages);
   const tn = useTranslator(navigationMessages);
-  /**
-   * Content that can be created in a project or folder. Without a target, each
-   * entry first opens the new-project dialog and then creates in that project.
-   */
   function creationMenuItems(
     target: LibraryTarget | null,
   ): LibraryContextMenuItem[] {
@@ -158,7 +153,6 @@ export function useMenuItems({
       },
     ];
   }
-  /** The grouped export menu shared by the top-bar ↗ button and the page 「…」 menu. */
   function pageExportMenuItems(
     target = activePageTarget(),
   ): LibraryContextMenuItem[] {
@@ -302,11 +296,6 @@ export function useMenuItems({
       },
     ];
   }
-  /**
-   * The sidebar's New menu: content, then a new project. Content goes to the
-   * open writable project, else the most recently used writable project, else
-   * a project created first.
-   */
   function newMenuItems(): LibraryContextMenuItem[] {
     const readOnly = (id: string) =>
       syncOverview.markers.get(id) === "readOnly";
@@ -326,7 +315,6 @@ export function useMenuItems({
         : destination.kind === "recent"
           ? projectTarget(destination.project)
           : null;
-    // A selected folder that is still loading would put content one level too high.
     const disabled =
       !workspaceReady ||
       routing ||

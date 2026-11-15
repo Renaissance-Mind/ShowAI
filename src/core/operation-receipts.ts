@@ -8,7 +8,6 @@ import type { HistoryEntry } from "./history-model";
 const key = (operationId: string) =>
   createHash("sha256").update(operationId).digest("hex");
 
-/** Rebuildable operation lookup; the committed change remains the source of truth. */
 export class OperationReceipts {
   readonly path: string;
   constructor(

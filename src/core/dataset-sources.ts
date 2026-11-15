@@ -45,22 +45,8 @@ export type {
   UrlSource,
 } from "../datasets/dataset-file";
 
-// A dataset can keep its value outside the content library: in a local file
-// or at an http(s) address. The library stores only the dataset's description
-// and `source` (format, file name, and for online data the address, all
-// synchronized with the project). A file's absolute path is linked per device
-// in local/dataset-sources.json, so a shared project never makes another
-// device read files it did not choose, and each device links its own copy.
-// JSON, CSV and TSV files are read and written; spreadsheets (.xlsx) and
-// online data are read-only.
 
-/**
- * Limits of one fetch of online data; hosts and tests may adjust them. A
- * hosted server sets publicAddressesOnly so that addresses of its own
- * network (loopback, private ranges, link-local) are never fetched.
- */
 const publicRemoteFetch = new AsyncLocalStorage<boolean>();
-/** Limit an external MCP request without changing the desktop's own data connections. */
 export function withPublicRemoteFetch<T>(
   operation: () => Promise<T>,
 ): Promise<T> {
@@ -77,25 +63,20 @@ export const REMOTE_FETCH = {
   publicAddressesOnly: false,
 };
 
-/** What a read of the linked file found, carried by the dataset record. */
 export interface ExternalFileState {
   path: string;
   format: SourceFormat;
   bytes: number;
   modifiedAt: string;
 }
-/** What the last fetch of online data found. */
 export interface RemoteSourceState {
   url: string;
   format: SourceFormat;
   bytes: number;
-  /** When the data was last fetched or confirmed unchanged. */
   fetchedAt: string;
-  /** Last-Modified of the response, when the server sent one. */
   modifiedAt?: string;
 }
 
-/** A CoreError of a source read, with the warning code that explains it. */
 export function sourceFailure(
   code: "INVALID_DATA" | "INVALID_PATH" | "SOURCE_UNAVAILABLE",
   message: string,
@@ -123,7 +104,6 @@ function registryPath(home: string) {
   return join(home, "local", "dataset-sources.json");
 }
 
-/** The format a file name or address implies, or the explicit one. */
 export function sourceFormat(path: string, format?: unknown): SourceFormat {
   if (format !== undefined) {
     if (!SOURCE_FORMATS.includes(format as SourceFormat))
@@ -142,7 +122,6 @@ export function sourceFormat(path: string, format?: unknown): SourceFormat {
   );
 }
 
-/** An http(s) address for online data; credentials are never stored. */
 export function sourceUrl(value: unknown): string {
   if (typeof value !== "string" || !value.trim() || value.length > 2048)
     throw new CoreError(
@@ -165,7 +144,6 @@ export function sourceUrl(value: unknown): string {
   return url.href;
 }
 
-/** The refresh interval of online data, in seconds. */
 export function refreshSeconds(value: unknown): number | undefined {
   if (value === undefined) return undefined;
   if (
@@ -188,7 +166,6 @@ function inside(root: string, target: string) {
   );
 }
 
-/** An absolute file path outside the content library. */
 export function externalPath(home: string, path: unknown): string {
   if (typeof path !== "string" || !path.trim() || path.length > 4096)
     throw new CoreError("INVALID_PATH", "Give the external file's path.");
@@ -228,7 +205,6 @@ export class DatasetSourceLinks {
     return (await this.registry()).links[key(projectId, datasetId)]?.path;
   }
 
-  /** Every linked file of this device, by dataset key ("project/dataset"). */
   async all(): Promise<Map<string, string>> {
     return new Map(
       Object.entries((await this.registry()).links).map(([name, link]) => [
@@ -253,10 +229,7 @@ export class DatasetSourceLinks {
   }
 }
 
-// ---------------------------------------------------------------------------
-// File formats
 
-/** How the file was written, so a write keeps its layout. */
 export interface FileLayout {
   indent: string | number;
   newline: "\n" | "\r\n";
@@ -286,7 +259,6 @@ function layoutOf(text: string): FileLayout {
 
 const NUMBER = /^-?(?:0|[1-9]\d*)(?:\.\d+)?$/;
 
-/** Cells that read back to the same text become numbers or booleans. */
 function cellValue(text: string): string | number | boolean {
   if (text === "true") return true;
   if (text === "false") return false;
@@ -449,7 +421,6 @@ export function parseSource(
     try {
       return { value: JSON.parse(body), layout };
     } catch (error) {
-      // JSON.parse quotes the file's text; report only the position.
       const position = String(
         error instanceof Error ? error.message : error,
       ).match(/position \d+(?: \(line \d+ column \d+\))?/);
@@ -477,7 +448,6 @@ function readOnlyFormat(format: SourceFormat): CoreError {
   return error;
 }
 
-/** A cell of a spreadsheet as JSON: dates become ISO strings. */
 type SheetCell = string | number | boolean | null;
 function sheetCell(cell: unknown): SheetCell {
   if (cell instanceof Date)
@@ -487,14 +457,11 @@ function sheetCell(cell: unknown): SheetCell {
   return cell === null || cell === undefined ? null : String(cell);
 }
 
-/** Every sheet of a workbook as { sheets: [{ name, rows }] }. */
 export async function parseWorkbook(
   bytes: Buffer,
 ): Promise<{ sheets: { name: string; rows: SheetCell[][] }[] }> {
-  // Loaded on first use, so commands that never read a workbook start faster.
   const { default: readXlsxFile } = await import("read-excel-file/node");
   const sheets = await readXlsxFile(bytes).catch((error: unknown) => {
-    // The library reports damaged or unsupported files by throwing.
     throw sourceFailure(
       "INVALID_DATA",
       `The file is not a readable .xlsx workbook (${error instanceof Error ? error.message : String(error)}).`,
@@ -509,7 +476,6 @@ export async function parseWorkbook(
   };
 }
 
-/** Parses the bytes of a file or response in its format. */
 export async function parseSourceBytes(
   bytes: Buffer,
   format: SourceFormat,
@@ -519,8 +485,6 @@ export async function parseSourceBytes(
     return { value: await parseWorkbook(bytes), layout: DEFAULT_LAYOUT };
   let text: string;
   try {
-    // Undecodable bytes would be read as replacement characters and
-    // written back, damaging the file.
     text = new TextDecoder("utf-8", { fatal: true }).decode(bytes);
   } catch (error) {
     if (!(error instanceof TypeError)) throw error;
@@ -549,21 +513,17 @@ export function serializeSource(
   return layout.bom ? `﻿${text}` : text;
 }
 
-// ---------------------------------------------------------------------------
-// Reading and writing the linked file
 
 export interface ExternalRead {
   value: unknown;
   layout: FileLayout;
   state: ExternalFileState;
-  /** Identity of the version read, checked again before a write replaces it. */
   stamp: string;
 }
 
 const stampOf = (info: { size: number; mtimeMs: number; ino: number }) =>
   `${info.ino}:${info.size}:${info.mtimeMs}`;
 
-/** The bytes of a linked file with the identity of the version read. */
 export async function readExternalBytes(
   path: string,
   limit: number,
@@ -626,11 +586,6 @@ export async function readExternal(
   };
 }
 
-/**
- * Replaces the linked file atomically, keeping its permissions. `expected`
- * is the version the write started from; a file changed since is not
- * overwritten.
- */
 export async function writeExternal(
   path: string,
   text: string | Buffer,
@@ -670,7 +625,6 @@ export async function writeExternal(
   }
 }
 
-/** Readable text of a file system error, without the file's contents. */
 export function fileProblem(error: unknown): string {
   const code = (error as NodeJS.ErrnoException)?.code;
   if (code === "ENOENT") return "the file does not exist";
@@ -679,8 +633,6 @@ export function fileProblem(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
-// ---------------------------------------------------------------------------
-// Fetching online data
 
 export type RemoteFetch =
   | { notModified: true; etag?: string; lastModified?: string }
@@ -723,7 +675,6 @@ function publicIp(address: string): boolean {
   );
 }
 
-/** Connections that resolve only to public addresses (checked at connect time). */
 let publicDispatcher: Agent | undefined;
 async function publicOnly(): Promise<Agent> {
   const { Agent } = await import("undici");
@@ -766,7 +717,6 @@ const unreachable = (url: string, problem: string) =>
     "SOURCE_UNREACHABLE",
   );
 
-/** Reads the body of a response, stopping as soon as it exceeds the limit. */
 async function responseBytes(
   response: Response,
   url: string,
@@ -799,7 +749,6 @@ async function responseBytes(
   return Buffer.concat(chunks);
 }
 
-/** Browser captures of remote-authored pages must not request the device's private network. */
 export async function fetchPublicMedia(url: string) {
   let target = sourceUrl(url);
   const signal = AbortSignal.timeout(15000);
@@ -832,11 +781,6 @@ export async function fetchPublicMedia(url: string) {
   throw unreachable(url, "too many redirects");
 }
 
-/**
- * Fetches online data without cookies or credentials, following redirects
- * only to http(s) addresses. With the validators of an earlier fetch, an
- * unchanged response comes back as notModified.
- */
 export async function fetchSource(
   url: string,
   format: SourceFormat,
@@ -913,7 +857,6 @@ export async function fetchSource(
       return { notModified: false, value, bytes: bytes.length, ...fresh };
     }
   } catch (error) {
-    // Network failures and the timeout reject fetch or the body read.
     if (error instanceof CoreError) throw error;
     const cause = (error as { cause?: { code?: string; message?: string } })
       ?.cause;
@@ -929,10 +872,7 @@ export async function fetchSource(
   }
 }
 
-// ---------------------------------------------------------------------------
-// Watching linked files
 
-/** Projects this device synchronizes, with its role in each. */
 async function synchronizedProjects(home: string) {
   const bytes = await readLibraryBytes(
     home,
@@ -948,7 +888,6 @@ async function synchronizedProjects(home: string) {
   );
 }
 
-/** Shares changed linked files of synchronized projects as their bundled copies. */
 async function shareChangedFiles(store: FileStore, keys: string[]) {
   const synchronized = await synchronizedProjects(store.root);
   const targets = keys
@@ -958,7 +897,6 @@ async function shareChangedFiles(store: FileStore, keys: string[]) {
       return datasetId && role && role !== "viewer";
     });
   if (!targets.length) return;
-  // Loaded on demand: the dataset store itself reads sources through this module.
   const { DatasetStore } = await import("./datasets");
   const datasets = new DatasetStore(store);
   for (const [projectId, datasetId] of targets)
@@ -968,11 +906,6 @@ async function shareChangedFiles(store: FileStore, keys: string[]) {
     });
 }
 
-/**
- * Reports changes of this device's linked files (and of the links
- * themselves) as dataset keys, together with the transforms computed from
- * them, so open windows refresh bound blocks.
- */
 export function watchDatasetSources(
   home: string,
   onChange: (datasets: string[]) => void,
@@ -989,7 +922,6 @@ export function watchDatasetSources(
     if (closed || !pending.size) return;
     const keys = [...pending];
     pending.clear();
-    // A changed file of a synchronized project becomes its new shared copy.
     void shareChangedFiles(store, keys).catch((error) =>
       console.error("ShowAI dataset sources:", error),
     );

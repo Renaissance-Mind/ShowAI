@@ -43,7 +43,6 @@ export default function MergeDialog({
   baseRevision: string;
   document: ShowDocument;
   onClose: () => void;
-  /** Closing without a decision (Escape, ×, 保留草稿并返回); the draft stays. */
   onDismiss?: () => void;
   onMerged: () => Promise<void>;
   saveFailure?: boolean;

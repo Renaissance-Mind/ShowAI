@@ -23,12 +23,10 @@ export function useLanguagePreference(): LanguagePreference {
   );
 }
 
-/** Translator for a namespace that re-renders the component when the language changes. */
 export function useTranslator<T extends Record<string, Message>>(
   namespace: Namespace<T>,
 ): Translator<T> {
   const locale = useLocale();
-  // A new function identity per locale lets memoized callers notice the change.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   return useMemo(() => translator(namespace), [namespace, locale]);
 }

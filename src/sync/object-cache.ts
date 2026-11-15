@@ -15,13 +15,11 @@ import syncEngineMessages from "../i18n/messages/syncEngine";
 const t = translator(syncEngineMessages);
 
 const verified = new Map<string, string>();
-/** Reuse verified immutable bytes; a replaced or damaged cache is checked again. */
 export async function retainCachedObject(
   home: string,
   path: string,
   bytes: Buffer,
   expected: string,
-  /** The caller derived `expected` from these exact bytes. */
   trusted = false,
 ) {
   if (!trusted && createHash("sha256").update(bytes).digest("hex") !== expected)

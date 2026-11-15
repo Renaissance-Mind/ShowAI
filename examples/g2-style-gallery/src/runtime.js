@@ -101,7 +101,6 @@ function adaptSpec(input, theme, expanded, root = true) {
     spec.paddingTop = 20;
     spec.paddingBottom = expanded ? 48 : 35;
   }
-  // Dense legends and demonstration labels are available in the larger view.
   if (!expanded) {
     spec.legend = false;
     if (spec.labels) spec.labels = [];

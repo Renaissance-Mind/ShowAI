@@ -1,9 +1,6 @@
 export interface ComponentContextSnapshot {
-  /** Visible to the Agent with the next message. */
   model: unknown;
-  /** Returned only to the same component instance, never to the Agent. */
   private?: unknown;
-  /** Short text for the conversation chip. */
   label?: string;
 }
 export const componentContextLimits: Readonly<{

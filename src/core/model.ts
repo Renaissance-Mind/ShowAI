@@ -18,7 +18,6 @@ export interface ProjectBinding {
 export type DirectorySortBy = "name" | "createdAt" | "updatedAt" | "manual";
 
 export interface DirectoryPreferences {
-  /** Applies to the immediate children of this directory; omitted means updatedAt. */
   sortBy?: DirectorySortBy;
   manualOrder?: string[];
 }
@@ -31,7 +30,6 @@ export interface ProjectMetadata extends DirectoryPreferences {
   icon?: string;
   createdAt: string;
   updatedAt: string;
-  /** Canonical host project directory, shared by all Agent sessions in it. */
   sourceDirectory?: string;
   binding?: ProjectBinding;
   bindings?: ProjectBinding[];
@@ -55,10 +53,8 @@ export interface ProjectSummary extends ProjectMetadata {
   pageCount: number;
 }
 
-/** A project directory whose metadata or pages could not be read. */
 export interface UnreadableProject {
   directory: string;
-  /** Absolute path of the project directory. */
   path: string;
   code: string;
   message: string;
@@ -77,7 +73,6 @@ export interface SidebarOrganization {
 }
 
 export interface SidebarEntryMove {
-  /** Change only sibling order, without updating page content or requiring its revision. */
   reorderOnly?: boolean;
   kind: "page" | "folder";
   projectId: string;
@@ -108,7 +103,6 @@ export interface PageSummary {
   icon: string;
   hash: string;
   blockCount: number;
-  /** Created by an Agent and not opened in the workbench since (local state). */
   agentCreated?: import("./agent-created").AgentCreatedMark;
   parentId: string | null;
   favorite: boolean;
@@ -132,7 +126,6 @@ export type PageFields = Partial<
   >
 >;
 
-/** A null parent identifies the document root; omitted afterId appends. */
 export type PageOperation =
   | {
       type: "component.insert";
@@ -175,18 +168,12 @@ export type PageOperation =
       afterId?: string | null;
     }
   | { type: "block.attrs.set"; blockId: string; attrs: Record<string, unknown> }
-  /** Replace top-level component data keys without resending the node envelope. */
   | {
       type: "component.props.set";
       blockId: string;
       props: Record<string, unknown>;
     }
   | { type: "block.text.set"; blockId: string; text: string }
-  /**
-   * Point a custom component block at another exact revision. The block id,
-   * props and dataset binding stay; the props are checked against the new
-   * revision's schema (resolved props for bound blocks).
-   */
   | {
       type: "component.ref.set";
       blockId: string;
@@ -194,25 +181,17 @@ export type PageOperation =
       version: string;
       integrity: string;
     }
-  /** Bind a component block to a project dataset; see the datasets guide. */
   | {
       type: "component.binding.set";
       blockId: string;
       binding: Record<string, unknown>;
     }
-  /** Detach a bound block; "snapshot" (default) keeps the shown props in the block. */
   | {
       type: "component.binding.remove";
       blockId: string;
       keep?: "snapshot" | "local";
     }
-  /** Native shapes and bound arrows from nodes and edges, laid out when unpositioned. */
   | ({ type: "diagram.insert" } & DiagramInsertInput)
-  /**
-   * Comments. No threadId: start a thread on blockId, on quoted text (quote,
-   * optionally within blockId) or on the page. threadId: reply with text
-   * and/or resolve or reopen with resolved.
-   */
   | {
       type: "comment";
       text?: string;
@@ -221,14 +200,8 @@ export type PageOperation =
       threadId?: string;
       resolved?: boolean;
     }
-  /** Lay out existing connected objects along their arrows, as the editor's arrange command does. */
   | { type: "diagram.arrange"; nodeIds: string[]; direction?: DiagramDirection };
 
-/**
- * Fields of each page operation, for argument checks, error messages and the
- * test that keeps documented examples current. The type ties every entry to
- * PageOperation.
- */
 export const PAGE_OPERATION_FIELDS = {
   "component.insert": ["kind", "data", "parentId", "afterId"],
   "surface.upgrade": [],
@@ -270,10 +243,6 @@ export interface ApplyPageInput {
   baseRevision?: string;
   baseHash: string;
   operations: PageOperation[];
-  /**
-   * Dataset hashes ("projectId/datasetId" or datasetId → hash) the writer read
-   * for bound blocks; defaults to this session's last read of each dataset.
-   */
   datasetBases?: Record<string, string>;
 }
 
@@ -325,13 +294,9 @@ export type CoreErrorCode =
   | "INVALID_PATH"
   | "INVALID_DATA"
   | "LOCKED"
-  /** A dataset's linked external file cannot be read on this device. */
   | "SOURCE_UNAVAILABLE"
-  /** The data cannot be written: online data, a spreadsheet, or a stale copy. */
   | "READ_ONLY"
-  /** The action needs the person's decision first; details describe it. */
   | "CONFIRMATION_REQUIRED"
-  /** Still referenced elsewhere; details.uses lists where. */
   | "IN_USE";
 
 export class CoreError extends Error {
@@ -339,9 +304,7 @@ export class CoreError extends Error {
   readonly currentHash?: string;
   readonly currentRevision?: string;
   readonly conflictId?: string;
-  /** Structured facts for the caller, e.g. the conflicting fields of a dataset write. */
   details?: Record<string, unknown>;
-  /** A specific next step that replaces the generic guidance for this code. */
   nextStep?: string;
   saveFailed?: boolean;
   recovery?: {
@@ -369,9 +332,7 @@ export class CoreError extends Error {
   }
 }
 
-/** What a failed library integrity check found damaged. */
 export type IntegrityProblem = "database" | "content" | "history" | "repository";
-/** An integrity failure that names its kind, so Settings can say what to do. */
 export function integrityError(kind: IntegrityProblem, message: string) {
   const error = new CoreError("INVALID_DATA", message);
   error.details = { integrity: kind };

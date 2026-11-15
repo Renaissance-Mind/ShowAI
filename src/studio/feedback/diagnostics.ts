@@ -1,10 +1,3 @@
-/**
- * The diagnostic report behind 复制诊断信息 / 导出诊断包 / 附加诊断信息.
- * Contains versions, mode, language, library format, built-in Agent
- * readiness, plugin hosts, sync hosts and the latest problems. Never page
- * content, conversations, account names, tokens or keys; the library path
- * only when the person includes it.
- */
 import type { AgentHostStatus } from "../../agent-host/types";
 import type { AgentConnectionRecord } from "../../agent/mcp-connections";
 import type { RuntimeRegistrationStatus } from "../../agent/runtime";
@@ -21,7 +14,6 @@ import { pluginHostNames } from "../usePluginHosts";
 
 export const DIAGNOSTIC_LOG_LINES = 200;
 
-/** A part that could not be read is reported with its code, not left out. */
 export type Part<T> = { ok: true; value: T } | { ok: false; error: string };
 
 type SyncStatus = Omit<SyncConfiguration, "connections"> & {
@@ -41,7 +33,6 @@ export interface DiagnosticsInput {
   sync?: Part<SyncStatus>;
   problems: LoggedProblem[];
   includeLibraryPath?: boolean;
-  /** Redacted tail of the main-process log. */
   log?: Part<string>;
 }
 
@@ -86,7 +77,6 @@ export function modeLine(info: DesktopInfo | null) {
   return `${info.mode ?? "desktop"} · ${info.packaged ? "packaged" : "development"}`;
 }
 
-/** One line per plugin host: install state and the latest connection result. */
 export function pluginLines(
   hosts: PluginInstallation[],
   records: AgentConnectionRecord[],
@@ -185,7 +175,6 @@ function part<T>(
   return [`${label}:`, ...(value.ok ? lines(value.value) : [`  unavailable (${value.error})`])];
 }
 
-/** The plain-text report; paths and secrets are redacted. */
 export function formatDiagnostics(input: DiagnosticsInput): string {
   const { info } = input;
   const libraryRedaction = info?.home ? { library: info.home } : {};
@@ -245,7 +234,6 @@ async function read<T>(load: () => Promise<T>): Promise<Part<T>> {
   try {
     return { ok: true, value: await load() };
   } catch (error) {
-    // Reported in the text; a missing part must not block the rest of the report.
     return {
       ok: false,
       error: errorCode(error) ?? (errorMessage(error).slice(0, 80) || "ERROR"),
@@ -259,7 +247,6 @@ export interface GatherOptions {
   includeLog?: boolean;
 }
 
-/** Reads every part from the App; desktop-only parts are skipped in the browser. */
 export async function gatherDiagnostics(
   options: GatherOptions,
 ): Promise<string> {

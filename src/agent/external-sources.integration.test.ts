@@ -71,7 +71,6 @@ const exists = (path: string) =>
     () => false,
   );
 
-/** A page with one database block bound to the rows of a dataset. */
 async function boundPage(datasetId: string, title: string) {
   const page = await ok("page_create", {
     title,
@@ -117,7 +116,6 @@ async function boundPage(datasetId: string, title: string) {
   return { pageId: page.document.id as string, blockId: block.attrs.id };
 }
 
-/** Changes the title of the first mapped row through the bound block. */
 async function editBlock(pageId: string, blockId: string) {
   const read = await ok("page_read", { pageId, rendered: false });
   const rows = read.bindings[0].props.rows;
@@ -206,7 +204,6 @@ test("a spreadsheet links with every sheet and is read-only", async () => {
     details: { reason: "READ_ONLY", warning: { code: "READ_ONLY" } },
   });
   expect(await readFile(path)).toEqual(bytes);
-  // Renaming changes only the library's description of the data.
   const renamed = await ok("dataset_write", {
     action: "apply",
     datasetId,
@@ -215,7 +212,6 @@ test("a spreadsheet links with every sheet and is read-only", async () => {
     name: "预算表",
   });
   expect(renamed.record.dataset.name).toBe("预算表");
-  // A dataset is never written into a new spreadsheet.
   const created = await ok("dataset_write", {
     action: "create",
     name: "清单",
@@ -289,16 +285,13 @@ test("online data refreshes, revalidates and falls back to its last value", asyn
       },
     });
     const datasetId = linked.dataset.id;
-    // The address is synchronized with the project; the data is not.
     const stored = JSON.parse(await readFile(linked.path, "utf8"));
     expect(stored.source.url).toBe(url);
     expect(stored.value).toBeUndefined();
     expect(server.requests).toHaveLength(1);
 
-    // Within the refresh interval a read uses the last fetch.
     await ok("dataset_read", { action: "read", datasetId });
     expect(server.requests).toHaveLength(1);
-    // An explicit refresh revalidates with the ETag.
     const same = await ok("dataset_read", {
       action: "read",
       datasetId,
@@ -316,12 +309,10 @@ test("online data refreshes, revalidates and falls back to its last value", asyn
     expect(changed.dataset.value.rows[0].title).toBe("第 2 版");
     expect(changed).toMatchObject({ status: "ok", warnings: [] });
 
-    // Bound blocks show online data and refuse edits.
     const { pageId, blockId } = await boundPage(datasetId, "在线");
     let read = await ok("page_read", { pageId, rendered: false });
     expect(read.bindings[0]).toMatchObject({
       status: "ok",
-      // Mapped fields of online data are read-only; the table's own parts are not.
       editable: { paths: ["*", "rows[*]", "!rows[id=row:*].title"] },
       warnings: [],
       source: { kind: "url", url, format: "json", available: true },
@@ -329,7 +320,6 @@ test("online data refreshes, revalidates and falls back to its last value", asyn
     expect(read.datasetBases[datasetId]).toBe(changed.hash);
     expect((await editBlock(pageId, blockId)).error.code).toBe("READ_ONLY");
 
-    // An unreachable source returns the last value read, marked stale.
     mode = "error";
     const stale = await ok("dataset_read", {
       action: "read",
@@ -367,7 +357,6 @@ test("online data refreshes, revalidates and falls back to its last value", asyn
       REMOTE_FETCH.timeoutMs = timeout;
     }
     mode = "error";
-    // Linking needs one successful fetch; nothing is created without it.
     const unreachable = await call("dataset_write", {
       action: "link",
       name: "按需刷新",
@@ -379,7 +368,6 @@ test("online data refreshes, revalidates and falls back to its last value", asyn
       code: "SOURCE_UNAVAILABLE",
       details: { reason: "SOURCE_UNREACHABLE" },
     });
-    // An interval of 0 fetches only on an explicit refresh.
     mode = "ok";
     const manual = await ok("dataset_write", {
       action: "link",
@@ -393,7 +381,6 @@ test("online data refreshes, revalidates and falls back to its last value", asyn
     await ok("dataset_read", { action: "read", datasetId: manual.dataset.id });
     expect(server.requests).toHaveLength(requests);
 
-    // Stale bindings show the last value but give no base for writes.
     mode = "error";
     await ok("dataset_read", { action: "read", datasetId, refresh: true });
     read = await ok("page_read", { pageId, rendered: false });
@@ -406,7 +393,6 @@ test("online data refreshes, revalidates and falls back to its last value", asyn
     expect(read.bindings[0].props.rows[0].title).toBe("第 2 版");
     expect(read.datasetBases?.[datasetId]).toBeUndefined();
 
-    // Responses beyond the dataset limit are cut off.
     const huge = await call("dataset_write", {
       action: "link",
       name: "太大",
@@ -426,7 +412,6 @@ test("online data refreshes, revalidates and falls back to its last value", asyn
       ).error.code,
     ).toBe("INVALID_DATA");
 
-    // Hosted connections link online data but not files.
     mode = "ok";
     const hosted = await connect({ presentation: { transport: "http" } });
     const remote = await ok(
@@ -481,7 +466,6 @@ test("a linked file falls back to its last value, and reports empty without one"
     ],
   });
   expect(stale.dataset.value.rows).toHaveLength(2);
-  // Writes never start from a stale value.
   const write = await call("dataset_write", {
     action: "apply",
     datasetId,
@@ -496,7 +480,6 @@ test("a linked file falls back to its last value, and reports empty without one"
   let read = await ok("page_read", { pageId, rendered: false });
   expect(read.bindings[0]).toMatchObject({
     status: "stale",
-    // Mapped titles are read-only now; the table's own parts are not.
     editable: { paths: ["*", "rows[*]", "!rows[id=row:*].title"] },
     source: { kind: "file", path: csv, available: false },
     warnings: [{ code: "SOURCE_MISSING" }],
@@ -509,7 +492,6 @@ test("a linked file falls back to its last value, and reports empty without one"
     ),
   ).toMatchObject({ status: "stale", source: { available: false } });
 
-  // Content that no longer parses is reported as such.
   await writeFile(csv, 'id,title\nt1,"未闭合\n');
   expect(
     (await ok("dataset_read", { action: "read", datasetId })).warnings[0],
@@ -523,7 +505,6 @@ test("a linked file falls back to its last value, and reports empty without one"
   });
   expect(restored.dataset.value.rows[1].id).toBe("t3");
 
-  // A schema the file no longer satisfies: SHAPE_CHANGED.
   const json = join(outside, "shape.json");
   await writeFile(json, JSON.stringify({ rows: [] }));
   const shaped = await ok("dataset_write", {
@@ -546,7 +527,6 @@ test("a linked file falls back to its last value, and reports empty without one"
     ).warnings[0],
   ).toMatchObject({ code: "SHAPE_CHANGED", stage: "format" });
 
-  // Without a value read on this device the dataset is empty.
   await rm(csv);
   await rm(
     join(root, "local", "dataset-cache", projectId, `${datasetId}.json`),
@@ -564,7 +544,6 @@ test("a linked file falls back to its last value, and reports empty without one"
     warnings: [{ code: "SOURCE_MISSING", level: "error" }],
   });
   expect(read.bindings[0].error).toMatch(/cannot be read/);
-  // An export says why the block has no data, naming the file but not its path.
   const out = join(outside, "exports", "empty.html");
   await ok("page_export", { pageId, format: "html", out, externalData: "embed" });
   const artifact = parseArtifact(
@@ -585,7 +564,6 @@ test("a linked file falls back to its last value, and reports empty without one"
     editable: false,
     source: { available: false },
   });
-  // A dataset whose source is gone can still be deleted by its listed hash.
   const detached = await ok("page_read", { pageId, rendered: false });
   await ok("page_apply", {
     pageId,

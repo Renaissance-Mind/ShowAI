@@ -1,6 +1,5 @@
 import { defineMessages } from "../index";
 
-// Custom (sandboxed or inline) component blocks inside pages and readers.
 export default defineMessages("customComponents", {
   "zh-CN": {
     notInstalledError: "组件尚未安装。",

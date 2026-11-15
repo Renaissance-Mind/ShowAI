@@ -27,7 +27,6 @@ import {
   useResetOnChange,
 } from "../../surface/reader-state";
 
-// Colors come from tone tokens so lines, bands and badges follow light and dark themes.
 const tone = (value: EventTimelineTone = "neutral") => `var(--et-${value})`;
 const soft = (value: EventTimelineTone = "neutral") =>
   `var(--et-${value}-soft)`;
@@ -50,7 +49,6 @@ function useWidth() {
   return [ref, width] as const;
 }
 
-/** A 1/2/5 × 10ⁿ step that splits the range into about `parts` intervals. */
 function niceStep(range: number, parts: number) {
   const raw = range / parts || 1;
   const power = 10 ** Math.floor(Math.log10(raw));
@@ -58,7 +56,6 @@ function niceStep(range: number, parts: number) {
   return (unit <= 1 ? 1 : unit <= 2 ? 2 : unit <= 5 ? 5 : 10) * power;
 }
 
-/** One y scale per side, shared by the series drawn against it. */
 function scaleFor(series: EventTimelineSeries[]) {
   if (!series.length) return null;
   const values = series.flatMap((item) =>
@@ -78,7 +75,6 @@ function scaleFor(series: EventTimelineSeries[]) {
   return { lo, hi, ticks, unit: series.find((item) => item.unit)?.unit };
 }
 
-/** Axis label stride: the smallest round step that keeps labels apart. */
 function labelStride(points: number, room: number, type: string) {
   const steps =
     type === "date"
@@ -112,7 +108,6 @@ export function EventTimelineBlock({ data }: BlockProps) {
 
   const start = initialPoint(model);
   const [point, setPoint] = useReaderState("point", start, { accept: isIndex });
-  // Clicking one of several events on the same point pins it; scrubbing releases the pin.
   const [pinned, setPinned] = useReaderState<number | null>("pinned", null, {
     accept: (value) => value === null || isIndex(value),
   });
@@ -161,7 +156,6 @@ export function EventTimelineBlock({ data }: BlockProps) {
   const paths = series.map((item) => {
     const y = yOf(scaleOf(item));
     const zero = y(Math.max(scaleOf(item).lo, 0));
-    // Null values break the line, so gaps in the data stay visible.
     const runs: [number, number][][] = [[]];
     item.values.forEach((value, i) => {
       if (value === null) runs.push([]);
@@ -209,7 +203,6 @@ export function EventTimelineBlock({ data }: BlockProps) {
     scrub(Math.round(ratio * (count - 1)));
   };
 
-  // Keep the expanded event in view inside the list without scrolling the page.
   const listRef = useRef<HTMLOListElement>(null);
   useEffect(() => {
     const list = listRef.current;
@@ -333,7 +326,6 @@ export function EventTimelineBlock({ data }: BlockProps) {
               ))}
               {phases.map((item) => {
                 const room = x(item.to) - x(item.from) - 8;
-                // Wide characters take about one em, narrow ones about half.
                 const need = [...item.label].reduce(
                   (sum, ch) => sum + (ch.charCodeAt(0) > 0x2e80 ? 11 : 6.2),
                   0,

@@ -130,7 +130,6 @@ function safeJson(value: unknown): string {
     .replace(/\u2029/g, "\\u2029");
 }
 
-/** Whether a string appears as a value anywhere in a component's props. */
 function propsMention(value: unknown, text: string, depth = 0): boolean {
   if (value === text) return true;
   if (depth > 40 || !value || typeof value !== "object") return false;
@@ -164,10 +163,6 @@ function jsonObject(value: unknown): value is Record<string, unknown> {
   return visit(value);
 }
 
-/**
- * The dataState a component frame receives: a bound block's own, otherwise
- * current data that is editable exactly when the block is.
- */
 export function frameDataState(
   bound: BlockDataStateValue | null,
   readOnly: boolean,
@@ -231,26 +226,20 @@ function SandboxComponent({
   const [channel] = useState(() => crypto.randomUUID());
   useSelectionFrame(iframe, channel);
   const [height, setHeight] = useState(inline ? 24 : 180);
-  // Inline frames take the width their content reports; older runtimes report none.
   const [width, setWidth] = useState<number | null>(null);
   const references = useContext(PageReferenceContext);
   const referencesRef = useRef(references);
   referencesRef.current = references;
-  // The last height the frame measured; an empty root reports about 2px.
   const [measured, setMeasured] = useState<number | null>(null);
-  // Parameter validation text from the runtime (参数不符), cleared once props apply.
   const [error, setError] = useState("");
-  // A render, handler or promise failure inside the frame (运行出错).
   const [crash, setCrash] = useState<FrameRuntimeError | null>(null);
   const crashRef = useRef<FrameRuntimeError | null>(null);
   crashRef.current = crash;
-  // Retrying mounts a fresh frame; the old React root does not recover.
   const [attempt, setAttempt] = useState(0);
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState("");
   const [draftError, setDraftError] = useState("");
   const [validating, setValidating] = useState(false);
-  // Raw JSON is the advanced path; without an agent it is the only one, so it starts open.
   const [jsonOpen, setJsonOpen] = useState(false);
   const draftBase = useRef("");
   const settingsButton = useRef<HTMLButtonElement>(null);
@@ -259,9 +248,7 @@ function SandboxComponent({
     props: Record<string, unknown>;
     timeout: number;
   } | null>(null);
-  // Present in the workbench page; readers and exports have no conversation.
   const assistant = useContext(AssistantContext);
-  // A bound block says how current its data is and which parts can change.
   const bound = useContext(BlockDataState);
   const dataState = frameDataState(bound, !!readOnly || !onChange);
   const latest = useRef({
@@ -277,7 +264,6 @@ function SandboxComponent({
     readOnly: !!readOnly || !onChange,
     dataState,
   });
-  // A page block in the App keeps the reader's view of it on this device.
   const readerScope = useReaderStateScope();
   const readerView = useRef({
     scope: readerScope,
@@ -288,8 +274,6 @@ function SandboxComponent({
     slot: `component:${parsed.componentId}`,
   };
   latest.current = { data, parsed, onChange, readOnly, assistant, dataState };
-  // A bound block asks which props each change started from. The frame posts
-  // showai:valid after applying each props message, in order.
   const basisContext = useContext(BindingBasisContext);
   const basisReporter = useRef(basisContext);
   basisReporter.current = basisContext;
@@ -297,7 +281,6 @@ function SandboxComponent({
     basisReporter.current?.(props);
   const frameProps = useRef(initial.current.props);
   const unconfirmed = useRef<Record<string, unknown>[]>([]);
-  /** The page block this instance renders, for state handed to the conversation. */
   const blockId = () => {
     const owner = iframe.current?.closest<HTMLElement>(
       "[data-block-id],[data-surface-id]",
@@ -365,23 +348,18 @@ function SandboxComponent({
     );
   };
   const html = useMemo(() => {
-    // A portable package is executable user content. Enforce the policy before
-    // parsing any of its markup, even if its own document omits or changes CSP.
     const policy = `<!doctype html><meta http-equiv="Content-Security-Policy" content="${componentSandboxPolicyFor(localMediaSource())}">`;
     return (
       policy +
       injectComponentBootstrap(
         withoutPackagePolicies(component.html),
-        // Built-in blocks compiled into the package start in the workbench language.
         `<style>body{color:var(--text)}</style><script>(${installFrameErrorReporter.toString()})(${safeJson(channel)});</script><script>document.documentElement.lang=document.documentElement.dataset.showaiLocale=${safeJson(locale)};(${installComponentActivity.toString()})(${safeJson(channel)});(${installSandboxTheme.toString()})(${safeJson(channel)},${safeJson(initialTheme.current)},${safeJson(appearanceTokens())});</script><script id="showai-component-data" type="application/json">${safeJson({ channel, ...initial.current, ...savedView(), ...(inline ? { inline: true } : {}) })}</script>`,
       ) +
       `<script>${componentSelectionScript(channel)}(${installIconTooltips.toString()})(document);(${installComponentLinks.toString()})(${safeJson(channel)});</script>` +
-      // A changed document reloads the same frame element after 重试.
       (attempt ? `<!--retry ${attempt}-->` : "")
     );
   }, [component.html, channel, locale, attempt]);
 
-  /** Read when the frame is built, so 重试 starts from the latest view. */
   function savedView() {
     const { scope, slot } = readerView.current;
     if (!scope?.block) return {};
@@ -402,7 +380,6 @@ function SandboxComponent({
         props: current.parsed.props,
         readOnly: !!current.readOnly || !current.onChange,
         dataState: current.dataState,
-        // Previews and dialogs are not page blocks, so they cannot hand over state.
         context: !!current.assistant && !!blockId(),
       },
       "*",
@@ -437,7 +414,6 @@ function SandboxComponent({
         frameProps.current = initial.current.props;
         unconfirmed.current = [];
         sendProps();
-        // State still waiting in the conversation input returns to its component.
         const id = blockId();
         const pending = id
           ? latest.current.assistant?.pendingComponentContext(id)
@@ -451,7 +427,6 @@ function SandboxComponent({
       if (event.data.type === "showai:view-state") {
         const { scope, slot } = readerView.current;
         const value = event.data.clear === true ? undefined : event.data.state;
-        // The runtime checks this too; the host never trusts the frame.
         if (!scope?.block || componentViewStateIssue(value)) return;
         scope.store.write(scope.page, scope.block, slot, value);
         return;
@@ -459,7 +434,6 @@ function SandboxComponent({
       if (event.data.type === "showai:context") {
         const snapshot = event.data.snapshot;
         const id = blockId();
-        // The runtime checks this too; the host never trusts the frame.
         if (!id || componentContextIssue(snapshot)) return;
         latest.current.assistant?.componentContext({
           ...snapshot,
@@ -490,7 +464,6 @@ function SandboxComponent({
         return;
       }
       if (event.data.type === "showai:open-url") {
-        // The page around the block may open its own links in place, such as the built-in docs.
         const link = new CustomEvent("showai:component-link", {
           bubbles: true,
           cancelable: true,
@@ -501,7 +474,6 @@ function SandboxComponent({
         return;
       }
       if (event.data.type === "showai:references") {
-        // Any component reads the same index the built-ins read, through the host.
         const { requestId } = event.data;
         const frame = event.source as Window;
         const reply = (answer: Record<string, unknown>) =>
@@ -549,7 +521,6 @@ function SandboxComponent({
         return;
       }
       if (event.data.type === "showai:resource") {
-        // A component shows a local file named in its own props only.
         const { requestId, ref, kind } = event.data;
         const frame = event.source as Window;
         const reply = (answer: Record<string, unknown>) =>
@@ -600,7 +571,6 @@ function SandboxComponent({
         channel,
       );
       if (runtime) {
-        // Keep the first failure: later ones usually follow from it.
         setCrash((current) => current ?? runtime);
         setError((current) =>
           repeatsRuntimeError(current, runtime) ? "" : current,
@@ -741,7 +711,6 @@ function SandboxComponent({
     setMeasured(null);
     setAttempt((value) => value + 1);
   };
-  // New data after a crash gets a fresh frame, like a built-in block's boundary.
   const crashedProps = useRef<unknown>(null);
   useEffect(() => {
     if (!crash) {
@@ -751,7 +720,6 @@ function SandboxComponent({
     if (crashedProps.current === null) crashedProps.current = parsed.props;
     else if (crashedProps.current !== parsed.props) retry();
   }, [crash, parsed.props]);
-  // Callback identity is host plumbing; only data and edit permission cross the sandbox.
   useEffect(sendProps, [
     parsed.props,
     readOnly,
@@ -761,7 +729,6 @@ function SandboxComponent({
     dataState.status,
     JSON.stringify(dataState.editable),
   ]);
-  // The frame reads references again when the library changes.
   useEffect(
     () =>
       references?.subscribe(() =>
@@ -784,9 +751,7 @@ function SandboxComponent({
     return () => frame?.removeEventListener("load", sendTheme);
   }, [theme, channel]);
 
-  // No height since the (re)load counts as empty: a failed first render may never resize.
   const blank = !!(crash || error) && (measured === null || measured <= 4);
-  // The frame reports its first height once the component has rendered.
   const starting = measured === null && !crash && !error;
   if (inline)
     return (
@@ -950,7 +915,6 @@ function SandboxComponent({
           width: "100%",
           height,
           border: 0,
-          // An empty frame after a failure would only leave a blank area.
           display: blank ? "none" : "block",
           background: "transparent",
         }}

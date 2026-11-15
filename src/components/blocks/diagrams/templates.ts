@@ -21,8 +21,6 @@ export interface DiagramTemplate {
   input?: unknown;
 }
 
-// Use the original shell, SVG and cards together; the reader's semantic controls
-// depend on authored attributes that disappear in an image or a recreated graph.
 export function listDiagramTemplates(kind: DiagramFamily): DiagramTemplate[] {
   if (kind === "archify")
     return archify.map((item) => {
@@ -69,7 +67,6 @@ export function diagramStyledSource(kind: DiagramFamily, source: string) {
   return `<!-- Offline font licenses\n${notice}\n--><style>${fonts.css}</style>${source}`;
 }
 
-/** Standalone HTML retains the captions moved outside the diagram reader. */
 export function diagramExportDocument(
   html: string,
   title: string,
@@ -90,7 +87,6 @@ export function diagramExportDocument(
     : html.replace(/<style>/i, caption + "<style>");
 }
 
-/** Put this policy before all imported markup, including an authored head. */
 export function diagramDocument(
   kind: DiagramFamily,
   source: string,

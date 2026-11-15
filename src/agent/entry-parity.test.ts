@@ -6,12 +6,7 @@ import { commandKey } from "./cli/command";
 import { PROJECT_TOOLS } from "./mcp-tools";
 import { OPERATIONS } from "./operations";
 
-// The CLI and MCP reach the same capabilities through shared operations
-// (src/agent/operations). These lists name what only one entry offers. They
-// may only shrink: a new command or tool runs a shared operation that the
-// other entry also runs, or is added here on purpose.
 
-/** CLI commands that run no shared operation. */
 const CLI_ONLY = [
   "catalog describe",
   "catalog import",
@@ -81,7 +76,6 @@ const CLI_ONLY = [
   "workspace resolve",
 ];
 
-/** MCP tools (tool:action for action tools) that run no shared operation. */
 const MCP_ONLY = [
   "catalog_describe",
   "catalog_list",
@@ -137,7 +131,6 @@ const MCP_ONLY = [
   "workspace_resolve:resolve",
 ];
 
-/** Shared operations that only one entry runs yet. */
 const OPERATION_CLI_ONLY: string[] = [];
 const OPERATION_MCP_ONLY: string[] = [];
 
@@ -149,7 +142,6 @@ const fixture = (name: string) =>
     inputSchema: { properties?: { action?: { enum?: string[] } } };
   }[];
 
-/** Every MCP tool and action that any connection kind lists. */
 function mcpEntries() {
   const entries = new Set<string>();
   for (const file of ["mcp-tools-library.json", "mcp-tools-project.json", "mcp-tools-http.json"])

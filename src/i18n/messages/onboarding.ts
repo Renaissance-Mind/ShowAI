@@ -1,8 +1,5 @@
 import { defineMessages } from "../index";
 
-// First run: the welcome in the Recent view, Agent status and next steps in the
-// Agent panel, and the connection check in Settings → Plugins. The tagline,
-// one-liner, prompts and sample names follow the shared entry copy verbatim.
 export default defineMessages("onboarding", {
   "zh-CN": {
     "welcome.label": "欢迎使用 ShowAI",

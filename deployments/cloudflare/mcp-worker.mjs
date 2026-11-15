@@ -28,8 +28,6 @@ export class ShowAIMcpGateway extends DurableObject {
           });
           await container.setInactivityTimeout(600000);
         } catch (error) {
-          // Right after a deployment Cloudflare may still be provisioning the
-          // Container; answer with a retryable status instead of an exception.
           console.error("MCP container start failed:", error);
           return new Response("ShowAI MCP is starting. Retry shortly.", {
             status: 503,
@@ -38,7 +36,6 @@ export class ShowAIMcpGateway extends DurableObject {
         }
       }
       const port = container.getTcpPort(8789);
-      // Probe only the read-only health endpoint; never replay an operation.
       const deadline = Date.now() + 45000;
       let ready = false;
       while (Date.now() < deadline) {
@@ -52,7 +49,6 @@ export class ShowAIMcpGateway extends DurableObject {
             break;
           }
         } catch {
-          /* Connection refusal while the container boots. */
         }
         await new Promise((resolve) => setTimeout(resolve, 250));
       }
@@ -63,7 +59,6 @@ export class ShowAIMcpGateway extends DurableObject {
         );
       const target = new URL(request.url);
       target.protocol = "http:";
-      // The container listens on plain HTTP; preserve the public host and Origin header.
       return port.fetch(new Request(target.href, request));
     });
     this.tail = next.then(

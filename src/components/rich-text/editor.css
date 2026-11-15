@@ -62,7 +62,6 @@
   overflow-wrap: anywhere;
   caret-color: var(--accent);
 }
-/* A text component inside a page sizes to its own content. */
 .document-content .document-content {
   min-height: 0;
 }
@@ -202,7 +201,6 @@
   opacity: 1;
   cursor: default;
 }
-/* The tone dot sits under the icon without adding height, so a one-line callout stays one line tall. */
 .callout-color {
   position: absolute;
   top: 100%;
@@ -304,7 +302,6 @@
   z-index: 15;
   transition: top 0.07s ease;
 }
-/* Bridge the gap to the block without changing document layout. */
 .block-handle::after {
   content: "";
   position: absolute;
@@ -1039,7 +1036,6 @@
   font-size: 12px;
 }
 
-/* Noneditable NodeViews still contain selectable reading text. */
 .document-content
   :is(
     .document-widget,

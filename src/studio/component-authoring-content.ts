@@ -1,14 +1,11 @@
 import type { JSONContent } from "@tiptap/core";
 import { markdownToRichText } from "../document/rich-text.mjs";
 
-/** Resolve upstream Markdown links for display without changing the stored original. */
 export function componentAuthoringContent(
   markdown: string,
   sourceUrl?: string,
   imageLabel = "Image",
 ) {
-  // Skill files open with YAML metadata; show it as a code block instead of
-  // letting it run into the first paragraph.
   const frontmatter = /^---\r?\n([\s\S]*?)\r?\n---\r?\n/.exec(markdown);
   const readable = frontmatter
     ? `\`\`\`yaml\n${frontmatter[1]}\n\`\`\`\n\n${markdown.slice(frontmatter[0].length)}`

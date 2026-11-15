@@ -363,7 +363,6 @@ test("anonymous clients discover and customize public resources without a projec
   expect(
     tools.tools.find((t) => t.name === "page_save")?.inputSchema.properties,
   ).toHaveProperty("projectId");
-  // Device-file operations are not part of the hosted tools.
   expect(
     tools.tools.find((t) => t.name === "component_save")?.inputSchema
       .properties,
@@ -374,12 +373,10 @@ test("anonymous clients discover and customize public resources without a projec
         .properties?.action as { enum?: string[] }
     ).enum,
   ).toEqual(["create", "apply", "link", "transform"]);
-  // Hosted links take online data only, never a file of the server.
   const datasetWrite = tools.tools.find((t) => t.name === "dataset_write")
     ?.inputSchema.properties;
   expect(datasetWrite).toHaveProperty("url");
   expect(datasetWrite).not.toHaveProperty("path");
-  // Transform scripts are passed inline.
   expect(datasetWrite).toHaveProperty("script");
   expect(datasetWrite).not.toHaveProperty("scriptFile");
   expect(
@@ -1578,7 +1575,6 @@ test("social login resumes a completed upstream account flow without exposing it
       body: new URLSearchParams({ flow, csrf }),
     });
     expect(await pending.text()).toContain("登录尚未完成");
-    // Seed the persisted state produced by a verified provider callback. No provider network call is simulated.
     const row = (
       await db.all<{ id: string; secret: string }>(
         "SELECT id,secret FROM login_flows WHERE provider='github'",
@@ -1590,7 +1586,6 @@ test("social login resumes a completed upstream account flow without exposing it
       context,
       row.secret,
     );
-    // The callback binds the provider identity and shows a one-time completion code.
     await db.run(
       "INSERT INTO login_identities(provider,subject,user_id,email,created_at) VALUES('github','social-subject',?,NULL,?)",
       [user.user.id, new Date().toISOString()],
@@ -1607,7 +1602,6 @@ test("social login resumes a completed upstream account flow without exposing it
         row.id,
       ],
     );
-    // Without a code the gateway only checks status and asks for the code.
     const awaiting = await fetch(gateway.url + "/oauth/external/finish", {
       method: "POST",
       headers,
@@ -1646,7 +1640,6 @@ test("a real browser completes provider start and password consent back to the c
     syncServers: [social.url],
     port: 0,
   });
-  // The registered client redirect is a separate origin, like chatgpt.com.
   const received: string[] = [];
   const callback = createServer((request, response) => {
     received.push(request.url!);
@@ -1684,7 +1677,6 @@ test("a real browser completes provider start and password consent back to the c
     });
     const page = await browser.newPage();
     await page.goto(gateway.url + "/oauth/authorize?" + query);
-    // Browser form posts carry the page's real Origin header.
     await page.getByRole("button", { name: "使用 GitHub 登录" }).click();
     await page.getByLabel("完成码").waitFor();
     expect(
@@ -1696,12 +1688,10 @@ test("a real browser completes provider start and password consent back to the c
     await page.getByLabel("账号").fill("browser-user");
     await page.getByLabel("密码").fill("browser-test-password-123");
     await page.getByRole("button", { name: "使用账号密码登录" }).click();
-    // The consent redirect leaves for the client's origin after the form post.
     await Promise.all([
       page.waitForURL((url) => url.href.startsWith(redirect)),
       page.getByRole("button", { name: "确认授权" }).click(),
     ]);
-    // The browser may also ask the callback origin for /favicon.ico.
     const returned = new URL(
       received.find((url) => url.startsWith("/callback"))!,
       redirect,

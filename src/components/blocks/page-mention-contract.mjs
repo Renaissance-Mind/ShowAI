@@ -1,12 +1,8 @@
-// Data contracts of the date and backlinks components. Dependency-free: the
-// workbench, CLI and MCP saves and the offline reader all run them.
-
 const ID = /^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/;
 const DAY = /^(\d{4})-(\d{2})-(\d{2})$/;
 const isObject = (value) =>
   !!value && typeof value === "object" && !Array.isArray(value);
 
-/** A calendar day; `date` is YYYY-MM-DD. */
 export function validateDateData(data) {
   if (!isObject(data)) throw new Error("Date data must be an object.");
   for (const key of Object.keys(data))
@@ -24,7 +20,6 @@ export function validateDateData(data) {
   return data;
 }
 
-/** Backlinks of the page holding the block, or of the page it names. */
 export function validateBacklinksData(data) {
   if (!isObject(data)) throw new Error("Backlinks data must be an object.");
   for (const key of Object.keys(data))

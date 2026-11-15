@@ -10,7 +10,6 @@ const container = {
 
 describe("centeredScrollTop", () => {
   it("places a row in the middle of the container", () => {
-    // The row sits 50px below the visible top, so 350px into the content.
     const top = centeredScrollTop(container, { top: 150, height: 36 });
     expect(top).toBe(350 - (400 - 36) / 2);
   });

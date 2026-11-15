@@ -1,7 +1,3 @@
-// Shared contract for the roadmap and waterfall built-ins.
-// Validation runs in the workbench, the CLI and the portable reader, so it stays dependency-free.
-// Errors name the exact field path, e.g. items[3].depends[0].
-
 const fail = (message) => {
   throw new Error(message);
 };
@@ -46,10 +42,8 @@ function oneOf(value, options, path) {
     fail(`${path} must be one of ${options.join(", ")}.`);
 }
 
-// ---------------------------------------------------------------- dates
 
 const DAY = 86400000;
-/** Whole days since 1970-01-01 for a YYYY-MM-DD date; NaN when the text is not a real calendar date. */
 export function dayNumber(value) {
   const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value ?? "");
   if (!match) return Number.NaN;
@@ -62,7 +56,6 @@ export function dayNumber(value) {
     ? time / DAY
     : Number.NaN;
 }
-/** YYYY-MM-DD for a day number. */
 export function dayText(day) {
   return new Date(day * DAY).toISOString().slice(0, 10);
 }
@@ -72,10 +65,8 @@ function date(value, path) {
   return dayNumber(value);
 }
 
-// ---------------------------------------------------------------- roadmap
 
 export const ROADMAP_TONES = ["done", "active", "todo", "blocked"];
-/** Default statuses used by a roadmap that does not define its own. */
 export const DEFAULT_ROADMAP_STATUSES = [
   { id: "done", label: "已完成", tone: "done" }, // i18n-exempt: default status data, translated at display by id
   { id: "active", label: "进行中", tone: "active" }, // i18n-exempt: default status data, translated at display by id
@@ -84,12 +75,10 @@ export const DEFAULT_ROADMAP_STATUSES = [
 ];
 const MAX_ROADMAP_DAYS = 400;
 
-/** Inclusive length of an item in days. */
 export function itemDays(item) {
   return dayNumber(item.end) - dayNumber(item.start) + 1;
 }
 
-/** The visible date window: explicit start/end, or the span of every dated entry. */
 export function roadmapWindow(data) {
   if (data.start && data.end)
     return { start: dayNumber(data.start), end: dayNumber(data.end) };
@@ -107,10 +96,6 @@ export function roadmapWindow(data) {
   };
 }
 
-/**
- * Days per owner: everything scheduled, and what is still open
- * (unfinished items, reduced by their progress).
- */
 export function ownerWorkload(data) {
   const tones = new Map(
     (data.statuses ?? DEFAULT_ROADMAP_STATUSES).map((status) => [
@@ -131,7 +116,6 @@ export function ownerWorkload(data) {
   return load;
 }
 
-/** Items the given item waits for, and items waiting for it. */
 export function itemLinks(data, id) {
   const item = data.items.find((entry) => entry.id === id);
   return {
@@ -238,7 +222,6 @@ function validateRoadmap(data) {
   if (data.initialItem !== undefined && !items.has(data.initialItem))
     fail(`initialItem ${data.initialItem} does not match an item id.`);
 
-  // Everything dated must fall inside the visible window.
   const range = roadmapWindow(data);
   if (range.end - range.start + 1 > MAX_ROADMAP_DAYS)
     fail(`The roadmap spans more than ${MAX_ROADMAP_DAYS} days.`);
@@ -275,14 +258,9 @@ function dependencyCycle(items) {
   for (const item of items) visit(item.id, []);
 }
 
-// ---------------------------------------------------------------- waterfall
 
 export const WATERFALL_KINDS = ["total", "up", "down"];
 
-/**
- * Running levels of a bridge. Each step gets its [bottom, top] span; totals after the
- * first are checked against the computed running level.
- */
 export function waterfallBridge(steps) {
   let level = 0;
   const mismatches = [];
@@ -300,7 +278,6 @@ export function waterfallBridge(steps) {
   return { spans, end: level, mismatches };
 }
 
-/** Mismatches larger than half of the smallest displayed unit. */
 export function waterfallMismatches(data) {
   const format = data.format ?? {};
   const tolerance =
@@ -333,7 +310,6 @@ function validateWaterfall(data) {
   if (data.format !== undefined) {
     const format = data.format;
     if (!isObject(format)) fail("format must be an object.");
-    // Affixes may be empty or only a space, e.g. suffix " 万".
     for (const [key, maxLength] of [
       ["prefix", 6],
       ["suffix", 10],
@@ -381,7 +357,6 @@ function validateWaterfall(data) {
     fail(`initialStep ${data.initialStep} does not match a step id.`);
   if (data.axisFloor !== undefined) {
     finite(data.axisFloor, "axisFloor");
-    // A floor may cut the base of totals, never a change bar: that would misstate its size.
     const { spans } = waterfallBridge(data.steps);
     data.steps.forEach((step, index) => {
       const [bottom, top] = spans[index];

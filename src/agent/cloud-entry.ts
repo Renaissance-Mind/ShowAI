@@ -7,7 +7,6 @@ const syncServer = process.env.SHOWAI_MCP_SYNC_SERVER;
 if (!publicUrl || !stateKey || !syncServer)
   throw new Error("MCP URL, sync server and state key are required.");
 const stateDirectory = "/state";
-// A deployment is ready only after Chromium renders on the actual cloud CPU.
 const browserRendering = await checkCloudBrowser();
 const gateway = await startMcpHttpServer({
   host: "0.0.0.0",
@@ -22,9 +21,6 @@ const gateway = await startMcpHttpServer({
     stateKey,
   ),
 });
-// As PID 1 the process ignores SIGTERM without a handler, so rollouts would
-// wait for SIGKILL. Stop accepting requests and exit once in-flight requests,
-// whose responses follow their state checkpoint, have finished.
 process.once("SIGTERM", () => {
   gateway.server.close(() => process.exit(0));
   gateway.server.closeIdleConnections();

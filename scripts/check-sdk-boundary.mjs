@@ -1,8 +1,3 @@
-// Compile one custom component against showai:components with the product's
-// own compiler (compilePackage and its showai-component-boundary plugin),
-// bundled the way the CLI build embeds the ?raw SDK sources. An SDK module that
-// imports something outside the shipped built-in sources fails here in seconds
-// instead of in every component compile test.
 import { build } from "esbuild";
 import { mkdir, mkdtemp, readFile, rm } from "node:fs/promises";
 import { join, relative, resolve } from "node:path";
@@ -11,17 +6,12 @@ import { rawSourcePlugin } from "./raw-source-plugin.mjs";
 
 const root = resolve(fileURLToPath(new URL("../", import.meta.url)));
 const started = performance.now();
-// The bundled compiler resolves React, Tiptap and the other runtimes from its
-// own location, as the shipped CLI does; a runtime directory inherited from a
-// dev or App session would compile against another tree.
 delete process.env.SHOWAI_RUNTIME_ENTRY;
 delete process.env.SHOWAI_DEV_RUNTIME;
-// Inside node_modules so the bundle finds this checkout's packages.
 const cache = join(root, "node_modules/.cache");
 await mkdir(cache, { recursive: true });
 const working = await mkdtemp(join(cache, "showai-sdk-boundary-"));
 
-// Map virtual SDK paths back to repository files for the failure report.
 async function sdkSourcePaths() {
   const paths = new Map();
   for (const name of [
@@ -69,7 +59,6 @@ export { builtinSources } from "./src/core/builtin-sources.ts";`,
   const { compilePackage, builtinSources } = await import(
     pathToFileURL(harness).href
   );
-  // A re-export of a missing TypeScript binding bundles without an error.
   if (typeof compilePackage !== "function")
     throw new Error(
       "src/core/catalog.ts no longer exports compilePackage, the compiler this check runs.",
@@ -89,8 +78,6 @@ export { builtinSources } from "./src/core/builtin-sources.ts";`,
     properties: {},
     additionalProperties: false,
   };
-  // Bundling resolves every import the SDK reaches; the namespace import also
-  // keeps every export live, as a component using any of them would.
   const files = new Map([
     [
       "index.tsx",
@@ -105,7 +92,6 @@ export { builtinSources } from "./src/core/builtin-sources.ts";`,
   );
 } catch (error) {
   process.exitCode = 1;
-  // Boundary errors carry the importing SDK module as their location.
   const outside = (error?.errors ?? []).filter(
     (message) =>
       message.pluginName === "showai-component-boundary" &&
@@ -130,7 +116,6 @@ export { builtinSources } from "./src/core/builtin-sources.ts";`,
   }
   if (!outside.length || outside.length < error.errors.length) {
     console.error("SDK boundary check could not compile the SDK probe:");
-    // esbuild failures already list each message with its location.
     console.error(error?.errors ? error.message : (error?.stack ?? error));
   }
 } finally {

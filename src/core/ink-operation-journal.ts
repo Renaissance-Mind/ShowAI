@@ -45,9 +45,6 @@ type Plan = { cached: Cached; token: string; ordinal: number; generation?: strin
 const digest = (text: string) => createHash("sha256").update(text).digest("hex");
 const scopeKey = (scope: Scope) => canonicalInkJSON([scope.pageId, scope.boardId]);
 
-/** Synchronous host/worker API. One retained replica validates only fresh edits;
- * source + touched register rows commit atomically before publishing its delta.
- * Never instantiate this adapter on an input/render thread. */
 export class InkOperationJournal {
   readonly actor: string;
   private readonly replicas = new Map<string, Cached>();
@@ -78,7 +75,7 @@ export class InkOperationJournal {
       return result;
     } catch (error) {
       if (!durable) { this.db.exec("ROLLBACK"); for (const plan of plans) plan.cached.replica.abort(plan.token); }
-      else this.replicas.clear(); // The durable source is authoritative after a publication failure.
+      else this.replicas.clear();
       throw error;
     }
   }
@@ -99,7 +96,6 @@ export class InkOperationJournal {
     const legacy = this.db.prepare("SELECT ordinal,sha256,payload FROM ink_checkpoints WHERE page_id=? AND board_id=?").get(scope.pageId, scope.boardId) as SnapshotRow | undefined;
     const indexed = this.db.prepare("SELECT ordinal,sha256,payload FROM ink_replica_state WHERE page_id=? AND board_id=?").get(scope.pageId, scope.boardId) as SnapshotRow | undefined;
     let checkpoint: InkOperationCheckpoint | undefined, ordinal = 0, legacySelected = false;
-    // Always expose corrupt committed checkpoints, even when a newer index exists.
     if (legacy && digest(legacy.payload) !== legacy.sha256) throw new Error("Ink checkpoint checksum mismatch.");
     if (indexed && digest(indexed.payload) !== indexed.sha256) throw new Error("Ink replica state checksum mismatch.");
     if (legacy && (!indexed || legacy.ordinal > indexed.ordinal)) {
@@ -142,7 +138,6 @@ export class InkOperationJournal {
     }
     return cached;
   }
-  /** Page-load warmup; the first subsequent stroke uses retained semantic state. */
   warm(scope: Scope) {
     this.db.exec("BEGIN");
     try { const cached = this.cached(scope); this.db.exec("COMMIT"); return { actor: this.actor, ordinal: cached.ordinal }; }
@@ -204,8 +199,6 @@ export class InkOperationJournal {
       return { ordinal, changedRecords: prepared.records.length };
     });
   }
-  /** A separate persisted wire actor stamps CAS-checked snapshot editors. It
-   * cannot collide with the device actor's actual journal operation sequence. */
   reserveWireIdentity(pageId: string, minimumSequence = 0) {
     if (!Number.isSafeInteger(minimumSequence) || minimumSequence < 0) throw new Error("Invalid wire sequence baseline.");
     return this.transaction(() => {
@@ -224,15 +217,12 @@ export class InkOperationJournal {
     this.db.prepare("INSERT INTO ink_replica_state VALUES(?,?,?,?,?) ON CONFLICT(page_id,board_id) DO UPDATE SET ordinal=excluded.ordinal,payload=excluded.payload,sha256=excluded.sha256").run(scope.pageId, scope.boardId, ordinal, payload, digest(payload));
     return digest(payload);
   }
-  /** Explicit export snapshot. Hot appends already checkpoint only touched rows;
-   * they never serialize or rewrite every stored stroke. */
   checkpoint(scope: Scope) {
     this.transaction(plans => {
       const cached = this.cached(scope), prepared = cached.replica.prepare([]);
       const plan: Plan = { cached, token: prepared.token, ordinal: cached.ordinal }; plans.push(plan);
       plan.generation = this.writeIndex(scope, cached.dirty, prepared, cached.ordinal);
     });
-    // Reconstruction/export is outside the SQLite writer lock.
     return this.readState(scope).checkpoint ?? null;
   }
   operations(scope: Scope): InkOperation[] { return this.tail(scope, 0).map(row => row.operation); }

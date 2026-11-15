@@ -152,7 +152,6 @@ export type {
   PackageMergePreview,
 } from "../contract/types";
 
-/** Agent discovery adds conversation fit; the reader bundle never needs it. */
 export function listBuiltinComponents({
   includeLegacy = false,
 }: { includeLegacy?: boolean } = {}): BuiltinComponentMetadata[] {
@@ -292,7 +291,6 @@ async function optionalStat(home: string, path: string) {
     throw error;
   });
 }
-/** Every descendant is checked, including the final file, before catalog I/O. */
 async function safePath(
   home: string,
   path: string,
@@ -696,8 +694,6 @@ function templateRecord(
           bundle: bundle.source,
           workflow: {
             format: 1 as const,
-            // A staged bundle's own stage list is part of its integrity hash,
-            // so earlier records keep verifying; stageless bundles have none.
             ...(bundle.staged
               ? {
                   stages: bundle.legacy
@@ -752,7 +748,6 @@ const folderTemplates = builtinTemplateBundles.map((source) => {
   };
 });
 const templates = [...legacyTemplates, ...folderTemplates];
-/** Studio creates new pages from these; agents never see them in catalogs. */
 const STUDIO_ONLY_TEMPLATES = new Set(["blank"]);
 
 function builtinTemplate(
@@ -1085,7 +1080,6 @@ async function saveTemplateImpl(
   assertVersion(version);
   if (version === "0.0.0-legacy")
     throw new Error("Legacy flat templates are read-only. Save a new version.");
-  // A template carries the data its blocks show, not references to this project's datasets.
   const source = input.document
     ? project
       ? (
@@ -1605,8 +1599,6 @@ function combined(data){if(!structural(data)){combined.errors=structural.errors;
   );
 }
 
-// Exported only for scripts/check-sdk-boundary.mjs, which compiles a probe
-// against showai:components; saving still goes through importComponent.
 export async function compilePackage(
   directory: string,
   manifest: ComponentManifest,
@@ -1818,7 +1810,6 @@ export async function compilePackage(
     new Set([`${manifest.id}@${manifest.version}`]),
     0,
   );
-  // Every local import stays within its own verified package, including nested packages.
   const locate = (
     map: Map<string, Buffer> | Record<string, string>,
     candidate: string,
@@ -1922,9 +1913,6 @@ export default function Nested({data=defaults,onChange,readOnly=true}){check(dat
         )
           return { path: require.resolve(args.path) };
         const sdkImport = args.namespace === "showai-builtin";
-        // A shipped SDK module may only load other shipped SDK modules or the
-        // runtimes below. Anything else is a ShowAI build defect, so name the
-        // SDK file and its import instead of blaming the component package.
         const sdkBoundary = (reason: string) => ({
           errors: [
             {
@@ -2088,8 +2076,6 @@ export default function Nested({data=defaults,onChange,readOnly=true}){check(dat
     .filter((file) => file.path.endsWith(".css"))
     .map((file) => file.text)
     .join("\n");
-  // The conversation already provides the security sandbox and forbids nested
-  // frames. Reuse its reader's React instead of embedding React twice per package.
   const inlineReact: Plugin = {
     name: "showai-inline-react",
     setup(plugin) {
@@ -2180,8 +2166,6 @@ interface CatalogProjection {
   queued: boolean;
 }
 const catalogProjections = new Map<string, Promise<CatalogProjection>>();
-// Listings are small, so the projection can cover every installed revision;
-// a bound below the library's revision count would evict and rewrite on each listing.
 const catalogProjectionLimit = 8192;
 const compiledReads = new Map<
   string,
@@ -2221,7 +2205,6 @@ async function readCompiled(
   }
   return value;
 }
-/** Listings keep example names for search; sample data stays in the compiled package. */
 function componentListing(
   component: Omit<StoredComponent, "html" | "inline" | "sourceIntegrity">,
 ): ComponentListing {
@@ -2249,7 +2232,6 @@ async function loadCatalogProjection(root: string): Promise<CatalogProjection> {
   } catch (error) {
     if (!(error instanceof SyntaxError)) throw error;
   }
-  // Version 1 stored sample data and is rebuilt from the packages.
   if (
     cache?.version === 2 &&
     cache.entries &&
@@ -2259,7 +2241,6 @@ async function loadCatalogProjection(root: string): Promise<CatalogProjection> {
     projection.entries = new Map(Object.entries(cache.entries));
   return projection;
 }
-/** Projections written while a write is queued join that write. */
 function persistCatalogProjection(home: string, state: CatalogProjection) {
   if (state.queued) return state.writes;
   state.queued = true;
@@ -2313,7 +2294,6 @@ async function componentMetadata(
   const metadata = componentListing(component);
   if (projection && cacheKey) {
     projection.entries.set(cacheKey, structuredClone(metadata));
-    // Bound retained historic metadata too; it is always derivable from immutable packages.
     for (const key of projection.entries.keys()) {
       if (projection.entries.size <= catalogProjectionLimit) break;
       projection.entries.delete(key);
@@ -2553,8 +2533,6 @@ async function importComponentImpl(
       throw new Error(
         `Component ${manifest.id}@${manifest.version} is immutable. Increase its version before changing the package.`,
       );
-    // Restoring source does not rewrite an immutable portable revision. Keep
-    // verified source in a separate content-addressed cache beside versions.
     const cache = await safePath(
       home,
       join(dirname(destination), ".sources", existing.integrity),
@@ -2830,7 +2808,6 @@ export async function resolveDocumentComponents(
     ]);
   const refs = collectCustomComponentRefs(document);
   const required = new Set<string>();
-  // Content components are required; only a navigation renderer may fail.
   const custom: ShowDocument["content"][] = [];
   walk(document.content, (node) => {
     if ((node.type === "widget" || node.type === "inlineWidget") && node.attrs?.kind === "custom") {
@@ -2850,7 +2827,6 @@ export async function resolveDocumentComponents(
         if (required.has(key(ref))) throw error;
         return undefined;
       });
-      // A failed navigation package must not prevent reading the Page's content.
       if (!component) return undefined;
       if (ref.integrity && component.integrity !== ref.integrity)
         throw new Error(
@@ -2871,14 +2847,12 @@ export async function resolveDocumentComponents(
     if (!schemas.has(reference))
       throw new Error("A custom component reference was not resolved.");
     const component = schemas.get(reference)!;
-    // A bound block keeps only its local props; the resolved props are checked when rendered.
     if (!hasBinding(node.attrs!.data))
       assertProps(component.schema, data.props, component.documentation);
   }
   return components;
 }
 
-/** Installs serialized sandbox runtimes without ever evaluating or executing their code. */
 async function importCompiledComponentsImpl(
   home: string,
   components: CompiledComponent[],
@@ -3000,7 +2974,6 @@ export function blankDocument(): ShowDocument {
   };
 }
 
-/** Freeze authoring references without mutating a caller's live editor draft. */
 export async function lockDocumentComponents(
   home: string,
   document: ShowDocument,
@@ -3049,9 +3022,6 @@ export async function lockDocumentComponents(
       assertProps(component.schema, ref.props, component.documentation);
     }
   };
-  // Components nested in rich text are pinned like top-level ones. Nodes are
-  // collected before any is changed in place, and changing a node keeps the
-  // rich text inside its data, so every collected node stays in the copy.
   const nodes: ShowDocument["content"][] = [];
   walk(copy.content, (node) => {
     if (
@@ -3339,7 +3309,6 @@ function componentSourceFiles(source: ComponentSource): Map<string, Buffer> {
   return files;
 }
 
-/** Semantic validation is separate from a publication transport's byte checksum. */
 export function validatePackageBundle(value: unknown): PackageBundle {
   const bundle = record(value, "Catalog bundle");
   if (
@@ -3483,7 +3452,6 @@ async function installBundle(
       integrity: entry.integrity,
     })),
   ];
-  // Preflight every dependency before making any visible revision available.
   for (const target of targets) {
     const path = await safePath(
       home,
@@ -3577,7 +3545,6 @@ async function installBundle(
       await rm(staging, { recursive: true, force: true });
     }
   }
-  // resolvePackageBundle orders children before parents. The root becomes visible last.
   const pending = new Map(
     bundle.templates.map((item) => [
       revisionIdentity(packageRevisionRef("template", item)),
@@ -3708,7 +3675,6 @@ async function editablePackage(
   projectId: string,
 ): Promise<EditablePackage> {
   if (ref.kind === "component") {
-    // Verify the locked runtime as well as loading the source. Never invent a base.
     await getComponentByRef(home, ref, projectId);
     const source = await readComponentSource(
       home,

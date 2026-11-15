@@ -1,6 +1,5 @@
 import { CoreError } from "./model";
 
-/** Project, page and dataset identifiers: one path segment on every platform. */
 export function isId(id: unknown): id is string {
   return (
     typeof id === "string" &&

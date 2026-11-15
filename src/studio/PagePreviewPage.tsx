@@ -5,7 +5,6 @@ import { desktop, errorMessage } from "../host/bridge";
 import "./studio.css";
 import "./catalog-workspace.css";
 
-/** Private data delivered only to the background page capture frame. */
 export interface PagePreviewCapture {
   id: string;
   theme: string;
@@ -13,7 +12,6 @@ export interface PagePreviewCapture {
   record: LoadedPage;
 }
 
-/** Only the capture window receives this page's data; the directory gets a PNG. */
 export default function PagePreviewPage() {
   const [capture, setCapture] = useState<PagePreviewCapture>();
   const [error, setError] = useState("");
@@ -74,8 +72,6 @@ export default function PagePreviewPage() {
       let previous = "";
       while (current && stable < 3) {
         const element = stage.current!;
-        // The capture covers only the viewport, and Chromium does not render
-        // cross-origin frames outside it, so those frames never report a height.
         const frames = [
           ...element.querySelectorAll<HTMLIFrameElement>(
             ".showai-custom-block iframe",

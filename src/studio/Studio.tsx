@@ -62,10 +62,6 @@ import { StudioViews } from "./shell/StudioViews";
 import { StudioMenus } from "./shell/menus/StudioMenus";
 import { StudioDialogs } from "./shell/StudioDialogs";
 
-/**
- * The workbench. Each part lives in ./shell; this component calls their hooks
- * in order and places the parts on the page.
- */
 export default function Studio() {
   useEffect(() => {
     trackDesktopPreviewActivity();
@@ -131,7 +127,6 @@ export default function Studio() {
   } | null>(null);
   const appearance = useAppearancePreference();
   const page = usePage(info?.home);
-  // Built-in docs are read-only pages: find works there without replace.
   const findKey =
     view === "page" && page.draft
       ? page.draft.id
@@ -171,7 +166,6 @@ export default function Studio() {
     pageSelection,
     directoryMarquee,
   } = directory;
-  // The tabs come later: the router and actions read them when they run.
   const workspaceRef = useRef<Workspace>(null!);
   const router = useStudioRouter({
     feedback,
@@ -190,7 +184,6 @@ export default function Studio() {
     openDoc,
     locateCurrentPage,
   } = router;
-  // A library the App just created gets its sample project once.
   const sampleProject = useSampleProject(
     info && capabilities.manageLibrary ? info.home : null,
     refresh,
@@ -272,7 +265,6 @@ export default function Studio() {
     dialogOpen: !!dialog,
     home: info?.home,
   });
-  // A sample project the person removed is never offered again.
   const seededSamples =
     sampleProject.samples?.state === "seeded" ? sampleProject.samples : null;
   const sampleProjectId =
@@ -282,15 +274,11 @@ export default function Studio() {
     )
       ? seededSamples.projectId
       : null;
-  // The welcome stays until the library has pages outside the sample project;
-  // it waits for the first page list so existing libraries never flash it.
   const welcoming =
     workspaceReady &&
     !!info &&
     !recent.some((item) => item.projectId !== sampleProjectId);
   const studioRoot = useRef<HTMLDivElement>(null);
-  // A page starts loading when the pointer rests on a link to it or presses
-  // it, so opening it does not wait for the read.
   useEffect(() => {
     let timer = 0;
     const link = (event: PointerEvent) => {
@@ -344,8 +332,6 @@ export default function Studio() {
   const assistantOpen = workspace.assistantOpen;
   const changeAssistantOpen = (open: boolean) =>
     workspace.setAssistantOpen(open, workspace.activeId);
-  // A new App opens on the first-run page of its documentation, once per window,
-  // while the library has no pages of its own; restored sessions and page links win.
   const launchedWelcome = useRef(false);
   useEffect(() => {
     if (!workspaceReady || !info || launchedWelcome.current) return;
@@ -396,13 +382,11 @@ export default function Studio() {
     appearance,
     assistant,
   });
-  // An external write just installed into the open page: outline what changed.
   const externalChange = view === "page" ? page.externalChange : undefined;
   useEffect(() => {
     if (externalChange?.fresh)
       flashBlocks(catalogScrollRef.current, externalChange.blockIds);
   }, [externalChange]);
-  // Opening a page an Agent created clears its 「Agent 新建」 mark.
   const openedPage =
     view === "page" && page.projectId && page.draft
       ? { projectId: page.projectId, pageId: page.draft.id }
@@ -713,8 +697,6 @@ export default function Studio() {
               ? info.home
               : null
           }
-          // Settings → Plugins and the welcome list the same hosts with their own actions.
-          // A downloaded App update brings its own plugin, so it is offered after the restart.
           hidden={
             appUpdate.state?.phase === "ready" ||
             (view === "settings" &&

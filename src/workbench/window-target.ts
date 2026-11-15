@@ -2,10 +2,8 @@ export interface WindowTarget {
   projectId?: string;
   pageId?: string;
   folderId?: string;
-  /** Comma-separated content IDs to highlight once the page opens. */
   blocks?: string;
   invite?: string;
-  /** The App's first window brings back the tabs of the previous session. */
   restoreTabs?: boolean;
 }
 

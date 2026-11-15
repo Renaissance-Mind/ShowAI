@@ -1,4 +1,3 @@
-// Injected by the development launcher only; never included in a distribution.
 import info from "virtual:showai-development-info";
 
 const previewParameters = new URLSearchParams(location.search);
@@ -47,7 +46,6 @@ if (
   import.meta.hot.on("showai:prepare-restart", async ({ id }) => {
     if (!window.showai?.prepareReload) return;
     freeze(true);
-    // The report names what refused (page, shared data, listener) for dev:status.
     let result = { allow: false, blockers: [] };
     try {
       result = window.showai.prepareReloadReport

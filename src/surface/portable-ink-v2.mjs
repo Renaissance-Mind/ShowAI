@@ -1,5 +1,3 @@
-/** Canonical cubic circular-sweep source. Pure validation: no DOM, WebAssembly
- * instantiation, host provider, derived outline, mesh or raster is required. */
 export const CUBIC_INK_FORMAT = "showai-ink-v2";
 export const DEFAULT_OUTLINE_TOLERANCE = 0.0025;
 const finite = (n, min, max) =>

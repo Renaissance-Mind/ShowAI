@@ -138,8 +138,6 @@ export class RequestBudgets {
     try {
       lease = await this.maintenance.enterWrite("metadata");
     } catch (error) {
-      // Frozen reads cannot mutate the exported counters. Edge/source rate
-      // protection still applies; data writes are rejected by their admission.
       if (error instanceof SyncError && error.code === "SERVER_READ_ONLY") {
         credit.remaining = 1;
         return;

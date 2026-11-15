@@ -1,18 +1,10 @@
-/**
- * Turns any thrown value (CoreError results from IPC, Node system errors,
- * CAPACITY_EXCEEDED, fetch failures, HTTP statuses) into the parts of a
- * problem notice: what happened, whether content is safe, why, what to do,
- * and the original text as technical details.
- */
 import { translator, type MessageKey } from "../i18n";
 import messages from "../i18n/messages/errors";
 
 const t = translator(messages);
 
-/** Fixed answer to "is my content safe?". */
 export type ProblemSafety = "saved" | "draftKept" | "windowOnly";
 
-/** Suggested follow-ups; the caller binds the ones it can perform. */
 export type ProblemActionId =
   | "retry"
   | "reload"
@@ -22,15 +14,10 @@ export type ProblemActionId =
   | "openSettings";
 
 export interface ProblemContext {
-  /** Display name of the operation, e.g. 导出网站 / Export site. */
   action?: string;
-  /** Display name of the object, e.g. a page title. */
   object?: string;
-  /** Whether the person's content is safe; only the caller knows this. */
   safety?: ProblemSafety;
-  /** Version line for the details, e.g. "0.10.0 (6d8d3b9)". */
   app?: string;
-  /** Where the problem was raised, e.g. "studio" or "save". */
   source?: string;
 }
 
@@ -43,7 +30,6 @@ export interface ProblemFacts {
   actualBytes?: number;
   limitBytes?: number;
   status?: number;
-  /** The fetch/network layer failed before any response. */
   network?: boolean;
   message: string;
 }
@@ -51,19 +37,13 @@ export interface ProblemFacts {
 export interface ProblemDescription {
   title: string;
   safety?: ProblemSafety;
-  /** Human sentence about the cause; absent when unknown. */
   cause?: string;
-  /** Suggested follow-ups, most useful first. */
   actions: ProblemActionId[];
-  /** Multi-line technical details with the original text. */
   details: string;
-  /** Most specific machine code: errno, CoreError code or HTTP_<status>. */
   code: string;
-  /** Original error text. */
   message: string;
   action?: string;
   source: string;
-  /** ISO time the problem was described. */
   at: string;
 }
 
@@ -75,7 +55,6 @@ function field<T>(value: unknown, key: string, type: string): T | undefined {
   return typeof item === type ? (item as T) : undefined;
 }
 
-/** Reads the structured fields that survive IPC from any thrown value. */
 export function problemFacts(error: unknown): ProblemFacts {
   const message =
     typeof error === "string"
@@ -177,7 +156,6 @@ function formatSize(bytes: number) {
     : `${Math.max(1, Math.round(bytes / 1024))} KB`;
 }
 
-/** Most specific code for reports and de-duplication. */
 export function problemCode(facts: ProblemFacts): string {
   if (facts.errno) return facts.errno;
   if (facts.network) return "NETWORK";
@@ -212,8 +190,6 @@ export function describeError(
     cause = t(known.cause, { status: facts.status ?? "" });
     actions = [...known.actions];
   }
-  // Revealing needs a path; choosing another location only fits writes the
-  // caller can redirect, which it signals by binding the action.
   if (!facts.path) actions = actions.filter((item) => item !== "reveal");
   const title = context.action
     ? context.object
@@ -258,28 +234,22 @@ export function describeError(
   };
 }
 
-/** Sentence for a ProblemSafety value. */
 export function safetyText(safety: ProblemSafety): string {
   return t(`safety.${safety}`);
 }
 
-// The workbench sets the platform of the machine holding its files (the
-// browser workbench's server, not the browser), so 显示所在位置 names the
-// file manager the person will actually see, as the save banners do.
 let problemPlatform: string | undefined;
 
 export function configureProblemPlatform(platform: string | undefined) {
   problemPlatform = platform;
 }
 
-/** Label for revealing a path in the platform's file manager. */
 export function revealLabel(platform = problemPlatform): string {
   return platform === "darwin" || platform === "win32" || platform === "linux"
     ? t(`action.reveal.${platform}`)
     : t("action.reveal");
 }
 
-/** Label for a suggested action. */
 export function actionLabel(action: ProblemActionId): string {
   return action === "reveal" ? revealLabel() : t(`action.${action}`);
 }

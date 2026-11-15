@@ -8,7 +8,6 @@ export interface HoveredTable {
 
 const acceptAll = () => true;
 
-/** Keep the table and its detached controls in a single pointer interaction region. */
 export function useTableHover(
   root: HTMLElement | null,
   options: {
@@ -89,7 +88,6 @@ export function useTableHover(
       if (current?.cell?.isConnected) {
         const cell = current.cell.getBoundingClientRect();
         const column = tableControlPositions(current, 0).column;
-        // Keep the header's controls while crossing the gap below it, even over a body cell.
         if (
           event.clientX >= Math.min(cell.left, column.left) &&
           event.clientX <= Math.max(cell.right, column.left + 88) &&
@@ -107,7 +105,6 @@ export function useTableHover(
       }
       if (current?.table.isConnected) {
         const rect = current.table.getBoundingClientRect();
-        // The controls float immediately above the border; crossing that gap must not hide them.
         if (
           event.clientX >= rect.left - 8 &&
           event.clientX <= rect.right + 8 &&
@@ -163,7 +160,6 @@ export function useTableHover(
         dismiss();
     };
     const update = () => {
-      // Every editor listens; only the one showing controls re-measures them.
       if (latest.current.target) refresh((value) => value + 1);
     };
     document.addEventListener("pointermove", move);

@@ -152,7 +152,6 @@ function rebindImportedComponents(
   return copy;
 }
 
-/** Operations that cannot add or change a component reference or its props. */
 const REF_NEUTRAL_OPERATIONS = new Set<string>([
   "block.text.set",
   "block.remove",
@@ -163,12 +162,6 @@ const REF_NEUTRAL_OPERATIONS = new Set<string>([
   "diagram.arrange",
 ]);
 
-/** CLI and MCP share operations; project-bound connections cannot mutate shared libraries. */
-/**
- * Build a new Page from catalog components without a nested document tree:
- * each block goes through the same component.insert path as page_apply.
- * The store assigns the real id, title and timestamps on creation.
- */
 
 export class AgentService extends CatalogService {
   declare readonly store: FileStore;
@@ -234,7 +227,6 @@ export class AgentService extends CatalogService {
       () => this.datasets.transform(this.requireProject(projectId), input),
     );
   }
-  /** Runs a transform script on its inputs without saving anything. */
   datasetTryTransform(
     projectId: string,
     input: Parameters<DatasetService["tryTransform"]>[1],
@@ -653,11 +645,9 @@ export class AgentService extends CatalogService {
       kind?: "page" | "board";
       parentId?: string | null;
       document?: ShowDocument;
-      /** Shallow alternative to document: catalog components in reading order. */
       blocks?: { kind: string; data: Record<string, unknown> }[];
       components?: CompiledComponent[];
       remoteComponents?: PublishedComponentLocator[];
-      /** A page id chosen beforehand (imports link pages to each other). */
       id?: string;
     },
   ) {
@@ -722,7 +712,6 @@ export class AgentService extends CatalogService {
       }),
     };
   }
-  /** Backlinks (to) and outgoing references (from) of a page. */
   pageReferences(
     projectId: string,
     pageId: string,
@@ -852,8 +841,6 @@ export class AgentService extends CatalogService {
       input.operations,
       input.datasetBases,
     );
-    // The stored page is locked already; these operations add no component
-    // refs or props, and applyOperations has normalized the result.
     const document = input.operations.every((operation) =>
       REF_NEUTRAL_OPERATIONS.has(operation?.type),
     )
@@ -868,7 +855,6 @@ export class AgentService extends CatalogService {
       input.baseRevision,
       current,
     );
-    // The same library transaction commits the page and its dataset writes.
     await routed.commit();
     return {
       ...saved,
@@ -883,7 +869,6 @@ export class AgentService extends CatalogService {
       sinceHash,
     );
   }
-  /** The comparison with one entry per record-level change (see page-diff-view). */
   async diffPageEntries(projectId: string, pageId: string, sinceHash: string) {
     const { diff, baseline, current } = await this.store.diffPageDocuments(
       this.requireProject(projectId),
@@ -1104,8 +1089,6 @@ export class AgentService extends CatalogService {
   ): ReturnType<AgentService["createPageImpl"]> {
     return this.mutation("Create page", args, async () => {
       const created = await this.createPageImpl(...args);
-      // Marked inside the mutation so the workbench sees it with the change
-      // notification; a rolled-back page leaves a mark nothing lists.
       const context = changeContext();
       if (agentAuthored(context))
         await markAgentCreated(
@@ -1117,10 +1100,6 @@ export class AgentService extends CatalogService {
       return created;
     });
   }
-  /**
-   * Delete (archive), restore or pin a page; deleted pages stay restorable and
-   * appear in deletedEntries. Without baseHash the current version changes.
-   */
   async updatePage(
     projectId: string,
     pageId: string,
@@ -1134,7 +1113,6 @@ export class AgentService extends CatalogService {
       updatePageState(this.store, project, pageId, fields, base),
     );
   }
-  /** A copy of a page with new block ids in the same folder; title defaults to "<title> copy". */
   async duplicatePage(projectId: string, pageId: string, title?: string) {
     const project = this.requireProject(projectId);
     const document = await duplicatePageDocument(
@@ -1145,12 +1123,6 @@ export class AgentService extends CatalogService {
     );
     return this.createPage(project, { document });
   }
-  /**
-   * Remove a component or template revision (or every revision without
-   * version) unless a page, package or publication still uses it. Global and
-   * published revisions change the shared library, which a project-bound
-   * connection cannot do.
-   */
   async removeCatalog(
     projectId: string | undefined,
     input: Omit<CatalogRemovalInput, "projectId">,
@@ -1162,7 +1134,6 @@ export class AgentService extends CatalogService {
       scope === "project" ? this.requireProject(projectId) : undefined;
     await openLibrary(this.store.root);
     const context = changeContext();
-    // The removal checks uses through the index and then commits on its own.
     return withChangeContext(
       {
         ...context,
@@ -1187,7 +1158,6 @@ export class AgentService extends CatalogService {
         }),
     );
   }
-  /** Deleted projects, folders and pages that can be restored. */
   deletedEntries() {
     return listDeletedEntries(
       this.store,
@@ -1208,11 +1178,6 @@ export class AgentService extends CatalogService {
   }
 }
 
-/**
- * What an Agent does next for common codes (tool names, not CLI flags) and one
- * sentence it can relay to the person. Agent-facing text is English; the Agent
- * relays it in the person's language.
- */
 const AGENT_GUIDANCE: Record<string, { nextStep: string; userMessage: string }> =
   {
     CONFLICT: {
@@ -1285,9 +1250,7 @@ const AGENT_GUIDANCE: Record<string, { nextStep: string; userMessage: string }> 
     },
   };
 
-/** What a failed request was doing, so its user message names that step. */
 export type FailedOperation = "save" | "export" | "present";
-/** The operation of the request being served; errorResult reads it. */
 export const failedOperation = new AsyncLocalStorage<FailedOperation>();
 const OPERATION_GUIDANCE: Partial<
   Record<string, Record<FailedOperation, { userMessage: string }>>
@@ -1368,7 +1331,6 @@ export function errorResult(
     ...(error instanceof CoreError && error.nextStep && !error.saveFailed
       ? { nextStep: error.nextStep }
       : {}),
-    // Built-in Agent failures carry their classification across IPC.
     ...(error instanceof Error &&
     "problem" in error &&
     error.problem &&
@@ -1378,11 +1340,6 @@ export function errorResult(
   };
 }
 
-/**
- * Node system errors (ENOSPC, EACCES, EROFS, ENOENT…) keep their errno code,
- * syscall and path so the workbench can explain them; also read one wrapped
- * `cause`, which is how library writes rethrow file errors.
- */
 function systemErrorFacts(
   error: unknown,
 ): { errno?: string; syscall?: string; path?: string } {

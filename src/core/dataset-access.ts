@@ -8,7 +8,6 @@ interface DatasetAccess {
   write: Set<string>;
 }
 const access = new AsyncLocalStorage<DatasetAccess>();
-/** Recursive transforms and cross-project bindings inherit the external caller's policy. */
 export function withDatasetAccess<T>(
   policy: DatasetAccess,
   operation: () => Promise<T>,

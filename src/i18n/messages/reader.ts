@@ -1,6 +1,5 @@
 import { defineMessages } from "../index";
 
-// Chrome of exported HTML readers. The language follows the exporter (<html lang>).
 export default defineMessages("reader", {
   "zh-CN": {
     draftNote: "交互预览 · 更改仅保存在此预览中",

@@ -143,7 +143,6 @@ test("large manifests live in object storage and only the current state is retai
           "SELECT manifest,manifest_key,manifest_bytes,sequence FROM revisions WHERE project_id=? ORDER BY sequence",
           [id],
         );
-        // Replaced manifests are reclaimed; the current one lives in object storage.
         expect(rows).toHaveLength(1);
         expect(rows[0].manifest).toBe("");
         expect(rows[0].manifest_key.startsWith(`projects/${id}/manifests/`)).toBe(

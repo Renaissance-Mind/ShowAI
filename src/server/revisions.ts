@@ -29,7 +29,6 @@ export const manifestMaximum = CAPACITY.syncManifestBytes;
 export function manifestKey(projectId: string, digest: string) {
   return `projects/${identifier(projectId)}/manifests/${digestId(digest)}`;
 }
-/** Verified manifests kept in memory; a revision's manifest never changes. */
 const parsedBudget = 32 * 1024 * 1024;
 export class Revisions {
   private parsed = new Map<
@@ -41,7 +40,6 @@ export class Revisions {
     readonly db: MetadataStore,
     readonly objects: ObjectStore,
   ) {}
-  /** Callers treat cached snapshots as immutable. */
   remember(
     projectId: string,
     revision: string,
@@ -58,13 +56,11 @@ export class Revisions {
       this.parsedBytes -= entry.bytes;
     }
   }
-  /** The verified manifest of a project's current head, when it is readable. */
   async current(projectId: string, head: string | null) {
     if (!head) return undefined;
     const row = await this.row(projectId, head);
     return row ? this.snapshot(projectId, row) : undefined;
   }
-  /** Existing records are retained as a frozen archive; new publications replace state. */
   async activateCurrent(projectId: string) {
     await this.db.run(
       "INSERT OR IGNORE INTO settings(key,value) SELECT ?,CAST(COALESCE(MAX(sequence),0) AS TEXT) FROM revisions WHERE project_id=?",
@@ -200,7 +196,6 @@ export class Revisions {
       snapshot: await this.snapshot(projectId, row),
     };
   }
-  /** Explicit, restartable conversion; inline bytes remain available for rollback. */
   async migrateInline(projectId?: string, maximum = 100) {
     const rows = await this.db.all<RevisionRow & { project_id: string }>(
       `SELECT r.*,u.id AS source_user_id,u.name AS source_user_name,r.created_at AS received_at FROM revisions r JOIN users u ON u.id=r.user_id WHERE r.manifest_key IS NULL${projectId ? " AND r.project_id=?" : ""} ORDER BY r.sequence LIMIT ?`,

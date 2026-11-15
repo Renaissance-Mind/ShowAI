@@ -1,8 +1,6 @@
-/** The lossless native-archive container marker on a region, or null. */
 export function inkArchiveGroup(node) {
   return node?.type === "region" ? (node.attrs?.inkArchiveGroup ?? null) : null;
 }
-// ShowAI native geometry. Parent-local coordinates; no editor/DOM dependency.
 export const radians = (degrees = 0) => (degrees * Math.PI) / 180;
 export function rotatePoint(point, center, degrees = 0) {
   const a = radians(degrees),
@@ -75,7 +73,6 @@ export function hitFrame(frame, point, tolerance = 0) {
     p.y <= frame.y + height + tolerance
   );
 }
-/** Separating-axis test avoids selecting empty corners of a rotated bounding box. */
 export function intersectsFrame(frame, rect) {
   const a = frameCorners(frame),
     b = frameCorners(rect);
@@ -125,7 +122,6 @@ export function objectCapabilities(node) {
     minHeight: node.type === "surface" ? 180 : 1,
   };
 }
-/** Create once per gesture. Callers supply measured heights for content-sized nodes. */
 export function createSnapIndex(objects) {
   const boxes = objects.map(({ id, frame }) => ({ id, ...frameBounds(frame) }));
   const anchors = (axis) =>
@@ -190,7 +186,6 @@ export function snapFrame(frame, index, scale = 1, resize = false) {
       }
     }
     if (!resize) {
-      // Only neighbors overlapping the object's orthogonal band can define an equal gap.
       const neighbors = index.boxes
         .filter(
           (b) =>
@@ -237,7 +232,6 @@ export function snapFrame(frame, index, scale = 1, resize = false) {
   };
 }
 
-/** Resize in the object's local axes, preserving the opposite edge even when rotated. */
 export function resizeFrame(
   frame,
   delta,
@@ -290,7 +284,6 @@ export function resizeFrame(
   };
 }
 
-/** Snap the moving handle; fixed edges never attract their own stationary coordinate. */
 export function snapResizeFrame(
   frame,
   index,
@@ -377,7 +370,6 @@ export function snapResizeFrame(
       (c) => c.axis === axis && Math.abs(c.entry.value - actual[axis]) < 0.001,
     );
     if (!matched) continue;
-    // An unchanged orthogonal coordinate is not a resize snap.
     if (
       Math.abs(actual[axis] - point[axis]) < 0.001 &&
       !((axis === "x" && horizontal) || (axis === "y" && vertical))
@@ -399,7 +391,6 @@ export function snapResizeFrame(
   return { frame: next, guides };
 }
 
-/** Preserve relative geometry when the smallest member reaches its size limit. */
 export function selectionMinimum(bounds, objects) {
   let widthRatio = 0,
     heightRatio = 0;
@@ -417,7 +408,6 @@ export function selectionMinimum(bounds, objects) {
   };
 }
 
-/** Bindings require a parent whose children have explicit local coordinates. */
 export function bindingParent(parent, layout) {
   return (
     (parent?.type === "surface" && parent.attrs?.kind === "board") ||
@@ -425,7 +415,6 @@ export function bindingParent(parent, layout) {
   );
 }
 
-/** Clamp a selection as one translation, preserving member offsets at coordinate limits. */
 export function translationDelta(frames, delta) {
   let minX = -Infinity,
     maxX = Infinity,

@@ -15,12 +15,8 @@ import { useTranslator } from "../../i18n/react";
 import messages from "../../i18n/messages/metrics";
 import common from "../../i18n/messages/common";
 
-// A leading/trailing label around one number, e.g. "$1,234.5M" or "98%".
 const countable = /^(\D*?)(-?\d{1,3}(?:,\d{3})+|-?\d+)(\.\d+)?(\D*)$/;
 
-/** Counts a figure up the first time it is seen. Reduced motion and rendered
- * exports keep the final value; `aria-busy` lets thumbnail capture and screen
- * readers wait for it. Pattern after Magic UI's NumberTicker (MIT). */
 function CountUp({ value }: { value: string }) {
   const element = useRef<HTMLSpanElement>(null);
   useLayoutEffect(() => {
@@ -31,14 +27,11 @@ function CountUp({ value }: { value: string }) {
       !match ||
       typeof IntersectionObserver === "undefined" ||
       matchMedia("(prefers-reduced-motion: reduce)").matches ||
-      // Catalog thumbnails capture a still frame, as their stage already
-      // turns off CSS motion.
       target.closest(".component-capture-stage")
     )
       return;
     const [, prefix, integer, fraction = "", suffix] = match;
     const end = Number(integer.replaceAll(",", "") + fraction);
-    // Years read as labels, not quantities to count towards.
     const year = !fraction && /^(19|20)\d\d$/.test(integer);
     if (!end || year) return;
     const digits = Math.max(0, fraction.length - 1);
@@ -69,8 +62,6 @@ function CountUp({ value }: { value: string }) {
       if (entries.some((entry) => entry.isIntersecting)) count();
     });
     const box = target.getBoundingClientRect();
-    // Start before the first paint when already on screen, so the final value
-    // never flashes; otherwise wait until the figure scrolls into view.
     if (
       document.visibilityState === "visible" &&
       box.bottom > 0 &&

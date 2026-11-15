@@ -42,14 +42,12 @@ const asAgent = <T>(action: () => Promise<T>) =>
     action,
   );
 
-/** A file of the given size without writing its bytes (sparse). */
 async function sizedFile(path: string, bytes: number) {
   const file = await open(path, "w");
   await file.truncate(bytes);
   await file.close();
 }
 
-/** The export plan of a stored page, as the exporter builds it. */
 async function planOf(
   pageId: string,
   options: {
@@ -156,7 +154,6 @@ test("a transform of a transform of a file counts as data from this device", asy
     }),
   ]);
   expect(plan.bytes).toBe(plan.items[0].bytes);
-  // A transform of library data only stays ordinary data.
   const plain = await asAgent(() =>
     datasets.defineTransform(projectId, {
       name: "库内处理",
@@ -203,7 +200,6 @@ test("defaults carry what fits each item and the total; previous choices and dec
   );
   const plan = await planOf(page.document.id);
   const byName = Object.fromEntries(plan.items.map((item) => [item.name, item]));
-  // An exported page embeds files up to its resource budget (128 MiB).
   expect(names.map((name) => byName[name].defaultChoice)).toEqual([
     "embed",
     "embed",
@@ -220,7 +216,6 @@ test("defaults carry what fits each item and the total; previous choices and dec
   expect(plan.bytes).toBe(120 * MiB);
   expect(plan.remainingBytes).toBe(136 * MiB);
   expect(plan.overLimit).toBe(false);
-  // Synchronization carries copies while one item and the total fit.
   const sync = await syncPackagingPlan(store, projectId);
   expect(
     names.map(
@@ -232,7 +227,6 @@ test("defaults carry what fits each item and the total; previous choices and dec
     choice: "bundle",
     path: join(outside, "rows.csv"),
   });
-  // A previous choice that still applies replaces the default.
   const previous = await planOf(page.document.id, {
     previous: { [byName["a.mp4"].id]: "skip", [byName["big.mp4"].id]: "embed" },
   });
@@ -242,14 +236,12 @@ test("defaults carry what fits each item and the total; previous choices and dec
   expect(previous.items.find((item) => item.name === "big.mp4")!.choice).toBe(
     "skip",
   );
-  // Decisions are checked against each item's choices.
   await expect(
     planOf(page.document.id, { decisions: { [byName["big.mp4"].id]: "embed" } }),
   ).rejects.toMatchObject({ code: "INVALID_DATA" });
   await expect(
     planOf(page.document.id, { decisions: { "dataset:x/y": "skip" } }),
   ).rejects.toMatchObject({ code: "INVALID_DATA" });
-  // Carrying all five goes over the total: the export is refused with the plan.
   const over = await planOf(page.document.id, {
     decisions: Object.fromEntries(
       names.slice(0, 5).map((name) => [byName[name].id, "embed"]),
@@ -279,7 +271,6 @@ test("synchronized copies stay out of history and unreferenced ones are collecte
   expect(
     logicalPath(root, join(store.projectPath(projectId), "packaging.json")),
   ).toBe(`projects/${projectId}/packaging.json`);
-  // A fresh copy survives the grace period; an old one is removed.
   expect(await collectBundles(store)).toEqual([]);
   const old = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000);
   await utimes(path, old, old);

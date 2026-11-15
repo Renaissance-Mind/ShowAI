@@ -24,9 +24,6 @@ export function pageContentKey(document: ShowDocument): string {
         : value;
   return JSON.stringify(normalize(content));
 }
-// An absent child list and [] encode the same empty editor node. Restrict
-// this normalization to the actual node tree; widget data/unknown fields retain
-// all distinctions, including their own properties named "content".
 function recoveryContentKey(document:ShowDocument):string {
   const node=(value:JSONContent):JSONContent=>{
     const {content,...fields}=value;
@@ -34,9 +31,6 @@ function recoveryContentKey(document:ShowDocument):string {
   };
   return pageContentKey({...document,content:node(document.content)});
 }
-/** Classification never writes, deletes, publishes or restores a draft.
- * An exact equality or conflict-free no-op merge proves there is no independent
- * edit to recover. Missing ancestry, retained conflicts and errors stay visible. */
 export function pageDraftNeedsRecovery(saved:ShowDocument,draft:RetainedPageDraft):boolean {
   if(draft.record.normalizationWarning || draft.content.id!==saved.id || draft.record.resourceId!==saved.id)return true;
   const savedKey=recoveryContentKey(saved),draftKey=recoveryContentKey(draft.content);

@@ -71,7 +71,6 @@ export function TableControls({ editor }: { editor: Editor }) {
   }, [editor, owner]);
 
   if (!target || !target.table.isConnected || !editor.isEditable) return null;
-  // An active selection menu owns this editor's actions; hover yields to it.
   if (
     !target.context &&
     (selected ||
@@ -80,7 +79,6 @@ export function TableControls({ editor }: { editor: Editor }) {
         !editor.state.selection.empty))
   )
     return null;
-  // Resolve DOM to current document positions after edits, undo, and table movement.
   const resolved = editor.state.doc.resolve(
     editor.view.posAtDOM(target.table, 0),
   );
@@ -127,7 +125,6 @@ export function TableControls({ editor }: { editor: Editor }) {
   };
   const runAction = (action: () => void) => {
     prepareSelection();
-    // Structural actions should undo independently of recent typing/alignment.
     editor.view.dispatch(closeHistory(editor.state.tr));
     action();
     setMenuOpen(false);

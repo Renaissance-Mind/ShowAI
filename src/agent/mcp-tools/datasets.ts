@@ -23,7 +23,6 @@ export const datasetWriteTools = new Set<string>([
   "dataset_delete",
 ]);
 
-// Large values and operation lists can come from a JSON file on this device.
 const filePath = z.string().min(1).max(4096).optional();
 const context = ({ service, projectId }: ToolConnection): OperationContext => ({
   service,
@@ -63,7 +62,6 @@ function readActions(connection: ToolConnection): Record<string, ToolAction> {
             full: out !== undefined,
           });
           if (out === undefined) return result;
-          // The value or comparison goes to the file; the reply keeps identity.
           await writeFile(String(out), JSON.stringify(result, null, 2), {
             flag: overwrite === true ? "w" : "wx",
           }).catch((error: NodeJS.ErrnoException) => {
@@ -175,8 +173,6 @@ function writeActions(connection: ToolConnection): Record<string, ToolAction> {
           { operationId, message, groupId } as Record<string, string>,
         ),
     },
-    // Online data is not a file of this device, so every transport links it;
-    // files (and copying a file's data back) need a local connection.
     link: {
       fields: {
         ...changeSchema,
@@ -256,7 +252,6 @@ function writeActions(connection: ToolConnection): Record<string, ToolAction> {
   };
 }
 
-/** Shared datasets: one value that several page blocks read and write. */
 export const datasetTools: ToolDeclaration[] = [
   {
     name: "dataset_read",

@@ -1,5 +1,3 @@
-// G2 Kagi concept: https://g2.antv.antgroup.com/en/charts/kagi
-// Closing values from G2's official K-chart example, in chronological order.
 export default async function drawKagi(context) {
   const prices = [7.57, 7.8, 8.15, 8.41, 8.7, 8.37, 8.09, 8.32];
   const reversal = 0.02;

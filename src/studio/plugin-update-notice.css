@@ -1,7 +1,6 @@
 .plugin-update-notice {
   position: fixed;
   right: 18px;
-  /* Clear of the development marker and the centered toast. */
   bottom: 52px;
   z-index: 240;
   display: flex;

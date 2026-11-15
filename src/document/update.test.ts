@@ -69,13 +69,11 @@ describe("updateNode", () => {
       }),
       { scope: "content" },
     );
-    // The input is never mutated.
     expect(before).toEqual(snapshot);
     const [found] = findNodes(after, "deep", { scope: "content" });
     expect(found.node.attrs!.data.version).toBe("2.0.0");
     expect(found.host!.attrs!.id).toBe("callout");
     expect(found.owner!.attrs!.id).toBe("note");
-    // Untouched branches keep their identity.
     expect(after.content![0]).toBe(before.content![0]);
     expect(after.content![2]).toBe(before.content![2]);
     const note = (root: JSONContent) => root.content![1].attrs!.data.content;

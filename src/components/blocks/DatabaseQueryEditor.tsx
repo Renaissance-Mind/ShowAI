@@ -1,5 +1,3 @@
-// Filter group and sort list of a database view, edited in the filter row
-// the view menu opens. Operators come from each field's value type.
 import { ArrowDown, ArrowUp, Filter, Plus, Trash2 } from "../../ui/icons";
 import {
   OPERATORS,
@@ -25,7 +23,6 @@ import fieldMessages from "../../i18n/messages/databaseFields";
 import type { DatabaseColumn } from "./types";
 
 export interface QueryChoices {
-  /** Options or records a list operand can name for this column. */
   (column: DatabaseColumn): { id: string; label: string }[];
 }
 
@@ -34,7 +31,6 @@ const isGroup = (item: unknown): item is FilterGroup =>
   typeof item === "object" &&
   Array.isArray((item as FilterGroup).conditions);
 
-/** A fitting starting value for an operator on a column. */
 function initialOperand(
   operator: FilterOperator,
   column: DatabaseColumn,

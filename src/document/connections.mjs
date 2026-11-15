@@ -64,7 +64,6 @@ export function arrowFromEndpoints(
   delete nextFrame.rotation;
   return { node: { ...node, attrs }, frame: nextFrame };
 }
-/** Resolve once after a logical edit. Invalidated bindings become stored free endpoints. */
 export function reconcileConnections(document) {
   const index = indexSurfaceTree(document.content),
     replacements = new Map();
@@ -119,7 +118,6 @@ export function reconcileConnections(document) {
   document.layout = layout;
   return document;
 }
-/** The last painted sibling wins. Endpoint targets never cross container coordinates. */
 export function bindingAtPoint(
   document,
   parentId,
@@ -141,7 +139,6 @@ export function bindingAtPoint(
   return hit
     ? {
         targetId: hit.id,
-        // A Page is an annotation surface: preserve the point inside its content.
         anchor:
           hit.node.type === "surface" && hit.node.attrs?.kind === "page"
             ? normalizedAnchor(hit.frame, point)
@@ -150,10 +147,6 @@ export function bindingAtPoint(
     : null;
 }
 
-/**
- * Endpoints near an edge's middle, or dropped deep inside the target, attach
- * to that edge midpoint so connections line up instead of landing anywhere.
- */
 export function connectionAnchor(frame, point, snap = 16) {
   const anchor = normalizedAnchor(frame, point),
     width = frame.width,
@@ -175,7 +168,6 @@ export function connectionAnchor(frame, point, snap = 16) {
   return distance(nearest) <= snap || edge > snap ? nearest : anchor;
 }
 
-/** A transform retains only relationships whose targets participate in the same command. */
 export function transformedBindings(bindings, transformedIds) {
   return Object.fromEntries(
     Object.entries(bindings ?? {}).filter(([, binding]) =>

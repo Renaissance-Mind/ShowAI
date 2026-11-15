@@ -35,7 +35,6 @@ import {
 } from "./dsh-stage.mjs";
 
 export type PluginHost = "codex" | "claude" | "deepseek";
-/** Changes DeepSeek Harness needs from the person; ShowAI never edits its profile. */
 export interface DshPendingSteps {
   bundlePath: string;
   profileMissing: boolean;
@@ -53,22 +52,15 @@ export interface PluginInstallation {
   installed: boolean;
   enabled: boolean;
   version?: string;
-  /** The installed or staged copy is the one this App would install now (same plugin files, runtime and library). */
   current?: boolean;
-  /** Identifies what this App would install now; it changes with the App, its bundled plugin or the library. */
   expected?: string;
   installedPath?: string;
   otherSources: string[];
   error?: string;
-  /** Code of `error` for a localized message; the raw text stays in `error`. */
   errorCode?: string;
-  /** Library the installed plugin is bound to (from the install receipt). */
   boundHome?: string;
-  /** Not found: the directories searched, for the person to compare with their shell. */
   searched?: string[];
-  /** Executable the person chose by hand. */
   manualPath?: string;
-  /** DeepSeek Harness only: the staged bundle and remaining host-side steps. */
   dsh?: DshPendingSteps;
 }
 export interface PluginInstallReceipt {
@@ -82,7 +74,6 @@ export interface PluginInstallReceipt {
 }
 
 const marketplaceName = "showai-desktop";
-/** How long a status scan waits for one host's `plugin list`. */
 const STATUS_TIMEOUT = 15000;
 const identity = `showai@${marketplaceName}`;
 export const desktopPluginActions = new Set([
@@ -94,7 +85,6 @@ export const desktopPluginActions = new Set([
   "plugins:launchConfig",
 ]);
 
-/** One dispatch for the desktop IPC handler and the local browser server. */
 export function pluginInstallerAction(
   installer: DesktopPluginInstaller,
   action: string,
@@ -160,7 +150,6 @@ async function exists(path: string, mode = constants.F_OK) {
   );
 }
 
-/** Harness is detected by its Desktop app; its bundles are installed from inside Harness. */
 async function dshApplication() {
   if (process.platform === "darwin")
     for (const root of ["/Applications", join(homedir(), "Applications")]) {
@@ -191,7 +180,6 @@ function dshSteps(path: string, state: DshProfileState): DshPendingSteps {
   };
 }
 
-/** Writes a script that starts the runtime with the plugin's arguments; returns its file name. */
 async function writeLauncher(
   directory: string,
   server: { command: string; args: string[] },
@@ -234,7 +222,6 @@ export async function hostExecutable(host: PluginHost) {
   return null;
 }
 
-/** Plugin hosts the App drives through their official CLIs. */
 export const PLUGIN_HOSTS = ["codex", "claude", "deepseek"] as const;
 function pluginHost(value: unknown): PluginHost {
   if (!PLUGIN_HOSTS.includes(value as PluginHost))
@@ -242,11 +229,6 @@ function pluginHost(value: unknown): PluginHost {
   return value as PluginHost;
 }
 
-/**
- * Fixed hosts and arguments; the page cannot supply commands. The only path it
- * supplies is a host executable the person chose, which must exist and be executable.
- * The desktop App and the local browser server share it: both run on the person's machine.
- */
 export class DesktopPluginInstaller {
   private pending = false;
   constructor(
@@ -269,14 +251,12 @@ export class DesktopPluginInstaller {
     );
   }
 
-  /** The person's chosen executable wins over detection while it still exists. */
   private async hostExecutable(host: PluginHost) {
     const manual = (await this.manualPaths())[host];
     if (manual && (await exists(manual, constants.X_OK))) return manual;
     return hostExecutable(host);
   }
 
-  /** Persists a host executable chosen by hand; an empty path returns to detection. */
   async setPath(input: Record<string, unknown>) {
     const host = pluginHost(input.host);
     const path = typeof input.path === "string" ? input.path.trim() : "";
@@ -297,7 +277,6 @@ export class DesktopPluginInstaller {
     return this.status();
   }
 
-  /** The library's runtime registration compared with this App. */
   runtimeStatus() {
     const runtime = this.options.runtime();
     return runtimeRegistrationStatus(
@@ -307,17 +286,12 @@ export class DesktopPluginInstaller {
     );
   }
 
-  /** 修复登记: registers this App for the current library, replacing any other registration. */
   async repairRuntime() {
     const runtime = this.options.runtime();
     await registerRuntime(runtime.home, runtime.cli, this.options.channel);
     return this.runtimeStatus();
   }
 
-  /**
-   * How to start the plugin's launcher by hand: the App's executable runs
-   * mcp/launch.mjs, which checks the registered runtime and starts its `mcp` entry.
-   */
   launchConfig() {
     const runtime = this.options.runtime();
     return {
@@ -336,7 +310,6 @@ export class DesktopPluginInstaller {
       ...process.env,
       PATH: executablePaths().join(delimiter),
     };
-    // Host CLIs must run as themselves, even when this caller is Electron.
     delete env.ELECTRON_RUN_AS_NODE;
     const result = await execute(executable, ["plugin", ...args], {
       env,
@@ -356,7 +329,6 @@ export class DesktopPluginInstaller {
     return result.stdout;
   }
 
-  /** Older host CLIs print text or another JSON shape for `--json`; that needs a newer host. */
   private async listJson(
     host: "codex" | "claude",
     executable: string,
@@ -403,7 +375,6 @@ export class DesktopPluginInstaller {
     const staged = await optionalJson<{ version?: string }>(
       join(target, "package.json"),
     );
-    // The staging receipt records which App bundle, runtime and library produced the files.
     const receipt = staged
       ? await optionalJson<{ version?: string; source?: string }>(
           join(this.options.root, "deepseek-install.json"),
@@ -431,11 +402,6 @@ export class DesktopPluginInstaller {
     };
   }
 
-  /**
-   * The version installHost() gives the plugin: the bundled manifest version plus a hash of the
-   * bundled files and this runtime launch, which includes the library. A different library, a moved
-   * App or a newer bundle changes it.
-   */
   private async expectedVersion() {
     const manifest = JSON.parse(
       await readFile(join(this.options.pluginRoot(), "plugin.json"), "utf8"),
@@ -453,10 +419,6 @@ export class DesktopPluginInstaller {
     return { manifest, original, version };
   }
 
-  /**
-   * What a staged Harness bundle should be built from: the bundled Harness files, the bundled
-   * plugin and this runtime launch, which includes the library.
-   */
   private async dshSource() {
     const [bundle, plugin] = await Promise.all([
       pluginFingerprint(this.options.dshBundleRoot()),
@@ -480,7 +442,6 @@ export class DesktopPluginInstaller {
     expected?: Promise<string>,
   ): Promise<PluginInstallation> {
     if (host === "deepseek") return this.inspectDsh(executable, expected);
-    // A host CLI that stops answering must not hold the whole scan.
     const data = await this.listJson(
       host,
       executable,
@@ -548,7 +509,6 @@ export class DesktopPluginInstaller {
             ...(manual[host] ? { manualPath: manual[host] } : {}),
           };
           if (!executable) return { ...base, searched: executablePaths() };
-          // Each host is an independent I/O boundary; one failure must not hide the other.
           try {
             return await this.inspect(
               host,
@@ -590,7 +550,6 @@ export class DesktopPluginInstaller {
     }
   }
 
-  /** Harness installs bundles itself; the App stages files and reports the remaining steps. */
   private async stageDsh(): Promise<PluginInstallReceipt> {
     const executable = await this.hostExecutable("deepseek");
     if (!executable)
@@ -632,7 +591,6 @@ export class DesktopPluginInstaller {
   private async installHost(
     host: "codex" | "claude",
   ): Promise<PluginInstallReceipt> {
-    // The user-scope Claude plugin follows the stable App; a development build would rebind it.
     if (host === "claude" && this.options.channel === "development")
       throw new PluginInstallError(
         "PLUGIN_DEVELOPMENT_BUILD",
@@ -680,7 +638,6 @@ export class DesktopPluginInstaller {
     }
     const runtime = this.options.runtime();
     const { manifest, original, version } = await this.expectedVersion();
-    // Only this App-owned staging directory is replaced; host caches are managed by official CLIs.
     await rm(source, { recursive: true, force: true });
     await cp(this.options.pluginRoot(), source, {
       recursive: true,
@@ -701,9 +658,6 @@ export class DesktopPluginInstaller {
     const json = async (path: string, value: unknown) => {
       await writeFile(path, JSON.stringify(value, null, 2) + "\n");
     };
-    // Use the App's executable instead of requiring Node on the user's PATH.
-    // Pin this connection to the selected library and to this App's runtime: the record lives
-    // outside the library, so another App registering there does not rebind the plugin.
     const record = join(this.options.root, `${host}-runtime.json`);
     await writeRuntimeRecord(
       record,
@@ -728,10 +682,7 @@ export class DesktopPluginInstaller {
       ...claudeManifest,
       version,
     });
-    // Each host declares how show_component reaches its conversation.
     if (host === "codex") {
-      // Codex reads the Agent Plugins mcp.json and silently drops a server whose file lacks
-      // $schema or whose command is an absolute path; it accepts a `./` launcher in the plugin.
       const launcher = await writeLauncher(join(source, "mcp"), server);
       await json(join(source, "mcp.json"), {
         $schema: "https://agent-plugins.org/schemas/1.0.0/mcp.schema.json",

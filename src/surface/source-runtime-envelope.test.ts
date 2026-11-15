@@ -89,7 +89,6 @@ it("preserves actual foreign edits and native semantic actions on the ordinary m
 it("preserves a pinned actual baseline after a canonical failure and still accepts its later correct delta",()=>{
  const f=setup({maximumResidentBytes:1,maximumUnleased:0}),first=output(f.owner.registerActualNativeEnvelopeJSON(JSON.stringify(f.request))),before=body(f.owner,first.next);
  const invalid=nextRequest(f,first,"invalid-source"),node=invalid.packet.document.content.content![1];
- // Corrupt a genuinely generated source after its independent first capture.
  node.attrs!.ink.geometryVersion=2;invalid.request.envelope.edits=diffNativeSource(f.packet,invalid.packet);
  expect(()=>f.owner.registerActualNativeEnvelopeJSON(JSON.stringify(invalid.request))).toThrow(/version|Unsupported|ink/);
  expect(body(f.owner,first.next)).toBe(before);expect(f.owner.nativePublicationDocumentMatching({ref:first.next,document:before})?.publicationId).toBe("actual-first");

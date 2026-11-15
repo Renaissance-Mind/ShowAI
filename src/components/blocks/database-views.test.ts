@@ -188,7 +188,6 @@ describe("database views", () => {
     };
     expect(columnWidth(view, "title", 0)).toBe(280);
     expect(columnWidth(view, "status", 1)).toBe(200);
-    // Widths outside the contract fall back to the default.
     expect(columnWidth(view, "doc", 2)).toBe(165);
     const ids = (list: DatabaseColumn[]) => list.map((column) => column.id);
     expect(ids(moveColumnTo(columns, "doc", "title", "before"))).toEqual([
@@ -235,7 +234,6 @@ describe("database views", () => {
 describe("record name and page title", () => {
   it("copies whichever side changed since they last matched", () => {
     const synced = new Map<string, string>();
-    // Matching pairs are remembered; on first sight the page title wins.
     expect(
       titleSyncActions(
         [
@@ -250,7 +248,6 @@ describe("record name and page title", () => {
       ["a", "BERT"],
       ["b", "新标题"],
     ]);
-    // The record changed: rename the page. The page changed: update the record.
     expect(
       titleSyncActions(
         [
@@ -319,7 +316,6 @@ describe("database rendering", () => {
   });
   it("edits a page cell through the shared choice-list picker", () => {
     const html = render(records(), false);
-    // A picker trigger showing the linked page's title, beside its link.
     expect(html).toContain('aria-label="选择文档"');
     expect(html).toContain('<span class="sb-cell-value">实验笔记</span>');
     expect(html).not.toContain('<select aria-label="文档"');

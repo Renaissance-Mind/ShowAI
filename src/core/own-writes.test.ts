@@ -26,7 +26,6 @@ it("reports a client's own write once and keeps other paths and clients separate
   const first = await writes.echoes([page, other]);
   expect([...first.keys()]).toEqual(["1"]);
   expect([...first.get("1")!]).toEqual([page]);
-  // A later event for the same path is a new change, not the recorded echo.
   expect((await writes.echoes([page])).size).toBe(0);
 });
 

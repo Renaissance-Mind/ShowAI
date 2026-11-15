@@ -4,9 +4,6 @@
 #include "mesh-pages.hpp"
 #include "../analytic-path-checked.hpp"
 namespace showai_boundary {
-/* Factory-local const input/options/count binding. No source or caller count
- * can be supplied to emit, and this borrow never leaves the synchronous raw
- * factory. It adds no source copy or persistent arena/GPU lifetime. */
 class RawAnalyticCapture final {
     const showai_analytic_internal::CheckedEmissionPlan plan_;
 public:
@@ -19,15 +16,9 @@ public:
         return plan_.emit(p, pc, v, vc, out);
     }
 };
-/* Original closed-path derivative, not a new source format or a caller proof.
- * Root's private C adapter must capture actual immutable commands. Generation
- * below is an echo, never an authority. Matrices use [a,b,c,d], x'=ax+cy.
- * The envelope certifies geometric regularization and Float32 position error.
- * Regular KLM follows the shared analytic factory and the observed vendor ramp;
- * it is NOT a residual/gradient, pixel-alpha or GPU interpolation certificate. */
 struct RawCoverageOptions {
-    double maximum_forward_norm=0; // ||A||1 = max(|a|+|b|,|c|+|d|)
-    double maximum_inverse_norm=0; // ||A^-1||inf, bounds A^-T in L1
+    double maximum_forward_norm=0;
+    double maximum_inverse_norm=0;
     double maximum_geometry_error_pixels=0;
     uint32_t maximum_commands=0,maximum_patches=0,maximum_vertices=0,maximum_draws=0;
     uint32_t maximum_analytic_depth=0,reserved=0;
@@ -37,7 +28,7 @@ struct RawCoverageCertificate {
     double maximum_geometry_error_pixels=0;
     double actual_position_error_source=0,actual_regularization_error_source=0;
     double maximum_field_value=0,maximum_field_derivative_source=0;
-    uint64_t absolute_contribution_bound=0; // actual emitted triangle count, NOT winding
+    uint64_t absolute_contribution_bound=0;
     uint32_t regularized_rays=0,degenerate_triangles=0;
 };
 struct RawCoverageStorage {
@@ -48,16 +39,12 @@ struct RawCoverageStorage {
 struct RawCoverageMesh {
     RawCoverageStorage mesh; RawCoverageCertificate certificate{};
     uint64_t source_generation=0;
-    uint32_t regularized_curves=0; // regular analytic intervals proved flat, never labelled RAY
-    uint32_t regularization_segments=0; // bounded exact source-restricted chord leaves
-    double source_control_bounds[4]{}; // conservative minX,minY,maxX,maxY; not AA support
+    uint32_t regularized_curves=0;
+    uint32_t regularization_segments=0;
+    double source_control_bounds[4]{};
     explicit RawCoverageMesh(Context&c):mesh(c){}
 };
-/* Cheap matrix validation. Translation is deliberately absent. No Q/rebuild on
- * ordinary camera changes within the admitted object/pixelDensity envelope. */
 inline bool raw_coverage_supports(const RawCoverageCertificate&,const double source_to_pixels[4]);
-/* Atomic on error. No exact global Boolean graph, no original source mutation,
- * and no binary-RAY vertices are ever emitted. */
 inline uint32_t build_raw_coverage_mesh(PolynomialContext&,const SAInkPathCommand*,uint32_t,
     uint64_t source_generation,const RawCoverageOptions&,RawCoverageMesh&,BoundaryKLMReason&);
 namespace raw_coverage {
@@ -73,18 +60,12 @@ inline bool matrix_norms(const double*m,double&forward,double&inverse){
  for(uint32_t i=0;i<4;i++)if(!finite_double(m[i]))return false;
  forward=max(sum(abs(m[0]),abs(m[1])),sum(abs(m[2]),abs(m[3])));
  double scale=max(max(abs(m[0]),abs(m[1])),max(abs(m[2]),abs(m[3])));if(!(scale>0))return false;
- // Outward interval for the scaled determinant. The scale division error is
- // included before subtraction; an uncertain singular map is rejected.
  double a=m[0]/scale,b=m[1]/scale,c=m[2]/scale,d=m[3]/scale;
  double det=a*d-b*c,err=mul(32*0x1p-52,sum(abs(a*d),abs(b*c)));
  double lower=abs(det)-err;if(!(lower>0)||!finite_double(lower))return false;
  inverse=up(max(sum(abs(d),abs(c)),sum(abs(b),abs(a)))/lower/scale);
  return finite_double(forward)&&finite_double(inverse);
 }
-/* Recover the factory's four-control convex hull before Float32 packing.
- * Matching rounded positions is insufficient: two distinct endpoint controls
- * can encode to the same Float32 pair. Use the actual numerical hull order,
- * and verify it against the factory output rather than guessing an anchor. */
 inline uint32_t hull(const double*p,uint32_t*out){
  uint32_t sorted[4]={0,1,2,3};auto same=[&](uint32_t a,uint32_t b){return p[2*a]==p[2*b]&&p[2*a+1]==p[2*b+1];};
  auto turn=[&](uint32_t a,uint32_t b,uint32_t d){double x=p[2*b]-p[2*a],y=p[2*b+1]-p[2*a+1],z=p[2*d]-p[2*a],w=p[2*d+1]-p[2*a+1],scale=max(max(abs(x),abs(y)),max(abs(z),abs(w)));return scale?(x/scale)*(w/scale)-(y/scale)*(z/scale):0;};
@@ -104,35 +85,22 @@ inline bool field_range(const BoundaryCoverageVertex*v,const RawCoverageOptions&
   double x=up(sum(mul(f1,abs(dy2)),mul(f2,abs(dy1)))/lower),y=up(sum(mul(f1,abs(dx2)),mul(f2,abs(dx1)))/lower);
   double sourceDerivative=sum(x,y);maximum=max(maximum,maximumJ);derivative=max(derivative,sourceDerivative);
   pixelDerivatives[j]=mul(sourceDerivative,o.maximum_inverse_norm);
-  // Default center interpolation may lie outside a skinny MSAA-covered
-  // triangle. Each functional needs its own extended helper bound; mixing
-  // maxima across unrelated K/L/M can spuriously exceed Float32 range.
   values[j]=sum(maximumJ,mul(2,pixelDerivatives[j]));
  }
  cert.maximum_field_value=max(cert.maximum_field_value,maximum);cert.maximum_field_derivative_source=max(cert.maximum_field_derivative_source,derivative);
  double field=sum(mul(mul(values[0],values[0]),values[0]),mul(values[1],values[2]));
  double gradient=sum(mul(mul(3,mul(values[0],values[0])),pixelDerivatives[0]),
                      sum(mul(values[2],pixelDerivatives[1]),mul(values[1],pixelDerivatives[2])));
- // Explicit Float32 exponent headroom, not a denominator epsilon or an AA
- // accuracy promise. Zero gradients follow the witnessed finite shader branch.
  return finite_double(values[0])&&finite_double(values[1])&&finite_double(values[2])&&
         values[0]<0x1p120&&values[1]<0x1p120&&values[2]<0x1p120&&
         finite_double(field)&&finite_double(gradient)&&field<0x1p120&&mul(2,mul(gradient,gradient))<0x1p120;
 }
-/* The cubic implicit is homogeneous with weights (2,3,3):
- * (s^2 K)^3-(s^3 L)(s^3 M)=s^6 F. Its screen gradient has the
- * same positive factor, so the observed ramp F/length(gradient) is unchanged.
- * Power-of-two scaling must roundtrip each encoded scalar exactly. This
- * addresses finite exponent range; it never substitutes a binary RAY or
- * claims that an uncertain implicit/cusp has become geometrically correct. */
 inline bool finite_fields(BoundaryCoverageVertex v[3],uint32_t kind,const RawCoverageOptions&o,RawCoverageCertificate&cert){
  RawCoverageCertificate candidate=cert;
  if(field_range(v,o,candidate)){cert=candidate;return true;}
  if(kind!=boundary_coverage_cubic&&kind!=boundary_coverage_embedded_quad)return false;
  for(uint32_t step=0;step<32;step++){
   if(kind==boundary_coverage_embedded_quad){
-   // Preserve M==K for the audited quadratic embedding. K/M scale by1/4,
-   // L by1/16, hence both F and its gradient scale exactly by1/64.
    for(uint32_t i=0;i<3;i++){
     float k=v[i].k*.25f,l=v[i].l*.0625f,m=v[i].m*.25f;
     if(k*4!=v[i].k||l*16!=v[i].l||m*4!=v[i].m)return false;
@@ -140,10 +108,6 @@ inline bool finite_fields(BoundaryCoverageVertex v[3],uint32_t kind,const RawCov
    }
    candidate=cert;if(field_range(v,o,candidate)){cert=candidate;return true;}continue;
   }
-  // K'=K/4 fixes F'=F/64. Distribute the six remaining binary exponents
-  // between L and M: a tiny functional need not underflow just because its
-  // partner can safely carry more of the scaling. All scalar casts must
-  // exact-roundtrip; this is an algebraic identity, not an epsilon edit.
   BoundaryCoverageVertex best[3]{};bool found=false;double bestMaximum=0;
   for(uint32_t exponent=0;exponent<=6;exponent++){
    float lScale=1,mScale=1;for(uint32_t k=0;k<exponent;k++)lScale*=.5f;for(uint32_t k=exponent;k<6;k++)mScale*=.5f;
@@ -166,10 +130,6 @@ inline bool position_cast_error(const double*positions,uint32_t count,double ox,
   error=max(error,sum(difference_error(positions[2*i],ox,x),difference_error(positions[2*i+1],oy,y)));
  }return true;
 }
-/* Keep the original representation whenever its actual cast meets the physical
- * budget. A long fan may need a nearer binary64 origin even though its source
- * is valid. Preflight and emission select the same origin for each triangle;
- * rebasing changes no authoritative command, KLM value or geometric budget. */
 inline bool position_origin(const double*positions,const RawCoverageOptions&o,double&ox,double&oy,double&error){
  if(!position_cast_error(positions,3,ox,oy,error))return false;
  if(mul(o.maximum_forward_norm,error)<=o.maximum_geometry_error_pixels)return true;
@@ -191,13 +151,8 @@ inline bool emit(PolynomialContext&c,RawCoverageMesh&out,const double*positions,
  if(mul(o.maximum_forward_norm,sum(error,cert.actual_regularization_error_source))>o.maximum_geometry_error_pixels){reason=boundary_klm_error_budget;return false;}
  double dx1=double(v[1].x)-v[0].x,dy1=double(v[1].y)-v[0].y,dx2=double(v[2].x)-v[0].x,dy2=double(v[2].y)-v[0].y;
  double determinant=dx1*dy2-dx2*dy1;
- // Exact Float32 coordinate rank/orientation predicate (rare ambiguous area).
  double areaError=mul(16*0x1p-52,sum(abs(dx1*dy2),abs(dx2*dy1)));int orientation=determinant>0?1:-1;
  if(abs(determinant)<=areaError){Q exact=boundary_coverage::cross(c,v[0],v[1],v[2]);if(c.numbers.status)return false;if(exact.zero()){
-  // The actual Float32 triangle has exactly zero source area. The existing
-  // encoded geometry has collapsed within the charged position-error cell;
-  // there is no finite affine interpolant/coverage lens to submit. This is
-  // counted derived collapse, never removal of authoritative source commands.
   ++cert.degenerate_triangles;return true;}orientation=exact.sign();}
  if(kind!=boundary_coverage_solid&&!finite_fields(v,kind,o,cert)){reason=boundary_klm_zero_gradient;return false;}
  if(orientation!=winding){auto z=v[1];v[1]=v[2];v[2]=z;}
@@ -220,22 +175,12 @@ inline bool chord_error(PolynomialContext&c,const Point restricted[4],const doub
   if(i==0)projection=Q(0);else if(i==3)projection=Q(1);else if(projection<Q(0)||projection>Q(1)||projection<previous)monotone=false;
   previous=projection;Q ex=(restricted[i].x-a.x-dx*projection).absolute(),ey=(restricted[i].y-a.y-dy*projection).absolute();if(ex>maximumX)maximumX=ex;if(ey>maximumY)maximumY=ey;
  }
- // If a rounding-scale tangent reverses, projection onto the chord cannot
- // certify a monotone reparameterization. Compare the original restricted
- // cubic directly with the linear chord parameter instead. This charges all
- // longitudinal/backtracking motion as well as transverse/endpoint error.
  if(!monotone){maximumX=Q::from_signed(ctx,0);maximumY=Q::from_signed(ctx,0);for(uint32_t i=0;i<4;i++){
   Q t=Q::from_signed(ctx,i)/Q(3),ex=(restricted[i].x-a.x-dx*t).absolute(),ey=(restricted[i].y-a.y-dy*t).absolute();
   if(ex>maximumX)maximumX=ex;if(ey>maximumY)maximumY=ey;
  }}
  return !ctx.status&&boundary_quantization::upper_bound(maximumX+maximumY,error);
 }
-/* Outward binary64 filter for the exact restricted Bernstein controls. Every
- * primitive encloses its real result, including subnormals. A proved chord
- * error replaces only the expensive proof, preserving the analytic factory's
- * actual vertices. Uncertain/over-budget bounds use the exact rational proof.
- * Final admission still charges endpoint rounding and Float32 position error
- * under the original transform envelope and geometric tolerance. */
 struct Enclosure {double lo=0,hi=0;};
 inline double adjacent(double x,bool positive){
  if(!finite_double(x))return x;uint64_t bits;copy_bytes(&bits,&x,8);
@@ -268,13 +213,11 @@ inline bool chord_enclosure(const Enclosure controls[4][2],const double a[2],con
  }
  double mx=0,my=0;
  if(valid(den)&&den.lo>0&&n[0].lo>=0&&n[1].hi<=den.lo&&n[0].hi<=n[1].lo){
-  // A monotone projected Bernstein parameter maps [0,1] onto the chord.
   mx=max(magnitude(subtract(controls[0][0],enclose(a[0]))),magnitude(subtract(controls[3][0],enclose(b[0]))));
   my=max(magnitude(subtract(controls[0][1],enclose(a[1]))),magnitude(subtract(controls[3][1],enclose(b[1]))));
   mx=max(mx,up(mul(magnitude(d[1]),crossMax)/den.lo));
   my=max(my,up(mul(magnitude(d[0]),crossMax)/den.lo));
  }else{
-  // Parameter-wise convex bound also covers reversals and zero-length chords.
   for(uint32_t i=0;i<4;i++){
    Enclosure t=i==0?enclose(0):i==3?enclose(1):Enclosure{adjacent(double(i)/3,false),adjacent(double(i)/3,true)};
    Enclosure ex=subtract(subtract(controls[i][0],enclose(a[0])),multiply(d[0],t)),ey=subtract(subtract(controls[i][1],enclose(a[1])),multiply(d[1],t));
@@ -303,9 +246,6 @@ inline bool chord(PolynomialContext&c,const SAInkPathCommand&command,const Comma
  if(filterLimit>0&&restricted_enclosure(command,meta,p,bounds)&&chord_enclosure(bounds,a,b,filtered)&&filtered<=filterLimit){error=filtered;return true;}
  Point controls[4];return restricted_cubic(c,command,meta,p,controls)&&chord_error(c,controls,a,b,error);
 }
-/* Actual preflight of the original factory vertices. A newly admitted
- * polyline interval cannot consume headroom needed by a later original fan.
- * This is the same position-cast calculation as emit, not a larger tolerance. */
 inline bool original_cast_error(const Vector<SAAnalyticPatch>&patches,const Vector<Command>&metadata,
  const SAInkPathCommand*commands,const RawCoverageOptions&o,double&error){
  error=0;
@@ -329,28 +269,12 @@ inline double float_cell_error(double bound){
  uint64_t encoded=uint64_t(int(e?e:1)-127-24+1023)<<52;double half;copy_bytes(&half,&encoded,8);
  return sum(half,half_ulp_double(bound));
 }
-/* Replace only an actual unresolved interval by a certified polyline. The
- * factory's original chord fan remains; the added oriented fans have that
- * chord as their opposite boundary, so the signed sum follows the polyline.
- * Every shared split endpoint is rounded ONCE from the original exact cubic.
- * Each leaf charges the exact Bernstein/chord error plus all retained triangle
- * position casting under the unchanged physical metric envelope. */
 inline uint32_t refine_ray(PolynomialContext&c,const SAInkPathCommand&command,const Command&meta,const SAAnalyticPatch&p,
  const RawCoverageOptions&o,RawCoverageMesh&out,double originalCast,uint32_t leafBudget,BoundaryKLMReason&reason){
  auto&ctx=c.numbers;
  struct Cell {Point controls[4];double a[2]{},b[2]{};uint32_t depth=0;};
  Cell first;if(!restricted_cubic(c,command,meta,p,first.controls)){reason=boundary_klm_ray;return ctx.status?ctx.status:SA_INK_RANGE;}
  first.a[0]=p.controls[0];first.a[1]=p.controls[1];first.b[0]=p.controls[6];first.b[1]=p.controls[7];
- // Convex bounds of the exact restricted curve plus the once-rounded shared
- // binary64 endpoint bound every later split anchor. The Float32 cell bound
- // reserves casting headroom BEFORE choosing any chord leaf, without storing
- // a full polyline or revising already admitted geometry after another leaf.
- // One binary64 endpoint is already the shared fan anchor. Rebase only
- // these derived RAY triangles to it. Whole-subpath MOVE distance can make
- // a conservative Float cell wider than the remaining error budget forever,
- // even after the actual chord error has converged. Both the future-cast
- // proof and emit use this exact same origin; original fans/preflight and
- // the accumulated geometric error policy remain unchanged.
  const double anchor[2]={first.a[0],first.a[1]};
  double futureCast[2]{};
  for(uint32_t axis=0;axis<2;axis++){
@@ -367,13 +291,10 @@ inline uint32_t refine_ray(PolynomialContext&c,const SAInkPathCommand&command,co
   if(!ctx.step())return ctx.status;Cell cell=pending.back();pending.pop_back();double error=0;
   if(!chord_error(c,cell.controls,cell.a,cell.b,error)){reason=boundary_klm_ray;return ctx.status?ctx.status:SA_INK_RANGE;}
   auto&cert=out.certificate;
-  // The emitted triangles must also satisfy this same combined budget;
-  // admission here never widens the policy or bypasses their casting check.
   double previous=cert.actual_regularization_error_source;
   bool admitted=mul(o.maximum_forward_norm,sum(max(cert.actual_position_error_source,castBound),max(previous,error)))<=o.maximum_geometry_error_pixels;
   if(admitted){
    if(out.regularization_segments>=leafBudget){reason=boundary_klm_capacity;return SA_INK_CAPACITY;}
-   // The whole source factory and every added leaf share one patch cap.
    ++out.regularization_segments;cert.actual_regularization_error_source=max(previous,error);
    Point a{Q::from_double(ctx,cell.a[0]),Q::from_double(ctx,cell.a[1])},b{Q::from_double(ctx,cell.b[0]),Q::from_double(ctx,cell.b[1])};
    Q area=(a.x-qa.x)*(b.y-qa.y)-(a.y-qa.y)*(b.x-qa.x);if(ctx.status)return ctx.status;
@@ -394,7 +315,6 @@ inline uint32_t refine_ray(PolynomialContext&c,const SAInkPathCommand&command,co
   }
   double midpoint[2];if(!boundary_quantization::nearest_lower_tie(work[0].x,midpoint[0])||!boundary_quantization::nearest_lower_tie(work[0].y,midpoint[1]))return ctx.status;
   for(uint32_t axis=0;axis<2;axis++)left.b[axis]=right.a[axis]=midpoint[axis];
-  // Depth first, in original source direction; the stack has depth+1 cells.
   pending.push_back(right);pending.push_back(left);
  }
  return ctx.status;
@@ -408,18 +328,11 @@ inline uint32_t build_raw_coverage_mesh(PolynomialContext&c,const SAInkPathComma
  if(ctx.status)return ctx.status;
  if((count&&!commands)||!o.maximum_commands||count>o.maximum_commands||o.maximum_commands>100000||!o.maximum_patches||o.maximum_patches>100000||o.maximum_vertices<3||o.maximum_vertices>1000000||!o.maximum_draws||o.maximum_draws>333333||!o.maximum_analytic_depth||o.maximum_analytic_depth>32||o.reserved||!finite_double(o.maximum_forward_norm)||!(o.maximum_forward_norm>0)||!finite_double(o.maximum_inverse_norm)||!(o.maximum_inverse_norm>0)||!finite_double(o.maximum_geometry_error_pixels)||!(o.maximum_geometry_error_pixels>0)||output.mesh.vertices.context()!=&ctx){reason=boundary_klm_invalid;return SA_INK_INVALID;}
  double identity[6]={1,0,0,1,0,0};SAAnalyticBudget budget{o.maximum_commands,o.maximum_patches,o.maximum_analytic_depth,0};const RawAnalyticCapture captured(commands,count,identity,&budget);auto status=captured.status();if(status)return status;SAAnalyticCounts counts=captured.counts();
- // Admission includes the actual source factory temporary output and final mesh.
  if(counts.vertices>o.maximum_vertices||counts.vertices/3>o.maximum_draws){reason=boundary_klm_capacity;return SA_INK_CAPACITY;}
- // Scratch follows closed source subpaths, independently of the retained
- // result. Keeping every original patch/vertex beside a growing final mesh
- // makes an otherwise small stroke depend on contiguous whole-input scratch.
  Vector<Command>metadata(ctx);metadata.resize(count);if(ctx.status)return ctx.status;
  auto stream=[&](auto&&consume)->uint32_t{
   for(uint32_t first=0;first<count;){
    uint32_t end=first+1;
-   // Every closed source contour has an independent analytic anchor. Consume
-   // its patches before preparing the next contour; command count alone does
-   // not bound subdivision output near a degenerate cubic.
    while(end<count){if(commands[end].operation==SA_INK_MOVE&&commands[end-1].operation==SA_INK_CLOSE)break;++end;}
    const RawAnalyticCapture part(commands+first,end-first,identity,&budget);if(part.status())return part.status();
    SAAnalyticCounts required=part.counts();Vector<SAAnalyticPatch>patches(ctx);Vector<SAAnalyticVertex>vertices(ctx);
@@ -456,13 +369,6 @@ inline uint32_t build_raw_coverage_mesh(PolynomialContext&c,const SAInkPathComma
    if(p.mode==SA_ANALYTIC_QUADRATIC&&quadMask!=7){reason=boundary_klm_invalid;return SA_INK_INVALID;}
    uint32_t kind=p.mode==SA_ANALYTIC_SOLID?boundary_coverage_solid:p.mode==SA_ANALYTIC_QUADRATIC?boundary_coverage_embedded_quad:boundary_coverage_cubic;
    if(!emit(c,staged,positions,tri,p.winding,meta.origin[0],meta.origin[1],p.command_index,kind,o,reason)){
-    // A valid but rounding-scale regular cubic can have a nonzero encoded
-    // triangle whose extended-center functional cannot stay finite without
-    // losing a coefficient. Do not weaken finite_fields or emit binary RAY.
-    // The analytic factory already emitted this interval's oriented chord fan.
-    // Prove the ORIGINAL restricted curve is within the same geometric budget
-    // of that retained chord (including its binary64 endpoint rounding), then
-    // remove the entire lens transaction, not merely its failing triangle.
     double error=0;
     if(!ctx.status&&reason==boundary_klm_zero_gradient&&p.mode==SA_ANALYTIC_CUBIC&&
        chord(c,commands[p.command_index],meta,p,error,o.maximum_geometry_error_pixels/o.maximum_forward_norm-patchCertificate.actual_position_error_source)&&

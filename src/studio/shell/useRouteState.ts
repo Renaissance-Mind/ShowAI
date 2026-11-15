@@ -14,10 +14,6 @@ import type { workbenchCapabilities } from "../capabilities";
 import { useBuiltinDocTitle } from "../BuiltinDocs";
 import type { View } from "./types";
 
-/**
- * Where the workbench is: the view, the selected project and folder, the open
- * documentation page, the search, and the settings section with its requests.
- */
 export function useRouteState({
   info,
   capabilities,
@@ -28,13 +24,11 @@ export function useRouteState({
   const receivingInvite = useRef(false);
   const [syncNavigationKey, setSyncNavigationKey] = useState(0);
   const [syncRequest, setSyncRequest] = useState<ProjectSyncRequest>();
-  // 关于与反馈 opens on its report form or diagnostics preview on request.
   const [feedbackRequest, setFeedbackRequest] = useState<FeedbackRequest>();
   const feedbackRequestId = useRef(0);
   const [workspaceReady, setWorkspaceReady] = useState(false);
   const [routing, setRouting] = useState(false);
   const routingRef = useRef(false);
-  // Built-in documentation; the website workbench publishes its own instead.
   const [docPage, setDocPage] = useState<{ id: string; hash: string } | null>(
     null,
   );
@@ -56,10 +50,7 @@ export function useRouteState({
   );
   const [query, setQuery] = useState("");
   const [searchLibrary, setSearchLibrary] = useState(false);
-  // Lists filter on the deferred query so typing stays responsive.
   const deferredQuery = useDeferredValue(query);
-  // A history entry brings back the search it was left with; other view
-  // changes start without one.
   const restoredSearch = useRef<{
     view: View;
     query: string;

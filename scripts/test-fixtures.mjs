@@ -1,7 +1,6 @@
 import { lstat, rm } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 
-/** Call after this run's browser/backend processes have exited. */
 export async function releaseTestFixtures(output, fixtures) {
   const owner = resolve(output);
   const metadata = await lstat(owner);

@@ -19,7 +19,6 @@ type Session = {
   current?: number;
 };
 
-/** Account and device management for one server connection, shown inside its card. */
 export default function SyncAccountPanel({
   connection,
   busy,
@@ -341,7 +340,6 @@ export default function SyncAccountPanel({
   );
 }
 
-/** A newly issued secret, shown once with an explicit copy action. */
 export function IssuedToken({
   token,
   detail,

@@ -1,8 +1,5 @@
 import { desktopTestEnvironment } from "../../scripts/desktop-test-env.mjs";
 import { execFileSync, spawnSync } from "node:child_process";
-// Exercises the real desktop catalog across two real project directories. The
-// App's component and template views are read-only: revisions are written the
-// way an Agent writes them, and the UI previews, inserts and applies them.
 import assert from "node:assert/strict";
 import {
   access,
@@ -18,7 +15,6 @@ import { fileURLToPath } from "node:url";
 import electron from "electron";
 import { _electron } from "playwright-core";
 
-// The smoke checks select controls by their Chinese labels.
 process.env.SHOWAI_LANGUAGE ??= "zh-CN";
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 await mkdir(join(root, "output/playwright"), { recursive: true });
@@ -97,8 +93,6 @@ try {
       (elapsed) => elapsed > 250,
       "component geometry settled",
     );
-    // Convert the local control rectangle through the actual parent transform.
-    // The iframe locator's automatic click omits this ancestor scale in Electron.
     const outer = await host.evaluate((element) => {
       const rect = element.getBoundingClientRect();
       return {
@@ -124,7 +118,6 @@ try {
     b = await api("projects:create", { name: "Catalog project B" });
   result.projectIds = [a.id, b.id];
   const original = await api("components:createExample", { projectId: a.id });
-  // An exact revision as an Agent copies it from a catalog result.
   const exactRef = (item, owner, kind = "component") => ({
     kind,
     id: item.id,
@@ -166,8 +159,6 @@ try {
     .getByRole("heading", { name: "适用场景", exact: true })
     .waitFor();
   await dialog.getByRole("heading", { name: "可调整", exact: true }).waitFor();
-  // The App catalog only inserts into an open page; with none open the action
-  // stays visible, disabled, and says why.
   const insert = dialog.getByRole("button", {
     name: "插入到页面",
     exact: true,
@@ -222,7 +213,6 @@ try {
     "builtin chart and text details share one responsive preview with scenarios and documentation; insertion stays disabled until a page is open",
   );
 
-  // Components are written by Agents; the App catalog reads what they saved.
   const text = await api("components:get", { id: "text", scope: "builtin" });
   const customText = await api("components:save", {
     projectId: a.id,
@@ -426,7 +416,6 @@ try {
     join(home, "workspace", "projects", b.id),
     join(output, "removed-source-project"),
   );
-  // The workspace drops the removed project, including its open catalog view.
   await page
     .locator(`.studio-sidebar .studio-tree-row[data-library-id="${b.id}"]`)
     .waitFor({ state: "detached" });
@@ -555,7 +544,6 @@ try {
       },
     },
   });
-  // The open editor keeps its own draft; reloading reopens the saved page.
   await page.reload();
   const panelFrame = page.frameLocator('iframe[title="嵌套面板"]');
   await panelFrame

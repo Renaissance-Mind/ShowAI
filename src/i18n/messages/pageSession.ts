@@ -1,6 +1,5 @@
 import { defineMessages } from "../index";
 
-// Page saving, local drafts and save-state messages.
 export default defineMessages("pageSession", {
   "zh-CN": {
     "status.saved": "本机已保存",

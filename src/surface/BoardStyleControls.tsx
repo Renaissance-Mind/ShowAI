@@ -73,10 +73,6 @@ function StrokeWidthSlider({
   );
 }
 
-/**
- * Text size for selected shapes and arrows that carry a label. It belongs to
- * the selection's text settings, ahead of object-specific actions.
- */
 export function LabelSizeSelect({
   nodes,
   onChange,

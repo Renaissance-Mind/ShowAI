@@ -30,11 +30,6 @@ export function useWorkspaceTabs({
   home?: string;
   ready: boolean;
   entry: WorkspaceEntry;
-  /**
-   * Prepares the entry's content without showing it and returns a function
-   * that shows it, or null when the entry cannot be opened. The function runs
-   * in the same render as the tab change and returns false if it was superseded.
-   */
   restore: (
     entry: WorkspaceEntry,
     tabId: string,
@@ -50,13 +45,11 @@ export function useWorkspaceTabs({
   const closing = useRef(false);
   const library = useRef<string | undefined>(undefined);
   const restored = useRef(false);
-  // How this window began: with a new workspace, or by restoring its saved tabs.
   const launch = useRef<"new" | "restored" | null>(null);
   const latest = useRef({ entry, restore, getScroll, onError, beforeClose });
   latest.current = { entry, restore, getScroll, onError, beforeClose };
   const readyRef = useRef(ready);
   readyRef.current = ready;
-  // A tab command made while another switch runs waits for it; the latest wins.
   const waiting = useRef<{ start: () => void; drop: () => void } | null>(null);
   const idle = useRef<(() => void)[]>([]);
 
@@ -64,11 +57,9 @@ export function useWorkspaceTabs({
     current.current = next;
     setState(next);
     if (!library.current) return;
-    // Storage failures must not turn a successful navigation into an apparent failure.
     try {
       const bytes = JSON.stringify({ version: 1, ...next });
       sessionStorage.setItem(`showai:tabs:${library.current}`, bytes);
-      // The most recent window's tabs come back when the App starts again.
       localStorage.setItem(`showai:tabs:last:${library.current}`, bytes);
     } catch (error) {
       latest.current.onError(error);
@@ -84,7 +75,6 @@ export function useWorkspaceTabs({
   };
 
   const busyNow = () => pending.current || closing.current || !readyRef.current;
-  /** Runs when no switch is in flight; a later request replaces one still waiting. */
   const whenFree = (request: () => Promise<boolean>): Promise<boolean> => {
     if (!busyNow()) return request();
     return new Promise<boolean>((resolve, reject) => {
@@ -114,7 +104,6 @@ export function useWorkspaceTabs({
   const activate = async (next: WorkspaceTabsState) => {
     if (busyNow()) return false;
     pending.current = true;
-    // A quick switch renders once; only a slow one shows its busy state.
     const busy = setTimeout(() => setSwitching(true), 150);
     let shown = false;
     try {
@@ -126,7 +115,6 @@ export function useWorkspaceTabs({
       if (!show) return false;
       clearTimeout(busy);
       pending.current = false;
-      // The page, the workbench location and the tab strip change in one commit.
       flushSync(() => {
         shown = show();
         if (shown) publish(next);
@@ -162,13 +150,11 @@ export function useWorkspaceTabs({
       } catch (error) {
         latest.current.onError(error);
       }
-      // An explicit page/invitation launch takes priority over a previous session.
       const explicit =
         firstLibrary && (params.has("project") || params.has("invite"));
       if (saved && !explicit && !restored.current) {
         restored.current = true;
         if (firstLibrary) launch.current = "restored";
-        // Tabs from an earlier launch may name pages deleted since; start fresh then.
         const fresh = () => publish(createWorkspace(latest.current.entry));
         void activate(saved).then(
           (opened) => {
@@ -265,19 +251,15 @@ export function useWorkspaceTabs({
   return {
     ...state,
     switching,
-    /** Event handlers read this; `switching` is only shown once a switch is slow. */
     isSwitching: () => pending.current || closing.current,
-    /** Resolves once no tab switch is running or waiting. */
     settled: () =>
       switchingNow() || waiting.current
         ? new Promise<void>((resolve) => idle.current.push(resolve))
         : Promise.resolve(),
-    /** Removes history entries for deleted content from every tab. */
     prune: (gone: (location: WorkspaceLocation) => boolean) => {
       const next = pruneWorkspace(current.current, gone);
       if (next !== current.current) publish(next);
     },
-    /** Rewrites history entries for content that moved to another project. */
     relocate: (
       moved: (location: WorkspaceLocation) => boolean,
       projectId: string,

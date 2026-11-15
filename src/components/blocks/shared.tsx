@@ -6,8 +6,6 @@ import messages from "../../i18n/messages/blocks";
 import { NoteText } from "./NoteText";
 import { plainNotes } from "../../document/note-markup.mjs";
 
-// Default titles that built-in components save into documents; a caption that
-// still matches one of them is hidden.
 const genericTitles = new Set(
   [
     "数据图表|数据库|关键指标|交互计算|图片画廊|交互流程图|思维导图|G2 图表|图表", // i18n-exempt: saved default titles
@@ -21,7 +19,6 @@ const genericTitles = new Set(
     .split("|"),
 );
 
-/** Accessible name: the block's own title, or a translated label while it still has a saved default. */
 export function blockLabel(title: unknown, fallback: string): string {
   return typeof title === "string" &&
     title.trim() &&

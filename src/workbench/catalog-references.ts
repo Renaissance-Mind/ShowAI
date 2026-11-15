@@ -5,7 +5,6 @@ import { workspaceRoot } from "../core/library-runtime";
 import type { ReferenceEdge } from "../core/library-index";
 import type { FileStore } from "../core/store";
 
-/** One page that shows a package revision, with the blocks that do. */
 export interface CatalogPageReference {
   projectId: string;
   projectName: string;
@@ -14,17 +13,14 @@ export interface CatalogPageReference {
   blockIds: string[];
   revisions: { version?: string; integrity?: string }[];
 }
-/** Another package revision that depends on the target. */
 export interface CatalogPackageReference {
   kind: "component" | "template";
   id: string;
-  /** The package's display name, when its revision file was read. */
   name?: string;
   version?: string;
   scope: "project" | "global" | "published";
   projectId?: string;
   projectName?: string;
-  /** The target revisions this package depends on. */
   revisions: { version?: string; integrity?: string }[];
 }
 export interface CatalogReferences {
@@ -36,13 +32,11 @@ const PAGE = /^projects\/([^/]+)\/pages\/([^/]+)(?:\.json|\/reader\.json)$/;
 const PACKAGE =
   /^(?:projects\/([^/]+)\/)?packages\/(published\/)?(components|templates)\/([^/]+)(?:\/([^/]+))?/;
 
-/** Groups index edges per page and per depending package, named for people. */
 export function groupCatalogReferences(
   edges: ReferenceEdge[],
   names: {
     project: (projectId: string) => string | undefined;
     page: (projectId: string, pageId: string) => string | undefined;
-    /** Name of the package revision at a library path such as `packages/templates/x/1.0.0`. */
     package?: (path: string) => string | undefined;
   },
 ): CatalogReferences {
@@ -116,7 +110,6 @@ export function groupCatalogReferences(
   };
 }
 
-/** Where a package revision is used across the whole library. */
 export async function catalogReferences(
   store: FileStore,
   input: {

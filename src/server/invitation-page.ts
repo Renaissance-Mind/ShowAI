@@ -1,4 +1,3 @@
-/** Public invitation metadata only; access is granted after authenticated acceptance. */
 export function invitationPage(base: string) {
   const encodedBase = JSON.stringify(base).replace(/</g, "\\u003c");
   return `<!doctype html><html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>加入 ShowAI 项目</title>

@@ -1,6 +1,5 @@
 import { defineMessages } from "../index";
 
-// The single-page canvas used when ShowAI runs without the workbench.
 export default defineMessages("canvas", {
   "zh-CN": {
     readFailed: "本地页面未能读取，原始数据已保留。",

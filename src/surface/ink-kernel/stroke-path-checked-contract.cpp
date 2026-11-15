@@ -1,4 +1,3 @@
-// Actual private factory contract. Product modules never export this test.
 #include "stroke-path-checked.hpp"
 #if !defined(__wasm__)
 #include "include/stroke-plan-private.h"
@@ -25,7 +24,7 @@ void copy(void *a, const void *b, uint32_t n) {
   for (uint32_t i = 0; i < n; i++)
     x[i] = y[i];
 }
-} // namespace
+}
 extern "C" uint32_t checked_stroke_contract() {
   SAInkStrokeSegment source{};
   source.degree = 3;
@@ -129,7 +128,7 @@ extern "C" uint32_t checked_stroke_contract() {
                                        &actual) != SA_INK_INVALID)
     return 19;
   actual = {};
-  actual.commands = 1; // A caller's modified summary cannot authorize emit.
+  actual.commands = 1;
   if (showai_private_stroke_plan_build(state, commands, actual.commands,
                                        &actual) != SA_INK_CAPACITY ||
       walk_work().emissions)

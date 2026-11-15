@@ -10,34 +10,6 @@ import { CAPACITY, measureContent } from "../portable/capacity.mjs";
 import { builtinComponent } from "../contract/catalog";
 import { componentBlock } from "../surface/component-insertion";
 
-/**
- * Applying an operation to a page costs a clone, a reconcile and a full
- * validation of the page. For the operations long pages are written with
- * (block.insert, component.insert of a plain block, block.text.set) the same
- * result follows from the touched block alone, provided the page before the
- * operation is the output of a full step: valid, normalized and reconciled.
- * A step here either produces exactly that result or declines, and the
- * caller applies the operation fully, which also yields the exact error.
- *
- * Invalid states one of these operations can produce, and how each is
- * caught before the step is accepted:
- * - the block itself breaks a node rule (type, attrs, marks, data, empty
- *   text, child types, nesting depth, JSON shape): validateSubtree runs the
- *   page validator's own node checks on it in its place;
- * - the parent may not hold it: validateSubtree checks the parent's child
- *   types (inserting never empties a parent);
- * - the page exceeds its node count: the running count goes into
- *   validateSubtree;
- * - the page exceeds its byte limits: an upper bound (the full measure of the
- *   last full step plus every byte added since, nothing subtracted) must stay
- *   within the limits; data URLs are deduplicated page-wide, so blocks that
- *   carry them decline;
- * - an id repeats one on the page, or is empty, too long or reserved:
- *   checked against the page's id set (tree and component content);
- * - shared-data bindings, documents held in component data, layout-bearing
- *   containers, drawings, positioned parents (Boards, free regions) and Page
- *   placeholders involve relations beyond the block: those steps decline.
- */
 export interface BatchState {
   document: ShowDocument;
   ids: Set<string>;
@@ -48,16 +20,11 @@ export interface BatchState {
 const reserved = new Set(["__proto__", "prototype", "constructor"]);
 const INCREMENTAL = new Set(["block.insert", "component.insert", "block.text.set"]);
 
-/** Whether a step of this type may avoid a full apply. */
 export const incrementalCandidate = (operation: PageOperation) =>
   !!operation &&
   typeof operation === "object" &&
   INCREMENTAL.has(operation.type);
 
-/**
- * State for incremental steps on the output of a full step, or undefined
- * when that output is not a reconciled container page.
- */
 export function batchState(document: ShowDocument): BatchState | undefined {
   if (!isResource(document)) return undefined;
   if (canonicalJson(reconcileSurface(document)) !== canonicalJson(document))
@@ -87,7 +54,6 @@ interface Located {
   node: JSONContent;
   parent: JSONContent | null;
   index: number;
-  /** Index path from the content root, as assignSurfaceIds writes it. */
   path: string;
   depth: number;
 }
@@ -111,7 +77,6 @@ function locate(root: JSONContent, id: string): Located | undefined {
   return undefined;
 }
 
-/** A block placed by itself: no relations beyond its own subtree. */
 function selfContained(node: JSONContent): boolean {
   let plain = true;
   walk(node, (item) => {
@@ -130,7 +95,6 @@ function selfContained(node: JSONContent): boolean {
   return plain;
 }
 
-/** The bytes a fragment adds, or undefined when it carries data URLs. */
 function addedBytes(value: unknown) {
   const measured = measureContent(value);
   if (measured.resourceCount) return undefined;
@@ -153,7 +117,6 @@ function withinCapacity(state: BatchState, additions: ({ structureBytes: number;
   return next;
 }
 
-/** Ids for the nodes assignSurfaceIds would fill, in its order; undefined on any id it would reject. */
 function assignIds(state: BatchState, node: JSONContent, path: string) {
   const explicit = new Set<string>();
   let valid = true;
@@ -259,7 +222,6 @@ function insertBlock(
       resource: true,
     });
   } catch {
-    // The full step reports this failure with its exact message.
     return false;
   }
   parent.content = [...children.slice(0, index), node, ...children.slice(index)];
@@ -314,11 +276,6 @@ function setText(state: BatchState, blockId: string, text: unknown): boolean {
   return true;
 }
 
-/**
- * Apply one operation in place on the batch's private document when its
- * result follows from the touched block alone. Returns false, leaving the
- * document untouched, when the operation needs a full step.
- */
 export function applyIncrementally(state: BatchState, operation: PageOperation): boolean {
   switch (operation.type) {
     case "block.insert": {
@@ -343,7 +300,6 @@ export function applyIncrementally(state: BatchState, operation: PageOperation):
       try {
         block = componentBlock(kind, data as Record<string, unknown>);
       } catch {
-        // The full step reports invalid component data with its exact message.
         return false;
       }
       const { node, frame } = block;

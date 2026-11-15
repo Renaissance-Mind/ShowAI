@@ -59,7 +59,6 @@ type Roadmap = {
 };
 
 const DAY = 86400000;
-// Owners without a color take these in order; all read on light and dark paper.
 const PALETTE = [
   "#3b74b8",
   "#2f8f6b",
@@ -73,7 +72,6 @@ const PALETTE = [
 const GUTTER = 132;
 const MIN_TRACK = 520;
 
-// Statuses still carrying a contract default label are shown in the reader's language.
 const DEFAULT_LABELS = new Map(
   (DEFAULT_ROADMAP_STATUSES as Status[]).map((status) => [
     status.id,
@@ -102,14 +100,12 @@ function useWidth() {
   return [ref, width] as const;
 }
 
-/** Rough label width so short bars put their title beside the bar instead of clipping it. */
 const textWidth = (value: string) =>
   [...value].reduce(
     (sum, char) => sum + (/[\u2e80-\uffff]/.test(char) ? 12 : 6.8),
     0,
   ) + 16;
 
-/** Tick days: every day for short plans, Mondays for a few months, month starts beyond. */
 function axisTicks(start: number, end: number) {
   const total = end - start + 1;
   const ticks: number[] = [];
@@ -118,7 +114,6 @@ function axisTicks(start: number, end: number) {
     return { ticks, unit: "day" as const };
   }
   if (total <= 120) {
-    // Day 4 since the epoch (1970-01-05) is a Monday.
     for (let day = start + ((((4 - start) % 7) + 7) % 7); day <= end; day += 7)
       ticks.push(day);
     return { ticks, unit: "week" as const };
@@ -186,7 +181,6 @@ export function RoadmapBlock({ data }: BlockProps) {
     { accept: (value) => value === null || itemOf.has(value as string) },
   );
   const detailsRef = useRef<HTMLDetailsElement>(null);
-  // Printing shows every task, not only the one selected on screen.
   useEffect(() => {
     const open = () => {
       if (detailsRef.current) detailsRef.current.open = true;
@@ -232,7 +226,6 @@ export function RoadmapBlock({ data }: BlockProps) {
   const gutter = narrow ? 0 : GUTTER;
   const trackPx = Math.max(width, MIN_TRACK) - gutter;
   const { ticks, unit } = axisTicks(d0, d1);
-  // Thin out labels so neighbouring ticks never collide.
   const tickPx =
     ticks.length > 1 ? ((ticks[1] - ticks[0]) / total) * trackPx : trackPx;
   const labelEvery = Math.max(

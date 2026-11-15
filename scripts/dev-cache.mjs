@@ -8,7 +8,6 @@ const optionalRead = (path) =>
     throw error;
   });
 
-// Hash content rather than mtimes so edits, deletions and restored files invalidate.
 export function developmentCache(root, directory, mode, options = {}) {
   const receipt = join(directory, options.name ?? "build-cache.json");
   const configuration = JSON.stringify({
@@ -41,7 +40,6 @@ export function developmentCache(root, directory, mode, options = {}) {
     ])
       paths.add(join(root, path));
     const hash = createHash("sha256").update(configuration);
-    // Limit concurrent reads so large source graphs don't exhaust file handles.
     const sorted = [...paths].sort();
     for (let index = 0; index < sorted.length; index += 64) {
       const files = await Promise.all(
@@ -101,7 +99,6 @@ export function developmentCache(root, directory, mode, options = {}) {
       return cached.dependencies;
     },
     async save(before, dependencies, paths) {
-      // Never certify a build if a source file changed while it was compiling.
       if (before !== (await fingerprint())) return;
       const data = {
         configuration,

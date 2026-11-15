@@ -1,5 +1,3 @@
-/* Actual original-curve fixture transport. No expected mesh, image or mocked
- * geometry participates in the retained-vs-independent-full comparison. */
 #include "source-delta.hpp"
 #include <vector>
 #include <cstdio>

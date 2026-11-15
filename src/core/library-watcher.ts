@@ -4,7 +4,6 @@ import { stat } from "node:fs/promises";
 import { join } from "node:path";
 import { watch } from "chokidar";
 
-/** FSEvents watches the tree without one kqueue file descriptor per content file. */
 class RecursiveLibraryWatcher extends EventEmitter {
   private native: FSWatcher;
   private pending = new Map<

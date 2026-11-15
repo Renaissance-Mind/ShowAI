@@ -83,7 +83,6 @@ export function ResourceEditor({
       setLoading(false);
     }
   };
-  /** Links the original file where it is, instead of embedding a copy. */
   const link = async () => {
     if (!chooseFiles) return;
     setError("");

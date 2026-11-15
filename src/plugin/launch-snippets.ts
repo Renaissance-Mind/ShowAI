@@ -1,4 +1,3 @@
-/** A stdio MCP server as hosts configure it. */
 export interface McpLaunch {
   command: string;
   args: string[];
@@ -15,14 +14,8 @@ function shellQuote(value: string, platform?: string) {
     : `'${value.replace(/'/g, `'\\''`)}'`;
 }
 
-/** TOML basic strings accept JSON string escapes. */
 const toml = (value: string) => JSON.stringify(value);
 
-/**
- * Configuration text for adding ShowAI by hand. `server` is the plugin launcher
- * (checks the registered runtime, then starts its `mcp` entry) or, without one,
- * the runtime CLI with the `mcp` subcommand appended.
- */
 export function launchSnippet(
   kind: LaunchSnippetKind,
   server: McpLaunch,
@@ -31,7 +24,6 @@ export function launchSnippet(
   const env = Object.entries(server.env);
   if (kind === "claude")
     return [
-      // -e takes several values, so the name comes first and `--` ends the options.
       "claude mcp add --scope user showai",
       ...env.map(([key, value]) => `-e ${shellQuote(`${key}=${value}`, platform)}`),
       "--",
@@ -64,7 +56,6 @@ export function launchSnippet(
   );
 }
 
-/** The runtime CLI started directly needs its `mcp` subcommand. */
 export function runtimeMcpLaunch(cli: McpLaunch): McpLaunch {
   return { ...cli, args: [...cli.args, "mcp"] };
 }

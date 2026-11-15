@@ -27,11 +27,6 @@ import type { AgentService } from "./service";
 import type { CompiledComponent } from "../contract/types";
 import type { PublishedComponentLocator } from "../core/publication";
 
-// The import harness: whatever importer filled the slot, the bundle it
-// returns is checked, shown as a plan, and written through the normal save
-// paths — folders, datasets, then one page per transaction, so every page is
-// complete or absent, history and the search index see ordinary saves, and a
-// failed page is reported without stopping the others.
 
 export type ImportSource =
   { path: string } | { files: { name: string; data: string }[] };
@@ -59,7 +54,6 @@ export interface ImportPlan {
     bytes: number;
   };
   target: ImportTarget;
-  /** The folder made to hold the import, when it has more than one top item. */
   root: string | null;
   counts: {
     folders: number;
@@ -87,7 +81,6 @@ export interface ImportReport {
     databases: number;
     resources: number;
   };
-  /** Items that could not be written, each with its reason; the rest were saved. */
   problems: {
     type: ImportPlanItem["type"];
     key: string;
@@ -95,13 +88,9 @@ export interface ImportReport {
     source?: string;
     message: string;
   }[];
-  /** The folder holding the import, if one was made. */
   folderId: string | null;
-  /** Created pages by bundle key (at most 200 listed). */
   pages: { key: string; pageId: string; title: string }[];
-  /** The page to open first: the only page, or the first top-level page. */
   openPageId: string | null;
-  /** Deleting these moves the whole import to the trash. */
   undo: { folders: string[]; pages: string[] };
 }
 
@@ -160,7 +149,6 @@ async function openSource(source: ImportSource): Promise<OpenedInput> {
   return openImportFiles(items);
 }
 
-/** Checks the bundle an importer returned; contributed importers are untrusted input. */
 function checkBundle(value: unknown): ImportBundle {
   const fail = (message: string): never => {
     throw new CoreError(
@@ -200,7 +188,6 @@ function checkBundle(value: unknown): ImportBundle {
       fail(
         `${item.key} names the unknown parent folder ${String(item.parent)}.`,
       );
-  // Folder parents must not form a cycle.
   const parents = new Map(
     (bundle.folders ?? []).map((item) => [item.key, item.parent]),
   );
@@ -236,7 +223,6 @@ function checkBundle(value: unknown): ImportBundle {
   return bundle;
 }
 
-/** Every placeholder in a JSON value. */
 function references(value: unknown, found: { kind: string; key: string }[]) {
   if (typeof value === "string") {
     for (const match of value.matchAll(IMPORT_PLACEHOLDER))
@@ -248,7 +234,6 @@ function references(value: unknown, found: { kind: string; key: string }[]) {
   return found;
 }
 
-/** Resources an importer already embedded as data URLs (e.g. images inside a .docx). */
 function embeddedResources(
   value: unknown,
   found: { count: number; bytes: number },
@@ -437,7 +422,6 @@ async function prepare(
   }
 }
 
-/** What an import would create, without writing anything. */
 export async function planImport(
   service: AgentService,
   source: ImportSource,
@@ -454,7 +438,6 @@ export async function planImport(
   return plan;
 }
 
-/** Reads, converts and writes an import; progress and cancellation are checked between items. */
 export async function runImport(
   service: AgentService,
   source: ImportSource,
@@ -472,7 +455,6 @@ export async function runImport(
     options.importer,
   );
   const context = changeContext();
-  // One history group per import, so its saves read as one operation.
   return withChangeContext(
     {
       ...context,
@@ -517,8 +499,6 @@ async function write(
     openPageId: null,
     undo: { folders: [], pages: [] },
   };
-  // Each item is its own operation of the import's history group; the
-  // operation of the request that started the import must not be replayed.
   const own = <T>(write: () => Promise<T>) =>
     withChangeContext(
       {
@@ -564,7 +544,6 @@ async function write(
     report.created.folders++;
     step(plan.root);
   }
-  // Folders after their parents.
   const pending = [...(bundle.folders ?? [])];
   while (pending.length && !stopped()) {
     const index = pending.findIndex(
@@ -614,7 +593,6 @@ async function write(
     if (kind === "dataset") return datasetIds.get(key) ?? "";
     return embedded.get(key) ?? (whole ? "" : "#");
   };
-  // Files are read once per page that uses them and embedded as data URLs.
   const embedded = new Map<string, string>();
   async function embed(value: unknown, owner: { key: string; title: string }) {
     embedded.clear();
@@ -710,7 +688,6 @@ async function write(
       if (report.pages.length < 200)
         report.pages.push({ key: page.key, pageId: id, title: name });
       if (!page.parent && !plan.root) report.undo.pages.push(id);
-      // The page to open: a top-level page, or the page of a top-level folder.
       const topFolder =
         page.parent !== undefined &&
         page.parent === page.key &&
@@ -731,8 +708,6 @@ async function write(
   return report;
 }
 
-// ---------------------------------------------------------------------------
-// Runs the workbench follows: progress is polled, cancellation is requested.
 
 interface Run {
   progress: ImportProgress;
@@ -742,7 +717,6 @@ const runs = new Map<string, Run>();
 const staged = new Map<string, { source: ImportSource; expires: number }>();
 const STAGE_MS = 30 * 60 * 1000;
 
-/** Keeps a planned source so the confirmed run reads the same input. */
 export function stageImport(source: ImportSource): string {
   const now = Date.now();
   for (const [token, item] of staged)

@@ -18,7 +18,6 @@ import type { Operation } from "../operations/operation";
 
 export type Access = "read" | "write";
 
-/** Options of one MCP connection to a project (see createMcpServer). */
 export interface McpServerOptions {
   root?: string;
   projectId: string;
@@ -44,7 +43,6 @@ export type ChangeMetadata = {
   message?: string;
   groupId?: string;
 };
-/** A tool result made from a handler's value or failure. */
 export type CallResult =
   | {
       isError?: undefined;
@@ -61,32 +59,24 @@ export type Call = (
   metadata?: ChangeMetadata,
 ) => Promise<CallResult>;
 
-/** What every tool of one connection shares. */
 export interface ToolConnection {
   service: AgentService;
   projectId: string;
   options: McpServerOptions;
-  /** Runs a handler in the connection's change context and wraps its result. */
   call: Call;
-  /** Device paths are only meaningful where ShowAI runs on the same machine. */
   localFiles: boolean;
   workspace: WorkspaceService;
-  /** Where the saved page lives, so the Agent can say "saved to project X — open it here". */
   withOpenLink<T>(result: T, pageId?: unknown): Promise<T>;
 }
 
 interface ToolBase {
   name: string;
-  /** Annotations follow from it; hints override single values. */
   access: Access;
   hints?: { openWorldHint?: true; destructiveHint?: true };
-  /** Registered only on connections where this holds. */
   available?(connection: ToolConnection): boolean;
   meta?: Record<string, unknown>;
 }
-/** A tool with one input schema and handler. */
 export interface PlainTool extends ToolBase {
-  /** The shared operation the handler runs, if any (see ../operations). */
   operation?: Operation<any>;
   description: string | ((connection: ToolConnection) => string);
   input(connection: ToolConnection): z.ZodRawShape;
@@ -96,11 +86,9 @@ export interface PlainTool extends ToolBase {
     extra: Parameters<ToolCallback<z.ZodRawShape>>[1],
   ): Promise<CallToolResult>;
 }
-/** Related operations of one access class as actions of one tool (actionTool). */
 export interface ActionToolDeclaration extends ToolBase {
   summary: string | ((connection: ToolConnection) => string);
   actions(connection: ToolConnection): Record<string, ToolAction>;
-  /** The shared operation each action runs, by action name. */
   operations?: Record<string, Operation<any>>;
 }
 export type ToolDeclaration = PlainTool | ActionToolDeclaration;
@@ -153,7 +141,6 @@ export function registerTool(
   );
 }
 
-// Schemas several tools share.
 export const changeSchema = {
   operationId: z.string().max(1000).optional(),
   message: z.string().max(4000).optional(),

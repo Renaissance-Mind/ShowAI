@@ -12,7 +12,6 @@ export const COMPONENT_VERSION =
   /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-[a-zA-Z0-9.-]+)?$/;
 export const COMPONENT_DATA_MARKER = "<!--SHOWAI_COMPONENT_DATA-->";
 
-/** Insert serialized user content literally, including JavaScript replacement tokens. */
 export function injectComponentBootstrap(
   html: string,
   bootstrap: string,
@@ -22,7 +21,6 @@ export function injectComponentBootstrap(
   return html.replace(COMPONENT_DATA_MARKER, () => bootstrap);
 }
 
-/** Browser-safe JSON validation; schema compilation stays in the component runtime. */
 export function assertJsonValue(value: unknown, depth = 0): void {
   if (depth > 40) throw new Error("Component data is nested too deeply.");
   if (value === null || typeof value === "string" || typeof value === "boolean")
@@ -113,7 +111,6 @@ export function readCustomBlockData(value: unknown): CustomBlockData {
   };
 }
 
-/** Every library component a document shows, including those nested in rich text. */
 export function collectCustomComponentRefs(
   document: ShowDocument,
 ): CustomComponentRef[] {

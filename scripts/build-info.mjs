@@ -22,7 +22,6 @@ export function buildIdentity() {
       stdio: ["ignore", "pipe", "ignore"],
     }).trim();
   } catch {
-    /* Source archives may supply SHOWAI_SOURCE_COMMIT; absence stays explicit. */
   }
   return {
     version,

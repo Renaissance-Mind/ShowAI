@@ -148,7 +148,6 @@ describe("dataset diff and apply", () => {
     expect(
       applyOperations(theirs, diffValues(base, mine)).conflicts[0].reason,
     ).toBe("missing");
-    // And removing a record someone edited is a conflict too.
     const removal = applyOperations(mine, diffValues(base, theirs));
     expect(removal.conflicts[0]).toMatchObject({
       op: "remove",

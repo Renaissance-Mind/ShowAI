@@ -5,13 +5,9 @@ export interface InstanceDetails {
   channel: "packaged" | "development";
   appVersion: string;
   sourceCommit?: string;
-  /** The launch Agents use for this App's CLI and MCP. */
   cli?: { command: string; args: string[] };
-  /** Browser edition: the workbench address. */
   url?: string;
-  /** Source development: the launcher's frontend address. */
   developmentUrl?: string;
-  /** Desktop: the main-process log folder (holds quit-blocked.json). */
   logs?: string;
   userData?: string;
 }

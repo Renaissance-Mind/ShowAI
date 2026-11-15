@@ -26,7 +26,6 @@ export async function cloudGitAsset(root, architecture = process.arch) {
   return { ...asset, dugiteVersion: metadata.dugiteVersion };
 }
 
-/** Publish only a complete, verified archive into dugite's supported cache. */
 export async function downloadGitAsset(asset, cacheDirectory, { attempts = 4, timeoutMs = 300000, retryDelayMs = 2000 } = {}) {
   await mkdir(cacheDirectory, { recursive: true });
   const archive = join(cacheDirectory, asset.name);

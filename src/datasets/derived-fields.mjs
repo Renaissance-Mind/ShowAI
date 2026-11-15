@@ -1,9 +1,3 @@
-// Derived fields of typed records: relations between datasets and the values
-// computed from them (reverse relations, rollups) and from a record's own
-// fields (formulas). Relations are facts between datasets, and formulas run
-// in the harness's QuickJS transform runtime with FORMULA_SCRIPT, so this
-// module belongs to the harness. Pure and dependency-free.
-
 import { isErrorValue } from "./value-types.mjs";
 
 export const ROLLUP_AGGREGATES = [
@@ -21,7 +15,6 @@ const isObject = (value) =>
 const ids = (value) =>
   Array.isArray(value) ? value.filter((item) => typeof item === "string") : [];
 
-/** The record table of a dataset value shaped like a database: {columns, rows}. */
 export function recordTable(value) {
   if (!isObject(value) || !Array.isArray(value.rows)) return null;
   return {
@@ -36,7 +29,6 @@ export function recordTable(value) {
   };
 }
 
-/** A record's name: its first text field, else title or name, else its id. */
 export function recordTitle(record, columns = []) {
   const text = columns.find((column) => column.type === "text");
   const value = text ? record[text.id] : (record.title ?? record.name);
@@ -50,12 +42,6 @@ export function recordTitle(record, columns = []) {
 export const reverseColumnId = (datasetId, columnId) =>
   `rev-${datasetId}-${columnId}`.slice(0, 200);
 
-/**
- * Derived reverse columns of a dataset: every relation column of another
- * dataset that points at it with `reverse` set shows up here, listing the
- * records that link to each record.
- * `incoming`: [{datasetId, name, value}] for the other datasets of the project.
- */
 export function reverseColumns(selfDataset, incoming) {
   const columns = [];
   for (const source of incoming) {
@@ -111,11 +97,6 @@ const aggregate = (kind, values) => {
   return Math.max(...numbers);
 };
 
-/**
- * Values of derived columns per record id: reverse relations, rollups and the
- * formula results already evaluated (`formulas`: {rowId: {columnId: value}}).
- * `related(datasetId)` returns a record table or undefined while unknown.
- */
 export function deriveValues(columns, rows, { related, formulas } = {}) {
   const values = new Map(rows.map((row) => [row.id, {}]));
   const read = (row, column) =>
@@ -172,7 +153,6 @@ export function deriveValues(columns, rows, { related, formulas } = {}) {
 
 const PROP = /\bprop\(\s*("(?:[^"\\\n]|\\.)*"|'(?:[^'\\\n]|\\.)*')\s*\)/g;
 
-/** Property names a formula reads with prop("…"); throws for any other prop() use. */
 export function formulaReferences(expression) {
   const names = [];
   const literal = expression.replace(PROP, (_match, quoted) => {
@@ -188,10 +168,6 @@ export function formulaReferences(expression) {
   return names;
 }
 
-/**
- * The evaluation plan of a database's formulas: their order, the column each
- * prop() name reads, and the formulas that cannot run (unknown names, cycles).
- */
 export function formulaPlan(columns) {
   const formulas = columns.filter((column) => column.type === "formula");
   const references = {};
@@ -241,7 +217,6 @@ export function formulaPlan(columns) {
   return { order, references, errors };
 }
 
-/** Inputs of FORMULA_SCRIPT for these records; `values(row)` adds derived values. */
 export function formulaInputs(columns, rows, values) {
   const plan = formulaPlan(columns);
   const formulas = columns
@@ -275,11 +250,6 @@ export function formulaInputs(columns, rows, values) {
   };
 }
 
-/**
- * Evaluates formulas in the transform sandbox: transform(inputs, helpers)
- * returns {rowId: {columnId: value | {error}}}. Each expression is compiled
- * on its own, so a syntax error stays in its column.
- */
 export const FORMULA_SCRIPT = String.raw`function transform(inputs, helpers) {
   "use strict";
   const compiled = {};
@@ -337,5 +307,4 @@ export const FORMULA_SCRIPT = String.raw`function transform(inputs, helpers) {
   return out;
 }`;
 
-/** Whether a computed value is a formula error ({error}). */
 export { isErrorValue };

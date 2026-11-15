@@ -4,7 +4,6 @@ import type { MetadataStore, ObjectStore, SqlStatement } from "./storage";
 import { Quotas } from "./quotas";
 
 export const uploadPartBytes = 5 * 1024 * 1024;
-/** Unfinished tasks older than this are abandoned; clients start a new task. */
 export const uploadTaskLifetimeMs = 24 * 3600_000;
 interface Upload {
   id: string;
@@ -152,7 +151,6 @@ export class Uploads {
     }
     return this.status(await this.find(projectId, userId, id));
   }
-  /** Releases a bounded number of abandoned tasks, their parts and capacity. */
   async expire(now = Date.now()) {
     const stale = await this.db.all<Upload>(
       "SELECT * FROM object_uploads WHERE completed=0 AND created_at<? ORDER BY created_at LIMIT 4",
@@ -163,7 +161,6 @@ export class Uploads {
         "SELECT * FROM object_upload_parts WHERE upload_id=?",
         [upload.id],
       );
-      // Metadata goes first so a concurrent resume cannot reference removed parts.
       await this.db.batch([
         {
           sql: "DELETE FROM object_upload_parts WHERE upload_id=?",
@@ -357,7 +354,6 @@ export class Uploads {
         "FORBIDDEN",
         "Final publication permission or reservation is unavailable.",
       );
-    // These parts are request-owned transaction artifacts; published objects remain immutable.
     for (const part of parts)
       await store.remove(partKey(projectId, uploadId, part.digest));
     await this.db.run("DELETE FROM object_upload_parts WHERE upload_id=?", [

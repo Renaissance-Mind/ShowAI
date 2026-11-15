@@ -2,7 +2,6 @@ import type { ChangeContext } from "../../core/history-model";
 import type { AgentService } from "../service";
 import { parseInput, type Operation } from "../operations/operation";
 
-/** The words and options of one command line. */
 export interface Arguments {
   positional: string[];
   options: Record<string, string | boolean>;
@@ -10,7 +9,6 @@ export interface Arguments {
 
 export interface OptionSpec {
   type: "string" | "boolean";
-  /** Accepted but left out of the help, e.g. an option kept for older callers. */
   hidden?: true;
 }
 export const text: OptionSpec = { type: "string" };
@@ -20,58 +18,28 @@ export const hiddenFlag: OptionSpec = { type: "boolean", hidden: true };
 
 export type Access = "read" | "write";
 
-/** What a command's handler receives besides its arguments. */
 export interface CommandScope {
   service: AgentService;
-  /** The explicit --project, or the project of the host directory. */
   project(): Promise<string>;
   action: string;
   id: string;
 }
 
 export interface CommandDeclaration {
-  /** The first word, e.g. "pages". */
   command: string;
-  /**
-   * The second words this declaration handles. Omitted: the command takes no
-   * subcommand word. ["*"]: the command's answer to any other second word.
-   */
   actions?: readonly string[];
-  /** Options of this command besides the global ones. */
   options?: Record<string, OptionSpec>;
-  /**
-   * Writes run in one recorded library transaction with an operation id.
-   * A function decides from the arguments (e.g. --dry-run reads only).
-   */
   access?: Access | ((args: Arguments) => Access);
-  /** The handler records its own changes; runCli does not wrap it. */
   ownTransaction?: true;
-  /**
-   * Shapes a recorded write's result. Called before the command runs, so an
-   * invalid shaping option fails before anything is written.
-   */
   result?: (args: Arguments) => (value: unknown) => unknown;
-  /**
-   * Help lines in order. Usage lines start with the command; notes start
-   * with two spaces. Commands without help are not listed in showai --help.
-   */
   help?: readonly string[];
-  /** Other commands (keys) that this declaration's help lines also describe. */
   covers?: readonly string[];
-  /**
-   * The shared operation this command runs (see ../operations). Its access
-   * applies unless the command declares its own.
-   */
   operation?: Operation<any>;
-  /** The operation's input from the arguments, before the operation validates it. */
   input?(args: Arguments, scope: CommandScope): Promise<Record<string, unknown>>;
-  /** How the command spells each input field, for validation errors. */
   fields?: Record<string, string>;
-  /** Commands without an operation run their own handler. */
   run?(args: Arguments, scope: CommandScope): Promise<unknown>;
 }
 
-/** Runs a command: its handler, or its operation with validated input. */
 export async function runCommand(
   declaration: CommandDeclaration,
   args: Arguments,
@@ -90,23 +58,16 @@ export async function runCommand(
   );
 }
 
-/** Whether a command writes: its own declaration, else its operation's. */
 export function commandAccess(declaration: CommandDeclaration, args: Arguments) {
   const access = declaration.access ?? declaration.operation?.access;
   return typeof access === "function" ? access(args) : access;
 }
 
-/** "pages save", "mcp", "public *". */
 export const commandKey = (declaration: CommandDeclaration) =>
   declaration.actions
     ? `${declaration.command} ${declaration.actions[0]}`
     : declaration.command;
 
-/**
- * Options every command accepts: the library and project, output, help, and
- * the change context of a write (see commandContext). runCli also reads
- * --dry-run, --revision and --response before choosing how to run a command.
- */
 export const GLOBAL_OPTIONS: Record<string, OptionSpec> = {
   home: text,
   project: text,

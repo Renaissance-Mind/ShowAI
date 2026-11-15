@@ -39,8 +39,6 @@ export interface PortableInputAcceptance {
 export type PortableInputReservation = (
   options: CubicInputOptions,
 ) => PortableInputAcceptance;
-/** The accepted-contact barrier is independent of mounted input tools. Tool
- * switches can seal a contact, but cannot retire already accepted raw input. */
 export class PortableInputScope {
   private clientValue: PortableCubicClient | undefined;
   private contacts = new Set<PortableInputContact>();
@@ -93,9 +91,6 @@ export class PortableInputScope {
     scopes.add(this);
   }
   private lifecycle = 0;
-  /** A hidden Activity disconnects the editor's effects without unmounting
-   * it; reconnecting reopens this scope with a fresh Worker client. A source
-   * owner that was stopped for retirement stays closed. */
   open() {
     if (this.owner && (this.owner.disposed || stoppedOwners.has(this.owner)))
       return;
@@ -205,7 +200,6 @@ export class PortableInputScope {
     );
     this.failures.clear();
     this.notify();
-    // Replays exact original kernel batches, not a resampled v1 placeholder.
     for (const contact of failed) {
       contact.replay();
       await this.accepted(contact);

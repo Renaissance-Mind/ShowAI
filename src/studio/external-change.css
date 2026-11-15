@@ -1,4 +1,3 @@
-/* Changed blocks after an external write: outlined, then fading out. */
 .external-change-layer {
   position: fixed;
   inset: 0;
@@ -28,7 +27,6 @@
   }
 }
 
-/* 「<名称> 刚更新了这个页面的 N 处」: one line floating below the top bar. */
 .external-change-notice {
   position: absolute;
   top: 44px;
@@ -98,7 +96,6 @@
   color: var(--text);
 }
 
-/* 「Agent 新建」 on sidebar rows and in 最近, cleared when the page is opened. */
 .agent-created-mark {
   flex: none;
   display: inline-flex;

@@ -152,7 +152,6 @@
   font: 500 12px/1.2 var(--font-ui, system-ui, sans-serif);
   cursor: pointer;
 }
-/* Copy reference sits beside Ask AI as a compact icon; its tooltip names the count. */
 .rich-text-selection-toolbar .editor-bubble-reference {
   color: var(--accent, #6c805f);
 }

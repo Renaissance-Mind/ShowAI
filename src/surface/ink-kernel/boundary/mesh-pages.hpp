@@ -2,10 +2,6 @@
 #define SHOWAI_BOUNDARY_MESH_PAGES_HPP
 #include "vector.hpp"
 namespace showai_boundary {
-/* Append-only derived POD storage. Each page occupies one 4 KiB arena block,
- * including its header. Growing a mesh never retains an old whole-mesh array
- * beside a doubled replacement. Output order and all payload bytes are exact.
- * Ownership is unique; only the small page-offset table uses Vector's COW. */
 template<class T> class MeshPages {
     static_assert(__is_trivially_copyable(T),"mesh pages contain only POD output");
     static constexpr uint32_t page_bytes=4096,slots=(page_bytes-16)/sizeof(T);

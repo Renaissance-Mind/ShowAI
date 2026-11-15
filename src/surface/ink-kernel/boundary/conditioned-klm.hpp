@@ -3,18 +3,11 @@
 #include "quantization.hpp"
 #include "../include/analytic-path.h"
 namespace showai_boundary {
-/* Internal derived-geometry analysis, not a source format/public trust flag.
- * Uses the existing shared Loop--Blinn factory and audits its actual Float32
- * fields in exact Q. No RAY patch is accepted as continuous coverage. Closure
- * records are directed authoritative anchors, NOT antialiased triangle edges.
- * Outside support/closure-fringe construction and hardware interpolation error
- * remain obligations of a later coverage mesh producer; this record alone is
- * deliberately not a "pixel certified" or live-render authorization. */
 enum BoundaryKLMReason:uint32_t { boundary_klm_none=0,boundary_klm_invalid=1,
     boundary_klm_ray=2,boundary_klm_singular_triangle=3,boundary_klm_zero_gradient=4,
     boundary_klm_error_budget=5,boundary_klm_capacity=6 };
 struct BoundaryKLMOptions {
-    double source_to_pixels[4]{1,0,0,1}; // actual linear map [a,b,c,d]
+    double source_to_pixels[4]{1,0,0,1};
     double maximum_residual_over_gradient_pixels=0;
     uint32_t maximum_patches=0,maximum_vertices=0,maximum_depth=0,reserved=0;
     uint32_t maximum_conditioning_cells=0,maximum_conditioning_depth=0;
@@ -24,13 +17,9 @@ struct BoundaryKLMClosure {
     uint32_t source_edge=0,degree=0;uint64_t curve_identity=0;
 };
 struct BoundaryKLMAudit {
-    uint32_t first_vertex=0,mode=0; // exactly one emitted triangle
+    uint32_t first_vertex=0,mode=0;
     double residual_upper=0,gradient_lower_source=0,gradient_lower_pixels=0;
     double residual_over_gradient_pixels=0,source_quantization_pixels=0;
-    // These are exact-real audits of the actual encoded Float32 interpolants.
-    // This residual/gradient ratio is NOT a global Hausdorff/topology or
-    // pixel-alpha bound. Raster interpolation/derivative instruction errors
-    // and support/branch selection are NOT certified by this audit.
 };
 struct BoundaryKLMArc {
     BoundaryKLMClosure closure{};uint32_t conditioning_cells=0;
@@ -65,18 +54,12 @@ inline Q gradient_lower(PolynomialContext&c,const Q f[3][3],const SAAnalyticVert
             else g=add(add(multiply(square(range[0]),{Q(3)*f[0][axis],Q(3)*f[0][axis]}),negate(multiply(range[2],{f[1][axis],f[1][axis]}))),negate(multiply(range[1],{f[2][axis],f[2][axis]})));
             source_gradient[axis]=g;Q component=minimum_abs(g);if(component>lower)lower=component;
         }
-        // The ramp is defined in physical pixels. Saturation must use the
-        // actual inverse-transpose metric, not a source-coordinate gradient.
-        // In particular zoom<1 widens the active band in source coordinates.
         Q upper=Q::from_signed(c.numbers,0);
         for(uint32_t axis=0;axis<2;axis++){
             Interval pixel=add(multiply(source_gradient[0],{inverse_transpose[axis][0],inverse_transpose[axis][0]}),multiply(source_gradient[1],{inverse_transpose[axis][1],inverse_transpose[axis][1]}));
             upper+=absolute_max(pixel.lower,pixel.upper);
         }
         Interval field=mode==SA_ANALYTIC_QUADRATIC?add(square(range[0]),negate(range[1])):add({range[0].lower*range[0].lower*range[0].lower,range[0].upper*range[0].upper*range[0].upper},negate(multiply(range[1],range[2])));
-        // A zero derivative away from the zero set is valid: F/|grad F|
-        // is infinite and the ramp saturates. Certify saturation instead of
-        // demanding a global gradient lower bound in constant-coverage areas.
         if((field.lower>Q(0)&&field.lower>=upper/Q(2))||(field.upper<Q(0)&&-field.upper>=upper/Q(2)))continue;
         if(lower>Q(0)&&lower>=required){if(minimum.zero()||lower<minimum)minimum=lower;continue;}
         if(cell.depth>=o.maximum_conditioning_depth){reason=lower>Q(0)?boundary_klm_error_budget:boundary_klm_zero_gradient;return Q(0);}
@@ -104,8 +87,6 @@ inline bool audit(PolynomialContext&c,const BoundaryQuantizedEdge&e,const SAAnal
     Q residual=bernstein_bound(implicit);
     Q a=Q::from_double(ctx,o.source_to_pixels[0]).absolute()+Q::from_double(ctx,o.source_to_pixels[1]).absolute();
     Q b=Q::from_double(ctx,o.source_to_pixels[2]).absolute()+Q::from_double(ctx,o.source_to_pixels[3]).absolute();Q metric=a>b?a:b;
-    // ||g_source||inf <= ||A^T||inf * ||g_pixel||inf. The actual
-    // smallest Euclidean gradient is at least this certified component bound.
     Q source_error=Q::from_double(ctx,e.error_l1)*metric,remaining=Q::from_double(ctx,o.maximum_residual_over_gradient_pixels)-source_error;
     if(remaining<=Q(0)&&residual>Q(0)){reason=boundary_klm_error_budget;return false;}
     Q required=residual.zero()?Q::from_signed(ctx,0):residual*metric/remaining;
@@ -118,12 +99,6 @@ inline bool audit(PolynomialContext&c,const BoundaryQuantizedEdge&e,const SAAnal
     result=staged;return ctx.status==SA_INK_OK;
 }
 }
-/* One actual parameter-ordered quantized arc. The source key/certificates and
- * endpoint anchor values remain unchanged. direction is applied only to the
- * closure; candidate path follows parameter order and carries that direction
- * into patch winding. No guessed edge adjacency or loop walk is performed.
- * Atomic output on any analysis/budget failure. Reason is diagnostic only.
- */
 inline uint32_t condition_quantized_boundary_arc(PolynomialContext&c,const BoundaryQuantizedEdge&e,
         const BoundaryKLMOptions&o,BoundaryKLMArc&output,BoundaryKLMReason&reason){
     reason=boundary_klm_none;auto&ctx=c.numbers;if(ctx.status!=SA_INK_OK)return ctx.status;

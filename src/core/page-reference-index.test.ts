@@ -80,7 +80,6 @@ test("text, step, database and declared component fields enter the index", async
     ["database", "Source"],
     ["component", "Source"],
   ]);
-  // Three references from one page: the heading count reads pages.
   expect(references.total.to).toBe(3);
   expect(references.pages.to).toBe(1);
   const [text, database, declared] = references.to;
@@ -88,7 +87,6 @@ test("text, step, database and declared component fields enter the index", async
   expect(database.snippet).toBe("Reading list · First record");
   expect(declared.snippet).toBe("Background");
   const blocks = source.document.content.content!.map((node) => node.attrs!.id);
-  // The paragraph inside the text block holds the link.
   const paragraph = source.document.content.content![0].content![0].attrs!.id;
   expect(references.to.map((item) => item.blockId)).toEqual([
     paragraph,
@@ -104,7 +102,6 @@ test("text, step, database and declared component fields enter the index", async
     [target, "Target"],
   ]);
   expect(outgoing.pages.from).toBe(1);
-  // Invalid declared values never reach a page.
   await expect(
     service.applyPage(projectId, source.document.id, {
       baseHash: (await service.store.readPage(projectId, source.document.id))
@@ -173,12 +170,10 @@ test("page cells of databases bound to a shared dataset enter the index; relatio
   expect((await to(target)).map((item) => [item.title, item.kind, item.blockId, item.snippet])).toEqual([
     ["Shelf", "database", block, "Shelf · First"],
   ]);
-  // A relation holds record ids of People; no page is referred to.
   const outgoing = await index.pageReferences(projectId, source.document.id, {
     direction: "from",
   });
   expect(outgoing.from.map((item) => item.pageId)).toEqual([target]);
-  // Changing the dataset alone moves the reference.
   const current = await service.datasetRead(projectId, reading.dataset.id);
   await service.datasetApply(projectId, reading.dataset.id, {
     baseHash: current.hash,
@@ -233,13 +228,11 @@ test("backlinks follow rename, delete, restore and duplicate", async () => {
   expect(await titles()).toEqual(["Renamed"]);
   await service.duplicatePage(projectId, source.document.id, "Copy");
   expect((await titles()).sort()).toEqual(["Copy", "Renamed"]);
-  // A deleted target stays listed from the source, marked missing.
   await service.updatePage(projectId, target, { archived: true });
   const from = await index.pageReferences(projectId, source.document.id);
   expect(from.from).toEqual([
     expect.objectContaining({ pageId: target, missing: true }),
   ]);
-  // A rebuild produces the same rows as the incremental updates.
   await index.synchronize(true);
   expect((await titles()).sort()).toEqual(["Copy", "Renamed"]);
 });
@@ -338,7 +331,6 @@ test("a mentionable component sits inside a line and exports carry the reference
   const markdown = JSON.stringify(read);
   expect(markdown).toContain('@[date]{\\"date\\":\\"2026-11-20\\"}');
   expect(markdown).toContain(tag.id);
-  // The target page shows its backlinks through a custom component that reads them.
   const current = await service.store.readPage(projectId, target);
   await service.applyPage(projectId, target, {
     baseHash: current.hash,
@@ -371,7 +363,6 @@ test("a mentionable component sits inside a line and exports carry the reference
   expect(artifact.references.page).toEqual({ projectId, pageId: target });
   expect(artifact.references.to.map((item: { title: string }) => item.title))
     .toEqual(["Source"]);
-  // A page without a component reading references exports none.
   const plain = join(home, "..", `${projectId}-plain.html`);
   roots.push(plain, plain.replace(/\.html$/, ".showai.json"));
   const source = (await service.store.listPages(projectId)).find((page) => page.title === "Source")!;

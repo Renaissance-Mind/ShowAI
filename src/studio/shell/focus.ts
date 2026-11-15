@@ -1,4 +1,3 @@
-/** The Agent panel mounts its input after opening; focus it once it can take text. */
 export function focusAssistantInput(started = Date.now()) {
   const input = document.querySelector<HTMLTextAreaElement>(
     ".assistant-input textarea",
@@ -11,13 +10,6 @@ export function focusAssistantInput(started = Date.now()) {
     window.setTimeout(() => focusAssistantInput(started), 100);
 }
 
-/**
- * A blank page the person just made takes its title first. The page mounts
- * after the view switches, and a closing dialog or the editor's own focus
- * restore can move focus once more, so this keeps trying until the title has
- * held focus for two checks in a row. Boards have no body title and use the
- * title field in the top bar.
- */
 export function focusPageTitle(
   isShown: () => boolean,
   started = Date.now(),

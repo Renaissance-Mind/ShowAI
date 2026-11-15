@@ -1,5 +1,3 @@
-/* mechanism-diagram: grid objects, state tables, links and step chips, all
- * coloured through the drawing palette so the dark theme follows. */
 .sb-block.md-block {
   color: var(--dw-ink);
 }
@@ -180,7 +178,6 @@
 .sb-block.md-block .showai-note {
   cursor: help;
 }
-/* The dotted note underline marks the object name only. */
 .sb-block.md-block .md-node[data-showai-note] {
   text-decoration: none;
 }

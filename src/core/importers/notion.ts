@@ -18,18 +18,9 @@ import {
   type Importer,
 } from "./types";
 
-// Notion's "Markdown & CSV" export: pages are "Title <32 hex>.md", a page's
-// subpages and attachments sit in the folder of the same name, databases are
-// "Name <id>.csv" (and "_all.csv" with every row) with their row pages in the
-// folder "Name <id>". Markdown text of a page stays Markdown inside rich text
-// blocks; blocks Notion writes as HTML or as a lone line (callouts, toggles,
-// images, files, bookmarks, database links) become components through
-// NOTION_BLOCKS. A folder of plain Markdown files with links and images reads
-// the same way.
 
 const NOTION_ID = /^(.*?)\s*([0-9a-f]{32})$/i;
 const MAX_TEXT_BLOCK = 400_000;
-/** Inline images inside text stay inline only up to this size. */
 const INLINE_IMAGE_BYTES = 256 * 1024;
 const MAX_ROWS = 5000;
 const MAX_COLUMNS = 50;
@@ -57,7 +48,6 @@ function join(base: string, relative: string): string | undefined {
   }
   return parts.join("/");
 }
-/** "Title 0123…" → { title, id }. */
 function parseName(name: string): { title: string; id?: string } {
   const match = NOTION_ID.exec(name);
   return match && match[1]
@@ -80,7 +70,6 @@ interface DatabaseNode {
   id?: string;
 }
 
-/** The export as pages, databases and the folders between them. */
 function index(input: ImportInput) {
   const pages = new Map<string, PageNode>();
   const databases = new Map<string, DatabaseNode>();
@@ -97,7 +86,6 @@ function index(input: ImportInput) {
     } else if (type === ".csv") {
       const all = /_all\.csv$/i.test(file.path);
       const base = file.path.slice(0, all ? -8 : -4);
-      // The _all file lists every row; the plain one only the saved view's.
       if (databases.has(base) && !all) continue;
       const { title, id } = parseName(basename(base));
       databases.set(base, { type: "database", base, file, title, id });
@@ -109,7 +97,6 @@ function index(input: ImportInput) {
 
 type Index = ReturnType<typeof index>;
 
-/** Where a link of a page points: another page or database, a file, or outside. */
 function resolveLink(
   href: string,
   from: string,
@@ -161,7 +148,6 @@ interface PageContext {
 const LINK =
   /(!?)\[((?:[^\]\\]|\\.)*)\]\(\s*<?([^)\s>]+)>?(?:\s+"[^"]*")?\s*\)/g;
 
-/** Rewrites the links and images of Markdown text that are not alone on a line. */
 function rewriteInline(markdown: string, context: PageContext): string {
   let fence: string | undefined;
   return markdown
@@ -202,7 +188,6 @@ function rewriteInline(markdown: string, context: PageContext): string {
     .join("\n");
 }
 
-/** A line that is only a link or an image becomes a component of its own. */
 function lineBlock(
   line: string,
   context: PageContext,
@@ -227,7 +212,6 @@ function lineBlock(
     return undefined;
   }
   if (target.kind === "web" && /^https?:/i.test(target.url)) {
-    // Notion writes bookmarks and embeds as a link whose text is the address.
     if (!/^https?:\/\//i.test(text.trim())) return undefined;
     return NOTION_BLOCKS.bookmark({ url: target.url, title: text.trim() });
   }
@@ -256,7 +240,6 @@ function lineBlock(
 const HTML_TAG = /<\/?([a-z][a-z0-9-]*)\b[^>]*>/gi;
 const KNOWN_TEXT_TAGS = new Set(["br", "u", "sup", "sub", "mark", "span"]);
 
-/** Notion Markdown → component instances in reading order. */
 export function notionBlocks(
   markdown: string,
   context: PageContext,
@@ -276,7 +259,6 @@ export function notionBlocks(
         message: `HTML <${[...tags].join(">, <")}> has no ShowAI component; kept as text.`,
       });
     const rewritten = rewriteInline(joined, context);
-    // Very long text is split at paragraph breaks to stay within one block.
     let rest = rewritten;
     while (rest.length > MAX_TEXT_BLOCK) {
       const cut = rest.lastIndexOf("\n\n", MAX_TEXT_BLOCK);
@@ -360,8 +342,6 @@ export function notionBlocks(
   return blocks;
 }
 
-// ---------------------------------------------------------------------------
-// Databases
 
 const MONTHS = [
   "january",
@@ -378,7 +358,6 @@ const MONTHS = [
   "december",
 ];
 
-/** A Notion date ("November 12, 2026", "2026/11/12 9:00 AM", ISO) → YYYY-MM-DD and whether a time was left out. */
 export function notionDate(
   value: string,
 ): { day: string; time: boolean } | undefined {
@@ -446,10 +425,8 @@ function inferProperty(values: string[], rows: number): NotionProperty {
   return "text";
 }
 
-/** A relation column, resolved once every database of the export is read. */
 interface PendingRelation {
   column: Record<string, unknown>;
-  /** Per row: the related page bases (undefined when a part named no page) and titles. */
   cells: {
     row: Record<string, unknown>;
     targets: { base?: string; title: string }[];
@@ -462,7 +439,6 @@ interface DatabaseResult {
     rows: Record<string, unknown>[];
   };
   headers: string[];
-  /** Row page base → record id. */
   rowIds: Map<string, string>;
   relations: PendingRelation[];
 }
@@ -556,8 +532,6 @@ function databaseValue(
           ),
         ];
       else if (property === "relation") {
-        // Written as related titles now; resolveRelations turns them into
-        // record ids when the pages are the rows of one database.
         const targets = raw.split(/,\s*(?=[^,]*\.md\))/).map((part) => {
           const match = RELATION.exec(part.trim());
           if (!match) return { title: part };
@@ -587,7 +561,6 @@ function databaseValue(
     titleColumn: "title",
     folder: importRef("folder", node.base),
   });
-  // Row pages are matched to rows by title, in order for repeated titles.
   const byTitle = new Map<string, string[]>();
   for (const page of rowPages) {
     const title = rowTitles.get(page.base) ?? page.title;
@@ -620,12 +593,6 @@ function databaseValue(
   return { value: { columns, rows }, headers, rowIds, relations };
 }
 
-/**
- * A relation column becomes a relation to the database whose row pages its
- * values name, holding those records' ids. When a value names something else
- * (a plain page, another database's row in the same column, or nothing found
- * in the export) the column stays text with the related titles.
- */
 function resolveRelations(
   databases: { base: string; result: DatabaseResult }[],
   warnings: ImportWarning[],
@@ -662,9 +629,7 @@ function resolveRelations(
     }
 }
 
-// ---------------------------------------------------------------------------
 
-/** The page title from its first heading, and the Markdown after it. */
 function splitTitle(markdown: string, fallback: string) {
   const text = markdown.replace(/^﻿/, "").replace(/\r\n?/g, "\n");
   const match = /^\s*#\s+(.+?)\s*#*\s*(?:\n|$)/.exec(text);
@@ -673,7 +638,6 @@ function splitTitle(markdown: string, fallback: string) {
     : { title: fallback, body: text };
 }
 
-/** Removes the "Property: value" lines Notion writes below a row page's title. */
 function stripProperties(body: string, headers: string[]): string {
   const names = new Set(headers.map((name) => name.trim()));
   const lines = body.split("\n");
@@ -714,7 +678,6 @@ async function convertNotion(input: ImportInput): Promise<ImportBundle> {
     warnings,
   };
   const folderKeys = new Set<string>();
-  // Folders on the way to a page, made from the export's own folders.
   const ensureFolder = (path: string): string | undefined => {
     if (!path) return undefined;
     if (folderKeys.has(path)) return path;
@@ -729,8 +692,6 @@ async function convertNotion(input: ImportInput): Promise<ImportBundle> {
     });
     return path;
   };
-  // A page or database with anything inside its folder becomes a folder
-  // holding the page itself and its children.
   const hasChildren = (base: string) =>
     [...exportIndex.pages.keys(), ...exportIndex.databases.keys()].some((key) =>
       key.startsWith(`${base}/`),
@@ -823,9 +784,7 @@ async function convertNotion(input: ImportInput): Promise<ImportBundle> {
       message: "No page refers to this file; it was not imported.",
     });
   }
-  // Reading order: a page before what its folder holds.
   bundle.pages.sort((a, b) => (a.key < b.key ? -1 : a.key > b.key ? 1 : 0));
-  // A database's own folder exists already; drop folders that only held attachments.
   const needed = new Set<string>();
   for (const item of [...bundle.pages, ...bundle.folders]) {
     let parent = item.parent;

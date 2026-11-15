@@ -3,8 +3,6 @@ import { existsSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { describe, expect, it } from "vitest";
 
-// The contributing guides and the repository Skill name many source paths.
-// These checks keep those paths, links and the two Skill copies current.
 const skills = [
   ".agents/skills/showai-contributing/SKILL.md",
   ".claude/skills/showai-contributing/SKILL.md",
@@ -20,12 +18,9 @@ const guides = [
   "docs/i18n/development.zh-CN.md",
 ];
 const files = [...skills, ...guides];
-// Paths the guides describe that a command writes into each checkout, such as
-// the project settings `npm run plugin:claude` creates.
 const generated = new Set([".claude/settings.json"]);
 const read = (path: string) => readFileSync(path, "utf8");
 
-// GitHub heading anchors: lower case, punctuation removed, spaces to hyphens.
 const anchor = (heading: string) =>
   heading
     .trim()

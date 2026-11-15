@@ -1,7 +1,3 @@
-// Table column resizing: a gesture changes only the colgroup geometry and
-// commits one edit on release. The handle is a focusable separator: arrow keys
-// change the width by 10px (50px with Shift), Home restores the default width
-// and Escape cancels a drag.
 import {
   useEffect,
   useLayoutEffect,
@@ -28,10 +24,8 @@ export function useColumnResize({
 }: {
   viewId: string;
   columns: ColumnWidth[];
-  /** Width of the columns after the properties, such as row actions. */
   trailing: number;
   disabled: boolean;
-  /** A width, or undefined to restore the default. */
   onCommit: (id: string, width: number | undefined) => void;
 }) {
   const table = useRef<HTMLTableElement>(null);
@@ -203,7 +197,6 @@ export function useColumnResize({
           event.currentTarget.focus({ preventScroll: true });
           document.body.classList.add("sb-database-resizing");
           setResizing(id);
-          // Keep widening while the pointer rests near an edge of the scroller.
           const tick = () => {
             const current = gesture.current;
             if (!current) return;

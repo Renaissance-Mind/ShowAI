@@ -1,4 +1,3 @@
-/** Portable Page outline contract. Derived trees never become stored page content. */
 import { SKIP, walk } from "./walk.mjs";
 export const PAGE_OUTLINE_PROTOCOL = 1;
 const reserved = new Set(["__proto__", "prototype", "constructor"]);
@@ -20,7 +19,6 @@ export function defaultPageOutline() {
     width: 220,
   };
 }
-/** Headings the outline can list: the Page's own tree, not nested surfaces or component bodies. */
 export function pageOutlineNodes(page) {
   const nodes = new Map();
   walk(page, (node, { parent }) => {
@@ -188,7 +186,6 @@ export function buildPageOutline(page, config = page.attrs?.outline) {
 export function flattenOutline(items) {
   return items.flatMap((item) => [item, ...flattenOutline(item.children)]);
 }
-/** Copies remap identities; projections remove targets outside their retained Page. */
 export function remapPageOutline(config, mapping, nextId) {
   const next = structuredClone(config);
   if (next.source.mode === "headings" && next.source.overrides) {

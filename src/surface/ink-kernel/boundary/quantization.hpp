@@ -2,21 +2,6 @@
 #define SHOWAI_BOUNDARY_QUANTIZATION_HPP
 #include "graph.hpp"
 namespace showai_boundary {
-/* Derived quantization version 1. This is NOT a portable source format or an
- * exact Boolean/topology claim. The retained Curve and Root certificates remain
- * authoritative. All coordinates below are relative to ONE common owner/paint
- * origin. No rounded world-space addition is part of the promised error bound.
- * A consumer must additionally bound its affine/physical metric and GPU error.
- *
- * For F(u)=C(a+(b-a)u), choose rational interval midpoints alpha,beta. Bernstein
- * derivative controls bound |C'_x|<=Mx and |C'_y|<=My on [0,1]. Thus, for every
- * u in [0,1], ||F(u)-C(alpha+(beta-alpha)u)||_1 <= (Mx+My)*delta, where delta is
- * max half-width of the two certified root intervals. The exact restricted
- * curve has Bernstein controls D_i. Quantized controls P_i (including shared
- * endpoint anchors) satisfy ||B_P-B_D||_1 <= max_i|P_ix-D_ix|+max_i|P_iy-D_iy|.
- * Both bounds are computed as actual exact Q values; only their outward upper
- * binary64 encoding escapes. No midpoint/sample test substitutes for this bound.
- */
 constexpr uint32_t boundary_quantization_version=1;
 struct BoundaryQuantizationOptions {
     double origin[2]{},maximum_error_l1=0;
@@ -87,8 +72,6 @@ inline bool anchor(const Curve&curve,Root root,uint32_t vertex,uint32_t edge,uin
                    const BoundaryQuantizationOptions&o,BoundaryQuantizationMetrics&m,BoundaryQuantizedVertex&output){
     return anchor_polynomials(curve.x,curve.y,root,vertex,edge,endpoint,o,m,output);
 }
-// PointAuthority may hold an exact rational position independent of any source
-// slot. Quantize after exact origin subtraction; no approximate absolute point.
 inline bool anchor_exact_point(const Point&point,uint32_t vertex,uint32_t edge,uint32_t endpoint,
                    const BoundaryQuantizationOptions&o,BoundaryQuantizationMetrics&m,BoundaryQuantizedVertex&output){
     if(!point.context())return false;auto&c=*point.context();
@@ -99,16 +82,12 @@ inline bool anchor_exact_point(const Point&point,uint32_t vertex,uint32_t edge,u
     const Q error=(Q::from_double(c,staged.position[0])+ox-point.x).absolute()+(Q::from_double(c,staged.position[1])+oy-point.y).absolute();
     if(error>allowed){c.fail(SA_INK_RANGE);return false;}if(!upper_bound(error,staged.error_l1))return false;output=staged;return c.status==SA_INK_OK;
 }
-/* The supplied edge comes from an actual retained immutable source chunk.
- * index is the certificate index within that binding (flat only for cold export).
- * This entry permits changed-block consumers to avoid any flat-tree traversal. */
 inline bool captured_edge(const Graph&g,const Edge&edge,uint32_t index,const BoundaryQuantizedVertex&a,const BoundaryQuantizedVertex&b,
                           const BoundaryQuantizationOptions&o,BoundaryQuantizationMetrics&m,BoundaryQuantizedEdge&output,
                           uint32_t topology_a=no_index,uint32_t topology_b=no_index){
     auto&c=*g.context();if(edge.source>=g.curves.size()){c.fail(SA_INK_INVALID);return false;}const auto&source=g.curves[edge.source];const auto&curve=source.geometry;
     if(source.origins.empty()||curve.controls.size()<2||curve.controls.size()>4||(edge.direction!=1&&edge.direction!=-1)||index>0x7ffffffeu){c.fail(SA_INK_RANGE);return false;}
     Root lo=edge.a,hi=edge.b;if(lo.context()!=&c||hi.context()!=&c){c.fail(SA_INK_INVALID);return false;}if(!root_domain(lo,m,o)||!root_domain(hi,m,o))return false;
-    // Exact order only. Same algebraic roots do not become an artificial span.
     while(c.status==SA_INK_OK&&!(lo.upper<hi.lower)){
         if(hi.upper<=lo.lower){c.fail(SA_INK_RANGE);return false;}
         bool changed=false;if(!lo.exact()){if(!refine_owned(lo,m,o))return false;changed=true;}if(!hi.exact()){if(!refine_owned(hi,m,o))return false;changed=true;}
@@ -141,12 +120,6 @@ inline bool edge(const Graph&g,uint32_t index,const BoundaryQuantizedVertex&a,co
     return captured_edge(g,g.edges[index],index,a,b,o,m,output);
 }
 }
-/* Full explicit lease export, NOT a tail/live interface. New vertices are
- * anchored once per graph and all incident endpoints reuse their exact bits.
- * An incremental consumer must retain verified anchors or replace every incident
- * block; it cannot silently re-anchor a vertex while retaining old geometry.
- * Output changes only after success; all original curves/root bounds are read.
- */
 inline uint32_t quantize_boundary_graph(const Graph&g,const BoundaryQuantizationOptions&o,BoundaryQuantizedGraph&output){
     auto&c=*g.context();if(!g.good())return c.status;
     if(!finite_double(o.origin[0])||!finite_double(o.origin[1])||!finite_double(o.maximum_error_l1)||!(o.maximum_error_l1>0)||o.reserved||

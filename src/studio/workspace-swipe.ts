@@ -21,7 +21,6 @@ export interface SwipePreview {
   committed: boolean;
 }
 
-/** The first recipient keeps the complete wheel burst, including momentum. */
 export class WorkspaceSwipe {
   private lastWheel = -Infinity;
   private owner: "pending" | "content" | "history" = "pending";
@@ -35,15 +34,10 @@ export class WorkspaceSwipe {
     if (!this.committed) this.owner = "content";
   }
 
-  /** The current burst already belongs to the content under the pointer. */
   settled(now: number) {
     return this.owner === "content" && now - this.lastWheel <= GESTURE_IDLE;
   }
 
-  /**
-   * `contentOwns` inspects the DOM, so it runs only once a burst shows
-   * horizontal intent; vertical reading never pays for it.
-   */
   push(
     input: SwipeInput,
     now: number,
@@ -113,7 +107,6 @@ export class WorkspaceSwipe {
   }
 }
 
-/** Even a scroller at its edge keeps its gesture; it must never leave a Page. */
 export function ownsHorizontalSwipe(event: WheelEvent, root: HTMLElement) {
   const path = event.composedPath();
   if (!path.includes(root)) return true;

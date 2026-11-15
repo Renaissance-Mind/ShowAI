@@ -2,7 +2,6 @@ import { useLayoutEffect, useRef } from "react";
 
 const easing = "cubic-bezier(.22,1,.36,1)";
 
-/** Animate the selected tab and committed view; keep the surrounding page and record preview mounted. */
 export function useDatabaseViewMotion(viewId: string, ready: boolean) {
   const tabs = useRef<HTMLDivElement>(null);
   const indicator = useRef<HTMLSpanElement>(null);

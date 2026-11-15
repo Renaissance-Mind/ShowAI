@@ -1,21 +1,11 @@
 import type { ImportBlock } from "./types";
 
-// What a Notion export becomes in ShowAI, kept as data in one place. The
-// importer recognises Notion blocks and database properties; these tables
-// decide the catalog component (or rich text) and column type each one
-// becomes. To target another component — a custom one included — change
-// the entry; the importer's parsing stays as it is.
 
-/** Notion blocks that become their own component instance. Everything else
- * (headings, paragraphs, lists, to-dos, quotes, code with its language,
- * equations, simple tables, dividers, inline links) is Markdown inside a
- * rich text block, whose parser maps it to the matching rich text nodes. */
 export const NOTION_BLOCKS = {
   text: (markdown: string): ImportBlock => ({
     kind: "text",
     data: { format: "markdown", content: markdown },
   }),
-  /** <aside> callouts; the leading emoji becomes the icon. */
   callout: (input: { icon?: string; markdown: string }): ImportBlock => ({
     kind: "callout",
     data: {
@@ -25,7 +15,6 @@ export const NOTION_BLOCKS = {
       content: input.markdown,
     },
   }),
-  /** <details><summary> toggles. */
   toggle: (input: { summary: string; markdown: string }): ImportBlock => ({
     kind: "toggle",
     data: { summary: input.summary, content: input.markdown, open: false },
@@ -34,7 +23,6 @@ export const NOTION_BLOCKS = {
     kind: "image",
     data: { src: input.src, alt: input.alt, caption: "" },
   }),
-  /** A link alone on its line: Notion's bookmarks and embeds. */
   bookmark: (input: { url: string; title: string }): ImportBlock => ({
     kind: "bookmark",
     data: {
@@ -44,7 +32,6 @@ export const NOTION_BLOCKS = {
       image: "",
     },
   }),
-  /** File blocks by the attachment's type. */
   video: (input: { src: string; name: string }): ImportBlock => ({
     kind: "video",
     data: { title: "", src: input.src, caption: "", fileName: input.name },
@@ -57,7 +44,6 @@ export const NOTION_BLOCKS = {
     kind: "pdf",
     data: { title: "", src: input.src, caption: "", fileName: input.name },
   }),
-  /** A CSV database, bound to the dataset that holds its columns and rows. */
   database: (input: { title: string; dataset: string }): ImportBlock => ({
     kind: "database",
     data: {
@@ -71,7 +57,6 @@ export const NOTION_BLOCKS = {
   }),
 };
 
-/** Kinds of Notion database properties the importer can tell from a CSV. */
 export type NotionProperty =
   | "title"
   | "text"
@@ -84,14 +69,6 @@ export type NotionProperty =
   | "date"
   | "relation";
 
-/**
- * The ShowAI database column type of each Notion property. A multi-select
- * keeps its distinct values as options; a relation links the records of the
- * database whose row pages it names, and stays text (the related titles) when
- * its pages are not the rows of one database in the export. Formula and
- * rollup properties arrive in the CSV as their computed values and are read
- * like any other column, so they import as those values.
- */
 export const NOTION_PROPERTY_COLUMNS: Record<
   NotionProperty,
   "text" | "number" | "select" | "multiSelect" | "relation" | "checkbox" | "url" | "date"
@@ -108,11 +85,8 @@ export const NOTION_PROPERTY_COLUMNS: Record<
   relation: "relation",
 };
 
-/** Settings of the inference that turns CSV text into property kinds. */
 export const NOTION_INFERENCE = {
-  /** A column with at most this many distinct values (and repeats) is a select. */
   selectOptions: 20,
-  /** Values Notion writes for checkboxes. */
   checked: ["yes", "true"],
   unchecked: ["no", "false"],
 };

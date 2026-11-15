@@ -1,7 +1,3 @@
-// Shared contract for the event-timeline built-in.
-// Validation runs in the workbench, the CLI and the portable reader, so it stays dependency-free.
-// Every position (events[].at, phases[].from/to, initialAt) is a 0-based point index on the axis.
-
 const fail = (message) => {
   throw new Error(message);
 };
@@ -114,7 +110,6 @@ function validateAxis(axis) {
   }
 }
 
-/** Number of points on the axis: axis.count, or the length of the series. */
 export function pointCount(data) {
   return data.axis.count ?? data.series?.[0]?.values.length ?? 0;
 }
@@ -219,7 +214,6 @@ export function validateEventTimelineData(data) {
   return data;
 }
 
-/** Index of the latest event at or before the point, or -1 before the first event. */
 export function eventAt(events, point) {
   let found = -1;
   events.forEach((event, i) => {
@@ -228,7 +222,6 @@ export function eventAt(events, point) {
   return found;
 }
 
-/** The phase covering the point; a shared boundary belongs to the later phase. */
 export function phaseAt(phases, point) {
   let found = -1;
   (phases ?? []).forEach((phase, i) => {
@@ -237,12 +230,10 @@ export function phaseAt(phases, point) {
   return found;
 }
 
-/** Point the reader starts on: initialAt, else the first event, else the last point. */
 export function initialPoint(data) {
   return data.initialAt ?? data.events[0]?.at ?? pointCount(data) - 1;
 }
 
-/** Label for a point index, following the axis type. */
 export function axisPointLabel(axis, point, locale = "en") {
   const step = axis.step ?? 1;
   if (axis.type === "clock") {

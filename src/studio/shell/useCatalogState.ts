@@ -22,7 +22,6 @@ import { latestTemplateVersions } from "../template-catalog-model";
 import { useSlidingIndicator } from "../useSlidingIndicator";
 import type { Catalog, ProjectScan } from "./types";
 
-/** The component and template catalogs, their filters and how they load. */
 export function useCatalogState({
   selectedRef,
 }: {

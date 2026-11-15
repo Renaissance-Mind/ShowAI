@@ -91,14 +91,12 @@ async function status() {
     );
   return result;
 }
-/** The most recent launcher record of this port, for a service that is gone. */
 async function lastSession() {
   const records = [];
   for (const kind of ["desktop", "browser"]) {
     const folder = join(root, ".showai-dev", `${kind}-${port}`);
     const session = await readJson(join(folder, "session.json")).catch(
       (error) => {
-        // A record being replaced is reported as unreadable, not fatal.
         if (error instanceof SyntaxError) return null;
         throw error;
       },
@@ -125,7 +123,6 @@ async function lastSession() {
   )[0];
 }
 
-/** A launcher started before it reported reasons: infer what is visible. */
 async function legacyReason(current) {
   const folder = join(root, ".showai-dev", `${current.mode}-${port}`);
   const session = await readJson(join(folder, "session.json")).catch(
@@ -160,11 +157,6 @@ async function legacyReason(current) {
   };
 }
 
-/**
- * dev:status: the service on this port, why it is not ready, what keeps a
- * restart waiting, and every App instance serving the requested library.
- * Read-only; exit code 0 only when the service is ready.
- */
 async function statusReport() {
   let problem;
   const response = await fetch(origin + "/__showai-dev/status", {

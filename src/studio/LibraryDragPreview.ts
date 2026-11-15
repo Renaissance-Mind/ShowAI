@@ -4,7 +4,6 @@ const rowSelector =
 const duration = () =>
   matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : 180;
 
-/** Transient layout only: React takes over the rows when the drop lands. */
 export class LibraryDragPreview {
   private ghost: HTMLElement;
   private placeholder: HTMLElement;
@@ -91,7 +90,6 @@ export class LibraryDragPreview {
     }
     return copy;
   }
-  /** Hit testing uses the destination layout, independent of the in-flight FLIP animation. */
   layoutRect(element: HTMLElement) {
     const rect = element.getBoundingClientRect();
     if (!this.animations.has(element)) return rect;
@@ -173,7 +171,6 @@ export class LibraryDragPreview {
           ? target.parentElement!
           : target;
       if (target.matches(".studio-page-list-row")) {
-        // The matching tree node supplies a real nested slot when entering a folder from its card.
         const tree = [
           ...this.root.querySelectorAll<HTMLElement>(
             ".studio-tree-row[data-library-id]",
@@ -222,7 +219,6 @@ export class LibraryDragPreview {
       return;
     this.signature = signature;
     this.animateLayout(() => {
-      // Use the same item's representation in the receiving list when available.
       const grid = parent.matches(".studio-page-list");
       const representative = [
         ...this.root.querySelectorAll<HTMLElement>(rowSelector),

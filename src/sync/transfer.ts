@@ -96,7 +96,6 @@ export async function captureProject(
   parents: string[],
   remoteProjectId = projectId,
   deviceId?: string,
-  /** Project files already read at `entry.revision`. */
   read?: Map<string, Buffer>,
 ): Promise<CapturedSnapshot> {
   const logical = new Map(
@@ -110,8 +109,6 @@ export async function captureProject(
       remoteProjectId,
     ),
   );
-  // A retained import from an earlier client can still carry archived files.
-  // Filter at the publication boundary as well as when reading local content.
   for (const path of logical.keys())
     if (!isCurrentSyncPath(path)) logical.delete(path);
   const files: Record<string, string> = {},
@@ -123,7 +120,6 @@ export async function captureProject(
       files[name] = id;
       objects.set(id, content);
     }
-  // Copies of linked files travel by content beside the versioned files.
   for (const hash of referencedBundles(logical)) {
     const bytes = await readBundle(home, hash);
     if (!bytes) continue;
@@ -206,7 +202,6 @@ export async function decodeSnapshot(
   return owned;
 }
 
-/** Resolve received package references solely against this snapshot's owned depot. */
 function validateProjectPackageClosure(
   files: Map<string, Buffer>,
   projectId: string,
@@ -277,7 +272,6 @@ function validateProjectPackageClosure(
   }
 }
 
-/** Old shared packages are read into an owned immutable depot, never installed globally. */
 function relocateLegacyPackages(files: Map<string, Buffer>, projectId: string) {
   const roots = new Map<
     string,
@@ -339,7 +333,6 @@ function relocateLegacyPackages(files: Map<string, Buffer>, projectId: string) {
 export async function validSnapshotRecord(record: SnapshotRecord) {
   if ((await snapshotRevision(record.snapshot)) === record.revision)
     return true;
-  // V1 manifests retain the original server serialization order, including its locale.
   return (
     record.snapshot.format === legacySyncProtocol &&
     digest(Buffer.from(JSON.stringify(record.snapshot))) === record.revision
@@ -350,7 +343,6 @@ export interface FileConflict {
   base: string | null;
   local: string | null;
   remote: string | null;
-  /** The merged file keeps both sides' other changes; these fields kept the remote value. */
   fields?: string[];
 }
 export function mergeProjectFiles(
@@ -452,7 +444,6 @@ export function mergeProjectFiles(
         continue;
       }
     }
-    // Immutable dependency depots can coexist; a differing same-path package is a real conflict.
     conflicts.push({
       path,
       base: a?.toString("base64") ?? null,
@@ -495,7 +486,6 @@ export async function projectHistory(
   }
   return entries.reverse();
 }
-/** Original times/actors and remote graph identities survive replay into a shared local library. */
 export async function importProjectHistory(
   home: string,
   projectId: string,
@@ -588,8 +578,6 @@ export async function importProjectHistory(
       files.get(path)!,
     );
   };
-  // Validate the complete sequence before replay; spool bytes so history size does not
-  // multiply memory use. A rejected later record must not leave earlier writes behind.
   const parent = join(home, "local", "sync");
   if (singleRevision) {
     const one: { record: SnapshotRecord; files: Map<string, Buffer> }[] = [];
@@ -807,7 +795,6 @@ export function sameFiles(one: Map<string, Buffer>, two: Map<string, Buffer>) {
   );
 }
 
-/** Copies of linked files a snapshot carries, by hash (see dataset-bundles). */
 export function snapshotBundles(record: SnapshotRecord): string[] {
   return Object.entries(record.snapshot.files)
     .filter(

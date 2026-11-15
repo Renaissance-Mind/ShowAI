@@ -24,9 +24,6 @@ export const HighlightedCodeBlock = CodeBlockLowlight.extend({
                 newState.doc,
                 (node) => node.type.name === name,
               );
-              // The upstream plugin only refreshes selected or replaced blocks.
-              // AttrStep (language menu) and edits from agents can affect other
-              // blocks too. Compare code nodes, ignoring selection and position.
               if (
                 before.length !== after.length ||
                 after.some((block, index) => !block.node.eq(before[index].node))

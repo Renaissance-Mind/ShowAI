@@ -24,20 +24,15 @@ type NodeValue = {
 const digest = (bytes: Buffer) =>
   createHash("sha256").update(bytes).digest("hex");
 function jsonEnvelope(path: string): boolean {
-  // Component source fingerprints cover exact bytes, including JSON formatting.
   return (
     path.endsWith(".json") &&
     (!/\/components\//.test(path) || path.endsWith("/compiled.json"))
   );
 }
 
-/** Extract only actual data URLs. Slot locations avoid reserving keys in component props. */
 function encodeJson(value: unknown, files: FileChanges): Buffer {
   const assets: AssetSlot[] = [];
-  // The location of the value being visited; copied only for a data URL.
   const pointer: string[] = [];
-  // Returns the value itself unless it holds a data URL, so the JSON text of
-  // unchanged parts is that of the input.
   const visit = (value: unknown): unknown => {
     if (typeof value === "string") {
       if (!value.startsWith("data:")) return value;
@@ -103,7 +98,6 @@ function assetPath(slot: AssetSlot): string {
     throw new CoreError("INVALID_DATA", "Invalid stored asset reference.");
   return `assets/${slot.id}`;
 }
-/** The value with the asset's data URL restored at the slot's location. */
 function restoreAsset(value: unknown, slot: AssetSlot, asset: Buffer): unknown {
   if (digest(asset) !== slot.id)
     throw new CoreError("INVALID_DATA", `Corrupt asset: ${slot.id}`);
@@ -161,8 +155,6 @@ function nodePath(path: string, id: string): string {
   return `${nodePrefix(path)}${createHash("sha256").update(id).digest("hex")}.json`;
 }
 
-/** Storage splits pages, while callers and portable exports keep full readable artifacts. */
-/** Reports the errors that would stop a page artifact from being stored as nodes. */
 export function assertStorablePage(value: {
   format?: unknown;
   document?: { content?: NodeValue };
@@ -173,8 +165,6 @@ export function assertStorablePage(value: {
       "A stored page requires a ShowAI artifact.",
     );
   const ids = new Set<string>();
-  // Storage splits the tree into node files; documents held in component
-  // data stay inside their node, so only the tree needs stored identities.
   walk(value.document.content as JSONContent, (node) => {
     if (node.type === "text") return;
     const id = node.attrs?.id;
@@ -212,7 +202,6 @@ export function encodeFile(path: string, bytes: Buffer): FileChanges {
   return files;
 }
 
-/** The node an entry of a stored page refers to, or undefined for inline content. */
 function nodeReference(
   entry: unknown,
   depth: number,
@@ -278,10 +267,6 @@ export async function decodeFile(
   return Buffer.from(JSON.stringify(value, null, 2) + "\n");
 }
 
-/**
- * decodeFile for a reader that answers synchronously, without a promise per
- * node. Nodes are read depth first; a valid page decodes to the same bytes.
- */
 export function decodeFileSync(
   path: string,
   read: (path: string) => Buffer,

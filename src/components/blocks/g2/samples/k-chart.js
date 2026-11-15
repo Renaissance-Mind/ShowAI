@@ -1,6 +1,3 @@
-// Adapted from https://github.com/antvis/G2/blob/v5/site/docs/charts/k-chart.en.mdx
-// License notices: resources/licenses/g2-runtime.json.
-
 export default async function draw(context) {
   const { Chart, asset, fetch } = context;
   const G2 = { Chart };
@@ -38,10 +35,6 @@ export default async function draw(context) {
       x: "time",
       color: (d) => {
         const trend = Math.sign(d.start - d.end);
-        // Note: In many Western contexts, red is down and green is up.
-        // This example uses red for up ('上涨') and green for down ('下跌').
-        // Translated labels: 'Down', 'Unchanged', 'Up'
-        // Original colors: Down '#4daf4a' (green), Up '#e41a1c' (red)
         return trend > 0 ? "Down" : trend === 0 ? "Unchanged" : "Up";
       },
     },
@@ -51,7 +44,7 @@ export default async function draw(context) {
       },
       color: {
         domain: ["Down", "Unchanged", "Up"],
-        range: ["#4daf4a", "#999999", "#e41a1c"], // Green for Down, Gray for Unchanged, Red for Up
+        range: ["#4daf4a", "#999999", "#e41a1c"],
       },
     },
     children: [

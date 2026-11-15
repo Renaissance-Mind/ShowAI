@@ -25,11 +25,9 @@ export default function ServiceLogin({
   registrationKey: string;
   invite?: string;
   onMethods?: (methods: string[]) => void;
-  /** Server facts such as whether registration needs a key. */
   onInfo?: (info: { auth: string[]; registration?: string }) => void;
   connectionId?: string;
   onConnected: (id: string) => Promise<void>;
-  /** A selected peer in the account login tabs; omitted when linking methods. */
   provider?: string;
   availableMethods?: string[];
 }) {
@@ -48,7 +46,6 @@ export default function ServiceLogin({
     [confirming, setConfirming] = useState(false),
     [error, setError] = useState(""),
     [busy, setBusy] = useState(false);
-  // After a mistyped code: attempts left and a ticking expiry.
   const [remaining, setRemaining] = useState<number | null>(null),
     [now, setNow] = useState(Date.now);
   useEffect(() => {
@@ -65,8 +62,6 @@ export default function ServiceLogin({
       return;
     }
     if (!url) return;
-    // The parent passes the address once it is committed (blur or submit),
-    // so typing does not probe the server on every keystroke.
     let cancelled = false;
     void desktop
       .invoke<{ auth: string[]; registration?: string }>("sync:serverInfo", {

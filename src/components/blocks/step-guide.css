@@ -1,7 +1,3 @@
-/* step-guide; the .sg-code panel is shared with command-reference.
- * Neutral colors follow the design tokens so the block follows light and dark themes. */
-/* Page typography reaches into blocks at 0,2,1; this baseline (0,2,2) clears it
- * for structural elements, and the rules below (0,3,0) set this block's own values. */
 .sb-block.sg-block :is(h3, h4, p, ul, ol, li, pre):not(svg) {
   margin: 0;
 }
@@ -14,7 +10,6 @@
   background: none;
   color: inherit;
 }
-/* Doubled class so the shared .sb-block font and size do not override these. */
 .sb-block.sg-block {
   --sg-text: var(--text, #222222);
   --sg-muted: var(--muted, #6a6a6a);
@@ -103,7 +98,6 @@
   margin: 0;
 }
 
-/* ---------------------------------------------------------------- progress */
 :is(.sb-block.sg-block, .sb-block.cr-block) .sg-progress {
   display: flex;
   flex-wrap: wrap;
@@ -150,7 +144,6 @@
   color: var(--sg-accent);
 }
 
-/* ---------------------------------------------------------------- list layout */
 :is(.sb-block.sg-block, .sb-block.cr-block) .sg-list {
   list-style: none;
   margin: 0;
@@ -331,7 +324,6 @@
   color: var(--sg-muted);
 }
 
-/* ---------------------------------------------------------------- code panel (shared) */
 :is(.sb-block.sg-block, .sb-block.cr-block) .sg-code {
   --sg-code-line: var(--line, #dddddd);
   margin-top: 12px;
@@ -456,7 +448,6 @@
   outline: 2px solid var(--accent, #120a8f);
   outline-offset: -2px;
 }
-/* Scoped under the block root to outrank the page's :is(.document-content, …) pre rule. */
 :is(.sb-block.sg-block, .sb-block.cr-block) .sg-code .sg-pre {
   margin: 0;
   padding: 13px 16px 14px;
@@ -479,7 +470,6 @@
   color: var(--muted, #6a6a6a);
 }
 
-/* ---------------------------------------------------------------- timer */
 :is(.sb-block.sg-block, .sb-block.cr-block) .sg-timer {
   display: flex;
   flex-wrap: wrap;
@@ -621,7 +611,6 @@
   justify-content: center;
 }
 
-/* ---------------------------------------------------------------- timeline ribbon */
 :is(.sb-block.sg-block, .sb-block.cr-block) .sg-ribbon {
   margin: 0 0 16px;
 }
@@ -776,7 +765,6 @@
   transform: none;
 }
 
-/* ---------------------------------------------------------------- timer tray */
 :is(.sb-block.sg-block, .sb-block.cr-block) .sg-tray {
   display: flex;
   flex-wrap: wrap;
@@ -806,7 +794,6 @@
   max-width: 12em;
 }
 
-/* ---------------------------------------------------------------- focus layout */
 :is(.sb-block.sg-block, .sb-block.cr-block) .sg-card {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 200px;

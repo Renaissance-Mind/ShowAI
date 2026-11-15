@@ -1063,7 +1063,6 @@
   color: var(--sb-text);
   max-width: 180px;
 }
-/* The page cell's picker fills the cell beside the open-page link. */
 .sb-cell-input-wrap > .sb-field-popover-root {
   min-width: 0;
   flex: 1;
@@ -1299,7 +1298,6 @@
   font-weight: 500;
   overflow-wrap: anywhere;
 }
-/* Fixed-width digits keep the figure steady while it counts up. */
 .sb-metric-figure {
   font-variant-numeric: tabular-nums;
 }
@@ -1716,7 +1714,6 @@
   padding: 20px;
   background: var(--sb-soft);
 }
-/* A block bound to shared data that had no value when the page was made. */
 .sb-data-notice {
   margin: 0;
   padding: 18px 16px;
@@ -2026,7 +2023,6 @@
 .sb-code pre { margin: 0; padding: 16px; overflow-x: auto; background: #f1f3ef; border-radius: 5px; font: 13px/1.65 ui-monospace, monospace; }
 .sb-code textarea { width: 100%; margin-top: 10px; min-height: 130px; font: 13px/1.65 ui-monospace, monospace; }
 
-/* Shared table alignment controls, including the document editor. */
 .table-alignment-buttons {
   display: inline-flex;
   align-items: center;
@@ -2119,7 +2115,6 @@
   }
 }
 
-/* Secondary controls occupy only their local hover target, not a permanent row. */
 .sb-block > .sb-data-details:not([open]),
 .sb-primitive > .sb-primitive-editor:not([open]) {
   position: absolute;
@@ -2213,7 +2208,6 @@
   .sb-board-column > .sb-add-row { opacity: 1; }
 }
 
-/* A linked local file a reader or export does not include, or one opening now. */
 .sb-resource-notice,
 .sb-resource-loading {
   margin: 0;

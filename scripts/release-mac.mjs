@@ -1,10 +1,4 @@
 #!/usr/bin/env node
-// Builds, verifies and (with --publish) publishes the macOS release of the pushed main commit.
-//   node scripts/release-mac.mjs --headline TEXT --changes FILE.json [--work DIR] [--identity NAME] [--without-ci] [--publish]
-//
-// The full test suite runs in GitHub Actions (Check); this script requires that run to pass for the
-// commit and then verifies what only a local build can: the signed bundle, the packaged App
-// (src/desktop/smoke.mjs) and the in-app update feed. Without --publish it stops before tagging.
 import { execFileSync, spawn, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { createReadStream, createWriteStream, existsSync, readFileSync, statSync, statfsSync, writeFileSync } from "node:fs";
@@ -29,7 +23,6 @@ function capture(command, args, options = {}) {
 }
 
 const timings = {};
-// Runs a command with its output in logs/<name>.log and records how long it took.
 async function step(work, name, command, args, options = {}) {
   const started = Date.now();
   const log = join(work, "logs", `${name}.log`);
@@ -63,7 +56,6 @@ function developerIdentity(requested) {
   return identities[0];
 }
 
-// The Check workflow must have passed for the commit; waits while it is still running.
 async function requireCheck(sha) {
   for (;;) {
     const runs = JSON.parse(capture("gh", ["api", `repos/${REPO}/actions/workflows/check.yml/runs?head_sha=${sha}&per_page=5`])).workflow_runs;
@@ -98,7 +90,6 @@ async function main(args) {
   const exports = join(work, "exports");
   const source = join(work, "source");
 
-  // Preflight: everything that can stop the release before the long steps.
   if (process.platform !== "darwin" || process.arch !== "arm64") throw new Error("The macOS release builds on an Apple silicon Mac.");
   capture("git", ["fetch", "--quiet", "origin", "main", "--tags"]);
   const sha = capture("git", ["rev-parse", "HEAD"]);
@@ -115,7 +106,6 @@ async function main(args) {
   await rm(exports, { recursive: true, force: true });
   await mkdir(source, { recursive: true });
   execFileSync("/bin/sh", ["-c", `git archive ${sha} | tar -x -C "${source}"`], { cwd: root });
-  // An APFS clone of the dependencies the commit was tested with; it costs no disk space.
   execFileSync("cp", ["-cR", join(root, "node_modules"), join(source, "node_modules")]);
   const env = { SHOWAI_SOURCE_COMMIT: sha, TMPDIR: join(work, "tmp") };
   await mkdir(env.TMPDIR, { recursive: true });
@@ -137,7 +127,6 @@ async function main(args) {
   if (capture("defaults", ["read", join(app, "Contents/Info.plist"), "CFBundleShortVersionString"]) !== version) throw new Error("The App reports a different version.");
   if (!existsSync(join(app, "Contents/Resources/app-update.yml"))) throw new Error("The App has no app-update.yml, so it cannot update itself.");
 
-  // The packaged App registers itself for showai:// when it starts; give the scheme back afterwards.
   const handler = urlHandler();
   try {
     await step(work, "packaged-smoke", "node", ["src/desktop/smoke.mjs", join(app, "Contents/MacOS/ShowAI")], { cwd: source, env });
@@ -176,7 +165,6 @@ async function main(args) {
       const uploaded = remote.assets.find((item) => item.name === asset.name);
       if (uploaded?.size !== asset.size || uploaded.digest !== `sha256:${asset.sha256}`) throw new Error(`${asset.name} on GitHub differs from the local file.`);
     }
-    // The public releases API is cached for 60 s; wait until it lists this release before checking.
     for (let attempt = 0; attempt < 12; attempt++) {
       const releases = await (await fetch(`https://api.github.com/repos/${REPO}/releases?per_page=1`)).json();
       if (releases[0]?.tag_name === tag) break;

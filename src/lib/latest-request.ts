@@ -1,4 +1,3 @@
-/** Run one request at a time, keeping only the newest waiting request. */
 export function latestRequest<T>() {
   let pending: Promise<T> | undefined, next: (() => Promise<T>) | undefined;
   return (action: () => Promise<T>): Promise<T> => {

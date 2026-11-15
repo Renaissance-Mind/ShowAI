@@ -5,8 +5,6 @@ import {fileURLToPath} from 'node:url';
 import {createHash} from 'node:crypto';
 import {execFileSync} from 'node:child_process';
 
-// Independent public boundary module. Legacy v1/input/stroke evaluation and
-// its generated module, compiler flags and provenance remain separate.
 const root=resolve(dirname(fileURLToPath(import.meta.url)),'..');
 const source=join(root,'src/surface/ink-kernel');
 const clang=process.env.SHOWAI_INK_CLANG||'clang++';

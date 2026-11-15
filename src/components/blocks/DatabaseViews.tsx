@@ -1,7 +1,3 @@
-// The database's views. Each view registers one definition: its name, icon,
-// whether it pages its records, and how it lays out the records the query
-// already filtered and sorted. A later view (timeline, gallery) plugs in
-// through registerDatabaseView with the same props.
 import { useState, type ReactNode, type RefObject } from "react";
 import {
   ArrowDown,
@@ -32,19 +28,15 @@ import type {
 } from "./types";
 import type { resolveCalendar } from "./DatabaseCalendar";
 
-/** What every view receives from the database. */
 export interface DatabaseViewProps {
   view: DatabaseView;
   columns: DatabaseColumn[];
   rows: DatabaseRow[];
-  /** Records after search, filter and sort. */
   shownRows: DatabaseRow[];
-  /** The current page of shownRows, for views that page. */
   pagedRows: DatabaseRow[];
   editable: boolean;
   sources: ReadonlyMap<string, BlockItemSource> | null;
   cell: (row: DatabaseRow, column: DatabaseColumn) => ReactNode;
-  /** A cell shown read-only, e.g. the properties under a list item. */
   readCell: (row: DatabaseRow, column: DatabaseColumn) => ReactNode;
   cellEditable: (row: DatabaseRow, column: DatabaseColumn) => boolean;
   deleteButton: (row: DatabaseRow, label: string) => ReactNode;
@@ -78,7 +70,6 @@ export interface DatabaseViewDefinition {
   type: string;
   label: MessageKey<typeof messages>;
   Icon: typeof Table2;
-  /** Views that page show 30 records at a time. */
   paged: boolean;
   View: (props: DatabaseViewProps) => ReactNode;
 }

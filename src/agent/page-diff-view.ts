@@ -9,13 +9,6 @@ import type { JSONContent, PageDiff, ShowDocument } from "../core/model";
 import { isResource } from "../document/containers.mjs";
 import { walk } from "../document/walk.mjs";
 
-/**
- * Record-level page comparison for Agents. The core diff reports changed
- * fields with their whole before/after values, so one edited record of a
- * component's list returned the entire list twice. Here every block change is
- * expressed with the dataset id-path engine (objects per key, arrays of
- * records per id), large values are summarized and the entries are paged.
- */
 
 export type DiffOp = "set" | "remove" | "insert" | "move";
 export type DiffEntry =
@@ -60,9 +53,7 @@ export interface DiffViewOptions {
   blockIds?: string[];
   offset?: number;
   limit?: number;
-  /** Serialized size of the returned entries. */
   maxBytes?: number;
-  /** Keep values as stored (for file output). */
   full?: boolean;
 }
 
@@ -75,7 +66,6 @@ const MAX_VALUE_BYTES = 4096;
 const digest = (value: string) =>
   createHash("sha256").update(value).digest("hex").slice(0, 16);
 
-/** Long text and embedded files become markers; small values stay as they are. */
 export function compactValue(
   value: unknown,
   counter = { omitted: 0 },
@@ -131,7 +121,6 @@ export function compactValue(
   };
 }
 
-/** A block's own attributes and inline text; nested blocks have their own entries. */
 function own(node: JSONContent): Record<string, unknown> {
   const { content, ...rest } = node;
   return {
@@ -192,7 +181,6 @@ function entriesFor(
   });
 }
 
-/** Every change between two documents, one entry per record-level edit. */
 export function pageDiffEntries(
   baseline: ShowDocument,
   current: ShowDocument,
@@ -266,17 +254,11 @@ function summarize(entries: DiffEntry[]) {
   };
 }
 
-/**
- * One page of entries within limit and maxBytes; values are compacted unless
- * full. The receipt keeps the identities of the core diff.
- */
-/** One page of change entries within limit and maxBytes, values compacted unless full. */
 export function pageEntries<T extends object>(
   entries: T[],
   options: DiffViewOptions = {},
 ) {
   const offset = Math.max(0, options.offset ?? 0);
-  // Full output (files) is not paged; conversation pages are bounded.
   const limit = options.full
     ? Number.POSITIVE_INFINITY
     : Math.min(DIFF_MAX_LIMIT, Math.max(1, options.limit ?? DIFF_DEFAULT_LIMIT));
@@ -310,7 +292,6 @@ export function pageEntries<T extends object>(
   };
 }
 
-/** Record-level changes between two values of a dataset (or any JSON value). */
 export function valueDiffEntries(
   before: unknown,
   after: unknown,
@@ -338,7 +319,6 @@ export function valueDiffEntries(
   });
 }
 
-/** Datasets bound in a document, with the blocks that show them. */
 export function boundDatasets(document: ShowDocument, projectId: string) {
   const found = new Map<
     string,
@@ -380,7 +360,6 @@ export function pageDiffView(
     : entries;
   const page = pageEntries(selected, options);
   const { changes: _changes, ...identity } = diff;
-  // Values of bound blocks live in datasets, which page hashes do not cover.
   const datasets = options.current
     ? boundDatasets(options.current, diff.projectId).filter(
         (dataset) =>

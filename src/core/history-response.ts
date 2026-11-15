@@ -18,7 +18,6 @@ export type ResponseDescriptor =
       extras: Record<string, ResponseDescriptor>;
     };
 
-/** Response receipts refer to committed files, rather than duplicate pages/images/runtimes. */
 export function describeResponse(
   value: unknown,
   changes: FileChanges,
@@ -39,7 +38,6 @@ export function describeResponse(
         if (parsed && typeof parsed === "object" && !Array.isArray(parsed))
           json.push({ path, value: parsed });
       }
-      // Text source and binary asset values also have stable file references.
       if (/\.(tsx?|jsx?|css|md)$/.test(path))
         texts.set(bytes.toString("utf8"), path);
       if (/\.(png|jpe?g|gif|webp|svg|woff2?|ttf|otf)$/.test(path))

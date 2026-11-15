@@ -1,6 +1,3 @@
-// Adapted from https://github.com/antvis/G2/blob/v5/site/docs/charts/mosaic.en.mdx
-// See ../../UPSTREAM-LICENSE.txt for upstream license.
-
 export default async function draw(context) {
   const { Chart, asset } = context;
   const G2 = { Chart };
@@ -22,9 +19,9 @@ export default async function draw(context) {
       ),
     },
     transform: [
-      { type: "flexX", reducer: "sum" }, // Flexible X-axis width
-      { type: "stackY" }, // Y-axis stacking
-      { type: "normalizeY" }, // Y-axis normalization
+      { type: "flexX", reducer: "sum" },
+      { type: "stackY" },
+      { type: "normalizeY" },
     ],
     encode: {
       x: "market",

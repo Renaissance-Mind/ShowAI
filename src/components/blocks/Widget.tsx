@@ -34,7 +34,6 @@ import { dataNotice, unavailableText } from "./data-notice";
 
 const widgetMessages = translator(messages);
 
-/** A built-in block that cannot show its content, as a component status card. */
 function UnavailableBlock({
   kind,
   data,
@@ -47,7 +46,6 @@ function UnavailableBlock({
 }: BlockProps & {
   kind: string;
   state: ComponentStatusState;
-  /** The data cannot be read here; nothing is wrong with the component. */
   unavailable?: boolean;
   error?: string;
   stack?: string;
@@ -126,7 +124,6 @@ class BlockBoundary extends Component<
   }
 }
 
-/** A block bound to a shared dataset resolves its props there first. */
 export const Widget = memo(function Widget(props: BlockProps & { kind: string }) {
   const host = useContext(BoundWidgetHost);
   if (!hasBinding(props.data))
@@ -170,10 +167,6 @@ const WidgetBody = memo(function WidgetBody({
   host,
   inline,
 }: BlockProps & { kind: string }) {
-  // Components own a mutable working copy, including read-only renderers that
-  // internally prepare their data. Published callbacks capture before returning.
-  // Rich text only reads its data and publishes new objects, so it receives the
-  // data itself: unchanged blocks keep their identity for the editor's echo check.
   const draft = useMemo(
     () => (kind === "text" ? data : cloneSourceValue(data)),
     [data, kind],
@@ -223,7 +216,6 @@ const WidgetBody = memo(function WidgetBody({
       }
     />
   );
-  // Inline components are part of a line of text: they mount with it.
   if (!queued.mounted && !inline) return pending;
   if (!definition)
     return (

@@ -1,6 +1,5 @@
 import { defineMessages } from "../index";
 
-// Mechanism diagram built-in.
 export default defineMessages("mechanismDiagram", {
   "zh-CN": {
     diagram: "机制图",

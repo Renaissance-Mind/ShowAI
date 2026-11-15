@@ -3,7 +3,6 @@ import { randomUUID } from "node:crypto";
 const text = (value, limit) =>
   typeof value === "string" && value ? value.slice(0, limit) : undefined;
 
-/** Close blockers a workbench window reported, limited to known fields. */
 function reportedBlockers(value, url) {
   if (!Array.isArray(value)) return [];
   return value.slice(0, 50).flatMap((item) => {
@@ -24,7 +23,6 @@ function reportedBlockers(value, url) {
   });
 }
 
-/** One-line text of blockers, for the console and the development badge. */
 export function describeBlockers(blockers) {
   return blockers
     .map((blocker) => {
@@ -36,10 +34,6 @@ export function describeBlockers(blockers) {
     .join("；");
 }
 
-/**
- * Ask each open workbench to flush before replacing its local backend.
- * prepare() resolves { allow, blockers }: a refusal names the window and why.
- */
 export function developmentSessions(ws, timeout = 20000) {
   const clients = new Map();
   let pending;
@@ -49,7 +43,6 @@ export function developmentSessions(ws, timeout = 20000) {
     client.socket.once("close", () => {
       const url = clients.get(client)?.url;
       clients.delete(client);
-      // A disappearing window is not proof that its draft was saved.
       if (pending?.waiting.has(client))
         pending.finish(false, [
           {

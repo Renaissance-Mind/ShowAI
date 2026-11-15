@@ -1,9 +1,6 @@
 import { freezeOwnedJSON, captureOwnedJSON } from "../portable/owned-json.mjs";
 import { inkInputConfiguration } from "./ink-kernel/compiled-ink-input.mjs";
 
-// Only this actual Worker receiver writes the cache. There is deliberately no
-// public "adopt geometry"/claimed-proof method. Keys bind the actual immutable
-// source graph plus style and persisted derivation parameters, not a nonce.
 const sources = new WeakMap(),
   immutableData = new WeakSet(),
   retained = new Map(),
@@ -82,8 +79,6 @@ export function preparedCubicGeometry(
   }
   return entry.weak.deref();
 }
-// Charging a query cannot create a geometry/source proof. Only the actual
-// receiver above can do that. Keep derived polygon allocations in the same LRU.
 export function chargePreparedCubicQuery(geometry, query) {
   if (queryCharges.has(query)) return;
   const id = geometryOwners.get(geometry),
@@ -110,10 +105,6 @@ export class CubicWorkerFailure extends Error {
   }
 }
 
-/** Lazily created by a real editor, never by the synchronous Node/JSC reader.
- * A Worker has a private port; its producer result is frozen before callbacks
- * escape. Mutable/shallow-frozen source callers cannot create a cache binding.
- */
 export function createPortableCubicClient() {
   let worker,
     disposed = false,
@@ -185,8 +176,6 @@ export function createPortableCubicClient() {
             ),
           );
         else {
-          // UA structured cloning cannot transfer accessors. This actual private
-          // producer's entire graph is sealed before any callback can alias it.
           let result = freezeOwnedJSON(event.data.result);
           const context = contexts.get(job.strokeId);
           if (result.paint) {

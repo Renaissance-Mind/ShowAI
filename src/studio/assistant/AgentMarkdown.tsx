@@ -2,7 +2,6 @@ import { marked, type Token } from "marked";
 import { Fragment, type ReactNode } from "react";
 import { isSafeUrl } from "../../portable/validation.mjs";
 
-/** Agent output is Markdown data. HTML is displayed as text and never executed. */
 export function AgentMarkdown({
   text,
   onFile,

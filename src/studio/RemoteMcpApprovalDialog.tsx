@@ -6,7 +6,6 @@ import { useTranslator } from "../i18n/react";
 import messages from "../i18n/messages/remoteMcp";
 import type { RemoteApprovalRequest } from "../remote-mcp/types";
 
-/** Global to the workbench so a request is visible without opening Settings. */
 export default function RemoteMcpApprovalDialog() {
   const t = useTranslator(messages);
   const [requests, setRequests] = useState<RemoteApprovalRequest[]>([]);
@@ -21,7 +20,6 @@ export default function RemoteMcpApprovalDialog() {
       try {
         const next =
           await desktop.invoke<RemoteApprovalRequest[]>("remoteMcp:requests");
-        // Polled continuously: an unchanged list keeps its identity and skips a commit.
         if (active)
           setRequests((current) =>
             JSON.stringify(current) === JSON.stringify(next) ? current : next,

@@ -1,6 +1,5 @@
 import { defineMessages } from "../index";
 
-// Workbench shell: the root error page, menu fallbacks and the browser connection.
 export default defineMessages("appShell", {
   "zh-CN": {
     "crash.title": "ShowAI 界面出错了",

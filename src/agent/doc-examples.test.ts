@@ -14,15 +14,6 @@ import { PAGE_OPERATION_FIELDS } from "../core/model";
 import { openLibrary } from "../core/open-library";
 import { syncManager } from "../sync/manager";
 
-/**
- * Skills, guides, tool descriptions and public docs show tool calls such as
- * page_read({projectId,pageId,response:"source"}). Each example is checked
- * against the live inputSchema of a local library connection: the tool must
- * exist under its current name, every argument must exist (per action for
- * action tools, which must name their action), literal enum values must be
- * valid, and page operations must use a current type and fields. Example
- * values are placeholders, so required arguments are not enforced.
- */
 
 const repository = resolve(__dirname, "../..");
 let root: string;
@@ -41,9 +32,6 @@ afterAll(async () => {
   await rm(root, { recursive: true, force: true });
 });
 
-// ---------------------------------------------------------------------------
-// A tolerant reader for the object-literal notation used in documents:
-// shorthand keys, optional markers (key?), spreads, quoted and bare values.
 
 type Value =
   | { kind: "object"; entries: { key: string; value?: Value }[] }
@@ -71,7 +59,6 @@ class Reader {
     this.index++;
     return value;
   }
-  /** Text up to a delimiter at depth 0, for placeholders like 原baseRevision. */
   raw(stop: string): string {
     const start = this.index;
     let depth = 0;
@@ -97,7 +84,6 @@ class Reader {
     if (char && "\"'`".includes(char)) {
       const start = this.index;
       const value = this.string();
-      // "component"或"template" and similar prose stay raw.
       const rest = this.raw(stop);
       return rest
         ? { kind: "raw", text: this.text.slice(start, this.index) }
@@ -127,7 +113,6 @@ class Reader {
       else {
         const match = /^[^\s:,?{}[\]()]+/.exec(this.text.slice(this.index));
         if (!match) {
-          // Prose such as "{…}" or "|": skip one character.
           this.index++;
           continue;
         }
@@ -163,7 +148,6 @@ class Reader {
   }
 }
 
-/** The argument object of name( … ): {…} or bare key:value pairs. */
 function callArguments(
   text: string,
   open: number,
@@ -174,13 +158,11 @@ function callArguments(
   if (char === ")")
     return { value: { kind: "object", entries: [] }, end: reader.index };
   if (char === "{") return { value: reader.object(), end: reader.index };
-  // guide prose writes dataset_write(action:apply) without braces.
   if (!/^[A-Za-z_$][\w$]*\s*:/.test(text.slice(reader.index))) return undefined;
   const value: Value = { kind: "object", entries: reader.entries(")") };
   return { value, end: reader.index };
 }
 
-// ---------------------------------------------------------------------------
 
 interface Source {
   name: string;
@@ -196,7 +178,6 @@ const unwrap = (schema: unknown): z.ZodType => {
     else return current;
   }
 };
-/** Arguments only the hosted gateway adds (src/agent/mcp-http.ts guide). */
 const HOSTED_ARGUMENTS: Record<string, string[]> = {
   guide: ["skill", "file", "section"],
 };
@@ -217,7 +198,6 @@ function checkOperation(value: Value, where: string, problems: string[]) {
     type.value
   ];
   if (!fields) {
-    // Board drawings and other nodes also carry "type"; only dotted names are operations.
     if (/^[a-z-]+\.[a-z.-]+$/.test(type.value))
       problems.push(`${where}: unknown page operation ${type.value}`);
     return;
@@ -313,7 +293,6 @@ function scan(source: Source, names: string[]) {
     calls.push([match.index!, args.end]);
     checkCall(match[1], args.value, where, problems);
   }
-  // Operation objects written outside a page_apply call.
   for (const match of source.text.matchAll(/\{\s*type\s*:\s*["'][a-z]/g)) {
     if (
       calls.some(([start, end]) => match.index! > start && match.index! < end)
@@ -346,7 +325,6 @@ async function documentSources(): Promise<Source[]> {
   )
     .split("\n")
     .filter((path) => path.endsWith(".md"));
-  // New Skill files count as soon as they exist, before they are committed.
   const untracked = execFileSync(
     "git",
     ["ls-files", "--others", "--exclude-standard", "plugins/showai/skills"],
@@ -393,7 +371,6 @@ test("documented tool calls match the live tool schemas", async () => {
     problems.push(...result.problems);
   }
   expect(problems, problems.join("\n")).toEqual([]);
-  // The scan must keep finding the documented calls it is meant to check.
   expect(examples).toBeGreaterThan(100);
   expect(relative(repository, __dirname)).toBe(join("src", "agent"));
 });

@@ -343,11 +343,9 @@ describe("components and their commands", () => {
       `catalog:standup@1.0.0#${"sha256-" + "0".repeat(64)}:today`,
       `catalog:standup@1.0.0#${"sha256-" + "0".repeat(64)}:board`,
     ]);
-    // Without an editable page only navigation stays.
     expect(
       componentCommandItems([builtin, custom], false, "C").map((entry) => entry.title),
     ).toEqual(["Open the team board"]);
-    // A component placed inside a line keeps its navigation commands only.
     const inline = {
       ...custom,
       id: "status-tag",

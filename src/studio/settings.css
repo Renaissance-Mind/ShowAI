@@ -72,7 +72,6 @@
   font-weight: 500;
   line-height: 1.5;
 }
-/* A group heading with actions that apply to the whole group. */
 .settings-group-heading {
   display: flex;
   flex-wrap: wrap;

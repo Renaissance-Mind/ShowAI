@@ -1,6 +1,5 @@
 import { defineMessages } from "../index";
 
-// The date and backlinks components.
 export default defineMessages("pageMention", {
   "zh-CN": {
     "date.change": "更改日期",

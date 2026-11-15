@@ -1,7 +1,3 @@
-/* event-timeline: a chart with phase bands and an event list kept on one cursor.
- * Neutral colors follow the design tokens; tones switch with the theme. */
-/* Page typography reaches into blocks at 0,2,1; this baseline (0,2,2) clears it
- * for structural elements, and the rules below (0,3,0) set this block's own values. */
 .sb-block.et-block :is(h3, h4, p, ul, ol, li, pre):not(svg) {
   margin: 0;
 }
@@ -14,7 +10,6 @@
   background: none;
   color: inherit;
 }
-/* Doubled class so the shared .sb-block font and size do not override these. */
 .sb-block.et-block {
   --et-text: var(--text, #222222);
   --et-muted: var(--muted, #6a6a6a);
@@ -415,7 +410,6 @@
     scroll-behavior: auto;
   }
 }
-/* Print and static reading: the chart stays, every event shows its detail. */
 @media print {
   .sb-block.et-block .et-controls {
     display: none;

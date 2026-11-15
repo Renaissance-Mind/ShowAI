@@ -95,7 +95,6 @@ import {
 
 const CellEnvironmentContext = createContext<CellEnvironment | null>(null);
 
-/** The type menu value of a column: its type, or the contributed component. */
 const typeKey = (column: Pick<DatabaseColumn, "type" | "component">) =>
   column.type === "custom" && column.component
     ? `custom:${column.component.componentId}@${column.component.version}`
@@ -103,7 +102,6 @@ const typeKey = (column: Pick<DatabaseColumn, "type" | "component">) =>
 const contributedKey = (listing: FieldTypeListing) =>
   `custom:${listing.ref.componentId}@${listing.ref.version}`;
 
-/** A column switched to the type a menu value names, keeping only settings that type uses. */
 function withType(
   column: DatabaseColumn,
   key: string,
@@ -124,7 +122,6 @@ function withType(
       ...rest,
       type: "custom",
       component: { ...listing.ref },
-      // Readers without the component still filter and sort by this kind.
       kind: listing.valueKind,
       config: structuredClone(listing.defaultConfig),
     };
@@ -182,7 +179,6 @@ function Cell({
   );
 }
 
-/** Settings of one column: name, type and the type's own configuration. */
 function ColumnSettings({
   column,
   columns,
@@ -237,7 +233,6 @@ function ColumnSettings({
   );
 }
 
-/** The new-property form the table header opens above the table. */
 function AddProperty({
   columns,
   contributed,
@@ -280,7 +275,6 @@ function AddProperty({
         placeholder={t("propertyName")}
         value={draft.name}
         maxLength={1000}
-        // Typing must reach the form, not the page editor holding this component.
         autoFocus
         onChange={(event) => setDraft({ ...draft, name: event.target.value })}
       />
@@ -319,7 +313,6 @@ export function DatabaseBlock({ data, onChange, readOnly }: BlockProps) {
   useEffect(() => () => closeRecord?.(sourceId), [sourceId, closeRecord]);
   const liveHost = useDatabaseHost();
   const snapshot = data[DERIVED_KEY];
-  // A bound table follows what its shared data allows: columns, then each row's fields.
   const dataState = useContext(BlockDataState);
   const selfDataset = dataState?.dataset;
   const host = useMemo(
@@ -376,7 +369,6 @@ export function DatabaseBlock({ data, onChange, readOnly }: BlockProps) {
   const [activeView, setActiveView] = useReaderState("activeView", "", {
     accept: isText,
   });
-  // Readers change views for themselves; editors change the saved views.
   const [overrides, setOverrides] = useReaderState<
     Record<string, ViewOverride>
   >("viewOverrides", {}, { accept: isRecord });
@@ -426,7 +418,6 @@ export function DatabaseBlock({ data, onChange, readOnly }: BlockProps) {
         },
       }));
   };
-  // Calendar column choices are reading state seeded from the saved settings, like board grouping.
   const [calendarChoice, setCalendarChoice] =
     useReaderState<DatabaseCalendarConfig>(
       "calendar",
@@ -444,11 +435,9 @@ export function DatabaseBlock({ data, onChange, readOnly }: BlockProps) {
   const [error, setError] = useState("");
   const [page, setPage] = useReaderState("page", 0, { accept: isIndex });
   const [pageError, setPageError] = useState("");
-  // Page creation is asynchronous; it edits the data current when it finishes.
   const latestData = useRef(data);
   latestData.current = data;
   const pageQueue = useRef<Promise<unknown>>(Promise.resolve());
-  // Rows mapped from shared data keep their source fields and stay in the source.
   const sources = useContext(BlockItemSources);
   const cellEditable = (row: DatabaseRow, column: DatabaseColumn) =>
     editable &&
@@ -557,13 +546,11 @@ export function DatabaseBlock({ data, onChange, readOnly }: BlockProps) {
     setPage(Math.floor(rows.length / pageSize));
     setQuery("");
     if (filter) changeCurrent({ filter: undefined });
-    // A database of pages gives every new record its own page.
     if (canCreatePages && pageColumns[0])
       createLinkedPage(row.id, pageColumns[0]);
     return row.id;
   };
   const canCreatePages = editable && !!pages?.createPage;
-  /** Create a page in the column's folder and link it from the record. */
   const createLinkedPage = (rowId: string, column: DatabaseColumn) => {
     const bridge = pages;
     if (!bridge?.createPage) return;
@@ -577,7 +564,6 @@ export function DatabaseBlock({ data, onChange, readOnly }: BlockProps) {
         (item) => item.id === rowId,
       );
       if (!savedColumn || !record) return;
-      // The first page names the record column it stays in step with.
       const titleColumn =
         savedColumn.titleColumn ??
         (base.columns as DatabaseColumn[]).find((item) => item.type === "text")
@@ -622,8 +608,6 @@ export function DatabaseBlock({ data, onChange, readOnly }: BlockProps) {
       }
     });
   };
-  // A record name and its page title stay equal: whichever changed since
-  // they last matched is copied to the other.
   const titlePageColumn = pageColumns.find((column) =>
     columns.some(
       (item) => item.id === column.titleColumn && item.type === "text",
@@ -701,7 +685,6 @@ export function DatabaseBlock({ data, onChange, readOnly }: BlockProps) {
           () => {
             rename.saving = false;
             const latest = storedName(rowId);
-            // Typing went on while the page saved: rename again.
             if (latest.trim() && latest !== rename.title)
               schedule(key, rowId, pageId, latest);
             else rename.listed = latestPages.current?.pages;
@@ -726,7 +709,6 @@ export function DatabaseBlock({ data, onChange, readOnly }: BlockProps) {
         clearTimeout(rename.timer);
         renames.current.delete(pair.key);
       }
-      // A finished rename waits until the host lists pages again.
       else if (
         !rename.saving &&
         !rename.timer &&
@@ -781,7 +763,6 @@ export function DatabaseBlock({ data, onChange, readOnly }: BlockProps) {
     });
     setPage(0);
   };
-  /** Checks a column's type settings; returns a message or "". */
   const columnProblem = (column: DatabaseColumn): string => {
     if (column.type === "relation" && !column.relation?.dataset)
       return tf("error.relationTarget", { name: column.name });
@@ -936,11 +917,9 @@ export function DatabaseBlock({ data, onChange, readOnly }: BlockProps) {
               id: row.id,
               ...Object.fromEntries(
                 cleaned.flatMap((column) => {
-                  // Derived values are computed, never stored.
                   if (isDerivedColumn(column)) return [];
                   const previous = row[column.id];
                   const type = typeOf(column);
-                  // A value nothing can read stays as it was.
                   if (type.unknown || column.type === "custom")
                     return previous === undefined
                       ? []
@@ -965,7 +944,6 @@ export function DatabaseBlock({ data, onChange, readOnly }: BlockProps) {
             },
       ),
     };
-    // Calendar settings and views must keep pointing at columns of the right type.
     const calendarConfig = pruneCalendarConfig(
       data.calendar ? savedCalendar : undefined,
       cleaned,

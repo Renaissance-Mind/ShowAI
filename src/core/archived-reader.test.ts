@@ -61,10 +61,6 @@ describe("retained legacy readers", () => {
       .digest("hex");
     await writeFile(archive, JSON.stringify(raw));
   }
-  /**
-   * Current saves no longer capture readers. Readers captured by a legacy Git
-   * library remain retained recovery material after migration.
-   */
   async function legacyCapturedPage() {
     const source = new FileStore(join(directory, "source"));
     const project = await source.createProject({ name: "Frozen renderer" });
@@ -114,7 +110,6 @@ describe("retained legacy readers", () => {
       current.hash,
       current.revision,
     );
-    // Saving keeps the retained binding instead of capturing a new reader.
     expect(
       (
         await operations.historicalHtml(

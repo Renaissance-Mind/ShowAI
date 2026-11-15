@@ -1,5 +1,3 @@
-/* Host-only file transport for the actual source-curve fixture suite. No JSON
- * parser, oracle library or allocator enters the freestanding kernel. */
 #include "graph.hpp"
 #include <cstdio>
 #include <vector>

@@ -43,7 +43,6 @@ import type {
 export { canonicalJson } from "./canonical";
 import { canonicalJson } from "./canonical";
 
-/** Blocks bound to shared data must carry a complete, valid binding when saved. */
 function assertBindings(document: ShowDocument) {
   walk(document.content, (node) => {
     if (node.type !== "widget" || !readBinding(node.attrs?.data)) return;
@@ -58,16 +57,11 @@ function assertBindings(document: ShowDocument) {
   }, { scope: "content" });
 }
 
-/** Only document bookkeeping dates are excluded; dates in user data remain meaningful. */
 export function documentHash(document: ShowDocument): string {
   const { createdAt: _createdAt, updatedAt: _updatedAt, ...content } = document;
   return createHash("sha256").update(canonicalJson(content)).digest("hex");
 }
 
-/**
- * `validated` is only for the fresh document parseArtifact just returned; it
- * is mutated in place instead of being validated and cloned a second time.
- */
 export function normalizeDocument(
   input: unknown,
   previous?: ShowDocument,
@@ -264,7 +258,6 @@ export function diffDocuments(
         changes.push({ type: "block.added", blockId: id, ...entry });
       continue;
     }
-    // Direct text and marks belong to this block. Nested blocks have their own records.
     const own = (node: JSONContent): Record<string, unknown> => {
       const { content, ...rest } = node;
       return {
@@ -276,7 +269,6 @@ export function diffDocuments(
     if (fields.length)
       changes.push({ type: "block.changed", blockId: id, fields });
     if (old.parentId !== entry.parentId || old.afterId !== entry.afterId) {
-      // Removing/inserting a preceding sibling is not a move of every later sibling.
       const survivingPredecessor = (
         map: Map<string, NodeEntry>,
         target: NodeEntry,
@@ -304,10 +296,6 @@ export function diffDocuments(
   return changes;
 }
 
-/**
- * Operations that reconcile the surface or read the frames and geometry of
- * other objects. Incomplete drawings are completed before them.
- */
 const GEOMETRY_OPERATIONS = new Set<string>([
   "component.insert",
   "diagram.insert",
@@ -316,7 +304,6 @@ const GEOMETRY_OPERATIONS = new Set<string>([
   "surface.wrap",
 ]);
 
-/** Names the failing operation by its index in the caller's list. */
 function operationError(error: unknown, index: number, type: unknown) {
   const label = `operations[${index}]${typeof type === "string" ? ` (${type})` : ""}`;
   if (error instanceof CoreError) {
@@ -332,19 +319,9 @@ function operationError(error: unknown, index: number, type: unknown) {
   return wrapped;
 }
 
-/**
- * Apply operations in order. The result, or the failure and its operation
- * index, is the one separate page_apply calls would give: each operation is
- * applied to the result of the previous one and completed, reconciled,
- * validated and normalized before the next. Block inserts and text edits on
- * a reconciled container page take the incremental path in
- * apply-incremental.ts, which checks only the touched block and falls back
- * to the full step whenever it cannot vouch for the same result.
- */
 export function applyOperations(
   document: ShowDocument,
   operations: PageOperation[],
-  /** Index of operations[0] in the caller's list, for error messages. */
   firstIndex = 0,
 ): ShowDocument {
   if (!Array.isArray(operations) || operations.length > 1000)
@@ -353,7 +330,6 @@ export function applyOperations(
       "Expected at most 1000 page operations.",
     );
   let current = document;
-  // Incremental steps work in place on a private result of a full step.
   let state: BatchState | undefined;
   let fresh = false;
   for (const [offset, operation] of operations.entries()) {
@@ -372,7 +348,6 @@ export function applyOperations(
   return current;
 }
 
-/** applyOperations with every operation applied by a full step. */
 export function applyOperationsStepwise(
   document: ShowDocument,
   operations: PageOperation[],
@@ -392,14 +367,9 @@ function applyOperation(
   const operations = [operation];
   let draft = structuredClone(document);
   const transformedIds = new Set<string>();
-  // Frames the caller set explicitly; others are automatic placeholders that
-  // drawing completion may size from the drawing itself.
   const framed = new Set(Object.keys(document.layout ?? {}));
   let removedPlaceholder = false;
   let originalIds: Set<string> | undefined;
-  // Fills omitted drawing fields (frames, points, arrow anchors). It runs at
-  // the end and before any operation that reads geometry, so later operations
-  // never see an arrow without points or a shape without extent.
   const completeDraftDrawings = () => {
     if (!isSurface(draft)) return;
     originalIds ??= new Set(indexSurfaceTree(document.content).keys());
@@ -435,7 +405,6 @@ function applyOperation(
     };
     return visit(draft.content);
   };
-  /** A block inside a document a component holds (its rich text, a step). */
   const nested = (id: string) => {
     try {
       const found = addressNode(draft.content, id);
@@ -454,7 +423,6 @@ function applyOperation(
       ? `component ${host} inside block ${owner}`
       : `block ${owner}`;
   };
-  /** Blocks of the page tree: frames, views, containers and order. */
   const locate = (
     id: string,
   ): { parent: JSONContent; index: number; node: JSONContent } => {
@@ -468,13 +436,11 @@ function applyOperation(
       );
     throw new CoreError("NOT_FOUND", `Block ${id} does not exist.`);
   };
-  /** Any addressable block, including blocks nested in component content. */
   const target = (id: string): JSONContent => {
     const found = inTree(id) ?? nested(id);
     if (!found) throw new CoreError("NOT_FOUND", `Block ${id} does not exist.`);
     return found.node;
   };
-  /** Replace a block by id; nested blocks are written back into the data of their component. */
   const edit = (id: string, change: (node: JSONContent) => JSONContent) => {
     const found = inTree(id);
     if (found) {
@@ -529,8 +495,6 @@ function applyOperation(
     children.splice(index, 0, node);
     parent.content = children;
   };
-  // A new nested Page holds one empty paragraph so people can type into it.
-  // Content added through an operation replaces that placeholder.
   const placeholderOf = (parentId?: string | null) => {
     if (!parentId || parentId === draft.content.attrs?.id) return undefined;
     const parent = locate(parentId).node;
@@ -571,7 +535,6 @@ function applyOperation(
     if (GEOMETRY_OPERATIONS.has(operation.type)) completeDraftDrawings();
     switch (operation.type) {
       case "component.insert": {
-        // Components go into the page tree; a nested parent is refused by name.
         if (
           operation.parentId &&
           operation.parentId !== draft.content.attrs?.id &&
@@ -638,7 +601,6 @@ function applyOperation(
           );
         Object.assign(draft.layout!, tidy.frames);
         Object.keys(tidy.frames).forEach((id) => framed.add(id));
-        // Arrows re-attach to the sides that face each other in the new arrangement.
         for (const [arrowId, anchors] of Object.entries(tidy.anchors)) {
           const arrow = locate(arrowId).node;
           const bindings = arrow.attrs!.bindings;
@@ -898,7 +860,6 @@ function applyOperation(
           );
         edit(operation.blockId, (node) => {
           const attrs = { ...node.attrs, ...operation.attrs };
-          // Like a JSON merge patch, null removes an attribute.
           for (const [key, value] of Object.entries(operation.attrs))
             if (value === null) delete attrs[key];
           return { ...node, attrs };
@@ -919,7 +880,6 @@ function applyOperation(
           break;
         }
         const data = node.attrs?.data;
-        // Images, text, tables and steppers are native nodes, not widgets.
         if (node.type !== "widget")
           throw new CoreError(
             "INVALID_DATA",
@@ -979,7 +939,6 @@ function applyOperation(
             "INVALID_DATA",
             "component.ref.set componentId must be non-empty text when given.",
           );
-        // Only the reference changes; props and $binding are kept as stored.
         const { scope: _scope, ...rest } = data as Record<string, unknown>;
         const next = {
           ...rest,
@@ -1041,7 +1000,6 @@ function applyOperation(
   };
   const finish = (): ShowDocument => {
   completeDraftDrawings();
-  // Validate caller-supplied references before intentional structural cleanup.
   const structural =
     removedPlaceholder ||
     operations.some(
@@ -1071,7 +1029,6 @@ function applyOperation(
         node.attrs.bindings,
     );
   if (arrows.length) {
-    // Reject invalid caller data before intentionally detaching valid relationships.
     validateDocument(draft);
     for (const node of arrows) {
       const bindings = transformedBindings(
@@ -1082,14 +1039,12 @@ function applyOperation(
       else delete node!.attrs!.bindings;
     }
   }
-  // Anchored comments follow their text through these operations.
   return rebaseCommentAnchors(document, normalizeDocument(draft, document));
   };
   try {
     applyOne(operation);
     return finish();
   } catch (error) {
-    // Completion and validation failures belong to the operation too.
     throw operationError(
       error,
       index,

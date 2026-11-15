@@ -16,15 +16,12 @@ async function syncState({ service, projectId }: ToolConnection) {
     projectId,
     connected: !!project,
     ...(project ? { synchronization: project } : { mode: "local" }),
-    // Copies of this device's files that travel to the other devices.
     packaging: await syncPackagingPlan(service.store, projectId),
   };
 }
-// Synchronization runs where the library is; hosted connections have none.
 const local = ({ options }: ToolConnection) =>
   options.presentation?.transport !== "http";
 
-/** Drafts against the current page, external file changes and synchronization. */
 export const workspaceTools: ToolDeclaration[] = [
   {
     name: "page_merge_preview",

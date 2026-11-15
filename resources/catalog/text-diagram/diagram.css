@@ -1,5 +1,4 @@
 .sd-diagram .am-diagram { margin: 0; overflow: visible; text-align: center; }
-/* Embedded previews can lose html[data-theme]; the fallbacks keep diagrams readable, and defined theme variables still win. */
 .sd-diagram .am-diagram svg { max-width: 100%; height: auto; font-family: var(--font-sans, sans-serif); }
 .sd-diagram .am-diagram text { fill: var(--ink, #16181d); font-size: 13px; }
 .sd-diagram .am-node-shape { fill: var(--paper, #ffffff); stroke: var(--line, #1d2026); stroke-width: var(--bw, 1.5px); }
@@ -18,19 +17,14 @@
 .sd-diagram .am-diagram .am-step { fill: var(--ink-3, #8b929e); font: 10px var(--font-mono, monospace); }
 
 
-/* Change markers (only on pages that have one). Only the Changes view (.am-view-changes) draws change styling: colors, strike-through, faded items
-   and badges. Before and After look like a plain diagram, and the items that do not exist in the view are hidden.
-   The colors are the theme's --ok, --err and --warn, so every theme and mode works. A view hides items with visibility, so nothing moves. */
 .sd-diagram .am-view-before [data-delta="added"], .sd-diagram .am-view-after [data-delta="removed"] { visibility: hidden; }
 .sd-diagram .am-view-before .am-delta-badge, .sd-diagram .am-view-after .am-delta-badge { visibility: hidden; }
-/* A list label's badge is inline and would indent the label like a nesting level, so there it takes no space; the other badges are positioned and move nothing. */
 .sd-diagram .am-view-before .am-tree-label > .am-delta-badge, .sd-diagram .am-view-after .am-tree-label > .am-delta-badge { display: none; }
 
 .sd-diagram .am-delta-badge--added { --badge: var(--ok, #1f9d4d); }
 .sd-diagram .am-delta-badge--removed { --badge: var(--err, #c62828); }
 .sd-diagram .am-delta-badge--changed { --badge: var(--warn, #a8620a); }
 
-/* flow */
 .sd-diagram .am-view-changes .am-node[data-delta="added"] .am-node-shape { stroke: var(--ok, #1f9d4d); }
 .sd-diagram .am-view-changes .am-node[data-delta="removed"] .am-node-shape { stroke: var(--err, #c62828); }
 .sd-diagram .am-view-changes .am-node[data-delta="changed"] .am-node-shape { stroke: var(--warn, #a8620a); }
@@ -51,7 +45,6 @@
 .sd-diagram .am-diagram .am-delta-badge circle { fill: var(--badge); stroke: var(--paper, #ffffff); stroke-width: 1.5; }
 .sd-diagram .am-diagram .am-delta-badge text { fill: var(--paper, #ffffff); font: 700 11px var(--font-sans, sans-serif); text-decoration: none; }
 
-/* the count row and the switch */
 .sd-diagram .am-delta-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; margin-top: 10px; text-align: start; font: 12px/1.3 var(--font-mono, monospace); }
 .sd-diagram .am-delta-count--added { color: var(--ok); }
 .sd-diagram .am-delta-count--removed { color: var(--err); }

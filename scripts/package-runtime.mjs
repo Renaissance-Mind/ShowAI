@@ -1,6 +1,5 @@
 import { frontendManifest } from "./build-info.mjs";
 import { trimEmbeddedGit } from "./trim-embedded-git.mjs";
-// Prepare the canonical plugin before taking the copy shipped inside the App.
 import "./package-plugin.mjs";
 import { build } from "esbuild";
 import {
@@ -26,7 +25,6 @@ await cp(join(root, "plugins/showai"), join(runtime, "assets/agent-plugin"), {
   recursive: true,
   verbatimSymlinks: true,
 });
-// The DeepSeek Harness bundle source; the App stages it with this runtime's paths.
 await rm(join(runtime, "assets/dsh-plugin"), { recursive: true, force: true });
 const dshBundle = join(root, "plugins/dsh-showai");
 await cp(dshBundle, join(runtime, "assets/dsh-plugin"), {
@@ -47,7 +45,6 @@ await copyFile(
   join(root, "dist-portable/reader-source.json"),
   join(runtime, "assets/reader-source.json"),
 );
-// Names the published CDN reader that conversation previews import.
 await copyFile(
   join(root, "dist-cdn/manifest.json"),
   join(runtime, "assets/cdn-manifest.json"),
@@ -113,12 +110,9 @@ for (const name of [
   "d3-regression",
   "topojson-client",
   "three",
-  // Dataset transforms load the QuickJS WebAssembly file from here; the
-  // packaged desktop main process resolves it through this runtime too.
   "@jitl/quickjs-wasmfile-release-sync",
 ])
   await copyPackage(name);
-// Windows ships dugite's minGit layout, which keeps its own credential setup.
 if (process.platform !== "win32")
   await trimEmbeddedGit(join(runtime, "node_modules/dugite/git"));
 const compilerPackages = await readdir(join(root, "node_modules/@esbuild"));

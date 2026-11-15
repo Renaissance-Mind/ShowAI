@@ -4,7 +4,6 @@
 #include "chunk-tree.hpp"
 #include "../include/boundary-kernel.h"
 namespace showai_boundary {
-// Lifetime-safe witnesses: no reference back into a recyclable curve slot.
 struct PointFunction{Polynomial x,y;PointFunction()=default;explicit PointFunction(const Curve&c):x(c.x),y(c.y){}Context*context()const{return x.context();}};
 struct AlgebraicPoint{Record<PointFunction>function;Root parameter;AlgebraicPoint()=default;AlgebraicPoint(const Record<PointFunction>&f,const Root&t):function(f),parameter(t){}Context*context()const{return parameter.context();}};
 struct PointAuthority{
@@ -15,9 +14,6 @@ struct VertexCertificate{Record<PointAuthority>point;Interval x,y;uint64_t revis
 struct PointAlias{Record<PointAuthority>a,b,point;Record<VertexCertificate>before_a,before_b,after;uint32_t vertex_a=0,vertex_b=0,target=0,reserved=0;Context*context()const{return point.context();}};
 struct VertexCertificateChange{uint32_t vertex=0,reserved=0;Record<VertexCertificate>before,after;};
 struct VertexCertificateLookup{uint32_t canonical=0xffffffffu,steps=0;Record<VertexCertificate>certificate;};
-// Incidence holds the actual immutable output record, not just a caller key.
-// Endpoint multiplicity is independent of orientation and may exceed two for
-// a self-intersecting curve block. Each root is persistent / source-owned.
 template<class T>struct IncidentNode{
  using Chunk=typename ChunkTree<T>::Chunk;
  Record<Chunk>block;uint64_t epoch=0;uint32_t slot=0,references=0,height=1,blocks=1;uint64_t endpoints=0;Record<IncidentNode>left,right;

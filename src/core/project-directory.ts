@@ -2,7 +2,6 @@ import { lstat, realpath } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import { CoreError } from "./model";
 
-/** A host-supplied project directory is exact; cwd falls back to its Git root. */
 export async function projectDirectory(
   sourceDirectory?: string,
 ): Promise<string> {

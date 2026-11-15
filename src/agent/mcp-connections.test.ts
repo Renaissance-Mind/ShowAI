@@ -54,7 +54,6 @@ test("records each MCP client's first connection and first tool call", async () 
   expect(called.firstCallAt).toBeDefined();
   expect(called.firstConnectedAt).toBe(connected.firstConnectedAt);
 
-  // A later session keeps the first call and adds the other host separately.
   await new Promise((done) => setTimeout(done, 5));
   const again = await connect(root, "claude-code");
   const codex = await connect(root, "codex-mcp-client");

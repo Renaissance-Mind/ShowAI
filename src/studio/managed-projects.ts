@@ -14,7 +14,6 @@ export type ManagedProject = {
   connection?: ProjectAccount;
   remote?: SyncProject;
 };
-/** Join by server/project identity, never by name, including stopped sync bindings. */
 export function managedProjects(
   local: ProjectSummary[],
   bindings: ProjectConnection[],

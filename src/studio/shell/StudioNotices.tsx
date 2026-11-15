@@ -27,7 +27,6 @@ import type { StudioRouter } from "./useStudioRouter";
 import type { PageActions } from "./usePageActions";
 import type { PageState } from "./types";
 
-/** External edits are listed only while some are waiting for a decision. */
 export function useExternalChangeCount({
   available,
   dialogOpen,
@@ -65,10 +64,6 @@ export function useExternalChangeCount({
   return externalChangeCount;
 }
 
-/**
- * Notices above the content: problems, sync and read-only states, unreadable
- * projects, save failures and conflicts, and the outline of an external edit.
- */
 export function StudioNotices({
   feedback: { problemQueue, setNotice, report, action },
   library: {
@@ -118,7 +113,6 @@ export function StudioNotices({
             count={entry.count}
             reportable={entry.problem.code !== "LOCKED"}
             actions={bindProblemActions(entry.problem.actions, {
-              // Repeating the operation replaces this notice.
               ...Object.fromEntries(
                 Object.entries({ ...entry.handlers, retry: entry.retry })
                   .filter(([, handler]) => handler)
@@ -323,7 +317,6 @@ export function StudioNotices({
               if (id && page.draft)
                 void locateAssistantTarget(page.draft.id, [id]);
             }}
-            // Without unsaved edits, loading the file loses nothing.
             onDiscard={
               page.dirty
                 ? () => setDialog({ type: "discardDraft" })
@@ -426,7 +419,6 @@ export function StudioNotices({
   );
 }
 
-/** Where an export was saved, with a way to show it in the file manager. */
 export function ExportReceipt({
   feedback: { action },
   library: { info, capabilities },

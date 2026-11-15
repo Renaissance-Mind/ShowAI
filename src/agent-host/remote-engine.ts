@@ -18,7 +18,6 @@ import {
   type RemoteActor,
 } from "./remote-protocol";
 
-/** One cloud account per engine/container; desktop engines retain their configured host. */
 export class RemoteAgentEngine {
   readonly host: AgentHost;
   readonly turns: RemoteTurns;
@@ -128,8 +127,6 @@ export class RemoteAgentEngine {
       throw new Error("Configure this Mac's Agent on the Mac.");
     const connection = await this.connection(actor);
     await this.turns.ready();
-    // Cloud requests have already passed the gateway's live session check.
-    // A Mac also validates its own separate server session before executing.
     if (this.options.host) await accountRequest(connection, "/api/me");
     const fingerprint = createHash("sha256")
       .update(
@@ -206,7 +203,6 @@ export class RemoteAgentEngine {
         (await this.turns.cancel(localId, String(args.id)))
       )
         return null;
-      // A remote task/file/approval must belong to the explicitly authorized project.
       if (
         ["agent:cancel", "agent:readFile", "agent:permission"].includes(action)
       ) {
@@ -305,7 +301,6 @@ export class RemoteAgentEngine {
         ),
       };
     }
-    // Only successful replies are memoized; a timed-out caller retries with the same id.
     if (!remoteReadActionsForEngine.has(action))
       await writeProtected(receiptPath, {
         fingerprint,

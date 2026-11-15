@@ -55,7 +55,6 @@ describe("deleted items", () => {
     const deleted: DeletedEntries = await invoke("library:deleted");
     expect(deleted.projects.map((item) => item.name)).toEqual(["Removed"]);
     expect(deleted.folders.map((item) => item.name)).toEqual(["Folder"]);
-    // The page inside the deleted folder returns with the folder.
     expect(deleted.pages.map((item) => item.title)).toEqual(["Loose"]);
 
     await invoke("library:restore", { kind: "project", projectId: removed.id });
@@ -125,7 +124,6 @@ describe("deleted items", () => {
       await expect(read(projectId, pageId)).rejects.toMatchObject({
         code: "NOT_FOUND",
       });
-    // A reader that knew the page's version is told the same.
     await expect(
       invoke("pages:get", {
         projectId: project.id,

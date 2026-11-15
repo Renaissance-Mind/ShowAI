@@ -15,9 +15,6 @@ inline Bounds curve_bounds(const Curve&c){Bounds b;bool first=true;for(const aut
 inline Bounds unite(Bounds a,Bounds b){return{a.x0<b.x0?a.x0:b.x0,a.y0<b.y0?a.y0:b.y0,a.x1>b.x1?a.x1:b.x1,a.y1>b.y1?a.y1:b.y1};}
 inline bool overlap(Bounds a,Bounds b){return a.x0<=b.x1&&b.x0<=a.x1&&a.y0<=b.y1&&b.y0<=a.y1;}
 inline bool contains(Bounds b,double x,double y){return b.x0<=x&&x<=b.x1&&b.y0<=y&&y<=b.y1;}
-// Missing entries are exact zero. Copies share arena storage until an actual
-// write; the logical-path dimension is governed by the caller's whole budget,
-// not a fixed Board clip-depth assumption.
 struct Weight{
     Vector<int32_t,1>values;
     Weight()=default;explicit Weight(Context&c):values(c){}
@@ -161,9 +158,6 @@ inline Weight winding(Graph&g,const Point&q,bool boundary_error=false){
     double xlo=lower(q.x),xhi=upper(q.x),ylo=lower(q.y),yhi=upper(q.y);
     while(!pending.empty()&&g.good()){
         auto record=pending.back();pending.pop_back();const auto&node=*record.get();++g.metrics.bvh_visits;if(!g.step())return result;
-        // A complete actually captured closed chain has winding zero outside
-        // its control box. This does not assume individual open curves have
-        // zero winding and does not prune a caller-asserted "closed" flag.
         auto outside=[&](Bounds b){return b.x1<xlo||b.x0>xhi||b.y1<ylo||b.y0>yhi;};
         if(outside(node.all))continue;if(node.left.valid())pending.push_back(node.left);if(node.right.valid())pending.push_back(node.right);
         if(outside(node.own))continue;const auto&block=static_cast<const Graph&>(g).blocks[node.block];if(!block.closed){g.context()->fail(SA_INK_RANGE);return result;}
@@ -178,9 +172,6 @@ inline Weight winding(Graph&g,const Point&q,bool boundary_error=false){
 }
 
 
-/* A separating normal segment is accepted only after exact original-curve
- * intersection tests. Refinement is a bounded proof search, never a sampled
- * substitute for checking the two sides of a Boolean boundary. */
 inline bool neighborhood(Graph&g,const Point&center,const Point&T,const Point&N,const Q&distance){
     Point A=center-N*distance,B=center+N*distance;
     Q xmin=A.x<B.x?A.x:B.x,xmax=A.x>B.x?A.x:B.x,ymin=A.y<B.y?A.y:B.y,ymax=A.y>B.y?A.y:B.y;

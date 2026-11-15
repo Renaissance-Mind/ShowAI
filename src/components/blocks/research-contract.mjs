@@ -34,7 +34,6 @@ export function safeResourceUrl(kind, value) {
     const url = new URL(value);
     if (["http:", "https:"].includes(url.protocol)) return url.href;
   } catch {
-    /* URL parsing is an input boundary. */
   }
 }
 export function fileMime(kind, file) {

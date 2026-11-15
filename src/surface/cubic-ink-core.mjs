@@ -10,8 +10,6 @@ export const CUBIC_INK_CHUNK_SEGMENTS = 128;
 export const CUBIC_INK_MAX_COMMANDS = 1_000_000;
 export const CUBIC_INK_MAX_CHUNK_COMMANDS = 100_000;
 export const CUBIC_INK_MAX_LEAVES = 100_000;
-// Logical retained-cost charge, not a promise about an engine's process RSS.
-// Entries contain detached derived values and never retain the source ink.
 const MAX_CACHE_BYTES = 32 * 1024 * 1024,
   MAX_CACHE_ENTRIES = 128;
 const immutable = new WeakSet(),
@@ -148,8 +146,6 @@ export function cubicInkGeometry(
       [...sumFields, ...maxFields].map((field) => [field, 0]),
     );
   const plan = [];
-  // Admit the whole source before retaining any derived command arrays. The
-  // fixed block limits are real consumer limits, never reset whole budgets.
   for (
     let start = 0;
     start < ink.segments.length;
@@ -217,8 +213,6 @@ export function cubicInkGeometry(
   }
   return result;
 }
-/** The partition is derived only: all source segments/pressure knots remain
- * unchanged. All chunks must be unioned in ONE nonzero-opacity composite. */
 export function cubicInkChunks(
   ink,
   width = ink.width,
@@ -283,9 +277,6 @@ export function cubicInkHitFromGeometry(ink, geometry, point) {
     area: ink.extent[0] * ink.extent[1],
   };
 }
-/** Export the finished actual shared input as one editable center/radius
- * authority. Browser and native author adapters use this format; archived v1
- * strokes retain their original interpretation and are never converted here. */
 export function cubicInkFromInput(
   input,
   {

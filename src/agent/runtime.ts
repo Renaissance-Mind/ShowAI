@@ -11,7 +11,6 @@ import { GUIDE_TOPICS } from "./guides";
 import { TEMPLATE_WORKFLOW_CAPABILITIES } from "../portable/template-bundle.mjs";
 import { supportInfo } from "./support";
 
-/** Tool names and parameters the installed plugin skills describe. */
 export const TOOL_SURFACE_PROTOCOL = "showai-mcp-tools-v2";
 
 export interface RuntimeLaunch {
@@ -19,7 +18,6 @@ export interface RuntimeLaunch {
   args: string[];
   env: Record<string, string>;
 }
-/** Which kind of build registered itself; a packaged App replaces a development build of the same version. */
 export type RuntimeChannel = "packaged" | "development";
 export interface RuntimeRegistration {
   format: "showai-agent-runtime";
@@ -40,7 +38,6 @@ function validLaunch(launch: RuntimeLaunch) {
     throw new Error("A runtime launch needs a command and CLI arguments.");
 }
 
-/** Explicit registration: `runtime register` and 修复登记 always replace the file. */
 export function registerRuntime(
   home: string,
   launch: RuntimeLaunch,
@@ -54,10 +51,6 @@ export function registerRuntime(
   );
 }
 
-/**
- * Writes a registration at any path. A plugin bound to one runtime passes this path as
- * SHOWAI_RUNTIME_CONFIG, so another App registering in the library cannot rebind it.
- */
 export async function writeRuntimeRecord(
   path: string,
   home: string,
@@ -82,7 +75,6 @@ export async function writeRuntimeRecord(
   return { path, version, home: resolve(home), launch };
 }
 
-/** Numeric x.y.z comparison; pre-release and build suffixes are ignored. */
 export function compareVersions(left: string, right: string) {
   const parts = (value: string) =>
     value
@@ -108,16 +100,13 @@ const reachable = (path: string) =>
   );
 
 export type RegistrationState =
-  /** This App's launch is registered. */
   | "current"
-  /** Another App or build is registered. */
   | "other"
   | "missing"
   | "invalid";
 export interface RuntimeRegistrationStatus {
   path: string;
   state: RegistrationState;
-  /** How another registration compares with this App. */
   reason?: "newer" | "same-version" | "older" | "unreachable" | "other-library";
   registered?: {
     version: string;
@@ -131,7 +120,6 @@ export interface RuntimeRegistrationStatus {
   current: { version: string; entry: string };
 }
 
-/** Reads agent-runtime.json and compares it with this App's launch. */
 export async function runtimeRegistrationStatus(
   home: string,
   launch: RuntimeLaunch,
@@ -150,7 +138,6 @@ export async function runtimeRegistrationStatus(
   try {
     value = JSON.parse(text);
   } catch {
-    // A damaged registration is a state the person repairs, not a startup failure.
     return { path, state: "invalid", current };
   }
   if (
@@ -194,11 +181,6 @@ export async function runtimeRegistrationStatus(
   return { path, state: "other", reason, registered, current };
 }
 
-/**
- * Startup registration. Replaces only a missing, invalid, unreachable or older
- * registration, or this App's own; another valid App or build is kept, so the last
- * started instance does not silently take over the library's plugin connection.
- */
 export async function registerRuntimeOnStartup(
   home: string,
   launch: RuntimeLaunch,

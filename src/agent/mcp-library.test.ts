@@ -236,7 +236,6 @@ test("catalog discovery returns all compact entries, with optional pagination be
           "reuse",
           "documentationStatus",
           "version",
-          // Only components that do not fit a conversation as-is are flagged.
           ...(item.conversation ? ["conversation"] : []),
         ].sort(),
       );
@@ -257,7 +256,6 @@ test("catalog discovery returns all compact entries, with optional pagination be
     expect(filtered.items.length).toBeLessThan(all.items.length);
     expect(filtered.total).toBe(filtered.items.length);
     expect(filtered.nextCursor).toBeNull();
-    // Several terms match any of them, best-matching entries first.
     const terms = await call(client, name, {
       ...args,
       query: "流程 架构 不存在的词",
@@ -555,7 +553,6 @@ test("presentation templates apply as independent native Pages, persist edits an
         (node) => node.attrs?.id && secondIds.has(node.attrs.id),
       ),
     ).toEqual([]);
-    // Method templates apply as empty Pages; the instance supplies its content.
     expect(
       firstNodes.filter(
         (node) => node.type === "paragraph" && node.content?.length,
@@ -644,7 +641,6 @@ test("pages are authored through shallow blocks and component.insert", async () 
   const c = await connect(createLibraryMcpServer({ root }));
   const p = await call(c, "project_create", { name: "Shallow authoring" }),
     projectId = p.id;
-  // The same content a model once sent as a seven-level nested document.
   const page = await call(c, "page_create", {
     projectId,
     title: "北京天气 · 出行速览",
@@ -688,7 +684,6 @@ test("pages are authored through shallow blocks and component.insert", async () 
     for (const child of node.content ?? []) visit(child);
   };
   visit(created.content);
-  // No layout or view entry outlives the starter text the blocks replaced.
   for (const id of Object.keys(created.layout)) expect(ids.has(id)).toBe(true);
   for (const [id, views] of Object.entries<any>(created.surfaceViews)) {
     expect(ids.has(id)).toBe(true);

@@ -22,17 +22,12 @@ import "./auto-hide-sidebar.css";
 import { mobileNavigationLayout, sidebarSwipe } from "./mobile-navigation.mjs";
 import "./mobile-navigation.css";
 
-/** Toggles the sidebar as the ⌘\ shortcut does. */
 export const SIDEBAR_TOGGLE_EVENT = "showai:toggle-sidebar";
 const minimumWidth = 200;
 const maximumWidth = 480;
 const widthPreference = "showai:sidebar-width";
 const lockedPreference = "showai:sidebar-locked";
 
-/**
- * The sidebar stays pinned unless the person unpins it; an unpinned sidebar
- * hides while a page is open and edge reveals float over the document.
- */
 export default function AutoHideSidebar({
   enabled,
   interactionHeld,
@@ -52,20 +47,17 @@ export default function AutoHideSidebar({
   children: ReactNode;
   navigation: ReactNode;
   history: ReactNode;
-  /** Enabled while a page is shown; reveals its row in the navigation. */
   canLocate: boolean;
   onLocate: () => void;
   topbar: ReactNode;
   switchingTab: boolean;
   mobileBoardKey?: string;
   onMobileBack?: () => void;
-  /** Keep settings forms usable in narrow browser/desktop windows. */
   compactOverlay?: boolean;
 }) {
   const t = useTranslator(sidebarMessages);
   const tn = useTranslator(navigationMessages);
   const toggleKeys = formatShortcut("Mod+\\", clientIsMac());
-  // Keeps an automatically hidden sidebar in view while the located row flashes.
   const [locating, setLocating] = useState(false);
   const appIcon = appIconForTheme(useAppearanceTheme());
   const nativeTouch = document.documentElement.dataset.native === "ios";
@@ -77,7 +69,6 @@ export default function AutoHideSidebar({
     "docked",
   );
   const [hovered, setHovered] = useState(false);
-  // Hiding reflows the document; never do it under an ongoing drag.
   const [pressed, setPressed] = useState(false);
   const pointer = useRef<{ x: number; y: number } | null>(null);
   const [keyboardFocus, setKeyboardFocus] = useState(false);
@@ -149,8 +140,6 @@ export default function AutoHideSidebar({
   };
   const leave = (event: { clientX: number; clientY: number }) => {
     pointer.current = { x: event.clientX, y: event.clientY };
-    // Hiding the edge trigger or moving the panel can cause a DOM leave event
-    // while the pointer is still inside the navigation's destination bounds.
     setHovered(pointerIsInside(pointer.current));
   };
 
@@ -205,7 +194,6 @@ export default function AutoHideSidebar({
       event.preventDefault();
       toggle();
     };
-    // Quick jump runs the same toggle as the shortcut.
     window.addEventListener("keydown", key);
     window.addEventListener(SIDEBAR_TOGGLE_EVENT, toggle);
     return () => {
@@ -277,7 +265,6 @@ export default function AutoHideSidebar({
       resizing
     )
       return;
-    // A short grace period bridges the edge, menus and quick pointer crossings.
     const timer = window.setTimeout(() => {
       if (pointer.current && pointerIsInside(pointer.current)) {
         setHovered(true);

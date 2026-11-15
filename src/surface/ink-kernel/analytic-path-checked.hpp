@@ -6,17 +6,6 @@
 
 namespace showai_boundary { class RawAnalyticCapture; }
 namespace showai_analytic_internal {
-/* Internal synchronous borrow, never an exported C capability or caller count.
- * The source span stays immutable/alive for the whole containing factory call;
- * there are no callbacks, awaits, escapes or cross-call cache. Options and the
- * actual validated counts are captured together. Emit cannot rebind any input.
- * Core holds its immutable raw Array through withUnsafeBufferPointer until the
- * complete C prepare returns. Concurrent mutation violates that existing input
- * span contract; this object does not authorize a mutable external snapshot. */
-// Apple partial ld -r localizes hidden private externs inside ShowAIInkKernel.
-// The real coverage target must resolve these C++ implementation symbols after
-// that step. This header is never in a public module map or the C API. WASM
-// still marks the class hidden and its linker exports only public C functions.
 #if defined(__wasm__)
 #define SHOWAI_ANALYTIC_PLAN_VISIBILITY "hidden"
 #else

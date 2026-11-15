@@ -61,7 +61,6 @@ describe("describeError", () => {
         (error: unknown) => error,
       );
       await chmod(directory, 0o700);
-      // Root can write anywhere; the errno mapping is still covered below.
       if (failure) {
         const wire = JSON.parse(JSON.stringify(errorResult(failure)));
         expect(wire).toMatchObject({ code: "ERROR", errno: "EACCES" });

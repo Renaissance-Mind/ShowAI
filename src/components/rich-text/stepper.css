@@ -1,5 +1,3 @@
-/* Stepper: ordered steps shown one at a time in the editor and the reader.
- * Neutral colors follow the content tokens so the container sits in any page. */
 .document-stepper {
   margin: 1em 0;
 }
@@ -127,7 +125,6 @@
   display: none;
 }
 
-/* Editor: inactive steps stay in the document but out of view. */
 .stepper-steps[data-active="0"]
   > [data-node-view-content-react]
   > section[data-step]:not(:nth-child(1)),
@@ -166,7 +163,6 @@
   > section[data-step]:not(:nth-child(12)) {
   display: none;
 }
-/* Reader: the open step carries data-active. */
 .portable-stepper > .stepper-step:not([data-active]) {
   display: none;
 }

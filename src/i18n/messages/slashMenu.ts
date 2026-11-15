@@ -1,6 +1,5 @@
 import { defineMessages } from "../index";
 
-// Insert (slash) menus in rich text and containers.
 export default defineMessages("slashMenu", {
   "zh-CN": {
     recent: "最近使用",

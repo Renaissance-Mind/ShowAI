@@ -1,4 +1,3 @@
-/** Preserve proportions; document thumbnails can fill the width of the card. */
 export function previewFit(
   viewportWidth: number,
   viewportHeight: number,
@@ -22,12 +21,6 @@ export function previewFit(
 export function previewZoom(value: number) {
   return Math.max(0.05, Math.min(3, value));
 }
-/**
- * Split a tall page into balanced columns (1 to `max`) when that lets the
- * preview show it larger: the count whose combined shape best matches the
- * viewport wins, so a long document fills a wide card instead of becoming a
- * thin strip, and a short one keeps a single column.
- */
 export function previewColumns(
   viewportWidth: number,
   viewportHeight: number,
@@ -47,7 +40,6 @@ export function previewColumns(
       height / columns,
       padding,
     );
-    // Another column must enlarge the page noticeably to be worth the split.
     if (scale > bestScale * 1.1) {
       best = columns;
       bestScale = scale;

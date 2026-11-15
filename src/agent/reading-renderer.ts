@@ -124,8 +124,6 @@ async function actionTarget(
     : owner.getByRole(action.role!, { name: action.name!, exact: true });
   const message = `Action target is missing or ambiguous: ${action.selector ?? `${action.role} ${action.name}`}. Read the HTML view and specify its blockId.`;
   let matches = await target.count();
-  // Controls often prefix their visible label (a step number, an icon name);
-  // a name that matches exactly one control by substring still identifies it.
   if (matches === 0 && !action.selector) {
     const partial = owner.getByRole(action.role!, { name: action.name! });
     if ((await partial.count()) === 1) {
@@ -134,8 +132,6 @@ async function actionTarget(
     }
   }
   if (matches === 0) {
-    // A preceding action can mount its next control asynchronously. count()
-    // is only a snapshot and must not reject that control before it appears.
     await target.waitFor({ state: "attached" }).catch((error) => {
       throw new Error(message, { cause: error });
     });
@@ -185,8 +181,6 @@ async function settleFramePaint(frame: Frame): Promise<void> {
   await frame.evaluate(
     () =>
       new Promise<void>((done) => {
-        // Chromium may suspend animation frames in offscreen iframes. Their
-        // DOM still needs to be read, so paint settling must remain bounded.
         let animation = 0;
         const finish = () => {
           clearTimeout(timer);
@@ -203,7 +197,6 @@ async function settleFramePaint(frame: Frame): Promise<void> {
 
 const PENDING_SELECTOR = '[data-preview-pending="true"]';
 const PENDING_TIMEOUT = 10000;
-/** Lazily loaded components render a Suspense placeholder until their code resolves. */
 async function settleComponents(page: Page): Promise<void> {
   const { errors } =
     require("playwright-core") as typeof import("playwright-core");
@@ -213,7 +206,6 @@ async function settleComponents(page: Page): Promise<void> {
       .waitForFunction(
         (selector) => !document.querySelector(selector),
         PENDING_SELECTOR,
-        // Offscreen frames may not receive animation frames; poll by time instead.
         { polling: 50, timeout: Math.max(1, deadline - Date.now()) },
       )
       .then(
@@ -243,10 +235,6 @@ async function settleComponents(page: Page): Promise<void> {
   }
 }
 
-/**
- * Document height plus what the page-level scroll shell still hides. Runs in
- * the page; scrollers smaller than half the viewport belong to components.
- */
 function contentHeight() {
   let hidden = 0;
   for (const element of document.querySelectorAll<HTMLElement>("body *")) {
@@ -257,7 +245,6 @@ function contentHeight() {
   return document.documentElement.scrollHeight + hidden;
 }
 
-/** `image: false` reads components and the DOM without a screenshot, so page height is unbounded. */
 export async function renderReading(
   htmlPath: string,
   options: ReadingOptions,
@@ -278,12 +265,8 @@ export async function renderReading(
       colorScheme: options.theme,
       reducedMotion: "reduce",
       acceptDownloads: false,
-      // Without it Chromium reports the runtime's locale to the reader and its components.
       ...(locale ? { locale } : {}),
     });
-    // Online images and media of the page load as they would for a reader;
-    // every other request (scripts, data, frames) stays blocked, and
-    // component code stays in its browser sandbox.
     const restrictedNetwork = remoteFetchRestricted();
     if (restrictedNetwork)
       await context.route(/^file:/, (route) =>
@@ -304,7 +287,6 @@ export async function renderReading(
         const media = await fetchPublicMedia(request.url());
         return route.fulfill({ status: 200, ...media });
       } catch {
-        // Network boundary: unavailable/forbidden media stays a failed resource in the capture.
         return route.abort();
       }
     });
@@ -343,8 +325,6 @@ export async function renderReading(
     for (const frame of page.frames()) {
       await frame.evaluate(async () => {
         await document.fonts.ready;
-        // An online image that cannot load, or not within 8 s, shows as
-        // broken in the capture.
         await Promise.all(
           Array.from(document.images).map((image) =>
             Promise.race([
@@ -358,9 +338,7 @@ export async function renderReading(
     }
     for (const action of options.actions) {
       await act(page, action);
-      // An action can reveal a component whose code has not loaded yet.
       await settleComponents(page);
-      // Dialogs and frame resizing triggered by an action must settle before the next control is targeted.
       for (const frame of page.frames()) await settleFramePaint(frame);
     }
     for (const frame of page.frames()) await settleFramePaint(frame);
@@ -427,7 +405,6 @@ export async function renderReading(
           });
       }
     }
-    // Measure at the requested viewport, before legacy full capture can enlarge it.
     const layout = options.inspect?.layout
       ? await page.evaluate(measureReadingLayout, {
           blockIds: options.inspect.blockIds,
@@ -450,9 +427,6 @@ export async function renderReading(
         capture: captureInfo(),
         ...(layout ? { layout } : {}),
       };
-    // The reader lays a Page out inside a 100dvh shell that scrolls on its
-    // own, so a full-page screenshot of the document alone stops at the
-    // viewport. Grow the viewport until that shell no longer scrolls.
     let height = await page.evaluate(contentHeight);
     for (
       let attempt = 0;

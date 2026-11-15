@@ -89,7 +89,7 @@ test("native regions wrap by their own width, keep order and do not render a tit
     const a = box(children[0]),
       b = box(children[1]),
       c = box(children[2]);
-    expect(a.x).toBeCloseTo(box(region).x, 0); // No container-only inset.
+    expect(a.x).toBeCloseTo(box(region).x, 0);
     if (columns === 2) {
       expect(b.x).toBeGreaterThan(a.x);
       expect(b.y).toBeCloseTo(a.y, 0);
@@ -98,7 +98,6 @@ test("native regions wrap by their own width, keep order and do not render a tit
       expect(b.y).toBeGreaterThan(a.y);
     }
     expect(c.y).toBeGreaterThan(a.y);
-    // Nested region is narrow even when the overall viewport is desktop-wide.
     expect(box(nestedChildren[1]).y).toBeGreaterThan(box(nestedChildren[0]).y);
     expect(result.dom!.map((d) => d.accessibility).join("\n")).not.toContain(
       'button "Internal-only group label',

@@ -1,9 +1,3 @@
-/**
- * Built-in components whose parameters a person can change by hand: a settings
- * form (BlockSettings) or direct editing on the canvas. Every other component,
- * including custom components, is changed through an agent; their raw JSON stays
- * an advanced option.
- */
 const SETTINGS_FORM = new Set([
   "chart",
   "database",

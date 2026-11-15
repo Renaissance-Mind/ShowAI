@@ -4,7 +4,6 @@ export interface NativeCameraIntent {scope:string|null;baseNativeRevision:number
 export interface NativeCameraState {scope:string|null;nativeRevision:number;webRevision:number;nextIntentRevision:number;intent?:Readonly<NativeCameraIntent>}
 const revision=(value:number)=>Number.isSafeInteger(value)&&value>=0;
 export function initialNativeCameraState():NativeCameraState{return{scope:null,nativeRevision:0,webRevision:0,nextIntentRevision:0}}
-/** Capture at the actual viewport event. Sending/retrying never rebases it. */
 export function captureNativeCameraIntent(state:NativeCameraState,camera:Camera):NativeCameraState {
   if(![camera.x,camera.y,camera.scale].every(Number.isFinite)||camera.scale<.01||camera.scale>32)throw new TypeError("Invalid camera intent");
   if(!revision(state.nextIntentRevision)||state.nextIntentRevision>=Number.MAX_SAFE_INTEGER)throw new RangeError("Camera intent revision exhausted");

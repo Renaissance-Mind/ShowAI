@@ -215,8 +215,6 @@ class Stroke {
       fitEvaluations += snapshot.fitEvaluations;
     };
     for (const batch of batches) {
-      // Preserve actual DOM/coalesced batch boundaries. Backpressure can combine
-      // messages, but never changes input-kernel call order or loses real knots.
       for (const point of batch.corrections ?? [])
         observe(this.input.correct(point));
       observe(this.input.push(batch.actual, batch.predicted));
@@ -302,8 +300,6 @@ class Stroke {
       };
     });
     const baseGeneration = this.generation;
-    // Commit only after the complete changed suffix has passed counts/build.
-    // Prefix admission is O(1), not a scan of every historical chunk each frame.
     this.chunks.length = firstChunk;
     this.prefixes.length = firstChunk + 1;
     for (const chunk of replacements) {
@@ -359,8 +355,6 @@ class Stroke {
       brush: o.tool === "highlighter" ? "marker" : "pen",
       capture: true,
     });
-    // This is one fixed pen-down source basis. A legal post-geometry affine
-    // locates the final frame; sealing never refits or rewrites the center/raw.
     source.transform = [1, 0, 0, 1, -box.x, -box.y];
     validateCubicInk(source);
     const commands: InkStrokeCommand[] = [],
@@ -429,8 +423,6 @@ class Stroke {
   }
 }
 
-/** One thread owns real input state and derived vectors. Nothing here touches
- * React, a camera callback, saved pages or a second geometry source format. */
 export class PortableCubicInputOwner {
   private strokes = new Map<string, Stroke>();
   private kernel = new CompiledInkStroke();

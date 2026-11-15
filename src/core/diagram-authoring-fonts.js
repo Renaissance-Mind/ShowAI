@@ -39,7 +39,6 @@ export async function offlineDiagramFonts(html, licenses = {}) {
         ),
       ),
     );
-  // The content stays local. Google receives font family names, never a text= query.
   const characters = new Set([...text].map((value) => value.codePointAt(0)));
   const assets = new Map();
   const faces = [];

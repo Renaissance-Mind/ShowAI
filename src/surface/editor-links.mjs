@@ -2,11 +2,6 @@ import { isSafeUrl } from "../portable/validation.mjs";
 import { validateCubicInk } from "./portable-ink-v2.mjs";
 import { richTextDocument } from "../document/rich-text.mjs";
 
-// These are closed payload envelopes in the canonical model, not arbitrary
-// widget data identified by a coincidental key. Their internals contain numeric
-// brush samples, binary archive provenance or hash-protected causal records;
-// they cannot contain editable link marks. This repair pass is not validation:
-// the normal complete save validator still rejects malformed payload values.
 const record = value => value && typeof value === "object" && !Array.isArray(value);
 const only = (value, keys) => record(value) && Object.keys(value).every(key => keys.has(key));
 const portableKeys = new Set(["format","brushVersion","brush","strokeCount","width","opacity","extent","samples","transform","mask","sourceDrawing","seed","createdAt"]);
@@ -23,7 +18,6 @@ const native = value => portable(value) || only(value,nativeKeys) && value.forma
   typeof value.drawing === "string" && typeof value.preview === "string" && (value.extent === undefined || extent(value.extent));
 function cubic(value) {
   if(value?.format !== "showai-ink-v2")return false;
-  // An input boundary: unknown or malformed fields retain the ordinary link walk.
   try { validateCubicInk(value); return true; } catch { return false; }
 }
 function opaqueField(context,key,value) {
@@ -51,7 +45,6 @@ function childContext(context,node,key) {
     return {kind:"imageData",node:context.node};
 }
 
-/** Repair editor link marks without dropping their text or relaxing saved-page validation. */
 export function repairEditorLinks(document, diagnostics) {
   const repairs = [];
   if(diagnostics) { diagnostics.visitedValues=0;diagnostics.opaqueFields=0; }

@@ -32,7 +32,6 @@ export interface Scene3dObject {
   label?: string;
   labelOffset?: Scene3dVector;
   position?: Scene3dVector;
-  /** Degrees. */
   rotation?: Scene3dVector;
   rotationOrder?: "XYZ" | "XZY" | "YXZ" | "YZX" | "ZXY" | "ZYX";
   scale?: number | Scene3dVector;

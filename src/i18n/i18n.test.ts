@@ -109,7 +109,6 @@ describe("built-in component package", () => {
   });
 });
 
-// Workbench UI sources whose user-visible strings live in the catalogs.
 const scanned = [
   "src/App.tsx",
   "src/CanvasApp.tsx",
@@ -126,9 +125,7 @@ const scanned = [
   "src/portable",
 ];
 
-// Whole files that may keep Chinese text, with the reason. Prefer a line
 // marker (`// i18n-exempt: reason` on the line or the line above) for single
-// strings such as saved defaults or agent-facing protocol text.
 const exemptFiles: Record<string, string> = {
   "src/portable/cdn-fragment.mjs":
     "standalone reader bootstrap selects bilingual text from the page language before i18n is loaded",
@@ -157,7 +154,6 @@ function sourceFiles(path: string): string[] {
   });
 }
 
-/** Lines that still contain Chinese outside comments and without an exemption marker. */
 function hardCodedLines(path: string): string[] {
   const source = readFileSync(join(root, path), "utf8");
   const lang = /\.tsx$/.test(path) ? "tsx" : /\.[cm]?ts$/.test(path) ? "ts" : "jsx";

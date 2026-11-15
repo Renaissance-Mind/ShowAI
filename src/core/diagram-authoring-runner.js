@@ -6,7 +6,6 @@ import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
 import { offlineDiagramFonts } from "./diagram-authoring-fonts.js";
 
-/** Windows installs Python as `python`; `python3` there is usually a Store alias. */
 export function defaultPython() {
   return (
     process.env.SHOWAI_DIAGRAM_PYTHON ??
@@ -141,8 +140,6 @@ export async function generateDiagram(options) {
       ],
       original,
       options.cwd ?? process.cwd(),
-      // The original script reads and writes UTF-8 with the locale's default
-      // encoding, which is a legacy code page on Windows.
       { ...process.env, PYTHONUTF8: "1" },
     );
   } else {
@@ -243,8 +240,6 @@ async function main() {
     }) + "\n",
   );
 }
-// Compare real paths: macOS temp and home folders are symlinked, and Windows
-// may name the same folder by its short 8.3 name.
 if (
   process.argv[1] &&
   (await realpath(resolve(process.argv[1]))) ===

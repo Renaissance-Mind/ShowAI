@@ -66,7 +66,6 @@ assertBytes(
 );
 const artifact = parseArtifact(await readFile(inputPath, "utf8"));
 assertOfflineImages(artifact.document);
-// A CDN fragment carries only the page, so it needs no bundled reader.
 const cdnTemplate = `<!doctype html><html lang="zh-CN"><head><title></title></head><body><script id="showai-data" type="application/json">null</script></body></html>`;
 const html = injectArtifactIntoHtml(
   readerUrl

@@ -26,7 +26,6 @@ describe("local media grants", () => {
     expect(localMediaPath(pathToFileURL(video).href)).toBe(video);
     expect(localMediaPath("file:~/clip.mp4")).toBe(join(homedir(), "clip.mp4"));
     expect(localMediaPath("~/clip.mp4")).toBe(join(homedir(), "clip.mp4"));
-    // Components encode each path segment, so spaces, CJK, # and ? survive.
     const segments = "~/RM 宣传/成片/a#1?.mp4".split("/").map(encodeURIComponent).join("/");
     expect(localMediaPath(`file:${segments}`)).toBe(join(homedir(), "RM 宣传/成片/a#1?.mp4"));
     for (const bad of ["clip.mp4", "file:clip.mp4", "", 3, "file:///a%ZZ"])
@@ -42,7 +41,6 @@ describe("local media grants", () => {
     await writeFile(notes, "# hi");
     const text = await grants.grant(notes);
     expect(text.kind).toBeUndefined();
-    // Files the player cannot show are only revealed, never served.
     expect((await localMediaResponse(text.token, null, false, grants)).status).toBe(404);
     await expect(grants.grant(join(root, "missing.mp4"))).rejects.toMatchObject({ code: "NOT_FOUND" });
     await mkdir(join(root, "folder.mp4"));
@@ -58,9 +56,7 @@ describe("local media grants", () => {
     expect(again.token).toBe(first.token);
     expect(again.expiresAt).toBe(now + 6 * 60 * 60 * 1000);
     now = 8 * 60 * 60 * 1000;
-    // Renewed at 5 h, so it still serves at 8 h.
     expect(grants.resolve(first.token)?.path).toBe(first.path);
-    // The player keeps minting its own grants.
     expect((await grants.grant(video)).token).not.toBe(first.token);
   });
 
@@ -75,7 +71,6 @@ describe("local media grants", () => {
       "Content-Type": "application/pdf",
       "Access-Control-Allow-Origin": "*",
     });
-    // Images and media load without CORS, so frames cannot read their pixels.
     const { token } = await grants.grant(video);
     const media = await localMediaResponse(token, null, true, grants);
     expect(media.headers["Access-Control-Allow-Origin"]).toBeUndefined();

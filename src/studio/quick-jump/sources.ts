@@ -21,7 +21,6 @@ import {
 import { parsePageLink } from "../../document/page-link.mjs";
 import type { QuickJumpItem, QuickJumpSource } from "./registry";
 
-/** An action the workbench already has, offered as a command. */
 export interface WorkbenchCommand {
   id: string;
   title: string;
@@ -31,20 +30,16 @@ export interface WorkbenchCommand {
   run: () => void | Promise<unknown>;
 }
 
-/** What the built-in sources read and do; the workbench supplies it. */
 export interface QuickJumpContext {
   projects: readonly ProjectSummary[];
   pages: Readonly<Record<string, { pages: readonly PageSummary[] } | undefined>>;
   commands: readonly WorkbenchCommand[];
-  /** The latest version of each catalog component, built-in and library. */
   components: readonly CatalogComponent[];
-  /** An editable page or board is open and can take a component. */
   canInsert: boolean;
   labels: Record<
     "pages" | "folders" | "projects" | "content" | "commands" | "components",
     string
   >;
-  /** Full-text matches from the library index. */
   searchContent: (query: string) => Promise<readonly SearchResult[]>;
   openPage: (target: {
     projectId: string;
@@ -55,7 +50,6 @@ export interface QuickJumpContext {
     projectId: string,
     folderId: string | null,
   ) => void | Promise<unknown>;
-  /** Inserts the component, with props computed from its compiled package. */
   insert: (
     component: CatalogComponent,
     props?: (component: Pick<CompiledComponent, "defaultData" | "examples">) => Record<string, unknown>,
@@ -64,11 +58,9 @@ export interface QuickJumpContext {
 
 interface Located {
   projectId: string;
-  /** Project name, then the folder chain. */
   path: string;
 }
 
-/** Folder paths are built once per project list; typing reuses them. */
 const directoryCache = new WeakMap<
   readonly ProjectSummary[],
   Map<string, { project: ProjectSummary; folders: Map<string, string> }>
@@ -213,7 +205,6 @@ export const projectsSource: QuickJumpSource<QuickJumpContext, DirectoryData> =
       context.openDirectory(item.data.projectId, item.data.folderId),
   };
 
-/** Page text matches from the library index, after every title match. */
 export const contentSource: QuickJumpSource<QuickJumpContext, PageData> = {
   id: "content",
   label: (context) => context.labels.content,
@@ -284,16 +275,9 @@ export const commandsSource: QuickJumpSource<
 
 type ComponentData = {
   component: CatalogComponent;
-  /** Absent for the insertion every component offers. */
   command?: ComponentCommand;
 };
 
-/**
- * Every catalog component placed as a block offers to insert itself, and every
- * component adds the commands its contract declares in contributes.commands
- * (insert commands only when it is placed as a block). Built-in and library
- * components take the same path.
- */
 export function componentCommandItems(
   components: readonly CatalogComponent[],
   canInsert: boolean,
@@ -369,7 +353,6 @@ export const componentsSource: QuickJumpSource<
   },
 };
 
-/** The built-in sources, in the order their groups appear when they tie. */
 export const builtinSources = [
   pagesSource,
   foldersSource,

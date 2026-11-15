@@ -59,7 +59,6 @@ function sampleServer() {
     { inputSchema: { value: z.string() } },
     async (input) => mcpSuccess(input),
   );
-  // Decorators replace parameters; strictness must survive.
   plain.update({ paramsSchema: { value: z.string(), extra: z.number() } });
   return { server, description: tool.description };
 }
@@ -84,7 +83,6 @@ test("action tools validate each call against exactly its action's fields", asyn
   expect((created.structuredContent as any).data).toEqual({
     created: { name: "A" },
   });
-  // The union accepts null for rename; create still rejects it.
   const renamed = await client.callTool({
     name: "sample",
     arguments: { action: "rename", id: "x", name: null },
@@ -97,7 +95,6 @@ test("action tools validate each call against exactly its action's fields", asyn
     arguments: { action: "create", name: null },
   });
   expect(nullName.isError).toBe(true);
-  // Structured: the action's own fields, not the advertised union.
   const nullError = (nullName.structuredContent as any).error;
   expect(nullError.code).toBe("INVALID_ARGUMENTS");
   expect(nullError.issues).toEqual([
@@ -208,7 +205,6 @@ test("library connections reject removed and cross-action arguments", async () =
     unexpected: ["name"],
     expected: { required: ["action", "parentId", "sortBy"] },
   });
-  // Removed capture knobs are ignored and reported, not silently dropped.
   const knob = await client.callTool({
     name: "board_read",
     arguments: { projectId: project.id, pageId: "p", maxImages: 1 },
@@ -219,9 +215,6 @@ test("library connections reject removed and cross-action arguments", async () =
   ]);
 });
 
-// codex-rs/core/src/mcp_tool_exposure.rs: plugin MCP tools share 64,000 bytes
-// of model specs, each tool's spec repeating the server instructions. Codex
-// keeps only these schema keywords (codex-rs/tools/src/json_schema/types.rs).
 const CODEX_KEYWORDS = new Set([
   "$ref",
   "type",
@@ -284,8 +277,6 @@ test("the local library tool list stays well inside Codex's plugin tool budget",
     ),
   }));
   const total = bytes.reduce((sum, item) => sum + item.bytes, 0);
-  // Other plugins share the 64,000 bytes (DrawAI alone uses ~7,400); keep
-  // about 20 KB free so another plugin does not silently hide ShowAI tools.
   expect(total, JSON.stringify(bytes)).toBeLessThan(44_000);
   for (const item of bytes) expect(item.bytes, item.name).toBeLessThan(4_000);
   for (const tool of tools)

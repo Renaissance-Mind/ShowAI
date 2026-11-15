@@ -21,8 +21,6 @@ async function* rows(path: string) {
   for await (const line of lines)
     yield JSON.parse(line) as Record<string, SqlValue>;
 }
-/** This report is bound to a verified frozen backup generation. It deliberately
- * performs no deletion and retains all history, reservations and upload tasks. */
 export async function planServerCleanup(input: {
   backup: string;
   destination: string;

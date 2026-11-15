@@ -9,8 +9,6 @@ import type { PortableInputContact } from "./portable-input-scope";
 import { fingerNavigatesBoard } from "./board-input.mjs";
 import { portableInkColor } from "./portable-ink.mjs";
 
-/** All vector fitting and changed-suffix preparation belongs to the actual
- * Worker. This view only retains the producer's immutable analytic chunks. */
 export function PortableCubicDrawingInput({
   pageId,
   boardId,

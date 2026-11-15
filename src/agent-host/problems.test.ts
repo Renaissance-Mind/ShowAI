@@ -26,7 +26,6 @@ afterAll(async () => {
   await rm(directory, { recursive: true, force: true });
 });
 
-/** A real Node program that writes stderr and exits with the given code. */
 async function failingAgent(stderr: string, code: number) {
   const path = join(directory, `agent-${code}-${Date.now()}.mjs`);
   await writeFile(

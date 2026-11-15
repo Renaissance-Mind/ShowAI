@@ -145,7 +145,6 @@ for (let attempt = 0; attempt < 20; attempt++) {
       break;
     }
   } catch {
-    /* Newly provisioned DNS or TLS is not ready yet. */
   }
   await new Promise((r) => setTimeout(r, 3000));
 }

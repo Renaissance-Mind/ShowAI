@@ -40,14 +40,11 @@ export default function ProjectSidebar({
   setCollapsed: Dispatch<SetStateAction<Record<string, boolean>>>;
   renderProject: (project: ProjectSummary) => ReactNode;
   onCreate: (groupId?: string) => void;
-  /** Opens the New menu: content for the current project, and a new project. */
   onNew: (anchor: HTMLButtonElement) => void;
   onMenu: (anchor: HTMLElement) => void;
   onManage?: () => void;
   onGroupMenu: (group: ProjectGroup, anchor: HTMLElement) => void;
-  /** Rows for project folders that could not be read. */
   unreadable?: ReactNode;
-  /** The built-in documentation, pinned under the New button. */
   docs?: ReactNode;
 }) {
   const t = useTranslator(sidebarMessages);

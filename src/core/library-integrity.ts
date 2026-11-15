@@ -1,7 +1,6 @@
 import { ContentLibrary } from "./content-library";
 import { CoreError, type IntegrityProblem } from "./model";
 
-/** What Settings shows after checking the library. */
 export type IntegrityResult =
   | { ok: true; checkedAt: string }
   | {
@@ -11,16 +10,10 @@ export type IntegrityResult =
       message: string;
     };
 
-/**
- * Maps a verification failure to a result. Damage the check recognises keeps
- * its kind; any other stored-content error is reported as unknown. Failures
- * that are not about stored content (a missing library, permissions) throw.
- */
 export function integrityResult(
   error: unknown,
   checkedAt = new Date().toISOString(),
 ): IntegrityResult {
-  // SQLite reports a damaged file itself: SQLITE_CORRUPT (11) or SQLITE_NOTADB (26).
   const sqlite = (error as { errcode?: unknown } | null)?.errcode;
   if (typeof sqlite === "number" && [11, 26].includes(sqlite & 0xff))
     return {
@@ -46,7 +39,6 @@ export function integrityResult(
   };
 }
 
-/** Runs what `showai library verify` runs and reports the outcome. */
 export async function checkLibraryIntegrity(
   root: string,
 ): Promise<IntegrityResult> {

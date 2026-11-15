@@ -5,7 +5,6 @@ export interface MarqueeBounds {
   bottom: number;
 }
 
-/** All coordinates are in scroll-content space, including offscreen entries. */
 export function marqueeIds(
   entries: (MarqueeBounds & { id: string })[],
   bounds: MarqueeBounds,

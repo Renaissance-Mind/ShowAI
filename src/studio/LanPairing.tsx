@@ -27,7 +27,6 @@ type Pair = {
   state: string;
   code: string;
   expiresAt: number;
-  /** Set by the Mac when a request ends: "declined" or "cancelled". */
   reason?: string;
 };
 const pairingErrors: Record<string, Parameters<typeof t>[0]> = {
@@ -36,12 +35,10 @@ const pairingErrors: Record<string, Parameters<typeof t>[0]> = {
   PAIRING_RATE_LIMITED: "error.rateLimited",
   UNAUTHORIZED: "error.pairAgain",
 };
-/** Pairing failures by code in the UI language; anything else keeps its text. */
 export function pairingErrorText(reason: unknown) {
   const key = pairingErrors[errorCode(reason) ?? ""];
   return key ? t(key) : errorMessage(reason);
 }
-/** Why a finished request ended, for its title and hint. */
 export function pairingEnd(pair: Pick<Pair, "state" | "reason">) {
   if (pair.state === "expired") return "expired" as const;
   if (pair.state === "rejected")
@@ -50,12 +47,10 @@ export function pairingEnd(pair: Pick<Pair, "state" | "reason">) {
       : ("declined" as const);
   return null;
 }
-/** m:ss until a request expires. */
 export function countdown(expiresAt: number, now: number) {
   const seconds = Math.max(0, Math.ceil((expiresAt - now) / 1000));
   return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
 }
-/** Re-renders every second while a request waits, for its countdown. */
 function useNow(active: boolean) {
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
@@ -292,7 +287,6 @@ export function NearbyMacs({
     </Dialog>
   );
 }
-/** One consent surface per Mac window. Remembered devices reconnect directly. */
 export function MacPairingPrompt() {
   const [requests, setRequests] = useState<Device[]>([]);
   const [error, setError] = useState("");
@@ -311,14 +305,12 @@ export function MacPairingPrompt() {
           const next = value.pendingClients.filter((p) =>
             p.id.startsWith("lan:"),
           );
-          // Polled continuously: an unchanged list keeps its identity and skips a commit.
           setRequests((current) =>
             JSON.stringify(current) === JSON.stringify(next) ? current : next,
           );
         })
         .catch((reason) => {
           if (stopped) return;
-          // Hosts without nearby pairing, such as the website workbench, answer UNAVAILABLE.
           if (errorCode(reason) === "UNAVAILABLE") {
             stopped = true;
             stop();

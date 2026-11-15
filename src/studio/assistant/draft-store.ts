@@ -8,7 +8,6 @@ export interface ComposerDraft {
   text: string;
   target: AssistantTarget | null;
   reference: CanvasReference | null;
-  /** Component states handed over on pageId, sent with the next message. */
   components: ComponentContextItem[];
   pageId: string | null;
   updatedAt: number;
@@ -31,7 +30,6 @@ export interface DraftStorage {
 }
 
 export const draftStorageKey = "showai:assistant-drafts:v1";
-/** Floating requests leave one draft per target; the oldest beyond this are dropped. */
 export const draftLimit = 100;
 
 function hash(text: string) {
@@ -41,7 +39,6 @@ function hash(text: string) {
   return (value >>> 0).toString(36);
 }
 
-/** The floating request box keeps one draft per project, page and target. */
 export function composerDraftKey(
   projectId: string | null,
   pageId: string | null,
@@ -53,10 +50,6 @@ export function composerDraftKey(
   return `${projectId ?? ""}/composer/${pageId ?? ""}/${target.kind}/${blocks}/${text}/${prompt}`;
 }
 
-/**
- * One store for every Agent input in the window, so the side panel and the
- * floating request box read and write the same drafts and storage entry.
- */
 export function createDraftStore(
   storage: () => DraftStorage,
   { limit = draftLimit, delay = 150 } = {},
@@ -85,7 +78,6 @@ export function createDraftStore(
     snapshot = next;
     for (const listener of listeners) listener();
   };
-  /** Writes the drafts; returns why that failed, or undefined when written. */
   const persist = () => {
     clearTimeout(timer);
     timer = undefined;
@@ -138,7 +130,6 @@ export function createDraftStore(
         [key]: { ...(before[key] ?? emptyDraft), ...patch, updatedAt: Date.now() },
       }));
     },
-    /** With sentText or sentAt, clears only while the draft is still what was sent. */
     clear(key: string, sentText?: string, sentAt?: number) {
       change((before) => {
         if (!(key in before)) return before;

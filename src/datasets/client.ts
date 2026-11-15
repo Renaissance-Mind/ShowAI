@@ -1,10 +1,3 @@
-// Renderer side of shared datasets: one session per dataset per window, shared
-// by every bound block in that window. Edits apply locally at once, are kept
-// as a draft on disk and saved as id-addressed operations; other windows'
-// and Agents' writes arrive through file change events and are merged in.
-// A field changed differently elsewhere is held with both values until the
-// person chooses; it is never overwritten.
-
 import {
   applyOperations,
   cloneValue,
@@ -41,7 +34,6 @@ interface DatasetFile {
     blockId?: string;
   };
   source?: { kind: "file" | "url"; format: string; name?: string; url?: string };
-  /** Computed by a script from other datasets (read-only). */
   transform?: { inputs: Record<string, unknown>; script: string };
   updatedAt: string;
 }
@@ -60,12 +52,10 @@ interface DatasetRecord {
   status?: Exclude<DatasetReadStatus, "empty">;
   editable?: Editable;
   warnings?: DatasetWarning[];
-  /** A transform dataset: its inputs as read. */
   transform?: {
     inputs: Record<string, { datasetId: string; name?: string }>;
   };
 }
-/** Where the value of an external dataset comes from, as last read. */
 export interface DatasetSourceState {
   kind?: "file" | "url";
   format: string;
@@ -74,7 +64,6 @@ export interface DatasetSourceState {
   url?: string;
   bytes?: number;
   modifiedAt?: string;
-  /** False while the source cannot be read on this device (the value may be stale). */
   available: boolean;
 }
 export interface HeldConflict extends DatasetConflict {
@@ -94,7 +83,6 @@ export interface DatasetSnapshot {
   name?: string;
   description?: string;
   origin?: DatasetFile["origin"];
-  /** What bound blocks render: the saved value plus this window's pending edits. */
   value?: unknown;
   hash?: string;
   readOnly: boolean;
@@ -104,20 +92,11 @@ export interface DatasetSnapshot {
   recovered: RecoveredDraft[];
   error?: string;
   errorCode?: string;
-  /** Present for a dataset whose value lives in a file outside the library. */
   source?: DatasetSourceState;
-  /** Names of the inputs of a dataset computed by a script. */
   transform?: { inputs: string[] };
-  /** Why the shown value is stale, or why there is none (see datasets/warnings). */
   warnings: DatasetWarning[];
-  /**
-   * How current the value is: ok, stale (the last value read on this
-   * device), or empty (no value: see warnings). Absent while loading.
-   */
   dataStatus?: DatasetReadStatus;
-  /** Whether the dataset accepts writes (false for a read-only project). */
   editable: Editable;
-  /** Names of other datasets that warnings refer to (transform inputs), by id. */
   names: Record<string, string>;
   canUndo: boolean;
   canRedo: boolean;
@@ -133,7 +112,6 @@ function errorCode(error: unknown): string | undefined {
     ? String(error.code)
     : undefined;
 }
-/** Why a SOURCE_UNAVAILABLE error left the dataset without a value. */
 function unavailableWarnings(error: unknown): DatasetWarning[] {
   if (errorCode(error) !== "SOURCE_UNAVAILABLE") return [];
   return (
@@ -141,7 +119,6 @@ function unavailableWarnings(error: unknown): DatasetWarning[] {
       ?.warnings ?? []
   );
 }
-/** The state a failed read leaves: missing, empty (source unavailable) or an error. */
 function failedRead(error: unknown): Partial<DatasetSnapshot> {
   const code = errorCode(error);
   if (code === "NOT_FOUND")
@@ -160,7 +137,6 @@ function failedRead(error: unknown): Partial<DatasetSnapshot> {
       : {}),
   };
 }
-/** The external source a SOURCE_UNAVAILABLE error names. */
 function unavailableSource(error: unknown): DatasetSourceState | undefined {
   if (errorCode(error) !== "SOURCE_UNAVAILABLE") return undefined;
   const source = (
@@ -191,7 +167,6 @@ export class DatasetSession {
   private past: HistoryEntry[] = [];
   private future: HistoryEntry[] = [];
   private draftWritten = false;
-  /** Whether the dataset itself accepts writes, apart from the project's role. */
   private sourceEditable: Editable = true;
   private retryDelay = 0;
   references = 0;
@@ -239,7 +214,6 @@ export class DatasetSession {
     for (const listener of this.listeners) listener();
   }
 
-  /** Reads the dataset; `refresh` reads online data now instead of within its interval. */
   load(options: { refresh?: boolean } = {}): Promise<void> {
     this.loading ??= this.loadNow(options).finally(
       () => (this.loading = undefined),
@@ -270,7 +244,6 @@ export class DatasetSession {
     this.base = { hash: record.hash, value: record.dataset.value };
     this.local = cloneValue(record.dataset.value);
     this.adopt(record);
-    // Unsaved writes of this window survive a reload; other windows' are offered.
     const drafts = await this.client.transport
       .invoke<(RecoveredDraft & { clientId: string })[]>("datasets:draftList", {
         projectId: this.projectId,
@@ -301,7 +274,6 @@ export class DatasetSession {
       name: record.dataset.name,
       description: record.dataset.description,
       origin: record.dataset.origin,
-      // Online data, spreadsheets and stale values cannot be edited.
       readOnly: !!record.readOnly || record.editable === false,
       editable: record.readOnly ? false : (record.editable ?? true),
       dataStatus: record.status ?? "ok",
@@ -372,10 +344,6 @@ export class DatasetSession {
     }
   }
 
-  /**
-   * Applies a block's change. Writes whose starting value no longer matches
-   * this window's current value are held as conflicts. Returns them.
-   */
   edit(
     operations: DatasetOperation[],
     options: { history?: boolean } = {},
@@ -402,7 +370,6 @@ export class DatasetSession {
         at: Date.now(),
       };
       const last = this.past.at(-1);
-      // Typing in one field forms one undo step that returns to before the first keystroke.
       if (last && last.keys === entry.keys && entry.at - last.at < 800) {
         const start = applyOperations(before, last.undo, {
           atomic: false,
@@ -439,7 +406,6 @@ export class DatasetSession {
     return true;
   }
 
-  /** Keeps this window's value ("mine") or the other one ("theirs") for a held field. */
   resolve(id: string, choice: "mine" | "theirs") {
     const conflict = this.held.find((item) => item.id === id);
     if (!conflict) return;
@@ -475,7 +441,6 @@ export class DatasetSession {
     this.scheduleDraft();
   }
 
-  /** Applies or discards the unsaved writes another window left behind. */
   async recover(clientId: string, choice: "restore" | "discard") {
     const draft = this.snapshot.recovered.find(
       (item) => item.clientId === clientId,
@@ -504,7 +469,6 @@ export class DatasetSession {
   }
 
   private draftWrites: Promise<void> = Promise.resolve();
-  /** Draft writes run one at a time, each from the state at that moment. */
   private persistDraft() {
     const write = () => this.persistDraftNow();
     this.draftWrites = this.draftWrites.then(write, write);
@@ -538,7 +502,6 @@ export class DatasetSession {
   private scheduleSave(delay = 500) {
     if (!this.firstPending) this.firstPending = Date.now();
     clearTimeout(this.saveTimer);
-    // A continuous edit still saves within two seconds of its first change.
     const wait = Math.max(
       0,
       Math.min(delay, this.firstPending + 2000 - Date.now()),
@@ -546,7 +509,6 @@ export class DatasetSession {
     this.saveTimer = setTimeout(() => void this.flush(), wait);
   }
 
-  /** Saves pending writes; resolves true when nothing remains unsaved. */
   async flush(): Promise<boolean> {
     clearTimeout(this.saveTimer);
     if (this.saving) await this.saving;
@@ -561,7 +523,6 @@ export class DatasetSession {
   }
 
   private async saveNow() {
-    // A conflict response merges the rest at once; a few rounds cover concurrent writers.
     for (let round = 0; round < 4 && this.base; round++) {
       const operations = diffValues(this.base.value, this.local);
       if (!operations.length) break;
@@ -587,7 +548,6 @@ export class DatasetSession {
           error: errorText(error),
           ...(code === "NOT_FOUND" ? { status: "missing" as const } : {}),
         });
-        // Writes stay in the draft; transient failures retry, invalid data waits for an edit.
         if (code !== "INVALID_DATA" && code !== "NOT_FOUND") {
           this.retryDelay = Math.min(30000, (this.retryDelay || 1000) * 2);
           this.saveTimer = setTimeout(() => void this.flush(), this.retryDelay);
@@ -597,7 +557,6 @@ export class DatasetSession {
       }
       this.retryDelay = 0;
       if (result.conflicts.length) {
-        // Someone else changed the same fields; hold both and merge the rest.
         this.rebase(result.record);
       } else {
         const later = diffValues(sentLocal, this.local);
@@ -631,11 +590,6 @@ export class DatasetSession {
     this.adopt(record);
   }
 
-  /**
-   * Reads the saved dataset again after a change elsewhere and merges pending
-   * writes. `retry` reads the source now (online data too) and always
-   * returns its current state, as the 重试 action of a warning.
-   */
   async refresh(options: { retry?: boolean } = {}): Promise<void> {
     if (this.loading) return this.loading;
     if (!this.base) return this.load({ refresh: options.retry });
@@ -649,7 +603,6 @@ export class DatasetSession {
         projectId: this.projectId,
         datasetId: this.datasetId,
         ...(options.retry ? { refresh: true } : {}),
-        // After a source error the same content still needs its new source details.
         ...(options.retry ||
         this.snapshot.errorCode === "SOURCE_UNAVAILABLE" ||
         this.snapshot.source?.available === false
@@ -657,7 +610,6 @@ export class DatasetSession {
           : { ifHash: this.base.hash }),
       });
       if ("unchanged" in result) {
-        // The project may have become read-only (or writable); the source has not changed.
         const readOnly = !!result.readOnly || this.sourceEditable === false;
         if (readOnly !== this.snapshot.readOnly)
           this.publish({
@@ -672,7 +624,6 @@ export class DatasetSession {
       await this.persistDraft();
     } catch (error) {
       const code = errorCode(error);
-      // The source went away without a value to keep: show why instead.
       this.publish(
         code === "NOT_FOUND" || code === "SOURCE_UNAVAILABLE"
           ? failedRead(error)
@@ -683,7 +634,6 @@ export class DatasetSession {
     }
   }
 
-  /** The value at a path, for presenting a held conflict. */
   valueAt(path: DataPath) {
     return valueAt(this.local, path);
   }
@@ -706,12 +656,10 @@ export class DatasetSession {
     return this.snapshot.dirty || this.held.length > 0;
   }
 
-  /** Before a window closes: save what can be saved; anything else stays in the draft. */
   async prepareClose(): Promise<boolean> {
     return !(await this.closeProblem());
   }
 
-  /** Like prepareClose, but says why unsaved writes could not be kept. */
   async closeProblem(): Promise<DatasetCloseProblem | undefined> {
     let saveError: unknown;
     await this.flush().catch((error) => {
@@ -738,16 +686,12 @@ export class DatasetSession {
   }
 }
 
-/** Shared data whose unsaved writes are neither saved nor kept in a draft. */
 export interface DatasetCloseProblem {
   projectId: string;
   datasetId: string;
   name?: string;
-  /** Why the local draft could not be written. */
   draftError: string;
-  /** Why the formal save failed, when it did. */
   saveError?: string;
-  /** Held conflicts that are waiting for the person's choice. */
   conflicts: number;
 }
 
@@ -773,7 +717,6 @@ export class DatasetClient {
     session.references++;
     return () => {
       session.references--;
-      // Unused clean sessions are dropped; one with unsaved writes stays until saved.
       setTimeout(() => {
         if (session.references > 0) return;
         void session.flush().then((clean) => {
@@ -784,7 +727,6 @@ export class DatasetClient {
     };
   }
 
-  /** File change events from this or another window, the CLI, MCP or sync. */
   invalidate(change: {
     type: string;
     all?: boolean;
@@ -803,7 +745,6 @@ export class DatasetClient {
     }
   }
 
-  /** Refreshes every open dataset, e.g. when the window regains focus. */
   refreshAll() {
     for (const session of this.sessions.values()) void session.refresh();
   }
@@ -819,7 +760,6 @@ export class DatasetClient {
     return !(await this.closeProblems()).length;
   }
 
-  /** Every open dataset whose unsaved writes would be lost by closing now. */
   async closeProblems(): Promise<DatasetCloseProblem[]> {
     const problems = await Promise.all(
       [...this.sessions.values()].map((session) => session.closeProblem()),

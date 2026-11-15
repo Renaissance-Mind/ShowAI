@@ -24,7 +24,6 @@ def certified_root(record):
     if lo == hi:
         assert abs(polynomial(coefficients, lo)) == 0
         return lo
-    # Actual square-free isolating certificates have a single simple root.
     left, right = polynomial(coefficients, lo), polynomial(coefficients, hi)
     assert left * right < 0, (lo, hi, left, right)
     for _ in range(700):
@@ -65,9 +64,6 @@ for fixture in fixtures:
             u = mp.mpf(index) / 1024
             t = a + (b-a)*u
             error = sum(abs(bezier(source[axis],t)-bezier(derived[axis],u)) for axis in range(2))
-            # Only numerical oracle evaluation has a rounding allowance, at
-            # precision200 far below any requested bound. No production bound
-            # or acceptance tolerance is enlarged by this diagnostic allowance.
             assert error <= bound + mp.mpf('1e-170'), (fixture['id'], edge['edge'], index, error, bound)
             if bound:
                 ratio = error/bound

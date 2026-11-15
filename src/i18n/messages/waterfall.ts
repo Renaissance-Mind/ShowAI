@@ -1,6 +1,5 @@
 import { defineMessages } from "../index";
 
-// Waterfall (bridge) built-in: how a starting value becomes an ending value.
 export default defineMessages("waterfall", {
   "zh-CN": {
     title: "瀑布桥图",

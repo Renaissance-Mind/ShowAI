@@ -1,6 +1,5 @@
 import { defineMessages } from "../index";
 
-// Content library storage, maintenance and upgrade.
 export default defineMessages("library", {
   "zh-CN": {
     "category.repository": "正式内容",
@@ -74,7 +73,6 @@ export default defineMessages("library", {
     "toast.cleaned": "清理完成，正式内容已保留。",
     "toast.archived": "完整备份已保存并验证：{path}",
 
-    // Library upgrade dialog
     "upgrade.title": "升级内容库",
     "upgrade.unsaved": "请先处理当前页面的未保存修改，本机草稿仍会保留。",
     "upgrade.intro":

@@ -1,7 +1,6 @@
 import { symlink } from "node:fs/promises";
 import type { TestContext } from "vitest";
 
-/** File symlinks require Developer Mode or a privilege on Windows. */
 export async function fileSymlink(
   context: TestContext,
   target: string,

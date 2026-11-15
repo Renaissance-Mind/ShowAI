@@ -20,8 +20,6 @@ test("without a CDN reader the conversation view is unavailable", () => {
 });
 
 test("a reader without a fragment means the page data is over the budget", () => {
-  // Embedded images can push the CDN fragment past the chat budget; the
-  // reader is still there, so the next step is a smaller selection.
   const handoff = conversationHandoff(
     undefined,
     undefined,

@@ -32,7 +32,6 @@ import {
 const revisionId = z.string().optional();
 const revisionVersion = z.string();
 
-/** The guide and the project's context, read first. */
 export const contextTools: ToolDeclaration[] = [
   {
     name: "guide",
@@ -89,7 +88,6 @@ export const contextTools: ToolDeclaration[] = [
   },
 ];
 
-/** Components, templates, revisions, publications and search. */
 export const catalogTools: ToolDeclaration[] = [
   {
     name: "catalog_list",
@@ -145,7 +143,6 @@ export const catalogTools: ToolDeclaration[] = [
     run: ({ service, projectId, call }, { id, out, overwrite, ...input }) =>
       call(async () => {
         if (input.kind === "importer") {
-          // A contributed importer: its importer.json and importer.js.
           const found = (
             await listContributedImporters(service.store.root, projectId)
           ).importers.find((item) => item.manifest.id === id);

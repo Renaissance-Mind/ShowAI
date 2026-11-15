@@ -3,11 +3,6 @@ import { prefersReducedMotion } from "./motion";
 
 export type PresenceState = "hidden" | "entering" | "shown" | "exiting";
 
-/**
- * Keeps an element mounted while it animates out. `show` and `hide` may be
- * called in any order: an exit ends only through `settle`, and showing again
- * before it settles cancels the pending unmount.
- */
 export class PresenceController {
   private generation = 0;
   state: PresenceState;
@@ -16,7 +11,6 @@ export class PresenceController {
     open: boolean,
     private report: (state: PresenceState) => void,
   ) {
-    // An element that is open from the start appears without an entrance.
     this.state = open ? "shown" : "hidden";
   }
 
@@ -32,7 +26,6 @@ export class PresenceController {
     this.set(animate ? "entering" : "shown");
   }
 
-  /** Marks the element shown once `done` resolves, unless it was hidden meanwhile. */
   entered(done: Promise<unknown>) {
     if (this.state !== "entering") return;
     const generation = this.generation;
@@ -48,7 +41,6 @@ export class PresenceController {
     this.set(animate ? "exiting" : "hidden");
   }
 
-  /** Unmounts once `done` resolves, unless the element was shown again meanwhile. */
   settle(done: Promise<unknown>) {
     if (this.state !== "exiting") return;
     const generation = this.generation;
@@ -59,7 +51,6 @@ export class PresenceController {
   }
 }
 
-/** Waits for every animation running on the element, ignoring cancelled ones. */
 export function animationsSettled(element: Element) {
   return Promise.all(
     element
@@ -68,13 +59,6 @@ export function animationsSettled(element: Element) {
   );
 }
 
-/**
- * `mounted` stays true until the exit animation of `ref` ends. The element
- * reads `state` (as a data attribute) to choose its entrance or exit
- * animation; while exiting it should be inert so it takes no clicks or focus.
- * Under reduced motion, or when `animate` is false, it mounts and unmounts
- * at once.
- */
 export function usePresence(
   open: boolean,
   ref: RefObject<Element | null>,
@@ -91,7 +75,6 @@ export function usePresence(
     else controller.current!.hide(motion && !!ref.current);
   }, [open, ref]);
   useLayoutEffect(() => {
-    // Runs after the new state rendered, so its CSS animation exists.
     const done = ref.current
       ? animationsSettled(ref.current)
       : Promise.resolve();

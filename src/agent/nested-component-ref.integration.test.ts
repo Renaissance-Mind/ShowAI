@@ -16,11 +16,6 @@ import { findNodes } from "../document/update.mjs";
 import { parseArtifact } from "../portable/validation.mjs";
 import type { ShowDocument } from "../core/model";
 
-/**
- * component.ref.set through MCP on a library component that sits in a
- * callout inside a text block: upgraded in place, read back, exported and
- * rendered offline with the new revision.
- */
 
 let root: string;
 let projectId: string;

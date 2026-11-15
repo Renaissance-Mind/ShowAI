@@ -25,7 +25,6 @@ export const localAgentNames: Record<string, string> = {
   opencode: "OpenCode",
 };
 
-/** What keeps the built-in Agent from running, decided from the host status. */
 export type AgentReadiness =
   | { kind: "checking" }
   | { kind: "ready" }
@@ -40,7 +39,6 @@ export type AgentStepKind = Exclude<AgentReadiness["kind"], "checking" | "ready"
 const loopback = ["127.0.0.1", "localhost", "[::1]"];
 
 export function agentReadiness(status: AgentHostStatus): AgentReadiness {
-  // Remote execution (iPad) is checked by the device that runs the turn.
   if (status.executionKind) return { kind: "ready" };
   const { settings } = status;
   if (settings.mode === "local") {
@@ -67,23 +65,19 @@ export function agentReadiness(status: AgentHostStatus): AgentReadiness {
   return { kind: "ready" };
 }
 
-/** What the Agent settings page should open with, set by a next-step action. */
 export type AgentSetupIntent = "chatgpt" | "apiKey";
 export const AGENT_SETUP_EVENT = "showai:agent-setup";
 let pendingSetup: AgentSetupIntent | null = null;
-/** Asks Agent settings to start connecting ChatGPT or adding an API key. */
 export function requestAgentSetup(intent: AgentSetupIntent) {
   pendingSetup = intent;
   window.dispatchEvent(new CustomEvent(AGENT_SETUP_EVENT, { detail: intent }));
 }
-/** Agent settings consumes the pending intent once, when it is ready to act. */
 export function takeAgentSetup(): AgentSetupIntent | null {
   const intent = pendingSetup;
   pendingSetup = null;
   return intent;
 }
 
-/** Whether Codex was found on this computer, so switching to it can work. */
 export function localCodexAvailable(status: AgentHostStatus | null) {
   return (
     !!status &&
@@ -92,23 +86,19 @@ export function localCodexAvailable(status: AgentHostStatus | null) {
   );
 }
 
-/** Handlers behind next-step buttons, shared by readiness and error notices. */
 export interface AgentSetupHandlers {
   checking: boolean;
   onOpenSettings: () => void;
   onRecheck: () => void;
-  /** Present when the local Codex can take over; switches execution to it. */
   onUseLocalCodex?: () => void;
 }
 
-/** Switches the built-in Agent to the local Codex and checks again. */
 export async function switchToLocalCodex(status: AgentHostStatus) {
   return desktop.invoke<AgentHostStatus>("agent:settings", {
     settings: { ...status.settings, mode: "local", localAgent: "codex" },
   });
 }
 
-/** Maps an MCP clientInfo name to the plugin host it belongs to. */
 export function connectionHost(client: string): PluginHost | null {
   const name = client.toLowerCase();
   if (name.includes("claude")) return "claude";
@@ -117,7 +107,6 @@ export function connectionHost(client: string): PluginHost | null {
   return null;
 }
 
-/** Built-in Agent status, scanning local agents once when none were detected yet. */
 export function useAgentStatus(
   active: boolean,
   projectId: string | null,
@@ -171,7 +160,6 @@ export function useAgentStatus(
   return { status, error, checking, recheck };
 }
 
-/** "Runs with Codex" / "Runs with DeepSeek · model", or empty while unknown. */
 export function useExecutionLabel(status: AgentHostStatus | null) {
   const t = useTranslator(assistantMessages);
   if (!status) return "";
@@ -219,7 +207,6 @@ export type AgentStepId =
   | "localCodex"
   | "settings"
   | "recheck";
-/** Next steps for a readiness kind, most useful first. */
 export function agentSteps(
   kind: AgentStepKind,
   options: { chatgpt?: boolean; localCodex?: boolean } = {},
@@ -244,7 +231,6 @@ export function agentSteps(
   }
 }
 
-/** Next-step actions for a setup problem: connect, add a key, docs, settings. */
 export function AgentNextSteps({
   kind,
   chatgpt = false,
@@ -321,15 +307,10 @@ export function AgentNextSteps({
   );
 }
 
-/** Leading CODE of an Agent error ("INVALID_DATA: …", "ENOSPC …"), if any. */
 export function agentErrorCode(message: string): string {
   return /^\s*([A-Z][A-Z0-9_]{2,})\b/.exec(message)?.[1] ?? "AGENT_ERROR";
 }
 
-/**
- * Next steps under an Agent error ShowAI does not recognize: the
- * troubleshooting page, and 报告问题 with the error prefilled.
- */
 export function AgentHelpSteps({ message }: { message: string }) {
   const t = useTranslator(feedbackMessages);
   const tr = useTranslator(messages);
@@ -363,7 +344,6 @@ export function AgentHelpSteps({ message }: { message: string }) {
   );
 }
 
-/** Current execution source and state, with a way to change it. */
 export function AgentStatusRow({
   status,
   error,
@@ -373,7 +353,6 @@ export function AgentStatusRow({
   status: AgentHostStatus | null;
   error: string;
   setup: AgentSetupHandlers;
-  /** Another notice in the panel already offers these steps. */
   hideSteps?: boolean;
 }) {
   const t = useTranslator(messages);

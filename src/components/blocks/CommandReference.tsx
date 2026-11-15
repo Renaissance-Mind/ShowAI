@@ -44,10 +44,8 @@ type Reference = {
 type Range = [number, number];
 
 const ALL = "\u0000all";
-/** Long groups show this many commands in the unfiltered overview. */
 const LIMIT = 6;
 
-/** text[from, to) with <mark> over the matched ranges. */
 function marked(
   text: string,
   ranges: Range[],
@@ -78,10 +76,6 @@ const highlighter = (terms: string[]) =>
       )
     : undefined;
 
-/**
- * Command line: the program prefix muted, leading sub-command words bold,
- * flags and placeholders styled; search matches are highlighted across tokens.
- */
 function CommandLine({
   text,
   terms,
@@ -112,7 +106,6 @@ function CommandLine({
       /^[A-Za-z_][\w.-]*$/.test(token) &&
       !/^[A-Z][A-Z0-9_]*$/.test(token)
     ) {
-      // A tool-style name (with _ or .) is the whole name; plain words may continue it ("pages read").
       kind = "verb";
       named = true;
       if (/[_.]/.test(token)) verbs = false;
@@ -143,7 +136,6 @@ function CommandLine({
   return <code className="cr-cmd">{out}</code>;
 }
 
-/** Paragraphs separated by blank lines; a paragraph whose lines all start with "- " becomes a list. */
 function DetailText({ source }: { source: string }) {
   return (
     <>
@@ -385,7 +377,6 @@ export function CommandReferenceBlock({ data }: BlockProps) {
                       command.params?.length ||
                       command.examples?.length,
                     );
-                    // Parameters that matched when the command line and summary did not.
                     const paramHits = terms.length
                       ? (command.params ?? []).filter((param) =>
                           terms.some(
@@ -402,7 +393,6 @@ export function CommandReferenceBlock({ data }: BlockProps) {
                       <li
                         key={command.key}
                         className={`cr-item${isOpen ? " is-open" : ""}`}
-                        // Capped commands stay in the document for print and static reading.
                         hidden={cut && index >= LIMIT}
                       >
                         <button

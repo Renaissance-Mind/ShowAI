@@ -1,6 +1,4 @@
 import { desktopTestEnvironment } from "../../scripts/desktop-test-env.mjs";
-// Build first, then run: node src/desktop/directory-selection-ui-smoke.mjs.
-// Real Electron, workbench actions and filesystem; every write uses an isolated library.
 import assert from "node:assert/strict";
 import { mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
@@ -120,7 +118,6 @@ try {
   await openFolder(source.id);
   await row(pages[3].id).waitFor();
 
-  // Opening remains a normal click until the user starts selecting.
   await row(pages[0].id).locator(".studio-page-list-open").click();
   await page.getByRole("textbox", { name: "页面标题", exact: true }).waitFor();
   await openFolder(source.id);
@@ -195,7 +192,6 @@ try {
     "Batch move to a nested folder persists selected pages and preserves unselected pages",
   );
 
-  // Open the nested folder by opening its parent first, so its sidebar row exists.
   await openFolder(folder.id);
   await openFolder(nested.id);
   await page.getByRole("button", { name: "视图", exact: true }).click();
@@ -258,7 +254,6 @@ try {
     "Cross-project batch move persists pages in the selected destination",
   );
 
-  // A concurrent real move exercises partial success and retry, with no mocked bridge.
   await check(pages[2].id).click();
   await check(pages[3].id).click();
   await bar.getByRole("button", { name: "移动", exact: true }).click();
@@ -320,7 +315,6 @@ try {
     "Delete confirmation, cancel preserving selection, persistent batch archive and unselected-page preservation",
   );
 
-  // Folders join batch selection; they move only inside their project and never into themselves.
   await openFolder(source.id);
   await page.getByRole("button", { name: "选择", exact: true }).click();
   await check(folder.id).click();

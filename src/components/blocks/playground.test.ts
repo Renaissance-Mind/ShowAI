@@ -15,7 +15,6 @@ import {
   validatePlaygroundData,
 } from "./playground-contract.mjs";
 
-// Until the 1.1.0 entry lands in the catalog, read it from the integration fragment.
 const FRAGMENT =
   "/Users/chunqiu/ShowAI-Development/development/builtin-candidates-20261018/fragments/playground.json";
 const entry: any = catalog.find((component) => component.kind === "playground");
@@ -164,7 +163,6 @@ describe("playground contract", () => {
   it("computes the trip budget the way the homepage demo did", () => {
     const data = example("京都五日预算");
     const scope = evaluatePlayground(data);
-    // 2 people, 4 nights, business hotel: one room × 15000 × 4 / 2 + food + transit + trips.
     expect(scope.rooms).toBe(1);
     expect(scope.lodging).toBe(30000);
     expect(scope.perPerson).toBe(30000 + 7000 * 5 + 1200 * 5 + 1600 + 5000);

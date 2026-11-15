@@ -1,6 +1,5 @@
 import { defineMessages } from "../index";
 
-// Find and replace inside the open page.
 export default defineMessages("find", {
   "zh-CN": {
     bar: "查找和替换",

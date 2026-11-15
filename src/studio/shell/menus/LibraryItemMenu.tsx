@@ -43,7 +43,6 @@ import type { PageState, WorkspaceTabs } from "../types";
 import type { MenuState } from "./useMenuState";
 import type { MenuItems } from "./useMenuItems";
 
-/** The menu of one library item, the directory's selection, or what can be added to a directory. */
 export function LibraryItemMenu({
   feedback: { notifyWithUndo, setNotice, action },
   library: { info, capabilities, organization, refreshProjects },
@@ -166,7 +165,6 @@ export function LibraryItemMenu({
                 ...(contextMenu.target.kind === "page"
                   ? [
                       {
-                        // Like copying a link, for Agents outside ShowAI.
                         label: tc("copyReference"),
                         icon: <AtSign size={15} />,
                         onSelect: action(() =>

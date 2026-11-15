@@ -4,7 +4,6 @@ import syncEngineMessages from "../i18n/messages/syncEngine";
 
 const t = translator(syncEngineMessages);
 
-/** A server base includes its deployment prefix, never /api or a resource. */
 export function serverBaseUrl(input: string): string {
   const invalid = () =>
     new SyncError(400, "INVALID_SERVER_URL", t("url.invalidBase"));
@@ -14,7 +13,6 @@ export function serverBaseUrl(input: string): string {
   } catch {
     throw invalid();
   }
-  // Inspect the source too: URL normalizes dot segments and backslashes.
   const rawPath = input.match(/^https?:\/\/[^/?#]+([^?#]*)/i)?.[1] ?? "";
   if (
     input !== input.trim() ||

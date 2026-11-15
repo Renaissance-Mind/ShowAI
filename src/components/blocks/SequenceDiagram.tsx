@@ -42,7 +42,6 @@ type Sequence = {
   steps: Step[];
 };
 type Cast = (Actor & { tone: DiagramTone })[];
-// a and b are actor column indexes.
 type Placed = Step & { kind: Kind; a: number; b: number };
 
 const PLAY_MS = 1600;
@@ -50,7 +49,6 @@ const ROW = 46;
 const SELF_ROW = 56;
 const FALLBACK_FONT = "system-ui, -apple-system, sans-serif";
 
-/** Paragraphs of detail text with **bold**, `code` and safe links. */
 export function DetailText({ source }: { source?: string }) {
   return (
     <>
@@ -63,7 +61,6 @@ export function DetailText({ source }: { source?: string }) {
   );
 }
 
-// SVG text cannot wrap, so labels are measured and shortened to fit their lane.
 let canvas: CanvasRenderingContext2D | null | undefined;
 function measurer(font: string) {
   if (canvas === undefined)
@@ -103,7 +100,6 @@ function fit(
   return `${chars.slice(0, low).join("").trimEnd()}…`;
 }
 
-/** Steps whose ends are not actors are left out so a partial edit still renders. */
 function arrange(model: Sequence) {
   const actors: Cast = (Array.isArray(model.actors) ? model.actors : []).map(
     (actor) => ({
@@ -344,12 +340,10 @@ function Wide({
           let x0: number;
           let x1: number;
           if (step.a === step.b) {
-            // A note on one actor stays inside that actor's column.
             const w = Math.min(want, colW - 8);
             x0 = low - w / 2;
             x1 = low + w / 2;
           } else {
-            // A note across actors spans their lifelines, wider when the label needs it.
             x0 = low - colW * 0.36;
             x1 = high + colW * 0.36;
             if (x1 - x0 < want) {
@@ -490,7 +484,6 @@ export function SequenceDiagramBlock({ data }: BlockProps) {
   const { actors, steps } = useMemo(() => arrange(model), [model]);
   const rootRef = useRef<HTMLElement>(null);
   const listRef = useRef<HTMLOListElement>(null);
-  // Server rendering and export start wide; the observer corrects it on mount.
   const [width, setWidth] = useState(800);
   const [font, setFont] = useState(FALLBACK_FONT);
   const [current, setCurrent] = useReaderState("step", 0, { accept: isIndex });
@@ -689,7 +682,6 @@ export function SequenceDiagramBlock({ data }: BlockProps) {
             </div>
           </>
         ))}
-      {/* Printed pages cannot step through, so every step and its detail is listed. */}
       <div className="sq-static">
         <p className="sq-static-title">{t("allSteps")}</p>
         <ol>

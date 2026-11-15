@@ -1,4 +1,3 @@
-// Common Skills have one authoring source; distribution packages bind one host guide.
 import { cp, mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { createHash } from "node:crypto";
 import { dirname, isAbsolute, join, resolve, relative, sep } from "node:path";
@@ -31,7 +30,6 @@ export async function skillFiles(root) {
   return files;
 }
 
-/** Copy shared instructions unchanged and replace only the bound delivery guide. */
 export async function bindHostSkills({ source, target, profile }) {
   if (!Object.hasOwn(HOST_PROFILES, profile))
     throw new Error(`Unknown ShowAI host profile: ${profile}`);
@@ -87,19 +85,16 @@ export async function bindHostSkills({ source, target, profile }) {
   return receipt;
 }
 
-/** Generate an installable local plugin while preserving its marketplace identity. */
 export async function stageHostPlugin({ source, target, profile }) {
   if (!["codex", "claude"].includes(profile))
     throw new Error(`Use the native bundle packager for ${profile}.`);
   const path = relative(resolve(source), resolve(target));
   if (
     !path ||
-    // A target on another Windows drive has no relative path at all.
     (!path.startsWith(".." + sep) && path !== ".." && !isAbsolute(path))
   ) {
     throw new Error("Host packages must be outside the common plugin source.");
   }
-  // Replace only a previously generated package, never an unrelated directory.
   const previous = await readFile(
     join(target, "host-profile.json"),
     "utf8",

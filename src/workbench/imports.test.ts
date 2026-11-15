@@ -54,7 +54,6 @@ it("the workbench plans, runs, opens and undoes an import as one request each", 
   });
   expect(plan.counts.pages).toBe(5);
   expect(await invoke("pages:list", { projectId: project.id })).toEqual([]);
-  // The request's own operation id must not make every page a replay of the first.
   const report = await invoke("imports:run", {
     projectId: project.id,
     parentId: null,

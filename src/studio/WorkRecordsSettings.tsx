@@ -5,7 +5,6 @@ import { useTranslator } from "../i18n/react";
 import messages from "../i18n/messages/settings";
 import type { WorkRecordsLocation } from "../core/work-records";
 
-/** Where Agents keep the stage records of each work on this device. */
 export default function WorkRecordsSettings() {
   const t = useTranslator(messages);
   const [location, setLocation] = useState<WorkRecordsLocation | null>(null);

@@ -176,7 +176,6 @@ export function descendants(tasks: Task[], id: string): Set<string> {
   visit(id);
   return result;
 }
-/** Summary rows derive their dates and progress from leaf tasks, counted once. */
 export function summarize(tasks: Task[]): Task[] {
   const parents = new Set(tasks.map((task) => task.parentId).filter(Boolean));
   return tasks.map((task) => {

@@ -291,8 +291,6 @@ test("staged and legacy saved templates stay readable and keep verifying", async
       integrity: saved.integrity,
     },
   ]);
-  // Records saved by earlier runtimes hash their declared stages; the runtime
-  // keeps that list so stored integrity still verifies.
   expect(saved.workflow?.stages).toEqual([...LEGACY_TEMPLATE_STAGES]);
   const legacySummary = context.templates?.[0];
   expect(legacySummary).toHaveProperty("note");

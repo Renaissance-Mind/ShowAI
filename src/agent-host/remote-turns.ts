@@ -22,7 +22,6 @@ interface RemoteTurn {
   phase: "preparing" | "active" | "finished";
   expectedHash?: string;
 }
-/** Admission is durable and quick; project download and model execution run independently of HTTP. */
 export class RemoteTurns {
   private jobs = new Map<string, RemoteTurn>();
   private queues = new Map<string, Promise<unknown>>();
@@ -320,7 +319,6 @@ export class RemoteTurns {
       .map(summary)
       .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
   }
-  /** Renames the stored conversation and the copies queued turns still carry. */
   async rename(projectId: string, id: string, title: string) {
     await this.ready();
     const next = conversationTitle(title);

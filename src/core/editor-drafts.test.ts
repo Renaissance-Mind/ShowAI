@@ -83,7 +83,6 @@ describe("persistent local editor drafts", () => {
     expect(await readdir(directory)).toEqual(["drafts"]);
     expect((await drafts.read(saved.id)).content).toEqual(content);
     const path = `projects/${input.projectId}/pages/${input.resourceId}.json`;
-    // A real old-format generation remains recoverable by a fresh store.
     const files = encodeFile(
       path,
       Buffer.from(

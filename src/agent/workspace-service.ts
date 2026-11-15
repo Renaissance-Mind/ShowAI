@@ -18,7 +18,6 @@ import {
   resolveDocumentComponents,
 } from "../core/catalog";
 
-/** Shared content organization, with the connection's project boundary checked before I/O. */
 export class WorkspaceService {
   readonly store: FileStore;
   constructor(
@@ -61,7 +60,6 @@ export class WorkspaceService {
         .digest("hex"),
     });
   }
-  /** Restorable deleted items within this connection's projects. */
   deleted() {
     return listDeletedEntries(
       this.store,
@@ -112,7 +110,6 @@ export class WorkspaceService {
         await this.store.arrangeEntry(
           { ...input, projectId: source },
           async (document) => {
-            // Shared data stays in its project; bindings name it explicitly.
             document = retargetBindings(document, source, destination);
             const locked = await lockDocumentComponents(
               this.store.root,
@@ -234,7 +231,6 @@ export class WorkspaceService {
       this.store.root,
       this.project(),
     ).references(kind, id, input);
-    // Page references grouped per page, so each page takes one page_apply.
     const pages = new Map<
       string,
       { pageId: string; blockIds: string[]; versions: string[] }
@@ -297,7 +293,6 @@ export class WorkspaceService {
         "Draft generation changed. Read it again before discarding.",
       );
     await new EditorDrafts(this.store.root).remove(id, generation);
-    // remove is generation-conditional; a simultaneous newer save must be reported.
     if ((await this.drafts({})).some((record) => record.id === id))
       throw new CoreError("CONFLICT", "A newer draft was retained.");
     return { id, removed: true };

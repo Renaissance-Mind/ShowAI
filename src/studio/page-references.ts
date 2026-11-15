@@ -5,11 +5,6 @@ import type {
 } from "../components/page-references";
 import { desktop } from "../host/bridge";
 
-/**
- * Reference queries of the workbench around one page. Answers come from the
- * library index; a save of any page, a page list refresh or a change from
- * another writer asks every reader to read again.
- */
 export function workbenchReferenceSource(
   page: { projectId: string; pageId: string },
   subscribePages: (listener: () => void) => () => void,
@@ -45,7 +40,6 @@ export function workbenchReferenceSource(
             pages: result.pages[direction],
           }));
         answers.set(key, answer);
-        // A failed read is asked again next time.
         answer.catch(() => answers.delete(key));
       }
       return answer;

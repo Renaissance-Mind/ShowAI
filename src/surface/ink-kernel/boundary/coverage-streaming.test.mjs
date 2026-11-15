@@ -11,8 +11,6 @@ ex.memory.grow(Math.ceil(Math.max(0,diagnostics+128-ex.memory.buffer.byteLength)
 const view=new DataView(ex.memory.buffer),bytes=new Uint8Array(ex.memory.buffer);
 let count=0;
 function command(operation,values=[]){const at=commands+count++*56;view.setUint32(at,operation,true);values.forEach((value,i)=>view.setFloat64(at+8+i*8,value,true));}
-// Genuine closed cubic geometry: its detached output fits the original budget.
-// Scratch must follow bounded subpaths rather than every patch in the input.
 for(let i=0;i<2400;i++){
  const x=(i%40)*6,y=Math.floor(i/40)*6,r=2,k=r*0.5522847498307936;
  command(0,[x+r,y]);command(3,[x+r,y+k,x+k,y+r,x,y+r]);

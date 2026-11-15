@@ -51,7 +51,6 @@ function readExpanded(): Record<string, boolean> {
     : {};
 }
 
-/** Title and icon of a documentation entry, including the first-run page. */
 export function useBuiltinDocTitle() {
   const locale = useLocale();
   const t = useTranslator(sidebarMessages);
@@ -61,10 +60,6 @@ export function useBuiltinDocTitle() {
       : (builtinDocs(locale).pages[id] ?? { title: t("docs.title"), icon: "" });
 }
 
-/**
- * The documentation folder pinned under "Add" in the sidebar. It starts collapsed;
- * its folders open and close like library folders and the state is kept per App.
- */
 export function DocsNavigation({
   activeId,
   onOpen,
@@ -77,7 +72,6 @@ export function DocsNavigation({
   const docs = builtinDocs(locale);
   const title = useBuiltinDocTitle();
   const [expanded, setExpanded] = useState(readExpanded);
-  // A page inside closed folders marks the outermost closed one, without opening anything.
   const closedAncestor = !activeId
     ? null
     : !expanded.root
@@ -205,7 +199,6 @@ export function DocsNavigation({
   );
 }
 
-/** Folder names above a documentation page, for the breadcrumb. */
 export function useBuiltinDocFolders(id: string | null) {
   const locale = useLocale();
   return id && id !== WELCOME_DOC
@@ -213,7 +206,6 @@ export function useBuiltinDocFolders(id: string | null) {
     : [];
 }
 
-/** A documentation page in the native read-only editor; links to other docs stay in the App. */
 export function BuiltinDocPage({
   id,
   hash,
@@ -264,7 +256,6 @@ export function BuiltinDocPage({
         event.button === 1 || event.metaKey || event.ctrlKey,
       );
     };
-    // Components run in frames; their links reach the page as this event.
     const component = (event: Event) => {
       const url = (event as CustomEvent<{ url?: unknown }>).detail?.url;
       const target = typeof url === "string" ? builtinDocLink(url) : undefined;
@@ -272,7 +263,6 @@ export function BuiltinDocPage({
       event.preventDefault();
       latest.current(target.pageId, target.hash, false);
     };
-    // In-page targets from components stay in this document, not the library page behind it.
     const navigate = (event: Event) => {
       const target = (event as CustomEvent<NavigationDetail>).detail?.target;
       if (!target || target.pageId) return;

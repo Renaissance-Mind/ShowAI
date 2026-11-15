@@ -6,7 +6,6 @@ export type LibraryContents = Record<
   { pages: PageSummary[]; folders: FolderMetadata[] }
 >;
 
-/** Keep a pending drop visible even when an older navigation read finishes. */
 export function applyLibraryMove(
   contents: LibraryContents,
   drop: LibraryDrop,
@@ -29,7 +28,6 @@ export function applyLibraryMove(
     };
   }
   const page = from.pages.find((item) => item.id === source.id);
-  // A refresh may already have completed the transfer.
   if (!page) return contents;
   const moved = { ...page, parentId };
   if (source.projectId === projectId)

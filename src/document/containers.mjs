@@ -103,7 +103,6 @@ export function fillResource(document) {
   }, { scope: "tree" });
   return document;
 }
-/** Adapts old documents without changing source bytes. Old whiteboards keep their positions. */
 export function upgradeResource(source, { includeTitle = true } = {}) {
   const page = structuredClone(source);
   if (isResource(page)) return fillResource(page);
@@ -172,7 +171,6 @@ export function upgradeResource(source, { includeTitle = true } = {}) {
     const board = upgradeDocument(page, { includeTitle });
     Object.assign(page, board);
     const children = page.content.content ?? [];
-    // A single flowing region is a document, even when an earlier version stored it on a surface.
     if (
       children.length === 1 &&
       children[0].type === "region" &&

@@ -1,4 +1,3 @@
-// Generate display icons and unmasked platform masters from icon-design.json.
 import AppKit
 
 let target = CommandLine.arguments[1]

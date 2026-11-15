@@ -1,8 +1,6 @@
 #include "number.hpp"
 #include "polynomial.hpp"
 #include "algebra.hpp"
-// This translation unit is compiled only by the exact-kernel tests. It does
-// not add a public document/API format or enter the production WASM module.
 using namespace showai_boundary;
 static bool overlap(const void*a,uint64_t an,const void*b,uint64_t bn){uint64_t x=(uintptr_t)a,y=(uintptr_t)b;if(!a||!b||an>UINTPTR_MAX-x||bn>UINTPTR_MAX-y)return true;return x<y+bn&&y<x+an;}
 static Integer input(Context&c,const uint32_t*words,uint32_t count,int32_t sign){Integer v=Integer::from(c,0);for(uint32_t i=count;i;i--)v=v.shifted_left(32)+Integer::from(c,words[i-1]);return sign<0?-v:v;}
@@ -22,7 +20,6 @@ uint32_t sabt_rational_double(double value,void*memory,uint32_t bytes,uint64_t w
     Context c;if(!c.initialize(memory,bytes,work_limit))return c.status;Rational r=Rational::from_double(c,value);double low=0,high=0;if(c.status!=SA_INK_OK)return c.status;if(!r.bounds(low,high))return c.status==SA_INK_OK?SA_INK_RANGE:c.status;uint32_t n=r.numerator().size(),d=r.denominator().size();for(uint32_t i=0;i<n;i++)words[i]=r.numerator().data()[i];for(uint32_t i=0;i<d;i++)words[2048+i]=r.denominator().data()[i];counts[0]=n;counts[1]=d;counts[2]=(uint32_t)r.sign();output[0]=low;output[1]=high;return c.status;
 }
 }
-// Freestanding compiler-generated aggregate copies have explicit local bodies.
 #if defined(__wasm__)
 extern "C" void*memcpy(void*d,const void*s,size_t n){auto*a=(uint8_t*)d;auto*b=(const uint8_t*)s;for(size_t i=0;i<n;i++)a[i]=b[i];return d;}
 extern "C" void*memset(void*d,int v,size_t n){auto*a=(uint8_t*)d;for(size_t i=0;i<n;i++)a[i]=(uint8_t)v;return d;}

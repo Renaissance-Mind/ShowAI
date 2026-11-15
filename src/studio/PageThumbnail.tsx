@@ -19,11 +19,6 @@ interface ThumbnailProps {
   padding?: number;
 }
 
-/**
- * Load nearby cards and retain recent renders while scrolling back.
- * Documents flow into up to four columns to fill the card; boards show their
- * content's bounds with a margin, centred, so a drawn shape never becomes the edge.
- */
 export const LivePageThumbnail = memo(function LivePageThumbnail({
   projectId,
   pageId,
@@ -71,7 +66,6 @@ export const LivePageThumbnail = memo(function LivePageThumbnail({
           loadedKey.current = key;
           setRecord(value);
         });
-      // Let the mounted reader commit and paint before admitting another one.
       await new Promise<void>((resolve) =>
         requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
       );
@@ -221,8 +215,6 @@ function RasterPageThumbnail({
     const requestId = crypto.randomUUID();
     let submitted = false;
     setError("");
-    // The desktop capture queue owns expensive work. Submit raster requests
-    // immediately so cached images do not wait for other pages or input idle.
     void Promise.resolve()
       .then(async () => {
         if (controller.signal.aborted) return "";
@@ -240,7 +232,6 @@ function RasterPageThumbnail({
             Math.max(0, bounds.top - innerHeight, -bounds.bottom),
           ),
         };
-        // Show the last good snapshot first, including after a page edit/build change.
         const cached = await desktop.invoke<string | null>("pages:thumbnail", {
           ...args,
           cachedOnly: true,
@@ -282,7 +273,6 @@ function RasterPageThumbnail({
       {image ? (
         <img src={image} alt="" decoding="async" draggable={false} />
       ) : error ? (
-        // Readers of the library see a calm placeholder; the reason is the tooltip.
         <span className="component-preview-error" title={error}>
           <ImageOff size={18} aria-hidden />
           {t("previewUnavailable")}

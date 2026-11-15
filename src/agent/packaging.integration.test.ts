@@ -15,7 +15,6 @@ import { parseArtifact } from "../portable/validation.mjs";
 import { walk } from "../document/walk.mjs";
 import type { ShowDocument } from "../core/model";
 
-// A real 1×1 PNG, served online and stored as a local file.
 const png = Buffer.from(
   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=",
   "base64",
@@ -164,7 +163,6 @@ test("an export lists every item with its size and carries what the person chose
     ],
   });
 
-  // Nothing is written before the person sees the items.
   const out = join(outside, "exports", "清单.html");
   const unconfirmed = await call("page_export", { pageId, format: "html", out });
   expect(unconfirmed.error.code).toBe("CONFIRMATION_REQUIRED");
@@ -182,7 +180,6 @@ test("an export lists every item with its size and carries what the person chose
     defaultChoice: "bundle",
   });
   expect(items["日程"].bytes).toBeGreaterThan(0);
-  // A transform over a spreadsheet counts as data from a file of this device.
   expect(items["月度金额"]).toMatchObject({
     kind: "transform-output",
     local: true,
@@ -211,7 +208,6 @@ test("an export lists every item with its size and carries what the person chose
   expect(plan.remainingBytes).toBe(plan.limits.totalBytes - plan.bytes);
   await expect(readdir(join(outside, "exports"))).rejects.toThrow();
 
-  // A choice that does not apply to an item is refused.
   const wrong = await call("page_export", {
     pageId,
     format: "html",
@@ -241,7 +237,6 @@ test("an export lists every item with its size and carries what the person chose
     "图.png": "embed",
     "online.png": "embed",
   });
-  // Files leaving the device carry no paths of it.
   const html = await readFile(out, "utf8");
   const sourceText = await readFile(out.replace(/\.html$/, ".showai.json"), "utf8");
   for (const text of [html, sourceText]) {
@@ -250,7 +245,6 @@ test("an export lists every item with its size and carries what the person chose
     expect(text).not.toContain("体检");
   }
   const source = parseArtifact(sourceText).document;
-  // The data left out shows its name and file name only.
   expect(widget(source, "database").attrs.data.$dataState).toEqual({
     status: "empty",
     omitted: true,
@@ -268,7 +262,6 @@ test("an export lists every item with its size and carries what the person chose
     `data:image/png;base64,${png.toString("base64")}`,
     `data:image/png;base64,${png.toString("base64")}`,
   ]);
-  // "both" writes the transform's inputs beside the page.
   expect(exported.inputFiles).toEqual([
     join(outside, "exports", "清单.inputs", `${amounts}.json`),
   ]);
@@ -280,7 +273,6 @@ test("an export lists every item with its size and carries what the person chose
   });
   expect(JSON.stringify(input)).not.toContain(outside);
 
-  // The next export starts from the person's last choices.
   const again = await call("page_export", {
     pageId,
     format: "html",
@@ -294,7 +286,6 @@ test("an export lists every item with its size and carries what the person chose
   );
   expect(remembered).toMatchObject({ 日程: "skip", 月度金额: "both" });
 
-  // externalData "embed" still carries everything that fits.
   const all = await ok("page_export", {
     pageId,
     format: "html",
@@ -307,7 +298,6 @@ test("an export lists every item with its size and carries what the person chose
     "日程",
   ]);
 
-  // Inline fragments have no files beside them: a transform gives its result or nothing.
   const inline = await call("page_export", {
     pageId,
     format: "inline",

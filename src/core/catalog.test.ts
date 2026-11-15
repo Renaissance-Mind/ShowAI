@@ -666,14 +666,12 @@ describe("component composition and editable primitives", () => {
       expect(compiled.html).toContain("Content-Security-Policy");
       expect(compiled.inline?.script).toBeTruthy();
       if (item.kind === "text")
-        // Includes editing, syntax highlighting, offline math and range selection.
         expect(Buffer.byteLength(compiled.inline!.script)).toBeLessThan(2_250_000);
       expect(compiled.defaultData).toEqual(item.defaultData);
     },
     process.platform === "win32" ? 600000 : 360000,
   );
 
-  // Several real SDK builds include a nested rich-text bundle.
   it("bundles nested exact revisions, preserves closure and validates every dependency", async () => {
     const home = await temporary();
     const child = await saveComponent(

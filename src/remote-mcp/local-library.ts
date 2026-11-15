@@ -4,7 +4,6 @@ import { FileStore } from "../core/store";
 import { withChangeContext } from "../core/history-context";
 import type { RemoteMcpConfig } from "./types";
 
-/** Resolve current library membership on every call, including projects created after consent. */
 export function localLibraryPolicy(
   root: string,
   config: Pick<RemoteMcpConfig, "access" | "projects">,

@@ -1,6 +1,5 @@
 import { defineMessages } from "../index";
 
-// Basic blocks: image, table, callout, toggle and code.
 export default defineMessages("primitives", {
   "zh-CN": {
     sharedData: "共享数据…",

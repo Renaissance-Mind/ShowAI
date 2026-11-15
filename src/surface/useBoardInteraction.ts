@@ -57,7 +57,6 @@ export interface BoardInteraction {
   drawingSnapIndex: () => SnapIndex;
   selectionHit: (x: number, y: number) => string | null;
   edgeHit: (x: number, y: number) => ReturnType<BoardInteraction["hitTest"]>;
-  /** Geometry snapshot for one eraser gesture; each sample reuses the measurements. */
   createHitTest: (
     radius?: number,
     target?: "paint" | "selection",
@@ -81,7 +80,6 @@ export interface BoardInteraction {
   selectIds: (ids: string[]) => void;
   lassoHit: (points: Point[]) => string[];
   nudge: (x: number, y: number) => void;
-  /** Visual bounds in the selection's coordinate layer, including measured heights. */
   measured: (
     ids: string[],
   ) => Record<string, { x: number; y: number; width: number; height: number }>;
@@ -195,7 +193,6 @@ export function useBoardInteraction({
       );
     });
     outline.dataset.drawingSelection = String(drawings);
-    // One frame owns a group selection and its corner handles.
     const fixed = [...ids].some(
       (id) =>
         world.current?.querySelector<HTMLElement>(
@@ -366,8 +363,6 @@ export function useBoardInteraction({
       resizing &&
       (input.shiftKey ||
         (!single && selectedIds.some((id) => !!drag.frames[id].rotation)));
-    // Alt resizes symmetrically around the center; Shift locks a move to the
-    // dominant axis; Command/Ctrl turns snapping off.
     const centered = resizing && input.altKey;
     const axis =
       !resizing && drag.kind === "move" && input.shiftKey
@@ -500,7 +495,6 @@ export function useBoardInteraction({
       apply(drag.elements.get(id)!, next);
     }
     refreshOutline();
-    // Only connections touching the gesture participate in the per-frame preview.
     if (!drag.affectedArrows.length) return;
     const layout = { ...drag.source.layout, ...drag.next };
     for (const id of drag.affectedArrows) {
@@ -511,7 +505,6 @@ export function useBoardInteraction({
       if (!svg || !path) continue;
       if (el.dataset.boardOriginalPath === undefined)
         el.dataset.boardOriginalPath = path.getAttribute("d") ?? "";
-      // Preserve the SVG viewbox, expressing world endpoints in its existing local coordinates.
       const [a, b] = boundEndpoints(entry.node, layout[id], index, layout).map(
         (p) => ({
           x:
@@ -711,8 +704,6 @@ export function useBoardInteraction({
           target === "selection"
             ? pickSelection(visible)
             : pickShape(visible, inside);
-        // An arrow's label sits on its line but beyond the stroke; it still
-        // selects the arrow unless a later-painted object covers it.
         let label: (typeof visible)[number] | undefined;
         for (const item of visible) {
           if (item.node.type !== "drawing" || item.node.attrs?.tool !== "arrow")
@@ -760,7 +751,6 @@ export function useBoardInteraction({
       const next = new Set<string>(
         (parent?.content ?? [])
           .map((node) => node.attrs?.id)
-          // Like a marquee, select-all leaves locked objects alone.
           .filter((id) => !!source?.layout?.[id] && !source.layout[id].locked),
       );
       setSelection(next);
@@ -784,7 +774,6 @@ export function useBoardInteraction({
             { ...frame, x: frame.x + delta.x, y: frame.y + delta.y },
           ]),
         ),
-        // Holding an arrow key is one undo step.
         `nudge:${Object.keys(frames).sort().join(",")}`,
       );
     },

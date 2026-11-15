@@ -23,8 +23,6 @@ function committedDraftHash(document: ShowDocument): string {
   walk(normalized.content, (node) => {
     if(node.type==="surface" && node.attrs?.kind==="board")delete node.attrs.inkState;
     const data = node.attrs?.data;
-    // Catalog resolution adds a lookup scope; locking an exact revision removes it.
-    // The immutable fingerprint, version and all content props still participate.
     if (
       (node.type === "widget" || node.type === "inlineWidget") &&
       node.attrs?.kind === "custom" &&
@@ -151,7 +149,6 @@ function validateRecord(record: EditorDraftRecord, id: string) {
     throw new CoreError("INVALID_DATA", "Invalid recovery draft identity.");
 }
 
-/** Draft generations are local; formal history begins only after a successful commit. */
 export class EditorDrafts {
   constructor(readonly root: string) {}
   async save(input: EditorDraftInput): Promise<EditorDraftRecord> {
@@ -259,9 +256,6 @@ export class EditorDrafts {
               throw error;
             normalizationWarning = error.message;
           }
-        // Local recovery snapshots don't need Git's per-node object layout.
-        // Keep the existing JSON representation and asset deduplication so one
-        // keystroke cannot require thousands of individual durable writes.
         const files = encodeFile(path, Buffer.from(JSON.stringify(content)));
         const assets: string[] = [];
         for (const [name, bytes] of files)
@@ -334,7 +328,6 @@ export class EditorDrafts {
           join(directory, "draft.json"),
           Buffer.from(JSON.stringify(record, null, 2)),
         );
-        // The published generation is durable. Earlier local generations can be removed.
         for (const name of await readdir(directory))
           if (name !== generation && /^[a-f0-9-]{36}$/.test(name))
             await rm(join(directory, name), { recursive: true });
@@ -540,10 +533,6 @@ export class EditorDrafts {
     );
   }
 
-  /**
-   * Deletes every draft of permanently deleted pages, discarded copies
-   * included. Their assets become unreferenced, so cleanup reclaims them.
-   */
   async purgePages(pages: { projectId: string; pageId: string }[]) {
     if (!pages.length) return;
     const doomed = (record: EditorDraftRecord) =>
@@ -616,8 +605,6 @@ export class EditorDrafts {
             "CONFLICT",
             "The saved page revision changed. Read its current revision before completing the draft.",
           );
-        // Resource revisions remain stable across unrelated writes. The current-state
-        // library does not retain the old global snapshot carrying that identifier.
         const bytes = await library.readFile(path);
         const committed = JSON.parse(bytes.toString("utf8"))
           .document as ShowDocument;

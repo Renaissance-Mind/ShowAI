@@ -1,6 +1,5 @@
 import { defineMessages } from "../index";
 
-// Quick jump (⌘K / Ctrl+K): pages, projects, commands and components.
 export default defineMessages("quickJump", {
   "zh-CN": {
     dialog: "快速跳转",

@@ -23,7 +23,6 @@ type Translate = (
 
 const statusKey = (status: EntryStatus) => `status.${status}` as const;
 
-/** Code lines starting with + or - read as an added or removed diff line. */
 function CodeLines({ code }: { code: string }) {
   return (
     <pre className="wk-code">
@@ -287,7 +286,6 @@ export function StepWalkthroughBlock({ data }: BlockProps) {
   const [current, setCurrent] = useReaderState("step", initial, {
     accept: isIndex,
   });
-  // A changed initial step in the data resets the reader's position.
   const [seenInitial, setSeenInitial] = useState(initial);
   if (seenInitial !== initial) {
     setSeenInitial(initial);
@@ -421,7 +419,6 @@ export function StepWalkthroughBlock({ data }: BlockProps) {
         </footer>
       </div>
 
-      {/* Printed pages cannot switch steps, so every step is laid out in order. */}
       <div className="wk-print">
         {steps.map((item, k) => (
           <section key={item.id} className="wk-print-step">

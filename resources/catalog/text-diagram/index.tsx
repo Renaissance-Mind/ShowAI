@@ -7,7 +7,6 @@ import "./diagram.css";
 
 export const readData = inspect;
 function preview(data: DiagramData, uid: string) {
-  // A syntax error is a user-input boundary: retain the draft and show its cause.
   try {
     return { ...renderDiagram(data, uid), error: "" };
   } catch (error) {

@@ -2,10 +2,6 @@
 #define SHOWAI_BOUNDARY_COVERAGE_MESH_HPP
 #include "conditioned-klm.hpp"
 namespace showai_boundary {
-/* Internal full/cold mesh producer. Actual retained source/anchor capabilities
- * must be checked by the owner adapter; a vertex ID is never that capability.
- * Common-anchor fans are hard raster support, as in the measured vendor route.
- * This is not an exact pixel-area or hardware interpolation certificate. */
 enum BoundaryCoverageKind:uint32_t {boundary_coverage_solid=0,boundary_coverage_embedded_quad=1,boundary_coverage_cubic=2};
 struct alignas(16) BoundaryCoverageVertex {float x=0,y=0,pad0=0,pad1=0,k=0,l=0,m=0,pad2=0;};
 static_assert(sizeof(BoundaryCoverageVertex)==32&&__builtin_offsetof(BoundaryCoverageVertex,k)==16,"coverage vertex ABI");
@@ -43,18 +39,11 @@ inline bool emit(PolynomialContext&c,BoundaryCoverageMesh&mesh,BoundaryCoverageV
     }
     if(max_error>Q::from_double(c.numbers,o.conditioning.maximum_residual_over_gradient_pixels)){reason=boundary_klm_error_budget;return false;}
     if(!boundary_quantization::upper_bound(max_error,draw.float_cast_error_pixels)){reason=boundary_klm_error_budget;return false;}
-    // This is only the encoded position's rounding-cell bound, not the whole
-    // source-to-pixel or interpolation error. Actual graph admission charges
-    // vertices/draw uniforms plus cached and in-flight generations separately.
     for(uint32_t i=0;i<3;i++)mesh.vertices.push_back(v[i]);mesh.draws.push_back(draw);return c.numbers.status==SA_INK_OK;
 }
 struct AnchorSlot {uint32_t vertex=no_index,index=0;int32_t flow=0;};
 inline uint32_t find(const Vector<AnchorSlot>&slots,uint32_t vertex){uint32_t mask=slots.size()-1,index=(vertex*2654435761u)&mask;for(uint32_t n=0;n<slots.size();n++,index=(index+1)&mask){if(slots[index].vertex==vertex||slots[index].vertex==no_index)return index;}return no_index;}
 }
-/* Always recomputes actual full input work; no K=N work is advertised as a
- * suffix update. The incremental owner can later invoke a block producer using
- * actual retained anchor Records. All accepted outputs are immutable by owner
- * policy, and failures leave the old output entirely intact. */
 inline uint32_t build_boundary_coverage_mesh(PolynomialContext&c,const BoundaryQuantizedGraph&q,
         const BoundaryCoverageOptions&o,BoundaryCoverageMesh&output,BoundaryKLMReason&reason){
     auto&ctx=c.numbers;reason=boundary_klm_none;
@@ -87,9 +76,6 @@ inline uint32_t build_boundary_coverage_mesh(PolynomialContext&c,const BoundaryQ
         if(staged.conditioned_cells>=local.maximum_conditioning_cells){reason=boundary_klm_capacity;return SA_INK_CAPACITY;}local.maximum_conditioning_cells-=staged.conditioned_cells;
         uint32_t remaining=o.maximum_vertices-staged.vertices.size();if(remaining<3){reason=boundary_klm_capacity;return SA_INK_CAPACITY;}if(local.maximum_vertices>remaining)local.maximum_vertices=remaining;
         BoundaryKLMArc arc(ctx);uint32_t status=condition_quantized_boundary_arc(c,e,local,arc,reason);if(status)return status;staged.conditioned_cells+=arc.conditioning_cells;
-        // Boundary source graph is a balanced directed chain. Summing these
-        // directed triangles closes every arc to ONE common source-local anchor;
-        // radial edges cancel without guessing a loop walk at branch vertices.
         const auto&z=arc.closure;Q area=Q::from_double(ctx,z.from[0])*Q::from_double(ctx,z.to[1])-Q::from_double(ctx,z.from[1])*Q::from_double(ctx,z.to[0]);
         if(!area.zero()){
             BoundaryCoverageVertex fan[3]{};fan[1].x=float(z.from[0]);fan[1].y=float(z.from[1]);fan[2].x=float(z.to[0]);fan[2].y=float(z.to[1]);for(auto&v:fan){v.k=0;v.l=v.m=1;}
@@ -103,10 +89,6 @@ inline uint32_t build_boundary_coverage_mesh(PolynomialContext&c,const BoundaryQ
                     if(patch.mode==SA_ANALYTIC_SOLID){out.k=0;out.l=out.m=1;}
                     else if(patch.mode==SA_ANALYTIC_QUADRATIC){
                         if(patch.sign!=-1||!((v.k==0&&v.l==0)||(v.k==0.5f&&v.l==0)||(v.k==1&&v.l==1))){reason=boundary_klm_invalid;return SA_INK_INVALID;}
-                        // M==K exactly. K/L are affine-independent and K is
-                        // nonnegative, zero at only the canonical start vertex.
-                        // F=K*(K*K-L); the single critical endpoint uses the
-                        // explicit finite-zero shader semantics, not epsilon.
                         quad_values|=v.k==0?1u:v.k==0.5f?2u:4u;out.k=out.m=v.k;out.l=v.l;
                     }else if(patch.mode==SA_ANALYTIC_CUBIC){float sign=-patch.sign;out.k=v.k*sign;out.l=v.l*sign;out.m=v.m;}
                     else {reason=boundary_klm_invalid;return SA_INK_INVALID;}

@@ -8,13 +8,11 @@ import { homedir } from "node:os";
 import { dirname, isAbsolute, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-// Resolve only the host-selected library. Never scan other libraries or fall back after a failure.
 const home = resolve(process.env.SHOWAI_HOME || join(homedir(), ".showai"));
 const configPath =
   process.env.SHOWAI_RUNTIME_CONFIG || join(home, "agent-runtime.json");
 const pluginRoot = dirname(dirname(fileURLToPath(import.meta.url)));
 
-/** A launch failure the person can fix; served through one diagnostic MCP tool. */
 class LaunchProblem extends Error {
   constructor(code, detail) {
     super(detail);
@@ -22,7 +20,6 @@ class LaunchProblem extends Error {
   }
 }
 
-// Each code answers: what happened, whether content is safe, and what to do.
 const PROBLEMS = {
   RUNTIME_MISSING: {
     en: "This content library has no registered ShowAI runtime (agent-runtime.json is missing).",
@@ -144,7 +141,6 @@ const REPORT_URL = "https://github.com/Renaissance-Mind/ShowAI/issues/new";
 
 const readJson = async (path) => JSON.parse(await readFile(path, "utf8"));
 async function pluginVersion() {
-  // Codex and Claude Code read plugin.json; DeepSeek Harness bundles carry package.json.
   for (const file of [
     "plugin.json",
     ".claude-plugin/plugin.json",
@@ -159,7 +155,6 @@ async function pluginVersion() {
   return undefined;
 }
 
-/** Fingerprint of the runtime files a probe result depends on. */
 async function probeKey(config, text) {
   const files = await Promise.all(
     [config.launch.command, config.launch.args[0]].map(async (path) => {
@@ -177,7 +172,6 @@ async function probe(config, text, env) {
   const key = await probeKey(config, text).catch((error) => {
     throw new LaunchProblem("RUNTIME_UNAVAILABLE", error.message);
   });
-  // A missing or unreadable cache only costs one probe.
   const cached = await readJson(cachePath).catch((error) => {
     if (error.code === "ENOENT" || error instanceof SyntaxError) return undefined;
     throw error;
@@ -213,7 +207,6 @@ async function probe(config, text, env) {
   } catch (error) {
     throw new LaunchProblem("RUNTIME_PROBE_FAILED", error.message);
   }
-  // Only the fields this launcher checks are cached; a changed runtime file changes the key.
   const kept = {
     ok: info.ok,
     data: {
@@ -228,7 +221,6 @@ async function probe(config, text, env) {
       .then(() => writeFile(temporary, JSON.stringify({ key, info: kept }) + "\n"))
       .then(() => rename(temporary, cachePath))
       .catch((error) =>
-        // The cache only saves time; the next launch probes again.
         process.stderr.write(`ShowAI could not cache the runtime probe: ${error.message}\n`),
       );
   }
@@ -332,7 +324,6 @@ async function prepare() {
   return { command: config.launch.command, args, env, version };
 }
 
-/** Library-relative names; the record and the tool never show the person's home or secrets. */
 const redact = (text) =>
   String(text ?? "")
     .split(home)
@@ -352,9 +343,7 @@ function connectionFile(client) {
   return `${slug || "client"}-${digest}-failure.json`;
 }
 
-/** Lets Settings → Plugins show the latest failure of each host next to its calls. */
 async function recordFailure(problem, client, version) {
-  // Only an existing library receives a record; a mistyped SHOWAI_HOME is not created.
   const exists = await stat(home).then(
     (value) => value.isDirectory(),
     () => false,
@@ -384,11 +373,6 @@ async function recordFailure(problem, client, version) {
   await rename(temporary, path);
 }
 
-/**
- * Completes the MCP handshake and exposes one diagnostic tool, so the host shows
- * a readable reason instead of "connection closed". Nothing in the library changes
- * except the failure record.
- */
 async function serveProblem(problem) {
   const code = problem instanceof LaunchProblem ? problem.code : "RUNTIME_START_FAILED";
   const failure =
@@ -505,7 +489,6 @@ if (launch) {
     env: launch.env,
     stdio: "inherit",
   });
-  // A spawn error happens before the child reads stdin, so the handshake is still ours to answer.
   child.once("error", (error) => {
     void serveProblem(new LaunchProblem("RUNTIME_START_FAILED", error.message));
   });

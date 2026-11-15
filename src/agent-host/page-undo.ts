@@ -4,7 +4,6 @@ import { randomUUID } from "node:crypto";
 import type { PageWrite } from "../core/page-write-capture";
 import { readOptional, writeProtected } from "./storage";
 
-/** One file per committed MCP call also supports concurrent tool requests. */
 export async function savePageWrites(directory: string, writes: PageWrite[]) {
   if (writes.length)
     await writeProtected(join(directory, `${randomUUID()}.json`), writes);
@@ -28,7 +27,6 @@ export async function readPageWrites(directory: string): Promise<PageWrite[]> {
   return writes.flat();
 }
 
-/** An intervening writer breaks the chain; restoring a whole-page snapshot is then unsafe. */
 export function undoBaseline(writes: PageWrite[], currentHash: string) {
   if (!writes.length) return undefined;
   const remaining = [...writes];

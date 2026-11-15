@@ -6,12 +6,10 @@ import { Loader2 } from "../../ui/icons";
 import { errorMessage } from "../../host/bridge";
 import { gatherDiagnostics } from "./diagnostics";
 
-/** The log lives in the desktop App's main process; the browser has none. */
 export function logAvailable() {
   return typeof window !== "undefined" && !!window.showai?.logTail;
 }
 
-/** Collects redacted diagnostics with the available log; `null` while collecting. */
 export function useDiagnostics(info: DesktopInfo | null, enabled = true) {
   const [text, setText] = useState<string | null>(null);
   const [error, setError] = useState("");
@@ -39,7 +37,6 @@ export function useDiagnostics(info: DesktopInfo | null, enabled = true) {
   return { text, error };
 }
 
-/** Read-only full text, shown before anything is copied or attached. */
 export function DiagnosticsPreview({
   text,
   error,

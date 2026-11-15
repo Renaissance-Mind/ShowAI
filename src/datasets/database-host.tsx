@@ -1,7 +1,3 @@
-// The workbench's database host: related datasets through the window's
-// dataset sessions, reverse relations, formulas in the transform runtime and
-// field types that library components contribute (contributes.databaseField),
-// whose `field` export runs in the same iframe sandbox as custom components.
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   DatabaseHostContext,
@@ -41,7 +37,6 @@ const json = (value: unknown) =>
     .replace(/\u2029/g, "\\u2029");
 const refKey = (ref: FieldComponentRef) => `${ref.componentId}@${ref.version}`;
 
-/** The sandboxed page of a field type component; `field` adds the editor protocol. */
 function fieldFrame(
   component: CompiledComponent,
   channel: string,
@@ -57,11 +52,6 @@ function fieldFrame(
   );
 }
 
-/**
- * Runs a field type's synchronous `field.format` and `field.project` in a
- * hidden sandbox frame and caches the answers by value; misses answer
- * undefined now and notify when the sandbox replies.
- */
 class FieldEvaluator {
   private frame: HTMLIFrameElement;
   private channel = crypto.randomUUID();
@@ -111,7 +101,6 @@ class FieldEvaluator {
     window.addEventListener("message", this.receive);
     document.body.append(this.frame);
   }
-  /** A cached answer, or undefined after asking the sandbox. */
   call(fn: string, args: unknown[]) {
     const key = `${fn}\u0000${JSON.stringify(args)}`;
     const result = this.results.get(key);
@@ -152,7 +141,6 @@ class FieldEvaluator {
   }
 }
 
-/** The editor of a contributed field type: the component itself, in its sandbox. */
 function FieldEditorFrame({
   component,
   column,
@@ -179,7 +167,6 @@ function FieldEditorFrame({
           theme,
         },
       ),
-    // The frame keeps its page; later values arrive as messages.
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [component.html, channel],
   );
@@ -243,7 +230,6 @@ const rawText = (value: unknown) =>
       ? ""
       : String(value);
 
-/** A contributed field type from its compiled component. */
 function contributedField(
   component: CompiledComponent,
   ref: FieldComponentRef,
@@ -296,7 +282,6 @@ function contributedField(
   };
 }
 
-/** A page-level host; blocks add the dataset they show as selfDataset. */
 function createHost(
   client: DatasetClient,
   projectId: string,
@@ -460,7 +445,6 @@ function createHost(
         name: entry.names?.get(id),
         value: open(id).value,
       }));
-      // The same array while nothing changed keeps memoized columns stable.
       if (
         entry.result?.length === result.length &&
         entry.result.every((item, index) => item.value === result[index].value)
@@ -514,7 +498,6 @@ function createHost(
   };
 }
 
-/** Provides the database host to the blocks of one project's pages. */
 export function DatabaseHostProvider({
   client,
   projectId,

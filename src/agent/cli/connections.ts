@@ -12,7 +12,6 @@ import {
 } from "./command";
 import { readJson } from "./inputs";
 
-/** A credential from --*-file, or else from the environment. */
 async function credential(
   args: Arguments,
   fileOption: string,
@@ -37,7 +36,6 @@ const sync = (
   run,
 });
 
-/** The workbench, MCP servers and project synchronization. */
 export const connectionCommands: CommandDeclaration[] = [
   {
     command: "serve",

@@ -37,10 +37,6 @@ async function fixture() {
   const page = await store.createPage(project.id, { title: "Initial page" });
   return { root, library, store, project, page };
 }
-/**
- * The first FileStore write activates SQLite on a legacy root, so legacy
- * content is committed directly through the original Git library.
- */
 async function legacyFixture() {
   const base = process.env.SHOWAI_TEST_ROOT ?? tmpdir();
   await mkdir(base, { recursive: true });
@@ -113,7 +109,6 @@ test("SQLite saves current content with guarded resource revisions and author at
   expect((await f.library.entryAt((await f.library.head())!)).actor.label).toBe(
     "Author",
   );
-  // Superseded revisions are not retained, so they cannot be restored.
   await expect(
     f.library.restore([path], baseline!, {
       actor: { kind: "human", label: "Author" },
@@ -235,7 +230,6 @@ test("legacy Git content and operation history migrate losslessly into SQLite", 
   expect(manifest.storage).toBe("sqlite");
   const sqlite = new ContentLibrary(f.root);
   expect(await sqlite.head()).toBe(head);
-  // Current storage exposes no history; the migrated records stay archived.
   expect(await sqlite.history({ limit: 1000 })).toEqual([]);
   expect(await new SqliteLibrary(f.root).history({ limit: 1000 })).toEqual(
     history,
@@ -309,7 +303,6 @@ test("migration resumes a durable copied prefix and a history directory installe
       (await f.library.tree(first.revision)).map((entry) => entry.path),
       first.revision,
     );
-  // Migration copies legacy entries into the retained archive.
   await staged.commit(first, bytes, null, true);
   await writeFile(
     join(directory, "migration.json"),
@@ -327,8 +320,6 @@ test("migration resumes a durable copied prefix and a history directory installe
     [...entries].reverse(),
   );
   expect(await readdir(join(f.root, "local/migrations"))).toEqual([id]);
-  // Reconstruct the actual atomic-rename window: verified SQLite files exist,
-  // while the durable marker still points at the retained original authority.
   await rename(
     join(directory, "legacy-repository.git"),
     join(f.root, "repository.git"),
@@ -402,7 +393,6 @@ test("the first save after migration copies archived resource tokens once and in
       db.close();
     }
   };
-  // A migrated library predates the flag: nothing has been copied yet.
   expect(inspect()).toEqual({ flag: undefined, resources: [], indexes: [] });
   const page = await store.readPage(f.project.id, f.page.document.id);
   const saved = await store.savePage(
@@ -416,9 +406,7 @@ test("the first save after migration copies archived resource tokens once and in
   expect(first.flag).toBe("1");
   expect(first.indexes).toEqual(["changes_oid", "current_files_oid"]);
   expect(first.resources).toContain(projectPath);
-  // The untouched resource keeps its archived token for concurrency checks.
   expect(await sqlite.resourceRevision(projectPath)).toBe(archivedProject);
-  // A later save does not copy again: a removed row stays removed.
   const db = database();
   db.prepare("DELETE FROM current_resources WHERE path=?").run(projectPath);
   db.close();
@@ -499,7 +487,6 @@ test("a page save stores the same objects as a full write while leaving unedited
       ]),
     );
   const before = rows();
-  // Edit one block, drop one and add one.
   const content = first.document.content.content!;
   const second = await f.store.savePage(
     f.project.id,
@@ -515,13 +502,11 @@ test("a page save stores the same objects as a full write while leaving unedited
   );
   const workspace = await readFile(second.path);
   const after = rows();
-  // The stored rows are exactly the encoding of the saved file.
   expect(after).toEqual(objects(workspace));
   expect(await f.library.readFile(path)).toEqual(workspace);
   for (const [name, oid] of before)
     if (after.get(name) === oid) continue;
     else if (name.endsWith(".json") && !after.has(name))
-      // The removed node and its object are gone.
       expect(name.includes("/nodes/")).toBe(true);
   const db = new DatabaseSync(join(f.root, "history", "content.sqlite"));
   try {
@@ -541,7 +526,6 @@ test("a save projects the committed decoding and still keeps external edits made
     library = new SqliteLibrary(f.root),
     path = `projects/${f.project.id}/pages/${f.page.document.id}.json`,
     projected = join(library.workspace, path);
-  // Stored assets are restored into the projection exactly as a read decodes them.
   const artifact = JSON.parse((await library.readFile(path)).toString());
   artifact.document.title = "data:image/png;base64,iVBORw0KGgo=";
   await library.writeFiles(
@@ -553,8 +537,6 @@ test("a save projects the committed decoding and still keeps external edits made
   expect(JSON.parse(committed.toString()).document.title).toBe(
     artifact.document.title,
   );
-  // The transaction's own read of the page is its comparison baseline, so an
-  // edit made to the workspace file beforehand is still captured.
   const page = await f.store.readPage(f.project.id, f.page.document.id);
   const external = JSON.parse(committed.toString());
   external.document.title = "External version";

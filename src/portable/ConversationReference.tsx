@@ -14,8 +14,6 @@ import { findSurfaceNode } from "../document/document.mjs";
 import { useTranslator } from "../i18n/react";
 import messages from "../i18n/messages/reader";
 
-/** The saved page a conversation reader shows; written by the MCP Apps reader
- * only when its host accepts model context. */
 export interface ConversationPage {
   projectId: string;
   pageId: string;
@@ -23,7 +21,6 @@ export interface ConversationPage {
   hash: string;
   revision?: string;
 }
-/** The conversation reader listens for this; detail.result settles delivery. */
 export const conversationReferenceEvent = "showai:conversation-reference";
 
 export function conversationPage(
@@ -49,11 +46,8 @@ export function conversationPage(
 const idOf = (element: HTMLElement) =>
   element.dataset.blockId ?? element.dataset.surfaceId!;
 
-/** Blocks or Board objects the text selection under the pointer covers,
- * innermost first, with its text. A click elsewhere is about that place. */
 function selectionAt(root: HTMLElement, event: MouseEvent) {
   const { clientX: x, clientY: y } = event;
-  // Readers paint their own text selection; the DOM selection is the fallback.
   const painted =
     event.target instanceof Element ? paintedTextSelection(event.target) : null;
   const selection = window.getSelection();
@@ -73,7 +67,6 @@ function selectionAt(root: HTMLElement, event: MouseEvent) {
       if (!item.intersectsNode(element)) return false;
       const inner = document.createRange();
       inner.selectNodeContents(element);
-      // Components render in shadow roots: count them when wholly selected.
       if (
         item.compareBoundaryPoints(Range.START_TO_START, inner) <= 0 &&
         item.compareBoundaryPoints(Range.END_TO_END, inner) >= 0
@@ -103,8 +96,6 @@ interface MenuState {
   block: HTMLElement | null;
 }
 
-/** "Reference … in the conversation" for a page shown inside an MCP Apps
- * host. The host shows the reference in its input; nothing is sent or saved. */
 export function useConversationReference(
   root: RefObject<HTMLElement | null>,
   document: ShowDocument,
@@ -182,8 +173,6 @@ export function useConversationReference(
   useEffect(() => {
     const element = root.current;
     if (!page || !element) return;
-    // A secondary click may move the caret before contextmenu fires, so the
-    // selection is read when the button goes down.
     let pressed: {
       at: number;
       selection: ReturnType<typeof selectionAt>;
@@ -197,7 +186,6 @@ export function useConversationReference(
     };
     const open = (event: MouseEvent) => {
       const target = event.target as Element;
-      // Shift keeps the browser menu; fields and links keep theirs.
       if (
         event.shiftKey ||
         target.closest("input,textarea,select,a[href],[contenteditable=true]")
@@ -252,14 +240,11 @@ export function useConversationReference(
   useEffect(() => {
     const element = menuRef.current;
     if (!element || !menu) return;
-    // Keep the menu inside the conversation frame.
     const box = element.getBoundingClientRect();
     element.style.left = `${Math.max(8, Math.min(menu.x, innerWidth - box.width - 8))}px`;
     element.style.top = `${Math.max(8, Math.min(menu.y, innerHeight - box.height - 8))}px`;
     element.querySelector("button")?.focus();
   }, [menu]);
-  // Readers may show a Board as a reading projection, so its objects are
-  // recognised from the document rather than from the layout on screen.
   const boardOf = (id: string) => {
     const parent = findSurfaceNode(document, id)?.parent;
     return parent?.type === "surface" && parent.attrs?.kind === "board"

@@ -45,7 +45,6 @@ export function queueNavigationScope(
   for (const id of change?.projectIds ?? []) scope.ids.add(id);
   boundScope(scope);
 }
-/** The change an operation on known projects makes, so only they are read again. */
 export function libraryChange(
   home: string,
   projectIds: string[],
@@ -59,19 +58,11 @@ export function libraryChange(
     ...(options.pageIds ? { pageIds: options.pageIds } : {}),
   };
 }
-/** Preserve unchanged navigation values so a background refresh does not rebuild the editor. */
 export function retainEqual<T>(previous: T, next: T): T {
   return previous === next || JSON.stringify(previous) === JSON.stringify(next)
     ? previous
     : next;
 }
-/**
- * The sidebar contents after a refresh read the scanned projects and their
- * pages. Each project's folders come from the same scan, so pages and folders
- * always describe one moment: a page whose folder was created elsewhere (an
- * import, another window, an Agent) never shows without its folder, whether
- * or not the project is expanded or open.
- */
 export function refreshedContents(
   current: ProjectContents,
   scanned: { project: ProjectSummary; pages: PageSummary[] }[],
@@ -116,10 +107,6 @@ type ProjectContents = Record<
   string,
   { pages: PageSummary[]; folders: FolderMetadata[] }
 >;
-/**
- * Applies this window's own save to loaded navigation. The file watcher no
- * longer echoes that save back here, so the sidebar updates from its record.
- */
 export function withSavedPage(
   contents: ProjectContents,
   projectId: string,
@@ -149,7 +136,6 @@ export function withSavedPage(
   pages[index] = next;
   return { ...contents, [projectId]: { ...current, pages } };
 }
-/** Structure changes still need a scoped refresh of that project's lists. */
 export function savedPageMoved(
   contents: ProjectContents,
   projectId: string,
@@ -169,7 +155,6 @@ export interface LibraryEntryFields {
   icon?: string;
   pinned?: boolean;
 }
-/** Shows a rename, icon or pin change in loaded navigation before the library confirms it. */
 export function withLibraryEntry(
   contents: ProjectContents,
   target: { kind: "page" | "folder"; projectId: string; id: string },
@@ -235,7 +220,6 @@ export function withProjectFields(
     new Set([projectId]),
   );
 }
-/** The folders and pages inside a folder, the folder included. */
 export function folderSubtree(
   contents: ProjectContents,
   projectId: string,
@@ -264,7 +248,6 @@ export function folderSubtree(
     ),
   };
 }
-/** Removes deleted folders and pages from loaded navigation before the library confirms it. */
 export function withoutLibraryEntries(
   contents: ProjectContents,
   projectId: string,
@@ -285,7 +268,6 @@ export function withoutLibraryEntries(
     },
   };
 }
-/** Adds a page this window just created, until the scoped refresh lists it. */
 export function withCreatedPage(
   contents: ProjectContents,
   projectId: string,

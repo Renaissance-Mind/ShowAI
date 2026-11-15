@@ -57,8 +57,6 @@ function rawSource() {
       ],
     },
   ];
-  // Deliberately need canonical missing-ID, layout and view cleanup. These
-  // changes must path-copy frozen descendants instead of changing captured P.
   document.layout = {
     stale: { x: 0, y: 0, width: 40 },
     "actual-ink": {
@@ -150,7 +148,6 @@ it("matches the complete public normalizer on actual frozen captured trees requi
     (raw as any).futureRoot,
   );
   expect(resolve(owner, result.next).comments).toEqual(raw.comments);
-  // Retry compares against the original complete P, not its normalized result.
   const repeated = owner.registerActualNativePublicationIfUnchanged({
     ...request,
     current: result.next,

@@ -9,7 +9,6 @@ export type InkEditPatch = {
   color?: string | null;
   strokeWidth?: number | null;
   pressure?: boolean | null;
-  /** Node structure/metadata excluding ink, color, strokeWidth and pressure. */
   node?: JSONContent;
   layout?: NodeLayout;
   placement?: { parentId: string; after: string | null; before: string | null };
@@ -104,7 +103,6 @@ export type InkJournalEvent = { ordinal: number } & ({ kind: "operation"; operat
 export function replayInkJournalEvents(scope: { pageId: string; boardId: string }, events: InkJournalEvent[]): InkOperationCheckpoint;
 export function canonicalInkJSON(value: unknown): string;
 export function inkOperationDigest(value: unknown): string;
-/** SHA-256 of UTF-8 input, replacing isolated surrogates and preserving normalization. */
 export function installInkDigestProvider(provider: ((source:string)=>string)|null): void;
 export function inkNodeMetadata(node: JSONContent): JSONContent;
 export function validateInkCheckpoint(value: unknown): InkOperationCheckpoint;

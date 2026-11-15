@@ -9,9 +9,6 @@ export interface NativeContentHistoryAction {
   document:ShowDocument;
 }
 
-/** Native object edits can share a source receipt with foreign mutations.
- * Roll back only the accepted local edits against that latest source, retaining
- * foreign changes in every undo snapshot. No intermediate source is published. */
 export function nativeContentHistoryStages(current:ShowDocument,baseline:ShowDocument,
   incoming:ShowDocument,actions:NativeContentHistoryAction[],prepared?:{
     baseline:ShowDocument;current:ShowDocument;incoming:ShowDocument;result:PageMergeResult;

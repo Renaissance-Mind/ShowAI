@@ -95,7 +95,6 @@ describe("shared history/search/restore operations", () => {
     expect(
       (await operations.search({ query: "图表", projectId })).items,
     ).toHaveLength(1);
-    // Current storage records no history and keeps only the current revision.
     expect(
       (
         await operations.history({
@@ -179,7 +178,6 @@ describe("shared history/search/restore operations", () => {
   });
 
   it("merges a draft against its base and refuses a stale reviewed merge", async () => {
-    // Agent reads retain the merge base; superseded revisions are not stored.
     await new ReadBaselines(root).remember(projectId, page);
     const current = await store.savePage(
       projectId,

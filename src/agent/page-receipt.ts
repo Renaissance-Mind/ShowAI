@@ -2,10 +2,6 @@ import type { JSONContent } from "@tiptap/core";
 import type { PageRecord } from "../core/model";
 import type { ShowDocument } from "../types";
 
-/**
- * What an Agent needs after a page state change, without the document. Built
- * after the transaction commits, when the record carries its revision.
- */
 export function pageStateReceipt(record: PageRecord, projectId?: string) {
   return {
     ...(projectId ? { projectId } : {}),
@@ -19,15 +15,12 @@ export function pageStateReceipt(record: PageRecord, projectId?: string) {
   };
 }
 
-/** Ids per kind of change; long lists keep their first ids and report the total. */
 export interface BlockChanges {
   added: string[];
   removed: string[];
   changed: string[];
   moved: string[];
-  /** Total per kind when a list was cut to RECEIPT_IDS entries. */
   counts?: { added: number; removed: number; changed: number; moved: number };
-  /** Title or other page fields changed. */
   page?: true;
 }
 
@@ -39,7 +32,6 @@ interface Entry {
   afterId: string | null;
 }
 
-/** Each identified block's own attributes and direct text, with its place. */
 function blocks(document: ShowDocument): Map<string, Entry> {
   const entries = new Map<string, Entry>();
   const visit = (node: JSONContent, parentId: string | null) => {
@@ -71,7 +63,6 @@ function pageFields(document: ShowDocument) {
     content,
     createdAt: _created,
     updatedAt: _updated,
-    // Layout and views follow the blocks; inserting one is not a page-level change.
     surfaceViews: _views,
     layout: _layout,
     ...rest
@@ -79,11 +70,6 @@ function pageFields(document: ShowDocument) {
   return JSON.stringify([rest, content.type, content.attrs ?? null]);
 }
 
-/**
- * Which blocks a save added, removed, changed or moved, compared by their own
- * attributes and text. One serialization pass per document, so receipts stay
- * cheap on large pages; page_diff gives the field-level comparison.
- */
 export function blockChanges(
   before: ShowDocument,
   after: ShowDocument,
@@ -104,7 +90,6 @@ export function blockChanges(
     if (previous.own !== entry.own) changed.push(id);
     if (previous.parentId !== entry.parentId) moved.push(id);
     else if (previous.afterId !== entry.afterId) {
-      // Inserting or removing a sibling shifts the next one without moving it.
       let left = previous.afterId,
         right = entry.afterId;
       while (left && !next.has(left)) left = old.get(left)?.afterId ?? null;

@@ -1,8 +1,3 @@
-// Shows resource fields that link a file on this device (file: references).
-// The workbench grants each file a short-lived local address; a component
-// frame asks its host page for that grant; readers and exports, which have
-// no device behind them, name the file only.
-
 import {
   createContext,
   useCallback,
@@ -23,27 +18,14 @@ import messages from "../i18n/messages/media";
 
 export type { LocalResourceKind };
 
-/** What a resource field can show now. */
 export interface ResourceView {
-  /** The address to load; absent while a local file is granted or when it cannot be shown. */
   url?: string;
-  /**
-   * ready: load `url`. loading: a local file is being granted. missing: the
-   * host cannot open the file. failed: the file opens but cannot be shown.
-   * unavailable: no device is behind this view (reader, export).
-   */
   status: "ready" | "loading" | "missing" | "failed" | "unavailable";
-  /** Whether the value is a file: reference. */
   local: boolean;
-  /** The reference as stored. */
   ref?: string;
-  /** File name of a local reference. */
   name: string;
-  /** The host's reason a local file cannot be opened. */
   message?: string;
-  /** Asks the host again, e.g. after the file came back. */
   retry(): void;
-  /** Reports that the element could not load `url`. */
   failed(): void;
 }
 
@@ -61,7 +43,6 @@ const errorText = (error: unknown) => {
   return typeof message === "string" ? message : String(error);
 };
 
-/** The channel of the component frame this code runs in, if any. */
 function frameChannel(): string | undefined {
   if (typeof document === "undefined" || window.parent === window) return;
   const config = document.getElementById("showai-component-data")?.textContent;
@@ -71,7 +52,6 @@ function frameChannel(): string | undefined {
 }
 
 let requests = 0;
-/** A component frame asks the page around it; the page checks the reference is in the component's props. */
 function requestFromHost(
   channel: string,
   ref: string,
@@ -93,7 +73,6 @@ function requestFromHost(
         data.requestId !== requestId
       )
         return;
-      // Bytes arrive where the frame cannot reach the host's address.
       const url =
         data.bytes instanceof ArrayBuffer
           ? URL.createObjectURL(
@@ -117,7 +96,6 @@ function requestFromHost(
             },
       );
     };
-    // A host page without local files never answers.
     const timer = setTimeout(
       () => finish({ status: "unavailable", name: localRefName(ref) }),
       10000,
@@ -130,10 +108,6 @@ function requestFromHost(
   });
 }
 
-/**
- * Grants a local file through the workbench host. Absolute URLs, so a
- * component frame (an opaque document) can load them too.
- */
 export async function grantLocalResource(
   ref: string,
   kind: LocalResourceKind,
@@ -148,7 +122,6 @@ export async function grantLocalResource(
         name: grant.name,
         expiresAt: grant.expiresAt,
       }),
-      // The host names why it cannot open the file; the field shows it.
       (error: unknown) => ({ status: "missing", name, message: errorText(error) }),
     );
   const channel = frameChannel();
@@ -156,12 +129,6 @@ export async function grantLocalResource(
   return { status: "unavailable", name };
 }
 
-/**
- * The answer to a component frame's request for a local file. Desktop frames
- * load the granted address; the browser workbench's loopback address is out
- * of reach for opaque frames, so they receive the file's bytes (up to one
- * resource budget) and make their own blob address.
- */
 export async function frameResource(
   ref: string,
   kind: LocalResourceKind,
@@ -222,7 +189,6 @@ function resolveCached(ref: string, kind: LocalResourceKind) {
     const request = grantLocalResource(ref, kind);
     pending = request;
     cache.set(key, request);
-    // Only grants are kept: a file that is missing now may be back for the next view.
     void request.then((outcome) => {
       if (outcome.status !== "ready" && cache.get(key) === request)
         cache.delete(key);
@@ -231,7 +197,6 @@ function resolveCached(ref: string, kind: LocalResourceKind) {
   return pending;
 }
 
-/** Forget a grant, so every view of the file asks the host again. */
 function invalidate(ref: string, kind: LocalResourceKind) {
   const key = cacheKey(ref, kind);
   cache.delete(key);
@@ -241,17 +206,12 @@ function invalidate(ref: string, kind: LocalResourceKind) {
 const RENEW_BEFORE = 60 * 1000;
 const noop = () => {};
 
-/**
- * What a resource field shows for its value: web addresses and embedded
- * data as they are, local file references through a granted address.
- */
 export function useResource(
   value: unknown,
   kind: LocalResourceKind,
 ): ResourceView {
   const ref = isLocalFileRef(value) ? value : undefined;
   const [state, setState] = useState<{ ref?: string; outcome?: Outcome }>({});
-  // An element that cannot load the file asks the host once more, then fails.
   const [failure, setFailure] = useState<{
     ref?: string;
     step: "retrying" | "failed";
@@ -278,7 +238,6 @@ export function useResource(
     outcome?.status === "ready" ? outcome.expiresAt : undefined;
   useEffect(() => {
     if (!ref || !expiresAt) return;
-    // Grants expire; ask for a fresh one shortly before.
     const timer = setTimeout(
       () => invalidate(ref, kind),
       Math.max(1000, expiresAt - Date.now() - RENEW_BEFORE),
@@ -297,7 +256,6 @@ export function useResource(
       setFailure({ ref, step: "failed" });
       return;
     }
-    // The file may have moved since it was granted; ask again before failing.
     setFailure({ ref, step: "retrying" });
     invalidate(ref, kind);
   }, [ref, kind, url, step]);
@@ -328,21 +286,15 @@ export function useResource(
     : { url, status: "ready", local: true, ref, name, retry, failed };
 }
 
-/** What the workbench shows for a local file it cannot show: its warning surface. */
 export interface LocalResourceIssueProps {
   view: ResourceView;
   kind: LocalResourceKind;
-  /** Stores another file reference in the field; absent when it is read-only. */
   onReplace?: (ref: string) => void;
 }
 export const LocalResourceUi = createContext<{
   Issue: ComponentType<LocalResourceIssueProps>;
 } | null>(null);
 
-/**
- * A local file a field cannot show: the workbench warning with its actions,
- * or in readers and exports a notice naming the file.
- */
 export function LocalResourceNotice(props: LocalResourceIssueProps) {
   const ui = useContext(LocalResourceUi);
   const t = useTranslator(messages);
@@ -360,10 +312,6 @@ export function LocalResourceNotice(props: LocalResourceIssueProps) {
   );
 }
 
-/**
- * Links an original file to a resource field: the workbench host opens its
- * file chooser. Undefined where no host can link files (readers, frames).
- */
 export function useLocalFileChooser():
   | ((
       kind: LocalResourceKind,

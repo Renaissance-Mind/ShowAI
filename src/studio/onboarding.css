@@ -1,4 +1,3 @@
-/* First run: welcome in the Recent view, Agent status and next steps. */
 .studio-welcome {
   container-type: inline-size;
   box-sizing: border-box;
@@ -182,7 +181,6 @@
 .studio-welcome-footer {
   display: flex;
 }
-/* Follows the space left by the sidebar and Agent panel, not the window. */
 @container (max-width: 520px) {
   .studio-welcome-intro h2 {
     font-size: 22px;
@@ -204,7 +202,6 @@
   white-space: normal;
 }
 
-/* Agent status row and next-step actions (Agent panel, setup errors). */
 .onboarding-status {
   display: flex;
   flex-direction: column;

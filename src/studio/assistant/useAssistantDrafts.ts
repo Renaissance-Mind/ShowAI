@@ -8,7 +8,6 @@ const t = translator(persistMessages);
 const store = createDraftStore(() => localStorage);
 
 let detach: (() => void) | null = null;
-/** Saves before the window closes while any Agent input is on screen. */
 function attach() {
   const stop = desktop.onBeforeClose(async () => {
     const error = store.persist();
@@ -46,11 +45,9 @@ function subscribe(listener: () => void) {
 
 export function useAssistantDrafts(key: string) {
   const snapshot = useSyncExternalStore(subscribe, store.getSnapshot);
-  // Drafts saved before a field existed take its empty value.
   const current: ComposerDraft = store.draft(key);
   return {
     ...current,
-    /** Whether anything was typed or picked for this key. */
     saved: key in snapshot.drafts,
     persistenceError: snapshot.error,
     update: (patch: Partial<ComposerDraft>, capturedKey = key) =>

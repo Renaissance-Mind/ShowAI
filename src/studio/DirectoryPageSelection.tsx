@@ -75,20 +75,16 @@ export function useDirectoryPageSelection(scope: string, pageIds: string[]) {
   };
 }
 
-/** Start on empty directory space so opening and dragging entries keep their existing meaning. */
 export function useDirectoryMarquee(
   selection: ReturnType<typeof useDirectoryPageSelection>,
   scope: string,
   enabled: boolean,
 ) {
-  // Pointer motion only paints this overlay; it must not render the workbench.
   const overlayRef = useRef<HTMLDivElement>(null);
   const t = useTranslator(studioMessages);
   const label = useRef(t);
   label.current = t;
   const repaint = useRef<() => void>(() => {});
-  // A navigation or toolbar render may commit while dragging; reapply the live
-  // highlight without publishing transient pointer positions to Studio.
   useLayoutEffect(() => {
     repaint.current();
   });
@@ -195,8 +191,6 @@ export function useDirectoryMarquee(
       const bounds = element.getBoundingClientRect();
       const scrollTop = element.scrollTop;
       const scrollLeft = element.scrollLeft;
-      // Read geometry together, once per gesture or actual directory reflow.
-      // Scrolling translates content coordinates without remeasuring every card.
       current.entries ??= Array.from(
         element.querySelectorAll<HTMLElement>("[data-selectable]"),
         (row) => {
@@ -258,7 +252,6 @@ export function useDirectoryMarquee(
         overlay.style.width = `${rectangle.width}px`;
         overlay.style.height = `${rectangle.height}px`;
       }
-      // Keep ticking only while the pointer actually moves the scroll position.
       const delta = speed(clientY, bounds.top, bounds.bottom);
       if (delta && !final) {
         element.scrollTop = scrollTop + delta;
@@ -510,7 +503,6 @@ export function BatchPagesDialog({
   const sameLocation = targets.every(
     (target) => target.projectId === projectId && target.parentId === parentId,
   );
-  // Folders move only within their project, and never into themselves.
   const movingFolders = new Set(
     targets
       .filter((target) => target.kind === "folder")

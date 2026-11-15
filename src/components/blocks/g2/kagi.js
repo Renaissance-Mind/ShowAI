@@ -1,5 +1,3 @@
-// G2 Kagi concept: https://g2.antv.antgroup.com/en/charts/kagi
-// Closing values from G2's official K-chart example, in chronological order.
 import { translator } from "../../../i18n";
 import messages from "../../../i18n/messages/g2";
 

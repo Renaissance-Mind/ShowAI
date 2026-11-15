@@ -1,15 +1,9 @@
-// Contract for the svg built-in: a hand-drawn vector figure stored as SVG source.
-// It runs in the workbench, the CLI and the portable reader, so it stays
-// dependency-free and checks the source as text. The renderer sanitizes again
-// with the browser's parser before the figure is shown.
-
 const fail = (message) => {
   throw new Error(message);
 };
 const isObject = (value) =>
   Boolean(value) && typeof value === "object" && !Array.isArray(value);
 
-/** Tones of the shared drawing palette; classes such as fill-blue use them. */
 export const DRAWING_TONES = [
   "blue",
   "gray",
@@ -21,7 +15,6 @@ export const DRAWING_TONES = [
 ];
 export const SVG_LIMITS = { sourceLength: 2_000_000, textLength: 2000 };
 
-/** Elements a figure may use; anything else is rejected or removed. */
 export const SVG_ELEMENTS = [
   "svg",
   "g",
@@ -51,12 +44,10 @@ export const SVG_ELEMENTS = [
 ];
 
 const RASTER = /^data:image\/(png|jpe?g|gif|webp);base64,/i;
-/** Whether an href may stay: same-figure references or embedded raster images. */
 export function safeSvgHref(value) {
   const href = String(value).trim();
   return href.startsWith("#") || RASTER.test(href);
 }
-/** Whether a style or attribute value only uses url(#id) references. */
 export function safeSvgUrls(value) {
   return [...String(value).matchAll(/url\(\s*(['"]?)([^)'"]*)\1\s*\)/gi)].every(
     ([, , target]) => target.trim().startsWith("#"),

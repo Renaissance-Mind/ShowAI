@@ -1,6 +1,5 @@
 import { defineMessages } from "../index";
 
-// Sync engine errors and statuses shown in Settings → Server & sync.
 export default defineMessages("syncEngine", {
   "zh-CN": {
     "server.status": "服务器返回 {status}",

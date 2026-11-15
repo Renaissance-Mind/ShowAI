@@ -1,6 +1,5 @@
 import { defineMessages } from "../index";
 
-// The import dialog: what an import will create, its progress and its result.
 export default defineMessages("imports", {
   "zh-CN": {
     title: "导入 {name}",

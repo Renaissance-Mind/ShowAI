@@ -1,6 +1,5 @@
 import { defineMessages } from "../index";
 
-// Agent host status, progress and errors (Electron main / browser server).
 export default defineMessages("agentHost", {
   "zh-CN": {
     "gateway.unsupportedTool": "Chat Completions 来源不支持工具 {type}。",

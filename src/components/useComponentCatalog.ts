@@ -78,7 +78,6 @@ export function useComponentCatalog(open: boolean) {
     resolve,
     error,
     loading,
-    // Hosted editors label built-ins in the workbench language.
     displayName: componentDisplayName,
     displayDescription: componentDisplayDescription,
   };

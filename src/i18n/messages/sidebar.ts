@@ -1,6 +1,5 @@
 import { defineMessages } from "../index";
 
-// Project sidebar, library tree, recent pages and workspace tabs.
 export default defineMessages("sidebar", {
   "zh-CN": {
     collapseSidebar: "收起侧栏",

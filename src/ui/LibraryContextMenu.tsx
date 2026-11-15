@@ -1,8 +1,3 @@
-/**
- * The shared menu surface for sidebar rows, cards and page actions. It lives
- * apart from the sidebar rows so page readers can use it without bundling the
- * workbench navigation.
- */
 import {
   useId,
   useLayoutEffect,
@@ -28,11 +23,8 @@ interface LibraryMenuItemBase {
   separatorBefore?: boolean;
   shortcut?: string;
   checked?: boolean;
-  /** One line under the label that says what the action produces. */
   description?: string;
-  /** Items sharing a group follow one heading; a new group starts a new section. */
   group?: string;
-  /** A stable id under which quick jump offers the same action. */
   command?: string;
 }
 export type LibraryContextMenuItem = LibraryMenuItemBase &
@@ -79,7 +71,6 @@ function enabledItems(
   ].filter((item) => !item.disabled);
 }
 
-/** A single menu surface works for sidebar rows, cards and page actions. */
 export function LibraryContextMenu({
   anchor,
   portalRoot,
@@ -171,7 +162,6 @@ export function LibraryContextMenu({
     const outsidePointer = (event: PointerEvent) => {
       const target = event.target as Node | null;
       if (!target || menu.contains(target) || anchor.contains(target)) return;
-      // Let the clicked control receive focus naturally instead of stealing it.
       restoreFocus.current = false;
       latestClose.current();
     };

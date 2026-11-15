@@ -46,7 +46,6 @@ describe("external workspace conflict protection", () => {
     await writeFile(join(library.workspace, path), bytes);
     return bytes;
   }
-  /** A save records the external edit instead of overwriting it. */
   async function recordedBySave() {
     const formal = await store.readPage(projectId, pageId);
     await expect(
@@ -64,7 +63,6 @@ describe("external workspace conflict protection", () => {
   it("preserves external edits, blocks only their resource and permits other writes", async () => {
     const before = await library.head();
     const bytes = await external("External edit");
-    // Opening a page compares no files; the save that would overwrite one does.
     const opened = await store.readPage(projectId, pageId);
     expect(opened.document.title).toBe("Original");
     expect(opened.workspaceConflicts).toBeUndefined();

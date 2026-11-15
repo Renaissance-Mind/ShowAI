@@ -257,7 +257,6 @@ describe("contributed field types", () => {
     const contributed = {
       ...valueTypeOf({ ...rating, kind: "number" as const }),
       operators: ["gte" as const],
-      // The component's project() answer: ratings count double.
       project: (value: unknown) => (typeof value === "number" ? value * 2 : null),
     };
     const context = { contributed: () => contributed };

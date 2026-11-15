@@ -35,7 +35,6 @@ import type { MenuState } from "./useMenuState";
 import type { MenuItems } from "./useMenuItems";
 import { LibraryItemMenu } from "./LibraryItemMenu";
 
-/** The workbench's anchored menus: export, the project list, New, groups, the directory view and items. */
 export function StudioMenus({
   feedback,
   library,

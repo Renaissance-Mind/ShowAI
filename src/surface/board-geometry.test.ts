@@ -641,7 +641,7 @@ describe("content-sized object geometry", () => {
   it("returns the actual source identity only when this materialization changes no geometry", () => {
     const document=reconcileConnections(fixture()),store=new SurfaceGeometryStore(),bytes=JSON.stringify(document);
     expect(store.materialize(document)).toBe(document);
-    store.measure("page",200,540); // a different rendered width is not applicable
+    store.measure("page",200,540);
     expect(store.materialize(document)).toBe(document);expect(JSON.stringify(document)).toBe(bytes);
     document.layout.page={...document.layout.page,heightMode:"auto"};
     store.measure("page",300,540);
@@ -658,7 +658,6 @@ describe("content-sized object geometry", () => {
   it("observes in-place node insertion and changed arrow dependencies before returning identity", () => {
     const document=reconcileConnections(fixture()),store=new SurfaceGeometryStore();
     expect(store.materialize(document)).toBe(document);
-    // Populate the separate render cache before an external same-root edit.
     store.resolveArrow(arrow(document),document.layout.arrow,document);
     document.content.content!.push(createSurface("page","New Page","new-page"));
     document.layout["new-page"]={x:0,y:0,width:300,height:200,heightMode:"auto"};

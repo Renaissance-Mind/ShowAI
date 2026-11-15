@@ -1,8 +1,3 @@
-/**
- * A failed built-in Agent request or turn, shown with the shared problem
- * notice: a summary chosen by the host's problem code, the reason, actions
- * for that code, the original text collapsed, and the troubleshooting guide.
- */
 import { useRef } from "react";
 import type { AgentProblem, AgentProblemCode } from "../../agent-host/types";
 import { translator } from "../../i18n";
@@ -58,7 +53,6 @@ const codes = new Set<AgentProblemCode>([
   "unknown",
 ]);
 
-/** The host's classification carried by a thrown IPC error, if any. */
 export function agentProblemOf(error: unknown): AgentProblem | null {
   const problem =
     error && typeof error === "object" && "problem" in error
@@ -74,7 +68,6 @@ export function agentProblemOf(error: unknown): AgentProblem | null {
   return null;
 }
 
-/** An error the host didn't classify still gets retry and a report. */
 export function unclassifiedProblem(error: unknown): AgentProblem {
   const message =
     error && typeof error === "object" && "message" in error
@@ -87,7 +80,6 @@ export function unclassifiedProblem(error: unknown): AgentProblem {
   };
 }
 
-/** Readiness kinds whose status card already offers the same next steps. */
 export function readinessKindOf(code: AgentProblemCode): AgentStepKind | null {
   const kinds: Partial<Record<AgentProblemCode, AgentStepKind>> = {
     no_model_source: "noSource",
@@ -100,7 +92,6 @@ export function readinessKindOf(code: AgentProblemCode): AgentStepKind | null {
   return kinds[code] ?? null;
 }
 
-/** Actions for a problem code, most useful first; the caller drops what it can't do. */
 export function problemActions(
   problem: Pick<AgentProblem, "code" | "chatgpt">,
   options: { localCodex?: boolean } = {},
@@ -147,7 +138,6 @@ export function problemActions(
 
 const translateErrors = translator(errorMessages);
 
-/** Notice parts for the shared ProblemNotice, in the current UI language. */
 export function describeAgentProblem(
   problem: AgentProblem,
   t: ReturnType<typeof translator<(typeof messages)["catalogs"]["zh-CN"]>>,
@@ -172,7 +162,6 @@ export function describeAgentProblem(
   const at = context.at ?? new Date().toISOString();
   const lines: [string, string | number | undefined][] = [
     [translateErrors("detail.code"), code],
-    // The execution label already names itself, e.g. 执行：DeepSeek · model.
     ["", context.agent],
     [translateErrors("detail.status"), problem.status],
     [t("detail.exitCode"), problem.exitCode],
@@ -211,13 +200,10 @@ export function AgentProblemNotice({
   onNewConversation,
 }: {
   problem: AgentProblem;
-  /** "input": the request was not sent and stays in the input; "page": the turn left the page unchanged. */
   safety?: "input" | "page";
   setup: AgentSetupHandlers;
-  /** Execution label for the details, e.g. "Codex" or "DeepSeek · model". */
   agent?: string;
   at?: string;
-  /** The readiness card above already offers the actions; keep only the reassurance. */
   compact?: boolean;
   onRetry?: () => void;
   onNewConversation?: () => void;
@@ -260,7 +246,6 @@ export function AgentProblemNotice({
     const onSelect = handlers[id];
     return onSelect ? [{ label: t(`action.${id}`), onSelect }] : [];
   });
-  // Unclassified failures always offer a report, even without a retry.
   if (problem.code === "unknown" && !actions.length)
     actions.push({ label: t("action.report"), onSelect: handlers.report! });
   const reassurance = safety

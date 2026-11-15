@@ -1,7 +1,3 @@
-// Contract for the mechanism-diagram built-in: objects on a grid, the state
-// they hold (small tables), the links between them, and steps that change only
-// what differs. Dependency-free so the workbench, CLI and reader share it.
-
 import { DRAWING_TONES } from "./svg-contract.mjs";
 
 const fail = (message) => {

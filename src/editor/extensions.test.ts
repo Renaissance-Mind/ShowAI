@@ -180,11 +180,8 @@ describe("stable block IDs in the real editor schema", () => {
       ]),
       plugins: [createBlockIdPlugin(() => true)],
     });
-    // A text edit lets the plugin record the plain paragraph as text-only.
     state = state.applyTransaction(state.tr.insertText("X", 2)).state;
     expect(ids(state)).toEqual(["plain", "with-break", "break"]);
-    // The same paragraph later gains an inline atom without an ID, then one
-    // that duplicates an existing ID; both receive fresh IDs.
     state = state.applyTransaction(
       state.tr.insert(3, schema.nodes.hardBreak.create({ id: null })),
     ).state;

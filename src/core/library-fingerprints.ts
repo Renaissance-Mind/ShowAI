@@ -3,7 +3,6 @@ import { constants } from "node:fs";
 import { open } from "node:fs/promises";
 import { safeLibraryPath } from "./library-files";
 import { CoreError } from "./model";
-/** Streaming fingerprints cover large Git packs without loading them into memory. */
 export async function libraryFingerprint(root: string, path: string) {
   await safeLibraryPath(root, path);
   const file = await open(

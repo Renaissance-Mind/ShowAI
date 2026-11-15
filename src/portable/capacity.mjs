@@ -1,12 +1,10 @@
 import { capturedContentSummary } from "./owned-json.mjs";
-/** Byte budgets for distinct architectural boundaries. Binary resources are measured decoded. */
 const MiB = 1024 * 1024;
 export const CAPACITY = Object.freeze({
   pageStructureBytes: 16 * MiB,
   resourceBytes: 64 * MiB,
   pageResourceBytes: 128 * MiB,
   componentPropsBytes: 8 * MiB,
-  // A shared dataset becomes component props, so it shares their budget.
   datasetBytes: 8 * MiB,
   componentSourceBytes: 16 * MiB,
   componentAssetBytes: 128 * MiB,
@@ -19,15 +17,11 @@ export const CAPACITY = Object.freeze({
   publicationTransferBytes: 512 * MiB,
   syncManifestBytes: 16 * MiB,
   syncObjectBytes: 64 * MiB,
-  // Packaging of files outside the library for synchronization and export:
-  // one bundled item, and everything one sync or export carries.
   packageItemBytes: 64 * MiB,
   packageTotalBytes: 256 * MiB,
-  // The conversation renderer's limit is decimal bytes, unlike storage budgets.
   chatBytes: 1_000_000,
   mcpImageBytes: 8 * MiB,
 });
-/** Counts TextEncoder's output without allocating it; lone surrogates encode as U+FFFD. */
 export const utf8Bytes = (value) => {
   let bytes = value.length;
   for (let index = 0; index < value.length; index++) {
@@ -63,7 +57,6 @@ export class CapacityError extends Error {
 export function assertBytes(kind, bytes, maximum) {
   if (bytes > maximum) throw new CapacityError(kind, bytes, maximum);
 }
-/** Reject malformed encodings before allocating their decoded buffer. */
 function canonicalPadding(encoded) {
   const padding = encoded.endsWith("==") ? 2 : encoded.endsWith("=") ? 1 : 0;
   const alphabet =
@@ -85,8 +78,6 @@ export function base64Bytes(encoded) {
     throw new Error("Non-canonical base64 resource.");
   return (encoded.length / 4) * 3 - padding;
 }
-/** Pure classification used while an actual independent JSON branch seals.
- * It does not admit a resource: the ordinary measurement gate checks limits. */
 export function dataUrlContent(value) {
   if (typeof value !== "string") return null;
   const match = /^data:([\w.+\/-]+);base64,([A-Za-z0-9+/]*={0,2})$/.exec(value);
@@ -97,12 +88,9 @@ export function dataUrlContent(value) {
     structureBytes: utf8Bytes(JSON.stringify(`asset:${match[1]}:sha256`)),
   };
 }
-// Extra traversal evidence stays private: ordinary measurement report shape is
-// unchanged, and a caller-created numeric report cannot assert a measured depth.
 const measurementDepth = new WeakMap();
 export const contentMeasurementDepth = (report) =>
   measurementDepth.get(report) ?? null;
-/** Mirrors storage's whole-string data-URL extraction; URLs inside code remain structure. */
 export function measureContent(value) {
   const held = capturedContentSummary(value);
   if (held) {
@@ -165,7 +153,6 @@ export function measureContent(value) {
           resourceBytes += bytes;
         }
         structureBytes += utf8Bytes(JSON.stringify(`asset:${match[1]}:sha256`));
-        // Canonical data URLs contain only ASCII and need no JSON escaping.
         jsonBytes += entry.length + 2;
       } else addStructure(utf8Bytes(JSON.stringify(entry)));
     } else if (Array.isArray(entry)) {
@@ -195,9 +182,6 @@ export function measureContent(value) {
   measurementDepth.set(result, maximumDepth);
   return result;
 }
-/** Local byte comparison only. A caller must separately prove that one
- * existing field changed and that its real base body satisfies all limits.
- * New/different resources require a whole-body deduplicated measurement. */
 export function nonResourceReplacementDoesNotGrow(before, after) {
   const oldSize = measureContent(before),
     newSize = measureContent(after);
@@ -215,8 +199,6 @@ export function assertContent(
 ) {
   return assertContentSizes(measureContent(value), kind, maximum);
 }
-/** Apply the same limits to an internally measured report or a proven upper
- * bound. Reports themselves are measurements, never document-validation proof. */
 export function assertContentSizes(
   sizes,
   kind = "Page structure",
@@ -228,7 +210,6 @@ export function assertContentSizes(
     sizes.resourceBytes,
     CAPACITY.pageResourceBytes,
   );
-  // Repeated URLs deduplicate in storage but expand in portable JSON and requests.
   assertBytes(
     "Authoring JSON (encoded resources included)",
     sizes.jsonBytes,
@@ -277,7 +258,6 @@ export function assertPackageFiles(files) {
   );
   return { sourceBytes, assetBytes, files: count };
 }
-/** Bound body allocation for Worker and Node HTTP MCP before decoding JSON. */
 export async function readCapacityText(request, maximum, kind) {
   const declared = request.headers.get("content-length");
   if (declared !== null) {

@@ -43,10 +43,6 @@ const exists = (path: string) =>
 const workspacePage = (projectId: string, pageId: string) =>
   join(home, "workspace", "projects", projectId, "pages", `${pageId}.json`);
 
-/**
- * A page whose text and image do not compress, so their stored size is
- * measurable. The image is kept once under assets/, shared by reference.
- */
 async function largePage(projectId: string, title: string, bytes = 200_000) {
   return invoke("pages:create", {
     projectId,
@@ -297,7 +293,6 @@ describe("permanently deleting items in the trash", () => {
     await maintenance.cleanup(plan.id);
     const after = await maintenance.storage();
 
-    // The page text (~200 KB stored), its image (100 KB) and the draft image (50 KB) are gone.
     expect(
       before.git.packedBytes - after.git.packedBytes,
     ).toBeGreaterThan(290_000);
@@ -351,7 +346,6 @@ describe("permanently deleting items in the trash", () => {
     const bytes = Buffer.from(
       JSON.stringify({ archived: randomBytes(200_000).toString("base64") }),
     );
-    // An older library whose saves were recorded as history before the archive froze.
     const donor = await mkdtemp(join(tmpdir(), "showai-purge-donor-"));
     const donorLibrary = new ContentLibrary(donor);
     await donorLibrary.initialize();
@@ -372,7 +366,6 @@ describe("permanently deleting items in the trash", () => {
     const workspaceFile = join(home, "workspace", path);
     await mkdir(dirname(workspaceFile), { recursive: true });
     await writeFile(workspaceFile, bytes);
-    // The file left current content long ago; only the archived history holds it.
     await new ContentLibrary(home).writeFiles(new Map([[path, null]]), {
       actor: { kind: "human" },
       channel: "desktop",

@@ -3,15 +3,6 @@ import { randomUUID } from "node:crypto";
 import { dirname, join } from "node:path";
 import { atomicRename } from "./atomic-rename";
 
-/**
- * First-run state of one content library. It lives in the library's local
- * state, so it never syncs and never changes project history.
- *
- * Only a library created by `openLibrary` is marked `pending`; libraries that
- * existed before have no file and are never given sample content. Once the
- * samples were created (or creation failed), the state never returns to
- * `pending`, so a deleted sample project does not come back.
- */
 export type SampleState =
   | { state: "pending"; markedAt: string }
   | { state: "seeding"; startedAt: string }
@@ -19,7 +10,6 @@ export type SampleState =
       state: "seeded";
       projectId: string;
       locale: string;
-      /** Sample key → page ID in the sample project. */
       pages: Record<string, string>;
       seededAt: string;
     }
@@ -68,7 +58,6 @@ export async function writeOnboarding(root: string, samples: SampleState) {
   await atomicRename(temporary, path);
 }
 
-/** Marks a newly created library once; an existing state is never replaced. */
 export async function markNewLibrary(root: string) {
   const path = onboardingPath(root);
   await mkdir(dirname(path), { recursive: true });

@@ -9,7 +9,6 @@ import {
 import { useTranslator } from "../../i18n/react";
 import messages from "../../i18n/messages/richText";
 
-/** Shared actions for the selection and context menu slots. */
 export function TableSelectionActions({
   editor,
   context = false,

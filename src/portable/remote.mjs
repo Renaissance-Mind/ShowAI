@@ -1,5 +1,4 @@
 import { CAPACITY } from "./capacity.mjs";
-/** Shared transport rules for Node verification and the browser reader. No code executes here. */
 export const MAX_PUBLICATION_BUNDLE_BYTES = CAPACITY.publicationBytes;
 const digestPattern = /^sha256-[a-f0-9]{64}$/;
 const idPattern = /^[a-z][a-z0-9-]{0,79}$/;

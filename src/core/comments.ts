@@ -1,14 +1,3 @@
-/**
- * Page comments: threads anchored to a text range in a text block or to a
- * whole block (component, board object, any block with a stable id).
- *
- * `document.comments` stays a flat list so that pages without comments keep
- * their bytes and hashes, and concurrent writers merge record by record. A
- * thread is its first comment plus the comments whose `threadId` names it.
- * Text anchors quote the text with a little context instead of storing
- * positions, so they survive edits around them and edits by any writer; when
- * the quoted text is gone the thread is detached but kept.
- */
 import type { JSONContent } from "@tiptap/core";
 import type { CommentAnchor, CommentAuthor, PageComment, ShowDocument } from "../types";
 import { walk } from "../document/walk.mjs";
@@ -16,7 +5,6 @@ import { walk } from "../document/walk.mjs";
 export type { CommentAnchor, CommentAuthor, PageComment };
 
 const TEXT_BLOCKS = new Set(["paragraph", "heading", "codeBlock"]);
-/** Inline leaves (hard breaks, inline math) take one position in the editor. */
 const INLINE_LEAF = "￼";
 const CONTEXT = 32;
 export const COMMENT_TEXT_LIMIT = 10_000;
@@ -39,7 +27,6 @@ export function isTextBlock(node: JSONContent | undefined): boolean {
   return !!node && TEXT_BLOCKS.has(node.type ?? "");
 }
 
-/** Text of a text block with each inline leaf as one character, matching editor offsets. */
 export function textBlockText(node: JSONContent): string {
   return (node.content ?? [])
     .map((child) =>
@@ -51,7 +38,6 @@ export function textBlockText(node: JSONContent): string {
 export function blockIndex(document: ShowDocument) {
   const blocks = new Map<string, { node: JSONContent; order: number }>();
   let order = 0;
-  // Comment highlights render on the page tree, so anchors address its blocks.
   walk(document.content, (node, { parent }) => {
     if (!parent || node.type === "text") return;
     const id = node.attrs?.id;
@@ -93,7 +79,6 @@ function sharedPrefix(a: string, b: string) {
   return length;
 }
 
-/** The occurrence of the quote that best matches its context, or -1. */
 export function findQuote(text: string, anchor: CommentAnchor): number {
   const quote = anchor.quote ?? "";
   if (!quote) return -1;
@@ -156,7 +141,6 @@ export function commentThreads(comments: readonly PageComment[]): CommentThread[
   }
   for (const reply of replies) {
     const thread = threads.get(reply.threadId!);
-    // A reply whose first comment was deleted concurrently keeps its own thread.
     if (thread) thread.replies.push(reply);
     else
       threads.set(reply.threadId!, {
@@ -175,7 +159,6 @@ export interface LocatedThread extends CommentThread {
   location: AnchorLocation;
 }
 
-/** Threads in reading order: by anchor block and offset; page-level and detached last. */
 export function documentThreads(document: ShowDocument): LocatedThread[] {
   const comments = document.comments ?? [];
   if (!comments.length) return [];
@@ -198,7 +181,6 @@ export function documentThreads(document: ShowDocument): LocatedThread[] {
   );
 }
 
-// Thread operations. Each returns a new list; callers save it as `comments`.
 
 export function newCommentId() {
   return `comment-${crypto.randomUUID()}`;
@@ -278,7 +260,6 @@ export function editComment(
   );
 }
 
-/** Deleting a thread's first comment deletes the thread. */
 export function deleteComment(
   comments: readonly PageComment[],
   id: string,
@@ -288,7 +269,6 @@ export function deleteComment(
   );
 }
 
-/** Resolution lives on the thread's first comment. */
 export function setThreadResolved(
   comments: readonly PageComment[],
   threadId: string,
@@ -301,9 +281,7 @@ export function setThreadResolved(
   );
 }
 
-// Keeping anchors on their text through edits.
 
-/** Map an offset through the single changed region between two texts. */
 function mapOffset(
   before: string,
   after: string,
@@ -318,19 +296,12 @@ function mapOffset(
   const delta = after.length - before.length;
   if (offset < head) return offset;
   if (offset > changedEnd) return offset + delta;
-  // Text typed exactly at an anchor's edge stays outside the anchor.
   if (head === changedEnd) return assoc < 0 ? offset : offset + delta;
   if (offset === head) return head;
   if (offset === changedEnd) return changedEnd + delta;
   return assoc < 0 ? head : changedEnd + delta;
 }
 
-/**
- * Carry text anchors from `before` to `after`: an anchor whose quoted text was
- * edited follows the edit, an anchor whose text moved to a new block (a split
- * or a join) follows it, and an anchor whose text was deleted stays as it was
- * and therefore detached. Returns `after` itself when nothing changes.
- */
 export function rebaseCommentAnchors(
   before: ShowDocument,
   after: ShowDocument,
@@ -365,7 +336,6 @@ export function rebaseCommentAnchors(
         return { ...comment, anchor: moved };
       }
     }
-    // The quoted text may now live in a block created or changed by this edit.
     const candidates = [...next].filter(
       ([id, entry]) =>
         isTextBlock(entry.node) &&
@@ -387,9 +357,6 @@ export function rebaseCommentAnchors(
   return changed ? { ...after, comments: rebased } : after;
 }
 
-// Validation of the fields comments gained after the original
-// {id,text,createdAt,resolved} shape. The portable reader keeps its own
-// lenient check; saves go through this one.
 
 function isDate(value: unknown) {
   return typeof value === "string" && Number.isFinite(Date.parse(value));
@@ -449,7 +416,6 @@ export function validateComments(comments: readonly PageComment[]): void {
   }
 }
 
-/** Open threads as an Agent reads them with a page; resolved ones are only counted. */
 export function agentCommentView(document: ShowDocument, blockIds?: string[]) {
   const scope = blockIds ? new Set(blockIds) : undefined;
   const threads = documentThreads(document).filter(

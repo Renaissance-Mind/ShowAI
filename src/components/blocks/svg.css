@@ -1,4 +1,3 @@
-/* svg: a drawn figure scaled to the page, themed through the drawing palette. */
 .sb-block.sv-block {
   margin: 0;
 }
@@ -19,8 +18,6 @@
   height: auto;
   overflow: visible;
 }
-/* Unstyled text and shapes follow the theme; explicit attributes still win
- * over these defaults only where a palette class is absent. */
 .sb-block.sv-block .sv-figure text:not([fill]):not([class*="ink-"]) {
   fill: var(--dw-ink);
 }
@@ -34,7 +31,6 @@
   outline: 2px solid var(--sb-accent);
 }
 
-/* Neutral roles. */
 .sb-block.sv-block .sv-figure .ink {
   fill: var(--dw-ink);
 }
@@ -57,8 +53,6 @@
   stroke: var(--dw-muted);
 }
 
-/* Tone roles: fill-* soft fills, solid-* strong fills, stroke-* lines,
- * ink-* text on a soft fill. */
 .sb-block.sv-block .sv-figure .fill-blue {
   fill: var(--dw-blue-soft);
 }

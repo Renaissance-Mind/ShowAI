@@ -40,7 +40,6 @@ export async function remoteSaveOrigin(
     : !!origin.sourceUser && origin.sourceUser.id !== connection.user.id;
   return foreign ? { config, connection, origin } : null;
 }
-/** A dirty editor encountering an imported remote version follows the cross-device policy. */
 export async function preserveRemoteSave(
   home: string,
   projectId: string,

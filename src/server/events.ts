@@ -36,8 +36,6 @@ const base64 = (bytes: Uint8Array) => {
   return btoa(value);
 };
 
-/** Shared by Linux sockets and hibernating Cloudflare sockets. Permissions and
- * budgets are rechecked before every delivery; no token is persisted by peers. */
 export class ProjectEvents {
   constructor(
     readonly db: MetadataStore,
@@ -102,9 +100,6 @@ export class ProjectEvents {
     event: ProjectEvent,
     authority?: SyncProject[],
   ) {
-    // Permission changes can interleave with object reads and budget accounting.
-    // Re-read authority immediately before constructing the delivered payload,
-    // unless the caller has just done so.
     const current = authority ?? (await this.projects(peer.identity()));
     if (!current) {
       peer.close(4001, "The device session is no longer valid.");
@@ -135,8 +130,6 @@ export class ProjectEvents {
       );
       peer.send(frame);
     } catch (error) {
-      // A recipient's exhausted budget or failed transport must not turn an
-      // already durable publication into a failed write for every other member.
       const code =
         error instanceof SyncError ? error.code : "EVENT_DELIVERY_FAILED";
       if (!(error instanceof SyncError))
@@ -168,7 +161,6 @@ export class ProjectEvents {
         "INVALID_EVENT",
         "A project event request is required.",
       );
-    // Heartbeats only keep the transport alive; deliveries recheck the session.
     if (input.type === "ping") {
       peer.send(JSON.stringify({ type: "pong" }));
       return;
@@ -222,11 +214,6 @@ export class ProjectEvents {
       await this.prepare(projectId, previousHead)
     )();
   }
-  /**
-   * Reads everything a publication notice needs while the publication's state
-   * is current, and returns the per-peer delivery to run after responding.
-   * The publishing session gets only the new head: it already has the content.
-   */
   async prepare(
     projectId: string,
     previousHead?: string | null,
@@ -259,7 +246,6 @@ export class ProjectEvents {
         previousSequence = row.sequence;
       }
     }
-    // Subscribers that keep the previous state receive only what changed.
     const delta =
       previous &&
       previous.snapshot.format === syncProtocol &&
@@ -279,7 +265,6 @@ export class ProjectEvents {
       for (const [path, digest] of Object.entries(record.snapshot.files)) {
         if (previous?.snapshot.files[path] === digest || seen.has(digest))
           continue;
-        // Bound storage lookups when nothing previous is known, as on a first publish.
         if (seen.size >= 256) break;
         seen.add(digest);
         const key = `projects/${projectId}/objects/${digest}`;
@@ -327,8 +312,6 @@ export class ProjectEvents {
           );
           continue;
         }
-        // The head can advance while objects are read. Never attach an older record
-        // to a newer notification; the next verified current-state request catches up.
         await this.deliver(
           peer,
           {

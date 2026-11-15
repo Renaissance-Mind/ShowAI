@@ -2,10 +2,6 @@ export const reducedMotion = () =>
   window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
 let stop: (() => void) | undefined;
-/**
- * Outline the given rects for a moment, following it each frame
- * (scrolling, Board panning) without touching editor DOM.
- */
 export function flashTarget(rectsOf: () => DOMRect[], duration = 1600) {
   stop?.();
   const box = document.createElement("div");

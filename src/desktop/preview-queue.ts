@@ -1,4 +1,3 @@
-/** Bound capture work, choosing visible cards before speculative neighbors. */
 export class CaptureQueue {
   private pending: { start: () => Promise<void>; priority: () => number }[] =
     [];

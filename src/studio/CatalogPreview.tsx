@@ -11,7 +11,6 @@ import { errorMessage } from "../host/bridge";
 import { useTranslator } from "../i18n/react";
 import messages from "../i18n/messages/catalog";
 
-/** Space between columns of a split page, in page pixels. */
 const COLUMN_GAP = 64;
 
 export default function CatalogPreview({
@@ -32,11 +31,8 @@ export default function CatalogPreview({
   resetKey?: string | number;
   accessory?: ReactNode;
   thumbnail?: boolean;
-  /** Let a tall page flow into up to this many balanced columns. */
   maxColumns?: number;
-  /** Document thumbnails fill the width and show the page from its top. */
   fitMode?: "contain" | "width";
-  /** Margin kept around the fitted page, in screen pixels. */
   padding?: number;
   minHeight?: number;
 }) {
@@ -69,7 +65,6 @@ export default function CatalogPreview({
       const w = Math.max(width, paper.scrollWidth),
         h = Math.max(1, paper.scrollHeight, paper.offsetHeight);
       if (maxColumns > 1) {
-        // Decide from the one-column height; a split page only re-measures when it clearly grew.
         const current = layout.current;
         if (current.columns === 1) current.singleHeight = h;
         else if (h * current.columns > current.singleHeight * 1.5)

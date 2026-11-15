@@ -44,7 +44,6 @@ import type {
   TemplateRecord,
 } from "../contract/types";
 import { availableImporters } from "../core/importers/registry";
-/** Column settings each built-in field type takes, for Agents writing columns. */
 const DATABASE_FIELD_SETTINGS: Record<string, string> = {
   select:
     "options: [text], colors?: {option: tone} (gray, brown, orange, yellow, green, blue, purple, pink, red)",
@@ -72,7 +71,6 @@ export interface CatalogSelection {
   parameterLimit?: number;
   knownHash?: string;
 }
-/** Shared catalog semantics. Storage access is provided by the host catalog adapter. */
 export class CatalogService {
   constructor(
     readonly store: { root: string },
@@ -192,7 +190,6 @@ export class CatalogService {
                     previous.scope === item.scope,
                 ),
           );
-    // Items matching more query terms come first; ties keep catalog order.
     const entries = recommended
       .filter((item) => matching.has(identity(item)))
       .sort((a, b) => matching.get(identity(b))! - matching.get(identity(a))!)
@@ -241,12 +238,6 @@ export class CatalogService {
     };
   }
 
-  /**
-   * Every harness slot and what fills it in this project: quick jump
-   * commands, @ menu sources and database field types (components declaring
-   * manifest.contributes), page outline renderers, and importers. Built-ins
-   * appear with scope builtin, filling the slots the same way.
-   */
   async catalogContributions(input: { projectId?: string; query?: string }) {
     const projectId = this.catalogProject(input.projectId);
     const query = input.query?.trim().toLocaleLowerCase();
@@ -376,10 +367,6 @@ export class CatalogService {
     };
   }
 
-  /**
-   * The database's field types: built-ins with their value kind and filter
-   * operators, and those library components contribute (contributes.databaseField).
-   */
   private async databaseFieldTypes(projectId?: string) {
     const contributed = (
       await listComponents(this.store.root, projectId, { scope: "all" })

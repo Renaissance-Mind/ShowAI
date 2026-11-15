@@ -197,7 +197,6 @@ describe("experiment tracker", () => {
     expect(html).toContain("越低越好");
     expect(html).toContain(`以表格阅读全部实验（${data.experiments.length}）`);
     expect(html).toContain("估算成本");
-    // A lower-is-better metric that beats its baseline reads as a positive gain.
     expect(html).toContain("比基线改善");
     expect(html).toMatch(/比基线改善<\/small><div class="an-stat-value">\+/);
     for (const experiment of data.experiments)

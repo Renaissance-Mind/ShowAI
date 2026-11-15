@@ -33,14 +33,11 @@ import "./find-bar.css";
 export type FindCommand = "open" | "replace" | "next" | "previous";
 export interface FindRequest {
   command: FindCommand;
-  /** Each request is new, so repeating a command runs it again. */
   id: number;
 }
 
-/** The query and options survive closing the bar, as in other editors. */
 const remembered = { query: "", caseSensitive: false };
 
-/** A short single-line selection seeds the query when the bar opens. */
 function selectedQuery() {
   const text = window.getSelection()?.toString() ?? "";
   return text && text.length <= 200 && !/[\r\n]/.test(text) ? text : null;
@@ -54,11 +51,9 @@ export function FindBar({
   onReveal,
 }: {
   request: FindRequest;
-  /** The open page's content element. */
   page: () => HTMLElement | null;
   readOnly: boolean;
   onClose: () => void;
-  /** Moves a board's camera to an object whose text is out of view. */
   onReveal: (nodeId: string) => void;
 }) {
   const t = useTranslator(messages);
@@ -109,7 +104,6 @@ export function FindBar({
     [page, onReveal],
   );
 
-  /** Finds again; the current match stays where it was unless asked to move. */
   const search = useCallback(
     (reveal: boolean) => {
       const root = page();
@@ -124,7 +118,6 @@ export function FindBar({
     search(true);
   }, [search]);
 
-  // Edits, lazily mounted component bodies and board changes update the matches.
   useEffect(() => {
     const root = page();
     if (!root) return;
@@ -164,7 +157,6 @@ export function FindBar({
       target.focus({ preventScroll: true });
   }, [onClose]);
 
-  /** The field a request focuses once the replace row has rendered. */
   const [focusTarget, setFocusTarget] = useState<{
     field: "query" | "replacement";
     id: number;
@@ -183,12 +175,10 @@ export function FindBar({
         id: request.id,
       });
     }
-    // Only a new request runs a command.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [request.id]);
   useLayoutEffect(() => {
     if (!focusTarget) return;
-    // Replacing starts in the replacement field once there is a query.
     const input =
       focusTarget.field === "replacement" && query
         ? replaceInput.current
@@ -199,7 +189,6 @@ export function FindBar({
     setFocusTarget(null);
   }, [focusTarget, replacing]);
 
-  // A page that becomes read-only hides replacing.
   useEffect(() => {
     if (readOnly) setReplacing(false);
   }, [readOnly]);
@@ -207,8 +196,6 @@ export function FindBar({
   const replaceCurrent = () => {
     const match = matches.current[current.current];
     if (!match || !replaceMatches([match], replacement)) return step(1);
-    // The editor updates its text at once; find again from this place, and
-    // move past a replacement that itself contains the query.
     search(false);
     const next = matches.current[current.current];
     if (

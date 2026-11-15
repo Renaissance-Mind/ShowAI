@@ -13,8 +13,6 @@ export function usePreparedCubic(
 ) {
   const scope = useContext(PortableCubicContext),
     [, refresh] = useState(0);
-  // Transport capability only chooses where preparation runs. Actual
-  // actions.nativeScene still decides whether DOM paint exists at all.
   const nativeTransport =
     typeof window !== "undefined" && !!window.showai?.inlineInk?.nativeScene;
   const ready =
@@ -40,8 +38,6 @@ export function usePreparedCubic(
     };
   }, [ink, width, pressure, scope, native, nativeTransport, ready]);
   if (failure) throw failure;
-  // Hold the actual derived object while this reader is mounted. The shared LRU
-  // may release its strong reference, but never forces an active reader to refit.
   const held =
     ink && ready ? preparedCubicGeometry(ink, width, pressure) : undefined;
   return { ready, held };

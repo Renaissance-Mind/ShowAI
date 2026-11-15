@@ -56,11 +56,9 @@ interface PairRequest {
   code: string;
   expiresAt: number;
   state: "pending" | "approved" | "rejected";
-  /** Why a rejected request ended: the Mac declined it or the iPad withdrew it. */
   reason?: "declined" | "cancelled";
 }
 const t = translator(lanMessages);
-/** Pairing failures carry a code the iPad and the Mac localize. */
 const pairingError = (
   code: "PAIRING_EXPIRED" | "PAIRING_QUEUE_FULL" | "PAIRING_RATE_LIMITED",
   message: string,
@@ -73,7 +71,6 @@ const denied = (message: string) =>
   Object.assign(new Error(message), { code: "FORBIDDEN" });
 const uuid = (v: unknown): v is string =>
   typeof v === "string" && /^[a-f0-9-]{36}$/.test(v);
-/** Local TLS endpoint. Discovery is untrusted; the approval code binds both devices to the certificate and secret. */
 export class LanPeerServer {
   private server?: Server;
   private sockets = new WebSocketServer({ noServer: true, maxPayload: 1024 });
@@ -185,7 +182,6 @@ export class LanPeerServer {
         `ShowAI-${settings.deviceId}`,
         3650,
       );
-      // The key marks a complete identity, so it is written last.
       await writeFile(certPath, identity.cert, { mode: 0o600 });
       await writeFile(keyPath, identity.key, { mode: 0o600 });
     }
@@ -546,7 +542,6 @@ export class LanPeerServer {
       return value;
     };
     const inflight = this.requests.get(body.requestId);
-    // Serialize only a retry of the same request. FileStore's transactional CAS handles independent writers.
     if (inflight && inflight.fingerprint !== fingerprint)
       throw new Error("Request identity was reused.");
     const task = inflight?.task ?? run();
@@ -617,8 +612,6 @@ export class LanPeerServer {
       key = `${peer.id}/${wireId}`;
     const prior = this.incoming.get(key);
     if (prior) return prior;
-    // A device may supply its own project. It never names an existing Mac
-    // workspace or gains access to other projects on this computer.
     const work = (async () => {
       const existing = await this.projectMapping(home, peer, wireId);
       if (existing) return existing;

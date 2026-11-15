@@ -10,7 +10,6 @@ import { collectCustomComponentRefs } from "../contract/contract";
 import type { CustomComponentRef } from "../contract/types";
 import type { ShowDocument } from "../types";
 
-/** Compile against immutable input bytes after releasing the library's writer lease. */
 class PreviewLibrary extends ContentLibrary {
   constructor(
     root: string,
@@ -61,7 +60,6 @@ class PreviewLibrary extends ContentLibrary {
   }
 }
 
-/** Library paths that can hold a referenced component revision, in catalog lookup order. */
 function componentPackagePrefixes(
   projectId: string,
   ref: CustomComponentRef,
@@ -99,9 +97,6 @@ export async function pagePreviewSnapshot(
           path === `${project}project.json`,
       );
     const files = await snapshot.library.readFiles(paths, snapshot.revision);
-    // Freeze only the component revisions this page names. Projects keep every
-    // historical package version, and decoding all of them for each preview
-    // exhausted the worker heap on large libraries.
     const stored = files.get(`${page}.json`);
     const prefixes = stored
       ? collectCustomComponentRefs(

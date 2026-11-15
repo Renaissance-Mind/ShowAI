@@ -1,7 +1,5 @@
 #include "include/ink-input-kernel.h"
 
-// Independently implemented, versioned streaming geometry. No platform/runtime,
-// allocator or recovered implementation source is part of this module.
 namespace {
 constexpr uint32_t MAGIC=0x53414931, NEIGHBORS=256, CONTEXT=5, FIT_LIMIT=200;
 constexpr double PI=3.1415926535897932384626433832795;
@@ -23,8 +21,6 @@ static XY sub(XY a,XY b){return {a.x-b.x,a.y-b.y};}
 static XY mul(XY p,double n){return {p.x*n,p.y*n};}
 static double dot(XY a,XY b){return a.x*b.x+a.y*b.y;}
 static XY unit(XY p){double n=length(p);return n?mul(p,1/n):XY{0,0};}
-// Inputs are [0,pi/2]. Fixed-order Taylor arithmetic avoids native/Wasm libm
-// differences. atan reduces to |z|<=tan(pi/8) before a convergent series.
 static double cosine(double x){double z=x*x,term=1,result=1;for(uint32_t i=1;i<=14;i++){term*= -z/((2.0*i-1)*(2.0*i));result+=term;}return max(0,result);}
 static double arctan(double z){bool reciprocal=z>1;if(reciprocal)z=1/z;bool shift=z>0.4142135623730950488;if(shift)z=(z-1)/(z+1);double zz=z*z,term=z,result=z;for(uint32_t i=1;i<32;i++){term*= -zz;result+=term/(2.0*i+1);}if(shift)result+=PI/4;return reciprocal?PI/2-result:result;}
 static double angle(XY p){if(!p.x)return p.y>0?PI/2:p.y<0?-PI/2:0;double a=arctan(abs(p.y/p.x));if(p.x<0)a=PI-a;return p.y<0?-a:a;}
@@ -101,8 +97,6 @@ static double forceUncapped(const State *s,uint32_t i){
 }
 static double calligraphyValue(const State *s,uint32_t i){
     double value=forceUncapped(s,i);uint32_t n=total(s);if(!s->config.force_forward||n<2)return value;
-    // Bounded tip walks: unlike the reference's full-history boundary scan,
-    // constant work is guaranteed for extremely dense stationary input.
     uint32_t left=1,right=n-2;double d=0;uint32_t k=0;
     for(;left<n-1&&k<NEIGHBORS;left++,k++){d+=length(sub(location(point(s,left)),location(point(s,left-1))));if(d>=s->config.force_forward)break;}
     d=0;k=0;for(;right>0&&k<NEIGHBORS;right--,k++){d+=length(sub(location(point(s,right+1)),location(point(s,right))));if(d>=s->config.force_forward)break;}
@@ -133,8 +127,6 @@ static bool solve(double a[3][4],uint32_t n,double *out){
 static SAInkInputCurve fit(State *s,uint32_t first,uint32_t last,XY tangent){
     ++s->fit_work;SAInkInputCurve c{};c.first_raw=first;c.last_raw=last;XY p0=xy(s,first),p3=xy(s,last),delta=sub(p3,p0);XY p1=mul(delta,1.0/3),p2=mul(delta,2.0/3);tangent=unit(tangent);
     uint32_t begin=first>CONTEXT?first-CONTEXT:0,end=last+CONTEXT<total(s)?last+CONTEXT:total(s)-1;
-    // Small coordinate-relative normal equations. A tangent constraint is part
-    // of the solve and error test, rather than unchecked post-fit projection.
     double ax[3][4]{},ay[3][4]{};bool constrained=length(tangent)>0;
     for(uint32_t i=begin;i<=end;i++){
         double t=double(int64_t(i)-first)/(last-first),u=1-t,b1=3*u*u*t,b2=3*u*t*t,b3=t*t*t;XY q=sub(sub(xy(s,i),p0),mul(delta,b3));
@@ -175,7 +167,6 @@ static void rebuild(State *s,uint32_t dirty,bool finishing){
     ++s->generation;
 }
 static uint32_t sampleCount(const State *s){return !total(s)?0:s->curves?curves(s)[s->curves-1].sample_offset+curves(s)[s->curves-1].steps:1;}
-// Private test-TU work accounting; no production storage, exports or ABI.
 #ifdef SHOWAI_INK_INPUT_EXPORT_WORK
 struct StrokeExportWork {
   uint64_t lookup_comparisons = 0, curve_advances = 0, segments = 0;
@@ -184,8 +175,6 @@ static StrokeExportWork strokeExportWork;
 #endif
 static uint32_t strokeCurveForSegment(const State *s, uint32_t start) {
   uint32_t lo = 0, hi = s->curves;
-  // Match the old forward seek exactly: an interval at a shared endpoint
-  // belongs to the NEXT fitted curve, hence upper_bound(last_raw<=start).
   while (lo < hi) {
 #ifdef SHOWAI_INK_INPUT_EXPORT_WORK
     ++strokeExportWork.lookup_comparisons;

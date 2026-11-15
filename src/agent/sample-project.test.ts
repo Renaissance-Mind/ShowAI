@@ -56,12 +56,10 @@ describe("sample project", () => {
       expect(pages.map((page) => page.id).sort()).toEqual(
         Object.values(first.pages).sort(),
       );
-      // Pages keep their custom components and open with them.
       const service = new AgentService({ root });
       const kyoto = await service.readPage(first.projectId, first.pages.kyoto);
       expect(JSON.stringify(kyoto)).toContain("trip-route-map");
 
-      // Removing the project (the workbench archives it) never restores it.
       await store.updateProject(first.projectId, { archived: true });
       expect(await seedSampleProject(root, await input())).toEqual(first);
       await openLibrary(root);
@@ -80,7 +78,6 @@ describe("sample project", () => {
         name: "Examples",
       });
       if (seeded?.state !== "seeded") throw new Error("not seeded");
-      // The default directory order (newest first) lists the samples as given.
       const pages = await new FileStore(root).listPages(seeded.projectId);
       expect(
         pages

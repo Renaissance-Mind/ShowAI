@@ -76,7 +76,6 @@ describe("revision-backed list projections", () => {
       return store.listPages(project.id);
     });
     await started;
-    // The save commits while the list still reads its pinned state.
     await store.savePage(
       project.id,
       page.document.id,

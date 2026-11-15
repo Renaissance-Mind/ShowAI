@@ -1,6 +1,3 @@
-// Canonical pure WASM geometry stays in one implementation. Actual editor
-// workers may supply a separately proved, immutable derived result; standalone
-// Node/JSC/SSR/readers continue through the same synchronous core.
 export * from "./cubic-ink-core.mjs";
 import {
   cubicInkGeometry as compute,
@@ -28,7 +25,6 @@ export function cubicInkGeometry(
     try {
       observe("surface.cubic.prepare.sync", performance.now() - start);
     } catch {
-      /* Diagnostics do not change geometry results. */
     }
   }
 }

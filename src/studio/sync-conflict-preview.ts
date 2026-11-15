@@ -13,7 +13,6 @@ const shorten = (text: string) =>
 function decode(bytes: string | null): string | null {
   if (bytes === null) return null;
   const data = Uint8Array.from(atob(bytes), (char) => char.charCodeAt(0));
-  // Binary resources are valid conflicts, but cannot be shown as text.
   try {
     const text = new TextDecoder("utf-8", { fatal: true }).decode(data);
     return text.includes("\0") ? t("binaryFile", { count: data.length }) : text;
@@ -42,7 +41,6 @@ function valueText(value: unknown, other: unknown): string {
     : shorten(JSON.stringify(value, null, 2));
 }
 
-/** Compare the retained snapshots once, including changes after large shared data. */
 export function conflictPreview(file: Pick<FileConflict, "local" | "remote">) {
   const local = decode(file.local),
     remote = decode(file.remote);

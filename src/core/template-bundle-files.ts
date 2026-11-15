@@ -5,7 +5,6 @@ import {
   type TemplateBundleSource,
 } from "../portable/template-bundle.mjs";
 
-/** Directory imports and remote payloads both pass the portable bundle validator. */
 export async function readTemplateDirectory(
   directory: string,
 ): Promise<TemplateBundleSource> {

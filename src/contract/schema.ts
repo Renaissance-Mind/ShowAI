@@ -34,17 +34,11 @@ function validator(schema: JsonSchema) {
 }
 
 export interface PropsIssue {
-  /** JSON pointer inside props, e.g. /objectives/0/title ("" for props itself). */
   path: string;
   message: string;
   kind: "schema" | "relation";
 }
 
-/**
- * Schema and relation problems of props without throwing, so callers can
- * report every field (component.ref.set checks props against a new revision).
- * Structural limits (JSON values, size) still throw like assertProps.
- */
 export function propsIssues(
   schema: JsonSchema,
   props: unknown,

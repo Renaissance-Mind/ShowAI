@@ -11,7 +11,6 @@ import messages from "../../i18n/messages/richText";
 
 const t = translator(messages);
 
-/** Most steps a stepper holds; stepper.css hides inactive steps up to this count. */
 export { MAX_STEPS } from "../blocks/primitive-contract.mjs";
 
 export const stepTitle = (title: unknown, index: number) =>
@@ -19,10 +18,6 @@ export const stepTitle = (title: unknown, index: number) =>
     ? title
     : t("stepper.step", { n: index + 1 });
 
-/**
- * Numbered step bar with previous/next. The editor and the reader share it;
- * which step is open is view state owned by the caller.
- */
 export function StepperBar({
   titles,
   active,
@@ -101,10 +96,6 @@ export function StepperBar({
   );
 }
 
-/**
- * Reader for saved pages. Every step stays in the document so printing and
- * static reading show them all; the screen shows the open one.
- */
 export function StepperReader({
   id,
   style,

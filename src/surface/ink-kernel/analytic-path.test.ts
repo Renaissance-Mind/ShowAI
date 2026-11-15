@@ -104,8 +104,6 @@ function native(
 function map(p: Point, m: number[]): Point {
   return [m[0] * p[0] + m[2] * p[1] + m[4], m[1] * p[0] + m[3] * p[1] + m[5]];
 }
-// Mathematical oracle in test code: Bernstein evaluation + derivative partition.
-// No tessellated polygon, compiled module, or mesh implicit coefficients used.
 function value(p: Point[], t: number): Point {
   let a = p.map((q) => [...q] as Point);
   while (a.length > 1)
@@ -220,14 +218,14 @@ const fixtures: Command[][] = [
     ["L", 0, -30],
   ],
   [["M", 0, 0], ["C", 0, 100, 100, 100, 100, 0], ["Z"]],
-  [["M", 0, 0], ["C", 100, 100, -100, 100, 0, 0], ["Z"]], // loop with closed endpoints
-  [["M", 0, 0], ["C", 100, 200, -100, -200, 100, 0], ["Z"]], // serpentine
-  [["M", 0, 0], ["C", 100, 100, -100, -100, 0, 0], ["Z"]], // line, retraced
-  [["M", 0, 0], ["C", 0, 0, 0, 0, 0, 0], ["Z"]], // point
-  [["M", 1, -1], ["C", -1 / 3, 1, -1 / 3, -1, 1, 1], ["Z"]], // cusp
-  [["M", 0, 0], ["C", 0, 0, 100, 100, 100, 100], ["Z"]], // repeated endpoints
-  [["M", 0, 0], ["C", 0, 100, 100, 0, 100, 100], ["Z"]], // cusp at infinity
-  [["M", 0, 0], ["C", 1 / 3, 2 / 3, 2 / 3, 2 / 3, 1, 0], ["Z"]], // degree-elevated quadratic
+  [["M", 0, 0], ["C", 100, 100, -100, 100, 0, 0], ["Z"]],
+  [["M", 0, 0], ["C", 100, 200, -100, -200, 100, 0], ["Z"]],
+  [["M", 0, 0], ["C", 100, 100, -100, -100, 0, 0], ["Z"]],
+  [["M", 0, 0], ["C", 0, 0, 0, 0, 0, 0], ["Z"]],
+  [["M", 1, -1], ["C", -1 / 3, 1, -1 / 3, -1, 1, 1], ["Z"]],
+  [["M", 0, 0], ["C", 0, 0, 100, 100, 100, 100], ["Z"]],
+  [["M", 0, 0], ["C", 0, 100, 100, 0, 100, 100], ["Z"]],
+  [["M", 0, 0], ["C", 1 / 3, 2 / 3, 2 / 3, 2 / 3, 1, 0], ["Z"]],
   [["M", 0, 0], ["C", 10, 1e-12, 20, -1e-12, 30, 0], ["Z"]],
   [
     ["M", -100, -100],
@@ -247,7 +245,7 @@ const fixtures: Command[][] = [
     ["L", -100, 100],
     ["L", 100, -100],
     ["Z"],
-  ], // bowtie
+  ],
 ];
 function check(
   commands: Command[],
@@ -293,8 +291,6 @@ function check(
 
 describe("shared analytic Bezier path kernel", () => {
   it("retains a valid near-collinear large-origin cubic when repeated loop classification reaches the depth budget", () => {
-    // Minimal three-command numerical trace: local translation alone changes
-    // binary64 subdivision rounding, so keep the canonical origin as well.
     const commands: Command[] = [
       ["M", 100804.83027921774, 100760.40385414359],
       [

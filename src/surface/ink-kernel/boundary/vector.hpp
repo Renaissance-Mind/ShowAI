@@ -11,10 +11,6 @@ template<class T,uint32_t Inline=4>class Vector {
     bool unique(uint32_t wanted){
         if(ctx_&&ctx_->status!=SA_INK_OK)return false;if(wanted<=capacity_&&(offset_==no_block||ctx_->block(offset_).refs==1))return true;
         if(!ctx_)return false;
-        // The arena already rounds (payload + its header) to buddy blocks.
-        // Rounding the element count first can double the block again. Ask
-        // for the actual minimum and use every complete slot in that block;
-        // crossing its capacity still grows geometrically through the arena.
         if(uint64_t(wanted)*sizeof(T)>0x3ffffff0u){ctx_->fail(SA_INK_CAPACITY);return false;}
         uint32_t fresh=ctx_->allocate(wanted*uint32_t(sizeof(T)));if(fresh==no_block)return false;
         uint32_t next=((uint32_t(1)<<ctx_->block(fresh).order)-16u)/uint32_t(sizeof(T));

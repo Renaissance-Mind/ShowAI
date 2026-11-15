@@ -2,7 +2,6 @@ import { buildIdentityPlugin } from "./scripts/build-info.mjs";
 import { defineConfig, type Plugin } from "vite";
 import react from "@vitejs/plugin-react";
 
-/** Inline only our own emitted assets; no runtime CDN or pattern-matching dependency. */
 function portableHtml(): Plugin {
   return {
     name: "showai-portable-html",
@@ -20,7 +19,6 @@ function portableHtml(): Plugin {
             const asset = bundle[url.replace(/^\.\//, "").replace(/^\//, "")];
             if (!asset || asset.type !== "chunk")
               throw new Error(`Missing portable script: ${url}`);
-            // Inlined lazy modules may be reported as a reference to this same chunk.
             if (
               asset.imports.length ||
               asset.dynamicImports.some((name) => name !== asset.fileName)

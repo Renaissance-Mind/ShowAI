@@ -37,8 +37,6 @@ import { useTranslator } from "../i18n/react";
 import messages from "../i18n/messages/surface";
 type Point = { x: number; y: number; pressure?: number };
 interface DrawingProps {node:JSONContent;frame?:NodeLayout}
-/** Native paint keeps the canonical source and exact DOM measurement basis;
- * the browser never prepares a second hidden brush/shape representation. */
 export function Drawing(props:DrawingProps) {
   const actions=useContext(ObjectContext);
   return actions.nativeScene ? <DrawingMeasurement {...props}/> : <DrawingPresentation {...props}/>;
@@ -431,12 +429,9 @@ export function DrawingInput({
   point: (x: number, y: number) => Point;
   onDraw: (node: JSONContent, frame: NodeLayout) => void;
   onExit: () => void;
-  /** Arrow tool: highlight the object an endpoint at this client point would bind to. */
   onTarget?: (x: number, y: number) => void;
 }) {
   const t = useTranslator(messages);
-  // Points live in the gesture; a version counter repaints without copying
-  // the whole stroke on every pointer sample.
   const [, setVersion] = useState(0);
   const paintFrame = useRef(0);
   const repaint = () => {
@@ -504,8 +499,6 @@ export function DrawingInput({
       },
       modifiers ?? current.modifiers,
     );
-    // Retire the gesture first, but replace its preview with the committed object
-    // in one paint. Capture-loss events cannot discard or commit it twice.
     pending.current = null;
     flushSync(() => {
       onDraw(result.node, result.frame);
@@ -526,7 +519,6 @@ export function DrawingInput({
     };
     const root = surface.current?.closest(".page-surface");
     root?.addEventListener("showai-board-pinch", cancel);
-    // Panning while drawing keeps the preview attached to the content.
     const viewportChanged = () => {
       if (pending.current) repaint();
     };
@@ -592,7 +584,6 @@ export function DrawingInput({
           scale >=
         3;
       if (freehand && ruler) {
-        // The ruler keeps a straight stroke from the start point.
         current.points = [current.origin, next];
         continue;
       }
@@ -749,10 +740,6 @@ type Modifiers = {
   ctrlKey: boolean;
   metaKey: boolean;
 };
-/**
- * Plain-text label centered inside a shape, or on an arrow's midpoint. Sizes
- * are Board units: the label lives inside the scaled world like the shape.
- */
 function DrawingLabel({
   node,
   first,
@@ -806,7 +793,6 @@ function DrawingLabel({
     if (finished.current) return;
     finished.current = true;
     const field = input.current;
-    // Keyboard endings keep the shape focused, so undo and nudging still reach the Board.
     const host = refocus
       ? field?.closest<HTMLElement>("[data-surface-id]")
       : null;
@@ -886,8 +872,6 @@ function DrawingPreview({ node }: { node: JSONContent }) {
   } = node.attrs!;
   const a = points[0],
     b = points.at(-1);
-  // Freehand points append in place. Build only new curve segments each frame
-  // instead of walking an increasingly long stroke on every repaint.
   const cache = useRef<{ points: Point[]; next: number; path: string } | null>(
     null,
   );

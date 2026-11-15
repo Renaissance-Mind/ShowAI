@@ -1,5 +1,3 @@
-// Adapted from https://github.com/antvis/G2/blob/v5/site/docs/charts/pack.en.mdx
-// See ../../UPSTREAM-LICENSE.txt for upstream license.
 import { interpolateHcl } from "d3-interpolate";
 
 export default async function draw(context) {

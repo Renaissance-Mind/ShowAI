@@ -71,7 +71,6 @@ describe("workspace tabs", () => {
     state = visitWorkspace(state, page("page-b"));
     state = visitWorkspace(state, page("page-a"));
     state = visitWorkspace(state, page("page-c"));
-    // A second tab showing only the deleted page, and one untouched.
     state = addWorkspaceTab(state, page("page-b"), false);
     state = addWorkspaceTab(state, projectEntry, false);
     const [first, second, third] = state.tabs;
@@ -82,7 +81,6 @@ describe("workspace tabs", () => {
     const gone = (location: WorkspaceEntry["location"]) =>
       location.view === "page" && location.pageId === "page-b";
     const pruned = pruneWorkspace(state, gone);
-    // page-a, page-b, page-a collapses to one page-a; the cursor stays on it.
     expect(
       pruned.tabs[0].entries.map((entry) => entry.location.pageId),
     ).toEqual(["page-a", "page-c"]);
@@ -175,7 +173,6 @@ describe("workspace tabs", () => {
     const closed = setWorkspaceAssistantOpen(other, other.activeId, false);
     expect(closed.tabs[0].assistantOpen).toBe(true);
     expect(closed.tabs[1].assistantOpen).toBe(false);
-    // An in-flight turn can finish after the user switches tabs.
     const completed = setWorkspaceAssistantOpen(closed, initial.activeId, true);
     expect(completed.tabs[1].assistantOpen).toBe(false);
     expect(
@@ -417,7 +414,6 @@ describe("opening library targets", () => {
     expect(windowQuery({ projectId: "project-a" })).toEqual({
       project: "project-a",
     });
-    // Only the App's first window restores the previous session's tabs.
     expect(windowQuery({ restoreTabs: true })).toEqual({ restore: "tabs" });
     expect(
       windowQuery({ projectId: "project-a", restoreTabs: true }),
@@ -429,7 +425,6 @@ describe("opening library targets", () => {
       project: "project-a",
       page: "page-a",
     });
-    // Reference links highlight their blocks once the page opens.
     expect(
       windowQuery({
         projectId: "project-a",

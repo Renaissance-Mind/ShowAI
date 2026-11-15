@@ -91,8 +91,6 @@ it('keeps both durable actions undoable when the save echo already contains the 
  const j=await open();
  const create=(id:string)=>j.appendLocal({...scope,parents:replica(j).materialize().frontier,changes:[{kind:'create',strokeId:id,node:{...node,attrs:{...node.attrs,id}},layout:frame}]});
  const first=create('first'),second=create('second');
- // Both source values have already reached UI before the second actual action
- // receipt. History ownership comes from actual scoped IDs, never JSON deltas.
  const arrivedSource=j.read(scope).materialization!,registered:NativeInkHistoryAction[]=[];
  expect(arrivedSource.strokes.filter(s=>!s.deleted).map(s=>s.id)).toEqual(['first','second']);
  for(const operation of [first,second]){

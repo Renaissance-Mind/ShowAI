@@ -3,7 +3,6 @@ import { join } from "node:path";
 import { createHash } from "node:crypto";
 import { crc32, deflateRawSync } from "node:zlib";
 
-/** Portable ZIP with UTF-8 names; packaged resources are small enough for ZIP32. */
 function archive(entries: { name: string; data: Buffer }[]) {
   const locals: Buffer[] = [],
     central: Buffer[] = [];
@@ -69,7 +68,6 @@ export function chatgptAppId(value: string) {
   return match[1];
 }
 
-/** Bundle only shared Skills and assets. No runtime, content, launcher or credentials. */
 export async function remotePluginPackage(
   source: string,
   endpoint: string,

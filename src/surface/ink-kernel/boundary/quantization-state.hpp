@@ -6,7 +6,6 @@ namespace showai_boundary {
 struct BoundaryQuantizedBlockChange{SABoundaryBlockKey before{},after{};uint64_t before_revision=0,after_revision=0;};
 struct BoundaryQuantizationWork{uint64_t blocks=0,arcs=0,incident_blocks=0,aliases=0,certificates=0,new_anchors=0,anchor_nodes=0,anchor_visits=0;BoundaryQuantizationMetrics math{};};
 struct BoundaryQuantizationSnapshot{
- // First member: destroyed last, after all source-arena records.
  BoundaryQuantizationSourcePin source;
  BoundaryAnchorTable anchors;ChunkTree<BoundaryQuantizedArc>blocks;
  Vector<BoundaryQuantizedBlockChange,1>changes;
@@ -52,8 +51,6 @@ inline uint32_t build(const BoundaryQuantizationSourcePin&source,const BoundaryQ
    uint32_t slot=change.after_edges?change.after.slot:change.before.slot;if(!add(slot))break;
    if(change.before_edges){const auto*block=checked_block(old,change.before);for(const auto&e:block->values){uint32_t raw[2]={e.va,e.vb};for(uint32_t v:raw)if(!selected_add(c,cleanup_marked,cleanup,v))break;}}
   }
-  // Actual producer aliases prove equality. Choose a certified retained anchor,
-  // then rebuild the full actual incident set once per resulting component.
   for(const auto&record:g.point_aliases){
    if(!record.valid()||record.context()!=&c){c.fail(SA_INK_INVALID);break;}const auto&a=*record.get();++staged.work.aliases;
    auto actual=vertex_certificate(g,a.target);if(!g.good())break;
@@ -94,8 +91,6 @@ inline uint32_t build(const BoundaryQuantizationSourcePin&source,const BoundaryQ
  output=static_cast<BoundaryQuantizationSnapshot&&>(staged);return SA_INK_OK;
 }
  }
-// Internal owner API. Flat keys are accepted only against this actual registry.
-// Public ABI/wrappers must also bind their actual WASM instance / Swift storage.
 struct BoundaryQuantizationLease{uint64_t owner=0;uint32_t epoch=0,slot=0,generation=0,reserved=0;};
 class BoundaryQuantizationState{
  struct Slot{Record<BoundaryQuantizationSnapshot>snapshot;uint64_t base_revision=0;uint32_t generation=0,references=0;bool prepared=false,cancelled=false,cold=false;};
@@ -129,7 +124,6 @@ class BoundaryQuantizationState{
   busy_=false;return result;
  }
 public:
- // Requires an already actually captured source pin; never accepts a caller Graph.
  BoundaryQuantizationState(const BoundaryQuantizationSourcePin&source,uint32_t epoch,uint32_t maximum_leases):domain_pin_(source),slots_(source.valid()?Vector<Slot,1>(*source.get()->graph.context()):Vector<Slot,1>()),epoch_(epoch){
   if(!source.valid())return;auto&c=*source.get()->graph.context();if(!epoch||!maximum_leases||maximum_leases>1024){c.fail(SA_INK_INVALID);return;}slots_.resize(maximum_leases);initialization_status_=c.status;
  }

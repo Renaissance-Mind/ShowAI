@@ -21,7 +21,6 @@ function useController(documentId: string | null) {
   };
 }
 
-/** The top-bar control: opens the page's comment list and counts open threads. */
 export function CommentsToggle({
   documentId,
   onOpen,
@@ -64,7 +63,6 @@ function anchorLabel(
   return thread.anchor?.quote ?? t("block");
 }
 
-/** The comment list in the workbench's side-panel slot, beside the Agent panel. */
 export function CommentsPanel({
   documentId,
   assistantOpen,
@@ -75,7 +73,6 @@ export function CommentsPanel({
   const t = useTranslator(messages);
   const { store, controller } = useController(documentId);
   const list = useRef<HTMLDivElement>(null);
-  // The panel and the Agent panel share the slot.
   useEffect(() => {
     if (assistantOpen) commentsStore.setOpen(false);
   }, [assistantOpen]);

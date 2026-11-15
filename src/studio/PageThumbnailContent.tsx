@@ -8,7 +8,6 @@ import { CustomComponentsProvider } from "../components/custom/CustomBlock";
 import CatalogPreview from "./CatalogPreview";
 import type { LoadedPage } from "./usePage";
 
-/** Shared renderer, used in the capture process instead of the desktop directory. */
 export default function PageThumbnailContent({
   record,
   updatedAt,

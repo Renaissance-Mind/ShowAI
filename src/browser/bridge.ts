@@ -20,19 +20,16 @@ const shell = translator(shellMessages);
 
 export type ConnectionState = "connected" | "lost" | "restarted";
 let connection: ConnectionState = "connected";
-/** The local service connection, shown by the workbench banner. */
 export function connectionState() {
   return connection;
 }
 function announce(state: ConnectionState) {
   if (state === connection) return;
-  // Once the new access token could not be read, only a refresh recovers.
   if (connection === "restarted") return;
   connection = state;
   window.dispatchEvent(new CustomEvent("showai:connection", { detail: state }));
 }
 
-/** Reads the access token from the workbench page the local service serves. */
 export function pageToken(html: string): string | undefined {
   const config = /window\.__SHOWAI_LOCAL__=(\{[^<]*?\})\s*<\/script>/.exec(
     html,
@@ -59,11 +56,7 @@ export function installBrowserBridge() {
   const reloadListeners = new Set<CloseListenerEntry>();
   const report = closeReporter();
   let dirty = false;
-  // Lets the server skip echoing this tab's own saves back to it.
   const client = crypto.randomUUID();
-  // A restarted local service issues a new access token in the page it
-  // serves. Reading it from the same origin is what a refresh would do, but
-  // keeps edits that so far exist only in this window, so 重试 can save them.
   let renewing: Promise<boolean> | undefined;
   function renewToken() {
     renewing ??= fetch("/", { cache: "no-store" })
@@ -95,7 +88,6 @@ export function installBrowserBridge() {
         body: JSON.stringify(args),
       });
     } catch (error) {
-      // fetch rejects with a TypeError when the loopback service is gone.
       if (!(error instanceof TypeError)) throw error;
       announce("lost");
       throw failure("SERVICE_UNREACHABLE", shell("connection.unreachable"));
@@ -116,7 +108,6 @@ export function installBrowserBridge() {
         { code: "HTTP_ERROR", status: response.status },
       );
     const result = (await response.json()) as DesktopResponse<T>;
-    // Keep the structured error (code, errno, path…) and add the HTTP status.
     if (!result.ok) throw { ...result.error, status: response.status };
     return result.data;
   }
@@ -125,7 +116,6 @@ export function installBrowserBridge() {
     args: Record<string, unknown>,
     prepare?: () => Promise<boolean>,
   ): Promise<T | null> {
-    // Reserve the window during the click, before saving or validating the target.
     const opened = window.open(
       "about:blank",
       "_blank",
@@ -164,7 +154,6 @@ export function installBrowserBridge() {
       "dialog:openPage": {
         title: t("title.importPage"),
         kind: "file",
-        // The extensions of the importers this project can use.
         extensions:
           action === "dialog:openPage"
             ? [
@@ -177,7 +166,6 @@ export function installBrowserBridge() {
                       { action: "imports:importers", args: { projectId: args.projectId } },
                     )
                   ).importers
-                    // A chosen importer offers only its own file types.
                     .filter(
                       (importer) =>
                         args.importer === undefined ||
@@ -264,8 +252,6 @@ export function installBrowserBridge() {
     }
     return request<T>("invoke", { action, args });
   }
-  // Thumbnail frames only read their component; a persistent connection per
-  // frame would exhaust the browser's connections to this loopback host.
   if (!new URLSearchParams(location.search).has("componentPreview")) {
     const connect = () => {
       const events = new EventSource(
@@ -275,7 +261,6 @@ export function installBrowserBridge() {
         const change = JSON.parse(event.data) as DesktopChange;
         for (const listener of listeners) listener(change);
       };
-      // Reconnects trigger a refresh even if changes happened while the connection was lost.
       events.onopen = () => {
         announce("connected");
         for (const listener of listeners)
@@ -283,7 +268,6 @@ export function installBrowserBridge() {
       };
       events.onerror = () => {
         announce("lost");
-        // The browser retries by itself unless the service refused the stream.
         if (events.readyState !== EventSource.CLOSED) return;
         setTimeout(() => {
           void request("invoke", { action: "app:info", args: {} }).then(

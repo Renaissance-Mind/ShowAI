@@ -52,7 +52,6 @@ export function configuredLogins(env: LoginEnvironment): ExternalLoginOptions {
             clientSecret: env.SHOWAI_GITHUB_CLIENT_SECRET,
           }
         : undefined,
-    // A relayed deployment never exchanges codes itself, so it needs no secret.
     googleLogin:
       env.SHOWAI_GOOGLE_CLIENT_ID &&
       (env.SHOWAI_GOOGLE_CLIENT_SECRET || env.SHOWAI_GOOGLE_RELAY_URL)
@@ -101,7 +100,6 @@ interface ExternalIdentity {
 }
 const encoder = new TextEncoder();
 const completionAlphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-/** A short code the browser hands back to the window that started the login. */
 function completionCode() {
   return Array.from(
     crypto.getRandomValues(new Uint8Array(8)),
@@ -322,7 +320,6 @@ export class ExternalLogins {
       maximum: 20,
       windowMs: 60_000,
     });
-    // A new login method outlives every session, so only a fresh sign-in may add one.
     if (link) await requireRecentSignIn(this.db, link);
     await this.db.run(
       "DELETE FROM login_flows WHERE id IN(SELECT id FROM login_flows WHERE expires_at<=? LIMIT 100)",
@@ -386,7 +383,6 @@ export class ExternalLogins {
         response_type: "code",
         redirect_uri: secret.redirectUri,
         state,
-        // GitHub's public ID and login are sufficient to identify the account.
         scope: provider === "github" ? "" : "openid profile email",
         nonce,
         code_challenge_method: "S256",
@@ -713,7 +709,6 @@ export class ExternalLogins {
           { headers: pageHeaders },
         );
       }
-      // Reject unknown accounts here so the browser explains a closed registration.
       if (
         !(
           await this.db.all(
@@ -723,8 +718,6 @@ export class ExternalLogins {
         ).length
       )
         await this.assertRegistration(secret);
-      // The account is resolved only after the starting window returns this code,
-      // so a forwarded authorization link cannot sign in someone else's device.
       const completion = completionCode();
       secret.completionDigest = await hash(`${row.id}:${completion}`);
       await this.db.run(
@@ -759,8 +752,6 @@ export class ExternalLogins {
     const recent = await requireRecentSignIn(this.db, user);
     const provider = plainText(input.provider, 30),
       subject = plainText(input.subject, 254);
-    // Accounts created through a provider have no password their owner knows,
-    // so they keep at least one external login method.
     const result = await this.db.batch([
       {
         sql: `DELETE FROM login_identities WHERE provider=? AND subject=? AND user_id=? AND EXISTS(${recent.sql}) AND (NOT EXISTS(SELECT 1 FROM audit_events WHERE user_id=? AND event='account.external-register') OR EXISTS(SELECT 1 FROM audit_events WHERE user_id=? AND event='account.password-change') OR (SELECT COUNT(*) FROM login_identities WHERE user_id=?)>1)`,
@@ -862,14 +853,12 @@ export class ExternalLogins {
         secret.error ?? "登录未完成，请重新发起登录。",
       );
     if (row.status === "ready") return { status: "completed", ...secret.result };
-    // Email codes are entered while pending; browser completion codes follow the provider callback.
     const email = row.provider === "email",
       awaiting = email ? "pending" : "completed";
     if (row.status !== awaiting) return { status: "pending" };
     const supplied = email ? input.code : input.completionCode;
     if (supplied === undefined)
       return { status: email ? "pending" : "confirm" };
-    // Count the attempt before comparing so concurrent guesses share the limit.
     const counted = await this.db.run(
       "UPDATE login_flows SET claimed=claimed+1 WHERE id=? AND status=? AND claimed<5",
       [id, awaiting],
@@ -889,7 +878,6 @@ export class ExternalLogins {
         "UPDATE login_flows SET status='failed' WHERE id=? AND status=? AND claimed>=5",
         [id, awaiting],
       );
-      // Tell the client how many attempts remain so a typo keeps the flow.
       const [attempts] = await this.db.all<{ claimed: number }>(
         "SELECT claimed FROM login_flows WHERE id=?",
         [id],
@@ -928,7 +916,6 @@ export class ExternalLogins {
         secret.device,
         secret.link ? { condition: liveSession(secret.link) } : {},
       );
-      // Retain the issued credential only long enough to repeat a lost response.
       await this.db.run(
         "UPDATE login_flows SET status='ready',secret=?,expires_at=MIN(expires_at,?) WHERE id=? AND status='issuing'",
         [

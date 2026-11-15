@@ -10,17 +10,11 @@ export interface SampleProjectInput {
   name: string;
   icon?: string;
   locale: string;
-  /** Page sources in the order they appear in the project. */
   pages: { key: string; artifact: string }[];
 }
 
 const running = new Map<string, Promise<SampleState | null>>();
 
-/**
- * Creates the sample project of a newly created library exactly once.
- * Pages and their component dependencies are written in one library change,
- * so a failed import leaves no partial project behind.
- */
 export function seedSampleProject(
   root: string,
   input: SampleProjectInput,
@@ -48,7 +42,6 @@ async function seed(root: string, input: SampleProjectInput) {
     )
   )
     throw new Error("Invalid sample project input.");
-  // Parse everything before the state changes, so invalid input stays retryable.
   const artifacts = input.pages.map((page) => ({
     key: page.key,
     ...parseArtifact(page.artifact),
@@ -75,7 +68,6 @@ async function seed(root: string, input: SampleProjectInput) {
             input.icon,
           );
           const pages: Record<string, string> = {};
-          // Newest first is the default page order, so the first sample is created last.
           for (const artifact of [...artifacts].reverse()) {
             const page = await service.createPage(project.id, {
               document: { ...artifact.document, parentId: null },
@@ -97,7 +89,6 @@ async function seed(root: string, input: SampleProjectInput) {
     await writeOnboarding(root, seeded);
     return seeded;
   } catch (error) {
-    // Failed sample content is reported once instead of retried on every launch.
     const failed: SampleState = {
       state: "failed",
       error: error instanceof Error ? error.message : String(error),

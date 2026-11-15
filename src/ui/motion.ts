@@ -1,9 +1,3 @@
-/**
- * Motion values shared by the workbench's script-driven animations. Durations
- * and curves come from the tokens in design/tokens.css, so CSS and scripts
- * keep one scale.
- */
-
 export type MotionToken =
   | "--duration-fast"
   | "--duration-base"
@@ -19,7 +13,6 @@ const fallback: Record<MotionToken, string> = {
   "--ease-in-out": "cubic-bezier(0.77, 0, 0.175, 1)",
 };
 
-/** Milliseconds for a CSS time such as `140ms` or `0.2s`. */
 export function parseDuration(value: string): number {
   const text = value.trim();
   const number = parseFloat(text);
@@ -44,7 +37,6 @@ export function prefersReducedMotion(view: Window = window) {
   return view.matchMedia("(prefers-reduced-motion: reduce)").matches;
 }
 
-/** How an overlay leaves: the reverse of the way it entered, and shorter. */
 export type ExitStyle = "fade" | "pop" | "drop" | "rise";
 
 export function exitKeyframes(style: ExitStyle): Keyframe[] {
@@ -82,14 +74,8 @@ export interface RowMotionPlan {
   exits: string[];
 }
 
-/** Rows that move, appear or leave between two layouts of the same list. */
 export const ROW_MOTION_LIMIT = 200;
 
-/**
- * Plans a FLIP pass between two measured layouts. Only rows that touch the
- * visible band move, and a change larger than `limit` rows is not animated,
- * so expanding a big folder or loading a long directory stays immediate.
- */
 export function planRowMotion(
   before: ReadonlyMap<string, RowBox>,
   after: ReadonlyMap<string, RowBox>,

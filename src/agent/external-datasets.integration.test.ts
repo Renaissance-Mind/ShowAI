@@ -88,7 +88,6 @@ test("a dataset reads and writes a CSV file outside the library", async () => {
     done: false,
   });
   const datasetId = linked.dataset.id;
-  // The library keeps the description and source, not the data or the path.
   const stored = JSON.parse(await readFile(linked.path, "utf8"));
   expect(stored.value).toBeUndefined();
   expect(JSON.stringify(stored)).not.toContain(outside);
@@ -149,7 +148,6 @@ test("a dataset reads and writes a CSV file outside the library", async () => {
     "row:m2",
   ]);
 
-  // Editing the block writes the file, keeping its line endings and quoting.
   await ok("page_apply", {
     pageId: page.document.id,
     baseHash: read.hash,
@@ -170,7 +168,6 @@ test("a dataset reads and writes a CSV file outside the library", async () => {
     'id,title,date,done\r\nm1,体检,2026-10-23,true\r\nm2,"复盘, 周会",2026-10-24,false\r\n',
   );
 
-  // A change made elsewhere is read next time and merges with a stale write.
   const before = await ok("dataset_read", { action: "read", datasetId });
   await new Promise((done) => setTimeout(done, 20));
   await writeFile(
@@ -201,7 +198,6 @@ test("a dataset reads and writes a CSV file outside the library", async () => {
   });
   expect(rejected.error.code).toBe("INVALID_DATA");
 
-  // An export asks before embedding the external data, then carries it.
   const out = join(outside, "exports", "schedule.html");
   const confirm = await call("page_export", {
     pageId: page.document.id,
@@ -239,7 +235,6 @@ test("a dataset reads and writes a CSV file outside the library", async () => {
   );
   expect(widget(artifact.document, "database").attrs.data.rows).toHaveLength(3);
 
-  // Another device has no link: the dataset reports it instead of failing everywhere.
   await writeFile(
     join(root, "local", "dataset-sources.json"),
     JSON.stringify({ format: "showai-dataset-sources", version: 1, links: {} }),
@@ -272,7 +267,6 @@ test("a dataset reads and writes a CSV file outside the library", async () => {
       .error.message,
   ).toMatch(/reads a csv file/);
   await ok("dataset_write", { action: "link", datasetId, path: csv });
-  // Conversation delivery files carry the data too and say so.
   const presented = await ok("page_present", { pageId: page.document.id });
   expect(presented.externalSnapshots.datasets[0]).toMatchObject({
     datasetId,
@@ -283,7 +277,6 @@ test("a dataset reads and writes a CSV file outside the library", async () => {
       .rows,
   ).toHaveLength(3);
 
-  // Linking a file inside the library is refused.
   const inside = await call("dataset_write", {
     action: "link",
     name: "x",
@@ -291,7 +284,6 @@ test("a dataset reads and writes a CSV file outside the library", async () => {
   });
   expect(inside.error.code).toBe("INVALID_PATH");
 
-  // Deleting the dataset keeps the file.
   const detach = await ok("page_read", {
     pageId: page.document.id,
     rendered: false,
@@ -323,14 +315,12 @@ test("library data moves into a new JSON file and back", async () => {
   const datasetId = created.dataset.id;
   const path = join(outside, "metrics.json");
   await writeFile(path, "{}");
-  // Both hold data: linking an existing file needs an explicit choice.
   const ambiguous = await call("dataset_write", {
     action: "link",
     datasetId,
     path,
   });
   expect(ambiguous.error.code).toBe("CONFLICT");
-  // An existing file is never overwritten.
   const overwrite = await call("dataset_write", {
     action: "link",
     datasetId,
@@ -344,7 +334,6 @@ test("library data moves into a new JSON file and back", async () => {
   expect(JSON.parse(await readFile(path, "utf8"))).toEqual(
     created.dataset.value,
   );
-  // The file's own layout is kept by later writes.
   await writeFile(
     path,
     '{\n    "title": "指标",\n    "items": [\n        {\n            "id": "a",\n            "value": 1\n        }\n    ]\n}\n',
@@ -368,7 +357,6 @@ test("library data moves into a new JSON file and back", async () => {
     source: { format: "json", path, available: true },
   });
 
-  // Copying back into the library stops using the file and keeps it.
   const embedded = await ok("dataset_write", {
     action: "link",
     datasetId,

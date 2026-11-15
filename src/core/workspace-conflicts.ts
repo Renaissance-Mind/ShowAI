@@ -45,12 +45,6 @@ export function workspaceHash(
   return createHash("sha256").update(normalized).digest("hex");
 }
 
-/**
- * Records external edits among workspace files. Comparing reads one committed
- * state without the writer lease; files that match it, or that a save is still
- * writing, need nothing more. Only the rest are confirmed and recorded under the
- * lease, after any save in progress finishes.
- */
 export async function recordWorkspaceChanges(
   library: Pick<
     GitLibrary,
@@ -81,11 +75,6 @@ export async function recordWorkspaceChanges(
   return conflicts;
 }
 
-/**
- * Parsed conflict records by conflicts directory and id, with the identity of
- * the file each was read from. capture() can rewrite a resolved record as
- * unresolved under the same id, so a record is reused only while its file is.
- */
 const conflictRecords = new Map<
   string,
   Map<string, { identity: string; record: WorkspaceConflict }>
@@ -95,14 +84,11 @@ const COMPARE_BATCH = 16;
 const sameBytes = (a: Buffer | null, b: Buffer | null) =>
   a === null || b === null ? a === b : a.equals(b);
 
-/** External content stays in place and is independently retained before resolution. */
 export class WorkspaceProtection {
-  /** Workspace bytes baseline() fingerprinted, so materialize() can reuse them. */
   private recorded = new Map<
     string,
     { bytes: Buffer | null; hash: string | null }
   >();
-  /** Committed files the caller already holds, by revision; null marks an absent path. */
   private known = new Map<string, Map<string, Buffer | null>>();
   constructor(
     readonly library: Pick<
@@ -129,7 +115,6 @@ export class WorkspaceProtection {
       if (!/^[a-f0-9]{64}$/.test(name)) continue;
       present.add(name);
       const file = join(root, name, "conflict.json");
-      // A real directory holding an unchanged regular file needs no read.
       if (entry.isDirectory() && !parentsChecked) {
         await safeLibraryPath(this.library.root, root);
         parentsChecked = true;
@@ -211,11 +196,6 @@ export class WorkspaceProtection {
     return record;
   }
 
-  /**
-   * Paths of saves that committed but may still be writing workspace files. A
-   * save writes its journal before committing, compares each file with its
-   * prior fingerprint while writing, and removes the journal afterwards.
-   */
   async writing(): Promise<Set<string>> {
     const root = join(this.library.root, "local", "transactions");
     const names = await readdir(root).catch((error: NodeJS.ErrnoException) => {
@@ -239,7 +219,6 @@ export class WorkspaceProtection {
     return paths;
   }
 
-  /** Paths whose workspace file differs from the revision. Reads only. */
   async changed(paths: string[], revision: string | null): Promise<string[]> {
     return (await this.compare(paths, revision)).map((item) => item.path);
   }
@@ -256,17 +235,12 @@ export class WorkspaceProtection {
     return conflicts;
   }
 
-  /**
-   * Records files as committed at a revision, read or written by the caller in
-   * the same writer transaction, so comparisons reuse them instead of reading.
-   */
   remember(revision: string, files: Map<string, Buffer | null>) {
     const known = this.known.get(revision) ?? new Map();
     for (const [path, bytes] of files) known.set(path, bytes);
     this.known.set(revision, known);
   }
 
-  /** Which of the paths the revision contains. */
   private async tracked(paths: string[], revision: string | null) {
     const known = revision ? this.known.get(revision) : undefined;
     const found = new Set(paths.filter((path) => known?.get(path)));
@@ -280,7 +254,6 @@ export class WorkspaceProtection {
     return found;
   }
 
-  /** Committed bytes of paths the revision contains. */
   private async committed(paths: string[], revision: string) {
     const known = this.known.get(revision);
     const unread = paths.filter((path) => !known?.get(path));
@@ -301,8 +274,6 @@ export class WorkspaceProtection {
       actual: Buffer | null;
       tracked: boolean;
     }[] = [];
-    // A whole-library scan decodes every page and package; reading it in one
-    // request held gigabytes at once and exhausted the shared V8 heap.
     for (let offset = 0; offset < paths.length; offset += COMPARE_BATCH) {
       const batch = paths.slice(offset, offset + COMPARE_BATCH),
         present = batch.filter((path) => tree.has(path));
@@ -359,7 +330,6 @@ export class WorkspaceProtection {
     return result;
   }
 
-  /** workspaceHash, reusing the fingerprint baseline() took of the same bytes. */
   private fingerprint(path: string, bytes: Buffer | null) {
     const recorded = this.recorded.get(path);
     return recorded && sameBytes(recorded.bytes, bytes)
@@ -382,8 +352,6 @@ export class WorkspaceProtection {
       const target = join(this.library.workspace, path);
       const actual = await readLibraryBytes(this.library.root, target),
         desired = files.get(path) ?? null;
-      // Identical bytes have identical fingerprints; otherwise the file is the
-      // save's own projection when it still has the fingerprint taken before.
       const fingerprint = sameBytes(actual, desired)
         ? undefined
         : this.fingerprint(path, actual);

@@ -1,6 +1,3 @@
-/* step-walkthrough: neutral colors follow the design tokens; tones carry a light and a dark hue. */
-/* Page typography reaches into blocks at 0,2,1; this baseline (0,2,2) clears it
- * for structural elements, and the rules below (0,3,0) set this block's own values. */
 .sb-block.wk-block-root :is(h3, h4, p, ul, ol, li, dl, dt, dd, pre):not(svg) {
   margin: 0;
 }
@@ -13,7 +10,6 @@
   background: none;
   color: inherit;
 }
-/* Doubled class so the shared .sb-block font and size do not override these. */
 .sb-block.wk-block-root {
   --wk-text: var(--sb-text);
   --wk-muted: var(--sb-muted);

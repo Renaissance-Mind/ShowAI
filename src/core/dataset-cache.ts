@@ -6,38 +6,19 @@ import { atomicLibraryFile, readLibraryBytes } from "./library-files";
 import { assertId } from "./store";
 import type { WarningCode } from "../datasets/warnings.mjs";
 
-// The last value read successfully from each external dataset on this
-// device, under local/dataset-cache/<project>/<dataset>.json. local/ is
-// outside history and synchronization. When the source cannot be read, a
-// read returns this value marked stale; online data is also served from
-// here until its refresh interval passes. A transform dataset keeps its last
-// good output here, with the hash of the inputs and script it came from.
 
 export interface CachedValue {
   format: "showai-dataset-cache";
   version: 1;
   projectId: string;
   datasetId: string;
-  /** The source the value came from; a cache of another source is ignored. */
   origin: string;
-  /** sha256 of the value's canonical JSON. */
   hash: string;
-  /** When the source was last read (or confirmed unchanged). */
   readAt: string;
-  /** Size of the source as read. */
   bytes: number;
-  /** HTTP validators of online data, for conditional fetches. */
   etag?: string;
   lastModified?: string;
-  /**
-   * The last fetch of online data failed after readAt; reads stay stale
-   * until the refresh interval passes or an explicit refresh succeeds.
-   */
   failure?: { at: string; reason: WarningCode; problem: string };
-  /**
-   * A transform's output: the inputs and script it was computed from (as
-   * one hash) and how long the run took.
-   */
   transform?: { key: string; ms: number };
   value: unknown;
 }
@@ -46,7 +27,6 @@ export function valueHash(value: unknown): string {
   return createHash("sha256").update(canonicalJson(value)).digest("hex");
 }
 
-/** The source identity a cached value belongs to. */
 export function cacheOrigin(
   source: { kind: string; format: string; url?: string },
   path?: string,
@@ -56,11 +36,9 @@ export function cacheOrigin(
     : `file:${source.format}:${path}`;
 }
 
-/** Files are read on every read; their cache is rewritten after this long without a change. */
 const FILE_REWRITE_MS = 10 * 60_000;
 
 export class DatasetValueCache {
-  /** What this process last wrote, so unchanged file reads skip the write. */
   private static written = new Map<
     string,
     { origin: string; hash: string; at: number }
@@ -100,10 +78,6 @@ export class DatasetValueCache {
     return entry;
   }
 
-  /**
-   * Keeps a value read successfully. A file read that found the same value
-   * shortly before is not written again.
-   */
   async write(
     input: Omit<CachedValue, "format" | "version" | "hash" | "readAt"> & {
       readAt?: string;

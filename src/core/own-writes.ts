@@ -13,11 +13,6 @@ async function currentDigest(path: string): Promise<string | null> {
   }
 }
 
-/**
- * Recognizes file-watcher echoes of a client's own saves. A path counts as an
- * echo only while its bytes still match what that client's save produced, so
- * a concurrent edit from an Agent or another window is still reported.
- */
 export class OwnWrites {
   private expected = new Map<
     string,
@@ -35,7 +30,6 @@ export class OwnWrites {
       });
   }
 
-  /** Returns, per origin, the paths in this batch that are its own echoes. */
   async echoes(paths: Iterable<string>): Promise<Map<string, Set<string>>> {
     const now = Date.now();
     for (const [path, entry] of this.expected)

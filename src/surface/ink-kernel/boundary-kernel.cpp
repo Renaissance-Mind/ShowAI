@@ -43,14 +43,11 @@ uint32_t sa_boundary_update(void*state,const SABoundaryLease*base,const SABounda
     if(o->math.numbers.status)return o->math.numbers.status;if(final_commands>o->budget.max_commands||final_sources>o->budget.max_sources)return SA_INK_CAPACITY;
     if(!changes){if(o->slots[o->current].references==0xffffffffu)return SA_INK_CAPACITY;++o->slots[o->current].references;*output=o->lease(o->current);return SA_INK_OK;}
     prepared_slot=available_slot(*o);if(prepared_slot==no_index)return SA_INK_CAPACITY;SourceDirty dirty(o->math.numbers);
-    // Remove all changed old captures before inserting any replacement. Valid
-    // final batches do not fail merely because packet order transiently exceeds
-    // the source/command pool. The externally visible base remains immutable.
     for(uint32_t i=0;i<mutation_count&&graph.good();i++)if(static_cast<const PagedVector<uint32_t,6>&>(changed)[i]&&static_cast<const PagedVector<uint32_t,6>&>(old_indices)[i]!=no_index)remove_source(graph,static_cast<const PagedVector<uint32_t,6>&>(old_indices)[i],dirty);
     for(uint32_t i=0;i<mutation_count&&graph.good();i++)if(static_cast<const PagedVector<uint32_t,6>&>(changed)[i]&&mutations[i].operation==SA_BOUNDARY_UPSERT_SOURCE)upsert_source(graph,mutations[i].source,commands,command_count,dirty);
     if(!graph.good())return o->math.numbers.status;if(graph.active_commands!=final_commands||graph.active_sources!=final_sources)return SA_INK_RANGE;
     construct_delta(graph,dirty);if(!graph.good())return o->math.numbers.status;
-    } // packet/hash/support staging is workspace, not a retained snapshot.
+    }
     return publish_graph(*o,graph,prepared_slot,baseline,output);
 }
 uint32_t sa_boundary_retain(void*state,SABoundaryLease lease){auto*o=owner(state);if(!o||o->busy||!o->valid(lease)||!o->begin())return SA_INK_INVALID;OwnerCall call(*o);auto&s=o->slots[lease.slot];if(s.references==0xffffffffu)return SA_INK_CAPACITY;++s.references;return SA_INK_OK;}

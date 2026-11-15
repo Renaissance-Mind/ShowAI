@@ -1,6 +1,5 @@
 import { defineMessages } from "../index";
 
-// Structure browser built-in.
 export default defineMessages("structureBrowser", {
   "zh-CN": {
     title: "结构浏览器",

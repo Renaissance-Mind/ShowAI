@@ -9,7 +9,6 @@ test("release verification rejects changed, additional and removed Docker inputs
   const source = await mkdtemp(join(tmpdir(), "showai-cloud-release-"));
   t.after(() => rm(source, { recursive: true, force: true }));
   const real = await cloudMcpBuildInputs(resolve(import.meta.dirname, ".."));
-  // Small real filesystem fixture with each required build input directory.
   for (const file of real.files) {
     await mkdir(dirname(join(source, file.path)), { recursive: true });
     await writeFile(join(source, file.path), "release fixture");

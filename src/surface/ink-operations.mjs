@@ -12,7 +12,6 @@ const id = value => typeof value === "string" && value.length > 0 && value.lengt
 const invalid = message => { throw new Error(`Invalid ink operation: ${message}`); };
 const clone = value => JSON.parse(canonicalInkJSON(value));
 
-/** Strict JSON, UTF-16 object-key order, and ECMAScript number formatting. */
 export function canonicalInkJSON(value) {
   if (value === null || typeof value === "string" || typeof value === "boolean") return JSON.stringify(value);
   if (finite(value)) return JSON.stringify(value);
@@ -27,12 +26,6 @@ const checkedDigest = value => {
   if (typeof value !== "string" || !/^[a-f0-9]{64}$/.test(value)) invalid("SHA-256 provider must return 64 lowercase hexadecimal characters synchronously");
   return value;
 };
-/** Install a trusted synchronous platform SHA-256 implementation. Input is the
- * exact existing source string; encode UTF-8 with isolated UTF-16 surrogates
- * replaced by U+FFFD, preserving NUL and Unicode normalization form. No provider
- * error is caught or silently retried with another implementation. Installation
- * publishes only after all known vectors pass; a failed replacement leaves the
- * previous provider active. Passing null restores the portable implementation. */
 export function installInkDigestProvider(provider) {
   if (provider === null) { inkDigestProvider = null; return; }
   if (typeof provider !== "function") invalid("SHA-256 provider must be a function or null");
@@ -55,7 +48,6 @@ export function installInkDigestProvider(provider) {
   inkDigestProvider = provider;
 }
 
-/** Synchronous SHA-256 shared by every lexical kernel and wire call site. */
 export function inkOperationDigest(value) {
   const source = typeof value === "string" ? value : canonicalInkJSON(value);
   return inkDigestProvider ? checkedDigest(inkDigestProvider(source)) : portableInkDigest(source);
@@ -159,11 +151,8 @@ export function createInkOperation({ actor, sequence, pageId, boardId, parents =
   return clone(validateInkOperation({ format: INK_OPERATION_FORMAT, id: `${actor}:${sequence}`, actor, sequence, pageId, boardId, parents: [...new Set(parents)].sort(compare), changes }));
 }
 
-/** Bootstrap once from an existing Board. It does not flatten or rasterize strokes. */
 export function bootstrapInkOperation({ actor, pageId, boardId, nodes, layout }) {
   if (!nodes.length) return null;
-  // The same imported snapshot must have one identity on every device. Distinct
-  // snapshots require an explicit baseline reconciliation, never two creations.
   actor ??= `snapshot-${inkOperationDigest({ pageId, boardId, nodes, layout: Object.fromEntries(nodes.map(node => [node.attrs.id, layout[node.attrs.id]])) }).slice(0, 48)}`;
   return createInkOperation({ actor, sequence: 1, pageId, boardId, changes: nodes.map(node => ({ kind: "create", strokeId: node.attrs.id, node, layout: layout[node.attrs.id] })) });
 }
@@ -180,8 +169,6 @@ const observed = (clock, operationId) => {
   return own(clock, actor) && clock[actor] >= sequence;
 };
 
-/** Checkpoints are local trusted accelerators, not self-authenticating remote
- * snapshots. Journal checksums detect corruption; remote batches replay source ops. */
 export function validateInkCheckpoint(state) {
   if (state?.format !== INK_CHECKPOINT_FORMAT || !id(state.pageId) || !id(state.boardId) || !state.known || !Array.isArray(state.strokes) || !Array.isArray(state.frontier)) invalid("checkpoint");
   const known = state.known, operationIds = Object.keys(known);
@@ -213,9 +200,6 @@ export function validateInkCheckpoint(state) {
   return state;
 }
 
-/** Incremental replay: checkpoints retain causal metadata and current register heads,
- * not the historical sample payloads. Old operations remain in the durable journal
- * for selective undo and later peer reconciliation; this is not peer-safe GC. */
 export class InkOperationReplica {
   constructor({ pageId, boardId, checkpoint }) {
     const state = checkpoint ? clone(validateInkCheckpoint(checkpoint)) : emptyInkCheckpoint({ pageId, boardId });
@@ -229,8 +213,6 @@ export class InkOperationReplica {
       for (const [actor, sequence] of Object.entries(item.clock)) this.clock[actor] = Math.max(this.clock[actor] ?? 0, sequence);
     }
   }
-  /** Prepare is copy-on-write for touched strokes/registers only. Existing sample
-   * payloads and causal maps remain owned and are not cloned or revalidated. */
   prepare(operations) {
     if (this.prepared) invalid("a replica already has a prepared transaction");
     const pending = new Map(), known = new Map(), strokes = new Map(), touched = new Map(), undo = {};
@@ -322,8 +304,6 @@ export class InkOperationReplica {
     this.prepared = { token, known, strokes, frontier, clock };
     return { token, records: clone(records), frontier: [...frontier].sort(compare), clock, undo, appendedIds: [...known.keys()] };
   }
-  /** Import actual compact causal heads, never a fabricated after-all operation.
-   * Foreign anchors have a context and optional source hash, not an op body. */
   prepareImport(checkpoint) {
     if (this.prepared) invalid("a replica already has a prepared transaction");
     validateInkCheckpoint(checkpoint);
@@ -389,9 +369,6 @@ export class InkOperationReplica {
     }
     return { pageId: this.pageId, boardId: this.boardId, changes: clone(changes), parents: [...this.frontier].sort(compare), skipped };
   }
-  /** One logical action may own several sequential writes. Follow actual
-   * prior register ownership, rather than writing intermediate inverse events
-   * which would hide the older source heads from selective compensation. */
   compensationGroupPlan(sources) {
     if (!Array.isArray(sources) || !sources.length) invalid("empty compensation group");
     const group = new Map(), affected = new Map(), changes = [], sourcePhase = [], skipped = [];
@@ -468,9 +445,6 @@ export class InkOperationReplica {
         for (const field of ["ink", "inkFragments"]) if (wanted.has(field)) skip(field, "logical-geometry-conflict");
       }
       for (const [field, value] of resolved) if (field !== "alive") patch[field] = value;
-      // The existing raw format permits one change per stroke per operation.
-      // A liveness+source inverse therefore needs two real contiguous events,
-      // committed together by the journal transaction before any publication.
       if (resolved.has("alive")) {
         changes.push({ kind: resolved.get("alive") ? "restore" : "delete", strokeId });
         if (Object.keys(patch).length) sourcePhase.push({ kind: "edit", strokeId, patch });
@@ -489,8 +463,6 @@ export class InkOperationReplica {
       }
       this.known.set(key, value); this.level = Math.max(this.level, value.level);
     }
-    // Import can replace an approximate compact anchor level with its real
-    // lower level. Only that cold correction needs to revisit numeric levels.
     if (!this.levelCounts.has(this.level)) { this.level = 0; for (const level of this.levelCounts.keys()) this.level = Math.max(this.level, level); }
     for (const [key, value] of strokes) this.strokes.set(key, value);
     this.frontier = frontier; this.clock = clock; this.prepared = null; this.version++;
@@ -506,15 +478,10 @@ export class InkOperationReplica {
       frontier: [...this.frontier].sort(compare), known: Object.fromEntries([...this.known].sort(([a], [b]) => compare(a, b))),
       strokes: [...this.strokes.values()].sort(strokeOrder) });
   }
-  /** Cold-load ordering index. Deliberately excludes nodes, geometry and
-   * historic contexts; live projection uses sparseCheckpoint instead. */
   projectionIndex() {
     return [...this.strokes.values()].sort(strokeOrder).map(stroke => clone({ id: stroke.id, born: stroke.creationOrder,
       ...(stroke.registers.placement ? { placement: stroke.registers.placement[0].value } : {}) }));
   }
-  /** A projection read visits requested stroke records and their descriptors
-   * only. Its global metadata is maintained during commit, never reconstructed
-   * by scanning every historic event or unrelated sample payload. */
   sparseCheckpoint(ids) {
     if (!Array.isArray(ids) || ids.some(strokeId => !id(strokeId))) invalid("sparse projection stroke identities");
     const strokes = [], required = new Set(this.frontier);
@@ -533,7 +500,6 @@ export class InkOperationReplica {
     return clone({ checkpoint: { format: INK_CHECKPOINT_FORMAT, pageId: this.pageId, boardId: this.boardId,
       frontier: [...this.frontier].sort(compare), known, strokes: strokes.sort(strokeOrder) }, clock: this.clock, level: this.level });
   }
-  /** Explicit reads may materialize the whole Board; append does not. */
   materialize(ids) {
     const strokes = (ids ? ids.map(id => this.strokes.get(id)).filter(Boolean) : [...this.strokes.values()]).sort(strokeOrder);
     return materializeState({ pageId: this.pageId, boardId: this.boardId, frontier: [...this.frontier].sort(compare), strokes }, id => this.known.get(id));
@@ -562,8 +528,6 @@ export function inkCheckpointFromRecords({ pageId, boardId, frontier, records })
   }
   state.strokes = [...strokes.values()].sort(strokeOrder); return state;
 }
-/** Offline/audit replay. Import records are the exact validated post-merge delta
- * durably committed at that point, not a newly authored after-all operation. */
 export function replayInkJournalEvents(scope, events) {
   let replica = new InkOperationReplica(scope);
   for (const event of events) {
@@ -614,15 +578,11 @@ function materializeState(state, getKnown) {
         }
       }
     }
-    // Any concurrent deletion hides the stroke; source data and delete/edit
-    // conflicts survive. A snapshot consumer must explicitly resolve conflicts.
     return [{ id: stroke.id, node, layout: frame, ...(stroke.registers.placement ? { placement: clone(stroke.registers.placement[0].value) } : {}), deleted: stroke.registers.alive.some(entry => entry.value === false), heads, conflicts: local }];
   });
   return { pageId: state.pageId, boardId: state.boardId, frontier: state.frontier, strokes, tombstones, conflicts };
 }
 
-/** Selective undo never writes over a later or concurrent remote register head.
- * New concurrent arrivals can still produce explicit conflicts, never silent loss. */
 export function inkCompensationPlan(operations, operationId) {
   const target = operations.find(operation => operation.id === operationId);
   if (!target) invalid("undo target is missing from retained journal");

@@ -1,73 +1,24 @@
-/**
- * ShowAI inline page preview — Host half.
- *
- * A ShowAI presentation tool (`page_present` / `render_document`) answers with a
- * delivery record: the compiled page was written to disk, and only the *paths*
- * are on the wire (`data.delivery.inline` / `data.delivery.html`). The Harness
- * model-facing projection keeps the tool's text blocks and drops the MCP
- * `_meta.showai.inline` payload that an MCP Apps host would render, so the
- * browser cannot see the page on its own.
- *
- * This half closes that gap without touching the wire contract:
- *
- * 1. observe the settled result of a ShowAI presentation tool and copy the
- *    delivered HTML into a plugin-owned cache under `$DSH_HOME/cache/showai-page`;
- * 2. serve that cache from a dedicated loopback origin (`127.0.0.1:<random>`),
- *    so the page runs in its own origin instead of the Harness page origin and
- *    cannot reach the application DOM, session data or `/api`;
- * 3. expose one same-origin route on the Harness web server that answers a
- *    `HEAD` probe from the cache and `302`s a real load to the preview origin
- *    (the browser gets no CORS access to that origin, only a navigation).
- *
- * `delivery.inline` is an *inline reader fragment*: it starts at a `<section>`
- * and relies on the embedding host to supply the surrounding document. Framing
- * that fragment directly puts the preview into quirks mode, which breaks KaTeX
- * and changes layout (`document.compatMode === "BackCompat"`). The cache
- * therefore stores a complete document: full deliveries are kept byte-for-byte,
- * and inline fragments get a doctype, head and body shell. Legacy fragment
- * cache entries are wrapped on read, so replaying an old transcript also
- * renders in standards mode.
- *
- * The preview is therefore durable across restarts: the cache survives, so
- * replaying an old transcript still renders the page it presented.
- */
 import { createServer } from "node:http";
 import { mkdir, readFile, readdir, rename, rm, stat, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
 
-/** Same-origin route the browser asks for; the Host answers it and redirects a load. */
 export const PREVIEW_ROUTE = "/showai-page-preview";
-/** Wire tools whose settled result carries a ShowAI presentation delivery. */
 const PRESENTATION_TOOL = /^mcp__[A-Za-z0-9_-]+__(?:page_present|render_document|show_component)$/;
-/** Preview files kept in the cache; older ones are dropped after each write. */
 const MAX_PREVIEWS = 40;
-/** A preview above this size is not cached (the fallback surface opens the file instead). */
 const MAX_PREVIEW_BYTES = 12 * 1024 * 1024;
-/** Preview file names are opaque ids; nothing else is servable. */
 const PREVIEW_NAME = /^[A-Za-z0-9_-]{1,96}\.html$/;
-/** The fragment's own language, when it carries one. */
 const FRAGMENT_LANGUAGE = /<section\b[^>]*\blang="([A-Za-z0-9-]{1,32})"/i;
 
-/**
- * The preview cache directory.
- * @returns the absolute cache path for this Harness home.
- */
 function cacheRoot() {
   const home = process.env.DSH_HOME ?? join(homedir(), ".dsh");
   return join(home, "cache", "showai-page");
 }
 
-/**
- * The one file-name rule shared with the Client half (see `client.js`).
- * @param callId - the tool call id that produced the presentation.
- * @returns a safe, collision-free cache file name.
- */
 function fileNameFor(callId) {
   return `${String(callId).replace(/[^A-Za-z0-9_-]/g, "_")}.html`;
 }
 
-/** Escape text that becomes document metadata. */
 function escapeHtmlText(value) {
   return String(value)
     .replaceAll("&", "&amp;")
@@ -76,19 +27,6 @@ function escapeHtmlText(value) {
     .replaceAll('"', "&quot;");
 }
 
-/**
- * Turn a delivered file into a complete HTML document.
- *
- * `delivery.html` and the compressed online reader can already be complete
- * documents; those are returned byte-for-byte. `delivery.inline` is normally a
- * `<section>` fragment intended for another host's document, so it gets the
- * smallest standards-mode shell it needs. Loading it directly is what put the
- * preview into quirks mode.
- *
- * @param body - the delivered HTML bytes.
- * @param title - the presentation title, when the result carries one.
- * @returns complete HTML bytes.
- */
 export function completePreviewDocument(body, title) {
   const text = Buffer.isBuffer(body) ? body.toString("utf8") : String(body);
   const head = text.slice(0, 4096);
@@ -110,11 +48,6 @@ export function completePreviewDocument(body, title) {
   );
 }
 
-/**
- * Read the delivery record out of one settled tool result.
- * @param result - the frozen `tools/result` outcome.
- * @returns the source HTML path and label, or undefined for an unrelated result.
- */
 function presentationFromResult(result) {
   if (result === undefined || result === null || result.isError === true) {
     return undefined;
@@ -146,10 +79,6 @@ function presentationFromResult(result) {
   return undefined;
 }
 
-/**
- * Keep only the newest preview files.
- * @param root - the preview cache directory.
- */
 async function prune(root) {
   const entries = await readdir(root, { withFileTypes: true }).catch(() => []);
   const files = [];
@@ -164,12 +93,6 @@ async function prune(root) {
   }
 }
 
-/**
- * Copy one delivered page into the preview cache as a complete document.
- * @param callId - the tool call id owning the preview.
- * @param presentation - the parsed delivery record.
- * @param root - the preview cache directory.
- */
 async function cachePreview(callId, presentation, root) {
   const body = completePreviewDocument(await readFile(presentation.source), presentation.title);
   if (body.byteLength === 0 || body.byteLength > MAX_PREVIEW_BYTES) {
@@ -181,7 +104,6 @@ async function cachePreview(callId, presentation, root) {
   const temporary = join(root, `.${name}.${process.pid}.${Date.now()}.tmp`);
   try {
     await writeFile(temporary, body);
-    // Publish atomically so a HEAD probe never sees a half-written document.
     await rename(temporary, target);
   } catch (error) {
     await rm(temporary, { force: true }).catch(() => {});
@@ -190,20 +112,10 @@ async function cachePreview(callId, presentation, root) {
   await prune(root);
 }
 
-/**
- * Read a cached preview as a complete document, wrapping legacy fragments.
- * @param name - the validated cache file name.
- * @returns the servable HTML bytes.
- */
 async function readPreview(name) {
   return completePreviewDocument(await readFile(join(cacheRoot(), name)));
 }
 
-/**
- * Start the isolated preview origin.
- * @param log - the plugin logger.
- * @returns the listening server and port, or undefined when binding failed.
- */
 function startPreviewOrigin(log) {
   const server = createServer((request, response) => {
     void (async () => {
@@ -251,17 +163,8 @@ function startPreviewOrigin(log) {
   });
 }
 
-/**
- * The preview needs the Web carrier: without `webServer` the page has no
- * address to reach the cached HTML, so the row stays inactive in a headless
- * composition instead of activating a service it cannot use.
- */
 export const inject = ["webServer"];
 
-/**
- * Host half of the ShowAI inline page preview.
- * @param ctx - the plugin context.
- */
 export function apply(ctx) {
   const log = ctx.logger;
   const root = cacheRoot();

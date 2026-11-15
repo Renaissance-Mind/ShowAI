@@ -6,10 +6,8 @@ import type { AgentProblem, AgentProblemCode } from "./types";
 
 const t = translator(messages);
 
-/** Longest original text kept with a problem; stderr can reach 64 KB. */
 export const PROBLEM_DETAIL_LIMIT = 4000;
 
-/** Redacts secrets and the home path, keeping the last part of long output. */
 export function problemDetail(text: string | undefined): string | undefined {
   const clean = redact((text ?? "").trim(), { home: homedir() });
   if (!clean) return undefined;
@@ -25,7 +23,6 @@ export function problemSummary(problem: Omit<AgentProblem, "summary">): string {
   return t(`summary.${problem.code}`, { name });
 }
 
-/** A failure the host already understands; travels through IPC as `problem`. */
 export class AgentFailure extends Error {
   readonly problem: AgentProblem;
   constructor(problem: Omit<AgentProblem, "summary"> & { summary?: string }) {
@@ -42,7 +39,6 @@ export class AgentFailure extends Error {
   }
 }
 
-/** Last provider failure seen by the model gateway during one run. */
 export interface GatewayFailure {
   status?: number;
   code?: string;
@@ -99,17 +95,11 @@ const PATTERNS: [AgentProblemCode, RegExp][] = [
   ],
 ];
 
-/** Recognizes a well-known failure in Agent output; null when nothing matches. */
 export function matchProblem(text: string): AgentProblemCode | null {
   for (const [code, pattern] of PATTERNS) if (pattern.test(text)) return code;
   return null;
 }
 
-/**
- * Turns whatever a run threw into a classified problem. Known failures keep
- * their classification; process exits look for a recognizable reason in
- * stderr first; everything else is matched by text or stays `unknown`.
- */
 export function classifyFailure(
   error: unknown,
   context: { name?: string; chatgpt?: boolean; output?: string } = {},
@@ -121,7 +111,6 @@ export function classifyFailure(
       : {};
   if (error instanceof AgentFailure) {
     const problem = error.problem;
-    // Exits and unfinished runs often name their reason in stderr.
     if (problem.code !== "process_exited" && problem.code !== "unknown")
       return problem;
     const specific = matchProblem(
@@ -137,7 +126,6 @@ export function classifyFailure(
   }
   const message = error instanceof Error ? error.message : String(error);
   const code = matchProblem(`${message}\n${context.output ?? ""}`);
-  // The Codex SDK reports a failed child process as "exited with code N".
   const exit = /exited with code (\d+)/i.exec(message);
   return new AgentFailure({
     code: code ?? (exit ? "process_exited" : "unknown"),

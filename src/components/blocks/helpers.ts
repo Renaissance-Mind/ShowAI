@@ -83,7 +83,6 @@ export function parseChartData(value: string): {
   return { labels, series };
 }
 
-/** CSV of database rows; `cellText` writes each typed value (default: the stored text). */
 export function toCsv(
   columns: DatabaseColumn[],
   rows: DatabaseRow[],
@@ -92,7 +91,6 @@ export function toCsv(
 ): string {
   const escape = (value: unknown) => {
     const content = String(value ?? "");
-    // Preserve text when opened in spreadsheet software instead of evaluating formulas.
     const safe =
       /^[\s]*[=+@-]|^[\t\r\n]/.test(content) && !/^-?\d+(\.\d+)?$/.test(content)
         ? `'${content}`

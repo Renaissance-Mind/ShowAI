@@ -30,7 +30,6 @@ const CARRYING = new Set<PackagingChoice>([
   "both",
 ]);
 
-/** Bytes an item adds with a choice (as core/packaging counts them). */
 function choiceBytes(item: PackagingItem, choice: PackagingChoice) {
   const own = item.bytes ?? 0;
   if (choice === "bundle" || choice === "embed" || choice === "result")
@@ -40,11 +39,6 @@ function choiceBytes(item: PackagingItem, choice: PackagingChoice) {
   return 0;
 }
 
-/**
- * Lists what an export or synchronization would carry from outside the
- * library, with sizes, so the person chooses each item; the total is held
- * against the limit of one export or synchronization.
- */
 export function PackagingDialog({
   plan,
   purpose,
@@ -53,9 +47,7 @@ export function PackagingDialog({
 }: {
   plan: PackagingPlan;
   purpose: "export" | "sync";
-  /** The id of an item to show and focus first. */
   focus?: string;
-  /** The choice of every item, or null when the person cancels. */
   onDecide: (decisions: PackagingDecisions | null) => void;
 }) {
   const t = useTranslator(messages);
@@ -74,7 +66,6 @@ export function PackagingDialog({
   const over = total > plan.limits.totalBytes;
   const focused = useRef<HTMLSelectElement>(null);
   useEffect(() => {
-    // After the dialog's own initial focus, move to the item asked for.
     const frame = requestAnimationFrame(() => {
       focused.current?.scrollIntoView({ block: "center" });
       focused.current?.focus({ preventScroll: true });
@@ -101,7 +92,6 @@ export function PackagingDialog({
               <ul>
                 {items.map((item) => {
                   const choice = choices[item.id] ?? item.choice;
-                  // The size the item adds when carried, whatever is chosen now.
                   const carry = CARRYING.has(choice)
                     ? choice
                     : item.choices.find((option) => CARRYING.has(option));

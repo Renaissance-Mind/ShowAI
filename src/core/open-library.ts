@@ -22,7 +22,6 @@ async function empty(root: string) {
   }
   return true;
 }
-/** New empty libraries use history by default; existing originals need reviewed import. */
 export async function openLibrary(home: string) {
   const root = resolve(home),
     existing = versionedLibrary(root);
@@ -51,7 +50,6 @@ export async function openLibrary(home: string) {
       throw error;
     return { mode: "legacy" as const, initialized: false };
   }
-  // The App offers sample content only to libraries it created itself.
   await markNewLibrary(root);
   return { mode: "versioned" as const, initialized: true };
 }

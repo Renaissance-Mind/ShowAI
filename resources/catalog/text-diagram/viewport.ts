@@ -10,7 +10,6 @@ export function fitScale(width: number, naturalWidth: number) {
   return Math.min(1, Math.max(1, width - PADDING * 2) / naturalWidth);
 }
 
-/** Preserve the diagram point under an anchor, including centered small drawings. */
 export function zoomScroll(
   scroll: number,
   anchor: number,
@@ -91,7 +90,6 @@ export function useDiagramViewport(
         current.scale,
         next,
       ),
-      // Drawings are centered horizontally, but start at the top vertically.
       y: Math.max(
         0,
         ((element.scrollTop + y - PADDING) / current.scale) * next +

@@ -6,20 +6,6 @@ import type {
   ValueKind,
 } from "../datasets/value-types.mjs";
 
-/**
- * What a component contributes to the slots the workbench offers, declared in
- * `manifest.contributes` (library packages) or `contributes` (built-in
- * metadata). Every slot a component fills is validated here, with one error
- * style: `contributes.<path> <problem>`.
- *
- * - commands: entries in quick jump (Cmd/Ctrl+K) that insert the component or
- *   open a page.
- * - mention: the component is offered in the @ menu of rich text and placed
- *   inside the line, the menu filling one string prop.
- * - databaseField: the component is a database field type; the harness half
- *   (value kind, operators) is declared here, the cell half is its `field`
- *   export and default React export.
- */
 
 export const COMPONENT_COMMAND_LIMIT = 20;
 const commandId = z
@@ -126,7 +112,6 @@ export interface ComponentContributions {
   databaseField?: DatabaseFieldContribution;
 }
 
-/** The slots a component can fill, for listings and guides. */
 export const CONTRIBUTION_SLOTS = ["commands", "mention", "databaseField"] as const;
 
 const fail = (message: string): never => {
@@ -137,11 +122,6 @@ const at = (path: PropertyKey[]) =>
     .map((part) => (typeof part === "number" ? `[${part}]` : `.${String(part)}`))
     .join("");
 
-/**
- * The checked declaration. `examples` is the number of examples, for
- * commands that insert one; `schema` (the props schema) is given when the
- * package is compiled and checks the prop a mention fills.
- */
 export function validateContributions(
   value: unknown,
   { examples, schema }: { examples: number; schema?: unknown },
@@ -185,7 +165,6 @@ export function validateContributions(
   return contributions;
 }
 
-/** The props an insert command puts into the page. */
 export function commandProps(
   command: ComponentCommand,
   component: {

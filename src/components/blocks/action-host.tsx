@@ -1,17 +1,12 @@
 import { createContext, useContext, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 
-/** A container may host an object's existing actions without recreating its commands. */
 export const BlockActionHost = createContext<{
   target: HTMLElement | null;
   selected: boolean;
   closeSettings?: () => void;
 } | null>(null);
 
-/**
- * Items a host maps into a component from elsewhere (e.g. shared dataset
- * records), by item id: their source and the fields that cannot change here.
- */
 export interface BlockItemSource {
   label?: string;
   readOnly: readonly string[];
@@ -22,15 +17,9 @@ export const BlockItemSources = createContext<ReadonlyMap<
   BlockItemSource
 > | null>(null);
 
-/**
- * What a block bound to shared data may rely on: how current its data is
- * and which parts can change (true, false or { paths }, see
- * datasets/editable.mjs). Unbound blocks have none.
- */
 export interface BlockDataStateValue {
   status: "ok" | "stale" | "empty";
   editable: boolean | { paths: string[] };
-  /** The dataset whose records the block shows as its own, when it does. */
   dataset?: string;
 }
 export const BlockDataState = createContext<BlockDataStateValue | null>(null);
@@ -46,7 +35,6 @@ export function BlockActions({ children }: { children: ReactNode }) {
 export function BlockSettings({ children }: { children: ReactNode }) {
   const host = useContext(BlockActionHost);
   if (!host) return children;
-  // Keep the component and its draft mounted when selection changes.
   return host.target
     ? createPortal(
         <div
@@ -58,7 +46,6 @@ export function BlockSettings({ children }: { children: ReactNode }) {
               event.preventDefault();
               event.stopPropagation();
               host.closeSettings();
-              // The settings toggle is the last header action and is active while open.
               host.target
                 ?.querySelector<HTMLButtonElement>(
                   ".sb-actions > button.sb-icon-button.is-active:last-child",

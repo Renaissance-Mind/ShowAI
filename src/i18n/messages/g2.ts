@@ -1,6 +1,5 @@
 import { defineMessages } from "../index";
 
-// G2 chart block chrome and settings.
 export default defineMessages("g2", {
   "zh-CN": {
     chart: "图表",

@@ -11,11 +11,6 @@ import messages from "../../i18n/messages/svg";
 import "./drawing-palette.css";
 import "./svg.css";
 
-/**
- * A drawn figure: the saved SVG source is sanitized, scaled to the page width
- * and themed through the palette classes. Readers only view it; the figure
- * changes through its data.
- */
 export function SvgBlock({ data }: BlockProps) {
   const t = useTranslator(messages);
   const model = data as Partial<SvgData>;

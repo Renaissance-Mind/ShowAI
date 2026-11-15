@@ -1,9 +1,7 @@
-/** Rectangles, ellipses and arrows carry an optional plain-text label. */
 export const LABEL_TOOLS = ["rectangle", "ellipse", "arrow"];
 export const DEFAULT_LABEL_SIZE = 16;
 export const MAX_LABEL_LENGTH = 2000;
 export const LABEL_LINE_HEIGHT = 1.3;
-/** Preset label sizes offered by the style controls, in Board units. */
 export const LABEL_SIZES = [14, 16, 22, 30];
 
 export function labelCapable(node) {
@@ -14,15 +12,10 @@ export function labelCapable(node) {
   );
 }
 
-/** Space between a shape's outline and its label text, in Board units. */
 export function labelPadding(tool, strokeWidth = 2) {
   return tool === "arrow" ? 4 : Math.max(8, strokeWidth + 6);
 }
 
-/**
- * The label area inside a frame. An ellipse keeps text within its inscribed
- * rectangle so lines never cross the curved outline.
- */
 export function labelBox(tool, width, height, strokeWidth = 2) {
   const pad = labelPadding(tool, strokeWidth);
   if (tool === "ellipse") {
@@ -51,10 +44,6 @@ function charWidth(char) {
   return /[A-Z0-9MW@#%&]/.test(char) ? 0.64 : 0.54;
 }
 
-/**
- * Approximate wrapped text size without a browser. Used to size shapes that
- * an Agent creates without explicit dimensions; the editor measures real text.
- */
 export function estimateLabel(text, fontSize = DEFAULT_LABEL_SIZE, maxWidth) {
   let lines = 0,
     widest = 0;
@@ -78,7 +67,6 @@ export function estimateLabel(text, fontSize = DEFAULT_LABEL_SIZE, maxWidth) {
   };
 }
 
-/** Default frame size for a labelled shape that has no explicit dimensions. */
 export function labelledShapeSize(
   tool,
   label,
@@ -101,7 +89,6 @@ export function labelledShapeSize(
   };
 }
 
-/** Frame height a shape needs to show its label at `fontSize` within `width`. */
 export function labelFitHeight(
   tool,
   label,

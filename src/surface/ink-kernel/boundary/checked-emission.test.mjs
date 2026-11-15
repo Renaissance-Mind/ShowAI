@@ -44,8 +44,6 @@ test('actual Apple partial-link keeps implementation symbols resolvable across i
       const analytic = join(temporary, `${sdk}-analytic.o`), coverage = join(temporary, `${sdk}-coverage.o`), partial = join(temporary, `${sdk}-InkKernel.o`);
       execFileSync('xcrun', [...flags, '-c', join(source, 'analytic-path.cpp'), '-o', analytic]);
       execFileSync('xcrun', [...flags, '-c', join(source, 'coverage-kernel.cpp'), '-o', coverage]);
-      // Xcode's SPM static-target partial link localizes hidden private externs.
-      // A direct object-to-object executable link alone misses this boundary.
       execFileSync('xcrun', ['ld', '-r', '-arch', 'arm64', '-syslibroot', sysroot, '-platform_version', platform, '17.0', version, analytic, '-o', partial]);
       execFileSync('xcrun', [...flags, '-dynamiclib', '-Wl,-undefined,error', partial, coverage, '-o', join(temporary, `${sdk}.dylib`)]);
     }

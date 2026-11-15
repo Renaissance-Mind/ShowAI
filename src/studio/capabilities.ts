@@ -1,4 +1,3 @@
-/** Native iOS exposes the shared editor, but not the desktop filesystem/runtime. */
 export function workbenchCapabilities(platform?: string) {
   const ios =
     platform === "ios" ||
@@ -15,7 +14,6 @@ export function workbenchCapabilities(platform?: string) {
     externalChanges: !ios,
     componentSource: !ios,
     componentThumbnails: !ios,
-    /** Requests of remote MCP clients to this computer's library. */
     remoteApprovals: !ios,
   };
 }

@@ -54,8 +54,6 @@ async function run(
 
 beforeAll(async () => {
   home = await mkdtemp(join(tmpdir(), "showai-agent-test-"));
-  // This shared fixture exercises the retained file-library protocol. New empty
-  // homes have separate versioned tests and now initialize history automatically.
   await new FileStore(home).createProject({ name: "Legacy protocol fixture" });
   await mkdir(join(repository, "node_modules/.cache"), { recursive: true });
   bundleDirectory = await mkdtemp(
@@ -256,7 +254,6 @@ test("show_component shows conversation components without a project and saves t
       expect(Buffer.from(png!.data!, "base64").subarray(1, 4).toString()).toBe(
         "PNG",
       );
-      // Compact text needs a CDN reader; without one the host gets an image.
       const compact = (
         (
           await publicClient.callTool({
@@ -292,7 +289,6 @@ test("show_component shows conversation components without a project and saves t
     const project = await run(["projects", "create", "--name", "Show"], {
       home: library,
     });
-    // The plugin launcher passes SHOWAI_PRESENTATION_DIR as this option.
     const codex = await connect(["--presentation-directory", hostDirectory], {
       SHOWAI_HOST_DISPLAY: "codex-visualize",
     });
@@ -343,7 +339,6 @@ test("show_component shows conversation components without a project and saves t
       expect(
         (pages.structuredContent as { data: unknown[] }).data,
       ).toHaveLength(0);
-      // Keeping a shown component reuses the same blocks unchanged.
       const saved = await codex.callTool({
         name: "page_create",
         arguments: { projectId: project.id, title: "延迟", blocks: [chart] },
@@ -361,7 +356,6 @@ test("show_component shows conversation components without a project and saves t
         }
       ).data.document;
       expect(page.content.content[0].attrs).toMatchObject(chart);
-      // Saved project components are read from the library, never written.
       const component = await run(
         [
           "catalog",
@@ -422,11 +416,9 @@ test("show_component shows conversation components without a project and saves t
         arguments: { projectId: project.id, pageId },
       });
       expect(codexPresented.isError).not.toBe(true);
-      // Hosts that read delivery files need no handoff.
       expect(
         (codexPresented.structuredContent as Presented).data.conversation,
       ).toBeUndefined();
-      // A host whose model writes the HTML gets the fragment and the next step.
       const claude = await connect([], { SHOWAI_HOST_DISPLAY: "model-html" });
       try {
         const presented = (
@@ -455,8 +447,6 @@ test("show_component shows conversation components without a project and saves t
   }
 }, 90_000);
 
-// Content history and checkpoint restore were replaced by current-state
-// storage; importing and activating an old library remains supported.
 test("CLI prepares and activates an old library and the bound MCP reads it within project scope", async () => {
   const old = join(home, "legacy-import-source"),
     target = join(home, "legacy-import-target");
@@ -553,8 +543,6 @@ test("external runtime records an executable launch and exposes only relevant gu
   const info = await run(["runtime", "info"]);
   expect(info.protocol).toBe(1);
   expect(info.projectResolution.mode).toBe("directory");
-  // Node runs the entry through symlinks, such as a worktree's linked
-  // node_modules, so the runtime records the real path of the bundle.
   expect(info.launch.args).toEqual([await realpath(cli)]);
   expect(info.guideTopics).toContain("template-extraction");
   expect(info.support).toMatchObject({
@@ -698,7 +686,6 @@ test("real CLI binds sessions, detects user changes and rejects stale writes", a
     "--base-hash",
     read.hash,
   ]);
-  // Saves reply with a receipt: identity, title and which blocks changed.
   expect(changed).toMatchObject({
     title: "Manual revision",
     response: "receipt",
@@ -1900,7 +1887,6 @@ test("progressive CLI discovery is paginated and keeps detailed content opt-in",
 });
 
 test("real catalog versions promote explicitly, fork and resolve an immutable source merge", async () => {
-  // The value-slider fixture is at 1.2.0; both revisions must be newer.
   const project = await run([
     "projects",
     "create",
@@ -2531,8 +2517,6 @@ test("catalog search indexes descriptive examples while returning only summaries
   expect(unavailable.next).toHaveProperty("source");
 });
 
-// Session identities were recorded in content history, which current-state
-// storage removed; conditional revisions and request replay remain.
 test("versioned CLI and MCP enforce conditional revisions and replay completed requests", async () => {
   const root = await mkdtemp(join(home, "versioned-cli-"));
   const workspace = await mkdtemp(join(home, "versioned-workspace-"));
@@ -2562,7 +2546,6 @@ test("versioned CLI and MCP enforce conditional revisions and replay completed r
   const initial = await runHere(create);
   const project = (await runHere(["projects", "current"])).project;
   expect(initial.revision).toBeTruthy();
-  // A retry before newer edits returns the original response.
   expect(await runHere(create)).toEqual(initial);
   const operations = join(home, "versioned-edit.json");
   await writeFile(
@@ -2584,7 +2567,6 @@ test("versioned CLI and MCP enforce conditional revisions and replay completed r
     "versioned-two",
   );
   expect(edited.revision).not.toBe(initial.revision);
-  // After newer edits a retry is refused instead of replaying stale content.
   await expect(runHere(create)).rejects.toThrow(
     "already completed before newer edits",
   );
@@ -2610,7 +2592,6 @@ test("versioned CLI and MCP enforce conditional revisions and replay completed r
       initial.revision,
     ]),
   ).rejects.toThrow("newer revision");
-  // Without --base-revision the revision of the last read with that hash is used.
   await writeFile(
     operations,
     JSON.stringify([{ type: "page.set", fields: { title: "Read-based edit" } }]),
@@ -2625,7 +2606,6 @@ test("versioned CLI and MCP enforce conditional revisions and replay completed r
     read.hash,
   ]);
   expect(readBased.revision).not.toBe(edited.revision);
-  // A hash that no read returned still needs an explicit revision.
   await expect(
     runHere([
       "pages",
@@ -2701,8 +2681,6 @@ test("versioned CLI and MCP enforce conditional revisions and replay completed r
   }
 });
 
-// Current-state storage keeps search, storage maintenance and conflict
-// listing; page history, comparison and restore were removed.
 test("search, storage maintenance and conflicts are reachable from CLI and project-bound MCP", async () => {
   const root = await mkdtemp(join(home, "storage-api-"));
   const local = (args: string[]) => run(args, { home: root });
@@ -2820,7 +2798,6 @@ test("plugin launcher starts library MCP with explicit host delivery and refuses
       projectId: project.id,
       title: "Launch verified",
     });
-    // Receipts name the project and link to the page in the App.
     const openUrl = `showai://project/${project.id}/page/${page.document.id}`;
     expect(page).toMatchObject({
       projectName: "Launched through installed protocol",
@@ -2838,7 +2815,6 @@ test("plugin launcher starts library MCP with explicit host delivery and refuses
     expect(await readFile(presentation.delivery.html, "utf8")).toContain(
       "Launch verified",
     );
-    // The launcher passes the plugin version into the connection record and caches its probe.
     const { version: pluginVersion } = JSON.parse(
       await readFile(join(repository, "plugins/showai/plugin.json"), "utf8"),
     );
@@ -2863,7 +2839,6 @@ test("plugin launcher starts library MCP with explicit host delivery and refuses
       docsUrl: "https://showai.renaissancemind.ai/doc/agent-troubleshooting",
       appPath: "设置 → 关于与反馈",
     });
-    // A mismatched library still answers the handshake, with only the diagnostic tool.
     const mismatch = new Client({ name: "codex-mcp-client", version: "1" });
     await mismatch.connect(
       new StdioClientTransport({

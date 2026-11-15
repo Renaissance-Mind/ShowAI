@@ -1,9 +1,6 @@
 #include "analytic-path-checked.hpp"
 #include "include/analytic-path.h"
 
-// Independent implementation of the public Loop/Blinn construction (2005),
-// GPU Gems 3 chapter 25. No allocation, host math/runtime, or sampled
-// polylines.
 namespace {
 using P = SAInkPoint;
 static double ab(double x) { return x < 0 ? -x : x; }
@@ -57,7 +54,6 @@ static bool affine_valid(const double *m) {
       return false;
   return true;
 }
-// Stable quadratic roots. Scaling before products prevents exponent overflow.
 static int affine_orientation(const double *m) {
   double a = mx(ab(m[0]), ab(m[1])), b = mx(ab(m[2]), ab(m[3]));
   if (!a || !b)
@@ -189,10 +185,6 @@ static int quad_winding(P a, P q, P z, double x, double y, bool &boundary) {
   }
   return w;
 }
-// A bounded exact dyadic certificate is used ONLY for singular classifications.
-// If the local binary64 grid needs more than 22 bits, no rounding/snap occurs:
-// the curve uses analytic ray mode. 22-bit coordinates keep determinants in
-// int64; the discriminant is compared with an owned two-word integer product.
 struct U128 {
   uint64_t hi, lo;
 };
@@ -294,8 +286,6 @@ struct CurveData {
   double d1, d2, d3, disc;
   int kind;
 };
-// Coordinates are normalized before classification, not quantized. A doubtful
-// determinant is NOT rounded to zero or to a quadratic: use analytic ray mode.
 static bool data(const P *p, CurveData &d) {
   P q[4];
   double scale = 0;
@@ -315,8 +305,6 @@ static bool data(const P *p, CurveData &d) {
   d.d2 = -a2 + 3 * a3;
   d.d3 = 3 * a3;
   d.disc = 3 * d.d2 * d.d2 - 4 * d.d1 * d.d3;
-  // Conservative roundoff guard; zero only has line semantics when the actual
-  // control points are collinear. All other uncertain classifications are rays.
   double err = 256 * 0x1p-52 * (ab(a1) + 2 * ab(a2) + 3 * ab(a3));
   bool d1zero = false, d2zero = false, disczero = false;
   bool certified = false;
@@ -392,8 +380,6 @@ static bool data(const P *p, CurveData &d) {
   }
   return true;
 }
-// Affine coordinates from the widest control triangle. The fourth control's
-// residual verifies numerical rank; ill-conditioned implicitization stays rays.
 static bool functionals(const P *p, const CurveData &d, double f[3][3]) {
   int a = 0, b = 1, c = 2;
   double det = 0;
@@ -430,7 +416,6 @@ static double implicit(const double f[3][3], P p) {
          m = f[2][0] * p.x + f[2][1] * p.y + f[2][2];
   return k * k * k - l * m;
 }
-// Four-point convex hull. Sorting is literal numeric order and has no epsilon.
 static int hull(const P *p, P *out) {
   P a[4];
   for (int i = 0; i < 4; i++)
@@ -515,8 +500,6 @@ struct Sink {
       error = SA_INK_RANGE;
       return;
     }
-    // Checked emission cannot write beyond the ACTUAL admitted arrays, even
-    // if an internal misuse breaks the immutable-span precondition.
     if ((patches || vertices) &&
         (counts.patches >= patch_capacity || counts.vertices > vertex_capacity ||
          nv > vertex_capacity - counts.vertices)) {
@@ -686,10 +669,6 @@ struct Sink {
       for (int i = 0; i < nr; i++)
         if (rr[i] > 1e-10 && rr[i] < 1 - 1e-10) {
           if (depth >= b->max_depth) {
-            // Near-degenerate loop roots may recur after binary64 splitting.
-            // Preserve the actual remaining cubic lens, exactly as the bounded
-            // inflection fallback above; exhausting classification depth is not
-            // permission to drop a valid curve or force more subdivisions.
             solid(anchor, p[0], p[3], ci);
             ray(p, ci, t0, t1);
             return;
@@ -716,8 +695,6 @@ struct Sink {
       return;
     }
     solid(anchor, p[0], p[3], ci);
-    // Work in a local normalized frame to compute KLM. This also avoids losing
-    // all low bits when the document has a very large world-space translation.
     P local[4];
     double scale = 0;
     for (int i = 0; i < 4; i++) {
@@ -744,9 +721,6 @@ struct Sink {
       ray(p, ci, t0, t1);
       return;
     }
-    // Texture functionals stay canonical; the emitter independently maps the
-    // actual geometry. No temporary normalized geometry reaches
-    // output/preflight.
     P localHull[4];
     for (int i = 0; i < n; i++) {
       P delta = sub(poly[i], p[0]);
@@ -777,7 +751,6 @@ struct Sink {
     }
   }
 };
-// One parser drives sizing/build and the independent full path oracle.
 static SAInkStatus walk(const SAInkPathCommand *commands, uint32_t count,
                         const double *m, Sink *s, double x, double y, int *w,
                         bool *boundary, uint32_t command_limit = 100000) {
@@ -926,7 +899,7 @@ static int triangle(const SAAnalyticVertex *a, double x, double y, double *bary,
   bary[2] = v;
   return 1;
 }
-} // namespace
+}
 namespace showai_analytic_internal {
 #ifdef SHOWAI_ANALYTIC_WALK_COUNTERS
 static WalkWork observed_walks{};
@@ -950,8 +923,6 @@ SAInkStatus CheckedEmissionPlan::emit(SAAnalyticPatch *p, uint32_t pc,
   const uint64_t pn = uint64_t(required_.patches) * sizeof(*p),
       vn = uint64_t(required_.vertices) * sizeof(*v),
       cn = uint64_t(count_) * sizeof(*commands_);
-  // Preserve the public builder's real alias rules, including ORIGINAL option
-  // addresses. Capturing options must not make an aliased public output legal.
   if (overlap(p, pn, v, vn) || overlap(p, pn, commands_, cn) ||
       overlap(v, vn, commands_, cn) || overlap(p, pn, original_matrix_, 48) ||
       overlap(v, vn, original_matrix_, 48) || overlap(p, pn, original_budget_, sizeof(budget_)) ||

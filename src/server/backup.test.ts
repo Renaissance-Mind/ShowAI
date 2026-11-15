@@ -91,8 +91,6 @@ async function fixture() {
   const url = remote ?? original!.url;
   if (remote)
     cleanup.push(async () => {
-      // The replacement is closed by the later cleanup action before reopening
-      // the reusable isolated source for another contract. No dual writable replicas.
       const state = await (
         await operationsRequest(url, credential, "/api/ops/state")
       ).json();

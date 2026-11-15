@@ -1,7 +1,3 @@
-// Shared contract for the playground (交互计算) built-in.
-// Validation runs in the workbench, the CLI and the portable reader, so it stays dependency-free.
-// Formulas use a small declarative expression language; nothing here calls eval or Function.
-
 const fail = (message) => {
   throw new Error(message);
 };
@@ -25,9 +21,7 @@ export const LIMITS = {
 };
 const IDENTIFIER = /^[A-Za-z_][A-Za-z0-9_]*$/;
 
-/* ---------- Expression language ---------- */
 
-// Function name → [minimum arguments, maximum arguments].
 const FUNCTIONS = {
   min: [1, 16],
   max: [1, 16],
@@ -73,10 +67,6 @@ function tokenize(source) {
   return tokens;
 }
 
-/**
- * Parses an expression into a plain AST:
- * num | ref | unary | binary | call. Throws with the failing position.
- */
 export function parseExpression(source) {
   if (typeof source !== "string" || !source.trim())
     fail("Expression must be non-empty text.");
@@ -135,7 +125,6 @@ export function parseExpression(source) {
     const base = primary();
     if (!isOp("^")) return base;
     position += 1;
-    // Right-associative, and binds tighter than a leading minus: -2^2 is -(2^2).
     return { type: "binary", op: "^", left: base, right: nested(unary) };
   }
   function primary() {
@@ -180,7 +169,6 @@ export function parseExpression(source) {
   return tree;
 }
 
-/** Ids an expression reads, in first-use order. */
 export function expressionRefs(tree) {
   const refs = new Set();
   const visit = (node) => {
@@ -195,7 +183,6 @@ export function expressionRefs(tree) {
   return [...refs];
 }
 
-/** Evaluates a parsed expression; comparisons yield 1 or 0. Non-finite results propagate. */
 export function evaluateExpression(tree, scope) {
   const run = (node) => {
     switch (node.type) {
@@ -267,11 +254,9 @@ export function evaluateExpression(tree, scope) {
   return run(tree);
 }
 
-/* ---------- Data helpers ---------- */
 
 export const inputType = (input) => input.type ?? "slider";
 
-/** Initial value of an input as authored; choice defaults to its first option, toggle to 0. */
 export function inputDefault(input) {
   const type = inputType(input);
   if (type === "toggle") return input.value ? 1 : 0;
@@ -280,7 +265,6 @@ export function inputDefault(input) {
   return isFinite(input.value) ? input.value : 0;
 }
 
-/** Coerces a reading-time value into what the input accepts. */
 export function clampInput(input, value) {
   const type = inputType(input);
   if (type === "toggle") return value ? 1 : 0;
@@ -291,7 +275,6 @@ export function clampInput(input, value) {
   return Math.min(input.max, Math.max(input.min, value));
 }
 
-/** True when the playground shows the original sum/product/average result. */
 export function isLegacyPlayground(data) {
   return (
     data.formulas === undefined &&
@@ -314,7 +297,6 @@ function compileFormulas(formulas, inputIds) {
       if (!inputIds.has(ref) && !parsed.has(ref))
         fail(`formulas[${index}].expr references unknown id "${ref}".`);
   });
-  // Depth-first topological order; a grey node met again closes a cycle.
   const order = [];
   const state = new Map();
   const visit = (id, trail) => {
@@ -333,7 +315,6 @@ function compileFormulas(formulas, inputIds) {
   return order;
 }
 
-/** Parses and orders formulas once; reuse the result for every evaluation. */
 export function compilePlayground(data) {
   const inputs = Array.isArray(data.inputs) ? data.inputs : [];
   return compileFormulas(
@@ -342,10 +323,6 @@ export function compilePlayground(data) {
   );
 }
 
-/**
- * Computes every input and formula value for the given reading-time overrides.
- * `compiled` comes from compilePlayground(data).
- */
 export function evaluatePlayground(
   data,
   values = {},
@@ -362,7 +339,6 @@ export function evaluatePlayground(
   return scope;
 }
 
-/** Breakdown parts with each part's share of the summed magnitudes. */
 export function breakdownParts(data, scope) {
   const items = data.breakdown?.items ?? [];
   const parts = items.map((item) => ({ ...item, value: scope[item.formula] }));
@@ -378,10 +354,6 @@ export function breakdownParts(data, scope) {
   }));
 }
 
-/**
- * Weighted ranking: each criterion contributes weight × score / Σweights,
- * rescaled so a perfect item scores 100. Ties keep the authored order.
- */
 export function rankItems(ranking, scope) {
   const scale = ranking.scale ?? 10;
   const weights = ranking.criteria.map((criterion) => {
@@ -411,7 +383,6 @@ export function rankItems(ranking, scope) {
     .sort((a, b) => b.score - a.score || a.index - b.index);
 }
 
-/** Formats a number with an optional prefix, suffix, divisor and fixed decimals. */
 export function formatNumber(value, format = {}, locale) {
   if (!Number.isFinite(value)) return "";
   const scaled = value / (format.divisor ?? 1);
@@ -429,7 +400,6 @@ export function formatNumber(value, format = {}, locale) {
   return `${sign}${format.prefix ?? ""}${body}${format.suffix ?? ""}`;
 }
 
-/* ---------- Validation ---------- */
 
 function text(value, label, maximum = 1000) {
   if (typeof value !== "string" || value.length > maximum)
@@ -611,7 +581,6 @@ function validateRanking(ranking, known) {
   });
 }
 
-/** Validates playground data and returns it unchanged; throws with a field path. */
 export function validatePlaygroundData(data) {
   if (!isObject(data)) fail("Playground data must be an object.");
   optionalText(data.title, "title", 200);

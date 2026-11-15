@@ -21,7 +21,6 @@ import {
   nativeBoardScenePatch,
   resolveNativeBoardScene,
 } from "./native-board-scene.mjs";
-// Actual PencilKit archive exported by the native-ink fixture, retained as provenance.
 const sourceDrawing =
   "data:application/vnd.showai.pencilkit;base64,d3Jk8AEACAASEAAAAAAAAAAAAAAAAAAAAAASEHnHyyx7XUmOkvT2D5x8MC8aBggAEAAYABoGCAEQARgBIjQKFA0AAAAAFQAAAAAdAAAAACUAAIA/EhFjb20uYXBwbGUuaW5rLnBlbhgDQQAAAAAAAAAAKuUBChBY1UZfFIdJhbwHcOCl8NAyEgYIABABGAEaBggAEAEYACAAKoEBChCJq2t6zsFDd4vkkJ/O+GkvEQAAAEDkJ83BGAMg5wcomAgyBugDAAAAADpUAABAQQAAwEEAAAAAAAAAQMgAEoRtPP9/AAAAQAAAjEIAAHBCzczMPQAAAEGEAziMukz/fwAAAEEAAAxDAADwQc3MTD4AAIBAkAEliCEsZmYAAIBAMhQNAAAAABUAAAAAHQAABEMlAAAEQjoeDQAAgD8VAAAAAB0AAAAAJQAAgD8tAAAwwTUAALjBQMCKgICABDoGCAAQABgAQhA4C0A0XdJMb5gDlJSiV1/E";
 const group = () => ({

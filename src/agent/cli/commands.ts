@@ -27,11 +27,6 @@ export const COMMANDS_BY_KEY = new Map(
   COMMANDS.map((declaration) => [commandKey(declaration), declaration]),
 );
 
-/**
- * The declaration that handles these words: the one naming the second word,
- * else the command without subcommands, else the command's answer to any
- * other second word.
- */
 export function findCommand(positional: string[]) {
   const [command, action] = positional;
   const own = COMMANDS.filter((item) => item.command === command);
@@ -42,7 +37,6 @@ export function findCommand(positional: string[]) {
   );
 }
 
-/** Every option name with its value type; a name has one type everywhere. */
 export const OPTION_TYPES: ReadonlyMap<string, OptionSpec["type"]> = (() => {
   const types = new Map<string, OptionSpec["type"]>();
   for (const options of [
@@ -87,7 +81,6 @@ export function parseArguments(args: string[]): Arguments {
   return { positional, options };
 }
 
-/** Rejects an option the command does not declare, naming the command. */
 export function checkOptions(args: Arguments, declaration: CommandDeclaration) {
   if (declaration.actions?.[0] === "*") return;
   const named = declaration.actions

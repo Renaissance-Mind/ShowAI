@@ -2,7 +2,6 @@ import PageIcon from "../components/PageIcon";
 import { Cloud, Folder, FolderOpen } from "../ui/icons";
 import "./project-icon.css";
 
-/** Cloud membership stays visible while the row reports transient sync problems. */
 export default function ProjectIcon({
   value,
   size = 18,

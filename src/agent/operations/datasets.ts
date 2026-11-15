@@ -4,9 +4,6 @@ import { TRANSFORM_LIMITS } from "../../core/dataset-transform";
 import type { AgentService } from "../service";
 import { operation } from "./operation";
 
-// Shared datasets: one value that several page blocks read and write.
-// Shared by the CLI (datasets *) and MCP (dataset_read, dataset_write,
-// dataset_delete). Reading files of the device stays with each entry.
 
 const jsonObject = z.record(z.string(), z.unknown());
 const segment = z.union([
@@ -36,7 +33,6 @@ const recordQuerySchema = z
     search: z.string().max(1000).optional(),
   })
   .strict();
-/** dataset read query: {filter?, sorts?, search?}; filter and sorts are checked by the record query. */
 function recordQueryInput(value: unknown) {
   const result = recordQuerySchema.safeParse(value);
   if (!result.success)
@@ -88,9 +84,7 @@ export const datasetRead = operation({
     offset: z.number().int().nonnegative().optional(),
     limit: z.number().int().min(1).max(500).optional(),
     refresh: z.boolean().optional(),
-    // Checked in run, so the listed schema stays small.
     query: jsonObject.optional(),
-    /** The whole value or comparison, for an entry that writes it to a file. */
     full: z.boolean().optional(),
   },
   run: (
@@ -171,7 +165,6 @@ export const datasetLink = operation({
   access: "write",
   input: {
     datasetId: datasetId.optional(),
-    /** A file of this device; null copies a linked value back into the library. */
     path: z.union([z.string().min(1).max(4096), z.null()]).optional(),
     url: z.string().min(1).max(2048).optional(),
     format: z.enum(["json", "csv", "tsv", "xlsx"]).optional(),
@@ -250,7 +243,6 @@ export const datasetTransform = operation({
         ...(datasetId ? { datasetId } : {}),
         ...definition,
       });
-    // With baseHash, datasetId names the transform to change; otherwise the new one's id.
     return service.datasetTransform(projectId, {
       ...(datasetId ? (baseHash ? { datasetId } : { id: datasetId }) : {}),
       ...(baseHash ? { baseHash } : {}),

@@ -51,7 +51,6 @@ describe("ids inside component content", () => {
     expect(ids).toContain("same");
     expect(ids.filter((id) => id === "top")).toEqual([]);
     expect(ids).toHaveLength(4);
-    // Deterministic: saving again changes nothing.
     expect(nestedIds(assignSurfaceIds(structuredClone(document)))).toEqual(ids);
   });
 

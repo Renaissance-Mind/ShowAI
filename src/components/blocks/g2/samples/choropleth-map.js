@@ -1,12 +1,9 @@
-// Adapted from https://github.com/antvis/G2/blob/v5/site/docs/charts/choropleth-map.en.mdx
-// License notices: resources/licenses/g2-runtime.json.
 import { feature } from "topojson-client";
 
 export default async function draw(context) {
   const { Chart, asset, fetch } = context;
   const G2 = { Chart };
   const Math = context.math;
-  // Load map and data
   await Promise.all([
     fetch(asset("https://assets.antv.antgroup.com/g2/us-10m.json")).then(
       (res) => res.json(),
@@ -25,7 +22,7 @@ export default async function draw(context) {
     chart.options({
       type: "geoPath",
       coordinate: {
-        type: "albersUsa", // Use US-specific map projection
+        type: "albersUsa",
       },
       data: {
         value: counties,
@@ -40,16 +37,16 @@ export default async function draw(context) {
       },
       scale: {
         color: {
-          palette: "ylGnBu", // Use yellow-to-blue gradient palette
-          unknown: "#fff", // Display unknown data as white
+          palette: "ylGnBu",
+          unknown: "#fff",
         },
       },
       encode: {
-        color: "rate", // Map unemployment rate to color channel
+        color: "rate",
       },
       legend: {
         color: {
-          layout: { justifyContent: "center" }, // Adjust legend layout
+          layout: { justifyContent: "center" },
         },
       },
       style: {

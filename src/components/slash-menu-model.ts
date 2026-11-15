@@ -1,17 +1,9 @@
-/**
- * Rows of the insert (slash) menus. Without a query the menu opens with the
- * recently inserted items, keeps rarely used entries out of view and folds
- * chart types into one entry with its own level; a query searches everything.
- */
 export interface SlashEntry {
-  /** Stable across menus: the same component has the same id everywhere. */
   id: string;
   title: string;
   keywords: string;
   group: string;
-  /** Reached by typing only. */
   hidden?: boolean;
-  /** Listed on the chart level instead of the first one. */
   chart?: boolean;
 }
 
@@ -68,10 +60,8 @@ export function slashMenuRows<T extends SlashEntry>(
   return rows;
 }
 
-/** The @ menu keeps its own recent list. */
 export const RECENT_MENTIONS = "showai:mention-recent";
 
-/** Ids of recently inserted items, most recent first. */
 export function readRecentSlashItems(
   storage: Pick<Storage, "getItem">,
   key = RECENT_PREFERENCE,
@@ -95,22 +85,15 @@ export function rememberSlashItem(
   return next;
 }
 
-/** Built-in chart kinds: the generic chart and every G2 chart type. */
 export function isChartKind(kind: string) {
   return kind === "chart" || kind.startsWith("g2-");
 }
 
-/** The catalog fields an insert-menu row is made from. */
 export type SlashComponent = { name: string; description: string } & (
   | { kind: string }
   | { kind?: undefined; id: string; version: string; integrity: string }
 );
 
-/**
- * Whether a catalog component is offered as a block by the insert menus and
- * quick jump. Components that fill another slot (the page outline, the @ menu
- * inside a line, a database field type) are placed by that slot instead.
- */
 export function insertsAsBlock(item: {
   kind?: string;
   role?: string;
@@ -123,11 +106,6 @@ export function insertsAsBlock(item: {
   );
 }
 
-/**
- * The insert-menu row of one catalog component. The page and board insert
- * menus and quick jump all list components through it, so a component has
- * one id, title and set of keywords everywhere and recent items are shared.
- */
 export function componentSlashEntry<T extends SlashComponent>(
   item: T,
   group: string,
@@ -148,18 +126,11 @@ export function componentSlashEntry<T extends SlashComponent>(
   };
 }
 
-/**
- * Asks the rich-text editor that holds focus to insert a resolved catalog
- * component at its caret, exactly as its "/" menu does. The editor calls
- * preventDefault when it took the request.
- */
 export const INSERT_COMPONENT_EVENT = "showai:insert-component";
 export interface InsertComponentDetail<C = unknown> {
   kind: string;
   data: Record<string, unknown>;
-  /** A native container or primitive the host inserts as its own node. */
   native: boolean;
   component?: C;
-  /** Where in the editor: its caret (default) or the end of its content. */
   at?: "selection" | "end";
 }

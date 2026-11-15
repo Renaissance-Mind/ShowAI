@@ -1,4 +1,3 @@
-// Actual OS process interruption. Observers use persisted files; no mocked I/O.
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { once } from "node:events";
@@ -32,7 +31,6 @@ await build({
   format: "esm",
   plugins: [rawSourcePlugin],
 });
-// Import the same saved bundle without a work mode for parent-side verification.
 const { GitLibrary, FileStore, LibraryImport, openLibrary } = await import(
   pathToFileURL(entry).href
 );

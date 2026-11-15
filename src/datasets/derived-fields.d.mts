@@ -15,7 +15,6 @@ export interface FormulaInputs {
   }[];
   rows: { id: string; values: Record<string, unknown> }[];
 }
-/** Formula results by record id and column id: a value or {error}. */
 export type FormulaResults = Record<string, Record<string, unknown>>;
 export declare const ROLLUP_AGGREGATES: string[];
 export declare const FORMULA_SCRIPT: string;

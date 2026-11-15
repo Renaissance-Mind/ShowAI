@@ -46,7 +46,6 @@ import {
 } from "./sources";
 import "./quick-jump.css";
 
-/** The built-in sources; other contributors register here too. */
 export const quickJumpSources = new QuickJumpRegistry<QuickJumpContext>(
   builtinSources,
 );
@@ -73,7 +72,6 @@ export default function QuickJump({
   projects: readonly ProjectSummary[];
   pages: QuickJumpContext["pages"];
   commands: readonly WorkbenchCommand[];
-  /** The open page or board, when it is editable. */
   editor?: Pick<EditorControls, "kind" | "insertComponent">;
   openDirectory: QuickJumpContext["openDirectory"];
   onClose: () => void;
@@ -91,12 +89,9 @@ export default function QuickJump({
   const previous = useRef<HTMLElement | null>(null);
   const latestQuery = useRef("");
   latestQuery.current = query;
-  // The workbench re-renders often; the dialog keeps the commands it opened
-  // with and reads its callbacks through refs, so typing alone re-ranks.
   const [openedCommands] = useState(commands);
   const latest = useRef({ resolve: catalog.resolve, openDirectory, onError });
   latest.current = { resolve: catalog.resolve, openDirectory, onError };
-  // Read while rendering, before the input takes focus (effects run twice in development).
   if (previous.current === null)
     previous.current = document.activeElement as HTMLElement | null;
   useLayoutEffect(() => {
@@ -105,8 +100,6 @@ export default function QuickJump({
   const restoreFocus = () =>
     previous.current?.isConnected &&
     previous.current.focus({ preventScroll: true });
-  // The dialog is gone and focus is back where it was when this returns,
-  // inside the key or click handler, as the "/" menu leaves things.
   const close = () => {
     flushSync(onClose);
     restoreFocus();
@@ -127,7 +120,6 @@ export default function QuickJump({
         commands: t("group.commands"),
         components: t("group.components"),
       },
-      // Typing pauses before the full-text index is asked.
       searchContent: (value) =>
         new Promise<void>((resolve) => setTimeout(resolve, 160)).then(() =>
           latestQuery.current.trim() !== value
@@ -155,9 +147,6 @@ export default function QuickJump({
                 props(component as Parameters<typeof props>[0]),
               )
           : value.data;
-        // The rich-text editor with the caret inserts there, as its "/" menu
-        // does; a page without a caret takes it at the end of its text flow;
-        // a board places it after its selection.
         const request = (target: Element, at: "selection" | "end") =>
           !target.dispatchEvent(
             new CustomEvent<InsertComponentDetail>(INSERT_COMPONENT_EVENT, {
@@ -227,7 +216,6 @@ export default function QuickJump({
         className="studio-modal quick-jump"
         onKeyDown={(event) => {
           if (event.nativeEvent.isComposing || event.keyCode === 229) return;
-          // ⌘K again closes, like Escape.
           if (
             event.key === "Escape" ||
             ((mac ? event.metaKey : event.ctrlKey) &&

@@ -250,8 +250,6 @@ if (process.argv.includes("--install-runtime")) {
       response.end(JSON.stringify({ ok: true, data: value }));
       if (admittedId) engine.turns.startAdmitted(admittedId);
     };
-    // Slow storage must not enqueue an unbounded chain of timer snapshots.
-    // Request checkpoints still wait for their own durable snapshot.
     let backgroundCheckpoint: Promise<unknown> | undefined;
     const timer = setInterval(() => {
       if (!backgroundCheckpoint) {

@@ -32,7 +32,6 @@ export async function startSyncServer(
     host?: string;
     port?: number;
     realtime?: boolean;
-    /** Key a trusted proxy presents when it reports the client address. */
     trustedProxyKey?: string;
   },
 ): Promise<{ server: Server; url: string; close(): Promise<void> }> {
@@ -107,7 +106,6 @@ export async function startSyncServer(
     });
     await app.initialize();
   } catch (error) {
-    // An open database keeps Windows from removing the server's folder.
     metadata.close();
     throw error;
   }
@@ -156,9 +154,6 @@ export async function startSyncServer(
         for await (const chunk of response.body as unknown as AsyncIterable<Uint8Array>)
           if (!outgoing.write(chunk)) await once(outgoing, "drain");
       outgoing.end();
-      // Discard a body the handler left unread so the connection stays
-      // reusable. Its chunks must pass through the web stream: resuming the
-      // request directly would push them into a stream that may have closed.
       if (!body) incoming.resume();
       else if (!body.locked)
         await body.pipeTo(new WritableStream()).catch(() => {});

@@ -24,7 +24,6 @@ const unavailable = () =>
     "SERVER_READ_ONLY",
     "The server is frozen for a consistent backup. Local changes are retained.",
   );
-/** Far longer than a transfer body deadline plus its storage commit. */
 export const transferLeaseMs = 15 * 60_000;
 export class ServerMaintenance {
   budgetSummary?: () => Promise<unknown>;
@@ -47,11 +46,6 @@ export class ServerMaintenance {
     if (!rows[0]) throw new Error("Missing operations migration.");
     return rows[0];
   }
-  /**
-   * A transfer admission outlives its request while a front end streams the
-   * object to storage. Its body has a two-minute deadline, so an admission
-   * older than this can no longer describe a live write.
-   */
   private async expireTransfers() {
     await this.db.run(
       "DELETE FROM server_write_leases WHERE kind='transfer' AND started_at<?",

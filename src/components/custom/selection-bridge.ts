@@ -1,6 +1,5 @@
 import { createTextModel } from "../../surface/text-selection-model";
 
-/** Both sides use the same character offsets; sandbox DOM never leaves its frame. */
 export function installComponentSelectionBridge(
   channel: string,
   buildModel: typeof createTextModel,
@@ -90,7 +89,6 @@ export function installComponentSelectionBridge(
         )
       )
         return;
-      // Content that opts out of selection, such as a pannable diagram viewport, keeps its drag.
       if (getComputedStyle(event.target).userSelect === "none") return;
       const range = document.caretRangeFromPoint(event.clientX, event.clientY);
       if (

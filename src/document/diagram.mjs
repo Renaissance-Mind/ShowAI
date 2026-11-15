@@ -11,10 +11,6 @@ import {
 const rankdir = { right: "LR", down: "TB", left: "RL", up: "BT" };
 const shapeNames = { rectangle: "矩形", ellipse: "椭圆", arrow: "箭头" }; // i18n-exempt: saved default names
 
-/**
- * Lay out a directed graph with dagre. Returns top-left positions so the
- * graph's bounding box starts at `origin`.
- */
 export function layoutGraph(
   nodes,
   edges,
@@ -86,11 +82,6 @@ const identifier = (value, path) => {
   return value;
 };
 
-/**
- * Expand a nodes-and-edges description into native Board shapes and bound
- * arrows. Missing positions come from an automatic layout; missing sizes fit
- * the label. Returns the ids of the created shapes (framed) and arrows.
- */
 export function insertDiagram(document, operation) {
   const index = indexSurfaceTree(document.content);
   const parent =
@@ -282,12 +273,6 @@ export function insertDiagram(document, operation) {
   };
 }
 
-/**
- * New frames for selected objects arranged along the arrows that connect
- * them, plus arrow anchors facing each other in the new arrangement. The
- * selection keeps its top-left corner. Returns null when fewer than two
- * connected objects are selected.
- */
 export function tidyFrames(document, ids, direction = "right") {
   const index = indexSurfaceTree(document.content);
   const layout = document.layout ?? {};

@@ -1,15 +1,3 @@
-// Shared data (dataset) operations: id-addressed paths, a structural diff and a
-// precondition-checked apply. The same code runs in the workbench, the CLI/MCP
-// host and the sync merge, so it stays dependency-free.
-//
-// A path is an array of segments: an object key (string), an array index
-// (number) or an array element selected by its `id` ({ id }). Writes carry the
-// value their author started from (`before`, or `absent: true`); a write whose
-// starting value no longer matches the current one is a conflict unless the
-// current value already equals the written one. Different records and different
-// fields therefore merge, while two different writes to one field never
-// silently replace each other.
-
 export const MAX_OPERATIONS = 5000;
 const MAX_DEPTH = 64;
 const ABSENT = Symbol("absent");
@@ -34,7 +22,6 @@ export function cloneValue(value) {
   return value === undefined ? undefined : JSON.parse(JSON.stringify(value));
 }
 
-/** JSON equality; object key order is irrelevant. */
 export function equalValues(a, b) {
   if (a === b) return true;
   if (a === ABSENT || b === ABSENT) return false;
@@ -57,7 +44,6 @@ export function equalValues(a, b) {
   return false;
 }
 
-/** A record identity: a non-empty string or finite number `id`. */
 export function recordId(value) {
   if (!isPlainObject(value)) return undefined;
   const id = value.id;
@@ -66,7 +52,6 @@ export function recordId(value) {
   return undefined;
 }
 
-/** Arrays whose every element is a record with a unique id merge per record. */
 export function isKeyedArray(value) {
   if (!Array.isArray(value)) return false;
   const seen = new Set();
@@ -108,7 +93,6 @@ export function validatePath(path, label = "path") {
   return path;
 }
 
-/** Text form for messages and Agents: objectives[id=promo].keyResults[0].due */
 export function formatPath(path) {
   let text = "";
   for (const segment of path) {
@@ -122,7 +106,6 @@ export function formatPath(path) {
   return text || "(root)";
 }
 
-/** Parses formatPath output; arrays pass through after validation. */
 export function parsePath(input) {
   if (Array.isArray(input)) return validatePath(input);
   if (typeof input !== "string") fail("A path must be an array or text.");
@@ -149,10 +132,6 @@ function elementIndex(array, id) {
   return array.findIndex((item) => recordId(item) === wanted);
 }
 
-/**
- * Finds the container and slot a path names. `missing` is the number of leading
- * segments that resolved before a container was absent.
- */
 function locate(root, path) {
   let parent = undefined,
     slot = undefined,
@@ -181,7 +160,6 @@ function locate(root, path) {
   return { found: value !== ABSENT, parent, slot, value };
 }
 
-/** The value a path names, or undefined when it does not exist. */
 export function valueAt(root, path) {
   const result = locate(root, path);
   return result.found ? result.value : undefined;
@@ -193,11 +171,8 @@ export function hasPath(root, path) {
 
 const isRecordSelector = (segment) => isPlainObject(segment);
 
-// ---------------------------------------------------------------------------
-// Diff
 
 function longestIncreasing(values) {
-  // Indexes into `values` of one longest strictly increasing subsequence.
   const tails = [],
     previous = new Array(values.length);
   for (let index = 0; index < values.length; index++) {
@@ -222,11 +197,6 @@ function selectorFor(item) {
   return { id: typeof id === "number" ? id : String(id) };
 }
 
-/**
- * Operations that turn `base` into `next`. Objects diff per key, arrays of
- * records diff per id (with insert/remove/move), anything else is replaced as
- * one value. Every write carries its starting value.
- */
 export function diffValues(base, next, path = []) {
   const operations = [];
   const visit = (before, after, at) => {
@@ -280,7 +250,6 @@ export function diffValues(base, next, path = []) {
       const stableIds = new Set(
         [...stable].map((index) => recordId(common[index])),
       );
-      // Order among the elements kept in both; predecessors exist when applied in this order.
       const keptBefore = before.filter((item) => afterIds.has(recordId(item)));
       const predecessorBefore = new Map(
         keptBefore.map((item, index) => [
@@ -332,8 +301,6 @@ export function diffValues(base, next, path = []) {
   return operations;
 }
 
-// ---------------------------------------------------------------------------
-// Validation
 
 const hasOwn = (value, key) => Object.prototype.hasOwnProperty.call(value, key);
 function anchor(value, label) {
@@ -413,8 +380,6 @@ export function validateOperations(operations) {
   });
 }
 
-// ---------------------------------------------------------------------------
-// Apply
 
 function describe(value) {
   return value === ABSENT ? undefined : cloneValue(value);
@@ -455,11 +420,6 @@ function placeAfter(array, item, after) {
   else array.splice(index + 1, 0, item);
 }
 
-/**
- * Applies operations to a copy of `root`. Returns the new value, the list of
- * conflicts and whether anything changed. With `atomic` (default) nothing is
- * applied when any operation conflicts.
- */
 export function applyOperations(root, operations, options = {}) {
   const atomic = options.atomic !== false;
   let value = cloneValue(root);
@@ -583,7 +543,6 @@ export function applyOperations(root, operations, options = {}) {
         applied++;
         continue;
       }
-      // Order is soft: a missing anchor appends, and moves never discard content.
       const array = target.parent,
         index = target.slot;
       const predecessor = index ? (recordId(array[index - 1]) ?? null) : null;
@@ -603,11 +562,6 @@ export function applyOperations(root, operations, options = {}) {
   return { value, conflicts, changed, applied };
 }
 
-/**
- * Gives operations without a starting value the one `base` had, and splits a
- * coarse replacement of an object or record list into per-field writes, so a
- * write prepared against `base` merges with changes made since.
- */
 export function refineOperations(operations, base) {
   const refined = [];
   for (const operation of operations) {
@@ -650,13 +604,11 @@ export function refineOperations(operations, base) {
   return refined;
 }
 
-/** True when `path` equals `prefix` or lies under it. */
 export function pathWithin(path, prefix) {
   if (path.length < prefix.length) return false;
   return prefix.every((segment, index) => equalValues(segment, path[index]));
 }
 
-/** Stable text key for a path, used to index held conflicts. */
 export function pathKey(path) {
   return JSON.stringify(
     path.map((segment) =>

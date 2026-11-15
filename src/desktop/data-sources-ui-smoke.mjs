@@ -1,10 +1,4 @@
 import { desktopTestEnvironment } from "../../scripts/desktop-test-env.mjs";
-// Supplementary real Electron regression for the data reading layer: linked
-// files and spreadsheets in bound blocks, transforms, local files in built-in
-// and custom components (showai-media:), the warning surface and its
-// actions, and the packaging list of an export. UI acceptance also uses the
-// official computer tool. Needs `npm run build` (renderer, agent CLI,
-// desktop main) and ffmpeg for the media fixtures.
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
 import {
@@ -54,13 +48,10 @@ const check = (name, detail) => {
   console.log("✓", name);
 };
 
-// ---------------------------------------------------------------------------
-// Fixtures: real files outside the library
 
 async function ffmpeg(args) {
   await run("ffmpeg", ["-hide_banner", "-loglevel", "error", "-y", ...args]);
 }
-/** A one-page PDF whose text the reader extracts. */
 function pdf(text) {
   const objects = [
     "<< /Type /Catalog /Pages 2 0 R >>",
@@ -136,8 +127,6 @@ for (const target of [paths.video, paths.clip])
   ]);
 const webImage = "https://github.githubassets.com/favicons/favicon.png";
 
-// ---------------------------------------------------------------------------
-// Content through the Agent's own path (CLI + MCP over stdio)
 
 const { stdout } = await run(process.execPath, [
   cli, "projects", "create", "--name", "数据读取层", "--home", home, "--json",
@@ -285,8 +274,6 @@ await tool("page_apply", {
 await mcp.close();
 check("content created through MCP", { projectId, pageId, component: component.id });
 
-// ---------------------------------------------------------------------------
-// The desktop workbench
 
 let app, window, appChild;
 process.once("exit", () => {
@@ -298,11 +285,9 @@ const shot = async (name) => {
   await window.screenshot({ path });
   return path;
 };
-/** Waits until the workbench shows a text (or stops showing it). */
 const waitText = (text, shown = true, timeout = 30000) =>
   window.waitForFunction(
     ({ text, shown }) =>
-      // Cells and labels may be inputs or SVG text.
       [
         document.body.textContent,
         ...[...document.querySelectorAll("input, textarea")].map((field) => field.value),
@@ -322,7 +307,6 @@ try {
   appChild = app.process();
   appChild.stderr.on("data", (data) => process.stderr.write(data));
   await app.firstWindow();
-  // Hidden preview windows may open first; the workbench has the sidebar.
   for (let attempt = 0; attempt < 360 && !window; attempt++) {
     for (const candidate of app.windows())
       if (await candidate.locator(".studio-sidebar").count().catch(() => 0))
@@ -356,7 +340,6 @@ try {
       { action, args },
     );
   assert.equal((await invoke("app:info")).home, home);
-  // The native file pickers answer with the files a person would choose.
   const answerDialogs = (open, save) =>
     app.evaluate(
       ({ dialog }, { open, save }) => {
@@ -377,7 +360,6 @@ try {
   await waitText("3月");
   check("the transform of the spreadsheet feeds the chart");
 
-  // Built-in blocks show local files through showai-media:.
   const image = await window.waitForFunction(() => {
     const img = document.querySelector(".sb-image img, figure img");
     return img?.complete && img.naturalWidth > 0
@@ -406,7 +388,6 @@ try {
   assert.match(videoState.src, /^showai-media:/);
   check("local video loads its metadata through showai-media:", videoState);
 
-  // The component frame loads its granted file from showai-media: too.
   let frameState;
   for (let attempt = 0; attempt < 120 && !frameState?.ready; attempt++) {
     for (const frame of window.frames()) {
@@ -440,7 +421,6 @@ try {
   assert.match(frameState.src, /^showai-media:/);
   assert.match(frameState.policy ?? "", /media-src[^;]*showai-media:/);
   check("custom component frame plays its local video from showai-media:", frameState);
-  // The online image loads over the network, after the local clip.
   for (let attempt = 0; attempt < 80 && !(frameState.web.width > 0); attempt++) {
     await new Promise((done) => setTimeout(done, 250));
     for (const frame of window.frames()) {
@@ -469,7 +449,6 @@ try {
     );
   await shot("page-loaded");
 
-  // A missing CSV keeps its last rows, marked out of date.
   await mkdir(dirname(paths.movedCsv), { recursive: true });
   await rename(paths.csv, paths.movedCsv);
   const badge = window.locator(".dataset-warning-badge.is-stale").first();
@@ -494,7 +473,6 @@ try {
   check("link-file reads the chosen file and clears the warning");
   await shot("relinked");
 
-  // A file over the dataset limit offers packaging; without sync the dialog holds the choice.
   const large = Buffer.alloc(9 * 1024 * 1024, "x");
   await writeFile(paths.movedCsv, Buffer.concat([Buffer.from("id,title\nm1,"), large, Buffer.from("\n")]));
   await window.evaluate(() => window.dispatchEvent(new Event("focus")));
@@ -519,7 +497,6 @@ try {
     (expected) => document.querySelector(".dataset-sync-copy input")?.checked === expected,
     !before,
   );
-  // The plan reads the choice from the dataset's source.bundle.sync.
   const stored = (await invoke("packaging:sync", { projectId })).items.find(
     (item) => item.id === `dataset:${projectId}/${schedule}`,
   );
@@ -537,7 +514,6 @@ try {
     .first()
     .waitFor({ state: "detached", timeout: 20000 });
 
-  // Export with the packaging list and mixed choices.
   const out = join(output, "exports", "验收.html");
   await mkdir(dirname(out), { recursive: true });
   await answerDialogs(undefined, out);

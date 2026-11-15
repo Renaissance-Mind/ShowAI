@@ -1,8 +1,4 @@
 #!/usr/bin/env node
-// Release notes and public-entry consistency for README, docs, the app welcome copy and the homepage.
-//   node scripts/release-entry.mjs notes --headline TEXT [--changes FILE.json] [--notarized] [--media URL] [--source SHA] [--out FILE]
-//   node scripts/release-entry.mjs check [--online] [--homepage DIR]
-//   node scripts/release-entry.mjs assets DIR [--version X.Y.Z]
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { existsSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
@@ -12,7 +8,6 @@ import { pathToFileURL } from "node:url";
 export const REPO = "Renaissance-Mind/ShowAI";
 export const SITE = "https://showai.renaissancemind.ai";
 
-// Shared wording for every public entry. Keep in step with the app's welcome copy and the homepage.
 export const ENTRY_COPY = {
   en: {
     tagline: "The evolving interface between humans and agents.",
@@ -87,14 +82,11 @@ function filesUnder(dir, pattern) {
     .filter((path) => pattern.test(path) && !/node_modules|\/dist\//.test(path) && statSync(path).isFile());
 }
 
-// Files a macOS release uploads. The App's in-app updater reads latest-mac.yml and downloads the ZIP,
-// using the blockmap for differential downloads; a release without them leaves installed Apps behind.
 export function releaseAssetNames(version) {
   const base = `ShowAI-${version}-arm64`;
   return [`${base}.dmg`, `${base}.zip`, `${base}.zip.blockmap`, "latest-mac.yml", "SHA256SUMS.txt"];
 }
 
-// Versions before 0.10.1 shipped without the in-app updater, so their releases carry no update feed.
 const updaterSince = [0, 10, 1];
 function hasUpdater(version) {
   const parts = version.split(/[.-]/).slice(0, 3).map(Number);
@@ -103,7 +95,6 @@ function hasUpdater(version) {
   return true;
 }
 
-// The files electron-builder lists in latest-mac.yml: url, base64 sha512 and size.
 export function parseUpdateFeed(text) {
   const version = text.match(/^version:\s*['"]?([^'"\s]+)/m)?.[1];
   const files = [...text.matchAll(/^\s*- url:\s*(\S+)\n\s+sha512:\s*(\S+)\n\s+size:\s*(\d+)/gm)].map(
@@ -112,7 +103,6 @@ export function parseUpdateFeed(text) {
   return { version, path: text.match(/^path:\s*(\S+)/m)?.[1], files };
 }
 
-// Checks a release folder before upload; writes SHA256SUMS.txt when it is missing.
 export function checkReleaseAssets(dir, version) {
   const errors = [];
   const [dmg, zip, blockmap, feedName, sumsName] = releaseAssetNames(version);
@@ -139,7 +129,6 @@ export function checkReleaseAssets(dir, version) {
   return { errors, files: releaseAssetNames(version).map((name) => join(dir, name)) };
 }
 
-// Returns { errors, warnings } for the files in this repository (and an optional homepage checkout).
 export function checkLocalEntries(root, { homepage } = {}) {
   const errors = [];
   const warnings = [];
@@ -175,7 +164,6 @@ export function checkLocalEntries(root, { homepage } = {}) {
   return { errors, warnings };
 }
 
-// Published state: GitHub releases and the homepage. Needs network access.
 export async function checkOnlineEntries(version) {
   const errors = [];
   const warnings = [];
@@ -195,7 +183,6 @@ export async function checkOnlineEntries(version) {
     for (const wanted of [ENTRY_COPY.en.tagline, "docs/quick-start.md"])
       if (!newest.body?.includes(wanted)) errors.push(`${newest.tag_name} notes: missing “${wanted}”`);
   }
-  // The site answers every path with its app shell; the launch page's shared copy ships in its main script.
   const published = [];
   const shell = await fetch(`${SITE}/`);
   if (!shell.ok) errors.push(`${SITE}/: HTTP ${shell.status}`);

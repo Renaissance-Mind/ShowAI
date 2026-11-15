@@ -1,4 +1,3 @@
-/** One background admission at a time; input pauses pending work, abort removes stale cards. */
 export class PreviewQueue {
   private pending: (() => void)[] = [];
   private running = false;
@@ -129,7 +128,6 @@ function previewQueue() {
   return queue;
 }
 
-/** Desktop sends input priority to its capture queue; cached image I/O stays free. */
 export function onPreviewActivity(listener: (paused: boolean) => void) {
   previewQueue();
   activityListeners.add(listener);
@@ -140,7 +138,6 @@ export function onPreviewActivity(listener: (paused: boolean) => void) {
 }
 
 let desktopActivityRegistered = false;
-/** Track all workbench input, including Recent/list views while caches warm offscreen. */
 export function trackDesktopPreviewActivity() {
   if (!window.showai?.pageThumbnails || desktopActivityRegistered) return;
   desktopActivityRegistered = true;

@@ -47,7 +47,6 @@ type Guide = {
   initialStep?: number;
   steps: Step[];
 };
-/** A countdown is paused (`endAt` null) with `left` ms remaining, or running until `endAt`. */
 type Timer = { left: number; endAt: number | null; done: boolean };
 type T = Translator<(typeof messages)["catalogs"]["zh-CN"]>;
 
@@ -72,9 +71,7 @@ function Paragraphs({
   );
 }
 
-// ---------------------------------------------------------------- copyable code panel (shared with command-reference)
 
-/** Copy through a temporary textarea (the Clipboard API is denied in sandboxed readers); select the code when that fails. */
 function copyText(text: string, fallback: HTMLElement | null): boolean {
   const active = document.activeElement as HTMLElement | null;
   const area = document.createElement("textarea");
@@ -107,10 +104,6 @@ const isComment = (line: string, lang?: string) => {
   );
 };
 
-/**
- * Code with an optional row of variant tabs (one per platform or host) and a copy button.
- * `name` is the accessible name of the code, e.g. "code for step 3".
- */
 export function CodePanel({
   variants,
   name,
@@ -217,7 +210,6 @@ export function CodePanel({
           <span>{status === "copied" ? t("code.copied") : t("code.copy")}</span>
         </button>
       </div>
-      {/* Every variant stays in the document so print and static reading show them all. */}
       {variants.map((variant, index) => (
         <pre
           key={index}
@@ -254,7 +246,6 @@ export function CodePanel({
   );
 }
 
-// ---------------------------------------------------------------- time
 
 function duration(minutes: number, t: T) {
   const hours = Math.floor(minutes / 60);
@@ -365,7 +356,6 @@ function TimerControl({
   );
 }
 
-// ---------------------------------------------------------------- step content
 
 function StepDetails({
   step,
@@ -436,7 +426,6 @@ function StepDetails({
   );
 }
 
-/** Timer text for print and static reading, where the countdown cannot run. */
 function StaticTimer({ step, t }: { step: Step; t: T }) {
   if (!step.timer) return null;
   const minutes = duration(step.timer.minutes, t);
@@ -456,7 +445,6 @@ const CheckMark = () => (
   </svg>
 );
 
-// ---------------------------------------------------------------- block
 
 export function StepGuideBlock({ data }: BlockProps) {
   const t = useTranslator(messages);
@@ -538,7 +526,6 @@ export function StepGuideBlock({ data }: BlockProps) {
     setTimers(next);
   };
 
-  /** Focus mode switches the card; list mode scrolls the step into view. */
   const go = (target: number) => {
     const next = Math.min(steps.length - 1, Math.max(0, target));
     setCurrent(next);
@@ -596,7 +583,6 @@ export function StepGuideBlock({ data }: BlockProps) {
     );
   };
 
-  // Timers that keep running (or have finished) away from what the reader is looking at.
   const tray = steps
     .map((step, i) => ({ step, i, timer: timers[keyOf(step, i)] }))
     .filter(
@@ -820,7 +806,6 @@ export function StepGuideBlock({ data }: BlockProps) {
               <span aria-hidden="true"> →</span>
             </button>
           </nav>
-          {/* Print and static reading show every step; the countdown becomes text. */}
           <ol className="sg-print" start={start}>
             {steps.map((item, i) => (
               <li key={keyOf(item, i)}>

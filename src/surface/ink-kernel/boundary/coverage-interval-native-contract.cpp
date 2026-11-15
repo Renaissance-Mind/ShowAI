@@ -40,8 +40,6 @@ int main(){
   }
  }
  std::fesetround(FE_TONEAREST);
- // Cancellation, signed zero, subnormal products and overflow must be enclosed
- // or rejected by the filter, never treated as a finite zero-error proof.
  for(double v:{0.,-0.,0x1p-1074,-0x1p-1074,0x1p-1022,-0x1p-1022,0x1.fffffffffffffp1023}){
   auto r=raw_coverage::multiply(raw_coverage::enclose(v),raw_coverage::enclose(.5));
   if(raw_coverage::valid(r)){
@@ -50,8 +48,6 @@ int main(){
   }
  }
  {
-  // A tiny interval of a visibly curved command can be certified without any
-  // limb arithmetic; the whole command must still use/refuse the exact proof.
   SAInkPathCommand command{3,0,{1,1,2,1,3,0}};raw_coverage::Command meta{};SAAnalyticPatch p{};p.parameter_end=0x1p-12;
   Point exact[4];if(!raw_coverage::restricted_cubic(c,command,meta,p,exact))return 12;
   if(!boundary_quantization::nearest_lower_tie(exact[3].x,p.controls[6])||!boundary_quantization::nearest_lower_tie(exact[3].y,p.controls[7]))return 13;

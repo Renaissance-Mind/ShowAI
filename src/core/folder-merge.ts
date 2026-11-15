@@ -1,7 +1,6 @@
 import { mergeValues } from "./catalog-merge";
 import type { FolderMetadata } from "./model";
 
-/** Folder ids, rather than array positions, identify independently edited directories. */
 export function mergeFolders(
   base: FolderMetadata[],
   ours: FolderMetadata[],

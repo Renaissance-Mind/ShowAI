@@ -12,7 +12,6 @@ export async function openLocalPath(
   if (process.platform === "darwin")
     await run("open", reveal ? ["-R", path] : [path]);
   else if (process.platform === "win32") {
-    // Explorer can return 1 after successfully handing off to an existing window.
     await run("explorer.exe", [reveal ? `/select,${path}` : path]).catch(
       (error) => {
         if (error.code !== 1) throw error;
@@ -29,11 +28,6 @@ export async function openBrowser(url: string): Promise<void> {
 
 let operatingSystem: Promise<string> | undefined;
 
-/**
- * The operating system version a person would recognise, matching what the
- * desktop app reports: the macOS product version (not the Darwin kernel), the
- * Windows build, or the Linux distribution name. Read once per process.
- */
 export function systemVersion(): Promise<string> {
   operatingSystem ??= (async () => {
     if (process.platform === "darwin")

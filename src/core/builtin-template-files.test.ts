@@ -5,12 +5,8 @@ import { parseTemplateBundle } from "../portable/template-bundle.mjs";
 import { builtinTemplateBundles } from "./builtin-template-bundles";
 import templateMessages from "../i18n/messages/templates";
 
-// A built-in template is a folder in resources/templates that only ships once
-// each file is imported by builtin-template-bundles.ts and allowed by .gitignore
-// (Markdown is ignored by default). docs/contributing-templates.md lists these steps.
 const root = "resources/templates";
 
-// Forward slashes keep paths comparable with the imports on Windows too.
 async function folderFiles(directory: string): Promise<string[]> {
   const entries = await readdir(directory, { withFileTypes: true });
   const files = await Promise.all(
@@ -54,7 +50,6 @@ describe("built-in template folders", async () => {
         execFileSync("git", ["check-ignore", "-q", "--no-index", path]);
         return true;
       } catch (error) {
-        // Exit status 1 means "not ignored"; anything else is a real failure.
         if ((error as { status?: number }).status === 1) return false;
         throw error;
       }

@@ -1,12 +1,7 @@
-// Small runtime-agnostic i18n core shared by the workbench, the Electron main
-// process and exported readers. Catalogs are split into namespaces so each
-// bundle only carries the strings its own modules import.
-
 export const LOCALES = ["zh-CN", "en"] as const;
 export type Locale = (typeof LOCALES)[number];
 export type LanguagePreference = "system" | Locale;
 
-/** Each language is named in itself so people can find their own in the picker. */
 export const LOCALE_NAMES: Record<Locale, string> = {
   "zh-CN": "简体中文",
   en: "English",
@@ -14,14 +9,12 @@ export const LOCALE_NAMES: Record<Locale, string> = {
 
 export const LANGUAGE_STORAGE_KEY = "showai:language";
 
-/** A message is plain text, or plural forms selected by the `count` param. */
 export type Message =
   | string
   | { zero?: string; one?: string; two?: string; few?: string; many?: string; other: string };
 
 export type MessageParams = Record<string, string | number>;
 
-/** The English catalog of a namespace mirrors the Chinese keys exactly. */
 export type Translation<T> = { [K in keyof T]: Message };
 
 export interface Namespace<T extends Record<string, Message>> {
@@ -36,12 +29,10 @@ export function defineMessages<T extends Record<string, Message>>(
   return { name, catalogs };
 }
 
-/** Key union of a namespace, for tables that store keys and translate at render. */
 export type MessageKey<N> = N extends Namespace<infer T> ? keyof T & string : never;
 
 export type Translator<T> = (key: keyof T & string, params?: MessageParams) => string;
 
-/** Chinese variants (zh, zh-Hans, zh-TW…) use Simplified Chinese; everything else uses English. */
 export function resolveLocale(
   tags: string | readonly (string | undefined | null)[] | undefined | null,
 ): Locale {
@@ -58,7 +49,6 @@ function environment(): Record<string, string | undefined> {
   return typeof process !== "undefined" && process.env ? process.env : {};
 }
 
-/** `SHOWAI_LANGUAGE` pins the language for tests and headless runs. */
 export function languageOverride(): Locale | undefined {
   const value = environment().SHOWAI_LANGUAGE;
   return value ? resolveLocale(value) : undefined;
@@ -78,10 +68,6 @@ function systemLanguages(): readonly string[] {
   return [Intl.DateTimeFormat().resolvedOptions().locale];
 }
 
-/**
- * Compiled components carry their own copy of this module. Their host page
- * records its language on the root element so every copy starts in it.
- */
 function hostLocale(): Locale | undefined {
   if (typeof document === "undefined") return undefined;
   const value = document.documentElement?.dataset.showaiLocale;
@@ -98,7 +84,6 @@ function readStoredPreference(): LanguagePreference {
     const saved = globalThis.localStorage?.getItem(LANGUAGE_STORAGE_KEY);
     return isLanguagePreference(saved) ? saved : "system";
   } catch {
-    // Storage can be unavailable in sandboxed or file:// readers.
     return "system";
   }
 }
@@ -121,7 +106,6 @@ export function getLanguagePreference(): LanguagePreference {
   return preference;
 }
 
-/** Renderer startup: read the saved preference, falling back to the OS/browser locale. */
 export function initLanguagePreference(): Locale {
   preference = readStoredPreference();
   apply(preference === "system" ? systemLocale : preference);
@@ -134,12 +118,10 @@ export function setLanguagePreference(next: LanguagePreference) {
     if (next === "system") globalThis.localStorage?.removeItem(LANGUAGE_STORAGE_KEY);
     else globalThis.localStorage?.setItem(LANGUAGE_STORAGE_KEY, next);
   } catch {
-    // The choice still applies to this session when storage is unavailable.
   }
   apply(next === "system" ? systemLocale : next, true);
 }
 
-/** Used by hosts that receive the locale from elsewhere (Electron main, exported readers). */
 export function setLocale(next: Locale, system?: Locale) {
   if (system) systemLocale = system;
   apply(next);
@@ -172,7 +154,6 @@ export function formatMessage(
   );
 }
 
-/** Returns a translator that reads the current locale on every call. */
 export function translator<T extends Record<string, Message>>(
   namespace: Namespace<T>,
 ): Translator<T> {
@@ -184,7 +165,6 @@ export function translator<T extends Record<string, Message>>(
   };
 }
 
-/** Exported readers show their chrome in the language recorded as <html lang>. */
 export function withHtmlLanguage(html: string, locale: Locale = current): string {
   return html.replace(/<html\b[^>]*>/i, (tag) =>
     /\slang=/i.test(tag)
@@ -193,7 +173,6 @@ export function withHtmlLanguage(html: string, locale: Locale = current): string
   );
 }
 
-/** Pick a value for the active locale, for cases like Intl formatting options. */
 export function byLocale<T>(values: Record<Locale, T>): T {
   return values[current];
 }

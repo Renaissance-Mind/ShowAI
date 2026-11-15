@@ -62,7 +62,6 @@ function note(id: string, title: string, text: string): ShowDocument {
     comments: [],
   };
 }
-/** Keep both inputs as ordinary pages and immutable source bytes in the shared project. */
 export function retainSyncConflicts(input: {
   projectId: string;
   files: Map<string, Buffer>;
@@ -85,7 +84,6 @@ export function retainSyncConflicts(input: {
     const localBytes =
       conflict.local === null ? null : Buffer.from(conflict.local, "base64");
     const localHash = localBytes && hash(localBytes);
-    // Another device may already have published the preservation of this exact input.
     if (
       prior.some(
         (record) =>
@@ -154,7 +152,6 @@ export function retainSyncConflicts(input: {
         hash: bytes && hash(bytes),
       });
     }
-    // A field-merged dataset keeps its merge; the inputs above preserve both versions.
     if (!originalPageId && !conflict.fields) {
       const remote = input.remoteFiles.get(conflict.path);
       if (remote) files.set(conflict.path, remote);

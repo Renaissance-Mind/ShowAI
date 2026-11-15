@@ -35,7 +35,6 @@ const documentFields = {
   remoteComponents: "--input",
 };
 
-/** Page reading and changes: pages *, boards read. */
 export const pageCommands: CommandDeclaration[] = [
   {
     command: "boards",
@@ -114,7 +113,6 @@ export const pageCommands: CommandDeclaration[] = [
     fields: { title: "--title", kind: "--kind", ...documentFields },
     async input(args) {
       requireCount(args, 2);
-      // An artifact file also carries its format and presentation; the page takes the rest.
       const artifact = option(args, "input")
         ? await readDocument(option(args, "input")!)
         : undefined;
@@ -267,7 +265,6 @@ export const pageCommands: CommandDeclaration[] = [
       baseRevision: "--base-revision",
       ...documentFields,
     },
-    // Page changes reply with receipts, made after the transaction has recorded the revision.
     result(args) {
       const profile = responseProfile(args);
       return (value) => compactData(value, profile);

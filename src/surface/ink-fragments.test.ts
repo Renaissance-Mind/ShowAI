@@ -21,7 +21,6 @@ describe("logical portable ink fragments", () => {
     expect(portableNodeHit(node,{x:90,y:80}).inside).toBe(false);
     expect(portableNodeBounds(node).height).toBeGreaterThan(60);
     expect(drawingBounds(node)).toEqual(portableNodeBounds(node));
-    // Scale 2x about the frame, rotate90 about its center(300,400).
     const frame={x:200,y:300,width:200,height:200,rotation:90};
     expect(shapeHit(node,frame,{x:240,y:400}).inside).toBe(true);
     expect(shapeHit(node,frame,{x:240,y:480}).inside).toBe(false);
@@ -30,7 +29,7 @@ describe("logical portable ink fragments", () => {
     const {attrs} = stroke();
     const html = renderToStaticMarkup(createElement("svg", null, createElement(PortableInkPaths,
       {ink:attrs.ink, fragments:attrs.inkFragments, color:attrs.color, width:attrs.strokeWidth, pressure:attrs.pressure})));
-    expect(html.match(/opacity="0.35"/g)).toHaveLength(2); // light/dark variants, one group each
+    expect(html.match(/opacity="0.35"/g)).toHaveLength(2);
     expect(html.match(/data-portable-ink="1"/g)).toHaveLength(2);
     const continuation = portableInkGeometry(attrs.inkFragments[0],8,false).path;
     expect(html).toContain(continuation);

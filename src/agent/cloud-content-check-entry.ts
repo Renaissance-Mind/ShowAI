@@ -4,9 +4,6 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { AgentService } from "./service";
 
-// Run against the bundled gateway files: project and page operations load the
-// content worker beside the bundle, so a missing runtime file fails the image
-// build instead of the first user request.
 const root = await mkdtemp(join(tmpdir(), "showai-content-check-"));
 try {
   async function readableTree(path: string): Promise<void> {

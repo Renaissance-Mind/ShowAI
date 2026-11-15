@@ -41,14 +41,8 @@ import "./agent-settings.css";
 import "./onboarding.css";
 
 const PROMPTS = ["mortgage", "foldable", "attention"] as const;
-/** After this, a detection still running shows its result as not found. */
 const DETECTION_TIMEOUT = 20000;
 
-/**
- * The first-run page: "Get started" in the built-in documentation, opened when a new App
- * starts, or the Recent view's content while the documentation is hidden and the library
- * has no pages of its own.
- */
 export default function Welcome({
   info,
   samples,
@@ -70,12 +64,10 @@ export default function Welcome({
   onOpenAgentSettings: () => void;
   onOpenPluginSettings: () => void;
   onCreateProject: () => void;
-  /** Writes the prompt into the built-in Agent on a new sample page. */
   onStartPrompt?: (prompt: string) => Promise<void>;
 }) {
   const t = useTranslator(messages);
   const tp = useTranslator(pluginMessages);
-  // The desktop App and the local browser server both reach the host CLIs on this machine.
   const desktopPlugins =
     !!info && workbenchCapabilities(info.platform).localPlugins;
   const plugins = usePluginHosts(desktopPlugins ? info.home : null);
@@ -107,7 +99,6 @@ export default function Welcome({
       clearTimeout(copiedTimer.current);
       copiedTimer.current = setTimeout(() => setCopied(null), 2400);
     } catch (reason) {
-      // Without clipboard access the prompt stays visible for copying by hand.
       setCopyError({ key, message: errorMessage(reason) });
     }
   };
@@ -123,8 +114,6 @@ export default function Welcome({
     !plugins.hosts.some(
       (host) => host.host !== "deepseek" && !!host.executable,
     );
-  // Prompts go where they can be used: an external host takes a pasted prompt,
-  // otherwise a ready built-in Agent receives it on a new page.
   const externalHost =
     desktopPlugins &&
     plugins.hosts.some((host) => host.host !== "deepseek" && !!host.executable);
@@ -201,7 +190,6 @@ export default function Welcome({
                 {host.executable &&
                   !pluginUpToDate(host, info?.home) &&
                   (pluginActionBlocked(host) ? (
-                    // Another plugin source or a host error is explained in Settings → Plugins.
                     <button
                       type="button"
                       className="settings-button"
@@ -304,7 +292,6 @@ export default function Welcome({
             )}
           </div>
         )}
-        {/* After an installation, the first call from the agent confirms the connection here. */}
         {plugins.receipt && !plugins.receipt.dsh && installedHosts.length > 0 && (
           <div className="studio-welcome-verify plugin-install-settings">
             <VerifyConnection

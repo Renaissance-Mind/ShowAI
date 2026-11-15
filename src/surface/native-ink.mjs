@@ -13,7 +13,6 @@ function embedded(value, mime, label) {
   assertBytes(label, bytes, CAPACITY.resourceBytes);
 }
 
-/** Native archives remain opaque; iPad verifies them with the PencilKit decoder. */
 export function validateNativeInk(ink) {
   if (isPortableInk(ink)) return validatePortableInk(ink);
   if (!ink || typeof ink !== "object" || Array.isArray(ink))

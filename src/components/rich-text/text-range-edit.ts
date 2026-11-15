@@ -7,7 +7,6 @@ export interface TextEditRange {
   from: number;
   to: number;
 }
-/** Delete only characters. Structural boundaries and component nodes stay intact. */
 export function replaceTextRanges(
   state: EditorState,
   ranges: TextEditRange[],

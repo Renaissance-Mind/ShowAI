@@ -9,11 +9,6 @@ import workbenchMessages from "../i18n/messages/workbench";
 const t = translator(workbenchMessages);
 const tc = translator(commonMessages);
 
-/**
- * Delete (archive), restore or pin a page. Deleting only archives, so the page
- * stays listed under deleted items until it is restored. Without a base the
- * change applies to the current version.
- */
 export async function updatePageState(
   store: FileStore,
   projectId: string,
@@ -36,10 +31,6 @@ export async function updatePageState(
   );
 }
 
-/**
- * The document for a copy of a page: new block ids, not archived, in the same
- * folder while that folder still exists. The caller creates the page.
- */
 export async function duplicatePageDocument(
   store: FileStore,
   projectId: string,
@@ -66,10 +57,6 @@ export async function duplicatePageDocument(
   };
 }
 
-/**
- * Deleted projects, folders and pages that can be restored, limited to the
- * given projects when a connection is bound to them.
- */
 export async function listDeletedEntries(
   store: FileStore,
   projectIds?: string[],

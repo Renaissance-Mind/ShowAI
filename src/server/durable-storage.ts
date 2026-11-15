@@ -53,8 +53,6 @@ interface HotObject {
 export const hotLimit = 256 * 1024;
 const hotBudget = 128 * 1024 * 1024;
 
-/** Small immutable edit objects are durable before acknowledgement. R2 remains
- * the large-object and archival tier. Inventory/export sees one logical union. */
 export class DurableObjects implements ObjectStore {
   constructor(
     readonly storage: DurableStorage,
@@ -74,7 +72,6 @@ export class DurableObjects implements ObjectStore {
       .exec<HotObject>("SELECT * FROM _showai_hot_objects WHERE key=?", key)
       .toArray()[0];
   }
-  /** Running hot-tier size, so a write never sums the whole table. */
   private hotBytes?: number;
   private hotTotal() {
     this.hotBytes ??= this.storage.sql
@@ -306,8 +303,6 @@ export class DurableObjects implements ObjectStore {
         (await hash(stored)) !== (await hash(bytes))
       )
         throw new Error("Archived object failed integrity verification.");
-      // A freeze or a concurrent reader can keep the hot copy. Inventory still
-      // exports one object and acknowledges no deletion before R2 verification.
       if (this.writable())
         this.storage.sql.exec(
           "DELETE FROM _showai_hot_objects WHERE key=? AND used_at=?",
@@ -315,7 +310,6 @@ export class DurableObjects implements ObjectStore {
           row.used_at,
         );
     }
-    // Archival runs from an alarm, so it can afford an exact recount.
     this.hotBytes = undefined;
     const total = this.hotTotal();
     if (total > hotBudget * 0.75)

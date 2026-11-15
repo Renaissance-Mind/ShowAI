@@ -19,7 +19,6 @@ export const CATALOG_VIEWS = [
 ] as const;
 export type CatalogView = (typeof CATALOG_VIEWS)[number];
 export type CatalogKind = "component" | "template";
-/** Semver precedence, including stable releases versus prerelease identifiers. */
 export function compareCatalogVersions(
   left = "0.0.0",
   right = "0.0.0",
@@ -66,7 +65,6 @@ export interface CatalogSummary {
   version?: string;
   integrity?: string;
   description?: string;
-  /** One-line props type summary derived from the schema; components only. */
   signature?: string;
   scenarios: string[];
   parameterDocumentation?: {
@@ -74,13 +72,10 @@ export interface CatalogSummary {
     state: "versioned" | "legacy" | "missing";
   };
   effects?: string[];
-  /** The workbench slots the component fills (manifest.contributes). */
   contributes?: import("../contract/contributions").ComponentContributions;
-  /** The component reads page references; exports carry them. */
   pageReferences?: true;
   reuse?: "general" | "domain" | "content-specific" | "unclassified";
   documentationStatus?: "available" | "missing";
-  /** Built-in components only: fit for show_component in a conversation column. */
   conversation?: import("../contract/types").InlineReadiness;
   workflow?: {
     format: 1;
@@ -97,7 +92,6 @@ export function shellToken(value: string): string {
     : `'${value.replaceAll("'", `'"'"'`)}'`;
 }
 
-/** Search only descriptive metadata, independently of the small returned summary. */
 export function catalogSearchText(value: object): string {
   const item = value as Record<string, unknown>;
   const text: string[] = [];
@@ -145,11 +139,6 @@ export function catalogSearchText(value: object): string {
   return text.join("\n").toLocaleLowerCase();
 }
 
-/**
- * Scores searchable catalog text against a query of one or more terms split
- * on whitespace or list punctuation: 0 matches nothing, any matching term
- * counts, and the whole query as one phrase ranks above separate terms.
- */
 export function catalogQueryScore(text: string, query: string): number {
   const phrase = query.trim().toLocaleLowerCase();
   if (!phrase) return 1;
@@ -299,7 +288,6 @@ export function describeCommand(
   ].join(" ");
 }
 
-/** Full discovery stays compact; detailed metadata belongs to describe. */
 export function catalogEntry(item: CatalogSummary) {
   const {
     kind,
@@ -325,7 +313,6 @@ export function catalogEntry(item: CatalogSummary) {
     scenarios,
     scope,
     ...(reuse ? { reuse, documentationStatus } : {}),
-    // The compact index flags only components that do not fit a conversation as-is.
     ...(conversation && conversation.status !== "ready"
       ? { conversation: conversation.status }
       : {}),
@@ -335,7 +322,6 @@ export function catalogEntry(item: CatalogSummary) {
   };
 }
 
-/** Catalogs disclose all matches unless a caller explicitly requests paging. */
 export function catalogPage<T>(
   items: T[],
   input: { limit?: number; cursor?: string; key?: unknown } = {},

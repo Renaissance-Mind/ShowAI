@@ -1,5 +1,3 @@
-// Shared contract for the structure-browser and card-grid built-ins.
-// Validation runs in the workbench, the CLI and the portable reader, so it stays dependency-free.
 import {
   isSafeHref,
   parseInline,
@@ -49,7 +47,6 @@ function inlineLinks(value, label) {
     );
 }
 
-// ---------------------------------------------------------------- structure-browser
 
 export const STRUCTURE_KINDS = ["dir", "file", "object", "array", "field"];
 const NODE_KEYS = [
@@ -65,22 +62,14 @@ const NODE_KEYS = [
   "open",
 ];
 export const STRUCTURE_LIMITS = { siblings: 60, nodes: 400, depth: 8 };
-/** Tree column width as a percent of the frame: allowed range and the default. */
 export const STRUCTURE_SPLIT = { min: 18, max: 60, fallback: 32 };
 
-/** A node's path segment: its name without trailing slashes ("src/" → "src"). */
 export const pathSegment = (name) => name.replace(/\/+$/, "") || name;
-/** Normalizes a written path ("docs/", "/a//b") to the joined segments used as keys. */
 export const normalizePath = (path) =>
   path.split("/").filter(Boolean).join("/");
-/** Kind written on the node, or dir for nodes with children and file otherwise. */
 export const nodeKind = (node) =>
   node.kind ?? (node.children?.length ? "dir" : "file");
 
-/**
- * Flattens the nested nodes into depth-first order, keyed by path.
- * Each entry records its depth, parent path and child paths.
- */
 export function structureOutline(nodes) {
   const items = new Map();
   const roots = [];
@@ -163,13 +152,11 @@ function validateStructure(data) {
   }
 }
 
-// ---------------------------------------------------------------- card-grid
 
 export const CARD_TONES = ["brand", "teal", "warm", "violet", "rose", "slate"];
 export const CARD_VARIANTS = ["tile", "row"];
 const CARD_KEYS = ["icon", "title", "body", "href", "tag", "tone"];
 
-/** Written column count, or a balanced default for the card count and variant. */
 export function cardGridColumns(data) {
   if (data.columns) return data.columns;
   const count = data.cards.length;
@@ -200,7 +187,6 @@ function validateCards(data) {
         fail(
           `${at}.href must be an http(s), mailto, # anchor, ShowAI page or relative link.`,
         );
-      // The whole card is the link, so its body cannot hold another one.
       if (parseInline(card.body).some((segment) => segment.type === "link"))
         fail(`${at}.body cannot contain links when the card has an href.`);
     } else inlineLinks(card.body, `${at}.body`);

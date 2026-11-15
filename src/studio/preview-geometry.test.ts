@@ -15,7 +15,6 @@ test("manual zoom supports reading detail without losing a valid finite scale", 
   expect(previewZoom(0.8)).toBe(0.8);
 });
 test("a long document splits into more columns the taller it is, up to four", () => {
-  // A 300×150 card; pages are 960 wide with a 64 gap between columns.
   expect(previewColumns(300, 150, 960, 500, 64)).toBe(1);
   expect(previewColumns(300, 150, 960, 1400, 64)).toBe(2);
   expect(previewColumns(300, 150, 960, 4000, 64)).toBe(3);

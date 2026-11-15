@@ -31,7 +31,6 @@ const environment = () => ({
   SHOWAI_HOME: home,
   SHOWAI_VIEWER: join(root, "dist-portable/portable.html"),
 });
-// Claude Code and Codex usually start the runtime from an English shell.
 const englishShell = (): Record<string, string> => ({
   ...Object.fromEntries(
     Object.entries(environment()).filter(

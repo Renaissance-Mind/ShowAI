@@ -9,7 +9,6 @@ import {
   type SurfaceIndex,
 } from "../document/connections.mjs";
 
-/** DOM measurements are transient. Only an explicit editor command materializes hints. */
 export class SurfaceGeometryStore {
   private measurements = new Map<string, { width: number; height: number }>();
   private listeners = new Map<string, Set<() => void>>();
@@ -62,8 +61,6 @@ export class SurfaceGeometryStore {
   }
   private publish() {
     if (this.gestures || !this.changed.size) return;
-    // React subscribers can change a connector's size. Deliver outside the
-    // ResizeObserver phase so that change cannot trigger a same-frame loop.
     if (typeof requestAnimationFrame === "function") {
       if (!this.scheduled)
         this.scheduled = requestAnimationFrame(() => {
@@ -115,8 +112,6 @@ export class SurfaceGeometryStore {
   }
   materialize<T extends ShowDocument>(document: T): T {
     let layout = document.layout;
-    // Authoring observes the current tree, including any externally edited
-    // nodes on this same root reference; the render cache is not evidence.
     const index = indexSurfaceTree(document.content);
     for (const [id, measurement] of this.measurements) {
       const frame = layout?.[id],
@@ -137,7 +132,6 @@ export class SurfaceGeometryStore {
       if (layout === document.layout) layout = { ...layout };
       layout![id] = { ...frame, contentSize: measurement };
     }
-    // Connection reconciliation may replace root fields even with no new measurements.
     const next = reconcileConnections({ ...document, ...(layout ? { layout } : {}) });
     return next.content === document.content && next.layout === document.layout ? document : next;
   }

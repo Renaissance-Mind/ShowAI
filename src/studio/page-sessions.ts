@@ -18,9 +18,7 @@ import commonMessages from "../i18n/messages/common";
 import pageSessionMessages from "../i18n/messages/pageSession";
 
 const t = translator(pageSessionMessages);
-/** How long a page read ahead of an open stays usable. */
 const PREFETCH_TTL = 4000;
-/** A retained view of a record; it never becomes the workbench active page. */
 export const PAGE_PREVIEW_TAB = "showai:record-preview";
 const common = translator(commonMessages);
 
@@ -37,7 +35,6 @@ export interface BackgroundPageIssue {
   pageId: string;
   title: string;
   error: string;
-  /** retire: closing the page could not write its ink or history. */
   kind?: "save" | "retire";
 }
 interface WorkspaceSnapshot {
@@ -49,7 +46,6 @@ interface WorkspaceSnapshot {
   revision: number;
 }
 
-/** Open tabs retain their live views; only navigation history is evictable. */
 export class PageSessions {
   home?: string;
   private pages = new Map<string, PageSession>();
@@ -62,7 +58,6 @@ export class PageSessions {
   private stale = new Map<PageSession, number>();
   private changedComponents = new Set<PageSession>();
   private refreshTimer?: ReturnType<typeof setTimeout>;
-  /** Pages read ahead of an open, used once by the session that opens them. */
   private prefetched = new Map<
     string,
     { projectId: string; read: Promise<LoadedPage>; until: number }
@@ -72,7 +67,6 @@ export class PageSessions {
   private pendingPages = new Map<string, Promise<PageSession | null>>();
   private disposed = false;
   private dirty = false;
-  /** Pages whose release failed after their session was closed. */
   private retirementIssues: (BackgroundPageIssue & { home?: string })[] = [];
   private snapshot: WorkspaceSnapshot = {
     active: null,
@@ -95,7 +89,6 @@ export class PageSessions {
       this.listeners.delete(listener);
     };
   };
-  /** Every retained page reports its successful saves, including background tabs. */
   subscribeSaved = (
     listener: (projectId: string, record: LoadedPage) => void,
   ) => {
@@ -152,10 +145,6 @@ export class PageSessions {
     this.home = home;
     this.publish({ active: null, activeView: null, previewView: null, views: [] });
   }
-  /**
-   * Closes a page session. A release that cannot write ink or history is
-   * shown as a background issue, not only logged.
-   */
   private retire(session: PageSession) {
     const state = session.getSnapshot();
     const home = this.home;
@@ -211,8 +200,6 @@ export class PageSessions {
     this.viewStates.delete(key);
     this.viewStates.set(key, view);
     this.tabViews.set(tabId, key);
-    // Recency belongs to the cache map, not DOM order. Moving a retained iframe
-    // within its parent recreates its browsing context even when React keeps the node.
     const views = this.snapshot.views.some((item) => item.key === key)
       ? this.snapshot.views.map((item) => (item.key === key ? view : item))
       : [...this.snapshot.views, view];
@@ -266,11 +253,6 @@ export class PageSessions {
       this.retire(session);
     }
   }
-  /**
-   * Starts reading a page the person is about to open, such as one under the
-   * pointer. The open that follows within a few seconds uses this read; a
-   * library change to the page discards it first.
-   */
   prefetch(projectId: string, pageId: string) {
     const key = this.pageKey(projectId, pageId);
     const now = performance.now();
@@ -283,7 +265,6 @@ export class PageSessions {
       pageId,
       expectedHome: home,
     });
-    // An unused read that fails is dropped; the open reads again and reports.
     read.catch(() => {
       if (this.prefetched.get(key)?.read === read) this.prefetched.delete(key);
     });
@@ -304,7 +285,6 @@ export class PageSessions {
     const show = await this.prepare(projectId, pageId, initial);
     return !!show && show(tabId);
   }
-  /** Read once even when a normal tab and a preview request the same source. */
   private loadPage(projectId: string, pageId: string, initial?: LoadedPage) {
     const key = this.pageKey(projectId, pageId);
     const pending = this.pendingPages.get(key);
@@ -389,7 +369,6 @@ export class PageSessions {
     }
     return session;
   }
-  /** Show a record alongside the current page without replacing its session. */
   async openPreview(projectId: string, pageId: string): Promise<PageViewSession | null> {
     if (!this.home || !this.snapshot.activeView) return null;
     const ticket = ++this.previewTicket;
@@ -404,7 +383,6 @@ export class PageSessions {
     if (this.stale.has(target)) void this.refresh(target);
     return view;
   }
-  /** A failed save may close only after the draft has reached durable storage. */
   async closePreview(): Promise<boolean> {
     const ticket = ++this.previewTicket;
     const previous = this.snapshot.views.find((view) => view.key === this.snapshot.previewView);
@@ -414,12 +392,6 @@ export class PageSessions {
     if (this.snapshot.previewView) this.publish({ previewView: null });
     return true;
   }
-  /**
-   * Leaves the active page and loads the target without showing it. The
-   * returned function shows it, so a caller can switch the page and its other
-   * navigation state in one render; it returns false once a later navigation
-   * has started.
-   */
   async prepare(
     projectId: string,
     pageId: string,
@@ -431,7 +403,6 @@ export class PageSessions {
     }
     const ticket = ++this.ticket;
     if (!(await this.closePreview()) || ticket !== this.ticket) return null;
-    // Opening the page again shows its recoverable drafts in place.
     this.retirementIssues = this.retirementIssues.filter(
       (issue) => issue.pageId !== pageId || issue.projectId !== projectId,
     );
@@ -453,12 +424,10 @@ export class PageSessions {
     if (!(await this.closePreview())) return false;
     return this.snapshot.active ? this.snapshot.active.leave() : true;
   }
-  /** Share an already-open source with record naming and icon commands. */
   sessionFor(projectId: string, pageId: string) {
     const session = this.pages.get(this.pageKey(projectId, pageId));
     return session?.getSnapshot().draft?.id === pageId ? session : undefined;
   }
-  /** Every retained page with its location, for operations on several pages at once. */
   retained() {
     return [...new Set(this.pages.values())].flatMap((session) => {
       const state = session.getSnapshot();
@@ -478,7 +447,6 @@ export class PageSessions {
     const show = await this.prepareClear();
     return !!show && show();
   }
-  /** Leaves the active page; the returned function hides it, like `prepare`. */
   async prepareClear(): Promise<(() => boolean) | null> {
     const ticket = ++this.ticket;
     if (!(await this.closePreview()) || ticket !== this.ticket) return null;
@@ -489,7 +457,6 @@ export class PageSessions {
       return true;
     };
   }
-  /** Retire clean editors after a library operation changes their location or archives them. */
   forgetPage(projectId: string, pageId: string) {
     const key = this.pageKey(projectId, pageId);
     const session = this.pages.get(key);
@@ -522,21 +489,17 @@ export class PageSessions {
     return results.every(Boolean);
   }
   async prepareClose() {
-    // The close boundary needs a durable recovery record, not a free writer
-    // lease. A blocked formal save must not hold the window open indefinitely.
     const retained = await Promise.all(
       [...new Set(this.pages.values())].map((session) => session.leave()),
     );
     return retained.every(Boolean);
   }
-  /** Pages whose changes are not yet durable on disk, with their source for export. */
   unsavedPages(): UnsavedPage[] {
     return [...new Set(this.pages.values())].flatMap((session) => {
       if (session.isDurable()) return [];
       const state = session.getSnapshot();
       if (!state.draft || !state.projectId) return [];
       let source: string | undefined;
-      // Export is a convenience; an unserializable draft still gets listed.
       try {
         source = serializeArtifact(state.draft, state.record?.components);
       } catch (error) {
@@ -553,7 +516,6 @@ export class PageSessions {
       ];
     });
   }
-  /** The window close answer: allowed, or which pages hold it open and why. */
   async closeResult(): Promise<CloseResult> {
     if (await this.prepareClose()) return true;
     const pages = this.unsavedPages();
@@ -573,7 +535,6 @@ export class PageSessions {
           }),
     };
   }
-  /** Development reload: every page must be formally saved, not only kept in a draft. */
   async reloadResult(): Promise<CloseResult> {
     if (await this.flushAll()) return true;
     const blockers = [...new Set(this.pages.values())].flatMap(

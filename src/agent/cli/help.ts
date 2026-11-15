@@ -1,10 +1,5 @@
 import { COMMANDS_BY_KEY } from "./commands";
 
-/**
- * The sections of showai --help: a title and the commands it lists, by key.
- * Each command contributes its own help lines. An inline section puts its
- * first line on the title line.
- */
 const SECTIONS: readonly {
   title: string;
   inline?: true;
@@ -105,7 +100,6 @@ const FOOTER = [
   "Use showai guide TOPIC for exact authoring, versioning and delivery commands.",
 ];
 
-/** Command keys showai --help lists, in order. */
 export const HELP_COMMANDS = SECTIONS.flatMap((section) => section.commands);
 export const HELP_FOOTER = FOOTER;
 
@@ -120,7 +114,6 @@ function sectionText(section: (typeof SECTIONS)[number]) {
     : [section.title, ...lines];
 }
 
-/** The text of showai --help, built from the command declarations. */
 export function cliHelp() {
   const sections = SECTIONS.map(sectionText);
   return [

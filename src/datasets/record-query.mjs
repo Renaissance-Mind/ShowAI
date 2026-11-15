@@ -1,12 +1,3 @@
-// Filter groups and sort lists over typed records. One pure module for the
-// workbench, the portable reader, the CLI and custom components (through the
-// SDK), so a query means the same everywhere.
-//
-// Filter group: {join: "and"|"or", conditions: [condition | group]}, nested one
-// level; condition: {column, operator, value?}. Sorts: [{column, direction}].
-// Older views saved one {column, value} filter and one {column, direction}
-// sort; they read as a one-condition group and a one-item list.
-
 import {
   OPERATORS,
   compareProjections,
@@ -27,10 +18,6 @@ const isLegacyFilter = (filter) =>
   isObject(filter) && !("conditions" in filter) && "column" in filter;
 const isGroup = (item) => isObject(item) && Array.isArray(item.conditions);
 
-/**
- * The filter group of a saved view filter, or null. A legacy {column, value}
- * filter (equality on the text readers saw) becomes one condition.
- */
 export function readFilter(filter, columns = []) {
   if (filter === undefined || filter === null) return null;
   if (isLegacyFilter(filter)) {
@@ -53,13 +40,11 @@ export function readFilter(filter, columns = []) {
   return isGroup(filter) ? filter : null;
 }
 
-/** The sort list of a view: `sorts`, or the older single `sort`. */
 export function readSorts(view) {
   if (Array.isArray(view?.sorts)) return view.sorts;
   return isObject(view?.sort) && view.sort.column ? [view.sort] : [];
 }
 
-/** Every condition of a group, nested ones included. */
 export function filterConditions(group) {
   if (!group) return [];
   return group.conditions.flatMap((item) =>
@@ -67,10 +52,6 @@ export function filterConditions(group) {
   );
 }
 
-/**
- * Check a filter group's structure (and operands against column kinds when
- * columns are given). Throws with a path-qualified message.
- */
 export function validateFilter(filter, path, columns, context) {
   const fail = (message) => {
     throw new Error(`${path}${message}`);
@@ -162,10 +143,6 @@ export function validateSorts(sorts, path) {
   });
 }
 
-/**
- * Prepared accessors for a set of columns: each column's type, kind and a
- * projection per record, cached so a query projects each cell once.
- */
 function prepare(columns, context) {
   const byId = new Map();
   const read = context.value ?? ((row, column) => row[column.id]);
@@ -200,7 +177,6 @@ function matches(row, group, fields, today) {
       result = matches(row, item, fields, today);
     } else {
       const field = fields.get(item.column);
-      // A condition on a deleted column, or one this type no longer offers, is ignored.
       if (
         !field ||
         !(OPERATORS[item.operator] === "none" || item.value !== undefined)
@@ -222,11 +198,6 @@ function matches(row, group, fields, today) {
   return group.join === "and" || !results.length;
 }
 
-/**
- * Records that pass the search text and filter group, in sort order. Pass a
- * context with `today` (day number), `locale`, `value(row, column)` for
- * derived values, `pageTitle`, `recordTitles` and `contributed`.
- */
 export function queryRecords(rows, columns, query = {}, context = {}) {
   const fields = prepare(columns, context);
   const today = context.today ?? localDay();
@@ -267,7 +238,6 @@ export function queryRecords(rows, columns, query = {}, context = {}) {
     .map((entry) => entry.row);
 }
 
-/** Group keys of a record for a column whose type groups (select, multiSelect, checkbox). */
 export function groupKeys(row, column, context = {}) {
   const type = valueTypeOf(column, context);
   const read = context.value ?? ((item, field) => item[field.id]);

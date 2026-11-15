@@ -1,4 +1,3 @@
-// Test-only actual Graph -> quantizer -> mesh; no exported production ABI.
 #include "coverage-mesh.hpp"
 using namespace showai_boundary;
 namespace {

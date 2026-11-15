@@ -45,10 +45,6 @@ import {
   type WorkspaceTabs,
 } from "./types";
 
-/**
- * Moves the workbench between views, projects, pages and documentation, one
- * request at a time, and follows page links and requests from components.
- */
 export function useStudioRouter({
   feedback: { report, draftHeld, action },
   library: {
@@ -141,7 +137,6 @@ export function useStudioRouter({
   >;
   menus: Pick<MenuState, "setContextMenu">;
   page: PageState;
-  /** The workspace tabs are created after the router; functions read them when they run. */
   workspaceRef: RefObject<WorkspaceTabs>;
 }) {
   const t = useTranslator(studioMessages);
@@ -172,7 +167,6 @@ export function useStudioRouter({
     return () => window.removeEventListener("showai:invitation", receive);
   });
   useEffect(() => {
-    // The shared data dialog lists the pages using it; opening one reveals the block.
     const open = (event: Event) => {
       const detail = (
         event as CustomEvent<{
@@ -190,8 +184,6 @@ export function useStudioRouter({
     return () => window.removeEventListener("showai:open-page", open);
   });
   useEffect(() => {
-    // A bound block's packaging action: a project that syncs lists what
-    // synchronization carries; without sync the block's dialog holds the choice.
     const packaging = (event: Event) => {
       const detail = (event as CustomEvent<PackagingRequest>).detail;
       const binding = detail && syncOverview.bindings.get(detail.projectId);
@@ -214,7 +206,6 @@ export function useStudioRouter({
     return () => window.removeEventListener(PACKAGING_EVENT, packaging);
   });
   useEffect(() => {
-    // Page links in content and the Agent panel, and navigation requests from components.
     const request = (event: Event) => {
       const detail = (event as CustomEvent<NavigationDetail>).detail;
       if (!detail?.target) return;
@@ -231,8 +222,6 @@ export function useStudioRouter({
         );
       const target = anchor && parsePageLink(anchor.getAttribute("href"));
       if (!target) return;
-      // Database records handle a plain click through their optional host bridge.
-      // Modified clicks keep the same tab/window behavior as other page links.
       if (
         anchor.hasAttribute("data-database-record") &&
         event.button === 0 &&
@@ -243,7 +232,6 @@ export function useStudioRouter({
       )
         return;
       event.preventDefault();
-      // A plain click inside an editor places the caret; the editor follows its links on ⌘-click.
       if (anchor.isContentEditable) return;
       void followPageLink(target, event).catch(report);
     };
@@ -257,7 +245,6 @@ export function useStudioRouter({
     };
   });
   useEffect(() => {
-    // A missing component's status card searches the component library for it.
     const find = (event: Event) => {
       const query = (event as CustomEvent<{ query?: string }>).detail?.query;
       if (typeof query !== "string") return;
@@ -268,22 +255,13 @@ export function useStudioRouter({
     return () => window.removeEventListener(FIND_COMPONENT_EVENT, find);
   });
   const initialized = useRef(false);
-  /** Before an action on the open page itself: it must be saved, conflict or not. */
   async function saveOpenPage() {
     if (!(await page.flush())) throw new DraftHeld(t("resolveDraftFirst"));
   }
-  /**
-   * Before an action elsewhere: a page waiting on a save conflict keeps its
-   * draft and banner, and the action goes ahead.
-   */
   async function settleOpenPage() {
     if (!(await page.flushOrDefer()))
       throw new DraftHeld(t("resolveDraftFirst"));
   }
-  /**
-   * Saves every retained page an operation on library items touches; one
-   * that cannot save (a conflict, a failed write) holds the operation.
-   */
   async function settlePages(
     projectId: string,
     touches: (pageId: string, parentId: string | null) => boolean,
@@ -299,7 +277,6 @@ export function useStudioRouter({
       if (!saved) throw new DraftHeld(t("resolveDraftFirst"));
     }
   }
-  /** Retires the editors of deleted pages and drops them from every tab's history. */
   function forgetDeleted(
     projectId: string,
     gone: { project?: boolean; folders?: Set<string>; pages?: Set<string> },
@@ -322,7 +299,6 @@ export function useStudioRouter({
               (!!location.folderId && !!gone.folders?.has(location.folderId)))),
     );
   }
-  /** History entries follow pages and folders moved to another project. */
   function relocateMoved(
     projectId: string,
     moved: { folders: Set<string>; pages: Set<string> },
@@ -341,8 +317,6 @@ export function useStudioRouter({
       destination,
     );
   }
-  // Pages deleted elsewhere, by an Agent or another window, leave every
-  // tab's history; the page on screen keeps its entry.
   const openPageId = page.draft?.id;
   useEffect(() => {
     const workspace = workspaceRef.current;
@@ -391,7 +365,6 @@ export function useStudioRouter({
         pageId = params.get("page"),
         folderId = params.get("folder"),
         blocks = (params.get("blocks") ?? "").split(",").filter(Boolean);
-      // Restore saved navigation before expanding the explicit launch target.
       await verification;
       if (projectId) {
         selectedRef.current = projectId;
@@ -402,7 +375,6 @@ export function useStudioRouter({
           if (await page.open(projectId, pageId, workspace.activeId)) {
             setView("page");
             void loadCatalog().catch(report);
-            // A reference link opens here; show what it points at.
             if (blocks.length) void locateAssistantTarget(pageId, blocks);
           }
           const parentId =
@@ -420,8 +392,6 @@ export function useStudioRouter({
       setWorkspaceReady(true);
     })().catch(report);
   }, [refresh, loadCatalog, page, report]);
-  // Navigation runs one request at a time; a click made meanwhile wins over
-  // the one still loading, and runs as soon as it settles.
   const routes = useRef<{
     navigate: (next: View, current: () => boolean) => Promise<void>;
     openProject: (
@@ -508,7 +478,6 @@ export function useStudioRouter({
     if (catalogLoaded.current) void loadCatalog().catch(report);
     return true;
   }
-  /** Open a linked page here, in a tab or a window, and show the linked content. */
   async function followPageLink(
     target: NavigationTarget,
     modifiers?: NavigationModifiers,
@@ -552,7 +521,6 @@ export function useStudioRouter({
     }
     await locateAssistantTarget(pageId, ids, projectId);
   }
-  /** Open the page an Agent turn worked on and highlight the blocks it named. */
   async function locateAssistantTarget(
     pageId: string,
     ids: string[],
@@ -564,8 +532,6 @@ export function useStudioRouter({
     )
       return;
     if (ids[0]) setRevealNode(ids[0]);
-    // Editors own their DOM attributes, so the highlight is a separate overlay.
-    // A page that is still opening gets a moment to render its content.
     const started = Date.now();
     const flash = () => {
       const scope = document.querySelector(".studio-main");
@@ -580,8 +546,6 @@ export function useStudioRouter({
         window.setTimeout(flash, 160);
         return;
       }
-      // Board reveal already moves its camera. DOM scrolling would move the
-      // native overlay independently of that camera and can blank the canvas.
       if (!found[0]?.closest(".page-surface"))
         found[0]?.scrollIntoView({ block: "center" });
       for (const element of found) {
@@ -609,7 +573,6 @@ export function useStudioRouter({
     if (!projectId) return false;
     const show = await page.prepare(projectId, id);
     if (!show) return page.status === "error" ? draftHeld() : false;
-    // A newer click is waiting; it opens next and this page is not shown.
     if (!latest()) return false;
     if (show(workspace.activeId)) {
       selectedRef.current = projectId;
@@ -638,7 +601,6 @@ export function useStudioRouter({
   ) {
     const workspace = workspaceRef.current;
     if (!workspaceReady) return false;
-    // A tab switch in flight finishes first; this click then opens in its tab.
     await workspace.settled();
     if (
       (!capabilities.tabs && disposition !== "window") ||
@@ -675,7 +637,6 @@ export function useStudioRouter({
       report(error, { action: operation("op.open"), object: target.title }),
     );
   }
-  /** Built-in documentation opens like a page: in this tab, or a new one on a modified click. */
   async function openDoc(
     id: string,
     hash = "",
@@ -724,7 +685,6 @@ export function useStudioRouter({
     openPage: openPageNow,
     openDoc: openDocNow,
   };
-  /** Scroll the navigation to the open page, expanding whatever hides it. */
   async function locateCurrentPage() {
     const projectId = page.projectId;
     const current = page.draft;
@@ -740,7 +700,6 @@ export function useStudioRouter({
       project && !project.pinned
         ? organization.projectGroups[projectId]
         : undefined;
-    // The row is measured right after this, so the tree expands synchronously.
     flushSync(() => {
       setExpandedProjects((state) => ({ ...state, [projectId]: true }));
       expandFolderPath(loaded.folders, parentId);
@@ -751,7 +710,6 @@ export function useStudioRouter({
     if (!revealSidebarRow(document, target))
       requestAnimationFrame(() => revealSidebarRow(document, target));
   }
-  /** Back from templates, components or settings returns to where the person was. */
   async function leaveDetour() {
     const workspace = workspaceRef.current;
     const tab = workspace.tabs.find((item) => item.id === workspace.activeId);

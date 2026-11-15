@@ -9,8 +9,6 @@ import {
 import { parsePageLink } from "./page-link.mjs";
 import { isLocalResourceRef } from "./local-files.mjs";
 
-// ==text== is the common Markdown highlight syntax (Obsidian, Typora, many AI
-// outputs). Its content must not start or end with a space, so `a == b` stays text.
 const highlightExtension = {
   name: "highlight",
   level: "inline",
@@ -26,8 +24,6 @@ const highlightExtension = {
       };
   },
 };
-// @[kind]{data} places a component inside a line, e.g. @[date]{"date":"2026-11-12"}.
-// data is the component's JSON object on one line; its kind validator checks it.
 const inlineComponentExtension = {
   name: "inlineComponent",
   level: "inline",
@@ -57,7 +53,6 @@ const inlineComponentExtension = {
   },
 };
 const markdownImport = new Marked({
-  // [visible text]{note} attaches a hover note; see note-markup.mjs.
   extensions: [
     inlineComponentExtension,
     ...mathExtensions,
@@ -78,7 +73,6 @@ export const richTextFormats = [
   "annotation",
 ];
 export const richTextAlignments = ["left", "center", "right", "justify"];
-// Editors label these by value from their own message catalog.
 export const richTextFonts = [
   { value: "" },
   { value: "sans-serif" },
@@ -107,7 +101,6 @@ const decodeText = (value) =>
   );
 const textNode = (text, marks = []) =>
   text ? [{ type: "text", text, ...(marks.length ? { marks } : {}) }] : [];
-/** Markdown is an import format. Editing and AI patches share the structured document. */
 export function markdownToRichText(
   source,
   { allowComponentBlocks = false } = {},
@@ -142,7 +135,6 @@ export function markdownToRichText(
       if (t.type === "inlineComponent")
         return [{ type: "inlineWidget", attrs: { kind: t.kind, data: t.data } }];
       if (t.type === "mathInline" || t.type === "mathBlock") {
-        // Formulas carry no marks; an annotated formula keeps its note in LaTeX.
         const note = [...marks]
           .reverse()
           .find((mark) => mark.type === "annotation");
@@ -441,7 +433,6 @@ export function richTextStyle(data = {}) {
   };
 }
 
-/** Canonical content nodes shared by document editing, the catalog and SDK. */
 export const primitiveNodeTypes = Object.freeze({
   __proto__: null,
   image: "image",
@@ -523,7 +514,6 @@ export function primitiveContentNode(kind, data, id) {
   }
   return node;
 }
-/** Pure, idempotent compatibility conversion. Original files and history are untouched. */
 export function normalizeContentTree(input) {
   const visit = (inputNode) => {
     let node = inputNode;
@@ -543,7 +533,6 @@ export function normalizeContentTree(input) {
   };
   return visit(structuredClone(input));
 }
-/** normalizeContentTree that copies only the paths it changes; read-only use. */
 export function readContentTree(input) {
   if (input.type === "widget" && primitiveNodeTypes[input.attrs?.kind])
     return normalizeContentTree(input);

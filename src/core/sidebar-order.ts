@@ -1,4 +1,3 @@
-/** Unknown items retain their existing relative order after manually ordered items. */
 export function orderSidebarItems<T extends { id: string }>(
   items: T[],
   order: string[] = [],
@@ -9,7 +8,6 @@ export function orderSidebarItems<T extends { id: string }>(
   );
 }
 
-/** Legacy projects without a saved rank use immutable creation time, then identity. */
 export function orderSidebarProjects<
   T extends { id: string; createdAt: string; pinned?: boolean },
 >(projects: T[], order: string[] = []): T[] {

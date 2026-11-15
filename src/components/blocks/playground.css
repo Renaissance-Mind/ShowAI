@@ -1,5 +1,3 @@
-/* Additions for the playground block: stepper, toggle, choice, presets, results,
- * breakdown and ranking. The legacy slider and result keep their block.css styles. */
 .sb-block.sb-playground {
   --pg-c1: #4b6fae;
   --pg-c2: #c98a3a;
@@ -46,7 +44,6 @@
   color: var(--sb-muted);
 }
 
-/* Presets */
 .sb-block.sb-playground .pg-presets {
   display: flex;
   flex-wrap: wrap;
@@ -68,7 +65,6 @@
   color: var(--sb-surface);
 }
 
-/* Stepper and toggle share a label-left, control-right row. */
 .sb-block.sb-playground .pg-stepper-row,
 .sb-block.sb-playground .pg-toggle-row {
   display: flex;
@@ -138,7 +134,6 @@
   transform: translateX(16px);
 }
 
-/* Choice cards */
 .sb-block.sb-playground .pg-choices {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
@@ -170,7 +165,6 @@
   color: var(--sb-muted);
 }
 
-/* Results */
 .sb-block.sb-playground .sb-calculation-result.pg-results {
   justify-content: flex-start;
   gap: 12px;
@@ -283,7 +277,6 @@
   color: var(--sb-muted);
 }
 
-/* Breakdown */
 .sb-block.sb-playground .pg-breakdown {
   width: 100%;
   display: flex;
@@ -303,7 +296,6 @@
   height: 100%;
   transition: width 0.3s ease;
 }
-/* A negative part (a cost or loss inside a total) is drawn hatched. */
 .sb-block.sb-playground .pg-bar .is-negative,
 .sb-block.sb-playground .pg-table i.is-negative {
   background-image: repeating-linear-gradient(
@@ -357,7 +349,6 @@
   border-radius: 2px;
 }
 
-/* Ranking */
 .sb-block.sb-playground .pg-ranking-body {
   grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.4fr);
 }
@@ -467,7 +458,6 @@
 }
 
 @container (max-width: 560px) {
-  /* block.css stacks inputs and results only by viewport width; follow the block's own width too. */
   .sb-block.sb-playground .sb-playground-body {
     grid-template-columns: 1fr;
     gap: 20px;

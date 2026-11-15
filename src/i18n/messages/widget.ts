@@ -1,6 +1,5 @@
 import { defineMessages } from "../index";
 
-// Fallback shown when a block cannot be rendered: the component status card.
 export default defineMessages("widget", {
   "zh-CN": {
     unavailable: "此组件暂时无法显示",

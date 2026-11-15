@@ -16,7 +16,6 @@ export function saveCanvas(
   storage.setItem(CANVAS_KEY, serializeArtifact(document));
 }
 
-/** Preserve the preceding page before replacing the visible canvas with a file. */
 export function retainPage(
   storage: Pick<Storage, "setItem">,
   document: ShowDocument,

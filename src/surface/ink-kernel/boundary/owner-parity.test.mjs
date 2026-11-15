@@ -14,11 +14,7 @@ assert.equal(ex.sa_boundary_prepare(state,0,path,1,source,1,commands,5,a),0);con
 assert.equal(ex.sa_boundary_prepare(state,a,path,1,source,1,commands,5,b),0);assert.deepEqual(leaseA(),leaseB());assert.equal(ex.sa_boundary_release(state,b),0);
 dv.setFloat64(commands+56+8,2,true);dv.setFloat64(commands+112+8,2,true);assert.equal(ex.sa_boundary_prepare(state,a,path,1,source,1,commands,5,b),0);assert.equal(ex.sa_boundary_snapshot(state,b,reportB),0);assert.notDeepEqual(leaseA(),leaseB());
 assert.equal(ex.sa_boundary_copy_edges(state,a,0,4,oldEdges,4),0);assert.equal(ex.sa_boundary_copy_edges(state,b,0,4,nextEdges,4),0);
-// The actual clang/Wasm C ABI passes by-value aggregate arguments indirectly.
-// These buffers are ordinary public SABoundaryLease values; no owner internals
-// or writable arena views are used by the test.
 const cert=u[(nextEdges+144)/4];assert.equal(ex.sa_boundary_copy_parameter(state,b,cert,0,0,required),0);const words=u[required/4];assert.ok(words>4);assert.equal(ex.sa_boundary_copy_parameter(state,b,cert,parameter,words,required),0);
-// Same key, new bytes, late base, live old lease and failure are real owner paths.
 dv.setFloat64(commands+56+8,99,true);u.set([12,0,34,56,78,90],failedLease/4);assert.equal(ex.sa_boundary_prepare(state,a,path,1,source,1,commands,5,failedLease),1);assert.deepEqual([...u.slice(failedLease/4,failedLease/4+6)],[12,0,34,56,78,90]);
 setCommands([[0,0,0],[1,2,0],[1,3,1],[1,1,3],[1,-1,1],[4]]);u[source/4+6]=6;assert.equal(ex.sa_boundary_prepare(state,b,path,1,source,1,commands,6,failedLease),2);assert.deepEqual([...u.slice(failedLease/4,failedLease/4+6)],[12,0,34,56,78,90]);
 const snapshot=Buffer.concat([Buffer.from(new Uint32Array([0x53414f31,160,104,24]).buffer),Buffer.from(ex.memory.buffer.slice(a,a+24)),Buffer.from(ex.memory.buffer.slice(b,b+24)),Buffer.from(ex.memory.buffer.slice(reportA,reportA+104)),Buffer.from(ex.memory.buffer.slice(reportB,reportB+104)),Buffer.from(ex.memory.buffer.slice(oldEdges,oldEdges+640)),Buffer.from(ex.memory.buffer.slice(nextEdges,nextEdges+640)),Buffer.from(ex.memory.buffer.slice(required,required+4)),Buffer.from(ex.memory.buffer.slice(parameter,parameter+words*4))]);

@@ -142,7 +142,6 @@ describe("sequence diagram rendering", () => {
     expect(html.match(/class="sq-step"/g)).toHaveLength(4);
     expect(html).toContain('data-state="cur" data-kind="note"');
     expect(html.match(/data-state="todo"/g)).toHaveLength(3);
-    // Replies use the dashed line and open arrow head.
     expect(html).toContain("data-reply");
     expect(html).toContain("sq-open");
     expect(html).toContain("第 1 / 4 步");
@@ -174,7 +173,6 @@ describe("layer diagram rendering", () => {
     expect(panel).toContain("src/core/store.ts");
     expect(panel).toContain("<strong>拒绝覆盖</strong>");
     expect(html).toContain("暂无模块");
-    // Layers without a tone take the default order; the second layer keeps its own.
     expect(html).toContain('data-tone="accent"');
     expect(html).toContain('data-tone="orange"');
     expect(html).toContain('data-tone="violet"');

@@ -38,7 +38,6 @@ export function WorkspaceSwipeNavigation({
   const [preview, setPreview] = useState<SwipePreview | null>(null);
   const [leaving, setLeaving] = useState(false);
   const dismiss = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-  // Ordinary scrolling must not schedule renders: only a visible preview does.
   const shown = useRef(false);
   const show = (next: SwipePreview | null) => {
     shown.current = next !== null;
@@ -70,8 +69,6 @@ export function WorkspaceSwipeNavigation({
     const observe = (event: WheelEvent) => {
       const now = performance.now();
       if (machine.current.settled(now)) return;
-      // A child may stop propagation instead of preventDefault. Remember that
-      // recipient too, before a later momentum event reaches another element.
       const observation = setTimeout(() => {
         observations.delete(observation);
         if (handled.has(event)) return;
@@ -80,8 +77,6 @@ export function WorkspaceSwipeNavigation({
       }, 0);
       observations.add(observation);
     };
-    // Bubble on window: native and React component handlers have first refusal.
-    // The listener is passive so the compositor never waits for it to scroll.
     const wheel = (event: WheelEvent) => {
       handled.add(event);
       const current = latest.current;

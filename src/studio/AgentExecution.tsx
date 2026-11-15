@@ -34,8 +34,6 @@ export function AgentExecutionPicker({
   const load = async (refresh = true) => {
     const generation = ++loadGeneration.current;
     try {
-      // Saved selection and authenticated LAN state do not depend on the cloud.
-      // Render them before refreshing the remote device inventory.
       for (const cached of refresh ? [true, false] : [true]) {
         const next = await desktop.invoke<NonNullable<typeof context>>(
           "agent:execution",

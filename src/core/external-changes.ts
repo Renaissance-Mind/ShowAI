@@ -8,10 +8,6 @@ import type { ChangeActor, ChangeContext } from "./history-model";
 import type { ShowDocument } from "./model";
 import { assertId } from "./store";
 
-/**
- * Who wrote the current revision of a page, as shown to the person editing it.
- * Session identifiers stay in the library history; the workbench needs only a name.
- */
 export interface ChangeAuthor {
   kind: ChangeActor["kind"];
   harness?: string;
@@ -36,24 +32,15 @@ export function changeAuthor(
   };
 }
 
-/**
- * A write by another writer (an Agent through MCP or the CLI, another window)
- * that the workbench installed into an open page. `before` is the page as it
- * was immediately before that write, `after` the version the write produced;
- * 「撤销此次修改」 merges the inverse of after→before into the current page.
- */
 export interface ExternalChange {
   id: string;
   projectId: string;
   pageId: string;
-  /** When the workbench installed the write. */
   at: string;
   revision?: string;
   hash: string;
   author?: ChangeAuthor;
-  /** Added, edited or moved blocks still present after the write, in document order. */
   blockIds: string[];
-  /** Changed places: blocks added, edited, moved or removed, plus page fields. */
   count: number;
 }
 export interface StoredExternalChange extends ExternalChange {
@@ -61,7 +48,6 @@ export interface StoredExternalChange extends ExternalChange {
   after: ShowDocument;
 }
 
-/** Snapshots are a short-lived safety net, not page history. */
 export const EXTERNAL_CHANGE_LIMIT = 5;
 export const EXTERNAL_CHANGE_TTL_MS = 24 * 60 * 60 * 1000;
 
@@ -86,8 +72,6 @@ export function summarizeChange(before: ShowDocument, after: ShowDocument) {
     else if (change.type === "block.removed") removed++;
     else present.add(change.blockId);
   }
-  // A changed parent and its changed children are separate places only when
-  // the parent changed itself; diffDocuments already reports them that way.
   const blockIds = [...present].sort(
     (a, b) => (order.get(a) ?? 0) - (order.get(b) ?? 0),
   );
@@ -126,7 +110,6 @@ async function writeEntries(path: string, entries: StoredExternalChange[]) {
 const fresh = (entries: StoredExternalChange[], now: number) =>
   entries.filter((entry) => now - Date.parse(entry.at) < EXTERNAL_CHANGE_TTL_MS);
 
-/** One writer per page file inside this process; renderers call through it. */
 const queues = new Map<string, Promise<unknown>>();
 function serialized<T>(path: string, action: () => Promise<T>): Promise<T> {
   const previous = queues.get(path) ?? Promise.resolve();
@@ -138,10 +121,6 @@ function serialized<T>(path: string, action: () => Promise<T>): Promise<T> {
   return next;
 }
 
-/**
- * Records the snapshot before an installed external write. Returns null when
- * the write changed nothing visible (only timestamps).
- */
 export function recordExternalChange(
   root: string,
   input: {
@@ -184,7 +163,6 @@ export function recordExternalChange(
   });
 }
 
-/** Newest first; expired snapshots are removed on read. */
 export function listExternalChanges(
   root: string,
   projectId: string,
@@ -214,7 +192,6 @@ export function dismissExternalChange(
   });
 }
 
-/** Removes every page file whose snapshots have all expired. */
 export async function pruneExternalChanges(root: string, now = Date.now()) {
   const base = join(root, "local", "external-changes");
   const projects = await readdir(base).catch((error: NodeJS.ErrnoException) => {

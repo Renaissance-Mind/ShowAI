@@ -19,12 +19,9 @@ import {
 import { checkOptions, findCommand, parseArguments } from "./cli/commands";
 import { cliHelp } from "./cli/help";
 
-// The command line: words and options are parsed against the command
-// declarations in ./cli, which also produce the help text.
 
 export const CLI_HELP = cliHelp();
 
-/** The guide topic `showai COMMAND --help` prints. */
 const HELP_TOPICS: Record<string, string> = {
   projects: "workspace",
   pages: "authoring",
@@ -82,11 +79,9 @@ export async function runCli(argv: string[]): Promise<unknown> {
   ) {
     const root = new AgentService({ root: option(args, "home") }).store.root;
     await openLibrary(root);
-    // The browser workbench sets its own language; other commands speak the App's.
     if (command !== "serve") await followAppLanguage(root);
   }
   const access = declaration && commandAccess(declaration, args);
-  // Writes run in one recorded transaction unless the handler records its own.
   const mutation = access === "write" && !declaration?.ownTransaction;
   if (!mutation || args.options.help)
     return withChangeContext(context, () => runCliCommand(args, declaration));
@@ -149,7 +144,6 @@ function printHuman(value: unknown) {
   } else process.stdout.write(JSON.stringify(value, null, 2) + "\n");
 }
 
-/** The step a failed command was taking, for the error's user message. */
 function cliOperation(argv: string[]): FailedOperation | undefined {
   const [command, action] = parseArguments(argv).positional;
   if (command === "export") return "export";

@@ -1,8 +1,6 @@
 #ifndef SHOWAI_BOUNDARY_GRAPH_DELTA_TEST_API_HPP
 #define SHOWAI_BOUNDARY_GRAPH_DELTA_TEST_API_HPP
 #include "source-delta.hpp"
-// Correctness transport only. Actual immutable source, retained delta and an
-// independent full rebuild all evaluate original Bezier curves, not meshes.
 extern "C" uint32_t sabt_graph_delta(const uint32_t*ranges,uint32_t path_count,const SAInkPathCommand*commands,uint32_t command_count,const double*queries,uint32_t query_count,void*memory,uint32_t bytes,uint64_t work_limit,uint32_t*output,uint32_t capacity,int32_t*metadata){
     if(!ranges||!path_count||path_count>8||!commands||command_count>512||!queries||query_count>128||!memory||!output||!metadata||((uintptr_t)ranges&3u)||((uintptr_t)commands&7u)||((uintptr_t)queries&7u)||((uintptr_t)output&3u)||((uintptr_t)metadata&3u))return SA_INK_INVALID;
     const void*objects[6]={ranges,commands,queries,memory,output,metadata};uint64_t sizes[6]={uint64_t(path_count)*8,uint64_t(command_count)*sizeof(SAInkPathCommand),uint64_t(query_count)*32,bytes,uint64_t(capacity)*4,32};for(uint32_t i=0;i<6;i++)for(uint32_t j=i+1;j<6;j++)if(overlap(objects[i],sizes[i],objects[j],sizes[j]))return SA_INK_INVALID;

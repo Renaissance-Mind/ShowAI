@@ -3,8 +3,6 @@ import { readFileSync, readdirSync } from "node:fs";
 import { dirname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 
-// The workbench is split so parallel work lands in different files; these
-// limits keep Studio.tsx a composition and every part small enough to own.
 const STUDIO_LIMIT = 1500;
 const SHELL_LIMIT = 1200;
 

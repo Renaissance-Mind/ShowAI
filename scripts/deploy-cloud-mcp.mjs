@@ -6,9 +6,7 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { verifyCloudMcpRelease } from "./cloud-mcp-release.mjs";
 
-// Run by the account owner in their terminal. No credential is printed.
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-// The handoff directory comes from scripts/prepare-cloud-mcp-release.mjs.
 if (!process.argv[2]) throw new Error("用法：node scripts/deploy-cloud-mcp.mjs <发布交接目录>");
 const handoff = resolve(root, process.argv[2]);
 const source = join(handoff, "release-source");
@@ -63,8 +61,6 @@ async function startColima() {
   try { owner = await readlink(lockPath); }
   catch (error) { if (error.code !== "ENOENT") throw error; }
   const limaEnv = { ...env, LIMA_HOME: limaHome };
-  // Inspect the existing lock before startup. The host-agent's final log can
-  // arrive after Colima exits, so recovery must not depend on that log timing.
   if (owner !== undefined) {
     if (resolve(dirname(lockPath), owner) !== instance) throw new Error("磁盘锁属于另一个实例，已停止。");
     const state = await run("limactl", ["list", "colima", "--json"], { capture: true, commandEnv: limaEnv });
@@ -116,7 +112,6 @@ async function main() {
   let identity = await wrangler(["whoami", "--json"], { capture: true, allowFailure: true });
   requireAuthConnectivity(identity);
   if (identity.code !== 0) {
-    // Reuse a private task-specific location instead of modifying global login settings.
     env.XDG_CONFIG_HOME = join(privateDir, "auth");
     await mkdir(env.XDG_CONFIG_HOME, { recursive: true, mode: 0o700 });
     await chmod(env.XDG_CONFIG_HOME, 0o700);
@@ -148,8 +143,6 @@ async function main() {
   const buildx = await run("docker", ["buildx", "version"], { capture: true, allowFailure: true });
   if (buildx.code !== 0)
     throw new Error("Docker Buildx 不可用；Wrangler 构建需要 --load，旧构建器不支持。请先运行 brew install docker-buildx，再重试部署。现有存储和密钥保持不变。");
-  // Wrangler invokes docker build with BuildKit-only --load/--provenance flags.
-  // Scope this to our child processes; do not change shared Docker settings.
   env.DOCKER_BUILDKIT = "1";
   console.log(`Docker Buildx 可用：${buildx.stdout.trim()}`);
 
@@ -204,15 +197,13 @@ async function main() {
   await wrangler(deployArgs);
   console.log("[6/6] 等待新容器接管并验证 HTTPS、OAuth 和 MCP 工具（滚动替换旧容器可能需要十几分钟）。");
   let health;
-  // A running instance keeps serving until Cloudflare replaces it, so only a
-  // browser check rendered after this deployment proves the new image is live.
   const fresh = (value) => value?.ok && Date.parse(value.browserRendering?.checkedAt ?? "") > deployStartedAt;
   const healthDeadline = Date.now() + 30 * 60_000;
   while (Date.now() < healthDeadline) {
     try {
       const response = await fetch(`${origin}/health`, { signal: AbortSignal.timeout(55000) });
       if (response.ok) { health = await response.json(); if (fresh(health)) break; }
-    } catch { /* DNS, certificate or container may still be starting. */ }
+    } catch {                                                            }
     await new Promise((r) => setTimeout(r, 15000));
   }
   if (!fresh(health)) throw new Error(health?.ok ? "已提交部署，但旧容器仍在服务，新容器尚未接管。稍后检查 /health 的 browserRendering.checkedAt。" : "已提交部署，但健康检查尚未通过。请把终端最后的提示告诉我。");

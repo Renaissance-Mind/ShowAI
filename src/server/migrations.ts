@@ -133,7 +133,6 @@ export const migrations = [
   },
 ];
 
-/** Linux upgrades transactionally; Workers require deployment-time D1 migrations. */
 export async function prepareMetadata(
   db: MetadataStore,
   autoMigrate: boolean,

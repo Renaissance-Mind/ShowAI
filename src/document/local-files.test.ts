@@ -45,7 +45,6 @@ describe("local file references", () => {
   it("know which field kinds a reference fits", () => {
     expect(isLocalResourceRef("file:~/a.PNG", "image")).toBe(true);
     expect(isLocalResourceRef("file:~/a.avif", "image")).toBe(true);
-    // SVG documents are not served; raster images only.
     expect(isLocalResourceRef("file:~/a.svg", "image")).toBe(false);
     expect(isLocalResourceRef("file:~/a.png", "video")).toBe(false);
     expect(isLocalResourceRef("file:~/a.pdf", "pdf")).toBe(true);

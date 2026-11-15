@@ -1,14 +1,7 @@
-/**
- * The readable form of a sandboxed component's parameter validation messages
- * (ajv text), e.g. 「rows 第 1 项缺少 label」. Readers replace this module with a
- * stub that keeps the original text, since they never show technical details.
- */
 import { translator } from "../../i18n";
 import messages from "../../i18n/messages/componentValidation";
 
-/** One parsed ajv message: where in the data, and what is wrong there. */
 export interface ValidationIssue {
-  /** Data path segments; numbers are list positions (0-based). */
   path: (string | number)[];
   rule:
     | { kind: "required"; property: string }
@@ -101,13 +94,11 @@ export function parseValidationMessage(text: string): ValidationIssue[] {
           rule: { kind: "other", message: part },
         } as ValidationIssue;
       const parsed = rule(message);
-      // A root `required` error names the missing property where the path would be.
       const path = head.startsWith("/") ? pointer(head) : [];
       return { path, rule: parsed };
     });
 }
 
-/** Whether a component error text is the runtime's parameter validation. */
 export function isValidationMessage(text: string): boolean {
   return parseValidationMessage(text).some(
     (issue) => issue.rule.kind !== "other",
@@ -120,7 +111,6 @@ type Translate = (
 ) => string;
 const defaultTranslate = translator(messages) as unknown as Translate;
 
-/** A data path as readers say it: `rows 第 1 项的 label`. Empty for the whole data. */
 export function readablePath(
   path: (string | number)[],
   t: Translate = defaultTranslate,
@@ -139,7 +129,6 @@ export function readablePath(
     .trim();
 }
 
-/** One readable sentence per issue, e.g. 「rows 第 1 项缺少 label」. */
 export function readableValidation(
   text: string,
   t: Translate = defaultTranslate,

@@ -133,7 +133,6 @@ const sourceOwner = useRef<OwnedSourceSession | undefined>(undefined);
     };
   }, [page.id]);
   const blocked = useRef(!!initial.error);
-  // While blocked, autosave is off; the notice stays until another page opens.
   const [saveBlocked, setSaveBlocked] = useState(!!initial.error);
   const importGeneration = useRef(0);
   current.current = page;

@@ -1,6 +1,3 @@
-// DeepSeek Harness bundle staging, shared by the desktop App and the source installer.
-// Harness installs bundles itself (Plugins → Add plugin, or its plugin_manager tool);
-// ShowAI only prepares the machine-specific bundle directory and reads the profile state.
 import { createHash } from "node:crypto";
 import {
   cp,
@@ -17,7 +14,6 @@ import { dirname, isAbsolute, join, resolve } from "node:path";
 import { bindHostSkills } from "./host-package.mjs";
 
 export const DSH_BUNDLE = "@showai/dsh-showai";
-/** Bundle names of earlier ShowAI previews that the full bundle replaces. */
 export const DSH_LEGACY_BUNDLES = [
   "@showai/dsh-showai-preview",
   "@showai/dsh-showai-page",
@@ -35,7 +31,6 @@ export function dshHome() {
   return resolve(process.env.DSH_HOME || join(homedir(), ".dsh"));
 }
 
-/** Hash every file path and its bytes under a directory, in a stable order. */
 export async function dshFingerprint(root) {
   const files = [];
   async function visit(directory, prefix = "") {
@@ -64,7 +59,6 @@ export async function dshFingerprint(root) {
   };
 }
 
-/** YAML accepts JSON strings, which keeps arbitrary paths and values literal. */
 function mcpRow(server) {
   const lines = [
     "    - id: showai-mcp",
@@ -81,16 +75,11 @@ function mcpRow(server) {
         `          ${JSON.stringify(key)}: ${JSON.stringify(value)}`,
     ),
     `        cwd: ${JSON.stringify(server.cwd)}`,
-    // Presentation and export calls compile pages; the Harness default of 60 s is too short.
     "        toolCallTimeoutMs: 300000",
   ];
   return lines.join("\n") + "\n";
 }
 
-/**
- * Stage the complete bundle at `target`: preview, Skills and the MCP launcher bound to
- * one ShowAI runtime and library. The directory is replaced as a whole.
- */
 export async function stageDshBundle({
   target,
   bundleRoot,
@@ -117,15 +106,11 @@ export async function stageDshBundle({
   const server = {
     command: runtime.command,
     args: [join(target, "mcp/launch.mjs")],
-    // The preview view reads the fragment file show_component writes.
     env: {
       ...runtime.env,
       SHOWAI_HOME: home,
       SHOWAI_HOST_DISPLAY: "fragment-file",
     },
-    // Staging replaces the bundle directory as a whole, so a live MCP child
-    // must not keep its working directory there: its cwd would vanish and every
-    // later call would fail with uv_cwd ENOENT. The library home is stable.
     cwd: home,
   };
   const staging = `${target}.staging-${process.pid}-${Date.now()}`;
@@ -182,14 +167,12 @@ async function readOptional(path) {
   }
 }
 
-/** Resolve a `link:` dependency the way pnpm records it, relative to the profile. */
 async function linkTarget(spec, profile) {
   if (typeof spec !== "string" || !spec.startsWith("link:")) return undefined;
   const path = resolve(profile, spec.slice(5).replace(/^~(?=\/)/, homedir()));
   return realpath(path).catch(() => path);
 }
 
-/** Read-only view of the Harness Desktop profile and what still needs a person's action. */
 export async function inspectDshProfile({
   target,
   home = dshHome(),

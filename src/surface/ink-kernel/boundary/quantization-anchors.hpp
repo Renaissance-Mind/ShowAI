@@ -3,8 +3,6 @@
 #include "quantization-block.hpp"
 #include "vertex.hpp"
 namespace showai_boundary {
-// Private indices locate candidates only. Every use also compares the actual
-// producer PointAuthority record; an integer never establishes point equality.
 struct BoundaryAnchorBinding {
  Record<PointAuthority>point;Record<VertexCertificate>certificate;Record<BoundaryQuantizedVertex>anchor;
 };

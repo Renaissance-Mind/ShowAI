@@ -45,7 +45,6 @@ const code = page([
     content: [{ type: "text", text: 'const message = "hello";' }],
   },
 ]);
-// A grammar name only the syntax highlighter's registry carries.
 const GRAMMARS = "Visual Basic .NET";
 
 describe("reader omissions", () => {
@@ -104,8 +103,6 @@ describe("reader omissions", () => {
   });
 });
 
-// Conversation hosts cap previews at CAPACITY.chatBytes. Without a
-// margin, any reader growth silently moves every preview onto the network.
 describe.skipIf(!existsSync(archive))("conversation preview budget", () => {
   const inlineBytes = async (document: ShowDocument) => {
     const reader = await bundleReader(archive, [document]);
@@ -132,13 +129,10 @@ describe.skipIf(!existsSync(archive))("conversation preview budget", () => {
       'name="showai-reader-omits" content="code notes ink"',
     );
     expect(bytes).toBeLessThan(CAPACITY.chatBytes * 0.9);
-    // Keep 40 kB of that budget free (measured 836,827 in November 2026), so
-    // reader growth fails here well before previews stop fitting.
     expect(bytes).toBeLessThan(860_000);
   });
   test("a page carries only the styles and validators of the components it holds", async () => {
     const { reader } = await inlineBytes(plain);
-    // Roadmap's own block class and a message only its validator raises.
     const roadmapValidator = "must be a calendar date written YYYY-MM-DD";
     expect(reader.includes(".rm-block")).toBe(false);
     expect(reader.includes(roadmapValidator)).toBe(false);

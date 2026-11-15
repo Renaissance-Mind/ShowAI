@@ -1,6 +1,5 @@
 import type { FolderMetadata, PageSummary, ProjectSummary } from "./model";
 
-/** Deleting a project, folder or page only archives it; these can be restored. */
 export interface DeletedEntries {
   projects: { id: string; name: string; icon?: string; updatedAt: string }[];
   folders: {
@@ -21,7 +20,6 @@ export interface DeletedEntries {
   }[];
 }
 
-/** True when every ancestor folder of `parentId` exists and is not archived. */
 function ancestorsVisible(folders: FolderMetadata[], parentId: string | null) {
   const byId = new Map(folders.map((folder) => [folder.id, folder]));
   const seen = new Set<string>();
@@ -35,11 +33,6 @@ function ancestorsVisible(folders: FolderMetadata[], parentId: string | null) {
   return true;
 }
 
-/**
- * Lists the archived items that restoring would bring back into view: archived
- * projects, and archived folders and pages whose project and ancestors remain
- * visible. Items inside an archived folder or project come back with it.
- */
 export function deletedEntries(
   projects: {
     project: ProjectSummary;

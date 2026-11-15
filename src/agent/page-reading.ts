@@ -5,7 +5,6 @@ import {
   type BindingRead,
 } from "../core/dataset-resolution";
 import { structuredContent, type OutlineItem } from "./page-structured";
-/** The runtime and reader build behind a rendered read, for checking that new code is live. */
 async function renderedBy() {
   const [support, reader] = await Promise.all([
     supportInfo(),
@@ -44,14 +43,9 @@ import { supportInfo } from "./support";
 import { withHtmlLanguage, type Locale } from "../i18n";
 
 export const READ_VIEWS = ["structured", "image", "html"] as const;
-/** Source size above which a default read returns an outline window. */
 export const DEFAULT_READ_BYTES = 256 * 1024;
 const LARGE_OUTLINE_BLOCKS = 100;
 
-/**
- * Outline items of the page's blocks [offset, offset+limit) with their nested
- * items. Blocks are the children of the page's root container when it has one.
- */
 function outlineWindow(
   outline: OutlineItem[],
   rootId: unknown,
@@ -83,11 +77,6 @@ function outlineWindow(
   };
 }
 
-/**
- * Ids of the blocks that show custom components drawn by these compiled
- * components. A component nested in rich text is shown by the block that
- * holds the rich text, so that block is selected for rendering.
- */
 function customBlocks(
   document: ShowDocument,
   components: { id: string; version: string; integrity: string }[],
@@ -205,7 +194,6 @@ export const pageReadSchema = z
       .optional(),
     out: z.string().min(1).optional(),
     overwrite: z.boolean().default(false),
-    /** Adds pages referring to this page (to), pages it refers to (from), or both. */
     references: z.enum(["to", "from", "both"]).optional(),
   })
   .strict();
@@ -229,31 +217,18 @@ export interface ReadIdentity {
   blockIds?: string[];
   view: (typeof READ_VIEWS)[number];
   componentRefs: { id: string; version: string; integrity?: string }[];
-  /** Blocks whose props come from a project dataset, with the resolved props. */
   bindings?: BindingRead[];
-  /** With the references option: backlinks (to) and outgoing references (from). */
   references?: import("../core/library-index").PageReferences;
-  /** Open comment threads (address them with page_apply {type:"comment"}) and the resolved count. */
   comments?: ReturnType<typeof agentCommentView>;
-  /**
-   * The dataset hashes this read saw, ready to pass as page_apply datasetBases
-   * from any later connection ("projectId/datasetId" for other projects).
-   */
   datasetBases?: Record<string, string>;
-  /**
-   * Local files (file: references) and web addresses in resource fields and
-   * custom component props, once per reference with where each is used.
-   */
   resources?: ResourceRead[];
 }
 
-/** datasetBases for page_apply from the bindings of a read. */
 export function datasetBasesFor(
   projectId: string,
   bindings: BindingRead[],
 ): Record<string, string> | undefined {
   const bases: Record<string, string> = {};
-  // A stale value is not the source's, so it is never a base for writes.
   for (const binding of bindings)
     if (binding.hash && binding.status === "ok")
       bases[
@@ -289,11 +264,9 @@ export type PageReadResult =
       capture?: ReadingCapture["capture"];
       layout?: ReadingCapture["layout"];
       metadataPath?: string;
-      /** Outline windows: top-level block count and where the next window starts. */
       blockCount?: number;
       offset?: number;
       nextOffset?: number;
-      /** What a default read of a large page left out, and how to fetch it. */
       omitted?: { fields: string[]; reason: string; next: string };
     });
 
@@ -303,7 +276,6 @@ function previewHtml(
   identity: ReadIdentity,
   locale: Locale,
 ): string {
-  // The reader takes its language from <html lang>, ahead of the browser's.
   return withHtmlLanguage(
     injectReadingOptions(html, {
       draft: state.draft,
@@ -404,7 +376,6 @@ export async function readPageView(
       "The page changed since the preceding read. Read the current structured view before continuing.",
       { currentHash: record.hash },
     );
-  // A default read of a large page answers with a window of its outline.
   const sourceBytes =
     options.view === "structured" &&
     options.detail === undefined &&
@@ -424,7 +395,6 @@ export async function readPageView(
   const document = options.blockIds
     ? selectDocumentBlocks(record.document, options.blockIds)
     : record.document;
-  // Bound blocks read and render their shared data; `document` stays the stored source.
   const shared = await resolveDocumentDatasets(store, projectId, document, {
     includeProps: true,
     remember: true,
@@ -548,8 +518,6 @@ export async function readPageView(
     }
     return result;
   }
-  // A structured read renders only to obtain component readings, so it
-  // renders just those components unless actions need the whole page.
   const readingBlocks =
     options.view === "structured" &&
     !options.blockIds &&
@@ -595,7 +563,6 @@ export async function readPageView(
         undefined,
       ),
       options,
-      // The preview names the page, not this device's files.
       { ...identity, resources: undefined },
       locale,
     );

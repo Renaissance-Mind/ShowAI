@@ -8,9 +8,6 @@ import { pageReadSchema } from "../page-reading";
 import { boardReadSchema } from "../board-reading";
 import { operation } from "./operation";
 
-// Pages: list, read, create, save, apply, export, archive or pin, duplicate;
-// boards: read. Shared by the CLI (pages *, boards read, export) and MCP
-// (pages_list, page_*, board_read, organization_update page actions).
 
 const jsonObject = z.record(z.string(), z.unknown());
 const entryId = z.string().min(1).max(128);
@@ -116,7 +113,6 @@ export const pageApply = operation({
       baseHash,
       baseRevision,
       operations: operations as PageOperation[],
-      // The CLI leaves the key out unless the input file has it.
       ...(datasetBases ? { datasetBases } : {}),
     }),
 });
@@ -140,7 +136,6 @@ export const pageExport = operation({
       )
       .optional(),
     externalData: z.literal("embed").optional(),
-    // The CLI also exports an earlier revision or an imported snapshot.
     revision: z.string().optional(),
     importedSnapshot: z
       .object({ importId: z.string(), snapshotId: z.string() })

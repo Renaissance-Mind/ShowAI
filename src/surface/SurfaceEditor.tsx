@@ -52,12 +52,10 @@ const contentKey = (document: ShowDocument) =>
     document.surfaceViews,
     document.icon,
   ]);
-/** The page tail paragraph is rebuilt on every conversion with the same id. */
 const isPageTail = (node: JSONContent | undefined) =>
   node?.type === "richText" &&
   typeof node.attrs?.id === "string" &&
   node.attrs.id.startsWith("page-tail-");
-/** Editor content whose blocks are the same objects needs no new data. */
 function samePageEditorDoc(previous: JSONContent, next: JSONContent) {
   if (previous === next) return true;
   const before = previous.content ?? [],
@@ -176,8 +174,6 @@ function SurfaceEditor({
       if (!retainedState) return;
       retainedState.document = current.current;
       if(travelQueue.pending){
-        // A remount must observe the same history consumption when the old
-        // accepted callback eventually finishes; a copied stack would be stale.
         history.current.inkActions=inkActions.current;
         retainedState.history=history.current;
         return;
@@ -270,8 +266,6 @@ function SurfaceEditor({
     refresh((value) => value + 1);
   }, [document,rebaseHistory]);
   const settleGeometry = useCallback(() => {
-    // Let content layout and ResizeObserver settle, then complete this same undo transaction.
-    // Opening/reading a document never schedules this authoring-only step.
     const settlement = geometrySettlement.current,
       generation = ++settlement.generation;
     cancelAnimationFrame(settlement.first);
@@ -281,8 +275,6 @@ function SurfaceEditor({
         if (settlement.generation !== generation) return;
         const before = current.current,
           measured = measureNativeSync("surface.settle.materialize",()=>geometry.materialize(before));
-        // materialize guarantees COW after observing this current tree. This
-        // only proves the geometry operation made no additional source edit.
         if (before === measured) return;
         const owner=sourceSessionFor(before);
         if (!owner&&measureNativeSync("surface.settle.key",()=>contentKey(before) === contentKey(measured))) return;
@@ -300,7 +292,6 @@ function SurfaceEditor({
     (value: ShowDocument, group = "", nativeAction?:NativeInkHistoryAction, recordHistory=true, authoring=true, publish=true) => {
       if (latestReadOnly.current) return;
       const before = current.current;
-      // Anchored comments follow their text through this edit.
       if (value.content !== before.content) value = rebaseCommentAnchors(before, value);
       const owner=sourceSessionFor(before);
       const next = (owner?(authoring?owner.replace(value):sourceSessionFor(value)===owner?value:owner.replace(value)):measureNativeSync("surface.commit.reconcile",()=>
@@ -321,8 +312,6 @@ function SurfaceEditor({
       const stack = history.current,
         now = Date.now();
       if (recordHistory&&(nativeAction || !group || group !== stack.group || now - stack.at > 800)) {
-        // A semantic-only receipt still owns a distinct history edge; using
-        // current itself would overwrite a second edge with that same body.
         const snapshot=nativeAction&&next===before?(owner?owner.snapshot(before) as ContainerDocument:{...before}):before;
         stack.past.push(snapshot);
         if(nativeAction)inkActions.current.set(snapshot,nativeAction);
@@ -384,8 +373,6 @@ reservePortable.current = (options) => {
     stack.group = "";
     stack.at = 0;
     pinHistory(session);
-    // Marks accepted input dirty using the existing author/save deadline. The
-    // save barrier below waits for this real contact, never writes a v1 stand-in.
     latestChange.current(current.current);
     refresh((v) => v + 1);
     let acceptedSource: ContainerDocument | undefined,
@@ -425,8 +412,6 @@ reservePortable.current = (options) => {
         let source = acceptedSource,
           next: ContainerDocument;
         if (!source && prior.content === authoredBefore.content) {
-          // Only actual owned identical child-tree identity proves the Board's
-          // authored order is unchanged. Root metadata remains the latest UI.
           next = session.replace(
             appendNewPortableInk(prior, options.boardId, value.node, value.frame),
           ) as ContainerDocument;
@@ -565,7 +550,6 @@ reservePortable.current = (options) => {
               rebaseHistory(before,sourceOnly);current.current=sourceOnly;
               let prior:ShowDocument=sourceOnly;
               for(const stage of snapshot.history.stages){const body=session.apply(stage.delta,{publish:false,baseDocument:prior});if(!body)throw new InkEditConflict("Native history stage lost its owned baseline");commit(body,`native-content:${stage.groupId}`,undefined,true,false,false);prior=body;}
-              // Worker final normalization is independent from history stages.
               current.current=target as ContainerDocument;bridge.setDocument?.(target.id,target);latestChange.current(target);refresh(value=>value+1);
             }else commit(target,value.nativeContentAction?`native-content:${value.nativeContentGroup??""}`:"",nativeAction,!!nativeAction||value.nativeContentAction===true,false);
           }else if(value.document){
@@ -658,8 +642,6 @@ reservePortable.current = (options) => {
     bridge.setDocument?.(document.id, current.current);
     return ()=>{
       const retire=()=>{bound=false;unbind()};
-      // An accepted trip still needs this actual listener to finish its Native
-      // preflush/publication. React cleanup itself cannot await that barrier.
       if(travelQueue.pending)void travelQueue.settled().then(retire);else retire();
     };
   }, [document.id, inlineInkProjectId, readOnly, commit,rebaseHistory,travelQueue]);
@@ -858,9 +840,6 @@ reservePortable.current = (options) => {
       textViews.current.set(retentionKey, view);
     }
     view.props = { content, parentId, ids, kind, renderModule, componentData };
-    // The host and data keep their identity until their real inputs change, so
-    // the memoized Widget and its rich text skip unchanged editors. Callbacks
-    // read the latest render props and editor state when they run.
     if (view.hostShape !== hostShape) {
       const owner = view;
       view.hostShape = hostShape;

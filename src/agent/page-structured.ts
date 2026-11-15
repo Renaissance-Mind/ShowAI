@@ -152,7 +152,6 @@ export function structuredContent(document: ShowDocument) {
     if (node.type === "toggle")
       lines.push(`### ${attrs.title ?? "折叠内容"}`, "");
     if (node.type === "stepper") {
-      // Steps read in order; each title carries its id for later inserts.
       (node.content ?? []).forEach((step, index) => {
         lines.push(
           `### ${index + 1}. ${step.attrs?.title || `第 ${index + 1} 步`} [${step.attrs?.id ?? ""}]`,

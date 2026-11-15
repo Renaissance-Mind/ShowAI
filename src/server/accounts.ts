@@ -53,8 +53,6 @@ export async function publicLimits(
     maximum: rules.global,
     windowMs: rules.windowMs,
   });
-  // Successful budget admission also retires a bounded set of expired counters.
-  // Random failed account names must not grow durable limiter state indefinitely.
   await db.run(
     "DELETE FROM request_limits WHERE key IN(SELECT key FROM request_limits WHERE expires_at<=? ORDER BY expires_at LIMIT 100)",
     [Date.now()],
@@ -193,7 +191,6 @@ export async function loginAccount(
   const user = (
     await db.all<PasswordUser>("SELECT * FROM users WHERE name=?", [name])
   )[0];
-  // A missing name pays the same KDF cost and returns the same public error.
   const matched = await verifyPassword(
     password,
     user?.password_salt ?? "0".repeat(64),

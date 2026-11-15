@@ -1,5 +1,3 @@
-// Adapted from https://github.com/antvis/G2/blob/v5/site/docs/charts/regressioncurve.en.mdx
-// License notices: resources/licenses/g2-runtime.json.
 import { regressionLinear } from "d3-regression";
 
 export default async function draw(context) {

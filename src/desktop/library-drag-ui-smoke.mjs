@@ -1,6 +1,4 @@
 import { desktopTestEnvironment } from "../../scripts/desktop-test-env.mjs";
-// Build first, then run: node src/desktop/library-drag-ui-smoke.mjs.
-// Real pointer gestures, Electron IPC and isolated versioned storage; no mocked bridge.
 import assert from "node:assert/strict";
 import { mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
@@ -71,7 +69,6 @@ try {
   await row(id).locator(".studio-tree-main").click();
   const title = page.getByRole("textbox", { name: "页面标题", exact: true });
   await title.waitFor();
-  // Keep the editor DOM identity across a same-project metadata change.
   await page.locator("textarea.studio-page-heading-title").waitFor();
   await page
     .locator("textarea.studio-page-heading-title")
@@ -138,7 +135,6 @@ try {
     "Folder drop lands promptly and retains the current editor DOM",
   );
 
-  // Editing after the move must preserve its new parent and revision.
   await title.fill("移动后继续编辑");
   await title.press("Meta+s");
   await waitFor(
@@ -155,7 +151,6 @@ try {
     () => saved(),
     (value) => value.document.parentId === second.id,
   );
-  // Focus a sidebar button so Cmd+Z is routed to library history.
   await row(id).locator(".studio-tree-main").focus();
   await page.keyboard.press("Meta+z");
   await waitFor(

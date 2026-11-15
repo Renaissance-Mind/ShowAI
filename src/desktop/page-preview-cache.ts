@@ -23,7 +23,6 @@ interface Entry extends PreviewReference {
   updatedAt: number;
 }
 
-/** A single fitted image serves small/medium/large cards, folder fans and prefetch. */
 export const pagePreviewSize = { width: 640, height: 440, padding: 8 };
 const digest = (value: string | Buffer) =>
   createHash("sha256").update(value).digest("hex");
@@ -37,7 +36,6 @@ const keyFor = (reference: PreviewReference) =>
     ]),
   );
 
-/** Persistent latest-image pointers; invalidation retains the image for immediate display. */
 export class PagePreviewCache {
   private entries = new Map<string, Entry>();
   private writes = new Map<string, Promise<unknown>>();
@@ -158,7 +156,6 @@ export class PagePreviewCache {
         updatedAt: Date.now(),
       };
       await this.metadata(entry);
-      // A notification arriving during I/O must leave the entry stale, not bless an old capture.
       if (!valid()) {
         entry.fingerprint = "";
         await this.metadata(entry);

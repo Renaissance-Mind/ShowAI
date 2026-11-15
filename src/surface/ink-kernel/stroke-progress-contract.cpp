@@ -1,5 +1,3 @@
-// Real internal arithmetic contract, compiled only by the kernel test target.
-// Including the implementation avoids adding a production diagnostic ABI.
 #include "ink-stroke-kernel.cpp"
 #include <cstdio>
 static void require(bool value, const char *message) {

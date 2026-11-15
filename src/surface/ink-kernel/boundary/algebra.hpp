@@ -33,9 +33,6 @@ struct PairProof{bool complete=false,coincident=false;Q alpha,beta;Vector<PairHi
 inline PairProof directional_intersections(const Curve&a,const Curve&b){auto&c=*a.owner();PairProof proof(c);auto relation=correspondence(a,b);if(!relation.complete||c.numbers.status!=SA_INK_OK)return proof;if(relation.result.zero()){c.numbers.fail(SA_INK_RANGE);return proof;}auto rt=squarefree(relation.result);auto gx=substitute(b.x,relation.parameter)-RationalFunction(a.x),gy=substitute(b.y,relation.parameter)-RationalFunction(a.y);auto valid=gcd(gcd(rt,gx.numerator),gy.numerator);auto reverse=resultant(equation(b.x,a.x),equation(b.y,a.y));auto ur=roots(reverse);auto tr=roots(rt);Q width(Integer::from(c.numbers,1),Integer::from(c.numbers,1).shifted_left(48));
  for(Root t:tr){
   if(c.numbers.status!=SA_INK_OK)return proof;if(root_of(t,relation.forbidden)||!root_of(t,valid)){c.numbers.fail(SA_INK_RANGE);return proof;}
-  // A rational image interval and two isolated reverse-root intervals may
-  // share a non-root endpoint. Closed interval overlap is only a candidate,
-  // never proof that the first candidate is the actual corresponding root.
   bool at_zero=root_of(t,relation.parameter.numerator),at_one=root_of(t,relation.parameter.numerator-relation.parameter.denominator),outside=false;int match=-1;
   if(at_zero&&at_one){c.numbers.fail(SA_INK_RANGE);return proof;}
   for(uint32_t round=0;round<200&&c.numbers.status==SA_INK_OK;round++){
@@ -44,8 +41,6 @@ inline PairProof directional_intersections(const Curve&a,const Curve&b){auto&c=*
    if(mapped&&ui.lower>=Q(0)&&ui.upper<=Q(1)&&ui.upper-ui.lower<width){
     uint32_t count=0;int candidate=-1;for(uint32_t i=0;i<ur.size()&&c.numbers.status==SA_INK_OK;i++)if(overlap(ui,{ur[i].lower,ur[i].upper})){candidate=int(i);++count;}
     if(count==1){match=candidate;break;}
-    // Every valid actual image is a reverse-resultant root, so no candidate
-    // is a failed certificate. Multiple candidates require more evidence.
     if(!count){c.numbers.fail(SA_INK_RANGE);return proof;}
     if(round+1<200)for(uint32_t i=0;i<ur.size()&&c.numbers.status==SA_INK_OK;i++)if(overlap(ui,{ur[i].lower,ur[i].upper}))refine(ur[i]);
    }
@@ -55,9 +50,6 @@ inline PairProof directional_intersections(const Curve&a,const Curve&b){auto&c=*
  }
  proof.complete=c.numbers.status==SA_INK_OK;return proof;}
 inline PairProof curve_pair(const Curve&a,const Curve&b){if(!a.owner()||a.owner()!=b.owner()){if(a.context())a.context()->fail(SA_INK_INVALID);return{};}auto&c=*a.owner();PairProof result(c);if(c.numbers.status!=SA_INK_OK)return result;if(affine_coincidence(a,b,result.alpha,result.beta)){result.coincident=true;result.complete=c.numbers.status==SA_INK_OK;return result;}if(c.numbers.status!=SA_INK_OK)return result;
- // A singular rational-univariate projection may become regular in the other
- // direction (for example a line through a cubic double point). The first
- // attempt's private records are destroyed before retry; budget use is kept.
  {auto attempt=directional_intersections(a,b);if(attempt.complete||c.numbers.status!=SA_INK_RANGE)return attempt;}
  c.numbers.status=SA_INK_OK;auto reverse=directional_intersections(b,a);if(!reverse.complete)return reverse;for(const auto&hit:reverse.hits)result.hits.push_back({hit.b,hit.a});result.complete=c.numbers.status==SA_INK_OK;return result;}
 }

@@ -8,23 +8,12 @@ import { CoreError } from "./model";
 import { assertId, type FileStore } from "./store";
 import { isSourceBundle, type SourceBundle } from "./dataset-sources";
 
-// Copies of files outside the library that travel with a synchronized
-// project, so its other devices can read (and for datasets, edit) them.
-//
-// A copy is the file's bytes stored once under bundles/<sha256> in the
-// library workspace. bundles/ is part of a project's synchronization but not
-// of history: the dataset file (source.bundle) or projects/<id>/packaging.json
-// records which copy is current, and that record is versioned like any
-// project file. Each device remembers in local/bundle-state.json the content
-// its file and the synchronized copy last agreed on, which tells a change of
-// the file on this device from a change made on another device.
 
 const HASH = /^[a-f0-9]{64}$/;
 
 export const bundleHash = (bytes: Buffer) =>
   createHash("sha256").update(bytes).digest("hex");
 
-/** sha256 of a file, read as a stream. */
 export async function fileHash(path: string): Promise<string> {
   const digest = createHash("sha256");
   for await (const chunk of createReadStream(path)) digest.update(chunk);
@@ -51,7 +40,6 @@ export async function hasBundle(home: string, hash: string): Promise<boolean> {
   );
 }
 
-/** Stores a copy once by its content; returns its hash. */
 export async function storeBundle(home: string, bytes: Buffer): Promise<string> {
   const hash = bundleHash(bytes);
   if (!(await hasBundle(home, hash)))
@@ -59,7 +47,6 @@ export async function storeBundle(home: string, bytes: Buffer): Promise<string> 
   return hash;
 }
 
-/** A stored copy, checked against its hash; undefined when it has not arrived. */
 export async function readBundle(
   home: string,
   hash: string,
@@ -71,18 +58,12 @@ export async function readBundle(
   return bytes;
 }
 
-// ---------------------------------------------------------------------------
-// What this device's file and the synchronized copy last agreed on
 
 export interface BundleAgreement {
-  /** Content both sides had when they last matched. */
   hash: string;
-  /** The copy shared from the file that this content derives from. */
   base?: string;
   at: string;
-  /** Both changed since: the file was kept and the other copy stays in bundles/. */
   conflict?: { file: string; bundle: string; at: string };
-  /** The file was too large to bundle when last checked. */
   tooLarge?: { bytes: number; at: string };
 }
 interface AgreementFile {
@@ -131,13 +112,10 @@ export const datasetBundleKey = (projectId: string, datasetId: string) =>
 export const resourceBundleKey = (projectId: string, ref: string) =>
   `${projectId}/resource:${bundleHash(Buffer.from(ref)).slice(0, 32)}`;
 
-// ---------------------------------------------------------------------------
-// Packaging of a project's linked resource files: projects/<id>/packaging.json
 
 export interface ProjectPackaging {
   format: "showai-packaging";
   version: 1;
-  /** By file: reference as the pages store it. */
   resources: Record<string, SourceBundle>;
 }
 
@@ -204,7 +182,6 @@ export async function writePackaging(
     );
 }
 
-/** Hashes of the copies a set of project files refers to. */
 export function referencedBundles(files: Map<string, Buffer>): Set<string> {
   const hashes = new Set<string>();
   for (const [path, bytes] of files) {
@@ -225,7 +202,6 @@ export function referencedBundles(files: Map<string, Buffer>): Set<string> {
   return hashes;
 }
 
-/** Copies stored on this device and the time each was last written. */
 export async function storedBundles(
   home: string,
 ): Promise<{ hash: string; modifiedAt: number }[]> {
@@ -244,13 +220,8 @@ export async function storedBundles(
   return result;
 }
 
-/** How long an unreferenced stored copy is kept before collection. */
 export const BUNDLE_GRACE_MS = 24 * 60 * 60 * 1000;
 
-/**
- * Removes stored copies no project file refers to any more, after a grace
- * period that covers a synchronization still placing a new record.
- */
 export async function collectBundles(
   store: FileStore,
   options: { graceMs?: number; now?: number } = {},

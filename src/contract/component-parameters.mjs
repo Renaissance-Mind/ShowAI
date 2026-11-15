@@ -1,4 +1,3 @@
-/** Portable schema/semantics contract, shared by authoring, readers and compiled sandboxes. */
 export const COMPONENT_PARAMETER_PROTOCOL = "showai-component-parameters-v1";
 export const COMPONENT_PARAMETER_CAPABILITIES = Object.freeze({
   protocol: COMPONENT_PARAMETER_PROTOCOL,
@@ -424,7 +423,6 @@ export function assertParameterContract(schema, documentation) {
         issues.map((x) => x.path + " " + x.code).join("; "),
     );
 }
-/** Self-contained so exactly this implementation can be embedded in an offline sandbox. */
 export function parameterRuleIssues(data, rules = []) {
   function parts(path) {
     return path.startsWith("/")
@@ -555,7 +553,6 @@ export function parameterRuleIssues(data, rules = []) {
           );
       }
     } else if (rule.kind === "page") {
-      // The same form as document/page-link.mjs; empty means no page.
       for (const entry of collect(rule.path))
         if (
           entry.value !== "" &&

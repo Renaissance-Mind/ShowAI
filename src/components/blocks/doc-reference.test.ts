@@ -137,7 +137,6 @@ describe("step guide rendering", () => {
     expect(html).toContain('href="https://example.com/docs"');
     expect(html).toContain("<strong>Node.js 22</strong>");
     expect(html).toContain('role="tablist"');
-    // The inactive variant stays in the document for print.
     expect(html).toContain("winget install");
     expect(html).toContain('class="sg-comment"');
     expect(html).toContain("已完成 0 / 3 步");
@@ -212,7 +211,6 @@ describe("command reference", () => {
     expect(html).toContain('<span class="cr-verb">pages</span>');
     expect(html).toContain('<span class="cr-flag">[--port</span>');
     expect(html).toContain('<span class="cr-ph">PAGE</span>');
-    // Details stay in the document (hidden) so print and static reading keep them.
     expect(html).toMatch(/class="cr-detail"[^>]*hidden/);
     expect(html).toContain("<li>支持 outline</li>");
     expect(html).toContain("tool serve --port 5173");

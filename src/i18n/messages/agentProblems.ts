@@ -1,6 +1,4 @@
 import { defineMessages } from "../index";
-// Built-in Agent failures by code: what happened (summary), why or what it
-// means (cause) and the actions offered. Shared by the Agent host and the UI.
 export default defineMessages("agentProblems", {
   "zh-CN": {
     "summary.no_model_source": "还没有可用的模型",

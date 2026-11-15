@@ -1,4 +1,3 @@
-/* Comment highlights: quiet until active. */
 ::highlight(showai-comment) {
   background-color: color-mix(in srgb, var(--warning) 14%, transparent);
   text-decoration: underline 1.5px color-mix(in srgb, var(--warning) 60%, transparent);
@@ -198,7 +197,6 @@
   color: var(--muted);
 }
 
-/* Shares the right-hand slot with the Agent panel. */
 .comments-panel {
   display: flex;
   flex: 0 0 auto;
@@ -303,7 +301,6 @@
   font-size: 11px;
 }
 
-/* Narrow windows: the panel floats over the page, like the Agent panel. */
 @media (max-width: 760px) {
   .comments-panel {
     position: fixed;

@@ -1,11 +1,7 @@
-// Adapted from https://github.com/antvis/G2/blob/v5/site/docs/charts/spiral.en.mdx
-// See ../../UPSTREAM-LICENSE.txt for upstream license.
-
 export default async function draw(context) {
   const { Chart, asset } = context;
   const G2 = { Chart };
   const Math = context.math;
-  // 需要精确对比的数据示例
   const data = [];
   const categories = ["产品A", "产品B", "产品C", "产品D"];
   categories.forEach((category, index) => {
@@ -13,7 +9,7 @@ export default async function draw(context) {
       data.push({
         time: `2023-${month.toString().padStart(2, "0")}`,
         category: category,
-        sales: 80 + index * 5 + Math.random() * 10, // 接近的数值，需要精确比较
+        sales: 80 + index * 5 + Math.random() * 10,
       });
     }
   });

@@ -353,7 +353,6 @@
   }
 }
 
-/* An image that failed to load or whose address is not allowed. */
 .sb-image-unavailable {
   padding: 18px 16px;
   border: 1px dashed var(--line);

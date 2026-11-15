@@ -33,7 +33,6 @@ export function diagramPresentation(
 }
 
 function htmlText(markup: string) {
-  // Only text enters this inert document; imported images and scripts are excluded.
   return (
     new DOMParser()
       .parseFromString(markup.replace(/<[^>]*>/g, ""), "text/html")
@@ -41,7 +40,6 @@ function htmlText(markup: string) {
   );
 }
 function cardsText(source: string) {
-  // Extract the authored cards without putting imported HTML into the app DOM.
   const start = source.search(
     /<div\b[^>]*class=["'][^"']*\bcards\b[^"']*["'][^>]*>/i,
   );
@@ -96,7 +94,6 @@ export function diagramCaptions(source: string) {
   };
 }
 
-/** Same source transformation is used by the live reader and the SVG exporter. */
 export function diagramPresentationSource(
   source: string,
   presentation: DiagramPresentation,
@@ -136,7 +133,6 @@ export function diagramPresentationSource(
   style.textContent =
     "[data-showai-diagram-hidden=true]{display:none!important}";
   svg.prepend(style);
-  // Crop only the caption band, keeping every node, port and edge coordinate intact.
   const removed = [
     ...doc.querySelectorAll(
       "svg > text[data-showai-diagram-hidden=true],svg > g#title > text[data-showai-diagram-hidden=true]",

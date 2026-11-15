@@ -51,10 +51,6 @@ import {
   type ProjectScan,
 } from "./types";
 
-/**
- * The content library as the navigation shows it: projects, their pages and
- * folders, the sidebar organization and expansion, and the library's undo history.
- */
 export function useLibraryState({
   resolveProblem,
 }: Pick<StudioFeedback, "resolveProblem">) {
@@ -95,7 +91,6 @@ export function useLibraryState({
       }, "sidebar"),
     [],
   );
-  // Sync state for project rows, the page header and workbench banners.
   const syncOverview = useSyncOverview(info?.home);
   const projectSyncMarker = (projectId: string) => {
     const marker = syncOverview.markers.get(projectId);
@@ -137,7 +132,6 @@ export function useLibraryState({
   const sidebarHome = useRef<string | null>(null);
   const expandedRef = useRef(expandedProjects);
   expandedRef.current = expandedProjects;
-  // Cmd+Z in the library reverses moves, deletions and renames, newest first.
   const libraryHistory = useRef<LibraryHistory>(null!);
   libraryHistory.current ??= new LibraryHistory();
   const historyBusy = useRef(false);
@@ -146,7 +140,6 @@ export function useLibraryState({
     libraryHistory.current.record(entry);
     refreshLibraryHistory((value) => value + 1);
   }
-  // A toast's Undo reaches the library history, which records its changes later.
   const undoLibraryRef = useRef<(entry: LibraryChange) => Promise<unknown>>(
     () => Promise.resolve(),
   );
@@ -160,7 +153,6 @@ export function useLibraryState({
     return next;
   }, []);
   const navigationScope = useRef(emptyNavigationScope());
-  // Counts library switches; a refresh started before one discards its reads.
   const libraryGeneration = useRef(0);
   useEffect(
     () =>
@@ -250,7 +242,6 @@ export function useLibraryState({
           } catch (error) {
             console.warn("Could not cache the project list", error);
           }
-          // Folders come with the scan; only pages are read per project.
           const nextContents = await Promise.all(
             next.map(async (project) => ({
               project,
@@ -268,9 +259,7 @@ export function useLibraryState({
             }),
           );
         } catch (error) {
-          // A failed scoped read must remain pending when another change asks for a retry.
           mergeNavigationScope(navigationScope.current, requested);
-          // The failure is reported; the list must not look like it is still loading.
           setNavigationUpdating(false);
           throw error;
         }
@@ -295,7 +284,6 @@ export function useLibraryState({
     },
     [refreshNavigation, resolveProblem],
   );
-  /** Confirms an operation by reading only the projects it changed. */
   const refreshProjects = (
     projectIds: string[],
     options?: { sidebar?: boolean; pageIds?: string[] },
@@ -456,10 +444,6 @@ export function useLibraryState({
 
 export type LibraryState = ReturnType<typeof useLibraryState>;
 
-/**
- * Keeps the navigation and the catalogs current: changes on disk, this
- * window's own saves, and the catalog a view or filter asks for.
- */
 export function useLibraryUpdates({
   feedback: { report },
   library: { info, contents, setContents, setProjects, refresh },
@@ -511,7 +495,6 @@ export function useLibraryUpdates({
   }, [refresh, loadCatalog, report]);
   const contentsRef = useRef(contents);
   contentsRef.current = contents;
-  // The host no longer echoes this window's own saves, so apply them here.
   useEffect(
     () =>
       page.sessions.subscribeSaved((projectId, record) => {

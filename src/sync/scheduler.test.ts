@@ -41,8 +41,6 @@ async function fixture(dropFirstUpload = false) {
   const calls: { at: number; method: string; path: string }[] = [];
   let uploading = 0,
     maxUploading = 0;
-  // A real streaming reverse proxy counts traffic to the real Node or Wrangler
-  // backend without replacing responses or intercepting client methods.
   const proxy = createServer((incoming, outgoing) => {
     calls.push({
       at: Date.now(),
@@ -51,7 +49,6 @@ async function fixture(dropFirstUpload = false) {
     });
     if (dropFirstUpload && incoming.method === "PUT") {
       dropFirstUpload = false;
-      // A real socket failure precedes forwarding; the retry reaches the same backend.
       incoming.destroy();
       return;
     }
@@ -103,10 +100,6 @@ async function fixture(dropFirstUpload = false) {
       registrationKey: process.env.SHOWAI_SYNC_TEST_KEY,
     });
     await manager.stop();
-    // This suite measures the real HTTP polling fallback. Dedicated event-stream
-    // tests exercise direct WebSocket connections on both deployment adapters.
-    // Retry/concurrency tests need the real object PUT fallback; small inline
-    // revisions exercise a different transport path.
     const saved = await manager.configuration();
     saved.connections[0].capabilities =
       saved.connections[0].capabilities?.filter(
@@ -215,8 +208,6 @@ test("batch heads hide private projects and background wakes preserve edits and 
   ).toHaveLength(2);
   expect(calls).toHaveLength(2);
 
-  // A saved connection from a server without the additive batch capability
-  // still reads real per-project heads and skips unchanged full scans.
   const legacy = await alice.manager.configuration();
   legacy.connections[0].capabilities =
     legacy.connections[0].capabilities?.filter(
@@ -246,7 +237,6 @@ test("batch heads hide private projects and background wakes preserve edits and 
   expect((await alice.manager.status()).scheduler.scanned).toBe(
     legacyBefore.scanned,
   );
-  // Restore the negotiated capability before the shared edit acceptance.
   const restored = await alice.manager.configuration();
   restored.connections[0].capabilities = own.capabilities;
   await writeFile(
@@ -352,7 +342,6 @@ test.runIf(process.env.SHOWAI_SCHEDULER_MEASURE === "1")(
     }
     await bob.manager.stop();
     await until(async () => !(await alice.manager.status()).running);
-    // Let the real active window expire; no clock stubs or private-field overrides.
     await until(
       async () =>
         Date.now() > (await alice.manager.status()).scheduler.activeUntil,

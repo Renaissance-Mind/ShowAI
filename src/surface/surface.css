@@ -17,7 +17,6 @@
   background: var(--paper, var(--bg));
   outline-offset: -3px;
   touch-action: none;
-  /* Screen-size factor for selection chrome inside every enclosing zoom. */
   --board-inv: calc(var(--board-inv-outer, 1) / var(--board-zoom, 1));
 }
 .surface-scroll {
@@ -121,7 +120,6 @@
   border-radius: 10px;
   background: transparent;
 }
-/* Bare media in a Board uses the existing object controls without a second frame. */
 .surface-object:has(> .surface-object-content > .sb-media),
 .surface-object:has(> .surface-object-content > .sb-pdf) {
   border: 0;
@@ -804,7 +802,6 @@
   outline: calc(1px * var(--board-inv, 1)) solid #467de380;
   outline-offset: calc(2px * var(--board-inv, 1));
 }
-/* A selected Board object always shows its frame, at a constant screen width. */
 .surface-world > .surface-object.is-selected:not(.is-drawing),
 .surface-world
   .surface-layout-free
@@ -962,7 +959,6 @@ body:has([data-showai-development]) .surface-toolbar {
 .surface-object:not(.is-selected) > .board-resize-handle {
   display: none;
 }
-/* Unselected objects hint at resizing only while hovered. */
 .surface-object.is-hovered:not(.is-selected):not(.is-locked)
   > .board-resize-handle.handle-se,
 .surface-object[data-board-fixed-height="false"].is-hovered:not(
@@ -981,8 +977,6 @@ body:has([data-showai-development]) .surface-toolbar {
   pointer-events: none;
 }
 
-/* Free regions frame other objects: only their border and children take
-   pointer input, so content they overlap stays reachable. */
 .surface-world
   .surface-object.is-region:has(
     > .surface-object-content > .surface-layout-free
@@ -998,12 +992,9 @@ body:has([data-showai-development]) .surface-toolbar {
   pointer-events: auto;
 }
 
-/* Move one composited texture while panning instead of repainting the viewport. */
 .surface-grid {
   display: none;
 }
-/* Native Board retains object data/layout in the editor while a single native
-   scene owns their presentation and camera for every input tool. */
 .page-surface[data-native-board-active="true"]
   > .surface-scroll
   > :is(.surface-world, .surface-grid) {
@@ -1043,7 +1034,6 @@ body:has([data-showai-development]) .surface-toolbar {
   opacity: 0.75;
 }
 
-/* Align and distribute open from the selection actions in the docked toolbar. */
 .board-align-menu > summary::-webkit-details-marker {
   display: none;
 }
@@ -1120,8 +1110,6 @@ html[data-native="ios"] .board-resize-handle {
   height: calc(40px * var(--board-inv, 1));
 }
 
-/* Native archive groups have an extent-local drawing space, not region chrome.
-   This also overrides Page/mobile region gutters. Selection handles stay UI. */
 .page-surface .surface-object.is-region.is-ink-archive-group,
 .surface-object.is-region.is-ink-archive-group {
   border: 0;
@@ -1148,7 +1136,6 @@ html[data-native="ios"] .board-resize-handle {
   top: 0;
 }
 
-/* Layout containers add no visible frame, label, background or inset. */
 .surface-object.is-region:not(.is-ink-archive-group) {
   border: 0;
   background: transparent;

@@ -36,7 +36,6 @@ const record = (fields: Partial<AgentConnectionRecord>): AgentConnectionRecord =
 
 test("verification compares calls with the current installation", () => {
   expect(verifyState(host, [])).toEqual({ kind: "waiting" });
-  // A call by the earlier plugin does not prove the new one works.
   expect(
     verifyState(host, [
       record({
@@ -46,7 +45,6 @@ test("verification compares calls with the current installation", () => {
       }),
     ]),
   ).toEqual({ kind: "notSinceInstall", at: at(2) });
-  // Records from launchers that did not report a version predate this installation.
   expect(verifyState(host, [record({ lastCallAt: at(2) })]).kind).toBe(
     "notSinceInstall",
   );
@@ -62,7 +60,6 @@ test("verification compares calls with the current installation", () => {
       }),
     ]),
   ).toEqual({ kind: "called", at: at(3) });
-  // A host that reports no version keeps the earlier behaviour.
   expect(
     verifyState({ ...host, version: undefined }, [record({ lastCallAt: at(2) })])
       .kind,
@@ -86,7 +83,6 @@ test("a launcher failure after the latest connection is the current state", () =
       }),
     ]),
   ).toMatchObject({ kind: "failed", code: "RUNTIME_OUTDATED", at: at(5) });
-  // A later successful connection supersedes it.
   expect(
     verifyState(host, [
       record({
@@ -98,7 +94,6 @@ test("a launcher failure after the latest connection is the current state", () =
       }),
     ]).kind,
   ).toBe("called");
-  // A failure of an earlier plugin does not describe this installation.
   expect(
     verifyState(host, [
       record({
@@ -134,7 +129,6 @@ test("plugin errors are localized with the host output kept as details", () => {
   expect(text.message).toContain("0.163.0");
   expect(text.message).toContain("Codex");
   expect(text.details).toContain("Usage: codex plugin");
-  // Unknown codes keep the original message.
   expect(pluginErrorText({ code: "OTHER", message: "raw" })).toEqual({
     message: "raw",
   });
@@ -171,7 +165,6 @@ test("per-host launch configuration is accepted by the Claude Code CLI", async (
     () => "",
   );
   if (!executable) return;
-  // A disposable configuration directory; the person's Claude Code settings are untouched.
   const config = await mkdtemp(join(tmpdir(), "showai-claude-config-"));
   try {
     const env = { ...process.env, CLAUDE_CONFIG_DIR: config, HOME: config };

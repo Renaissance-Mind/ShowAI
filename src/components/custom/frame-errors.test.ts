@@ -11,7 +11,6 @@ import {
 
 const t = translator(messages) as never;
 
-/** The component runtime joins ajv errors exactly like this (catalog.ts runtimeSource). */
 function runtimeMessage(schema: object, data: unknown) {
   const validate = new Ajv({ allErrors: true, strict: false }).compile(schema);
   expect(validate(data)).toBe(false);
@@ -88,7 +87,6 @@ describe("readableValidation", () => {
     expect(readableValidation(message, t)).toEqual([
       "rows needs at least 1 item",
     ]);
-    // Parameter relation rules are written by the component author.
     expect(readableValidation("/rows Use rows or series, not both", t)).toEqual([
       "rows: Use rows or series, not both",
     ]);

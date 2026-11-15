@@ -7,7 +7,6 @@ export interface CloudBrowserCheck {
   checkedAt: string;
 }
 
-/** Run before serving Cloud MCP, and in the native local verification image. */
 export async function checkCloudBrowser(): Promise<CloudBrowserCheck> {
   const require = createRequire(import.meta.url);
   const { chromium } =

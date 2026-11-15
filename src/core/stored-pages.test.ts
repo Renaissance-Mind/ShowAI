@@ -40,7 +40,6 @@ test("repeated page reads return independent documents equal to a full parse", a
   const expected = await parse();
   expect(first.document).toEqual(expected.document);
   expect(first.hash).toBe(expected.hash);
-  // A caller changing its copy does not change the next read.
   first.document.title = "Changed by a caller";
   first.document.content.content = [];
   const second = await f.store.readPage(f.project.id, f.page.document.id);
@@ -48,7 +47,6 @@ test("repeated page reads return independent documents equal to a full parse", a
   expect(second.document).not.toBe(first.document);
   expect(second.hash).toBe(expected.hash);
   expect(second.revision).toBe(first.revision);
-  // New bytes are parsed again.
   const saved = await f.store.savePage(
     f.project.id,
     f.page.document.id,

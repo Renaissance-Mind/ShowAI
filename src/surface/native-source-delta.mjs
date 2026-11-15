@@ -1,7 +1,4 @@
 import { captureOwnedJSON } from "../portable/owned-json.mjs";
-/** Exact JSON transport edits. This carries existing source packets; it is not
- * an editing/causal protocol. The caller owns publication identity and receipt
- * validation. Neither inserted values nor mutable UI objects become baselines. */
 const own = (value, key) => Object.hasOwn(value, key);
 const object = (value) => value !== null && typeof value === "object";
 const define = (value, key, child) => Object.defineProperty(value, key, {
@@ -38,8 +35,6 @@ function equalJSON(one, two) {
   const keys = Object.keys(one);
   return keys.length === Object.keys(two).length && keys.every(key => own(two, key) && equalJSON(one[key], two[key]));
 }
-/** Literal string keys are distinct (including NFC/NFD), object order is not.
- * No reference identity shortcut: callers may have edited an object in place. */
 export function diffNativeSource(base, next) {
   const edits = [];
   const visit = (before, after, path) => {
@@ -77,9 +72,6 @@ export function diffNativeSource(base, next) {
   return edits;
 }
 
-/** Apply all edits before returning any result. Each touched ancestor is cloned
- * once, untouched private subtrees remain private, and base/edits are unchanged
- * even when a later edit is malformed. Never expose this result to mutable UI. */
 function applySourceDelta(base, edits, inserted, mutableInsertedRoot) {
   if (!Array.isArray(edits)) fail("edits must be an array");
   let result = base;
@@ -124,8 +116,6 @@ function applySourceDelta(base, edits, inserted, mutableInsertedRoot) {
         !Number.isSafeInteger(edit.deleteCount) || edit.deleteCount < 0 || edit.deleteCount > value.length - edit.index || !Array.isArray(edit.items))
         fail("splice requires an existing array and valid range");
       const items = inserted(edit.items);
-      // No argument spreading: a large inserted JSON array must not exceed the
-      // engine's function-argument limit. All values are already independent.
       const copy = value.slice(0, edit.index).concat(items, value.slice(edit.index + edit.deleteCount));
       owned.add(copy);
       if (parent) define(parent, key, copy); else result = copy;
@@ -152,15 +142,10 @@ function applySourceDelta(base, edits, inserted, mutableInsertedRoot) {
   return result;
 }
 
-/** Mutable callers retain independent copies of every inserted value. */
 export function applyNativeSourceDelta(base, edits) {
   return applySourceDelta(base, edits, cloneJSON, true);
 }
 
-/** Closed ownership boundary: both inputs become independent sealed JSON data
- * before edits execute. Only actually captured inserted branches may be reused;
- * every writable ancestor is local and the complete result seals before escape.
- * A root set is NOT mutable local ownership: later edits must path-copy it too. */
 export function applyCapturedSourceDelta(base, edits) {
   const capturedBase = captureOwnedJSON(base), capturedEdits = captureOwnedJSON(edits);
   return captureOwnedJSON(applySourceDelta(capturedBase, capturedEdits, value => value, false));

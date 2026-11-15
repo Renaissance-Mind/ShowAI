@@ -34,7 +34,6 @@ it("keeps edges and SVG markers visible in standalone and opaque inline hosts", 
   ];
   const html = await buildPageHtml(document);
   const inline = toInlineFragment(html);
-  // Percentage-sized SVGs are a real host convention; the frame has an opaque origin.
   const frameDocument = `<!doctype html><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data: blob:; base-uri 'none'"><style>svg{display:block;width:100%}body{margin:0}</style>${inline}`;
   const escaped = frameDocument
     .replaceAll("&", "&amp;")

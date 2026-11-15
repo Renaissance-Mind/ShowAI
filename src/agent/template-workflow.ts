@@ -50,12 +50,6 @@ async function selected(
 async function system(home: string, projectId: string) {
   return getTemplate(home, SYSTEM_TEMPLATE_ID, projectId, { scope: "builtin" });
 }
-/**
- * The exact template references of one task, with every selected template
- * read whole. The presentation workflow itself lives in the show-document
- * Skill (guide topic presentation for hosts without Skills); a template only
- * adds the methods for its kind of content.
- */
 export async function templateContext(
   home: string,
   projectId: string,

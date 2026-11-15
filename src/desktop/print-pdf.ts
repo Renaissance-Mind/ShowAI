@@ -3,18 +3,12 @@ import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { SETTLE_SCRIPT } from "../agent/print-page";
 
-/**
- * Prints a page's reader HTML to a PDF file in a hidden window. The window
- * loads the page from a private temporary file, follows no links and opens
- * no windows; it is closed whether printing succeeds or not.
- */
 export async function printHtmlToPdf(html: string, path: string) {
   const directory = await mkdtemp(join(app.getPath("temp"), "showai-print-"));
   const page = join(directory, "page.html");
   await writeFile(page, html, { mode: 0o600 });
   const window = new BrowserWindow({
     show: false,
-    // A reading width close to an A4 sheet at 96 dpi.
     width: 820,
     height: 1100,
     webPreferences: {

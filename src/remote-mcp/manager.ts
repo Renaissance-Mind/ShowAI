@@ -74,7 +74,6 @@ export function validateRemoteMcpConfig(value: unknown): RemoteMcpConfig {
   };
 }
 
-/** Owns only the foreground connector it starts. Never resets an existing tunnel or tailnet. */
 export class RemoteMcpManager {
   private config = { ...defaults };
   private encryptedToken?: string;
@@ -121,8 +120,6 @@ export class RemoteMcpManager {
         throw error;
       });
       if (saved) {
-        // Legacy setup required picking projects without an explicit access mode.
-        // New defaults are library-wide; old limited grants are revoked before use.
         this.config = validateRemoteMcpConfig(saved.config);
         this.resumeOnLaunch = saved.resumeOnLaunch === true;
         this.managedCloudflared =
@@ -450,7 +447,6 @@ export class RemoteMcpManager {
       resolveUrl = resolve;
       rejectUrl = reject;
     });
-    // All modes observe failures; fixed hostnames do not wait for log wording.
     void urlReady.catch(() => undefined);
     const onData = (chunk: Buffer) => {
       const text = chunk.toString();

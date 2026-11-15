@@ -17,7 +17,6 @@ import { withWindowsSharingRetry } from "./atomic-rename";
 
 const lockContext = new AsyncLocalStorage<Map<string, string>>();
 const activeLocks = new Map<string, string>();
-/** Holders in this process take turns instead of polling the shared lease. */
 const localTurns = new Map<string, Promise<void>>();
 
 interface LeaseOwner {
@@ -46,12 +45,10 @@ async function ownerAt(
       throw error;
     });
     if (!info) return undefined;
-    // Earlier development revisions used an owner file inside a lock directory.
     const source = await readFile(
       info.isDirectory() ? join(path, "owner.json") : path,
       "utf8",
     ).catch((error: NodeJS.ErrnoException) => {
-      // A cooperating owner may release the lease between stat and read.
       if (error.code === "ENOENT") return undefined;
       throw error;
     });
@@ -61,8 +58,6 @@ async function ownerAt(
       value = JSON.parse(source) as LeaseOwner;
     } catch (error) {
       if (!(error instanceof SyntaxError)) throw error;
-      // Leases are not flushed to disk. Only an OS crash can leave one
-      // incomplete, and a lease from before this boot has no live owner.
       if (info.mtimeMs < Date.now() - uptime() * 1000 - 2000)
         return { pid: 0, token: "interrupted" };
       throw new CoreError(
@@ -83,14 +78,12 @@ async function ownerAt(
   });
 }
 
-/** Whether the calling operation already holds this lease. */
 export function holdsLibraryLock(root: string, name = "writer"): boolean {
   const key = `${root}:${name}`;
   const token = lockContext.getStore()?.get(key);
   return !!token && activeLocks.get(key) === token;
 }
 
-/** Publish a fully written owner with an atomic hard link; no reader sees a partial owner. */
 export async function withLibraryLock<T>(
   root: string,
   action: () => Promise<T>,
@@ -146,8 +139,6 @@ async function acquireLibraryLock<T>(
   await safeLibraryPath(root, prepared);
   await mkdir(join(local, "leases"), { recursive: true });
   await safeLibraryPath(root, prepared);
-  // The lease is complete before it is linked; durability only matters across
-  // an OS crash, after which ownerAt treats a pre-boot partial lease as stale.
   try {
     const lease = await open(prepared, "wx", 0o600);
     try {

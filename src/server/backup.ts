@@ -734,7 +734,6 @@ export async function restoreServerBackup(input: {
   }
   const verifyDb = new SQLiteMetadata(join(staging, "metadata.sqlite"));
   try {
-    // Reuse the original receipts against the copied tree, without altering its tables.
     await verifyContent(
       input.backup,
       verifyDb,

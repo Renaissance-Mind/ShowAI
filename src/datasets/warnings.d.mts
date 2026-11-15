@@ -16,7 +16,6 @@ export type WarningStage =
 export type WarningAction =
   "link-file" | "retry" | "open-file" | "ask-agent" | "packaging";
 
-/** Why a dataset read returned stale or no data, or why it cannot be written. */
 export interface DatasetWarning {
   code: WarningCode;
   level: WarningLevel;
@@ -26,9 +25,7 @@ export interface DatasetWarning {
   actions: WarningAction[];
 }
 
-/** How current the value of a read is. */
 export type DatasetReadStatus = "ok" | "stale" | "empty";
-/** Whether a dataset can be written: all of it, none, or these field paths. */
 export type Editable = boolean | { paths: string[] };
 
 export const WARNING_CODES: Record<

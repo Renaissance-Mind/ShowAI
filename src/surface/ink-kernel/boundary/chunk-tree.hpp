@@ -3,9 +3,6 @@
 #include "record.hpp"
 #include "vector.hpp"
 namespace showai_boundary {
-// Stable immutable chunks, ordered by their actual captured curve slot. A tree
-// draft replaces a logarithmic path; retained chunk records are never edited.
-// Indexing/iteration are explicit full-export helpers, not an update scan.
 template<class T>class SharedChunkValues{
     Vector<Record<T>,1>records_;
 public:

@@ -19,8 +19,6 @@ try {
   execFileSync(clang, [...compilerFlags, '-c', join(source, 'ink-input-kernel.cpp'), '-o', inputObject], { stdio: 'inherit' });
   execFileSync(clang, [...compilerFlags, '-c', join(source, 'analytic-path.cpp'), '-o', analyticObject], { stdio: 'inherit' });
   execFileSync(clang, [...compilerFlags, '-c', join(source, 'ink-stroke-kernel.cpp'), '-o', strokeObject], { stdio: 'inherit' });
-  // The old --export-all also publishes private C++ helpers. Only actual C
-  // declarations are callable; the checked-emission plan is not a client API.
   const publicHeaders = ['include/showai_ink.h', 'include/ink-input-kernel.h', 'include/analytic-path.h', 'include/ink-stroke-kernel.h'];
   const api = [...new Set((await Promise.all(publicHeaders.map(name => readFile(join(source, name), 'utf8')))).flatMap(text => [...text.matchAll(/\b(sa_(?:ink|input|analytic|stroke)_[a-z0-9_]+)\s*\(/g)].map(match => match[1])))].sort();
   const linkerGlobals = ['__wasm_call_ctors', '__dso_handle', '__data_end', '__stack_low', '__stack_high', '__global_base', '__heap_base', '__heap_end', '__memory_base', '__table_base'];

@@ -1,5 +1,3 @@
-// Contract for the step-walkthrough built-in.
-// Validation runs in the workbench, the CLI and the portable reader, so it stays dependency-free.
 import { DIAGRAM_TONES } from "./doc-diagrams-contract.mjs";
 
 const fail = (message) => {
@@ -34,9 +32,7 @@ function partRef(partIds, id, label) {
   if (!partIds.has(id)) fail(`${label} must name an existing part.`);
 }
 
-/** Change marks for a state entry, in reading order. */
 export const ENTRY_STATUSES = ["new", "changed", "retired", "kept"];
-/** Visual roles for the actions in a step. */
 export const ACTION_KINDS = ["input", "action", "result", "note"];
 export const WALKTHROUGH_LIMITS = {
   parts: 6,
@@ -196,7 +192,6 @@ export function validateWalkthroughData(data) {
   return data;
 }
 
-/** Per step and part: how many entries carry each status. */
 export function summarizeWalkthrough(data) {
   return data.steps.map((step) => ({
     id: step.id,

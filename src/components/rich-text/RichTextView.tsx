@@ -87,7 +87,6 @@ function markedText(node: JSONContent): ReactNode {
         break;
       case "link": {
         const href = String(mark.attrs?.href ?? "");
-        // In-page anchors and ShowAI page links are followed by the reading host.
         const local = href.startsWith("#") || !!parsePageLink(href);
         content = (
           <a
@@ -127,8 +126,6 @@ function tableColumns(node: JSONContent): ReactNode {
   ) : null;
 }
 
-/** Renders only validated page JSON. The exported reader includes no editor runtime. */
-/** A toggle the reader opens and closes; App pages keep that per reader. */
 function ReadingToggle({
   id,
   open,

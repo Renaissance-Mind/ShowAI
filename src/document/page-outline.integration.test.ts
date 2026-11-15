@@ -25,7 +25,6 @@ let directory: string,
   store: FileStore,
   projectId: string,
   pageId: string;
-// Pages use zh-CN like the assertions below; the browser default differs between Chrome and the headless shell.
 let browser: Browser, server: Awaited<ReturnType<typeof startBrowserServer>>;
 const compiled: CompiledComponent[] = [];
 let cdnHost: Awaited<ReturnType<typeof startCdnHost>>;
@@ -108,7 +107,6 @@ describe("Page outline in the real workbench and standalone reader", () => {
     page.on("pageerror", (error) => errors.push(error.message));
     await page.goto(server.url + `?project=${projectId}&page=${pageId}`);
     page.setDefaultTimeout(10000);
-    // The launch URL opens the page; opening it again from the sidebar while it loads mounts a second root.
     await page
       .getByRole("button", { name: "页面操作", exact: true })
       .click({ timeout: 30000 });
@@ -123,7 +121,6 @@ describe("Page outline in the real workbench and standalone reader", () => {
         async () =>
           (await store.readPage(projectId, pageId)).document.content.attrs
             ?.outline?.enabled,
-        // A save reaches the library after the debounced write and its sync.
         { timeout: 10000 },
       )
       .toBe(true);
@@ -180,7 +177,6 @@ describe("Page outline in the real workbench and standalone reader", () => {
         async () =>
           (await store.readPage(projectId, pageId)).document.content.attrs
             ?.outline?.renderer?.componentId,
-        // A save reaches the library after the debounced write and its sync.
         { timeout: 10000 },
       )
       .toBe("page-outline-index");

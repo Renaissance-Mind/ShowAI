@@ -2,7 +2,6 @@ import { creationPoints, snapCreation } from "../document/drawing-geometry.mjs";
 import { pointsBounds } from "../document/geometry.mjs";
 import { createPortableInk } from "./portable-ink.mjs";
 
-/** Release coordinates are authoritative even if no move/paint frame was delivered. */
 export function finishBoardDrawing(tool, style, gesture, modifiers = {}) {
   const { origin, release, scale, snap } = gesture;
   const freehand = tool === "pen" || tool === "highlighter";
@@ -33,7 +32,6 @@ export function finishBoardDrawing(tool, style, gesture, modifiers = {}) {
       release,
       modifiers,
     );
-    // Command/Ctrl turns snapping off; Alt only draws from the center.
     if (
       snap &&
       ["rectangle", "ellipse", "region"].includes(tool) &&

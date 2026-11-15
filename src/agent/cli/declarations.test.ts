@@ -15,7 +15,6 @@ const repository = resolve(import.meta.dirname, "../../..");
 const flags = (line: string) =>
   [...line.matchAll(/--([a-z][a-z-]*)/g)].map((match) => match[1]);
 
-/** Help lines of each command, including lines another command shares with it. */
 function helpLines() {
   const lines = new Map<CommandDeclaration, string[]>();
   for (const declaration of COMMANDS) {
@@ -36,7 +35,6 @@ test("every option in the help is declared by the commands its line describes", 
     const covered = [commandKey(declaration), ...(declaration.covers ?? [])].map(
       (key) => COMMANDS_BY_KEY.get(key)!,
     );
-    // Notes (indented lines) may mention another command's options.
     for (const line of declaration.help.filter((text) => !text.startsWith(" ")))
       for (const name of flags(line))
         if (
@@ -53,7 +51,6 @@ test("every declared option is in the help or marked hidden", () => {
   const missing: string[] = [];
   for (const declaration of COMMANDS) {
     const shown = new Set((lines.get(declaration) ?? []).flatMap(flags));
-    // Commands without help are not listed, and neither are their options.
     if (!lines.has(declaration)) continue;
     for (const [name, spec] of Object.entries(declaration.options ?? {}))
       if (!spec.hidden && !shown.has(name))
@@ -71,7 +68,6 @@ test("the help lists every command that has help lines, once", () => {
   const listed = COMMANDS.filter((item) => item.help).map(commandKey);
   expect([...HELP_COMMANDS].sort()).toEqual(listed.sort());
   expect(new Set(HELP_COMMANDS).size).toBe(HELP_COMMANDS.length);
-  // Keys are unique, so the help and lookups reach one declaration each.
   expect(COMMANDS_BY_KEY.size).toBe(COMMANDS.length);
 });
 
@@ -86,7 +82,6 @@ test("a command rejects an option it does not declare and names itself", () => {
   expect(() => check(["import", "notes.zip", "--view", "x"])).toThrow(
     "showai import does not take --view.",
   );
-  // Global options, before or after the words, and declared ones pass.
   check(["--home", "/tmp/x", "pages", "read", "PAGE", "--view", "image", "--json"]);
   check(["mcp", "--home", "/tmp/x", "--project", "p", "--templates", "t"]);
   expect(() => parseArguments(["pages", "list", "--from", "x"])).toThrow(

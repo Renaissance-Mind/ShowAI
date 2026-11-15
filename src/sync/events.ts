@@ -8,7 +8,6 @@ export const maximumEventBytes = 512 * 1024;
 export const maximumEventInput = 64 * 1024;
 export const maximumEventProjects = 1000;
 
-/** A notification is a durable published revision, never an uncommitted draft. */
 export type ProjectEvent =
   | { type: "heads"; serverId: string; projects: SyncProject[] }
   | {
@@ -19,7 +18,6 @@ export type ProjectEvent =
       sequence?: number;
       previousSequence?: number;
       record?: SnapshotRecord;
-      /** Changes from previousHead, sent to subscribers with the delta feature. */
       delta?: SnapshotDelta;
       objects?: Record<string, string>;
     }
@@ -33,7 +31,6 @@ export interface EventIdentity {
   features?: string[];
 }
 
-/** The credential stays in an encrypted handshake header, never in the URL. */
 export function eventCredential(request: Request): string | undefined {
   const header = request.headers
     .get("authorization")

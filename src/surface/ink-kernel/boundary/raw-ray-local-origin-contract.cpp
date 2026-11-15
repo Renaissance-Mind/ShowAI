@@ -6,7 +6,6 @@
 #include <new>
 #include <vector>
 
-// Public ABI consumer; Native and WASM must return the same complete mesh.
 int main(int argc,char**argv) {
  if(argc!=3)return 1;
  std::ifstream input(argv[1],std::ios::binary);uint32_t count=0;
@@ -27,7 +26,6 @@ int main(int argc,char**argv) {
   SACoverageSummary summary{};if(sa_coverage_summary(state,receipt,&summary))return 6;
   std::vector<SACoverageVertex>vertices(summary.vertices);std::vector<SACoverageDraw>draws(summary.draws);
   if(sa_coverage_copy_vertices(state,receipt,vertices.data(),summary.vertices)||sa_coverage_copy_draws(state,receipt,draws.data(),summary.draws))return 7;
-  // The address of the actual serial workspace is platform-specific.
   summary.receipt.owner=0;
   output.write(reinterpret_cast<const char*>(&summary),sizeof summary);
   output.write(reinterpret_cast<const char*>(vertices.data()),vertices.size()*sizeof(SACoverageVertex));

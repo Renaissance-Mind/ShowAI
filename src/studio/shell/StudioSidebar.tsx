@@ -37,11 +37,6 @@ import type { LibraryEdits } from "./useLibraryEdits";
 import type { LibraryMoves } from "./useLibraryMoves";
 import type { PageState, WorkspaceTabs } from "./types";
 
-/**
- * Each folder's sorted sidebar rows and the row handlers. The handlers keep
- * one identity for the life of the workbench, so memoized rows skip renders
- * that do not concern them.
- */
 export function useLibraryRows({
   feedback: { report },
   library: {
@@ -83,8 +78,6 @@ export function useLibraryRows({
   edits: Pick<LibraryEdits, "libraryKeyCommand" | "unpinTarget">;
 }) {
   const tc = useTranslator(commonMessages);
-  // Each folder's sorted rows, computed once per project when its contents,
-  // order or pending reorders change rather than on every workbench render.
   const sidebarChildren = useMemo(() => {
     const cache = new Map<string, Map<string | null, LibraryTarget[]>>();
     return (projectId: string, parentId: string | null): LibraryTarget[] => {
@@ -148,7 +141,6 @@ export function useLibraryRows({
     info?.home,
     tc,
   ]);
-  // Stable row handlers let memoized LibraryRows skip unrelated Studio renders.
   const rowHandlers = useRef({
     openTargetClick,
     showMenu,
@@ -241,7 +233,6 @@ export function useLibraryRows({
 
 export type LibraryRows = ReturnType<typeof useLibraryRows>;
 
-/** The sidebar: the library tree, or the navigation of the catalog or settings view. */
 export function StudioSidebar({
   feedback: { report, action },
   library,

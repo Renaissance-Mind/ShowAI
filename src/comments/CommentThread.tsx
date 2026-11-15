@@ -6,14 +6,12 @@ import { getLocale } from "../i18n";
 import type { CommentThread as Thread } from "../core/comments";
 import type { CommentAuthor, PageComment } from "../types";
 
-/** A person's own comment: the same sync account, or written on a device without one. */
 export function ownComment(comment: PageComment, me: CommentAuthor) {
   const author = comment.author;
   if (!author) return !me.id;
   return author.kind === "person" && (me.id ? author.id === me.id : !author.id);
 }
 
-/** Multi-line input: Enter submits, Shift+Enter adds a line, Escape cancels. */
 export function CommentInput({
   initial = "",
   placeholder,

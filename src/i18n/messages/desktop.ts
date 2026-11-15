@@ -1,6 +1,5 @@
 import { defineMessages } from "../index";
 
-// Electron main-process menus and native dialogs.
 export default defineMessages("desktop", {
   "zh-CN": {
     "login.libraryClosed": "请先打开 ShowAI 内容库，再完成登录。",

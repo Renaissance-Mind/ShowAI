@@ -1,4 +1,3 @@
-// Real Git transactions, content encoding, readers, package compilation and indexes.
 import { build } from "esbuild";
 import { spawn } from "node:child_process";
 import { mkdir, mkdtemp, writeFile } from "node:fs/promises";

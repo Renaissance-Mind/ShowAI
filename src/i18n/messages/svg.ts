@@ -1,6 +1,5 @@
 import { defineMessages } from "../index";
 
-// Vector figure built-in.
 export default defineMessages("svg", {
   "zh-CN": {
     figure: "矢量图",

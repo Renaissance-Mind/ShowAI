@@ -173,7 +173,6 @@ describe("structural page merges", () => {
       ...arrayBase,
       comments: [{ ...arrayBase.comments[0], resolved: true }],
     };
-    // Comments merge per record: different fields of one comment combine.
     const combined = previewPageMerge(arrayBase, a, b);
     expect(combined.conflicts).toEqual([]);
     expect(combined.document.comments).toMatchObject([

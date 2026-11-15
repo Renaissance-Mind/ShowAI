@@ -5,7 +5,6 @@ import type {
   PageSummary,
 } from "./model";
 
-/** Labels are translated by the workbench from each option's value. */
 export const directorySortOptions = [
   { value: "name" },
   { value: "createdAt" },
@@ -47,7 +46,6 @@ const names = new Intl.Collator("zh-CN", {
   sensitivity: "base",
 });
 
-/** Folders and pages share one order; pins always lead and ties remain deterministic. */
 export function sortDirectoryItems<
   T extends Omit<DirectoryEntry, "kind" | "parentId">,
 >(

@@ -64,7 +64,6 @@ function editorOf(element: Element | null): Editor | null {
   return dom?.editor ?? null;
 }
 
-/** The comment target of an editor selection: quoted text in one text block, or a whole block. */
 function editorTarget(
   editor: Editor,
   document: ShowDocument,
@@ -91,7 +90,6 @@ function editorTarget(
     }
     return { anchor: { blockId: id }, rect };
   }
-  // Text inside a component keeps its own structure: the component is the target.
   for (let depth = $from.depth; depth > 0; depth--) {
     const ancestor = $from.node(depth).attrs?.id;
     if (typeof ancestor === "string" && blocks.has(ancestor))
@@ -103,7 +101,6 @@ function editorTarget(
   return hostId && blocks.has(hostId) ? { anchor: { blockId: hostId }, rect } : null;
 }
 
-/** The ancestor of a block that sits directly in a surface: what the editor's reveal can open. */
 function surfaceChild(document: ShowDocument, blockId: string): string {
   let found: string | undefined;
   const tops = new Map<JSONContent, string | null>();
@@ -130,11 +127,6 @@ function placement(rect: Rect, width: number) {
     : { left, bottom: Math.max(gutter, window.innerHeight - rect.top + 8) };
 }
 
-/**
- * Comments for one page editor: the actions joined to the selection, block
- * and board menus, the shortcut, highlights, block markers, the composer and
- * thread popovers, and the controller the comments panel uses.
- */
 export function usePageComments({
   document,
   commit,
@@ -142,7 +134,6 @@ export function usePageComments({
   shell,
   projectId,
 }: {
-  /** The editor's current document. */
   document: ShowDocument;
   commit: (next: ShowDocument, group: string) => void;
   readOnly: boolean;
@@ -220,7 +211,6 @@ export function usePageComments({
     if (!thread || !root) return;
     const location = thread.location;
     if (location.kind === "text") {
-      // The editor's reveal leaves an expanded Board; the text then scrolls to the middle and flashes.
       setReveal(surfaceChild(latest.current.document, location.blockId));
       requestAnimationFrame(() =>
         requestAnimationFrame(() => {
@@ -232,7 +222,6 @@ export function usePageComments({
         }),
       );
     } else if (location.kind === "block") {
-      // The editor's reveal also opens nested surfaces and pans Boards.
       setReveal(location.blockId);
       const selector = anchorSelector(location.blockId);
       flashTarget(() =>
@@ -241,7 +230,6 @@ export function usePageComments({
     }
   }, []);
 
-  // The panel and its toggle use this page's controller.
   useEffect(
     () =>
       commentsStore.register({
@@ -265,7 +253,6 @@ export function usePageComments({
     highlight.refresh();
   }, [comments, content]);
   useEffect(() => highlight.refresh(), [store.active]);
-  // A thread deleted or undone elsewhere closes its popover.
   useEffect(() => {
     if (
       popover?.kind === "thread" &&
@@ -292,7 +279,6 @@ export function usePageComments({
     commentsStore.setActive(id);
   };
 
-  // Mod+Shift+M comments on the selected text, block or Board object.
   useEffect(() => {
     if (readOnly) return;
     const keyDown = (event: KeyboardEvent) => {
@@ -467,7 +453,6 @@ function groupBlockMarkers(threads: LocatedThread[]) {
   return [...byBlock].map(([blockId, ids]) => ({ blockId, ids }));
 }
 
-/** Small count markers at the top-right of commented blocks and Board objects. */
 function BlockMarkers({
   shell,
   markers,
@@ -514,7 +499,6 @@ function BlockMarkers({
     paint();
     return () => {
       cancelAnimationFrame(frame);
-      // A hidden tab keeps this DOM without running effects; nothing may stay on screen.
       for (const { blockId } of markers) {
         const marker = button(blockId);
         if (marker) marker.hidden = true;
@@ -573,7 +557,6 @@ function CommentPopover({
     const current = element.current;
     if (current) current.hidden = false;
     return () => {
-      // Hidden with its tab, shown again when the tab returns.
       if (current) current.hidden = true;
       window.removeEventListener("pointerdown", pointerDown, true);
       current?.removeEventListener("keydown", keyDown);

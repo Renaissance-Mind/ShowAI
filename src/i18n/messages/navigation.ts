@@ -1,6 +1,5 @@
 import { defineMessages } from "../index";
 
-// Library navigation: the New menu, undo toasts, deleted and hidden items, shortcuts.
 export default defineMessages("navigation", {
   "zh-CN": {
     undo: "撤销",

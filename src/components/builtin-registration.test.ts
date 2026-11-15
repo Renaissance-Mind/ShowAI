@@ -12,9 +12,6 @@ import { builtinEnglish } from "./builtin-display-text";
 import { builtinCategories } from "../core/component-categories";
 import { builtinExports } from "../core/builtin-sources";
 
-// One place that names every registration point of a built-in component, so a
-// contributor who adds a kind to one list learns which other lists need it.
-// docs/contributing-components.md walks through the same points.
 const blockKinds = [...primitives, ...components, ...g2, ...diagrams].map(
   (item) => item.kind,
 );

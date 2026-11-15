@@ -89,7 +89,6 @@ import { agentTarget } from "./targets";
 import { componentContextLimits } from "../../contract/component-context.mjs";
 
 const agentNames = localAgentNames;
-/** Starting points for an empty page; a chip fills the input for review. */
 const pageStarters = ["fromTitle", "calculator", "compare"] as const;
 const widthPreference = "showai:assistant-width";
 const quickActions = [
@@ -136,7 +135,6 @@ function TurnView({
 }: {
   turn: AgentTurn;
   latest: boolean;
-  /** Requests on this turn that are still in flight. */
   pending: { cancel: boolean; undo: boolean; retry: boolean };
   onLocate: (pageId: string, ids: string[]) => void;
   onCancel: () => void;
@@ -323,7 +321,6 @@ function TurnView({
   );
 }
 
-/** A running turn with its Stop control, in the panel and the floating box. */
 function RunningStatus({
   turn,
   stopping,
@@ -357,14 +354,12 @@ function RunningStatus({
   );
 }
 
-/** What the floating box sent from its input, cleared from the drafts once sent. */
 interface TypedDraft {
   key: string;
   text: string;
   at: number;
 }
 
-/** Floating request box opened from selection, block, board and page menus. */
 function Composer({
   target,
   draftKey,
@@ -378,21 +373,17 @@ function Composer({
   onClose,
 }: {
   target: AssistantTarget;
-  /** Keeps the typed request per target until it is sent. */
   draftKey: string;
   pageTitle?: string;
   busy: boolean;
-  /** The conversation's turn still working; the request waits in the input. */
   running?: ReactNode;
   error: string;
-  /** A failed send, shown with its next steps. */
   notice?: ReactNode;
   destination: ReactNode;
   onSend: (prompt: string, typed?: TypedDraft) => void;
   onClose: () => void;
 }) {
   const t = useTranslator(strings);
-  // A component status card hands over its error as the starting request.
   const prompt = "prompt" in target ? (target.prompt ?? "") : "";
   const draft = useAssistantDrafts(draftKey);
   const text = draft.saved ? draft.text : prompt;
@@ -551,13 +542,10 @@ export default function AssistantWorkbench({
   pageTitle?: string;
   flush: () => Promise<boolean>;
   onLocate: (pageId: string, ids: string[]) => void;
-  /** Saves and copies a reference to the target for an Agent outside ShowAI. */
   onReference: (target: AgentTarget) => void;
   onOpenSettings: () => void;
-  /** A prompt to place in a new conversation's composer once this page's panel is open. */
   prefill?: { key: string; pageId: string; text: string } | null;
   onPrefillUsed?: () => void;
-  /** A conversation was exported to this file. */
   onExported?: (path: string) => void;
   children: ReactNode;
 }) {
@@ -587,7 +575,6 @@ export default function AssistantWorkbench({
     messageDraft.update({
       components: items,
       pageId,
-      // Targets picked on another page do not carry over to this one.
       ...(samePage ? {} : { target: null, reference: null }),
     });
   const setPanelTarget = (target: AssistantTarget | null) =>
@@ -598,11 +585,9 @@ export default function AssistantWorkbench({
   const [inFlight] = useState(() => createInFlight(setSendingKeys));
   const busy = sendingKeys.includes(composerKey);
   const [error, setError] = useState("");
-  // A request that failed before a turn existed; the input keeps the text.
   const [sendProblem, setSendProblem] = useState<{
     problem: AgentProblem;
     at: string;
-    /** The guard key of the retried request, pending while it runs again. */
     retryKey: string;
     retry: () => void;
   } | null>(null);
@@ -616,7 +601,6 @@ export default function AssistantWorkbench({
   const selectionGeneration = useRef(0);
   const conversationCache = useRef(new Map<string, AgentConversation>());
   const rememberedThreads = useRef(new Map<string, string>());
-  // A new conversation stays chosen for its project until a thread is picked or it is sent.
   const rememberedFresh = useRef(new Map<string, boolean>());
   const project = useRef(projectId);
   project.current = projectId;
@@ -642,8 +626,6 @@ export default function AssistantWorkbench({
     const value = Number(localStorage.getItem(widthPreference));
     return Number.isFinite(value) && value >= 300 ? Math.min(value, 640) : 380;
   });
-  // The panel slides like the sidebar when someone opens or closes it, and
-  // leaves at once when the view no longer has a page.
   const panel = useRef<HTMLElement>(null);
   const presence = usePresence(open && enabled, panel, enabled);
   const list = useRef<HTMLDivElement>(null);
@@ -710,14 +692,12 @@ export default function AssistantWorkbench({
     setError("");
     setSendProblem(null);
   }, []);
-  /** Without a thread to show, the next request starts a new conversation. */
   const leaveThread = useCallback((projectKey: string) => {
     rememberedThreads.current.delete(projectKey);
     setSelectedId(null);
     setConversation(null);
     markFresh(true, projectKey);
   }, []);
-  /** Opens a thread; with keepFresh it only loads behind a chosen new conversation. */
   const select = useCallback(async (projectKey: string, id: string, keepFresh = false) => {
     const selection = ++selectionGeneration.current;
     rememberedThreads.current.set(projectKey, id);
@@ -739,7 +719,6 @@ export default function AssistantWorkbench({
         id,
       })
       .catch((reason: unknown) => {
-        // The input stays usable: the next request starts a new conversation.
         if (current()) leaveThread(projectKey);
         throw reason;
       });
@@ -749,7 +728,6 @@ export default function AssistantWorkbench({
       if (!keepFresh) markFresh(false, projectKey);
     }
   }, []);
-  // Conversations belong to the project; switching projects starts from its latest one.
   useEffect(() => {
     setConversation(null);
     setSelectedId(null);
@@ -786,7 +764,6 @@ export default function AssistantWorkbench({
       stopped = true;
     };
   }, [projectId, open, loadSummaries, select, executionRevision]);
-  // A prefilled prompt starts a new conversation, so it never lands in an older thread.
   const prefillStarted = useRef<string | null>(null);
   useEffect(() => {
     if (!prefill || !open || !projectId || prefill.pageId !== pageId) return;
@@ -800,7 +777,6 @@ export default function AssistantWorkbench({
     onPrefillUsed?.();
     requestAnimationFrame(() => input.current?.focus());
   }, [prefill, open, projectId, pageId, fresh, composerKey]);
-  // Re-read when the panel reappears, e.g. after changing Agent settings.
   const agent = useAgentStatus(
     (open && enabled) || !!composer,
     projectId,
@@ -811,7 +787,6 @@ export default function AssistantWorkbench({
     checking: agent.checking,
     onOpenSettings,
     onRecheck: () => void agent.recheck(),
-    // Offered only while a model API is configured and Codex is installed here.
     onUseLocalCodex:
       status && status.settings.mode === "api" && localCodexAvailable(status)
         ? () =>
@@ -899,7 +874,6 @@ export default function AssistantWorkbench({
       clearInterval(timer);
     };
   }, [conversation?.id, running?.id, refreshSummaries]);
-  // A new turn or conversation jumps to the end; streamed output follows only near the end.
   const lastEvent = running?.events.at(-1);
   useLayoutEffect(() => {
     const element = list.current;
@@ -929,7 +903,6 @@ export default function AssistantWorkbench({
     const sentText = draft,
       sentAt = messageDraft.updatedAt;
     const sentReference = clearDraft ? reference : target?.reference;
-    // Component states wait in the panel input; quick requests stay focused on their target.
     const sentComponents = clearDraft
       ? components.map(({ private: _private, ...item }) => item)
       : [];
@@ -1000,7 +973,6 @@ export default function AssistantWorkbench({
     await loadSummaries(target.projectId);
   };
   const exportMarkdown = async (target: AgentConversation) => {
-    // Read again so a reply still streaming in is exported as far as it got.
     const latest = await desktop.invoke<AgentConversation>(
       "agent:conversation",
       { projectId: target.projectId, id: target.id },
@@ -1029,7 +1001,6 @@ export default function AssistantWorkbench({
     );
     if (result) onExported?.(result.path);
   };
-  // Turn actions share the send guard, so each runs once and shows as pending.
   const guard = inFlight.run;
   const pending = (key: string) => sendingKeys.includes(key);
   const retryKey = (turn: AgentTurn) => `retry:${turn.conversationId}`;
@@ -1047,7 +1018,6 @@ export default function AssistantWorkbench({
         true,
       ),
     );
-  /** Sends a failed turn's request again in the same conversation. */
   const retryTurn = (turn: AgentTurn) =>
     guard(retryKey(turn), async () => {
       setError("");
@@ -1073,7 +1043,6 @@ export default function AssistantWorkbench({
       }
     });
 
-  // The bridge stays stable for page content; its actions read the latest draft.
   const live = useRef({
     pageId,
     components,
@@ -1114,7 +1083,6 @@ export default function AssistantWorkbench({
                   item,
                 ].slice(-componentContextLimits.perMessage),
               );
-              // The first hand-over opens the input; later updates stay quiet.
               if (fresh) {
                 current.onOpenChange(true);
                 requestAnimationFrame(() => input.current?.focus());
@@ -1203,13 +1171,11 @@ export default function AssistantWorkbench({
   const turns = conversation?.turns ?? [];
   const startVisible = !!projectId && (fresh || !turns.length);
   const readiness = status ? agentReadiness(status) : null;
-  // The status card already offers the steps for its own setup problem.
   const sendCompact =
     !!sendProblem &&
     startVisible &&
     !!readiness &&
     readinessKindOf(sendProblem.problem.code) === readiness.kind;
-  // A setup problem disappears once the status shows the Agent is ready.
   const sendResolved =
     !!sendProblem &&
     !!readinessKindOf(sendProblem.problem.code) &&

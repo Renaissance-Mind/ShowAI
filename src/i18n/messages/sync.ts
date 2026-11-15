@@ -1,6 +1,5 @@
 import { defineMessages } from "../index";
 
-// Server connections, sync, project sharing and account linking.
 export default defineMessages("sync", {
   "zh-CN": {
     "role.admin": "管理员",
@@ -16,7 +15,6 @@ export default defineMessages("sync", {
     "state.conflict": "需要处理冲突",
     "state.revoked": "需要重新登录或加入",
 
-    // Settings page
     readingConnections: "正在读取服务器连接…",
     newProjectLocation: "新项目默认保存到",
     newProjectLocationDetail: "选择服务器账号后，新建项目会自动上传并开始同步，你成为项目管理员。本机始终保留离线副本。",
@@ -171,7 +169,6 @@ export default defineMessages("sync", {
     "toast.synced": "“{name}”已同步。",
     "toast.uploaded": "已开始将“{name}”同步到 {server}。",
 
-    // Project management dashboard
     managedProjects: "管理的项目",
     projects: "项目",
     searchManagedProjects: "搜索管理的项目",
@@ -245,7 +242,6 @@ export default defineMessages("sync", {
     selectProjectHint: "选择左侧项目，查看成员与邀请。",
     createProjectHint: "从左侧新建项目，然后邀请成员加入。",
 
-    // Account linking
     accountBindings: "账号绑定",
     accountBindingsHelp: "把不同服务器上的账号绑定在一起。以后在新设备上登录其中一个，就能一并恢复其他服务器的登录。",
     chooseAccount: "选择账号",
@@ -266,7 +262,6 @@ export default defineMessages("sync", {
     "toast.unbindPending": "已保存解除请求，离线服务恢复连接后会完成撤销。",
     "toast.unbound": "已解除绑定，并撤销通过该服务签发的设备登录。",
 
-    // Browser and email sign-in
     "login.expired": "登录等待已过期，请重新发起。",
     "login.addMethodHelp":
       "为当前账号添加登录方式。在浏览器完成授权并确认绑定后，可用该方式登录同一个账号。",

@@ -27,7 +27,6 @@ test("a project's sync files carry each page's own dependency closure when pages
     await importComponent(root, join(catalog, "value-slider"), project),
     await importComponent(root, join(catalog, "text-diagram"), project),
   ]);
-  // Pages referencing both, one, or neither component.
   for (const used of [[0, 1], [1], [0, 1], []]) {
     const page = await store.createPage(project, { title: `Uses ${used}` });
     const document = structuredClone(page.document);
@@ -59,7 +58,6 @@ test("a project's sync files carry each page's own dependency closure when pages
   const head = (await library.head())!;
   const operations = new LibraryOperations(root, project);
   const files = await operations.projectFiles(project, head);
-  // Each page resolved on its own, without the shared per-call state.
   const resolve = (
     operations as unknown as {
       dependencies(

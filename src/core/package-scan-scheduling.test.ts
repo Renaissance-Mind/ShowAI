@@ -116,7 +116,6 @@ it("runs one workspace scan at a time and lets waiting requests share the next",
   const { root, paths } = await changedPackageLibrary(8);
   const library = new ContentLibrary(root);
   const first = scanWorkspaceResources(library);
-  // Requests made before the first scan starts are covered by it.
   expect(scanWorkspaceResources(library)).toBe(first);
   await new Promise((resolve) => setImmediate(resolve));
   const second = scanWorkspaceResources(library),

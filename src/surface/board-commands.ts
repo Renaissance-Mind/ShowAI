@@ -12,7 +12,6 @@ import {
 import { reconcileSurface } from "../document/document.mjs";
 import { walk } from "../document/walk.mjs";
 
-/** One logical transform, with untouched nodes and frames retaining identity. */
 export function transformObjects<T extends ShowDocument>(
   source: T,
   frames: Record<string, NodeLayout>,
@@ -67,10 +66,6 @@ export function transformObjects<T extends ShowDocument>(
   );
 }
 
-/**
- * A resized drawing keeps its stroke: points are rescaled into a viewbox with
- * the frame's own proportions, so the SVG never stretches line widths unevenly.
- */
 export function rescaledDrawing(
   node: JSONContent,
   before: NodeLayout,
@@ -109,7 +104,6 @@ export function rescaledDrawing(
   };
 }
 
-/** A self-contained copy of sibling objects, independent of the source document. */
 export interface BoardClip {
   format: "showai-board-clip";
   version: 1;
@@ -118,7 +112,6 @@ export interface BoardClip {
   surfaceViews: NonNullable<ShowDocument["surfaceViews"]>;
 }
 
-/** Selected roots only; descendants travel inside their parent's subtree. */
 function selectionRoots(
   index: ReturnType<typeof indexSurfaceTree>,
   ids: string[],
@@ -171,7 +164,6 @@ export function isBoardClip(value: unknown): value is BoardClip {
   );
 }
 
-/** Insert a clip with fresh identities; connections survive only between copied objects. */
 export function pasteObjects<T extends ShowDocument>(
   source: T,
   parentId: string,
@@ -186,7 +178,6 @@ export function pasteObjects<T extends ShowDocument>(
   const mapping = new Map<string, string>(),
     copies = clip.nodes.map((node) => structuredClone(node)),
     roots = new Set(copies.map((node) => node.attrs!.id as string));
-  // Blocks nested in a copied component's content get fresh ids too.
   for (const copy of copies)
     walk(copy, (node) => {
       if (node.attrs?.id) {
@@ -266,7 +257,6 @@ export function duplicateObjects<T extends ShowDocument>(
 
 export type StackOrder = "forward" | "backward" | "front" | "back";
 
-/** Paint order is sibling order. Moves keep the relative order of the selection. */
 export function reorderObjects<T extends ShowDocument>(
   source: T,
   ids: string[],
@@ -329,7 +319,6 @@ export type AlignMode =
   | "distribute-y";
 type Box = { x: number; y: number; width: number; height: number };
 
-/** Translations that align or evenly space visual bounds; frames keep their size. */
 export function alignOffsets(
   boxes: Record<string, Box>,
   mode: AlignMode,
@@ -385,7 +374,6 @@ export function alignOffsets(
   return result;
 }
 
-/** Move sibling objects into a free region, keeping their position on the Board. */
 export function adoptIntoRegion<T extends ShowDocument>(
   source: T,
   regionId: string,
@@ -423,7 +411,6 @@ export function adoptIntoRegion<T extends ShowDocument>(
   return reconcileSurface(document);
 }
 
-/** Wrap siblings in a new free region sized to their visual bounds. */
 export function groupObjects<T extends ShowDocument>(
   source: T,
   ids: string[],
@@ -445,7 +432,6 @@ export function groupObjects<T extends ShowDocument>(
   const container = indexSurfaceTree(document.content).get(
     parent.attrs!.id,
   )!.node;
-  // The region takes the stacking position of the selection's top object.
   const lastIndex = Math.max(
     ...roots.map((root) =>
       container.content!.findIndex((node) => node.attrs?.id === root),
@@ -473,7 +459,6 @@ export function groupObjects<T extends ShowDocument>(
   return { document: grouped, id };
 }
 
-/** Return a free region's children to its parent at the same Board position. */
 export function ungroupRegion<T extends ShowDocument>(
   source: T,
   regionId: string,
@@ -515,7 +500,6 @@ export function ungroupRegion<T extends ShowDocument>(
   return { document: reconcileSurface(document), ids };
 }
 
-/** Locked objects keep their frame against pointer gestures until unlocked. */
 export function setObjectsLocked<T extends ShowDocument>(
   source: T,
   ids: string[],
@@ -566,7 +550,6 @@ export function removeObjects<T extends ShowDocument>(
   );
 }
 
-/** Preserve independent edits; reject changes to the gesture's geometry or ancestry. */
 export function canCommitBoardGesture(
   original: ShowDocument,
   latest: ShowDocument | undefined,
@@ -582,8 +565,6 @@ export function canCommitBoardGesture(
     if (!latest.layout?.[id]) return false;
     let entry = index.get(id);
     if (!entry) return false;
-    // A fixed Page/Board's contents do not determine its outer frame, and a
-    // transform writes only that frame. Its latest contents can stay intact.
     const fixedSurface =
       entry.node.type === "surface" &&
       original.layout?.[id]?.heightMode !== "auto";
@@ -613,7 +594,6 @@ export function canCommitBoardGesture(
   );
 }
 
-/** Selection stays among siblings in the active Board's explicit coordinate layers. */
 export function boardSelectionScope(
   index: ReturnType<typeof indexSurfaceTree>,
   layout: ShowDocument["layout"],

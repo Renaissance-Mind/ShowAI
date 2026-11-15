@@ -15,7 +15,6 @@ async function markdownFiles(directory: string): Promise<string[]> {
   return files;
 }
 
-/** Settings sections as the workbench names them, in both languages. */
 function sectionNames() {
   const names = new Set<string>();
   for (const catalog of Object.values(settings.catalogs) as Record<
@@ -27,10 +26,6 @@ function sectionNames() {
   return names;
 }
 
-/**
- * Agent guides, skills and repository docs tell people where to click. Every
- * 「设置 → X」 / "Settings → X" they mention must name a real Settings section.
- */
 test("menu paths in guides, skills and docs name real Settings sections", async () => {
   const sources = [
     join(repository, "src/agent/guides.ts"),
@@ -44,11 +39,10 @@ test("menu paths in guides, skills and docs name real Settings sections", async 
   let checked = 0;
   for (const path of sources) {
     const text = await readFile(path, "utf8");
-    // The section ends at the next arrow, closing mark, bracket or sentence punctuation.
     for (const match of text.matchAll(
       /(System |系统)?(?:设置|Settings)\s*(?:→|>)\s*(?:\*\*)?([^→>*」』”"'`)(（,，。.;；:：\n|]+)/g,
     )) {
-      if (match[1]) continue; // macOS System Settings / 系统设置
+      if (match[1]) continue;
       const section = match[2].trim();
       checked++;
       if (!sections.has(section))

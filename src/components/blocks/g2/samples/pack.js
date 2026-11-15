@@ -1,5 +1,3 @@
-// Adapted from https://github.com/antvis/G2/blob/v5/site/docs/charts/pack.en.mdx
-// License notices: resources/licenses/g2-runtime.json.
 import { interpolateHcl } from "d3-interpolate";
 
 export default async function draw(context) {

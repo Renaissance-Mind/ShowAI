@@ -277,7 +277,6 @@ describe("portable project server with real SQLite and disk storage", () => {
       original.user.id,
       await hash(invitation.invite),
     ]);
-    // Reconstruct the real pre-version schema while preserving its account/session rows.
     const triggers = await metadata.all<{ name: string }>(
       "SELECT name FROM sqlite_master WHERE type='trigger' AND name LIKE 'freeze_%'",
     );

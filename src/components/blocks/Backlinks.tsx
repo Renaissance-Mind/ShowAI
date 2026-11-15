@@ -13,10 +13,6 @@ interface Entry {
   places: { blockId: string | null; snippet: string }[];
 }
 
-/**
- * Pages that refer to this page, each with the text around its reference.
- * It reads references through the public SDK hook, like any component.
- */
 export function BacklinksBlock({ data }: BlockProps) {
   const t = useTranslator(messages);
   const references = usePageReferences(

@@ -54,8 +54,6 @@
 .sync-settings .settings-button > svg {
   flex-shrink: 0;
 }
-/* Feedback sits after the last section and sticks to the bottom of the
-   scrolling page, so it stays in view without shifting the controls above. */
 .sync-feedback {
   position: sticky;
   bottom: 16px;
@@ -191,7 +189,6 @@
 .sync-text-button:hover:not(:disabled) {
   background: var(--hover, var(--surface));
 }
-/* Project list */
 .sync-project-list,
 .sync-session-list,
 .sync-binding-list {
@@ -305,7 +302,6 @@
   min-width: 0;
   flex: 1;
 }
-/* Joining through an invite */
 .sync-join {
   padding: 14px 16px;
   margin-bottom: 10px;
@@ -355,7 +351,6 @@
 .studio-settings .sync-invitation-actions .settings-help {
   margin: 0;
 }
-/* Server accounts */
 .sync-server-summary {
   display: flex;
   align-items: flex-start;
@@ -508,7 +503,6 @@
   flex: 1;
   min-width: 180px;
 }
-/* Forms */
 .sync-field {
   display: grid;
   gap: 6px;
@@ -629,7 +623,6 @@
   height: 1px;
   background: var(--line);
 }
-/* Rows still used by the server project dialog and the login method list. */
 .sync-connection,
 .sync-inline-form {
   display: flex;
@@ -1471,7 +1464,6 @@
   margin: 16px 0;
 }
 
-/* Account and project flows share the workbench's icon actions and menus. */
 .sync-view-tabs {
   margin-bottom: 26px;
 }

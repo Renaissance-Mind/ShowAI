@@ -121,7 +121,6 @@
 .sd-diagram .sd-drawing .am-view-changes {
   color: inherit;
 }
-/* The React wrapper owns the view state, so remove the vendor's initial Changes class. */
 .sd-viewport.am-view-before .am-view-changes [data-delta="added"],
 .sd-viewport.am-view-after .am-view-changes [data-delta="removed"] {
   visibility: hidden;

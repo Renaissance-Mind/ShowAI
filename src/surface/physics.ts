@@ -2,7 +2,6 @@ import type { Camera } from "./model";
 
 export const RELEASE_DISTANCE = 240;
 export const HORIZONTAL_GAIN = 0.72;
-// UIScrollView's normal deceleration: retain 99.8% of speed per millisecond.
 const PAN_FRICTION = -Math.log(0.998) * 1000;
 export class PanVelocity {
   private samples: { x: number; y: number; time: number }[] = [];
@@ -25,7 +24,6 @@ export class PanVelocity {
     return { x: x * limit, y: y * limit };
   }
 }
-/** Integrate exponential drag exactly, so 60 Hz and 120 Hz travel equally far. */
 export function momentumStep(
   velocity: { x: number; y: number },
   elapsed: number,
@@ -59,7 +57,6 @@ export interface SurfaceAnchor {
   maxY: number;
 }
 
-/** Initially firm, then gradually easier to pull. Continuous at every distance. */
 export function elasticDisplacement(distance: number) {
   const length = Math.abs(distance);
   return (
@@ -67,7 +64,6 @@ export function elasticDisplacement(distance: number) {
     (HORIZONTAL_GAIN * length - 50.4 * (1 - Math.exp(-length / 120)))
   );
 }
-/** Resume a pull from its currently displayed spring position without compressing it twice. */
 export function elasticInput(displacement: number) {
   const target = Math.abs(displacement);
   let input = target / HORIZONTAL_GAIN;
@@ -88,8 +84,6 @@ export function panFrom(
   delta: { x: number; y: number },
   anchor: SurfaceAnchor | null,
 ) {
-  // Free panning tracks the input exactly; resistance only exists around a
-  // reading anchor.
   if (!anchor)
     return {
       camera: { ...origin, x: origin.x + delta.x, y: origin.y + delta.y },
@@ -112,7 +106,6 @@ export function panFrom(
   };
 }
 
-/** Lock to a fully readable region without moving it more than a gentle nudge. */
 export function snapRegion(
   region: SurfaceRegion,
   camera: Camera,
@@ -187,7 +180,6 @@ export function nearestSnap(
   );
 }
 
-/** Damped spring step, stable across ordinary 60 Hz and 120 Hz displays. */
 export function springStep(
   position: number,
   velocity: number,

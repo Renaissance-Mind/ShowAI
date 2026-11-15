@@ -17,7 +17,6 @@ export {
 } from "./native-board-scene.mjs";
 let compiledKernel;
 const geometryKernel = () => (compiledKernel ??= new CompiledInkKernel());
-/** Portable brush v1. This module has no DOM, platform or storage dependencies. */
 export const PORTABLE_INK_FORMAT = "showai-ink-v1";
 export const isEditableDrawing = (node) =>
   node?.type === "drawing" &&
@@ -41,8 +40,6 @@ export function portableNodeSamples(node) {
   );
 }
 
-/** One logical stroke can exceed the bounded v1 fragment capacity. Keeping
- * fragments on the same node preserves selection, transforms and undo. */
 export function portableNodeFragments(node) {
   if (!isPortableInk(node?.attrs?.ink))
     throw new Error("Expected portable ink node");
@@ -141,8 +138,6 @@ export function inkModelPoses(document, boardId, previous = {}) {
   board?.content?.forEach((node) => visit(node, true));
   return { poses, nested, complete };
 }
-/** Transfer only changed ink payloads; the small hierarchy names every current stroke.
- * Previous is the last native-acknowledged model, never a merely queued frame. */
 export function inkScenePatch(document, boardId, previous) {
   const collect = (doc) => {
     const found = new Map();
@@ -307,7 +302,6 @@ export function validatePortableInk(ink) {
     ) < 1e-12
   )
     throw new Error("Invalid portable ink transform.");
-  // x, y, time, nib width, nib height, opacity, force, azimuth, altitude.
   if (
     !Array.isArray(ink.samples) ||
     !ink.samples.length ||
@@ -377,7 +371,6 @@ export function portableInkBounds(
   return geometryKernel().bounds(ink, strokeWidth, pressure);
 }
 
-/** One filled contour prevents translucent marker segments darkening at joins. */
 export function portableInkGeometry(
   ink,
   strokeWidth = ink.width,
@@ -403,7 +396,6 @@ export function portableInkGeometry(
   );
   const result = { polygons, path, mask };
   preparedGeometry.set(result, prepared);
-  // Do not accumulate every width visited by a slider.
   widths.clear();
   widths.set(key, result);
   return result;

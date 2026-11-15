@@ -1,4 +1,3 @@
-// Real source edits in an isolated checkout copy, real browser/Electron and files.
 import assert from "node:assert/strict";
 import { spawn, execFile } from "node:child_process";
 import { once } from "node:events";
@@ -17,7 +16,6 @@ import { promisify } from "node:util";
 import { chromium } from "playwright-core";
 import { releaseTestFixtures } from "./test-fixtures.mjs";
 
-// The smoke checks select controls by their Chinese labels.
 process.env.SHOWAI_LANGUAGE ??= "zh-CN";
 
 const root = resolve(import.meta.dirname, "..");
@@ -205,7 +203,6 @@ try {
     fetch(original.url + "__showai-dev/status").then((response) =>
       response.json(),
     );
-  // dev:status lists this backend through its presence record.
   const statusReport = await promisify(execFile)(
     process.execPath,
     [
@@ -362,7 +359,6 @@ try {
     await assertBackground(
       "explicit --show and --hide reuse the same desktop process",
     );
-    // Leave it explicitly shown to prove the subsequent hot restart does not show it again.
     await present("--show");
   }
 
@@ -587,7 +583,6 @@ try {
     `search runs through the real index worker and IPC (${Math.round(performance.now() - searchAt)} ms)`,
   );
 
-  // A real syntax error must leave the last working backend running.
   const backend = join(
     fixture,
     mode === "browser" ? "src/browser/server.ts" : "src/desktop/main.ts",
@@ -617,7 +612,6 @@ try {
   );
   record("compilation failure preserves the last working backend and CLI");
 
-  // Race the real autosave with an independent atomic file write.
   const baseline = await cli(
     "pages",
     "read",
@@ -681,8 +675,6 @@ try {
     );
   }
   if (info.libraryVersion === 2) {
-    // Versioned conflicts now use the retained-file review dialog. Preserve the
-    // real durable editor draft as a new page, then accept the external original.
     await page.evaluate(
       async ({ projectId, resourceId }) => {
         const records = await window.showai.invoke("drafts:list", {
@@ -734,7 +726,6 @@ try {
     undefined,
   );
   if (mode === "desktop") {
-    // Electron creates a new window after its ordinary save-aware quit.
     await browser.close();
     browser = await chromium.connectOverCDP(`http://127.0.0.1:${debugPort}`);
   }
@@ -763,7 +754,6 @@ try {
           window.showai.invoke("projects:list"),
         );
       } catch (error) {
-        // The native restart and the guarded renderer reload can overlap.
         if (String(error).includes("Execution context was destroyed"))
           return [];
         throw error;
@@ -823,7 +813,6 @@ try {
       "automatic recovery after runtime failure",
     );
     await poll(
-      // A successful recovery navigates the page before its bridge is ready.
       async () => {
         try {
           return await page.evaluate(
@@ -938,7 +927,6 @@ try {
     "malformed manual ordering is discarded before cached navigation renders",
   );
 
-  // A full quit/relaunch must reuse validated artifacts and still load real APIs.
   const beforeRelaunch = await receipt();
   await observer?.close();
   observer = undefined;

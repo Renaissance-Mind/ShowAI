@@ -1,6 +1,5 @@
 import { defineMessages } from "../index";
 
-// In-page AI: the floating composer opened from menus and the conversation panel.
 export default defineMessages("assistant", {
   "zh-CN": {
     "reference.pick": "标记参考位置",

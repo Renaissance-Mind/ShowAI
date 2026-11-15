@@ -131,8 +131,6 @@ function createPreviewWindow() {
     closePreview(preview);
   });
   previewWindows.add(preview);
-  // An unused native window has no committed page. Commit a blank document so
-  // debugger clients can attach without waiting for a thumbnail request.
   const initialized = preview.loadURL("about:blank");
   previewInitializations.set(preview, initialized);
   void initialized.catch((error) =>
@@ -145,7 +143,6 @@ function createPreviewWindow() {
   return preview;
 }
 
-/** Prepare hidden preview windows after the owning workbench has loaded. */
 export function preparePreviewWindows(owner: BrowserWindow) {
   workbenchOwners.add(owner);
   owner.once("closed", () => {
@@ -327,8 +324,6 @@ async function capture(
       void preview
         .loadFile(join(directory, "index.html"), { query })
         .catch(failedNavigation);
-    // Renderer IPC works while sandboxed subframes/resources are still loading.
-    // executeJavaScript/loadFile completion can otherwise wait indefinitely on them.
     await ready;
     clearTimeout(readyTimer!);
     if (preview.webContents.getOSProcessId() === owner.getOSProcessId())
@@ -571,7 +566,6 @@ async function pageThumbnail(
         const preview = capturing;
         capturing = undefined;
         pageShells.delete(preview);
-        // A quick scroll back must create a new job instead of joining an aborted capture.
         if (pending.get(pendingKey)?.leases === leases)
           pending.delete(pendingKey);
         void preview
@@ -685,7 +679,6 @@ export function pagePreviewStatus() {
   };
 }
 let warmTheme = "light";
-// Each failure doubles the wait before the same page revision is tried again.
 const warmFailures = new Map<string, { at: number; attempts: number }>();
 const warmRetryDelay = (attempts: number) =>
   Math.min(60000 * 2 ** (attempts - 1), 6 * 60 * 60 * 1000);
@@ -770,7 +763,6 @@ async function warmPages() {
   }
 }
 
-/** File notifications invalidate freshness, while the last good image remains readable. */
 export function invalidatePageThumbnails(change: DesktopChange) {
   warmGeneration++;
   const projects = new Set(change.projectIds ?? []);

@@ -9,7 +9,6 @@ import {
   onlinePresentation,
 } from "./presentation";
 
-/** One captured source revision, a complete reader and an optional focused preview. */
 export async function presentPage(input: {
   root: string;
   projectId: string;
@@ -30,8 +29,6 @@ export async function presentPage(input: {
         input.projectId,
         input.pageId,
       );
-      // A conversation view shows external data like page images do; only
-      // file exports ask before embedding it.
       const full = await service.export({
         projectId: input.projectId,
         pageId: input.pageId,
@@ -71,12 +68,9 @@ export async function presentPage(input: {
         ...preview,
         ...(online ? { online } : {}),
         ...(compact ? { compact } : {}),
-        // Delivery files embed data read from files outside the library;
-        // whoever hands them on decides with these sizes.
         ...(full.externalSnapshots
           ? { externalSnapshots: full.externalSnapshots }
           : {}),
-        // This operation never initiates synchronization. HTTP adds its verified receipt.
         persistence: { savedToProject: true, synchronized: false },
         bytes: {
           html: Buffer.byteLength(html),

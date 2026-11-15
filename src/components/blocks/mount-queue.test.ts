@@ -1,7 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { MountQueue } from "./mount-queue";
 
-/** A placeholder at a vertical position in an 800px window. */
 const at = (top: number, height = 180) =>
   ({
     getBoundingClientRect: () => ({
@@ -38,7 +37,6 @@ describe("component mount queue", () => {
     request("just above", at(-600));
     vi.runOnlyPendingTimers();
     expect(mounted).toEqual(["next screen", "just above", "top"]);
-    // The next batch waits until every body of this one has committed.
     releases.get("next screen")!();
     releases.get("just above")!();
     vi.runOnlyPendingTimers();

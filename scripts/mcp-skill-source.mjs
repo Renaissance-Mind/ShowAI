@@ -4,8 +4,6 @@ import { fileURLToPath } from "node:url";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
-// Only generates imports. The existing plugin remains the canonical source;
-// bundlers embed the same files without a second editable copy of the content.
 export async function mcpSkillSourceModule(sourceRoot = root) {
   const directory = join(sourceRoot, "plugins/showai/skills");
   const files = [];

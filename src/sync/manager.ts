@@ -195,7 +195,6 @@ export class SyncManager {
     readonly home: string,
     readonly options: {
       events?: boolean;
-      /** Bulk callers may use the server's eight per-account upload slots. */
       uploadConcurrency?: number;
       trace?: (event: {
         stage: string;
@@ -390,8 +389,6 @@ export class SyncManager {
       typeof event.previousHead === "string" &&
       /^[a-f0-9]{64}$/.test(event.previousHead)
     ) {
-      // Rebuild from the cached previous state; without it the head alone
-      // starts a normal synchronization that downloads the snapshot.
       const binding = bindings.find(
         (item) => item.remoteProjectId === event.project.id,
       );
@@ -411,7 +408,6 @@ export class SyncManager {
           };
           if (await validSnapshotRecord(rebuilt)) record = rebuilt;
         } catch {
-          // A malformed change set is ignored like a head-only notice.
         }
     }
     if (event.type === "revision" && record) {
@@ -565,8 +561,6 @@ export class SyncManager {
   private objectPath(digest: string, namespace?: string) {
     if (!/^[a-f0-9]{64}$/.test(digest))
       throw new CoreError("INVALID_DATA", "Invalid object digest.");
-    // Legacy unscoped bytes remain readable only by local recovery plans.
-    // Network snapshots cannot reuse objects learned from another project/server.
     return namespace
       ? join(this.root, "current-objects", namespace, digest)
       : join(this.root, "objects", digest);
@@ -593,8 +587,6 @@ export class SyncManager {
       });
       const value = await serverJson(response);
       if (response.ok) return value as T;
-      // BUSY is returned before the server performs any work, so waiting and
-      // repeating the same request is safe for every endpoint.
       const retryAfter = Number(value.error?.details?.retryAfter ?? 1);
       if (
         response.status === 429 &&
@@ -705,7 +697,6 @@ export class SyncManager {
             device: `ShowAI · ${hostname().slice(0, 180)}`,
           },
         ).catch((error: unknown) => {
-          // Tell the form which field is missing so it can open and focus it.
           if (
             error instanceof SyncError &&
             error.code === "REGISTRATION_KEY_REQUIRED"
@@ -800,7 +791,6 @@ export class SyncManager {
       serverUrl: connection.url,
     };
   }
-  /** Completion codes the browser delivered through a showai://login link. */
   private readonly loginCompletions = new Map<string, string>();
   deliverLoginCompletion(flowId: string, code: string) {
     identifier(flowId);
@@ -832,7 +822,6 @@ export class SyncManager {
         },
       );
     } catch (error) {
-      // A mistyped code keeps the login; only an exhausted flow ends it.
       const remaining = (
         error instanceof SyncError
           ? (error.details as { remainingAttempts?: unknown } | undefined)
@@ -899,7 +888,6 @@ export class SyncManager {
         (project) => project.connectionId === connectionId,
       )
     ) {
-      // End the server session too, and keep bound servers from restoring it.
       await this.request(removed, "/api/auth/logout", "POST").catch(
         () => undefined,
       );
@@ -1063,7 +1051,6 @@ export class SyncManager {
   }
   async revokeAllTokens(connectionId: string) {
     const connection = await this.connection(connectionId);
-    // Bound servers sign each other in, so a sign-out must reach the whole group.
     const peers = await this.accounts
       .profile(connectionId)
       .then((profile) =>
@@ -1397,8 +1384,6 @@ export class SyncManager {
     const current = head
       ? await operations.projectFiles(projectId, head)
       : new Map<string, Buffer>();
-    // Current-only libraries may compact old local revisions. Compare with the
-    // retained server baseline, without requiring a network request to stop sync.
     const connection = await this.connection(project.connectionId);
     const record = project.remoteHead
       ? await this.cachedRecord(connection, project, project.remoteHead)
@@ -1498,7 +1483,6 @@ export class SyncManager {
         (item) => item.projectId === projectId,
       );
       if (!project) return;
-      // Clearing the message clears its classification too.
       if ("error" in patch && patch.error === undefined) {
         delete project.errorKind;
         delete project.errorDetail;
@@ -1555,7 +1539,6 @@ export class SyncManager {
     }
     return undefined;
   }
-  /** The last decoded state per binding; a revision's content never changes. */
   private decoded = new Map<
     string,
     { revision: string; files: Map<string, Buffer> }
@@ -1585,7 +1568,6 @@ export class SyncManager {
     else this.decoded.delete(memoKey);
     return decoded;
   }
-  /** One object of a project's server snapshots, through the local object cache. */
   private async readObject(
     connection: ServerConnection,
     project: ProjectConnection,
@@ -1615,7 +1597,6 @@ export class SyncManager {
       await atomicLibraryFile(this.home, path, legacy);
       return legacy;
     }
-    // decodeSnapshot verifies every object digest, including cached ones.
     if (cached) return cached;
     const response = await fetch(
       `${connection.url}/api/projects/${project.remoteProjectId}/objects/${digest}`,
@@ -1635,7 +1616,6 @@ export class SyncManager {
     await cacheDownload(this.home, path, response, digest);
     return readFile(path);
   }
-  /** Shares or writes back linked files of a project this device has. */
   private async refreshBundles(
     library: GitLibrary,
     projectId: string,
@@ -1656,11 +1636,6 @@ export class SyncManager {
       publish,
     });
   }
-  /**
-   * Stores the copies of linked files a snapshot carries (see
-   * dataset-bundles) before its records apply, so the receiving datasets
-   * and resources read them right away.
-   */
   private async receiveBundles(
     connection: ServerConnection,
     project: ProjectConnection,
@@ -1739,13 +1714,11 @@ export class SyncManager {
         true,
       );
     const ids = [...captured.objects.keys()];
-    // Objects of the expected current state are already on the server.
     const baseline = expected
       ? await this.record(connection, project, expected)
       : undefined;
     const known = new Set(Object.values(baseline?.snapshot.files ?? {}));
     const changed = ids.filter((digest) => !known.has(digest));
-    // A server with the delta capability rebuilds the snapshot from its head.
     const deltaBase =
       baseline?.snapshot.format === syncProtocol &&
       captured.snapshot.format === syncProtocol &&
@@ -1933,7 +1906,6 @@ export class SyncManager {
     try {
       return await publishCaptured();
     } catch (error) {
-      // A server that lost part of its current state receives every object.
       if (!(error instanceof SyncError && error.code === "MISSING_OBJECT"))
         throw error;
       await send(ids);
@@ -2032,8 +2004,6 @@ export class SyncManager {
     connection: ServerConnection,
     suppliedRemote?: SyncProject,
   ) {
-    // App windows, the development App and CLI processes share checkpoints and
-    // recovery plans. Serialize the whole project cycle, not just config writes.
     return withLibraryLock(
       this.home,
       async () => {
@@ -2097,7 +2067,6 @@ export class SyncManager {
     project.role = remote.role;
     const library = new GitLibrary(this.home);
     await library.recover();
-    // Changes of linked files on this device become new synchronized copies.
     if (project.role !== "viewer")
       await this.refreshBundles(library, project.projectId, true);
     const localHead = await library.head();
@@ -2114,7 +2083,6 @@ export class SyncManager {
             project.projectId,
           ).projectFiles(project.projectId, localHead)
         : new Map<string, Buffer>();
-    // The files at localHead; merges below replace localFiles with new maps.
     const actual = localFiles;
     this.trace("local-files-read", phaseStarted);
     const unfinishedSave = (await new WorkspaceProtection(library).list()).find(
@@ -2146,7 +2114,6 @@ export class SyncManager {
           await this.record(connection, project, project.remoteHead),
         )
       : new Map<string, Buffer>();
-    // An interrupted import keeps one recovery draft, rather than a version chain.
     if (pending) {
       const saved = await this.pendingFiles(pending);
       const blend = mergeProjectFiles(baseline, localFiles, saved);
@@ -2239,8 +2206,6 @@ export class SyncManager {
         },
         localFiles,
       );
-      // Recheck the whole captured state under the content lock. Another window
-      // may have saved during the network request; its edits must be retried.
       await library.transaction(
         {
           actor: { kind: "system" },
@@ -2313,15 +2278,9 @@ export class SyncManager {
       error: undefined,
       syncedAt: new Date().toISOString(),
     });
-    // Copies edited on other devices go into this device's linked files.
     await this.refreshBundles(library, project.projectId, false);
     this.trace("synchronize-complete", phaseStarted);
   }
-  /**
-   * Creates a project that stays on this device even when new projects
-   * default to a server account. Its id is recorded before the project
-   * exists, so no background cycle can enroll it in between.
-   */
   async createLocalProject<T extends { id: string }>(
     create: (id: string) => Promise<T>,
   ) {
@@ -2344,7 +2303,6 @@ export class SyncManager {
     const config = await this.configuration();
     if (!config.defaultConnectionId || !config.defaultSince) return;
     const store = new FileStore(this.home);
-    // Only projects neither synchronized nor kept local need their metadata.
     const known = new Set([
       ...config.projects.map((connection) => connection.projectId),
       ...(config.localProjectIds ?? []),
@@ -2370,8 +2328,6 @@ export class SyncManager {
           (item) => item.id === config.defaultConnectionId,
         )!;
         await this.update((next) => {
-          // Re-checked under the settings lock: a local-only project may have
-          // been reserved after this cycle read the configuration.
           if (
             !next.projects.some((item) => item.projectId === project.id) &&
             !next.localProjectIds?.includes(project.id)
@@ -2401,8 +2357,6 @@ export class SyncManager {
     );
     const library = new GitLibrary(this.home);
     const global = await library.head();
-    // Resource tokens at this head, read in one request for the projects whose
-    // memo is older. Other identifiers fail on their own below, as before.
     let tokens: Promise<Map<string, string | null>> | undefined;
     const resourceToken = async (projectId: string) => {
       const path = `projects/${projectId}`;
@@ -2512,15 +2466,11 @@ export class SyncManager {
           const saved = (await this.configuration()).projects.find(
             (item) => item.projectId === project.projectId,
           );
-          // A stopped copy or retained viewer edit has no new synchronized
-          // revision. Its older local revision may already have been compacted.
           if (saved?.status !== "synced" || saved.paused) {
             this.observed.delete(project.projectId);
             changed ||= before !== saved?.remoteHead;
             continue;
           }
-          // Anchor the memo at the last synchronized revision. A concurrent new commit
-          // must remain visible on the next cycle, even if it arrived during upload.
           const revision = saved?.localRevision ?? null;
           this.observed.set(project.projectId, {
             global: revision,
@@ -2599,8 +2549,6 @@ export class SyncManager {
     await this.dispatch(projectId ? [projectId] : undefined, true);
     return this.status();
   }
-  /** Existing filesystem watchers supply dirty projects; foreground/network wakes
-   * only refresh heads and activate polling, without forcing every project scan. */
   wake(projectIds?: string[], invalidateAll = false) {
     this.trace("wake");
     this.activeUntil = Date.now() + 60_000;
@@ -2706,10 +2654,6 @@ export class SyncManager {
   }
 }
 
-/**
- * Classifies a failed project sync: a translated message for the workbench,
- * the kind of failure, and the original text for technical details.
- */
 export function syncFailure(
   error: unknown,
 ): Pick<ProjectConnection, "error" | "errorKind" | "errorDetail"> {
@@ -2734,7 +2678,6 @@ export function syncFailure(
       errorDetail: `${error.code} · ${error.status} · ${original}`,
     };
   }
-  // serverFetch reports transport failures as TypeError; timeouts abort.
   if (
     error instanceof TypeError ||
     (error instanceof Error &&
@@ -2748,10 +2691,6 @@ export function syncFailure(
   return { error: original, errorKind: "local", errorDetail: original };
 }
 
-/**
- * Reads a server JSON response. A web page instead of JSON usually means the
- * address points at the website rather than the ShowAI Server base.
- */
 async function serverJson(response: Response) {
   const body = await response.text();
   try {

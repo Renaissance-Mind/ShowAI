@@ -21,11 +21,6 @@ type State =
 
 let open: (() => void) | null = null;
 
-/**
- * Open a local file a component linked to in the workbench player.
- * The component never receives the file: the trusted frame asks its host for a
- * short-lived grant and plays it from the host's media route.
- */
 export function openComponentMedia(value: unknown): boolean {
   if (!isLocalFileLink(value) || navigator.userActivation?.isActive !== true)
     return false;
@@ -176,7 +171,6 @@ function decodeLink(link: string): string {
   }
 }
 
-/** Host errors arrive as Error instances or as plain `{code, message}` objects. */
 function errorText(error: unknown): string {
   const message = (error as { message?: unknown } | null)?.message;
   return typeof message === "string" ? message : String(error);

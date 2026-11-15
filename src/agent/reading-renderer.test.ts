@@ -92,7 +92,6 @@ test("rendered reading captures content below the viewport inside the reader's s
   const root = await mkdtemp(join(tmpdir(), "showai-reading-shell-"));
   fixtures.push(root);
   const html = join(root, "shell.html");
-  // Like the portable reader: a 100dvh app whose inner element scrolls.
   await writeFile(
     html,
     `<!doctype html><html><body style="margin:0"><main class="portable-app" style="height:100dvh">
@@ -170,7 +169,6 @@ window.__SHOWAI_COMPONENT_READING__={ready:true,status:"raw",props:{}};</script>
     `<!doctype html><html><body><div id="component-root"></div>${report}</body></html>`,
   );
   const html = join(root, "reader.html");
-  // Like the portable reader without a recorded <html lang>: the browser decides.
   await writeFile(
     html,
     `<!doctype html><html><body><main class="portable-app">
@@ -272,7 +270,6 @@ test("viewport capture keeps CSS viewport geometry while full capture reports ex
   expect(full.height).toBeGreaterThan(1200);
   expect(full.capture.expanded).toBe(true);
   expect(full.capture.requestedViewport.height).toBe(600);
-  // Inspection describes the requested viewport, not the resized screenshot.
   expect(full.layout?.blocks[0]).toMatchObject({ rect: { height: 300 } });
 }, 15000);
 

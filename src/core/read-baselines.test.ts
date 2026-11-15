@@ -25,7 +25,6 @@ test("one file per page version, found by hash or revision without reading other
   await baselines.remember(projectId, page);
   const [file] = await documents();
   const written = (await stat(join(directory(), file))).mtimeMs;
-  // Reading the same version again keeps the file and refreshes its time.
   await new Promise((done) => setTimeout(done, 20));
   await baselines.remember(projectId, page);
   expect(await documents()).toEqual([file]);

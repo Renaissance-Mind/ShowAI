@@ -3,17 +3,11 @@ import type { AgentService } from "../service";
 
 export type Access = "read" | "write";
 
-/** What an operation needs besides its input, the same for every entry. */
 export interface OperationContext {
   service: AgentService;
-  /** The project, already resolved and authorized by the entry. */
   projectId: string;
 }
 
-/**
- * One capability that the CLI and MCP share: its input contract and what it
- * does. run returns the result before an entry shapes it (receipts, links).
- */
 export interface Operation<Shape extends z.ZodRawShape = z.ZodRawShape> {
   id: string;
   access: Access;
@@ -28,7 +22,6 @@ export const operation = <Shape extends z.ZodRawShape>(
   declaration: Operation<Shape>,
 ) => declaration;
 
-/** Fields of an operation's input in the given order, e.g. for a tool schema. */
 export function pick<
   Shape extends z.ZodRawShape,
   const Key extends keyof Shape,
@@ -42,10 +35,6 @@ export function pick<
   >;
 }
 
-/**
- * Validates input from an entry that did not validate it yet (the CLI).
- * Errors name the entry's own spelling of each field, e.g. --base-hash.
- */
 export function parseInput<Shape extends z.ZodRawShape>(
   declaration: Operation<Shape>,
   input: Record<string, unknown>,

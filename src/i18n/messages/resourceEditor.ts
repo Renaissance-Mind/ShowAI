@@ -1,6 +1,5 @@
 import { defineMessages } from "../index";
 
-// Shared file settings panel for video, audio and PDF blocks.
 export default defineMessages("resourceEditor", {
   "zh-CN": {
     wrongType: "请选择对应类型的文件。",

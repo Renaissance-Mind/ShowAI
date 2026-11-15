@@ -19,7 +19,6 @@ afterAll(async () => {
 it("announces this process, ignores gone or reused pids and withdraws on removal", async () => {
   const directory = instanceDirectory(home);
   await mkdir(directory, { recursive: true });
-  // A crashed App left its record behind; pid 2^31-2 does not exist.
   await writeFile(
     join(directory, "2147483646.json"),
     JSON.stringify({ format: "showai-instance", version: 1, pid: 2147483646 }),
@@ -32,7 +31,6 @@ it("announces this process, ignores gone or reused pids and withdraws on removal
     cli: { command: process.execPath, args: ["/runtime/cli.mjs"] },
     url: "http://127.0.0.1:5999/",
   });
-  // Publishing prunes records of processes that no longer exist.
   expect(await readdir(directory)).toEqual([`${process.pid}.json`]);
   await writeFile(
     join(directory, "2147483645.json"),
@@ -51,7 +49,6 @@ it("announces this process, ignores gone or reused pids and withdraws on removal
     url: "http://127.0.0.1:5999/",
   });
   expect(live.ignored).toMatchObject([{ pid: 2147483645, reason: "NOT_RUNNING" }]);
-  // A pid now running another program is not this App any more.
   const reused = await readInstances(
     home,
     new Map([[process.pid, "/usr/bin/some-other-program"]]),

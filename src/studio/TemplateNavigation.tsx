@@ -4,7 +4,6 @@ import { useTranslator } from "../i18n/react";
 import messages from "../i18n/messages/templates";
 import "./template-navigation.css";
 
-// Labels are templates-namespace keys (`type.<id>`), translated at render.
 const types = [
   { id: "all", icon: LayoutTemplate },
   { id: "system-presentation", icon: FileText },

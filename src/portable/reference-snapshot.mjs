@@ -1,6 +1,3 @@
-// The references of an exported page, written by the export so components that
-// read references show them in the reader. Dependency-free: it runs in readers.
-
 export const REFERENCE_SNAPSHOT_LIMIT = 200;
 const ID = /^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/;
 const KINDS = ["link", "database", "component"];
@@ -40,7 +37,6 @@ function item(value, path) {
   };
 }
 
-/** The checked snapshot; throws with the field path when it is invalid. */
 export function validateReferenceSnapshot(value) {
   if (!value || typeof value !== "object" || Array.isArray(value))
     throw new Error("references must be an object.");
@@ -55,7 +51,6 @@ export function validateReferenceSnapshot(value) {
       );
     return items.map((entry, index) => item(entry, `references.${key}[${index}]`));
   };
-  // Distinct pages in each direction; the lists may stop at the limit.
   let pages;
   if (value.pages !== undefined) {
     if (!value.pages || typeof value.pages !== "object")

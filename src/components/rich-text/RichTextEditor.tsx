@@ -171,9 +171,7 @@ type DialogState = {
   type: "image" | "link" | "note";
   value: string;
   alt: string;
-  /** Formula node that receives the note through \note in its LaTeX. */
   math?: { pos: number; body: string };
-  /** The selection already carried a note when the dialog opened. */
   hadNote?: boolean;
 };
 
@@ -239,7 +237,6 @@ function safeLinkUrl(value: string) {
   return /^(https?:\/\/|mailto:|tel:|#)/i.test(value) || !!parsePageLink(value);
 }
 
-/** Page editors append a synthetic tail paragraph that is not stored in the document. */
 function isSyntheticId(id: string) {
   return id.startsWith("page-tail-");
 }
@@ -265,8 +262,6 @@ export default function RichTextEditor({
   trailingNode = true,
   retentionKey,
 }: RichTextEditorProps) {
-  // Primitive component nodes become editor nodes; every other block keeps its
-  // identity, so the echo of a local edit is recognised without parsing.
   const content = useMemo(() => readContentTree(source), [source]);
   const t = useTranslator(messages);
   const tc = useTranslator(commonMessages);
@@ -277,7 +272,6 @@ export default function RichTextEditor({
   const selectionMenuId = useId();
   latestOnChange.current = onChange;
   const wrapperRef = useRef<HTMLDivElement>(null);
-  // Quick jump inserts at the caret the way the "/" menu does.
   const insertAtSelection = useRef<
     (value: InsertComponentDetail) => boolean
   >(() => false);
@@ -290,7 +284,6 @@ export default function RichTextEditor({
   >(() => false);
   const dragPosition = useRef<number | null>(null);
   const [slash, setSlash] = useState<SlashState | null>(null);
-  // The @ menu: the slash menu's rows and keys with a second trigger.
   const [mention, setMention] = useState<SlashState | null>(null);
   const mentionRef = useRef<SlashState | null>(null);
   const dismissedMention = useRef<number | null>(null);
@@ -315,7 +308,6 @@ export default function RichTextEditor({
   const hoverHideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const hoverMenuOpen = useRef(blockMenu);
   hoverMenuOpen.current = blockMenu;
-  // Pointer moves are measured once per frame; moving within one block keeps state.
   const hoverFrame = useRef(0);
   const hoverPointer = useRef(0);
   useEffect(() => () => cancelAnimationFrame(hoverFrame.current), []);
@@ -366,7 +358,6 @@ export default function RichTextEditor({
     viewportChanged: (event: Event) => void;
   } | null>(null);
   const dismissedSelection = useRef<string | null>(null);
-  // Native selects and color pickers blur ProseMirror before they emit a value.
   const selectionMenuInteracting = useRef(false);
   const [, setRevision] = useState(0);
   const selectionBeforeDialog = useRef<{ from: number; to: number } | null>(
@@ -378,7 +369,6 @@ export default function RichTextEditor({
   const extensions = useMemo(
     () => [
       ...createExtensions({
-        // An empty page (no trailing node: the continuous page editor) points to the Agent.
         placeholder: ({ empty }) =>
           translate(empty && !trailingNode ? "placeholderPage" : "placeholder"),
         trailingNode,
@@ -460,13 +450,10 @@ export default function RichTextEditor({
         ) as HTMLAnchorElement | null;
         if (!link || (!readOnly && !event.metaKey && !event.ctrlKey))
           return false;
-        // Links inside components are not text being edited: the host follows
-        // them with their own click and modifiers.
         if (!readOnly && !link.isContentEditable) return false;
         const href = link.getAttribute("href") ?? "";
         if (!safeLinkUrl(href)) return true;
         const target = navigationTarget(href);
-        // The modifier that follows a link while editing is not a tab request.
         if (target && requestNavigation(link, target, readOnly ? event : undefined))
           return true;
         if (href.startsWith("#")) {
@@ -479,7 +466,6 @@ export default function RichTextEditor({
         const pasted = event.clipboardData?.getData("text/plain").trim() ?? "";
         const linked = parsePageLink(pasted);
         if (linked) {
-          // A copied page link links the selected text, or inserts the page title.
           event.preventDefault();
           const { empty, from, to } = view.state.selection;
           const mark = view.state.schema.marks.link.create({ href: pasted });
@@ -533,9 +519,6 @@ export default function RichTextEditor({
       setBubble(null);
     }
   }, [editor, readOnly]);
-  // React node views (toggle, callout, stepper) render synchronously while a
-  // transaction is applied; the page re-renders inside that flush with the
-  // previous echo of its content. Syncing then would revert the transaction.
   const latestContent = useRef(content);
   latestContent.current = content;
   const dispatching = useRef(false);
@@ -665,7 +648,6 @@ export default function RichTextEditor({
       editor.off("create", clearInitialSelection);
     };
   }, [editor, readOnly]);
-  // Only an editor holding a selected component listens on the document.
   useEffect(() => {
     if (!editor || readOnly || !widgetSelected) return;
     const clearOnBlank = (event: PointerEvent) => {
@@ -673,7 +655,6 @@ export default function RichTextEditor({
       const target = event.target;
       const widget = target.closest(".document-widget");
       if (widget && editor.view.dom.contains(widget)) return;
-      // Keep the selection while using its formatting, menus and dialogs.
       if (
         !widget &&
         target.closest(
@@ -687,7 +668,6 @@ export default function RichTextEditor({
       if (active instanceof HTMLElement && editor.view.dom.contains(active))
         active.blur();
       editor.view.dispatch(transaction);
-      // Editor whitespace otherwise lets ProseMirror select the nearest atom again.
       if (
         editor.view.dom.contains(target) &&
         !target.closest("[data-block-id]")
@@ -767,8 +747,6 @@ export default function RichTextEditor({
           dismissedSlash.current = null;
         }
       }
-      // An @ after a space or at the start of a line opens the mention menu,
-      // never inside code and never while an input method is composing.
       if (!editor.view.composing) {
         const before =
           empty && $from.parent.isTextblock && !$from.parent.type.spec.code
@@ -813,7 +791,6 @@ export default function RichTextEditor({
       target instanceof Element &&
       target.closest(".editor-bubble")?.id === selectionMenuId;
     const enteringMenu = (event: FocusEvent) => {
-      // Capture keyboard focus transfers before Tiptap's blur transaction.
       if (ownsMenuTarget(event.relatedTarget))
         selectionMenuInteracting.current = true;
     };
@@ -830,7 +807,6 @@ export default function RichTextEditor({
     const finishSelecting = (event: PointerEvent) => {
       if (event.pointerId !== selectionPointer) return;
       stopSelecting();
-      // Let the browser and ProseMirror commit the final selection on release.
       selectionFrame = requestAnimationFrame(refresh);
     };
     const cancelSelecting = () => {
@@ -915,9 +891,6 @@ export default function RichTextEditor({
       editor.view.dom.removeEventListener("contextmenu", hideBubble);
     };
   }, [editor, selectionMenuId, minimal]);
-  // Document and window listeners matter only while this editor is focused or
-  // shows a menu, bubble or block handle; a Board with many text boxes then
-  // runs one set of handlers per event rather than one per editor.
   const listensToWindow =
     focused || !!bubble || !!slash || !!mention || blockMenu || !!hover;
   useEffect(() => {
@@ -946,7 +919,6 @@ export default function RichTextEditor({
   }, [editor, listensToWindow]);
 
 
-  /** Closes the @ menu until this @ is typed again; the selection stays. */
   function dismissMention() {
     const current = mentionRef.current;
     if (current) dismissedMention.current = current.from;
@@ -962,7 +934,6 @@ export default function RichTextEditor({
     setSlash(null);
   }
 
-  /** Text for a link inserted without a selection: the page title for page links. */
   function linkLabel(href: string) {
     const target = parsePageLink(href);
     const bridge = pageLinksRef.current;
@@ -1001,7 +972,6 @@ export default function RichTextEditor({
     dialog?.type === "link" && pageLinks && !/^[a-z][a-z0-9+.-]*:|^#/i.test(dialog.value.trim())
       ? dialog.value.trim().toLocaleLowerCase()
       : null;
-  // Typing a page name instead of an address offers the project's pages.
   const linkSuggestions = useMemo(
     () =>
       linkQuery === null || !pageLinks
@@ -1073,7 +1043,6 @@ export default function RichTextEditor({
     [editor, selectionMenuId],
   );
 
-  /** Add, change or remove the hover note of the selected text or formula. */
   function applyNote(state: DialogState, value: string) {
     if (!editor) return false;
     if (value.length > NOTE_MAX) {
@@ -1114,7 +1083,6 @@ export default function RichTextEditor({
     return true;
   }
 
-  /** Inserts images that link their original files instead of embedding copies. */
   async function linkImageFiles() {
     if (!editor || !editor.isEditable || !chooseFiles) return;
     const files = await chooseFiles("image", true).catch((error: unknown) => {
@@ -1284,13 +1252,11 @@ export default function RichTextEditor({
         icon: <ArrowRight size={20} />,
         group: t("group.basic"),
         run: (e: Editor) => {
-          // Untitled steps read as "Step n" in the current language.
           const step = { type: "step", content: [{ type: "paragraph" }] };
           const { from } = e.state.selection;
           e.chain()
             .focus()
             .insertContent({ type: "stepper", content: [step, step] })
-            // Same transaction: continue typing in the new stepper's first step.
             .command(({ tr }) => {
               let stepper = -1;
               tr.doc.nodesBetween(
@@ -1375,12 +1341,10 @@ export default function RichTextEditor({
       t,
     ],
   );
-  /** Puts a resolved catalog component at from–to, replacing what is there. */
   const insertResolved = (
     value: Awaited<ReturnType<typeof catalog.resolve>>,
     from: number,
     to: number,
-    /** Move the caret to the end of the content first. */
     atEnd = false,
   ) => {
     if (!editor) return;
@@ -1418,7 +1382,6 @@ export default function RichTextEditor({
             to: editor.state.doc.content.size,
           }
         : editor.state.selection;
-    // The host resolved it through the same catalog this menu uses.
     insertResolved(
       value as Parameters<typeof insertResolved>[0],
       from,
@@ -1571,7 +1534,6 @@ export default function RichTextEditor({
         .querySelector(".slash-menu .slash-item.is-selected")
         ?.scrollIntoView({ block: "nearest" });
   }, [mentionMenu.selected]);
-  // Typing on past every match closes the menu, like a dismissed one.
   useEffect(() => {
     if (mention && !mentionMenu.rows.length && /\s$/.test(mention.query))
       dismissMention();
@@ -1696,7 +1658,6 @@ export default function RichTextEditor({
   if (!editor)
     return <div className="editor-loading" aria-label={t("openingDocument")} />;
 
-  // Components without a settings form or in-place editing are changed by an agent.
   const hoverNode = hover && blockMenu ? editor.state.doc.nodeAt(hover.pos) : null;
   const hoverNeedsAgent =
     hoverNode?.type.name === "widget" &&
@@ -1704,7 +1665,6 @@ export default function RichTextEditor({
   const textStyle = editor.isActive("heading")
     ? t("block.heading", { level: editor.getAttributes("heading").level })
     : t("block.text");
-  // The reference action names how many blocks the selection touches.
   const bubbleBlockCount =
     bubble && assistant
       ? selectionBlockIds(
@@ -2389,14 +2349,11 @@ export default function RichTextEditor({
                 title={t("insert.fromSelectionTitle")}
                 onMouseDown={(event) => event.preventDefault()}
                 onClick={() => {
-                  // Same entry as «/», opened at the end of the selected block so
-                  // the insertion neither replaces nor splits the selected text.
                   const end = editor.state.selection.$to.end();
                   selectionMenuInteracting.current = false;
                   setBubble(null);
                   editor.commands.setTextSelection(end);
                   openSlash();
-                  // The toolbar closes after this click; keep typing in the search field.
                   setTimeout(() => slashInputRef.current?.focus(), 0);
                 }}
               >

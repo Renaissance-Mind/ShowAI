@@ -14,8 +14,6 @@ import {
 } from "../../datasets/record-query.mjs";
 import type { DatabaseColumn, DatabaseView } from "./types";
 
-// Data in the shape the database saved before field registries: a single
-// {column, value} filter and a single sort per view.
 const legacy = {
   title: "Reading list",
   columns: [

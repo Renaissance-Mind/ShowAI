@@ -6,8 +6,6 @@ import { sourceSessionFor } from "../../src/surface/source-client";
 import { PortableInputScope } from "../../src/surface/portable-input-scope";
 import { appendNewPortableInk } from "../../src/surface/portable-ink-append.mjs";
 
-/** Executes only inside an explicit acceptance fixture, against the actual
- * installed browser bridge/backend and real independently owned Workers. */
 export async function pendingLifecycle(
   projectId: string,
   kind: "leave" | "clear" | "dispose" | "switch",

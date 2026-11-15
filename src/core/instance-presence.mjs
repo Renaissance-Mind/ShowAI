@@ -1,7 +1,3 @@
-// Which running ShowAI apps serve a content library. Each desktop or browser
-// build that opens a library writes <home>/local/instances/<pid>.json and
-// removes it when it switches libraries or exits. Readers ignore records of
-// processes that are gone or whose command no longer matches.
 import { mkdir, readdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { rmSync } from "node:fs";
 import { join, resolve } from "node:path";
@@ -13,7 +9,6 @@ export function instanceDirectory(home) {
   return join(resolve(home), "local", "instances");
 }
 
-/** Whether a process exists; another user's process (EPERM) counts as running. */
 export function processAlive(pid) {
   if (!Number.isInteger(pid) || pid <= 0) return false;
   try {
@@ -26,7 +21,6 @@ export function processAlive(pid) {
   }
 }
 
-// Paths this process published, with how many open libraries use each.
 const published = new Map();
 let exitHook = false;
 function removeOnExit() {
@@ -49,11 +43,6 @@ async function pruneDead(directory) {
   }
 }
 
-/**
- * Announces that this process serves `home`. Returns a handle whose remove()
- * withdraws the announcement (library switch or orderly shutdown); the record
- * is also removed when the process exits.
- */
 export async function publishInstance(home, details) {
   const directory = instanceDirectory(home);
   const path = join(directory, `${process.pid}.json`);
@@ -104,11 +93,6 @@ export async function publishInstance(home, details) {
   };
 }
 
-/**
- * Live instance records of a library. `commands` maps pid to its command line
- * (from `ps`); when given, a record whose process now runs another executable
- * (a reused pid) is ignored.
- */
 export async function readInstances(home, commands) {
   const directory = instanceDirectory(home);
   const names = await readdir(directory).catch((error) => {
@@ -123,7 +107,6 @@ export async function readInstances(home, commands) {
     try {
       record = JSON.parse(await readFile(path, "utf8"));
     } catch (error) {
-      // Written atomically; a vanished or damaged file is reported, not fatal.
       if (error.code === "ENOENT") continue;
       ignored.push({ path, reason: "INVALID" });
       continue;

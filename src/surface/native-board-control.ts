@@ -1,4 +1,3 @@
-/** Ephemeral input configuration. It is never document/source authority. */
 export interface NativeBoardControl {
   tool:string;color:string;fillColor:string;width:number;pressure:boolean;ruler:boolean;
 }
@@ -6,7 +5,6 @@ export interface NativeBoardControlRecord {revision:number;control:Readonly<Nati
 export interface NativeBoardToolReceipt {revision:number;tool:string;applied:boolean;superseded?:boolean}
 export interface NativeBoardControlHandle {update(value:Partial<NativeBoardControl>):void}
 const tools=new Set(["select","pen","highlighter","eraser","rectangle","ellipse","arrow","region","text","pan","lasso"]);
-/** Both an intent and a frame retain this same captured, closed value. */
 export function serializeNativeBoardControl(value:NativeBoardControl):Readonly<NativeBoardControl>{
   if(!value||Object.keys(value).length!==6||!["tool","color","fillColor","width","pressure","ruler"].every(key=>Object.hasOwn(value,key)))throw new TypeError("Invalid native Board input configuration");
   const {tool,color,fillColor,width,pressure,ruler}=value;

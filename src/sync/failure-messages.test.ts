@@ -49,7 +49,6 @@ it("classifies sync failures into network, sign-in, server and local writes", as
   expect(syncFailure(new CoreError("INVALID_DATA", "bad"))).toMatchObject({
     errorKind: "local",
   });
-  // A real refused connection: the translated sentence first, raw text kept.
   const unreachable = await serverFetch(`http://127.0.0.1:1/api/info`).catch(
     (error: unknown) => error,
   );

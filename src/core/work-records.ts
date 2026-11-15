@@ -4,11 +4,6 @@ import { tmpdir } from "node:os";
 import { dirname, isAbsolute, join, resolve } from "node:path";
 import { atomicRename } from "./atomic-rename";
 
-/**
- * Where Agents keep the stage records of a work (reader brief, material notes,
- * presentation plan, review). Records are working material on this device:
- * they are not content, are not synchronized and never ship with a page.
- */
 export interface WorkRecordsSetting {
   format: "showai-work-records";
   version: 1;
@@ -18,7 +13,6 @@ export interface WorkRecordsSetting {
 
 export interface WorkRecordsLocation {
   directory: string;
-  /** environment: SHOWAI_RECORDS_DIR; setting: Settings → General; default: the system temporary directory. */
   source: "environment" | "setting" | "default";
 }
 
@@ -51,7 +45,6 @@ export async function readWorkRecordsSetting(
   return absoluteDirectory(value.directory, "The work records directory");
 }
 
-/** null returns to the default location. */
 export async function setWorkRecordsDirectory(
   root: string,
   directory: string | null,
@@ -73,7 +66,6 @@ export async function setWorkRecordsDirectory(
   return workRecordsLocation(root);
 }
 
-/** SHOWAI_RECORDS_DIR isolates development and test instances. */
 export async function workRecordsLocation(
   root: string,
 ): Promise<WorkRecordsLocation> {

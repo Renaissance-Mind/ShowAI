@@ -3,14 +3,9 @@ import type { MessageKey } from "../i18n";
 import type navigationMessages from "../i18n/messages/navigation";
 import type surfaceMessages from "../i18n/messages/surface";
 
-/**
- * Key chords use `Mod` for Command on macOS and Ctrl elsewhere. A chord is a
- * `+`-separated list; named keys are translated where they have no glyph.
- */
 export type KeyChord = string;
 
 export interface ShortcutEntry {
-  /** Alternatives that do the same thing, such as `Mod+Z` or `Shift+Mod+Z`. */
   keys: KeyChord[];
   label:
     | { navigation: MessageKey<typeof navigationMessages> }
@@ -34,12 +29,10 @@ const glyphs: Record<string, [mac: string, other: string]> = {
   Tab: ["Tab", "Tab"],
 };
 
-/** The keyboard in front of the person, which may differ from the server's OS in browser mode. */
 export const clientIsMac = () =>
   typeof navigator !== "undefined" &&
   /Mac|iPhone|iPad/.test(navigator.platform);
 
-/** Formats a chord the way the platform writes it: `⇧⌘Z` or `Ctrl+Shift+Z`. */
 export function formatShortcut(
   chord: KeyChord,
   mac: boolean,
@@ -51,7 +44,6 @@ export function formatShortcut(
     return names[part] ?? (part.length === 1 ? part.toUpperCase() : part);
   });
   if (!mac) {
-    // Windows and Linux list Ctrl before Shift and Alt.
     const order = ["Ctrl", "Shift", "Alt"];
     const modifiers = parts
       .filter((part) => order.includes(part))
@@ -59,7 +51,6 @@ export function formatShortcut(
     const keys = parts.filter((part) => !order.includes(part));
     return [...modifiers, ...keys].join("+");
   }
-  // macOS lists ⌃ ⌥ ⇧ ⌘ in that order and joins without separators.
   const order = ["⌃", "⌥", "⇧", "⌘"];
   const modifiers = parts
     .filter((part) => order.includes(part))
@@ -68,7 +59,6 @@ export function formatShortcut(
   return modifiers.join("") + keys.join(mac && modifiers.length ? "" : "+");
 }
 
-/** Deleting from the sidebar: Delete, or ⌘⌫ where the key is labelled delete. */
 export function isDeleteShortcut(
   event: { key: string; metaKey: boolean; ctrlKey: boolean; altKey: boolean },
   mac: boolean,
@@ -96,15 +86,10 @@ export function isSidebarToggleShortcut(event: {
   );
 }
 
-/** Every shortcut the workbench handles, grouped as the overview lists them. */
 export function shortcutGroups(options: {
   mac: boolean;
   tabs: boolean;
   windows: boolean;
-  /**
-   * The browser keeps ⌘N, ⌘T, ⌘W and Ctrl+Tab for its own windows and tabs,
-   * so the browser workbench does not list them.
-   */
   browser?: boolean;
 }): ShortcutGroup[] {
   const own = (keys: string[]) =>

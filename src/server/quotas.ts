@@ -23,7 +23,6 @@ export const defaultStoragePolicy: StoragePolicy = {
   accountProjects: 50,
   serviceProjects: 10000,
 };
-/** Longer than any request body deadline plus publication. */
 export const reservationLifetimeMs = 15 * 60_000;
 export interface Reservation {
   id: string;
@@ -34,7 +33,6 @@ export interface Reservation {
   bytes: number;
   day: string;
 }
-/** How long a service-wide stored byte total may be reused. */
 const serviceUsageMs = 60_000;
 export class Quotas {
   readonly policy: StoragePolicy;
@@ -79,8 +77,6 @@ export class Quotas {
       `COALESCE((SELECT SUM(${column}) FROM ${table}${where ? ` WHERE ${where}` : ""}),0)`;
     const projectTotal = `${sum("objects", "bytes", "project_id=?")}+${sum("revisions", "manifest_bytes", "project_id=?")}+${sum("storage_reservations", "bytes", "project_id=?")}`;
     const accountTotal = `${sum("objects", "bytes", "uploaded_by=?")}+${sum("revisions", "manifest_bytes", "user_id=?")}+${sum("storage_reservations", "bytes", "user_id=?")}`;
-    // Project and account totals are indexed; the service total scans every
-    // object, so it is sampled once a minute. Pending reservations stay exact.
     const serviceTotal = `?+${sum("storage_reservations", "bytes")}`;
     const stored = await this.storedBytes();
     const budget =
@@ -178,10 +174,6 @@ export class Quotas {
       };
     return this.stored.bytes;
   }
-  /**
-   * Request-owned reservations outlive their request only after a crash or
-   * reset; resumable tasks own theirs until the task itself expires.
-   */
   async expire(now = Date.now()) {
     await this.db.run(
       "DELETE FROM storage_reservations WHERE id IN(SELECT r.id FROM storage_reservations r WHERE r.created_at<? AND NOT EXISTS(SELECT 1 FROM object_uploads u WHERE u.reservation_id=r.id AND u.completed=0) LIMIT 20)",

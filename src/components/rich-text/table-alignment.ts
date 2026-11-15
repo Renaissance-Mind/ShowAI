@@ -107,7 +107,6 @@ function cellPositions(table: Node, column: number | null): number[] {
     (!Number.isInteger(column) || column < 0 || column >= map.width)
   )
     throw new Error(t("table.columnOutOfRange"));
-  // Map offsets include cells spanning several rows or columns only once.
   return [
     ...new Set(
       column === null
@@ -136,7 +135,6 @@ export function alignDocumentTable(
     const position = tablePosition + 1 + offset;
     const cell = state.doc.nodeAt(position)!;
     tr.setNodeAttribute(position, "textAlign", alignment);
-    // Existing paragraph formatting must not override the chosen column alignment.
     cell.descendants((node, childOffset) => {
       if (node.type.name === "table") return false;
       if (

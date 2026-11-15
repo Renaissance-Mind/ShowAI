@@ -11,7 +11,6 @@ import { join } from "node:path";
 import { formatWithOptions } from "node:util";
 import { redact } from "../core/redact";
 
-/** The main-process log users can attach to a problem report. */
 export const MAIN_LOG_NAME = "showai-main.log";
 const MAX_BYTES = 1024 * 1024;
 const FILES = 3;
@@ -19,10 +18,6 @@ const LINE_LIMIT = 16 * 1024;
 
 export type LogLevel = "error" | "warn" | "info";
 
-/**
- * Log lines use the shared redaction of problem reports: the home directory
- * becomes `~` and credentials are masked.
- */
 export function redactLogText(text: string, home = homedir()): string {
   return redact(text, { home });
 }
@@ -38,7 +33,6 @@ export function createMainLog(options: {
   home?: string;
   maxBytes?: number;
   files?: number;
-  /** Where to say once that the log itself could not be written. */
   fallback?: (message: string) => void;
 }): MainLog {
   const directory = options.directory;
@@ -75,7 +69,6 @@ export function createMainLog(options: {
       if (message.length > LINE_LIMIT)
         message = `${message.slice(0, LINE_LIMIT)}… [truncated]`;
       const line = `${new Date().toISOString()} [${level}] [${source}] ${redactLogText(message, options.home)}\n`;
-      // The log is a reporting boundary: a full disk must not break the App.
       try {
         mkdirSync(directory, { recursive: true });
         rotate(Buffer.byteLength(line));
@@ -90,7 +83,6 @@ export function createMainLog(options: {
   };
 }
 
-/** Mirrors console warnings and errors of this process into the log file. */
 export function captureConsole(log: MainLog, source = "main"): () => void {
   const original = { error: console.error, warn: console.warn };
   console.error = (...values: unknown[]) => {
@@ -114,11 +106,6 @@ async function readOptional(path: string) {
   });
 }
 
-/**
- * The last `count` lines of the log, continuing into the previous rotated
- * file when the current one is short. Lines were redacted when written and
- * are redacted again for the report.
- */
 export async function readLogTail(
   directory: string,
   count = 200,

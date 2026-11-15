@@ -11,7 +11,6 @@ import {
   validateEventTimelineData,
 } from "./event-timeline-contract.mjs";
 
-// A small incident-shaped timeline: one point per minute from 13:50.
 const sample = (): any => ({
   title: "Checkout incident",
   axis: { type: "clock", start: "13:50", label: "Time" },
@@ -185,7 +184,6 @@ describe("event timeline block", () => {
     expect(items[3]).toContain("is-future");
     expect(items[0]).not.toMatch(/is-open|is-future/);
     expect(html).toContain('aria-current="step"');
-    // The cursor sits on 13:54 with both series values read out.
     expect(html).toContain("13:54");
     expect(html).toContain("58%");
     expect(html).toContain("10s");
@@ -208,7 +206,6 @@ describe("event timeline block", () => {
   it("draws gaps for missing values and one marker per event", () => {
     const html = render(sample());
     expect(html.match(/class="et-marker/g)).toHaveLength(4);
-    // A null value splits the error line into two runs.
     const paths = [...html.matchAll(/<path d="([^"]+)" class="et-line"/g)];
     expect(paths[0][1].match(/M/g)).toHaveLength(2);
   });

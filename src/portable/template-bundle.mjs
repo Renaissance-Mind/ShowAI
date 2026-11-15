@@ -1,16 +1,10 @@
-/** Portable template contract: Markdown instructions and editable component files. */
-// A template supplements the presentation workflow in the show-document Skill
-// with methods for one kind of content. Its guides are read whole, once per
-// task; schemaVersion 4 lists them without stages.
 export const TEMPLATE_SCHEMA_VERSION = 4;
-/** schemaVersion 3 bundles declared four stage guides; they remain readable. */
 export const STAGED_TEMPLATE_STAGES = Object.freeze([
   "intent",
   "material",
   "logic",
   "design",
 ]);
-/** schemaVersion 1–2 bundles declared six stages; they remain readable. */
 export const LEGACY_TEMPLATE_STAGES = Object.freeze([
   "intent",
   "evidence",
@@ -19,8 +13,6 @@ export const LEGACY_TEMPLATE_STAGES = Object.freeze([
   "authoring",
   "review",
 ]);
-// Legacy authoring and review guides predate the shared authoring rules and
-// are not disclosed.
 const LEGACY_DISCLOSED_STAGES = Object.freeze([
   "intent",
   "evidence",
@@ -88,7 +80,6 @@ export function templateFilePath(value) {
     throw new Error("Unsafe template path key.");
   return value;
 }
-/** Declared guide paths in reading order; staged and legacy bundles keep their stage order. */
 export function declaredGuidePaths(metadata) {
   if (metadata.schemaVersion === TEMPLATE_SCHEMA_VERSION)
     return [...metadata.guides];
@@ -277,7 +268,6 @@ export function parseTemplateBundle(input) {
     return files[name];
   };
   const { metadata, body } = parseTemplateReadme(read("README.md"));
-  // A staged guide folder contributes its README first, then its other Markdown files.
   const guides = [];
   for (const declared of declaredGuidePaths(metadata)) {
     const paths = declared.endsWith(".md")

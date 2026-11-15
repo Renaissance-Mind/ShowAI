@@ -13,11 +13,6 @@ import { describeSaveFailure, type SaveFailureState } from "./save-problem";
 
 export const SAVE_BANNER_ID = "studio-save-problem";
 
-/**
- * Banner for a failed page save (not a conflict): cause-specific title,
- * the fixed content-safety line and only the follow-ups that can work.
- * The cause already says what the details would, so they are left out.
- */
 export function SaveFailureBanner({
   state,
   platform,
@@ -75,7 +70,6 @@ export function SaveFailureBanner({
   );
 }
 
-/** Moves focus to the save banner, e.g. from the 失败 status mark. */
 export function focusSaveBanner() {
   const banner =
     document.getElementById(SAVE_BANNER_ID) ??
@@ -95,10 +89,6 @@ const labels = {
   error: "status.failed",
 } as const satisfies Record<SaveStatus, string>;
 
-/**
- * Low-key save state beside the page title. Routine progress changes several
- * times per edit, so only this mark observes it; 已保存 fades out.
- */
 export function SaveStatusMark({
   sessions,
   onShowProblem,
@@ -151,10 +141,6 @@ export function SaveStatusMark({
   );
 }
 
-/**
- * Confirms 「放弃修改，载入当前文件」: the draft is deleted and cannot be
- * recovered, so the dialog names when it was last edited.
- */
 export function DiscardDraftDialog({
   editedAt,
   onClose,

@@ -1,6 +1,5 @@
 import { defineMessages } from "../index";
 
-// Agent panel only; kept apart from the assistant catalogue that readers load.
 export default defineMessages("assistantPersist", {
   "zh-CN": {
     persistFailed:

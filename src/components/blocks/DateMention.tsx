@@ -4,14 +4,12 @@ import { useLocale, useTranslator } from "../../i18n/react";
 import messages from "../../i18n/messages/pageMention";
 import "./page-mention.css";
 
-/** A calendar day, usually placed inside a line through the @ menu. */
 export function DateBlock({ data, onChange, readOnly, inline }: BlockProps) {
   const t = useTranslator(messages);
   const locale = useLocale();
   const [editing, setEditing] = useState(false);
   const day = String(data.date ?? "");
   const [year, month, date] = day.split("-").map(Number);
-  // A calendar day has no time zone; format it as the same day everywhere.
   const label = new Intl.DateTimeFormat(locale, {
     year: "numeric",
     month: "short",

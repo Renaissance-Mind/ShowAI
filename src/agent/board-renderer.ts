@@ -34,7 +34,6 @@ async function browser() {
   });
 }
 
-/** Freeze rendered DOM, canvases, form values, scrolling and iframe bodies once. */
 export async function freezeBoard(
   htmlPath: string,
   boardId: string,
@@ -61,7 +60,6 @@ export async function freezeBoard(
     const root = page.locator(
       `[data-container-root=${JSON.stringify(boardId)}] > .container-board-scene > .page-surface > .surface-scroll > .surface-world`,
     );
-    // The world is an origin with absolutely positioned children; its own box can be zero-sized.
     await root.waitFor({ state: "attached" });
     const warnings: string[] = [];
     for (const frame of page.frames()) {
@@ -245,8 +243,6 @@ export async function freezeBoard(
         .join("\n");
       return { body: (clone(doc.body) as HTMLElement).innerHTML, styles };
     };
-    // Freeze child frames before parents so a component containing nested iframes
-    // retains every frame body, without assuming a custom runtime's root marker.
     for (const frame of page.frames().reverse()) {
       if (!frame.parentFrame()) continue;
       const handle = await frame.frameElement();
@@ -422,7 +418,6 @@ export async function renderFrozenBoard(
     const context = await instance.newContext({
       javaScriptEnabled: false,
       acceptDownloads: false,
-      // Keep media queries and viewport-dependent paint identical across all windows.
       viewport: { width: 2560, height: 2560 },
     });
     await context.route(/^https?:/, (route) => route.abort());

@@ -21,13 +21,11 @@ if (process.isMainFrame) {
   });
   const closeListeners = new Set<CloseListenerEntry>();
   const reloadListeners = new Set<CloseListenerEntry>();
-  // Each listener answers with its own reason; a slow one is named, not waited on forever.
   const report = closeReporter();
   ipcRenderer.on("showai:before-close", async (_event, requestId: string) => {
     const result = await report([...closeListeners]);
     ipcRenderer.send("showai:close-result", { requestId, ...result });
   });
-  // Uncaught renderer failures reach the main-process log for problem reports.
   const forward = (kind: string, value: unknown, fallback: string) => {
     const error = value instanceof Error ? value : undefined;
     ipcRenderer.send("showai:renderer-error", {
@@ -151,7 +149,6 @@ if (process.isMainFrame) {
         command: MenuCommand,
       ) => listener(command);
       ipcRenderer.on("showai:menu-command", receive);
-      // Commands chosen while this window was starting are delivered now.
       ipcRenderer.send("showai:menu-ready");
       return () => ipcRenderer.removeListener("showai:menu-command", receive);
     },

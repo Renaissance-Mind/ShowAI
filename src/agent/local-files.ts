@@ -4,15 +4,7 @@ import { isAbsolute } from "node:path";
 import { CoreError } from "../core/model";
 import { CapacityError } from "../portable/capacity.mjs";
 
-/**
- * File inputs and outputs of local MCP connections. Large tool arguments
- * (page operations, dataset values, component packages) can be read from a
- * file on this device instead of being copied into the call, and large reads
- * can be written to a file instead of being returned. Hosted connections run
- * elsewhere and never accept device paths.
- */
 
-/** Absolute path check with the argument name in the message. */
 export function assertLocalPath(path: unknown, field: string): string {
   if (typeof path !== "string" || !path.trim() || !isAbsolute(path))
     throw new CoreError(
@@ -24,17 +16,12 @@ export function assertLocalPath(path: unknown, field: string): string {
 
 const decoder = new TextDecoder("utf-8", { fatal: true });
 
-/** Line and column (1-based) of a character offset in text. */
 function position(text: string, offset: number) {
   const before = text.slice(0, offset);
   const line = before.split("\n").length;
   return { line, column: offset - before.lastIndexOf("\n") };
 }
 
-/**
- * Offset of the first JSON syntax error. V8 reports a position for some
- * errors only ("Unexpected token" has none), so the text is scanned again.
- */
 export function jsonErrorOffset(text: string): number | undefined {
   let index = 0;
   const space = () => {
@@ -126,7 +113,6 @@ export function jsonErrorOffset(text: string): number | undefined {
   }
 }
 
-/** Parses JSON text and names the file, line and column of a syntax error. */
 export function parseJsonText(text: string, label: string): unknown {
   try {
     return JSON.parse(text);
@@ -144,7 +130,6 @@ export function parseJsonText(text: string, label: string): unknown {
   }
 }
 
-/** Reads one UTF-8 JSON file named by an absolute path, within a byte budget. */
 export async function readJsonInput(
   path: unknown,
   field: string,
@@ -177,10 +162,6 @@ export async function readJsonInput(
   return parseJsonText(text.replace(/^﻿/, ""), `${field} ${absolute}`);
 }
 
-/**
- * Takes a value either inline or from a file argument, never both. The file
- * holds exactly the JSON value the inline argument would carry.
- */
 export async function inlineOrFile<T>(input: {
   inline: T | undefined;
   inlineName: string;
@@ -215,7 +196,6 @@ export async function inlineOrFile<T>(input: {
   )) as T;
 }
 
-/** Receipt fields that identify written output without returning it. */
 export async function fileReceipt(path: string) {
   const bytes = await readFile(path);
   return {

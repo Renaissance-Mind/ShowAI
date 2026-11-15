@@ -81,7 +81,6 @@ beforeAll(async () => {
       r2_buckets: [{ binding: "STATE", bucket_name: "isolated-agent-state" }],
     }),
   );
-  // npx is a batch file on Windows; run npm's own npx script with this Node.
   const npx =
     process.platform === "win32"
       ? [
@@ -120,7 +119,6 @@ beforeAll(async () => {
         break;
       }
     } catch {
-      /* Worker is starting. */
     }
     await new Promise((r) => setTimeout(r, 500));
   }
@@ -155,8 +153,6 @@ afterAll(async () => {
   connector?.close();
   host?.close();
   if (worker) {
-    // Windows ends only the npx process itself; wrangler and workerd would
-    // keep the worker state open.
     if (process.platform === "win32")
       spawnSync("taskkill", ["/pid", String(worker.pid), "/t", "/f"]);
     else worker.kill("SIGTERM");

@@ -1,5 +1,3 @@
-// Shared by the desktop preload, the browser bridge and the main process:
-// every close listener of a window answers, and a refusal always says why.
 import type {
   CloseBlocker,
   CloseBlockerCode,
@@ -9,7 +7,6 @@ import type {
   UnsavedPage,
 } from "../host/protocol";
 
-/** A listener that has not answered by then is reported as LISTENER_TIMEOUT. */
 export const CLOSE_LISTENER_TIMEOUT_MS = 15000;
 
 export interface CloseListenerEntry {
@@ -43,7 +40,6 @@ function errorText(error: unknown): string {
     : String(error);
 }
 
-/** English one-line description, for logs and the plain `reason` field. */
 export function describeBlocker(blocker: CloseBlocker): string {
   const subject = blocker.title
     ? `${blocker.source === "datasets" ? "dataset" : "page"} "${blocker.title}"`
@@ -77,11 +73,6 @@ function pageBlocker(page: UnsavedPage, source: CloseSource): CloseBlocker {
   };
 }
 
-/**
- * Runs every listener once and aggregates the answers. A listener still busy
- * from the previous request is awaited again instead of being started twice,
- * so "Try Again" after a timeout continues the same save.
- */
 export function closeReporter(timeoutMs = CLOSE_LISTENER_TIMEOUT_MS) {
   const running = new Map<CloseListenerEntry, Promise<CloseResult>>();
   return async function report(
@@ -130,7 +121,6 @@ export function closeReporter(timeoutMs = CLOSE_LISTENER_TIMEOUT_MS) {
           const own = result.blockers ?? [];
           blockers.push(
             ...own,
-            // Pages without their own blocker still say which page and why.
             ...listed
               .filter(
                 (page) =>
@@ -167,7 +157,6 @@ export function closeReporter(timeoutMs = CLOSE_LISTENER_TIMEOUT_MS) {
 const shortText = (value: unknown, limit: number) =>
   typeof value === "string" && value ? value.slice(0, limit) : undefined;
 
-/** Blockers a renderer reported, checked before the main process uses them. */
 export function closeBlockers(value: unknown): CloseBlocker[] {
   if (!Array.isArray(value)) return [];
   return value.slice(0, 100).flatMap((item): CloseBlocker[] => {

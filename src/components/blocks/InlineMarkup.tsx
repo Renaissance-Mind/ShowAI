@@ -7,7 +7,6 @@ import {
 } from "./inline-markup.mjs";
 import { noteProps } from "./NoteText";
 
-/** Wraps plain and code text, e.g. to highlight search matches. */
 export type InlineMark = (text: string, key: string) => ReactNode;
 
 function render(
@@ -55,11 +54,6 @@ function render(
   });
 }
 
-/**
- * **bold**, ==highlight==, `code`, safe [label](href) and hover notes
- * [label]{note} as React elements; never HTML.
- * `links={false}` keeps link labels as text, e.g. inside a card that is itself a link.
- */
 export function InlineMarkup({
   source,
   links = true,

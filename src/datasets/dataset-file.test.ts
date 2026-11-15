@@ -16,7 +16,6 @@ const tasks = (...items: object[]) => ({ tasks: items });
 
 describe("dataset file rules", () => {
   it("bundle without host APIs for the mobile apps", async () => {
-    // A Node built-in in this module graph would fail the browser build.
     const result = await build({
       entryPoints: [
         fileURLToPath(new URL("./dataset-file.ts", import.meta.url)),

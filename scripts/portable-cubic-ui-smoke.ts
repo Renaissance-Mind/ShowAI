@@ -1,5 +1,3 @@
-/** Real production browser bundle, loopback Workbench, SQLite/FileStore and
- * cold reopen. No substitute services, source models or geometry producers. */
 import assert from "node:assert/strict";
 import { mkdtemp, readFile, writeFile, mkdir, readdir } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -129,7 +127,6 @@ try {
   checks.push(
     "actual DOM pointer writing saves only v2 center/radius and full raw capture",
   );
-  // Rapid sequential contacts must retain acceptance order and separate Undo.
   await page.mouse.move(x + 130, y);
   await page.mouse.down();
   await page.mouse.move(x + 200, y + 20, { steps: 29 });
@@ -157,7 +154,6 @@ try {
     ids,
   );
   checks.push("three actual contacts have independent ordered Undo/Redo");
-  // Leave drawing, select exact geometry then edit the existing source style.
   await scene.getByRole("button", { name: "选择工具", exact: true }).click();
   await page.mouse.click(x + 45, y + 10);
   await page.screenshot({ path: join(directory, "selected.png") });
@@ -276,9 +272,6 @@ try {
   checks.push(
     "accepted actual Worker input survives leave, clear, dispose and page switch through real recovery/CAS",
   );
-  // Pause the actual new Worker at its debugger start barrier, not a fake
-  // producer or timeout. Main UI authoring and the independent source owner
-  // remain live while the accepted A contact is deterministically not ready.
   const race = await api<any>("pages:create", {
     projectId: project.id,
     title: "Actual pending A then B",

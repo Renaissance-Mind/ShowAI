@@ -1,4 +1,3 @@
-/** Wire contract shared by iOS, Cloudflare and the outbound desktop connector. */
 export const defaultAgentGateway = "https://run.showai.renaissancemind.ai";
 export interface RemoteActor {
   serverUrl: string;

@@ -5,7 +5,6 @@ import {
 
 export type ReportKind = "problem" | "suggestion" | "docs";
 
-/** Option labels of the `edition` dropdown in .github/ISSUE_TEMPLATE/bug_report.yml. */
 export const ISSUE_EDITIONS = {
   // i18n-exempt: must equal the bilingual dropdown option in the issue template
   desktop: "Desktop app / 桌面 App",
@@ -17,12 +16,10 @@ export interface IssueDraft {
   kind: ReportKind;
   summary: string;
   steps: string;
-  /** e.g. 「来自：保存失败 · ENOSPC · 14:02」, already redacted. */
   context?: string;
   version: string;
   platform: string;
   mode?: "desktop" | "browser";
-  /** Shown in the logs field, e.g. where the copied diagnostics go. */
   logs?: string;
 }
 
@@ -40,11 +37,6 @@ function title(draft: IssueDraft) {
   return draft.kind === "docs" ? `[Docs] ${text}` : text;
 }
 
-/**
- * A prefilled GitHub issue form. Field ids match the issue templates; long
- * text is shortened so the link stays under the URL limit, and the person
- * pastes the full diagnostics from the clipboard instead.
- */
 export function issueUrl(draft: IssueDraft, limit = SUPPORT_URL_LIMIT): string {
   const summary = [draft.summary.trim(), draft.context?.trim()]
     .filter(Boolean)
@@ -80,7 +72,6 @@ export function issueUrl(draft: IssueDraft, limit = SUPPORT_URL_LIMIT): string {
     );
     return `${SUPPORT_REPORT_URL}?${query}`;
   };
-  // Shorten the longest free-text field until the link fits.
   const shortenable = new Set(["summary", "steps", "logs", "problem", "context"]);
   let url = build();
   while (url.length > limit) {
@@ -89,7 +80,6 @@ export function issueUrl(draft: IssueDraft, limit = SUPPORT_URL_LIMIT): string {
       .sort((a, b) => b[1].length - a[1].length)[0];
     if (!longest || longest[1].length <= TRUNCATED.length) break;
     const overflow = url.length - limit;
-    // Encoded characters take up to 9 bytes each; trim generously.
     const keep = Math.max(
       0,
       longest[1].length - Math.ceil(overflow / 3) - TRUNCATED.length - 1,
@@ -100,7 +90,6 @@ export function issueUrl(draft: IssueDraft, limit = SUPPORT_URL_LIMIT): string {
   return url;
 }
 
-/** The whole report as plain text, for 复制全文 and any other channel. */
 export function reportText(
   draft: IssueDraft,
   labels: {

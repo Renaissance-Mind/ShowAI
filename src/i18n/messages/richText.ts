@@ -1,7 +1,5 @@
 import { defineMessages } from "../index";
 
-// Rich text editor: format toolbars, slash menu, block handle, table controls
-// and the reader view. Saved defaults (new-block text, node names) stay in code.
 export default defineMessages("richText", {
   "zh-CN": {
     region: "富文本",

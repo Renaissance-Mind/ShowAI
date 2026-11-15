@@ -1,6 +1,5 @@
 import { defineMessages } from "../index";
 
-// Agent settings: local Agents, model sources, the built-in runtime and tasks.
 export default defineMessages("agentSettings", {
   "zh-CN": {
     remoteMacHelp:
@@ -115,7 +114,6 @@ export default defineMessages("agentSettings", {
     "toast.sourceSaved": "模型来源已保存",
     "toast.modelsLoaded": "模型列表已更新，可以选择模型",
 
-    // Model resources shared through servers
     "resources.title": "服务器上的模型资源",
     "resources.help":
       "检索已登录服务的 API Key 和 ChatGPT 授权，选择后由来源服务器提供凭据。",

@@ -1,6 +1,3 @@
-// Shared contract for the comparison-matrix, status-tree and experiment-tracker built-ins.
-// Validation runs in the workbench, the CLI and the portable reader, so it stays dependency-free.
-
 const fail = (message) => {
   throw new Error(message);
 };
@@ -52,7 +49,6 @@ export const EXPERIMENT_STATUSES = [
   "stopped",
 ];
 
-/** Default statuses used by a status tree that does not define its own. */
 export const DEFAULT_TREE_STATUSES = [
   { id: "done", label: "走通", tone: "done" }, // i18n-exempt: default status data, translated at display by id
   { id: "active", label: "进行中", tone: "active" }, // i18n-exempt: default status data, translated at display by id
@@ -229,7 +225,6 @@ export function validateAnalysisData(kind, data) {
   return data;
 }
 
-/** Rows whose non-empty cells disagree across columns (by tone or text). */
 export function differingRows(data) {
   return data.rows
     .filter((row) => {
@@ -244,7 +239,6 @@ export function differingRows(data) {
     .map((row) => row.id);
 }
 
-/** Count items per status id across all groups. */
 export function statusCounts(data) {
   const counts = {};
   for (const group of data.groups)
@@ -253,11 +247,6 @@ export function statusCounts(data) {
   return counts;
 }
 
-/**
- * Running best over time for experiments with a score.
- * Only groups marked frontier (or every experiment when no groups exist) take part,
- * so runs with different budgets are not mixed on one frontier.
- */
 export function experimentFrontier(data) {
   const higher = data.metric.direction === "higher";
   const eligible = new Set(

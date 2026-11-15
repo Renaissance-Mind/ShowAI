@@ -23,7 +23,6 @@ type Item = {
 };
 type Result = { id: string; state: string };
 
-/** Every built-in's default data and catalog examples, one widget each. */
 function catalogPage(items: Item[]) {
   const doc = createResource(blankDocument());
   doc.content.content = items
@@ -47,7 +46,6 @@ function catalogPage(items: Item[]) {
   return doc;
 }
 
-/** Scrolls through every widget, then reports whether it rendered. */
 async function inspect(frame: Frame, ids: string[]): Promise<Result[]> {
   await frame.waitForSelector(`[data-block-id="${ids[0]}"]`, {
     timeout: 120_000,
@@ -169,7 +167,6 @@ describe("CDN reader across the built-in catalog", () => {
         );
       await cdn.page.close();
       await bundled.page.close();
-      // The CDN reader must render whatever the bundled reader renders.
       expect(
         report.filter((result) => result.state !== result.bundled),
       ).toEqual([]);

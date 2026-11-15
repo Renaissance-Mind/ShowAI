@@ -2,8 +2,6 @@
 #define SHOWAI_BOUNDARY_RECORD_HPP
 #include "number.hpp"
 namespace showai_boundary {
-// Immutable arena-owned records. A retained handle never exposes mutable data.
-// Copying a root/certificate increments only a bounded record reference count.
 template<class T>class Record {
     Pointer<Context>ctx_;uint32_t offset_=no_block,reserved_=0;
     void release(){if(ctx_&&offset_!=no_block){if(ctx_->block(offset_).refs==1)((T*)ctx_->payload(offset_))->~T();ctx_->release(offset_);}offset_=no_block;}
@@ -17,8 +15,6 @@ public:
     ~Record(){release();}
     bool valid()const{return ctx_&&offset_!=no_block;}Context*context()const{return ctx_;}
     const T*get()const{return valid()?(const T*)ctx_->payload(offset_):nullptr;}
-    // Internal structural drafts own this handle; sharing never grants mutable
-    // access to a retained record. A failed clone leaves every old handle intact.
     T*edit(){if(!valid()||ctx_->status)return nullptr;if(ctx_->block(offset_).refs>1){auto next=create(*ctx_,*get());if(!next.valid()||ctx_->status)return nullptr;*this=static_cast<Record&&>(next);}return(T*)ctx_->payload(offset_);}
 
 };

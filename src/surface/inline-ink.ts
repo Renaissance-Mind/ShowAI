@@ -9,25 +9,20 @@ export class InkEditConflict extends Error {
   readonly code = "INK_EDIT_CONFLICT";
 }
 export interface InkUpdate {
-  /** Immutable native publication identity; retries must not repeat history. */
   publicationId?: string;
   sourceSnapshot?: import("./source-runtime").SourceSnapshotDelta;
   pageId: string;
   boardId: string;
   nodes: JSONContent[];
   layout: Record<string, NodeLayout>;
-  /** Incremental native saves retain untouched nodes and their identity. */
   removedIds?: string[];
-  /** The source actually seen by the author, before this delta was produced. */
   baseNodes?: JSONContent[];
   baseLayout?: Record<string, NodeLayout>;
-  /** Canonical native replica projection, including real causal wire heads. */
   document?: ShowDocument;
   baseDocument?: ShowDocument;
   operationIds?: string[];
   historyStrokeIds?: string[];
   correctionOnly?: boolean;
-  /** A durable native object edit shares the ordinary document undo history. */
   nativeContentAction?: boolean;
   nativeContentGroup?: string;
   nativeContentActions?: import("./native-content-history").NativeContentHistoryAction[];
@@ -88,7 +83,6 @@ export interface NativeAuthorMutation {
   intentId?:string|null;mutationId?:string;authorMutationId?:string;authorBaseline?:ShowDocument;before?:ShowDocument;
 }
 export interface InlineInkBridge {
-  /** One native camera/scene for all Board tools, including selection. */
   nativeScene?: boolean;
   registerSourceModel?(model:{
     snapshotFor:(document:ShowDocument)=>Promise<{ref:import("./source-runtime").SourceSnapshotRef;sourceClientId:string}|null>;
@@ -96,7 +90,6 @@ export interface InlineInkBridge {
     completePublication:(document:ShowDocument,pubId:string)=>Promise<void>;
   }):()=>void;
   setDocument?(pageId: string, document: ShowDocument,author?:NativeAuthorMutation): void;
-  /** Carry ephemeral native provenance across the real immutable save snapshot. */
   copyDocumentMetadata?(source: ShowDocument, snapshot: ShowDocument): void;
   hasProjectionReceipt?(incoming: ShowDocument): boolean;
   mergeProjection?(incoming: ShowDocument, current: ShowDocument): Promise<PageMergeResult | null>;
@@ -105,7 +98,6 @@ export interface InlineInkBridge {
     projectId: string,
     listener: (value: InkUpdate, applied?: () => void) => Promise<boolean>,
   ): () => void;
-  /** Applied-input acknowledgement is independent of the scene/frame ACK. */
   toolIntent?(value:{pageId:string;boardId:string;token:string}&import("./native-board-control").NativeBoardControlRecord):Promise<import("./native-board-control").NativeBoardToolReceipt>;
   frame(value: InkFrame): Promise<void | boolean>;
   viewport?(
@@ -135,7 +127,6 @@ export function inkNodes(board: JSONContent): JSONContent[] {
   board.content?.forEach(visit);
   return result;
 }
-/** Only replace this Board's ink. Other edits and nested Boards remain current. */
 export function applyInkUpdate(
   document: ShowDocument,
   value: InkUpdate,
@@ -160,7 +151,6 @@ export function applyInkUpdate(
       const id = next.attrs!.id,
         before = base.get(id),
         present = current.get(id);
-      // A concurrent delete cannot be resurrected by a delayed native snapshot.
       if (before && !present) continue;
       const result = mergeValues(before, next, present, `/ink/${id}`);
       if (result.conflicts.length)

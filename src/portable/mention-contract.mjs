@@ -1,18 +1,8 @@
-// Days the @ menu offers for a component whose `contributes.mention` has
-// `input: "date"`: today, tomorrow and typed dates. The declaration itself is
-// validated with the other contributions (contract/contributions.ts).
-// Shared by the editor and the date component; no dependencies.
-
-/** YYYY-MM-DD of a local calendar day. */
 export function isoDay(date) {
   const pad = (number) => String(number).padStart(2, "0");
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
 }
 
-/**
- * Days a typed query names: an ISO day, a numeric month/day (with or without
- * year), or nothing. Relative words are matched by the menu's own labels.
- */
 export function typedDays(query, today = new Date()) {
   const text = query.trim();
   const valid = (year, month, day) => {

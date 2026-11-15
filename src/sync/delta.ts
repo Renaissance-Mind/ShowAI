@@ -5,12 +5,9 @@ import {
   type SyncUser,
 } from "./protocol";
 
-/** The server accepts a publication as changes to its current head. */
 export const snapshotDeltaCapability = "snapshot-delta-v1";
-/** An event subscriber accepts revisions as changes to the previous head. */
 export const revisionDeltaFeature = "revision-delta-v1";
 
-/** A current-format snapshot expressed against its base snapshot's files. */
 export interface SnapshotDelta {
   parents: string[];
   change: ProjectSnapshot["change"];
@@ -23,7 +20,6 @@ export function snapshotDelta(
   base: ProjectSnapshot,
   next: ProjectSnapshot,
 ): SnapshotDelta {
-  // Entries keep every path an own property, including names like "__proto__".
   const set = Object.fromEntries(
     Object.entries(next.files).filter(
       ([path, digest]) =>
@@ -39,10 +35,6 @@ export function snapshotDelta(
 const invalid = () =>
   new SyncError(400, "INVALID_DELTA", "Invalid project snapshot changes.");
 
-/**
- * Rebuilds the full snapshot. The caller still validates the result and
- * compares its revision, so a wrong base can only produce a mismatch.
- */
 export function applySnapshotDelta(
   base: ProjectSnapshot,
   value: unknown,

@@ -15,13 +15,10 @@ it("preserves pressure in saved strokes and renders fixed and pressure widths di
   const document = createResource(blankDocument(),"board");
   const saved = addNode(document,value.node,value.frame,document.content.attrs!.id);
   const restored = parseArtifact(serializeArtifact(saved)).document.content.content![0];
-  // Freehand nodes keep one authoritative trajectory: pressure lives in the
-  // portable ink samples (index 6), while attrs.points holds only the endpoints.
   expect(restored.attrs!.ink.samples.map((sample:number[])=>sample[6])).toEqual([0.2,0.9,0.4]);
   expect(restored.attrs!.points.map((p:{pressure:number})=>p.pressure)).toEqual([0.2,0.4]);
   const dynamic = renderToStaticMarkup(createElement(Drawing,{node:restored}));
   const fixed = renderToStaticMarkup(createElement(Drawing,{node:{...restored,attrs:{...restored.attrs,pressure:false}}}));
-  // Portable ink fills its outline either way; pressure changes the outline itself.
   const outline = (markup: string) => markup.match(/ d="([^"]+)"/)?.[1];
   expect(outline(dynamic)).toBeTruthy();
   expect(outline(fixed)).toBeTruthy();
@@ -31,8 +28,6 @@ it("preserves pressure in saved strokes and renders fixed and pressure widths di
 it.each([["pen",12],["highlighter",20],["eraser",64]] as const)("limits %s controls while exposing its actual stroke mode",(tool,max)=>{
   const markup=renderToStaticMarkup(createElement(BoardStyleControls,{tool,style:{color:"#252629",fillColor:"none",strokeWidth:6,pressure:false},nodes:[],onChange:()=>{}}));
   expect(markup).toContain(`max="${max}"`);
-  // Browser, Electron and iOS pens all record pressure, so every pen and
-  // highlighter offers the toggle; the eraser never varies with pressure.
   if(tool!=="eraser") {
     expect(markup).toContain('class="board-pressure-toggle"');
     expect(markup).toContain('class="board-color-presets"');

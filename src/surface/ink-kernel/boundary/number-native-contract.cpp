@@ -1,5 +1,5 @@
 #include "number.hpp"
-#include <gmpxx.h> // Test oracle only; never part of the freestanding kernel.
+#include <gmpxx.h>
 #include <vector>
 #include <cstdio>
 #include <cstdlib>

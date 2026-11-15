@@ -1,7 +1,6 @@
 @import "./tokens.css";
 @import "./content.css";
 
-/* Rings appear only during keyboard navigation (see ui/keyboard-focus.ts). */
 :root:not([data-keyboard-focus]) :focus-visible {
   outline: none !important;
 }
@@ -747,7 +746,6 @@
   }
 }
 
-/* Keep the primary action reachable while reading a long component reference. */
 .catalog-detail > footer {
   position: sticky;
   bottom: -24px;

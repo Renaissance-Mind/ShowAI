@@ -1,9 +1,4 @@
 #!/usr/bin/env node
-// The App ships the documentation published at showai.renaissancemind.ai/doc. The website is the
-// source: this copies its documentation pages and their compiled components into resources/docs.
-//   node scripts/sync-docs.mjs --site <ShowAI_Homepage/site>           write resources/docs
-//   node scripts/sync-docs.mjs --site <ShowAI_Homepage/site> --check   fail when the App copy differs
-// The homepage release runs --check against the ShowAI commit it deploys, so the two never diverge.
 import { createHash } from "node:crypto";
 import {
   mkdirSync,
@@ -18,12 +13,10 @@ import { dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 export const DOCS_ORIGIN = "https://showai.renaissancemind.ai";
-/** App locale → suffix of the website's seed and catalog files. */
 export const DOCS_LOCALES = { "zh-CN": "", en: ".en" };
 
 const sha256 = (text) => createHash("sha256").update(text).digest("hex");
 
-/** `doc-hero:1.0.0:sha256-<hex>` → `doc-hero@1.0.0-<12 hex>.json`; ids and versions never contain `:`. */
 export function componentFile(key) {
   const [id, version, integrity = ""] = key.split(":");
   const digest = integrity.replace(/^sha256-/, "");
@@ -32,11 +25,6 @@ export function componentFile(key) {
   return `${id}@${version}-${digest.slice(0, 12)}.json`;
 }
 
-/**
- * The documentation tree of one language: every published page of the website's "ShowAI 文档"
- * project, in its folders and order. docs-site.json names the project, the slugs that links use, and
- * the pages that only the website shows (appExclude, such as the launch article).
- */
 function localeDocs(locale, seed, catalog, site, files) {
   const project = seed.projects?.[site.projectId];
   if (!project)
@@ -55,7 +43,6 @@ function localeDocs(locale, seed, catalog, site, files) {
       continue;
     pages.set(pageId, record);
   }
-  // Every slug must open a page the App ships, or links to it would leave the App.
   const missing = Object.values(site.pages).filter((id) => !pages.has(id));
   if (missing.length)
     throw new Error(
@@ -152,7 +139,6 @@ function localeDocs(locale, seed, catalog, site, files) {
   return { name: project.name, icon: project.icon ?? "", tree, pages: meta };
 }
 
-/** Every file of resources/docs, keyed by its path relative to that directory. */
 export function buildDocs({ seeds, catalogs, site }) {
   if (!site?.projectId || !site.pages || site.pages[""] === undefined)
     throw new Error(
@@ -211,7 +197,6 @@ function existingFiles(dir) {
   return found;
 }
 
-/** Paths whose content differs, is missing or no longer belongs in `dir`. */
 export function compareDocs(files, dir) {
   const differences = [];
   for (const [path, content] of files) {
@@ -276,8 +261,6 @@ function main(argv) {
   );
 }
 
-// Node resolves the entry's symlinks (macOS /var → /private/var), so compare real paths;
-// a mismatch would skip main() and let --check pass without checking.
 if (
   process.argv[1] &&
   import.meta.url === pathToFileURL(realpathSync(process.argv[1])).href

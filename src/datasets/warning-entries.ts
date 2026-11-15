@@ -1,8 +1,3 @@
-// What a bound block lists in its warning popover: the reading layer's
-// warnings, why parts of it are read-only, mapping issues of its binding and
-// a change the host just rejected. Pure, so the list can be tested without a
-// workbench.
-
 import type { BindingIssue } from "./binding.mjs";
 import type {
   DatasetReadStatus,
@@ -16,39 +11,29 @@ import type {
 export interface WarningEntry {
   key: string;
   level: WarningLevel;
-  /** A reading-layer code, or "ISSUE" for a mapping issue of the binding. */
   code: DatasetWarning["code"] | "ISSUE";
   title: string;
-  /** The precise cause (the warning's message, an issue or rejection text). */
   detail?: string;
-  /** Name of the dataset the entry is about. */
   dataset?: string;
   datasetId?: string;
   stage?: WarningStage | "binding";
   actions: WarningAction[];
-  /** Shown only for a moment, right after the change it explains. */
   transient?: boolean;
 }
 
 export interface WarningEntryInput {
   datasetId: string;
   name?: string;
-  /** Names of other datasets the warnings refer to, by id. */
   names: Record<string, string>;
   status: DatasetReadStatus;
   warnings: DatasetWarning[];
-  /** Whether the dataset accepts writes. */
   datasetEditable: Editable;
-  /** What the block can change; false also when the page is read-only. */
   blockEditable: Editable;
-  /** The page lets this block change (an editable page, not a reader). */
   pageEditable: boolean;
   source?: { kind?: "file" | "url"; format: string };
   transform?: boolean;
   issues: BindingIssue[];
-  /** Text of a change the host just rejected. */
   rejection?: string;
-  /** Which actions this block can carry out here. */
   available: Partial<Record<WarningAction, boolean>>;
 }
 
@@ -56,7 +41,6 @@ type Translate = (key: string, values?: Record<string, unknown>) => string;
 
 const ORDER: Record<WarningLevel, number> = { error: 0, warning: 1, info: 2 };
 
-/** Entries in display order: errors first, then warnings, then information. */
 export function warningEntries(
   input: WarningEntryInput,
   t: Translate,
@@ -67,7 +51,6 @@ export function warningEntries(
     list.filter(
       (action) =>
         input.available[action] &&
-        // Packaging choices exist for the block's own linked file only.
         (action !== "packaging" || datasetId === input.datasetId),
     );
   const entries: WarningEntry[] = input.warnings.map((warning, index) => ({
@@ -81,7 +64,6 @@ export function warningEntries(
     stage: warning.stage,
     actions: actions(warning.actions, warning.datasetId),
   }));
-  // A stale or empty read already says why nothing can be written.
   if (
     input.pageEditable &&
     input.status === "ok" &&
@@ -141,7 +123,6 @@ export function warningEntries(
     .map(({ entry }) => entry);
 }
 
-/** The most severe level among entries; undefined without entries. */
 export function topLevel(entries: WarningEntry[]): WarningLevel | undefined {
   return entries.reduce<WarningLevel | undefined>(
     (top, entry) =>
@@ -150,7 +131,6 @@ export function topLevel(entries: WarningEntry[]): WarningLevel | undefined {
   );
 }
 
-/** The request an Agent receives for a warning it can help with. */
 export function agentRequest(entry: WarningEntry, t: Translate): string {
   return t("askAgentPrompt", {
     name: entry.dataset ?? entry.datasetId ?? "",
@@ -160,22 +140,13 @@ export function agentRequest(entry: WarningEntry, t: Translate): string {
   });
 }
 
-/** A linked local file a resource field cannot show. */
 export interface ResourceProblem {
-  /** missing: the host cannot open the file; failed: it opens but cannot be shown. */
   status: "missing" | "failed";
   name: string;
-  /** The host's reason. */
   message?: string;
-  /** Whether the reference names a location (not only a file name). */
   located: boolean;
 }
 
-/**
- * The warning entry of a resource field whose linked file cannot be shown,
- * in the same shape as a dataset warning: the file to link instead, where
- * the file was, and asking again.
- */
 export function resourceEntry(
   problem: ResourceProblem,
   available: Partial<Record<WarningAction, boolean>>,

@@ -1,6 +1,5 @@
 import { defineMessages } from "../index";
 
-// The app icon browser in Settings.
 export default defineMessages("icons", {
   "zh-CN": {
     "category.all": "全部",

@@ -101,11 +101,6 @@ function errno(error: unknown, code: string): boolean {
   return error instanceof Error && "code" in error && error.code === code;
 }
 
-/**
- * The transaction a page record was read in and the staged bytes of its file
- * then (undefined when unstaged). The transaction's head is fixed, so while
- * the same bytes stay staged a new read would return identical content.
- */
 const recordSources = new WeakMap<
   PageRecord,
   { state: LibraryMutation; staged: Buffer | null | undefined }
@@ -287,7 +282,6 @@ function requireActiveFolder(
     );
 }
 
-/** An item in the trash to delete permanently. */
 export type PurgeTarget =
   | { kind: "project"; projectId: string }
   | { kind: "folder"; projectId: string; folderId: string }
@@ -298,7 +292,6 @@ export interface PurgeResult {
   pages: number;
 }
 
-/** Canonical files, immutable checkpoints, and cooperating writers; no background service. */
 export class FileStore {
   readonly root: string;
 
@@ -354,7 +347,6 @@ export class FileStore {
     await this.safePath(path);
   }
 
-  /** The bytes of a file the content library manages, or undefined for others. */
   private async readManaged(path: string): Promise<Buffer | undefined> {
     await this.safePath(path);
     return readLibraryFile(this.root, path);
@@ -473,7 +465,6 @@ export class FileStore {
     return names;
   }
 
-  /** File access for project datasets (core/datasets.ts) under this store's path, lock and history rules. */
   datasetFiles() {
     return {
       root: this.root,
@@ -877,7 +868,6 @@ export class FileStore {
     });
   }
 
-  /** Directory names under projects/, without reading any project. */
   async projectDirectories(): Promise<string[]> {
     return this.contentNames(
       join(workspaceRoot(this.root), "projects"),
@@ -893,10 +883,6 @@ export class FileStore {
     return projects;
   }
 
-  /**
-   * Lists every readable project and reports the others by directory, so one
-   * damaged project does not hide the rest of the library.
-   */
   async scanProjects(
     options: { includeArchived?: boolean; projectIds?: string[] } = {},
   ): Promise<{
@@ -940,7 +926,6 @@ export class FileStore {
     const selected = names.filter(
       (name) => !options.projectIds || options.projectIds.includes(name),
     );
-    // Metadata reads are issued together; each project's failure stays its own.
     const metadata = await Promise.allSettled(
       selected.map((name) => this.readProject(name)),
     );
@@ -988,7 +973,6 @@ export class FileStore {
     name: string;
     icon?: string;
     binding?: ProjectBinding;
-    /** A caller-reserved id (e.g. recorded as local-only before creation). */
     id?: string;
   }): Promise<ProjectSummary> {
     const name = validateName(input.name);
@@ -1065,8 +1049,6 @@ export class FileStore {
     icon?: string,
     id: string = randomUUID(),
   ): Promise<ProjectSummary> {
-    // Freeze all existing ranks before publishing the new project, including
-    // legacy and archived projects. New projects always append to this order.
     const sidebar = await this.readSidebar();
     const projectOrder = (
       await this.listProjects({ includeArchived: true })
@@ -1113,8 +1095,6 @@ export class FileStore {
       }
     };
     try {
-      // Readers ignore the hidden staging directory. Publish a complete project
-      // in one rename so filesystem watchers never observe a missing manifest.
       await this.atomicWrite(
         join(staging, "project.json"),
         JSON.stringify(project, null, 2),
@@ -1374,12 +1354,6 @@ export class FileStore {
     });
   }
 
-  /**
-   * Permanently removes items already in the trash: an archived project, an
-   * archived folder with everything inside it, or an archived page. Their
-   * files, editor drafts and archived history go, so the next compaction and
-   * cleanup reclaim the space they held. This cannot be undone.
-   */
   async purgeArchived(targets: PurgeTarget[]): Promise<PurgeResult> {
     targets.forEach((target) => assertId(target.projectId));
     const library = versionedLibrary(this.root);
@@ -1446,7 +1420,6 @@ export class FileStore {
           if (!folder?.archived)
             throw new CoreError("CONFLICT", "Only deleted items can be deleted permanently.");
           ids.add(folder.id);
-          // Folders form a tree; repeat until no folder below a removed one remains.
           for (let size = 0; size !== ids.size; ) {
             size = ids.size;
             for (const item of folders)
@@ -1513,8 +1486,6 @@ export class FileStore {
       );
     });
     if (library) {
-      // Files a library keeps beside a project's content: generated exports in
-      // the workspace and the original folder retained when it was imported.
       for (const projectId of projectIds)
         for (const directory of [
           this.projectPath(projectId),
@@ -1584,7 +1555,6 @@ export class FileStore {
     const state = libraryMutations.getStore();
     const library = versionedLibrary(this.root);
     if (state?.root !== this.root && legacyMutations.getStore() !== this.root) {
-      // Versioned libraries read one committed state without the writer lease.
       if (library && libraryReadSnapshot.getStore()?.root !== this.root)
         return withLibrarySnapshot(this.root, () =>
           this.readRecord(projectId, pageId),
@@ -1606,7 +1576,6 @@ export class FileStore {
     let document: ShowDocument;
     if (known) document = known.document;
     else {
-      // The parsed value is this read's own, so validation needs no copy of it.
       const value = bytes
         ? JSON.parse(bytes.toString("utf8"))
         : await this.readJson(path);
@@ -1655,16 +1624,11 @@ export class FileStore {
       ...(revision ? { revision } : {}),
       ...(workspaceConflicts.length ? { workspaceConflicts } : {}),
     };
-    // Only when nothing restaged the file while it was read.
     if (library && name && state!.changes.get(name) === staged)
       recordSources.set(record, { state: state!, staged });
     return record;
   }
 
-  /**
-   * Whether a record read earlier in the current transaction still matches
-   * the page, so reading it again would return the same content and revision.
-   */
   private unchangedSinceRead(record: PageRecord): boolean {
     const source = recordSources.get(record),
       state = libraryMutations.getStore();
@@ -1675,7 +1639,6 @@ export class FileStore {
     );
   }
 
-  /** External edits of this file that a save has recorded and nobody resolved. */
   private async workspaceConflicts(library: ContentLibrary, path: string) {
     return (await new WorkspaceProtection(library).list(path)).filter(
       (item) => item.state === "unresolved",
@@ -1685,7 +1648,6 @@ export class FileStore {
   async listPages(
     projectId: string,
     options: { includeArchived?: boolean } = {},
-    /** The project's metadata when the caller read it in the same snapshot. */
     read?: ProjectMetadata,
   ): Promise<PageSummary[]> {
     if (
@@ -1803,7 +1765,6 @@ export class FileStore {
       kind?: "page" | "board";
       document?: ShowDocument;
       parentId?: string | null;
-      /** A page id chosen beforehand, e.g. so imported pages can link to each other. */
       id?: string;
     } = {},
   ): Promise<PageRecord> {
@@ -1894,8 +1855,6 @@ export class FileStore {
     const record = { document, hash, path: this.pagePath(projectId, pageId) };
     await this.checkpoint(projectId, current);
     await this.checkpoint(projectId, record);
-    // Recheck after checkpoint I/O; cooperating writers hold this page's lock
-    // throughout. A transaction that has not restaged the page reads the same.
     if (!this.unchangedSinceRead(current)) {
       const latest = await this.readRecord(projectId, pageId);
       if (latest.hash !== current.hash)
@@ -1957,8 +1916,6 @@ export class FileStore {
         "Page writes need a library transaction.",
       );
     const path = logicalPath(this.root, current.path)!;
-    // A transaction can continue editing a page it has already staged. Its first
-    // external baseline remains the condition for committing the complete operation.
     if (!provided && state.changes.has(path)) {
       state.expected.set(
         path,
@@ -1985,7 +1942,6 @@ export class FileStore {
     document: ShowDocument,
     baseHash: string,
     baseRevision?: string,
-    /** The page as the caller read it earlier in this transaction. */
     read?: PageRecord,
   ): Promise<PageRecord> {
     assertHash(baseHash);
@@ -2041,7 +1997,6 @@ export class FileStore {
     return (await this.diffPageDocuments(projectId, pageId, sinceHash)).diff;
   }
 
-  /** The comparison plus both documents, for record-level views of it. */
   async diffPageDocuments(
     projectId: string,
     pageId: string,

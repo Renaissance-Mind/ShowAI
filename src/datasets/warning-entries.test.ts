@@ -65,7 +65,6 @@ describe("warning entries of a bound block", () => {
     expect(entries.map((entry) => [entry.code, entry.level])).toEqual([
       ["TRANSFORM_FAILED", "error"],
       ["SOURCE_MISSING", "warning"],
-      // Mapping issues are information next to the reading problems.
       ["ISSUE", "info"],
     ]);
     expect(entries[1]).toMatchObject({
@@ -104,7 +103,6 @@ describe("warning entries of a bound block", () => {
       ["read-only", "部分只读"],
     ]);
     expect(entries[1].detail).toContain("XLSX");
-    // A reader page has nothing to change, so nothing is called read-only.
     expect(
       warningEntries(
         input({ datasetEditable: false, pageEditable: false }),
@@ -263,7 +261,6 @@ describe("linked local files in resource fields", () => {
       detail: "File not found: /a/clip.mp4",
       actions: ["link-file", "open-file", "retry"],
     });
-    // A name-only reference has no folder to show; a read-only field links nothing.
     expect(
       resourceEntry(
         { status: "failed", name: "a.png", located: false },

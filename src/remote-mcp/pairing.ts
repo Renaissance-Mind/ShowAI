@@ -7,7 +7,6 @@ import {
 import type { PairingStatus } from "./types";
 
 export const PAIRING_LIFETIME = 10 * 60_000;
-/** Keep only a digest; status lets every App window retire stale copies of a code. */
 export class PairingCodes {
   private current?: {
     id: string;

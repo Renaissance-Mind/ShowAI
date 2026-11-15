@@ -25,8 +25,6 @@ async function derive(password: string, salt: string) {
     false,
     ["deriveBits"],
   );
-  // This parameter set is exercised on Node and Workerd. The format fixes the
-  // algorithm/parameters so future upgrades cannot silently change old hashes.
   const bytes = new Uint8Array(
     await crypto.subtle.deriveBits(
       {
@@ -128,12 +126,7 @@ export function liveSession(user: {
   };
 }
 
-/** Window in which a direct sign-in may add lasting credentials to an account. */
 export const recentSignInMs = 15 * 60_000;
-/**
- * A live session that was issued by signing in to this server moments ago.
- * Federated sessions are excluded so a peer cannot mint lasting credentials.
- */
 export function recentSession(user: {
   id: string;
   session_digest: string;
@@ -162,7 +155,6 @@ export async function requireRecentSignIn(
   return recent;
 }
 
-/** Bound allocation even if Content-Length is absent or false. */
 export async function readBounded(
   request: Request,
   maximum: number,

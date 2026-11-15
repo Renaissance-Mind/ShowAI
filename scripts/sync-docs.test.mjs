@@ -85,7 +85,6 @@ test("the App receives the website's documentation pages in their folders and or
   const manifest = JSON.parse(files.get("manifest.json"));
   assert.deepEqual(manifest.locales["zh-CN"].tree, [
     { type: "page", id: "home" },
-    // A page without a slug is still documentation; slugs only name link targets.
     { type: "page", id: "faq" },
     {
       type: "folder",
@@ -103,7 +102,6 @@ test("the App receives the website's documentation pages in their folders and or
     `zh-CN/components/${componentFile(key)}`,
   ]);
   assert.equal(componentFile(key), `doc-hero@1.0.0-${hex.slice(0, 12)}.json`);
-  // The launch article (appExclude) and pages of other projects are website content.
   assert.ok(!files.has("zh-CN/pages/intro.json"));
   assert.ok(!files.has("zh-CN/pages/page.json"));
   assert.equal(

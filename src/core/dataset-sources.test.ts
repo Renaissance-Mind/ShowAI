@@ -123,7 +123,6 @@ describe("external dataset files", () => {
   it("refuse files that are not UTF-8 instead of damaging them", async () => {
     const folder = await directory();
     const path = join(folder, "gbk.csv");
-    // "名称\n你好" in GBK, as a Chinese Excel "CSV" save writes it.
     await writeFile(
       path,
       Buffer.from([0xc3, 0xfb, 0xb3, 0xc6, 0x0a, 0xc4, 0xe3, 0xba, 0xc3, 0x0a]),
@@ -281,7 +280,6 @@ describe("online data", () => {
           .writeHead(200, { "content-length": "4096" })
           .end("x".repeat(4096));
       else if (path === "/stream") {
-        // No declared length: the body is cut off once it passes the limit.
         response.writeHead(200);
         response.write("[" + "1,".repeat(600));
         setTimeout(() => response.end("1]"), 50);
@@ -335,7 +333,6 @@ describe("online data", () => {
       } finally {
         REMOTE_FETCH.timeoutMs = timeout;
       }
-      // A hosted server never fetches addresses of its own network.
       const requests = server.requests.length;
       REMOTE_FETCH.publicAddressesOnly = true;
       try {
@@ -375,7 +372,6 @@ describe("online data", () => {
         ),
       ).rejects.toThrow();
       expect(server.requests).toHaveLength(requests);
-      // A remote request must not disable the desktop's own loopback data sources.
       expect(
         await fetchSource(`${server.origin}/data.csv`, "csv", 1024),
       ).toMatchObject({ notModified: false });

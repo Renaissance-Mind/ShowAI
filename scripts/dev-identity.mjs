@@ -1,8 +1,3 @@
-// Refreshes the development identity (branch and commit) after Git refs move.
-// Reading it spawns `git`, which can fail transiently while another checkout
-// rewrites refs (for example EINTR from uv_cwd). Such a failure must never
-// stop the development server: it is logged and the read is retried a few
-// times, after which the next Git change triggers a fresh attempt.
 export function identityRefresher({
   read,
   apply,

@@ -1,7 +1,4 @@
 #!/usr/bin/env node
-// Builds the reader as code-split ES modules for static hosting on a CDN.
-// Inline conversation fragments then carry only page data and import the
-// reader from that host; each block's code and styles load with its chunk.
 import { build, transform } from "esbuild";
 import { copyFile, readFile, rm, writeFile, mkdir } from "node:fs/promises";
 import { dirname, join, relative, resolve } from "node:path";
@@ -10,17 +7,14 @@ import { createHash } from "node:crypto";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const styles = join(root, "src/portable/cdn-styles.ts");
-// Override with SHOWAI_CDN_PACKAGE to publish under another npm name.
 const packageName = process.env.SHOWAI_CDN_PACKAGE || "showai-reader";
 
-/** Stylesheets become modules that register their CSS with the mounted readers. */
 const cssModules = {
   name: "showai-cdn-css",
   setup(builder) {
     builder.onLoad({ filter: /\.css$/ }, async (args) => {
       const source = await readFile(args.path, "utf8");
       const imports = [];
-      // Keep @import as module imports so shared sheets are registered once.
       const body = source.replace(
         /@import\s+(?:url\()?["']([^"']+)["']\)?\s*;/g,
         (_, path) => {
@@ -43,9 +37,6 @@ registerStyle(${JSON.stringify(css)});`,
   },
 };
 
-// One CDN reader serves every block kind, so it cannot filter the catalogs by
-// page like the bundled reader. Reading needs each kind's name and default
-// data; examples, schemas and documentation serve authoring tools only.
 const AUTHORING_FIELDS = ["examples", "propsSchema", "scenarios", "effects"];
 const readingCatalogs = {
   name: "showai-cdn-catalogs",
@@ -106,8 +97,6 @@ export async function buildCdnReader(outdir = join(root, "dist-cdn")) {
   );
   const bytes = await readFile(resolve(root, entryPath));
   const app = JSON.parse(await readFile(join(root, "package.json"), "utf8"));
-  // The version carries the entry's content hash, so a runtime always names
-  // exactly the reader it was built with, even between app releases.
   const hash = entry.match(/-([A-Z0-9]+)\.js$/)?.[1]?.toLowerCase();
   if (!hash) throw new Error(`Unexpected CDN reader entry name: ${entry}`);
   const version = `${app.version}-reader.${hash}`;
@@ -125,8 +114,6 @@ export async function buildCdnReader(outdir = join(root, "dist-cdn")) {
     join(outdir, "manifest.json"),
     JSON.stringify(manifest, null, 2) + "\n",
   );
-  // The directory doubles as an npm package, so registry CDNs such as
-  // jsDelivr and unpkg can serve it at an immutable versioned URL.
   await writeFile(join(outdir, "index.js"), `export * from "./${entry}";\n`);
   await writeFile(
     join(outdir, "package.json"),

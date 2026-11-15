@@ -1,6 +1,4 @@
 import { desktopTestEnvironment } from "../../scripts/desktop-test-env.mjs";
-// Build first, then node src/desktop/window-ui-smoke.mjs.
-// Exercises real native windows against an isolated content library and profile.
 import assert from "node:assert/strict";
 import { mkdir, mkdtemp, writeFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
@@ -57,7 +55,6 @@ try {
       parentId: folder.id,
       title: "Other page",
     });
-    // Use the normal pinned-sidebar preference to keep navigation visible during clicks.
     localStorage.setItem("showai:sidebar-locked", "true");
     return {
       project: project.id,

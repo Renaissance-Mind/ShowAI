@@ -2,7 +2,6 @@
   --sf-ink: var(--sb-text);
   --sf-soft: var(--sb-soft);
   --sf-line: var(--sb-line);
-  /* Playback: the walked route uses the accent; stage states use semantic tones. */
   --sf-path: var(--sb-accent);
   --sf-ok: #2f7d5b;
   --sf-ok-soft: #e8f3ec;
@@ -53,7 +52,6 @@
   border-top: 1px solid var(--sb-line);
   border-bottom: 1px solid var(--sb-line);
 }
-/* Host styles can make SVG width relative to this otherwise empty absolute layer. */
 .sf-canvas .react-flow__edges {
   position: absolute;
   inset: 0;
@@ -202,7 +200,6 @@
   font-size: 12px;
   font-family: "SFMono-Regular", Consolas, monospace;
 }
-/* Only cards with an explanation respond to clicks. */
 .sf-canvas .react-flow__node {
   cursor: default;
 }
@@ -293,7 +290,6 @@
   }
 }
 
-/* Step-through playback: journeys and stages. */
 .sb-block.sf-block .sf-sr {
   position: absolute;
   width: 1px;

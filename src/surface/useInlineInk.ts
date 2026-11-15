@@ -8,8 +8,6 @@ import type { InkCommand } from "./inline-ink";
 import type { Camera } from "./model";
 import { useNativeBoard, type NativeBoardOptions } from "./useNativeBoard";
 
-/** WebKit's SVG screen matrix omits ancestor CSS scales. Read the CSS basis
- * and locate its transformed border box, including rotated/nested objects. */
 function clientMatrix(element: Element, width: number, height: number) {
   let matrix = new DOMMatrix();
   for (
@@ -249,8 +247,6 @@ export function useInlineInk({
           const frame = documentValue.layout?.[node.attrs!.id];
           const object = element.closest<HTMLElement>(".surface-object");
           if (frame?.height && object?.parentElement === content) {
-            // The document is authoritative. CSS rounds fractional SVG sizes
-            // to layout pixels; feeding that rounding back rescales saved ink.
             const extent =
               node.attrs!.extent ??
               node.attrs!.nativeInk?.extent ??
@@ -292,8 +288,6 @@ export function useInlineInk({
         widthPx: surface.clientWidth,
         heightPx: surface.clientHeight,
         viewport: values(viewport),
-        // WebKit's SVG screen matrix can omit ancestor CSS scale. The shared
-        // viewport already owns these coordinates; never infer them from SVG.
         camera: { ...viewCamera.current },
         cameraVersion: cameraRevision.current,
         holes,
@@ -328,8 +322,6 @@ export function useInlineInk({
         const accepted = await bridge.frame({
           ...packet,
           ...(lastPoses !== poses ? { poses } : {}),
-          // The bridge uses this model identity to verify nested DOM poses.
-          // It removes unchanged document payloads before native transport.
           document: documentValue,
         });
         if (accepted === false) return;
@@ -387,8 +379,6 @@ export function useInlineInk({
     const viewportChanged = () => {
       if (navigating.current) return;
       cameraRevision.current++;
-      // Camera updates bypass document import and the full-frame in-flight queue.
-      // The native side rejects older revisions so an expensive import cannot rewind zoom.
       if (bridge.viewport && surface.dataset.nativeInkActive === "true") {
         const viewport = clientMatrix(
           surface,

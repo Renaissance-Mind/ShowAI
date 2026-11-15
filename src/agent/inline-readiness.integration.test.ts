@@ -14,12 +14,6 @@ import { readingBrowserExecutable } from "./reading-renderer";
 import { inlinePresentation } from "./presentation";
 import type { ShowDocument } from "../types";
 
-/**
- * Renders every built-in component example the way show_component does, at
- * three conversation widths, and records errors, horizontal overflow and size.
- * It takes several minutes, so it runs only with SHOWAI_INLINE_READINESS=1;
- * SHOWAI_INLINE_READINESS_OUT names the JSON report.
- */
 const enabled = process.env.SHOWAI_INLINE_READINESS === "1";
 const WIDTHS = [360, 640, 760];
 const entries = [...primitives, ...components, ...g2, ...diagrams] as {

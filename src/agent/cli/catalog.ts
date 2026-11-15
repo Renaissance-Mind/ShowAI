@@ -26,7 +26,6 @@ import {
   saveOutput,
 } from "./inputs";
 
-/** --kind of catalog commands; list also takes contribution. */
 function catalogKind(args: Arguments) {
   const kind = option(args, "kind") as "component" | "template" | undefined;
   if (kind && !["component", "template"].includes(kind))
@@ -56,7 +55,6 @@ function templateSelections(args: Arguments) {
     });
 }
 
-/** Components, templates and publications: catalog *, template *, publish *. */
 export const catalogCommands: CommandDeclaration[] = [
   {
     command: "catalog",
@@ -169,7 +167,6 @@ export const catalogCommands: CommandDeclaration[] = [
     async run(args, { service, project, id }) {
       const kind = catalogKind(args);
       requireCount(args, 3);
-      // Core explains why built-in and unknown scopes cannot be removed.
       const scope = catalogScope(args) ?? "project";
       return service.removeCatalog(
         scope === "project" ? await project() : undefined,

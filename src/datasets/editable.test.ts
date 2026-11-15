@@ -2,8 +2,6 @@ import { describe, expect, it } from "vitest";
 import { resolveBinding, shareBlock, splitBindingChange } from "./binding.mjs";
 import { bindingEditable, canEdit, componentDataState } from "./editable.mjs";
 
-// A table whose rows come from a sheet: title and status are mapped, owner is
-// derived from the team list, anything else is kept with the block.
 const sheet = () => ({
   team: [{ id: "u1", name: "Ada" }],
   tasks: [
@@ -57,7 +55,6 @@ describe("editable paths of a bound block", () => {
     expect(canEdit(editable, "rows", "task:t1", "title")).toBe(false);
     expect(canEdit(editable, "rows", "task:t1", "owner")).toBe(false);
     expect(canEdit(editable, "rows", "task:t1", "note")).toBe(true);
-    // The list as a whole has read-only parts.
     expect(canEdit(editable, "rows")).toBe(false);
     expect(resolved.projected.get("task:t1")).toMatchObject({
       writable: [],
@@ -195,7 +192,6 @@ describe("the dataState prop of components", () => {
     const readOnly = componentDataState({ status: "ok", editable: true }, true);
     expect(readOnly.editable).toBe(false);
     expect(readOnly.canEdit("title")).toBe(false);
-    // Hosts before dataState: current data, editable with the block.
     expect(componentDataState(undefined, false)).toMatchObject({
       status: "ok",
       editable: true,

@@ -7,11 +7,6 @@ import type { ExternalChangeNotice as Notice } from "./page-session";
 import { authorName } from "./external-change";
 import "./external-change.css";
 
-/**
- * Outlines changed blocks for a few seconds without touching editor DOM
- * (ProseMirror re-reads nodes whose attributes change). Boxes are fixed-position,
- * follow the blocks each frame and are clipped to the page's scroll area.
- */
 let stopFlash: (() => void) | undefined;
 export function flashBlocks(
   root: HTMLElement | null,
@@ -59,7 +54,6 @@ export function flashBlocks(
   frame = requestAnimationFrame(paint);
 }
 
-/** Scrolls the first changed block into view and outlines the changes again. */
 export function locateBlocks(root: HTMLElement | null, blockIds: readonly string[]) {
   const first = blockIds
     .map((id) => root?.querySelector(`[data-block-id="${CSS.escape(id)}"]`))
@@ -77,13 +71,8 @@ const channelKey = {
   system: "System",
 } as const;
 
-/** Hovering or focusing the banner pauses this; leaving restarts it. */
 const AUTO_DISMISS_MS = 8000;
 
-/**
- * 「<名称> 刚更新了这个页面的 N 处」: a one-line banner floating over the top
- * of the page that dismisses itself unless the pointer or focus is on it.
- */
 export function ExternalChangeNotice({
   change,
   onLocate,

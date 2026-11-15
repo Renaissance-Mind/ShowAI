@@ -3,7 +3,6 @@ import { chmod, mkdir, rename, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { execute } from "../agent-host/process";
 
-/** Install one verified vendor binary inside this App profile; never modify system tools. */
 export async function installCloudflared(directory: string): Promise<string> {
   const system = { darwin: "darwin", linux: "linux", win32: "windows" }[
     process.platform as "darwin" | "linux" | "win32"

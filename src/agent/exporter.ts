@@ -93,25 +93,9 @@ export interface ExportOptions {
   overwrite?: boolean;
   components?: "bundled" | "remote";
   presentation?: "spatial" | "reading";
-  /**
-   * Inline prefers the compressed local reader, with CDN as a size fallback
-   * that the result's readerReason reports; "bundled" refuses the fallback.
-   */
   reader?: ReaderMode;
-  /**
-   * What the export carries, by packaging item id (see core/packaging):
-   * the person's decisions after seeing the plan. An export with files of
-   * this device (or data computed from them) and no decisions stops with
-   * CONFIRMATION_REQUIRED and details.packaging, and writes nothing. Items
-   * left out take the choice the plan shows.
-   */
   packaging?: PackagingDecisions;
-  /** "embed" confirms carrying everything that fits (the plan's defaults). */
   externalData?: "embed";
-  /**
-   * Per local file (by its file: reference): "embed" or "skip"; the same
-   * as packaging decisions for those items.
-   */
   resources?: LocalResourceDecisions;
 }
 export interface ExportResult {
@@ -123,24 +107,16 @@ export interface ExportResult {
   sourcePaths: string[];
   bytes: number;
   components: "bundled" | "remote";
-  /** The reader the written page uses. */
   reader: ReaderMode;
-  /** Why the page loads its reader online; absent when it carries its reader. */
   readerReason?: ReaderReason;
   requiresNetwork: boolean;
-  /** Snapshots of external datasets embedded in the export. */
   externalSnapshots?: ExternalSnapshotReport;
-  /** Local files of resource fields and what the export carries for each. */
   localResources?: LocalResourcePlanItem[];
-  /** Every packaging item and its choice, without paths of this device. */
   packaging?: ReturnType<typeof exportReceipt>;
-  /** Snapshots of transform inputs written beside the export ("inputs" or "both"). */
   inputFiles?: string[];
-  /** Web addresses of resource fields, kept as they are; readers load them online. */
   onlineResources?: string[];
 }
 
-/** The resource report of an export: local files and kept web addresses. */
 function resourceReport(
   documents: ShowDocument[],
   local: LocalResourcePlanItem[],
@@ -161,8 +137,6 @@ export function formatBytes(bytes: number): string {
   return `${(bytes / 1024 / 1024).toFixed(2)} MB`;
 }
 
-/** Ids of the blocks an exported (possibly partial) document contains,
- * including components nested in their rich text. */
 export function blockIdsOf(document: ShowDocument): string[] {
   const ids: string[] = [];
   walk(document.content, (node) => {
@@ -171,7 +145,6 @@ export function blockIdsOf(document: ShowDocument): string[] {
   return ids;
 }
 
-/** Bindings whose data an export carries, for the externalSnapshots report. */
 function carried(bindings: BindingRead[], plan: PackagingPlan): BindingRead[] {
   const left = new Set(
     plan.items
@@ -183,7 +156,6 @@ function carried(bindings: BindingRead[], plan: PackagingPlan): BindingRead[] {
   );
 }
 
-/** Whether the person confirmed what an export carries. */
 const confirmedPackaging = (options: {
   packaging?: PackagingDecisions;
   externalData?: "embed";
@@ -193,10 +165,6 @@ const confirmedPackaging = (options: {
   options.externalData === "embed" ||
   options.resources !== undefined;
 
-/**
- * The packaging plan of exported pages: the person's previous choices apply
- * unless externalData "embed" asks for everything that fits.
- */
 async function packagingPlan(
   store: FileStore,
   options: {
@@ -221,10 +189,6 @@ async function packagingPlan(
   });
 }
 
-/**
- * Resolves a page for export, plans and checks what it carries, and
- * applies the plan: the document as exported, with its plan.
- */
 export async function packagePage(
   store: FileStore,
   options: {
@@ -245,7 +209,6 @@ export async function packagePage(
   const record = await store.readPage(options.projectId, options.pageId, {
     checkpoint: false,
   });
-  // Shared data is resolved into the exported copy; the reader has no library.
   const resolved = await resolveDocumentDatasets(
     store,
     options.projectId,
@@ -286,10 +249,6 @@ export async function packagePage(
   };
 }
 
-/**
- * What an export of a page (or every active page) would carry, without
- * building it: the packaging plan with sizes and the choices in effect.
- */
 export async function analyzeExport(options: {
   root?: string;
   projectId: string;
@@ -331,7 +290,6 @@ export async function analyzeExport(options: {
   );
 }
 
-/** Writes the input snapshots of transforms beside an export. */
 async function writeInputSnapshots(
   store: FileStore,
   projectId: string,
@@ -393,7 +351,6 @@ export async function buildPageHtml(
   resources?: LocalResourceDecisions,
   references?: ShowArtifact["references"],
 ): Promise<string> {
-  // Web addresses stay; local files are embedded or keep their name only.
   const prepared = (await withLocalResources(document, resources)).document;
   return withHtmlLanguage(
     injectArtifactIntoHtml(
@@ -408,11 +365,6 @@ export async function buildPageHtml(
   );
 }
 
-/**
- * The page's references, for an export whose components declare that they
- * read them (pageReferences in their contract). Other exports carry none, so
- * no other page's title or text leaves the library unasked.
- */
 async function referenceSnapshot(
   root: string,
   projectId: string,
@@ -449,7 +401,6 @@ async function referenceSnapshot(
   return { page: { projectId, pageId: document.id }, to, from, pages };
 }
 
-/** Exported documents pin what was actually resolved, without mutating authoring files. */
 function lockedDocument(
   document: ShowDocument,
   components: CompiledComponent[],
@@ -518,7 +469,6 @@ async function effectivePath(path: string): Promise<string> {
   }
 }
 
-/** Allows the selected project's exports folder, while resolving aliases and symlinks. */
 export async function assertExportDestination(
   root: string,
   projectId: string,
@@ -547,8 +497,6 @@ export async function assertExportDestination(
     throw new Error(
       "Export destination resolves to protected package catalogs or publication records.",
     );
-  // Keep the permitted location lexical relative to the real projects root: an
-  // exports symlink must not redefine what belongs to the export subtree.
   const actualAllowed = join(actualProjects, projectId, "exports");
   if (
     isInside(actualProjects, actualTarget) &&
@@ -566,11 +514,6 @@ export async function assertExportDestination(
   }
 }
 
-/** Produces deliverables from a stored project; never changes its authoring source. */
-/**
- * The offline reader for one page in reading order, as text: what a PDF
- * export prints. Components and the reader are bundled; nothing is written.
- */
 export async function readingPageHtml(options: {
   root: string;
   projectId: string;
@@ -714,7 +657,6 @@ export async function exportPage(
         ? toCdnPage(html, { readerUrls: reader.urls })
         : html);
     const deliveredReader = preview?.reader ?? reader.mode;
-    // Only an export can ask for the bundled reader instead.
     const readerReason: ReaderReason | undefined =
       preview?.readerReason?.cause === "size"
         ? {
@@ -952,7 +894,6 @@ export async function exportPage(
         references,
       ),
     );
-    // Each page shares one reader bundle and stylesheet; page data remains embedded.
     const scripts: string[] = [];
     html = html.replace(
       /<script\b([^>]*)>([\s\S]*?)<\/script>/gi,
@@ -987,7 +928,6 @@ export async function exportPage(
       await writeFile(join(out, "assets/viewer.css"), css);
       bytes += Buffer.byteLength(code) + Buffer.byteLength(css);
     }
-    // Page links between exported pages open the page files.
     const siteRoutes = JSON.stringify({
       projectId: options.projectId,
       pages: Object.fromEntries(routes.map((route) => [route.id, route.file])),
@@ -1035,7 +975,6 @@ export async function exportPage(
         { force: true },
       );
   }
-  // A site written again keeps its input snapshots in step with its pages.
   const inputFiles = await writeInputSnapshots(
     store,
     options.projectId,

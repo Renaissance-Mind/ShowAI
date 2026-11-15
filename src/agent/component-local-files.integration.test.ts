@@ -14,7 +14,6 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { useResource } from "../components/local-resources";
 
-// A real 1×1 PNG.
 const png = Buffer.from(
   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=",
   "base64",
@@ -38,7 +37,6 @@ test("custom component props carry local files as packaged items and leave no de
   await new ContentLibrary(home).initialize();
   const store = new FileStore(home);
   const project = await store.createProject({ name: "组件本机文件" });
-  // Files outside the library, in a folder named like a person's home.
   const files = join(directory, "Users", "alice-device", "Material");
   await mkdir(files, { recursive: true });
   const imagePath = join(files, "cover image.png");
@@ -116,7 +114,6 @@ test("custom component props carry local files as packaged items and leave no de
   });
   const pageId = page.document.id;
 
-  // The export plan lists the component's files with where they are used.
   const plan = await analyzeExport({
     root: home,
     projectId: project.id,
@@ -135,10 +132,8 @@ test("custom component props carry local files as packaged items and leave no de
     { pageId, blockId: "viewer" },
   ]);
   expect(items[clip]).toMatchObject({ kind: "file-resource", bytes: 4096 });
-  // A file of another type is never carried, so it is not a choice.
   expect(items[report]).toBeUndefined();
 
-  // Without confirmation, local files stay on the device.
   await expect(
     exportPage({
       root: home,
@@ -169,7 +164,6 @@ test("custom component props carry local files as packaged items and leave no de
   });
   const html = await readFile(out, "utf8");
 
-  // A rendered conversation copy embeds what fits by default.
   const presented = await presentPage({
     root: home,
     projectId: project.id,
@@ -182,7 +176,6 @@ test("custom component props carry local files as packaged items and leave no de
   expect(presentedProps.clip).toMatch(/^data:video\/mp4;base64,/);
   expect(presentedProps.report).toBe("file:report.docx");
 
-  // An export of a page without local files shows what the reader itself contains.
   const plain = await store.createPage(project.id, {
     document: validateDocument({
       id: "plain",
@@ -226,7 +219,6 @@ test("useResource gives a component embedded data as its address", () => {
     status: "ready",
     local: false,
   });
-  // A copy without the file names it; the component shows that name.
   expect(views[1]).toMatchObject({
     status: "loading",
     local: true,

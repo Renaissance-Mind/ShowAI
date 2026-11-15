@@ -43,7 +43,6 @@ const highlightColors = [
   "#e5e5e5",
 ];
 
-/** Shared formatting actions for the document bar and the selection menu. */
 export function FormatControls({
   editor,
   onLink,
@@ -51,7 +50,6 @@ export function FormatControls({
 }: {
   editor: Editor;
   onLink: () => void;
-  /** Opens the hover-note editor for the selected text or formula. */
   onNote?: () => void;
 }) {
   const t = useTranslator(messages);

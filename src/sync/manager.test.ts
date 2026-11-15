@@ -125,7 +125,6 @@ describe("project synchronization between independent real content libraries", (
         (item) => item.id === parent.id,
       )?.sortBy,
     ).toBe("createdAt");
-    // Separate devices change different directories while offline.
     await alice.store.setDirectorySort(project.id, parent.id, "updatedAt");
     await bob.store.setDirectorySort(project.id, child.id, "name");
     await alice.manager.run();
@@ -224,7 +223,6 @@ describe("project synchronization between independent real content libraries", (
     const roots = await readdir(
       join(alice.home, "local", "sync", "current-snapshots"),
     );
-    // At most the four fixed slots; the publisher receives no incoming copy.
     const slots = await readdir(
       join(alice.home, "local", "sync", "current-snapshots", roots[0]),
     );
@@ -277,7 +275,6 @@ describe("project synchronization between independent real content libraries", (
     const files = await new LibraryOperations(home, project.id).projectFiles(project.id, revision);
     expect([...files.keys()].some(path => /\/history\/|runtimes\/|reader\.json/.test(path))).toBe(false);
 
-    // Recovery inputs written by older clients can still contain this projection.
     const archivedPath = `projects/${project.id}/history/imports/${report.id}/manifest.json`;
     files.set(archivedPath, await library.readFile(`imports/${report.id}/manifest.json`, revision));
     const captured = await captureProject(home, project.id, await library.entryAt(revision), [], project.id, undefined, files);
@@ -379,8 +376,6 @@ describe("project synchronization between independent real content libraries", (
       published.hash,
       published.revision,
     );
-    // The real server accepted publication, but the client retained its earlier
-    // checkpoint, as when a process dies before persisting the acknowledgement.
     await writeFile(configPath, checkpoint);
     await new SyncManager(alice.home).run();
     await bob.manager.run();
@@ -530,7 +525,6 @@ describe("project synchronization between independent real content libraries", (
       { role: "editor" },
     )) as { url: string };
     const link = new URL(invitation.url);
-    // This origin is unavailable to the recipient, as with an SSH tunnel on another machine.
     link.port = "1";
     expect((await bob.manager.previewInvite(link.toString())).url).toBe(
       bob.connection.url,
@@ -546,7 +540,6 @@ describe("project synchronization between independent real content libraries", (
     await bob.manager.join(bob.connection.id, link.toString());
     await bob.manager.stop();
     expect((await bob.manager.status()).projects[0].status).toBe("synced");
-    // Older invitations lack server identity; an explicitly selected connection still works.
     const legacy = (await alice.manager.manage(
       alice.connection.id,
       project.id,
@@ -673,7 +666,6 @@ describe("project synchronization between independent real content libraries", (
     const connection = config.connections[0];
     const originalUrl = connection.url;
     connection.url = "http://127.0.0.1:1";
-    // Exercise a persisted disconnected server, without substituting the transport.
     const { atomicLibraryFile } = await import("../core/library-files");
     await atomicLibraryFile(
       alice.home,

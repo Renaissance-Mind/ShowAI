@@ -1,6 +1,3 @@
-/* Shared by the desktop, exported reader and compiled component SDK.
- * Layout reference: https://github.com/nexu-io/open-design/blob/main/design-systems/airbnb/DESIGN-zh.md
- * User-selected accent anchor: RGB(18, 10, 143). Fonts use local fallbacks. */
 :root,
 .studio,
 .studio.settings-view,
@@ -25,7 +22,6 @@
   --accent-soft: #eeedf9;
   --brand-accent: var(--brand);
   --danger: #c13515;
-  /* Problem tones: text/icon colour; backgrounds mix them into --paper. */
   --warning: #9a6400;
   --info: #2f5f9e;
   --success: #2f7a4a;
@@ -76,14 +72,6 @@
   --shadow-dialog: 0 16px 64px #00000066;
   color-scheme: dark;
 }
-/* Motion: things enter on a strong ease-out, move on ease-in-out, and stay
- * short enough that repeated use never feels slow. Patterns adapted from
- * motion-primitives and Magic UI (both MIT); see resources/licenses/motion-ui.txt.
- * Scale: --duration-fast for hover, focus and colour changes, small menus and
- * every exit; --duration-base for panels, dialogs, rows and the sidebar or
- * Agent panel width; --duration-slow for large surfaces and image zoom.
- * Panels that move or resize use --ease-in-out; everything else --ease-out.
- * Loops, gesture tracking and highlight fades keep their own timings. */
 :root,
 [data-showai-inline-root] {
   --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
@@ -97,7 +85,6 @@
     opacity: 0;
   }
 }
-/* Overlays grow from slightly below full size, never from zero. */
 @keyframes showai-pop-in {
   from {
     opacity: 0;
@@ -118,7 +105,6 @@
     background-position: -100% 0;
   }
 }
-/* A highlight sweeping across text marks work in progress. */
 .showai-text-shimmer {
   color: transparent;
   background: linear-gradient(

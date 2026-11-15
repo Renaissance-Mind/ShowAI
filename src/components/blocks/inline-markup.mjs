@@ -1,14 +1,9 @@
-// Inline markup shared by documentation-style built-ins: **bold**,
-// ==highlight==, `code`, [label](href) and hover notes [label]{note}. Parsing is pure so contracts,
-// the CLI and the portable reader agree on what counts as a link or a note;
-// rendering never uses raw HTML.
 import { findNote, plainNotes } from "../../document/note-markup.mjs";
 import { parsePageLink } from "../../document/page-link.mjs";
 
 const INLINE =
   /\*\*(.+?)\*\*|`([^`]+)`|\[([^\]]+)\]\(([^)\s]+)\)|==([^=\s](?:[^=]*?[^=\s])?)==/g;
 
-/** Links may only reach http(s), mailto, in-page anchors, ShowAI pages or relative paths. */
 export function isSafeHref(href) {
   if (
     typeof href !== "string" ||
@@ -18,18 +13,11 @@ export function isSafeHref(href) {
     return false;
   if (/^(https?:\/\/[^/]|mailto:)/i.test(href) || parsePageLink(href))
     return true;
-  // Anything else with a scheme (javascript:, data:, file:…) or a protocol-relative host is refused.
   return !/^[a-z][a-z0-9+.-]*:/i.test(href) && !href.startsWith("//");
 }
 
-/** Http(s) links open in a new tab; mailto, anchors and relative paths stay in place. */
 export const isExternalHref = (href) => /^https?:\/\//i.test(href);
 
-/**
- * Split inline markup into segments. Bold and link labels keep nested
- * segments; links keep their raw href so validators can report unsafe targets
- * and renderers can fall back to the label.
- */
 export function parseInline(source) {
   const out = [];
   const pattern = new RegExp(INLINE.source, "g");
@@ -71,7 +59,6 @@ export function parseInline(source) {
   return out;
 }
 
-/** Inline markup reduced to its visible text; notes keep only their label. */
 export const plainInline = (source) =>
   plainNotes(source).replace(
     INLINE,
@@ -79,7 +66,6 @@ export const plainInline = (source) =>
       bold ?? code ?? label ?? highlight,
   );
 
-/** Unsafe link targets in the markup, in order of appearance. */
 export function unsafeInlineLinks(source) {
   const found = [];
   const visit = (segments) => {

@@ -55,10 +55,8 @@ export const blockIdNodeTypes = [
 ];
 
 export const blockIdPluginKey = new PluginKey("showaiBlockIds");
-/** Textblocks without id-bearing inline atoms; nodes are immutable. */
 const plainTextblocks = new WeakSet<ProseMirrorNode>();
 
-/** Attribute-only steps leave document positions, selection, and text untouched. */
 export function createBlockIdPlugin(isEditable: () => boolean): Plugin {
   const types = new Set([
     ...blockIdNodeTypes,
@@ -101,8 +99,6 @@ export function createBlockIdPlugin(isEditable: () => boolean): Plugin {
       current.doc.descendants((node, position) => {
         if (types.has(node.type.name)) assign(node, position);
         if (!node.isTextblock) return true;
-        // Inline content carries ids only on atoms such as hard breaks and
-        // inline formulas; text-only blocks are skipped once known.
         if (plainTextblocks.has(node)) return false;
         let plain = true;
         node.forEach((child) => {
@@ -190,7 +186,6 @@ export const WidgetNode = Node.create({
   addNodeView: () => ReactNodeViewRenderer(WidgetView),
 });
 
-/** A component inside a line of text, such as a date or another mention. */
 export const InlineWidgetNode = Node.create({
   name: "inlineWidget",
   group: "inline",
@@ -201,7 +196,6 @@ export const InlineWidgetNode = Node.create({
     return {
       kind: { default: "date" },
       data: {
-        // The date component's catalog default, so a bare node is valid.
         default: { date: "2026-01-01" },
         parseHTML: (element) => {
           const value = element.getAttribute("data-widget-content");
@@ -275,7 +269,6 @@ export const ToggleNode = Node.create({
   addNodeView: () => ReactNodeViewRenderer(ToggleView),
 });
 
-/** Ordered steps shown one at a time; which step is open is reading state, kept per reader and never saved to the page. */
 export const StepperNode = Node.create({
   name: "stepper",
   group: "block",
@@ -292,7 +285,6 @@ export const StepperNode = Node.create({
   addNodeView: () => ReactNodeViewRenderer(StepperView),
 });
 
-/** One step: a short title and any blocks, including other components. */
 export const StepNode = Node.create({
   name: "step",
   content: "block+",
@@ -372,7 +364,6 @@ const TextStyle = Mark.create({
     0,
   ],
 });
-// [visible text]{note}: hovering, focusing or tapping the text shows the note.
 const Annotation = Mark.create({
   name: "annotation",
   inclusive: false,
@@ -416,7 +407,6 @@ const t = translator(messages);
 export function createExtensions(
   options: {
     readOnly?: boolean;
-    /** Called while rendering so the placeholder follows the current language. */
     placeholder?: string | ((context: { empty: boolean }) => string);
     trailingNode?: boolean;
   } = {},
@@ -436,7 +426,6 @@ export function createExtensions(
       link: {
         openOnClick: options.readOnly ?? false,
         HTMLAttributes: { rel: "noopener noreferrer", target: "_blank" },
-        // ShowAI page links are kept; the page around the editor follows them.
         isAllowedUri: (url, context) =>
           !!parsePageLink(url) || context.defaultValidate(url),
       },
@@ -473,7 +462,6 @@ export function createExtensions(
   ];
 }
 
-/** Persist the same metadata through every ProseMirror edit and clipboard round trip. */
 const ContentAttributes = Extension.create({
   name: "showaiContentAttributes",
   addGlobalAttributes() {
@@ -550,7 +538,6 @@ const ContentAttributes = Extension.create({
   },
 });
 
-/** Retain Tiptap resizing and cell editing while displaying shared table metadata. */
 class ContentTableView extends TableView {
   constructor(...args: ConstructorParameters<typeof TableView>) {
     super(...args);

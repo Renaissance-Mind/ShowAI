@@ -1,8 +1,3 @@
-// ShowAI reader source: serves immutable showai-reader builds from R2.
-// A version is copied from the npm registry the first time it is requested,
-// after checking the registry's sha512 integrity, so publishing stays a single
-// npm release and this host needs no upload credentials.
-
 const PACKAGE = "showai-reader";
 const REGISTRY = "https://registry.npmjs.org";
 const VERSION = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/;
@@ -34,12 +29,10 @@ function notFound(message, maxAge = 60) {
   });
 }
 
-/** Parses /showai-reader@VERSION/PATH; anything else is rejected. */
 export function readerPath(pathname) {
   const match = /^\/([^/@]+)@([^/]+)\/(.+)$/.exec(pathname);
   if (!match || match[1] !== PACKAGE || !VERSION.test(match[2])) return null;
   const file = decodeURIComponent(match[3]);
-  // Dot files (including the import marker) are never served.
   if (!FILE.test(file) || file.split("/").some((part) => part.startsWith(".")))
     return null;
   return { version: match[2], file };
@@ -48,7 +41,6 @@ export function readerPath(pathname) {
 const octal = (bytes) => parseInt(new TextDecoder().decode(bytes).replace(/\0.*$/, "").trim() || "0", 8);
 const text = (bytes) => new TextDecoder().decode(bytes).replace(/\0.*$/, "");
 
-/** Regular files of a ustar archive, including PAX path overrides. */
 export function* tarEntries(archive) {
   let offset = 0,
     paxPath;
@@ -101,7 +93,6 @@ function base64(bytes) {
   return btoa(binary);
 }
 
-/** Copies one published version into the bucket; returns false if npm lacks it. */
 export async function importVersion(version, bucket, fetcher = fetch) {
   const meta = await fetcher(`${REGISTRY}/${PACKAGE}/${version}`, {
     headers: { accept: "application/json" },
@@ -126,7 +117,6 @@ export async function importVersion(version, bucket, fetcher = fetch) {
   const entries = [...tarEntries(archive)].filter(
     ({ path }) => path.startsWith("package/") && FILE.test(path.slice(8)),
   );
-  // Parallel writes keep the first request of a new version short.
   for (let i = 0; i < entries.length; i += 8)
     await Promise.all(
       entries.slice(i, i + 8).map(({ path, body }) =>

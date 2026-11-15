@@ -4,7 +4,6 @@ import { CellSelection, cellAround, TableMap } from "@tiptap/pm/tables";
 
 export const documentTableActionMeta = "showaiTableAction";
 
-/** Select logical rows/columns, including any cells that already span them. */
 export function selectDocumentTableCells(
   state: EditorState,
   tablePosition: number,
@@ -45,7 +44,6 @@ export function documentTableSelection(state: EditorState) {
   };
 }
 
-/** Follow stable cell IDs when saved content is normalized or updated externally. */
 export function restoreDocumentTableCellSelection(
   doc: Node,
   selection: CellSelection,
@@ -61,7 +59,6 @@ export function restoreDocumentTableCellSelection(
     if (node.attrs.id === headId) head = position;
   });
   if (anchor === undefined && head === undefined) return null;
-  // Undoing a split/merge can remove one endpoint while retaining the other.
   anchor ??= head;
   head ??= anchor;
   if (anchor === undefined || head === undefined) return null;

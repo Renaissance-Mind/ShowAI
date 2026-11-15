@@ -1,8 +1,6 @@
 import { generateKeyPair, randomBytes, sign } from "node:crypto";
 import { promisify } from "node:util";
 
-// A self-signed X.509 v3 certificate written with node:crypto, so the LAN
-// identity does not depend on an openssl binary (absent on Windows).
 
 function element(tag: number, ...parts: Buffer[]) {
   const body = Buffer.concat(parts);
@@ -32,7 +30,6 @@ function objectId(value: string) {
   return element(0x06, Buffer.from(bytes));
 }
 
-/** RFC 5280: UTCTime through 2049, GeneralizedTime after. */
 function time(date: Date) {
   const text = date.toISOString().replace(/[-:T]|\.\d+/g, "");
   return date.getUTCFullYear() < 2050
@@ -54,7 +51,6 @@ function pem(label: string, der: Buffer) {
   return `-----BEGIN ${label}-----\n${lines.join("\n")}\n-----END ${label}-----\n`;
 }
 
-/** An RSA-2048 key and a self-signed CA certificate for it, both as PEM. */
 export async function selfSignedIdentity(
   commonName: string,
   days: number,
@@ -68,7 +64,6 @@ export async function selfSignedIdentity(
     Buffer.from([0x05, 0x00]),
   );
   const serial = randomBytes(16);
-  // Positive and minimally encoded.
   serial[0] = (serial[0] & 0x7f) | 0x40;
   const subject = name(commonName);
   const basicConstraints = sequence(

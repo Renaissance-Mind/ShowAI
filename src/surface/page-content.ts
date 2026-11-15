@@ -11,7 +11,6 @@ const t = translator(messages);
 
 const moduleJSON = new WeakMap<JSONContent, JSONContent>();
 
-/** Keep structural identities in the document while exposing one continuous editor. */
 export function toPageEditor(
   node: JSONContent,
   document: ShowDocument,
@@ -67,17 +66,14 @@ export function toPageEditor(
   };
 }
 
-/** Plain module round-trip never writes the editor's readable source. */
 export function fromPageEditor(node: JSONContent): JSONContent {
   return decodePageEditor(node);
 }
 
-/** Duplicated modules allocate layout/view entries on this command's own draft. */
 export function fromPageEditorDraft<T extends ShowDocument>(
   node: JSONContent,
   source: T,
 ) {
-  // decode replaces each map only if a duplicated module contributes entries.
   const document: T = { ...source };
   const content = decodePageEditor(node, document);
   return { content, document };

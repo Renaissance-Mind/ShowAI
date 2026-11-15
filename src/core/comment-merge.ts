@@ -2,12 +2,6 @@ import { mergeValues, type MergeChoices } from "./catalog-merge";
 import type { MergeConflict } from "../contract/types";
 import type { PageComment } from "../types";
 
-/**
- * Three-way merge of page comments record by record, so two people working
- * on different threads (or adding replies to the same thread) never conflict.
- * Only the same comment changed in different ways on both sides conflicts,
- * at /page/comments/<id>/<field>.
- */
 export function mergeComments(
   base: readonly PageComment[] = [],
   ours: readonly PageComment[] = [],
@@ -37,7 +31,6 @@ export function mergeComments(
     conflicts.push(...merged.conflicts);
     if (merged.value !== undefined) value.push(merged.value as PageComment);
   }
-  // A thread deleted on one side drops the replies the other side added to it.
   const roots = new Set(value.filter((c) => !c.threadId).map((c) => c.id));
   const deletedRoots = new Set(
     [...b.keys()].filter((id) => !b.get(id)!.threadId && !roots.has(id)),

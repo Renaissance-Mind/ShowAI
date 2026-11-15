@@ -13,11 +13,6 @@ import { componentWidgetData, saveComponent } from "../core/catalog";
 import { walk } from "../document/walk.mjs";
 import type { ShowDocument } from "../core/model";
 
-/**
- * Agent-facing input and output paths found in real use: upgrading a
- * component revision in place, large inputs from files, reads and diffs to
- * files, record-level diffs, earlier tool shapes and dataset baselines.
- */
 
 let root: string;
 let files: string;
@@ -189,7 +184,6 @@ test("component.ref.set upgrades blocks in place, checks props and follows datas
     props,
   });
 
-  // An incompatible revision names the field and saves nothing.
   const rejected = await failed(client, "page_apply", {
     pageId: page.document.id,
     baseHash: upgraded.hash,
@@ -232,7 +226,6 @@ test("component.ref.set upgrades blocks in place, checks props and follows datas
   });
   expect(wrong.message).toContain("component.ref.set");
 
-  // References are grouped per page for batch upgrades.
   const refs = await ok(client, "catalog_references", {
     kind: "component",
     id: "ref-board",
@@ -246,7 +239,6 @@ test("component.ref.set upgrades blocks in place, checks props and follows datas
   ]);
   expect(refs.next).toContain("component.ref.set");
 
-  // A props dataset derived from the old revision follows the block.
   const shared = await ok(client, "dataset_write", {
     action: "create",
     name: "Items",
@@ -265,7 +257,6 @@ test("component.ref.set upgrades blocks in place, checks props and follows datas
     "4.0.0",
     schema({ note: { type: "string" }, tags: { type: "array" } }),
   );
-  // A second page shows the same data through another block.
   const other = await ok(client, "page_create", {
     title: "Mirror",
     blocks: [{ kind: "custom", data: componentWidgetData(v2, { items: [] }) }],
@@ -332,7 +323,6 @@ test("component.ref.set upgrades blocks in place, checks props and follows datas
     "note",
     "tags",
   ]);
-  // Bound blocks are checked with the props resolved from their dataset.
   const boundRejected = await failed(client, "page_apply", {
     pageId: page.document.id,
     baseHash: moved.hash,
@@ -414,7 +404,6 @@ test("large inputs come from local JSON files with precise errors", async () => 
     ).message,
   ).toContain("must be an array");
 
-  // Dataset values and operations.
   const value = join(files, "value.json");
   await writeFile(
     value,
@@ -480,7 +469,6 @@ test("component_save reads a package directory with the same contract", async ()
   expect(undocumented.message).toContain("legacy:true");
   const saved = await ok(client, "component_save", { directory, legacy: true });
   expect(saved).toMatchObject({ id: "dir-note", version: "1.0.0" });
-  // The package round-trips through a folder for editing.
   const exported = join(files, "exported-package");
   const written = await ok(client, "catalog_describe", {
     id: "dir-note",
@@ -509,7 +497,6 @@ test("component_save reads a package directory with the same contract", async ()
       })
     ).message,
   ).toContain("not empty");
-  // Earlier shape: component_import is translated and says so.
   const imported = await call(client, "component_import", { directory });
   expect(imported.structuredContent.ok).toBe(true);
   expect(imported.structuredContent.migration).toMatchObject({
@@ -592,7 +579,6 @@ test("page_read and page_diff write to files and diff records by id", async () =
     mime: "image/png",
   });
   expect(JSON.stringify(diff).length).toBeLessThan(6000);
-  // Paging keeps the remaining entries.
   const first = await ok(client, "page_diff", {
     pageId: page.document.id,
     sinceHash: page.hash,
@@ -722,7 +708,6 @@ test("a write from another connection names the datasetBases to pass", async () 
     response: "receipt",
   });
   expect(read.datasetBases).toEqual({ [shared.dataset.id]: shared.hash });
-  // A fresh connection of the same client has not read the dataset.
   const writer = await connect(createMcpServer({ root, projectId }));
   const operation = {
     type: "component.props.set",
@@ -775,7 +760,6 @@ test("bound data changes are compared by dataset_read sinceHash", async () => {
     response: "receipt",
   });
   const sinceHash = read.datasetBases[shared.dataset.id];
-  // A read written to a file still names the datasets it saw.
   const filed = await ok(client, "page_read", {
     pageId: page.document.id,
     rendered: false,
@@ -792,7 +776,6 @@ test("bound data changes are compared by dataset_read sinceHash", async () => {
       { op: "remove", path: "items[id=a]" },
     ],
   });
-  // The page itself did not change; page_diff points at the datasets.
   const diff = await ok(client, "page_diff", {
     pageId: page.document.id,
     sinceHash: read.hash,

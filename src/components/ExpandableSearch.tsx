@@ -12,7 +12,6 @@ import { useTranslator } from "../i18n/react";
 import messages from "../i18n/messages/search";
 import "./expandable-search.css";
 
-/** A search action that expands in the toolbar's normal layout flow. */
 export default function ExpandableSearch({
   label,
   placeholder = label,
@@ -61,7 +60,6 @@ export default function ExpandableSearch({
         if (event.key === "Escape" && open && !event.nativeEvent.isComposing) {
           event.preventDefault();
           event.stopPropagation();
-          // Dialogs also listen on document, outside React's event delegation.
           event.nativeEvent.stopImmediatePropagation();
           close();
           return;

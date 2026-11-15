@@ -24,10 +24,6 @@ import messages from "../i18n/messages/surface";
 
 const translate = translator(messages);
 
-/**
- * Containers are saved with the untranslated default name "Page" or "Board"
- * (containers.mjs); the interface shows those as the localized kind instead.
- */
 export function hasDefaultName(node: JSONContent) {
   return (
     node.type === "surface" &&
@@ -139,19 +135,13 @@ const ContentNode = memo(
     );
     const ink=sourceNode.attrs?.ink;
     const prepared=usePreparedCubic(ink?.format==='showai-ink-v2'?ink:undefined,sourceNode.attrs?.strokeWidth??ink?.width??1,sourceNode.attrs?.pressure??ink?.brush!=="monoline",!!actions.nativeScene);
-    // Keep this strong reference for the mounted reader even if the bounded
-    // shared cache evicts its LRU entry.
     const heldGeometry=useRef(prepared.held);if(prepared.held)heldGeometry.current=prepared.held;
     const lastPaint=useRef<JSONContent|undefined>(undefined);
     if(prepared.ready)lastPaint.current=observed.node;
-    // Keep the last real vector presentation while a new width/source suffix
-    // is being prepared. Canonical data and the current pose stay independent;
-    // an asynchronous style edit must not briefly erase the visible stroke.
     const node=prepared.ready?observed.node:lastPaint.current??observed.node,frame=observed.frame;
     const id = node.attrs!.id;
     const inkData = node.attrs?.nativeInk ?? node.attrs?.data?.nativeInk;
     const nativeInk = !!inkData;
-    // Keep stored native widgets intact while sharing the drawing's chrome.
     const drawingNode: JSONContent | undefined =
       node.type === "drawing"
         ? node

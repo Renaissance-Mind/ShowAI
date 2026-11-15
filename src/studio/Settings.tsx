@@ -180,13 +180,10 @@ export function SettingsPanel({
   onAppearanceChange: (appearance: AppearancePreference) => void;
   onChooseHome: () => void;
   onCopyHome: () => void;
-  /** Unused: Settings → Plugins copies a configuration per host. */
   onCopyConfig?: () => void;
   onMigrate: () => void;
   onOpenShortcuts: () => void;
-  /** Opens 关于与反馈 on its report form or diagnostics preview. */
   feedbackRequest?: FeedbackRequest;
-  /** Opens the built-in documentation; absent where it is unavailable. */
   onOpenDocs?: () => void;
   onOpenFaq?: () => void;
 }) {

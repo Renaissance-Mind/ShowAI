@@ -100,8 +100,6 @@ function record(value, name) {
   if (!value || typeof value !== "object" || Array.isArray(value))
     throw new Error(`${name} must be an object.`);
 }
-// Journeys walk a route step by step; stages recolour the same graph over
-// time. Both only reference nodes and edges of their own flow.
 function validatePlayback(flow, path) {
   const nodes = new Set(flow.nodes.map((node) => node.id));
   const edges = new Map(flow.edges.map((edge) => [edge.id, edge]));
@@ -173,10 +171,6 @@ function validatePlayback(flow, path) {
   } else if (flow.initialStage !== undefined)
     throw new Error(`${path}.initialStage requires stages.`);
 }
-/**
- * The edge walked to reach each journey step: the explicit `edge`, otherwise
- * an edge joining the previous step's node to this one (either direction).
- */
 export function journeyStepEdges(flow, journey) {
   return journey.steps.map((step, index) => {
     if (step.edge !== undefined) return step.edge;

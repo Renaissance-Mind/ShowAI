@@ -11,11 +11,6 @@ import {
   type SetStateAction,
 } from "react";
 
-/**
- * Personal reading state on this device: the tab, step, branch or parameter a
- * reader left a component on. It is keyed by page document and block, written
- * to localStorage after a short pause, and never enters the Page.
- */
 const PREFIX = "showai.reader-state.v1:";
 const INDEX_KEY = "showai.reader-state.v1";
 const MAX_PAGES = 400;
@@ -57,7 +52,6 @@ export class ReaderStateStore {
   read(page: string, block: string, slot: string): unknown {
     return this.page(page)[block]?.[slot];
   }
-  /** Stores one slot; undefined removes it. Other instances of the slot are told. */
   write(page: string, block: string, slot: string, value: unknown) {
     const state = this.page(page);
     if (value === undefined) {
@@ -74,7 +68,6 @@ export class ReaderStateStore {
       state[block] = { ...state[block], [slot]: JSON.parse(text) };
     }
     this.dirty.add(page);
-    // Told after the current render: a component may reset its state while rendering.
     const listeners = [
       ...(this.listeners.get(slotKey(page, block, slot)) ?? []),
     ];
@@ -95,8 +88,6 @@ export class ReaderStateStore {
       if (!set.size) this.listeners.delete(key);
     };
   }
-  /** Writes pending pages. Storage is a personal convenience: a full or
-   * unavailable one leaves the state in memory and says why. */
   flush() {
     clearTimeout(this.timer);
     if (!this.dirty.size) return;
@@ -122,7 +113,6 @@ export class ReaderStateStore {
         continue;
       }
       this.storage.setItem(PREFIX + page, text);
-      // Re-adding moves the page last, so equal stamps still keep the newest.
       delete index[page];
       index[page] = now;
     }
@@ -159,7 +149,6 @@ const slotKey = (page: string, block: string, slot: string) =>
   JSON.stringify([page, block, slot]);
 
 let shared: ReaderStateStore | undefined;
-/** The App's store; written on a pause, and before the window goes away. */
 export function readerStateStore() {
   if (shared) return shared;
   const store = new ReaderStateStore(localStorage);
@@ -172,11 +161,6 @@ export function readerStateStore() {
   return store;
 }
 
-/**
- * The page and block whose reading state components below keep. Only App
- * surfaces provide it; exports, previews and thumbnails render without it, so
- * their components start from the saved data every time.
- */
 export interface ReaderStateScope {
   page: string;
   block?: string;
@@ -185,19 +169,12 @@ export interface ReaderStateScope {
 export const ReaderStateContext = createContext<ReaderStateScope | null>(null);
 export const useReaderStateScope = () => useContext(ReaderStateContext);
 
-/**
- * useState that remembers its value for this reader on this device. `block`
- * names a node with its own id, such as a toggle inside rich text. `accept`
- * rejects a saved value the current data can no longer show; a value equal to
- * the initial one is not stored, so a changed default still reaches readers.
- */
 export function useReaderState<T>(
   slot: string,
   initial: T | (() => T),
   options: { block?: string | null; accept?: (value: unknown) => boolean } = {},
 ): [T, Dispatch<SetStateAction<T>>] {
   const scope = useContext(ReaderStateContext);
-  // An explicit id, even null, names the owner; otherwise the enclosing block.
   const block =
     options.block !== undefined ? (options.block ?? undefined) : scope?.block;
   const key = scope && block ? slotKey(scope.page, block, slot) : null;
@@ -239,7 +216,6 @@ export function useReaderState<T>(
       );
     };
     const stop = scope.store.subscribe(scope.page, block, slot, apply);
-    // A hidden tab resumes with what another view of the page chose meanwhile.
     apply(scope.store.read(scope.page, block, slot));
     return stop;
   }, [key]);
@@ -269,7 +245,6 @@ export function useReaderState<T>(
   return [current.value, dispatch];
 }
 
-/** Gives the components inside one page block their own reading state. */
 export function ReaderBlock({
   id,
   children,
@@ -305,7 +280,6 @@ export const isNumberRecord = (
     (item) => typeof item === "number" && Number.isFinite(item),
   );
 
-/** A remembered set of ids, kept as a list. */
 export function useReaderSet(
   slot: string,
   initial: () => Iterable<string> = () => [],
@@ -325,7 +299,6 @@ export function useReaderSet(
   return [set, dispatch];
 }
 
-/** Runs `reset` when `key` changes after mount, so restored state survives the first render. */
 export function useResetOnChange(key: string | number, reset: () => void) {
   const previous = useRef(key);
   const latest = useRef(reset);

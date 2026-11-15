@@ -1,7 +1,5 @@
-/** Shared by Workers, Linux and the local application. No host filesystem APIs. */
 export const syncProtocol = "showai-project-sync-v2";
 export const legacySyncProtocol = "showai-project-sync-v1";
-/** Archived readers and imported history belong to the originating device. */
 export const isCurrentSyncPath = (path: string): boolean =>
   !path.startsWith("runtimes/") &&
   !path.includes("/history/") &&
@@ -142,7 +140,6 @@ export function scopedPath(path: string, projectId: string): string {
     !(
       path.startsWith(`projects/${identifier(projectId)}/`) ||
       /^assets\/[a-f0-9]{64}$/.test(path) ||
-      // Copies of linked files (dataset-bundles); synchronized, not versioned.
       /^bundles\/[a-f0-9]{64}$/.test(path) ||
       /^runtimes\/readers\/[a-f0-9]{64}\//.test(path) ||
       /^packages\/(?:published\/)?(?:components|templates)\//.test(path)
@@ -266,8 +263,6 @@ export interface ServerConnection {
   capabilities?: string[];
   expiresAt?: string;
 }
-/** network: no connection; auth: sign-in needed; server: the server failed;
- * local: this device could not read or write the library. */
 export type SyncErrorKind = "network" | "auth" | "server" | "local";
 export interface ProjectConnection {
   projectId: string;
@@ -279,13 +274,10 @@ export interface ProjectConnection {
   status:
     "pending" | "synced" | "offline" | "conflict" | "revoked" | "save-failed";
   error?: string;
-  /** Why the last sync failed, so the workbench can say what to do. */
   errorKind?: SyncErrorKind;
-  /** Original error text for technical details; `error` is translated. */
   errorDetail?: string;
   syncedAt?: string;
   pendingCreation?: boolean;
-  /** Keep the local copy and merge baseline while synchronization is disabled. */
   paused?: boolean;
 }
 export interface SyncConfiguration {
@@ -293,12 +285,9 @@ export interface SyncConfiguration {
   deviceId: string;
   connections: ServerConnection[];
   projects: ProjectConnection[];
-  /** Stored apart so older runtimes also leave stopped copies alone. */
   pausedProjects?: ProjectConnection[];
   defaultConnectionId: string | null;
   defaultSince?: string;
-  /** Projects created to stay on this device; never enrolled by the default account. */
   localProjectIds?: string[];
-  /** Display choices belong to this device and are never part of project sync. */
   hiddenProjectIds?: string[];
 }

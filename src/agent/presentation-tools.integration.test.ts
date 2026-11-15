@@ -4,8 +4,6 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { registerPresentationTools } from "./presentation-tools";
 
-// Thirteen positioned nodes in a chain, with a journey and stages: the shape
-// that used to capture only the header above the graph.
 const nodes = Array.from({ length: 13 }, (_, index) => ({
   id: `n${index}`,
   label: `Step ${index + 1}`,
@@ -85,7 +83,6 @@ async function showImage(height: number) {
 test("a show_component image grows with the flowchart height", async () => {
   const short = await showImage(360);
   const tall = await showImage(720);
-  // The header and playback controls sit around the canvas.
   expect(short.height).toBeGreaterThan(360);
   expect(tall.height).toBeGreaterThan(720);
   expect(tall.height - short.height).toBe(360);

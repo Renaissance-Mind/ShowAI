@@ -150,7 +150,6 @@
   color: var(--sb-surface);
 }
 
-/* The shared selection menu is portalled outside the block's typography. */
 .editor-bubble[data-editor-keyboard-scope="mindmap"] {
   --editor-line: var(--line);
   --editor-soft: var(--accent-soft);

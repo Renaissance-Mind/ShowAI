@@ -1,6 +1,3 @@
-// Pointer reordering of database properties: a same-size preview follows the
-// pointer, the other columns or rows slide into place, and one move is saved
-// on release. Alt+Shift+arrow keys move a property one step.
 import {
   useEffect,
   useLayoutEffect,
@@ -16,7 +13,6 @@ type Point = { x: number; y: number };
 const easing = "cubic-bezier(.2,.8,.2,1)";
 const motionDuration = () =>
   matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : 170;
-// The preview lives outside the component, so it carries the component's colors.
 const THEME = [
   "--sb-surface",
   "--sb-soft",
@@ -28,7 +24,6 @@ const THEME = [
   "--sb-hover",
 ];
 
-/** A same-size, inert snapshot, anchored at the original grab point. */
 class DragPreview {
   private ghost: HTMLDivElement;
   private origin: DOMRect;
@@ -149,7 +144,6 @@ class DragPreview {
   }
 }
 
-/** React owns the order. FLIP translates existing cells or rows between those layouts. */
 class LayoutMotion {
   private animations = new Map<HTMLElement, Animation>();
   private before = new Map<HTMLElement, DOMRect>();
@@ -210,7 +204,6 @@ class LayoutMotion {
   }
 }
 
-/** Preview the order locally while dragging; report one move after landing. */
 export function usePropertyReorder<T extends HTMLElement = HTMLDivElement>({
   ids,
   disabled,
@@ -335,7 +328,6 @@ export function usePropertyReorder<T extends HTMLElement = HTMLDivElement>({
     if (current.root.hasPointerCapture(current.pointerId))
       current.root.releasePointerCapture(current.pointerId);
     if (!commit) project([...latest.current.ids]);
-    // Let React place the placeholder before measuring its destination.
     await new Promise<void>((resolve) =>
       requestAnimationFrame(() => resolve()),
     );

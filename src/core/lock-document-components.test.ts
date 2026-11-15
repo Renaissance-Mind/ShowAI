@@ -55,7 +55,6 @@ afterAll(async () => {
   await rm(home, { recursive: true, force: true });
 });
 
-// A Page whose views are filled in from its blocks during validation.
 function page(content: ShowDocument["content"]["content"]) {
   const document = createResource(blankDocument()) as ShowDocument;
   document.content.content = content;
@@ -67,14 +66,12 @@ const paragraph = (id: string) => ({
   attrs: { id },
   content: [{ type: "text", text: id }],
 });
-// The normalised private copy that every caller receives.
 const normalised = (document: ShowDocument) =>
   validateDocument(JSON.parse(JSON.stringify(document))) as ShowDocument;
 
 describe("lockDocumentComponents", () => {
   it("returns a normalised copy of a page without custom widgets", async () => {
     const document = page([paragraph("a"), paragraph("b")]);
-    // Optional fields left undefined by editor code are dropped, as JSON would.
     document.content.content![0].attrs!.textAlign = undefined;
     delete (document as Partial<ShowDocument>).icon;
     const before = structuredClone(document);

@@ -70,18 +70,12 @@ export async function setMaintenancePolicy(
   );
   return policy;
 }
-/** Persistent hosts compact only after observed idle time; short CLI calls stay synchronous. */
 export class MaintenanceScheduler {
   private lastHead: string | null | undefined;
   private changedAt = Date.now();
   private stopped = false;
   private timer?: ReturnType<typeof setTimeout>;
   private pending?: Promise<void>;
-  /**
-   * The state a complete pass found nothing more to do in. The index, the
-   * collected copies and the object counts only change with the head, the
-   * stored copies, the policy, or a copy outliving its grace period.
-   */
   private settled?: { head: string; state: string; at: number };
   constructor(
     readonly root: string,
@@ -122,7 +116,6 @@ export class MaintenanceScheduler {
     this.settled = undefined;
     await new IndexClient(this.root).synchronize();
     if (this.stopped || Date.now() - this.changedAt < policy.idleMs) return;
-    // Synchronized copies of linked files no project refers to any more.
     const removed = await collectBundles(new FileStore(this.root));
     if (this.stopped || Date.now() - this.changedAt < policy.idleMs) return;
     const objects = await library.objectStatistics();

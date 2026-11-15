@@ -121,7 +121,6 @@ type Options = z.output<typeof boardReadSchema>;
 interface IndexedElement extends CapturedElement {
   kind: string;
   title: string;
-  /** Text shown inside a shape or on an arrow. */
   label?: string;
   parentPath: string[];
 }
@@ -222,7 +221,6 @@ async function ownedSnapshot(
     throw new CoreError("INVALID_DATA", "Invalid Board snapshot metadata.");
   return snapshot;
 }
-/** Reclaim only expired, explicitly owned read caches. Current source files are never targets. */
 export async function pruneBoardSnapshots(root: string) {
   await safeLibraryPath(root, cacheRoot(root));
   const names = await readdir(cacheRoot(root)).catch(
@@ -395,7 +393,6 @@ async function createSnapshot(
           `Capture state ${nodeId} must identify a ${kind} inside this Board.`,
         );
     }
-  // Bound blocks render their shared data; the captured source stays unchanged.
   const rendered = (
     await resolveDocumentDatasets(store, projectId, scoped.document)
   ).document;
@@ -491,8 +488,6 @@ async function createSnapshot(
     }, { scope: "tree" });
     await writeCache(store.root, id, "source.json", Buffer.from(source));
     await writeCache(store.root, id, "frozen.html", Buffer.from(frozen.html));
-    // A detailed photograph can exceed the attachment limit even on a small Board.
-    // Check the real PNG rather than estimating from geometry, then use tiles if needed.
     let fullImageBytes = 0;
     if (full) {
       const request = { key: "full", bounds, scale };

@@ -30,7 +30,6 @@ async function ok(name: string, args: Record<string, unknown> = {}) {
   return result.data;
 }
 
-/** A budget workbook whose table does not start at a fixed cell. */
 const workbook = (march: number) =>
   xlsxWorkbook([
     { name: "封面", rows: [["2026 年部门预算"]] },
@@ -49,7 +48,6 @@ const workbook = (march: number) =>
     },
   ]);
 
-/** Chart data from three inputs: an Excel budget, a CSV of actuals and a project dataset of targets. */
 const script = `function transform({ budget, actuals, targets }, h) {
   const sheet = h.sheet(budget, "预算");
   const header = h.find(sheet, "月份");
@@ -249,7 +247,6 @@ test("a transform over a spreadsheet, a CSV file and project data feeds a chart"
     blockId: found.attrs.id,
     datasetId,
     status: "ok",
-    // The chart's own settings stay editable next to the computed values.
     editable: { paths: ["title", "type", "unit"] },
     warnings: [],
     transform: {
@@ -261,7 +258,6 @@ test("a transform over a spreadsheet, a CSV file and project data feeds a chart"
     },
     props: { title: "月度对比", type: "bar", unit: "元", ...chart },
   });
-  // Bound blocks show the output read-only.
   const edit = await call("page_apply", {
     pageId,
     baseHash: bound.hash,
@@ -277,7 +273,6 @@ test("a transform over a spreadsheet, a CSV file and project data feeds a chart"
   });
   expect(edit.error.code).toBe("READ_ONLY");
 
-  // Changing an input recomputes the output.
   await writeFile(budgetPath, workbook(1000));
   const updated = await ok("dataset_read", { action: "read", datasetId });
   expect(updated.dataset.value.series[0].values).toEqual([1500, 1300, 1450]);
@@ -341,7 +336,6 @@ test("a missing input file marks the output stale; a failing script keeps the la
   expect(invalid.record.warnings[0]).toMatchObject({ code: "OUTPUT_INVALID" });
   expect(invalid.record.dataset.value).toEqual({ total: 2450 });
 
-  // Definitions are versioned with the project; deleting an input is refused while used.
   const refused = await call("dataset_delete", {
     datasetId: actualsId,
     baseHash: current.hash,

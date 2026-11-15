@@ -22,8 +22,6 @@ export interface NativeBoardOptions {
   control?:RefObject<NativeBoardControlHandle|null>;
 }
 
-/** All tools share one native scene. DOM measurements belong to content/layout
- * changes; native contact/camera frames never ask React to repaint the Board. */
 export function useNativeBoard(options:NativeBoardOptions){
   const current=useRef(options);current.current=options;
   const [owner,setOwner]=useState<{pageId:string;boardId:string;token:string}|null>(null);
@@ -123,7 +121,5 @@ export function useNativeBoard(options:NativeBoardOptions){
       void bridge.hide(o.document!.id,o.boardId,token).finally(()=>{if(surface.dataset.nativeInkToken===token){delete surface.dataset.nativeBoardActive;delete surface.dataset.nativeInkToken}});
     };
   },[active,options.document?.id,options.boardId,options.root,options.world]);
-  // Ownership follows an accepted native scene, scoped to this exact Board.
-  // An inactive/printing/locked surface immediately keeps its DOM renderer.
   return active&&!!owner&&owner.pageId===options.document?.id&&owner.boardId===options.boardId;
 }

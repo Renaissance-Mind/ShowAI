@@ -6,7 +6,6 @@ import { reconcileSurface } from "../document/document.mjs";
 import { walk } from "../document/walk.mjs";
 import { validateDocument } from "./validation.mjs";
 
-/** Project a page into selected subtrees and the containers needed to render them. */
 export function selectDocumentBlocks(source, blockIds) {
   if (
     !Array.isArray(blockIds) ||
@@ -42,13 +41,11 @@ export function selectDocumentBlocks(source, blockIds) {
   document.content.content = (document.content.content ?? [])
     .map(prune)
     .filter(Boolean);
-  // Page decorations and comments are outside the requested content projection.
   document.cover = "";
   document.icon = "";
   document.comments = [];
   if (document.content.type === "surface") {
     reconcileSurface(document, { clone: false });
-    // A saved camera focus is a view over the original page, not this selection.
     if (document.surfaceViews)
       for (const views of Object.values(document.surfaceViews))
         views.initial = null;

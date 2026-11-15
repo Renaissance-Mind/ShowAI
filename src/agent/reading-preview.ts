@@ -1,4 +1,3 @@
-/** Insert transient reading state before the reader module, never into markup literals inside its JavaScript. */
 export function injectReadingOptions(html: string, options: unknown): string {
   const head = /<head\b[^>]*>/i;
   if (!head.test(html))

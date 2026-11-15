@@ -1,9 +1,4 @@
 import { desktopTestEnvironment } from "../../scripts/desktop-test-env.mjs";
-// Real Electron + filesystem lifecycle check. No mocked bridge, storage or clock.
-// Build first: npm run build
-// Run: node src/desktop/ui-smoke.mjs
-// Packaged: SHOWAI_SMOKE_BINARY=/path/ShowAI.app/Contents/MacOS/ShowAI node src/desktop/ui-smoke.mjs
-// SHOWAI_SMOKE_OUTPUT optionally selects the parent directory for retained evidence.
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
 import { createHash } from "node:crypto";
@@ -22,7 +17,6 @@ import electron from "electron";
 import { _electron } from "playwright-core";
 import { stopTestProcess } from "../../scripts/stop-test-process.mjs";
 
-// The smoke checks select controls by their Chinese labels.
 process.env.SHOWAI_LANGUAGE ??= "zh-CN";
 
 const repository = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
@@ -105,8 +99,6 @@ try {
     .getByRole("button", { name: "新建项目", exact: true })
     .first()
     .waitFor();
-  // Read-only discovery uses the real installed bridge so packaged CLI testing
-  // executes that package's binary and bundled script, not a repository substitute.
   const info = await page.evaluate(() => window.showai.invoke("app:info"));
   assert.equal(info.home, home);
   result.runtime = {
@@ -181,8 +173,6 @@ try {
     { type: "text", text: externalText },
   ];
   external.updatedAt = new Date().toISOString();
-  // Both writes are real. The editor's normal 450 ms auto-save races an atomic
-  // external file replacement; no UI state or timer is patched by this test.
   await editor.fill(draftText);
   const pendingPath = `${baseline.path}.external-write`;
   await writeFile(
@@ -225,7 +215,6 @@ try {
     .getByRole("button", { name: "修改后重新保存", exact: true })
     .click();
   await conflictDialog.waitFor({ state: "hidden" });
-  // Reviewing the draft must not overwrite the external version automatically.
   assert.equal(
     contentText((await readJson(baseline.path)).document.content),
     externalText,
@@ -253,8 +242,6 @@ try {
     "Reviewed local edits save only after explicit confirmation; the external snapshot remains available",
   );
 
-  // Capture a CLI checkpoint while open, then type once more and immediately
-  // close the actual app; its normal close/flush handshake must preserve it.
   const resolvedBaseline = await cli(
     "pages",
     "read",
@@ -295,9 +282,6 @@ try {
   );
   result.checks.push("Native application quit completes with pending edits");
 
-  // Closing keeps a pending edit in a durable recovery draft rather than
-  // forcing a formal save, so the page holds the last saved text and the
-  // reopened app restores the final keystrokes.
   const finalOriginal = await cli(
     "pages",
     "read",
@@ -319,8 +303,6 @@ try {
   page = await application.firstWindow({ timeout: 30000 });
   page.setDefaultTimeout(15000);
   page.on("pageerror", (error) => rendererErrors.push(error.message));
-  // The reopened page offers the retained draft; restoring it brings back
-  // the final keystrokes.
   await page.getByRole("button", { name: /^恢复草稿/ }).click();
   await page
     .getByRole("textbox", { name: "文档内容", exact: true })
@@ -350,8 +332,6 @@ try {
   process.exitCode = 1;
 } finally {
   if (application && !closed && application.process().exitCode === null) {
-    // Only this script's isolated child is terminated on a failed run. Its files
-    // remain available for inspection, including any unflushed conflict evidence.
     await stopTestProcess(application.process());
   }
   result.rendererErrors = rendererErrors;

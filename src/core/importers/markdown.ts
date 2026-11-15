@@ -4,10 +4,6 @@ import { parseArtifact } from "../../portable/validation.mjs";
 import { htmlArtifactSource } from "./html-artifact";
 import type { ImportBundle, Importer } from "./types";
 
-// Markdown, plain text and ShowAI's own HTML/JSON page exports: each file
-// becomes one page, as the workbench's import has always done. A Markdown
-// page is a document whose content is the parsed Markdown; an export keeps
-// its document and bundled components.
 
 export const PAGE_FILE_LIMIT = 20 * 1024 * 1024;
 const EXTENSIONS = [".json", ".html", ".htm", ".md", ".markdown", ".txt"];

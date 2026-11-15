@@ -1,6 +1,5 @@
 import { defineMessages } from "../index";
 
-// Step guide built-in and the copyable code panel it shares with the command reference.
 export default defineMessages("stepGuide", {
   "zh-CN": {
     title: "操作步骤",

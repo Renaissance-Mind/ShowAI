@@ -44,14 +44,7 @@ describe("terminology glossary", () => {
   });
 });
 
-/**
- * English words left in Chinese text after removing placeholders, paths,
- * URLs, code-like identifiers and the allowed product names. Two or more
- * words in a row read as an untranslated phrase; a single word is a name
- * such as Codex, MCP or JSON.
- */
 function untranslatedPhrases(text: string) {
-  // Removed parts become "|" so they also end a run of words.
   let rest = text
     .replace(/\{\w+\}/g, "|")
     .replace(/`[^`]*`/g, "|")

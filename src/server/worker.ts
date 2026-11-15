@@ -214,8 +214,6 @@ export function workerObjects(env: WorkerEnvironment): ObjectStore {
       await env.CONTENT.put(key, bytes);
     },
     async putVerified(key, body, expected, maximum) {
-      // Each streaming upload buffers one 5 MiB part; six stay well inside the
-      // isolate's memory while letting several devices upload at once.
       if (activeUploads >= 6)
         throw new SyncError(
           429,
@@ -275,8 +273,6 @@ export function workerObjects(env: WorkerEnvironment): ObjectStore {
             "Content does not match its digest.",
           );
         if (!upload) {
-          // Small verified objects publish once. Larger bodies retain bounded
-          // multipart streaming without exposing an unverified final key.
           note("put", filled);
           await env.CONTENT.put(key, buffer.subarray(0, filled));
           return length;
@@ -307,8 +303,6 @@ export function workerObjects(env: WorkerEnvironment): ObjectStore {
           note("abortMultipartUpload");
           await upload.abort();
         }
-        // This request-owned staging key has never been published or referenced.
-        // Its transaction rollback differs from historical orphan garbage collection.
         if (upload) {
           note("delete");
           await env.CONTENT.delete(temporary);
@@ -317,7 +311,6 @@ export function workerObjects(env: WorkerEnvironment): ObjectStore {
     },
   };
 }
-/** Headers only this front end may send to the Durable Object. */
 const internalHeaders = ["x-showai-transfer", "x-showai-length"];
 const objectRoute = /\/api\/projects\/[^/]+\/objects\/([a-f0-9]{64})$/;
 type DurableStub = { fetch(request: Request): Promise<Response> };
@@ -367,11 +360,6 @@ function failure(request: Request, env: WorkerEnvironment, error: unknown) {
     env.SHOWAI_SERVER_URL ? new URL(env.SHOWAI_SERVER_URL).origin : undefined,
   );
 }
-/**
- * Streams large object bytes between the client and R2 in this Worker. The
- * Durable Object keeps authority: it authorizes and charges every read, and
- * admits, commits or aborts every write, but never carries the bytes.
- */
 async function objectTransfer(
   request: Request,
   env: WorkerEnvironment,

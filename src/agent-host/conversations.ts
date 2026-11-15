@@ -91,7 +91,6 @@ export function parseTarget(value: unknown): AgentTarget {
   };
 }
 
-/** Component state the person handed over; it describes the live view only. */
 export function componentInstructions(components?: AgentTarget["components"]) {
   if (!components?.length) return "";
   return (
@@ -105,7 +104,6 @@ export function componentInstructions(components?: AgentTarget["components"]) {
   );
 }
 
-/** Tell the Agent exactly which objects the user pointed at and how far it may write. */
 export function targetInstructions(target: AgentTarget, pageTitle?: string) {
   if (!target.pageId)
     return "The user did not focus a page; work at project level and ask before broad changes.";
@@ -136,7 +134,6 @@ export function targetInstructions(target: AgentTarget, pageTitle?: string) {
   );
 }
 
-/** Backends without native session resume receive the previous turns as context. */
 export function recap(conversation: AgentConversation, beforeTurnId: string) {
   const turns = conversation.turns
     .filter((turn) => turn.id !== beforeTurnId && turn.state !== "running")
@@ -175,7 +172,6 @@ export function summary(
   };
 }
 
-/** A conversation title as the person typed it, on one line. */
 export function conversationTitle(value: unknown) {
   return z
     .string()
@@ -184,11 +180,6 @@ export function conversationTitle(value: unknown) {
     .parse(value);
 }
 
-/**
- * Whether every word of the query occurs in the conversation's title, its
- * requests or its replies, ignoring case and character width. An empty query
- * matches every conversation.
- */
 export function matchesConversation(
   conversation: AgentConversation,
   query: string,
@@ -210,15 +201,10 @@ export function matchesConversation(
   return words.every((word) => text.includes(word));
 }
 
-/**
- * Conversations live per project under the host root. Writes for one
- * conversation are serialised; running turns persist at most once a second.
- */
 export class ConversationStore {
   private cache = new Map<string, AgentConversation>();
   private listed = new Set<string>();
   private writes = new Map<string, Promise<void>>();
-  /** Last write failure per conversation; cleared by the next successful write. */
   private failures = new Map<string, string>();
   private timers = new Map<string, ReturnType<typeof setTimeout>>();
   constructor(private readonly root: string) {}
@@ -325,15 +311,12 @@ export class ConversationStore {
     this.writes.set(conversation.id, next);
     return next;
   }
-  /** Waits for queued writes so a reader sees whether they reached disk. */
   async settled(id: string) {
     await this.writes.get(id)?.catch(() => {});
   }
-  /** Why the conversation's latest write failed, if it did. */
   persistFailure(id: string): string | undefined {
     return this.failures.get(id);
   }
-  /** Coalesce frequent event updates during a run. */
   schedule(conversation: AgentConversation) {
     if (this.timers.has(conversation.id)) return;
     this.timers.set(
@@ -360,7 +343,6 @@ export class ConversationStore {
       this.basePath(projectId, conversationId, turnId),
     );
   }
-  /** The title is only derived when a conversation starts, so a rename stays. */
   async rename(projectId: string, id: string, title: string) {
     const conversation = await this.get(projectId, id);
     conversation.title = conversationTitle(title);

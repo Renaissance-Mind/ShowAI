@@ -5,12 +5,6 @@
 #include <new>
 #endif
 
-// Independent circular-sweep mathematics, not recovered vendor implementation.
-// Formula and singular cases:
-// https://luthert.web.illinois.edu/blog/posts/775.html Endpoint Hermite
-// interpolation is ordinary cubic polynomial interpolation. For circular arcs
-// its coordinate remainder is <= r*angle^4/384, hence the Euclidean bound
-// sqrt(2)*r*angle^4/384 (plus conservative binary64 allowance).
 namespace {
 constexpr double PI = 3.1415926535897932384626433832795, TAU = 2 * PI;
 constexpr double SQRT2 = 1.4142135623730950488;
@@ -52,7 +46,6 @@ static double dot(V a, V b) { return a.x * b.x + a.y * b.y; }
 static V turn(V a) { return {a.y, -a.x}; }
 static double norm(V a) { return __builtin_sqrt(dot(a, a)); }
 static V mix(V a, V b, double t) { return add(mul(a, 1 - t), mul(b, t)); }
-// Shared fixed-order elementary math avoids host libm/native-Wasm differences.
 static void trig(double x, double &s, double &c) {
   while (x > PI)
     x -= TAU;
@@ -163,20 +156,6 @@ static Envelope envelope(const Curve &c, double t, double side) {
   double r = c.r0 + (c.r1 - c.r0) * t;
   return {add(p, mul(u, r)), add(v, add(mul(u, q), mul(du, r)))};
 }
-// A second, sufficient regularity certificate works on the exact polynomial
-// inputs, not sampled envelope points. Let s=|c'|^2, D=c'.c'', C=c' cross c'',
-// q=r' (constant on this authored element), and B=s^2-q^2*s+r*q*D. Direct
-// differentiation gives s*(E'_+/- . c')=B +/- r*sqrt(s-q^2)*C. Thus strict
-// positivity of S=s-q^2, B and P=B^2-r^2*S*C^2 proves forward progress of BOTH
-// envelopes. At q=0 this reduces to s>0 and s^3-r^2*C^2>0: tangential center
-// acceleration cancels exactly, instead of being mistaken for curvature.
-//
-// Every scalar operation is enclosed by adjacent binary64 values. Positive
-// Bernstein lower bounds prove positivity over the WHOLE parameter interval.
-// Bounded midpoint subdivision only tightens the certificate; an uncertain,
-// singular, nonfinite or exhausted certificate takes the existing fallback.
-// No allocator, libm nextafter, sampled acceptance, radius-knot removal or
-// change to the envelope fitting/arc tolerances is involved.
 struct ProgressInterval {
   double lo, hi;
 };
@@ -385,9 +364,6 @@ static bool certifiedProgress(const Curve &c) {
       true);
   return progressCertificate(P, budget);
 }
-// Convex-hull derivative bounds certify positive progress of both envelope
-// sides. This excludes local folded ribbons, not merely zero sqrt arguments.
-// A failed certificate subdivides, or selects the explicit disk-union fallback.
 static bool regular(const Curve &c) {
   if (!c.degree)
     return false;
@@ -444,10 +420,6 @@ static void command(Run &r, uint32_t op, V a = {0, 0}, V b = {0, 0},
 static ProgressInterval positiveDifference(double a, double b) {
   return progressAdd(progressPoint(a), progressPoint(-b));
 }
-// For S(t,u)=(1-u)L(t)+uR(t), det(S_t,S_u) interpolates these
-// two degree-five polynomials. Nonnegative Bernstein lower bounds prove the
-// actual fitted strip's degree cannot be negative, even under self-overlap.
-// This is independent of the separate true-envelope regularity certificate.
 static bool positiveRibbonSide(const V *L, const V *R, bool rightSide) {
   ProgressInterval dx[4], dy[4], vx[3], vy[3], coefficients[6]{};
   const V *edge = rightSide ? R : L;
@@ -481,9 +453,6 @@ static bool positiveRibbonSide(const V *L, const V *R, bool rightSide) {
   return progressPositive(coefficients, 5, 0, budget, true);
 }
 static bool positiveBoundary(V origin, V a, V b, V c, V d) {
-  // A boundary fan has Jacobian u*det(E',origin-E). The closed contour is
-  // algebraically the sum of positively certified fans; radial edges cancel.
-  // Validate actual emitted controls, not ideal trigonometric construction.
   V edge[4] = {a, b, c, d}, center[4] = {origin, origin, origin, origin};
   return positiveRibbonSide(edge, center, false);
 }
@@ -496,8 +465,6 @@ static bool positiveLine(V origin, V a, V b) {
   return determinant.lo >= 0;
 }
 
-// Counterclockwise circular arc. Its angular Hermite error is bounded
-// independently of the sampled envelope error. No argument-spread/host trig.
 static void arc(Run &r, V center, double radius, V start, V end,
                 bool full = false) {
   if (radius == 0)
@@ -674,10 +641,6 @@ static bool buildGap(Run &r, const Curve &a, const Curve &b) {
        ey = progressAdd(progressPoint(n[0].y), progressPoint(n[1].y));
   auto e2 = progressAdd(progressMultiply(ex, ex), progressMultiply(ey, ey));
   double error = progressStep(__builtin_sqrt(max(0, e2.hi)), true);
-  // If n1=-n0+e, a disk/halfplane-intersection point satisfies
-  // d0<=n0.p<=-d1+r|e|. This enclosing band remains in the canonical endpoint
-  // disk. Extra band coverage neither adds a foreign nib nor erases a width
-  // knot. It avoids an ill-conditioned near-parallel plane intersection.
   if (error < .125)
     return buildGapBand(r, center, radius, n[0], distances[0], distances[1],
                         error);
@@ -711,9 +674,6 @@ static bool buildGap(Run &r, const Curve &a, const Curve &b) {
   if (!finite(norm2.lo) || !finite(norm2.hi))
     return false;
   if (norm2.hi < rr.lo) {
-    // Keep the whole certified intersection box, not a rounded midpoint which
-    // could cut off a true gap vertex. Its box is inside the endpoint disk;
-    // convexifying it only adds already-canonical disk coverage.
     auto wx = progressAdd(ix, progressPoint(center.x)),
          wy = progressAdd(iy, progressPoint(center.y));
     auto dx = progressAdd(wx, progressPoint(-center.x)),
@@ -818,9 +778,6 @@ static bool buildGap(Run &r, const Curve &a, const Curve &b) {
   return r.status == SA_INK_OK;
 }
 static void positiveGap(Run &r, const Curve &a, const Curve &b) {
-  // A full endpoint disk is always canonical coverage. Use it if clipping,
-  // finite precision or a convex boundary fan cannot be certified; never
-  // emit a negative join correction or trust a sampled winding test.
   Run probe = r;
   probe.output = nullptr;
   if (!buildGap(probe, a, b)) {
@@ -885,9 +842,6 @@ static bool containedDisk(V a, double ar, V b, double br) {
   return norm(sub(a, b)) + ar < br - rounding;
 }
 static bool containedHull(const Curve &a, const Curve &b) {
-  // A hull is the convex hull of its two endpoint disks. Containment of BOTH
-  // disks in ONE endpoint disk of B is sufficient; no sampled visibility test
-  // or guessed radius dominance can remove source coverage.
   for (uint32_t k = 0; k < 2; ++k) {
     V p = b.p[k ? b.degree : 0];
     double radius = k ? b.r1 : b.r0;
@@ -1008,10 +962,6 @@ static void positiveFit(Run &r, const Curve &c, uint32_t depth,
   }
 }
 static void positiveBand(Run &r, const Curve &c, uint32_t depth) {
-  // Exact cross-section matches let adjacent strip boundaries cancel without
-  // changing their nonnegative degree. Otherwise retain independent pieces
-  // and seal discontinuities with a canonical endpoint disk. Planning emits
-  // no commands: max_commands applies to the final, not scratch, geometry.
   if (c.r0 == 0 && c.r1 == 0)
     return;
   Run probe = r;
@@ -1091,9 +1041,6 @@ static bool span(const void *p, uint64_t bytes) {
 }
 static bool aligned(const void *p) { return (uintptr_t)p % 8 == 0; }
 static bool gradualBinary64() {
-  // A host may change its thread-local FP mode. FTZ/DAZ would invalidate a
-  // one-ULP interval enclosure; reject that actual execution mode atomically.
-  // Volatile operands require real operations, not constant-folded answers.
   volatile double normal = 0x1p-1022, half = .5,
                   smallest = 0x0.0000000000001p-1022, one = 1;
   double first = normal * half, second = smallest * one;
@@ -1169,7 +1116,7 @@ static SAInkStatus prepare(const SAInkStrokeSegment *segments, uint32_t count,
     result = run.result;
   return run.status;
 }
-} // namespace
+}
 namespace showai_stroke_internal {
 #ifdef SHOWAI_STROKE_WALK_COUNTERS
 static WalkWork observed{};
@@ -1231,7 +1178,7 @@ SAInkStatus EmissionPlan::emit(SAInkPathCommand *commands, uint32_t capacity,
   *out = actual;
   return SA_INK_OK;
 }
-} // namespace showai_stroke_internal
+}
 #ifdef SHOWAI_STROKE_WALK_COUNTERS
 namespace {
 void observe_stroke_walk(bool emission) {
@@ -1240,7 +1187,7 @@ void observe_stroke_walk(bool emission) {
   else
     ++showai_stroke_internal::observed.counts;
 }
-} // namespace
+}
 #endif
 #if !defined(__wasm__)
 namespace {
@@ -1259,7 +1206,7 @@ bool valid_stroke_plan(const void *p) {
              0x5354524f4b455031ull &&
          static_cast<const NativeStrokePlan *>(p)->owner == p;
 }
-} // namespace
+}
 extern "C" {
 SAInkStatus showai_private_stroke_prepare_scratch(
     const SAInkStrokeSegment *source, uint32_t count,
@@ -1290,7 +1237,6 @@ SAInkStatus showai_private_stroke_plan_initialize(void *p, uint32_t bytes,
       overlap(p, bytes, s, uint64_t(n) * sizeof(*s)) ||
       overlap(p, bytes, o, sizeof(*o)))
     return SA_INK_INVALID;
-  // Native owner zero-initializes fresh storage. Never overwrite a live plan.
   if (valid_stroke_plan(p))
     return SA_INK_INVALID;
   auto *state = new (p) NativeStrokePlan(s, n, o);
@@ -1406,8 +1352,6 @@ SAInkStatus sa_stroke_path_build(const SAInkStrokeSegment *s, uint32_t n,
 }
 }
 
-// Path queries consume the SAME generated Bezier contours. This is a detached,
-// bounded measurement/selection representation, never persisted rendering data.
 #include "include/analytic-path.h"
 namespace {
 struct PathWalk {
@@ -1582,7 +1526,7 @@ static SAInkStatus pathWalk(const SAInkPathCommand *commands, uint32_t n,
   finishContour(w);
   return w.status;
 }
-} // namespace
+}
 extern "C" {
 uint32_t sa_stroke_sizeof_path_measure() {
   return sizeof(SAInkStrokePathMeasure);

@@ -1,8 +1,3 @@
-/* structure-browser: expandable tree on the left, the selected node's description on the right,
- * with a draggable divider between them.
- * Neutral colors follow the design tokens so the block follows light and dark themes. */
-/* Page typography reaches into blocks at 0,2,1; this baseline (0,2,2) clears it
- * for structural elements, and the rules below (0,3,0) set this block's own values. */
 .sb-block.stb-block :is(h3, h4, p, ul, ol, li, pre):not(svg) {
   margin: 0;
 }
@@ -15,7 +10,6 @@
   background: none;
   color: inherit;
 }
-/* Doubled class so the shared .sb-block font and size do not override these. */
 .sb-block.stb-block {
   --stb-text: var(--text, #222222);
   --stb-muted: var(--muted, #6a6a6a);
@@ -75,7 +69,6 @@
   gap: 1px;
 }
 
-/* divider: a 1px line with a wider grab area and a grip */
 .sb-block.stb-block .stb-divider {
   position: relative;
   z-index: 1;
@@ -125,7 +118,6 @@
   -webkit-user-select: none;
 }
 
-/* rows */
 .sb-block.stb-block .stb-row {
   position: relative;
   display: flex;
@@ -236,7 +228,6 @@
   color: var(--stb-accent);
 }
 
-/* kind icons */
 .sb-block.stb-block .stb-icon {
   flex: none;
   width: 16px;
@@ -290,7 +281,6 @@
   padding-right: 2px;
 }
 
-/* detail pane */
 .sb-block.stb-block .stb-detail {
   padding: 18px 24px 22px;
   min-width: 0;
@@ -394,7 +384,6 @@
   color: var(--stb-faint);
 }
 
-/* code */
 .sb-block.stb-block .stb-code {
   margin-top: 16px;
   border: 1px solid var(--stb-line);
@@ -480,7 +469,6 @@
   overflow-wrap: normal;
 }
 
-/* children */
 .sb-block.stb-block .stb-kids {
   margin-top: 20px;
 }
@@ -531,7 +519,6 @@
   text-overflow: ellipsis;
 }
 
-/* inline markup */
 .sb-block.stb-block .stb-detail code,
 .sb-block.stb-block .stb-caption code,
 .sb-block.stb-block .stb-print code {
@@ -562,7 +549,6 @@
   color: var(--stb-muted);
 }
 
-/* the fully expanded outline is only for print */
 .sb-block.stb-block .stb-print {
   display: none;
 }

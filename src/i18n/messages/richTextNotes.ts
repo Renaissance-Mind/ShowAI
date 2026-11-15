@@ -1,7 +1,5 @@
 import { defineMessages } from "../index";
 
-// Hover-note action and dialog of the rich text editor. Kept apart from the
-// richText catalog so page readers, which never edit, do not carry them.
 export default defineMessages("richTextNotes", {
   "zh-CN": {
     "format.note": "注释",

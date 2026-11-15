@@ -128,7 +128,6 @@ export function promoteMindmapNode(data, id) {
   });
   return validateMindmapData({ ...data, nodes });
 }
-/** Two balanced branch banks; every descendant keeps its first branch's color and side. */
 export function layoutMindmap(data, collapsed = new Set()) {
   const root = data.nodes.find((node) => node.parentId === null);
   const children = new Map(

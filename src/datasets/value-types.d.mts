@@ -25,7 +25,6 @@ export type FilterOperator =
 export type OperandKind =
   "none" | "text" | "value" | "number" | "range" | "date" | "relative" | "list";
 
-/** A typed field definition: anything with id and type (e.g. a database column). */
 export interface TypedField {
   id: string;
   type: string;
@@ -44,11 +43,9 @@ export interface TypedField {
 export interface ValueTypeContext {
   today?: number;
   locale?: string;
-  /** Stored or derived value of a record's field. */
   value?: (row: Record<string, unknown>, field: TypedField) => unknown;
   pageTitle?: (value: unknown) => string | undefined;
   recordTitles?: (field: TypedField, ids: string[]) => string[] | undefined;
-  /** Value types that library components contribute (field type "custom"). */
   contributed?: (field: TypedField) => ValueType | undefined;
 }
 export interface ValueType {

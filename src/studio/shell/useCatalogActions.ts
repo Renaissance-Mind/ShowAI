@@ -13,7 +13,6 @@ import type { DialogControl } from "./useDialogState";
 import type { StudioRouter } from "./useStudioRouter";
 import type { DialogState, LoadedTemplate, PageState } from "./types";
 
-/** Opening components and templates in their dialogs, and managing them. */
 export function useCatalogActions({
   library: { capabilities, projects },
   route: { view, selectedProject },

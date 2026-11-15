@@ -23,7 +23,6 @@ const empty: PageSnapshot = {
   busy: false,
 };
 
-/** Routine save progress is shown by SaveState and does not re-render Studio. */
 const routineStatus = new Set<SaveStatus>([
   "saved",
   "saving",
@@ -78,7 +77,6 @@ function sameStudioView(previous: StudioView, next: StudioView) {
   );
 }
 
-/** Studio observes metadata; each retained editor observes its own document. */
 export function usePage(home?: string) {
   const sessionsRef = useRef<PageSessions | null>(null);
   if (!sessionsRef.current) {
@@ -164,15 +162,9 @@ export function usePage(home?: string) {
     [sessions],
   );
   const flush = useCallback(async () => {
-    // Finish native input while its editor and save listener still belong
-    // to the outgoing page. React cleanup runs after navigation changes it.
     await window.showai?.inlineInk?.flush();
     return sessions.getSnapshot().active?.flush() ?? true;
   }, [sessions]);
-  // A page waiting on a save conflict cannot save, but leaving it is safe:
-  // the session's leave keeps its edits in the local draft, and the conflict
-  // banner is still there when the person comes back to resolve it. Hiding
-  // it (clear) takes the same leave, so its draft survives too.
   const flushOrDefer = useCallback(
     async () =>
       (await flush()) ||
@@ -266,7 +258,6 @@ export function usePage(home?: string) {
   const live = () => sessions.getSnapshot().active?.getSnapshot() ?? empty;
   return {
     ...state,
-    // Studio may skip routine save renders, so handlers read the latest edit.
     get draft() {
       return live().draft;
     },

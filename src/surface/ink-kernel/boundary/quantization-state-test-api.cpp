@@ -1,4 +1,3 @@
-// Test-only actual source + derived owner transport, never a public wire API.
 #include "quantization-state.hpp"
 static uint32_t saqt_state_failure_line=0;
 inline uint32_t saqt_state_fail(uint32_t line){saqt_state_failure_line=line;return SA_INK_INVALID;}
@@ -25,8 +24,6 @@ extern "C" uint32_t saqt_state(uint32_t count,void*memory,uint32_t bytes,uint64_
  auto*source=owner(raw);auto&c=source->math.numbers;uint64_t report[24]{};uint32_t status=0,serialized_count=0;uint64_t*serialized=nullptr;
  {
   Vector<SABoundarySourceBlock,1>blocks(c);Vector<SAInkPathCommand,1>commands(c);
-  // API input must be external to its owned arena. Allocate this small captured
-  // transport in the reserved tail of the caller's test buffer instead.
   auto*source_blocks=(SABoundarySourceBlock*)(raw+4096+needed);auto*source_commands=(SAInkPathCommand*)(source_blocks+count);serialized=(uint64_t*)(source_commands+count*5);
   const uint64_t transport=uint64_t(count)*(sizeof(SABoundarySourceBlock)+5*sizeof(SAInkPathCommand));if(transport+uint64_t(count)*4*50*8>bytes-4096-needed)return SA_INK_CAPACITY;
   auto rectangle=[](SAInkPathCommand*out,double x){SAInkPathCommand value[5]={{0,0,{x,0}},{1,0,{x+1,0}},{1,0,{x+1,1}},{1,0,{x,1}},{4,0,{}}};for(uint32_t i=0;i<5;i++)out[i]=value[i];};
@@ -43,35 +40,25 @@ extern "C" uint32_t saqt_state(uint32_t count,void*memory,uint32_t bytes,uint64_
    SABoundarySourceMutation mutation{};mutation.source=source_blocks[count-1];mutation.source.first_command=0;SAInkPathCommand moved[5];rectangle(moved,mode?1:count*3+4);
    if(sa_boundary_update(raw,&A,&mutation,1,moved,5,&B)||BoundaryQuantizationSourcePin::capture(raw,B,b))return saqt_state_fail(__LINE__);
    rectangle(moved,count*3+8);if(sa_boundary_update(raw,&B,&mutation,1,moved,5,&C)||BoundaryQuantizationSourcePin::capture(raw,C,d))return saqt_state_fail(__LINE__);
-   // The actual source owner is already C while quantization consumes A->B.
    if(b.latest()||!a.base_of(b)||!b.base_of(d)||state.prepare_update(b,qa,options,qb)||state.prepare_update(b,qa,options,duplicate))return saqt_state_fail(__LINE__);++report[0];
    auto limited=options;limited.maximum_edges=1;auto unchanged=sentinel;
    if(state.prepare_update(b,qa,limited,sentinel)!=SA_INK_CAPACITY||sentinel.owner!=unchanged.owner||sentinel.generation!=unchanged.generation||state.current().generation!=qa.generation)return saqt_state_fail(__LINE__);++report[0];
-   // Real exact-arithmetic failure followed by cancellation must preserve pins.
    {BoundaryQuantizationSnapshot rejected(c);rejected.revision=12345;c.begin_work(1);auto result=boundary_quantization_state::build(b,before,false,options,999,rejected);if(result!=SA_INK_CAPACITY||rejected.revision!=12345)return saqt_state_fail(__LINE__);}
    if(state.cancel(duplicate)||state.read(duplicate)||state.release(duplicate)||c.status!=SA_INK_CAPACITY)return saqt_state_fail(__LINE__);++report[0];
    if(state.commit(qb))return saqt_state_fail(__LINE__);const auto*after=state.read(qb);if(!after||(!mode&&(after->changes.size()!=4||after->work.blocks!=4||after->work.arcs!=4))||(mode&&(!after->work.aliases||after->blocks.size()!=6)))return saqt_state_fail(__LINE__);++report[0];
    uint64_t retained=0,anchors=0;for(uint32_t i=0;i<count*4-4;i++){if(after->blocks.same_chunk(i,before->blocks))++retained;const auto*old=before->blocks.chunk(i);const auto*next=after->blocks.chunk(i);if(old&&next&&old->values[0].a.get()==next->values[0].a.get()&&old->values[0].b.get()==next->values[0].b.get())++anchors;}
    if((!mode&&retained!=count*4-4)||(!mode&&anchors!=retained)||(mode&&anchors<retained)||after->work.anchor_nodes>1024||after->work.anchor_visits>4096)return saqt_state_fail(__LINE__);++report[0];
    report[1]=count;report[2]=retained;report[3]=anchors;report[4]=after->work.blocks;report[5]=after->work.arcs;report[6]=after->work.anchor_nodes;report[7]=after->work.anchor_visits;report[8]=after->work.math.root_refinements;report[9]=after->work.math.polynomial_operations;report[10]=after->work.math.limb_operations;report[11]=after->work.aliases;report[12]=after->blocks.size();report[13]=after->anchors.size();
-   // Explicit full TEST export for direct Native/WASM value parity. This
-   // scan is outside the production prepare/update algorithm and its counters.
    serialized_count=saqt_serialize(*after,serialized,count*4*50);if(serialized_count!=after->blocks.size()*50)return saqt_state_fail(__LINE__);report[15]=serialized_count;report[16]=after->blocks.size();
-   // SAME actual source, two simultaneous explicit cold derivations. Their
-   // different local origins must not collide under an identical source key.
    {const auto*kept=after->blocks.chunk(0);auto left=options,right=options;left.origin[0]=.25;right.origin[0]=.5;right.maximum_error_l1=1e-7;BoundaryQuantizationLease l{},r{};
     if(state.prepare_cold(b,qb,left,l)||state.prepare_cold(b,qb,right,r))return saqt_state_fail(__LINE__);
     const auto*L=state.read(l);const auto*R=state.read(r);const auto*lc=L?L->blocks.chunk(0):nullptr;const auto*rc=R?R->blocks.chunk(0):nullptr;
     if(!lc||!rc||lc->identity!=rc->identity||lc->revision==rc->revision||lc->values[0].edge.controls[0]==rc->values[0].edge.controls[0]||after->blocks.chunk(0)!=kept||lc->revision==kept->revision||rc->revision==kept->revision)return saqt_state_fail(__LINE__);
     if(state.cancel(l)||state.release(l)||state.cancel(r)||state.release(r)||state.read(qb)!=after)return saqt_state_fail(__LINE__);++report[0];}
-   // Prepare C, then full prepare D. Cold reset explicitly retires old stages.
    if(state.prepare_update(d,qb,options,qd))return saqt_state_fail(__LINE__);
    SABoundaryPath other=path;other.fill=SA_BOUNDARY_EVENODD;
    const uint64_t retained_before=c.live_bytes;const auto source_reset=sa_boundary_prepare(raw,&C,&other,1,source_blocks,count,source_commands,count*5,&D);
    if(count>128){
-    // A second full4096-source graph does not fit this explicitly256MiB
-    // arena while old source/derived leases remain pinned. Admission must fail
-    // atomically, not evict caller-owned snapshots or relax the resource cap.
     if(source_reset!=SA_INK_CAPACITY||D.owner||c.live_bytes!=retained_before||!d.valid()||!d.latest()||state.read(qb)!=after||state.commit(qd))return saqt_state_fail(__LINE__);
     report[14]=1;++report[0];if(state.release(qa)||state.release(qb)||state.release(qd))return saqt_state_fail(__LINE__);
     state.retire();if(state.read(qd)||state.prepare_cold(d,{},options,sentinel)!=SA_INK_INVALID)return saqt_state_fail(__LINE__);++report[0];

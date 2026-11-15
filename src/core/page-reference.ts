@@ -6,8 +6,6 @@ import { walk } from "../document/walk.mjs";
 import { richTextDocument } from "../document/rich-text.mjs";
 import { plainText } from "../lib/document";
 
-/** A person's explicit pointer at saved page content, handed to an Agent
- * conversation. It stays small: the Agent reads details by these IDs. */
 export interface PageReference {
   type: "showai.reference";
   version: 1;
@@ -17,13 +15,9 @@ export interface PageReference {
   title: string;
   hash: string;
   revision?: string;
-  /** Page blocks, addressable with page_read blockIds. */
   blockIds?: string[];
-  /** Board objects; page_read blockIds or board_read element nodeId. */
   nodeIds?: string[];
-  /** The Board (board_read boardId) the reference belongs to. */
   surfaceId?: string;
-  /** Short text labels so the Agent and the person recognise the target. */
   labels: string[];
   position?: CanvasReference;
 }
@@ -41,7 +35,6 @@ function richTextChildren(node: JSONContent): JSONContent[] {
     : [];
 }
 
-/** One label per text block of the referenced subtrees, in reading order. */
 function collectLabels(node: JSONContent, labels: string[]) {
   if (labels.length >= referenceLimits.labels) return;
   const inner = richTextChildren(node);
@@ -57,8 +50,6 @@ function collectLabels(node: JSONContent, labels: string[]) {
   for (const child of node.content ?? []) collectLabels(child, labels);
 }
 
-/** Map editor IDs to IDs page_read can address: text inside a rich text
- * component resolves to that component. Unknown IDs are reported. */
 export function addressableIds(document: ShowDocument, ids: string[]) {
   const nodes = new Map<string, JSONContent>();
   const owners = new Map<string, string>();
@@ -79,8 +70,6 @@ export function addressableIds(document: ShowDocument, ids: string[]) {
   return { ids: resolved, missing, nodes };
 }
 
-/** Build the reference to a saved page record from the target the built-in
- * Agent also receives. Text selections keep the selected text as labels. */
 export function pageReference(
   projectId: string,
   record: { document: ShowDocument; hash: string; revision?: string },
@@ -134,7 +123,6 @@ export function pageReference(
   };
 }
 
-/** Opens the page in the desktop app and highlights the referenced content. */
 export function referenceLink(reference: PageReference) {
   const ids =
     reference.blockIds ??
@@ -146,11 +134,9 @@ export function referenceLink(reference: PageReference) {
     : link;
 }
 
-/** Short version label for people; Agents compare the full hash/revision. */
 export const referenceVersion = (reference: PageReference) =>
   (reference.revision ?? reference.hash).slice(0, 7);
 
-/** Paste-ready text: a heading for people, the app link and one JSON line. */
 export function formatReference(reference: PageReference, heading: string) {
   return `${heading}\n${referenceLink(reference)}\n${JSON.stringify(reference)}`;
 }

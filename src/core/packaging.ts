@@ -1,14 +1,3 @@
-// What travels with a copy of a project that leaves this device: an export
-// someone else reads, or synchronization to the project's other devices.
-//
-// One planner walks pages → bound blocks → datasets → transform inputs
-// (transitively) → where the data lives (library, a file of this device, an
-// address), and the resource fields' file: and web references. Every item
-// carries its size, the choices that apply to it, the default and the choice
-// in effect, so the person decides with sizes in front of them. Online data
-// and library data behave as usual; files of this device (and transforms
-// computed from them) are what a person confirms.
-
 import { readFile, stat } from "node:fs/promises";
 import { join } from "node:path";
 import { CAPACITY } from "../portable/capacity.mjs";
@@ -55,13 +44,6 @@ export type PackagingKind =
   | "transform-output"
   | "file-resource"
   | "url-resource";
-/**
- * bundle: carry the data (a dataset's snapshot in an export, a copy of the
- * file in synchronization). skip: leave it out; its blocks show the name
- * only. keep-url: keep the web address without its content. result /
- * inputs / both: a transform's output, the snapshots of its inputs (as files
- * beside the export), or both. embed: a resource file inside the export.
- */
 export type PackagingChoice =
   | "bundle"
   | "skip"
@@ -87,66 +69,46 @@ export interface PackagingBlock {
   pageId: string;
   blockId: string;
 }
-/** An input of a transform output, as an export's input snapshots carry it. */
 export interface PackagingInput {
   name: string;
   projectId: string;
   datasetId: string;
   kind: "library" | "file" | "url" | "transform";
-  /** JSON bytes of its current value; null when it has none. */
   bytes: number | null;
   available: boolean;
 }
 export interface PackagingItem {
-  /** dataset:<project>/<dataset> for data, the reference itself for resources. */
   id: string;
   kind: PackagingKind;
   name: string;
   projectId?: string;
   datasetId?: string;
   format?: string;
-  /** Files of this device: where it is. Never written into an export. */
   path?: string;
-  /** Web references: the address. */
   url?: string;
-  /**
-   * Bytes the item adds when carried: an export's data snapshot or embedded
-   * file, a synchronized copy of the file. null when unknown.
-   */
   bytes: number | null;
-  /** The size comes from the server's answer without downloading. */
   estimated?: boolean;
-  /** Size of the file itself, when that differs from bytes (exports of datasets). */
   fileBytes?: number;
-  /** Transform outputs: what "inputs" adds (their snapshots). */
   inputBytes?: number;
   inputs?: PackagingInput[];
   choices: PackagingChoice[];
   defaultChoice: PackagingChoice;
   choice: PackagingChoice;
   blocks: PackagingBlock[];
-  /** Whether this device can carry it now. */
   available: boolean;
-  /** Read from the synchronized copy of another device's file. */
   bundled?: boolean;
-  /** Larger than one packaged item may be. */
   tooLarge?: boolean;
-  /** A file of this device, or computed from one: the person confirms it. */
   local: boolean;
-  /** Why it is unavailable. */
   problem?: string;
 }
 export interface PackagingPlan {
   purpose: PackagingPurpose;
   projectId: string;
   items: PackagingItem[];
-  /** Bytes the current choices carry. */
   bytes: number;
   limits: { itemBytes: number; totalBytes: number };
-  /** What the total limit leaves after the current choices (negative when over). */
   remainingBytes: number;
   overLimit: boolean;
-  /** Some items are files of this device or computed from them. */
   confirm: boolean;
 }
 
@@ -158,7 +120,6 @@ const CARRYING = new Set<PackagingChoice>([
   "both",
 ]);
 
-/** Bytes an item adds with a choice. */
 export function choiceBytes(item: PackagingItem, choice: PackagingChoice) {
   const own = item.bytes ?? 0;
   if (choice === "bundle" || choice === "embed" || choice === "result")
@@ -171,17 +132,10 @@ export function choiceBytes(item: PackagingItem, choice: PackagingChoice) {
 const jsonBytes = (value: unknown) =>
   Buffer.byteLength(JSON.stringify(value ?? null));
 
-/**
- * Settles defaults and choices of planned items: defaults carry what is
- * available while it fits one item and the total; previous choices (the
- * person's last ones) replace defaults where they still apply; decisions
- * replace both and are checked.
- */
 function settle(
   purpose: PackagingPurpose,
   projectId: string,
   drafts: (Omit<PackagingItem, "defaultChoice" | "choice"> & {
-    /** The choice stored with the project (synchronization). */
     stored?: PackagingChoice;
   })[],
   previous: PackagingDecisions = {},
@@ -197,7 +151,6 @@ function settle(
       );
   }
   let total = 0;
-  // Files embedded in exported pages also share the page resource budget.
   let embedded = 0;
   const items: PackagingItem[] = [];
   for (const { stored, ...draft } of drafts) {
@@ -250,7 +203,6 @@ function settle(
   };
 }
 
-/** Choices that keep only what applies to an item now. */
 function allowed(
   kind: PackagingKind,
   options: { available: boolean; tooLarge?: boolean; format?: PackagingFormat },
@@ -262,7 +214,6 @@ function allowed(
     case "url-dataset":
       return carry ? ["bundle", "keep-url"] : ["keep-url"];
     case "transform-output":
-      // Input snapshots are files beside an HTML page or in a site.
       return !carry
         ? ["skip"]
         : options.format === "html" || options.format === "site"
@@ -275,18 +226,13 @@ function allowed(
   }
 }
 
-// ---------------------------------------------------------------------------
-// Datasets
 
 interface DatasetFacts {
   definition: DatasetDocument;
-  /** Kind of the stored data: a transform, a file, an address or library data. */
   kind: "library" | "file" | "url" | "transform";
-  /** Read from or computed from a file of a device. */
   local: boolean;
 }
 
-/** Definitions of datasets and whether each derives from a file, transitively. */
 class DatasetFactsCache {
   private readonly facts = new Map<string, Promise<DatasetFacts | undefined>>();
   constructor(readonly datasets: DatasetStore) {}
@@ -332,7 +278,6 @@ class DatasetFactsCache {
   }
 }
 
-/** Bound blocks of documents, by dataset key. */
 function boundBlocks(
   pages: { pageId: string; document: ShowDocument; blockIds?: string[] }[],
   projectId: string,
@@ -351,10 +296,7 @@ function boundBlocks(
   return blocks;
 }
 
-// ---------------------------------------------------------------------------
-// Resources
 
-/** Size of a web resource from a HEAD request; unknown when it does not answer. */
 async function remoteSize(url: string): Promise<number | null> {
   try {
     const response = await fetch(url, {
@@ -368,12 +310,10 @@ async function remoteSize(url: string): Promise<number | null> {
       ? length
       : null;
   } catch {
-    // An address that does not answer a HEAD request has no known size.
     return null;
   }
 }
 
-/** The synchronized copy of a resource file another device shared, if stored here. */
 export async function bundledResource(
   store: FileStore,
   ref: string,
@@ -448,25 +388,15 @@ function resourceDraft(
   };
 }
 
-// ---------------------------------------------------------------------------
-// Export plans
 
 export interface ExportPagePlanInput {
   pageId: string;
-  /** The page as stored. */
   document: ShowDocument;
-  /** Its bound blocks as resolved (resolveDocumentDatasets). */
   bindings: BindingRead[];
-  /** Selected blocks of a partial export (ids of the exported document). */
   blockIds?: string[];
-  /** The document the export shows (selection applied), for its resources. */
   shown: ShowDocument;
 }
 
-/**
- * The plan of an export: data snapshots of bound datasets, transform
- * outputs and their inputs, and resource files and addresses.
- */
 export async function exportPackagingPlan(
   store: FileStore,
   input: {
@@ -607,7 +537,6 @@ export async function exportPackagingPlan(
   );
 }
 
-/** Stops an export of local items nobody confirmed, returning the plan. */
 export function assertPackagingConfirmed(
   plan: PackagingPlan,
   confirmed: boolean,
@@ -636,7 +565,6 @@ export function assertPackagingConfirmed(
   throw error;
 }
 
-/** The plan as written into a result that may leave the device: no paths. */
 export function exportReceipt(plan: PackagingPlan) {
   return {
     bytes: plan.bytes,
@@ -644,18 +572,12 @@ export function exportReceipt(plan: PackagingPlan) {
   };
 }
 
-/** What an export carries after packaging: the document and input snapshots. */
 export interface PackagedDocument {
   document: ShowDocument;
   resources: LocalResourcePlanItem[];
   inputs: { projectId: string; datasetId: string; name: string; value: unknown }[];
 }
 
-/**
- * Applies a plan to one exported document: blocks of data left out show the
- * name-only notice, local files are embedded or keep their name, chosen web
- * resources are downloaded, and transform inputs are read for "inputs".
- */
 export async function applyPackaging(
   store: FileStore,
   plan: PackagingPlan,
@@ -663,7 +585,6 @@ export async function applyPackaging(
 ): Promise<PackagedDocument> {
   const notices = new Map<string, DataNotice>();
   for (const item of plan.items) {
-    // Data without a value already carries the notice of why it is empty.
     if (
       !item.datasetId ||
       !item.available ||
@@ -732,8 +653,6 @@ export async function applyPackaging(
   return { document: local.document, resources: local.resources, inputs };
 }
 
-// ---------------------------------------------------------------------------
-// The person's last export choices, per project, on this device
 
 interface RememberedChoices {
   format: "showai-packaging-choices";
@@ -775,10 +694,7 @@ export async function rememberChoices(
   );
 }
 
-// ---------------------------------------------------------------------------
-// Synchronization
 
-/** Pages of a project with their stored documents. */
 async function projectPages(store: FileStore, projectId: string) {
   const pages = [];
   for (const page of await store.listPages(projectId, {
@@ -792,7 +708,6 @@ async function projectPages(store: FileStore, projectId: string) {
   return pages;
 }
 
-/** Ids of the datasets stored in a project. */
 async function datasetIds(store: FileStore, projectId: string) {
   const files = store.datasetFiles();
   const names = await files.names(files.directory(projectId)).catch((error) => {
@@ -811,11 +726,6 @@ async function fileSize(path: string): Promise<number | undefined> {
   );
 }
 
-/**
- * What synchronization carries to the project's other devices: a copy of
- * each linked dataset file and resource file, as the project records the
- * choice (source.bundle, packaging.json) or by default while it fits.
- */
 export async function syncPackagingPlan(
   store: FileStore,
   projectId: string,
@@ -897,10 +807,6 @@ export async function syncPackagingPlan(
   return settle("sync", projectId, drafts, {}, decisions);
 }
 
-/**
- * Stores the person's synchronization choices with the project (synced and
- * versioned), then shares copies of what is now bundled.
- */
 export async function setSyncPackaging(
   store: FileStore,
   projectId: string,
@@ -930,12 +836,6 @@ export async function setSyncPackaging(
   return syncPackagingPlan(store, projectId);
 }
 
-/**
- * Shares this device's changed files as new synchronized copies and writes
- * copies edited elsewhere into its linked dataset files. `publish: false`
- * only writes back (e.g. right after receiving changes). Resource files are
- * read-only on other devices; their copies only follow this device's file.
- */
 export async function refreshProjectBundles(
   store: FileStore,
   projectId: string,
@@ -972,7 +872,6 @@ export async function refreshProjectBundles(
         });
       continue;
     }
-    // A copy another device shared of its own file stays while this file is unchanged.
     if (entry?.hash && agreed?.hash === current) continue;
     const bytes = await readFile(item.path);
     const hash = await storeBundle(store.root, bytes);

@@ -14,7 +14,6 @@ export {
   validateDocument,
 } from "../portable/validation.mjs";
 
-/** The template contains the entire React viewer and is produced by build:portable. */
 export async function buildArtifactHtml(
   document: ShowDocument,
   templateUrl = `${import.meta.env.BASE_URL}portable.html`,

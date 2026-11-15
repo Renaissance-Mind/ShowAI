@@ -27,7 +27,6 @@ export interface ReaderManifest {
   appVersion: string;
   sourceArchiveHash: string | null;
   kinds: string[];
-  /** Optional capabilities left out of this reader; absent on older full readers. */
   omits?: string[];
 }
 type Read = (path: string) => Promise<Buffer>;
@@ -91,7 +90,6 @@ export async function captureReader(
   const sourceArchiveHash = (await readerFileExists(archive))
     ? hash(await readFile(archive))
     : null;
-  // Dependencies are frozen in the emitted HTML; even a prebuilt viewer is fingerprinted.
   const fullHash = sourceArchiveHash ?? hash(await readFile(viewer));
   const kinds = readerKinds([document]),
     omits = readerOmissions([document]),

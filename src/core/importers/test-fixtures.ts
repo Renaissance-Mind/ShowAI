@@ -1,8 +1,5 @@
 import { strToU8, zipSync } from "fflate";
 
-// Small hand-made inputs for the importer tests: a Notion "Markdown & CSV"
-// export (as Notion names and links its files) and a Word document built
-// from its XML parts. No personal data.
 
 export const PNG = Uint8Array.from(
   Buffer.from(
@@ -10,7 +7,6 @@ export const PNG = Uint8Array.from(
     "base64",
   ),
 );
-/** A one-page PDF with a correct cross-reference table. */
 function pdf(): Uint8Array {
   const objects = [
     "<< /Type /Catalog /Pages 2 0 R >>",
@@ -51,7 +47,6 @@ Review,Done,"November 14, 2026 → November 15, 2026",No,1.5,https://example.com
 Ship,In progress,,No,,,,
 `;
 
-/** The files of the export, by path inside it. */
 export function notionFiles(): Record<string, Uint8Array> {
   const text: Record<string, string> = {
     [`${home}.md`]: `# Workspace Home
@@ -128,11 +123,6 @@ Review notes.
   };
 }
 
-/**
- * Two related Notion databases: Projects lists its tasks and Tasks names its
- * project (a two-way relation, exported as one column on each side), with a
- * multi-select of labels and a rollup exported as its computed number.
- */
 export function notionRelationZip(): Uint8Array {
   const ids = {
     projects: "55555555555555555555555555555555",
@@ -172,7 +162,6 @@ Publish,${project("Docs", ids.docs)},"writing, release"
   );
 }
 
-/** Notion's download: a zip holding Export-…-Part-1.zip. */
 export function notionZip(): Uint8Array {
   const part = zipSync(notionFiles());
   return zipSync({ "Export-5f1c-Part-1.zip": part });
@@ -187,7 +176,6 @@ const listItem = (text: string, numId: number, level: number) =>
 const cell = (text: string, properties = "") =>
   `<w:tc>${properties ? `<w:tcPr>${properties}</w:tcPr>` : ""}<w:p>${run(text)}</w:p></w:tc>`;
 
-/** A Word document with each feature the importer maps. */
 export function docxFile(): Uint8Array {
   const document = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <w:document ${W}><w:body>

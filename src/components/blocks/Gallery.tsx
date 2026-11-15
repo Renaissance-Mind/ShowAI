@@ -78,11 +78,9 @@ export function imageFileToDataUrl(file: File): Promise<string> {
   });
 }
 
-/** An image a gallery can show: a web address, embedded data or a linked local file. */
 const isGalleryImage = (src: string) =>
   !!safeImageUrl(src) || isLocalResourceRef(src, "image");
 
-/** One gallery image, with a linked local file granted by the host. */
 function ResourceImage({
   src,
   alt,
@@ -92,7 +90,6 @@ function ResourceImage({
   src: string;
   alt: string;
   lazy?: boolean;
-  /** Shown while a linked file is not available. */
   fallback?: ReactNode;
 }) {
   const view = useResource(src, "image");
@@ -109,7 +106,6 @@ function ResourceImage({
   );
 }
 
-/** A grid cell: the image opens the preview; a linked file it cannot show offers its fixes. */
 function GalleryItem({
   item,
   label,
@@ -346,7 +342,6 @@ export function GalleryBlock({ data, onChange, readOnly }: BlockProps) {
       setBusy(false);
     }
   };
-  /** Stores another linked file for one image, keeping the others. */
   const replaceImage = (id: string, ref: string) =>
     onChange?.({
       ...data,

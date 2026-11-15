@@ -1,7 +1,3 @@
-// Contract for the scene-3d built-in: a declarative Three.js scene whose
-// transforms can be bound to reader parameters. Validation runs in the
-// workbench, the CLI and the portable reader, so it stays dependency-free.
-
 export const SCENE3D_SHAPES = [
   "group",
   "box",
@@ -293,7 +289,6 @@ function validateObject(object, path, depth, state) {
   }
 }
 
-/** Validates scene-3d data and returns it unchanged. */
 export function validateScene3dData(data) {
   if (!isObject(data)) fail("scene-3d data must be an object.");
   optionalText(data.title, "title");
@@ -313,13 +308,11 @@ export function validateScene3dData(data) {
   return data;
 }
 
-/** Current value of a bound property: the static base plus factor × parameter. */
 export function boundValue(base, binding, values) {
   const value = values[binding.parameter];
   return base + (binding.factor ?? 1) * (Number.isFinite(value) ? value : 0);
 }
 
-/** Every label shown in the scene, in document order, for static and assistive reading. */
 export function sceneLabels(data) {
   const labels = [];
   const visit = (object) => {

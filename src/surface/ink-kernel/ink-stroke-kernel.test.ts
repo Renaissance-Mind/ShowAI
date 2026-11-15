@@ -107,10 +107,6 @@ function wasmBytes(
   });
   return output;
 }
-// Independent geometric oracle: squared distance to the moving disk is a
-// degree<=6 polynomial. Its global minimum is at an endpoint or derivative
-// root. Root isolation partitions by recursively isolated derivative roots;
-// it uses neither the envelope formula nor any compiled renderer coefficients.
 function evalPoly(c: number[], t: number) {
   let v = 0;
   for (let i = c.length - 1; i >= 0; i--) v = v * t + c[i];
@@ -477,8 +473,6 @@ it("keeps all actual input pressure knots when preparing real coalesced input cu
   expect(native(segments).equals(wasmBytes(segments))).toBe(true);
   expect(result.result.fallbackLeaves).toBe(0);
   expect(result.result.contours).toBeLessThanOrEqual(segments.length * 3);
-  // Actual37-sample portable-v1 footprint is590triangles; positive derived
-  // strip/cap pieces must retain a real geometry advantage at this workload.
   expect(analytic.build(result.commands).vertices.length / 15).toBeLessThan(
     590,
   );
@@ -589,8 +583,6 @@ it("prepares affected elements independently while preserving single-opacity uni
 function section(points: P[], lo: number, hi: number) {
   const front = hi === 1 ? points : split(points, hi)[0],
     part = lo === 0 ? front : split(front, lo / hi)[1];
-  // Both adjacent pieces evaluate the SAME original polynomial at their common
-  // parameter; nested splitting must not introduce two different endpoint bits.
   const at = (t: number) => {
     let p = points;
     while (p.length > 1)
@@ -666,9 +658,6 @@ it("executes the real native interval normal/subnormal/overflow and strict-posit
   );
 });
 it("preserves nonnegative coverage of an actual fitted negative-pocket regression and a second genuine disk block", () => {
-  // Exact dyadic/Sturm verification of the former8-command output gives -1
-  // at this off-boundary point, despite true-source regularity. Position
-  // sampling alone therefore cannot authorize signed block composition.
   const segments: InkStrokeSegment[] = [
     {
       points: [
@@ -816,8 +805,6 @@ it("proves both curved envelopes below the real curvature fold and keeps actual 
     [1, 1],
     [2, 0],
   ];
-  // |curvature| reaches exactly1 at t=1/2. Radius0.8 has
-  // s^3-r^2*C^2>0 everywhere; radius1 touches a fold and1.2 folds.
   for (const radius of [0.8, 1, 1.2]) {
     const segments: InkStrokeSegment[] = [{ points, radius: [radius, radius] }];
     const result = oracle(segments, grid(-1.5, -1.5, 5, 4, 37), 0.0025);

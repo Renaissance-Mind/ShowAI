@@ -1,6 +1,5 @@
 import { useLayoutEffect, useRef, useState } from "react";
 
-/** Adapter to ShowAI's existing personal viewport-lock protocol; no content writes. */
 export function useReadingLock() {
   const ref = useRef<HTMLElement>(null);
   const [locked, setLocked] = useState(true);
@@ -37,8 +36,6 @@ export function useReadingLock() {
           setLocked(event.data.locked);
         setError(event.data.error || "");
       };
-      // Native scrolling inside a tall drawing remains available while locked.
-      // At its edge the existing host bridge resumes normal document reading.
       const wheel = (event: WheelEvent) => {
         if (element.dataset.viewportLocked !== "true") return;
         if (!event.ctrlKey && !event.metaKey) {

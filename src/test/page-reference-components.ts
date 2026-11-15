@@ -1,9 +1,5 @@
 import type { ComponentSource } from "../contract/types";
 
-/**
- * A custom component that declares a page-reference field and reads the
- * reference index through the SDK, the way an Agent would write one.
- */
 export function relatedPagesComponent(
   id = "related-pages",
   version = "1.0.0",
@@ -93,7 +89,6 @@ export function relatedPagesComponent(
   };
 }
 
-/** A component offered in the @ menu with fixed choices, placed inside a line. */
 export function statusTagComponent(id = "status-tag"): ComponentSource {
   const schema = {
     type: "object",

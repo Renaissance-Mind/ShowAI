@@ -17,16 +17,11 @@ import {
 } from "../datasets/derived-fields.mjs";
 import type { TypedField } from "../datasets/value-types.mjs";
 
-// Derived database values outside the workbench: formulas run in the
-// transform sandbox, relations read the project's datasets. Exports and
-// Agent reads carry the result as `$derived`, so readers without a host
-// show the same values, filters and sorts.
 
 const DERIVED_KEY = "$derived";
 const isObject = (value: unknown): value is Record<string, unknown> =>
   !!value && typeof value === "object" && !Array.isArray(value);
 
-/** Checks formula inputs that arrive from a window before they reach the sandbox. */
 function formulaRequest(value: unknown): FormulaInputs {
   if (
     !isObject(value) ||
@@ -52,7 +47,6 @@ function formulaRequest(value: unknown): FormulaInputs {
   return value as unknown as FormulaInputs;
 }
 
-/** Formula results by record and column; a failed run fails every formula cell. */
 export async function evaluateFormulas(
   inputs: unknown,
 ): Promise<FormulaResults> {
@@ -73,7 +67,6 @@ export async function evaluateFormulas(
   );
 }
 
-/** Datasets of the project whose relations point at `datasetId` with a reverse side. */
 export async function incomingRelations(
   store: FileStore,
   projectId: string,
@@ -109,11 +102,6 @@ const needsDerivation = (columns: TypedField[]) =>
     ["relation", "formula", "rollup"].includes(column.type),
   );
 
-/**
- * The `$derived` snapshot of one database's data: derived values, reverse
- * columns and the titles of related records. `selfDataset` is the dataset a
- * bound block shows.
- */
 export async function deriveDatabase(
   store: FileStore,
   projectId: string,
@@ -180,10 +168,6 @@ export async function deriveDatabase(
   };
 }
 
-/**
- * A rendering snapshot whose database blocks carry `$derived`. `selfDatasets`
- * names the dataset each bound block (by id) shows.
- */
 export async function withDerivedDatabases(
   store: FileStore,
   projectId: string,
@@ -191,7 +175,6 @@ export async function withDerivedDatabases(
   selfDatasets: Map<string, string> = new Map(),
 ): Promise<ShowDocument> {
   const targets: Record<string, unknown>[] = [];
-  // Databases nested in rich text show derived values too.
   walk(document.content, (node) => {
     if (
       node.type === "widget" &&

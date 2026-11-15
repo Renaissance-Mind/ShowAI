@@ -1,6 +1,5 @@
 import type { ComponentSource } from "../contract/types";
 import type { ShowDocument } from "../types";
-/** Stage keys declared by schemaVersion 3 bundles. */
 export type StagedTemplateStage = "intent" | "material" | "logic" | "design";
 export type LegacyTemplateStage =
   | "intent"
@@ -22,22 +21,17 @@ export interface TemplateBundleMetadata {
   version: string;
   description: string;
   scenarios: string[];
-  /** Ordered Markdown paths for schemaVersion 4; stage maps for schemaVersion 1–3. */
   guides: string[] | Record<string, string | null>;
   components: { id: string; path: string }[];
-  /** Legacy schemaVersion 1 only. */
   page?: string | null;
 }
 export interface ParsedTemplateBundle {
   metadata: TemplateBundleMetadata;
   body: string;
-  /** Every guide in reading order; an Agent reads them whole. */
   guides: { path: string; markdown: string }[];
   components: { id: string; path: string; source: ComponentSource }[];
   document?: Partial<ShowDocument>;
-  /** True for schemaVersion 1–2 six-stage bundles. */
   legacy: boolean;
-  /** True for schemaVersion 1–3 bundles that declared stages. */
   staged: boolean;
   source: TemplateBundleSource;
 }

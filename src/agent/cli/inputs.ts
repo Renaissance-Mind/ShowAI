@@ -12,8 +12,6 @@ import type { ResponseProfile } from "../mcp-response";
 import type { AgentService } from "../service";
 import { option, type Arguments } from "./command";
 
-// Reading command inputs: JSON files (or stdin), documents and the option
-// values several commands share.
 
 export async function readJson(path: string): Promise<unknown> {
   let data: string;
@@ -73,7 +71,6 @@ export function binding(
     : undefined;
 }
 
-/** pages save/apply reply with a receipt unless --response asks for the document. */
 export function responseProfile(args: Arguments): ResponseProfile {
   const value = option(args, "response") ?? "receipt";
   if (!["receipt", "source", "full"].includes(value))
@@ -160,10 +157,6 @@ export async function saveOutput(
   return path;
 }
 
-/**
- * The explicit --base-revision, or the revision the last `pages read` of this
- * page returned together with the given hash.
- */
 export async function readRevision(
   service: AgentService,
   args: Arguments,

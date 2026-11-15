@@ -1,4 +1,3 @@
-// The browser package embeds the upstream locale files; the authoring kit keeps the original filesystem loader.
 import localeData from './archify-locales.json';
 
 export const DEFAULT_LOCALE = 'en';
@@ -9,12 +8,6 @@ export function escapeHtml(value) {
   return String(value ?? '').replace(/[&<>"']/g, (character) => ESCAPE_MAP[character]);
 }
 
-// Bundled catalogs are package data, not renderer code. locales/manifest.json
-// enrolls the catalogs meta.locale selects automatically; only listed files
-// are read, relative to this installed package and never from the working
-// directory, home, environment, or network. Adding a language changes data
-// only. en.json defines the canonical keys and the final fallback.
-// Mirrors common.schema.json#/$defs/locale.
 const LOCALE_TAG = /^[a-z]{2,3}(-[A-Za-z0-9]{2,8})*$/;
 const CATALOG_FILE = /^[A-Za-z0-9][A-Za-z0-9._-]*\.json$/;
 
@@ -35,8 +28,6 @@ function loadManifest() {
     if (typeof file !== 'string' || !CATALOG_FILE.test(file)) {
       throw new Error(`Archify locale manifest has an invalid catalog file for ${locale}`);
     }
-    // Tags match case-insensitively, so two entries differing only in case
-    // would make selection ambiguous.
     const key = locale.toLowerCase();
     if (byKey.has(key)) throw new Error(`Archify locale manifest lists ${locale} more than once`);
     byKey.set(key, { locale, file });
@@ -75,9 +66,6 @@ function placeholdersMatch(expected, actual) {
   return true;
 }
 
-// Splits translation data into the entries that can replace a canonical
-// message and the ones that cannot. Rejected entries never replace a valid
-// lower-priority message.
 function classifyTranslations(translations) {
   const supplied = Object.keys(translations || {});
   const usable = new Map();
@@ -104,9 +92,6 @@ function classifyTranslations(translations) {
   return { supplied, usable, unknownKeys, placeholderMismatches };
 }
 
-// Validates caller-supplied translation data against the canonical (English)
-// message-key set. Pure and side-effect free; coverage here describes only the
-// supplied data. resolveCatalog() reports the final resolved coverage.
 export function validateTranslations(translations = {}) {
   const { usable, unknownKeys, placeholderMismatches } = classifyTranslations(translations);
   return {
@@ -129,8 +114,6 @@ function isEnglishTag(locale) {
   return key === DEFAULT_LOCALE || key.startsWith(`${DEFAULT_LOCALE}-`);
 }
 
-// Bundled catalogs load on first use and stay immutable; a diagram's
-// overrides are layered onto a copy.
 const BUNDLED_CATALOGS = new Map([[DEFAULT_LOCALE, { usable: new Map(Object.entries(EN)), messages: EN }]]);
 
 function bundledCatalog(locale) {
@@ -144,12 +127,6 @@ function bundledCatalog(locale) {
   return BUNDLED_CATALOGS.get(locale);
 }
 
-// Resolves each canonical message as: valid meta.translations value →
-// selected bundled-catalog value → English source. Pure; returns the resolved
-// catalog with a report that separates rejected overrides from real English
-// fallback gaps. Omitted or empty translations mean no override. A tag with
-// neither a bundled catalog nor a usable override falls back to English UI
-// and language metadata.
 export function resolveCatalog(locale, translations = undefined) {
   const override = classifyTranslations(translations);
   const bundledLocale = bundledLocaleFor(locale);
@@ -191,10 +168,6 @@ export function resolveCatalog(locale, translations = undefined) {
   };
 }
 
-// Per-document catalogs installed by registerLocale(). Tags are
-// case-insensitive, so the key is lowercased: renderers may pass the authored
-// meta.locale (zh-cn) or its resolved tag (zh-CN) and reach the same document
-// catalog. They never mutate a bundled catalog.
 const DOCUMENT_CATALOGS = new Map();
 
 function documentKey(locale) {
@@ -208,9 +181,6 @@ function catalogFor(locale) {
   return bundledLocale ? { locale: bundledLocale, messages: bundledCatalog(bundledLocale).messages } : null;
 }
 
-// Installs the resolved catalog for one authored locale and returns its
-// report. Re-registering the same tag replaces the previous document's
-// overrides; a fallback clears them.
 export function registerLocale(locale, translations = undefined) {
   const { messages, report } = resolveCatalog(locale, translations);
   if (report.fallback || !locale) {
@@ -221,9 +191,6 @@ export function registerLocale(locale, translations = undefined) {
   return report;
 }
 
-// Agent-facing warnings for one document's meta.locale/meta.translations.
-// Pure, so the renderer and the CLI receipts (validate/deliver/finalize)
-// report the same diagnostics from the same input.
 export function localeDiagnostics(diagramType, meta) {
   const locale = meta?.locale;
   if (!locale) return [];
@@ -277,8 +244,6 @@ export function localeDiagnostics(diagramType, meta) {
         appliedOverrideKeys: appliedKeys,
         missingKeys,
         missingKeysTotal: report.fallbackKeys.length,
-        // English source for the listed gaps, so a caller can translate
-        // exactly those keys without re-reading the whole catalog.
         englishSource: Object.fromEntries(missingKeys.map((key) => [key, EN[key]])),
       },
       supportedFixes: ['Add each missing key to meta.translations, translating its English source string and keeping its {placeholders}.'],

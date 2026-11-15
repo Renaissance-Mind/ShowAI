@@ -6,35 +6,22 @@ import { parameterValues } from "../contract/component-parameters.mjs";
 import { readBinding } from "../datasets/binding.mjs";
 import { parsePath, valueAt as datasetValueAt } from "../datasets/operations.mjs";
 
-/** Where a page refers to another page. */
 export interface PageReferenceEdge {
-  /** The page block holding the reference, addressable with page_read blockIds. */
   blockId: string | null;
   projectId: string;
   pageId: string;
-  /** Blocks the reference points at on the target page. */
   blockIds: string[];
-  /** link: a page link in text. database: a page cell. component: a field its contract declares. */
   kind: "link" | "database" | "component";
-  /** Text around the reference, for people deciding whether to follow it. */
   snippet: string;
 }
 
-/**
- * A database block whose rows live in a shared dataset. Its page cells are
- * read from the dataset, so the index resolves them once the dataset file is
- * read (boundDatabaseEdges) and reads the page again when the dataset changes.
- */
 export interface BoundDatabase {
   blockId: string | null;
-  /** Project and id of the dataset. */
   projectId: string;
   datasetId: string;
-  /** The block's own data: its title and the props it keeps locally. */
   data: Record<string, unknown>;
 }
 
-/** Page-reference field paths a component version declares, or none. */
 export type ComponentPageFields = (
   componentId: string,
   version: string,
@@ -44,7 +31,6 @@ const SNIPPET = 200;
 const clean = (text: string) => text.replace(/\s+/g, " ").trim();
 function plainText(node: JSONContent): string {
   if (node.type === "text") return node.text ?? "";
-  // A component inside the line, such as a date, reads as its text values.
   if (node.type === "inlineWidget") {
     const data = node.attrs?.data ?? {};
     return Object.values(data.props ?? data)
@@ -53,7 +39,6 @@ function plainText(node: JSONContent): string {
   }
   return (node.content ?? []).map(plainText).join(" ");
 }
-/** The text of a block, a window around `focus` when it is long. */
 function excerpt(text: string, focus = "") {
   const value = clean(text);
   if (value.length <= SNIPPET) return value;
@@ -68,7 +53,6 @@ function excerpt(text: string, focus = "") {
     (start + SNIPPET < value.length ? "…" : "")
   );
 }
-/** Strings of an item, the reference itself left out. */
 function itemText(value: unknown, skip: unknown): string {
   if (!value || typeof value !== "object" || Array.isArray(value)) return "";
   return Object.entries(value)
@@ -88,11 +72,6 @@ function valueAt(root: unknown, pointer: string): unknown {
   return value;
 }
 
-/**
- * Every reference a page makes to other pages: page links in its text,
- * including text kept in component data and steps, page cells of databases,
- * and the fields components declare with a `page` parameter rule.
- */
 export function pageReferenceEdges(
   document: { id: string; content: JSONContent },
   projectId: string,
@@ -101,8 +80,6 @@ export function pageReferenceEdges(
 ): PageReferenceEdge[] {
   const edges: PageReferenceEdge[] = [];
   const seen = new Set<string>();
-  // Text inside component data belongs to its component: page_read
-  // addresses the component, not the nodes of its own text.
   const holders = new Map<JSONContent, { id: string | null; owned: boolean }>();
   const blockTexts = new Map<JSONContent, string>();
   const add = (
@@ -191,10 +168,6 @@ export function pageReferenceEdges(
   return edges;
 }
 
-/**
- * Page cells of a database's columns and rows. Only page columns refer to
- * pages: relation columns hold record ids of another dataset.
- */
 function databasePageCells(data: Record<string, unknown>) {
   if (!Array.isArray(data.columns)) return [];
   const columns = data.columns as { id: string; type: string }[];
@@ -220,13 +193,6 @@ function databasePageCells(data: Record<string, unknown>) {
   return cells;
 }
 
-/**
- * The page cells of a database block bound to a shared dataset, read from the
- * dataset's stored value the way the block resolves its props: the value (or
- * the object at binding.props.path) supplies every prop the block does not
- * keep locally. A dataset read from a file, a URL or a transform has no stored
- * value and contributes nothing.
- */
 export function boundDatabaseEdges(
   database: BoundDatabase,
   datasetValue: unknown,
@@ -270,7 +236,6 @@ export function boundDatabaseEdges(
   return edges;
 }
 
-/** Page-reference paths declared by a component's parameter contract. */
 export function declaredPageFields(manifest: {
   documentation?: { usage?: { rules?: { kind: string; path?: string }[] } };
 }): string[] {

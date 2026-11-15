@@ -1,4 +1,3 @@
-// Test-only actual source-owner API transport; no production/public ABI addition.
 #include "quantization-source-pin.hpp"
 extern "C" uint32_t saqt_source_pins(void*memory,uint32_t bytes,uint32_t*output,uint32_t capacity){
     if(!memory||((uintptr_t)memory&15u)||bytes<16*1024*1024||!output||capacity<8||memory_overlap(memory,bytes,output,uint64_t(capacity)*4))return SA_INK_INVALID;
@@ -36,7 +35,6 @@ extern "C" uint32_t saqt_source_pins(void*memory,uint32_t bytes,uint32_t*output,
         SAInkPathCommand later[5]={{0,0,{4,0}},{1,0,{5,0}},{1,0,{5,1}},{1,0,{4,1}},{4,0,{}}};SABoundaryLease latest{};
         if(sa_boundary_update(stateA,&next,&mutation,1,later,5,&latest))return SA_INK_INVALID;
         BoundaryQuantizationSourcePin advanced;if(BoundaryQuantizationSourcePin::capture(stateA,latest,advanced))return SA_INK_INVALID;
-        // Ordered intermediate catch-up is valid even after source ran ahead.
         if(changed.latest()||!advanced.latest()||!a.base_of(changed)||!changed.base_of(advanced)||a.base_of(advanced))return SA_INK_INVALID;++checks;
         SABoundaryPath alternate=path;alternate.fill=SA_BOUNDARY_EVENODD;SABoundaryLease reset{};
         if(sa_boundary_prepare(stateA,&latest,&alternate,1,&block,1,commands,5,&reset))return SA_INK_INVALID;

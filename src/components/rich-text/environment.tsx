@@ -6,30 +6,25 @@ import { translator } from "../../i18n";
 import messages from "../../i18n/messages/richText";
 
 const t = translator(messages);
-/** Native host actions join the existing block menu, not a second toolbar. */
 export const BlockMenuExtensionContext = createContext<
   ((blockId: string, close: () => void) => ReactNode) | null
 >(null);
-/** What an editor hands to the workbench Agent: stable block ids, optional text and an anchor rect. */
 export interface AssistantRequest {
   kind: "text" | "blocks";
   blockIds: string[];
   text?: string;
   anchor: { left: number; top: number; bottom: number };
-  /** Text placed in the request input, e.g. a component error to fix. */
   prompt?: string;
 }
 export interface LinkablePage {
   id: string;
   title: string;
   icon?: string;
-  /** Orders the @ menu's pages, recently changed first. */
   updatedAt?: string;
 }
 export interface RecordPeekTarget {
   projectId: string;
   pageId: string;
-  /** Rows and pages have independent identities; a page may be linked twice. */
   recordId?: string;
 }
 export interface RecordPeekRequest extends RecordPeekTarget {
@@ -39,52 +34,33 @@ export interface RecordPeekRequest extends RecordPeekTarget {
 }
 export interface RecordPeekState extends RecordPeekTarget {
   sourceId: string;
-  /** The database renders its own live property cells into this host. */
   propertiesHost: HTMLElement | null;
 }
-/** Links between saved pages, offered by the workbench around an editable page. */
 export interface PageLinkBridge {
   projectId: string;
   pageId: string;
-  /**
-   * Pages of the same project the link dialog can offer. Hosts may serve the
-   * current list through a getter; components that show it subscribe below.
-   */
   readonly pages: LinkablePage[];
-  /** Calls the listener when pages changes; absent when the list is fixed. */
   subscribePages?(listener: () => void): () => void;
-  /** Copy a link to the page, or to these blocks on it. */
   copyLink(blockIds: string[]): void;
-  /**
-   * Create a page in a folder of this project, making the folder beside this
-   * page when it no longer exists. Absent where pages cannot be created.
-   */
   createPage?(input: {
     title?: string;
     folderId?: string;
     folderName: string;
   }): Promise<{ pageId: string; folderId: string }>;
-  /** Rename a page of this project. Absent where pages cannot be renamed. */
   renamePage?(pageId: string, title: string): Promise<void>;
-  /** Optional workbench presentation; readers keep using the original link. */
   openRecord?(request: RecordPeekRequest): void;
-  /** Release a preview when its source component is hidden or removed. */
   closeRecord?(sourceId: string): void;
   recordPeek?: RecordPeekState;
 }
-/** The host supplies project resources; all writing tools belong to the component. */
 export const RichTextEnvironment = createContext<{
   useCatalog: typeof useComponentCatalog;
   registerComponent: (component: CompiledComponent) => void;
   renderWidget: (props: BlockProps & { kind: string }) => ReactNode;
-  /** Present only inside an editable workbench page with an Agent available. */
   assistant?: {
     open: (request: AssistantRequest) => void;
-    /** Copies a reference to the request's blocks for an external Agent. */
     reference: (request: AssistantRequest) => void;
   } | null;
   pageLinks?: PageLinkBridge | null;
-  /** Comment actions for the selection and block menus; present only in the editable workbench. */
   comments?: {
     text(editor: import("@tiptap/core").Editor, close: () => void): ReactNode;
     block(id: unknown, close: () => void): ReactNode;

@@ -1,6 +1,5 @@
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 export type ResponseProfile = "full" | "source" | "receipt";
-/** Keep complete storage/rendering results while choosing one model-facing representation. */
 export function compactMcpResult(
   result: CallToolResult,
   profile: ResponseProfile,
@@ -25,10 +24,6 @@ export function compactMcpResult(
   };
 }
 
-/**
- * The model-facing part of a tool result before it is serialized, so a receipt
- * never pays for encoding the full document.
- */
 export function compactData(data: unknown, profile: ResponseProfile): unknown {
   if (
     profile === "full" ||
@@ -94,7 +89,6 @@ export function compactData(data: unknown, profile: ResponseProfile): unknown {
     selected.title ??= document.title;
     if (profile === "source") selected.document = document;
   }
-  // Bound blocks keep only their binding in the source; their props live in a dataset.
   if (profile === "source" && Array.isArray(record.bindings))
     selected.bindings = record.bindings;
   selected.response = profile;

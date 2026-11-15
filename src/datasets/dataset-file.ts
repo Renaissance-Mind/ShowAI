@@ -1,8 +1,3 @@
-// A dataset file: its shape, the checks every stored version passes, what a
-// write does to it and the three-way merge synchronization applies. The module
-// uses no host APIs, so the desktop store, its sync and the mobile apps run the
-// same rules on the same files.
-
 import { CAPACITY, assertContent } from "../portable/capacity.mjs";
 import { assertProps } from "../contract/schema";
 import type { JsonSchema } from "../contract/types";
@@ -21,57 +16,33 @@ import {
 
 export const SOURCE_FORMATS = ["json", "csv", "tsv", "xlsx"] as const;
 export type SourceFormat = (typeof SOURCE_FORMATS)[number];
-/** Formats ShowAI writes back into a linked file. */
 export const WRITABLE_FORMATS: readonly SourceFormat[] = ["json", "csv", "tsv"];
 export const SOURCE_KINDS = ["file", "url"] as const;
-/** Online data is fetched again when the last fetch is older than this. */
 export const DEFAULT_REFRESH_SECONDS = 300;
 export const MAX_REFRESH_SECONDS = 86_400;
 
-/**
- * Whether synchronization carries a copy of a linked file to the project's
- * other devices, and which copy: the file's bytes stored once under
- * bundles/<hash> (see dataset-bundles), outside history.
- */
 export interface SourceBundle {
   sync: boolean;
-  /** sha256 of the bundled copy; absent until a copy was made. */
   hash?: string;
-  /**
-   * The copy shared from the linked file that this copy derives from: the
-   * copy itself when the file's device shared it, the copy edited when
-   * another device changed it. Tells an edit made on top of the file's
-   * latest version from a concurrent one.
-   */
   base?: string;
   bytes?: number;
   updatedAt?: string;
 }
-/** The synchronized part of a linked file, stored in the dataset file. */
 export interface FileSource {
   kind: "file";
   format: SourceFormat;
-  /** File name when it was linked; a hint for linking on another device. */
   name?: string;
-  /** Packaging for synchronization; absent means bundled while it fits. */
   bundle?: SourceBundle;
 }
-/** Online data, read-only; the address is synchronized with the project. */
 export interface UrlSource {
   kind: "url";
   format: SourceFormat;
-  /** http(s) address without credentials. */
   url: string;
   name?: string;
-  /**
-   * Seconds after which a read fetches the data again (default 300); 0
-   * fetches only on an explicit refresh.
-   */
   refreshSeconds?: number;
 }
 export type DatasetSource = FileSource | UrlSource;
 
-/** Whether ShowAI writes changes back into the source. */
 export function sourceWritable(source: DatasetSource): boolean {
   return source.kind === "file" && WRITABLE_FORMATS.includes(source.format);
 }
@@ -135,31 +106,21 @@ export function isDatasetSource(value: unknown): value is DatasetSource {
   );
 }
 
-/** Limits of transform scripts; the sandbox that runs them applies the rest. */
 export const TRANSFORM_LIMITS = {
   memoryBytes: 64 * 1024 * 1024,
   timeoutMs: 2000,
-  /** QuickJS stack; deep recursion fails inside the sandbox. */
   stackBytes: 256 * 1024,
   scriptBytes: 256 * 1024,
   maxInputs: 16,
   outputBytes: CAPACITY.datasetBytes,
 };
 
-/** An input of a transform: a dataset of the same project, or of another one. */
 export type TransformInput = string | { project: string; dataset: string };
-/**
- * A dataset computed by a script from other datasets. The script defines
- * function transform(inputs, helpers) and returns the value; it runs in a
- * sandbox (see dataset-transform) whenever an input or the script changes.
- */
 export interface DatasetTransform {
-  /** Input name (the key of `inputs` in the script) → dataset. */
   inputs: Record<string, TransformInput>;
   script: string;
 }
 
-/** A project's shared data: one JSON value that several page blocks read and write. */
 export interface DatasetDocument {
   format: "showai-dataset";
   version: 1;
@@ -168,22 +129,14 @@ export interface DatasetDocument {
   description?: string;
   createdAt: string;
   updatedAt: string;
-  /** Where the data was first shared from; informational. */
   origin?: {
     kind: string;
     componentId?: string;
     pageId?: string;
     blockId?: string;
   };
-  /** Optional JSON Schema every write must satisfy. */
   schema?: JsonSchema;
-  /**
-   * The value lives outside the library: in a file linked on each device, or
-   * at an http(s) address (see dataset-sources). The stored file then has no
-   * value.
-   */
   source?: DatasetSource;
-  /** The value is computed from other datasets; the stored file has no value. */
   transform?: DatasetTransform;
   value: unknown;
 }
@@ -217,7 +170,6 @@ export function assertJsonTree(value: unknown, depth = 0): void {
   }
 }
 
-/** Rethrows a check's failure as INVALID_DATA, keeping core and capacity errors. */
 export function throwInvalidData(error: unknown): never {
   if (error instanceof CoreError) throw error;
   if (
@@ -233,7 +185,6 @@ export function throwInvalidData(error: unknown): never {
   );
 }
 
-/** UTF-8 bytes of a string, without a host Buffer. */
 function utf8Bytes(text: string): number {
   let bytes = 0;
   for (const character of text) {
@@ -243,7 +194,6 @@ function utf8Bytes(text: string): number {
   return bytes;
 }
 
-/** Checks the shape of a transform definition (inputs and script). */
 export function assertTransform(
   value: unknown,
 ): asserts value is DatasetTransform {
@@ -378,7 +328,6 @@ export function validateDataset(
       );
     assertTransform(dataset.transform);
   }
-  // An external or computed dataset's stored file has no value.
   if ((dataset.source || dataset.transform) && dataset.value === undefined)
     return dataset;
   if (!("value" in dataset))
@@ -393,18 +342,14 @@ export function validateDataset(
   return dataset;
 }
 
-/** The metadata and operations of one write to a dataset; operations are validated. */
 export interface DatasetWrite {
   operations: DatasetOperation[];
   name?: string;
   description?: string | null;
-  /** Replaces the JSON Schema every write must satisfy; null removes it. */
   schema?: JsonSchema | null;
 }
 export type DatasetWriteResult =
-  /** The writer read another version that is unavailable; read again first. */
   | { status: "missing-baseline" }
-  /** Fields changed since the writer read them; nothing was written. */
   | { status: "conflicts"; conflicts: DatasetConflict[] }
   | { status: "unchanged" }
   | {
@@ -414,12 +359,6 @@ export type DatasetWriteResult =
       metadataChanged: boolean;
     };
 
-/**
- * What a write does to the current version of a dataset. `sameBase` says the
- * writer read the current version; otherwise `base` is the value it read (if
- * it is still known), from which operations without a starting value take
- * theirs, so the write merges with changes made since.
- */
 export function applyDatasetWrite(
   current: DatasetDocument,
   write: DatasetWrite,
@@ -478,10 +417,6 @@ export function applyDatasetWrite(
   };
 }
 
-/**
- * The part of a component's props schema that describes its shared keys, so
- * every write to the dataset keeps it valid for that component.
- */
 export function sharedPropsSchema(
   schema: JsonSchema,
   local: string[],
@@ -496,11 +431,6 @@ export function sharedPropsSchema(
   return copy as JsonSchema;
 }
 
-/**
- * Three-way merge of two versions of a dataset file (sync): local changes are
- * replayed onto the remote version per record and field. Conflicting fields
- * keep the remote value and are returned so both inputs can be retained.
- */
 export function mergeDatasetVersions(
   base: DatasetDocument,
   local: DatasetDocument,
@@ -533,7 +463,6 @@ export function mergeDatasetVersions(
     description = pick("description"),
     schema = pick("schema"),
     transform = pick("transform"),
-    // Two devices editing a synchronized copy of a file each make a new copy.
     source = pick("source");
   const {
     description: _d,
@@ -547,7 +476,6 @@ export function mergeDatasetVersions(
     name: name ?? remote.name,
     ...(description ? { description } : {}),
     ...(schema ? { schema } : {}),
-    // A script changed on two devices keeps the remote one and reports a conflict.
     ...(transform ? { transform } : {}),
     ...(source ? { source } : {}),
     updatedAt: [local.updatedAt, remote.updatedAt].sort().at(-1)!,
@@ -556,7 +484,6 @@ export function mergeDatasetVersions(
   try {
     return { dataset: validateDataset(dataset, remote.id), conflicts };
   } catch {
-    // A merged value that no longer satisfies the schema keeps the remote version.
     return {
       dataset: remote,
       conflicts: [

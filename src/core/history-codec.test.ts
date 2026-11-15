@@ -4,7 +4,6 @@ import { decodeFile, decodeFileSync, encodeFile } from "./history-codec";
 
 const digest = (bytes: Buffer) =>
   createHash("sha256").update(bytes).digest("hex");
-/** The stored-JSON encoding as first specified: every value rebuilt in order. */
 function referenceEnvelope(value: unknown, assets: Map<string, Buffer>) {
   const slots: { pointer: string[]; id: string; mime: string }[] = [];
   const visit = (value: unknown, pointer: string[]): unknown => {
@@ -60,12 +59,10 @@ const artifact = {
 
 test("stored pages encode as specified and decode to the same bytes either way", async () => {
   const path = "projects/p/pages/page.json";
-  // JSON text can name an own "__proto__" key, which every copy must keep.
   const text = JSON.stringify(artifact).replace('"title":', '"__proto__":{"x":1},"title":');
   const source = Buffer.from(JSON.stringify(JSON.parse(text), null, 2) + "\n");
   expect(source.toString()).toContain('"__proto__"');
   const files = encodeFile(path, source);
-  // Each node file and the page skeleton equal the reference encoding.
   const parsed = JSON.parse(source.toString());
   const assets = new Map<string, Buffer>();
   const expected = new Map<string, Buffer>();

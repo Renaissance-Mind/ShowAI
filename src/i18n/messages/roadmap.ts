@@ -1,6 +1,5 @@
 import { defineMessages } from "../index";
 
-// Roadmap built-in: a reading view of a day/week-scale plan.
 export default defineMessages("roadmap", {
   "zh-CN": {
     title: "路线图",

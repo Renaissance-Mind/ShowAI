@@ -2,17 +2,8 @@
 #define SHOWAI_BOUNDARY_QUANTIZATION_SOURCE_PIN_HPP
 #include "owner.hpp"
 namespace showai_boundary {
-// Internal serial-owner lifetime binding. The host must keep the state and its
-// backing arena allocated while any lease is retained, as for the public API.
-// These pins use the actual source-owner reference count, so destroy cannot
-// succeed merely because the host released its original source lease. All math
-// records in a derived snapshot must be destroyed BEFORE its final source pin.
-// A raw lease is never a cross-WASM-instance or cross-state capability.
 class BoundaryQuantizationSourcePin {
     Pointer<Owner>owner_;SABoundaryLease lease_{};
-    // Owner's slot registry is unique (Owner is noncopyable). Lifecycle
-    // bookkeeping must not use Vector::edit while an arithmetic failure is set.
-    // It performs no allocation and preserves that original failure status.
     static LeaseSlot&slot(Owner&owner,uint32_t index){return owner.edit_slot(index);}
     void drop(){if(owner_){owner_->drop(lease_.slot);owner_=nullptr;lease_={};}}
     bool retain(const BoundaryQuantizationSourcePin&other){

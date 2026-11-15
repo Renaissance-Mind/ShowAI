@@ -1,5 +1,4 @@
 #include "native-parity-stdio.hpp"
-// Executable regression harness; not part of the freestanding runtime target.
 #include "include/showai_ink.h"
 #include <cstdio>
 #include <cstdlib>
@@ -23,7 +22,6 @@ int main(){
     check(sa_ink_resolve_samples(samples.data(),n,&style,resolved.data(),n));
     check(sa_ink_build(samples.data(),n,0,n,&style,points.data(),counts.points,contours.data(),counts.contours,vertices.data(),counts.vertices,&bounds));
     check(sa_ink_flatten_mask(commands.data(),commands_count,style.affine,mask_points.data(),mask_counts.points,mask_contours.data(),mask_counts.contours));
-    // UINT32_MAX denotes absent mask; zero is an explicitly empty mask.
     const SAInkContour *mask=header[3]==UINT32_MAX ? nullptr : mask_contours.data();
     uint32_t output[6]={0,counts.points,counts.contours,counts.vertices,mask_counts.points,mask_counts.contours};write(output,4,6);
     write(&bounds,sizeof(bounds));write(resolved.data(),sizeof(SAInkSample),n);write(points.data(),sizeof(SAInkPoint),counts.points);

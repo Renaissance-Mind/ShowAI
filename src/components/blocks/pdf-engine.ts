@@ -5,8 +5,6 @@ import { translator } from "../../i18n";
 import messages from "../../i18n/messages/pdf";
 
 const t = translator(messages);
-// The bundled worker handler runs in-process so standalone HTML needs no worker URL,
-// CDN, eval or filesystem access. PDF loading/rendering remains asynchronous.
 (globalThis as typeof globalThis & { pdfjsWorker: unknown }).pdfjsWorker = {
   WorkerMessageHandler,
 };
@@ -24,8 +22,6 @@ export function loadPdf(src: string) {
       data: Uint8Array.from(binary, (char) => char.charCodeAt(0)),
     });
   }
-  // A linked local file comes from the host's media address, which pdf.js
-  // would not fetch itself (it streams only http and https).
   if (!/^https?:$/i.test(new URL(src, location.href).protocol)) {
     let task: ReturnType<typeof getDocument> | undefined;
     let destroyed = false;

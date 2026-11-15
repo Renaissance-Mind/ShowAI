@@ -5,7 +5,6 @@ import {
   relayComponentSelectionPointer,
 } from "../../surface/text-selection";
 
-/** Validate opaque iframe messages at their owning host before relaying them. */
 export function useSelectionFrame(
   ref: RefObject<HTMLIFrameElement | null>,
   channel: string,

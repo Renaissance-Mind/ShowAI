@@ -23,7 +23,6 @@ beforeEach(async () => {
   dialogs = [];
   hostCalls = [];
   const service = new AgentService({ root: home });
-  // The host answers the file dialog with the paths the person picked.
   const workbench = createWorkbench(service.store, service, {
     info: () => ({ home, mode: "desktop" }) as unknown as DesktopInfo,
     openDialog: async (options) => {
@@ -50,7 +49,6 @@ describe("linked resource actions", () => {
     const ref = localFileRef(path);
     const grant = await invoke("media:resolve", { ref, kind: "image" });
     expect(grant).toMatchObject({ name: "图 1.png", kind: "image", size: 3 });
-    // The renderer receives an address, never the device path.
     expect(grant.path).toBeUndefined();
     expect((await invoke("media:resolve", { ref, kind: "image" })).token).toBe(
       grant.token,

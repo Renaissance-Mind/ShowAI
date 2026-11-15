@@ -1,6 +1,5 @@
 import type { TabCommand } from "../host/protocol";
 
-/** The command modifier: ⌘ alone on macOS, where Ctrl+letter edits text; Ctrl elsewhere. */
 export function commandKey(
   input: { metaKey: boolean; ctrlKey: boolean },
   mac: boolean,

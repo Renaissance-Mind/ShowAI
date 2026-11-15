@@ -1,6 +1,3 @@
-// Shared contract for the sequence-diagram and layer-diagram built-ins.
-// Validation runs in the workbench, the CLI and the portable reader, so it stays dependency-free.
-
 const fail = (message) => {
   throw new Error(message);
 };
@@ -31,7 +28,6 @@ function tone(value, label) {
     fail(`${label} must be one of ${DIAGRAM_TONES.join(", ")}.`);
 }
 
-/** Color families shared by both diagrams; each maps to a light and a dark hue in CSS. */
 export const DIAGRAM_TONES = [
   "accent",
   "teal",
@@ -40,7 +36,6 @@ export const DIAGRAM_TONES = [
   "rose",
   "slate",
 ];
-/** Layers without a tone take these in order. */
 export const LAYER_TONE_ORDER = [
   "accent",
   "teal",
@@ -120,7 +115,6 @@ export function validateDocDiagramData(kind, data) {
   return data;
 }
 
-/** Detail text split into non-empty paragraphs; each renders through InlineMarkup. */
 export function detailParagraphs(source) {
   if (typeof source !== "string") return [];
   return source

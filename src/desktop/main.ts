@@ -149,7 +149,6 @@ let watcher: LibraryWatcher | undefined;
 let sources: ReturnType<typeof watchDatasetSources> | undefined;
 let maintenance: MaintenanceScheduler | undefined;
 let notification: ReturnType<typeof setTimeout> | undefined;
-// A window already holds the record of its own save; skip that echo for it.
 const ownWrites = new OwnWrites();
 let pendingDeepLink = process.argv.find((argument) =>
   argument.startsWith("showai://"),
@@ -160,16 +159,13 @@ interface CloseReply {
   blockers: CloseBlocker[];
   reason: string;
 }
-/** How a close request ended, with what held the window open. */
 interface CloseOutcome {
   allow: boolean;
   windowId: number;
   title: string;
   blockers: CloseBlocker[];
-  /** keep: the person kept editing; discard: closed despite the blockers. */
   decision?: "keep" | "discard";
 }
-/** A window that does not answer a close request in this time is reported as NO_REPLY. */
 const CLOSE_REPLY_TIMEOUT_MS = 20000;
 const closeRequests = new Map<
   number,
@@ -185,15 +181,12 @@ let allowedQuit = false;
 let presence: InstanceHandle | undefined;
 
 app.setName("ShowAI");
-// Chromium reports this to the renderer as the system language.
 const pinnedLocale = languageOverride();
 if (pinnedLocale) app.commandLine.appendSwitch("lang", pinnedLocale);
 if (process.env.SHOWAI_USER_DATA) {
   app.setPath("userData", resolve(process.env.SHOWAI_USER_DATA));
-  // Isolated instances keep their log next to their own profile.
   app.setAppLogsPath(join(resolve(process.env.SHOWAI_USER_DATA), "logs"));
 }
-// Main process, Agent host and renderer failures, for problem reports.
 const mainLog = createMainLog({
   directory: app.getPath("logs"),
   fallback: (message) => process.stderr.write(`${message}\n`),
@@ -211,7 +204,6 @@ mainLog.write(
   `ShowAI ${app.getVersion()} starting (${process.platform} ${process.arch}, Electron ${process.versions.electron})`,
 );
 
-/** Commit recorded at build time; development reads it from the checkout. */
 const sourceCommit = (() => {
   try {
     const recorded = JSON.parse(
@@ -233,7 +225,6 @@ const sourceCommit = (() => {
   }
 })();
 
-// Scripts and Agents read why a quit was refused from <logs>/quit-blocked.json.
 const quitRecord = new QuitRecord(
   mainLog.directory,
   () => ({
@@ -320,7 +311,6 @@ function updateLine(): string {
     .join(" · ");
 }
 
-/** Plain-text environment summary for problem reports; paths are redacted. */
 function diagnostics(extra: string[] = []): string {
   const lines = [
     `ShowAI ${app.getVersion()} (${app.isPackaged ? "packaged" : "development"}, desktop)`,
@@ -352,8 +342,6 @@ async function deliverFiles(root: string, batch: string[]): Promise<void> {
   const echoes = await ownWrites.echoes(batch);
   if (root !== store.root) return;
   const change = changedResources(root, batch);
-  // Transforms computed from changed datasets refresh in every window,
-  // including the one whose own write changed their input.
   const dependents = change.datasets?.length
     ? await datasetDependents(store, change.datasets)
     : [];
@@ -402,9 +390,7 @@ async function useHome(home?: string): Promise<void> {
   ownWrites.clear();
   store = new FileStore(home);
   await openLibrary(store.root);
-  // Agent reads of this library render in the language this App shows.
   await recordAppLanguage(store.root, getLocale());
-  // Linked external files of datasets refresh the blocks bound to them.
   sources = watchDatasetSources(store.root, (datasets) =>
     broadcast("files", {
       type: "files",
@@ -420,7 +406,6 @@ async function useHome(home?: string): Promise<void> {
     info().cli,
     app.isPackaged ? "packaged" : "development",
   );
-  // Lets dev:status and Agents see every App serving this library.
   await presence?.remove();
   presence = await publishInstance(store.root, {
     mode: "desktop",
@@ -475,9 +460,7 @@ async function useHome(home?: string): Promise<void> {
 
 interface DesktopSettings {
   home?: string;
-  /** Last workbench language, so native menus match it before a window loads. */
   locale?: Locale;
-  /** In-app updates check and download in the background unless turned off. */
   autoUpdate?: boolean;
 }
 
@@ -510,7 +493,6 @@ async function readSettings(): Promise<DesktopSettings> {
     );
   return {
     home: settings.home,
-    // An unknown saved language falls back to the system language.
     locale:
       isLanguagePreference(settings.locale) && settings.locale !== "system"
         ? settings.locale
@@ -534,14 +516,12 @@ async function saveSettings(update: DesktopSettings): Promise<void> {
   await atomicRename(temporary, path);
 }
 
-/** The window a menu item acts on; a new window when none is open. */
 async function menuWindow(target?: unknown): Promise<BrowserWindow> {
   if (target instanceof BrowserWindow && windows.has(target)) return target;
   const focused = BrowserWindow.getFocusedWindow();
   if (focused && windows.has(focused)) return focused;
   const first = [...windows].find((window) => !window.isDestroyed());
   if (first) return first;
-  // The command waits in menuCommands until the new window's renderer listens.
   return createWindow();
 }
 
@@ -567,7 +547,6 @@ async function openLogFolder(): Promise<void> {
   if (error) throw new Error(error);
 }
 
-/** A library folder that exists, so a startup problem can offer to show it. */
 async function existingFolder(path: string | undefined) {
   if (!path) return undefined;
   return stat(path).then(
@@ -587,7 +566,6 @@ function buildApplicationMenu() {
     accelerator: "CommandOrControl+,",
     click: sendMenuCommand("settings"),
   };
-  // Release builds only; the About page shows the result of the check.
   const checkForUpdates = appUpdates?.status().supported
     ? [
         {
@@ -827,7 +805,6 @@ async function nativeAction(
       if (selection.canceled || !selection.filePaths[0]) return null;
       const home = await realpath(selection.filePaths[0]);
       await new FileStore(home).listProjects();
-      // Only a library that actually opens is remembered for the next launch.
       const previous = store.root;
       try {
         await useHome(home);
@@ -841,7 +818,6 @@ async function nativeAction(
       return info();
     }
     case "media:reveal":
-      // The action layer only passes paths it granted for the player.
       shell.showItemInFolder(String(args.path));
       return null;
     case "clipboard:write": {
@@ -999,8 +975,6 @@ configurePageThumbnails({
   },
   identity: async ({ projectId, pageId }) => {
     const library = versionedLibrary(store.root);
-    // Page hashes already cover page edits. Unrelated projects/pages must not
-    // invalidate every cached thumbnail whenever an Agent writes to the library.
     const dependencies =
       library &&
       (await library.resourceRevisions([
@@ -1057,7 +1031,6 @@ function trustedSender(
 const shortText = (value: unknown, limit: number) =>
   typeof value === "string" ? value.slice(0, limit) : "";
 
-/** Page details reported by a renderer that could not save before closing. */
 function unsavedPages(value: unknown): UnsavedPage[] {
   if (!Array.isArray(value)) return [];
   return value.slice(0, 100).flatMap((item): UnsavedPage[] => {
@@ -1119,15 +1092,10 @@ async function exportUnsavedPages(
   return t("close.exported", { count: written, path: folder });
 }
 
-/** The window's title as the person sees it ("Page — ShowAI"). */
 function windowTitle(window: BrowserWindow): string {
   return window.isDestroyed() ? "" : window.getTitle() || "ShowAI";
 }
 
-/**
- * A refused close or quit may come from outside the App (Dock, AppleScript,
- * logout), so the window that explains it is restored and brought to the front.
- */
 function revealWindow(window: BrowserWindow): void {
   if (window.isDestroyed() || presentation.background) return;
   if (window.isMinimized()) window.restore();
@@ -1150,7 +1118,6 @@ const blockerSources: Record<CloseBlocker["source"], Parameters<typeof t>[0]> =
     window: "close.source.window",
   };
 
-/** One dialog line: what holds the window open, and why. */
 function blockerLine(blocker: CloseBlocker): string {
   const subject =
     blocker.source === "datasets" && (blocker.title || blocker.datasetId)
@@ -1177,7 +1144,6 @@ function blockerLine(blocker: CloseBlocker): string {
   return `• ${subject} — ${message}`;
 }
 
-/** What the renderer said holds the window open; never an empty list. */
 function replyBlockers(reply: CloseReply): CloseBlocker[] {
   if (reply.blockers.length) return reply.blockers;
   if (reply.pages.length)
@@ -1198,14 +1164,12 @@ function replyBlockers(reply: CloseReply): CloseBlocker[] {
   ];
 }
 
-/** Log lines name pages and datasets by id; titles stay in the dialog and the record. */
 function loggedBlockers(blockers: CloseBlocker[]): string[] {
   return blockers.map((blocker) =>
     describeBlocker({ ...blocker, title: undefined }),
   );
 }
 
-/** Logs and records a refusal; `state` says whether the person is still deciding. */
 function noteRefusal(
   window: BrowserWindow,
   trigger: CloseTrigger,
@@ -1228,7 +1192,6 @@ function noteRefusal(
   });
 }
 
-/** One step of an allowed quit; a step still running after 5 s is logged by name. */
 async function shutdownStep(name: string, run: () => unknown): Promise<void> {
   const started = Date.now();
   if (!app.isPackaged && process.env.SHOWAI_DEV_URL)
@@ -1252,7 +1215,6 @@ async function shutdownStep(name: string, run: () => unknown): Promise<void> {
     mainLog.write("info", "main", `Quit: ${name} stopped after ${elapsed} ms.`);
 }
 
-/** Explains why a window cannot close yet; never refuses silently. */
 async function blockedClose(
   window: BrowserWindow,
   reply: CloseReply,
@@ -1292,7 +1254,6 @@ async function blockedClose(
       cancelId: buttons.length - 1,
       noLink: true,
     });
-    // A window destroyed meanwhile has nothing left to keep open.
     if (window.isDestroyed()) return "discard";
     const label = buttons[choice.response];
     if (label === t("close.retry")) return "retry";
@@ -1331,7 +1292,6 @@ function requestClose(
     resolveResult = resolve;
   });
   const timer = setTimeout(() => resolveResult(null), CLOSE_REPLY_TIMEOUT_MS);
-  // A window that goes away settles its close request, even while a dialog is open.
   const closed = new Promise<CloseOutcome>((resolve) =>
     window.once("closed", () => resolve(outcome(true))),
   );
@@ -1347,7 +1307,6 @@ function requestClose(
             seconds: CLOSE_REPLY_TIMEOUT_MS / 1000,
           },
         ];
-    // Hidden automation must preserve changes and report the refusal without a modal.
     if (presentation.background) {
       noteRefusal(window, trigger, blockers, "kept-open");
       return outcome(false, blockers, "keep");
@@ -1407,7 +1366,6 @@ function requestClose(
   return promise;
 }
 
-/** Renderer crashes, failed loads and hangs get a way out instead of a blank window. */
 function watchWindowHealth(window: BrowserWindow): void {
   let open = false;
   const offer = async (
@@ -1464,7 +1422,6 @@ function watchWindowHealth(window: BrowserWindow): void {
   window.webContents.on(
     "did-fail-load",
     (_event, code, description, url, isMainFrame) => {
-      // -3 is an aborted navigation, replaced by another load.
       if (!isMainFrame || code === -3) return;
       console.error("ShowAI window load failed:", code, description, url);
       void offer(
@@ -1509,7 +1466,6 @@ async function createWindow(page?: WindowTarget): Promise<BrowserWindow> {
   });
   windows.add(window);
   presentation.track(window);
-  // A reload or navigation replaces the renderer's menu listener.
   window.webContents.on("did-start-navigation", (details) => {
     if (details.isMainFrame && !details.isSameDocument)
       menuCommands.reset(window);
@@ -1582,7 +1538,6 @@ async function createWindow(page?: WindowTarget): Promise<BrowserWindow> {
       ).catch((error) => showWindowError(t("openPageFailed"), error));
       return { action: "deny" };
     }
-    // The workbench follows page links itself; any other opener gets a window.
     if (parsePageLink(url)) void handleDeepLink(url);
     else if (/^https?:\/\//i.test(url)) void shell.openExternal(url);
     return { action: "deny" };
@@ -1622,7 +1577,6 @@ class DeepLinkPageMissing extends Error {
   }
 }
 
-/** A link that cannot open never quits the App; the main window explains why. */
 async function handleDeepLink(source: string): Promise<void> {
   try {
     await openDeepLink(source);
@@ -1684,7 +1638,6 @@ async function handleDeepLink(source: string): Promise<void> {
 async function openDeepLink(source: string): Promise<void> {
   const url = new URL(source);
   if (url.protocol === "showai:" && url.hostname === "login") {
-    // The browser returns the login completion code to the window polling for it.
     if (!store) throw new CoreError("NOT_FOUND", t("login.libraryClosed"));
     syncManager(store.root).deliverLoginCompletion(
       url.searchParams.get("flow") ?? "",
@@ -1709,7 +1662,6 @@ async function openDeepLink(source: string): Promise<void> {
     throw new CoreError("INVALID_PATH", t("deepLink.malformedDetail"));
   const project = assertId(parts[0]),
     page = assertId(parts[2]);
-  // A copied ShowAI reference names the blocks to highlight.
   const blocks = (url.searchParams.get("blocks") ?? "")
     .split(",")
     .filter(Boolean)
@@ -1732,7 +1684,6 @@ function quitNow(): void {
   app.quit();
 }
 
-/** Damaged settings are moved aside so the next launch can start cleanly. */
 async function startupSettings(): Promise<
   DesktopSettings & { damagedBackup?: string }
 > {
@@ -1762,10 +1713,6 @@ async function libraryProblem(
   await access(home, fsConstants.R_OK | fsConstants.W_OK);
 }
 
-/**
- * Opens the remembered library. A missing one is never replaced by a new
- * empty library: the person decides to wait, choose another or use the default.
- */
 async function openStartupLibrary(
   saved: string | undefined,
   damagedBackup?: string,
@@ -1843,7 +1790,6 @@ async function openStartupLibrary(
     });
     const label = buttons[choice.response];
     if (label === t("action.quit")) throw new StartupCancelled();
-    // Looking at the folder or the log keeps the question open.
     if (folder && label === t("library.reveal")) {
       await openLibraryFolder(folder).catch((reason) =>
         console.error("ShowAI library folder:", reason),
@@ -1875,7 +1821,6 @@ async function startupFailed(error: unknown): Promise<void> {
   console.error("ShowAI startup failed:", error);
   if (presentation.background) return;
   const message = errorResult(error).message;
-  // The library being opened when startup failed, if its folder exists.
   const folder = await existingFolder(
     (store as FileStore | undefined)?.root ?? process.env.SHOWAI_HOME,
   );
@@ -1932,11 +1877,9 @@ else {
         );
       }
     });
-  // Granted local files (videos, audio, images) for the workbench player; streamed with ranges.
   protocol.registerSchemesAsPrivileged([
     {
       scheme: LOCAL_MEDIA_SCHEME,
-      // The PDF reader fetches linked PDFs; images and media load directly.
       privileges: {
         standard: true,
         secure: true,
@@ -1962,7 +1905,6 @@ else {
   app
     .whenReady()
     .then(async () => {
-      // Startup dialogs use the system language until the saved one is known.
       setLocale(
         pinnedLocale ?? resolveLocale(app.getPreferredSystemLanguages()),
       );
@@ -2011,7 +1953,6 @@ else {
       agentHost = new AgentHost({
         resources: new ModelResourceClient(() => store.root),
         root: join(app.getPath("userData"), "agent-host"),
-        // Isolated development instances keep Agent work files in their task directory.
         workspaceRoot:
           process.env.SHOWAI_AGENT_WORKSPACES ||
           join(app.getPath("documents"), "ShowAI", "Agent Workspaces"),
@@ -2139,7 +2080,6 @@ else {
             ],
           });
           if (selection.canceled || !selection.filePath) return null;
-          // The renderer already redacted it; the main process knows the home directory.
           await writeFile(
             selection.filePath,
             redact(text, { home: homedir(), library: store.root }),
@@ -2160,7 +2100,6 @@ else {
           return;
         }
         if (!payload || typeof payload !== "object") return;
-        // A render loop must not fill the log; keep at most 30 reports a minute.
         const minute = Math.floor(Date.now() / 60000);
         const budget = rendererReports.get(window.id);
         const count = budget?.minute === minute ? budget.count + 1 : 1;
@@ -2274,7 +2213,6 @@ else {
     if (allowedQuit) return;
     event.preventDefault();
     if (checkingQuit) {
-      // Asked again while a dialog waits: show that dialog instead of hiding the request.
       mainLog.write(
         "info",
         "main",
@@ -2335,7 +2273,6 @@ else {
         await shutdownStep("remote MCP", () => remoteMcp?.suspend());
         agentHost?.close();
         clearTimeout(notification);
-        // Stopping waits for running work (maintenance, sync); a slow step is named.
         await shutdownStep("library watcher", () => watcher?.close());
         await shutdownStep("dataset sources", () => sources?.close());
         await shutdownStep("library maintenance", () => maintenance?.stop());

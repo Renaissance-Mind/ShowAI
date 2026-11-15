@@ -13,19 +13,12 @@ import {
 
 const DISMISSED_KEY = "showai:plugin-update-dismissed";
 
-/**
- * Checks the agent plugins once the App starts or switches libraries. A host
- * still running the plugin from an earlier App, another library or a moved App
- * is offered one update for all; "Later" stays quiet until what the App would
- * install changes again. The decision is shared by every window of the App.
- */
 export default function PluginUpdateNotice({
   home,
   hidden,
   onOpenSettings,
 }: {
   home: string | null;
-  /** Settings → Plugins already shows the same state; keep the scan, skip the notice. */
   hidden: boolean;
   onOpenSettings: () => void;
 }) {
@@ -43,7 +36,6 @@ export default function PluginUpdateNotice({
     return () => removeEventListener("storage", sync);
   }, []);
   const outdated = plugins.hosts.filter(pluginNeedsUpdate);
-  // What this App would install for each outdated host; a new App or library changes it.
   const key = outdated
     .map((host) => `${home}|${host.host}|${host.expected}`)
     .sort()
@@ -133,7 +125,6 @@ export default function PluginUpdateNotice({
             void plugins
               .updateAll(outdated.map((host) => host.host))
               .then((next) => {
-                // Other windows hide the same notice once this one has updated.
                 if (!next.failed.length) dismiss(key);
                 setResult(next);
               })

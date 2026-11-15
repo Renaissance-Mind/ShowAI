@@ -28,7 +28,6 @@ const charWidth = (char: string) => (char.charCodeAt(0) > 0x2e80 ? 10 : 5.6);
 const textWidth = (value: string) =>
   [...value].reduce((width, char) => width + charWidth(char), 0);
 
-/** The label's visible text, shortened with "…" to fit maxWidth. */
 function fitLabel(plain: string, maxWidth: number) {
   if (textWidth(plain) <= maxWidth) return plain;
   let shown = "";
@@ -39,13 +38,8 @@ function fitLabel(plain: string, maxWidth: number) {
   return shown + "…";
 }
 
-/** Width a category axis gives a label below a vertical bar: 12 characters, or 10 and "…". */
 const BELOW_BAR = 12 * 10;
 
-/**
- * Axis label: [label]{note} keeps its note; a shortened label shows the full
- * text on hover.
- */
 function AxisLabel({
   label,
   maxWidth = BELOW_BAR,
@@ -67,7 +61,6 @@ function AxisLabel({
   );
 }
 
-/** Rendered width of a label below a vertical bar. */
 function labelWidth(label: string) {
   const plain = plainNotes(label);
   return textWidth(plain.length <= 12 ? plain : plain.slice(0, 10) + "…");
@@ -134,14 +127,10 @@ export function ChartBlock({ data, onChange, readOnly }: BlockProps) {
   const y = (value: number) =>
     TOP + ((domainMax - value) / (domainMax - domainMin)) * chartHeight;
   const baseline = y(0);
-  // Every bar needs its category label. When the labels cannot sit under
-  // their bars (many categories or long names), the bars lie down and the
-  // labels move to the left in full.
   const horizontal =
     type === "bar" &&
     (labels.length > 10 ||
       labels.some((label) => labelWidth(label) > band - 8));
-  // Lying bars show labels in full up to a 220-unit column.
   const labelColumn = Math.min(
     220,
     Math.max(

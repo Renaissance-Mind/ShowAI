@@ -24,7 +24,6 @@ export async function writeProtected(path: string, value: unknown) {
   await chmod(path, 0o600);
 }
 
-/** Credentials managed by a hosted vault are resolved there, never refreshed locally. */
 export interface HostedCredentialBroker {
   accessToken(
     connectionId: string,

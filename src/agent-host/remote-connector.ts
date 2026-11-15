@@ -32,7 +32,6 @@ export const remoteDeviceActions = new Set([
   "agent:shareDevice",
   "agent:approveRemoteClient",
 ]);
-/** Outbound only. The desktop keeps its own model credentials and project grants. */
 export class RemoteMacConnector {
   readonly lan: LanPeerServer;
   private socket?: WebSocket;

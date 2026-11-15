@@ -3,7 +3,6 @@ import { connectionState, type ConnectionState } from "./browser/bridge";
 import { useTranslator } from "./i18n/react";
 import messages from "./i18n/messages/appShell";
 
-/** Browser mode only: the loopback service went away or restarted. */
 export function ConnectionBanner() {
   const t = useTranslator(messages);
   const [state, setState] = useState<ConnectionState>(connectionState);

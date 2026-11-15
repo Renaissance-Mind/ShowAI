@@ -1,11 +1,6 @@
 const navigationKeys =
   /^(Tab|Arrow(Up|Down|Left|Right)|Home|End|Page(Up|Down))$/;
 
-/**
- * Focus rings belong to keyboard navigation. Browsers also draw them when a
- * shortcut or dialog moves focus by script, so the app CSS hides them until
- * Tab, or arrows outside text fields, move focus.
- */
 export function installKeyboardFocus(doc: Document) {
   const root = doc.documentElement;
   const key = (event: KeyboardEvent) => {

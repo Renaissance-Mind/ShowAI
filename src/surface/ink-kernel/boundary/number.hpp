@@ -12,8 +12,6 @@ inline void*operator new(size_t,void*p)noexcept{return p;}
 inline void operator delete(void*,void*)noexcept{}
 #endif
 
-// Independent bounded exact arithmetic. No allocator, exceptions, platform
-// APIs, GMP or compiler-specific wide integer is required by this header.
 namespace showai_boundary {
 static_assert(CHAR_BIT==8&&sizeof(double)==8&&DBL_MANT_DIG==53&&DBL_MAX_EXP==1024,"binary64 target required");
 template<bool B,class T=void>struct Enable{};template<class T>struct Enable<true,T>{using type=T;};
@@ -26,9 +24,6 @@ SA_BOUNDARY_INTEGER_TYPE(long) SA_BOUNDARY_INTEGER_TYPE(unsigned long) SA_BOUNDA
 template<class T>struct Floating{static constexpr bool value=false;};template<>struct Floating<float>{static constexpr bool value=true;};template<>struct Floating<double>{static constexpr bool value=true;};template<>struct Floating<long double>{static constexpr bool value=true;};
 constexpr uint32_t no_block=0xffffffffu;
 constexpr uint32_t stored_bits=16384,temporary_bits=65536,max_limbs=temporary_bits/32;
-// Arena records use one fixed-width internal pointer representation on both
-// native64 and wasm32. This keeps byte-budget/status decisions independent of
-// host pointer width; records are private process-local state, never wire data.
 template<class T>struct alignas(8) Pointer {
     uint64_t address=0;Pointer()=default;Pointer(T*p):address((uint64_t)(uintptr_t)p){}
     operator T*()const{return(T*)(uintptr_t)address;}T*operator->()const{return(T*)(uintptr_t)address;}
@@ -110,7 +105,7 @@ public:
     int compare(const Integer&b)const{if(sign_!=b.sign_)return sign_<b.sign_?-1:1;return sign_*magnitude_compare(*this,b);}
     Integer operator+(const Integer&b)const{Context*c=owner(*this,b);if(!valid()||!b.valid()||(c&&c->status!=SA_INK_OK))return bad(c);if(!sign_){Integer r=b;if(!r.ctx_)r.ctx_=c;return r;}if(!b.sign_){Integer r=*this;if(!r.ctx_)r.ctx_=c;return r;}Integer r;if(sign_==b.sign_)r=magnitude_add(*this,b,c);else{int cmp=magnitude_compare(*this,b);if(!cmp)return c?from(*c,0):Integer();r=cmp>0?magnitude_subtract(*this,b,c):magnitude_subtract(b,*this,c);r.sign_=cmp>0?sign_:b.sign_;return r;}if(r.sign_)r.sign_=sign_;return r;}
     Integer operator-(const Integer&b)const{return*this+(-b);}
-    Integer operator*(const Integer&b)const{Context*c=owner(*this,b);if(!valid()||!b.valid()||(c&&c->status!=SA_INK_OK))return bad(c);if(!sign_||!b.sign_)return c?from(*c,0):Integer();if(b.count_==1&&b.data()[0]==1){Integer r=*this;if(!r.ctx_)r.ctx_=c;r.sign_*=b.sign_;return r;}if(count_==1&&data()[0]==1){Integer r=b;if(!r.ctx_)r.ctx_=c;r.sign_*=sign_;return r;}uint32_t n=count_+b.count_;if(n>max_limbs+1)return bad(c);if(n>max_limbs&&bits()+b.bits()>temporary_bits+1)return bad(c); // exact leading-product boundary handled below
+    Integer operator*(const Integer&b)const{Context*c=owner(*this,b);if(!valid()||!b.valid()||(c&&c->status!=SA_INK_OK))return bad(c);if(!sign_||!b.sign_)return c?from(*c,0):Integer();if(b.count_==1&&b.data()[0]==1){Integer r=*this;if(!r.ctx_)r.ctx_=c;r.sign_*=b.sign_;return r;}if(count_==1&&data()[0]==1){Integer r=b;if(!r.ctx_)r.ctx_=c;r.sign_*=sign_;return r;}uint32_t n=count_+b.count_;if(n>max_limbs+1)return bad(c);if(n>max_limbs&&bits()+b.bits()>temporary_bits+1)return bad(c);
         Integer r=blank(c,n);if(!r.valid())return r;auto*p=r.mutable_data();for(uint32_t i=0;i<count_;i++){uint64_t carry=0;for(uint32_t j=0;j<b.count_;j++){if(c&&!c->step())return bad(c);uint64_t z=uint64_t(data()[i])*b.data()[j]+p[i+j]+carry;p[i+j]=(uint32_t)z;carry=z>>32;}p[i+b.count_]=(uint32_t)carry;}r.sign_=sign_*b.sign_;r.trim();return r;}
     Integer shifted_left(uint32_t amount)const{if(!valid())return bad(ctx_);if(!sign_||!amount)return*this;if(amount>temporary_bits||bits()>temporary_bits-amount)return bad(ctx_);uint32_t whole=amount/32,part=amount%32,n=(bits()+amount+31)/32;Integer r=blank(ctx_,n);if(!r.valid())return r;auto*p=r.mutable_data();uint64_t carry=0;for(uint32_t i=0;i<count_;i++){if(ctx_&&!ctx_->step())return bad(ctx_);uint64_t z=(uint64_t(data()[i])<<part)|carry;p[i+whole]=(uint32_t)z;carry=z>>32;}if(carry)p[count_+whole]=(uint32_t)carry;r.sign_=sign_;return r;}
     Integer shifted_right(uint32_t amount)const{if(!valid())return bad(ctx_);if(amount>=bits())return ctx_?from(*ctx_,0):Integer();if(!amount)return*this;uint32_t whole=amount/32,part=amount%32,n=count_-whole;Integer r=blank(ctx_,n);if(!r.valid())return r;auto*p=r.mutable_data();for(uint32_t i=0;i<n;i++){if(ctx_&&!ctx_->step())return bad(ctx_);uint64_t z=data()[i+whole];if(part&&i+whole+1<count_)z|=uint64_t(data()[i+whole+1])<<32;p[i]=(uint32_t)(z>>part);}r.sign_=sign_;r.trim();return r;}
@@ -152,8 +147,6 @@ public:
     Rational&operator+=(const Rational&b){*this=*this+b;return*this;}Rational&operator-=(const Rational&b){*this=*this-b;return*this;}Rational&operator*=(const Rational&b){*this=*this*b;return*this;}Rational&operator/=(const Rational&b){*this=*this/b;return*this;}
     int compare(const Rational&b)const{if(n_.sign()!=b.n_.sign())return n_.sign()<b.n_.sign()?-1:1;if(!n_.sign())return 0;if(d_==b.d_)return n_.compare(b.n_);Integer g=Integer::gcd(d_,b.d_);return(n_*(b.d_/g)).compare(b.n_*(d_/g));}
     bool stored()const{return valid()&&n_.bits()<=stored_bits&&d_.bits()<=stored_bits;}
-    // Adjacent binary64 endpoints enclosing the exact rational, independent of
-    // the active hardware rounding mode. Conversion uses integer division only.
     bool bounds(double&lower,double&upper)const{
         if(!valid())return false;Context*c=context();if(!c||c->status!=SA_INK_OK)return false;Integer n=n_.absolute(),d=d_;if(n.zero()){lower=upper=0;return true;}int e=(int)n.bits()-(int)d.bits();if(e>=0){if(n<d.shifted_left((uint32_t)e))--e;}else if(n.shifted_left((uint32_t)-e)<d)--e;
         uint64_t lo=0,hi=0;if(e>1023){lo=0x7fefffffffffffffull;hi=0x7ff0000000000000ull;}else if(e< -1074){lo=0;hi=1;}else{int power=e< -1022?1074:52-e;Integer a=n,b=d;if(power>=0)a=a.shifted_left((uint32_t)power);else b=b.shifted_left((uint32_t)-power);Integer q,r;if(!Integer::divmod(a,b,q,r)||c->status!=SA_INK_OK)return false;uint64_t mantissa=q.unsigned_value();lo=e< -1022?mantissa:(uint64_t(e+1023)<<52)|(mantissa-0x10000000000000ull);hi=lo+(r.zero()?0:1);}

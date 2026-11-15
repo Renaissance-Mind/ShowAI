@@ -19,7 +19,6 @@ test("menu commands wait for a starting window and arrive once, in order", () =>
     ["new", "about"],
     ["new", "settings"],
   ]);
-  // A reload holds commands again until the new document listens.
   queue.reset(opening);
   queue.send(opening, "import");
   expect(delivered).toHaveLength(3);

@@ -111,14 +111,11 @@ export interface McpHttpOptions {
   widgetDomain?: string;
   allowedHosts?: string[];
   instanceId?: string;
-  /** Desktop-owned library and access policy, never accepted from an MCP request. */
   local?: LocalMcpAuthorization & {
     root: string;
     onCall?: (name: string, clientId: string) => void;
   };
-  /** Successful startup screenshot check, supplied by the Cloud entry point. */
   browserRendering?: CloudBrowserCheck;
-  /** Cloud deployments persist private state before acknowledging a request. */
   durableState?: {
     restore(): Promise<void>;
     run(
@@ -128,7 +125,6 @@ export interface McpHttpOptions {
   };
 }
 export async function createMcpHttpApp(options: McpHttpOptions) {
-  // Online data linked by hosted clients never reaches this server's own network.
   const url = new URL(options.publicUrl);
   if (
     url.username ||
@@ -245,7 +241,6 @@ export async function createMcpHttpApp(options: McpHttpOptions) {
       sourceContext: {
         actor: { kind: "external", label: "MCP client" },
         channel: "mcp",
-        // Requests are stateless; one authorized client is one dataset reader.
         ...(grant ? { readerId: `grant:${grant.id}` } : {}),
       },
       instructions: remoteSkillInstructions,
@@ -254,7 +249,6 @@ export async function createMcpHttpApp(options: McpHttpOptions) {
         storePresentation: (value) => storePresentation(value, true),
         widgetDomain: options.widgetDomain,
         privateProjects: !!options.local || servers.length > 0,
-        // Hosted connections serve MCP Apps clients and have no local files.
         hostDisplay: "mcp-app",
       },
       decorateTool(name: string, tool: RegisteredTool) {
@@ -458,8 +452,6 @@ export async function createMcpHttpApp(options: McpHttpOptions) {
                         return `projects/${remote}/${value.slice(`projects/${local}/`.length)}`;
                     return value;
                   }
-                  // Page bodies, draft payloads and editable package source are
-                  // authored JSON. Metadata cleanup must never alter their keys.
                   if (
                     [
                       "document",
@@ -558,8 +550,6 @@ export async function createMcpHttpApp(options: McpHttpOptions) {
                     },
                   });
                   data.delivery = delivery;
-                  // An inline export reports its reader itself; a preview
-                  // made from an html file says which reader it loads.
                   if (args.format !== "inline" && preview.inline)
                     data.display = inlineReader(preview);
                   if (preview.inlineError)
@@ -808,7 +798,6 @@ export async function createMcpHttpApp(options: McpHttpOptions) {
           String((body.params as { name?: string })?.name),
           grant.id,
         );
-      // The SDK preserves tool extensions in _meta. Advertise the canonical field as well.
       if (output.result?.tools)
         for (const tool of output.result.tools) {
           if (
@@ -1330,7 +1319,6 @@ export async function startMcpHttpServer(
       return app!.authorization;
     },
     async configure(input) {
-      // Startup only: keep the bound port while the owner configures the public route.
       const next = await createMcpHttpApp({
         ...options,
         ...input,

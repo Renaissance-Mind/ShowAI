@@ -1,6 +1,5 @@
 import { defineMessages } from "../index";
 
-// Ink conflict inspector: choosing which concurrent stroke edit to keep.
 export default defineMessages("inkConflicts", {
   "zh-CN": {
     title: "笔迹冲突（{count}）",

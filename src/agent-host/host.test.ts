@@ -259,7 +259,6 @@ test("sending without any model source explains that no model is available", asy
     .catch((error) => error);
   expect(failure.problem).toMatchObject({ code: "no_model_source" });
   expect(failure.message).not.toContain("移除");
-  // Nothing was recorded, so the request stays only in the person's input.
   expect(await fresh.conversations.list(project.id)).toEqual([]);
   fresh.close();
 });
@@ -290,11 +289,9 @@ test("a second request for a conversation is refused while the first is still be
   const request = { projectId: project.id, conversationId: id, prompt: "再试一次" };
   const first = fresh.send(request).catch((error) => error),
     second = fresh.send(request).catch((error) => error);
-  // The first runs into the missing model source; the second never starts.
   expect((await first).problem).toMatchObject({ code: "no_model_source" });
   expect((await second).problem).toBeUndefined();
   expect((await second).message).toContain("正在执行");
-  // Once the first has settled the conversation accepts requests again.
   expect((await fresh.send(request).catch((error) => error)).problem).toMatchObject({
     code: "no_model_source",
   });

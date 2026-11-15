@@ -53,7 +53,6 @@ function applyFilters() {
 async function renderEntry(entry, container, expanded = false) {
   container.replaceChildren();
   const context = createContext(container, entry, activeTheme, expanded);
-  // This is the renderer/I/O boundary. Errors stay visible instead of substituting another chart.
   try {
     const draw =
       entry.id === "kagi" ? drawKagi : draws[`./samples/${entry.id}.js`];

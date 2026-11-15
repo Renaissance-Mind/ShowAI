@@ -5,7 +5,6 @@ import type { EditorView } from "@tiptap/pm/view";
 import type { LocatedThread } from "../core/comments";
 
 export interface HighlightSource {
-  /** Open threads located in the current document. */
   threads(): LocatedThread[];
   active(): string | null;
   open(threadId: string, rect: DOMRect): void;
@@ -18,7 +17,6 @@ interface Painted {
   range: Range;
 }
 
-/** Editor positions of the open text threads in one editor document. */
 function anchoredRanges(doc: ProseMirrorNode, threads: LocatedThread[]) {
   const wanted = new Set(
     threads.flatMap((thread) =>
@@ -46,11 +44,6 @@ function anchoredRanges(doc: ProseMirrorNode, threads: LocatedThread[]) {
   return result;
 }
 
-/**
- * Quiet highlights for open text comments, painted with the CSS Custom
- * Highlight API so neither the document nor the editor DOM changes.
- * `refresh` repaints every editor using this extension.
- */
 export function commentHighlights(source: HighlightSource) {
   const painted = new Map<EditorView, Painted[]>();
   const views = new Set<EditorView>();
@@ -121,9 +114,7 @@ export function commentHighlights(source: HighlightSource) {
       views.forEach((view) => measure(view));
       paint();
     },
-    /** Client rects of a thread's highlighted text, for scrolling and flashing. */
     rects(threadId: string) {
-      // Ranges go stale when an editor re-renders its DOM (e.g. leaving a Board).
       views.forEach((view) => measure(view));
       paint();
       return [...painted.values()]

@@ -1,17 +1,12 @@
-// Adapted from https://github.com/antvis/G2/blob/v5/site/docs/charts/contourline.en.mdx
-// License notices: resources/licenses/g2-runtime.json.
-
 export default async function draw(context) {
   const { Chart, asset, fetch } = context;
   const G2 = { Chart };
   const Math = context.math;
-  // Generate contour line data
   const generateContourLines = () => {
     const lines = [];
-    const levels = [20, 40, 60, 80, 100]; // Contour line levels
+    const levels = [20, 40, 60, 80, 100];
 
     levels.forEach((level, index) => {
-      // Generate circular lines for each contour level
       const points = [];
       const centerX = 25;
       const centerY = 25;
@@ -19,7 +14,7 @@ export default async function draw(context) {
 
       for (let angle = 0; angle <= 360; angle += 5) {
         const radian = (angle * Math.PI) / 180;
-        const radius = baseRadius + Math.sin((angle * Math.PI) / 45) * 2; // Add some variation
+        const radius = baseRadius + Math.sin((angle * Math.PI) / 45) * 2;
         const x = centerX + radius * Math.cos(radian);
         const y = centerY + radius * Math.sin(radian);
         points.push({ x, y, level, lineId: `line_${level}` });

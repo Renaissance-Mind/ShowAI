@@ -4,7 +4,6 @@ import { dirname, join } from "node:path";
 const require = createRequire(import.meta.url);
 const root = dirname(require.resolve("katex/package.json"));
 let css = await readFile(join(root, "dist/katex.min.css"), "utf8");
-// Only WOFF2 is needed by the supported browsers. Inline it for standalone exports.
 css = css.replace(/,url\(fonts\/[^)]+\) format\("(?:woff|truetype)"\)/g, "");
 for (const match of [...css.matchAll(/url\(fonts\/([^)]+\.woff2)\)/g)]) {
   const bytes = await readFile(join(root, "dist/fonts", match[1]));

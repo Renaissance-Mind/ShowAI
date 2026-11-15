@@ -5,21 +5,12 @@ import { readLibraryFile } from "./library-runtime";
 import { CoreError } from "./model";
 import type { FileStore } from "./store";
 
-// Transform datasets are computed from other datasets. When an input changes
-// (a library write, a linked file, a sync), the windows showing a transform
-// computed from it refresh too: change notifications name the changed
-// datasets together with every transform that reads them, directly or
-// through other transforms. Dataset keys are "projectId/datasetId";
-// "projectId/*" stands for every dataset of the project.
 
-/** The inputs of every transform dataset of a library. */
 class DependencyIndex {
-  /** Transform key → keys of its inputs. */
   private readonly inputs = new Map<string, string[]>();
   private built?: Promise<void>;
   constructor(readonly store: FileStore) {}
 
-  /** The input keys of a stored dataset; undefined unless it is a transform. */
   private async read(projectId: string, datasetId: string) {
     const path = join(
       this.store.datasetFiles().directory(projectId),
@@ -35,7 +26,6 @@ class DependencyIndex {
         return undefined;
       throw error;
     }
-    // Only files that mention a transform need parsing.
     if (!bytes?.includes('"transform"')) return undefined;
     const dataset = JSON.parse(bytes.toString("utf8")) as {
       transform?: { inputs?: unknown };
@@ -87,7 +77,6 @@ class DependencyIndex {
     return this.built;
   }
 
-  /** Reads the definitions of changed datasets again. */
   async refresh(keys: string[]) {
     for (const key of keys) {
       const [projectId, datasetId] = key.split("/");
@@ -97,14 +86,12 @@ class DependencyIndex {
     }
   }
 
-  /** Transforms with the key among their inputs. */
   readers(key: string): string[] {
     return [...this.inputs]
       .filter(([, inputs]) => inputs.includes(key))
       .map(([transform]) => transform);
   }
 
-  /** Transforms computed from any of the keys, transitively, not including the keys. */
   dependents(keys: string[]): string[] {
     const reached = new Set<string>();
     const queue = [...keys];
@@ -126,11 +113,6 @@ class DependencyIndex {
 
 const indexes = new Map<string, DependencyIndex>();
 
-/**
- * Transforms that must refresh because the given datasets changed (their
- * files, sources or definitions). The index of the library is built on first
- * use and kept current from the keys of later changes.
- */
 export async function datasetDependents(
   store: FileStore,
   changed: string[],
@@ -145,7 +127,6 @@ export async function datasetDependents(
   return index.dependents(changed);
 }
 
-/** Transforms with a dataset among their inputs, read from the library's current files. */
 export async function transformsReading(
   store: FileStore,
   key: string,

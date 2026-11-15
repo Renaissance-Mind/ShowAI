@@ -18,8 +18,6 @@ import { savePageWrites } from "./page-undo";
 
 let directory: string, library: FileStore, host: AgentHost, log: string;
 
-// A stand-in for `claude -p --output-format stream-json` that records its
-// arguments and the prompt it reads from stdin.
 const fakeClaude = `#!/usr/bin/env node
 const fs = require("node:fs");
 let prompt = "";
@@ -67,7 +65,6 @@ beforeAll(async () => {
   process.env.SHOWAI_FAKE_AGENT_LOG = log;
   let agentPath = join(directory, "claude");
   if (process.platform === "win32") {
-    // What `npm install -g` writes on Windows: a cmd-shim around the script.
     await writeFile(join(directory, "claude.js"), fakeClaude);
     agentPath += ".cmd";
     await writeFile(agentPath, npmShim("claude.js"));
@@ -236,14 +233,11 @@ test("a conversation streams, persists and resumes the same Claude session", asy
   const sessionId = calls[0].args[calls[0].args.indexOf("--session-id") + 1];
   expect(sessionId).toBe(done.threadId);
   expect(calls[1].args[calls[1].args.indexOf("--resume") + 1]).toBe(sessionId);
-  // The prompt arrives on stdin; the page context exceeds the Windows
-  // command-line limit.
   expect(calls[0].args).not.toContain(calls[0].prompt);
   expect(calls[0].prompt.length).toBeGreaterThan(32_767);
   expect(calls[1].prompt).toContain("Continue this ShowAI conversation");
   expect(calls[1].prompt).not.toContain("Component directory");
 
-  // A fresh store reads the same history from disk.
   const reloaded = await new ConversationStore(join(directory, "agent")).list(
     project.id,
   );
@@ -314,15 +308,11 @@ test("conversation search matches titles, requests and replies", async () => {
     )
       .map((item) => item.id)
       .sort();
-  // Title and request text.
   expect(await search("BUDGET")).toEqual([a.id]);
-  // Every word must occur, in any order.
   expect(await search("abstract translate")).toEqual([b.id]);
-  // The fake Agent replies "Hello world" to both.
   expect(await search("hello")).toEqual([a.id, b.id].sort());
   expect(await search("budget abstract")).toEqual([]);
   expect(await search("  ")).toEqual([a.id, b.id].sort());
-  // Full-width letters match their ASCII forms.
   expect(await search("ｂｕｄｇｅｔ")).toEqual([a.id]);
 });
 
@@ -339,7 +329,6 @@ test("undo restores the page only while it still matches the turn result", async
   await expect(
     host.undoTurn(project.id, conversation.id, turn.id),
   ).rejects.toThrow();
-  // Simulate the Agent's write, then record it as the turn result.
   const current = await library.readPage(project.id, page.document.id);
   const writes: PageWrite[] = [];
   const saved = await pageWriteCapture.run(writes, () =>

@@ -6,7 +6,6 @@ import { fileURLToPath } from "node:url";
 import electron from "electron";
 import { _electron } from "playwright-core";
 
-// The smoke checks select controls by their Chinese labels.
 process.env.SHOWAI_LANGUAGE ??= "zh-CN";
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 await mkdir(join(root, "output/playwright"), { recursive: true });

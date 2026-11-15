@@ -13,7 +13,6 @@ export interface FilterGroup {
   join: "and" | "or";
   conditions: (FilterCondition | FilterGroup)[];
 }
-/** The filter of a view saved before filter groups. */
 export interface LegacyFilter {
   column: string;
   value: string;

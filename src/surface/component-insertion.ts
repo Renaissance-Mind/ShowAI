@@ -53,11 +53,6 @@ export function nativeComponentDocument(
       : {}),
   });
 }
-/**
- * The block a component that is not a native container becomes, and the
- * frame it gets in a container: rich text, a primitive's native nodes, or
- * a widget holding a copy of the data.
- */
 export function componentBlock(
   kind: string,
   data: Record<string, unknown>,
@@ -80,10 +75,6 @@ export function componentBlock(
   };
 }
 
-/**
- * Every catalog item enters the same insertion path; containers remain native nodes.
- * An omitted afterId appends, null inserts first, and an id inserts after that sibling.
- */
 export function insertComponent(
   source: ShowDocument,
   parentId: string | null,
@@ -107,7 +98,6 @@ export function insertComponent(
     : document.content;
   if (!parent || !["surface", "region", "step"].includes(parent.type ?? ""))
     throw new Error("Component destination must be a container.");
-  // A stepper's step holds content blocks in flow; it has no layout frames.
   const inStep = parent.type === "step";
   const definition = builtinComponent(kind);
   if (!definition && kind !== "custom")
@@ -208,10 +198,6 @@ export function insertComponent(
 }
 
 type StepBlock = { kind: string; data: Record<string, unknown> };
-/**
- * A stepper may arrive with components for each step (steps[].blocks); they
- * enter each step through the same insertion path, after the step's text.
- */
 function insertStepper(
   source: ShowDocument,
   parentId: string | null,
@@ -252,7 +238,6 @@ function insertStepper(
   blocks.forEach((list, index) => {
     if (!list.length) return;
     const step = findSurfaceNode(inserted.document, stepIds[index])!.node;
-    // A step given only components drops the empty paragraph it was created with.
     const empty =
       !(steps[index].content as string | undefined)?.length &&
       step.content?.length === 1 &&
@@ -273,7 +258,6 @@ function insertStepper(
   return inserted;
 }
 
-/** Insert a structural component at a text caret, splitting only the active text run. */
 export function insertComponentAtText(
   source: ShowDocument,
   context: { parentId: string; ids: string[]; kind: "single" | "children" },

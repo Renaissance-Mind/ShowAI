@@ -11,7 +11,6 @@ const base = builtinTemplateBundles
   .sort((a, b) =>
     compareCatalogVersions(b.metadata.version, a.metadata.version),
   )[0]!;
-/** The whole presentation workflow, as embedded in the show-document Skill. */
 export const systemPresentationMarkdown = [
   base.body,
   ...base.guides.map(({ markdown }) => markdown.trim()),

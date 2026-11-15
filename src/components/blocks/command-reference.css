@@ -1,7 +1,3 @@
-/* command-reference; example code uses the shared .sg-code panel from step-guide.css.
- * Neutral colors follow the design tokens so the block follows light and dark themes. */
-/* Page typography reaches into blocks at 0,2,1; this baseline (0,2,2) clears it
- * for structural elements, and the rules below (0,3,0) set this block's own values. */
 .sb-block.cr-block :is(h3, h4, p, ul, ol, li, pre):not(svg) {
   margin: 0;
 }
@@ -14,7 +10,6 @@
   background: none;
   color: inherit;
 }
-/* Doubled class so the shared .sb-block font and size do not override these. */
 .sb-block.cr-block {
   --cr-text: var(--text, #222222);
   --cr-muted: var(--muted, #6a6a6a);
@@ -80,7 +75,6 @@
   margin: 0;
 }
 
-/* ---------------------------------------------------------------- search */
 .sb-block.cr-block .cr-search {
   display: flex;
   align-items: center;
@@ -158,7 +152,6 @@
   stroke-linecap: round;
 }
 
-/* ---------------------------------------------------------------- group chips */
 .sb-block.cr-block .cr-chips {
   display: flex;
   flex-wrap: wrap;
@@ -209,7 +202,6 @@
   outline-offset: 2px;
 }
 
-/* ---------------------------------------------------------------- list */
 .sb-block.cr-block .cr-list {
   margin-top: 14px;
   border: 1px solid var(--cr-line);
@@ -375,7 +367,6 @@
   stroke-linejoin: round;
 }
 
-/* ---------------------------------------------------------------- detail */
 .sb-block.cr-block .cr-detail {
   padding: 0 16px 18px;
   margin-right: 24px;
@@ -441,7 +432,6 @@
   overflow-wrap: anywhere;
 }
 
-/* ---------------------------------------------------------------- empty */
 .sb-block.cr-block .cr-empty {
   margin-top: 14px;
   padding: 34px 20px 30px;

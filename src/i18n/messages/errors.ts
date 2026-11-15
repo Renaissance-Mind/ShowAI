@@ -1,8 +1,5 @@
 import { defineMessages } from "../index";
 
-// Human wording for problems shown by ProblemNotice and describeError: what
-// happened, whether content is safe, why, and what to do. The original error
-// text only appears in the technical details.
 export default defineMessages("errors", {
   "zh-CN": {
     actionFailed: "{action}失败",

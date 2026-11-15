@@ -45,9 +45,6 @@ const expectDelta=(response:SourceRuntimeResponse):SourceSnapshotDelta=>{
 };
 const key=(ref:SourceSnapshotRef)=>JSON.stringify([ref.ownerId,ref.epoch,ref.snapshotId,ref.scope.homeId,ref.scope.projectId,ref.scope.pageId,ref.kind]);
 
-/** One page's UI projection. Local authoring freezes a distinct COW draft now;
- * only its small edits enter the worker queue. No display waits for normalize.
- * This is separate from the worker's immutable body/normalization proof. */
 export class OwnedSourceSession {
  readonly clientId:string;
  readonly leaseId:string;
@@ -65,9 +62,6 @@ export class OwnedSourceSession {
  private externalGeneration=new Map<string,number>();
  private proofs=new WeakMap<ShowDocument,Set<string>>();
  private issuedDeltas=new WeakSet<SourceSnapshotDelta>();
- // A prepared publication already owns an independent frozen UI projection.
- // Reuse only that actual issued delta on the EXACT same captured UI root.
- // Worker-private graphs never enter this cache; no ref/ID grants it authority.
  private materializedDeltas=new WeakMap<SourceSnapshotDelta,{base:ShowDocument|undefined;document:ShowDocument}>();
  private pendingPins=new Map<string,Promise<SourceSnapshotRef>>();
  private publicationOutputs=new Map<string,SourceSnapshotRef>();
@@ -105,15 +99,11 @@ export class OwnedSourceSession {
   this.pendingLeases.add(lease);this.pendingPins.set(key(ref),promise);void promise.then(()=>{if(this.pendingPins.get(key(ref))===promise)this.pendingPins.delete(key(ref))});
   this.jobs.push({document,edits:null,transactionId,lease,resolve,promise,targetLease:this.leaseId,existing:{session:this,reference:Promise.resolve(ref),remoteRef:ref}});this.drain();
  }
- /** Only an actual factory body may be installed after its corresponding
-  * save barrier; captured N cannot replace a newer immediate UI draft N+1. */
  publishKnown(document:ShowDocument,captured:ShowDocument):ShowDocument|null{
   if(this.latestDocument!==captured)return null;
   const binding=bindings.get(document);if(binding?.session!==this||!binding.remoteRef||!this.proofs.get(document)?.has(key(binding.remoteRef)))throw new SourceRuntimeError("SOURCE_NOT_OWNED","Saved body lacks an actual resolved factory proof");
   this.publish(document,binding.remoteRef);return document;
  }
- /** Call only with a real author value; this captures caller-owned fragments
-  * before onChange can return to a widget or retain another mutable reference. */
  replace(document:ShowDocument):ShowDocument{
   if(this.disposed)throw new SourceRuntimeError("SOURCE_DISPOSED","Source page is retired");
   if(document.id!==this.pageId)throw new SourceRuntimeError("SOURCE_SCOPE","Author document belongs to another page");
@@ -152,16 +142,11 @@ export class OwnedSourceSession {
    }
   })().catch(error=>{this.failure=error;this.signalFailure(error)}).finally(()=>{this.running=false;if(this.jobs.length&&!this.failure)this.drain()});
  }
- /** Retry the same original transaction/base/edits after a lost reply or failed
-  * registration. Later drafts stay queued; none are cleared or reseeded away. */
  async retryRegistration(){
   await this.tail;this.failure=undefined;this.failureSignal=new Promise(resolve=>{this.signalFailure=resolve});
   if(!this.actualScope)this.scopePromise=this.transport.scope(this.projectId,this.pageId).then(scope=>{this.actualScope=ownSourceValue(scope);return this.actualScope});
   this.drain();await this.barrier();
  }
- /** A server record/base is owned independently without becoming current.
-  * Stable named leases replace old remote baselines rather than accumulating
-  * one permanent temporary lease for every refresh/ack. */
  captureExternal(document:ShowDocument,leaseName:string):ShowDocument{
   if(this.disposed)throw new SourceRuntimeError("SOURCE_DISPOSED","Source page is retired");
   if(document.id!==this.pageId)throw new SourceRuntimeError("SOURCE_SCOPE","External source belongs to another page");
@@ -187,8 +172,6 @@ export class OwnedSourceSession {
  }
 
  async barrier(){do{const active=this.tail;await active;if(this.failure)throw this.failure;if(active===this.tail&&!this.running&&!this.jobs.length)break;}while(true);return this.latestRef?await this.latestRef:null}
- /** Apply only against the actual frozen UI graph for the issued base. Older
-  * normalized/save results never overwrite a newer local draft projection. */
  apply(delta:SourceSnapshotDelta,options:{publish?:boolean;baseDocument?:ShowDocument}={}):ShowDocument|null{
   return measureNativeSync("source.ui.apply",()=>this.applyOwnedDelta(delta,options));
  }
@@ -205,8 +188,6 @@ export class OwnedSourceSession {
   if(delta.base&&baseDocument){const registered=bindings.get(baseDocument);if(!registered||registered.session!==this)throw new SourceRuntimeError("SOURCE_NOT_OWNED","Delta baseline is not an owned UI snapshot")}
   const materialized=this.materializedDeltas.get(delta);
   if(materialized&&materialized.base===before&&bindings.get(materialized.document)?.session===this&&this.proofs.get(materialized.document)?.has(key(delta.next))){
-   // Keep metadata attached to this prepared target by the actual Native
-   // bridge. Re-copying the old base here could overwrite the newer receipt.
    return measureNativeSync("source.ui.applyPrepared",()=>{if(publish)this.publish(materialized.document,delta.next);return materialized.document;});
   }
   const target=measureNativeSync("source.ui.materialize",()=>freezeOwnedSource(delta.base?applyNativeSourceDelta(before!,delta.edits??[]):cloneSourceValue(delta.full!)));
@@ -218,8 +199,6 @@ export class OwnedSourceSession {
   if(publish)this.publish(target,delta.next);
   return target;
  }
- /** Distinct semantic edges may share one exact source body/ref without
-  * registering a fake draft operation or aliasing a mutable graph. */
  snapshot(document:ShowDocument):ShowDocument{
   const binding=bindings.get(document);if(binding?.session!==this)throw new SourceRuntimeError("SOURCE_NOT_OWNED","History body is not owned by this source session");
   const distinct=ownSourceValue({...document});this.remember(distinct,binding.reference);return distinct;
@@ -251,9 +230,6 @@ export class OwnedSourceSession {
   });
   }catch(error){await this.abandonOutputLease(leaseId);throw error}
  }
- /** Project one actually sealed stroke into captured later history edges.
-  * The worker sends only owner refs; the UI uses the same COW operation and
-  * binds its result only to this call's checked actual transport response. */
  async appendInkHistory(sourceDocument:ShowDocument,boardId:string,strokeId:string,documents:ShowDocument[],leaseName:string):Promise<{documents:ShowDocument[];release:()=>Promise<void>}>{
   if(this.disposed)throw new SourceRuntimeError("SOURCE_DISPOSED","Source page is retired");
   const source=await this.reference(sourceDocument),refs:SourceSnapshotRef[]=[];
@@ -266,8 +242,6 @@ export class OwnedSourceSession {
    const actualScope=await this.scopePromise;
    if(!("format" in response)||response.format!=="showai-owned-ink-history-v1"||!sameSourceRef(response.source,source)||response.boardId!==boardId||response.strokeId!==strokeId||response.entries.length!==documents.length)
     throw new SourceRuntimeError("SOURCE_PROTOCOL","Source worker did not return this captured ink history");
-   // Validate the entire descriptor before issuing any UI proof. No public
-   // adoption method accepts a caller-authored descriptor or copied owner ID.
    response.entries.forEach((entry,index)=>{
     this.checkedScope(entry.next,actualScope);
     if(!sameSourceRef(entry.base,refs[index])||entry.next.format!=="showai-source-snapshot-v1"||entry.next.ownerId!==source.ownerId||entry.next.epoch!==source.epoch||typeof entry.next.snapshotId!=="string"||!entry.next.snapshotId||typeof entry.unchanged!=="boolean"||
@@ -283,8 +257,6 @@ export class OwnedSourceSession {
    let released=false;
    return{documents:projected,release:async()=>{
     if(released)return;
-    // Publishing a projected result queues its current pin. Do not release
-    // the response's only ownership while that actual pin is still pending.
     for(const entry of response.entries){const pin=this.pendingPins.get(key(entry.next));if(pin)await this.waitRegistration(pin)}
     await this.transport.request({kind:"release",leaseId});this.pendingLeases.delete(leaseId);released=true;
    }};
@@ -311,8 +283,6 @@ export class OwnedSourceSession {
  }
  async completePublication(pubId:string){const leaseId=`${this.clientId}:publication-${pubId}`;if(this.disposed)return;const output=this.publicationOutputs.get(pubId),pin=output&&this.pendingPins.get(key(output));if(pin)await this.waitRegistration(pin);await this.transport.request({kind:"release",leaseId});this.pendingLeases.delete(leaseId);this.publicationRequests.delete(pubId);this.publicationOutputs.delete(pubId)}
  async retryPublication(snapshot:SourceSnapshotDelta){const request=snapshot.publicationId&&this.publicationRequests.get(snapshot.publicationId);if(!request)throw new SourceRuntimeError("SOURCE_BASELINE","Native publication descriptor is unavailable");return await this.preparePublication(request)}
- /** Host undo/resolution output is normalized on its actual worker. Merge
-  * any UI authoring that arrived while it was executing through owned refs. */
  async acceptProjection(snapshot:SourceSnapshotDelta,captured:ShowDocument,deliveryId?:string):Promise<ShowDocument>{
   const leaseName=`projection-${crypto.randomUUID()}`;snapshot=await this.actualDelta(snapshot,leaseName);
   const incoming=this.apply(snapshot,{publish:false,baseDocument:captured});if(!incoming)throw new SourceRuntimeError("SOURCE_BASELINE","Host projection has no captured independent body");
@@ -329,8 +299,6 @@ export class OwnedSourceSession {
    throw new SourceRuntimeError("SOURCE_DISPOSED","Host projection source was retired");
   }finally{const pin=this.pendingPins.get(key(snapshot.next));if(pin)await this.waitRegistration(pin);await this.releaseLease(leaseName)}
  }
- /** A real save response has already validated/CAS-committed its body. Keep a
-  * distinct saved view even when a newer local draft is currently displayed. */
  async acceptSaved(snapshot:SourceSnapshotDelta,captured:ShowDocument,deliveryId?:string):Promise<ShowDocument>{
   snapshot=await this.actualDelta(snapshot,"saved");
   const saved=this.apply(snapshot,{publish:false,baseDocument:captured});if(!saved)throw new SourceRuntimeError("SOURCE_BASELINE","Saved snapshot has no captured independent UI body");
@@ -356,9 +324,6 @@ export class OwnedSourceSession {
   await retain();
  }
  async releaseLease(name:string){const leaseId=`${this.clientId}:${name}`;this.historyGeneration.set(name,(this.historyGeneration.get(name)??0)+1);this.externalGeneration.set(leaseId,(this.externalGeneration.get(leaseId)??0)+1);await this.transport.request({kind:"release",leaseId});this.historyLeases.delete(leaseId)}
- /** Full mutable imports retain their own race check. A same-object draft
-  * mutation during await is captured again; canonical readonly data never uses
-  * this path to fake an unchanged generation. */
  async captureMutable(read:()=>ShowDocument):Promise<ShowDocument>{
   while(!this.disposed){const captured=this.replace(read());await this.reference(captured);if(nativeDocumentBodiesEqual(captured,read()))return captured;}
   throw new SourceRuntimeError("SOURCE_DISPOSED","Mutable draft owner was retired");
@@ -380,8 +345,6 @@ export class OwnedSourceSession {
  }
 }
 
-/** Lazy transport creation: iOS's inline IIFE never constructs a browser
- * worker URL. Browser/Electron use a real dedicated module worker. */
 export function createSourceTransport(invoke:<T>(action:string,args?:Record<string,unknown>)=>Promise<T>,homeId?:string,options:{headlessHomeId?:string}={}):SourceRuntimeTransport{
  const sourceClientId=crypto.randomUUID();
  let actualScope:SourceScope|undefined;

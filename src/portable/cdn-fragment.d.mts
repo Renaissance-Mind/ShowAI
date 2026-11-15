@@ -1,7 +1,5 @@
 export interface CdnReaderOptions {
-  /** A single reader entry URL. */
   readerUrl?: string;
-  /** Reader entry URLs tried in order; each serves the same build. */
   readerUrls?: string[];
   id?: string;
 }

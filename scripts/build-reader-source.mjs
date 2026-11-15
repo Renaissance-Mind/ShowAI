@@ -12,7 +12,6 @@ function statements(source, path) {
   return result.program.body;
 }
 
-/** The kinds a dispatch condition names, or null when it names them some other way. */
 function conditionKinds(test) {
   const isKind = (node) => node.type === "Identifier" && node.name === "kind";
   const literal = (node) =>
@@ -62,12 +61,6 @@ function conditionKinds(test) {
   return null;
 }
 
-/**
- * Component validators the portable validator reaches only through
- * validateWidgetData's dispatch on literal kinds. A reader whose pages hold
- * none of those kinds never calls them, so it can leave their modules out.
- * Imports used any other way are not listed and stay real.
- */
 function widgetValidators(source) {
   const path = "src/portable/validation.mjs";
   const body = statements(source, path);
@@ -96,7 +89,6 @@ function widgetValidators(source) {
     const kinds = conditionKinds(node.test);
     if (kinds) branches.set(call.expression.callee.name, kinds);
   }
-  // Used exactly twice: its import and its one dispatch call.
   const uses = (name) =>
     [...source.matchAll(new RegExp(`(?<![\\w$])${name}(?![\\w$])`, "g"))]
       .length;
@@ -126,7 +118,6 @@ function widgetValidators(source) {
   });
 }
 
-/** Freeze the reader's source graph and registration boundaries at build time. */
 export async function buildReaderSource(root, destination) {
   const graph = await build({
     entryPoints: [join(root, "src/portable/main.tsx")],
@@ -173,9 +164,6 @@ export async function buildReaderSource(root, destination) {
       return [];
     },
   );
-  // Top-level bindings the registrations use. A reader drops the ones its
-  // remaining registrations no longer name, so modules (and their CSS) behind
-  // a removed kind never enter the bundle.
   const declarations = statements(files[registryPath], registryPath).flatMap(
     (node) => {
       if (node.type === "ImportDeclaration" && node.specifiers.length)

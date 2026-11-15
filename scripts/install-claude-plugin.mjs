@@ -1,8 +1,3 @@
-// Connects Claude Code in this checkout to one development instance. The main checkout gets
-// showai-dev, each worktree showai-dev-<git worktree name>. Both are enabled in this checkout's own
-// .claude/settings.json (project scope; Claude Code shares local settings between the worktrees
-// of a repository). The stable showai@showai-desktop keeps its global setting, so a session here
-// sees both. The plugin is pinned to the instance's library and runtime.
 import { execFile, spawn } from "node:child_process";
 import { createHash } from "node:crypto";
 import { access, cp, mkdir, readdir, readFile, realpath, rename, rm, writeFile } from "node:fs/promises";
@@ -15,7 +10,6 @@ import { skillFiles } from "../src/plugin/host-package.mjs";
 
 const execute = promisify(execFile);
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-// Earlier installs turned the stable plugin off per checkout; install and remove clear that override.
 const STABLE = "showai@showai-desktop";
 const usage =
   "Usage: npm run plugin:claude -- --port PORT [--mode desktop|browser] [--json]\n" +
@@ -62,7 +56,6 @@ const exists = (path) =>
     },
   );
 
-/** The main checkout is showai-dev; a worktree is named after its directory. */
 async function checkout() {
   const git = async (...args) =>
     (await execute("git", ["rev-parse", "--path-format=absolute", ...args], { cwd: root })).stdout.trim();
@@ -73,8 +66,6 @@ async function checkout() {
     throw new Error(`Run from the checkout root ${top}.`);
   if ((await realpath(gitDir)) === (await realpath(commonDir)))
     return { worktree: false, name: "showai-dev" };
-  // Git's worktree name (.git/worktrees/<name>) is unique in the repository; directory names
-  // are not (every Codex worktree checks out into …/<id>/ShowAI).
   const slug = basename(gitDir)
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
@@ -87,7 +78,6 @@ async function checkout() {
 const generated = join(root, ".showai-dev/claude-plugin");
 const projectSettings = join(root, ".claude/settings.json");
 
-/** Turns plugins on or off for this checkout only, keeping its other settings. */
 async function setProjectPlugins(changes) {
   const settings = (await readJson(projectSettings)) ?? {};
   const enabled = { ...settings.enabledPlugins };
@@ -101,7 +91,6 @@ async function setProjectPlugins(changes) {
   else await rm(projectSettings, { force: true });
 }
 
-/** The per-checkout settings file is machine-specific; keep it out of every worktree's status. */
 async function excludeProjectSettings() {
   const common = (
     await execute("git", ["rev-parse", "--path-format=absolute", "--git-common-dir"], { cwd: root })
@@ -117,7 +106,6 @@ async function excludeProjectSettings() {
   await writeFile(exclude, `${text}${text && !text.endsWith("\n") ? "\n" : ""}${line}\n`);
 }
 
-/** One MCP handshake through the installed configuration, as Claude Code will start it. */
 async function handshake(server, pluginRoot) {
   const child = spawn(
     server.command,
@@ -183,7 +171,6 @@ async function install(identity) {
   if (!probe.ok || resolve(probe.data.home) !== resolve(session.home))
     throw new Error(`The instance runtime reports another library: ${probe.data?.home}`);
 
-  // Same Skills and launcher as the generated Claude package; only identity and binding differ.
   process.stderr.write(
     (await execute(process.execPath, [join(root, "scripts/package-plugin.mjs")], { cwd: root })).stdout,
   );
@@ -192,8 +179,6 @@ async function install(identity) {
   const record = join(generated, "agent-runtime.json");
   await rm(plugin, { recursive: true, force: true });
   await cp(source, plugin, { recursive: true });
-  // A session here also loads the stable plugin, whose Skills share these names; the channel in
-  // each description tells an Agent which instance and library a Skill writes to.
   const channel = `开发通道 ${identity.name}（${values.mode} ${values.port}，内容库 ${resolve(session.home).replace(homedir(), "~")}）`;
   for (const entry of await readdir(join(plugin, "skills"), { withFileTypes: true })) {
     if (!entry.isDirectory()) continue;
@@ -268,14 +253,12 @@ async function install(identity) {
   if (!installed?.enabled || installed.version !== version)
     throw new Error(`Claude Code did not confirm ${id} ${version} enabled here: ${JSON.stringify(installed)}`);
   const expected = JSON.stringify(await skillFiles(plugin));
-  // Claude Code records each running session that loaded a cached plugin under .in_use/.
   const copied = Object.fromEntries(
     Object.entries(await skillFiles(installed.installPath)).filter(([name]) => !name.startsWith(".in_use/")),
   );
   if (JSON.stringify(copied) !== expected)
     throw new Error(`Installed files at ${installed.installPath} differ from ${plugin}.`);
   const connection = await handshake(server, installed.installPath);
-  // A launcher that cannot reach its runtime serves only showai_connection_problem.
   if (connection.capabilities.version !== probe.data.version || connection.tools < 2)
     throw new Error(`The plugin connected to an unexpected ShowAI: ${JSON.stringify(connection)}`);
   return {
@@ -302,7 +285,6 @@ async function install(identity) {
 async function remove(identity) {
   const id = `${identity.name}@${identity.name}`;
   const markets = await claudeJson(["marketplace", "list"]);
-  // Removing the marketplace also uninstalls its plugin in every scope.
   if (markets.some((item) => item.name === identity.name))
     await claude(["marketplace", "remove", identity.name]);
   await setProjectPlugins({ [id]: undefined, [STABLE]: undefined });
@@ -310,7 +292,6 @@ async function remove(identity) {
   return { ok: true, action: "remove", pluginId: id, projectPath: root };
 }
 
-/** Removes development marketplaces whose checkout no longer exists (archived worktrees). */
 async function prune() {
   const removed = [];
   for (const item of await claudeJson(["marketplace", "list"])) {

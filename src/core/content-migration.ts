@@ -15,8 +15,6 @@ import {
 } from "./content-migration-journal";
 const sha = (value: Buffer) => createHash("sha256").update(value).digest("hex");
 
-/** Preserve revision IDs and every reachable operation. The original Git archive
- * stays retained locally; normal SQLite saving never opens or invokes it. */
 export async function migrateGitContent(
   home: string,
 ): Promise<LibraryManifest> {
@@ -200,7 +198,6 @@ export async function migrateGitContent(
     );
     journal.state = "activated";
     await save();
-    // The archive keeps all Git objects and refs, including unreachable originals.
     await retainActivatedGit(root, updated);
     return updated;
   });

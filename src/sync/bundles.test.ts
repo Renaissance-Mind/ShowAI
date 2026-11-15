@@ -41,7 +41,6 @@ const asAgent = <T>(action: () => Promise<T>) =>
     action,
   );
 
-/** Two devices with their own libraries and a project shared through a real sync server. */
 async function fixture() {
   const directory = await mkdtemp(join(tmpdir(), "showai-bundles-"));
   actions.push(() => rm(directory, { recursive: true, force: true }));
@@ -70,7 +69,6 @@ async function fixture() {
   }
   const [alice, bob] = clients;
   const project = await alice.store.createProject({ name: "Shared files" });
-  // Alice's files live outside her library, where only her device sees them.
   const files = join(directory, "alice-files");
   const csv = join(files, "schedule.csv");
   const image = join(files, "photo.png");
@@ -114,7 +112,6 @@ it("carries copies of linked files to other devices and writes their edits back"
     kind: "file",
     bundle: { sync: true, hash: first, base: first },
   });
-  // Copies synchronize without entering history.
   expect(logicalPath(alice.home, bundlePath(alice.home, first))).toBeUndefined();
   const tree = await alice.library.tree((await alice.library.head())!);
   expect(tree.some((entry) => entry.path.startsWith("bundles/"))).toBe(false);
@@ -138,11 +135,9 @@ it("carries copies of linked files to other devices and writes their edits back"
     columns: ["id", "title"],
     rows: [{ id: "m1", title: "体检" }],
   });
-  // The image shows Bob the copy of Alice's file.
   const copy = await bundledResource(bob.store, localFileRef(image));
   expect(copy && (await readFile(copy.path))).toEqual(png);
 
-  // Bob edits the copy; Alice's file receives the edit.
   await asAgent(() =>
     bobData.apply(project.id, datasetId, {
       baseHash: received.hash,
@@ -154,7 +149,6 @@ it("carries copies of linked files to other devices and writes their edits back"
   expect(await readFile(csv, "utf8")).toBe("id,title\nm1,复查\n");
   expect((await aliceData.read(project.id, datasetId)).warnings).toEqual([]);
 
-  // Both change at once: Alice keeps her file and sees the conflict.
   await writeFile(csv, "id,title\nm1,本机修改\n");
   const before = await bobData.read(project.id, datasetId);
   await asAgent(() =>
@@ -175,7 +169,6 @@ it("carries copies of linked files to other devices and writes their edits back"
       actions: ["retry", "open-file"],
     }),
   ]);
-  // Combining both in the file ends the conflict and shares the result.
   await writeFile(csv, "id,title\nm1,本机修改 / 另一台修改\n");
   await alice.manager.run(project.id);
   expect((await aliceData.read(project.id, datasetId)).warnings).toEqual([]);
@@ -206,8 +199,6 @@ it("leaves files out when the person chooses, and other devices say so", async (
     bytes: png.length,
     choice: "bundle",
   });
-  // Bob's plan lists the copy he received (both devices share one disk here,
-  // so only the dataset, linked per device, shows it).
   expect(
     (await syncPackagingPlan(bob.store, project.id)).items.find(
       (item) => item.kind === "file-dataset",
@@ -236,14 +227,12 @@ it("leaves files out when the person chooses, and other devices say so", async (
   ).toEqual({ sync: false });
   await alice.manager.run(project.id);
   await bob.manager.run(project.id);
-  // Bob keeps the value he read last, marked stale and not bundled.
   const stale = await bobData.read(project.id, datasetId);
   expect(stale.status).toBe("stale");
   expect(stale.warnings[0]).toMatchObject({
     code: "NOT_BUNDLED",
     actions: ["link-file"],
   });
-  // Without that value the dataset has no data on Bob's device.
   await rm(join(bob.home, "local", "dataset-cache"), {
     recursive: true,
     force: true,

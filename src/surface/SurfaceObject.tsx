@@ -328,7 +328,6 @@ export function SurfaceObject({
       : undefined;
   const chrome =
     visible || moving || (board?.ids.has(id) ?? actions.selected === id);
-  // A multi-selection shares one set of handles on its group outline.
   const single = !board || board.ids.size <= 1;
   const locked = !!frame?.locked;
   const drawingTool = drawingNode?.attrs?.tool;
@@ -370,9 +369,6 @@ export function SurfaceObject({
       aria-label={name}
       tabIndex={-1}
       onPointerDown={(event) => {
-        // A secondary click keeps a multi-selection for its context menu,
-        // which selects an unselected object itself. An embedded surface's UI
-        // owns its interaction without selecting the outer container object.
         if (
           event.defaultPrevented ||
           event.button !== 0 ||
@@ -509,8 +505,6 @@ export function SurfaceObject({
               <Maximize2 size={14} />
             </button>
           )}
-          {/* Delete lives in the module settings, the context menu and the Delete key;
-              the header keeps one entry per action instead of a second trash can. */}
           {!actions.readOnly && (
             <button
               type="button"

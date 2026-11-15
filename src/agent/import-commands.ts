@@ -16,10 +16,7 @@ import {
 } from "./import-service";
 import type { AgentService } from "./service";
 
-// The Agent's entries to the import harness (CLI and MCP): the same plan and
-// run as the workbench, plus saving the importers an Agent writes.
 
-/** At most this many plan items are listed back; counts cover all of them. */
 const LISTED_ITEMS = 200;
 
 export function compactPlan(plan: ImportPlan) {
@@ -70,7 +67,6 @@ export async function importCommand(
   });
 }
 
-/** importer.json and importer.js of a folder, as saving takes them. */
 export async function readImporterDirectory(directory: string) {
   const folder = resolve(directory);
   const manifest = JSON.parse(

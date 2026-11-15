@@ -9,7 +9,6 @@ import {
 } from "./command";
 import { binding } from "./inputs";
 
-/** Runtime, guides, projects and imports from other apps. */
 export const projectCommands: CommandDeclaration[] = [
   {
     command: "runtime",

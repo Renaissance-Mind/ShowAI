@@ -13,13 +13,6 @@ import {
 import { z } from "zod";
 export { TOOL_CHANGES } from "./tool-changes";
 
-/**
- * Tool shapes change between ShowAI versions while Agents still follow older
- * Skills, notes or habits. Calls in a recent earlier shape are translated to
- * the current tool and carry `migration` with the current form; other argument
- * mistakes return a structured INVALID_ARGUMENTS error that lists what the
- * tool accepts instead of the SDK's bare validation message.
- */
 
 interface Rename {
   tool: string;
@@ -28,7 +21,6 @@ interface Rename {
   add?: Record<string, unknown>;
 }
 
-/** Old tool names and the current tool that does the same. */
 const RENAMED: Record<string, Rename> = {
   dataset_list: { tool: "dataset_read", action: "list" },
   dataset_create: { tool: "dataset_write", action: "create" },
@@ -70,7 +62,6 @@ const RENAMED: Record<string, Rename> = {
 type Args = Record<string, unknown>;
 const has = (args: Args, key: string) => args[key] !== undefined;
 
-/** Current tools whose action became required: the earlier shape names it. */
 const IMPLIED_ACTION: Record<string, (args: Args) => string | undefined> = {
   dataset_read: (args) => (has(args, "datasetId") ? "read" : "list"),
   draft_read: (args) => (has(args, "draftId") ? "read" : "list"),
@@ -93,7 +84,6 @@ const IMPLIED_ACTION: Record<string, (args: Args) => string | undefined> = {
             : undefined,
 };
 
-/** Arguments that were removed and are now ignored. */
 const DROPPED: Record<string, string[]> = {
   board_read: [
     "tilePixels",
@@ -107,7 +97,6 @@ const DROPPED: Record<string, string[]> = {
   ],
 };
 
-/** Arguments that only exist where ShowAI runs on the caller's device. */
 const LOCAL_ONLY: Record<string, string[]> = {
   page_read: ["out", "overwrite"],
   page_diff: ["out", "overwrite"],
@@ -118,13 +107,11 @@ const LOCAL_ONLY: Record<string, string[]> = {
   catalog_describe: ["out", "overwrite"],
 };
 
-/** Per-action fields of action tools, keyed by their advertised action enum. */
 export const actionRegistry = new WeakMap<
   z.ZodType,
   Record<string, z.ZodRawShape>
 >();
 
-/** The actions and their fields when a tool's shape belongs to an action tool. */
 export function actionFields(
   shape: Record<string, unknown> | undefined,
 ): Record<string, z.ZodRawShape> | undefined {
@@ -151,7 +138,6 @@ function fieldList(shape: Record<string, unknown>) {
   };
 }
 
-/** The argument shape with long or nested values elided, for receipts. */
 function outline(args: Args): Args {
   return Object.fromEntries(
     Object.entries(args).map(([key, value]) => [
@@ -168,7 +154,6 @@ function outline(args: Args): Args {
   );
 }
 
-/** Translates a call in an earlier tool shape; undefined when it is current. */
 export function migrateCall(
   name: string,
   args: Args,
@@ -234,7 +219,6 @@ export interface ArgumentProblem {
   nextStep: string;
 }
 
-/** Structured validation of a call against the tool's live schema. */
 export async function checkArguments(
   name: string,
   tool: RegisteredTool,
@@ -374,7 +358,6 @@ function withMigration(
             text: JSON.stringify({ ...value, migration: note }),
           };
       } catch {
-        // Plain-text results keep their text; structuredContent carries the note.
       }
       return item;
     }),
@@ -397,7 +380,6 @@ function distance(a: string, b: string) {
   return previous[b.length];
 }
 
-/** Nearest current tool names for an unknown one. */
 function suggestions(name: string, tools: Map<string, RegisteredTool>) {
   const words = new Set(name.split("_"));
   return [...tools.keys()]
@@ -422,7 +404,6 @@ type Handler = (request: unknown, extra: unknown) => unknown;
 
 const servers = new WeakMap<McpServer, Map<string, RegisteredTool>>();
 
-/** The current tools of a server, as the compatibility layer sees them. */
 export function registeredTools(
   server: McpServer,
 ): ReadonlyMap<string, RegisteredTool> {
@@ -432,18 +413,12 @@ export function registeredTools(
   return tools;
 }
 
-/** Old tool names that calls are still translated from. */
 export const RENAMED_TOOLS: Readonly<Record<string, string>> = Object.freeze(
   Object.fromEntries(
     Object.entries(RENAMED).map(([name, target]) => [name, target.tool]),
   ),
 );
 
-/**
- * Wraps the tools/call handler the McpServer installs. Uses only the public
- * setRequestHandler entry point, intercepting the registration before the
- * first tool is registered.
- */
 export function installToolCompatibility(
   server: McpServer,
   tools: Map<string, RegisteredTool>,

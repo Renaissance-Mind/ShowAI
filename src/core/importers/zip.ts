@@ -1,9 +1,6 @@
 import { open, type FileHandle } from "node:fs/promises";
 import { inflateSync } from "fflate";
 
-// A zip reader that seeks: it reads the central directory once and then each
-// entry on demand, so a large export is never held in memory as a whole.
-// Stored (0) and deflated (8) entries are supported, including Zip64.
 
 export interface ZipEntry {
   path: string;
@@ -14,7 +11,6 @@ export interface ZipEntry {
   directory: boolean;
 }
 
-/** Bytes at a position of a file on disk or of a buffer in memory. */
 export interface RandomAccess {
   size: number;
   read(position: number, length: number): Promise<Uint8Array>;
@@ -55,8 +51,6 @@ const u64 = (data: DataView, at: number) => Number(data.getBigUint64(at, true));
 
 function decodeName(bytes: Uint8Array, utf8: boolean): string {
   if (utf8) return new TextDecoder("utf-8").decode(bytes);
-  // Without the UTF-8 flag most archivers still write UTF-8; fall back to
-  // Latin-1 only when the bytes are not valid UTF-8.
   try {
     return new TextDecoder("utf-8", { fatal: true }).decode(bytes);
   } catch {
@@ -64,7 +58,6 @@ function decodeName(bytes: Uint8Array, utf8: boolean): string {
   }
 }
 
-/** The entries of a zip archive, from its central directory. */
 export async function zipEntries(access: RandomAccess): Promise<ZipEntry[]> {
   const tail = Math.min(access.size, 65557);
   const end = await access.read(access.size - tail, tail);
@@ -119,7 +112,6 @@ export async function zipEntries(access: RandomAccess): Promise<ZipEntry[]> {
       bytes.subarray(at + 46, at + 46 + nameLength),
       (flags & 0x800) !== 0,
     );
-    // Zip64 extra field: the 0xffffffff values follow in this order.
     let extra = at + 46 + nameLength;
     const extraEnd = extra + extraLength;
     while (extra + 4 <= extraEnd) {
@@ -155,7 +147,6 @@ export async function zipEntries(access: RandomAccess): Promise<ZipEntry[]> {
   return entries;
 }
 
-/** The uncompressed bytes of one entry. */
 export async function readZipEntry(
   access: RandomAccess,
   entry: ZipEntry,

@@ -1,6 +1,3 @@
-// Named views of the database built-in. Data without `views` shows one view
-// built from the older `view` and `groupBy` fields; the first saved change
-// writes that view into `views`.
 import {
   DATABASE_VIEWS,
   MAX_COLUMN_WIDTH,
@@ -15,12 +12,10 @@ import {
 import { valueTypeOf } from "../../datasets/value-types.mjs";
 
 export const DEFAULT_VIEW_ID = "default";
-/** Default table widths: the first property names the record. */
 export const FIRST_COLUMN_WIDTH = 280;
 export const COLUMN_WIDTH = 165;
 export const ROW_ACTION_WIDTH = 33;
 
-/** Settings a reader may change for a view without editing the page. */
 export type ViewOverride = Partial<
   Pick<DatabaseView, "type" | "groupBy" | "sort" | "sorts" | "filter">
 >;
@@ -28,7 +23,6 @@ export type ViewOverride = Partial<
 const isViewType = (value: unknown): value is DatabaseViewType =>
   DATABASE_VIEWS.includes(value as string);
 
-/** The saved views, or the single view older data describes. */
 export function databaseViews(
   data: Record<string, unknown>,
   name: (type: DatabaseViewType) => string,
@@ -51,7 +45,6 @@ export function databaseViews(
   };
 }
 
-/** Data with these views; the older single-view fields are folded into them. */
 export function withViews(
   data: Record<string, unknown>,
   views: DatabaseView[],
@@ -60,10 +53,6 @@ export function withViews(
   return { ...rest, views };
 }
 
-/**
- * A view with changed settings. A view still named after its type follows a
- * type change, so a renamed view keeps its name.
- */
 export function changeView(
   view: DatabaseView,
   changes: Partial<DatabaseView>,
@@ -76,7 +65,6 @@ export function changeView(
     view.name === name(view.type)
   )
     next.name = name(changes.type);
-  // A saved sort list replaces the single sort older views kept.
   if ("sorts" in changes) delete next.sort;
   for (const key of ["groupBy", "sort", "sorts", "filter"] as const)
     if (
@@ -92,11 +80,6 @@ export function changeView(
   return next;
 }
 
-/**
- * The changes that rewrite a view's older single filter and sort in the
- * current shape: a filter group and a sort list. Columns decide how a legacy
- * filter value reads (e.g. "true" on a checkbox column means checked).
- */
 export function upgradeViewQuery(
   view: DatabaseView,
   columns: DatabaseColumn[],
@@ -109,14 +92,12 @@ export function upgradeViewQuery(
   };
 }
 
-/** A view id that is not used yet. */
 export function newViewId(views: DatabaseView[]): string {
   const used = new Set(views.map((view) => view.id));
   for (let index = views.length + 1; ; index += 1)
     if (!used.has(`view-${index}`)) return `view-${index}`;
 }
 
-/** The saved width of a table column in this view, or its default. */
 export function columnWidth(
   view: DatabaseView,
   id: string,
@@ -132,7 +113,6 @@ export function columnWidth(
       : COLUMN_WIDTH;
 }
 
-/** Columns with one moved before or after another. */
 export function moveColumnTo<T extends { id: string }>(
   columns: T[],
   id: string,
@@ -148,7 +128,6 @@ export function moveColumnTo<T extends { id: string }>(
   return next;
 }
 
-/** Views whose settings refer only to existing columns of a fitting type. */
 export function pruneViews(
   views: DatabaseView[],
   columns: DatabaseColumn[],
@@ -206,17 +185,10 @@ export function pruneViews(
 
 export interface TitlePair {
   key: string;
-  /** The record's name. */
   stored: string;
-  /** The linked page's title. */
   live: string;
 }
 
-/**
- * Compare each record name with its page title against the value they last
- * shared: a changed name renames the page, a changed title updates the record.
- * When nothing is known yet, the page title wins.
- */
 export function titleSyncActions(
   pairs: TitlePair[],
   synced: Map<string, string>,

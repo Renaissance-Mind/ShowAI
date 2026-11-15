@@ -22,7 +22,6 @@ const archives = new Map();
 let defaultCacheDirectory;
 async function temporaryReaderCache() {
   const directory = await mkdtemp(join(tmpdir(), "showai-readers-"));
-  // Exit handlers must be synchronous, including when a test throws uncaught.
   process.once("exit", () =>
     rmSync(directory, { recursive: true, force: true }),
   );
@@ -121,7 +120,6 @@ async function writeReaderCache(directory, path, key, html) {
   }
 }
 
-/** Component kinds a page shows, including those nested in rich text. */
 export function readerKinds(documents) {
   const kinds = new Set();
   for (const document of documents)
@@ -133,20 +131,8 @@ export function readerKinds(documents) {
   return [...kinds].filter((k) => typeof k === "string").sort();
 }
 const MATH_TEXT = /\$|\\\(|\\\[/;
-// Markdown gives code a language only through fences.
 const CODE_TEXT = /```|~~~/;
-// [text]{note} in any text field or \note{part}{note} in a formula.
 const NOTE_TEXT = /\]\{|\\note(?![A-Za-z])/;
-/**
- * Optional reader capabilities a page does not need. KaTeX (code and fonts) is
- * a third of a page reader, so it stays out unless the page has formulas or
- * Markdown-like text that may still become one. Syntax grammars likewise stay
- * out unless the page has code blocks or Markdown code fences, the hover
- * note controller unless some text or formula carries a note, and the compiled
- * ink kernel unless the page holds strokes or drawings.
- */
-// Contracts of built-ins that only some pages use; the reader carries the real
-// module only when the page holds one of these kinds.
 const CONTRACT_STUBS = {
   "src/components/blocks/svg-contract.mjs": {
     kinds: ["svg", "mechanism-diagram"],
@@ -173,7 +159,6 @@ const CONTRACT_STUBS = {
     ].join("\n"),
   },
 };
-// SVG figures mark note anchors with a data-note attribute instead of note text.
 const SVG_NOTE = /\sdata-note\s*=/;
 export function readerOmissions(documents) {
   let math = false;
@@ -231,12 +216,6 @@ const removeRanges = (source, ranges) => {
     source = source.slice(0, start) + source.slice(end);
   return source;
 };
-/**
- * Removed registrations plus every top-level import or binding that only they
- * named. A block module imported solely for a removed kind then never enters
- * the bundle, so neither does its stylesheet: esbuild drops unused JavaScript
- * but keeps the CSS of every module it reaches.
- */
 const unusedRegistryRanges = (source, removed, declarations) => {
   const ranges = [...removed];
   const named = (name, skip) => {
@@ -274,7 +253,6 @@ const compilerIdentity = createHash("sha256")
   )
   .digest("hex");
 
-/** Build the exact dependency closure from the software's immutable source archive. */
 export async function bundleReader(archivePath, documents) {
   const archiveText = await readFile(archivePath, "utf8");
   const archiveKey = createHash("sha256").update(archiveText).digest("hex");
@@ -327,7 +305,6 @@ async function compileReader(archivePath, archive, kinds, omits = []) {
     JSON.parse(archive.files[`resources/catalog/${name}.json`]).map(
       (item) => item.kind,
     );
-  // Registry loops over a catalog stay only when the page uses one of its kinds.
   const groupKinds = {
     g2Metadata: catalogKinds("g2"),
     primitiveMetadata: catalogKinds("primitives"),
@@ -382,7 +359,6 @@ async function compileReader(archivePath, archive, kinds, omits = []) {
     name: "showai-page-reader",
     setup(builder) {
       if (omitMath) {
-        // Never reached without formulas; the stub keeps text visible if it is.
         builder.onResolve({ filter: /^katex(?:\/.*)?$/ }, () => ({
           path: "katex",
           namespace: "reader-omitted",
@@ -430,9 +406,6 @@ async function compileReader(archivePath, archive, kinds, omits = []) {
         () => ({ contents: vendorCore, loader: "js" }),
       );
       builder.onLoad({ filter: /.*/, namespace: "reader" }, (args) => {
-        // Readers never show editing actions or technical details, so the
-        // workbench status card (actions, details, error catalogue) is
-        // replaced by one calm line naming the component.
         if (args.path === "src/components/blocks/ComponentStatus.tsx")
           return {
             contents: [
@@ -448,8 +421,6 @@ async function compileReader(archivePath, archive, kinds, omits = []) {
             loader: "js",
             resolveDir: join(dirname(archivePath), ".."),
           };
-        // Only sandboxed custom blocks report frame errors; without one on the
-        // page the reporter would only add weight.
         if (
           !selected.has("custom") &&
           args.path === "src/components/custom/frame-errors.ts"
@@ -463,7 +434,6 @@ async function compileReader(archivePath, archive, kinds, omits = []) {
             ].join("\n"),
             loader: "js",
           };
-        // Readers show no technical details, so validation text stays as is.
         if (args.path === "src/components/custom/validation-messages.ts")
           return {
             contents: [
@@ -476,7 +446,6 @@ async function compileReader(archivePath, archive, kinds, omits = []) {
           };
         if (omitMath && args.path === "src/components/blocks/katex.css")
           return { contents: "", loader: "css" };
-        // Never reached without code blocks; the stub keeps code as plain text if it is.
         if (
           omitCode &&
           args.path === "src/components/rich-text/code-highlighting.ts"
@@ -486,7 +455,6 @@ async function compileReader(archivePath, archive, kinds, omits = []) {
               'export const highlightCode = (code) => ({ type: "root", children: [{ type: "text", value: code }] });',
             loader: "js",
           };
-        // Never reached without notes; anchors simply show no bubble if they are.
         if (omitNotes && args.path === "src/components/blocks/note-bubble.ts")
           return {
             contents:
@@ -501,7 +469,6 @@ async function compileReader(archivePath, archive, kinds, omits = []) {
               'export const noteProps = () => ({}); export const installNotes = () => {}; export const NoteText = ({ text }) => String(text ?? ""); export const NoteSvgText = NoteText;',
             loader: "js",
           };
-        // Without "]{" or \note anywhere on the page, parsing finds nothing.
         if (omitNotes && args.path === "src/document/note-markup.mjs")
           return {
             contents: [
@@ -520,8 +487,6 @@ async function compileReader(archivePath, archive, kinds, omits = []) {
             ].join("\n"),
             loader: "js",
           };
-        // Ink geometry is computed only for strokes and drawings; without any,
-        // the compiled kernel and its WebAssembly would only add weight.
         if (omitInk && args.path === "src/surface/ink-kernel/compiled-ink.mjs")
           return {
             contents: [
@@ -532,35 +497,28 @@ async function compileReader(archivePath, archive, kinds, omits = []) {
             ].join("\n"),
             loader: "js",
           };
-        // Readers never draw: inline ink runs only with an edit handler, so the
-        // hook and the native board bridge behind it would only add weight.
         if (args.path === "src/surface/useInlineInk.ts")
           return {
             contents: "export function useInlineInk() {}",
             loader: "ts",
           };
-        // Frame tidying is an edit command; its graph layout would only add weight.
         if (args.path === "src/document/diagram.mjs")
           return {
             contents:
               'export function tidyFrames() { throw new Error("Readers never edit."); }',
             loader: "js",
           };
-        // Readers never paste: reading an image file is an edit path.
         if (args.path === "src/components/rich-text/image-files.ts")
           return {
             contents:
               'export async function readImageFile() { return { problem: "" }; }',
             loader: "ts",
           };
-        // Outline settings open only for editable pages.
         if (args.path === "src/surface/OutlineSettings.tsx")
           return {
             contents: "export function OutlineSettings() { return null; }",
             loader: "tsx",
           };
-        // Readers never insert components: the slash menu and the catalog
-        // behind it (with its strings) would only add weight.
         if (args.path === "src/components/ComponentSlashMenu.tsx")
           return {
             contents: "export function ComponentSlashMenu() { return null; }",
@@ -578,36 +536,27 @@ async function compileReader(archivePath, archive, kinds, omits = []) {
             loader: "ts",
             resolveDir: join(dirname(archivePath), ".."),
           };
-        // Parameter documentation serves Agents and the catalog, never the reader.
         if (
           args.path === "resources/catalog/component-documentation.json" ||
           args.path === "resources/catalog/diagram-documentation.json"
         )
           return { contents: "{}", loader: "json" };
-        // The icon picker opens only in editable pages.
         if (args.path === "src/components/PageIconDialog.tsx")
           return {
             contents:
               "export default function PageIconDialog() { return null; }",
             loader: "tsx",
           };
-        // Readers never edit: rich text renders through its static view, so
-        // the lazily loaded ProseMirror editor would only add weight.
         if (args.path === "src/components/rich-text/RichTextEditor.tsx")
           return {
             contents:
               "export default function RichTextEditor() { return null; }",
             loader: "tsx",
           };
-        // A page without these kinds never runs their validators.
         const contract = CONTRACT_STUBS[args.path];
         if (contract && !contract.kinds.some((kind) => selected.has(kind)))
           return { contents: contract.source, loader: "js" };
         let source = archive.files[args.path];
-        // validateWidgetData calls these only for their own kinds; without one
-        // on the page, the validator and its module never run. Like the
-        // contract stubs, a kind this reader does not carry is accepted and
-        // then shown as unavailable.
         if (args.path === "src/portable/validation.mjs")
           for (const validator of [...archive.validators].sort(
             (a, b) => b.start - a.start,

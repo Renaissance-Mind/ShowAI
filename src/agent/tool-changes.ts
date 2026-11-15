@@ -1,7 +1,3 @@
-/**
- * Recorded MCP tool-shape changes. guide migrations shows them, and
- * mcp-compat translates calls in the earlier shapes.
- */
 export const TOOL_CHANGES: {
   date: string;
   version: string;

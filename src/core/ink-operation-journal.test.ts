@@ -117,7 +117,6 @@ it("reports committed source corruption explicitly instead of skipping a stroke"
   const journal = await open(await temporary()); journal.append([seed()]);
   const db = new DatabaseSync(journal.path);
   db.prepare("UPDATE ink_operations SET payload=? WHERE operation_id=?").run("{}", "seed:1"); db.close();
-  // The independent current-register index still preserves editable geometry.
   expect(journal.read(scope).materialization!.strokes[0].node.attrs!.ink).toEqual(node.attrs.ink);
   expect(() => journal.operations(scope)).toThrow("checksum mismatch");
 });

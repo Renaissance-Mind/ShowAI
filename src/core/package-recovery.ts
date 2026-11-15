@@ -110,7 +110,6 @@ const lines = (value: unknown, fallback: string[]) =>
     ? value
     : fallback
   ).join("\n");
-/** Discovers added source files as well as edits/deletions of immutable packages. */
 async function inspectWorkspaceResources(
   library: GitLibrary,
   projectId?: string,
@@ -175,11 +174,6 @@ async function workspaceResourcePaths(
 }
 const queuedScans = new Map<string, Promise<WorkspaceConflict[]>>(),
   runningScans = new Map<string, Promise<unknown>>();
-/**
- * Window focus and every library change ask for a scan. One runs at a time per
- * scope; requests arriving meanwhile share the next scan, which starts after
- * them and therefore sees their changes.
- */
 export function scanWorkspaceResources(
   library: GitLibrary,
   projectId?: string,
@@ -189,8 +183,6 @@ export function scanWorkspaceResources(
   if (queued) return queued;
   const start = () => {
     queuedScans.delete(key);
-    // Directory discovery and other batches must not monopolize the writer lease.
-    // Recovery transactions still retain their existing outer lease atomically.
     return inspectWorkspaceResources(library, projectId);
   };
   const scan = (runningScans.get(key) ?? Promise.resolve()).then(start, start);
@@ -438,8 +430,6 @@ export async function recoverExternalPackage(
         );
       }
     }
-    // The full external input is durable. Return each immutable version projection
-    // to committed bytes without assigning those bytes a new package identity.
     for (const conflict of pending) {
       const target = join(library.workspace, conflict.path),
         current = originals.get(conflict.path);

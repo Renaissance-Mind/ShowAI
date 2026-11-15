@@ -1,6 +1,5 @@
 import { defineMessages } from "../index";
 
-// Card grid built-in.
 export default defineMessages("cardGrid", {
   "zh-CN": {
     title: "卡片导航",

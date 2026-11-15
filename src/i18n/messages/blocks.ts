@@ -1,6 +1,5 @@
 import { defineMessages } from "../index";
 
-// Chrome shared by every block (header actions, settings toggle).
 export default defineMessages("blocks", {
   "zh-CN": {
     blockActions: "组件操作",

@@ -112,7 +112,6 @@ export interface SurfaceHandle {
   scale: () => number;
   reveal: (id: string) => void;
   point: (x: number, y: number) => { x: number; y: number };
-  /** Start editing an object's text at its end, e.g. right after creating it. */
   edit: (id: string) => void;
   configureNativeInput:(tool:BoardTool|null,style:DrawingStyle)=>boolean;
 }
@@ -155,9 +154,7 @@ interface Props {
   drawStrokeWidth?: number;
   drawPressure?: boolean;
   onStyleChange?: (ids: string[], patch: Partial<DrawingStyle>) => void;
-  /** Commit a shape or arrow label; minHeight grows a shape to fit its text. */
   onLabel?: (id: string, label: string, minHeight?: number) => void;
-  /** Arrange connected objects along their arrows. */
   onTidy?: (ids: string[], direction: "right" | "down") => void;
   onAddComponent?: (
     kind: string,
@@ -191,15 +188,11 @@ interface Props {
 
 const controlSelector =
   'input,textarea,select,button,a,summary,[role="slider"],iframe,[data-surface-gesture="own"],.react-flow';
-/** Free-region children are laid out inside its padding and border. */
 const regionContentFallback = { x: 45, y: 27 };
-/** Rich text sits inside the object's content padding. */
 const textInset = { x: 28, y: 30 };
-/** The most recent Board copy, for menu paste where the system clipboard is unreadable. */
 let lastClip: BoardClip | null = null;
 const clipType = "application/x-showai-board+json";
 
-/** Place the caret under the pointer in the object's text, or at its end. */
 function enterEditing(element: HTMLElement, x?: number, y?: number) {
   const under =
     x === undefined
@@ -308,8 +301,6 @@ export default function PageSurface({
     `showai.viewport-lock.v1:board:${pageId.replace(/:(expanded|embedded)$/, "")}`,
   );
   const locked = embedded && lock.locked;
-  // drawTool carries every Board mode; these name the two families the
-  // surface treats differently.
   const drawingTool: BoardDrawingTool | null =
     drawTool && !["pan", "eraser", "lasso", "text"].includes(drawTool)
       ? (drawTool as BoardDrawingTool)
@@ -322,7 +313,6 @@ export default function PageSurface({
   const { rootRef, scrollRef, worldRef, camera, controls, scale } =
     useSurfaceViewport(
       layoutKey,
-      // App pages keep the camera even when read-only; exports do not.
       onMove || readerScope ? `showai.viewport.v3:${pageId}` : undefined,
       enabled && !locked,
       { reading: !onMove, anchorScreen: !embedded, panMode },
@@ -423,7 +413,6 @@ export default function PageSurface({
     layoutOf(selectedIds[0])?.mode === "free"
       ? selectedIds[0]
       : null;
-  /** The padding offset of a free region's children, measured when it is on screen. */
   const regionOffset = (id?: string) => {
     const element = id
       ? worldRef.current?.querySelector<HTMLElement>(
@@ -453,7 +442,6 @@ export default function PageSurface({
     }
     return clip;
   };
-  /** Last pointer position over the Board, in client coordinates. */
   const pastePoint = useRef<{ x: number; y: number } | null>(null);
   const paste = (
     value: Parameters<NonNullable<typeof onPasteObjects>>[0],
@@ -466,7 +454,6 @@ export default function PageSurface({
       focusRoot();
     }
   };
-  /** Keyboard and menu Paste: a Board copy, images as on pages, or text. */
   const pasteContent = async (
     text: string,
     files: File[],
@@ -477,7 +464,6 @@ export default function PageSurface({
     try {
       clip = JSON.parse(text);
     } catch {
-      /* Ordinary text becomes a text object. */
     }
     if (isBoardClip(clip)) return paste({ clip }, point);
     if (!files.length) return text.trim() && paste({ text }, point);
@@ -520,8 +506,6 @@ export default function PageSurface({
     if (
       !onTransform ||
       locked ||
-      // An embedded Board is an interactive, contenteditable=false NodeView
-      // inside the outer Page editor. That boundary stops text ownership.
       target.closest("[contenteditable]")?.getAttribute("contenteditable") === "true" ||
       target.closest(
         'input,textarea,select,iframe,video,audio,[data-editor-keyboard-scope],[data-surface-gesture="own"],.react-flow',
@@ -554,9 +538,7 @@ export default function PageSurface({
     additive: boolean;
     preserveSelection: boolean;
     touch: boolean;
-    /** A click on the selected text object starts editing at the pointer. */
     enterEdit: HTMLElement | null;
-    /** A click inside a multi-selection narrows it to the object under the pointer. */
     groupClick: boolean;
     input: BoardGesturePoint;
   } | null>(null);
@@ -564,8 +546,6 @@ export default function PageSurface({
   const hoverWindow = useRef({ id: "", since: 0, until: 0 });
   const hoverFrame = useRef(0);
   const bindTarget = useRef<HTMLElement | null>(null);
-  // The board interaction object is rebuilt each render; handlers and the
-  // objects' board view below call the latest one.
   const currentBoard = useRef(board);
   currentBoard.current = board;
   const highlightTarget = useCallback(
@@ -598,7 +578,6 @@ export default function PageSurface({
     cancelAnimationFrame(autoPan.current.frame);
     autoPan.current = { frame: 0, x: 0, y: 0 };
   };
-  /** Dragging near the viewport edge scrolls the Board toward the pointer. */
   const trackEdges = (x: number, y: number) => {
     const root = rootRef.current;
     if (!root) return;
@@ -672,8 +651,6 @@ export default function PageSurface({
       height: `${drag.next.height}px`,
     });
   };
-  // Camera moves during a gesture (wheel or edge auto-pan) keep the dragged
-  // object or the marquee corner under the pointer.
   useEffect(() => {
     const root = rootRef.current!;
     const changed = (event: Event) => {
@@ -715,7 +692,6 @@ export default function PageSurface({
       try {
         localStorage.setItem("showai.board-minimap", String(!value));
       } catch {
-        /* A personal preference; the minimap still toggles for this view. */
       }
       return !value;
     });
@@ -880,7 +856,6 @@ export default function PageSurface({
     configureNativeInput:(tool,style)=>{const control=nativeControl.current;if(!control)return false;control.update({tool:tool??"select",color:style.color,fillColor:style.fillColor??"none",width:style.strokeWidth,pressure:style.pressure!==false,ruler:rulerValue.current});return true},
   }));
   const addText = (point: { x: number; y: number }) => {
-    // Offset by the text box padding so typing starts where the user clicked.
     const id = onAddComponent?.("text", {
       x: point.x - textInset.x,
       y: point.y - textInset.y,
@@ -934,7 +909,6 @@ export default function PageSurface({
     (selectedIds.length === 1
       ? focusAfterMount(selectedIds, true)
       : focusAfterMount(selectedIds));
-  // Arranging along arrows needs an arrow between two selected objects.
   const tidyAvailable =
     !!onTidy &&
     !!boardDocument &&
@@ -972,7 +946,6 @@ export default function PageSurface({
       "⌥⇧V",
     ],
   ];
-  // Ask AI and Copy reference name the same Board and objects.
   const boardTarget = (
     ids: string[],
     anchor: { left: number; top: number; bottom: number },
@@ -1134,7 +1107,6 @@ export default function PageSurface({
     ];
     return items;
   };
-  /** A shape or arrow on this Board whose label can be edited now. */
   const labelTarget = (id: string) => {
     if (!editable || !onLabel || !boardDocument) return false;
     const entry = findSurfaceNode(boardDocument, id);
@@ -1163,8 +1135,6 @@ export default function PageSurface({
     setLabelEditing(hit.id);
     return true;
   };
-  // Objects receive a board view that changes only with the selection they
-  // display, so a commit does not re-render every object.
   const boardSelection = [...board.ids].join(":");
   const boardView = useMemo(
     () =>
@@ -1185,7 +1155,6 @@ export default function PageSurface({
     () => ({
       componentActionsHost,
       nativeScene,
-      // Read live so zoom frames do not re-render every object.
       get scale() {
         return camera.current.scale;
       },
@@ -1254,7 +1223,6 @@ export default function PageSurface({
           const target = event.target as Element;
           const hit = board.selectionTarget(event.clientX, event.clientY);
           if (navigation.current) navigation.current.open = false;
-          // Any object under the pointer gets the object menu, not only its frame.
           if (
             openObjectMenu(
               hit && !target.closest(controlSelector) ? hit.element : target,
@@ -1287,7 +1255,6 @@ export default function PageSurface({
         onDoubleClick={(event) => {
           const target = event.target as Element;
           if (startLabelEditing(target, event)) return;
-          // Double-clicking empty Board space writes text there.
           if (
             !editable ||
             !onAddComponent ||
@@ -1311,7 +1278,6 @@ export default function PageSurface({
             )
           )
             return;
-          // Secondary contacts belong to the viewport's two-finger gesture.
           if (event.pointerType === "touch" && !event.isPrimary) return;
           const hit =
             !drawTool || event.pointerType === "touch"
@@ -1319,8 +1285,6 @@ export default function PageSurface({
               : board.hitTest(event.clientX, event.clientY);
           const selectionId = board.selectionHit(event.clientX, event.clientY);
           const selectionTouch = event.pointerType === "touch" && !!selectionId;
-          // Touch navigation handles the pointer before the bubbling handler.
-          // Clear an empty hit here as well, while preserving toolbar actions.
           if (
             !hit &&
             !selectionId &&
@@ -1359,7 +1323,6 @@ export default function PageSurface({
             drawTool &&
             !target.closest("[data-resize-direction],.surface-object-rotate")
           ) {
-            // A lasso may cross a shape; a direct Pencil tap does not select it.
             if (!drawingTool && drawTool !== "eraser" && drawTool !== "lasso") {
               event.preventDefault();
               event.stopPropagation();
@@ -1417,8 +1380,6 @@ export default function PageSurface({
                   );
                 })
               : undefined);
-          // While drawing, pausing on an object's edge grabs it. Freehand and
-          // arrow tools never grab: strokes and connections start on edges.
           const edge =
             drawTool && drawTool !== "arrow"
               ? board.edgeHit(event.clientX, event.clientY)
@@ -1442,7 +1403,6 @@ export default function PageSurface({
           if (
             !onTransform ||
             locked ||
-            // Drawing tools never grab the selection; the lasso moves its own.
             (drawTool &&
               !fingerShape &&
               !selectionTouch &&
@@ -1485,10 +1445,6 @@ export default function PageSurface({
             const textual =
               hit.node.type !== "region" &&
               !!element.querySelector('[contenteditable="true"]');
-            // Editing text keeps native caret and selection gestures. A
-            // selected component receives clicks on its own content; a
-            // selected text object or region moves on drag, and text starts
-            // editing on click.
             if (
               editing ||
               (solo &&
@@ -1516,7 +1472,6 @@ export default function PageSurface({
                 ? "rotate"
                 : "move";
             let wasSelected = board.ids.has(moveId);
-            // Alt-drag leaves the original in place and moves a copy.
             if (event.altKey && gesture === "move" && onDuplicate) {
               const ids = wasSelected ? [...board.ids] : [moveId];
               let copies: string[] | void = undefined;
@@ -1535,7 +1490,6 @@ export default function PageSurface({
               !handle && !event.shiftKey && board.ids.size > 1 && wasSelected;
             if (event.shiftKey && !wasSelected) board.select(moveId, true);
             if (!board.start(moveId, gesture, event)) {
-              // Locked objects are selected but stay in place.
               if (!event.shiftKey) board.select(moveId);
               event.currentTarget.focus({ preventScroll: true });
               return;
@@ -1620,7 +1574,6 @@ export default function PageSurface({
             (event.target as Element).closest(".page-surface") ===
               event.currentTarget
           ) {
-            // Hover feedback runs once per frame, not once per pointer sample.
             const x = event.clientX,
               y = event.clientY;
             cancelAnimationFrame(hoverFrame.current);
@@ -1650,7 +1603,6 @@ export default function PageSurface({
                 hovered.current = element;
                 element?.classList.add("is-hovered");
               }
-              // The move cursor appears only once a grab is actually armed.
               rootRef.current?.classList.toggle(
                 "has-drawing-hit",
                 !!element &&
@@ -1675,7 +1627,6 @@ export default function PageSurface({
           trackEdges(event.clientX, event.clientY);
         }}
         onDragStartCapture={(event) => {
-          // Native image/text drag cancels pointer capture during fast moves.
           if (pointing.current || marquee.current) event.preventDefault();
         }}
         onPointerUpCapture={(event) => {
@@ -1837,7 +1788,6 @@ export default function PageSurface({
               return;
             }
           }
-          // View shortcuts work in every Board, including read-only ones.
           const command = event.metaKey || event.ctrlKey;
           if (event.shiftKey && !command && !event.altKey && !locked) {
             const view = { Digit0: 0, Digit1: 1, Digit2: 2 }[event.code];
@@ -1992,7 +1942,6 @@ export default function PageSurface({
             return;
           const text = target.closest("[contenteditable]");
           if (text?.getAttribute("contenteditable") === "true") {
-            // Escape leaves text editing and keeps that object selected.
             const object = text.closest<HTMLElement>(".surface-object");
             if (
               !object ||
@@ -2066,7 +2015,6 @@ export default function PageSurface({
                                   text = await (await item.getType(type)).text();
                             return pasteContent(text, files, point);
                           },
-                          // Without clipboard access, the last Board copy still pastes.
                           () => lastClip && paste({ clip: lastClip }, point),
                         );
                       },
@@ -2149,7 +2097,6 @@ export default function PageSurface({
               point={(x, y) => controls.current.point(x, y)}
               onTarget={(x, y) => highlightTarget(x, y)}
               onDraw={(node, frame) => {
-                // A region drawn around objects takes them in, like a frame.
                 let adopt;
                 if (node.type === "region" && containerId && boardDocument) {
                   const index = findSurfaceNode(
@@ -2648,7 +2595,6 @@ export default function PageSurface({
   );
 }
 
-/** Only the zoom controls re-render while zooming. */
 function ZoomControls({
   scale: store,
   controls,
@@ -2695,7 +2641,6 @@ function ZoomControls({
   );
 }
 
-/** Clipboard events inside text or form fields stay with that field. */
 function ownsText(target: EventTarget) {
   return (
     target instanceof Element &&

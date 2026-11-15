@@ -56,18 +56,10 @@ const scopeKey=(scope:SourceScope)=>JSON.stringify([scope.homeId,scope.projectId
 function scope(value:SourceScope){if(!value||[value.homeId,value.projectId,value.pageId].some(part=>typeof part!=="string"||!part))fail("Source scope requires its actual home, project and page");return value}
 export const sameSourceRef=(one:SourceSnapshotRef|null|undefined,two:SourceSnapshotRef|null|undefined)=>!!one&&!!two&&one.ownerId===two.ownerId&&one.epoch===two.epoch&&one.snapshotId===two.snapshotId&&one.kind===two.kind&&scopeKey(one.scope)===scopeKey(two.scope);
 const canonicalCapacityBodies=new WeakSet<ShowDocument>();
-// Only this owner's independent JSON captures/registered bodies may enter the
-// COW consuming normalizer. The exported generic freeze helper is not a grant
-// of input authority to an arbitrary object caller (including accessor graphs).
 const normalizationReadableBodies=new WeakSet<ShowDocument>();
-/** Same actual recursive ownership factory is used by private validation. */
 export function freezeOwnedSource<T>(value:T):T{return freezeOwnedJSON(value)}
 export const isOwnedSource=(value:unknown):boolean=>isOwnedJSON(value);
-/** Independent boundary for an arbitrary external value. Exact JSON cloning
- * rejects undefined, holes, cycles and non-finite numbers instead of dropping. */
 export function cloneSourceValue<T>(value:T):T{return applyNativeSourceDelta(null,[{op:"set",path:[],value}]) as T}
-/** Read-only COW capture: existing owned branches may be reused; all outside
- * objects become independent before they can enter current/history/save. */
 export function ownSourceValue<T>(value:T):T{
  const ancestors=new Set<object>();
  const capture=(value:unknown):unknown=>{
@@ -88,9 +80,6 @@ const equalOwned=(one:unknown,two:unknown):boolean=>{
  if(Array.isArray(one)&&Array.isArray(two))return one.length===two.length&&one.every((value,index)=>equalOwned(value,two[index]));
  const keys=Object.keys(one);return keys.length===Object.keys(two).length&&keys.every(key=>Object.hasOwn(two,key)&&equalOwned((one as Record<string,unknown>)[key],(two as Record<string,unknown>)[key]));
 };
-// Only actual private JSON captures and this module's registered factory
-// bodies can use identity below. Public shallow/generic freeze is not enough;
-// mutable external callers keep their complete literal comparison boundary.
 const readableJSON=(value:unknown):boolean=>!!value&&typeof value==="object"&&isOwnedSource(value)&&
  (normalizationReadableBodies.has(value as ShowDocument)||!!capturedContentSummary(value));
 function privateJSONEqual(one:unknown,two:unknown):boolean{
@@ -101,8 +90,6 @@ function privateDocumentBodiesEqual(one:ShowDocument,two:ShowDocument):boolean{
  const keys=Object.keys(one).filter(key=>key!=="updatedAt"),other=Object.keys(two).filter(key=>key!=="updatedAt");
  return keys.length===other.length&&keys.every(key=>Object.hasOwn(two,key)&&equalOwned((one as unknown as Record<string,unknown>)[key],(two as unknown as Record<string,unknown>)[key]));
 }
-/** Unlike generic mutable-source diff, both inputs are actual owned snapshots.
- * Identity shortcuts are restricted to this module's recursively frozen data. */
 export function diffOwnedSource(before:unknown,next:unknown):NativeSourceEdit[]{
  if(!isOwnedSource(before)||!isOwnedSource(next))throw new SourceRuntimeError("SOURCE_NOT_OWNED","Draft diff requires actual immutable owned graphs");
  const edits:NativeSourceEdit[]=[];
@@ -125,36 +112,22 @@ export function diffOwnedSource(before:unknown,next:unknown):NativeSourceEdit[]{
   for(const key of Object.keys(b).sort())if(Object.hasOwn(a,key))visit(a[key],b[key],[...path,key]);else edits.push({op:"set",path:[...path,key],value:cloneSourceValue(b[key])});
  };visit(before,next,[]);return edits;
 }
-/** The owner stores the actual validated canonical result, including known
- * defaults. The validator preserves legal unknown root/comment fields; a proof
- * must describe exactly the document returned by ordinary artifact parsing. */
 export function normalizeSourceDocument(document:ShowDocument):ShowDocument{
  const normalized=reconcileSurface(document);
  const canonical=parseArtifact({format:"showai",version:artifactVersion(normalized),document:normalized}).document;
  canonicalCapacityBodies.add(canonical);return canonical;
 }
 function normalizeOwnedSourceDocument(document:ShowDocument,observer?:SourceRuntimeObserver):ShowDocument{
- // Only the actual recursive owner may reuse readable child branches. Reconcile
- // writes an independent root/maps and path-copies structural repairs; the
- // consuming parser still runs every JSON, model, ink and capacity check.
- // Arbitrary caller objects retain the independent defensive capture below.
  if(normalizationReadableBodies.has(document)&&isOwnedSource(document))return normalizeParsedSourceDocument(document,observer);
  const normalized=reconcileSurface(document);
  const canonical=parseArtifactForSourceSnapshot({format:"showai",version:artifactVersion(normalized),document:normalized}).document;
  canonicalCapacityBodies.add(canonical);return canonical;
 }
 function normalizeParsedSourceDocument(document:ShowDocument,observer?:SourceRuntimeObserver):ShowDocument{
- // Retain the original result root for history's pre-normalization semantics.
- // This is either our exclusive JSON.parse graph or an actual recursively owned
- // readable graph. The independent mutable root/maps own every normalization
- // write; shared frozen leaves are read-only throughout complete validation.
  const normalized=measured(observer,"reconcile",()=>reconcileSurface({...document},{clone:false}));
  const canonical=parseArtifactConsumingForSourceSnapshot({format:"showai",version:artifactVersion(normalized),document:normalized},observer).document;
  canonicalCapacityBodies.add(canonical);return canonical;
 }
-/** The actual immutable base already satisfies all three official limits.
- * Replacing one existing non-resource scalar without increasing encoded or
- * structural bytes preserves that capacity proof, including shared resources. */
 function timestampCapacityDoesNotGrow(before:ShowDocument,after:ShowDocument):boolean{
  if(!Object.hasOwn(before,"updatedAt")||!isDocumentTimestamp(before.updatedAt)||!isDocumentTimestamp(after.updatedAt))return false;
  return nonResourceReplacementDoesNotGrow(before.updatedAt,after.updatedAt);
@@ -163,8 +136,6 @@ function onlySharedTimestampChanged(before:ShowDocument,after:ShowDocument):bool
  const keys=Object.keys(before);
  return keys.length===Object.keys(after).length&&keys.every(key=>Object.hasOwn(after,key)&&(key==="updatedAt"||(before as unknown as Record<string,unknown>)[key]===(after as unknown as Record<string,unknown>)[key]));
 }
-/** A private factory record, never a public request/asserted normalized flag.
- * The input ref must still resolve to its actual complete immutable body. */
 export interface NativePublicationOrigin {
  format:"showai-native-publication-origin-v1"|"showai-native-projection-origin-v1";publicationId:string;scope:SourceScope;
  boardId:string;token:string;sourceVersion:number;
@@ -181,8 +152,6 @@ export interface NativeSourceEnvelope {
 export interface NativeSourceEnvelopeRequest {current:SourceSnapshotRef;envelope:NativeSourceEnvelope;leaseId?:string}
 export type NativeSourceEnvelopeResult=SourceSnapshotDelta|null|{requiresFull:true};
 interface Snapshot {ref:SourceSnapshotRef;document:ShowDocument;candidates:SourceSnapshotDelta["inkCandidates"];conflicts:PageMergeConflict[];nativeOrigin?:PublicationOriginRecord}
-/** Same synchronous service runs in Native JSC, a browser worker or Node.
- * No transport/client is allowed to construct a registered reference itself. */
 export class SourceRuntimeOwner {
  readonly ownerId:string;readonly epoch:string;
  private nextId=0;
@@ -222,13 +191,8 @@ export class SourceRuntimeOwner {
   const unleased=[...this.snapshots.keys()].filter(id=>!pinned.has(id)&&!protectedIds.has(id));
   let remaining=unleased.length;
   for(const id of unleased){if(remaining<=this.limits.unleased&&this.residentBytes<=this.limits.bytes)break;this.forget(id);remaining--}
-  // Explicit pins always win over cache pressure. Callers can persist/retire an
-  // inactive scope; no author/history state is silently evicted to hit bytes.
   for(const [key,transaction]of this.transactions){
    if(this.transactions.size<=512&&this.residentBytes<=this.limits.bytes)break;
-   // An unanswered exact draft keeps its original transaction under its live
-   // response lease. Completed replay cache cannot silently consume unlimited
-   // point payload memory outside the same source residency budget.
    if(transaction.leaseId&&this.leases.has(transaction.leaseId))continue;
    this.transactions.delete(key);this.account(transaction.edits,-1);
   }
@@ -253,13 +217,9 @@ export class SourceRuntimeOwner {
    else if(timestampOnly){
     try{if(!timestampCapacityDoesNotGrow(base!.document,body)||!inheritSourceSnapshotTimestampCapacity(base!.document,body))assertOwnedSourceDocumentCapacity(body);this.validatedBodies.add(body);timestampProof=true}
     catch(error){
-     // An invalid JSON draft stays recoverable but receives no capacity proof.
-     // Trusted actual saves cannot claim success for an oversized stored body.
      if(kind==="normalized"||!(error instanceof CapacityError))throw error;
     }
    }else if(kind==="normalized"){
-    // Backend model validation precedes actualSaved. Confirm final bytes too:
-    // storage metadata may have changed after its earlier normalization.
     assertOwnedSourceDocumentCapacity(body);this.validatedBodies.add(body);
    }
   }else timestampProof=timestampOnly;
@@ -278,8 +238,6 @@ export class SourceRuntimeOwner {
   const key=scopeKey(current.ref.scope)+"\u0000"+publicationId,known=this.publications.get(key);
   if(known&&!privateJSONEqual(known.packet,packet))fail("Native publication identity names a different complete packet");
   if(known)return known;
-  // A live pinned origin outlives the eight-entry replay cache. It still binds
-  // its immutable complete P even if another actual call reuses that identity.
   for(const snapshot of this.snapshots.values())if(snapshot.nativeOrigin?.identity.publicationId===publicationId&&scopeKey(snapshot.ref.scope)===scopeKey(current.ref.scope)){
    if(!snapshot.nativeOrigin.packet||!privateJSONEqual(snapshot.nativeOrigin.packet,packet))fail("Native publication identity names a different complete packet");
   }
@@ -296,9 +254,6 @@ export class SourceRuntimeOwner {
   for(const snapshot of this.snapshots.values())if(snapshot.nativeOrigin?.identity.publicationId===publicationId&&scopeKey(snapshot.ref.scope)===scopeKey(current.ref.scope)){
    if(diffNativeSource(snapshot.nativeOrigin.identity,identity).length)fail("Native publication identity names a different captured source version");
   }
-  // The ordinary path will normalize exactly P, including its timestamp.
-  // A real merged/canonical difference requires running
-  // the SAME full factory on captured P, including capacity and causal fields.
   const equivalent=measured(observer,"origin.compare",()=>privateJSONEqual(packet.document,merged));
   let canonical:ShowDocument|undefined;
   if(!equivalent||!isDocumentTimestamp(packet.document.updatedAt)){
@@ -313,10 +268,6 @@ export class SourceRuntimeOwner {
   if(prepared.canonical&&!measured(observer,"origin.bodyCompare",()=>privateDocumentBodiesEqual(prepared.canonical!,actual.document)))return;
   actual.nativeOrigin=record;this.account(record,1);this.prune(new Set([result.next.snapshotId]));
  }
- /** Trusted host adapter only. An actual ref attached to another document is
-  * rejected; no caller boolean, kind or claimed publication can mint proof.
-  * This proves canonical captured-P semantics, never a persisted disk anchor;
-  * the host must separately check its real save baseline/CAS. */
  nativePublicationDocumentMatching(request:{ref:SourceSnapshotRef;document:ShowDocument}):NativePublicationOrigin|null{
   const actual=this.get(request.ref);
   return actual.nativeOrigin&&this.validatedBodies.has(actual.document)&&privateJSONEqual(actual.document,request.document)?actual.nativeOrigin.identity:null;
@@ -334,15 +285,11 @@ export class SourceRuntimeOwner {
    refs.push(sourceOnly.next);this.retain(leaseId!,refs);
    let previous=this.get(sourceOnly.next);const stages:{groupId:string;delta:SourceSnapshotDelta}[]=[];
    for(const stage of plan.stages){const next=this.register(current.ref.scope,stage.document,"draft",previous,undefined);refs.push(next.next);this.retain(leaseId!,refs);stages.push({groupId:stage.groupId,delta:next});previous=this.get(next.next)}
-   // The caller retains returned history refs before releasing this explicit
-   // response lease. No intermediate history document is normalized on UI.
    this.retain(leaseId!,refs);
    result.history={sourceOnly,stages};
   }});
   return{...result,publicationId,nativeBodyUnchanged:measured(observer,"bodyCompare",()=>privateDocumentBodiesEqual(packet.document,this.get(result.next).document))};
  }
- /** Only an actual backend author/adoption+merge route can call this adapter.
-  * A public request never accepts a client-asserted merged result. */
  registerActualMergedPublication(request:{current:SourceSnapshotRef;publicationId:string;sourceVersion?:number;packet:NativePublicationPacket;result:{document:ShowDocument;conflicts:PageMergeConflict[]};leaseId?:string},observer?:SourceRuntimeObserver):SourceSnapshotDelta{
   const current=this.get(request.current),entry=measured(observer,"rememberPublication",()=>this.rememberPublication(current,request.publicationId,request.packet));
   const origin=request.sourceVersion===undefined?undefined:this.prepareNativeOrigin(current,request.publicationId,entry,request.result.document,request.sourceVersion,observer);
@@ -350,8 +297,6 @@ export class SourceRuntimeOwner {
   if(origin)this.bindNativeOrigin(origin,result,observer);
   return result;
  }
- /** Only a live owner-held ref can supply a parse candidate. The raw request
-  * still names and validates the exact same ref after parsing, before mutation. */
  private capturedJSON(raw:string,expected:SourceSnapshotRef|undefined,field:"current"|"base",envelope=false,observer?:SourceRuntimeObserver):unknown{
   const actual=expected?this.get(expected):undefined;
   const previous=[...this.publications.values()].at(-1)?.packet;
@@ -361,8 +306,6 @@ export class SourceRuntimeOwner {
   if(actual&&!sameSourceRef(request[field] as SourceSnapshotRef,actual.ref))fail("Captured JSON baseline differs from its separately retained actual ref");
   return request;
  }
- /** The only consuming entry creates its own independent object graph here.
-  * General object callers cannot opt out of defensive capture or validation. */
  registerActualMergedJSON(raw:string,observer?:SourceRuntimeObserver,expectedRef?:SourceSnapshotRef):SourceSnapshotDelta{
   const request=this.capturedJSON(raw,expectedRef,"current",false,observer) as Parameters<SourceRuntimeOwner["registerActualMergedPublication"]>[0];
   const current=this.get(request.current);
@@ -372,10 +315,6 @@ export class SourceRuntimeOwner {
   if(origin)this.bindNativeOrigin(origin,result,observer);
   return result;
  }
- /** Private actual-Native producer only. A canonical current UI baseline is
-  * not a foreign edit of the raw captured writer baseline. Do not reconstruct
-  * unchanged rich leaves through a three-way merge merely to add Native ink.
-  * Native content/history actions deliberately keep their existing full route. */
  private unchangedNativePublication(current:Snapshot,request:{publicationId:string;sourceVersion:number;packet:NativePublicationPacket;leaseId?:string},entry:PublicationEntry,observer?:SourceRuntimeObserver):SourceSnapshotDelta|null{
   const packet=entry.packet;
   if(packet.nativeContentAction===true||(Array.isArray(packet.nativeContentActions)&&packet.nativeContentActions.length))return null;
@@ -383,8 +322,6 @@ export class SourceRuntimeOwner {
   let unchanged=false;
   const origin=current.nativeOrigin;
   if(origin?.packet&&this.validatedBodies.has(current.document)&&origin.identity.publicationId===request.publicationId&&scopeKey(origin.identity.scope)===scopeKey(current.ref.scope)){
-   // Same actually proved P after a failed save/ACK; timestamp-only COW has
-   // already retained its official model/capacity proof, not a caller token.
    unchanged=privateJSONEqual(origin.packet,packet);
   }
   if(!unchanged){
@@ -398,14 +335,10 @@ export class SourceRuntimeOwner {
    unchanged=measured(observer,"unchanged.compareBase",()=>privateDocumentBodiesEqual(base,current.document));
   }
   if(!unchanged)return null;
-  // A raw/draft ref is not itself capacity proof. Equality above proves all
-  // model fields except storage time; validate that actual scalar/body too.
   if(!this.validatedBodies.has(current.document))measured(observer,"unchanged.currentCapacity",()=>assertContent(current.document));
   const canonical=entry.canonical??measured(observer,"unchanged.normalizeIncoming",()=>freezeOwnedSource(normalizeOwnedSourceDocument(packet.document,observer && ((stage,time)=>observer("unchanged.incoming."+stage,time)))));
   if(!entry.canonical){entry.canonical=canonical;if(this.publications.get(scopeKey(current.ref.scope)+"\u0000"+request.publicationId)===entry)this.account(canonical,1)}
   const prepared=this.prepareNativeOrigin(current,request.publicationId,entry,canonical,request.sourceVersion,observer);
-  // The only pre-normalized argument is the fresh private formal factory
-  // object above; no public request or general object caller can provide it.
   const result=this.finishPublication(current,request.publicationId,packet,{document:canonical,conflicts:[]},request.leaseId,observer,undefined,canonical);
   this.bindNativeOrigin(prepared,result,observer);return result;
  }
@@ -418,11 +351,6 @@ export class SourceRuntimeOwner {
   const current=this.get(request.current),entry=measured(observer,"rememberPublication",()=>this.rememberPublication(current,request.publicationId,request.packet,()=>request.packet));
   return this.unchangedNativePublication(current,request,entry,observer);
  }
- /** Actual host transport only. The complete previous packet is resolved from
-  * this owner's retained capture, never asserted by a Web descriptor. Applying
-  * exact transport edits preserves its untouched sealed branches. A missing
-  * baseline requests the same captured full packet; it never guesses a source.
-  * This adapter is deliberately absent from the public execute dispatcher. */
  registerActualNativeEnvelopeJSON(raw:string,observer?:SourceRuntimeObserver,expectedRef?:SourceSnapshotRef):NativeSourceEnvelopeResult{
   const request=this.capturedJSON(raw,expectedRef,"current",true,observer) as NativeSourceEnvelopeRequest;
   const current=this.get(request.current),envelope=request.envelope,s=envelope?.scope;
@@ -453,28 +381,16 @@ export class SourceRuntimeOwner {
   if(!entry.transport){entry.transport=transport;if(this.publications.get(scopeKey(current.ref.scope)+"\u0000"+envelope.publicationId)===entry)this.account(transport,1)}
   return this.unchangedNativePublication(current,{publicationId:envelope.publicationId,sourceVersion:envelope.sourceVersion,packet:entry.packet,leaseId:request.leaseId},entry,observer);
  }
- /** Private host resolve only. Body and proofs come from the same actual get;
-  * public resolve/client JSON never supplies or manufactures these proofs. */
  resolveActualSnapshot(ref:SourceSnapshotRef){
   const actual=this.get(ref),modelValidated=this.validatedBodies.has(actual.document);
   return {format:"showai-resolved-source-v1" as const,ref:actual.ref,document:actual.document,
    modelValidated,nativeOrigin:modelValidated?actual.nativeOrigin?.identity??null:null};
  }
- /** Trusted adapter only: a ref or kind flag alone never proves a different
-  * Swift/JSON body. The exact comparator includes every root field, timestamp,
-  * sample, tombstone and retained variant. No JSON serialization is involved. */
  normalizedDocumentMatching(request:{ref:SourceSnapshotRef;document:ShowDocument}):ShowDocument|null{
   const current=this.get(request.ref);
   return this.validatedBodies.has(current.document)&&privateJSONEqual(current.document,request.document)?current.document:null;
  }
- /** Actual host projections (undo/resolution) still undergo full canonical
-  * normalization here. This adapter is not public client dispatch and does not
-  * borrow saved/publication proofs for a different source body. */
  normalizeActualProjection(request:{base:SourceSnapshotRef;document:ShowDocument;leaseId?:string;origin?:NativePublicationOrigin}):SourceSnapshotDelta{
-  // This endpoint is private to the host's actual compensation factory. It
-  // always performs complete model/capacity normalization; public execute has
-  // no origin assertion or projection request. Capture metadata before any
-  // observer/caller can mutate it, then bind only to the actual output ref.
   const base=this.get(request.base),origin=request.origin===undefined?undefined:captureOwnedJSON(request.origin);
   if(origin){
    const id=(value:unknown)=>typeof value==="string"&&value.length>0&&value.length<=256;
@@ -494,21 +410,13 @@ export class SourceRuntimeOwner {
   if(origin)this.bindNativeOrigin({record:freezeOwnedSource({identity:origin})},result);
   return result;
  }
- /** Trusted host adapter only: actual backend normalization/CAS has already
-  * completed. Never reachable through the client request discriminant. */
  registerActualSavedSnapshot(request:{scope:SourceScope;document:ShowDocument;base:SourceSnapshotRef;leaseId?:string},observer?:SourceRuntimeObserver):SourceSnapshotDelta{
   const base=this.get(request.base);
   if(scopeKey(scope(request.scope))!==scopeKey(base.ref.scope))fail("Saved source crosses its actual home/project/page");
   const document=measured(observer,"saved.capture",()=>captureOwnedJSON(request.document));
   return this.register(base.ref.scope,document,"normalized",base,request.leaseId,[],undefined,observer);
  }
- /** Private actual Store receipt only. The host has compared the complete
-  * committed record to its actual normalized witness; only this scalar may
-  * differ. Resolve the real base again and run the SAME saved registration and
-  * final capacity gate, never a caller-asserted validated/public request flag. */
  registerActualSavedMetadata(request:{scope:SourceScope;base:SourceSnapshotRef;updatedAt:string;leaseId?:string},observer?:SourceRuntimeObserver):SourceSnapshotDelta{
-  // Object adapters retain their defensive boundary too: read accessors once,
-  // then validate/use the same sealed scalar. Raw JSON is already captured.
   request=captureOwnedJSON(request);
   if(Object.keys(request).some(key=>!["scope","base","updatedAt","leaseId"].includes(key)))fail("Saved metadata contains an unproved field");
   const base=this.get(request.base);
@@ -517,9 +425,6 @@ export class SourceRuntimeOwner {
   const document=applyCapturedSourceDelta(base.document,[{op:"set",path:["updatedAt"],value:request.updatedAt}]) as ShowDocument;
   return this.registerActualSavedSnapshot({scope:base.ref.scope,base:base.ref,document,leaseId:request.leaseId},observer);
  }
- /** Actual saved backend JSON only; no public execute kind can assert saved
-  * validation. Parse creates/owns data, expectedBase is separately live-resolved,
-  * and final model capacity still gates the complete actual stored body. */
  registerActualSavedJSON(raw:string,expectedBase?:SourceSnapshotRef,observer?:SourceRuntimeObserver):SourceSnapshotDelta{
   const request=this.capturedJSON(raw,expectedBase,"base",false,observer) as Parameters<SourceRuntimeOwner["registerActualSavedSnapshot"]>[0];
   return this.registerActualSavedSnapshot(request,observer);
@@ -566,8 +471,6 @@ export class SourceRuntimeOwner {
     const source=this.get(request.source),entries=request.entries.map(ref=>this.get(ref));
     if(!request.leaseId)fail("Ink history requires an explicit output lease");
     if(entries.some(entry=>scopeKey(entry.ref.scope)!==scopeKey(source.ref.scope)))fail("Ink history crosses its actual home/project/page");
-    // Validate the actual sealed source even for an empty history. A caller's
-    // stroke ID or an existing target node never grants source authority.
     appendPortableInkFromSource(source.document,source.document,request.boardId,request.strokeId);
     const projected=new Map<Snapshot,ShowDocument>();
     for(const entry of entries)if(!projected.has(entry))projected.set(entry,appendPortableInkFromSource(entry.document,source.document,request.boardId,request.strokeId));
@@ -584,8 +487,6 @@ export class SourceRuntimeOwner {
     try{
      for(const [entry,body]of projected){
       if(body===entry.document){results.set(entry,entry.ref);continue}
-      // No full per-entry ink delta is materialized or returned. This exact
-      // COW body remains a draft until the ordinary actual save validator.
       const next=this.register(source.ref.scope,body,"draft",null,undefined).next;
       created.push(next);results.set(entry,next);this.retain(temporary,[...refs,...created]);
      }
@@ -628,12 +529,8 @@ export class SourceRuntimeOwner {
  }
 }
 let service:SourceRuntimeOwner|undefined;
-/** iOS validation-entry can re-export this directly; the registry is the same
- * real worker instance used by every resolve/save call, never a Web-side map. */
 export function sourceRuntime(raw:string):string{service??=new SourceRuntimeOwner();return JSON.stringify(service.execute(parseOwnedJSON(raw) as SourceRuntimeRequest));}
 
-/** Only a backend adapter may expose this in its private validation VM. Public
- * sourceRuntime requests have no saved/validated flag that bypasses validation. */
 export function registerActualSavedSnapshot(raw:string,expectedBase?:SourceSnapshotRef,observer?:SourceRuntimeObserver):string{
  service??=new SourceRuntimeOwner();
  return JSON.stringify(service.registerActualSavedJSON(raw,expectedBase,observer));
@@ -649,32 +546,26 @@ export function normalizeActualProjection(raw:string):string{
  return JSON.stringify(service.normalizeActualProjection(parseOwnedJSON(raw) as Parameters<SourceRuntimeOwner["normalizeActualProjection"]>[0]));
 }
 
-/** Private validation-entry adapter; deliberately absent from execute(). */
 export function normalizedSourceDocumentMatching(request:{ref:SourceSnapshotRef;document:ShowDocument}):ShowDocument|null{
  service??=new SourceRuntimeOwner();return service.normalizedDocumentMatching(request);
 }
 
-/** Private actual-factory provenance lookup, deliberately absent from execute. */
 export function nativePublicationDocumentMatching(request:{ref:SourceSnapshotRef;document:ShowDocument}):NativePublicationOrigin|null{
  service??=new SourceRuntimeOwner();return service.nativePublicationDocumentMatching(request);
 }
 
-/** Private captured-publication factory; never accepted by execute(). */
 export function registerActualNativePublicationIfUnchanged(raw:string,observer?:SourceRuntimeObserver,expectedRef?:SourceSnapshotRef):string{
  service??=new SourceRuntimeOwner();return JSON.stringify(service.registerActualNativeJSONIfUnchanged(raw,observer,expectedRef));
 }
 
-/** Private actual-host envelope adapter; never a public source request kind. */
 export function registerActualNativeEnvelope(raw:string,observer?:SourceRuntimeObserver,expectedRef?:SourceSnapshotRef):string{
  service??=new SourceRuntimeOwner();return JSON.stringify(service.registerActualNativeEnvelopeJSON(raw,observer,expectedRef));
 }
 
-/** Private native adapter; deliberately absent from the public dispatcher. */
 export function resolveActualSourceSnapshot(ref:SourceSnapshotRef){
  service??=new SourceRuntimeOwner();return service.resolveActualSnapshot(ref);
 }
 
-/** Private actual saved-receipt adapter; absent from public execute(). */
 export function registerActualSavedMetadata(raw:string,observer?:SourceRuntimeObserver):string{
  service??=new SourceRuntimeOwner();
  return JSON.stringify(service.registerActualSavedMetadata(measured(observer,"metadata.parse",()=>parseOwnedJSON(raw)) as Parameters<SourceRuntimeOwner["registerActualSavedMetadata"]>[0],observer));

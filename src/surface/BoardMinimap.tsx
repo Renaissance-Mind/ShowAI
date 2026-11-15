@@ -7,7 +7,6 @@ type Box = { x: number; y: number; width: number; height: number };
 const WIDTH = 180,
   HEIGHT = 120;
 
-/** Object outlines and the visible area; click or drag to move the view there. */
 export function BoardMinimap({
   root,
   world,

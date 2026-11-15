@@ -115,7 +115,6 @@ test("large real raster survives network embedding, SQLite, recovery, stdio MCP 
   const embedded = await embedDocumentImages(document(origin + "/large.png"));
   expect(measureContent(embedded).resourceBytes).toBe(png.length);
   const client = new Client({ name: "large-stdio", version: "1" });
-  // Client limits belong to the host; explicitly test with a host supporting large results.
   const transport = new StdioClientTransport({
     command: process.execPath,
     args: [resolve("dist-agent/cli.mjs"), "mcp"],
@@ -261,8 +260,6 @@ test("a used binary asset above 8 MiB compiles, reloads, publishes, exports and 
     (await getComponent(f.home, component.id, component.version, f.project.id))
       .integrity,
   ).toBe(component.integrity);
-  // Compare digests: deep equality walks all 8 MiB one byte at a time and
-  // exhausts a 2 GB heap (the default on the Windows runner).
   expect(
     digest(
       Buffer.from(

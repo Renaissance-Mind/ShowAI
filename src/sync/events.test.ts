@@ -247,7 +247,6 @@ test("published edits reach complete independent libraries over the actual push 
       process.env.SHOWAI_REALTIME_TRACE,
       JSON.stringify(diagnostics, null, 2),
     );
-  // The Windows runner measures ~1.2 s p50 where Linux measures ~0.26 s.
   expect(receipt.p95Ms).toBeLessThanOrEqual(
     Number(
       process.env.SHOWAI_REALTIME_MAX_MS ??

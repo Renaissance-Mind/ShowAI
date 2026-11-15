@@ -1,7 +1,4 @@
 import { inkFramePose } from "./portable-ink.mjs";
-/** A lossless container for independently editable strokes from one native archive.
- * Its extent is the children's coordinate space; the outer frame can scale/rotate
- * without rewriting any child samples or their original archive provenance. */
 export function validateInkArchiveGroup(node) {
   const value = node?.attrs?.inkArchiveGroup;
   if (value === undefined) return null;
@@ -73,9 +70,6 @@ export function inkArchiveGroupLayout(group, frame) {
   };
 }
 
-/** Bake the child frame into its portable affine when removing this container.
- * Keeping the outer group frame also represents nonuniform scale plus child
- * rotation (which cannot be represented by a single rotated rectangle). */
 export function flattenInkArchiveChild(node, localFrame, group, outerFrame) {
   const pose = inkFramePose(localFrame, node.attrs.extent),
     result = structuredClone(node);

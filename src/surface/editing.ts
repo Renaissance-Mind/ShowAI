@@ -7,19 +7,10 @@ import { translator } from "../i18n";
 import messages from "../i18n/messages/surface";
 import { isOwnedSource, ownSourceValue } from "./source-runtime";
 
-/** Text/widget transactions already carry schema-assigned IDs. Structural
- * commands retain explicit reconciliation; typing only copies its edited path. */
 export interface NodeEditOptions {
-  /** false skips normalization only while block structure stays unchanged. */
   normalize?: boolean;
-  /** Mutable attribute record only; existing nested values/children stay
-   * read-only. Replace a nested value with its own draft to edit it. */
   attributesOnly?: boolean;
 }
-/** Layout/view references follow block identities and hierarchy, not text,
- * inline marks or widget data. Only proven owned branches can skip comparison.
- * A structural edit still crosses the same COW reconciliation boundary used by
- * the structural commands; ordinary typing does not normalize the page. */
 function sameStructure(before: JSONContent, after: JSONContent): boolean {
   if (before === after && isOwnedSource(before)) return true;
   if (before.type !== after.type || before.attrs?.id !== after.attrs?.id)

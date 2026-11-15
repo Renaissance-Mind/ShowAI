@@ -7,7 +7,6 @@ import type {
 
 export type PackageKind = "component" | "template";
 
-/** The fields of a catalog listing that identify and order its revisions. */
 export interface RevisionItem {
   id: string;
   name: string;
@@ -16,7 +15,6 @@ export interface RevisionItem {
   scope: CatalogScope;
   updatedAt?: string;
   parents?: PackageRevisionRef[];
-  /** The project that owns a project-scope revision. */
   projectId?: string;
 }
 
@@ -27,7 +25,6 @@ const SCOPE_ORDER: Record<string, number> = {
   builtin: 3,
 };
 
-/** The exact revision reference catalog actions take. */
 export function exactRef(
   kind: PackageKind,
   item: Pick<RevisionItem, "id" | "version" | "integrity" | "scope">,
@@ -53,7 +50,6 @@ function parseVersion(version: string) {
     : null;
 }
 
-/** Semantic version order; a prerelease sorts before its release. */
 export function compareVersions(left: string, right: string): number {
   const a = parseVersion(left),
     b = parseVersion(right);
@@ -67,7 +63,6 @@ export function compareVersions(left: string, right: string): number {
   return a.pre.localeCompare(b.pre, undefined, { numeric: true });
 }
 
-/** The next free patch version after `version`. */
 export function nextVersion(version: string, taken: Iterable<string>): string {
   const used = new Set(taken);
   const parsed = parseVersion(version);
@@ -89,7 +84,6 @@ export function nextVersion(version: string, taken: Iterable<string>): string {
   return candidate;
 }
 
-/** Every revision of one package, newest first, project copies before shared ones. */
 export function packageRevisions<T extends RevisionItem>(
   items: T[],
   id: string,
@@ -104,23 +98,16 @@ export function packageRevisions<T extends RevisionItem>(
 }
 
 export interface Divergence<T extends RevisionItem> {
-  /** The shared revision the project copy started from. */
   base: T;
-  /** Newer shared revisions of the origin, newest first. */
   candidates: T[];
 }
 
-/**
- * A project copy diverged from its origin when the shared catalog has a newer
- * revision of the package it was forked or last merged from.
- */
 export function divergence<T extends RevisionItem>(
   current: RevisionItem,
   items: T[],
 ): Divergence<T> | null {
   if (current.scope !== "project" || !current.parents?.length) return null;
   const shared = items.filter((item) => item.scope !== "project");
-  // After a merge the origin parent is the shared one; after a fork it is the only one.
   const base = current.parents
     .map((parent) =>
       shared.find(
@@ -151,7 +138,6 @@ function decodePointer(path: string): string[] {
     .map((part) => part.replaceAll("~1", "/").replaceAll("~0", "~"));
 }
 
-/** A conflict path in reading order, e.g. `manifest › description`. */
 export function conflictLabel(path: string): string {
   const parts = decodePointer(path);
   return parts.length ? parts.join(" › ") : "/";
@@ -159,11 +145,6 @@ export function conflictLabel(path: string): string {
 
 export type MergeChoice = "ours" | "theirs";
 
-/**
- * The merge preview keeps the project value at every conflict. Applies the
- * person's choices: taking the origin value, or removing the field when the
- * origin removed it.
- */
 export function applyMergeChoices(
   merged: EditablePackage,
   conflicts: MergeConflict[],
@@ -194,16 +175,11 @@ export function applyMergeChoices(
   return result as EditablePackage;
 }
 
-/** A conflict value shown for comparison: text as is, other values as JSON. */
 export function conflictValue(value: unknown): string | undefined {
   if (value === undefined) return undefined;
   return typeof value === "string" ? value : JSON.stringify(value, null, 2);
 }
 
-/**
- * Whether a refused removal says the revision is still in use. The remove
- * actions report referencing pages; any of these shapes counts.
- */
 export function isStillReferenced(error: unknown): boolean {
   if (!error || typeof error !== "object") return false;
   const { code, details } = error as {

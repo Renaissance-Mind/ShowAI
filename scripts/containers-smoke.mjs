@@ -1,5 +1,4 @@
 import { desktopTestEnvironment } from "./desktop-test-env.mjs";
-// Real CLI, filesystem, local browser bridge and exported readers. No mocked services.
 import assert from "node:assert/strict";
 import { execFile, spawn } from "node:child_process";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
@@ -10,7 +9,6 @@ import { pathToFileURL } from "node:url";
 import { promisify } from "node:util";
 import { chromium, _electron } from "playwright-core";
 
-// The smoke checks select controls by their Chinese labels.
 process.env.SHOWAI_LANGUAGE ??= "zh-CN";
 const root = resolve(import.meta.dirname, "..");
 const outputRoot = resolve(
@@ -383,7 +381,6 @@ try {
           label === "白板" ? "document-slash.png" : "board-slash.png",
         ),
       });
-    // Match the option title exactly: the 白板 option's category reads 页面与白板.
     await menu
       .getByRole("option")
       .filter({ has: page.getByText(label, { exact: true }) })
@@ -646,15 +643,10 @@ try {
     /展开后继续编辑/,
   );
   await page.getByRole("button", { name: "返回上层", exact: true }).click();
-  // The pen stays chosen across Boards as a device preference; return to the
-  // selection tool before working with objects inside the embedded Board.
   await scene(boardId)
     .locator(":scope > .container-board-scene > .page-surface > .board-dockable-toolbar")
     .getByRole("button", { name: "选择工具", exact: true })
     .click();
-  // Board object headers are replaced by selection controls. Open the actual
-  // object's context menu; its enclosing Page editor must not claim this
-  // contenteditable=false embedded Board as its own editable text.
   await scene(nestedPageId)
     .locator(":scope > .container-page-column > .container-page-heading")
     .click({ button: "right" });
@@ -716,7 +708,6 @@ try {
   assert.equal(saved.document.content.attrs.kind, "page");
   const latestHash = saved.hash;
   await page.reload();
-  // The workbench restores its open tab after a reload.
   await page
     .getByRole("button", { name: "关闭标签页 递归内容工作页", exact: true })
     .waitFor();

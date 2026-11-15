@@ -179,7 +179,6 @@ it("pins a current read while a save commits, then publishes the next state", as
     first.hash,
     first.revision,
   );
-  // The save commits while the read still holds its snapshot.
   await writing;
   release();
   await reading;
@@ -233,7 +232,6 @@ it("reuses a page read within its transaction only until the page is staged agai
       read.revision,
       read,
     );
-    // The earlier read no longer describes the staged page and is read again.
     const stale = await store
       .savePage(
         project.id,

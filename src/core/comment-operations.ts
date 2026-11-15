@@ -16,7 +16,6 @@ import { CoreError, type PageOperation, type ShowDocument } from "./model";
 
 type CommentOperation = Extract<PageOperation, { type: "comment" }>;
 
-/** The writer of this change: an Agent through MCP/CLI, otherwise the person. */
 export function contextAuthor(): CommentAuthor {
   const context = changeContext();
   if (agentAuthored(context))
@@ -51,11 +50,6 @@ function anchorFor(
   );
 }
 
-/**
- * page_apply {type:"comment"}: without threadId it starts a thread on a block
- * (blockId), on text (quote, optionally inside blockId) or on the page; with
- * threadId it replies (text) and/or resolves or reopens (resolved).
- */
 export function applyCommentOperation(
   document: ShowDocument,
   operation: CommentOperation,

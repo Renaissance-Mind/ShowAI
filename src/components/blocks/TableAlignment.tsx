@@ -4,10 +4,6 @@ import messages from "../../i18n/messages/blockHelpers";
 
 export type TableAlignment = "left" | "center" | "right";
 
-/**
- * "table" for the whole table, a zero-based column index for one column. Any
- * other string is an already translated scope name.
- */
 export type AlignmentScope = "table" | number | string;
 
 const alignments = [

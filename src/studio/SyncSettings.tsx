@@ -43,10 +43,6 @@ const roleKeys: Record<ProjectRole, SyncKey> = {
 const defaultServer = "https://showai.renaissancemind.ai/cloud";
 export type ProjectSyncRequest = {
   projectId: string;
-  /**
-   * signIn: the project's account must sign in again. packaging: choose
-   * what synchronization carries, starting at the item `focus`.
-   */
   intent: "share" | "sync" | "signIn" | "packaging" | "manage";
   focus?: string;
   key: number;
@@ -172,7 +168,6 @@ export default function SyncSettings({
     }
   }, [status, request]);
   useEffect(() => {
-    // Success notices fade; errors stay until dismissed or replaced.
     if (!message) return;
     const timer = setTimeout(() => setMessage(""), 6000);
     return () => clearTimeout(timer);
@@ -258,11 +253,9 @@ export default function SyncSettings({
       (connection) =>
         !connection.signedOut && connection.serverId === preview.serverId,
     );
-    // Without an account there, the invitation card offers sign-in explicitly.
     if (existing) setServer(existing.id);
   }, [preview, status, server]);
   useEffect(() => {
-    // Opening the form from an invite or a sign-out lands far from it on this page.
     if (!showConnect) return;
     const section = connectSection.current;
     section?.scrollIntoView({ block: "nearest" });
@@ -271,7 +264,6 @@ export default function SyncSettings({
       ?.focus({ preventScroll: true });
   }, [showConnect, connectRequest]);
   useEffect(() => {
-    // Disabling a loading selector can move focus out of the dialog.
     if (panel && !busy && !document.activeElement?.closest(".sync-dialog")) {
       const target = actionFocus.current;
       (target?.isConnected &&
@@ -926,7 +918,6 @@ export default function SyncSettings({
                           );
                         } else {
                           setPanel(null);
-                          // Attaching starts the sync; it has not finished yet.
                           setMessage(
                             t("toast.uploaded", {
                               name:

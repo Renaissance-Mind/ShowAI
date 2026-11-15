@@ -122,7 +122,6 @@ function TaskResult({
 export default function AgentSettings() {
   const t = useTranslator(strings);
   const tc = useTranslator(common);
-  // Built-in presets carry Chinese names; show and seed them in the UI language.
   const presetName = (provider: string, fallback: string) =>
     provider === "chatgpt"
       ? t("preset.chatgpt")
@@ -133,7 +132,6 @@ export default function AgentSettings() {
   const [busy, setBusy] = useState(false),
     [error, setError] = useState(""),
     [notice, setNotice] = useState("");
-  // The model source form survives leaving Settings; the key stays in memory.
   const [adding, setAdding] = useSessionDraft("agent-settings.adding", false);
   const [editing, setEditing] = useSessionDraft<ModelSource | null>(
       "agent-settings.source",
@@ -259,7 +257,6 @@ export default function AgentSettings() {
     setModels([]);
     setAdding(false);
   };
-  // Next-step buttons elsewhere ask to connect ChatGPT or add an API key.
   const setupIntent = useRef<(() => void) | null>(null);
   setupIntent.current = () => {
     if (!status || remoteExecution()) return;

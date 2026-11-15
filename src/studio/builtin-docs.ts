@@ -3,11 +3,6 @@ import type { CompiledComponent } from "../contract/types";
 import type { Locale } from "../i18n";
 import type { ShowDocument } from "../types";
 
-/**
- * The documentation published at showai.renaissancemind.ai/doc, shipped with the App
- * (resources/docs, written by scripts/sync-docs.mjs). Pages are read-only and live outside
- * the content library; each file is its own lazy chunk.
- */
 export type DocsEntry =
   | { type: "page"; id: string }
   | {
@@ -34,9 +29,7 @@ const docs = manifest as {
   locales: Record<Locale, DocsLocale>;
 };
 
-/** The App's first-run screen, listed first among the documentation. */
 export const WELCOME_DOC = "welcome";
-/** The documentation's own front page (/doc). */
 export const DOCS_HOME = docs.slugs[""];
 
 const files = import.meta.glob<string>("../../resources/docs/*/*/*.json", {
@@ -55,7 +48,6 @@ export function builtinDocs(locale: Locale): DocsLocale {
   return docs.locales[locale] ?? docs.locales["zh-CN"];
 }
 
-/** Folders that contain the page, outermost first; undefined when the page is not documentation. */
 export function builtinDocPath(locale: Locale, id: string) {
   const search = (
     entries: DocsEntry[],
@@ -96,7 +88,6 @@ export async function loadBuiltinDoc(
   return { document, components: compiled };
 }
 
-/** A link to the website's documentation (/doc/<slug>, optionally under a language prefix). */
 export function builtinDocLink(
   href: string,
 ): { pageId: string; hash: string } | undefined {

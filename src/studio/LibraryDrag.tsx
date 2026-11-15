@@ -43,7 +43,6 @@ export const LibraryDragContext = createContext<{
 } | null>(null);
 export const useLibraryDrag = () => useContext(LibraryDragContext);
 
-/** Pointer dragging keeps row buttons clickable and also works with touch/pen input. */
 export function useLibraryDragController(options: {
   sectionFor: (projectId: string) => string;
   parentFor: (projectId: string, id: string) => string | null;
@@ -301,8 +300,6 @@ export function useLibraryDragController(options: {
       if (!next) visual.current?.restorePosition();
       await visual.current?.settle();
       if (gesture.current !== current) return;
-      // Release the preview before React moves its rows. Persistence must not
-      // leave a settled ghost blocking clicks for the duration of disk I/O.
       reset();
       if (next) await latest.current.onDrop(next.drop);
     };

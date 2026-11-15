@@ -51,7 +51,6 @@ test("current reads stay on one database snapshot while saves replace the curren
     const results = await Promise.allSettled([writer, reader]);
     for (const result of results)
       if (result.status === "rejected") throw result.reason;
-    // Explicit historical reads retain their strict meaning.
     await expect(library.readFile(paths[0], first)).rejects.toMatchObject({
       code: "NOT_FOUND",
     });

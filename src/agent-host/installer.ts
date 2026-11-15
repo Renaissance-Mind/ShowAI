@@ -46,9 +46,7 @@ export function verifyArchive(bytes: Buffer, integrity: string) {
       "Downloaded package integrity does not match the registry.",
     );
 }
-/** Extract npm archives without lifecycle scripts, shell interpolation, links or path traversal. */
 export async function extractPackage(archive: Buffer, root: string) {
-  // Official Linux packages include several native executables and exceed 400 MiB.
   const tar = gunzipSync(archive, { maxOutputLength: 1024 * 1024 * 1024 });
   let pax: Record<string, string> = {};
   for (let offset = 0; offset + 512 <= tar.length;) {
@@ -110,7 +108,6 @@ export async function extractPackage(archive: Buffer, root: string) {
     } else throw new Error(`Unsupported package entry type ${type}.`);
   }
 }
-/** Reads a response body, reporting received bytes and the declared length. */
 async function readBody(
   response: Response,
   progress?: (received: number, total?: number) => void,
@@ -127,7 +124,6 @@ async function readBody(
   }
   return Buffer.concat(chunks);
 }
-/** Classifies an install failure so the UI can explain it in its language. */
 export function installFailure(error: unknown): RuntimeFailureCode {
   const value = error as {
     name?: string;
@@ -366,7 +362,6 @@ export class SdkInstaller {
     try {
       this.state.progress = t("runtime.downloading", { version });
       this.state.stage = "downloading";
-      // Both archives download together; the UI shows their combined bytes.
       const parts = new Map<string, { received: number; total?: number }>();
       const progress = (name: string) => (received: number, total?: number) => {
         parts.set(name, { received, total });

@@ -51,7 +51,6 @@ const restoredSelections = new WeakSet<Editor>();
 export const hasRetainedSelection = (editor: Editor) =>
   restoredSelections.has(editor);
 
-/** Activity disconnects effects; the view owner retains ProseMirror's state. */
 export class WorkspaceEditors {
   private editors = new Map<string, Editor>();
   constructor(
@@ -129,9 +128,6 @@ export const WorkspaceEditorContext = createContext<WorkspaceEditors | null>(
   null,
 );
 
-// A pooled Editor can outlive the hook instance that first created it. Its
-// stable event/DOM proxies dispatch through the currently mounted view owner,
-// rather than retaining that first component's content-range closures.
 const editorOwners = new WeakMap<
   Editor,
   { readonly current: Partial<EditorOptions> }
@@ -202,7 +198,6 @@ export function useWorkspaceEditor(
         if (!next.isDestroyed) next.setEditable(false, false);
       }
       if (pool) return;
-      // React's effect replay must not destroy a still-mounted editor.
       destruction.current = setTimeout(() => {
         if (instance.current === next && !next.isDestroyed) next.destroy();
       }, 1);

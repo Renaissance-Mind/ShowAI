@@ -152,7 +152,6 @@ describe("continuous Page structural draft reconciliation", () => {
       "文章按顺序阅读",
     );
     expect(reopened.document.layout!["continuous-region"]).toBeUndefined();
-    // The next ordinary keypress retains both already-sanitized metadata maps.
     state = state.applyTransaction(state.tr.insertText("继续", 2)).state;
     const captured = ownSourceValue(next);
     const again = publish(captured, state);

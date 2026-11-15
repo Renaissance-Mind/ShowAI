@@ -14,7 +14,6 @@ export interface SqliteTreeEntry {
   oid: string;
   bytes?: number;
 }
-/** Exact paths and directory prefixes (each ending in "/") of one tree. */
 export interface TreeQuery {
   paths?: string[];
   prefixes?: string[];
@@ -27,12 +26,10 @@ export function assertTreeQuery(query: TreeQuery): TreeQuery {
         "INVALID_PATH",
         `A library directory prefix must end with "/": ${prefix}`,
       );
-    // A directory prefix is valid when a file directly inside it is.
     assertSqlitePath(`${prefix}_`);
   }
   return query;
 }
-/** The entries of a full tree that a query selects, in tree order. */
 export function selectTreeEntries<T extends { path: string }>(
   tree: T[],
   query: TreeQuery,
@@ -45,10 +42,7 @@ export function selectTreeEntries<T extends { path: string }>(
       prefixes.some((prefix) => entry.path.startsWith(prefix)),
   );
 }
-/** Stored nodes of split pages: projects/<id>/pages/<id>/nodes/<name>. */
 export const pageNodePath = /^projects\/[^/]+\/pages\/[^/]+\/nodes\/[^/]+$/;
-// The same paths in SQL. Stored paths have no empty segments, so the glob
-// plus exactly five separators leaves no "/" inside any wildcard.
 const notPageNode = (column: string) =>
   `NOT (${column} GLOB 'projects/*/pages/*/nodes/*' AND length(${column})-length(replace(${column},'/',''))=5)`;
 type Request = { session?: string } & (
@@ -59,7 +53,6 @@ type Request = { session?: string } & (
   | { kind: "entry"; revision: string }
 );
 type SnapshotRequest = { open: true } | { close: string };
-// Keep the bounded read cache warm between interactions, without preventing host exit.
 const worker = new BackgroundWorker(0);
 const trees = new Map<string, SqliteTreeEntry[]>();
 const oid = (value: string) => /^[a-f0-9]{40}(?:[a-f0-9]{24})?$/.test(value);
@@ -89,10 +82,6 @@ export function assertSqlitePath(path: string): string {
   return path;
 }
 
-/**
- * Read transactions held open in the thread that runs reads. SQLite's WAL keeps
- * each one on the state it first read while saves from any process commit.
- */
 const sessions = new Map<string, { db: DatabaseSync; home: string }>();
 const activeSnapshot = new AsyncLocalStorage<{
   home: string;
@@ -128,7 +117,6 @@ export async function runSqliteSnapshot(
   }
   const db = await openDatabase(home);
   try {
-    // The first read starts the snapshot every later request in the session sees.
     const revision = headOf(db),
       id = randomUUID();
     sessions.set(id, { db, home });
@@ -146,10 +134,6 @@ const snapshotCall = (home: string, request: SnapshotRequest) =>
     revision: string | null;
   } | null>;
 
-/**
- * Run several reads against one committed library state without the writer
- * lease. Reads inside the action that name the pinned revision use the session.
- */
 export async function withSqliteSnapshot<T>(
   home: string,
   action: (revision: string | null) => Promise<T>,
@@ -165,13 +149,11 @@ export async function withSqliteSnapshot<T>(
   }
 }
 
-/** The read transaction the calling operation runs in for this library, if any. */
 export function activeSqliteSnapshot(home: string) {
   const snapshot = activeSnapshot.getStore();
   return snapshot?.home === resolve(home) ? snapshot : undefined;
 }
 
-/** The stored record of a current or retained revision, as written. */
 export function selectEntry(db: DatabaseSync, revision: string) {
   if (!oid(revision))
     throw new CoreError("INVALID_DATA", "Invalid history revision.");
@@ -210,7 +192,6 @@ export function selectEntry(db: DatabaseSync, revision: string) {
   return retained as { revision: string; entry: string; checksum: string };
 }
 
-/** Read requests pin one revision and database snapshot, including dependent assets. */
 export async function readSqlite<T>(
   home: string,
   request: Request,
@@ -245,15 +226,11 @@ export async function runSqliteRead(home: string, request: Request) {
   try {
     return await readWithin(db, home, request);
   } finally {
-    // Read-only snapshot, so closing releases it on success and failure alike.
     db.close();
   }
 }
 async function readWithin(db: DatabaseSync, home: string, request: Request) {
   if (request.kind === "entry") return selectEntry(db, request.revision);
-  // Resolving HEAD before queuing this worker races with current-state saves,
-  // which intentionally remove superseded revisions. Pin HEAD in the same
-  // read transaction as the requested content and dependent objects.
   const selected = request.revision ?? headOf(db) ?? undefined;
   if (!selected) {
     if (request.kind === "tree" || request.kind === "entries") return [];
@@ -294,8 +271,6 @@ async function readWithin(db: DatabaseSync, home: string, request: Request) {
         : undefined);
     if (!tree) {
       const files = request.nodes === false;
-      // Selecting blobs.bytes would walk each large object's overflow pages;
-      // joining on the key alone reads only the blobs index.
       tree = (current
         ? db
             .prepare(
@@ -317,7 +292,6 @@ async function readWithin(db: DatabaseSync, home: string, request: Request) {
   if (request.kind === "entries") {
     const cached = trees.get(`${home}:${selected}`);
     if (cached) return selectTreeEntries(cached, request.query);
-    // The same rows the tree query returns, restricted by the primary key range.
     const select = current
       ? "SELECT f.path,f.oid FROM current_files f JOIN blobs b ON b.oid=f.oid WHERE f.path"
       : "SELECT p.path,c.oid FROM paths p JOIN changes c ON c.path=p.path AND c.sequence=(SELECT c2.sequence FROM changes c2 WHERE c2.path=p.path AND c2.sequence<=$sequence ORDER BY c2.sequence DESC LIMIT 1) JOIN blobs b ON b.oid=c.oid WHERE c.oid IS NOT NULL AND p.path";
@@ -342,7 +316,6 @@ async function readWithin(db: DatabaseSync, home: string, request: Request) {
       add(
         range.all({ ...pinned, start: prefix, end: prefix.slice(0, -1) + "0" }),
       );
-    // SQLite orders TEXT by its UTF-8 bytes, as the tree query does.
     return [...found.values()].sort((a, b) =>
       Buffer.compare(Buffer.from(a.path), Buffer.from(b.path)),
     );
@@ -390,7 +363,6 @@ async function readWithin(db: DatabaseSync, home: string, request: Request) {
       }),
     );
   }
-  // Resolve only requested paths and page nodes, rather than enumerating the library.
   const exact = db.prepare(
     current
       ? "SELECT b.* FROM current_files f JOIN blobs b ON b.oid=f.oid WHERE f.path=?"

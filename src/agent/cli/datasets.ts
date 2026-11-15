@@ -19,7 +19,6 @@ import {
 } from "./command";
 import { objectInput, readJson } from "./inputs";
 
-/** Shared datasets: datasets *. */
 export const datasetCommands: CommandDeclaration[] = [
   {
     command: "datasets",
@@ -82,7 +81,6 @@ export const datasetCommands: CommandDeclaration[] = [
         throw new Error(
           "--input must contain { value } or { fromBlock: { pageId, blockId, baseHash, local? } }.",
         );
-      // The file may name the new dataset's id.
       const { id: datasetId, ...value } = input as Record<string, unknown>;
       return {
         ...value,
@@ -169,7 +167,6 @@ export const datasetCommands: CommandDeclaration[] = [
       const dataset = args.positional[2];
       if (args.options.embed) {
         if (!dataset) throw new Error("datasets link --embed needs DATASET.");
-        // A null path copies the linked value back into the library.
         return {
           datasetId: dataset,
           path: null,

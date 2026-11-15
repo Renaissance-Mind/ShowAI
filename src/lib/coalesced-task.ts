@@ -1,4 +1,3 @@
-/** Merge bursts, retaining one follow-up for changes received during a running task. */
 export function coalescedTask<T>(action: () => Promise<T>): () => Promise<T> {
   let pending: Promise<T> | undefined,
     requested = false;

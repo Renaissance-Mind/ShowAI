@@ -1,5 +1,3 @@
-// Application icon registry. Import icons through this module so the viewer stays in sync.
-// Add a named export here when introducing an icon. No separate viewer list is needed.
 export {
   AlignCenter,
   AlignCenterHorizontal,

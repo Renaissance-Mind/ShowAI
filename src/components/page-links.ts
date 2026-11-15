@@ -13,15 +13,9 @@ export type {
   RecordPeekRequest,
   RecordPeekState,
 } from "./rich-text/environment";
-/** Provided by the workbench around a saved page; absent in readers and exports. */
 export const PageLinkContext = createContext<PageLinkBridge | null>(null);
 
 const noSubscription = () => () => {};
-/**
- * The page link bridge for components that display the page list: they
- * re-render when the host lists pages again. The context value itself keeps
- * its identity across saves, so other components are not re-rendered.
- */
 export function usePageLinks(): PageLinkBridge | null {
   const bridge = useContext(PageLinkContext);
   const pages = useSyncExternalStore<LinkablePage[] | undefined>(

@@ -1,11 +1,9 @@
-/* The documentation folder under "Add": library rows without row menus. */
 .studio-docs {
   margin: -4px 0 12px;
 }
 .studio-docs .studio-tree-row > .studio-tree-main {
   padding-right: 6px;
 }
-/* Documentation pages fill the scroll area like library pages. */
 .studio-scroll.has-page-surface > .studio-builtin-doc,
 .studio-builtin-doc > .surface-editor-shell {
   position: absolute;

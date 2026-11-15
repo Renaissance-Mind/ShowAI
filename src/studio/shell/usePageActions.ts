@@ -49,7 +49,6 @@ import {
   type WorkspaceTabs,
 } from "./types";
 
-/** Creating, importing, exporting and copying pages, and inserting components into them. */
 export function usePageActions({
   feedback: { setNotice, report, resolveProblem, notifyWithUndo, draftHeld },
   library: {
@@ -106,7 +105,6 @@ export function usePageActions({
   directory: Pick<DirectoryState, "project" | "folders" | "currentFolder">;
   router: Pick<StudioRouter, "saveOpenPage" | "settleOpenPage" | "openPage">;
   page: PageState;
-  /** The workspace tabs are created after these actions; they read them when they run. */
   workspaceRef: RefObject<WorkspaceTabs>;
 }) {
   const t = useTranslator(studioMessages);
@@ -118,7 +116,6 @@ export function usePageActions({
     plan: StagedImportPlan;
     destination: string;
   } | null>(null);
-  // Importers this project can use, offered as quick jump commands.
   const [importers, setImporters] = useState<
     { id: string; name: string; extensions: string[] }[]
   >([]);
@@ -157,7 +154,6 @@ export function usePageActions({
     const timer = setTimeout(() => setExportReceipt(null), 10000);
     return () => clearTimeout(timer);
   }, [exportReceipt]);
-  /** Save the page as shown, then copy a reference pinned to that version. */
   async function copyPageReference(projectId: string, target: AgentTarget) {
     const pageId = target.pageId;
     if (!pageId) return;
@@ -168,7 +164,6 @@ export function usePageActions({
         const state = item.getSnapshot();
         return state.projectId === projectId && state.draft?.id === pageId;
       });
-    // An open page saves first; the active one also finishes native ink input.
     const saved = !session
       ? true
       : session === workspaceState.active
@@ -211,7 +206,6 @@ export function usePageActions({
     template?: TemplateMetadata,
     kind?: "page" | "board",
     directory?: { projectId: string; parentId: string | null },
-    /** A blank page made by the person takes typing in its title at once. */
     focusTitle = false,
   ) {
     const workspace = workspaceRef.current;
@@ -223,7 +217,6 @@ export function usePageActions({
       : dialog?.type === "newPage"
         ? dialog.parentId
         : selectedFolder;
-    // A second click while the open page saves must not create another page.
     if (!projectId || creatingPage.current) return false;
     creatingPage.current = true;
     setBusy(true);
@@ -266,7 +259,6 @@ export function usePageActions({
             page.sessions.getSnapshot().active?.getSnapshot().draft?.id ===
             created.document.id,
         );
-      // The page is listed already; confirm only its project.
       void refreshProjects([projectId]).catch(report);
       return created.document.id;
     } catch (reason) {
@@ -277,10 +269,6 @@ export function usePageActions({
       setBusy(false);
     }
   }
-  /**
-   * A page a component on another page asked for, such as a database record.
-   * It goes into the given folder; a missing folder is made beside the asking page.
-   */
   async function createLinkedPage(input: {
     projectId: string;
     hostPageId: string;
@@ -313,7 +301,6 @@ export function usePageActions({
     await refreshProjects([input.projectId]);
     return { pageId: created.document.id, folderId: folder.id };
   }
-  /** Renames a page a component on another page links to, as the sidebar does. */
   async function renameLinkedPage(input: {
     projectId: string;
     pageId: string;
@@ -339,11 +326,6 @@ export function usePageActions({
     }
     await refreshProjects([input.projectId]);
   }
-  /**
-   * Copies the open read-only page into a new project this device owns. The
-   * copy stays local even when new projects default to a server account, and
-   * a failed import removes the empty project it was going to fill.
-   */
   async function saveLocalCopy() {
     const draft = page.draft;
     if (!draft) return;
@@ -386,7 +368,6 @@ export function usePageActions({
         retry: runSaveLocalCopy,
       }),
     );
-  /** The draft becomes a new page beside the original, which stays as saved. */
   async function keepDraftAsCopy() {
     const copy = await page.keepCopy();
     if (!copy) return;
@@ -394,7 +375,6 @@ export function usePageActions({
     else await refresh();
     setNotice(t("draftKeptAsCopy"));
   }
-  /** A blank page with the Agent panel open and its input focused. */
   async function createPageForAgent(directory: {
     projectId: string;
     parentId: string | null;
@@ -404,11 +384,6 @@ export function usePageActions({
     workspace.setAssistantOpen(true, workspace.activeId);
     focusAssistantInput();
   }
-  /**
-   * One import path for the toolbar, the 「添加内容」 menu and files dropped on
-   * the directory: the importer's plan is shown, and the import writes only
-   * after the person confirms it.
-   */
   async function importPage(
     directory: {
       projectId: string;
@@ -443,7 +418,6 @@ export function usePageActions({
       destination: [owner?.name, folder?.name].filter(Boolean).join(" / "),
     });
   }
-  /** After an import: the new content shows, and the whole import can be undone. */
   async function importFinished(report: ImportReport) {
     const { projectId: target } = report.plan.target;
     await refreshProjects([target]);
@@ -464,12 +438,6 @@ export function usePageActions({
       },
     );
   }
-  /**
-   * Files of this device, and data computed from them, leave with an export
-   * only as the person chooses after seeing the list with sizes (starting
-   * from their last choices): the decisions, undefined when nothing needs
-   * choosing, or null when they cancel.
-   */
   async function packagingChoice(
     projectId: string,
     pageId?: string,
@@ -498,8 +466,6 @@ export function usePageActions({
       : null,
   ) {
     if (!target) return;
-    // The browser saves a PDF from its own print dialog; the tab opens now,
-    // while the click still allows it, and shows the page once it is ready.
     const browserPrint = format === "pdf" && info?.mode === "browser";
     let printTab = browserPrint ? window.open("", "_blank") : null;
     setBusy(true);
@@ -557,7 +523,6 @@ export function usePageActions({
     if (!selectedProject) return;
     setBusy(true);
     try {
-      // The open page is part of the site when it belongs to this project.
       if (page.projectId === selectedProject) await saveOpenPage();
       else await settleOpenPage();
       const packaging = await packagingChoice(
@@ -605,7 +570,6 @@ export function usePageActions({
           parentId: page.draft.parentId,
         }
       : null;
-  /** Duplicates a page from any of its menus and opens the copy. */
   async function duplicatePage(target: LibraryTarget) {
     if (page.draft?.id === target.id) await saveOpenPage();
     const result = await desktop.invoke<LoadedPage>("pages:duplicate", {
@@ -618,7 +582,6 @@ export function usePageActions({
     await openPage(result.document.id, target.projectId);
     await refreshProjects([target.projectId]);
   }
-  /** Creates one kind of content in a project or folder. */
   function runCreation(
     choice: CreationChoice,
     directory: { projectId: string; parentId: string | null },

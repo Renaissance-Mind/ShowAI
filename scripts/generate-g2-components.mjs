@@ -1,4 +1,3 @@
-/** Extract editable defaults from the reviewed upstream examples; no rendering is simulated. */
 import { readFile, writeFile } from "node:fs/promises";
 import { csvParse, autoType } from "@antv/vendor/d3-dsv";
 import { catalog } from "../src/components/blocks/g2/catalog.js";
@@ -112,7 +111,6 @@ for (const entry of catalog) {
     for (const key of Object.keys(datasets))
       if (key.startsWith("layer-")) delete datasets[key];
   }
-  // Keep insertion defaults small. All values remain upstream samples; simplify only geometry.
   for (const [key, value] of Object.entries(datasets)) {
     if (Array.isArray(value) && value.length > 300 && key !== "unemployment2")
       datasets[key] = value.filter(

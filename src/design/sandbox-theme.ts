@@ -1,6 +1,5 @@
 import type { AppearanceTheme } from "./useAppearanceTheme";
 
-/** Serialized into the isolated component document, including older packages. */
 export function installSandboxTheme(
   channel: string,
   theme: AppearanceTheme,

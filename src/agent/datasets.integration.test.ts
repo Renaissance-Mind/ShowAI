@@ -241,7 +241,6 @@ test("two pages share one dataset; both write, merge and conflict at the field",
   });
   const board = widget(overview.document, "custom");
 
-  // Share the board's data; the page keeps only the binding and its title.
   const shared = await ok("dataset_write", {
     action: "create",
     name: "OKR",
@@ -265,7 +264,6 @@ test("two pages share one dataset; both write, merge and conflict at the field",
   expect(overviewRead.bindings[0]).toMatchObject({ datasetId, name: "OKR" });
   expect(overviewRead.bindings[0].props.objectives).toHaveLength(1);
 
-  // Map dated records of every level into the schedule database.
   let scheduleRead = await ok("page_read", {
     pageId: schedule.document.id,
     rendered: false,
@@ -312,7 +310,6 @@ test("two pages share one dataset; both write, merge and conflict at the field",
     kind: "截止",
   });
 
-  // Writing a mapped row in the schedule changes the shared record, not the overview page.
   const overviewHash = overviewRead.hash;
   await ok("page_apply", {
     pageId: schedule.document.id,
@@ -365,7 +362,6 @@ test("two pages share one dataset; both write, merge and conflict at the field",
     "task:t1": { prep: "2026-10-20" },
   });
 
-  // Removing a mapped row in the schedule is refused, not silently dropped.
   const refused = await call("page_apply", {
     pageId: schedule.document.id,
     baseHash: scheduleRead.hash,
@@ -383,7 +379,6 @@ test("two pages share one dataset; both write, merge and conflict at the field",
     expect.arrayContaining([{ id: "task:t1", reason: "removed" }]),
   );
 
-  // Two writers from the same read: different fields merge, the same field conflicts.
   const read = await ok("dataset_read", { action: "read", datasetId });
   const path = (id: string, field: string) =>
     `objectives[id=o1].keyResults[id=k1].tasks[id=${id}].${field}`;
@@ -422,7 +417,6 @@ test("two pages share one dataset; both write, merge and conflict at the field",
     { id: "t2", title: "审稿", due: "2026-10-26" },
   ]);
 
-  // An export carries a snapshot of the shared data.
   const out = join(root, "exports-test", "schedule.html");
   await ok("page_export", {
     pageId: schedule.document.id,
@@ -441,7 +435,6 @@ test("two pages share one dataset; both write, merge and conflict at the field",
     "kr:k1",
   ]);
 
-  // Deleting a used dataset is refused; detaching keeps a copy.
   const removal = await call("dataset_delete", {
     datasetId,
     baseHash: merged.hash,
@@ -469,7 +462,6 @@ test("two pages share one dataset; both write, merge and conflict at the field",
     "2026-10-26",
   );
 
-  // An incomplete binding is rejected when the page is saved.
   scheduleRead = await ok("page_read", {
     pageId: schedule.document.id,
     rendered: false,
@@ -601,7 +593,6 @@ test("a database bound with props keeps only its local settings, inserted or bou
       },
     ],
   });
-  // binding.set drops the block's own columns and rows.
   expect(widget(bound.document, "database").attrs.data).toEqual({
     title: "旧",
     $binding: { dataset: datasetId, props: { local } },
@@ -611,7 +602,6 @@ test("a database bound with props keeps only its local settings, inserted or bou
     blockId,
     props: { view: "calendar", calendar: { dateColumn: "due" } },
   };
-  // Creating the dataset is not a read: even local-only props need its hash.
   const missing = await call("page_apply", {
     pageId: page.document.id,
     baseHash: bound.hash,
@@ -664,7 +654,6 @@ test("a database bound with props keeps only its local settings, inserted or bou
     pageId: page.document.id,
     rendered: false,
   });
-  // A key outside local goes to the dataset; rebinding makes it block-only.
   const rebound = await ok("page_apply", {
     pageId: page.document.id,
     baseHash: read.hash,

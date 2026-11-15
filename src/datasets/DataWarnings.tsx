@@ -6,12 +6,10 @@ import { CircleAlert, Info, TriangleAlert } from "../ui/icons";
 import type { WarningAction, WarningLevel } from "./warnings.mjs";
 import { topLevel, type WarningEntry } from "./warning-entries";
 
-/** Carries out one action of an entry; resolves with a short result to show. */
 export type RunWarningAction = (
   action: WarningAction,
   entry: WarningEntry,
 ) => Promise<"copied" | void>;
-/** Labels that replace an action's default, e.g. copying instead of asking. */
 export type ActionLabels = Partial<Record<WarningAction, string>>;
 
 const icons = { error: CircleAlert, warning: TriangleAlert, info: Info };
@@ -21,7 +19,6 @@ function LevelIcon({ level }: { level: WarningLevel }) {
   return <Icon size={13} aria-hidden="true" />;
 }
 
-/** Buttons for an entry's actions, with the busy state and error of the last run. */
 function ActionButtons({
   entry,
   run,
@@ -77,11 +74,6 @@ function ActionButtons({
   );
 }
 
-/**
- * The warning surface of a bound block: a badge in its shared data row that
- * opens the list of entries with their actions. `stale` marks a value that
- * is shown although the source cannot be read now.
- */
 export function DataWarningBadge({
   entries,
   stale,
@@ -91,7 +83,6 @@ export function DataWarningBadge({
 }: {
   entries: WarningEntry[];
   stale: boolean;
-  /** The label when the only entries say what cannot be changed. */
   readOnlyLabel?: string;
   run: RunWarningAction;
   labels?: ActionLabels;
@@ -109,7 +100,6 @@ export function DataWarningBadge({
       if (!panel.current?.contains(target) && !button.current?.contains(target))
         setOpen(false);
     };
-    // Focus may stay in the page editor after clicking the badge; Escape still closes.
     const escape = (event: KeyboardEvent) => {
       if (event.key !== "Escape" || event.isComposing) return;
       event.preventDefault();
@@ -184,7 +174,6 @@ export function DataWarningBadge({
                   entry={entry}
                   run={async (action, target) => {
                     const result = await run(action, target);
-                    // Actions that continue elsewhere leave the list; a copied request stays to say so.
                     if (
                       action === "packaging" ||
                       (action === "ask-agent" && result !== "copied")
@@ -203,10 +192,6 @@ export function DataWarningBadge({
   );
 }
 
-/**
- * The body of a bound block without data: the main warning and its first
- * action, or all of its actions (`allActions`) where nothing else offers them.
- */
 export function DataEmptyState({
   entry,
   run,

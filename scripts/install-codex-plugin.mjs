@@ -62,7 +62,6 @@ async function npmScript(name) {
   if (result.stderr.trim()) process.stderr.write(result.stderr);
 }
 
-/** Hash source bytes and executable status; never follow a package symlink. */
 async function fingerprint(directory) {
   const entries = new Map();
   async function visit(path) {
@@ -116,7 +115,6 @@ async function install() {
     ? join(marketplaceRoot, "plugins/showai-cloud")
     : join(root, "plugins/showai-codex");
   if (remoteUrl) {
-    // Regenerate the remote package; only a previously generated copy is replaced.
     const previous = await readFile(
       join(pluginRoot, "plugin.json"),
       "utf8",
@@ -175,7 +173,6 @@ async function install() {
   const identity = `${pluginName}@${marketplace.name}`;
   const canonicalRoot = await realpath(marketplaceRoot);
 
-  // Refuse a name collision before any official command could replace a source.
   const considered = await codex(["marketplace", "list"]);
   if (!Array.isArray(considered.marketplaces))
     throw new Error(

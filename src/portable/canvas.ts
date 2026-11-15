@@ -47,7 +47,6 @@ export function retainCanvasArtifact(
   );
 }
 
-/** An explicitly opened thin page becomes a self-contained local editing copy. */
 export async function materializeCanvasArtifact(
   artifact: ShowArtifact,
 ): Promise<ShowArtifact> {

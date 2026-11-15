@@ -1,4 +1,3 @@
-/** Desktop smoke runs stay hidden unless the caller explicitly requests native UI. */
 export function desktopTestEnvironment() {
   return {
     ...process.env,

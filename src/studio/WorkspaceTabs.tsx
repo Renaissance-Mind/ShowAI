@@ -67,7 +67,6 @@ export default function WorkspaceTabs({
   shortcutHint = true,
 }: WorkspaceTabsState & {
   busy: boolean;
-  /** False in the browser, which keeps ⌘T / Ctrl+T for its own tabs. */
   shortcutHint?: boolean;
   onSelect: (id: string) => void;
   onClose: (id: string) => void;
@@ -92,7 +91,6 @@ export default function WorkspaceTabs({
     offsetY: number;
     width: number;
     height: number;
-    /** Ids and scroll-content positions at drag start, free of in-flight animations. */
     original: string[];
     layout: Map<string, { left: number; width: number }>;
   } | null>(null);
@@ -152,7 +150,6 @@ export default function WorkspaceTabs({
     const right = left + current.width;
     const from = current.original.indexOf(current.id);
     const others = current.original.filter((id) => id !== current.id);
-    // The ghost passes a neighbour once its leading edge crosses that tab's middle.
     let index = others.findIndex((id) => {
       const slot = current.layout.get(id)!;
       const middle = slot.left + slot.width / 2;

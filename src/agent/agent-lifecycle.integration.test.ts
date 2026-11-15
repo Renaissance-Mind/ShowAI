@@ -24,7 +24,6 @@ beforeAll(async () => {
   home = await mkdtemp(join(tmpdir(), "showai-agent-lifecycle-"));
   service = new AgentService({ root: home });
   projectId = (await service.createProject("Lifecycle")).id;
-  // The real CLI entry runs as its own process, as Agents call it.
   await mkdir(join(repository, "node_modules/.cache"), { recursive: true });
   bundleDirectory = await mkdtemp(
     join(repository, "node_modules/.cache/showai-lifecycle-"),
@@ -164,7 +163,6 @@ test("agents delete, list, restore, pin and duplicate pages through MCP and the 
   expect(text(duplicate.document)).toContain("Lifecycle body");
   expect(ids(duplicate.document).filter((id) => ids(original.document).includes(id))).toEqual([]);
 
-  // The CLI mirrors every operation.
   expect(await cli("pages", "delete", copy.pageId)).toMatchObject({
     pageId: copy.pageId,
     archived: true,
@@ -208,7 +206,6 @@ test("page_apply and page_save reply with receipts unless the document is reques
     changedBlocks: { removed: [], changed: [] },
   });
   expect(applied.document).toBeUndefined();
-  // Layout and views follow inserted blocks; that is not a page-level change.
   expect(applied.changedBlocks.page).toBeUndefined();
   expect(applied.revision).toEqual(expect.any(String));
   const [added] = applied.changedBlocks.added;
@@ -251,7 +248,6 @@ test("a default read of a large page returns an outline window and names what it
     ],
   }));
   document.content.content = blocks;
-  // Views are rebuilt from the new blocks when the page is saved.
   document.surfaceViews = {};
   const large = await service.savePage(
     projectId,
@@ -353,7 +349,6 @@ test("components and templates are removed only when nothing uses them", async (
   ]);
   expect(refused.error.nextStep).toContain("component.ref.set");
 
-  // An unused revision goes at once and leaves the used one in place.
   expect(
     await call("catalog_version", {
       action: "remove",
@@ -383,7 +378,6 @@ test("components and templates are removed only when nothing uses them", async (
     ],
   });
 
-  // A deleted page still counts: restoring it would bring the use back.
   await service.updatePage(projectId, page.document.id, { archived: true });
   const archived = await call("catalog_version", {
     action: "remove",

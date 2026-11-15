@@ -37,25 +37,16 @@ import "./portable.css";
 import "../design/tokens.css";
 import "../design/content.css";
 
-/** Where the reader finds its page and applies its theme. */
 export interface ReaderHost {
-  /** Set only by trusted inline hosts. Ordinary readers and the desktop app
-   * keep individual sandboxed iframes for custom code. */
   inlineHost: HTMLElement | null;
   readArtifact: () => string | null | undefined;
   readOptions: () => string | null | undefined;
-  /** Site exports list their pages so page links open the exported files. */
   readSite?: () => string | null | undefined;
   setTheme: (theme: "dark" | "light") => void;
 }
 
 const translate = translator(messages);
 
-/**
- * Remote loader errors carry a code so the reader can explain them in its own
- * language. Readers see what they can do; the publisher-facing reason (CORS,
- * checksums) stays in the collapsed technical details.
- */
 function remoteErrorMessage(error: unknown): {
   summary: string;
   detail: string;
@@ -144,13 +135,11 @@ function ArtifactReader({
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const appRef = useRef<HTMLDivElement>(null);
-  // Only a conversation host that accepts model context names the saved page.
   const conversation = useMemo(
     () => conversationPage(host.readOptions()),
     [host],
   );
   const references = useConversationReference(appRef, document, conversation);
-  // The export wrote the page's references; other pages have none here.
   const snapshot = artifact.references;
   const referenceSource = useMemo<PageReferenceSource | null>(
     () =>
@@ -390,10 +379,7 @@ function App({ host }: { host: ReaderHost }) {
   return <ArtifactReader artifact={result.artifact} host={host} />;
 }
 
-/** Mounts the reader into `target` and returns a function that unmounts it. */
 export function mountReader(target: HTMLElement, host: ReaderHost) {
-  // The exporter records its language on <html lang> (or the inline root);
-  // older exports default to zh-CN.
   setLocale(
     resolveLocale(
       host.inlineHost?.lang ||

@@ -13,12 +13,6 @@ import {
 import { CoreError } from "../model";
 import type { ImportBundle, ImportInput, Importer } from "./types";
 
-// Importers an Agent contributes to the content library. They live beside
-// components and templates, in packages/importers/ID of the library (every
-// project) or of one project: importer.json describes the importer and
-// importer.js converts the input in the QuickJS sandbox of dataset
-// transforms — no files, network or host objects, a memory limit and a
-// deadline. The script returns the same ImportBundle as built-in importers.
 
 export const IMPORTER_FORMAT = "showai-importer";
 export const BUILTIN_IMPORTER_IDS = ["notion", "word", "markdown"];
@@ -27,7 +21,6 @@ export const CONTRIBUTED_LIMITS = {
   memoryBytes: 256 * 1024 * 1024,
   timeoutMs: 20_000,
   outputBytes: 64 * 1024 * 1024,
-  /** Text handed to the script: each file and all files together. */
   textFileBytes: 4 * 1024 * 1024,
   textBytes: 32 * 1024 * 1024,
 };
@@ -174,7 +167,6 @@ async function readAt(
   };
 }
 
-/** Importers of the project first, then of the whole library; a project importer hides a library one with its id. */
 export async function listContributedImporters(
   home: string,
   projectId?: string,
@@ -200,7 +192,6 @@ export async function listContributedImporters(
           );
         if (importer) importers.push(importer);
       } catch (error) {
-        // One broken importer must not hide the others; its reason is listed.
         problems.push(
           `${scope === "project" ? `projects/${project}/` : ""}packages/importers/${id}: ${error instanceof Error ? error.message : String(error)}`,
         );
@@ -229,7 +220,6 @@ async function writeFiles(
     else await rm(path, { force: true });
 }
 
-/** Saves (or replaces) a contributed importer; the library history keeps earlier versions. */
 export async function saveContributedImporter(
   home: string,
   input: { manifest: unknown; script: unknown },
@@ -280,7 +270,6 @@ export async function removeContributedImporter(
   return { id, scope: target.scope };
 }
 
-/** The input as the sandbox sees it: every file with its size, and the text of text files. */
 async function sandboxInput(input: ImportInput, withText: boolean) {
   let total = 0;
   const files = [];
@@ -298,8 +287,6 @@ async function sandboxInput(input: ImportInput, withText: boolean) {
         if (text.charCodeAt(0) === 0xfeff) text = text.slice(1);
         total += file.size;
       } catch (error) {
-        // Binary files reach the script without text; their bytes stay with
-        // the harness, which embeds them through file placeholders.
         if (!(error instanceof TypeError)) throw error;
       }
     }
@@ -315,7 +302,6 @@ async function sandboxInput(input: ImportInput, withText: boolean) {
 const extensionOf = (path: string) =>
   /\.[^./]+$/.exec(path)?.[0]?.toLowerCase() ?? "";
 
-/** A contributed importer in the same slot as the built-in ones. */
 export function contributedImporter(item: ContributedImporter): Importer {
   const { manifest, script } = item;
   const limits = {

@@ -95,8 +95,6 @@ import {
   useReaderStateScope,
 } from "./reader-state";
 
-// Attribute commands replace nested values explicitly, retaining source ink and
-// children. Structural commands below perform their own reconciliation.
 function editNode(
   source: ShowDocument,
   id: string,
@@ -108,15 +106,12 @@ function editNode(
   }));
 }
 
-/** Text placed on a Board starts as a note-sized box rather than a page column. */
 const boardTextWidth = 320;
 interface Runtime {
   geometry: SurfaceGeometryStore;
   document: ContainerDocument;
   current: RefObject<ContainerDocument>;
-  /** The current document with measured geometry, as edits start from. */
   source: () => ContainerDocument;
-  /** Commits sharing a group within a short interval form one undo step. */
   commit: (next: ShowDocument, group?: string) => void;
   readOnly: boolean;
   printing: boolean;
@@ -186,7 +181,6 @@ export function ContainerRuntime({
   reading?: boolean;
   nativeInkBackground?: boolean;
   hideTitle?: boolean;
-  /** App editors opt in; exported readers retain their existing width. */
   pageWidthModes?: boolean;
   onActiveSurfaceChange?: (id: string) => void;
   onControlsChange?: (controls: EditorControls | null) => void;
@@ -230,7 +224,6 @@ export function ContainerRuntime({
     [],
   );
   const closeSlash = useCallback(() => setSlash(null), []);
-  // A stable value keeps every component body from re-rendering per commit.
   const registerComponent = useCallback(
     (component: CompiledComponent) =>
       setLoadedComponents((items) => [...items, component]),
@@ -325,7 +318,6 @@ export function ContainerRuntime({
     if (kind === "board" && inspecting && inspecting !== selected)
       inspect(null);
   }, [kind, selected, inspecting]);
-  // Quick jump inserts through the controls; it runs with the latest state.
   const insertFromControls = useRef<EditorControls["insertComponent"]>(
     () => {},
   );
@@ -546,8 +538,6 @@ export function ContainerRuntime({
             onKeyDown={(event) => {
               if (event.defaultPrevented || event.nativeEvent.isComposing)
                 return;
-              // A reconstructed text view has a fresh ProseMirror history. The
-              // retained surface history still owns edits made before eviction.
               if (
                 !runtime.readOnly &&
                 (event.metaKey || event.ctrlKey) &&
@@ -1086,8 +1076,6 @@ function ContainerView({
   const styleKey=keyForTool(tool);
   const style = styles[styleKey];
   const chooseTool = (next: BoardTool | null) => {
-    // The native control lane seals and registers the outgoing contact. Its
-    // captured/queued ownership is not an ACK and does not force a checkpoint.
     const nativeControlled=viewport.current?.configureNativeInput(next,styleValues.current[keyForTool(next)]);
     const saving = next===toolValue.current||nativeControlled ? undefined:window.showai?.inlineInk?.flush();
     toolValue.current=next;
@@ -1111,8 +1099,6 @@ function ContainerView({
     );
   const outlineView = runtime.outlines.get(persistKey)!;
   const scrollTarget = useRef<number | undefined>(undefined);
-  // The page is marked while it restores, so components that mount above the
-  // view leave the scroll position to the restore (see mount-queue.ts).
   const aimScroll = (target: number | undefined) => {
     scrollTarget.current = target;
     const element = page.current;
@@ -1129,13 +1115,10 @@ function ContainerView({
       element.scrollTop = captured.y;
       return;
     }
-    // Another tab, or a tab opened after a restart, starts where this page was last read.
     const saved =
       runtime.scrolls.get(persistKey) ??
       readScroll(persistKey) ??
       readScroll(sharedScrollKey);
-    // Content that is still loading cannot reach the saved position yet: keep
-    // restoring as it grows, until the reader scrolls or something is revealed.
     aimScroll(saved);
     let restored = element.scrollTop;
     const restore = () => {
@@ -1165,9 +1148,7 @@ function ContainerView({
       writeScroll(persistKey, top);
       writeScroll(sharedScrollKey, top);
     };
-    // Written after scrolling pauses, so quitting the App keeps the position.
     const scrolled = () => {
-      // A scroll the restore did not make, such as following a link, wins.
       if (Math.abs(element.scrollTop - restored) > 2)
         aimScroll(undefined);
       clearTimeout(timer);
@@ -1213,12 +1194,8 @@ function ContainerView({
       );
     runtime.requestReveal(null);
   }, [runtime.revealRequest]);
-  // Object actions come from the runtime's stable parts, so a commit does not
-  // hand every object a new context; mutations read the latest runtime.
   const latestRuntime = useRef(runtime);
   latestRuntime.current = runtime;
-  // Local tool/style state must not broadcast a new object context. These
-  // handlers keep their identity and read the latest runtime when they run.
   const transformObjectFrames = useCallback(
     (frames: Record<string, NodeLayout>, group?: string) => {
       const runtime = latestRuntime.current;
@@ -1259,7 +1236,6 @@ function ContainerView({
             current.select(null);
           },
     }),
-    // select and inspect are state setters and never change.
     [runtime.geometry, runtime.selected, runtime.expand, readOnly, kind, reading],
   );
   const connectObject = useCallback<NonNullable<ObjectActions["connect"]>>(
@@ -1317,7 +1293,6 @@ function ContainerView({
     },
     [],
   );
-  // A borderless Page blends into its Board: no frame and no title line.
   const heading =
     header ??
     (!root && !node.attrs?.frameless ? (
@@ -1487,8 +1462,6 @@ function ContainerView({
                   const roots = paste.clip.nodes
                     .map((node) => paste.clip.layout[node.attrs!.id])
                     .filter(Boolean);
-                  // Paste centers the copy under the pointer when it is over
-                  // the Board; otherwise it lands slightly offset.
                   const offset =
                     point && roots.length
                       ? {
@@ -1612,7 +1585,6 @@ function ContainerView({
             const drawings = ids.filter(
               (nodeId) => isEditableDrawing(findSurfaceNode(runtime.current.current,nodeId)?.node),
             );
-            // A current selection takes precedence over the active drawing tool.
             if (!drawings.length) {
               const key=keyForTool(toolValue.current),next={...styleValues.current,[key]:{...styleValues.current[key],...patch}};
               styleValues.current=next;
@@ -1630,7 +1602,6 @@ function ContainerView({
                 if (!labelCapable(node)) delete applicable.labelSize;
                 node.attrs = { ...node.attrs, ...applicable };
               }) as ContainerDocument;
-            // A larger label grows its shape in the same step when it no longer fits.
             if (patch.labelSize !== undefined) {
               const grown: Record<string, NodeLayout> = {};
               for (const nodeId of drawings) {
@@ -1656,7 +1627,6 @@ function ContainerView({
               if (Object.keys(grown).length)
                 next = transformObjects(next, grown) as ContainerDocument;
             }
-            // Dragging a slider or color picker is one undo step.
             runtime.commit(next, `style:${[...drawings].sort().join(",")}`);
           }}
           onLabel={readOnly ? undefined : setObjectLabel}
@@ -1753,8 +1723,6 @@ function ContainerView({
                       adopt.offset,
                     );
                   runtime.commit(next);
-                  // Keep drawing: the tool stays active and the next stroke
-                  // must not grab what was just drawn.
                   runtime.select(null);
                 }
           }
@@ -1781,7 +1749,6 @@ function ContainerView({
   );
 }
 
-/** A saved outline view, keeping only the fields it still understands. */
 function readOutlineView(value: unknown): OutlineViewState {
   if (!isRecord(value)) return {};
   return {
@@ -1791,7 +1758,6 @@ function readOutlineView(value: unknown): OutlineViewState {
   };
 }
 let printQuery: MediaQueryList | undefined;
-/** Scroll events read this on every frame; one query object serves them all. */
 function printMedia() {
   return (printQuery ??= matchMedia("print"));
 }
@@ -1808,6 +1774,5 @@ function writeScroll(key: string, value: number) {
   try {
     localStorage.setItem(key, String(value));
   } catch {
-    /* Personal view storage may be unavailable in an opaque inline host. */
   }
 }

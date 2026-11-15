@@ -5,7 +5,6 @@ import {
   type PortableInk,
 } from "./portable-ink.mjs";
 
-/** Shared brush output; the SVG is editable geometry, never a raster preview. */
 export function PortableInkPaths({
   ink,
   fragments = [],

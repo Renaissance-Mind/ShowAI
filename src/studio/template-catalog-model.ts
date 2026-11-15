@@ -18,7 +18,6 @@ export function latestTemplateVersions(items: TemplateMetadata[]) {
             }));
     if (!previous || order > 0) newest.set(key, item);
   }
-  // Preserve ambiguous copies with the same version rather than silently picking an integrity.
   return items.filter(
     (item) => newest.get(`${item.scope}:${item.id}`)?.version === item.version,
   );

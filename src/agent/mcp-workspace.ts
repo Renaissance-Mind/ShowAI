@@ -53,7 +53,6 @@ export class RemoteWorkspaces {
         403,
       );
     return this.serialized(grant.id, async () => {
-      // Validate the upstream session before creating any local project.
       await this.projects(grant);
       const root = join(this.directory, grant.id);
       await openLibrary(root);
@@ -128,7 +127,6 @@ export class RemoteWorkspaces {
       }
     });
   }
-  /** Serialize pull → operation → push in the same grant's replica, preserving version checks. */
   async withProject<T>(
     grant: ProjectGrant,
     remoteId: string,
@@ -138,10 +136,6 @@ export class RemoteWorkspaces {
     return this.withProjects(grant, [remoteId], write, operation);
   }
 
-  /** Hydrate and authorize every participant before an atomic local operation.
-   * Multi-project publication is destination-first; a durable queue resumes it
-   * before any later pull can publish a retained source deletion out of order.
-   */
   async withProjects<T>(
     grant: ProjectGrant,
     remoteIds: string[],

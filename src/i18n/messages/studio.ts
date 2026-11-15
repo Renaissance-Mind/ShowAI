@@ -1,6 +1,5 @@
 import { defineMessages } from "../index";
 
-// Workbench shell: top bar, project and page views, menus and small dialogs.
 export default defineMessages("studio", {
   "zh-CN": {
     "scope.builtin": "内置",

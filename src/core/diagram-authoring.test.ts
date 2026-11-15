@@ -187,8 +187,6 @@ test("all ten Archify types and eleven Fireworks generation styles match directl
         expect(result.input).toEqual(inputData);
         expect(resolve(result.path)).not.toBe(resolve(input));
         if (family === "archify") {
-          // Built-in samples must retain the original renderer's complete output,
-          // including SVG semantics, motion and the viewer's embedded resources.
           await writeFile(input, JSON.stringify(template.input));
           const render = join(
             reference,
@@ -201,8 +199,6 @@ test("all ten Archify types and eleven Fireworks generation styles match directl
           expect(template.source, `builtin/${type}`).toBe(
             await readFile(direct, "utf8"),
           );
-          // The browser replaces filesystem locale loading with bundled JSON.
-          // Check it against the untouched renderer, including locale casing.
           const localized = structuredClone(template.input) as any;
           localized.meta.locale = ["zh-CN", "zh-TW", "es", "ko", "zh-cn"][
             listDiagramTemplates(family).findIndex((item) => item.id === type) %

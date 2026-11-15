@@ -1,6 +1,5 @@
 import type { PairingStatus } from "./types";
 
-/** These are public discovery values, never OAuth client secrets or access tokens. */
 export function oauthSetupValues(endpoint: string) {
   const url = new URL(endpoint);
   return {

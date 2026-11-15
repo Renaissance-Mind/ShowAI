@@ -6,7 +6,6 @@ import {
   type NavigationTarget,
 } from "../document/page-link.mjs";
 
-/** Written into each page of a site export: the project and each page's file. */
 export interface SiteRoutes {
   projectId: string;
   pages: Record<string, string>;
@@ -27,7 +26,6 @@ export function parseSiteRoutes(raw: string | null | undefined) {
 const blockSelector = (id: string) =>
   `[data-block-id="${CSS.escape(id)}"],[data-surface-id="${CSS.escape(id)}"]`;
 
-/** Scroll to the first linked block and briefly outline each of them. */
 export function revealBlocks(
   root: HTMLElement,
   ids: string[],
@@ -50,11 +48,6 @@ export function revealBlocks(
   return found.length > 0;
 }
 
-/**
- * Follow page links inside a reader. The page itself scrolls to the linked
- * blocks, a site export opens its own page file, and every other page link
- * goes to the ShowAI app (or the conversation host's link handler).
- */
 export function installReaderLinks(
   root: HTMLElement,
   page: { pageId: string; projectId?: string },
@@ -94,7 +87,6 @@ export function installReaderLinks(
     const target = anchor && parsePageLink(anchor.getAttribute("href"));
     if (!target) return;
     const route = resolve(target);
-    // Links to other pages keep their default: the browser hands them to the app.
     if (!route || "app" in route) return;
     event.preventDefault();
     if ("here" in route) revealBlocks(root, target.blockIds);
@@ -109,7 +101,6 @@ export function installReaderLinks(
     if ("here" in route) revealBlocks(root, detail.target.blockIds);
     else if ("url" in route) location.assign(route.url);
     else {
-      // An anchor inside the reader reaches a conversation host's link handler.
       const anchor = window.document.createElement("a");
       anchor.href = route.app;
       anchor.hidden = true;
@@ -126,7 +117,6 @@ export function installReaderLinks(
   };
 }
 
-/** A page opened from another page's link shows the block named in its hash. */
 export function revealLinkedBlock(root: HTMLElement) {
   const id = decodeURIComponent(location.hash.slice(1));
   if (!id) return () => {};
@@ -135,7 +125,6 @@ export function revealLinkedBlock(root: HTMLElement) {
   const timer = setInterval(() => {
     const found = revealBlocks(root, [id], "auto");
     if (found || ++attempts > 20) clearInterval(timer);
-    // Components finish rendering after the first pass and can move the block.
     if (found)
       settle = setTimeout(() => {
         const element = root.querySelector(blockSelector(id));

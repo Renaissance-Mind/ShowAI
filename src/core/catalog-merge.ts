@@ -37,8 +37,6 @@ function hunks(base: string[], next: string[]): Hunk[] {
       start: change.start + prefix,
       end: change.end + prefix,
     }));
-  // Bound memory for large source files; conservative conflicts are preferable
-  // to an approximate merge that silently overwrites a change.
   if ((base.length + 1) * (next.length + 1) > 2_000_000) {
     let start = 0,
       suffix = 0;
@@ -136,10 +134,6 @@ export function mergeText(
     result.splice(change.start, change.end - change.start, ...change.lines);
   return result.join("");
 }
-/** Transform an old local undo snapshot through later remote text edits.
- * Characters inserted by the remote side have no base identity and are never
- * removed by the local inverse. This also preserves insertions inside a local
- * span being undone, rather than treating them as an overlapping replacement. */
 export function rebaseHistoryText(
   base: string,
   snapshot: string,
@@ -186,7 +180,6 @@ export function rebaseHistoryText(
 
 export type MergeChoices = Readonly<Record<string, "ours" | "theirs">>;
 
-/** Missing keys, deletions, and array changes remain distinct from null. */
 export function mergeValues(
   base: unknown,
   ours: unknown,

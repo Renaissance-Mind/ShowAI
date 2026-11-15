@@ -30,8 +30,6 @@ inline bool upsert_source(Graph&g,const SABoundarySourceBlock&description,const 
     if(old_index!=no_index&&block_unchanged(static_cast<const Graph&>(g).blocks[old_index],description,commands,count))return true;
     uint64_t resulting=uint64_t(g.active_commands)+description.command_count-(old_index==no_index?0:static_cast<const Graph&>(g).blocks[old_index].commands.size());
     if(resulting>g.budget.max_commands||(old_index==no_index&&g.active_sources>=g.budget.max_sources)){g.context()->fail(SA_INK_CAPACITY);return false;}
-    // A real independent captured parse mints closure and exact transformed
-    // curves. No key, caller flag or previously writable input is an authority.
     Graph fragment(*g.math,g.budget);if(!capture(fragment,g.paths.begin(),g.paths.size(),&description,1,commands,count))return false;
     if(old_index!=no_index&&!remove_source(g,old_index,dirty))return false;
     uint32_t index;if(g.free_blocks.empty()){index=g.blocks.size();g.blocks.push_back(CapturedBlock(*g.context()));}else{index=g.free_blocks.back();g.free_blocks.pop_back();}
@@ -47,8 +45,6 @@ inline void construct_delta(Graph&g,const SourceDirty&dirty){
     if(!g.good())return;g.output_reset=false;g.coincidences.clear();g.point_aliases.clear();g.vertex_changes.clear();g.metrics={};PagedVector<uint32_t,6>marked(*g.context());marked.resize(g.curves.size());Vector<uint32_t>selected(*g.context());
     auto mark=[&](uint32_t id){if(id<g.curves.size()&&!static_cast<const PagedVector<uint32_t,6>&>(marked)[id]){marked[id]=1;selected.push_back(id);}};
     for(uint32_t id:dirty.curves)mark(id);for(Bounds box:dirty.support)query_curves(g,box,mark);
-    // Coincident intervals share cuts. Include the exact retained component;
-    // this may conservatively visit more arcs, but never skips a required cut.
     for(uint32_t cursor=0;cursor<selected.size()&&g.good();cursor++)for(const auto&record:static_cast<const Graph&>(g).curves[selected[cursor]].proofs)if(record.get()->proof.coincident){mark(record.get()->a);mark(record.get()->b);}
     initialize_curves(g,selected);
     for(uint32_t id:selected){if(!g.good())return;if(static_cast<const Graph&>(g).curves[id].weight.zero())continue;query_curves(g,static_cast<const Graph&>(g).curves[id].bounds,[&](uint32_t other){if(id!=other&&(!static_cast<const PagedVector<uint32_t,6>&>(marked)[other]||id<other))add_pair(g,id,other);});}

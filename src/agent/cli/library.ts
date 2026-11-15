@@ -19,7 +19,6 @@ import {
 } from "./command";
 import { readDocument } from "./inputs";
 
-/** Versioned library maintenance, search and workspace conflicts. */
 export const libraryCommands: CommandDeclaration[] = [
   {
     command: "library",

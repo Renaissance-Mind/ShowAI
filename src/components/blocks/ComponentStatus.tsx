@@ -1,10 +1,3 @@
-/**
- * One status card for a component that cannot show its content: 运行出错 /
- * 参数不符 / 组件缺失. Built-in blocks and sandboxed custom components share
- * it. It names the component, says the rest of the page and the data are
- * safe, and offers what can be done here. Readers and exports see the same
- * card without editing actions or technical details.
- */
 import { useEffect, useRef, useState } from "react";
 import {
   CircleAlert,
@@ -19,7 +12,6 @@ import type { ProblemDescription } from "../../problems/describe";
 import messages from "../../i18n/messages/componentStatus";
 import widgetMessages from "../../i18n/messages/widget";
 import type { AssistantBridge } from "../assistant-context";
-// Direct module imports keep the reader bundle free of the workbench notice UI.
 import { dispatchReportProblem } from "../../problems/report-event";
 import { problemReportText } from "../../problems/report-text";
 import { downloadFile } from "./helpers";
@@ -27,34 +19,23 @@ import "./component-status.css";
 
 export type ComponentStatusState = "crashed" | "invalid" | "missing";
 
-/** Asks the workbench to open the component library filtered by a query. */
 export const FIND_COMPONENT_EVENT = "showai:find-component";
 
 export interface ComponentStatusProps {
   state: ComponentStatusState;
-  /** Display name, e.g. 示例图表; falls back to the reference. */
   name: string;
-  /** Stable identity: `id@version` for custom components, the kind for built-ins. */
   reference: string;
-  /** Library search for a missing component. */
   query?: string;
-  /** Original technical message. */
   error?: string;
   stack?: string;
-  /** Readable parameter issues (参数不符). */
   issues?: string[];
-  /** Replaces the state's title, e.g. when the data cannot be read here. */
   title?: string;
-  /** Replaces the default cause sentence. */
   cause?: string;
   integrity?: string;
-  /** Block data shown and downloadable in the technical details. */
   data?: unknown;
-  /** Readers, exports and read-only pages: no editing actions or details. */
   readOnly?: boolean;
   onRetry?: () => void;
   assistant?: AssistantBridge | null;
-  /** The status replaces the component (blank) or sits above it. */
   attached?: boolean;
 }
 
@@ -115,8 +96,6 @@ export function ComponentStatus({
   ]
     .filter(Boolean)
     .join("\n");
-  // Built here rather than through describeError so readers don't bundle the
-  // workbench error catalogue.
   const problem: ProblemDescription = {
     code:
       state === "crashed"

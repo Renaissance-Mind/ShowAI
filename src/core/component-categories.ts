@@ -83,7 +83,6 @@ export function componentCategory(item: CatalogComponent): ComponentCategory {
   return builtinCategories[item.id.replace(/^my-/, "")] ?? "other";
 }
 
-/** Discovery lists show the newest version within each component's library. */
 export function latestComponentVersions<T extends CatalogComponent>(
   items: T[],
 ): T[] {
@@ -111,7 +110,6 @@ export function latestComponentVersions<T extends CatalogComponent>(
             }));
     if (!previous || order > 0) newest.set(identity, item);
   }
-  // Equal versions with different integrity remain explicit rather than choosing a copy.
   return items.filter(
     (item) => "kind" in item || newest.get(key(item))?.version === item.version,
   );

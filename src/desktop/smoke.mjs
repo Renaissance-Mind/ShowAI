@@ -1,5 +1,4 @@
 import { desktopTestEnvironment } from "../../scripts/desktop-test-env.mjs";
-// Runs the actual Electron binary against an isolated data directory and built UI.
 import assert from "node:assert/strict";
 import { execFile, spawn } from "node:child_process";
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
@@ -11,7 +10,6 @@ import { promisify } from "node:util";
 import electron from "electron";
 import { stopTestProcess } from "../../scripts/stop-test-process.mjs";
 
-// The smoke checks select controls by their Chinese labels.
 process.env.SHOWAI_LANGUAGE ??= "zh-CN";
 
 const repository = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
@@ -158,8 +156,6 @@ try {
   const main = await connect(mainPort),
     renderer = await connect(rendererPort);
   inspectMain = main;
-  // Wait for the actual workbench navigation before running a long evaluation.
-  // The initial about:blank context can disappear while Windows is loading it.
   for (let attempt = 0; ; attempt++) {
     if (await renderer("!!window.showai && document.readyState === 'complete'"))
       break;
@@ -258,7 +254,6 @@ try {
   assert.equal(result.componentsOnSave, true);
   assert.equal(result.assetsPreserved, true);
   assert.equal(result.componentReady, true);
-  // Granted local files reach the workbench player through the showai-media scheme.
   assert.deepEqual(result.media, {
     kind: "image",
     width: 1,
@@ -307,8 +302,6 @@ try {
     "({count:window.__closeCount,bridge:!!window.showai})",
   );
   assert.deepEqual(refusal, { count: 1, bridge: true });
-  // Visible runs keep the explanation dialog open; hidden runs report the
-  // refusal without a dialog, and a subsequent quit asks the page again.
   await main(`${native}.app.quit(); 'quit requested'`);
   await new Promise((done) => setTimeout(done, 300));
   assert.deepEqual(
@@ -316,9 +309,6 @@ try {
     { count: environment.SHOWAI_BACKGROUND === "1" ? 2 : 1, bridge: true },
   );
   await renderer("window.__release();'released'");
-  // Reply before closing the last window. Windows quits the event loop at that
-  // point, so another inspector evaluation can wait forever for a response.
-  // Destroying the window dismisses the open explanation dialog with it.
   await main(
     `setTimeout(()=>{const window=${workbench};window.once('closed',()=>${native}.app.quit());window.destroy();},50); 'requested'`,
   );
@@ -357,7 +347,6 @@ try {
     {
       cwd: temporary,
       env: { ...environment, ...result.cli.env },
-      // Usually ~2 s; one Windows CI run needed more than 20 s.
       timeout: 60000,
     },
   );

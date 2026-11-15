@@ -109,14 +109,10 @@ export function TemplateDialog({
   record: LoadedTemplate;
   components: CompiledComponent[];
   onClose: () => void;
-  /** Present for templates that produce a page; disabled while no project is open. */
   onCreatePage?: () => Promise<void>;
   createUnavailable?: boolean;
-  /** Workflow templates hand their exact ref to an agent through a prompt. */
   onCopyPrompt?: (prompt: string) => Promise<void>;
-  /** Present where the catalog can be changed. */
   manager?: CatalogManager;
-  /** The project that owns a project revision, or the context project. */
   owner?: string;
 }) {
   const t = useTranslator(messages);
@@ -129,7 +125,6 @@ export function TemplateDialog({
   const [status, setStatus] = useState<{
     error: boolean;
     text: string;
-    /** Shown for copying by hand when the clipboard is unavailable. */
     prompt?: string;
   } | null>(null);
   const run = async (
@@ -369,16 +364,12 @@ export function ComponentDialog({
   builtin?: BuiltinComponentMetadata;
   custom?: CompiledComponent;
   canInsert: boolean;
-  /** The open page the component goes into, named on the button. */
   insertPageTitle?: string;
-  /** Keeps the button visible but disabled, saying a page must be open first. */
   insertUnavailable?: boolean;
   onInsert: (kind: string, data: Record<string, unknown>) => Promise<void>;
   onClose: () => void;
   loadSource?: () => Promise<ComponentSource>;
-  /** Present where the catalog can be changed; custom components only. */
   manager?: CatalogManager;
-  /** The project that owns a project revision, or the context project. */
   owner?: string;
 }) {
   const t = useTranslator(messages);
@@ -459,7 +450,6 @@ export function ComponentDialog({
                   <Plus size={16} />
                   {canInsert && insertPageTitle
                     ? t("insertIntoNamedPage", {
-                        // Long titles stay readable in the header; the full title is the page's.
                         title:
                           insertPageTitle.length > 14
                             ? `${insertPageTitle.slice(0, 13)}…`

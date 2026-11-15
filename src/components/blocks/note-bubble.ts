@@ -2,10 +2,6 @@ import { mathHtml } from "../../document/markdown-math.mjs";
 import "./katex.css";
 import "./note.css";
 
-// One delegated controller per document shows the note of any element that
-// carries data-showai-note: rich text, KaTeX parts, inline markup, SVG chart
-// labels and custom components. The bubble is styled inline so pages whose
-// stylesheet is scoped to a reader root still show it on document.body.
 
 const SELECTOR = "[data-showai-note]";
 const INSTALLED = Symbol.for("showai.noteBubbles");
@@ -21,7 +17,6 @@ const escapeHtml = (value: string) =>
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;");
 
-/** Note text with `$...$` formulas rendered and line breaks kept. */
 export function noteHtml(note: string): string {
   return note
     .split(/(\$[^$\n]+\$)/g)
@@ -44,7 +39,6 @@ function noteTarget(node: EventTarget | null): Element | null {
   return target?.getAttribute("data-showai-note")?.trim() ? target : null;
 }
 
-/** Install the hover/focus/tap controller once for a document. */
 export function installNoteBubbles(
   doc: Document | undefined = globalThis.document,
 ) {
@@ -115,7 +109,6 @@ export function installNoteBubbles(
     const rect = anchorRect(current);
     const width = view.innerWidth;
     const height = view.innerHeight;
-    // The anchor scrolled away or collapsed: a bubble pointing at nothing misleads.
     if (
       (!rect.width && !rect.height) ||
       rect.bottom < 0 ||
@@ -206,7 +199,6 @@ export function installNoteBubbles(
   doc.addEventListener("focusout", (event) => {
     if (noteTarget(event.target) === current && !pinned) scheduleHide();
   });
-  // Touch has no hover: a tap opens the note, a tap elsewhere closes it.
   doc.addEventListener("pointerup", (event) => {
     if (event.pointerType !== "touch") return;
     const target = noteTarget(event.target);

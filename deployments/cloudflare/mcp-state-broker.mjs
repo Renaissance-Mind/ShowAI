@@ -10,7 +10,6 @@ async function authorized(request, key) {
   for (let i = 0; i < actual.length; i++) difference |= actual[i] ^ expected[i];
   return difference === 0;
 }
-/** Only encrypted state objects cross this private broker; never serves content anonymously. */
 export async function stateRequest(request, env) {
   const key = new URL(request.url).pathname.match(
     /^\/__state\/(head|[a-f0-9]{64})$/,

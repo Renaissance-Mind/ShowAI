@@ -4,7 +4,6 @@ import { createPortal } from "react-dom";
 import { useTranslator } from "../i18n/react";
 import messages from "../i18n/messages/editor";
 
-/** One selection menu container; object-specific actions append to its children. */
 export function SelectionToolbar({
   id,
   anchor,
@@ -44,7 +43,6 @@ export function SelectionToolbar({
         window.innerWidth - 8,
         (boundary?.right ?? window.innerWidth) - 8,
       );
-      // Layout at the unscaled width, then measure the rendered bar for placement.
       element.style.maxWidth = `${Math.max(0, rightEdge - leftEdge) / scale}px`;
       const { width, height } = element.getBoundingClientRect();
       const bounds = anchorElement?.isConnected
@@ -59,7 +57,6 @@ export function SelectionToolbar({
         : anchor;
       const panel = element.querySelector<HTMLElement>(".editor-toolbar-panel");
       const panelHeight = panel?.getBoundingClientRect().height ?? 0;
-      // Reserve space above the bar for its independent secondary panel.
       const minimumTop =
         panelHeight && viewportTop + panelHeight + height + 24 < innerHeight
           ? viewportTop + panelHeight + 8
@@ -95,7 +92,6 @@ export function SelectionToolbar({
       place();
     });
     panels.observe(element, { childList: true, subtree: true });
-    // Ancestors can move the anchor while the anchor's own size stays unchanged.
     for (const target of [anchorElement, boundaryElement])
       for (
         let ancestor: HTMLElement | null = target ?? null;

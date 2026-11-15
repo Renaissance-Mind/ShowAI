@@ -1,8 +1,5 @@
 import { defineMessages } from "../index";
 
-// Page and board surfaces: board tools and style controls, object chrome,
-// context menus, the module inspector and navigation. Default names saved into
-// documents (region, drawing, rich text) stay in code.
 export default defineMessages("surface", {
   "zh-CN": {
     "selection.textInput": "跨组件文本选区",

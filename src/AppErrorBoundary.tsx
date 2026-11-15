@@ -10,7 +10,6 @@ import {
 
 const t = translator(messages);
 
-/** A lazily loaded interface file failed to arrive (update, restart, offline). */
 export function isChunkLoadError(error: unknown): boolean {
   const text =
     error instanceof Error ? `${error.name} ${error.message}` : String(error);
@@ -56,11 +55,9 @@ interface State {
   componentStack: string;
   at: string;
   copied: boolean;
-  /** The workbench is gone, so the report form opens on this page. */
   report?: ReportProblemDetail;
 }
 
-/** Keeps an uncaught interface error from leaving a blank window. */
 export class AppErrorBoundary extends Component<
   { children: ReactNode },
   State
@@ -93,7 +90,6 @@ export class AppErrorBoundary extends Component<
         message: redact(message, { truncateIds: true }),
         at,
       };
-      // 关于与反馈 takes over when the workbench still runs; otherwise report here.
       if (dispatchReportProblem(detail)) this.setState({ report: detail });
     };
     return (

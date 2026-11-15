@@ -8,9 +8,6 @@ import {
 
 export { esc };
 
-// `extra` appends type-owned definitions (the entity renderer's cardinality
-// markers) inside the same <defs>. Callers that pass nothing keep the exact
-// bytes the five longer-standing renderers already emit.
 export function renderDefinitions(extra = '') {
   return `        <!-- Definitions -->
         <defs>
@@ -87,17 +84,9 @@ const SIGIL_SHAPE = {
             <circle cx="8" cy="8" r="1.2" class="sigil-fill"/>`,
 };
 
-// A quiet, renderer-owned corner symbol (type default or authored icon). It is
-// SVG content rather than a
-// viewer overlay, so it survives canonical export while adding no focus target,
-// accessible name, layout box, or interaction state of its own.
-// Shared with label clearance so the reserved rail matches the actual icon.
 export const SEMANTIC_SIGIL_INSET = 6;
 export const SEMANTIC_SIGIL_SIZE = 11;
 export const SEMANTIC_SIGIL_FOOTPRINT = SEMANTIC_SIGIL_INSET + SEMANTIC_SIGIL_SIZE;
-// The viewer installs a runtime "sources" beacon on the node's top-right
-// rail, just left of the brand mark. Layout must reserve the same footprint
-// so labels never sit under the badge.
 export const SOURCE_BADGE_FOOTPRINT = 38;
 
 export function renderSemanticSigil(kind, { x, y, size = SEMANTIC_SIGIL_SIZE, icon } = {}) {
@@ -170,14 +159,9 @@ export function applyTemplate(template, {
       throw new Error(`applyTemplate: template missing placeholder ${JSON.stringify(ph)}`);
     }
   }
-  // Keep existing custom templates compatible when evidence is not requested.
-  // Silently dropping verified evidence would be misleading, so the new slot
-  // becomes mandatory only for the opt-in evidence path.
   if (sourceEvidence && !template.includes(SOURCE_EVIDENCE_PLACEHOLDER)) {
     throw new Error(`applyTemplate: repository evidence requires placeholder ${JSON.stringify(SOURCE_EVIDENCE_PLACEHOLDER)}`);
   }
-  // Function replacers: a literal `$&`, `$'`, `$\`` or `$$` in titles, labels,
-  // or rendered SVG must not be interpreted as a replacement pattern.
   const sourceEvidenceJson = serializeScriptJson(sourceEvidence);
   const resolvedLocale = resolveLocale(locale);
   const i18nJson = serializeScriptJson({ locale: resolvedLocale, messages: viewerCatalog(resolvedLocale) });
@@ -200,38 +184,12 @@ export function applyTemplate(template, {
       : '');
 }
 
-// CJK and other wide/fullwidth glyphs render at roughly twice the advance
-// width of ASCII in the monospace stacks the template uses. Keep halfwidth
-// forms (notably U+FF61–U+FF9F Katakana) out of this set. The explicit ranges
-// also cover vertical punctuation and supplementary East Asian scripts that
-// literal glyph ranges made difficult to audit.
-// Code points that take two columns of advance width: East Asian Wide and
-// Fullwidth per UAX #11, tracking Unicode 17.0. That takes in the BMP symbols
-// carrying emoji presentation (U+2705, U+2B50, U+26A1, U+231B, ...), which
-// render at the same square advance as the supplementary-plane emoji already
-// listed here, and Hangul Jamo Extended-A. Two boundary calls worth naming:
-// Unicode 16.0 reclassified the trigrams (U+2630-U+2637) and the monogram /
-// digram symbols (U+268A-U+268F) from Neutral to Wide, so both are in; and
-// Hangul Jamo Extended-A stops at U+A97C, its last assigned jamo, because
-// U+A97D-U+A97F are unassigned, and unassigned code points outside the CJK
-// ranges UAX #11 names default to Neutral rather than Wide. Spelled out as
-// ranges because V8 has no \p{East_Asian_Width=W} property escape.
 const FULLWIDTH_RE = /[\u1100-\u115F\u231A-\u231B\u2329-\u232A\u23E9-\u23EC\u23F0\u23F3\u25FD-\u25FE\u2614-\u2615\u2630-\u2637\u2648-\u2653\u267F\u268A-\u268F\u2693\u26A1\u26AA-\u26AB\u26BD-\u26BE\u26C4-\u26C5\u26CE\u26D4\u26EA\u26F2-\u26F3\u26F5\u26FA\u26FD\u2705\u270A-\u270B\u2728\u274C\u274E\u2753-\u2755\u2757\u2795-\u2797\u27B0\u27BF\u2B1B-\u2B1C\u2B50\u2B55\u2E80-\uA4CF\uA960-\uA97C\uAC00-\uD7A3\uF900-\uFAFF\uFE10-\uFE19\uFE30-\uFE6F\uFF01-\uFF60\uFFE0-\uFFE6\u{16FE0}-\u{18DFF}\u{1AFF0}-\u{1AFFF}\u{1B000}-\u{1B2FF}\u{1F000}-\u{1FAFF}\u{20000}-\u{3FFFD}]/u;
 
-// Variation selectors contribute no separate unit. This is a conservative
-// width estimate, not a measurement of the selected glyph: its actual advance
-// depends on the font and presentation (Unicode UAX #11).
-// VS16 requests emoji presentation, so reserve two units for the sequence.
-// VS15 retains the base's width estimate; forcing every text-presentation
-// sequence to one unit undercounts wide bases, including CJK characters whose
-// font ignores that selector. Neutral bases remain one unit. Some selected
-// text glyphs can be narrower than this estimate; prefer extra space to overflow.
 const VARIATION_SELECTOR_FIRST = 0xfe00;
 const VARIATION_SELECTOR_LAST = 0xfe0f;
 const VARIATION_SELECTOR_EMOJI = 0xfe0f;
 
-// Width measurement is pure and the same labels are measured many times per
-// compile, so the unit count is memoized by its input string.
 const TEXT_UNITS_CACHE = new Map();
 const MAX_TEXT_UNITS_CACHE_ENTRIES = 4096;
 const MAX_CACHED_TEXT_LENGTH = 1024;
@@ -249,7 +207,6 @@ export function textUnits(text) {
     if (next === VARIATION_SELECTOR_EMOJI) units += 2;
     else units += FULLWIDTH_RE.test(chars[i]) ? 2 : 1;
   }
-  // Keep repeated in-process compiles bounded, including unusually long labels.
   if (cacheKey.length <= MAX_CACHED_TEXT_LENGTH) {
     if (TEXT_UNITS_CACHE.size >= MAX_TEXT_UNITS_CACHE_ENTRIES) {
       TEXT_UNITS_CACHE.delete(TEXT_UNITS_CACHE.keys().next().value);

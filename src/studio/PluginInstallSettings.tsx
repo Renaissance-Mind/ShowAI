@@ -35,7 +35,6 @@ import AgentBrandIcon from "./AgentBrandIcon";
 import type { Onboarding } from "./sample-project";
 import "./agent-settings.css";
 
-/** Harness installs bundles itself, so the App lists the steps left in Harness. */
 function DshSteps({ steps }: { steps: DshPendingSteps }) {
   const t = useTranslator(messages);
   const [copied, setCopied] = useState(false);
@@ -84,7 +83,6 @@ function formatTime(value: string) {
   });
 }
 
-/** Restart instructions differ per host; show only those just installed or updated. */
 export function RestartHints({ hosts }: { hosts: PluginHost[] }) {
   const t = useTranslator(messages);
   return (
@@ -96,7 +94,6 @@ export function RestartHints({ hosts }: { hosts: PluginHost[] }) {
   );
 }
 
-/** A localized error with the original output collapsed beneath it. */
 export function PluginError({
   message,
   details,
@@ -126,11 +123,6 @@ type VerifyState =
   | { kind: "notSinceInstall"; at?: string }
   | { kind: "waiting" };
 
-/**
- * The state of one host compared with its current installation. A call recorded by an
- * earlier plugin version does not prove the current one works; a launcher failure after
- * the latest connection is the current state.
- */
 export function verifyState(
   host: PluginInstallation,
   records: AgentConnectionRecord[],
@@ -143,7 +135,6 @@ export function verifyState(
       ),
     )[0];
   if (!record) return { kind: "waiting" };
-  // Without a version from the host, every record counts (earlier Apps behaved so).
   const sameInstall = (version?: string) =>
     !host.version || version === host.version;
   const failure =
@@ -166,11 +157,6 @@ export function verifyState(
   return { kind: "notSinceInstall", at: record.lastCallAt };
 }
 
-/**
- * After installation, the first MCP call from each host proves the plugin is loaded
- * and pinned to this library; the stdio MCP records it in the library, and the plugin
- * launcher records failures that happen before the MCP handshake.
- */
 function useVerifyStates(hosts: PluginInstallation[]) {
   const [records, setRecords] = useState<AgentConnectionRecord[]>([]);
   const [error, setError] = useState("");
@@ -195,7 +181,6 @@ function useVerifyStates(hosts: PluginInstallation[]) {
           if (!stopped) setError(errorMessage(reason));
         });
     void read();
-    // Quick while the person switches to the agent; slower afterwards, so later failures still show.
     const timer = setInterval(() => void read(), waiting ? 3000 : 15000);
     return () => {
       stopped = true;
@@ -205,7 +190,6 @@ function useVerifyStates(hosts: PluginInstallation[]) {
   return { states, error };
 }
 
-/** The launcher failure code in the person's words. */
 function useFailureReason() {
   const t = useTranslator(onboardingMessages);
   return (code: string) => {
@@ -217,7 +201,6 @@ function useFailureReason() {
   };
 }
 
-/** The prompt that makes an agent call ShowAI, with the troubleshooting link. */
 function VerifyPrompt({ label }: { label: string }) {
   const t = useTranslator(onboardingMessages);
   const [copied, setCopied] = useState(false);
@@ -253,7 +236,6 @@ function VerifyPrompt({ label }: { label: string }) {
   );
 }
 
-/** The welcome's check after an installation: the prompt, then each host's first call. */
 export function VerifyConnection({
   hosts,
   busy,
@@ -261,7 +243,6 @@ export function VerifyConnection({
 }: {
   hosts: PluginInstallation[];
   busy: boolean;
-  /** Repairs the registration and reinstalls the plugin for one host. */
   onRepair: (host: PluginHost, failure: string) => Promise<boolean>;
 }) {
   const t = useTranslator(onboardingMessages);
@@ -339,7 +320,6 @@ export function VerifyConnection({
   );
 }
 
-/** Launcher failures that a new registration fixes; the others only need the plugin rebound. */
 export const RUNTIME_FAILURES = new Set([
   "RUNTIME_MISSING",
   "RUNTIME_INVALID",
@@ -349,10 +329,6 @@ export const RUNTIME_FAILURES = new Set([
   "RUNTIME_START_FAILED",
 ]);
 
-/**
- * Shown only when the registered runtime is not this App: the plugin launcher would
- * start another ShowAI for this library, or none.
- */
 function RuntimeRegistration({
   runtime,
   busy,
@@ -392,7 +368,6 @@ function RuntimeRegistration({
   );
 }
 
-/** Not found: what was searched, and a path the person sets by hand. */
 function ManualPath({
   host,
   busy,
@@ -461,7 +436,6 @@ function ManualPath({
   );
 }
 
-/** Per-host configuration for adding ShowAI by hand, started through the plugin launcher. */
 export function LaunchConfigCopy({ info }: { info: DesktopInfo | null }) {
   const t = useTranslator(messages);
   const [launcher, setLauncher] = useState<McpLaunch | null>(null);
@@ -483,7 +457,6 @@ export function LaunchConfigCopy({ info }: { info: DesktopInfo | null }) {
     };
   }, [info]);
   if (!info) return null;
-  // Without the launcher (an older host), the runtime CLI starts its MCP entry directly.
   const server = launcher ?? runtimeMcpLaunch(info.cli);
   const kinds: LaunchSnippetKind[] = ["claude", "codex", "json"];
   return (
@@ -528,7 +501,6 @@ export function LaunchConfigCopy({ info }: { info: DesktopInfo | null }) {
   );
 }
 
-/** One host's state in a single line: detection, plugin, then the latest connection. */
 function hostStatus(
   t: Translator<(typeof messages.catalogs)["zh-CN"]>,
   host: PluginInstallation,
@@ -615,7 +587,6 @@ export default function PluginInstallSettings({ home }: { home: string }) {
   const outdated = hosts.filter(pluginNeedsUpdate);
   const verify = useVerifyStates(installed);
   const reason = useFailureReason();
-  // Hosts installed or updated just now need a restart before the first call.
   const restart = new Set<PluginHost>(
     receipt && !receipt.dsh ? [receipt.host] : (batch?.updated ?? []),
   );

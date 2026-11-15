@@ -6,8 +6,6 @@ import {
 } from "./events";
 import { revisionDeltaFeature } from "./delta";
 
-/** Reconnects with a complete subscription; a missed frame never substitutes
- * for verified project history. The socket carries no draft or write command. */
 export class ProjectEventStream {
   private socket?: WebSocket;
   private timer?: ReturnType<typeof setTimeout>;
@@ -45,9 +43,6 @@ export class ProjectEventStream {
     );
   }
   start() {
-    // A pending reconnect keeps its backoff: every failed sync cycle rewrites
-    // the configuration and calls start() again, which must not reconnect at
-    // once and wake the next cycle in a tight loop.
     if (this.stopped || this.socket || this.timer) return;
     const endpoint = new URL(`${this.url}/api/events`);
     endpoint.protocol = endpoint.protocol === "https:" ? "wss:" : "ws:";

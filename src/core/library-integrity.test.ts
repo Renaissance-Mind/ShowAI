@@ -60,7 +60,6 @@ describe("library integrity check", () => {
     tamper(root, "PRAGMA wal_checkpoint(TRUNCATE)");
     const path = join(root, "history", "content.sqlite");
     const bytes = await readFile(path);
-    // Overwrite every page after the header page with noise.
     bytes.fill(0xa5, 4096);
     await writeFile(path, bytes);
     expect(await checkLibraryIntegrity(root)).toMatchObject({

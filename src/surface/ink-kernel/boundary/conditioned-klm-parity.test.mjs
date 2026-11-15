@@ -1,4 +1,3 @@
-// Standalone actual Native/WASM and independent BigInt rational regression.
 import assert from 'node:assert/strict';
 import {readFile,writeFile} from 'node:fs/promises';
 import {join} from 'node:path';

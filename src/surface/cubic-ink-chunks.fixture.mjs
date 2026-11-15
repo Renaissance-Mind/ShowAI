@@ -1,7 +1,5 @@
 import { CompiledInkInput } from "./ink-kernel/compiled-ink-input.mjs";
 import { cubicInkFromInput } from "./cubic-ink.mjs";
-/** Actual coalesced input, including replaced predictions and every exported
- * pressure knot. No synthetic outline or legacy samples are substituted. */
 export function longCubicInputFixture(count = 20001, varyingPressure = false) {
   const input = new CompiledInkInput({
     width: 4,

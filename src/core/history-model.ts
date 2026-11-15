@@ -9,11 +9,6 @@ export interface ChangeActor {
 export interface ChangeContext {
   actor: ChangeActor;
   channel: "desktop" | "browser" | "cli" | "mcp" | "external" | "system";
-  /**
-   * One MCP connection whose actor has no Agent session of its own. Dataset
-   * reads are remembered per reader, so two clients never mistake each
-   * other's read for their own merge baseline.
-   */
   readerId?: string;
   message?: string;
   operationId?: string;
@@ -21,11 +16,8 @@ export interface ChangeContext {
   restoredFrom?: string;
   mergedFrom?: string;
   externalConflictId?: string;
-  /** A legacy content snapshot is not a chronological Git revision. */
   restoredSnapshot?: { importId: string; snapshotId: string };
-  /** Generated from validated API arguments before server dates/IDs are allocated. */
   requestFingerprint?: string;
-  /** Original project history received through the sync protocol; local Git IDs differ. */
   syncOrigin?: {
     serverId: string;
     projectId: string;

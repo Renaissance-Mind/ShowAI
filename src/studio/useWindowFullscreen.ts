@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
 
-/** Native macOS fullscreen is independent of the browser Fullscreen API. */
 export function useWindowFullscreen() {
   const [fullScreen, setFullScreen] = useState(false);
   useEffect(() => {

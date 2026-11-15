@@ -1,6 +1,5 @@
 import { defineMessages } from "../index";
 
-// Readable component parameter validation; left out of readers.
 export default defineMessages("componentValidation", {
   "zh-CN": {
     "validation.pathItem": " 第 {index} 项",

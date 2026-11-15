@@ -1,8 +1,3 @@
-// A small XML reader for the parts of Office documents: elements with their
-// qualified names, attributes and children. Office XML is well formed and
-// has no DTDs, so entities are the five predefined ones and character
-// references.
-
 export interface XmlElement {
   name: string;
   attrs: Record<string, string>;
@@ -92,7 +87,6 @@ export const elements = (node: XmlElement, name?: string): XmlElement[] =>
   );
 export const child = (node: XmlElement | undefined, name: string) =>
   node ? elements(node, name)[0] : undefined;
-/** Every descendant with this name, in document order. */
 export function descendants(node: XmlElement, name: string): XmlElement[] {
   const found: XmlElement[] = [];
   const visit = (current: XmlElement) => {

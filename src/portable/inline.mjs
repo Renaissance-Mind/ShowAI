@@ -4,7 +4,6 @@ import { gzipSync } from "node:zlib";
 import { inlineStyleSheet, scopeReaderCss } from "./inline-style.mjs";
 import { walk } from "../document/walk.mjs";
 
-/** Inline hosts block network requests: every component must travel with the page. */
 export function assertInlineArtifact(artifact) {
   if (artifact?.remoteComponents?.length)
     throw new Error(
@@ -38,18 +37,14 @@ export function assertInlineArtifact(artifact) {
   }
 }
 
-/** Adapt our self-contained reader to the conversation's isolated HTML surface. */
 export function toInlineFragment(html, id = `showai-${randomUUID()}`) {
   if (!/^showai-[a-z0-9-]+$/.test(id))
     throw new Error("Invalid inline page id.");
   const body = html
     .slice(html.lastIndexOf("</head>") + 7)
     .match(/<body\b[^>]*>([\s\S]*?)<\/body>/i)?.[1];
-  // The host page owns <html>; carry the exporter's language on our root.
   const lang = html.match(/<html\b[^>]*\slang=["']([\w-]+)["']/i)?.[1];
   const langAttribute = lang ? ` lang="${lang}"` : "";
-  // Script bodies may contain "<style" text (e.g. a syntax highlighter's HTML grammar); only real
-  // <style> elements carry reader CSS. A script body cannot contain "</script>", so drop scripts first.
   const styles = [
     ...html
       .replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, "")
@@ -93,7 +88,6 @@ export function toInlineFragment(html, id = `showai-${randomUUID()}`) {
           "window.document.documentElement.dataset.theme",
           `window.document.getElementById("${id}").dataset.theme`,
         )
-        // Preserve DOMParser's runtime string while keeping the serialized file fragment-only.
         .replace(/<(?=!doctype\b|(?:html|head|body)(?:\s|>))/gi, "\\x3c");
       return `<script type="module">${script}</script>`;
     })
@@ -104,9 +98,6 @@ ${inlineStyleSheet(id, css)}
 </style>
 ${code}
 `;
-  // Pack the complete transport, including repeated component HTML and CSS.
-  // Restore the exact artifact before starting the reader: editable package
-  // integrity and source downloads retain their original bytes and fields.
   if (Buffer.byteLength(fragment) >= 128_000) {
     const transport = {
       artifact: artifactSource?.[2] ?? "null",

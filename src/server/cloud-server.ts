@@ -12,13 +12,11 @@ import { hash, SyncError } from "../sync/protocol";
 import { schemaVersion } from "./migrations";
 import { configuredLogins } from "./external-logins";
 
-/** Hibernation attachments are small, so subscriptions live in SQLite. */
 interface SocketAttachment {
   userId: string;
   sessionDigest: string;
   socketId: string;
   features?: string[];
-  /** Sockets accepted by an earlier deployment kept subscriptions here. */
   projects?: string[];
 }
 interface EventSocket extends WebSocket {
@@ -52,8 +50,6 @@ const json = (value: unknown, status = 200) =>
     },
   });
 
-/** One consistent metadata authority per server. Linux uses the same handler
- * against local SQLite; R2 and the database-neutral backup format stay shared. */
 export class ShowAIServer {
   readonly metadata: DurableMetadata;
   readonly objects: DurableObjects;
@@ -93,8 +89,6 @@ export class ShowAIServer {
       requirePublicOrigin: true,
       eventPeers: () => ctx.getWebSockets().map((socket) => this.peer(socket)),
     });
-    // Heartbeats are answered by the runtime without waking the object or
-    // spending request budget; every delivery still rechecks the session.
     const Pair = (
       globalThis as unknown as {
         WebSocketRequestResponsePair?: new (
@@ -107,8 +101,6 @@ export class ShowAIServer {
       ctx.setWebSocketAutoResponse(new Pair(ping, pong));
     this.ready = ctx.blockConcurrencyWhile(async () => {
       const id = await this.app.initialize();
-      // A new instance means every earlier request has ended, so admission
-      // records left by a reset or deploy can no longer describe a live write.
       await this.metadata.run("DELETE FROM server_write_leases");
       ctx.storage.sql.exec(
         "CREATE TABLE IF NOT EXISTS _showai_event_subscriptions(socket_id TEXT PRIMARY KEY,projects TEXT NOT NULL)",
@@ -211,8 +203,6 @@ export class ShowAIServer {
         "METHOD_NOT_ALLOWED",
         "Metadata migration requires POST.",
       );
-    // Read directly from the frozen D1 source; credentials and application rows
-    // are never transported to, returned by, or logged by the operator client.
     const sourceSettings = (
       await this.env.DB.prepare(
         "SELECT key,value FROM settings WHERE key IN('server_id','schema_version')",
@@ -290,9 +280,6 @@ export class ShowAIServer {
       };
       await this.ctx.storage.put("metadata-bootstrap", state);
     }
-    // Each call performs at most five bounded pages, below the concurrency gate
-    // deadline. Retrying resumes after a durable checkpoint, without replacing
-    // data already imported or allowing either server to become writable.
     for (
       let batch = 0;
       batch < 5 && state.table < backupTables.length;
@@ -366,7 +353,6 @@ export class ShowAIServer {
         throw new Error("Metadata migration changed the server identity.");
       state.complete = true;
       await this.ctx.storage.put("metadata-bootstrap", state);
-      // Rebuild the cached identity only after the complete frozen copy verifies.
       this.ready = this.app.reloadIdentity();
       if ((await this.ready) !== serverId)
         throw new Error("Imported application identity differs.");

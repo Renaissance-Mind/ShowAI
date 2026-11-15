@@ -1,5 +1,4 @@
 #include "native-parity-stdio.hpp"
-// Test executable only: libc/vector are not dependencies of the kernel.
 #include "include/analytic-path.h"
 #include <cstdint>
 #include <cstdio>

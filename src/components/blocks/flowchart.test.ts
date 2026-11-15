@@ -203,7 +203,6 @@ test("stage playback recolours nodes and edges and starts at the initial stage",
     label: "超时",
     flowing: true,
   });
-  // An edited flow that lost its stages falls back instead of failing.
   expect(
     playbackView({ ...route, stages: undefined } as never, mode).nodes.size,
   ).toBe(0);
@@ -224,7 +223,6 @@ test("playback renders controls, current step text and a printable list of every
   expect(html).toContain('aria-label="下一步"');
   expect(html).toContain("播放");
   expect(html).toContain("从头开始");
-  // Every step and stage is present as text for print and export.
   for (const text of ["返回结果。", "14:02 变慢", "排队 600+", "超时"])
     expect(html).toContain(text);
   expect(changed).toBe(0);

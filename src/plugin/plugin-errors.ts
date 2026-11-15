@@ -1,4 +1,3 @@
-/** Codes the plugin page translates; `details` keeps the host CLI's own output for the collapsed view. */
 export type PluginErrorCode =
   | "PLUGIN_UNKNOWN_HOST"
   | "PLUGIN_BUSY"
@@ -14,7 +13,6 @@ export type PluginErrorCode =
   | "PLUGIN_PATH_INVALID"
   | "PLUGIN_DEVELOPMENT_BUILD";
 
-/** Host versions the App's plugin commands were verified with (`plugin list --json`). */
 export const VERIFIED_HOST_VERSIONS = {
   codex: "0.163.0",
   claude: "2.1.306",

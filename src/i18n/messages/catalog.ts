@@ -1,6 +1,5 @@
 import { defineMessages } from "../index";
 
-// Component catalog: browsing, detail dialogs, previews and the insert menu.
 export default defineMessages("catalog", {
   "zh-CN": {
     "category.text": "文本",

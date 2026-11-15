@@ -1,14 +1,10 @@
 export interface NativeInkHistoryGroup {boardId:string;operationIds:string[]}
 export interface NativeInkHistoryAction {
-  /** Raw ink only: compensation keeps every current generic source field. */
   kind?:"native-ink";
   groups?:NativeInkHistoryGroup[];
-  /** Old sessions may still contain a single Board action. */
   boardId?:string;operationIds?:string[];
   intentId?:string;strokeIds?:string[];
 }
-/** Operation identities are local to a Board; identical actor:sequence values
- * in different Boards must never be deduplicated together. */
 export function nativeInkHistoryGroups(action:NativeInkHistoryAction):NativeInkHistoryGroup[]{
   const groups=new Map<string,string[]>();
   const incoming=action.groups??(action.boardId&&action.operationIds?[{boardId:action.boardId,operationIds:action.operationIds}]:[]);
@@ -25,9 +21,6 @@ export function appendNativeInkHistoryGroups(action:NativeInkHistoryAction,incom
   const {boardId:_board,operationIds:_ids,...metadata}=action;
   return {...metadata,groups,...(groups.length===1?groups[0]:{})};
 }
-/** A source echo can precede its actual operation receipt. Register unseen
- * scoped identities even when the normalized document is already equal, while
- * adoption/correction/retry packets never create another undo edge for them. */
 export function unregisteredNativeInkHistoryAction(action:NativeInkHistoryAction,registered:Iterable<NativeInkHistoryAction>):NativeInkHistoryAction|undefined{
   const known=new Map<string,Set<string>>();
   for(const previous of registered)for(const group of nativeInkHistoryGroups(previous)){

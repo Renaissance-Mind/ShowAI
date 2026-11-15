@@ -110,7 +110,6 @@ test("current-state snapshots refuse shared readers and foreign project decoding
   const f = await fixture();
   const bytes = Buffer.from("<script>hostile code</script>");
   const digest = await hash(bytes);
-  // Readers are rebuilt locally and never travel with current-state content.
   const reader = `runtimes/readers/${"b".repeat(64)}/viewer.html`;
   const snapshot = {
     ...f.captured.snapshot,
@@ -426,8 +425,6 @@ test("a package's foreign project locator cannot pull private source files into 
   await expect(
     new LibraryOperations(f.home, f.one.id).projectFiles(f.one.id, head!),
   ).rejects.toThrow("missing");
-  // Current-state storage keeps no earlier revision; the victim's package
-  // record itself must be unchanged.
   expect(JSON.parse((await f.library.readFile(path)).toString())).toEqual(
     record,
   );

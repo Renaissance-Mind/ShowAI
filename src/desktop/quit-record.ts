@@ -3,25 +3,14 @@ import { join } from "node:path";
 import { randomUUID } from "node:crypto";
 import type { CloseBlocker } from "../host/protocol";
 
-/**
- * Machine-readable record of windows that refused to close, next to the main
- * log. It exists only while at least one window is held open; a quit that
- * succeeds removes it.
- */
 export const QUIT_BLOCKED_NAME = "quit-blocked.json";
 
 export type CloseTrigger = "close" | "quit";
 
 export interface QuitBlockedWindow {
   windowId: number;
-  /** Window title: the open page's title, or "ShowAI". */
   title: string;
-  /** What asked the window to close. */
   trigger: CloseTrigger;
-  /**
-   * awaiting-decision: the dialog explaining the refusal is open;
-   * kept-open: the person chose to keep editing, or the dialog was dismissed.
-   */
   state: "awaiting-decision" | "kept-open";
   since: string;
   updatedAt: string;
@@ -37,7 +26,6 @@ export interface QuitBlockedRecord {
   mode: "desktop";
   sourceCommit: string;
   home: string;
-  /** The main-process log with the matching entries. */
   log: string;
   updatedAt: string;
   windows: QuitBlockedWindow[];
@@ -61,7 +49,6 @@ export class QuitRecord {
     this.path = join(directory, QUIT_BLOCKED_NAME);
   }
 
-  /** Records or updates one held-open window and rewrites the file. */
   set(
     windowId: number,
     entry: Omit<QuitBlockedWindow, "windowId" | "since" | "updatedAt">,
@@ -77,13 +64,11 @@ export class QuitRecord {
     return this.flush();
   }
 
-  /** The window closed or agreed to close. */
   delete(windowId: number): Promise<void> {
     if (!this.entries.delete(windowId)) return this.queue;
     return this.flush();
   }
 
-  /** A quit succeeded: nothing is held open any more. */
   clear(): Promise<void> {
     this.entries.clear();
     return this.flush();
@@ -105,7 +90,6 @@ export class QuitRecord {
         }
       : undefined;
     const write = async () => {
-      // The record is a reporting boundary: a failed write is logged, never fatal.
       try {
         if (!record) {
           await rm(this.path, { force: true });

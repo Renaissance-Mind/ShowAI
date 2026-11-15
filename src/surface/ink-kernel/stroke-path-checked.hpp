@@ -9,9 +9,6 @@ namespace showai_stroke_internal {
 #else
 #define SHOWAI_STROKE_VISIBILITY "default"
 #endif
-// Internal factory binding; no caller counts or source/options on emit. The
-// Native owner holds one immutable packed allocation/options until destruction.
-// Public standalone build uses a synchronous borrow of its existing C inputs.
 class __attribute__((visibility(SHOWAI_STROKE_VISIBILITY))) EmissionPlan final {
   const SAInkStrokeSegment *const source_;
   const uint32_t count_;
@@ -38,5 +35,5 @@ struct WalkWork {
 void reset_walk_work();
 WalkWork walk_work();
 #endif
-} // namespace showai_stroke_internal
+}
 #endif

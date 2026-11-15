@@ -1,6 +1,3 @@
-/** Screen-space cutouts must match painted UI, including scrolling/clipping.
- * Offscreen toolbar children still have DOM rectangles; sending those raw
- * rectangles to the native canvas would erase ink beyond the actual toolbar. */
 export function inkUIRegions(elements: Iterable<Element>) {
   const styles = new Map<Element, CSSStyleDeclaration>();
   const rectangles = new Map<Element, DOMRect>();
@@ -40,8 +37,6 @@ export function inkUIRegions(elements: Iterable<Element>) {
       ) {
         const parentStyle = styleOf(parent);
         const clipX = clips(parentStyle.overflowX), clipY = clips(parentStyle.overflowY);
-        // Hidden candidates and non-clipping ancestors need no layout read.
-        // All caches remain local to this one actual UI measurement.
         const rect = clipX || clipY ? rectangleOf(parent) : undefined;
         if (clipX) {
           left = Math.max(left, rect!.left);
@@ -65,9 +60,6 @@ export function inkUIRegions(elements: Iterable<Element>) {
   return regions;
 }
 
-/** The native scene owns presentation/input inside its retained DOM world.
- * That world is a layout mirror, not interactive overlay UI. A real top-layer
- * panel can escape it and still needs a cutout in the native input surface. */
 export function nativeBoardUIRegions(elements: Iterable<Element>) {
   function* candidates() {
     for (const element of elements) {

@@ -1,5 +1,3 @@
-// Actual production implementation in a test TU, with private work counters.
-// No replacement geometry, fake state, host service or production ABI is used.
 #define SHOWAI_INK_INPUT_EXPORT_WORK
 #include "ink-input-kernel.cpp"
 #include <cstdio>

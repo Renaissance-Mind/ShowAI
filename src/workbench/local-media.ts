@@ -11,10 +11,6 @@ import {
   type LocalResourceKind,
 } from "../document/local-files.mjs";
 
-/**
- * Types the workbench can show: the player opens video, audio and images,
- * resource fields also PDFs. Anything else is only revealed in the file manager.
- */
 const MEDIA_TYPES: Readonly<Record<string, { mime: string; kind: MediaKind }>> =
   LOCAL_FILE_TYPES;
 
@@ -24,37 +20,23 @@ export interface LocalMediaGrant {
   token: string;
   path: string;
   name: string;
-  /** Present only when the host player can show the file. */
   kind?: MediaKind;
   mime?: string;
   size: number;
-  /** When the grant stops serving the file (epoch milliseconds). */
   expiresAt: number;
 }
 
 const LIFETIME = 6 * 60 * 60 * 1000;
-// Pages may show many linked images at once; each file holds one reusable grant.
 const LIMIT = 2000;
 
-/** Absolute local path from a component link: an absolute path, `~/…`, or a `file:` URL. */
 export const localMediaPath = localFilePath;
 
-/**
- * Short-lived capabilities for local files a reader asked to open.
- * The trusted workbench mints a grant after a user click; the media route only
- * serves files it can find here, so no frame can name arbitrary paths.
- */
 export class LocalMediaGrants {
   private grants = new Map<string, LocalMediaGrant>();
-  /** Reusable grants by real path. */
   private byPath = new Map<string, string>();
 
   constructor(private now: () => number = Date.now) {}
 
-  /**
-   * A grant for a local file. `reuse` returns the live grant of the same file
-   * with a renewed lifetime, so a page showing the file keeps a stable address.
-   */
   async grant(
     value: unknown,
     options: { reuse?: boolean } = {},
@@ -73,10 +55,6 @@ export class LocalMediaGrants {
     return this.issue(path, basename(path), extname(path), info.size, options);
   }
 
-  /**
-   * A grant for the synchronized copy of another device's file (see
-   * dataset-bundles), named and typed by the reference the page stores.
-   */
   async grantCopy(path: string, ref: string): Promise<LocalMediaGrant> {
     const info = await stat(path);
     const name = localRefName(ref);
@@ -96,7 +74,6 @@ export class LocalMediaGrants {
       const token = this.byPath.get(path);
       const live = token ? this.grants.get(token) : undefined;
       if (live) {
-        // Refresh its order too, so the oldest unused grants leave first.
         this.grants.delete(live.token);
         const renewed = { ...live, size, expiresAt };
         this.grants.set(live.token, renewed);
@@ -141,7 +118,6 @@ export class LocalMediaGrants {
   }
 }
 
-/** One grant store per host process, shared by the action layer and the media route. */
 export const localMediaGrants = new LocalMediaGrants();
 
 export interface MediaResponse {
@@ -150,7 +126,6 @@ export interface MediaResponse {
   body?: Readable;
 }
 
-/** Stream a granted file, honouring one `bytes=` range so players can seek. */
 export async function localMediaResponse(
   token: string,
   range: string | null | undefined,
@@ -159,7 +134,6 @@ export async function localMediaResponse(
 ): Promise<MediaResponse> {
   const grant = grants.resolve(token);
   if (!grant?.mime) return { status: 404, headers: {} };
-  // The file may have changed since the grant; serve what is on disk now.
   const size = await stat(grant.path).then(
     (info) => (info.isFile() ? info.size : -1),
     () => -1,
@@ -170,8 +144,6 @@ export async function localMediaResponse(
     "Accept-Ranges": "bytes",
     "Cache-Control": "no-store",
     "X-Content-Type-Options": "nosniff",
-    // The PDF reader fetches its file; images and media load without CORS,
-    // so component frames still cannot read their pixels or samples.
     ...(grant.mime === "application/pdf"
       ? { "Access-Control-Allow-Origin": "*" }
       : {}),

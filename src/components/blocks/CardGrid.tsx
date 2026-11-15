@@ -31,7 +31,6 @@ function CardContent({
   tile: boolean;
   linked: boolean;
 }) {
-  // Inside a linked card, links in the body read as text so links never nest.
   const body = (
     <span className="cg-body">
       <InlineText source={card.body} links={!linked} />

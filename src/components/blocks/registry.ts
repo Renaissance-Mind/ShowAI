@@ -146,7 +146,6 @@ export type {
   BlockRegistration,
 } from "./types";
 
-/** Register before mounting the editor. Existing readers also update if a renderer is added later. */
 export const blockDefinitions: BlockDefinition[] = [];
 const allBlockDefinitions: BlockDefinition[] = [];
 const listeners = new Set<() => void>();
@@ -197,7 +196,6 @@ export function getBlockDefinition(kind: string): BlockDefinition | undefined {
 function cloneBlockData(data: BlockData): BlockData {
   if (!data || typeof data !== "object" || Array.isArray(data))
     throw new Error("Block data must be a JSON object.");
-  // structuredClone catches executable values; the JSON check prevents silent loss on export.
   const cloned = structuredClone(data);
   const assertJson = (value: unknown, depth = 0): void => {
     if (depth > 40) throw new Error("Block data is nested too deeply.");
@@ -520,7 +518,6 @@ for (const item of g2Metadata) {
   });
 }
 
-// Keep literal registrations: the portable reader removes unused kinds and metadata together.
 registerBlock({
   kind: "step-walkthrough",
   title: "分步演示",

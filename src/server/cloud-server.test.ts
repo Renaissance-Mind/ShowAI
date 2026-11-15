@@ -4,7 +4,6 @@ import { ShowAIServer } from "./cloud-server";
 import { token } from "../sync/protocol";
 import type { WorkerEnvironment } from "./worker";
 
-/** The parts of the Durable Object runtime the server uses, over node:sqlite. */
 function durableState(database: DatabaseSync, sockets: FakeSocket[]) {
   const values = new Map<string, unknown>();
   const state = {
@@ -181,7 +180,6 @@ test("hibernated sockets keep subscriptions outside their attachment and pings n
   expect(JSON.stringify(socket.deserializeAttachment()).length).toBeLessThan(
     300,
   );
-  // A new instance after hibernation restores the subscription from storage.
   const second = f.start();
   await request(second.server, "/api/info");
   const peer = (
@@ -198,7 +196,6 @@ test("hibernated sockets keep subscriptions outside their attachment and pings n
   ).toEqual({ count: 0 });
 });
 
-/** R2 as the Worker uses it, kept in memory. */
 function memoryBucket() {
   const items = new Map<string, Uint8Array>();
   const bytesOf = async (value: Uint8Array | ReadableStream<Uint8Array>) =>
@@ -257,7 +254,6 @@ function memoryBucket() {
 }
 
 test("large objects stream between the Worker and R2 while the Durable Object keeps authority", async () => {
-  // Workers provide DigestStream; node:crypto stands in for it here.
   const { createHash } = await import("node:crypto");
   class DigestStream extends WritableStream<Uint8Array> {
     digest: Promise<ArrayBuffer>;
@@ -355,7 +351,6 @@ test("large objects stream between the Worker and R2 while the Durable Object ke
   expect(read.status).toBe(200);
   expect(new Uint8Array(await read.arrayBuffer())).toEqual(bytes);
   expect(seen).toEqual(["read"]);
-  // A body that does not match its digest is refused and releases capacity.
   const wrong = new Uint8Array(bytes.length).fill(9);
   const refused = await call(`/api/projects/${id}/objects/${"a".repeat(64)}`, {
     method: "PUT",
@@ -367,7 +362,6 @@ test("large objects stream between the Worker and R2 while the Durable Object ke
   expect((await refused.json()).error.code).toBe("DIGEST_MISMATCH");
   expect(count("SELECT COUNT(*) AS count FROM server_write_leases")).toBe(0);
   expect(count("SELECT COUNT(*) AS count FROM storage_reservations")).toBe(0);
-  // Clients cannot speak the internal protocol themselves.
   seen.length = 0;
   const forged = await call(`/api/projects/${id}/objects/${digest}`, {
     method: "POST",

@@ -495,7 +495,6 @@ test("browser workbench, standalone CLI and a second client share real files and
   const info = await invoke<DesktopInfo>("app:info");
   expect(info.mode).toBe("browser");
   expect(info.cli.args).toEqual([cli]);
-  // The browser host reports the macOS product version, as the desktop app does.
   if (process.platform === "darwin")
     expect(info.osVersion).not.toBe(release());
   const registration = JSON.parse(
@@ -579,7 +578,7 @@ test("browser workbench, standalone CLI and a second client share real files and
 test("filesystem notifications include writes from an independent CLI process", async () => {
   const response = await fetch(server.url + "api/events?token=" + token);
   const reader = response.body!.getReader();
-  await reader.read(); // initial library refresh
+  await reader.read();
   await runCli(["projects", "create", "--name", "From Agent"]);
   const update = await reader.read();
   expect(new TextDecoder().decode(update.value)).toContain('"type":"files"');
@@ -676,7 +675,6 @@ test("local media plays only through grants minted by the authenticated workbenc
   expect(part.status).toBe(206);
   expect(part.headers.get("content-range")).toBe("bytes 3-4/10");
   expect(await part.text()).toBe("34");
-  // Unknown tokens, foreign origins and other methods never reach the file.
   expect((await fetch(server.url + "api/media/" + crypto.randomUUID())).status).toBe(404);
   expect(
     (await fetch(media, { headers: { Origin: "https://example.com" } })).status,
@@ -688,7 +686,6 @@ test("local media plays only through grants minted by the authenticated workbenc
   await expect(invoke("media:reveal", { token: crypto.randomUUID() })).rejects.toMatchObject({
     code: "NOT_FOUND",
   });
-  // The workbench page allows same-origin media for the player.
   expect((await fetch(server.url)).headers.get("content-security-policy")).toContain(
     "media-src 'self'",
   );
@@ -818,8 +815,6 @@ test("persisted browser content location survives restart and CLI remains usable
     settingsPath: configPath,
   });
   expect(server.home).toBe(savedHome);
-  // The restarted service rejects the old token and serves a new one in its
-  // page, which the workbench bridge reads without a full refresh.
   const previous = token;
   token = pageToken(await (await fetch(server.url)).text())!;
   expect(token).toMatch(/^[a-f0-9]{64}$/);

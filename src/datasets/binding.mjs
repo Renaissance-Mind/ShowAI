@@ -1,17 +1,3 @@
-// Bindings connect a page block to a project dataset. The block keeps only the
-// binding and its own (local) values; the host resolves the component props
-// from the dataset and splits the component's changes back into dataset
-// operations and block changes. Components themselves need no host API.
-//
-// Two forms combine freely:
-// - props:       the dataset value (or an object inside it) supplies the
-//                component's top-level props, except the keys listed as local.
-// - collections: records found along a path such as
-//                "objectives[*].keyResults[*].tasks[*]" become items of an array
-//                prop such as a database's rows, next to the block's own items.
-//                Mapped fields write back to the source record; derived fields
-//                are read-only; other fields are stored with the block.
-
 import {
   cloneValue,
   diffValues,
@@ -40,7 +26,6 @@ const fail = (message) => {
 const own = (value, key) => Object.prototype.hasOwnProperty.call(value, key);
 const isEmpty = (value) =>
   value === undefined || value === null || value === "";
-/** Cell equality: an absent value and an empty text are the same cell. */
 const sameCell = (a, b) => equalValues(a, b) || (isEmpty(a) && isEmpty(b));
 
 export function readBinding(data) {
@@ -52,7 +37,6 @@ export function hasBinding(data) {
   return readBinding(data) !== undefined;
 }
 
-/** The props object a component receives from its stored block data. */
 export function componentProps(kind, data) {
   if (!isPlainObject(data)) return {};
   if (kind === "custom") return isPlainObject(data.props) ? data.props : {};
@@ -60,7 +44,6 @@ export function componentProps(kind, data) {
   return props;
 }
 
-/** Block data with new component props; `binding` null removes the binding. */
 export function withComponentProps(
   kind,
   data,
@@ -77,10 +60,7 @@ export function withComponentProps(
   return binding ? { ...props, [BINDING_KEY]: binding } : { ...props };
 }
 
-// ---------------------------------------------------------------------------
-// Paths inside collections
 
-/** "objectives[*].keyResults[*].tasks[*]" → per-level relative paths. */
 export function parseCollectionPath(from) {
   if (typeof from !== "string" || !from.endsWith("[*]") || from.length > 500)
     fail(
@@ -96,7 +76,6 @@ export function parseCollectionPath(from) {
   });
 }
 
-/** "../../title" → { up: 2, path: ["title"] } */
 export function parseReference(reference, levels) {
   if (typeof reference !== "string" || !reference || reference.length > 300)
     fail(
@@ -119,8 +98,6 @@ function readReference(chain, reference) {
   return reference.path.length ? valueAt(element, reference.path) : element;
 }
 
-// ---------------------------------------------------------------------------
-// Validation
 
 function validateCondition(condition, levels, label) {
   if (!isPlainObject(condition)) fail(`${label} must be an object.`);
@@ -211,7 +188,6 @@ function validateDerivation(name, derivation, levels, label) {
   );
 }
 
-/** Validates and compiles a binding; throws INVALID_DATA with a reason. */
 export function compileBinding(binding) {
   if (!isPlainObject(binding)) fail("A binding must be an object.");
   for (const key of Object.keys(binding))
@@ -365,8 +341,6 @@ export function validateBinding(binding) {
   return binding;
 }
 
-// ---------------------------------------------------------------------------
-// Resolution
 
 function matches(chain, condition) {
   const value = readReference(chain, condition.field);
@@ -487,12 +461,6 @@ function collect(root, collection, issues) {
   return found;
 }
 
-/**
- * Component props for a bound block, plus what the host needs to route
- * changes: every projected item by id and any issues to show. With
- * `writable: false` (a read-only or stale dataset) mapped fields are shown
- * but cannot be changed; the block's own items and fields still can.
- */
 export function resolveBinding(
   kind,
   data,
@@ -617,8 +585,6 @@ function compiledIdField(compiled, into) {
   );
 }
 
-// ---------------------------------------------------------------------------
-// Writing back
 
 function writeField(field, info, basisValue, next, rejected) {
   const path = [...info.source, ...field.path];
@@ -650,13 +616,6 @@ function writeField(field, info, basisValue, next, rejected) {
   ];
 }
 
-/**
- * Routes a component change. `basis` is the dataset value and props the
- * component last rendered from; writes carry the basis values, so a change
- * made elsewhere meanwhile becomes a conflict instead of being overwritten.
- * With `writable: false` every change that would reach the dataset is
- * rejected; the block's own values are still stored.
- */
 export function splitBindingChange({
   kind,
   data,
@@ -777,7 +736,6 @@ export function splitBindingChange({
     for (const [id, info] of resolved.projected)
       if (info.into === into && !seen.has(id))
         rejected.push({ id, reason: "removed" });
-    // Local items hidden behind a mapped record keep their stored form.
     const stored = Array.isArray(
       isShared(into) ? sharedRoot?.[into] : ownProps[into],
     )
@@ -797,7 +755,6 @@ export function splitBindingChange({
         ...diffValues(sharedRoot[into], local, [...sharedPath, into]),
       );
   }
-  // The shared object itself is missing; create it with the shared keys.
   if (compiled.props && sharedRoot === undefined && Object.keys(created).length)
     operations.push({
       op: "set",
@@ -816,16 +773,11 @@ export function splitBindingChange({
   };
 }
 
-/** Plain block data with the resolved props, for exports and for detaching. */
 export function snapshotBinding(kind, data, value) {
   const { props } = resolveBinding(kind, data, value);
   return withComponentProps(kind, data, props, null);
 }
 
-/**
- * Converts a block into a dataset and a binding: the shared keys move into
- * the dataset value, the local keys stay with the block.
- */
 export function shareBlock(kind, data, datasetId, local = []) {
   const props = componentProps(kind, data);
   const value = {},
@@ -842,19 +794,15 @@ export function shareBlock(kind, data, datasetId, local = []) {
   };
 }
 
-/** Keys that stay with each block when a built-in block is shared without an explicit local list. */
 export function defaultLocalKeys(kind) {
   if (kind === "database")
     return ["title", "view", "groupBy", "calendar", "views"];
   return [];
 }
 
-// ---------------------------------------------------------------------------
-// Suggestions
 
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
 
-/** Record lists reachable through record lists, as collection paths. */
 export function findCollections(value, limit = 40) {
   const results = [];
   const visit = (node, prefix, depth) => {
@@ -886,7 +834,6 @@ export function findCollections(value, limit = 40) {
           [...fields].map(([field, kinds]) => [field, [...kinds]]),
         ),
       });
-      // Every nested record list continues the path.
       const nested = new Set();
       for (const entry of item)
         for (const [field, cell] of Object.entries(entry))
@@ -910,13 +857,7 @@ export function findCollections(value, limit = 40) {
   return results;
 }
 
-/**
- * A starting mapping from dated records into a database: the date column
- * reads the first date field, the first text column reads title or name and
- * a checkbox column reads done (or status "done").
- */
 export function suggestCollections(value, columns) {
-  // Stored fields by value kind: computed ones (formulas, rollups) cannot take a mapping.
   const stored = columns.filter((column) => !valueTypeOf(column).derived);
   const ofKind = (kind) =>
     stored.find(
@@ -970,7 +911,6 @@ export function suggestCollections(value, columns) {
     .filter(Boolean);
 }
 
-/** Checks a resolved block against database columns: mapped targets must exist. */
 export function bindingTargetIssues(compiled, columns) {
   if (!Array.isArray(columns)) return [];
   const ids = new Set(columns.map((column) => column?.id));
@@ -994,17 +934,12 @@ export function bindingTargetIssues(compiled, columns) {
 
 export { validatePath };
 
-/**
- * A page moving to another project keeps reading the datasets of the project
- * they belong to. Returns a new document when any binding changed.
- */
 export function retargetBindings(
   document,
   sourceProjectId,
   destinationProjectId,
 ) {
   let changed = false;
-  // Components nested in rich text keep their bindings too.
   const visit = (node) => {
     let next = node;
     const binding =

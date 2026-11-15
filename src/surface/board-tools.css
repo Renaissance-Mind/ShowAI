@@ -214,7 +214,6 @@
   color: var(--accent, #467de3);
 }
 
-/* Swatches and labels share the tool buttons' 32px content height. */
 .surface-toolbar .board-color-picker > summary {
   box-sizing: border-box;
   width: 22px;

@@ -18,10 +18,8 @@ export type RemovableScope = "project" | "global" | "published";
 export interface CatalogRemovalInput {
   kind: "component" | "template";
   id: string;
-  /** Without a version every revision of the package in this scope goes. */
   version?: string;
   scope?: RemovableScope;
-  /** Required for the project scope. */
   projectId?: string;
 }
 export interface RemovedRevision {
@@ -32,7 +30,6 @@ export interface RemovedRevision {
   scope: RemovableScope;
   projectId?: string;
 }
-/** Where the revisions are still used; removal waits until every list is empty. */
 export interface CatalogUses {
   pages: {
     projectId: string;
@@ -90,11 +87,6 @@ async function revisions(
     }));
 }
 
-/**
- * Pages, other packages and verified publications that use these revisions.
- * A project revision is only reachable from its own project; global and
- * published ones from every project.
- */
 export async function catalogUses(
   home: string,
   removed: RemovedRevision[],
@@ -108,7 +100,6 @@ export async function catalogUses(
         revision.version === version &&
         (!integrity || revision.integrity === integrity),
     );
-  // The package's own files reference their own dependencies, not uses of it.
   const own = (source: string) => {
     const match = PACKAGE.exec(source);
     return (
@@ -150,8 +141,6 @@ export async function catalogUses(
       entry.versions.push(edge.version);
     pages.set(key, entry);
   }
-  // Titles and archived state tell the person which pages to change; deleted
-  // pages still count because restoring them would bring the use back.
   const store = new FileStore(home);
   for (const projectId of new Set([...pages.values()].map((p) => p.projectId)))
     for (const summary of await store.listPages(projectId)) {
@@ -179,11 +168,6 @@ export async function catalogUses(
   return uses;
 }
 
-/**
- * Remove a component or template revision, or every revision of the package
- * in one scope. Built-in entries cannot be removed, and nothing is removed
- * while a page, package or publication still uses one of the revisions.
- */
 export async function removeCatalogPackage(
   home: string,
   input: CatalogRemovalInput,
@@ -212,7 +196,6 @@ export async function removeCatalogPackage(
       "INVALID_DATA",
       "This library needs a one-time import into the versioned format.",
     );
-  // The use check reads the library index, which waits for the library lock.
   if (libraryMutations.getStore()?.root === library.root)
     throw new Error("Catalog removal runs its own library transaction.");
   const target = { ...input, scope };
@@ -254,7 +237,6 @@ export async function removeCatalogPackage(
   return mutateLibrary(
     home,
     async () => {
-      // Uses were checked at one revision; a newer save could have added one.
       if (libraryMutations.getStore()?.head !== checkedAt)
         throw new CoreError(
           "CONFLICT",
@@ -265,7 +247,6 @@ export async function removeCatalogPackage(
       for (const revision of found) {
         const prefix = `${logicalPath(home, join(base, revision.id, revision.version))!}/`;
         const files = all.filter((path) => path.startsWith(prefix));
-        // Early templates were one file per id rather than a version folder.
         if (!files.length && input.kind === "template")
           files.push(logicalPath(home, join(base, `${revision.id}.json`))!);
         paths.push(...files);

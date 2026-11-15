@@ -155,7 +155,6 @@ export function DockableBoardToolbar({
         `${next.edge}:${next.position}${next.floating ? `:${next.floating.x}:${next.floating.y}` : ""}`,
       );
     } catch {
-      /* Personal placement remains usable when storage is unavailable. */
     }
   };
   const pointer = (event: PointerEvent) => {
@@ -225,9 +224,6 @@ export function DockableBoardToolbar({
     event.preventDefault();
     event.stopPropagation();
     if (!current.active) {
-      // Until actual movement, the browser owns the pressed control's native
-      // focus/click. Taking capture on pointerdown retargets that click and
-      // breaks buttons inside an embedded editor's NodeView.
       event.currentTarget.setPointerCapture(event.pointerId);
       current.active = true;
       position.current = toolbarCenter(
@@ -261,8 +257,6 @@ export function DockableBoardToolbar({
               : attached === "top"
                 ? current.pointer.y - origin.pointer.y
                 : origin.pointer.y - current.pointer.y;
-      // Keep the entry geometry while attached: rotating a long strip into a
-      // side dock must not detach it on the very next pointer sample.
       if (origin && attached && origin.gap + pull <= band * 1.4)
         snapped = { edge: attached, position: 0.5 };
       else {
@@ -293,8 +287,6 @@ export function DockableBoardToolbar({
           : "right");
     if (next !== current.edge) {
       current.edge = next;
-      // Orientation changes resize the strip. Measure that layout before
-      // the next sample/up so the grabbed control stays under the finger.
       flushSync(() => setEdge(next));
       const element = primary.current!;
       const measured = {
@@ -378,8 +370,6 @@ export function DockableBoardToolbar({
             across = horizontal(edge)
               ? (event.clientY - rect.top) / rect.height
               : (event.clientX - rect.left) / rect.width;
-          // Record drag intent without cancelling a button's native tap.
-          // Capture begins only when advance observes real pointer movement.
           drag.current = {
             id: event.pointerId,
             start: { x: event.clientX, y: event.clientY },

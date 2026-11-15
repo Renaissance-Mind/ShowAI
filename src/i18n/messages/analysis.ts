@@ -1,6 +1,5 @@
 import { defineMessages } from "../index";
 
-// Comparison matrix, status tree and experiment tracker built-ins.
 export default defineMessages("analysis", {
   "zh-CN": {
     "matrix.title": "对比矩阵",

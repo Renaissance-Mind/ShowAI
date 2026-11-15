@@ -1,6 +1,5 @@
 import type { ReactNode } from "react";
 
-/** Render Markdown links in Agent replies: web links open, workspace paths download. */
 export function messageLinks(
   text: string,
   download: (path: string) => void,
@@ -39,7 +38,6 @@ export function messageLinks(
   return output;
 }
 
-/** Save a file from an Agent task workspace through the host. */
 export async function downloadAgentFile(
   invoke: <T>(action: string, args?: Record<string, unknown>) => Promise<T>,
   id: string,

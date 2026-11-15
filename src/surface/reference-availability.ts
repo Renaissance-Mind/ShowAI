@@ -1,5 +1,3 @@
-// Track mounted, enabled pickers rather than inferring availability from the
-// resource kind: Pages can contain Boards, and Boards can be locked or hidden.
 const pickers = new Map<string, Set<symbol>>();
 const listeners = new Set<() => void>();
 const changed = () => listeners.forEach((listener) => listener());

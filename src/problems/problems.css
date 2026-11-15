@@ -129,9 +129,6 @@
   background: var(--hover);
   color: var(--text);
 }
-/* L2: attached banner. One line of text with the actions on its right; in a
-   narrow container the actions move under the text. The first text line, the
-   icon and the close button centre on the 31px action buttons. */
 .problem-notice.is-banner {
   container-type: inline-size;
   flex-wrap: wrap;
@@ -171,11 +168,9 @@
     margin-left: 0;
   }
 }
-/* L3: inside a dialog the caller owns. */
 .problem-notice.is-dialog {
   padding: 4px 0;
 }
-/* L4: recovery page. */
 .problem-notice.is-page {
   flex-direction: column;
   align-items: stretch;
@@ -188,7 +183,6 @@
   font-size: 22px;
   margin: 4px 0;
 }
-/* L1: compact toast. */
 .problem-notice.is-toast {
   align-items: center;
   padding: 10px 14px;
@@ -241,7 +235,6 @@
   position: static;
   transform: none;
   max-width: 100%;
-  /* A light surface keeps the tone icons legible in both themes. */
   background: var(--paper);
   color: var(--text);
   border: 1px solid var(--line);

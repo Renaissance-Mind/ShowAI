@@ -3,7 +3,6 @@ export interface TextEntry {
   start: number;
   end: number;
 }
-/** Keep this factory self-contained: sandboxed components receive this exact code. */
 export function createTextModel(
   root: Element,
   frameText: (frame: HTMLIFrameElement) => string = () => "",

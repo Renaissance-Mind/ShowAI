@@ -1,12 +1,6 @@
-// Hosts cache UI templates by URI; bump the version when the reader's behavior changes.
 export const readerResourceUri = "ui://showai/reader-v3.html";
-/** Conversation components use the same reader protocol under their own view. */
 export const componentResourceUri = "ui://showai/component-v1.html";
 
-/** One sandboxed reader for MCP Apps hosts; all page dependencies travel with the result.
- * Reader control values, references the reader makes and component states handed
- * over are reported together as model context only. They never write the Page.
- */
 export const mcpReaderHtml = `<!doctype html>
 <html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <style>
@@ -172,5 +166,4 @@ a{color:inherit}
 })();
 </script></body></html>`;
 
-/** The component view only renames its status text; rendering and model context are shared. */
 export const mcpComponentHtml = mcpReaderHtml.replaceAll("页面", "组件");

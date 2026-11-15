@@ -16,7 +16,6 @@ import {
   portableInkGeometry,
 } from "../surface/portable-ink.mjs";
 
-/** A lasso selects enclosed paint and any contour touched by its trace. */
 export function shapeIntersectsPolygon(node, frame, polygon, tolerance = 0) {
   if (polygon.length < 2) return false;
   if(node.type==="drawing"&&node.attrs?.ink?.format==="showai-ink-v2")return cubicIntersectsPolygon(node,frame,polygon,tolerance);
@@ -109,7 +108,6 @@ function cubicIntersectsPolygon(node,frame,polygon,tolerance){
   return contours.some(points=>points.some((b,i)=>polygon.some((d,j)=>intersects(points[(i+points.length-1)%points.length],b,polygon[(j+polygon.length-1)%polygon.length],d))));
 }
 
-/** Geometry is the painted centerline, independent of SVG viewport padding. */
 export function drawingBounds(node) {
   if (node.type !== "drawing") return null;
   if (isPortableInk(node.attrs.ink))
@@ -160,7 +158,6 @@ export function geometryFrame(node, frame) {
   };
 }
 
-/** Convert an edited geometry back to the unchanged document's SVG coordinates. */
 export function frameFromGeometry(node, stored, visual) {
   const box = drawingBounds(node);
   if (!box) return visual;
@@ -240,7 +237,6 @@ function drawingOutline(node, frame, p = { x: Infinity, y: Infinity }) {
       y: cy + ry * Math.sin((i * Math.PI) / 48),
     }));
   } else if (tool === "arrow") {
-    // Arrowheads use the same SVG-local dimensions as Drawing.
     const first = points[0],
       last = points.at(-1),
       angle = Math.atan2(last.y - first.y, last.x - first.x);
@@ -302,8 +298,6 @@ export function shapeHit(node, frame, point) {
       -(frame.rotation ?? 0),
     );
     const inside = hitFrame(frame, point);
-    // A free region is a frame around other objects: only its border is
-    // solid, so objects overlapped by its empty interior stay reachable.
     const hollow = node.type === "region" && frame.mode === "free";
     return {
       inside,
@@ -371,7 +365,6 @@ export function shapeHit(node, frame, point) {
   };
 }
 
-/** Brush the visible paths, not the empty area enclosed by a hollow drawing. */
 export function shapeIntersects(node, frame, rect, wrap = false) {
   const bounds = frameBounds(geometryFrame(node, frame));
   const contains =
@@ -479,12 +472,10 @@ export function shapeIntersects(node, frame, rect, wrap = false) {
   );
 }
 
-/** Candidates are in paint order. Empty interiors never occlude closer geometry. */
 export function pickShape(candidates, hitInside = true) {
   return pickCandidate(candidates, hitInside, false);
 }
 
-/** Selection owns the whole drawing frame; painting and erasing keep path hits. */
 export function pickSelection(candidates) {
   return pickCandidate(candidates, true, true);
 }
@@ -532,7 +523,6 @@ function pickCandidate(candidates, hitInside, drawingBounds) {
   return edge?.item ?? hollow?.item ?? null;
 }
 
-/** Arrowheads grow with the stroke so thick arrows keep a visible head. */
 export function arrowHeadLength(a, b, strokeWidth = 2.5) {
   return Math.min(
     Math.max(20, strokeWidth * 4),
@@ -545,7 +535,6 @@ export function arrowPath(a, b, strokeWidth = 2.5) {
   return `M ${a.x} ${a.y} L ${b.x} ${b.y} M ${b.x - head * Math.cos(angle - 0.5)} ${b.y - head * Math.sin(angle - 0.5)} L ${b.x} ${b.y} L ${b.x - head * Math.cos(angle + 0.5)} ${b.y - head * Math.sin(angle + 0.5)}`;
 }
 
-/** Freehand strokes render through segment midpoints as smooth quadratic curves. */
 export function smoothPath(points) {
   if (points.length < 3)
     return points.map((p, i) => `${i ? "L" : "M"} ${p.x} ${p.y}`).join(" ");
@@ -559,7 +548,6 @@ export function smoothPath(points) {
   return `${path} L ${last.x} ${last.y}`;
 }
 
-/** Creation modifiers match the geometry later used for selection and snapping. */
 export function creationPoints(
   tool,
   origin,

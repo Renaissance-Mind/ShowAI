@@ -1,6 +1,5 @@
 import { defineMessages } from "../index";
 
-// Settings → 关于与反馈, the report form and help entries elsewhere.
 export default defineMessages("feedback", {
   "zh-CN": {
     helpAndFeedback: "帮助与反馈",

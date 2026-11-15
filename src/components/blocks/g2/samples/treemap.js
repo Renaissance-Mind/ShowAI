@@ -1,6 +1,3 @@
-// Adapted from https://github.com/antvis/G2/blob/v5/site/docs/charts/treemap.en.mdx
-// License notices: resources/licenses/g2-runtime.json.
-
 export default async function draw(context) {
   const { Chart, asset, fetch } = context;
   const G2 = { Chart };

@@ -5,13 +5,7 @@ import { atomicRename } from "./atomic-rename";
 import type { ChangeContext } from "./history-model";
 import { assertId } from "./store";
 
-/**
- * Pages an Agent created that the person has not opened yet. One small file
- * per page under local/ (never synced or versioned); opening the page in the
- * workbench removes it.
- */
 export interface AgentCreatedMark {
-  /** Display name of the writer: harness or MCP client name. */
   label?: string;
   at: string;
 }
@@ -19,7 +13,6 @@ export interface AgentCreatedMark {
 const directory = (root: string, projectId: string) =>
   join(root, "local", "agent-created", assertId(projectId));
 
-/** Writes by Agents through MCP or the CLI with Agent attribution. */
 export function agentAuthored(context: ChangeContext) {
   return (
     context.actor.kind === "agent" ||
@@ -59,7 +52,6 @@ export async function readAgentCreated(
     if (!name.endsWith(".json")) continue;
     const text = await readFile(join(base, name), "utf8").catch(
       (error: NodeJS.ErrnoException) => {
-        // Removed by an opening window between readdir and read.
         if (error.code === "ENOENT") return null;
         throw error;
       },

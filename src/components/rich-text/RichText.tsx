@@ -36,7 +36,6 @@ export type RichTextHost = Pick<
     options?: { separateHistory?: boolean; historyGroup?: string },
   ) => void;
 };
-/** One text component for direct typing, catalog insertion, AI input and the SDK. */
 export function RichText({
   data,
   onChange,
@@ -44,11 +43,9 @@ export function RichText({
   host,
 }: BlockProps & { host?: RichTextHost }) {
   const t = useTranslator(messages);
-  // Annotated text and formulas show their notes in reading and editing.
   installNoteBubbles();
   validateRichTextData(data);
   const editable = !readOnly && !!(onChange || host?.onContentChange);
-  // The editor normalizes a content tree itself and keeps unchanged blocks.
   const content = useMemo(
     () =>
       editable && typeof data.content == "object"
@@ -94,10 +91,6 @@ export function RichText({
   );
 }
 
-/**
- * Shown while the editor code loads; it stays silent for the first 180 ms so
- * fast loads do not flash. (This package cannot import ui/PendingNotice.)
- */
 function OpeningEditor({ label }: { label: string }) {
   const [visible, setVisible] = useState(false);
   useEffect(() => {

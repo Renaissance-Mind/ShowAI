@@ -12,9 +12,6 @@ const endpoint = globalThis as unknown as {
 endpoint.onmessage = ({ data }) => {
   try {
     const result = owner.execute(data.request);
-    // The receiver already owns every unchanged command chunk. Only final
-    // per-chunk affine paths/bounds are new; don't clone the complete numeric
-    // mesh across the thread again at pen-up.
     if (result.sealed) {
       const { geometry, ...sealed } = result.sealed;
       const { commands, ...summary } = geometry;

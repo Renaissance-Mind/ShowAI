@@ -9,7 +9,6 @@ export const version: string = createRequire(
     : import.meta.url,
 )("esbuild/package.json").version;
 
-/** Load the compiler beside its native binary after the desktop runtime is ready. */
 export function build<T extends BuildOptions>(
   options: T & { [Key in Exclude<keyof T, keyof BuildOptions>]: never },
 ): Promise<BuildResult<T>> {

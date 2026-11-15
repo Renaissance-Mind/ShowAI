@@ -17,9 +17,6 @@ type PointerPacket = PointerSample & {
   getCoalescedEvents?: () => PointerSample[];
   getPredictedEvents?: () => PointerSample[];
 };
-/** Coordinates, zoom and direction are captured at pen-down. Camera movement
- * never refits already accepted source. Actual coalesced samples are retained,
- * including stationary pressure changes; only exact sensor duplicates vanish. */
 export class PortablePointerInput {
   private nextId = 1;
   private startTime: number;
@@ -62,8 +59,6 @@ export class PortablePointerInput {
         y = along * this.direction.y;
       }
     }
-    // W3C Pointer Events pressure is a normalized browser sensor value. It is
-    // preserved as received, not claimed to have UITouch.force calibration.
     const force = sample.pointerType === "pen" ? sample.pressure : 1;
     const tx = Math.tan(((sample.tiltX ?? 0) * Math.PI) / 180),
       ty = Math.tan(((sample.tiltY ?? 0) * Math.PI) / 180);
@@ -95,7 +90,6 @@ export class PortablePointerInput {
       predicted: [],
       corrections: [],
     };
-    // Per Pointer Events, process the coalesced list OR its parent event.
     const coalesced = actual ? (packet.getCoalescedEvents?.() ?? []) : [];
     const samples = actual ? (coalesced.length ? coalesced : [packet]) : [];
     for (const sample of samples) {
@@ -108,7 +102,6 @@ export class PortablePointerInput {
         prior = this.seen.get(key),
         point = this.convert(sample, prior?.id ?? this.nextId);
       if (prior) {
-        // Corrections retain the previously accepted position and identity.
         point.x = prior.x;
         point.y = prior.y;
         if (
@@ -126,8 +119,6 @@ export class PortablePointerInput {
       }
     }
     const predictions = packet.getPredictedEvents?.() ?? [];
-    // Forecasts are disposable and explicitly bounded to the nearest128
-    // future samples. This never truncates/rejects the actual sensor batch.
     for (const sample of predictions.slice(0, 128)) {
       if (sample.pointerId === this.pointerId)
         result.predicted.push(this.convert(sample, 0));

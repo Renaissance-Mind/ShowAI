@@ -13,11 +13,6 @@ let loginPath: string[] = [];
 let loginPathResolved: Promise<string[]> | undefined;
 const PATH_MARKER = "__SHOWAI_PATH__";
 
-/**
- * A Finder-launched App inherits launchd's short PATH, without nvm, volta, asdf or
- * other shell setups. Ask the person's login shell once, so host CLIs installed
- * there are found too. A failing or slow shell leaves the fixed directories.
- */
 export function resolveLoginShellPath(): Promise<string[]> {
   if (process.platform === "win32") return Promise.resolve([]);
   loginPathResolved ??= new Promise<string[]>((done) => {
@@ -86,18 +81,12 @@ export async function findExecutable(name: string): Promise<string | null> {
   }
   return null;
 }
-/**
- * Node cannot start a Windows batch file without a shell, and cmd.exe would
- * rewrite quotes and drop newlines in prompts. An npm-installed Agent is a
- * `.cmd` shim around one script, so run that script directly.
- */
 export function launchCommand(
   command: string,
   args: string[],
 ): [string, string[]] {
   if (process.platform !== "win32" || !/\.(cmd|bat)$/i.test(command))
     return [command, args];
-  // cmd-shim ends with: "%_prog%"  "%dp0%\node_modules\…\cli.js" %*
   const target = /"%~?dp0%?\\([^"]+)"\s+%\*/i.exec(
     readFileSync(command, "utf8"),
   )?.[1];
@@ -125,7 +114,6 @@ export function execute(
     timeout?: number;
     signal?: AbortSignal;
     onLine?: (line: string) => void;
-    /** Written to stdin, which then closes. */
     input?: string;
   } = {},
 ): Promise<ProcessResult> {
@@ -145,8 +133,6 @@ export function execute(
       timedOut = true;
       child.kill("SIGTERM");
     }, options.timeout ?? 120000);
-    // A process that exits without reading its input closes the pipe; the
-    // exit code reports that.
     child.stdin.on("error", () => {});
     child.stdin.end(options.input);
     child.stdout.setEncoding("utf8");
@@ -206,7 +192,6 @@ export function execute(
     });
   });
 }
-/** ACP is a persistent JSON-RPC process; no shell command interpolation. */
 export class RpcProcess {
   child: ChildProcessWithoutNullStreams;
   private next = 0;
@@ -284,8 +269,6 @@ export class RpcProcess {
       this.pending.clear();
     };
     this.child.once("error", fail);
-    // An Agent that exits early breaks the pipe under a pending write; its
-    // close below reports the exit with the stderr that explains it.
     this.child.stdin.on("error", () => {});
     this.child.once("close", (code) =>
       fail(

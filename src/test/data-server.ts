@@ -5,7 +5,6 @@ import {
 } from "node:http";
 import type { AddressInfo } from "node:net";
 
-/** A local HTTP server for online-data tests on 127.0.0.1 and an ephemeral port. */
 export async function dataServer(
   handler: (request: IncomingMessage, response: ServerResponse) => void,
 ) {

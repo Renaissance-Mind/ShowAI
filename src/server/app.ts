@@ -78,10 +78,6 @@ export interface ServerOptions extends ExternalLoginOptions {
   storagePolicy?: Partial<StoragePolicy>;
   eventPeers?: () => Iterable<EventPeer>;
   metadataDriver?: "sqlite" | "d1" | "durable-sqlite";
-  /**
-   * Honor x-showai-transfer from the Cloudflare front end, which streams
-   * object bytes to and from storage itself. Public requests never carry it.
-   */
   objectTransfer?: boolean;
 }
 interface Member {
@@ -125,7 +121,6 @@ async function body(request: Request): Promise<Record<string, unknown>> {
   return value;
 }
 
-/** Identical request handler for Workers and the Linux HTTP host. */
 export function createSyncServer(options: ServerOptions) {
   if (
     options.accountLimit !== undefined &&
@@ -170,9 +165,6 @@ export function createSyncServer(options: ServerOptions) {
     options.requestPolicy,
   );
   maintenance.budgetSummary = () => requestBudgets.usage();
-  // Manifest work is bounded by weight rather than one global slot: ordinary
-  // publications run side by side, while a large body takes every slot so the
-  // isolate never parses several multi-megabyte manifests at once.
   const manifestCapacity = 4;
   let manifestWeight = 0;
   const manifestWaiters: { weight: number; admit: () => void }[] = [];
@@ -186,8 +178,6 @@ export function createSyncServer(options: ServerOptions) {
       next.admit();
     }
   };
-  // Package objects are immutable and content-addressed, so a verified copy can
-  // serve later publications without another storage read and digest pass.
   const verifiedPackages = new Map<string, Uint8Array>();
   let verifiedPackageBytes = 0;
   const rememberPackage = (key: string, bytes: Uint8Array) => {
@@ -236,8 +226,6 @@ export function createSyncServer(options: ServerOptions) {
       [digest],
     );
     if (!rows[0]) {
-      // Clients may restore an expired login from a bound server, but never one
-      // its owner revoked here.
       const revoked = (
         await db.all(
           "SELECT 1 FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.digest=? AND (s.revoked=1 OR s.auth_version<>u.auth_version)",
@@ -306,8 +294,6 @@ export function createSyncServer(options: ServerOptions) {
   ) {
     const account = plainText(name, 100),
       windowMs = kind === "login" ? 60_000 : 3600_000;
-    // The tight limit follows one source so others cannot lock the owner out;
-    // the account-wide ceiling still bounds distributed guessing.
     await rateLimit(db, {
       scope: `${kind}:account-source`,
       identity: JSON.stringify([account, source]),
@@ -529,8 +515,6 @@ export function createSyncServer(options: ServerOptions) {
     if (path === "/api/account/grants" && method === "POST")
       return json(await accounts.grant(user, await body(request)));
     if (path === "/api/account/tokens" && method === "POST")
-      // A year-long token may only come from a direct sign-in, never a federated
-      // session, so it cannot extend a stolen credential or outlive an unbinding.
       return json(
         await sessions.create(user, (await body(request)).device, {
           kind: "personal",
@@ -1065,7 +1049,6 @@ export function createSyncServer(options: ServerOptions) {
           "Content object is missing.",
         );
       const key = objectKey(projectId, object[1]);
-      // The front end streams remote bytes itself once access is charged here.
       if (
         transfer === "read" &&
         (await objects.location?.(key)) === "remote"
@@ -1106,8 +1089,6 @@ export function createSyncServer(options: ServerOptions) {
       );
     }
     if (object && method === "PUT" && transfer === "admit") {
-      // Admission for a front end that writes the bytes to storage itself: the
-      // reservation and a transfer lease stay held until commit or abort.
       await projectFor(user.id, projectId, "editor");
       const declared = Number(request.headers.get("x-showai-length"));
       if (
@@ -1155,7 +1136,6 @@ export function createSyncServer(options: ServerOptions) {
       )[0];
       try {
         if (transfer === "abort") {
-          // Bytes that might already be stored keep their reservation for recovery.
           if (row && input.possible !== true)
             await quotas.release({
               id: row.id,
@@ -1345,7 +1325,6 @@ export function createSyncServer(options: ServerOptions) {
       );
     if (resource === "snapshot" && method === "GET") {
       const requested = url.searchParams.get("revision") ?? project.head;
-      // The version parameter guards against a head change during download.
       if (!requested || requested !== project.head)
         throw new SyncError(
           409,
@@ -1375,7 +1354,6 @@ export function createSyncServer(options: ServerOptions) {
       const expected =
         input.expected === null ? null : digestId(input.expected);
       if (input.delta !== undefined) {
-        // Changes are applied to the verified current head the client expected.
         if (expected === null || expected !== project.head)
           throw new SyncError(
             409,
@@ -1398,7 +1376,6 @@ export function createSyncServer(options: ServerOptions) {
         input.snapshot,
         projectId,
       );
-      // The current format's revision is the manifest digest; serialize once.
       const serialized =
         snapshot.format === syncProtocol ? canonical(snapshot) : undefined;
       const revision = serialized
@@ -1477,8 +1454,6 @@ export function createSyncServer(options: ServerOptions) {
           const bytes = Uint8Array.from(decoded, (character) =>
             character.charCodeAt(0),
           );
-          // Reuse the exact whole-object admission, integrity, quota, expiry and
-          // publication checks under this request's existing durable write lease.
           const headers = new Headers(request.headers);
           headers.set("content-length", String(bytes.length));
           headers.set("content-type", "application/octet-stream");
@@ -1531,7 +1506,6 @@ export function createSyncServer(options: ServerOptions) {
             "Only project administrators can archive or restore a project.",
           );
       }
-      // Objects of the verified current head already exist; check only new ones.
       const current = await revisions
         .current(projectId, project.head)
         .catch(() => undefined);
@@ -1684,15 +1658,12 @@ export function createSyncServer(options: ServerOptions) {
         );
       }
       revisions.remember(projectId, revision, snapshot, stored.bytes);
-      // The new head is durable; a failed notification must not report the
-      // publication as failed. Peers catch up through heads on their next cycle.
       const fanOut = (error: unknown) =>
         console.error("Project event fan-out failed", error);
       const notify = await events
         ?.prepare(projectId, expected, user.session_digest)
         .catch(fanOut);
       await revisions.retainCurrent(projectId, revision);
-      // Deliveries run after the response so the publisher never waits for peers.
       if (notify) void notify().catch(fanOut);
       return json({ revision, head: revision, published: true });
     }

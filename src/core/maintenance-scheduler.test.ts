@@ -23,7 +23,6 @@ test("an idle tick repeats no work while nothing changed, yet still collects cop
   await setMaintenancePolicy(root, { idleMs: 0 });
   const directory = bundleDirectory(root);
   await mkdir(directory, { recursive: true });
-  // An unreferenced copy whose grace period ends shortly after the first pass.
   const expiring = "a".repeat(64);
   await writeFile(join(directory, expiring), "copy");
   const modified = new Date(Date.now() - BUNDLE_GRACE_MS + 1500);
@@ -34,13 +33,11 @@ test("an idle tick repeats no work while nothing changed, yet still collects cop
   await scheduler.tick();
   expect(await readdir(directory)).toEqual([expiring]);
   const index = join(root, "index.sqlite");
-  // Unchanged: the pass is skipped, so it does not rebuild a removed index.
   await rm(index, { force: true });
   await rm(`${index}-wal`, { force: true });
   await rm(`${index}-shm`, { force: true });
   await scheduler.tick();
   expect(await readdir(root)).not.toContain("index.sqlite");
-  // A new stored copy changes the state.
   const old = "b".repeat(64);
   await writeFile(join(directory, old), "copy");
   const past = new Date(Date.now() - 2 * BUNDLE_GRACE_MS);
@@ -48,7 +45,6 @@ test("an idle tick repeats no work while nothing changed, yet still collects cop
   await scheduler.tick();
   expect(await readdir(directory)).toEqual([expiring]);
   expect(await readdir(root)).toContain("index.sqlite");
-  // Unchanged again, until the first copy outlives its grace period.
   await new Promise((done) => setTimeout(done, 1600));
   await scheduler.tick();
   expect(await readdir(directory)).toEqual([]);

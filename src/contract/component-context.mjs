@@ -1,16 +1,11 @@
-// What a component hands to the conversation through onContext: `model` is
-// visible to the Agent, `private` only returns to the same component instance.
 export const componentContextLimits = Object.freeze({
   modelBytes: 8192,
   totalBytes: 16384,
   labelChars: 80,
   depth: 20,
-  /** Snapshots from different blocks that travel with one message. */
   perMessage: 6,
 });
 
-/** Empty when the snapshot can be handed over, otherwise the reason. The
- * component runtime embeds this function's source, so it stays self-contained. */
 export function componentContextIssue(
   snapshot,
   limits = { modelBytes: 8192, totalBytes: 16384, labelChars: 80, depth: 20 },
@@ -62,12 +57,8 @@ export function componentContextIssue(
   return "";
 }
 
-/** What a component keeps through onViewState: this reader's view on this
- * device (a selected tab, a slider position), restored as `viewState`. */
 export const componentViewStateLimits = Object.freeze({ bytes: 16384, depth: 20 });
 
-/** Empty when the view state can be kept, otherwise the reason. The component
- * runtime embeds this function's source, so it stays self-contained. */
 export function componentViewStateIssue(
   value,
   limits = { bytes: 16384, depth: 20 },

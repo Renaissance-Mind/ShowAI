@@ -1,6 +1,5 @@
 import { defineMessages } from "../index";
 
-// Step walkthrough built-in.
 export default defineMessages("stepWalkthrough", {
   "zh-CN": {
     title: "分步演示",

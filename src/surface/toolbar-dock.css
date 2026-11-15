@@ -369,7 +369,6 @@
   }
 }
 
-/* iPad: a fixed primary strip and one equally long parallel settings strip. */
 .board-dockable-toolbar[data-mobile] .board-tool-shortcuts {
   display: none;
 }
@@ -480,14 +479,11 @@
   ) {
   flex-direction: column;
 }
-/* Tool buttons sit inside a scroll container. Give that container and its
-   controls the drag gesture too, so WebKit cannot cancel it to start scrolling. */
 .board-toolbar-primary
   :is(.board-tool-stack, .board-tool-buttons, button, summary) {
   touch-action: none;
 }
 
-/* One joined panel; the primary strip's shared border is the divider. */
 .board-dockable-toolbar[data-mobile] .board-toolbar-primary {
   box-shadow: none;
 }
@@ -534,7 +530,6 @@
   border-radius: 12px 0 0 12px;
 }
 
-/* Flatten the existing action groups into evenly spaced settings slots. */
 .board-dockable-toolbar[data-mobile] .board-toolbar-secondary {
   justify-content: space-evenly;
 }

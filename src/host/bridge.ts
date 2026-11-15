@@ -99,7 +99,6 @@ export const desktop = {
   onAppUpdate(listener: (state: AppUpdateState) => void) {
     return window.showai?.onAppUpdate?.(listener) ?? (() => {});
   },
-  /** `source` names this part of the window when it refuses to close. */
   onBeforeClose(listener: () => Promise<CloseResult>, source?: CloseSource) {
     return window.showai?.onBeforeClose(listener, source) ?? (() => {});
   },

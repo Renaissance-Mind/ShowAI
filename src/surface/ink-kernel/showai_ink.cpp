@@ -1,19 +1,11 @@
 #include "include/showai_ink.h"
 
-// This implementation is freestanding: no allocator, exceptions, C++ runtime,
-// storage or platform APIs. Native and WebAssembly compile this same source.
 static const double PI = 3.14159265358979323846264338327950288;
-// Owned deterministic elementary math. Portable samples limit azimuth to
-// [-100,100], so reduction never loses a quadrant. Split pi/2 and fixed-order
-// Taylor polynomials avoid host libm differences between Apple, Windows and
-// JavaScript. IEEE sqrt is a hardware/Wasm primitive. Contraction is disabled.
 static void trig(double x, double &s, double &c) {
     const double half = 1.57079632679489661923132169163975144;
     const double high = 0x1.921fb54400000p0;
     const double low = half - high;
     int quadrant = (int)(x / half + (x < 0 ? -0.5 : 0.5));
-    // The final split correction is the exact mathematical pi/2 residual beyond
-    // the nearest binary64 half constant, retained as a separate operation.
     double r = ((x - quadrant * high) - quadrant * low) - quadrant * 6.12323399573676603587e-17;
     double z = r * r;
     double sp = -1.0/121645100408832000.0;
@@ -242,10 +234,9 @@ SAInkStatus sa_ink_hit(const SAInkPoint *points,uint32_t point_count,const SAInk
     }
     return SA_INK_OK;
 }
-} // extern C
+}
 
 static void sort(double *values,uint32_t n) {
-    // In-place heapsort bounds worst-case work for highly intersecting masks.
     for(uint32_t start=n/2;start>0;--start) {
         uint32_t root=start-1;
         while(root*2+1<n){uint32_t child=root*2+1;if(child+1<n&&values[child]<values[child+1])++child;
@@ -291,7 +282,6 @@ extern "C" SAInkStatus sa_ink_segment_hit(const SAInkPoint *points,uint32_t poin
                    segment_distance(a,b,along(p,q,scratch[k-1]),along(p,q,scratch[k]))<=radius){*hit=1;return SA_INK_OK;}
             }
         }
-        // Mask boundaries inside paint also bound the clipped visible region.
         for(uint32_t m=0;m<mask_contour_count;++m) {
             const SAInkPoint *mask=mask_points+mask_contours[m].offset;uint32_t size=mask_contours[m].count;
             SAInkContour single={0,n};

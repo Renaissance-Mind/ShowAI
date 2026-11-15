@@ -1,4 +1,3 @@
-/* Shared catalog shell: fixed geometry, one top navigation row, contextual side panel. */
 .studio-modal.wide.catalog-component-dialog,
 .studio-modal.wide.catalog-template-dialog {
   width: min(1600px, calc(100vw - 40px));

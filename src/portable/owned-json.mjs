@@ -4,8 +4,6 @@ import {
   utf8Bytes,
   dataUrlContent,
 } from "./capacity.mjs";
-// One actual recursive ownership registry shared by source factories and their
-// private validation adapters. Object.isFrozen(root) alone is never proof.
 const owned = new WeakSet(),
   metrics = new WeakMap(),
   plainOwned = new WeakSet(),
@@ -36,8 +34,6 @@ export function freezeOwnedJSON(value) {
 export const isOwnedJSON = (value) =>
   !!value && typeof value === "object" && owned.has(value);
 export const ownedJSONMetrics = (value) => metrics.get(value);
-/** Read-only evidence for this module's actual captured data. Generic freezing
- * cannot install it; caller-authored reports never enter this private map. */
 export const capturedContentSummary = (value) =>
   value && typeof value === "object" ? contentSummaries.get(value) : undefined;
 
@@ -103,8 +99,6 @@ function summarizeCaptured(value, keys, array) {
   });
 }
 
-// This proof is separate from generic recursive freezing: only an exclusive
-// JSON.parse graph or an independent data capture can enter this registry.
 function scalarBytes(value) {
   return utf8Bytes(JSON.stringify(value));
 }
@@ -136,8 +130,6 @@ function capturePlain(
     throw new TypeError(
       "Invalid native source delta: non-JSON value (expected finite plain data)",
     );
-  // Reusing a sealed branch allocates no defensive copy. Its actual encoded
-  // bytes remain subject to the complete document/artifact gates afterwards.
   if (plainOwned.has(value)) return value;
   if (depth > 64 || (!exclusive && active.has(value)))
     throw new TypeError("Expected acyclic JSON data within depth 64");
@@ -192,13 +184,9 @@ function capturePlain(
     if (!exclusive) captured.set(value, candidate);
     return candidate;
   }
-  // The source is now actual plain data; this sealing walk visits only new
-  // immediate children. Previously proved branches are never re-frozen.
   freezeOwnedJSON(result);
   const summary = summarizeCaptured(result, keys, array);
   contentSummaries.set(result, summary);
-  // Logical residency includes bookkeeping for the retained summary/index.
-  // These graph estimates are separate from JavaScript heap measurement.
   const metric = metrics.get(result);
   metrics.set(
     result,
@@ -226,13 +214,7 @@ export function captureOwnedJSON(
     maximum: maximumNewCopyBytes,
   });
 }
-/** Parse, compare against actual sealed data, and seal before anything escapes.
- * The base may suggest reuse but every field is compared; no identity shortcut
- * grants ownership to mutable caller objects or accessor graphs. */
 export function parseOwnedJSON(raw, base) {
-  // This exclusive parse creates no extra defensive whole-graph copy. An
-  // internal merged request can contain three independently legal documents;
-  // the public artifact/P limits must not become a new whole-request limit.
   const candidate = base === undefined ? undefined : captureOwnedJSON(base);
   return capturePlain(
     JSON.parse(raw),
@@ -245,9 +227,6 @@ export function parseOwnedJSON(raw, base) {
   );
 }
 
-/** Exact sharing within independent, sealed JSON captures. The identity exit
- * is safe only after this factory's actual capture, including accessor inputs.
- * Reordered object arrays retain equal old leaves by their real unique IDs. */
 export function shareCapturedJSON(base, target) {
   const before = captureOwnedJSON(base),
     after = captureOwnedJSON(target);

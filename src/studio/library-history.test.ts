@@ -8,7 +8,6 @@ it("undoes newest first, redoes what was undone and drops redo after a new chang
   history.record("delete");
   history.record("rename");
   history.record("batch");
-  // The oldest change falls off past the limit.
   expect(history.undo).toEqual(["delete", "rename", "batch"]);
   expect(history.next(false)).toBe("batch");
   history.replayed("batch", false);
@@ -20,7 +19,6 @@ it("undoes newest first, redoes what was undone and drops redo after a new chang
   history.replayed("rename", false);
   history.record("new");
   expect(history.redo).toEqual([]);
-  // A toast can undo a change that is no longer the newest.
   history.replayed("delete", false);
   expect(history.undo).toEqual(["batch", "new"]);
   expect(history.redo).toEqual(["delete"]);

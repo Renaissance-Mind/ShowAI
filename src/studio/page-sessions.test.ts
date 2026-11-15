@@ -32,7 +32,6 @@ describe("workspace sessions against the real loopback workbench", () => {
   let first: LoadedPage;
   let second: LoadedPage;
   const calls: string[] = [];
-  /** The next page save fails as a full disk would, before reaching the library. */
   let failNextSave = false;
   let invoke: <T>(action: string, args?: Record<string, unknown>) => Promise<T>;
   beforeEach(async () => {
@@ -732,7 +731,6 @@ describe("workspace sessions against the real loopback workbench", () => {
     view.edit({title:"Local edit kept while away"});
     expect(await view.flush()).toBe(false);
     expect(view.getSnapshot().status).toBe("conflict");
-    // The workbench may leave a conflicted page; leaving retains the draft.
     expect(await sessions.open(project,second.document.id,"b")).toBe(true);
     expect(sessions.getSnapshot().active?.getSnapshot().draft?.id).toBe(second.document.id);
     const drafts=await invoke<{title:string}[]>("drafts:list",{kind:"page",projectId:project,resourceId:first.document.id});
@@ -875,7 +873,6 @@ describe("workspace sessions against the real loopback workbench", () => {
     try{
       view.edit({title:"Native packet N"});
       const pending=view.flush();
-      // Let the real save capture its immutable source while the writer is locked.
       while(view.getSnapshot().status!=="saving")await new Promise(resolve=>setTimeout(resolve,1));
       view.edit({title:"Native packet N+1"});
       release.release();await held;expect(await pending).toBe(true);
@@ -931,7 +928,6 @@ describe("workspace sessions against the real loopback workbench", () => {
     await entered.promise;
     try {
       a.edit({ title: "My retained edit" });
-      // A close blocked now can name the page and export its unsaved source.
       const unsaved = sessions.unsavedPages();
       expect(unsaved.map((page) => [page.pageId, page.title])).toEqual([
         [first.document.id, "My retained edit"],
@@ -949,7 +945,6 @@ describe("workspace sessions against the real loopback workbench", () => {
       await held;
     }
     expect(await sessions.flushAll()).toBe(false);
-    // A development reload names the page whose formal save is held, and why.
     const reload = await sessions.reloadResult();
     expect(reload).toMatchObject({ allow: false });
     const holding = (
@@ -968,7 +963,6 @@ describe("workspace sessions against the real loopback workbench", () => {
       "Second",
     );
     expect(await sessions.prepareClose()).toBe(true);
-    // The draft is retained, so closing the window is allowed.
     expect(await sessions.closeResult()).toBe(true);
     await sessions.shutdown();
     sessions = new PageSessions({ clientId: "workspace-test-client", invoke });

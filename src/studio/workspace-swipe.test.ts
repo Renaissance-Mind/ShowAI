@@ -26,7 +26,6 @@ describe("workspace swipe navigation", () => {
         direction,
       );
       for (let now = 40; now < 1500; now += 20) {
-        // The new view and availability cannot re-trigger momentum navigation.
         expect(
           swipe.push(input(direction * 20), now, {
             blocked: true,
@@ -71,7 +70,6 @@ describe("workspace swipe navigation", () => {
       15 / 150,
     );
     expect(swipe.push(input(50), 60, available).preview?.progress).toBe(0);
-    // A short, abandoned gesture does not accumulate into the next one.
     expect(
       swipe.push(input(-80), 60 + SWIPE_IDLE + 1, available).navigate,
     ).toBeUndefined();

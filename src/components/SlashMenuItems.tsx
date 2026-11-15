@@ -11,24 +11,17 @@ import {
   type SlashRow,
 } from "./slash-menu-model";
 
-/**
- * Rows, selection and keys of an insert menu. `key` returns whether it used
- * the key: ↑ ↓ move, Enter inserts or opens charts, → opens charts, and ← or
- * Escape on the chart level go back.
- */
 export function useSlashMenu<T extends SlashEntry>(
   items: readonly T[],
   query: string,
   onRun: (item: T) => void,
   open = true,
-  /** Where this menu keeps its recently used items. */
   recentKey?: string,
 ) {
   const t = useTranslator(messages);
   const [level, setLevel] = useState<SlashLevel>("root");
   const [selected, setSelected] = useState(0);
   const [recent, setRecent] = useState<string[]>([]);
-  // Each opening starts on the first level with the current recent items.
   useLayoutEffect(() => {
     if (!open) return;
     setLevel("root");
@@ -101,7 +94,6 @@ export function useSlashMenu<T extends SlashEntry>(
   };
 }
 
-/** The rows of an insert menu, with group headings. */
 export function SlashMenuItems<T extends SlashEntry>({
   menu,
   disabled,

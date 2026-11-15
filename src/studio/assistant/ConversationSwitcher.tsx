@@ -13,11 +13,6 @@ import { ChevronDown, Plus, Search } from "../../ui/icons";
 
 type Option = { id: string; title: string; running?: boolean };
 
-/**
- * The conversation picker in the Agent panel header: the current title opens
- * a searchable list of the project's conversations, and turns into a text
- * field while the conversation is renamed.
- */
 export function ConversationSwitcher({
   projectId,
   summaries,
@@ -31,13 +26,11 @@ export function ConversationSwitcher({
 }: {
   projectId: string | null;
   summaries: AgentConversationSummary[];
-  /** The open conversation; null while a new one is being written. */
   currentId: string | null;
   currentTitle: string;
   renaming: boolean;
   onSelect: (id: string) => void;
   onNew: () => void;
-  /** A new title, or null when renaming was cancelled. */
   onRename: (title: string | null) => void;
   onError: (message: string) => void;
 }) {

@@ -149,13 +149,10 @@ describe("sandbox", () => {
     expect(Date.now() - started).toBeLessThan(
       TRANSFORM_LIMITS.timeoutMs + 3000,
     );
-    // The engine keeps working after an interrupted run.
     expect(await value(`function transform() { return 1; }`)).toBe(1);
   });
 
   test("memory and stack are bounded", async () => {
-    // Filling 64 MiB of small objects takes about 0.8 s here and over 2 s on CI runners; give the
-    // memory limit room to stop the script before the deadline does.
     const timeoutMs = TRANSFORM_LIMITS.timeoutMs;
     TRANSFORM_LIMITS.timeoutMs = 10_000;
     try {
@@ -228,7 +225,6 @@ describe("sandbox", () => {
       });
       expect((result as { message: string }).message, script).toContain(text);
     }
-    // Properties set to undefined are left out, as JSON does.
     expect(
       await value(`function transform() { return { a: 1, b: undefined }; }`),
     ).toEqual({ a: 1 });

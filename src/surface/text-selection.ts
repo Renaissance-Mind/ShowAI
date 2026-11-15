@@ -13,13 +13,10 @@ const frames = new WeakMap<
 >();
 type Point = { x: number; y: number };
 type Caret = { node: Node; offset: number };
-/** Installed scopes read their painted selection through this, not the DOM selection. */
 const paintedSelections = new WeakMap<
   HTMLElement,
   () => { ranges: Range[]; text: string } | null
 >();
-/** The read-only text selection painted in the scope around `target`, if any.
- * Its document selection lives in a hidden input, so callers read it here. */
 export function paintedTextSelection(target: Element) {
   for (
     let element: HTMLElement | null = target.closest<HTMLElement>("*");
@@ -176,7 +173,6 @@ export function scrollSelection(
   return changed;
 }
 
-/** Cross-component selection is a set of character ranges, never a node selection. */
 export function installPageTextSelection(
   root: HTMLElement,
   inputLabel = "Text selection",
@@ -386,7 +382,6 @@ export function installPageTextSelection(
     if (!drag.cross) {
       drag.cross = true;
       root.dataset.textSelection = "true";
-      // Focus outside contenteditable prevents an editor from clamping the DOM range.
       proxy.hidden = false;
       proxy.focus({ preventScroll: true });
       doc.getSelection()?.removeAllRanges();

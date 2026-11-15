@@ -1,6 +1,3 @@
-// Derived values of a database: reverse relations, rollups and formulas,
-// from the host's related records and its formula runtime, or from the
-// snapshot an exported reader carries.
 import { useEffect, useMemo, useState } from "react";
 import {
   deriveValues,
@@ -13,12 +10,9 @@ import type { DatabaseHost } from "./database-host";
 import type { DatabaseColumn, DatabaseRow } from "./types";
 
 export interface DerivedDatabase {
-  /** The database's columns followed by reverse relations pointing at its dataset. */
   columns: DatabaseColumn[];
-  /** A cell's value: stored, or derived for derived columns. */
   value(row: DatabaseRow, column: DatabaseColumn): unknown;
   recordTitles(column: DatabaseColumn, ids: string[]): string[] | undefined;
-  /** Formula evaluation failed as a whole (e.g. the runtime stopped it). */
   formulaError?: string;
 }
 
@@ -44,7 +38,6 @@ export function useDatabaseDerived(
     return [...columns, ...reverse.filter((column) => !ids.has(column.id))];
   }, [columns, precomputed, self, incoming]);
   const related = host ? (id: string) => host.related(id) : undefined;
-  // The host's version changes whenever related records change.
   const hostVersion = host?.version() ?? 0;
   const pure = useMemo(
     () =>
@@ -83,7 +76,6 @@ export function useDatabaseDerived(
       current = false;
       clearTimeout(timer);
     };
-    // The key stands for the inputs.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key, evaluate]);
   const values = useMemo(() => {

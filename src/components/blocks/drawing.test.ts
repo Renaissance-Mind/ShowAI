@@ -97,7 +97,6 @@ describe("mechanism-diagram rendering", () => {
     const html = renderToStaticMarkup(
       createElement(MechanismDiagramBlock, { data: nat }),
     );
-    // Live frame shows the first step's label; the print copy draws all three.
     expect(html).toContain("从 192.168.0.5:41641");
     expect(html.match(/class="md-print-step"/g)).toHaveLength(3);
     expect(html).toContain("发往 203.0.113.7:22");

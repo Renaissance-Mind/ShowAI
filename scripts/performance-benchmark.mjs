@@ -1,4 +1,3 @@
-// Measure actual file/Git operations against an isolated copy of a content revision.
 import { build } from "esbuild";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";

@@ -10,7 +10,6 @@ import {
   supportsCodeLanguage,
 } from "./code-highlighting";
 
-/** The workbench's shared data dialog; it is not part of this package, so it answers an event. */
 const SHARED_DATA_EVENT = "showai:shared-data";
 function sharedDataAvailable() {
   if (typeof window === "undefined") return false;
@@ -22,7 +21,6 @@ function sharedDataAvailable() {
   return probe.defaultPrevented;
 }
 
-/** Component-specific fields join the existing block menu and its lifecycle. */
 export function ContentNodeActions({
   editor,
   position,
@@ -74,7 +72,6 @@ export function ContentNodeActions({
     sharedDataAvailable()
   ) {
     const id = node.attrs.id;
-    // Applies by block id: the document may change while the dialog is open.
     const apply = (data: Record<string, unknown>) => {
       let at = -1;
       editor.state.doc.descendants((child, offset) => {

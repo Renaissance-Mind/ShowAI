@@ -12,10 +12,6 @@ const { tmpdir } = require("node:os");
 const { delimiter, join } = require("node:path");
 const { signAsync } = require("@electron/osx-sign");
 
-// Only Mach-O code needs its own signature. Every other file in the bundle (.pak, fonts, wasm,
-// pdfjs cmaps, …) is sealed by the enclosing bundle's CodeResources, so a change to it still
-// breaks the signature. osx-sign would otherwise sign every non-text file, each with its own
-// timestamp request.
 function isMachO(path) {
   const header = Buffer.alloc(8);
   const fd = openSync(path, "r");
@@ -25,15 +21,12 @@ function isMachO(path) {
   const magic = header.readUInt32BE(0);
   if ([0xcffaedfe, 0xcefaedfe, 0xfeedfacf, 0xfeedface].includes(magic))
     return true;
-  // Universal binaries; a Java class shares the magic but has its class version (>= 45) here.
   return (
     (magic === 0xcafebabe || magic === 0xcafebabf) &&
     header.readUInt32BE(4) < 30
   );
 }
 
-// Apple's timestamp server drops requests now and then; codesign then fails with "A timestamp was
-// expected but was not found" and the whole package would start over. Retry that file instead.
 const RETRYING_CODESIGN = `#!/bin/bash
 for attempt in 1 2 3 4 5 6; do
   output=$(/usr/bin/codesign "$@" 2>&1); status=$?

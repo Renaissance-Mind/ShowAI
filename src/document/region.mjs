@@ -1,4 +1,3 @@
-/** Layout containers share native region nodes and the document's layout map. */
 export function validateRegionData(data, depth = 0) {
   if (!data || typeof data !== "object" || Array.isArray(data))
     throw new Error("region data must be an object.");
@@ -56,7 +55,6 @@ export function validateRegionData(data, depth = 0) {
   }
 }
 
-/** CSS chooses the column count from available container width, never window width. */
 export function regionGridStyle(frame = {}) {
   const columns = frame.columns ?? 2,
     gap = frame.gap ?? 24,

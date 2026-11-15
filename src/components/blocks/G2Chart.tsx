@@ -144,7 +144,6 @@ export function G2ChartBlock({
       current?.destroy();
     };
   }, [chartType, data, theme, lock.locked]);
-  // Editor commits re-render every block; serialize the raw view only on data changes.
   const rawData = useMemo(
     () => JSON.stringify(data.datasets, null, 2),
     [data.datasets],

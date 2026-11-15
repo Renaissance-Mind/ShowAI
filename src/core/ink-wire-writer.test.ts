@@ -69,8 +69,6 @@ it.skipIf(!process.env.SHOWAI_NATIVE_INK_ROUNDTRIP)("accepts the actual Swift jo
   const fixture = JSON.parse(await readFile(process.env.SHOWAI_NATIVE_INK_SOURCE!, "utf8"));
   const native = JSON.parse(await readFile(process.env.SHOWAI_NATIVE_INK_ROUNDTRIP!, "utf8"));
   const root = await temporary(), store = new FileStore(root), project = await store.createProject({ name: "Native/browser roundtrip" });
-  // The sync import seam installs the canonical source artifact. Subsequent edits
-  // use the production read/normalization/CAS save path without test doubles.
   const path = store.pagePath(project.id, fixture.browser.id); await mkdir(dirname(path), { recursive: true });
   await writeFile(path, JSON.stringify(serializeArtifact(fixture.browser)));
   const baseline = await store.readPage(project.id, fixture.browser.id);

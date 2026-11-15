@@ -14,8 +14,6 @@ function setup(options:ConstructorParameters<typeof SourceRuntimeOwner>[0]={}){
 }
 function publication(document:ShowDocument,current:SourceSnapshotRef,id="initial-no-operations",sourceVersion=1):Parameters<SourceRuntimeOwner["registerActualMergedPublication"]>[0]{
  const raw=structuredClone(document);
- // Canonical defaults and an empty rich-text child demonstrate why a raw P
- // digest is not proof of the actual normalized factory output.
  for(const key of ["icon","cover","parentId","favorite","archived"] as const)delete (raw as any)[key];
  (raw as any).futureRoot={keep:["é","é",false]};
  return{current,publicationId:id,sourceVersion,packet:{pageId:document.id,boardId:document.content.attrs!.id as string,token:"actual-native-token",document:raw,baseDocument:document,operationIds:[],nativeContentActions:[]},result:{document:raw,conflicts:[]},leaseId:`output:${id}`};
@@ -106,8 +104,6 @@ it("does not retain an older origin when a real three-way author branch changes 
  const first=owner.registerActualMergedPublication(firstRequest),current=resolve(owner,first.next);
  const baseline=structuredClone(current);baseline.title=document.title;
  const second=publication(document,first.next,"native-A",2);second.packet.document=structuredClone(baseline);second.packet.baseDocument=baseline;
- // Native P's writer saw A; current UI already contains B. The true merge
- // preserves B, so the second publication is not canonically Native A.
  second.result=mergePageContent(baseline,current,second.packet.document);
  expect(second.result.conflicts).toEqual([]);expect(second.result.document.title).toBe("B");
  const out=owner.registerActualMergedPublication(second),body=resolve(owner,out.next);

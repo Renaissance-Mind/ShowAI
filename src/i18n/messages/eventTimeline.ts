@@ -1,6 +1,5 @@
 import { defineMessages } from "../index";
 
-// Event timeline built-in.
 export default defineMessages("eventTimeline", {
   "zh-CN": {
     title: "事件时间线",

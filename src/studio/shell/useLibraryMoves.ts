@@ -32,10 +32,6 @@ import type { StudioRouter } from "./useStudioRouter";
 import type { LibraryEdits } from "./useLibraryEdits";
 import { DraftHeld, operation, type PageState } from "./types";
 
-/**
- * Moving library items by dragging, by Move to… and in batches, and the
- * library's undo and redo.
- */
 export function useLibraryMoves({
   feedback: { setNotice, report, notifyWithUndo },
   library: {
@@ -165,7 +161,6 @@ export function useLibraryMoves({
       placement: next ? "before" : "after",
     };
   }
-  /** Carries out one direction of a recorded change; true when the library took it. */
   async function applyLibraryChange(entry: LibraryChange, redo: boolean) {
     switch (entry.kind) {
       case "move":
@@ -221,7 +216,6 @@ export function useLibraryMoves({
       refreshLibraryHistory((value) => value + 1);
     }
   }
-  /** A toast's Undo reverses its own change, even after later ones were made. */
   async function undoLibraryChange(entry: LibraryChange) {
     if (libraryHistory.current.next(false) === entry)
       return replayLibraryChange(false);
@@ -232,8 +226,6 @@ export function useLibraryMoves({
   }
   const replayLibraryRef = useRef(replayLibraryChange);
   replayLibraryRef.current = replayLibraryChange;
-  // Deleting a row leaves focus on the body; the last place the person
-  // worked in decides whether Undo then belongs to the library.
   const libraryLast = useRef(false);
   useEffect(() => {
     const libraryAreas = ".studio-sidebar,.studio-library,.studio-topbar";
@@ -426,7 +418,6 @@ export function useLibraryMoves({
     let cleared = false;
     try {
       await reorderQueue.current;
-      // Pages that move save first; other pages, even one in a conflict, stay as they are.
       if (source.kind !== "project") {
         const moving =
           source.kind === "page"
@@ -499,7 +490,6 @@ export function useLibraryMoves({
       moved = true;
       remember();
       if (reopen) await openPage(source.id, drop.projectId!);
-      // Confirm only the affected projects; unrelated libraries can be large.
       await refresh(change);
       return true;
     } catch (error) {
@@ -557,7 +547,6 @@ export function useLibraryMoves({
     setContextMenu(null);
     setDialog({ type: "batchPages", operation, targets: selectedPageTargets });
   }
-  /** Moves one folder or page; a moved page's editor closes, as its location changed. */
   async function moveLibraryEntry(
     target: LibraryTarget,
     destination: LibraryPlace,
@@ -591,10 +580,6 @@ export function useLibraryMoves({
       destination.projectId,
     );
   }
-  /**
-   * Saves the open pages several library items hold, and closes the open page
-   * when it is one of them. Other pages, even one in a conflict, stay as they are.
-   */
   async function settleTargets(targets: LibraryTarget[]) {
     const scopes = targets.map((target) => ({
       target,
@@ -624,7 +609,6 @@ export function useLibraryMoves({
       throw new DraftHeld(t("resolveDraftFirst"));
     return scopes;
   }
-  /** Undo and redo of Move to…: each item goes back to (or again to) its place. */
   async function moveLibraryEntries(
     moves: { target: LibraryTarget; destination: LibraryPlace }[],
   ) {
@@ -668,7 +652,6 @@ export function useLibraryMoves({
           ({ target, scope }) =>
             target.projectId === selectedProject && scope.folders.has(folderId),
         );
-      // Pages go first so a page inside a selected folder is handled before its folder.
       for (const target of [
         ...targets.filter((target) => target.kind === "page"),
         ...targets.filter((target) => target.kind === "folder"),

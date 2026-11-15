@@ -14,7 +14,6 @@ export interface ResourceSlot {
   key: string;
   kind: "image" | "video" | "audio" | "pdf";
   blockId?: string;
-  /** Where the value sits in its block, e.g. `src`, `images[0].src`, `props.clip`. */
   field: string;
 }
 export function resourceSlots(

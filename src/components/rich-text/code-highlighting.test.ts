@@ -32,7 +32,6 @@ function render(code: string, language?: string | null) {
   );
 }
 
-// Runs before the grammars load: readers show the code itself, then color it.
 it("renders code as plain text until the highlighter loads", async () => {
   const code = 'const html = "<b>bold</b>";';
   const before = render(code, "javascript");

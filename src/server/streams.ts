@@ -1,7 +1,6 @@
 import { SyncError } from "../sync/protocol";
 import type { StreamDigest } from "./storage";
 
-/** A admitted request cannot hold backup drainage open with an endless body. */
 export function deadlineBody(
   body: ReadableStream<Uint8Array>,
   milliseconds = 120_000,

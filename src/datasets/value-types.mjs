@@ -1,14 +1,7 @@
-// Value types: how a typed field of a dataset record is checked, normalised,
-// compared, written as text and filtered. They belong to the harness, not to
-// one component: a database, a chart or a custom component bound to the same
-// records types and filters them the same way (exported through the SDK).
-// Dependency-free; runs in the workbench, the CLI and the portable reader.
-
 const DAY_MS = 86400000;
 const PAGE_LINK =
   /^showai:\/\/project\/([A-Za-z0-9][A-Za-z0-9_-]{0,127})\/page\/([A-Za-z0-9][A-Za-z0-9_-]{0,127})$/;
 
-/** ISO calendar day (YYYY-MM-DD) to a whole day number, or null when invalid. */
 export function parseDay(value) {
   if (typeof value !== "string") return null;
   const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
@@ -25,14 +18,12 @@ export function formatDay(day) {
   return new Date(day * DAY_MS).toISOString().slice(0, 10);
 }
 
-/** The reader's local calendar day as a day number. */
 export function localDay(date = new Date()) {
   return Math.round(
     Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()) / DAY_MS,
   );
 }
 
-/** Loose date text (2026/10/14, 2026-10-14T09:00) to ISO, or "" when unreadable. */
 export function normalizeDate(value) {
   if (typeof value !== "string") return "";
   const match = /^\s*(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})/.exec(value);
@@ -41,13 +32,11 @@ export function normalizeDate(value) {
   return parseDay(iso) === null ? "" : iso;
 }
 
-/** The project and page a page cell links to, or null for empty or invalid values. */
 export function parsePageCell(value) {
   const match = typeof value === "string" ? PAGE_LINK.exec(value) : null;
   return match ? { projectId: match[1], pageId: match[2] } : null;
 }
 
-/** What each operator compares its value with. */
 export const OPERATORS = {
   contains: "text",
   notContains: "text",
@@ -72,10 +61,6 @@ export const OPERATORS = {
   unchecked: "none",
 };
 
-/**
- * Value kinds: the comparable form a value type projects its values to. The
- * kind decides the operators, the order and the empty value.
- */
 export const KIND_OPERATORS = {
   text: ["contains", "notContains", "is", "isNot", "isEmpty", "isNotEmpty"],
   number: [
@@ -128,11 +113,9 @@ const finiteNumber = (value) => {
     return Number(value);
   return null;
 };
-/** A derived value that failed, e.g. a formula error: {error}. */
 export const isErrorValue = (value) =>
   isObject(value) && typeof value.error === "string";
 
-/** The empty projection of a kind. */
 export function emptyOf(kind) {
   return kind === "number" || kind === "date"
     ? null
@@ -142,14 +125,12 @@ export function emptyOf(kind) {
         ? false
         : "";
 }
-/** Whether a projection of the kind counts as empty. */
 export function isEmptyProjection(kind, projected) {
   if (kind === "list") return !projected.length;
   if (kind === "boolean") return projected !== true;
   return projected === null || projected === "";
 }
 
-/** Check an operand for an operator; returns an error message or "". */
 export function operandIssue(operator, operand, kind) {
   const expected = OPERATORS[operator];
   if (!expected) return `operator ${operator} is not supported.`;
@@ -208,7 +189,6 @@ export function operandIssue(operator, operand, kind) {
   return "";
 }
 
-/** Whether a projected value passes an operator; `today` is a day number. */
 export function testOperator(kind, projected, operator, operand, today) {
   if (operator === "isEmpty") return isEmptyProjection(kind, projected);
   if (operator === "isNotEmpty") return !isEmptyProjection(kind, projected);
@@ -279,10 +259,6 @@ export function testOperator(kind, projected, operator, operand, today) {
   return false;
 }
 
-/**
- * Order two projections of a kind; empty values sort after the others in
- * either direction, so the caller passes the direction.
- */
 export function compareProjections(kind, a, b, direction = "asc", locale) {
   const emptyA = isEmptyProjection(kind, a) && kind !== "boolean";
   const emptyB = isEmptyProjection(kind, b) && kind !== "boolean";
@@ -309,7 +285,6 @@ const listCheck = (value) =>
     : "must be a list of texts.";
 const noConfig = () => {};
 
-/** Built-in value types by type name. */
 const builtins = new Map();
 export function defineValueType(definition) {
   builtins.set(definition.type, Object.freeze({ ...definition }));
@@ -419,7 +394,6 @@ defineValueType({
       ? ""
       : "must be a showai://project/PROJECT/page/PAGE link or empty.",
   normalize: (value) => (parsePageCell(value) ? String(value) : ""),
-  // Search, filters and sorting read page cells by the titles readers see.
   project: (value, _column, context) =>
     value ? (context?.pageTitle?.(value) ?? String(value)) : "",
   text: (value, _column, context) =>
@@ -441,7 +415,6 @@ defineValueType({
   blank: () => [],
   checkConfig: noConfig,
 });
-// Derived types: their values are computed (see derived-fields.mjs) and never stored.
 defineValueType({
   type: "formula",
   kind: "text",
@@ -474,7 +447,6 @@ defineValueType({
 const formulaKind = (column) =>
   VALUE_KINDS.includes(column?.formula?.kind) ? column.formula.kind : "text";
 
-/** A raw value projected as a kind, for types whose kind is chosen per column. */
 export function projectAs(kind, value) {
   if (isErrorValue(value)) return emptyOf(kind);
   if (kind === "number") return finiteNumber(value);
@@ -486,10 +458,6 @@ export function projectAs(kind, value) {
     : primitiveText(value);
 }
 
-/**
- * A stored value nothing knows how to read (a field type whose component is
- * missing): shown as its text, read-only, never rewritten.
- */
 const unknownType = Object.freeze({
   type: "unknown",
   kind: "text",
@@ -506,11 +474,6 @@ const unknownType = Object.freeze({
   checkConfig: noConfig,
 });
 
-/**
- * A contributed field type read without its component (CLI, exported
- * readers, a missing component): the column's saved `kind` still filters and
- * sorts the stored values; cells stay read-only.
- */
 const storedTypes = new Map(
   VALUE_KINDS.map((kind) => [
     kind,
@@ -525,11 +488,6 @@ const storedTypes = new Map(
 
 export const BUILTIN_VALUE_TYPES = [...builtins.keys()];
 
-/**
- * The value type of a column. `contributed(column)` supplies types that a
- * library component declares (column.type "custom"); without one the column
- * reads by its saved kind, or as an unknown type.
- */
 export function valueTypeOf(column, context) {
   if (column?.type === "custom")
     return (
@@ -539,12 +497,10 @@ export function valueTypeOf(column, context) {
     );
   return builtins.get(column?.type) ?? unknownType;
 }
-/** The value kind of a column (formula columns choose theirs). */
 export function kindOf(column, context) {
   const type = valueTypeOf(column, context);
   return type.kindOf ? type.kindOf(column) : type.kind;
 }
-/** Operators the column's type supports. */
 export function operatorsOf(column, context) {
   const type = valueTypeOf(column, context);
   const kind = kindOf(column, context);
@@ -552,7 +508,6 @@ export function operatorsOf(column, context) {
   return type.operators ? all.filter((op) => type.operators.includes(op)) : all;
 }
 
-/** A summary of the built-in value types for Agents and documentation. */
 export function describeValueTypes() {
   return [...builtins.values()].map((type) => ({
     type: type.type,

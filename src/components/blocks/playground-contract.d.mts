@@ -21,12 +21,9 @@ export interface PlaygroundInput {
   id: string;
   label: string;
   type?: "slider" | "stepper" | "toggle" | "choice";
-  /** Required for slider and stepper. */
   min?: number;
   max?: number;
-  /** Required for slider; stepper defaults to 1. */
   step?: number;
-  /** Required for slider and stepper; choice defaults to its first option, toggle to 0. */
   value?: number;
   unit?: string;
   hint?: string;

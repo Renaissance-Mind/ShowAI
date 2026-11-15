@@ -36,7 +36,6 @@ export type LibraryTarget =
       pinned: boolean;
       parentId: string | null;
       icon?: string;
-      /** Writer name when an Agent created this page and it has not been opened. */
       agentCreated?: string;
     };
 
@@ -51,12 +50,9 @@ export interface LibraryRowProps {
     anchor: HTMLElement,
     point?: LibraryMenuPoint,
   ) => void;
-  /** F2 renames and Delete (⌘⌫ on macOS) deletes the focused row. */
   onCommand?: (target: LibraryTarget, command: "rename" | "delete") => void;
   onUnpin?: (target: LibraryTarget) => void;
-  /** Short status after the title, e.g. a project's sync state. */
   marker?: { label: string; title?: string; tone?: "warning" | "muted" };
-  /** Project is connected to cloud sync, independently of transient sync errors. */
   cloud?: boolean;
 }
 
@@ -239,7 +235,6 @@ const sameTarget = (a: LibraryTarget, b: LibraryTarget) =>
     ("agentCreated" in a ? a.agentCreated : undefined) ===
       ("agentCreated" in b ? b.agentCreated : undefined));
 
-/** Targets are rebuilt with each navigation render; rows compare their fields. */
 export const LibraryRow = memo(
   LibraryRowView,
   (previous, next) =>

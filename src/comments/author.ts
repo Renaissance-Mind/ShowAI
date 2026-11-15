@@ -10,10 +10,6 @@ interface SyncStatus {
 
 let status: Promise<SyncStatus> | undefined;
 
-/**
- * The person writing comments: the sync account of the page's project, else
- * the default account. Without an account comments are signed only as a person.
- */
 export function useCommentAuthor(projectId?: string): CommentAuthor {
   const [author, setAuthor] = useState<CommentAuthor>({ kind: "person" });
   useEffect(() => {
@@ -34,7 +30,6 @@ export function useCommentAuthor(projectId?: string): CommentAuthor {
           );
       },
       (error) => {
-        // Comments still work unsigned; the account is read again next time.
         status = undefined;
         console.warn("Comment author unavailable", error);
       },

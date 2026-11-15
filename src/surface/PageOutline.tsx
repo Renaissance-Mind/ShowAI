@@ -84,7 +84,6 @@ export interface PageOutlineHostProps {
   scroll: RefObject<HTMLDivElement | null>;
   shell: RefObject<HTMLDivElement | null>;
   view: OutlineViewState;
-  /** Called after the reader opens, pins or folds part of the outline. */
   onViewChange?: (view: OutlineViewState) => void;
   onSettings?: () => void;
 }
@@ -264,7 +263,6 @@ function ActivePageOutline({
     const scroller = scroll.current;
     if (!scroller) return;
     let frame = 0;
-    // Scrolling only moves the headings; look each one up again after it is replaced.
     const found = new Map<string, HTMLElement | undefined>();
     const locate = (nodeId: string) => {
       let target = found.get(nodeId);
@@ -459,7 +457,6 @@ function ActivePageOutline({
           data-custom={component && !error ? true : undefined}
         >
           {config.renderer && (!component || error) && (
-            // The original error is for diagnosis; readers see the fallback.
             <p
               className="page-outline-error"
               role="status"
@@ -484,7 +481,6 @@ function ActivePageOutline({
   );
 }
 
-/** Printing uses the same semantic tree, independent of a renderer's screen layout. */
 export function PageOutlinePrint({ page }: { page: JSONContent }) {
   const t = useTranslator(messages);
   if (!page.attrs?.outline?.enabled || page.attrs.kind !== "page") return null;

@@ -1,4 +1,3 @@
-// Template folders are the authoritative source; raw imports also bundle into remote runtimes.
 import system_presentation_0 from "../../resources/templates/system-presentation/README.md?raw";
 import system_presentation_1 from "../../resources/templates/system-presentation/guides/01-intent.md?raw";
 import system_presentation_2 from "../../resources/templates/system-presentation/guides/02-material.md?raw";

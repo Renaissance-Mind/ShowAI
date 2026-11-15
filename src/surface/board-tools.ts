@@ -27,7 +27,6 @@ export function boardToolForKey(key: string) {
   );
 }
 
-/** Every key that picks the tool, letters first, e.g. ["E", "O", "5"]. */
 export function boardToolKeys(tool: BoardTool | null) {
   const entry = boardTools.find((item) => item.tool === tool);
   return entry
@@ -37,15 +36,10 @@ export function boardToolKeys(tool: BoardTool | null) {
     : [];
 }
 
-/** Tooltip shortcut text, e.g. "P / 2". */
 export function boardToolShortcut(tool: BoardTool | null) {
   return boardToolKeys(tool).join(" / ");
 }
 
-/**
- * The board's keyboard help, built from the same table the key handler reads
- * so the description cannot name keys that do nothing.
- */
 export function boardEditDescription(
   t: Translator<(typeof messages)["catalogs"]["zh-CN"]>,
 ) {

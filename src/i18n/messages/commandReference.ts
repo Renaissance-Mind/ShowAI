@@ -1,6 +1,5 @@
 import { defineMessages } from "../index";
 
-// Command reference built-in.
 export default defineMessages("commandReference", {
   "zh-CN": {
     title: "命令参考",

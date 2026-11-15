@@ -4,9 +4,6 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { cloudMcpBuildInputs } from "./cloud-mcp-release.mjs";
 
-// Exports one committed revision as the deployment source, so a release never
-// includes uncommitted or parallel work from the shared checkout.
-// Usage: node scripts/prepare-cloud-mcp-release.mjs <handoff-directory> [commit]
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 if (!process.argv[2])
   throw new Error("Usage: node scripts/prepare-cloud-mcp-release.mjs <handoff-directory> [commit]");

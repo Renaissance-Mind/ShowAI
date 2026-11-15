@@ -1,4 +1,3 @@
-/** Keep secondary-strip menus in the top layer so scrolling never clips them. */
 export function toolbarPopovers(toolbar: HTMLElement) {
   let opened: {
     details: HTMLDetailsElement;

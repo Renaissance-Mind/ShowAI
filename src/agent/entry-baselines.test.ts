@@ -18,9 +18,6 @@ import { createMcpServer } from "./mcp";
 import { createLibraryMcpServer } from "./mcp-library";
 import { startMcpHttpServer } from "./mcp-http";
 
-// The tool lists of the four MCP connection kinds and the CLI help, byte for
-// byte. They change only when a tool or the help is changed on purpose; then
-// SHOWAI_WRITE_BASELINES=1 rewrites the files and the diff is reviewed.
 
 const execute = promisify(execFile);
 const repository = resolve(import.meta.dirname, "../..");

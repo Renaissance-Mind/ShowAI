@@ -39,7 +39,6 @@ const LazyPackageVersions = lazy(() =>
   panels().then((m) => ({ default: m.PackageVersions })),
 );
 
-/** The versions tab, loaded with the other management panels. */
 export function PackageVersions(props: {
   kind: PackageKind;
   item: RevisionItem;
@@ -60,19 +59,13 @@ export function PackageVersions(props: {
   );
 }
 
-/** What the workbench gives catalog dialogs to change the catalog. */
 export interface CatalogManager {
   invoke: <T>(action: string, args: Record<string, unknown>) => Promise<T>;
   projects: { id: string; name: string }[];
-  /** The project the person is working in, the default destination. */
   projectId?: string;
-  /** The page open in the editor, offered first when saving a template. */
   openPage?: { projectId: string; pageId: string };
-  /** components:remove and templates:remove are registered. */
   canRemove: boolean;
-  /** Saves pending edits of the open page before reading it from disk. */
   flushPage: () => Promise<void>;
-  /** Reloads the catalog lists. */
   changed: () => Promise<void>;
   openRevision: (
     kind: PackageKind,
@@ -82,10 +75,6 @@ export interface CatalogManager {
   closeDetail: () => void;
 }
 
-/**
- * The workbench's catalog manager, or none where the library is read-only.
- * Removal stays hidden until the running build registers it.
- */
 export function useCatalogManager(
   enabled: boolean,
   input: Omit<CatalogManager, "invoke" | "canRemove">,
@@ -125,7 +114,6 @@ export function PackageActions({
 }: {
   kind: PackageKind;
   item: RevisionItem;
-  /** The project that owns a project revision, or the context project. */
   owner?: string;
   manager: CatalogManager;
   onStatus: (status: ActionStatus) => void;

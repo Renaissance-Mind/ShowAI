@@ -29,8 +29,6 @@ export interface InkStrokeResult {
   arcErrorBound: number;
 }
 export type InkStrokeCommand = ["M" | "L" | "Q" | "C" | "Z", ...number[]];
-/** Round circular sweep geometry1; see C header for exact approximation,
- * empty/discontinuous/closed input and single-opacity nonzero-union semantics. */
 export class CompiledInkStroke {
   constructor();
   counts(

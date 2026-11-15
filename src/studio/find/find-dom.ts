@@ -8,13 +8,7 @@ import {
   type SegmentMatch,
 } from "./find-model";
 
-/**
- * Text that belongs to the page: editor content (page text, text inside
- * components that the editor owns, board text objects) and the same content
- * rendered for reading on read-only pages.
- */
 const TEXT_ROOT = ".ProseMirror, .portable-content";
-/** Component bodies, interface chrome and decorations inside text roots. */
 const SKIPPED =
   '[contenteditable="false"], .portable-widget, [aria-hidden="true"], [data-surface-ui], svg, canvas, script, style, template, textarea, input, button, select';
 const BLOCKS = new Set([
@@ -47,7 +41,6 @@ const BLOCKS = new Set([
 
 interface Piece {
   node: Text;
-  /** Where this text node starts in its segment's text. */
   start: number;
 }
 export interface TextSegment {
@@ -65,7 +58,6 @@ const visible = (element: Element) =>
     ? element.checkVisibility()
     : element.getClientRects().length > 0;
 
-/** The page's text, split at block boundaries, in reading order. */
 export function collectSegments(container: HTMLElement): TextSegment[] {
   const segments: TextSegment[] = [];
   let current: TextSegment | null = null;
@@ -93,7 +85,6 @@ export function collectSegments(container: HTMLElement): TextSegment[] {
       const next = child as Element;
       const isRoot = next.matches(TEXT_ROOT);
       if (!isRoot && root && next.matches(SKIPPED)) {
-        // Text owned by a nested editor inside a component body still counts.
         if (next.querySelector(TEXT_ROOT)) {
           end();
           visit(next, null);
@@ -129,7 +120,6 @@ function boundary(segment: TextSegment, offset: number, isEnd: boolean) {
   return { node: piece.node, offset: offset - piece.start };
 }
 
-/** Finds the query in the page and returns a DOM range for every match. */
 export function findInPage(
   container: HTMLElement,
   query: string,
@@ -153,13 +143,11 @@ export function findInPage(
 
 type EditorElement = HTMLElement & { editor?: Editor };
 
-/** The editor that owns a match's text, when that text can be edited. */
 export function editableEditor(match: PageMatch): Editor | null {
   const editor = (match.root as EditorElement).editor;
   return editor && !editor.isDestroyed && editor.isEditable ? editor : null;
 }
 
-/** The editor positions of a match, when they still hold the matched text. */
 function editorRange(editor: Editor, match: PageMatch): EditorRange | null {
   const { view, state } = editor;
   const { range } = match;
@@ -173,11 +161,6 @@ function editorRange(editor: Editor, match: PageMatch): EditorRange | null {
 
 let replacementGroup = 0;
 
-/**
- * Replaces matches through each owning editor's own transaction, one per
- * editor. All of them share one history group, so a single undo restores
- * every replacement. Returns how many matches were replaced.
- */
 export function replaceMatches(matches: readonly PageMatch[], text: string) {
   const byEditor = new Map<Editor, EditorRange[]>();
   for (const match of matches) {
@@ -196,8 +179,6 @@ export function replaceMatches(matches: readonly PageMatch[], text: string) {
       tr.insertText(text, range.from, range.to);
       replaced++;
     }
-    // Replacing text never turns it into a link; autolink detection also
-    // costs time per step, which matters for thousands of replacements.
     editor.view.dispatch(
       tr.setMeta(textRangeEditMeta, group).setMeta("preventAutolink", true),
     );
@@ -216,7 +197,6 @@ const HighlightClass = () =>
   (globalThis as unknown as { Highlight?: new (...ranges: Range[]) => unknown })
     .Highlight;
 
-/** Paints matches with the CSS Custom Highlight API; the DOM stays untouched. */
 export function paintMatches(matches: readonly PageMatch[], current: number) {
   const highlights = registry(),
     Highlight = HighlightClass();
@@ -247,10 +227,6 @@ const scrollable = (element: HTMLElement) => {
   );
 };
 
-/**
- * Scrolls the match into the middle of its scrolling ancestors. Returns false
- * when it stays out of view, as on a board whose camera has to move instead.
- */
 export function scrollToMatch(match: PageMatch, within: HTMLElement) {
   const rect = () => match.range.getBoundingClientRect();
   for (

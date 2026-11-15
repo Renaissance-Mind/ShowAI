@@ -23,7 +23,6 @@ export function writeViewportLock(key: string, locked: boolean) {
   localStorage.setItem(key, locked ? "locked" : "unlocked");
 }
 
-/** Personal reading preference, independent of content and editing permissions. */
 export function useViewportLock(scope: string, storageKey?: string) {
   const ref = useRef<HTMLDivElement>(null);
   const key = useRef("");
@@ -147,9 +146,7 @@ export function ViewportLockButton({
   locked: boolean;
   toggle: () => void;
   error?: string;
-  /** What the button locks, phrased to follow "Unlock"/"Lock" (e.g. "flowchart"). */
   label: string;
-  /** What unlocking allows, phrased to follow a colon (e.g. "allow zooming and panning"). */
   unlockDescription?: string;
 }) {
   const t = useTranslator(messages);

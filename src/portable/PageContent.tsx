@@ -33,7 +33,6 @@ export function PageContent({
   );
 }
 
-/** Editing is confined to the explicitly requested preview, never the stored Page. */
 function ReadingWidget({
   kind,
   data,

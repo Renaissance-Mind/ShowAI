@@ -7,7 +7,6 @@ import { useTranslator } from "../i18n/react";
 import messages from "../i18n/messages/surface";
 
 type Point = { x: number; y: number };
-/** Common stroke eraser and freeform selection for every Board renderer. */
 export function BoardGestureInput({
   tool,
   size,

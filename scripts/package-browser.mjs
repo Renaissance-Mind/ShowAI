@@ -45,8 +45,6 @@ await cp(runtime, join(output, "runtime"), {
   verbatimSymlinks: true,
 });
 await mkdir(join(output, "bin"));
-// Use the standalone official distribution: developer Node installations can depend
-// on Homebrew/system libraries that are absent on the recipient's machine.
 const nodeVersionTag =
   process.env.SHOWAI_PACKAGE_NODE_VERSION ?? process.versions.node;
 if (
@@ -175,7 +173,6 @@ const archive = join(
 );
 await rm(archive, { force: true });
 if (process.platform === "win32") {
-  // Paths are arguments/environment, never interpolated into PowerShell source.
   await run(
     "powershell.exe",
     [

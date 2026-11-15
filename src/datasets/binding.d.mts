@@ -4,11 +4,8 @@ export type FieldMapping =
   | string
   | {
       from: string;
-      /** Shown value (as text key) → stored value, e.g. { "true": "done" }. */
       map?: Record<string, unknown>;
-      /** Shown when the stored value matches no map entry. */
       otherwise?: unknown;
-      /** Clearing the shown value removes the stored field, or stores "". */
       empty?: "remove" | "keep";
     };
 export type Derivation =
@@ -71,19 +68,12 @@ export interface ProjectedItem {
   source: DataPath | null;
   label?: string;
   collection: CompiledCollection;
-  /** Fields written back to the source record. */
   writable: string[];
-  /** Fields shown from the source that cannot be changed here. */
   readOnly: string[];
 }
 export interface BindingRejection {
   id?: string;
   field?: string;
-  /**
-   * read-only: the record has no stable id to write to; source-read-only:
-   * the dataset itself cannot be written (online data, spreadsheets,
-   * transforms, stale values).
-   */
   reason:
     | "removed"
     | "derived"
@@ -128,7 +118,6 @@ export interface ResolvedBinding {
   projected: Map<string, ProjectedItem>;
   issues: BindingIssue[];
   compiled: CompiledBinding;
-  /** Whether the dataset accepts writes (see resolveBinding options). */
   writable: boolean;
 }
 export declare function splitBindingChange(input: {

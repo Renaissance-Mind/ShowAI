@@ -124,7 +124,6 @@ test("Agent restore discards legacy live-PID leases and checkpoints exclude held
     "leases/writer-previous-container.json",
   ])
     await writeFile(join(library, "local", path), owner);
-  // A previous release saved these leases, and the new container may reuse its PID.
   await new CloudState(root, objects, key).save();
   const restored = await directory();
   const state = new CloudState(restored, objects, key, {
@@ -141,7 +140,6 @@ test("Agent restore discards legacy live-PID leases and checkpoints exclude held
     ).rejects.toMatchObject({ code: "ENOENT" });
   await state.save((read) => withLibraryLock(join(restored, "library"), read));
   const restarted = await directory();
-  // Verify the saved checkpoint itself is clean without relying on a restore filter.
   await new CloudState(restarted, objects, key).restore();
   expect(await readFile(join(restarted, "library", "content"), "utf8")).toBe(
     "retained project",

@@ -13,10 +13,6 @@ import type {
 
 export type StagedImportPlan = ImportPlan & { token: string };
 
-/**
- * Shows what an import will create; writes only after the person confirms,
- * then follows its progress and shows what was not imported.
- */
 export default function ImportDialog({
   plan,
   destination,

@@ -81,7 +81,6 @@ test("a Notion export zip with a nested Part zip becomes folders, linked pages a
       "No page refers to this file; it was not imported.",
     ]),
   );
-  // Planning writes nothing.
   expect(await service.store.listPages(projectId)).toEqual([]);
 
   const progress: number[] = [];
@@ -158,15 +157,12 @@ test("a Notion export zip with a nested Part zip becomes folders, linked pages a
   expect(widgets.find((item) => item.kind === "pdf")!.data.src).toMatch(
     /^data:application\/pdf;base64,/,
   );
-  // Kept as text, with a warning: the HTML and the link that left the export.
   expect(JSON.stringify(home.document.content)).toContain("an old page");
 
-  // Links between pages, including a notion.so address, open the imported pages.
   const planLinks = nodes(plan_.document.content).flatMap((node) =>
     (node.marks ?? []).map((mark) => mark.attrs?.href),
   );
   expect(planLinks).toEqual([link(home.document.id), link(spec.document.id)]);
-  // Row pages lose the property lines the database holds.
   expect(JSON.stringify(spec.document.content)).not.toContain(
     "Status: In progress",
   );
@@ -230,7 +226,6 @@ test("a Notion export zip with a nested Part zip becomes folders, linked pages a
     { id: "r3", title: "Ship", p1: "In progress", p3: false },
   ]);
 
-  // Deleting the folder moves the whole import to the trash.
   await service.store.updateFolder(projectId, workspace.id, { archived: true });
   expect(
     (await service.store.listFolders(projectId)).some(
@@ -278,7 +273,6 @@ test("Notion relations between exported databases become relation columns of rec
     type: "multiSelect",
     options: ["writing", "review", "release"],
   });
-  // A rollup arrives as its computed value.
   expect(column(projects.value, "Open tasks").type).toBe("number");
   const id = (value: typeof projects.value, title: string) =>
     value.rows.find((row) => row.title === title)!.id;
@@ -290,7 +284,6 @@ test("Notion relations between exported databases become relation columns of rec
   expect(
     tasks.value.rows.find((row) => row.title === "Publish")![projectColumn],
   ).toEqual([id(projects.value, "Docs")]);
-  // The records read back with the related titles the database shows.
   const records = await service.datasetRead(projectId, projects.id, {
     query: {},
   });
@@ -373,7 +366,6 @@ test("a Word document becomes one page with formatting, lists, a merged table, a
     { type: "annotation", attrs: { note: "Source: internal survey." } },
   ]);
   expect(text("Source: internal survey.")).toBeDefined();
-  // "First" and "Second" are numbered; the details nest as bullets under "First".
   const ordered = all.find((node) => node.type === "orderedList")!;
   expect(ordered.content).toHaveLength(2);
   expect(ordered.content![0].content!.map((node) => node.type)).toEqual([
@@ -516,7 +508,6 @@ test("an importer contributed to the library fills the same slot and runs sandbo
   };
   expect(value.rows[0].page).toBe(link(home.document.id));
 
-  // The sandbox has no host objects, and a bundle that breaks the contract is refused.
   await saveContributedImporter(
     root,
     {

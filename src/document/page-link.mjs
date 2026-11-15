@@ -1,15 +1,9 @@
-// ShowAI page links: showai://project/PROJECT/page/PAGE[?blocks=ID,ID]
-// Pages store them as ordinary link hrefs; the workbench, readers and the
-// desktop app resolve them. A link names saved IDs only, never content.
-
 const ID = /^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/;
 export const PAGE_LINK_BLOCKS = 100;
-/** Bubbling DOM event that asks the surrounding host to follow a link. */
 export const NAVIGATE_EVENT = "showai:navigate";
 
 const id = (value) => typeof value === "string" && ID.test(value);
 
-/** The project, page and blocks a page link names, or null for anything else. */
 export function parsePageLink(href) {
   if (
     typeof href !== "string" ||
@@ -56,10 +50,6 @@ export function pageLink({ projectId, pageId, blockIds = [] }) {
   return blockIds.length ? `${link}?blocks=${blockIds.join(",")}` : link;
 }
 
-/**
- * A navigation request from a link or a component. Missing project or page
- * IDs mean the page that holds the request. Returns null when invalid.
- */
 export function navigationTarget(value) {
   if (typeof value === "string") {
     if (value.startsWith("#"))
@@ -86,7 +76,6 @@ export function navigationTarget(value) {
   };
 }
 
-/** Ask the host around `source` to follow a target; true when a host took it. */
 export function requestNavigation(source, target, modifiers) {
   const event = new CustomEvent(NAVIGATE_EVENT, {
     bubbles: true,

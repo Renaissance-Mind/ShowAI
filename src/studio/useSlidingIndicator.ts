@@ -1,13 +1,5 @@
 import { useLayoutEffect, useState } from "react";
 
-/**
- * Moves one shared highlight to the selected tab instead of repainting each
- * tab, so switching reads as motion between two places. The container draws
- * the highlight with `::before` from the `--indicator-*` properties; the first
- * placement jumps and later ones slide once `data-indicator="ready"` is set.
- * Returns a callback ref so a container that mounts later is still measured.
- * Pattern after motion-primitives' AnimatedBackground (MIT).
- */
 export function useSlidingIndicator<T extends HTMLElement>(active: unknown) {
   const [container, setContainer] = useState<T | null>(null);
   useLayoutEffect(() => {

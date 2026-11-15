@@ -1,6 +1,5 @@
 import { defineMessages } from "../index";
 
-// References list and source bookmark blocks.
 export default defineMessages("references", {
   "zh-CN": {
     invalid: "参考文献格式不正确。",

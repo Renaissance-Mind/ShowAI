@@ -1,6 +1,5 @@
 import { defineMessages } from "../index";
 
-// Catalog management: versions, copies, merges, publication, import and removal.
 export default defineMessages("catalogManagement", {
   "zh-CN": {
     packageActions: "版本操作",

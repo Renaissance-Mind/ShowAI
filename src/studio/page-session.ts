@@ -36,12 +36,9 @@ export interface LoadedPage extends PageRecord {
   incomingCrossDevice?: boolean;
   sourceSnapshot?: SourceSnapshotDelta;
   sourceSnapshotDeliveryId?: string;
-  /** Writer of this version, read from the library's change record. */
   changedBy?: ChangeAuthor;
 }
-/** An installed write by another writer, shown above the page until dismissed. */
 export interface ExternalChangeNotice extends ExternalChange {
-  /** False when restored after reopening: nothing on the page is new to highlight. */
   fresh: boolean;
 }
 export type PageRefresh = LoadedPage | { unchanged: true; readOnly?: boolean };
@@ -53,9 +50,7 @@ export interface PageSnapshot {
   record: LoadedPage | null;
   status: SaveStatus;
   error: string;
-  /** The thrown value behind `error`, for classifying save failures. */
   failure?: unknown;
-  /** The latest edit is retained in a local draft (or nothing is unsaved). */
   draftDurable: boolean;
   draftNotice: string;
   conflictId?: string;
@@ -82,8 +77,6 @@ export interface PageSession {
   edit(patch: Partial<ShowDocument>): void;
   editContent(content: JSONContent): void;
   flush(settle?: boolean): Promise<boolean>;
-  /** Native publication persistence called while an accepted Undo may itself
-   * be awaiting that publication. Still performs ordinary draft/save/CAS. */
   flushPublishedSource(settle?: boolean): Promise<boolean>;
   leave(): Promise<boolean>;
   reload(): Promise<void>;
@@ -100,7 +93,6 @@ export interface PageSession {
     hash: string,
   ): void;
   prepareExternalResolution(document: ShowDocument, id: string): void;
-  /** Merges the inverse of the noticed external write into the page and saves it normally. */
   undoExternalChange(): Promise<"merged" | "conflict" | "stale">;
   dismissExternalChange(): Promise<void>;
   clear(): Promise<boolean>;
@@ -111,21 +103,15 @@ export interface PageSession {
 }
 export interface PageSessionOptions {
   clientId: string;
-  /** Actual home captured by the page-session owner; Native verifies its own scope. */
   sourceHomeId?: string;
   invoke<T>(action: string, args?: Record<string, unknown>): Promise<T>;
   saveDelayMs?: number;
   draftDelayMs?: number;
-  /** Lets navigation reflect a save without refetching after its file echo. */
   onSaved?(projectId: string, record: LoadedPage): void;
 }
 
 const ref = <T>(current: T) => ({ current });
 
-/**
- * Save now (⌘S): a page stopped by a failed save tries again and, once that
- * succeeds, saves automatically again. A conflict stays until it is reviewed.
- */
 export function saveNow(
   session: Pick<PageSession, "getSnapshot" | "retry" | "flush">,
 ) {
@@ -135,7 +121,6 @@ export function saveNow(
     : session.flush();
 }
 
-/** A page owns its drafts and save queue independently of the displayed tab. */
 export function createPageSession(options: PageSessionOptions): PageSession {
   const listeners = new Set<() => void>();
   const metadataListeners = new Set<() => void>();
@@ -257,7 +242,6 @@ export function createPageSession(options: PageSessionOptions): PageSession {
       failure = undefined;
     },
   );
-  /** Shows a thrown save failure and keeps the value for classification. */
   const setFailure = (reason: unknown, text = errorMessage(reason)) => {
     setError(text);
     failure = reason;
@@ -341,8 +325,6 @@ export function createPageSession(options: PageSessionOptions): PageSession {
     const owner=ownerFor(ownerProject,page.document.id);
     return {...page,document:owner.captureExternal(page.document,"record")};
   };
-  // Merge on the source owner's worker. A local edit arriving during the
-  // await is merged again from its actual newer root before anything publishes.
   const mergeCurrentWith = async (
     baseline: ShowDocument,
     incoming: ShowDocument,
@@ -376,7 +358,6 @@ export function createPageSession(options: PageSessionOptions): PageSession {
       }
       return "stale";
     }finally{
-      // Cleanup must not turn an installed, valid merge into a save failure.
       await Promise.all([lease,`${lease}:base`,`${lease}:incoming`,`${lease}:recovered`].map(name=>owner.releaseLease(name).catch(reason=>console.error("Source merge lease cleanup failed",errorCode(reason)))));
     }
   };
@@ -402,7 +383,6 @@ export function createPageSession(options: PageSessionOptions): PageSession {
         if(retained.record.projectId!==projectRef.current || retained.record.resourceId!==page.document.id || pageDraftNeedsRecovery(page.document,retained))available.push(retained.record);
       }catch(reason){
         if(!valid() || recoveryScan!==scan)return;
-        // Inconclusive I/O/validation is recoverable, never proof of redundancy.
         available.push(item);setError(errorMessage(reason));
       }
     }
@@ -415,7 +395,6 @@ export function createPageSession(options: PageSessionOptions): PageSession {
       externalChange = value;
     },
   );
-  // Snapshots of recent installed writes; the library's local/ copy survives reloads.
   const externalDocuments = new Map<
     string,
     { before: ShowDocument; after: ShowDocument }
@@ -449,12 +428,10 @@ export function createPageSession(options: PageSessionOptions): PageSession {
             externalDocuments.delete(id);
           setExternalChange({ ...change, fresh: true });
         },
-        // The write is installed either way; only its notice and undo are missing.
         (reason) =>
           console.error("External change snapshot failed", errorCode(reason)),
       );
   };
-  /** After reopening, the newest snapshot still describes the current version. */
   const restoreExternalChange = (projectId: string, page: LoadedPage) => {
     const pageId = page.document.id;
     void options
@@ -494,8 +471,6 @@ export function createPageSession(options: PageSessionOptions): PageSession {
     undefined,
   );
   const draftTimer = ref<ReturnType<typeof setTimeout> | undefined>(undefined);
-  // The draft store keeps one baseline per base revision and can otherwise
-  // read it from the library, so the full base page is sent only once.
   const sentBaseline = ref<string | null>(null);
   const persist = async (
     source: ShowDocument,
@@ -578,7 +553,6 @@ export function createPageSession(options: PageSessionOptions): PageSession {
       ) {
         const repaired = measureNativeSync("session.save.repair",()=>repairEditorLinks(current.current!));
         if (repaired.repairs.length) {
-          // Retain the exact incoming version before making its links saveable.
           try {
             const recovery = await options.invoke<EditorDraftRecord>(
               "drafts:save",
@@ -705,8 +679,6 @@ export function createPageSession(options: PageSessionOptions): PageSession {
             if (revision.current === sequence) {
               let installed:ShowDocument;
               if(response.sourceSnapshot&&capturedOwner){
-                // Publishing is conditional on the exact frozen UI base. A
-                // saved N body remains a record when N+1 already owns the view.
                 installed=capturedOwner.publishKnown(savedDocument,source)??current.current!;
               }else{
                 const shared=shareNativeSource(current.current!,savedDocument);
@@ -897,8 +869,6 @@ export function createPageSession(options: PageSessionOptions): PageSession {
         pageId,
       }));
     if (opening.current !== ticket) return false;
-    // The editor remains usable during disk I/O. Save keystrokes entered after
-    // the first flush before replacing its draft with the newly loaded page.
     if (!(await flush()) || opening.current !== ticket) return false;
     if (
       projectRef.current === projectId &&
@@ -922,8 +892,6 @@ export function createPageSession(options: PageSessionOptions): PageSession {
     )
       return true;
     const candidate = drafts.find((item) => item.clientId === clientId.current);
-    // Restore this session first: scanning unrelated large drafts must not
-    // delay its own recovery while newly typed edits can already be retained.
     await (async()=>{
     if (candidate) {
       const restored = await options.invoke<{
@@ -932,8 +900,6 @@ export function createPageSession(options: PageSessionOptions): PageSession {
         baseContent?: ShowDocument;
       }>("drafts:read", { id: candidate.id });
       if (opening.current !== ticket || revision.current !== 0) return true;
-      // Retention can finish after the formal save or contain only a normalized
-      // baseline. It carries no local edit and must not replace newer content.
       if (
         restored.baseContent &&
         pageContentKey(restored.content) ===
@@ -1009,8 +975,6 @@ export function createPageSession(options: PageSessionOptions): PageSession {
     return true;
   };
 
-  // Reopening flushes edits before and after the read, and refuses to replace
-  // unresolved drafts. Only the page's renderer needs a fresh mount.
   const reloadCurrent = async () => {
     if (!projectRef.current || !current.current || refreshingPage.current)
       return false;
@@ -1376,8 +1340,6 @@ export function createPageSession(options: PageSessionOptions): PageSession {
     setRenderVersion((value) => value + 1);
   };
 
-  // A reviewed merge or external resolution supersedes this draft. Archive its
-  // exact generation; another window's newer draft must remain recoverable.
   const acceptResolution = async () => {
     const saved = retained.current;
     if (saved)
@@ -1501,10 +1463,6 @@ export function createPageSession(options: PageSessionOptions): PageSession {
       return false;
     }
   };
-  // Undo is a three-way merge of before→after reversed into the current page:
-  // edits made since the write stay, and the result is an ordinary edit whose
-  // save checks the base like any other, so a newer file version leads to the
-  // usual merge or conflict instead of being overwritten.
   const undoExternalChange = async (): Promise<
     "merged" | "conflict" | "stale"
   > => {
@@ -1606,9 +1564,6 @@ export function createPageSession(options: PageSessionOptions): PageSession {
       stopHistoryTravels(sourceOwner);
       clearTimeout(autoSaveTimer.current);clearTimeout(draftTimer.current);
       retirement=(async()=>{
-        // Existing accepted contacts are still real writers during retirement.
-        // Keep update callbacks alive until they have published and retained
-        // their actual full source; only then may the owner/Worker be retired.
         try{await flushHistoryTravels(sourceOwner)}
         catch(reason){await preserveHistoryFailure(reason);throw reason}
         await flushPortableInputs(sourceOwner,true);

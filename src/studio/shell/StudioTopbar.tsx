@@ -65,7 +65,6 @@ import {
   type PageState,
 } from "./types";
 
-/** The bar above the content: where the workbench is, search, and the view's actions. */
 export function StudioTopbar({
   feedback: { report, action },
   library,

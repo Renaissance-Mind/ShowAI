@@ -1,7 +1,4 @@
 import { desktopTestEnvironment } from "../../scripts/desktop-test-env.mjs";
-// Real sidebar/menu acceptance. Build first, then node src/desktop/library-ui-smoke.mjs.
-// Optional SHOWAI_SMOKE_BINARY points at an already built application executable.
-// All writes use an isolated home/profile; evidence and canonical files are retained.
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { mkdir, mkdtemp, readFile, readdir, writeFile } from "node:fs/promises";
@@ -10,7 +7,6 @@ import { fileURLToPath } from "node:url";
 import electron from "electron";
 import { _electron } from "playwright-core";
 
-// The smoke checks select controls by their Chinese labels.
 process.env.SHOWAI_LANGUAGE ??= "zh-CN";
 
 const repository = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
@@ -190,10 +186,8 @@ try {
       )
     ).find((doc) => doc.title === title);
   };
-  // The project name in the top bar identifies the directory in the main area.
   const breadcrumbProject = () =>
     page.locator(".studio-breadcrumb > button").first().innerText();
-  // A non-interactive heading in the main area, away from every sidebar row.
   const emptyProjectHeading = page
     .locator(".studio-main")
     .getByRole("heading", { name: "项目为空", exact: true });
@@ -429,8 +423,6 @@ try {
     (docs) => docs.some((doc) => doc.id === nested.id && doc.archived),
     "deleted page persistence",
   );
-  // Preserve an opened A page, navigate to B, then delete A's ancestor from
-  // the sidebar. The deletion must not carry A's parent folder into B.
   const otherName = "Project B context";
   await page
     .getByRole("button", { name: "新建项目", exact: true })

@@ -9,12 +9,10 @@ import {
   resourceNodes,
   insertResourceTemplate,
 } from "./containers.mjs";
-// Shared by Core, Agent, the editor and standalone exports. No DOM dependencies.
 export const isSurface = (document) => document.content?.type === "surface";
 export const artifactVersion = (document) =>
   isResource(document) ? 3 : isSurface(document) ? 2 : 1;
 
-/** The deterministic id assignSurfaceIds gives a node from its position. */
 export function stableId(seed) {
   let hash = 2166136261;
   for (const char of seed)
@@ -51,10 +49,6 @@ export function assignSurfaceIds(document, { repairLegacy = false } = {}) {
     return node;
   };
   const tree = descend(document.content, "");
-  // Documents components hold: page operations address their blocks by id,
-  // so a component without an id gets one and an id that repeats one seen
-  // before (in the tree or an earlier held document, as after copying a text
-  // block) gets a new one. Tree ids keep precedence.
   const nestedSeen = new Set();
   let position = 0;
   const content = mapNodes(tree, (node, { owner }) => {
@@ -126,7 +120,6 @@ export function fillSurfaceLayout(document) {
   return document;
 }
 
-/** Preserve existing content identities. Migration is deterministic and read-only. */
 export function upgradeDocument(source, { includeTitle = true } = {}) {
   const document = structuredClone(source);
   if (isSurface(document)) return fillSurfaceLayout(assignSurfaceIds(document));
@@ -185,7 +178,6 @@ export function upgradeDocument(source, { includeTitle = true } = {}) {
   return document;
 }
 
-/** Cleanup is explicit after structural edits; the file validator rejects dangling refs. */
 const reconciledDocuments = new WeakSet();
 export const isReconciledSurface = (document) =>
   reconciledDocuments.has(document);
@@ -198,8 +190,6 @@ export function reconcileSurface(source, options = {}) {
   return document;
 }
 function reconcileSurfaceDocument(source, { clone = true } = {}) {
-  // clone:false retains its mutable-command-root contract. Frozen readable
-  // roots first get their own draft; maps and missing-ID paths are always COW.
   const draft = clone ? structuredClone(source) : Object.isFrozen(source) ? { ...source } : source;
   if (!clone) {
     if (draft.layout) draft.layout = { ...draft.layout };
@@ -273,7 +263,6 @@ export function linearContent(document) {
   };
 }
 
-/** All IDs and every reference are remapped together when instantiating a template. */
 export function remapSurfaceIds(source, nextId = () => crypto.randomUUID()) {
   const document = structuredClone(source),
     mapping = new Map();
@@ -300,8 +289,6 @@ export function remapSurfaceIds(source, nextId = () => crypto.randomUUID()) {
     if (Object.keys(bindings).length) node.attrs.bindings = bindings;
     else delete node.attrs.bindings;
   }, { scope: "tree" });
-  // Blocks inside documents components hold get fresh ids too, so a placed
-  // copy never repeats the ids of the original.
   document.content = mapNodes(document.content, (node, { owner }) =>
     owner && node.attrs?.id && !["doc", "text"].includes(node.type)
       ? { ...node, attrs: { ...node.attrs, id: nextId() } }

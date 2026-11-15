@@ -8,10 +8,6 @@ import "./plugin-update-notice.css";
 
 const DISMISSED_KEY = "showai:app-update-dismissed";
 
-/**
- * Offers the restart once a downloaded update is ready. "Later" hides the
- * notice for that version in every window; ShowAI still installs it on quit.
- */
 export default function AppUpdateNotice({
   state,
   run,
@@ -19,7 +15,6 @@ export default function AppUpdateNotice({
 }: {
   state: AppUpdateState | null;
   run: (action: AppUpdateAction) => Promise<void>;
-  /** Settings → 关于与反馈 already shows the same state and action. */
   hidden: boolean;
 }) {
   const t = useTranslator(messages);

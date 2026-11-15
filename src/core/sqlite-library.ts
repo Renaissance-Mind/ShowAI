@@ -52,7 +52,6 @@ import {
   type LibraryManifest,
 } from "./history-model";
 
-/** Set once archived resource tokens have been copied into current_resources. */
 const RESOURCES_BACKFILLED = "current_resources_backfilled";
 const oid = (value: string) => /^[a-f0-9]{40}(?:[a-f0-9]{24})?$/.test(value);
 const sha = (value: Buffer | string) =>
@@ -160,11 +159,6 @@ function parseRecord(message: string): ChangeRecord {
   return value;
 }
 
-/**
- * Each query used to open a connection, run its schema statements and close it
- * again. Connections are now kept while in use and closed after a short idle
- * period. Windows keeps per-query connections so renames are never blocked.
- */
 const connections = new Map<
   string,
   {
@@ -184,10 +178,6 @@ function fileIdentity(path: string) {
   }
 }
 const uncached = new Map<string, number>();
-/**
- * File-level copies (archives) need the database without this process's open
- * connection; queries during the action open and close their own connection.
- */
 export async function withoutCachedConnections<T>(
   root: string,
   action: () => Promise<T>,
@@ -211,7 +201,6 @@ function forget(path: string) {
   if (cached.db.isOpen) cached.db.close();
 }
 
-/** SQLite owns immutable history and the current tree; files are recoverable projections. */
 export class SqliteLibrary {
   readonly root: string;
   readonly repository: string;
@@ -227,7 +216,6 @@ export class SqliteLibrary {
     const cached = connections.get(path);
     if (cached) {
       const identity = fileIdentity(path);
-      // A migration, import or restore may have replaced the database file.
       if (
         identity?.device === cached.device &&
         identity.inode === cached.inode &&
@@ -380,8 +368,6 @@ export class SqliteLibrary {
     });
   }
   async head(): Promise<string | null> {
-    // Reads in a snapshot see its state; an operation holding the writer lease
-    // always works on the latest one.
     const snapshot = activeSqliteSnapshot(this.root);
     if (snapshot && !holdsLibraryLock(this.root)) return snapshot.revision;
     return this.query(
@@ -412,18 +398,15 @@ export class SqliteLibrary {
       );
     return Number(row.sequence);
   }
-  /** Reads in the action see one committed state while saves keep committing. */
   readSnapshot<T>(action: (revision: string | null) => Promise<T>) {
     return withSqliteSnapshot(this.root, action);
   }
   async tree(revision?: string): Promise<SqliteTreeEntry[]> {
     return readSqlite(this.root, { kind: "tree", revision });
   }
-  /** The tree without the stored nodes of split pages. */
   async treeFiles(revision?: string): Promise<SqliteTreeEntry[]> {
     return readSqlite(this.root, { kind: "tree", revision, nodes: false });
   }
-  /** The tree entries at exact paths and below directory prefixes. */
   async treeEntries(
     query: TreeQuery,
     revision?: string,
@@ -487,7 +470,6 @@ export class SqliteLibrary {
     return entry;
   }
   async entryAt(revision: string) {
-    // Inside a read snapshot the record comes from that same committed state.
     const snapshot = activeSqliteSnapshot(this.root);
     const row = snapshot
       ? await readSqlite<RevisionRow>(this.root, {
@@ -847,8 +829,6 @@ export class SqliteLibrary {
             "The resolution must update its conflicted resource.",
           );
       }
-      // The external bytes are safely retained. Restore the canonical projection
-      // before recovering interrupted commits or applying the validated resolution.
       const target = join(this.workspace, conflict.path);
       if (current !== null) await this.atomicFile(target, current);
       else {
@@ -905,7 +885,6 @@ export class SqliteLibrary {
     );
   }
 
-  /** Import under one writer lease. Every input remains recoverable through normal journals. */
   async replayImported(
     entries:
       | Iterable<{ changes: FileChanges; context: ChangeContext }>
@@ -1009,7 +988,6 @@ export class SqliteLibrary {
     expected?: Map<string, string | null>,
     response?: ResponseDescriptor,
     allowedConflicts = new Set<string>(),
-    /** Files the transaction read as committed at a revision. */
     read?: { revision: string; files: Map<string, Buffer> },
   ): Promise<HistoryEntry | null> {
     await this.recoverUnlocked();
@@ -1050,7 +1028,6 @@ export class SqliteLibrary {
           { currentRevision: parent ?? undefined },
         );
     changes = new Map(changes);
-    // Changed files and the stored nodes of changed pages, not the whole library.
     const existing = await this.treeEntries(
       {
         paths: [...changes.keys()],
@@ -1180,8 +1157,6 @@ export class SqliteLibrary {
       Buffer.from(JSON.stringify(journal)),
     );
     await this.commit(entry, encoded, parent, false, digests);
-    // The committed files decode from the objects just written, as a read of
-    // the new revision would decode them from the database.
     const written = new Map<string, Buffer | null>();
     for (const path of record.paths)
       written.set(
@@ -1212,16 +1187,13 @@ export class SqliteLibrary {
     if (!conflicts.length) await rm(directory, { recursive: true });
     return entry;
   }
-  /** Commit content, history, head and idempotent operation receipt together. */
   async commit(
     entry: HistoryEntry,
     encoded: FileChanges,
     expectedHead: string | null,
     retainHistory = false,
-    /** SHA-256 of the encoded files, when the caller already computed them. */
     digests?: Map<string, string | null>,
   ) {
-    // Prepare compression before acquiring the database writer transaction.
     const prepared = new Map<
       string,
       { id: string; bytes: Buffer; data?: Buffer; packed?: boolean }
@@ -1239,7 +1211,6 @@ export class SqliteLibrary {
       objects.set(id, object);
       prepared.set(path, object);
     }
-    // Immutable objects already retained by history need neither recompression nor reinsertion.
     const stored = await this.query((db) => {
       const ids = [...objects.keys()],
         found = new Set<string>();
@@ -1273,15 +1244,10 @@ export class SqliteLibrary {
           "Content changed before the transaction committed.",
         );
       if (!retainHistory) {
-        // The legacy revision tables are a frozen archive. New saves replace only
-        // current content; resource tokens retain optimistic concurrency checks.
         const data = JSON.stringify(entry);
-        // Releasing a replaced object looks up other references by oid. The
-        // first save after an upgrade builds these indexes in its transaction.
         db.exec(
           "CREATE INDEX IF NOT EXISTS current_files_oid ON current_files(oid); CREATE INDEX IF NOT EXISTS changes_oid ON changes(oid);",
         );
-        // Copy each archived resource's latest token once; the flag commits with it.
         if (
           !db
             .prepare("SELECT 1 FROM metadata WHERE key=?")
@@ -1308,7 +1274,6 @@ export class SqliteLibrary {
           writeCurrent = db.prepare(
             "INSERT INTO current_files VALUES(?,?) ON CONFLICT(path) DO UPDATE SET oid=excluded.oid",
           );
-        // Current objects of every written path, read in this writer transaction.
         const current = new Map<string, string>(),
           paths = [...encoded.keys()];
         for (let offset = 0; offset < paths.length; offset += 500) {
@@ -1320,9 +1285,6 @@ export class SqliteLibrary {
             .all(...chunk))
             current.set(String(row.path), String(row.oid));
         }
-        // Only objects this commit stops referencing can become unused. Paths
-        // that already hold their object, such as a page's unedited nodes,
-        // need no write.
         const replaced = new Set<string>();
         for (const [path, bytes] of encoded) {
           const object = prepared.get(path),
@@ -1367,7 +1329,6 @@ export class SqliteLibrary {
         db.exec("COMMIT");
         return;
       }
-      // Archived resource tokens written here still need copying by the next save.
       db.prepare("DELETE FROM metadata WHERE key=?").run(RESOURCES_BACKFILLED);
       const data = JSON.stringify(entry),
         result = db
@@ -1478,8 +1439,6 @@ export class SqliteLibrary {
   }
   async recover() {
     await this.manifest();
-    // Recovery only acts on journals already in this directory. A journal that
-    // appears after this check belongs to a live writer holding the lease.
     const pending = await readdir(
       join(this.root, "local", "transactions"),
     ).catch((error: NodeJS.ErrnoException) => {
@@ -1494,7 +1453,6 @@ export class SqliteLibrary {
       await this.recoverUnlocked();
       const before = await stat(join(this.repository, "content.sqlite"));
       await this.query((db) => {
-        // Saves reclaim only the objects they replace; compaction sweeps the rest.
         db.exec(
           "DELETE FROM blobs WHERE oid NOT IN(SELECT oid FROM current_files) AND oid NOT IN(SELECT oid FROM changes WHERE oid IS NOT NULL)",
         );
@@ -1504,11 +1462,6 @@ export class SqliteLibrary {
       return { before: String(before.size), after: String(after.size) };
     });
   }
-  /**
-   * Drops the archived history of content that was permanently deleted, so
-   * its stored objects are released now and compaction reclaims the space.
-   * Each entry is an exact path or a directory prefix ending in "/".
-   */
   async forgetArchived(paths: string[]) {
     for (const path of paths)
       assertPath(path.endsWith("/") ? path.slice(0, -1) : path);
@@ -1538,12 +1491,6 @@ export class SqliteLibrary {
       }),
     );
   }
-  /**
-   * Images and other data URLs are stored once under assets/ and shared by
-   * every file that embeds them. After content is deleted permanently, the
-   * assets no current file refers to are removed so compaction reclaims them.
-   * Archived history keeps its own references to the objects it needs.
-   */
   async releaseUnreferencedAssets() {
     return withLibraryLock(this.root, () =>
       this.query((db) => {

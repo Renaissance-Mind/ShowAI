@@ -11,10 +11,6 @@ const sections = [
   ["settings", "nav.settings", Settings2],
 ] as const;
 
-/**
- * Shows the section names while they fit and icons alone below that width.
- * The width where a name was cut is kept, so resizing does not flicker.
- */
 function useLabelsFit(language: string) {
   const nav = useRef<HTMLElement>(null);
   const [labels, setLabels] = useState(true);
@@ -51,7 +47,6 @@ export default function SidebarNavigation({
   current,
   onSelect,
 }: {
-  /** The section the workspace shows now, or null for projects and pages. */
   current: SidebarSection | null;
   onSelect: (section: SidebarSection) => void;
 }) {

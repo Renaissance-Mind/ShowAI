@@ -1,6 +1,5 @@
 import { defineMessages } from "../index";
 
-// Layer diagram built-in.
 export default defineMessages("layerDiagram", {
   "zh-CN": {
     title: "分层架构图",

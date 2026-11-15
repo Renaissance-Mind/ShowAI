@@ -4,23 +4,11 @@ import { mountReader } from "./reader-app";
 let count = 0;
 
 export interface CdnMountOptions {
-  /** The page as a ShowAI artifact (JSON text or parsed object). */
   artifact: string | object;
-  /** Reader options such as `{ "theme": "dark" }`. */
   options?: { theme?: "dark" | "light"; draft?: boolean };
-  /**
-   * The reader owns the whole document, like an exported HTML page: styles
-   * apply to the page, the theme is set on <html> and the page menu is shown.
-   * Otherwise `section` is an inline root inside a host page.
-   */
   standalone?: boolean;
 }
 
-/**
- * Mounts a ShowAI page into `section` without a bundled reader. As an inline
- * root, page styles are scoped to the section, custom components run in its
- * shadow roots, and the theme is set on it.
- */
 export function mount(
   section: HTMLElement,
   { artifact, options, standalone = false }: CdnMountOptions,

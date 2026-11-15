@@ -39,7 +39,6 @@ import {
 } from "../operations/pages";
 import { changeSchema, type ToolDeclaration } from "./tool";
 
-// Capture tuning stays available to the service; agents use the defaults.
 const boardTuning = {
   tilePixels: true,
   overlapPixels: true,
@@ -63,7 +62,6 @@ const { pageId: _pageId, ...readShape } = pageRead.input;
 const { out: _out, overwrite: _overwrite, ...remoteReadShape } = readShape;
 const { operationsFile: _operationsFile, ...remoteApplyShape } = applyShape;
 
-/** Reading, creating, changing, comparing and exporting pages. */
 export const pageTools: ToolDeclaration[] = [
   {
     name: "pages_list",
@@ -87,7 +85,6 @@ export const pageTools: ToolDeclaration[] = [
     input: ({ localFiles }) => ({
       pageId: pageRead.input.pageId,
       ...(localFiles ? readShape : remoteReadShape),
-      // Keep tool discovery compact; readPageView enforces defaults and bounds.
       capture: z.enum(["full", "viewport"]).optional(),
       scrollToBlockId: z.string().optional(),
       inspect: z.object({ layout: z.literal(true), blockIds: z.array(z.string()).optional() }).strict().optional(),
@@ -106,7 +103,6 @@ export const pageTools: ToolDeclaration[] = [
         const data = result.structuredContent.data as PageReadResult;
         const out = (readOptions as { out?: string }).out;
         if (out !== undefined) {
-          // The file holds the read; the conversation only gets its identity.
           const written = data.view === "structured" ? out : (data.path ?? out);
           const receipt: Record<string, unknown> = {
             ...(compactMcpResult(result, "receipt").structuredContent!
@@ -323,7 +319,6 @@ export const pageTools: ToolDeclaration[] = [
       `Apply operations by stable block id with the Page's baseHash. Insert components with {type:"component.insert",kind,data,parentId?,afterId?}, change their data with {type:"component.props.set",blockId,props} and switch a custom component to another revision with {type:"component.ref.set",blockId,version,integrity,componentId?} (keeps id and props). Comment with {type:"comment",text,blockId?,quote?} or {type:"comment",threadId,text?,resolved?}; page_read returns open comments. Other operations: guide authoring. Replies with a receipt whose changedBlocks.added lists new block ids; response:"source" adds the document.${
         localFiles ? " operationsFile reads the operations array from a JSON file." : ""
       }`,
-    // Hosted connections keep operations required and accept no device path.
     input: ({ localFiles }) =>
       localFiles ? applyShape : { ...remoteApplyShape, operations: operationsSchema },
     run: (
@@ -438,7 +433,6 @@ export const pageTools: ToolDeclaration[] = [
     operation: pageExport,
     description:
       "Export a Page as HTML, an inline conversation fragment or a static site at out; blockIds exports part of it. Files of this device (or data computed from them) return CONFIRMATION_REQUIRED with details.packaging (items, sizes, choices); repeat with packaging {itemId: choice} after the person decides.",
-    // Exports of earlier revisions and imported snapshots stay on the CLI.
     input: () =>
       pick(pageExport.input, [
         "pageId",
@@ -484,7 +478,6 @@ export const pageTools: ToolDeclaration[] = [
   },
 ];
 
-/** Presents a saved page in the conversation; registered after the other project tools. */
 export const pagePresentTool: ToolDeclaration = {
   name: "page_present",
   access: "read",

@@ -48,7 +48,6 @@ interface FederationState {
   version: 1;
   pending: PendingBinding[];
   errors: Record<string, string>;
-  /** Accounts signed out on this device; bound servers must not restore them. */
   signedOut?: string[];
 }
 const label = () => `ShowAI · ${hostname().slice(0, 180)}`;
@@ -187,9 +186,6 @@ export class AccountManager {
     for (let index = 0; index < pending.length;) {
       const first = pending[index++],
         batch = [first];
-      // Remove all consecutive peers of a target in one transaction. A restored
-      // session can itself originate from the first removed peer; revoking it
-      // before the remaining removals would strand an incomplete unlink.
       while (
         first.state === "removed" &&
         index < pending.length &&
@@ -423,7 +419,6 @@ export class AccountManager {
           });
         } catch (error) {
           if (revoked(error)) {
-            // Respect a sign-out made on that server instead of undoing it.
             await this.signOut(identity.serverId, identity.user.id);
             await this.update((state) => {
               state.errors[peerKey] = t("account.signedOutHere");
@@ -473,8 +468,6 @@ export class AccountManager {
         });
       }
     }
-    // Propagate only within the account's existing connected component. Merely
-    // logging into unrelated accounts does not consent to binding them.
     for (const connection of connections) {
       const profile = profiles.get(connection.id);
       if (!profile?.own) continue;

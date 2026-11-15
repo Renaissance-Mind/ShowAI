@@ -19,7 +19,6 @@ it("fits large diagrams without enlarging small ones and preserves a zoom anchor
   expect(fitScale(432, 2000)).toBe(0.2);
   expect(fitScale(1000, 200)).toBe(1);
   expect(zoomScroll(300, 200, 432, 2000, 0.5, 1)).toBe(784);
-  // A centered small diagram crosses into horizontal overflow during zoom.
   expect(zoomScroll(0, 216, 432, 200, 1, 4)).toBe(200);
   expect(
     diagramSize(renderDiagram({ type: "flow", source: "A -> B" }, "sizes").html)
@@ -246,10 +245,8 @@ it("runs the compiled viewport in a real saved Page and retains view state acros
         (afterWheel.top + anchor.y - 16) / afterWheel.scale - diagramPoint.y,
       ),
     ).toBeLessThan(2);
-    // A real host message clones props, even when the content is unchanged.
     await tab.locator("iframe").evaluate((element, props) => {
       const iframe = element as HTMLIFrameElement;
-      // The channel is supplied by the actual generated host source.
       const config = iframe.srcdoc.match(
         /<script id="showai-component-data" type="application\/json">([^<]+)<\/script>/,
       );

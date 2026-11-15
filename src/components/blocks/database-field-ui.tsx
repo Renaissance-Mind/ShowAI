@@ -1,7 +1,3 @@
-// The database's field registry: each field type pairs a harness value type
-// (src/datasets/value-types.mjs) with the cell renderer, the cell editor and
-// the column settings this component shows for it. Field types a library
-// component contributes come from the host and pair the same way.
 import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { ExternalLink, FileText, TriangleAlert } from "../../ui/icons";
 import { safeUrl, text } from "./helpers";
@@ -27,10 +23,8 @@ import messages from "../../i18n/messages/database";
 import fieldMessages from "../../i18n/messages/databaseFields";
 import type { DatabaseColumn, DatabaseRow, DatabaseValue } from "./types";
 
-// A select value standing for "create a page"; page links never take this form.
 const NEW_PAGE = "showai:new-page";
 
-/** What every cell of one database shares. */
 export interface CellEnvironment {
   derived: DerivedDatabase;
   host: DatabaseHost | null;
@@ -60,14 +54,12 @@ export interface FieldUi {
   Config?: (props: ConfigProps) => ReactNode;
 }
 
-/** The class of an option tag: its saved tone, else a tone by position. */
 export function optionClass(column: DatabaseColumn, option: string): string {
   const tone = column.colors?.[option];
   if (tone && OPTION_TONES.includes(tone)) return `sb-tag sb-tone-${tone}`;
   return `sb-tag sb-tag-${Math.max(0, column.options?.indexOf(option) ?? 0) % 5}`;
 }
 
-/** The title of the page a cell links to, when the host lists it. */
 export function pageTitle(
   value: unknown,
   pages: PageLinkBridge | null,
@@ -77,7 +69,6 @@ export function pageTitle(
   return pages.pages.find((page) => page.id === target.pageId)?.title;
 }
 
-/** A small panel under a trigger button; Escape or a click outside closes it. */
 function Popover({
   label,
   trigger,
@@ -166,16 +157,9 @@ function Tags({
 interface Choice {
   id: string;
   label: string;
-  /** Orders choices without a query, recently changed first (pages). */
   updatedAt?: string;
 }
 
-/**
- * The picker of a cell: choices with optional search, ranked the way the @
- * menu and quick jump rank pages. Checkboxes for multi-select and relations,
- * radio buttons for a single page; leading choices (not set, new page) stay
- * first and are never filtered.
- */
 function ChoiceList({
   choices,
   selected,
@@ -851,7 +835,6 @@ function CustomConfig({ column, onChange }: ConfigProps) {
           if (parsed && typeof parsed === "object" && !Array.isArray(parsed))
             onChange({ config: parsed });
         } catch {
-          // Kept as a draft until it is valid JSON; saving checks it again.
         }
       }}
     />
@@ -859,7 +842,6 @@ function CustomConfig({ column, onChange }: ConfigProps) {
 }
 
 const registry = new Map<string, FieldUi>();
-/** Register the cells and settings of a built-in field type. */
 export function registerFieldUi(type: string, ui: FieldUi) {
   registry.set(type, ui);
 }
@@ -918,12 +900,10 @@ const customUi: FieldUi = {
   Config: CustomConfig,
 };
 
-/** The built-in field types in menu order. */
 export const BUILTIN_FIELD_TYPES = [...registry.keys()];
 export function fieldUiOf(column: DatabaseColumn): FieldUi {
   return registry.get(column.type) ?? customUi;
 }
-/** Field type names for menus: built-ins and contributed ones. */
 export function useFieldTypeLabel() {
   const t = useTranslator(messages);
   const tf = useTranslator(fieldMessages);

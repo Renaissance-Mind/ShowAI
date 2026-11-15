@@ -12,7 +12,6 @@ afterEach(async () => {
 });
 const passthrough = globalThis.fetch;
 
-/** A local server whose GitHub and Resend calls are answered in-process. */
 async function fixture() {
   const home = await mkdtemp(join(tmpdir(), "showai-login-security-"));
   cleanup.push(() => rm(home, { recursive: true, force: true }));
@@ -66,7 +65,6 @@ async function fixture() {
     } catch {}
     return { status: response.status, value };
   };
-  /** Authorizes a started GitHub flow in "a browser" and returns the page. */
   const authorize = async (url: string) => {
     const state = new URL(url).searchParams.get("state")!;
     return request(`/api/auth/callback/github?state=${state}&code=granted`);
@@ -84,7 +82,6 @@ test("a forwarded authorization link never signs in the device that started it",
     device: "Attacker device",
   });
   expect(started.status).toBe(200);
-  // The victim completes authorization in their own browser.
   const page = await f.authorize(started.value.url);
   expect(page.status).toBe(200);
   expect(page.value).toContain("Attacker device");
@@ -100,7 +97,6 @@ test("a forwarded authorization link never signs in the device that started it",
     expect((await poll("AAAA-AAAA")).value.error.code).toBe(
       "INVALID_COMPLETION_CODE",
     );
-  // After five guesses even the real code is refused and no account exists.
   expect((await poll(f.completion(page.value))).value.error.code).toBe(
     "LOGIN_FAILED",
   );
@@ -125,7 +121,6 @@ test("the starting window finishes a provider login with the browser completion 
   const first = await finish();
   expect(first.value.status).toBe("completed");
   expect(first.value.user.name).toBe("octo");
-  // A lost response may be repeated briefly with the same credential.
   expect((await finish()).value.token).toBe(first.value.token);
   expect(
     (await f.request("/api/me", "GET", undefined, first.value.token)).status,
@@ -147,7 +142,6 @@ test("lasting credentials and login methods need a recent direct sign-in", async
     credential,
   );
   expect(fresh.status).toBe(201);
-  // Age every session past the recent sign-in window.
   await f.metadata.run(
     "UPDATE sessions SET created_at=? WHERE user_id=?",
     [new Date(Date.now() - 20 * 60_000).toISOString(), owner.value.user.id],
@@ -171,7 +165,6 @@ test("lasting credentials and login methods need a recent direct sign-in", async
       ),
   ])
     expect((await attempt()).value.error.code).toBe("RECENT_SIGN_IN_REQUIRED");
-  // A federated session may never mint lasting credentials, even when fresh.
   await f.metadata.run(
     "UPDATE sessions SET created_at=?,credential_kind='federated' WHERE digest IN(SELECT digest FROM sessions WHERE user_id=? LIMIT 1)",
     [new Date().toISOString(), owner.value.user.id],
@@ -209,7 +202,6 @@ test("bound login methods are listed and removable, keeping one for provider acc
     completionCode: f.completion(page.value),
   });
   const credential = signedIn.value.token as string;
-  // Add an email login with the fresh session.
   const email = await f.request(
     "/api/auth/start",
     "POST",
@@ -239,7 +231,6 @@ test("bound login methods are listed and removable, keeping one for provider acc
       credential,
     );
   expect((await remove("email", "octo@example.test")).status).toBe(200);
-  // The provider-created account keeps its last login method.
   expect((await remove("github", String(f.github.id))).value.error.code).toBe(
     "LOGIN_REMOVAL_REFUSED",
   );
@@ -343,7 +334,6 @@ test("strict account limits follow the source so others cannot lock the owner ou
       )
     ).status,
   ).toBe(200);
-  // Forged client addresses without the proxy key all count as the connection.
   const forged = (address: string) =>
     fetch(f.server.url + "/api/auth/start", {
       method: "POST",

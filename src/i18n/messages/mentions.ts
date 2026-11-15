@@ -1,6 +1,5 @@
 import { defineMessages } from "../index";
 
-// The @ mention menu and the page heading's backlink count.
 export default defineMessages("mentions", {
   "zh-CN": {
     backlinkCount: "{count} 个页面引用了这里",

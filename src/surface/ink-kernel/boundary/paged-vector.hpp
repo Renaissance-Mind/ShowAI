@@ -2,9 +2,6 @@
 #define SHOWAI_BOUNDARY_PAGED_VECTOR_HPP
 #include "record.hpp"
 namespace showai_boundary {
-/* A fixed-radix immutable/COW sequence. Forking retains one root. A point edit
- * clones at most one page and one node per level, never the full source/cut map.
- * All pages, branch copies and inflight roots share the same bounded arena. */
 template<class T,uint32_t Bits=4>class PagedVector{
     static_assert(Bits>=2&&Bits<=6,"bounded radix");static constexpr uint32_t width=uint32_t(1)<<Bits;
     struct Page{T values[width]{};};

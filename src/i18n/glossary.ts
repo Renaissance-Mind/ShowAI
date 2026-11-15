@@ -1,32 +1,7 @@
-// Canonical product terms for interface text. Every catalog in ./messages
-// follows this table; glossary.test.ts checks the rules below against the
-// zh-CN and en values. Keys stay stable when a wording changes: only values
-// move to the canonical term.
-//
-// | Concept                                   | zh-CN       | en         | Not in UI text                 |
-// | ----------------------------------------- | ----------- | ---------- | ------------------------------ |
-// | Document made of rich text and components | 页面        | page       | Page（中文界面）               |
-// | Free canvas                               | 白板        | board      | Board（中文界面）、画板        |
-// | One unit of page content                  | 内容块      | block      | 区块、模块、块（单独使用）     |
-// | One element on a board                    | 对象        | object     | 模块                           |
-// | Reusable component type and its instance  | 组件        | component  | —                              |
-// | Make a new copy in place (⌘D)             | 创建副本    | duplicate  | 复制（此义）、拷贝             |
-// | Put on the clipboard (⌘C)                 | 复制        | copy       | 拷贝                           |
-// | The assistant that works on content       | Agent       | Agent      | AI（作为功能名）、AI 对话      |
-// | Move the board view (tool, M / 8)         | 移动画布    | pan canvas | 抓手、Hand                     |
-// | Kanban view of a database                 | 看板        | kanban     | Board（英文界面，避免与白板混淆）|
-//
-// 「组件」 stays wherever the text is about a component type or a component's
-// own data and settings. Domain words inside a component (for example the
-// modules of a layered architecture diagram) are not product terms and are
-// listed in `exemptKeys`.
-
 export interface GlossaryRule {
-  /** What the rule enforces, shown in failures. */
   readonly rule: string;
   readonly locale: "zh-CN" | "en";
   readonly pattern: RegExp;
-  /** `namespace.key` prefixes whose values may keep the word, with the reason. */
   readonly exemptKeys?: Readonly<Record<string, string>>;
 }
 
@@ -103,13 +78,8 @@ export const glossaryRules: readonly GlossaryRule[] = [
   { rule: "board instead of whiteboard", locale: "en", pattern: /whiteboard/i },
 ];
 
-/**
- * Product, protocol and format names that are written in English in the
- * Chinese interface. Anything else in a zh-CN value that reads as English
- * words is treated as untranslated.
- */
 export const englishInChinese: readonly string[] = [
-  "Token URL", // Exact field label in ChatGPT’s OAuth setup.
+  "Token URL",
   "Tailscale Funnel",
   "Logs or screenshots",
   "Responses API",

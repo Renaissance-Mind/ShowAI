@@ -6,8 +6,6 @@ let compiled;
 const module = () => compiled ??= new WebAssembly.Module(Uint8Array.from(atob(inkKernelWasmBase64), value => value.charCodeAt(0)));
 const number = value => String(Math.round(value * 10000) / 10000);
 
-/** One instance owns scratch memory. Returned arrays are detached retained
- * copies, so preparing a subsequent stroke never mutates displayed geometry. */
 export class CompiledInkKernel {
   constructor() {
     let exports;

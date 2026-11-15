@@ -44,7 +44,6 @@ test("a local copy stays on this device while new projects default to a server a
     expect((await manager.configuration()).localProjectIds).toEqual([
       local.id,
     ]);
-    // A failed creation releases its reserved id.
     await expect(
       manager.createLocalProject((id) =>
         store.createProject({ id: local.id, name: `Duplicate ${id}` }),

@@ -4,7 +4,6 @@ import { ownSourceValue } from "../surface/source-runtime";
 
 const serialized = new WeakMap<Node, JSONContent>();
 
-/** ProseMirror nodes are immutable; unchanged subtrees keep their JSON identity. */
 export function editorNodeJSON(node: Node): JSONContent {
   const cached = serialized.get(node);
   if (cached) return cached;
@@ -16,8 +15,6 @@ export function editorNodeJSON(node: Node): JSONContent {
   }
   if (node.marks.length) json.marks = node.marks.map((mark) => mark.toJSON());
   if (node.isText) json.text = node.text;
-  // PM attrs may include mutable widget data: never freeze or publish their
-  // aliases. Cached child JSON is already owned and remains shared.
   const snapshot = ownSourceValue(json);
   serialized.set(node, snapshot);
   return snapshot;
@@ -42,7 +39,6 @@ function sameNode(node: Node, json: JSONContent): boolean {
   return true;
 }
 
-/** A local echo needs no parsing; external changes still use position mapping. */
 export function sameEditorContent(node: Node, json: JSONContent): boolean {
   if (
     json.type !== node.type.name ||

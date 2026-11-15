@@ -3,7 +3,6 @@ import type { StudioFeedback } from "./useStudioFeedback";
 import type { RouteState } from "./useRouteState";
 import type { DialogState, PageState } from "./types";
 
-/** The one workbench dialog that is open, if any. */
 export function useDialogState() {
   const [dialog, setDialog] = useState<DialogState>(null);
   const dialogRef = useRef(dialog);
@@ -14,10 +13,6 @@ export function useDialogState() {
 
 export type DialogControl = ReturnType<typeof useDialogState>;
 
-/**
- * A save that fails on a conflict opens its comparison dialog once; dismissing
- * that dialog keeps the edits in the local draft until the next failure.
- */
 export function useSaveConflictDialog({
   route: { view, selectedProject },
   page,
@@ -30,8 +25,6 @@ export function useSaveConflictDialog({
   feedback: Pick<StudioFeedback, "report">;
 }) {
   const shownSaveFailure = useRef("");
-  // A conflict the person dismissed stays closed (its banner remains) until a
-  // later save attempt fails again or another conflict appears.
   const deferredSaveFailure = useRef("");
   const saveFailureIdentity = () =>
     JSON.stringify([
@@ -88,8 +81,6 @@ export function useSaveConflictDialog({
     page.error,
     page.saveFailureAttempt,
   ]);
-  // Dismissing a conflict dialog defers the decision: the unsaved edits stay
-  // in the local draft and the save-conflict banner reopens the dialog.
   const deferConflict = () => {
     deferredSaveFailure.current = saveFailureIdentity();
     closeDialog();

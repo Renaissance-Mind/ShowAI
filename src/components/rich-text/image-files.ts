@@ -4,10 +4,6 @@ import messages from "../../i18n/messages/richText";
 
 const t = translator(messages);
 
-/**
- * Reads a pasted, dropped or chosen image the way pages and boards store it:
- * a data URL within the resource limit, or the reason it cannot be used.
- */
 export async function readImageFile(
   file: File,
 ): Promise<{ src: string } | { problem: string }> {

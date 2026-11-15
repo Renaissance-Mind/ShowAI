@@ -35,7 +35,6 @@ function shortDate(value: string) {
   }).format(new Date(value));
 }
 
-/** The open project or folder: its pages and folders as a list or as cards. */
 export function DirectoryView({
   feedback: { action },
   library: { projectTarget, folderTarget },

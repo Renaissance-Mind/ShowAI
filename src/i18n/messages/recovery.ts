@@ -1,6 +1,5 @@
 import { defineMessages } from "../index";
 
-// Conflict, merge and external-change recovery dialogs, plus library search results.
 export default defineMessages("recovery", {
   "zh-CN": {
     sameTextDifferentAppearance: "正文相同，格式或页面设置有所不同。",

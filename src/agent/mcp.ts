@@ -39,10 +39,6 @@ import {
   type ToolConnection,
 } from "./mcp-tools/tool";
 
-/**
- * One MCP connection to a project: the connection context the tools share,
- * then the declared tools (./mcp-tools) and the presentation tools.
- */
 export function createMcpServer(options: McpServerOptions): McpServer {
   const service = new AgentService(options);
   const projectId = service.requireProject(options.projectId);
@@ -57,15 +53,11 @@ export function createMcpServer(options: McpServerOptions): McpServer {
     ),
   );
   const register: McpServer["registerTool"] = (name, config, callback) => {
-    // All project operations accept an explicit identity, including bound connections.
-    // Existing clients may omit it; an explicit mismatch must never be stripped silently.
     const tool = server.registerTool(name, config, callback);
     if (name !== "guide") {
       const shape = getObjectShape(tool.inputSchema);
       if (!shape) throw new Error(`Missing input schema: ${name}`);
       const original = tool.handler as ToolCallback<z.ZodRawShape>;
-      // Failures name the step that failed: an export, a conversation view,
-      // or a save for any other tool that writes.
       const operation: FailedOperation | undefined =
         name === "page_export"
           ? "export"
@@ -82,7 +74,6 @@ export function createMcpServer(options: McpServerOptions): McpServer {
           return mcpFailure(
             new Error("This MCP connection is bound to another project."),
           );
-        // Only runtimes serve MCP; their output follows the App's current language.
         await followAppLanguage(service.store.root);
         if (!options.pageWriteDirectory) return original(args, extra);
         const writes: PageWrite[] = [];
@@ -105,7 +96,6 @@ export function createMcpServer(options: McpServerOptions): McpServer {
     return tool;
   };
   const inherited = options.sourceContext ?? changeContext();
-  // Library connections pass their own reader; a bound connection is one.
   const readerId = inherited.readerId ?? randomUUID();
   const call: ToolConnection["call"] = (handler, metadata = {}) =>
     Promise.resolve()
@@ -146,15 +136,12 @@ export function createMcpServer(options: McpServerOptions): McpServer {
           structuredContent: { ok: false, error: errorResult(error) },
         }),
       );
-  // Local connections share the library with the ShowAI App, which opens showai:// links.
-  // Remote connections deliver through their own storage and have no local App.
   const openLinks = !options.storeProjectPresentation;
   const connection: ToolConnection = {
     service,
     projectId,
     options,
     call,
-    // Device paths are only meaningful where ShowAI runs on the same machine.
     localFiles: options.presentation?.transport !== "http",
     workspace: new WorkspaceService(service.store.root, projectId, {
       libraryAccess: options.projectAccess === "library",
@@ -231,7 +218,6 @@ export async function startMcp(options: {
   const transport = new StdioServerTransport(process.stdin, process.stdout, {
     maxBufferSize: CAPACITY.authoringRequestBytes,
   });
-  // Host plugins pinned to a project are recorded too; the built-in Agent is not a host.
   if (process.env.SHOWAI_MCP_CLIENT !== "builtin")
     recordConnections(transport, service.store.root);
   await createMcpServer({

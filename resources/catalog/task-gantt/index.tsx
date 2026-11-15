@@ -28,7 +28,6 @@ import {
 } from "./model";
 import "./style.css";
 
-/** Derived fields retain task IDs so Agents can join them to the original props. */
 export function readData(data: GanttData) {
   const issue = validate(data);
   if (issue) throw new Error(issue);

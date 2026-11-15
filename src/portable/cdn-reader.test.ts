@@ -23,7 +23,6 @@ import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { createMcpServer } from "../agent/mcp";
 import components from "../../resources/catalog/components.json";
 
-// Like injectArtifactIntoHtml, keep the JSON inert inside its script element.
 const page = (json: string) =>
   `<!doctype html><html lang="en"><body><script id="showai-data" type="application/json">${json.replace(/</g, "\\u003c")}</script></body></html>`;
 
@@ -46,7 +45,6 @@ describe("CDN fragment", () => {
     expect(fragment).toContain(
       '<section id="showai-test" data-showai-inline-root lang="en">',
     );
-    // The page title cannot close the loader script.
     expect(fragment.match(/<\/script>/g)).toHaveLength(1);
     const data = fragment.match(/const artifact=(\{.*?\});const timers/s)![1];
     expect(JSON.parse(data)).toEqual(artifact);
@@ -95,7 +93,6 @@ describe("CDN fragment", () => {
     });
     await mounted;
     expect(started.map(([url]) => url)).toEqual(urls);
-    // Without the failure hand-off the backup would wait 1.5 seconds.
     expect(started[1][1]).toBeLessThan(500);
   });
 
@@ -184,7 +181,6 @@ describe("CDN reader", () => {
       await buildPageHtml(doc, undefined, [slider]),
       { readerUrl: `${host.origin}/${entry}` },
     );
-    // The page data dominates; the reader itself is not embedded.
     expect(Buffer.byteLength(fragment)).toBeLessThan(
       Buffer.byteLength(JSON.stringify(slider)) + 20_000,
     );
@@ -202,13 +198,11 @@ describe("CDN reader", () => {
     expect(await frame.locator(".container-page-heading").isVisible()).toBe(
       false,
     );
-    // The custom component runs through its inline runtime on the shared React.
     const custom = frame.getByRole("slider").last();
     await custom.waitFor();
     await expect(
       frame.locator("[data-showai-placeholder]").count(),
     ).resolves.toBe(0);
-    // Blocks load on demand: the 3D chunk arrives, unused heavy blocks do not.
     expect(requested.some((url) => /\/chunks\/Scene3D-/.test(url))).toBe(true);
     expect(
       requested.some((url) => /\/chunks\/(pdf-engine|G2Chart)-/.test(url)),
@@ -276,7 +270,6 @@ describe("CDN reader", () => {
         requiresNetwork: false,
       });
       expect(await readFile(inline.path, "utf8")).not.toContain(`import(url)`);
-      // page_present carries its local reader and keeps a separate online page.
       const presented = await presentPage({
         root: home,
         projectId: project.id,
@@ -289,8 +282,6 @@ describe("CDN reader", () => {
       expect(presented.online).toContain("standalone:true");
       expect(presented.html).not.toContain(host.origin);
 
-      // Execute the bundled fragment with the same sandbox and verify that
-      // neither the entry nor any component chunk is requested from the CDN.
       const bundledTab = await browser.newPage();
       const bundledRequests: string[] = [];
       bundledTab.on("request", (request) =>
@@ -304,7 +295,6 @@ describe("CDN reader", () => {
       expect(bundledRequests).toEqual([`${host.origin}/bundled-preview`]);
       await bundledTab.close();
 
-      // The online page is an ordinary standalone reader with its page menu.
       const tab = await browser.newPage();
       const errors: string[] = [];
       tab.on("pageerror", (error) => errors.push(error.message));
@@ -333,8 +323,6 @@ describe("CDN reader", () => {
         project = await store.createProject({ name: "Large inline" });
       const doc = createResource(blankDocument());
       doc.title = "Large inline page";
-      // Random text barely compresses: with its bundled reader the inline page
-      // passes the 1,000,000-byte conversation limit; page data alone does not.
       doc.content.content = Array.from({ length: 20 }, (_, index) => ({
         type: "paragraph",
         attrs: { id: `noise-${index}` },
@@ -373,7 +361,6 @@ describe("CDN reader", () => {
         reader: "cdn",
         readerReason: { cause: "requested" },
       });
-      // page_present and render_document fall back the same way and say so.
       const [left, right] = InMemoryTransport.createLinkedPair();
       const server = createMcpServer({ root: home, projectId: project.id });
       const client = new Client({ name: "cdn-reader-test", version: "1" });
@@ -399,13 +386,11 @@ describe("CDN reader", () => {
             readerReason: { cause: "size", limitBytes: 1_000_000 },
           });
           expect(display.readerReason.bytes).toBeGreaterThan(1_000_000);
-          // Only an export takes a reader option.
           expect(display.readerReason.message).not.toContain("reader bundled");
         }
         expect(fallback.readerReason!.message).toContain(
           "Pass reader bundled to fail instead.",
         );
-        // A refused bundled export says that nothing was exported.
         const refused = await client.callTool(
           {
             name: "page_export",

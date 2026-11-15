@@ -9,14 +9,8 @@ import type { ToastItem, ToastKind } from "./ProblemNotice";
 import { recordProblem } from "./problem-log";
 
 export interface ReportOptions extends ProblemContext {
-  /**
-   * Groups problems of one operation so a later success clears them with
-   * `resolve(key)`. Defaults to `action`.
-   */
   key?: string;
-  /** Offered as 重试 when the description suggests retrying. */
   retry?: () => void;
-  /** Handlers for other suggested actions, e.g. chooseLocation. */
   handlers?: Partial<Record<ProblemActionId, () => void>>;
 }
 
@@ -32,11 +26,6 @@ export interface QueuedProblem {
 const GENERAL = "general";
 const CONTEXT = Symbol.for("showai.problemContext");
 
-/**
- * Attaches the operation to an error where it is thrown, so a generic
- * `.catch(report)` further up still titles it (e.g. 读取内容库失败).
- * Options passed to `report` itself take precedence.
- */
 export function labelProblem<T>(error: T, options: ReportOptions): T | Error {
   const target =
     error && typeof error === "object" ? error : new Error(String(error));
@@ -53,10 +42,6 @@ function attachedOptions(error: unknown): ReportOptions {
     : {};
 }
 
-/**
- * Problems of different operations stack; the same problem again only
- * raises its count. `resolve(key)` clears an operation once it succeeds.
- */
 export function useProblemQueue() {
   const [problems, setProblems] = useState<QueuedProblem[]>([]);
   const next = useRef(0);
@@ -83,7 +68,6 @@ export function useProblemQueue() {
       const entry: QueuedProblem = same
         ? { ...same, problem, count: same.count + 1, retry, handlers }
         : { id: ++next.current, key, problem, count: 1, retry, handlers };
-      // Newest first; equal-priority notices keep this order in a NoticeStack.
       return [entry, ...current.filter((item) => item !== same)].slice(0, 20);
     });
   }, []);
@@ -103,9 +87,7 @@ export function useProblemQueue() {
 
 export interface ToastOptions {
   kind?: ToastKind;
-  /** A single follow-up such as 撤销 or 查看. */
   action?: ToastItem["action"];
-  /** Milliseconds; success and info default to 5 s, warnings stay. */
   duration?: number;
 }
 
@@ -126,7 +108,6 @@ export function useToasts() {
       const kind = options.kind ?? "success";
       const id = ++next.current;
       setToasts((current) => {
-        // The same text again replaces the older toast instead of stacking.
         const kept = current.filter((item) => item.message !== message);
         for (const item of current)
           if (!kept.includes(item)) {
@@ -145,7 +126,6 @@ export function useToasts() {
     },
     [dismiss],
   );
-  /** Clears transient toasts; warnings stay unless `all` is set. */
   const clear = useCallback((all = false) => {
     setToasts((current) => {
       const kept = all ? [] : current.filter((item) => item.kind === "warning");

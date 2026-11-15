@@ -69,7 +69,6 @@ function useWidth() {
   return [ref, width] as const;
 }
 
-/** Round tick values covering [low, high] with about four intervals. */
 function ticks(low: number, high: number) {
   const raw = (high - low) / 4;
   const power = 10 ** Math.floor(Math.log10(raw));
@@ -100,7 +99,6 @@ export function WaterfallBlock({ data }: BlockProps) {
       }),
     [locale, format.decimals],
   );
-  // Axis ticks drop trailing zeros: 1 s rather than 1.00 s.
   const tickNumber = useMemo(
     () =>
       new Intl.NumberFormat(locale, {
@@ -108,7 +106,6 @@ export function WaterfallBlock({ data }: BlockProps) {
       }),
     [locale, format.decimals],
   );
-  /** Stored value → display text; signed shows + for gains and − for losses. */
   const show = (value: number, signed = false, tick = false) => {
     const body = (tick ? tickNumber : number).format(
       Math.abs(value) / (format.divisor ?? 1),
@@ -128,7 +125,6 @@ export function WaterfallBlock({ data }: BlockProps) {
         : "bad";
 
   const { spans } = waterfallBridge(steps);
-  // Running total after each step, where the connector to the next bar starts.
   const levels = spans.map((span, index) =>
     steps[index].kind === "total"
       ? steps[index].value
@@ -146,7 +142,6 @@ export function WaterfallBlock({ data }: BlockProps) {
   const [chartRef, chartWidth] = useWidth();
   const barsRef = useRef<SVGGElement>(null);
   const detailsRef = useRef<HTMLDetailsElement>(null);
-  // Printing shows the full table, not only the selected step.
   useEffect(() => {
     const open = () => {
       if (detailsRef.current) detailsRef.current.open = true;

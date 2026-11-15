@@ -6,7 +6,6 @@ export interface LibraryMutation {
   head: string | null;
   changes: FileChanges;
   expected: Map<string, string | null>;
-  /** Files this transaction read as committed at `head`, by path. */
   read?: Map<string, Buffer>;
   origins?: Pick<
     ChangeContext,
@@ -15,7 +14,6 @@ export interface LibraryMutation {
 }
 const actors = new AsyncLocalStorage<ChangeContext>();
 export const libraryMutations = new AsyncLocalStorage<LibraryMutation>();
-/** Serializes legacy writers with the one-time activation barrier. */
 export const legacyMutations = new AsyncLocalStorage<string>();
 
 export function changeContext(): ChangeContext {

@@ -1,4 +1,3 @@
-/** Self-contained so the same runtime can run inside existing sandboxed packages. */
 export function installIconTooltips(root) {
   const doc = root.nodeType === 9 ? root : root.ownerDocument;
   const win = doc.defaultView;
@@ -26,10 +25,7 @@ export function installIconTooltips(root) {
   let active = null;
   let nativeTitle = null;
   let hideTimer = 0;
-  // Only keyboard navigation reveals focus tooltips; script focus after a click or shortcut stays quiet.
   let keyboardNav = false;
-  // Hover tooltips follow a moving pointer. After a click, a key or a scroll,
-  // whatever lands under a still pointer stays quiet until the pointer moves.
   let armed = true;
   let hovered = null;
   let focused = null;
@@ -48,7 +44,6 @@ export function installIconTooltips(root) {
     element.textContent?.trim();
   const target = (event) => {
     const path = event.composedPath();
-    // A labelled icon inside a text button belongs to that button's label.
     const control = path.find(
       (element) =>
         element?.matches &&
@@ -71,7 +66,6 @@ export function installIconTooltips(root) {
     }
     return null;
   };
-  // Adds or removes the tooltip from the control's description, keeping others.
   const describe = (element, described) => {
     const ids = (element.getAttribute("aria-describedby") || "")
       .split(/\s+/)
@@ -141,7 +135,6 @@ export function installIconTooltips(root) {
     if (!element || element === tip) return;
     active = element;
     nativeTitle = element.getAttribute("title");
-    // Text controls need neither a custom tooltip nor a native title bubble.
     element.removeAttribute("title");
     render();
   };
@@ -157,7 +150,6 @@ export function installIconTooltips(root) {
     if (hovered === tip) win.clearTimeout(hideTimer);
     else show(hovered || focused);
   };
-  // Layout changes under a still pointer report no movement.
   const move = (event) => {
     if (armed || !(event.movementX || event.movementY)) return;
     armed = true;
@@ -183,8 +175,6 @@ export function installIconTooltips(root) {
   };
   const key = (event) => {
     const field = event.composedPath()[0];
-    // Any other key, such as Enter on a menu item or a shortcut, may move
-    // focus by script; that focus stays quiet.
     keyboardNav =
       event.key === "Tab" ||
       (/^(Arrow|Home$|End$|Page)/.test(event.key) &&

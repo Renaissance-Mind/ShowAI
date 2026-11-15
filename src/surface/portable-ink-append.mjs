@@ -16,8 +16,6 @@ const conflict = (id) => {
   throw error;
 };
 
-// These helpers edit already supplied trees. Their local structure checks do
-// not confer canonical/validated ownership or scan a stroke's large source.
 function tree(document) {
   if (!record(document) || !isResource(document))
     invalid("a resource tree is required");
@@ -168,8 +166,6 @@ function append(target, entry, node, frame, sourceOrder, sourceViewOrder) {
   return next;
 }
 
-/** Strict resource-tree append. Inputs and the supplied ink/frame stay shared
- * and read-only; ordinary validation/save remains a separate boundary. */
 export function appendNewPortableInk(target, boardId, node, frame) {
   drawing(node, frame);
   const entries = tree(target),
@@ -180,8 +176,6 @@ export function appendNewPortableInk(target, boardId, node, frame) {
   return append(target, entry, node, frame);
 }
 
-/** Reattach a genuinely supplied source stroke, preserving current target
- * edits and deleted Boards. Source-local frames require a direct Board child. */
 export function appendPortableInkFromSource(target, source, boardId, strokeId) {
   if (!validId(strokeId)) invalid("invalid stroke id");
   const sourceEntries = tree(source),

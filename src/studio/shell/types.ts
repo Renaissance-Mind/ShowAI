@@ -46,7 +46,6 @@ export type DialogState =
       type: "project";
       project?: ProjectSummary;
       groupId?: string;
-      /** Created in the new project once it exists. */
       then?: CreationChoice;
     }
   | { type: "group"; group?: ProjectGroup; projectId?: string }
@@ -66,7 +65,6 @@ export type DialogState =
       type: "folder";
       projectId: string;
       parentId: string | null;
-      /** Present when editing an existing folder's name and icon. */
       target?: LibraryTarget;
     }
   | {
@@ -98,13 +96,10 @@ export type ProjectScan = {
   projects: ProjectSummary[];
   unreadable: UnreadableProject[];
 };
-/** Operation names for problem titles; read the locale on each call. */
 export const operation = translator(errorMessages);
 export const LOAD_LIBRARY = "loadLibrary";
-/** The open page holds edits it could not save, so the requested action did not run. */
 export class DraftHeld extends Error {}
 
-/** The Agent panel of the active tab, and text waiting to be placed in its input. */
 export type AssistantControl = {
   assistantOpen: boolean;
   changeAssistantOpen: (open: boolean) => void;

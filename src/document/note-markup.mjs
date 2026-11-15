@@ -1,9 +1,3 @@
-// Hover notes shared by every ShowAI text surface. Text uses
-// [visible text]{note}; formulas use \note{part}{note} inside LaTeX. Parsing is
-// pure so rich text import, inline markup, charts, the CLI and the portable
-// reader agree on the same syntax.
-
-/** Longest note a reader is expected to read in a hover bubble. */
 export const NOTE_MAX = 1000;
 
 const escaped = (source, index) => {
@@ -12,7 +6,6 @@ const escaped = (source, index) => {
   return count % 2 === 1;
 };
 
-/** Index just past the brace group opening at `start`, or -1 when unbalanced. */
 function braceEnd(source, start) {
   let depth = 0;
   for (let i = start; i < source.length; i++) {
@@ -27,11 +20,6 @@ function braceEnd(source, start) {
   return -1;
 }
 
-/**
- * Match `[label]{note}` starting at `start`. The label may contain inline
- * formulas such as `$x_t$`; the note may contain balanced braces, so formulas
- * like `$\bar{\alpha}_t$` work in notes too.
- */
 export function matchNote(source, start = 0) {
   if (source[start] !== "[" || escaped(source, start)) return null;
   let i = start + 1;
@@ -60,7 +48,6 @@ export function matchNote(source, start = 0) {
   return { raw: source.slice(start, end), label, note, end };
 }
 
-/** First `[label]{note}` at or after `from`. */
 export function findNote(source, from = 0) {
   for (
     let index = source.indexOf("[", from);
@@ -73,7 +60,6 @@ export function findNote(source, from = 0) {
   return null;
 }
 
-/** Split plain text into literal text and annotated labels. */
 export function noteSegments(source) {
   const text = String(source ?? "");
   const segments = [];
@@ -89,22 +75,16 @@ export function noteSegments(source) {
   return segments;
 }
 
-/** Text as a reader sees it before hovering: labels stay, notes go. */
 export const plainNotes = (source) =>
   noteSegments(source)
     .map((segment) => segment.text)
     .join("");
 
-/** Notes in order of appearance, e.g. for a static summary or search. */
 export const textNotes = (source) =>
   noteSegments(source)
     .filter((segment) => segment.type === "note")
     .map(({ text, note }) => ({ text, note }));
 
-/**
- * Replace `\note{part}{text}` with a KaTeX data attribute placeholder. Notes
- * are returned separately because KaTeX attribute values cannot hold commas.
- */
 export function prepareNoteLatex(latex) {
   const notes = [];
   const visit = (source) => {
@@ -145,7 +125,6 @@ const attribute = (value) =>
     .replaceAll("<", "&lt;")
     .replaceAll(">", "&gt;");
 
-/** Put note texts back on the KaTeX elements that carry their placeholders. */
 export function attachLatexNotes(html, notes) {
   if (!notes.length) return html;
   return html.replace(/data-showai-note="(\d+)"/g, (whole, index) => {
@@ -156,10 +135,8 @@ export function attachLatexNotes(html, notes) {
   });
 }
 
-/** Wrap a formula so the whole expression shows `note` on hover. */
 export const annotateLatex = (latex, note) => `\\note{${latex}}{${note}}`;
 
-/** `{ body, note }` when the whole formula is one `\note{body}{note}`. */
 export function outerLatexNote(latex) {
   const source = String(latex ?? "").trim();
   const head = /^\\note\s*/.exec(source);
@@ -177,7 +154,6 @@ export function outerLatexNote(latex) {
   };
 }
 
-/** Marked inline extension that reads [label]{note} as an annotation token. */
 export const noteMarkdownExtension = {
   name: "annotation",
   level: "inline",
@@ -194,7 +170,6 @@ export const noteMarkdownExtension = {
   },
 };
 
-/** True for an annotation mark whose note is missing, blank or too long. */
 export const invalidNoteMark = (mark) =>
   mark?.type === "annotation" &&
   (typeof mark.attrs?.note !== "string" ||

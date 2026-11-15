@@ -281,8 +281,6 @@ it("fresh wrappers preserve complete unknown metadata, resource JSON counts, val
       body,
     ),
   ).toThrow(/actual registered/);
-  // Even a trusted capacity-only actual-save measurement of a 64-deep body
-  // cannot prove that embedding it at artifact.document stays within64.
   const capacityOnly = cloneSourceValue(body) as any;
   deep = 0;
   for (let i = 0; i < 63; i++) deep = { child: deep };
@@ -376,8 +374,6 @@ it("honors the actual 256MiB wrapper boundary and falls back rather than rejecti
   };
   padding = CAPACITY.artifactBytes - measureContent(small).jsonBytes;
   small.futurePadding = "x".repeat(padding);
-  // The inherited upper still includes the longer timestamp. The fast upper
-  // exceeds the cap, while the true full artifact is exactly valid.
   expect(parseArtifactWithValidatedDocument(small, shorter).document).toBe(
     shorter,
   );

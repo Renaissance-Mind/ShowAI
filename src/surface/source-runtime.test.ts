@@ -93,7 +93,6 @@ it("accepts only the private actual merge adapter and prepares exact generic his
  expect(resolve(owner,publication.next).title).toBe("Actual native title");
  expect(publication.history).toBeDefined();
  expect(publication.history!.stages).toHaveLength(1);
- // History includes all authored fields, rather than a canvas whitelist.
  expect(resolve(owner,publication.history!.sourceOnly.next).title).toBe(document.title);
  expect(()=>owner.execute({kind:"registerActualMergedPublication",packet,result:{document:incoming,conflicts:[]}} as any)).toThrow(/Unknown/);
  expect(()=>owner.registerActualMergedPublication({current:seed.next,publicationId:"actual-trusted-pub",packet:{...packet,other:"changed"},result:{document:incoming,conflicts:[]},leaseId:"changed"})).toThrow(/identity/);

@@ -27,7 +27,6 @@ import { LibraryOperations } from "./library-operations";
 import type { PageRecord } from "./model";
 import { serializeArtifact } from "../portable/validation.mjs";
 
-/** Earlier file libraries kept one immutable checkpoint per page state. */
 async function legacyCheckpoint(
   root: string,
   projectId: string,
@@ -197,7 +196,6 @@ describe("one-time file library import", () => {
       importId: first.importId,
       snapshotId: first.id,
     });
-    // The restore superseded the import revision; snapshots stay readable.
     expect(await library.head()).not.toBe(report.revision);
     expect(
       (

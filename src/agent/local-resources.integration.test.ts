@@ -14,7 +14,6 @@ import { parseArtifact } from "../portable/validation.mjs";
 import { walk } from "../document/walk.mjs";
 import type { ShowDocument } from "../core/model";
 
-// A real 1×1 PNG, served online and stored as a local file.
 const png = Buffer.from(
   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=",
   "base64",
@@ -103,7 +102,6 @@ test("pages keep linked local files, report them, and exports embed them next to
     ],
   });
   const pageId = page.document.id as string;
-  // Validation rejects a reference of the wrong kind.
   const wrong = await client.callTool({
     name: "page_create",
     arguments: {
@@ -114,7 +112,6 @@ test("pages keep linked local files, report them, and exports embed them next to
   expect((wrong.structuredContent as { ok: boolean }).ok).toBe(false);
 
   const read = await ok("page_read", { pageId, rendered: false });
-  // The stored page keeps the references as written.
   expect(widgets(read.document, "video")[0].attrs.data.src).toBe(video);
   const resources = Object.fromEntries(
     (read.resources as any[]).map((item) => [item.id, item]),
@@ -139,7 +136,6 @@ test("pages keep linked local files, report them, and exports embed them next to
   expect(resources[online]).toMatchObject({ source: "url", kind: "image" });
 
   const out = join(root, "exports", "linked.html");
-  // Local files leave the device only after the person sees the list.
   const unconfirmed = (
     await client.callTool({
       name: "page_export",
@@ -184,7 +180,6 @@ test("pages keep linked local files, report them, and exports embed them next to
   expect(gallery.map((item: any) => item.src)).toEqual([
     online,
     encoded,
-    // A file that is not available keeps only its name, never the path.
     "file:gone.png",
   ]);
   expect(widgets(source, "video")[0].attrs.data.src).toMatch(
@@ -194,7 +189,6 @@ test("pages keep linked local files, report them, and exports embed them next to
   expect(html).toContain(online);
   expect(html).not.toContain(outside);
 
-  // A rendered read loads the online image and embeds the local ones.
   const before = server.requests.filter((r) => r.url === "/online.png").length;
   const rendered = await ok("page_read", { pageId, view: "html" });
   const preview = await readFile(rendered.path, "utf8");

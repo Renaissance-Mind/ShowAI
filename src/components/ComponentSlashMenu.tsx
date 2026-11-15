@@ -52,7 +52,6 @@ export function ComponentSlashMenu({
     () =>
       catalog.items
         .filter(insertsAsBlock)
-        // The rich-text menu and quick jump use the same entries.
         .map((item) =>
           componentSlashEntry(item, t("allComponents"), {
             name: componentDisplayName,

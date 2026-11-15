@@ -4,10 +4,6 @@ import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-/**
- * A fake Host context that records the two effects and the result listener the
- * plugin installs, without depending on a Harness process.
- */
 function createContext() {
   const warnings = [];
   const disposers = [];
@@ -39,7 +35,6 @@ function createContext() {
   };
 }
 
-/** Build the minimum request/response pair the route handler reads. */
 function createExchange(method, url) {
   const response = { status: 0, headers: {}, body: undefined };
   response.writeHead = (status, headers = {}) => {
@@ -52,7 +47,6 @@ function createExchange(method, url) {
   return [{ method, url, headers: {} }, response];
 }
 
-/** Poll until the cache contains the named file. */
 async function waitForFile(path) {
   const deadline = Date.now() + 3000;
   while (Date.now() < deadline) {
@@ -60,7 +54,6 @@ async function waitForFile(path) {
       const info = await stat(path);
       if (info.isFile()) return;
     } catch {
-      // not written yet
     }
     await new Promise((resolve) => setTimeout(resolve, 25));
   }
@@ -115,8 +108,6 @@ test("the Host caches complete documents and serves legacy fragments in standard
     assert.match(cachedText, /<section lang="zh"/);
     assert.deepEqual(harness.warnings, []);
 
-    // A page presented by a PTC subcall reaches the same keyed Client view, so
-    // its result must be cached too; only the wire tool name decides.
     listener(
       { callId: "call_nested", name: "mcp__showai__render_document", parent: { kind: "oneOf" } },
       {
@@ -153,8 +144,6 @@ test("the Host caches complete documents and serves legacy fragments in standard
     assert.match(served, /^<!doctype html>/i);
     assert.match(served, /<title>测试 &lt;页面&gt; &quot;A&quot;<\/title>/);
 
-    // A cache entry written by the previous plugin generation is still a
-    // fragment; the origin must upgrade it on read instead of serving quirks.
     await writeFile(
       join(cache, "legacy.html"),
       '<section lang="en" id="legacy"><p>legacy fragment</p></section>',

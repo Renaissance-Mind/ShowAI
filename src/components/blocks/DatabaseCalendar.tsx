@@ -41,7 +41,6 @@ const MODES: Mode[] = ["month", "week", "heatmap"];
 const DAY_MS = 86400000;
 const MONTH_VISIBLE = 3;
 
-/** Calendar settings with every column id checked against the current columns. */
 export interface CalendarView {
   dateColumn?: DatabaseColumn;
   endDateColumn?: DatabaseColumn;
@@ -62,7 +61,6 @@ const pick = (
   type: DatabaseColumn["type"],
 ) => columns.find((column) => column.id === id && column.type === type);
 
-/** Resolve saved calendar settings; the date and color columns fall back to the first fitting column. */
 export function resolveCalendar(
   columns: DatabaseColumn[],
   config: DatabaseCalendarConfig = {},
@@ -101,7 +99,6 @@ export function resolveCalendar(
   };
 }
 
-/** Drop calendar references that no longer fit the columns, so edited properties keep the data valid. */
 export function pruneCalendarConfig(
   config: DatabaseCalendarConfig | undefined,
   columns: DatabaseColumn[],
@@ -192,7 +189,6 @@ export function DatabaseCalendar({
   onRemove,
 }: {
   columns: DatabaseColumn[];
-  /** Rows after search and filters; the calendar never filters on its own. */
   rows: DatabaseRow[];
   settings: CalendarView;
   editable: boolean;
@@ -204,7 +200,6 @@ export function DatabaseCalendar({
   const t = useTranslator(messages);
   const locale = useLocale();
   const format = useFormatters(locale);
-  // Rows mapped from shared data move only when their date is writable here.
   const sources = useContext(BlockItemSources);
   const movable = (id: string) =>
     !sources?.get(id)?.readOnly.includes(settings.dateColumn?.id ?? "");
@@ -294,7 +289,6 @@ export function DatabaseCalendar({
       />
     );
 
-  // Visible window per mode.
   let from: number, to: number, label: string;
   if (mode === "month") {
     const first = monthStart(anchor);
@@ -633,8 +627,6 @@ export function DatabaseCalendar({
 
   const heatmap = () => {
     const counted = entries.filter(inFocus);
-    // Streaks are counted as of the shown date, so a log viewed at its saved
-    // initial date keeps its streak after that day has passed.
     const asOf = Math.min(today, anchor);
     const summary = heatmapSummary(counted, {
       endDay: to,

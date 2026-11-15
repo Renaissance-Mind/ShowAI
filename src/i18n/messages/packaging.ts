@@ -1,7 +1,5 @@
 import { defineMessages } from "../index";
 
-// Choosing what an export or synchronization carries: files of this device,
-// data computed from them, online data and web resources.
 export default defineMessages("packaging", {
   "zh-CN": {
     exportTitle: "导出包含的内容",

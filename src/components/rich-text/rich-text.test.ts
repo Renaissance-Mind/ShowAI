@@ -228,7 +228,6 @@ describe("shared rich-text component", () => {
     expect(texts.find((n) => n.text === "==代码==")?.marks).toEqual([
       { type: "code" },
     ]);
-    // A page accepts the imported tree as its body, H4 included.
     expect(() =>
       validateDocument({ ...blankDocument(), content: doc }),
     ).not.toThrow();
@@ -280,7 +279,6 @@ describe("shared rich-text component", () => {
       content: { type: "doc", content: [{ type: "paragraph", content: [] }] },
     });
     expect(compiled.inline!.script).toContain("rich-text-component");
-    // The shared common-language highlighter adds ~173 KB minified to the SDK.
     expect(compiled.inline!.script.length).toBeLessThan(2200000);
   }, 60000);
 });

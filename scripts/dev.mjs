@@ -92,10 +92,6 @@ await writeFile(
   join(runtime, "index.html"),
   "<!-- Development assets are provided by Vite. -->\n",
 );
-// Conversation previews in hosts whose model writes the HTML (Claude Code)
-// import the reader from public CDNs, named by this manifest. A development
-// build is not published, so name the newest reader on npm; components added
-// since that release render as unknown there. Startup does not wait for it.
 async function publishCdnManifest() {
   if (process.env.SHOWAI_READER_CDN?.trim() === "off") return;
   const name = process.env.SHOWAI_CDN_PACKAGE ?? "showai-reader";
@@ -166,7 +162,6 @@ const developmentPlugin = {
     ],
   },
 };
-// Own the HTTP and signal lifecycle so Vite cannot exit before drafts are saved.
 const frontendServer = createHttpServer();
 const vite = await createServer({
   root,
@@ -263,8 +258,6 @@ let child,
 let dependencies = new Set();
 let readyReceipt;
 let presentation;
-// What dev:status explains: why the backend is not serving (phase) and what
-// keeps a source change from reaching a backend that still serves (pendingRestart).
 let phase = { code: "PREPARING", since: new Date().toISOString() };
 let pendingRestart;
 let stopBlocked;
@@ -335,7 +328,6 @@ function statusDetails() {
       : {}),
   };
 }
-/** Console text for a refused desktop quit, one line per window and reason. */
 function describeQuitBlocked(message) {
   const windows = Array.isArray(message?.windows) ? message.windows : [];
   return [
@@ -640,7 +632,6 @@ async function launch() {
   startedCommit = identity.commit;
   await writeSession();
 }
-/** Resolves { stopped: true }, or { stopped: false, blocked } with the App's reasons. */
 async function stopChild() {
   const previous = child;
   if (!previous) return { stopped: true };
@@ -653,7 +644,6 @@ async function stopChild() {
         message?.type === "quit-progress" &&
         typeof message.step === "string"
       ) {
-        // The App agreed to quit and is stopping this service.
         phase = {
           ...phase,
           step: message.step.slice(0, 100),
@@ -680,10 +670,8 @@ async function stopChild() {
     previous.once("error", reject);
   });
   previous.send("showai:development-quit");
-  // The desktop's normal close path waits for page saves. Never force-kill drafts.
   return await exited;
 }
-/** The refused quit as dev:status reports it. */
 function quitBlockedDetails(message) {
   return {
     record: typeof message?.record === "string" ? message.record : undefined,
@@ -782,7 +770,6 @@ async function rebuild(backend = true) {
     });
   } finally {
     rebuilding = false;
-    // A source fix queued during a failed compilation must still be rebuilt.
     if (requested && !stopping) void rebuild(backendRequested);
   }
 }
@@ -793,7 +780,6 @@ async function stop() {
   const stopped = await stopChild();
   if (!stopped.stopped) {
     stopping = false;
-    // The development service keeps running; status says why it did not stop.
     stopBlocked = {
       code: "QUIT_BLOCKED",
       message: "桌面版拒绝退出，开发服务继续运行。处理窗口中的保存提示后再停止",
@@ -866,8 +852,6 @@ try {
     resolve(root, git(["rev-parse", "--git-path", path])),
   );
   identityWatcher = watch(gitPaths, { ignoreInitial: true });
-  // A transient git failure (e.g. EINTR while another checkout moves refs)
-  // is retried and logged; it must never stop the development server.
   identityRefresh = identityRefresher({
     read: readIdentity,
     apply: (next) => {

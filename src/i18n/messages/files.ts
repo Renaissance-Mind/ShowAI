@@ -1,6 +1,5 @@
 import { defineMessages } from "../index";
 
-// File and folder pickers: native dialog titles plus the browser-mode picker.
 export default defineMessages("files", {
   "zh-CN": {
     "title.importPage": "导入文件",

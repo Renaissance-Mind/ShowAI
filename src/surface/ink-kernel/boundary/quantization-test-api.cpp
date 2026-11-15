@@ -1,4 +1,3 @@
-// Test-only transport. No this-file ABI is exposed by the production kernel.
 #include "quantization-block.hpp"
 using namespace showai_boundary;
 static uint32_t quantization_test_stage=0;
@@ -31,10 +30,6 @@ inline bool verify_actual_blocks(const Graph&g,const BoundaryQuantizedGraph&cold
             if(e.degree!=expected->degree||e.error_l1!=expected->error_l1||e.parameter_error_l1!=expected->parameter_error_l1||e.control_error_l1!=expected->control_error_l1){okay=false;break;}
             for(uint32_t j=0;j<8;j++)if(e.controls[j]!=expected->controls[j])okay=false;++processed;
         }
-        // Representative metadata is not current endpoint topology. A proved
-        // alias can preserve anchor bits/record metadata while the current graph
-        // uses a different canonical index; this math stage checks that topology
-        // against the actual source and includes endpoint adjustment in its bound.
         if(!pairs.empty()){
             BoundaryQuantizedVertex representative=*pairs[0].a.get();representative.vertex=0x7ffffffeu;
             pairs[0].a=Record<BoundaryQuantizedVertex>::create(c,representative);
@@ -42,14 +37,12 @@ inline bool verify_actual_blocks(const Graph&g,const BoundaryQuantizedGraph&cold
             if(quantize_boundary_block(g,key,pairs,o,metadata)||metadata.arcs[0].a.get()!=pairs[0].a.get()||metadata.arcs[0].edge.vertex_a!=pairs[0].vertex_a||metadata.arcs[0].a.get()->vertex!=0x7ffffffeu){okay=false;return;}
             for(uint32_t j=0;j<8;j++)if(metadata.arcs[0].edge.controls[j]!=derived.arcs[0].edge.controls[j])okay=false;
         }
-        // Actual changed/retired keys are rejected, without replacing old bytes.
         const auto*old=derived.arcs.empty()?nullptr:&derived.arcs[0];key.revision++;
         if(quantize_boundary_block(g,key,pairs,o,derived)!=SA_INK_INVALID||(!derived.arcs.empty()&&old!=&derived.arcs[0]))okay=false;
         key.revision--;Vector<BoundaryQuantizedAnchorPair,1>missing(c);
         if(quantize_boundary_block(g,key,missing,o,derived)!=SA_INK_INVALID||old!=&derived.arcs[0])okay=false;
         if(chunk.values.size()>1){auto limited=o;limited.maximum_edges=chunk.values.size()-1;
             if(quantize_boundary_block(g,key,pairs,limited,derived)!=SA_INK_CAPACITY||old!=&derived.arcs[0])okay=false;}
-        // A failure after earlier arcs were staged cannot publish a partial block.
         pairs[pairs.size()-1].vertex_b=0x7fffffffu;
         const uint64_t work_limit=c.max_work;
         if(quantize_boundary_block(g,key,pairs,o,derived)!=SA_INK_INVALID||old!=&derived.arcs[0])okay=false;
@@ -78,10 +71,6 @@ extern "C" uint32_t saqt_fixture(uint32_t fixture,double tolerance,uint32_t refi
         SABoundaryBudget budget{};budget.max_commands=100;budget.max_curves=64;budget.max_pairs=1000;budget.max_cuts=512;budget.max_edges=512;budget.max_sources=8;budget.max_paths=2;
         quantization_test_stage=1;Graph graph(c,budget);capture(graph,paths.begin(),paths.size(),sources.begin(),sources.size(),commands.begin(),commands.size());
         if(fixture==9){
-            // Independent analytic near-root lens. The generic RUR graph path
-            // currently returns RANGE for this input (fixture6); this separate
-            // test constructs its two certified arcs by the known x=t / y=eps
-            // relation, using the real captured curves and Sturm certificates.
             const uint32_t quadratic=static_cast<const Graph&>(graph).blocks[0].curves[0].curve,line=static_cast<const Graph&>(graph).blocks[1].curves[2].curve;
             const auto&curve=static_cast<const Graph&>(graph).curves[quadratic].geometry;
             auto endpoints=roots(curve.y-Polynomial(c,Q::from_double(c.numbers,1e-80)));

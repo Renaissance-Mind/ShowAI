@@ -1,8 +1,5 @@
 import { CompiledInkKernel } from "./compiled-ink.mjs";
 const operations = { M: [0, 2], L: [1, 2], Q: [2, 4], C: [3, 6], Z: [4, 0] };
-/** Retained, detached geometry from the shared native/WASM analytic path ABI.
- * See include/analytic-path.h for the signed stencil / rare ray-mode contract.
- * This API does not change portable ink v1 or flatten its mask/hit semantics. */
 export class AnalyticPathKernel {
   constructor() {
     this.kernel = new CompiledInkKernel();

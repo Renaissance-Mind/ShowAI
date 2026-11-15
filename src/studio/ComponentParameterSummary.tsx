@@ -5,7 +5,6 @@ import { useTranslator } from "../i18n/react";
 import messages from "../i18n/messages/catalog";
 
 const t = translator(messages);
-// Catalog-namespace keys, translated when the summary renders.
 const typeNames: Record<string, MessageKey<typeof messages>> = {
   string: "type.string",
   number: "type.number",
@@ -52,7 +51,6 @@ export default function ComponentParameterSummary({
   defaults: Record<string, unknown>;
   documentation?: ComponentDocumentation;
 }) {
-  // Re-render when the language changes; helpers above call t() lazily.
   const tr = useTranslator(messages);
   const properties =
     typeof schema === "object" &&

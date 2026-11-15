@@ -36,7 +36,6 @@ const MARKS: Record<Tone, string> = {
   todo: "○",
   paused: "‖",
 };
-// Tone colors map onto the shared semantic tokens; a status may override its color.
 const TONE_VARS: Record<Tone, [string, string]> = {
   done: ["var(--an-good)", "var(--an-good-soft)"],
   failed: ["var(--an-bad)", "var(--an-bad-soft)"],
@@ -52,7 +51,6 @@ const toneStyle = (status: Status): CSSProperties =>
       : TONE_VARS[status.tone][1],
   }) as CSSProperties;
 
-// Statuses still carrying a contract default label are shown in the reader's language.
 const DEFAULT_LABELS = new Map(
   (DEFAULT_TREE_STATUSES as Status[]).map((status) => [
     status.id,
@@ -157,7 +155,6 @@ export function StatusTreeBlock({ data }: BlockProps) {
   const rowH = 38;
   const groupGap = 16;
 
-  // Each item takes one row; a group is centred on its rows.
   let y = 0;
   const rows: { item: Item; y: number; group: Group }[] = [];
   const groups: { group: Group; y: number; top: number; bottom: number }[] = [];

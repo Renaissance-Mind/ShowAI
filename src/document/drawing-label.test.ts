@@ -34,8 +34,6 @@ describe("Shape labels", () => {
       },
       { type: "surface.layout.set", nodeId: "box", layout: { x: 0, y: 0, width: 200, height: 90 } },
     ]);
-    // Operations apply one after another: the insert completes the shape at
-    // the size its label needs, and the later frame scales that extent.
     expect(attrs(document, "box")).toMatchObject({
       label: "API 服务\n鉴权",
       labelSize: 22,
@@ -252,7 +250,6 @@ describe("diagram.insert", () => {
     expect(arrow).toMatchObject({ tool: "arrow", label: "② 未命中再查库" });
     expect(arrow.bindings.start.targetId).toBe("api");
     expect(arrow.bindings.end.targetId).toBe("db");
-    // Arrows paint above the shapes they connect.
     const order = (document.content.content ?? []).map((n) => n.attrs!.id);
     expect(order.indexOf("client-to-api")).toBeGreaterThan(order.indexOf("db"));
   });

@@ -1,9 +1,3 @@
-// Read-only view of every ShowAI App serving one content library, for
-// `npm run dev:status`. Sources: presence records the Apps write
-// (<home>/local/instances), development launchers of this source root
-// (.showai-dev/<mode>-<port>/session.json), and running processes whose
-// command matches the launch registered in <home>/agent-runtime.json (Apps
-// built before presence records existed).
 import { execFile } from "node:child_process";
 import { readdir, readFile, realpath } from "node:fs/promises";
 import { join, resolve } from "node:path";
@@ -24,12 +18,10 @@ async function readJson(path) {
   try {
     return JSON.parse(text);
   } catch {
-    // A record being replaced or damaged is reported as unreadable, not fatal.
     return null;
   }
 }
 
-/** Resolves symbolic links (/tmp → /private/tmp) so libraries compare equal. */
 export async function canonicalPath(path) {
   return realpath(resolve(path)).catch((error) => {
     if (missing(error)) return resolve(path);
@@ -37,10 +29,6 @@ export async function canonicalPath(path) {
   });
 }
 
-/**
- * pid → full command line. LC_ALL keeps non-ASCII App names (ShowAI 稳定版)
- * unescaped. Undefined where `ps` does not exist (Windows).
- */
 export async function processCommands() {
   if (process.platform === "win32") return undefined;
   const { stdout } = await promisify(execFile)(
@@ -59,7 +47,6 @@ export async function processCommands() {
   return commands;
 }
 
-/** <home>/agent-runtime.json: which App's CLI and MCP Agents launch. */
 export async function readRegistration(home) {
   const path = join(home, "agent-runtime.json");
   const value = await readJson(path);
@@ -83,17 +70,12 @@ export async function readRegistration(home) {
   };
 }
 
-/** The development launcher directory a runtime entry belongs to. */
 function developmentDirectory(entry) {
   return /^(.*[\\/]\.showai-dev[\\/](?:desktop|browser)-\d+)[\\/]runtime[\\/]scripts[\\/]cli\.mjs$/.exec(
     entry,
   )?.[1];
 }
 
-/**
- * How a process relates to a registered launch: "app" (an open desktop App
- * or browser server), "cli" (a CLI/MCP child Agents started) or undefined.
- */
 export function launchRole(line, registration) {
   const { command, entry } = registration;
   if (!line.startsWith(command)) return undefined;
@@ -101,8 +83,6 @@ export function launchRole(line, registration) {
   if (rest && !rest.startsWith(" ")) return undefined;
   const development = developmentDirectory(entry);
   if (development) {
-    // Every development desktop shares one Electron binary; its backend
-    // argument names the launcher directory.
     if (
       rest.startsWith(` ${join(development, "desktop")}`) ||
       rest.startsWith(` ${join(development, "browser.mjs")}`)
@@ -110,9 +90,7 @@ export function launchRole(line, registration) {
       return "app";
   } else if (rest.startsWith(` ${entry} serve`)) return "app";
   if (rest.startsWith(` ${entry}`)) return "cli";
-  // Chromium helper processes (GPU, renderer, utility) are part of an App, not one.
   if (/(?:^|\s)--type=/.test(rest)) return undefined;
-  // Processes carrying a script argument are CLI/MCP children, not open Apps.
   if (development || /\.(?:mjs|cjs|js)(?:\s|$)/.test(rest)) return undefined;
   return "app";
 }
@@ -132,7 +110,6 @@ async function developmentSessions(root, home, commands) {
     if (!session?.home || !Number.isInteger(session.backendPid)) continue;
     if (!processAlive(session.pid) || !processAlive(session.backendPid))
       continue;
-    // A reused pid no longer runs this launcher.
     if (commands && !commands.get(session.pid)?.includes("dev.mjs")) continue;
     if ((await canonicalPath(session.home)) !== home) continue;
     sessions.push({
@@ -174,12 +151,6 @@ function label(instance) {
   return `${kind}${where} (pid ${instance.pid}${version})`;
 }
 
-/**
- * Every live App serving `home`, the registration Agents use, and warnings.
- * `self` / `selfLauncher` are the backend and launcher pids of the development
- * service on the requested port; `selfQuitRecord` is the quit-blocked.json
- * path that service reports.
- */
 export async function libraryInstances({
   root,
   home: requested,
@@ -251,10 +222,8 @@ export async function libraryInstances({
               ? { channel: registration.channel }
               : {}),
           mode: /\bserve\b|browser\.mjs/.test(line) ? "browser" : "desktop",
-          // The version the registration names; the process is that build.
           appVersion: registration.version,
           entry: registration.entry,
-          // Older Apps say nothing about their library; the registration names it.
           homeConfirmed: false,
         },
         "registered-command",

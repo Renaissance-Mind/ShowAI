@@ -1,5 +1,3 @@
-/* scene-3d: a Three.js viewport with projected HTML labels and parameter sliders.
- * Neutral colors follow the shared block tokens so the block follows light and dark themes. */
 .s3-stage {
   position: relative;
   min-height: 200px;

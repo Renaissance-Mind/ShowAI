@@ -37,13 +37,11 @@ import { validateDatabaseData } from "../components/blocks/database-contract.mjs
 import { validateMechanismData } from "../components/blocks/mechanism-contract.mjs";
 import { validateSvgData } from "../components/blocks/svg-contract.mjs";
 import { validateResearchData } from "../components/blocks/research-contract.mjs";
-// Kept local so readers do not carry the binding engine; stores check bindings fully.
 const BINDING_KEY = "$binding";
 import {
   NOTE_MAX,
   invalidNoteMark,
 } from "../document/note-markup.mjs";
-// Shared by the browser importer and the dependency-free artifact command.
 import { validateRemoteComponents } from "./remote.mjs";
 import {
   CAPACITY,
@@ -57,7 +55,6 @@ import {
   contentMeasurementDepth,
   nonResourceReplacementDoesNotGrow,
 } from "./capacity.mjs";
-// Compatibility export for artifact importers; never a page or resource limit.
 export const MAX_ARTIFACT_BYTES = CAPACITY.artifactBytes;
 export const ARTIFACT_DATA_ID = "showai-data";
 const MAX_NODES = 12000;
@@ -93,7 +90,6 @@ const nodeTypes = new Set([
   "stepper",
   "step",
   "widget",
-  // A component placed inside a line of text, such as a date mention.
   "inlineWidget",
 ]);
 const markTypes = new Set([
@@ -186,15 +182,10 @@ export function isSafeUrl(value, image = false) {
   }
 }
 
-/** An image field: a web URL, an embedded raster image or a local image file reference. */
 export function isImageSource(value) {
   return isSafeUrl(value, true) || isLocalResourceRef(value, "image");
 }
 
-// A successful JSON check is context-independent except for the containing
-// depth. Only this module's successful check of an actual exclusive capture
-// can populate this weak cache; recursive freeze/caller flags never grant it.
-// Schema, model, capacity and cross-node validation still run on every body.
 const validatedCapturedJSON = new WeakSet();
 function validateJson(value, path, depth = 0) {
   if (depth > MAX_DEPTH) throw new Error(`${path} is nested too deeply.`);
@@ -213,9 +204,6 @@ function validateJson(value, path, depth = 0) {
     return;
   }
   if (Array.isArray(value)) {
-    // Model nodes have their own shared total counter below. Geometry samples,
-    // pressure knots and forward-compatible JSON data are not document nodes;
-    // their real bytes/depth and typed schema budgets still apply in full.
     for (let i = 0; i < value.length; i++) {
       if (!Object.hasOwn(value, i)) throw new Error(`${path} must contain dense JSON arrays.`);
       validateJson(value[i], `${path}[${i}]`, depth + 1);
@@ -321,8 +309,6 @@ function validateAttrs(attrs, path, permitted, surfaceIcon = false) {
 function validateWidgetData(kind, data, path) {
   if (kind === "region") throw new Error(`${path}: region is a native layout container; use component.insert instead of a widget.`);
   if (Object.hasOwn(data, BINDING_KEY)) {
-    // The block stores a dataset binding and its own values; the component
-    // props are resolved from the dataset and checked where they are rendered.
     const binding = data[BINDING_KEY];
     object(binding, `${path}.${BINDING_KEY}`);
     string(binding.dataset, `${path}.${BINDING_KEY}.dataset`, 128);
@@ -551,8 +537,6 @@ function validateNode(value, path, counter, depth = 0, parentType = null) {
     throw new Error(`Document exceeds ${MAX_NODES} nodes.`);
   if (depth > MAX_DEPTH) throw new Error("Document is nested too deeply.");
   const node = object(value, path);
-  // Component validators are intentionally opaque here. Never infer an output
-  // capacity bound across component/data-binding normalization.
   if (node.type === "widget" || node.type === "inlineWidget")
     counter.capacityMayGrow = true;
   if (
@@ -784,7 +768,6 @@ function validateNode(value, path, counter, depth = 0, parentType = null) {
     throw new Error(`${path} cannot contain formatted code.`);
 }
 
-/** Block types a node of this type may hold, or undefined when unrestricted. */
 function childTypes(type, resource) {
   const blockTypes = [
     "richText",
@@ -839,14 +822,6 @@ function childTypes(type, resource) {
   }[type];
 }
 
-/**
- * The node checks validateDocument applies to one subtree of a valid page,
- * run on the subtree alone: JSON shape and depth, every node rule, the
- * page-wide node count (`count` nodes outside it) and the child types its
- * parent allows. Throws the error the whole-page check would throw for the
- * subtree; relations to the rest of the page (ids, layout, views,
- * bindings, capacity) are the caller's to check.
- */
 export function validateSubtree(node, context) {
   const depth = context.depth;
   validateJson(node, context.path, 1 + 2 * depth);
@@ -863,14 +838,10 @@ export function validateSubtree(node, context) {
   return counter.count - context.count;
 }
 
-/** The same timestamp rule is used for full documents and the source owner's
- * sole-field storage acknowledgment proof. This does not validate a document. */
 export function isDocumentTimestamp(value) {
   return typeof value === "string" && Number.isFinite(Date.parse(value));
 }
 
-// Canonicalization copies these maps, adds IDs/frames and updates view arrays.
-// Preserve their real preimages before consuming validation may fill them.
 function capacityPreimage(document) {
   const plain = value => value && typeof value === "object" && !Array.isArray(value);
   const view = value => plain(value) ? {...value, ...(Object.hasOwn(value, "readingOrder") && Array.isArray(value.readingOrder) ? {readingOrder: [...value.readingOrder]} : {})} : value;
@@ -880,8 +851,6 @@ function capacityPreimage(document) {
     ...(Object.hasOwn(document, "surfaceViews") && plain(document.surfaceViews) ? {surfaceViews: Object.fromEntries(Object.entries(document.surfaceViews).map(([id, value]) => [id, view(value)]))} : {}),
   };
 }
-// A subset retaining the same leaves can only remove syntax/resources. This
-// never subtracts individual data URLs from their global deduplicated total.
 function shrinkingProjection(before, after) {
   if (before === after) return true;
   if (!before || !after || typeof before !== "object" || typeof after !== "object" || Array.isArray(before) !== Array.isArray(after)) return false;
@@ -897,8 +866,6 @@ function canonicalCapacity(before, after, sizes, opaque) {
     else if (!shrinkingProjection(before[key], value)) scan = true;
   }
   const addition = measureContent(added);
-  // New resources can coincide with URLs elsewhere, so only the full official
-  // measure can decide that case. Structural fills also take this fallback.
   if (addition.resourceCount) scan = true;
   const overhead = count => 2 + Math.max(0, count - 1);
   const addedCount = Object.keys(added).length, beforeCount = Object.keys(before).length, afterCount = Object.keys(after).length;
@@ -1045,8 +1012,6 @@ function validateDocumentValue(value, independent, observer, inputCapacity) {
     };
   });
   const canonical = {
-    // Full JSON has already passed validation. Preserve forward-compatible
-    // fields while the explicitly validated known fields retain authority.
     ...document,
     id: document.id,
     title: document.title,
@@ -1063,7 +1028,6 @@ function validateDocumentValue(value, independent, observer, inputCapacity) {
     archived: document.archived ?? false,
     createdAt: document.createdAt ?? now,
     updatedAt: document.updatedAt ?? now,
-    // `document` is already this call's private clone.
     content: document.content,
     ...(resource
       ? { layout: document.layout, surfaceViews: document.surfaceViews }
@@ -1149,7 +1113,6 @@ function validateSelection(selection, document) {
 }
 
 const ownedDocumentCapacity = new WeakMap();
-/** Read-only internal diagnostic; never grants a receipt to a caller object. */
 export const hasSourceSnapshotCapacity = (body) =>
   isOwnedJSON(body) && ownedDocumentCapacity.has(body);
 function rememberOwnedCapacity(document, sizes, maximumDepth) {
@@ -1170,17 +1133,10 @@ function captureOwnedArtifact(artifact) {
   rememberOwnedCapacity(document, proof.upper, proof.maximumDepth);
   return { ...artifact, document };
 }
-/** Internal source factory. Public parseArtifact keeps its mutable independent
- * capture semantics; only this synchronous validation+ownership step mints proof. */
 export function parseArtifactForSourceSnapshot(input) {
   return parseArtifactConsumingForSourceSnapshot(input);
 }
 export function parseArtifactConsumingForSourceSnapshot(input, observer) {
-  // This closed synchronous factory owns the actual normalization graph. One
-  // real document traversal supplies both its page gate and the enclosing
-  // artifact byte gate; wrapper fields retain their own complete traversal.
-  // Capture before any measurement or observer can run. Neither a wrapper
-  // accessor nor a reentrant observer can mutate the measured private graph.
   const captured = typeof input === "string" ? input : captureOwnedJSON(input);
   const measured = validationStage(observer, "input.capacity", () =>
     measureSourceArtifactInput(captured),
@@ -1194,8 +1150,6 @@ export function parseArtifactConsumingForSourceSnapshot(input, observer) {
     ),
   );
 }
-/** Source owner only: exact COW sharing preserves the complete canonical target,
- * then actual recursive ownership seals the mixed graph before it escapes. */
 export function shareSourceSnapshotDocument(base, canonical) {
   const receipt = ownedDocumentCapacity.get(canonical);
   if (receipt && (!isOwnedJSON(base) || !isOwnedJSON(canonical)))
@@ -1207,8 +1161,6 @@ export function shareSourceSnapshotDocument(base, canonical) {
   rememberOwnedCapacity(held, receipt.sizes, receipt.maximumDepth);
   return held;
 }
-/** Existing actual timestamp-only COW rule, with a quantified conservative
- * receipt. A caller's field list or shallow freeze cannot mint this proof. */
 export function inheritSourceSnapshotTimestampCapacity(base, body) {
   const receipt = ownedDocumentCapacity.get(base);
   if (
@@ -1234,8 +1186,6 @@ export function inheritSourceSnapshotTimestampCapacity(base, body) {
   rememberOwnedCapacity(body, receipt.sizes, receipt.maximumDepth);
   return true;
 }
-/** Trusted actual-save adapter only. Model validation preceded that backend
- * result; this always performs the official final-byte gate, never a skip flag. */
 export function assertOwnedSourceDocumentCapacity(body) {
   if (!isOwnedJSON(body))
     throw new Error("Actual saved capacity requires an owned body.");
@@ -1269,8 +1219,6 @@ function measureSourceArtifactInput(input) {
     document = artifact.document;
   const sizes = measureContent(document),
     depth = contentMeasurementDepth(sizes);
-  // Keep the full official traversal for an unprovable embedding. The ordinary
-  // mutable parser never receives a captured measurement from a caller.
   if (depth === null || depth + 1 > 64) return null;
   const wrapper = measureContent({ ...artifact, document: null });
   return {
@@ -1346,16 +1294,10 @@ export function parseArtifact(input) {
   return parseArtifactDocument(input, validateDocument);
 }
 
-/** Internal parser adapter for a JSON.parse result exclusively owned by the
- * calling backend. All JSON, model, ink, capacity and wrapper validation still
- * runs; only the redundant defensive copy of that private graph is omitted. */
 export function parseArtifactConsumingDocument(input) {
   return parseArtifactDocument(input, value => validateDocumentValue(value, false));
 }
 
-/** Trusted backend adapter only. The source registry must first return its
- * actual held body after an exact complete-body comparison. Public imports
- * always use parseArtifact and cannot supply a skip-validation flag. */
 export function parseArtifactWithValidatedDocument(input, heldDocument) {
   return parseArtifactDocument(input, document => {
     if (document !== heldDocument)

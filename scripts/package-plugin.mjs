@@ -35,7 +35,6 @@ for (let i = 0; i < args.length; i += 2) {
     );
   settings[args[i]] = args[i + 1];
 }
-// Remove only generated files from the previous runtime distribution layout.
 for (const path of [
   "scripts",
   "node_modules",
@@ -50,13 +49,10 @@ for (const path of [
 const manifest = JSON.parse(
   await readFile(join(plugin, "plugin.json"), "utf8"),
 );
-// The bundled/native entry is generated too; MCP Apps has one editable adapter source.
 await copyFile(
   join(plugin, "host-adapters/mcp-app.md"),
   join(plugin, "skills/use-showai/references/host-adapter.md"),
 );
-// The presentation workflow has one source, the system-presentation template;
-// show-document carries all of it and show-visual its visual principles.
 const workflowSource = await readFile(
   join(root, "resources/templates/system-presentation/README.md"),
   "utf8",
@@ -72,7 +68,6 @@ for (const path of workflowMetadata.guides)
       )
     ).trim(),
   );
-// Demote headings one level so the workflow nests under the Skill's own title.
 const demote = (markdown) =>
   markdown.replace(/^(#{1,5}) /gm, (_, marks) => `${marks}# `);
 const workflow = workflowParts.map(demote).join("\n\n");
@@ -106,7 +101,6 @@ await fill(
   "showai-visual-principles",
   visualPrinciples,
 );
-// Host packaging differs; skills, system rules and the MCP runtime remain shared.
 await mkdir(join(plugin, ".claude-plugin"), { recursive: true });
 const claudeManifestPath = join(plugin, ".claude-plugin/plugin.json");
 const existingClaude = await readFile(claudeManifestPath, "utf8").then(
@@ -139,7 +133,6 @@ await writeFile(
         showai: {
           command: "node",
           args: ["${CLAUDE_PLUGIN_ROOT}/mcp/launch.mjs"],
-          // Claude hosts show components through model-written HTML.
           env: { SHOWAI_HOST_DISPLAY: "model-html" },
         },
       },
@@ -150,7 +143,6 @@ await writeFile(
 );
 if (manifest.apps)
   throw new Error("Use an explicit MCP URL when packaging remote connections.");
-// Keep plugin branding identical to the application's theme-specific icons.
 await mkdir(join(plugin, "assets"), { recursive: true });
 for (const [source, target] of [
   ["icon.svg", "logo.svg"],
@@ -173,7 +165,6 @@ for (const skill of skills) {
   )
     throw new Error(`Invalid skill: ${skill}`);
 }
-// Relative guidance must ship with the skill, including links across skills.
 async function validateGuidanceLinks(directory, packageRoot = plugin) {
   for (const entry of await readdir(directory, { withFileTypes: true })) {
     const path = join(directory, entry.name);
@@ -210,13 +201,11 @@ await validateGuidanceLinks(join(plugin, "skills"));
 console.log(
   `Prepared ShowAI MCP plugin ${manifest.version}: ${skills.join(", ")}`,
 );
-// Git-backed marketplaces need real distributable directories, including fresh clones.
 for (const profile of ["codex", "claude"]) {
   const target = join(root, "plugins", `showai-${profile}`);
   await stageHostPlugin({ source: plugin, target, profile });
   await validateGuidanceLinks(join(target, "skills"), target);
 }
-// Kimi's manifest and shell entry are host-owned; all workflows and launcher stay shared.
 const kimi = join(root, "plugins-kimi/showai");
 const kimiManifestPath = join(kimi, "kimi.plugin.json");
 const kimiManifest = JSON.parse(await readFile(kimiManifestPath, "utf8"));
@@ -261,7 +250,6 @@ if (settings["--mcp-url"] || settings["--out"]) {
       "--chatgpt-app takes the asdk_app_… ID of the ChatGPT connection.",
     );
   await mkdir(destination, { recursive: false });
-  // The local stdio launcher does not belong in a package for a remote server.
   await cp(plugin, destination, {
     recursive: true,
     errorOnExist: true,
@@ -275,7 +263,6 @@ if (settings["--mcp-url"] || settings["--out"]) {
     target: destination,
     profile: "mcp-app",
   });
-  // A distinct name lets the remote package sit beside the local plugin.
   const remote = structuredClone(manifest);
   remote.name = name;
   const openai = remote.extensions["com.openai"];
@@ -286,10 +273,8 @@ if (settings["--mcp-url"] || settings["--out"]) {
     longDescription:
       "Operate ShowAI through its remote MCP server. Sign in with a ShowAI Server account to read, create and present pages in authorized cloud projects; public components, templates and standalone rendering need no account.",
   });
-  // Replace the local stdio server declaration copied from the source plugin.
   await rm(join(destination, "mcp.json"));
   if (app) {
-    // ChatGPT reaches the server through its registered connection.
     openai.apps = "./.app.json";
     await writeFile(
       join(destination, ".app.json"),
@@ -305,8 +290,6 @@ if (settings["--mcp-url"] || settings["--out"]) {
             showai: {
               type: "streamable-http",
               url: url.href,
-              // Public tools work anonymously; private projects use OAuth with
-              // dynamic client registration.
               extensions: {
                 "com.openai": {
                   auth: { type: "mixed", client: { mode: "dcr" } },
@@ -335,9 +318,6 @@ ${app ? `ChatGPT reaches the server through its registered connection \`${app}\`
 `,
   );
   if (app) {
-    // A ChatGPT package reaches the server only through the registered
-    // connection; ChatGPT treats any server it would have to run itself as
-    // desktop-only. The Claude Code manifests do not apply there.
     await rm(join(destination, ".claude-plugin"), { recursive: true });
     await rm(join(destination, ".mcp.json"));
   } else {

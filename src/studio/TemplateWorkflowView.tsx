@@ -8,7 +8,6 @@ import { parseMarkdown } from "../lib/markdown";
 import { useTranslator } from "../i18n/react";
 import messages from "../i18n/messages/templates";
 
-/** A guide's first heading names it; untitled guides fall back to their file. */
 function guideTitle({ path, markdown }: { path: string; markdown: string }) {
   return (
     /^#{1,3}\s+(.+)$/m.exec(markdown)?.[1].trim() ??

@@ -12,7 +12,6 @@ export const organizationWriteTools = new Set([
   "draft_write",
   "draft_remove",
 ]);
-/** Operations on this connection's sidebar, keyed tool:action. */
 export const sidebarOperations = new Set([
   "organization_read:sidebar",
   "organization_update:create_group",
@@ -38,7 +37,6 @@ const placement = z.enum(["before", "after"]);
 const draftId = z.string().regex(/^[a-f0-9]{64}$/);
 const generation = z.string().uuid();
 
-/** Folder, page, project and sidebar actions of organization_read and _update. */
 function organizationActions({
   workspace: service,
   service: pages,
@@ -251,7 +249,6 @@ function organizationActions({
   return { readActions, updateActions };
 }
 
-/** Folders, pages, the project and the sidebar; references; editor drafts. */
 export const organizationTools: ToolDeclaration[] = [
   {
     name: "organization_read",

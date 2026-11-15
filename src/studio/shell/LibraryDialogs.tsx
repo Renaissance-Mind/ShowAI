@@ -287,7 +287,6 @@ export function FolderDialog({
   );
 }
 
-/** Projects and folders share one name-and-icon form with a folder glyph fallback. */
 function DirectoryDialog({
   title,
   inputLabel,

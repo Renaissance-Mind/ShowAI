@@ -1,32 +1,12 @@
-/**
- * ShowAI inline page preview — Client half.
- *
- * Registers the dedicated Tool call view for the ShowAI presentation tools, so
- * a presented page renders inside the conversation instead of collapsing into
- * the generic JSON card. The page itself is not on the wire: the Host half
- * caches the delivered HTML and serves it from an isolated loopback origin, and
- * this half only builds the address and frames it.
- *
- * Rendering an externally produced HTML document is the one case where a frame
- * is the right surface (a ShowAI page is a whole interactive application with
- * its own runtime, not markup this plugin could re-render as React). Isolation
- * comes from the origin split the Host half owns: the frame is a different
- * origin from the Harness page, so its scripts cannot read the application DOM
- * or `/api`, while it keeps a real origin of its own for storage and workers.
- */
 window.__ModuleLoader__.load({
   id: "@showai/dsh-showai",
   factory: (require) => {
     const React = require("react");
     const h = React.createElement;
 
-    /** Locale namespace owned by this plugin. */
     const NS = "showai-page";
-    /** Same-origin Host route; the Host answers the probe and redirects the load. */
     const ROUTE = "/showai-page-preview";
-    /** Wire tools this view takes over. */
     const TOOLS = ["mcp__showai__page_present", "mcp__showai__render_document", "mcp__showai__show_component"];
-    /** Frame heights: the inline seat, and the expanded seat. */
     const COLLAPSED_HEIGHT = 420;
     const TAIL_HEIGHT = 460;
     const EXPANDED_HEIGHT = "76vh";
@@ -70,7 +50,6 @@ window.__ModuleLoader__.load({
       "action.show": "Show page",
     };
 
-    /** Styles use theme tokens only, so light and dark follow the host. */
     const css = `
 .showai-page-card{display:flex;flex-direction:column}
 .showai-page-row{align-items:center;min-width:0;height:24px;display:flex;position:relative;overflow:hidden}
@@ -102,20 +81,10 @@ window.__ModuleLoader__.load({
 `;
     const tagId = "@showai/dsh-showai/preview.css";
 
-    /**
-     * The preview file name rule shared with the Host half (`index.js`).
-     * @param callId - the tool call id owning the preview.
-     * @returns the cache file name the Host serves.
-     */
     function previewFile(callId) {
       return `${String(callId).replace(/[^A-Za-z0-9_-]/g, "_")}.html`;
     }
 
-    /**
-     * Flatten the durable result blocks under the generic Tool-row text contract.
-     * @param content - the settled result content blocks.
-     * @returns the joined text, or undefined when there is none.
-     */
     function textOf(content) {
       if (!Array.isArray(content)) return undefined;
       const parts = [];
@@ -126,13 +95,6 @@ window.__ModuleLoader__.load({
       return parts.length === 0 ? undefined : parts.join("\n");
     }
 
-    /**
-     * Whether the presentation asked for a block selection rather than the whole
-     * Page. `delivery.inline` is only the inline build, not by itself a sign of a
-     * partial render, so the call arguments are the authoritative signal.
-     * @param block - the frozen running or settled Tool call node.
-     * @returns true when the call carried a non-empty `blockIds` selection.
-     */
     function requestedSelection(block) {
       const raw =
         block !== null && typeof block === "object"
@@ -147,11 +109,6 @@ window.__ModuleLoader__.load({
       }
     }
 
-    /**
-     * Fold one call slice into everything the row and the frame need.
-     * @param block - the frozen running or settled Tool call node.
-     * @returns the presentation model.
-     */
     function previewModel(block) {
       const settled = block !== null && typeof block === "object" && "kind" in block;
       const state = !settled
@@ -194,11 +151,6 @@ window.__ModuleLoader__.load({
       };
     }
 
-    /**
-     * Render one ShowAI presentation call: a status row, then the framed page.
-     * @param props - the keyed toolview payload plus the locale seat.
-     * @returns the dedicated ShowAI page card.
-     */
     function ShowAIPageCard(props) {
       const { block, callId, openFile, t } = props;
       const tr = typeof t === "function" ? t : (key) => key;
@@ -240,8 +192,6 @@ window.__ModuleLoader__.load({
               setProbe("missing");
               return;
             }
-            // The Host caches the preview asynchronously, so a page presented
-            // just now can legitimately be absent for the first probe or two.
             await new Promise((resolve) => {
               wake = resolve;
               timer = setTimeout(resolve, 250);
@@ -399,17 +349,8 @@ window.__ModuleLoader__.load({
       );
     }
 
-    /**
-     * Wire tools whose settled result carries a ShowAI presentation delivery.
-     * Kept in sync with the Host half so a Turn record and the cache agree.
-     */
     const PRESENTATION_TOOL = /^mcp__[A-Za-z0-9_-]+__(?:page_present|render_document|show_component)$/;
 
-    /**
-     * Read the delivery record out of one settled Tool result message.
-     * @param message - the recorded result message.
-     * @returns the presented title, or undefined for an unrelated or failed result.
-     */
     function presentationOf(message) {
       if (message === null || typeof message !== "object" || message.isError === true) return undefined;
       if (!Array.isArray(message.content)) return undefined;
@@ -433,11 +374,6 @@ window.__ModuleLoader__.load({
       return undefined;
     }
 
-    /**
-     * Turn-local register of ShowAI presentations. It publishes no view Node: the
-     * Turn-tail slot reads it back after the Turn closes, so a presented page stays
-     * visible even though the completed Turn's process folds.
-     */
     const showaiPageDefinition = {
       kind: "showai-page",
       match: (event) => {
@@ -465,8 +401,6 @@ window.__ModuleLoader__.load({
         pages.push({ callId, title: presentation.title, fullPath: presentation.fullPath, seq: match.event.seq });
         return { ...context.state, pages };
       },
-      // Publish the Turn's pages as Location data; without this the Turn tail
-      // cannot read them back. Identity is kept when nothing changed.
       buildLocationData: (context, scope, previous) => {
         if (scope !== "turn" || context.state === undefined) return null;
         if (
@@ -486,12 +420,6 @@ window.__ModuleLoader__.load({
       },
     };
 
-    /**
-     * Render one presented page in the closing Turn's tail: a header the reader can
-     * act on, then the framed page. This seat is outside the collapsible process.
-     * @param props - closing Turn, its seq, the file opener, and locale copy.
-     * @returns the tail card, or null for a Turn that presented no page.
-     */
     function ShowAIPageTail(props) {
       const { turn, seq, openFile } = props;
       const tr = typeof props.t === "function" ? props.t : (key) => key;
@@ -506,11 +434,6 @@ window.__ModuleLoader__.load({
           );
     }
 
-    /**
-     * One presented page in the Turn tail, with its own fold, height and reload state.
-     * @param props - the presented page, file opener, and localized copy.
-     * @returns the tail card.
-     */
     function ShowAIPageTailCard({ page, openFile, tr }) {
       const [open, setOpen] = React.useState(true);
       const [expanded, setExpanded] = React.useState(false);
@@ -592,11 +515,6 @@ window.__ModuleLoader__.load({
 
     return {
       inject: ["slots", "locale", "uiConversation"],
-      /**
-       * Register the dictionaries, the two keyed Tool views, and the Turn-tail
-       * preview that survives the completed Turn's fold.
-       * @param ctx - the client plugin context.
-       */
       apply(ctx) {
         ctx.effect(() => {
           if (typeof document !== "undefined" && document.querySelector(`style[data-plugin-css=${JSON.stringify(tagId)}]`) === null) {
@@ -611,8 +529,6 @@ window.__ModuleLoader__.load({
           };
         }, "showai-page: styles");
         ctx.effect(() => ctx.locale.register(NS, { zh, en }), "showai-page: dictionaries");
-        // uiConversation is injected, so the registry is ready by the time this
-        // runs; the lazy lookup only guards a host that exposes it later.
         const conversation =
           ctx.uiConversation ?? (typeof ctx.get === "function" ? ctx.get("uiConversation") : undefined);
         if (conversation?.events !== undefined) {
@@ -620,11 +536,6 @@ window.__ModuleLoader__.load({
             const dispose = conversation.events.register(showaiPageDefinition);
             return typeof dispose === "function" ? dispose : () => {};
           }, "showai-page: turn records");
-          // The closing Turn's tail sits outside the collapsible process, so a
-          // presented page stays visible after the Turn folds.
-          // `conversation.chat.turnTail` is a list slot: the host rejects an entry
-          // without an `id`, and that rejection happens inside the deferred inject,
-          // so a missing id silently leaves the tail empty.
           ctx.slots.inject("conversation.chat.turnTail", () =>
             ctx.slots.register(
               { name: "conversation.chat.turnTail", id: "@showai/dsh-showai/page-tail", locale: NS },

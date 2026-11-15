@@ -5,7 +5,6 @@ import { pagePresentTool, pageTools } from "./pages";
 import type { ToolDeclaration } from "./tool";
 import { workspaceTools } from "./workspace";
 
-/** The project tools of an MCP connection, in the order tools/list shows them. */
 export const PROJECT_TOOLS: readonly ToolDeclaration[] = [
   ...datasetTools,
   ...organizationTools,

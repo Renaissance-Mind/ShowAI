@@ -1,6 +1,5 @@
 import { defineMessages } from "../index";
 
-// Imported diagram blocks (Archify, Diagram Design, Fireworks).
 export default defineMessages("diagram", {
   "zh-CN": {
     "family.archify": "Archify 交互架构图",

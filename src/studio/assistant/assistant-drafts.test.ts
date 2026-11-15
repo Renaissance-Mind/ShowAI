@@ -139,7 +139,6 @@ describe("assistant draft store", () => {
         anchor,
       }),
     );
-    // The panel's own drafts use projectId/threadId and never collide.
     expect(composerDraftKey("p", "page", { kind: "page" })).not.toBe("p/new");
   });
 });

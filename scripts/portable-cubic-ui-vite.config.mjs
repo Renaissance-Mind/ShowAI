@@ -1,4 +1,3 @@
-// Explicit real acceptance entry; regular production builds never include it.
 import config from "../vite.config.ts";
 export default {
   ...config,
