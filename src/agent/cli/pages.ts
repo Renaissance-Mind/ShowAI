@@ -145,6 +145,8 @@ export const pageCommands: CommandDeclaration[] = [
       theme: text,
       width: text,
       height: text,
+      capture: text,
+      "scroll-to-block": text,
       out: text,
       state: text,
       references: text,
@@ -165,6 +167,9 @@ export const pageCommands: CommandDeclaration[] = [
       blockIds: "--blocks",
       theme: "--theme",
       viewport: "--width/--height",
+      capture: "--capture",
+      scrollToBlockId: "--scroll-to-block",
+      inspect: "--state",
       presentation: "--presentation",
       actions: "--state",
       draft: "--draft",
@@ -180,6 +185,8 @@ export const pageCommands: CommandDeclaration[] = [
       "pages read PAGE --project PROJECT --format markdown [--detail full|outline] [--offset N --limit N]",
       "  A page source over 256 KiB reads as an outline window unless --detail full, --blocks or --out is given.",
       "pages read PAGE --project PROJECT --view image --theme dark --width 1000 --height 900 --out preview.png",
+      "pages read PAGE --project PROJECT --view image --capture viewport --scroll-to-block BLOCK --state inspect.json",
+      '  inspect.json: {"inspect":{"layout":true,"blockIds":["BLOCK"]}}. Measures in the full page; --blocks extracts a partial page.',
       "pages read PAGE --project PROJECT --view html [--state reading-state.json] --out preview.html",
       "pages read PAGE --project PROJECT --references to|from|both",
       "  Adds references: pages linking to this page (to, backlinks) and pages it links to (from),",
@@ -208,6 +215,10 @@ export const pageCommands: CommandDeclaration[] = [
         readOptions.references = references as PageReadOptions["references"];
       }
       const theme = option(args, "theme");
+      const capture = option(args, "capture");
+      if (capture) readOptions.capture = capture as PageReadOptions["capture"];
+      const scrollToBlockId = option(args, "scroll-to-block");
+      if (scrollToBlockId) readOptions.scrollToBlockId = scrollToBlockId;
       if (theme) readOptions.theme = theme as PageReadOptions["theme"];
       const blocks = option(args, "blocks");
       if (blocks) readOptions.blockIds = blocks.split(",");

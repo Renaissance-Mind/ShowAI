@@ -183,6 +183,19 @@ export const pageReadSchema = z
       .strict()
       .default({ width: 1000, height: 900 }),
     presentation: z.enum(["reading", "spatial"]).default("reading"),
+    capture: z.enum(["full", "viewport"]).default("full"),
+    scrollToBlockId: z.string().min(1).max(200).optional(),
+    inspect: z
+      .object({
+        layout: z.literal(true),
+        blockIds: z
+          .array(z.string().min(1).max(200))
+          .min(1)
+          .max(100)
+          .optional(),
+      })
+      .strict()
+      .optional(),
     actions: z.array(readingActionSchema).max(20).default([]),
     draft: z.boolean().default(false),
     rendered: z.boolean().optional(),
@@ -273,6 +286,8 @@ export type PageReadResult =
       capturedAt?: string;
       dom?: ReadingCapture["dom"];
       image?: { width: number; height: number; mimeType: "image/png" };
+      capture?: ReadingCapture["capture"];
+      layout?: ReadingCapture["layout"];
       metadataPath?: string;
       /** Outline windows: top-level block count and where the next window starts. */
       blockCount?: number;
@@ -330,6 +345,16 @@ export async function readPageView(
   input: PageReadOptions = {},
 ): Promise<PageReadResult> {
   const options = pageReadSchema.parse(input);
+  if (
+    (options.inspect ||
+      options.scrollToBlockId ||
+      options.capture === "viewport") &&
+    options.view === "structured"
+  )
+    throw new CoreError(
+      "INVALID_DATA",
+      "capture:viewport, inspect and scrollToBlockId require view:image or view:html.",
+    );
   if (
     options.snapshotId &&
     (options.view !== "structured" ||
@@ -656,6 +681,8 @@ export async function readPageView(
     capturedAt: capture.capturedAt,
     reader: await renderedBy(),
     dom: capture.dom,
+    capture: capture.capture,
+    ...(capture.layout ? { layout: capture.layout } : {}),
     computed,
     ...(options.view === "image"
       ? {

@@ -8,6 +8,12 @@ export const TOOL_CHANGES: {
   before: string;
   now: string;
 }[] = [
+  {
+    date: "2026-11-16",
+    version: "0.12.0",
+    before: "page_read image/html: only full-height capture",
+    now: 'page_read adds capture:"viewport"|"full" (default full), scrollToBlockId and inspect:{layout:true,blockIds?}. Old calls keep their full capture; no translation required.',
+  },
   ...(
     [
       ["dataset_list", 'dataset_read {action:"list"}'],

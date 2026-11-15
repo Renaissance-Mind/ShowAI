@@ -234,3 +234,125 @@ test("rendered reading loads online images but no other online requests", async 
     await server.close();
   }
 }, 30000);
+
+test("viewport capture keeps CSS viewport geometry while full capture reports expansion", async () => {
+  const root = await mkdtemp(join(tmpdir(), "showai-reading-viewport-"));
+  fixtures.push(root);
+  const html = join(root, "viewport.html");
+  await writeFile(
+    html,
+    `<!doctype html><style>body{margin:0}.portable-app{height:100dvh;overflow:auto}.figure{height:50vh;width:400px}</style><main class="portable-app">
+<div data-block-id="figure" class="figure">Figure</div><div style="height:1200px">Body</div><p data-block-id="explanation">Explanation</p></main>`,
+  );
+  const options = {
+    view: "image" as const,
+    viewport: { width: 800, height: 600 },
+    inspect: {
+      layout: true as const,
+      blockIds: ["figure", "explanation", "absent"],
+    },
+  };
+  const fixed = await renderReading(
+    html,
+    pageReadSchema.parse({ ...options, capture: "viewport" }),
+  );
+  expect([fixed.width, fixed.height]).toEqual([800, 600]);
+  expect(fixed.capture.expanded).toBe(false);
+  expect(fixed.layout?.blocks[0]).toMatchObject({
+    rect: { height: 300 },
+    visibleFraction: 1,
+    viewportHeightRatio: 0.5,
+  });
+  expect(fixed.layout?.blocks[1]).toMatchObject({ visibleFraction: 0 });
+  expect(fixed.layout?.blocks[2]).toEqual({
+    blockId: "absent",
+    status: "not-rendered",
+  });
+  const full = await renderReading(html, pageReadSchema.parse(options));
+  expect(full.height).toBeGreaterThan(1200);
+  expect(full.capture.expanded).toBe(true);
+  expect(full.capture.requestedViewport.height).toBe(600);
+  // Inspection describes the requested viewport, not the resized screenshot.
+  expect(full.layout?.blocks[0]).toMatchObject({ rect: { height: 300 } });
+}, 15000);
+
+test("layout accounts for ancestor clipping and scrolling without removing surrounding content", async () => {
+  const root = await mkdtemp(join(tmpdir(), "showai-reading-clipping-"));
+  fixtures.push(root);
+  const html = join(root, "clip.html");
+  await writeFile(
+    html,
+    `<!doctype html><body style="margin:0"><main class="portable-app" style="height:100vh;overflow:auto">
+<div style="width:300px;height:100px;overflow:hidden"><div data-block-id="clipped" style="width:300px;height:200px">Clipped</div></div>
+<div data-block-id="hidden" style="display:none">Hidden</div><div style="height:1200px">Surroundings</div>
+<div data-block-id="target" style="height:100px">Target</div><div style="height:500px">End</div></main></body>`,
+  );
+  const options = {
+    view: "image" as const,
+    capture: "viewport" as const,
+    viewport: { width: 800, height: 600 },
+    inspect: {
+      layout: true as const,
+      blockIds: ["clipped", "hidden", "target"],
+    },
+  };
+  const initial = await renderReading(html, pageReadSchema.parse(options));
+  expect(initial.layout?.blocks[0]).toMatchObject({
+    rect: { height: 200 },
+    visibleRect: { height: 100 },
+    visibleFraction: 0.5,
+  });
+  expect(initial.layout?.blocks[1]).toMatchObject({ visibleFraction: 0 });
+  const scrolled = await renderReading(
+    html,
+    pageReadSchema.parse({ ...options, scrollToBlockId: "target" }),
+  );
+  expect(scrolled.layout?.blocks[2]).toMatchObject({
+    rect: { y: 0 },
+    visibleFraction: 1,
+  });
+  expect(scrolled.layout?.blocks[0]).toMatchObject({ visibleFraction: 0 });
+  expect([scrolled.width, scrolled.height]).toEqual([800, 600]);
+  expect(scrolled.dom[0].accessibility).toContain("Surroundings");
+  await expect(
+    renderReading(
+      html,
+      pageReadSchema.parse({ ...options, scrollToBlockId: "missing" }),
+    ),
+  ).rejects.toThrow("scrollToBlockId is not rendered: missing");
+}, 20000);
+
+test("layout measures the root reading column after scrolling, excluding its padding", async () => {
+  const root = await mkdtemp(join(tmpdir(), "showai-reading-column-"));
+  fixtures.push(root);
+  const html = join(root, "column.html");
+  await writeFile(
+    html,
+    `<!doctype html><body style="margin:0"><main class="portable-app">
+<div class="container-page is-root" style="height:100vh;overflow:auto">
+<div class="container-page-column" style="box-sizing:border-box;width:600px;margin:auto;padding:20px">
+<div class="page-document-flow" data-block-id="first" style="height:1200px">First text flow</div>
+<div data-block-id="anchor" style="height:200px">Anchor</div><div style="height:700px">End</div>
+</div></div></main></body>`,
+  );
+  const result = await renderReading(
+    html,
+    pageReadSchema.parse({
+      view: "image",
+      capture: "viewport",
+      viewport: { width: 800, height: 600 },
+      scrollToBlockId: "anchor",
+      inspect: { layout: true, blockIds: ["anchor"] },
+    }),
+  );
+  expect(result.layout?.contentArea).toEqual({
+    x: 120,
+    y: 0,
+    width: 560,
+    height: 600,
+  });
+  expect(result.layout?.blocks[0]).toMatchObject({
+    rect: { y: 0, width: 560 },
+    visibleFraction: 1,
+  });
+}, 15000);

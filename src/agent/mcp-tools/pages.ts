@@ -79,14 +79,18 @@ export const pageTools: ToolDeclaration[] = [
     access: "read",
     operation: pageRead,
     description: ({ localFiles }) =>
-      `Read a Page as structured JSON/Markdown (default), a PNG image, or html (DOM, accessibility tree and an interactive file; actions run interactions). detail:"outline" lists block IDs; blockIds selects blocks.${
+      `Read Page JSON/image/html; capture/inspect: guide reading.${
         localFiles
-          ? " out (absolute path) writes the source, markdown, image or html to a file and returns only its path, sha256, hash and revision."
+          ? " out writes a file."
           : ""
       }`,
     input: ({ localFiles }) => ({
       pageId: pageRead.input.pageId,
       ...(localFiles ? readShape : remoteReadShape),
+      // Keep tool discovery compact; readPageView enforces defaults and bounds.
+      capture: z.enum(["full", "viewport"]).optional(),
+      scrollToBlockId: z.string().optional(),
+      inspect: z.object({ layout: z.literal(true), blockIds: z.array(z.string()).optional() }).strict().optional(),
       response: z.enum(["full", "source", "receipt"]).default("full"),
     }),
     run: ({ service, projectId, call }, { pageId, response, ...readOptions }) =>

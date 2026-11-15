@@ -35,7 +35,6 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { renderReading } from "./reading-renderer";
 import { getLocale } from "../i18n";
-import type { ReadingOptions } from "./page-reading";
 
 export type Presentation = Awaited<ReturnType<typeof renderPresentation>>;
 export interface PresentationDelivery {
@@ -165,9 +164,15 @@ async function captureComponents(html: string, theme: "light" | "dark") {
       {
         // A short viewport lets the full-page capture end where the components end.
         viewport: { width: 760, height: 240 },
+        view: "image",
+        format: "json",
+        capture: "full",
+        presentation: "spatial",
+        draft: false,
+        overwrite: false,
         theme,
         actions: [],
-      } as unknown as ReadingOptions,
+      },
       getLocale(),
     );
   } finally {

@@ -2,6 +2,7 @@ import { createRequire } from "node:module";
 import { access } from "node:fs/promises";
 import { join } from "node:path";
 import { homedir } from "node:os";
+import { measureReadingLayout, type ReadingLayout } from "./reading-layout";
 import { pathToFileURL } from "node:url";
 import type { Browser, Frame, Locator, Page } from "playwright-core";
 import type { ReadingAction, ReadingOptions } from "./page-reading";
@@ -24,6 +25,13 @@ export interface ReadingCapture {
   capturedAt: string;
   dom: { blockId?: string; url: string; accessibility: string }[];
   components: ComponentReading[];
+  capture: {
+    mode: "full" | "viewport";
+    requestedViewport: { width: number; height: number };
+    renderedViewport: { width: number; height: number };
+    expanded: boolean;
+  };
+  layout?: ReadingLayout;
 }
 const require = createRequire(import.meta.url);
 export async function readingBrowserExecutable(): Promise<string> {
@@ -356,6 +364,24 @@ export async function renderReading(
       for (const frame of page.frames()) await settleFramePaint(frame);
     }
     for (const frame of page.frames()) await settleFramePaint(frame);
+    if (options.scrollToBlockId) {
+      const id = options.scrollToBlockId;
+      const target = page
+        .locator(
+          `[data-block-id=${JSON.stringify(id)}],[data-surface-id=${JSON.stringify(id)}]`,
+        )
+        .first();
+      if (!(await target.count()))
+        throw new Error(`scrollToBlockId is not rendered: ${id}.`);
+      await target.evaluate((element) =>
+        element.scrollIntoView({
+          block: "start",
+          inline: "nearest",
+          behavior: "instant",
+        }),
+      );
+      for (const frame of page.frames()) await settleFramePaint(frame);
+    }
     if (errors.length)
       throw new Error(`Page preview failed: ${errors.join("; ")}`);
     const visibleError = await page
@@ -401,6 +427,18 @@ export async function renderReading(
           });
       }
     }
+    // Measure at the requested viewport, before legacy full capture can enlarge it.
+    const layout = options.inspect?.layout
+      ? await page.evaluate(measureReadingLayout, {
+          blockIds: options.inspect.blockIds,
+        })
+      : undefined;
+    const captureInfo = () => ({
+      mode: options.capture,
+      requestedViewport: options.viewport,
+      renderedViewport: page.viewportSize()!,
+      expanded: page.viewportSize()!.height !== options.viewport.height,
+    });
     if (!image)
       return {
         png: Buffer.alloc(0),
@@ -409,6 +447,8 @@ export async function renderReading(
         capturedAt: new Date().toISOString(),
         dom,
         components,
+        capture: captureInfo(),
+        ...(layout ? { layout } : {}),
       };
     // The reader lays a Page out inside a 100dvh shell that scrolls on its
     // own, so a full-page screenshot of the document alone stops at the
@@ -416,6 +456,7 @@ export async function renderReading(
     let height = await page.evaluate(contentHeight);
     for (
       let attempt = 0;
+      options.capture === "full" &&
       options.presentation === "reading" &&
       height > page.viewportSize()!.height &&
       height <= 16000 &&
@@ -427,12 +468,12 @@ export async function renderReading(
       for (const frame of page.frames()) await settleFramePaint(frame);
       height = await page.evaluate(contentHeight);
     }
-    if (height > 16000)
+    if (options.capture === "full" && height > 16000)
       throw new Error(
         "The rendered page exceeds 16000 px. Read a component or region using blockIds.",
       );
     const png = await page.screenshot({
-      fullPage: true,
+      fullPage: options.capture === "full",
       animations: "disabled",
     });
     return {
@@ -442,6 +483,8 @@ export async function renderReading(
       capturedAt: new Date().toISOString(),
       dom,
       components,
+      capture: captureInfo(),
+      ...(layout ? { layout } : {}),
     };
   } finally {
     await browser?.close();

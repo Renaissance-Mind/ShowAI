@@ -1264,7 +1264,7 @@
   },
   {
     "name": "page_read",
-    "description": "Read a Page as structured JSON/Markdown (default), a PNG image, or html (DOM, accessibility tree and an interactive file; actions run interactions). detail:\"outline\" lists block IDs; blockIds selects blocks.",
+    "description": "Read Page JSON/image/html; capture/inspect: guide reading.",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -1360,6 +1360,35 @@
             "reading",
             "spatial"
           ]
+        },
+        "capture": {
+          "type": "string",
+          "enum": [
+            "full",
+            "viewport"
+          ]
+        },
+        "scrollToBlockId": {
+          "type": "string"
+        },
+        "inspect": {
+          "type": "object",
+          "properties": {
+            "layout": {
+              "type": "boolean",
+              "const": true
+            },
+            "blockIds": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "required": [
+            "layout"
+          ],
+          "additionalProperties": false
         },
         "actions": {
           "default": [],

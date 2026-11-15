@@ -133,3 +133,11 @@ showai mcp --public
 旧内容库可通过经过检查的 library import/activate 或 migrate 迁移，原始记录保留。`workspace merge` 比较活动草稿与当前内容；`workspace conflicts` 查询外部冲突；`workspace recover-package CONFLICT_ID --project PROJECT` 将外部包修改恢复为可编辑草稿，修复后保存新版本。
 
 `library stats/compact/cleanup-plan/cleanup/rebuild-index/archive/verify-archive/policy` 提供容量统计、维护与核验。清理保留当前内容、原始档案和恢复材料。详见 [内容库](versioned-library.zh-CN.md)。
+
+## 测量真实布局
+
+使用 `page_read` 的 `view:"image"`、`capture:"viewport"`、`viewport:{width:1440,height:900}` 捕获固定窗口。省略 capture 保留原来的 full 行为，长内容可能使浏览器扩高；返回的 capture 记录请求视口、实际捕获视口与 expanded。
+
+添加 `inspect:{layout:true,blockIds:["图ID","解释ID"]}`，测量对象在原页面中的布局。它不同于顶层 blockIds，不会抽取区块。`scrollToBlockId:"图ID"` 滚动到已渲染的块，不展开隐藏步骤。layout.blocks 返回相对视口的 CSS 像素边界、经视口和祖先裁切后的可见边界与面积比例、块高/视口高，以及 client/scroll 尺寸与 overflow 模式。测量发生在全文截图扩高之前。未挂载块为 not-rendered；默认最多 200 个对象并带 total/truncated，显式目标最多 100 个 ID。它不评判美观，也不覆盖兄弟元素遮挡、位图文字和 iframe 内部。
+
+CLI：`showai pages read PAGE --project PROJECT --view image --capture viewport --width 1440 --height 900 --scroll-to-block BLOCK --state inspect.json --json`，其中 inspect.json 为 `{"inspect":{"layout":true,"blockIds":["BLOCK"]}}`。image 与 html 均支持测量；使用 out 时 MCP 回执仍保留 capture/layout，完整 `.read.json` 从 metadataPath 取得。调整前后用相同视口与定位比较，保存仍遵循 hash/revision 冲突检查。

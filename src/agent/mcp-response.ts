@@ -57,6 +57,8 @@ export function compactData(data: unknown, profile: ResponseProfile): unknown {
     "capturedAt",
     "reader",
     "image",
+    "capture",
+    "layout",
     "metadataPath",
     "workspaceConflicts",
     "retainedSyncConflicts",

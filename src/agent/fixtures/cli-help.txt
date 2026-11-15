@@ -80,6 +80,8 @@ Read one Page through structured data, an image or interactive HTML:
   pages read PAGE --project PROJECT --format markdown [--detail full|outline] [--offset N --limit N]
     A page source over 256 KiB reads as an outline window unless --detail full, --blocks or --out is given.
   pages read PAGE --project PROJECT --view image --theme dark --width 1000 --height 900 --out preview.png
+  pages read PAGE --project PROJECT --view image --capture viewport --scroll-to-block BLOCK --state inspect.json
+    inspect.json: {"inspect":{"layout":true,"blockIds":["BLOCK"]}}. Measures in the full page; --blocks extracts a partial page.
   pages read PAGE --project PROJECT --view html [--state reading-state.json] --out preview.html
   pages read PAGE --project PROJECT --references to|from|both
     Adds references: pages linking to this page (to, backlinks) and pages it links to (from),

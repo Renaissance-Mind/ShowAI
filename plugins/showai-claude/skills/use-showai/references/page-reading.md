@@ -40,7 +40,17 @@
 
 普通 Page 内容分析和编辑使用 structured；format:markdown 用于正文与组件数据。长页先 detail:outline，再用 blockIds 选择局部，纯源用 rendered:false。源超过 256 KiB 的页面，不指定 detail、blockIds 或 out 的读取只返回大纲窗口（仍带整页的 hash 与 revision，可直接作为 page_apply 的基线；大纲每项有 id、type、title 与层级）：前 100 个顶层块及其子项、`blockCount`、`nextOffset`，以及说明省略了 document、markdown 与 computed 的 `omitted`。用 `offset:nextOffset`（可加 `limit`，最多 1000）继续看大纲，用 blockIds 读需要的块；确实需要整页时传 `detail:"full"`，本机连接也可以用 out 写入文件。结构化读取只为计算组件结果而渲染这些组件本身，所以页面再长也不受截图高度限制。
 
-颜色、布局、遮挡用 page_read 的 view:image，指定 viewport/theme 并保留 hash、组件引用和状态。截图覆盖整页或所选 blockIds 的完整高度，viewport（默认 1000×900）的 height 只决定初始布局；高于 16000 px 时报错，PNG 超过 8 MiB 时同样报错，这两种情况都改用更少的 blockIds 分几次截，并用 out 把图片写进文件。要看清文字时每段控制在约 3000 px 高，过高的图交给模型查看时会被缩小到难以辨认。截图只看到首屏时，先核对返回的 image.height，确认运行时是否已更新；交互用 view:html，先读真实可访问性快照，再按控件实际名称操作。actions 可重放 hover、click、fill、select、check、uncheck、drag；控件不存在或重名会报错。不同状态对比保持同一宽高和源版本。正式宿主交互验收遵循当前任务的官方浏览器/电脑操控规则，自动化读图与读取 HTML 源码不能代替操作验收。
+颜色、布局、遮挡用 page_read 的 view:image，指定 viewport/theme 并保留 hash、组件引用和状态。默认 `capture:"full"` 覆盖整页或所选 blockIds 的完整高度，viewport（默认 1000×900）的 height 只决定初始布局；高于 16000 px 时报错，PNG 超过 8 MiB 时同样报错，这两种情况都改用更少的 blockIds 分几次截，并用 out 把图片写进文件。要看清文字时每段控制在约 3000 px 高，过高的图交给模型查看时会被缩小到难以辨认。截图只看到首屏时，先核对返回的 image.height，确认运行时是否已更新；交互用 view:html，先读真实可访问性快照，再按控件实际名称操作。actions 可重放 hover、click、fill、select、check、uncheck、drag；控件不存在或重名会报错。不同状态对比保持同一宽高和源版本。正式宿主交互验收遵循当前任务的官方浏览器/电脑操控规则，自动化读图与读取 HTML 源码不能代替操作验收。
+
+### 固定视口与实际布局测量
+
+检查一屏能看到什么时，用 `page_read({projectId,pageId,view:"image",capture:"viewport",viewport:{width:1440,height:900},scrollToBlockId:"目标块ID",inspect:{layout:true,blockIds:["图ID","说明ID"]}})`。`capture:"viewport"` 保持窗口尺寸，PNG 不扩高；`scrollToBlockId` 在完整页面里滚动到该块，不会自动展开隐藏的步骤。先查实际 inputSchema；旧运行时不支持时明确报告，不能用长截图冒充一屏截图。
+
+`inspect.blockIds` 只选择测量对象，不删除周围内容。顶层 `blockIds` 会抽出局部页面、可能改变布局；要测正式页面中的位置，不传顶层 `blockIds`。所有参数只用于读取，不保存页面。
+
+结果中的 `capture` 给出 mode、requestedViewport、renderedViewport、expanded。`layout` 在全文截图扩高之前按请求视口测量：`rect` 和 `visibleRect` 是相对视口的 CSS 像素坐标；`visibleFraction` 是矩形经视口与祖先裁切后的面积比例；`viewportHeightRatio` 是块高/视口高；`overflow` 给出横纵溢出、CSS overflow 模式及 client/scroll 尺寸。可滚动表格有溢出不等于错误。DOM 没挂载的块返回 `status:"not-rendered"`，包括未展开步骤；默认测前 200 个 DOM 块并返回 total/truncated，更多对象显式指定至多 100 个 ID。
+
+这些是测量，不是质量评分；兄弟元素遮挡、非矩形遮罩、iframe 内部、位图文字和 canvas 内容不在覆盖范围。Agent 根据自己的布局意图解释结果，再用原有编辑工具调整、以相同视口和定位复测。用 out 时，回执保留 capture/layout，完整元数据也在 metadataPath 指向的 `.read.json`。
 
 rendered 读取生成文件与 .read.json 记录来源和状态。本机连接传 `out:"/绝对路径/文件"` 时，结构化源（JSON 或 markdown）、image 的 PNG 或 html 写入该文件，回执只含 out（path、bytes、sha256）与 hash、revision（页面有绑定块时还带 datasetBases，键就是共享数据 id，可直接用于 dataset_read），不再把整页或图片放回对话；已有文件需加 overwrite:true。结构化源文件含 document、outline、computed（rendered:false 时为空），以及绑定块的 bindings（解析后的 props）与 datasetBases，内容不受 response 影响；共享数据本身另用 `dataset_read` 的 out 写出。draft:true 只在临时预览编辑，不写入正式 Page；computed.props 是预览数据。声明 manifest.reader=readData 的组件可返回同步派生数据，保留原始 props，按稳定 ID 核对 computed.data。渲染需要运行时浏览器与组件编译能力；缺失时明确报告，JSON 可读不能证明视觉通过。
 

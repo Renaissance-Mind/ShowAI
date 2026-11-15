@@ -172,6 +172,8 @@ description: 创作或修改要保存的作品：可交互报告、讲解页面�
 
 ### 制作与交付
 
+验收首屏或图文同屏时，用 `page_read({projectId,pageId,view:"image",capture:"viewport",viewport:{width:1440,height:900}})` 保持真实视口；默认全文截图会扩高，不能证明一屏可见。需要测量时添加 `inspect:{layout:true,blockIds:[...]}`，可用 `scrollToBlockId` 在原页面中定位；顶层 blockIds 会抽出局部、改变布局。测量字段与限制见[固定视口与实际布局测量](../use-showai/references/page-reading.md#固定视口与实际布局测量)。
+
 用了模板时用 `template_apply` 建页，它生成空白 Page 并记住模板引用；不用模板时用 `page_create`，只传标题和少量块，再用 `page_apply` 逐幕插入。插入组件、文字标记、图片、链接、修改已有页面的具体写法见 [写入页面的操作](../use-showai/references/authoring.md)；组件的 guide 与参数在选用时读取。设计稿确认的组件缺口进入 [create-component](../create-component/SKILL.md)，完成后回到这里继续制作。要嵌入较多图片或视频时，设计阶段先按 [容量与大文件](../use-showai/references/capacity.md) 决定用引用还是嵌入。
 
 新作品保存后调用 `page_present`，并先读 [当前宿主适配](../use-showai/references/host-adapter.md)，在同一轮把页面展示给用户；告诉用户页面存在哪个项目，给出 openUrl。续改已有作品时在原页面上修改，保存后默认不再展示，告诉用户改了什么、页面在哪；用户要求查看效果时再展示。导出文件、多页网站和本机文件打包的做法见 [写入页面的操作](../use-showai/references/authoring.md#展示与导出)。

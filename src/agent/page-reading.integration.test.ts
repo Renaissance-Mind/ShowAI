@@ -560,6 +560,9 @@ test("MCP exposes the reading modes and returns native PNG content for image rea
       (tool) => tool.name === "page_read",
     )!.inputSchema;
     expect(schema.properties).toHaveProperty("view");
+    expect(schema.properties).toHaveProperty("capture");
+    expect(schema.properties).toHaveProperty("inspect");
+    expect(schema.properties).toHaveProperty("scrollToBlockId");
     const result = await client.callTool({
       name: "page_read",
       arguments: {
@@ -575,6 +578,19 @@ test("MCP exposes the reading modes and returns native PNG content for image rea
     ).filter((content) => content.type === "image");
     expect(images).toHaveLength(1);
     expect(images[0].mimeType).toBe("image/png");
+    const inspected = await client.callTool({ name: "page_read", arguments: {
+      pageId, view: "image", capture: "viewport", viewport: { width: 736, height: 600 },
+      inspect: { layout: true, blockIds: ["gantt"] }, scrollToBlockId: "gantt",
+      response: "receipt", out: join(home, "fixed-window.png"),
+    }});
+    expect(inspected.isError).not.toBe(true);
+    const measured = inspected.structuredContent as { data: { capture: { expanded: boolean }; layout: { blocks: { blockId: string; status: string }[] }; metadataPath: string } };
+    expect(measured.data.capture.expanded).toBe(false);
+    expect(measured.data.layout.blocks[0]).toMatchObject({ blockId: "gantt", status: "measured" });
+    const written = await readFile(join(home, "fixed-window.png"));
+    expect([written.readUInt32BE(16), written.readUInt32BE(20)]).toEqual([736, 600]);
+    expect(JSON.parse(await readFile(measured.data.metadataPath, "utf8")).layout).toEqual(measured.data.layout);
+
     expect(
       Buffer.from(images[0].data!, "base64").subarray(1, 4).toString(),
     ).toBe("PNG");
