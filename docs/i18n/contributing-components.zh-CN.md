@@ -45,6 +45,23 @@ G2 图表和外部图示家族各有自己的流程。`g2.json` 中的 G2 条目
 12. **运行时依赖。** 运行时使用的新 npm 依赖要加入 `package.json`、`scripts/package-runtime.mjs` 的复制列表、`src/core/catalog.ts` 中 `compilePackage` 的运行时与 SDK 导入允许列表，许可证文本放进 `resources/licenses/`。新图标从 `src/ui/icons.ts` 导出。
 13. **Agent 指引。** 在 `resources/templates/system-presentation/guides/04-design.md` 的“组件与素材”一段中说明何时选用该组件，然后运行 `npm run package:plugin`，把这份指南嵌入 `show-document` Skill，并重新生成 Codex、Claude Code 和 Kimi 的 Skill 副本。另见[修订系统呈现规则](contributing-templates.zh-CN.md#修订系统呈现规则)。
 
+## 组合阅读交互
+
+容器可以使用 `showai:components` 的 `ComponentInteractions` 绑定子组件的阅读动作。目标身份为 `{type, scope, id}`：Flowchart 使用 `type: "node"`、`scope: flow.id`、`id: node.id`；LayerDiagram 使用 `type: "module"`、`scope: layer.id`、`id: module.id`。身份与文字、布局和 DOM 选择器无关。
+
+```jsx
+<ComponentInteractions
+  targets={[{ type: "node", scope: "system", id: "services" }]}
+  onActivate={() => setLevel("services")}
+>
+  <Flowchart data={overview} readOnly />
+</ComponentInteractions>
+```
+
+Provider 只处理声明过的目标；没有绑定的对象沿用原来的详情和播放行为。新增目标的组件使用 `useComponentInteractions().canActivate(target)` 判断是否提供动作，点击或键盘激活时调用 `activate(target)`。只有容器处理了动作才返回 true，否则继续原有阅读行为。嵌套 Provider 隔离各自的绑定。阅读事件不调用 `onChange`。
+
+`examples/multi-level-view` 是可导入的轻量多级容器。`createMultiLevelView(registry)` 接收组件渲染器和列举稳定目标的适配器，每层保留子组件的原生 props；自定义组件依赖仍需声明精确版本。模型在渲染前检查循环、不可达视图、重复绑定和不存在的目标。
+
 ## 修改已有内置组件
 
 查找已有内置组件的代码时，从它在 `registry.ts` 中的 `registerBlock` 调用开始，那里写明了渲染器和校验函数。已保存的页面保留写入时的数据，已导出的页面保留导出时的阅读器。因此修改必须接受旧数据契约接受过的所有结构，或者在读取时转换旧数据；不要以会让现有页面校验失败的方式收紧数据契约。数据契约、默认数据或行为变化时，提高 `components.json` 中的 `version`，同时更新 `propsSchema`、示例和使用说明，并在数据契约测试中加入旧结构。

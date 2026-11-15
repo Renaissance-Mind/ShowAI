@@ -1,0 +1,1078 @@
+{
+  "id": "multi-level-view",
+  "name": "多级组件视图",
+  "version": "1.1.1",
+  "description": "轻量的多级视图容器：每层组合原生组件，用稳定节点事件逐层展开，只有路径、返回和切换过渡。",
+  "scenarios": [
+    "软件架构从总览进入模块框图、业务流程和子结构。",
+    "把流程、架构图、文字和图表组合成可展开的结构。"
+  ],
+  "entry": "index.jsx",
+  "reader": "readData",
+  "defaultData": {
+    "title": "多级组件视图",
+    "root": "system",
+    "levels": [
+      {
+        "id": "system",
+        "parentId": null,
+        "label": "软件系统",
+        "component": {
+          "kind": "flowchart",
+          "props": {
+            "height": 390,
+            "flows": [
+              {
+                "id": "system",
+                "label": "流程",
+                "direction": "LR",
+                "nodes": [
+                  {
+                    "id": "client",
+                    "label": "用户入口",
+                    "kind": "query"
+                  },
+                  {
+                    "id": "services",
+                    "label": "业务服务",
+                    "kind": "query"
+                  },
+                  {
+                    "id": "storage",
+                    "label": "数据设施",
+                    "kind": "query"
+                  }
+                ],
+                "edges": [
+                  {
+                    "id": "e0",
+                    "source": "client",
+                    "target": "services"
+                  },
+                  {
+                    "id": "e1",
+                    "source": "services",
+                    "target": "storage"
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "bindings": [
+          {
+            "source": {
+              "type": "node",
+              "scope": "system",
+              "id": "client"
+            },
+            "to": "clients"
+          },
+          {
+            "source": {
+              "type": "node",
+              "scope": "system",
+              "id": "services"
+            },
+            "to": "services"
+          },
+          {
+            "source": {
+              "type": "node",
+              "scope": "system",
+              "id": "storage"
+            },
+            "to": "storage"
+          }
+        ]
+      },
+      {
+        "id": "clients",
+        "parentId": "system",
+        "label": "用户入口",
+        "component": {
+          "kind": "layer-diagram",
+          "props": {
+            "layers": [
+              {
+                "id": "channels",
+                "name": "访问终端",
+                "tone": "accent",
+                "modules": [
+                  {
+                    "id": "web",
+                    "name": "Web 应用",
+                    "detail": "浏览、检索与订单操作。"
+                  },
+                  {
+                    "id": "mobile",
+                    "name": "移动端",
+                    "detail": "移动设备上的同一条业务链路。"
+                  }
+                ]
+              },
+              {
+                "id": "access",
+                "name": "接入服务",
+                "tone": "teal",
+                "modules": [
+                  {
+                    "id": "gateway",
+                    "name": "API 网关",
+                    "detail": "路由、鉴权与限流。"
+                  },
+                  {
+                    "id": "session",
+                    "name": "会话管理",
+                    "detail": "维护当前用户的访问身份。"
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "bindings": []
+      },
+      {
+        "id": "services",
+        "parentId": "system",
+        "label": "业务服务",
+        "component": {
+          "kind": "layer-diagram",
+          "props": {
+            "layers": [
+              {
+                "id": "business",
+                "name": "领域服务",
+                "tone": "accent",
+                "modules": [
+                  {
+                    "id": "catalog",
+                    "name": "商品服务",
+                    "detail": ""
+                  },
+                  {
+                    "id": "order",
+                    "name": "订单服务",
+                    "detail": ""
+                  },
+                  {
+                    "id": "payment",
+                    "name": "支付服务",
+                    "detail": ""
+                  }
+                ]
+              },
+              {
+                "id": "support",
+                "name": "支撑能力",
+                "tone": "teal",
+                "modules": [
+                  {
+                    "id": "identity",
+                    "name": "身份认证",
+                    "detail": "统一验证用户身份与访问权限。"
+                  },
+                  {
+                    "id": "events",
+                    "name": "事件分发",
+                    "detail": "连接后续异步处理。"
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "bindings": [
+          {
+            "source": {
+              "type": "module",
+              "scope": "business",
+              "id": "catalog"
+            },
+            "to": "catalog"
+          },
+          {
+            "source": {
+              "type": "module",
+              "scope": "business",
+              "id": "order"
+            },
+            "to": "order"
+          },
+          {
+            "source": {
+              "type": "module",
+              "scope": "business",
+              "id": "payment"
+            },
+            "to": "payment"
+          }
+        ]
+      },
+      {
+        "id": "storage",
+        "parentId": "system",
+        "label": "数据设施",
+        "component": {
+          "kind": "layer-diagram",
+          "props": {
+            "layers": [
+              {
+                "id": "durable",
+                "name": "持久化",
+                "tone": "teal",
+                "modules": [
+                  {
+                    "id": "db",
+                    "name": "关系数据库",
+                    "detail": "保存订单、用户与商品记录。"
+                  }
+                ]
+              },
+              {
+                "id": "fast",
+                "name": "缓存与事件",
+                "tone": "orange",
+                "modules": [
+                  {
+                    "id": "cache",
+                    "name": "缓存",
+                    "detail": "加速热点读取和短期状态访问。"
+                  },
+                  {
+                    "id": "queue",
+                    "name": "消息队列",
+                    "detail": "将异步事件交给后续消费者。"
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "bindings": []
+      },
+      {
+        "id": "order",
+        "parentId": "services",
+        "label": "下单流程",
+        "component": {
+          "kind": "flowchart",
+          "props": {
+            "height": 390,
+            "flows": [
+              {
+                "id": "checkout",
+                "label": "流程",
+                "direction": "LR",
+                "nodes": [
+                  {
+                    "id": "validate",
+                    "label": "校验请求",
+                    "kind": "query"
+                  },
+                  {
+                    "id": "reserve",
+                    "label": "预留库存",
+                    "kind": "query",
+                    "detail": "为本次下单暂时保留可售数量。"
+                  },
+                  {
+                    "id": "create",
+                    "label": "创建订单",
+                    "kind": "query",
+                    "detail": "记录订单、金额与待支付状态。"
+                  },
+                  {
+                    "id": "emit",
+                    "label": "发布事件",
+                    "kind": "query",
+                    "detail": "通知支付与履约服务。"
+                  }
+                ],
+                "edges": [
+                  {
+                    "id": "e0",
+                    "source": "validate",
+                    "target": "reserve"
+                  },
+                  {
+                    "id": "e1",
+                    "source": "reserve",
+                    "target": "create"
+                  },
+                  {
+                    "id": "e2",
+                    "source": "create",
+                    "target": "emit"
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "bindings": [
+          {
+            "source": {
+              "type": "node",
+              "scope": "checkout",
+              "id": "validate"
+            },
+            "to": "validation"
+          }
+        ]
+      },
+      {
+        "id": "validation",
+        "parentId": "order",
+        "label": "请求校验",
+        "component": {
+          "kind": "layer-diagram",
+          "props": {
+            "layers": [
+              {
+                "id": "input",
+                "name": "输入检查",
+                "tone": "orange",
+                "modules": [
+                  {
+                    "id": "item",
+                    "name": "商品与数量",
+                    "detail": "检查商品是否有效、数量是否合法。"
+                  },
+                  {
+                    "id": "price",
+                    "name": "价格检查",
+                    "detail": "核对当前价格与优惠条件。"
+                  }
+                ]
+              },
+              {
+                "id": "permission",
+                "name": "访问检查",
+                "tone": "teal",
+                "modules": [
+                  {
+                    "id": "user",
+                    "name": "用户身份",
+                    "detail": "确认当前用户的身份。"
+                  },
+                  {
+                    "id": "permission",
+                    "name": "操作权限",
+                    "detail": "确认该用户可以执行本次操作。"
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "bindings": []
+      },
+      {
+        "id": "payment",
+        "parentId": "services",
+        "label": "支付流程",
+        "component": {
+          "kind": "flowchart",
+          "props": {
+            "height": 390,
+            "flows": [
+              {
+                "id": "payment",
+                "label": "流程",
+                "direction": "LR",
+                "nodes": [
+                  {
+                    "id": "intent",
+                    "label": "创建支付意图",
+                    "kind": "query",
+                    "detail": "接收订单号与应付金额。"
+                  },
+                  {
+                    "id": "pay",
+                    "label": "发起支付",
+                    "kind": "query",
+                    "detail": "将支付意图交给支付渠道。"
+                  },
+                  {
+                    "id": "callback",
+                    "label": "处理回调",
+                    "kind": "query",
+                    "detail": "校验回调并幂等地更新订单。"
+                  }
+                ],
+                "edges": [
+                  {
+                    "id": "e0",
+                    "source": "intent",
+                    "target": "pay"
+                  },
+                  {
+                    "id": "e1",
+                    "source": "pay",
+                    "target": "callback"
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "bindings": []
+      },
+      {
+        "id": "catalog",
+        "parentId": "services",
+        "label": "商品服务",
+        "component": {
+          "kind": "layer-diagram",
+          "props": {
+            "layers": [
+              {
+                "id": "catalog",
+                "name": "商品能力",
+                "tone": "accent",
+                "modules": [
+                  {
+                    "id": "information",
+                    "name": "商品信息",
+                    "detail": "维护商品名称、规格和展示内容。"
+                  },
+                  {
+                    "id": "pricing",
+                    "name": "定价规则",
+                    "detail": "维护当前价格与活动条件。"
+                  },
+                  {
+                    "id": "index",
+                    "name": "检索索引",
+                    "detail": "面向关键词与筛选条件组织查询。"
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "bindings": []
+      }
+    ]
+  },
+  "examples": [
+    {
+      "name": "软件架构的完整展开结构",
+      "request": "点击框图或流程节点逐层进入不同组件。",
+      "data": {
+        "title": "多级组件视图",
+        "root": "system",
+        "levels": [
+          {
+            "id": "system",
+            "parentId": null,
+            "label": "软件系统",
+            "component": {
+              "kind": "flowchart",
+              "props": {
+                "height": 390,
+                "flows": [
+                  {
+                    "id": "system",
+                    "label": "流程",
+                    "direction": "LR",
+                    "nodes": [
+                      {
+                        "id": "client",
+                        "label": "用户入口",
+                        "kind": "query"
+                      },
+                      {
+                        "id": "services",
+                        "label": "业务服务",
+                        "kind": "query"
+                      },
+                      {
+                        "id": "storage",
+                        "label": "数据设施",
+                        "kind": "query"
+                      }
+                    ],
+                    "edges": [
+                      {
+                        "id": "e0",
+                        "source": "client",
+                        "target": "services"
+                      },
+                      {
+                        "id": "e1",
+                        "source": "services",
+                        "target": "storage"
+                      }
+                    ]
+                  }
+                ]
+              }
+            },
+            "bindings": [
+              {
+                "source": {
+                  "type": "node",
+                  "scope": "system",
+                  "id": "client"
+                },
+                "to": "clients"
+              },
+              {
+                "source": {
+                  "type": "node",
+                  "scope": "system",
+                  "id": "services"
+                },
+                "to": "services"
+              },
+              {
+                "source": {
+                  "type": "node",
+                  "scope": "system",
+                  "id": "storage"
+                },
+                "to": "storage"
+              }
+            ]
+          },
+          {
+            "id": "clients",
+            "parentId": "system",
+            "label": "用户入口",
+            "component": {
+              "kind": "layer-diagram",
+              "props": {
+                "layers": [
+                  {
+                    "id": "channels",
+                    "name": "访问终端",
+                    "tone": "accent",
+                    "modules": [
+                      {
+                        "id": "web",
+                        "name": "Web 应用",
+                        "detail": "浏览、检索与订单操作。"
+                      },
+                      {
+                        "id": "mobile",
+                        "name": "移动端",
+                        "detail": "移动设备上的同一条业务链路。"
+                      }
+                    ]
+                  },
+                  {
+                    "id": "access",
+                    "name": "接入服务",
+                    "tone": "teal",
+                    "modules": [
+                      {
+                        "id": "gateway",
+                        "name": "API 网关",
+                        "detail": "路由、鉴权与限流。"
+                      },
+                      {
+                        "id": "session",
+                        "name": "会话管理",
+                        "detail": "维护当前用户的访问身份。"
+                      }
+                    ]
+                  }
+                ]
+              }
+            },
+            "bindings": []
+          },
+          {
+            "id": "services",
+            "parentId": "system",
+            "label": "业务服务",
+            "component": {
+              "kind": "layer-diagram",
+              "props": {
+                "layers": [
+                  {
+                    "id": "business",
+                    "name": "领域服务",
+                    "tone": "accent",
+                    "modules": [
+                      {
+                        "id": "catalog",
+                        "name": "商品服务",
+                        "detail": ""
+                      },
+                      {
+                        "id": "order",
+                        "name": "订单服务",
+                        "detail": ""
+                      },
+                      {
+                        "id": "payment",
+                        "name": "支付服务",
+                        "detail": ""
+                      }
+                    ]
+                  },
+                  {
+                    "id": "support",
+                    "name": "支撑能力",
+                    "tone": "teal",
+                    "modules": [
+                      {
+                        "id": "identity",
+                        "name": "身份认证",
+                        "detail": "统一验证用户身份与访问权限。"
+                      },
+                      {
+                        "id": "events",
+                        "name": "事件分发",
+                        "detail": "连接后续异步处理。"
+                      }
+                    ]
+                  }
+                ]
+              }
+            },
+            "bindings": [
+              {
+                "source": {
+                  "type": "module",
+                  "scope": "business",
+                  "id": "catalog"
+                },
+                "to": "catalog"
+              },
+              {
+                "source": {
+                  "type": "module",
+                  "scope": "business",
+                  "id": "order"
+                },
+                "to": "order"
+              },
+              {
+                "source": {
+                  "type": "module",
+                  "scope": "business",
+                  "id": "payment"
+                },
+                "to": "payment"
+              }
+            ]
+          },
+          {
+            "id": "storage",
+            "parentId": "system",
+            "label": "数据设施",
+            "component": {
+              "kind": "layer-diagram",
+              "props": {
+                "layers": [
+                  {
+                    "id": "durable",
+                    "name": "持久化",
+                    "tone": "teal",
+                    "modules": [
+                      {
+                        "id": "db",
+                        "name": "关系数据库",
+                        "detail": "保存订单、用户与商品记录。"
+                      }
+                    ]
+                  },
+                  {
+                    "id": "fast",
+                    "name": "缓存与事件",
+                    "tone": "orange",
+                    "modules": [
+                      {
+                        "id": "cache",
+                        "name": "缓存",
+                        "detail": "加速热点读取和短期状态访问。"
+                      },
+                      {
+                        "id": "queue",
+                        "name": "消息队列",
+                        "detail": "将异步事件交给后续消费者。"
+                      }
+                    ]
+                  }
+                ]
+              }
+            },
+            "bindings": []
+          },
+          {
+            "id": "order",
+            "parentId": "services",
+            "label": "下单流程",
+            "component": {
+              "kind": "flowchart",
+              "props": {
+                "height": 390,
+                "flows": [
+                  {
+                    "id": "checkout",
+                    "label": "流程",
+                    "direction": "LR",
+                    "nodes": [
+                      {
+                        "id": "validate",
+                        "label": "校验请求",
+                        "kind": "query"
+                      },
+                      {
+                        "id": "reserve",
+                        "label": "预留库存",
+                        "kind": "query",
+                        "detail": "为本次下单暂时保留可售数量。"
+                      },
+                      {
+                        "id": "create",
+                        "label": "创建订单",
+                        "kind": "query",
+                        "detail": "记录订单、金额与待支付状态。"
+                      },
+                      {
+                        "id": "emit",
+                        "label": "发布事件",
+                        "kind": "query",
+                        "detail": "通知支付与履约服务。"
+                      }
+                    ],
+                    "edges": [
+                      {
+                        "id": "e0",
+                        "source": "validate",
+                        "target": "reserve"
+                      },
+                      {
+                        "id": "e1",
+                        "source": "reserve",
+                        "target": "create"
+                      },
+                      {
+                        "id": "e2",
+                        "source": "create",
+                        "target": "emit"
+                      }
+                    ]
+                  }
+                ]
+              }
+            },
+            "bindings": [
+              {
+                "source": {
+                  "type": "node",
+                  "scope": "checkout",
+                  "id": "validate"
+                },
+                "to": "validation"
+              }
+            ]
+          },
+          {
+            "id": "validation",
+            "parentId": "order",
+            "label": "请求校验",
+            "component": {
+              "kind": "layer-diagram",
+              "props": {
+                "layers": [
+                  {
+                    "id": "input",
+                    "name": "输入检查",
+                    "tone": "orange",
+                    "modules": [
+                      {
+                        "id": "item",
+                        "name": "商品与数量",
+                        "detail": "检查商品是否有效、数量是否合法。"
+                      },
+                      {
+                        "id": "price",
+                        "name": "价格检查",
+                        "detail": "核对当前价格与优惠条件。"
+                      }
+                    ]
+                  },
+                  {
+                    "id": "permission",
+                    "name": "访问检查",
+                    "tone": "teal",
+                    "modules": [
+                      {
+                        "id": "user",
+                        "name": "用户身份",
+                        "detail": "确认当前用户的身份。"
+                      },
+                      {
+                        "id": "permission",
+                        "name": "操作权限",
+                        "detail": "确认该用户可以执行本次操作。"
+                      }
+                    ]
+                  }
+                ]
+              }
+            },
+            "bindings": []
+          },
+          {
+            "id": "payment",
+            "parentId": "services",
+            "label": "支付流程",
+            "component": {
+              "kind": "flowchart",
+              "props": {
+                "height": 390,
+                "flows": [
+                  {
+                    "id": "payment",
+                    "label": "流程",
+                    "direction": "LR",
+                    "nodes": [
+                      {
+                        "id": "intent",
+                        "label": "创建支付意图",
+                        "kind": "query",
+                        "detail": "接收订单号与应付金额。"
+                      },
+                      {
+                        "id": "pay",
+                        "label": "发起支付",
+                        "kind": "query",
+                        "detail": "将支付意图交给支付渠道。"
+                      },
+                      {
+                        "id": "callback",
+                        "label": "处理回调",
+                        "kind": "query",
+                        "detail": "校验回调并幂等地更新订单。"
+                      }
+                    ],
+                    "edges": [
+                      {
+                        "id": "e0",
+                        "source": "intent",
+                        "target": "pay"
+                      },
+                      {
+                        "id": "e1",
+                        "source": "pay",
+                        "target": "callback"
+                      }
+                    ]
+                  }
+                ]
+              }
+            },
+            "bindings": []
+          },
+          {
+            "id": "catalog",
+            "parentId": "services",
+            "label": "商品服务",
+            "component": {
+              "kind": "layer-diagram",
+              "props": {
+                "layers": [
+                  {
+                    "id": "catalog",
+                    "name": "商品能力",
+                    "tone": "accent",
+                    "modules": [
+                      {
+                        "id": "information",
+                        "name": "商品信息",
+                        "detail": "维护商品名称、规格和展示内容。"
+                      },
+                      {
+                        "id": "pricing",
+                        "name": "定价规则",
+                        "detail": "维护当前价格与活动条件。"
+                      },
+                      {
+                        "id": "index",
+                        "name": "检索索引",
+                        "detail": "面向关键词与筛选条件组织查询。"
+                      }
+                    ]
+                  }
+                ]
+              }
+            },
+            "bindings": []
+          }
+        ]
+      }
+    }
+  ],
+  "documentation": {
+    "version": 2,
+    "reuse": {
+      "kind": "general",
+      "boundaries": [
+        "容器只管理层级路径、事件路由和切换动效；每层的图形和内容由原组件提供。",
+        "默认给 Flowchart 节点与 LayerDiagram 模块接入 activate 事件；其他已注册组件可展示，增加新的交互类型需由子组件显式公开稳定目标。"
+      ]
+    },
+    "usage": {
+      "purpose": "把不同组件组织成可逐层展开的完整结构，为指定节点绑定进入下一视图的事件。",
+      "structure": [
+        "上方只有返回按钮与层级路径。",
+        "当前层直接展示一个现有组件；不同层可以使用不同的组件。",
+        "事件由 source 的 type/scope/id 映射到 to；源数据不随阅读改变。"
+      ],
+      "inputs": [
+        {
+          "path": "title",
+          "meaning": "容器的可访问名称。"
+        },
+        {
+          "path": "root",
+          "meaning": "根视图的稳定 ID，必须指向 parentId=null 的唯一根视图。"
+        },
+        {
+          "path": "levels",
+          "meaning": "完整视图列表；每个非根视图有且仅有一个父视图，并由父视图中的至少一条绑定进入；不能有孤立视图或循环。"
+        },
+        {
+          "path": "levels[].id",
+          "meaning": "在整个 levels 列表中唯一的稳定视图 ID。"
+        },
+        {
+          "path": "levels[].parentId",
+          "meaning": "父视图 ID，根视图为 null。"
+        },
+        {
+          "path": "levels[].label",
+          "meaning": "层级路径与当前视图的可访问名称。"
+        },
+        {
+          "path": "levels[].component",
+          "meaning": "要显示的子组件及其原生参数。"
+        },
+        {
+          "path": "levels[].component.kind",
+          "meaning": "默认按需注册 flowchart、layer-diagram。增加其他组件时，通过 createMultiLevelView(registry) 注册 React 渲染器与 targets 适配器，并同步本包 kind 枚举。"
+        },
+        {
+          "path": "levels[].component.props",
+          "meaning": "kind 对应组件的原生 data；先读取该组件的 guide/schema。流程图需要 flows，框图需要 layers；不改变原组件的数据结构。",
+          "opaque": true
+        },
+        {
+          "path": "levels[].bindings",
+          "meaning": "点击对象到直接子视图的路由，空数组保留原组件的阅读行为；同一对象最多一条绑定。"
+        },
+        {
+          "path": "levels[].bindings[].source",
+          "meaning": "子组件公开的稳定对象身份，三项共同定位，绝不按文字或 DOM 坐标匹配。"
+        },
+        {
+          "path": "levels[].bindings[].source.type",
+          "meaning": "node 表示流程图节点；module 表示分层框图模块。"
+        },
+        {
+          "path": "levels[].bindings[].source.scope",
+          "meaning": "node 使用 flow.id，module 使用 layer.id。"
+        },
+        {
+          "path": "levels[].bindings[].source.id",
+          "meaning": "node 使用 nodes[].id，module 使用 modules[].id；必须在所选 scope 中存在。"
+        },
+        {
+          "path": "levels[].bindings[].to",
+          "meaning": "要展开的直接子视图 ID，目标的 parentId 必须等于本层 id。"
+        }
+      ],
+      "rules": [
+        {
+          "kind": "unique",
+          "path": "levels[].id"
+        },
+        {
+          "kind": "reference",
+          "path": "root",
+          "target": "levels[].id"
+        }
+      ],
+      "recipes": [
+        {
+          "title": "规划完整展开结构",
+          "steps": [
+            "先列出根视图和全部子视图，给每层填写父视图 ID。",
+            "按每层需要讲清的关系选流程图、分层框图或其他已注册组件，并按原组件契约填写 props。",
+            "为需要展开的节点填写 source(type,scope,id) 与目标 to；每个子视图必须有进入事件。",
+            "检查所有分支，点击深入、返回和跨层路径，确保源数据不变。"
+          ],
+          "exampleIndex": 0
+        }
+      ],
+      "interactions": [
+        {
+          "action": "点击绑定的节点或模块",
+          "effect": "原组件通过 ComponentInteractions 发出稳定目标，容器切换到绑定的直接子视图；带短暂的缩放淡入。未绑定对象保留原来的详情等操作。",
+          "persistence": "view"
+        },
+        {
+          "action": "返回、层级路径与 Escape",
+          "effect": "返回父视图或直接选择祖先，回到不同组件；App 内使用 onViewState 记住层级，预览仅保留本次状态。",
+          "persistence": "view"
+        }
+      ],
+      "constraints": [
+        "最多 80 个视图，每层最多 100 条绑定；严格检查循环、孤立层、目标身份、父子关系与重复绑定。",
+        "props 是子组件的原生数据，先按对应 schema 验证；容器不模拟子组件。",
+        "阅读不调用 onChange，不写回正文；缺失的已保存层级回到根视图。",
+        "窄屏层级路径横向滚动；系统减少动态时关闭过渡。",
+        "新增 React 组件通过 registry 组合，并为其动作接入 ComponentInteractions/useComponentInteractions；自定义包依赖仍须显式声明精确版本。",
+        "默认只打包当前示例使用的流程图与框图；新增渲染器时重新检查聊天内联体积。"
+      ],
+      "editing": {
+        "data": ["替换完整 levels 树、原生组件 props 与绑定。"],
+        "implementation": [
+          "在 registry 添加 renderer 与 targets 适配器；容器逻辑保持不变。"
+        ]
+      }
+    },
+    "development": {
+      "entryPoints": [
+        {
+          "path": "index.jsx",
+          "purpose": "createMultiLevelView(registry)、默认组件适配器和阅读容器。"
+        },
+        {
+          "path": "model.js",
+          "purpose": "检查完整层级树、稳定目标与路由。"
+        },
+        {
+          "path": "style.css",
+          "purpose": "精简导航与双向切换过渡。"
+        }
+      ],
+      "architecture": [
+        "容器不画图，只渲染 registry 的组件。",
+        "ComponentInteractions 通过 React Context 给子组件注入明确绑定的目标和 activate 回调。",
+        "Flowchart(type=node,scope=flow.id,id=node.id) 与 LayerDiagram(type=module,scope=layer.id,id=module.id) 共用相同事件契约。"
+      ],
+      "extensionPoints": [
+        "registry 允许替换或添加任意已声明的 React 组件。",
+        "子组件用 useComponentInteractions().canActivate/activate 接入自己的稳定对象。"
+      ],
+      "invariants": [
+        "进入事件只指向直接子视图，所有非根视图必须可达。",
+        "没有绑定时，子组件行为与独立使用相同。",
+        "只保存层级阅读状态，不改变子组件的原生数据。"
+      ],
+      "verification": [
+        "独立 headless 实例真实编译并从流程图进入框图、再进入不同组件的多层结构。",
+        "测试返回、祖先跳转、无绑定节点、窄屏、键盘、非法路由与源数据不变。"
+      ]
+    }
+  }
+}

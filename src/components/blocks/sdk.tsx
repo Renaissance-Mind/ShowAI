@@ -5,6 +5,12 @@ import "./block.css";
 import "./theme.css";
 export { GestureBoundary } from "./GestureBoundary";
 export {
+  ComponentInteractions,
+  useComponentInteractions,
+  sameComponentTarget,
+  type ComponentTarget,
+} from "./component-interactions";
+export {
   TextBlock as Markdown,
   TextBlock as Text,
   ImageBlock as Image,

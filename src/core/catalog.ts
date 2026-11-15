@@ -69,6 +69,7 @@ import {
 } from "../contract/contributions";
 
 import { builtinSources, builtinExports } from "./builtin-sources";
+import { componentSdkSource } from "./component-sdk-source";
 import { componentSandboxPolicy } from "../contract/sandbox-policy.mjs";
 import { diagramSourceFiles } from "../components/blocks/diagrams/templates";
 import { diagramAuthoringFiles } from "./diagram-authoring-files";
@@ -1836,6 +1837,13 @@ export async function compilePackage(
     const slash = path.indexOf("/");
     return { key: path.slice(0, slash), file: path.slice(slash + 1) };
   };
+  const sdkSource = componentSdkSource(
+    builtinSources["sdk.tsx"],
+    [...packages.values()].flatMap((owner) =>
+      [...owner.files].filter(([path]) => /\.(?:[jt]sx?|mjs)$/.test(path))
+        .map(([, contents]) => contents.toString("utf8")),
+    ),
+  );
   const boundary: Plugin = {
     name: "showai-component-boundary",
     setup(plugin) {
@@ -1876,7 +1884,7 @@ export async function compilePackage(
         }),
       );
       plugin.onLoad({ filter: /.*/, namespace: "showai-builtin" }, (args) => ({
-        contents: builtinSources[args.path],
+        contents: args.path === "sdk.tsx" ? sdkSource : builtinSources[args.path],
         loader: args.path.endsWith(".mjs")
           ? "js"
           : (extname(args.path).slice(1) as "tsx" | "ts" | "css"),

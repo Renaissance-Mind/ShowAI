@@ -73,6 +73,7 @@ import localMediaLinkSource from "../components/custom/local-media-link.ts?raw";
 import editableSource from "../datasets/editable.mjs?raw";
 import sdk from "../components/blocks/sdk.tsx?raw";
 import actionHost from "../components/blocks/action-host.tsx?raw";
+import componentInteractions from "../components/blocks/component-interactions.tsx?raw";
 import manualEditing from "../components/blocks/manual-editing.ts?raw";
 import gestureBoundary from "../components/blocks/GestureBoundary.tsx?raw";
 import viewportLock from "../components/blocks/ViewportLock.tsx?raw";
@@ -321,6 +322,7 @@ const sources: Record<string, string> = {
   "editable.mjs": editableSource,
   "sdk.tsx": sdk,
   "action-host.tsx": actionHost,
+  "component-interactions.tsx": componentInteractions,
   "manual-editing.ts": manualEditing,
   "GestureBoundary.tsx": gestureBoundary,
   "ViewportLock.tsx": viewportLock,

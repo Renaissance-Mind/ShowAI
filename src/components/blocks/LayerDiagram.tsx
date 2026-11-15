@@ -13,6 +13,7 @@ import { useTranslator } from "../../i18n/react";
 import messages from "../../i18n/messages/layerDiagram";
 import { NoteText } from "./NoteText";
 import { useReaderState } from "../../surface/reader-state";
+import { useComponentInteractions } from "./component-interactions";
 
 type Module = { id: string; name: string; path?: string; detail?: string };
 type Layer = {
@@ -55,6 +56,7 @@ const toneOf = (layer: Layer, index: number): DiagramTone =>
     : LAYER_TONE_ORDER[index % LAYER_TONE_ORDER.length];
 
 export function LayerDiagramBlock({ data }: BlockProps) {
+  const interactions = useComponentInteractions();
   const t = useTranslator(messages);
   const model = data as unknown as Layers;
   const layers = useMemo(
@@ -181,7 +183,17 @@ export function LayerDiagramBlock({ data }: BlockProps) {
                           else buttons.current.delete(entry.id);
                         }}
                         aria-pressed={on}
-                        onClick={() => setSelected(on ? null : entry.id)}
+                        onClick={() => {
+                          if (
+                            interactions.activate({
+                              type: "module",
+                              scope: item.id,
+                              id: entry.id,
+                            })
+                          )
+                            return;
+                          setSelected(on ? null : entry.id);
+                        }}
                         onKeyDown={(event) => move(event, li, mi)}
                       >
                         <i aria-hidden="true" />

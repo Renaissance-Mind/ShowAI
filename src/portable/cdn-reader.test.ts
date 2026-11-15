@@ -17,6 +17,7 @@ import { exportPage } from "../agent/exporter";
 import { presentPage } from "../agent/page-presentation";
 import { readFile, writeFile } from "node:fs/promises";
 import { randomBytes } from "node:crypto";
+import { gunzipSync } from "node:zlib";
 import { startCdnHost } from "./cdn-test-host";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
@@ -46,8 +47,55 @@ describe("CDN fragment", () => {
       '<section id="showai-test" data-showai-inline-root lang="en">',
     );
     expect(fragment.match(/<\/script>/g)).toHaveLength(1);
-    const data = fragment.match(/const artifact=(\{.*?\});const timers/s)![1];
+    const data = fragment.match(/const artifact=(\{.*?\});const starts/s)![1];
     expect(JSON.parse(data)).toEqual(artifact);
+  });
+
+  it("compresses large component payloads and preserves their exact JSON", () => {
+    const large = {
+      ...artifact,
+      document: { title: "Packed", content: "结构与流程 ".repeat(300_000) },
+    };
+    const fragment = toCdnFragment(page(JSON.stringify(large)), {
+      readerUrl: "https://cdn.example.com/reader-A.js",
+    });
+    expect(Buffer.byteLength(fragment)).toBeLessThan(100_000);
+    expect(fragment).toContain('new DecompressionStream("gzip")');
+    const packed = fragment.match(/atob\("([A-Za-z0-9+/=]+)"\)/)![1];
+    expect(
+      JSON.parse(gunzipSync(Buffer.from(packed, "base64")).toString()).artifact,
+    ).toEqual(large);
+  });
+
+  it("restores shared component HTML bytes without mutating the package", () => {
+    const styles = ".diagram{color:blue}".repeat(12_000);
+    const script = 'const label="结构 🧭";'.repeat(8_000);
+    const component = {
+      inline: { styles, script },
+      html: `<style>${styles}</style><script>${script}</script>`,
+    };
+    const original = { ...artifact, components: [component] };
+    const before = JSON.stringify(original);
+    const fragment = toCdnFragment(page(before), {
+      readerUrl: "https://cdn.example.com/reader-A.js",
+    });
+    const packed = fragment.match(/atob\("([A-Za-z0-9+/=]+)"\)/)![1];
+    const bundle = JSON.parse(
+      gunzipSync(Buffer.from(packed, "base64")).toString(),
+    );
+    expect(bundle.html.length).toBe(1);
+    for (const item of bundle.html) {
+      const restored = bundle.artifact.components[item.index];
+      restored.html = item.parts
+        .map((part: string | [string, number, number]) =>
+          typeof part === "string"
+            ? part
+            : restored.inline[part[0]].slice(part[1], part[1] + part[2]),
+        )
+        .join("");
+    }
+    expect(bundle.artifact).toEqual(original);
+    expect(JSON.stringify(original)).toBe(before);
   });
 
   it("starts delayed backups and bounds the total reader wait", () => {
@@ -147,6 +195,62 @@ describe("CDN reader", () => {
     await rm(outdir, { recursive: true, force: true });
     await rm(home, { recursive: true, force: true });
   });
+
+  it("decodes a composed component and routes through four views under the host policy", async () => {
+    const store = new FileStore(home);
+    const project = await store.createProject({ name: "Packed composition" });
+    const component = await importComponent(
+      home,
+      resolve("examples/multi-level-view"),
+      project.id,
+    );
+    const doc = createResource(blankDocument());
+    doc.content.content = [
+      {
+        type: "widget",
+        attrs: {
+          id: "composition",
+          kind: "custom",
+          data: componentWidgetData(component),
+        },
+      },
+    ];
+    doc.surfaceViews[doc.content.attrs!.id].readingOrder = ["composition"];
+    const fragment = toCdnFragment(
+      await buildPageHtml(doc, undefined, [component]),
+      { readerUrl: `${host.origin}/${entry}` },
+    );
+    expect(fragment).toContain('new DecompressionStream("gzip")');
+    expect(Buffer.byteLength(fragment)).toBeLessThan(1_000_000);
+    const tab = await browser.newPage();
+    const errors: string[] = [];
+    tab.on("pageerror", (error) => errors.push(error.message));
+    try {
+      await tab.goto(host.host("/packed-composition", fragment));
+      const frame = tab.frameLocator('iframe[title="Host"]');
+      await frame
+        .getByRole("button", { name: "业务服务", exact: true })
+        .click();
+      await frame
+        .getByRole("button", { name: "订单服务", exact: true })
+        .click();
+      await frame
+        .getByRole("button", { name: "校验请求", exact: true })
+        .press("Enter");
+      await frame
+        .getByRole("region", { name: "请求校验", exact: true })
+        .waitFor();
+      await frame
+        .getByRole("button", { name: "返回上层", exact: true })
+        .click();
+      await frame
+        .getByRole("region", { name: "下单流程", exact: true })
+        .waitFor();
+      expect(errors).toEqual([]);
+    } finally {
+      await tab.close();
+    }
+  }, 180_000);
 
   it("mounts built-in and custom components from a small fragment under a strict host policy", async () => {
     const store = new FileStore(home),
@@ -376,9 +480,7 @@ describe("CDN reader", () => {
             undefined,
             { timeout: 240_000 },
           );
-          expect(result.isError, JSON.stringify(result.content)).not.toBe(
-            true,
-          );
+          expect(result.isError, JSON.stringify(result.content)).not.toBe(true);
           const { display } = (result.structuredContent as any).data;
           expect(display, name).toMatchObject({
             inlineAvailable: true,

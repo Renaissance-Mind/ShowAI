@@ -2043,6 +2043,11 @@
           "action": "展开全部步骤与阶段",
           "effect": "以文字列出所有路线步骤和阶段状态；打印与导出时始终展开。",
           "persistence": "view"
+        },
+        {
+          "action": "在组合组件中绑定进入事件",
+          "effect": "外层 ComponentInteractions 可以为 node 对象的稳定 type/scope/id 绑定 activate；绑定对象进入外层指定视图，未绑定对象继续显示原来的详情。",
+          "persistence": "view"
         }
       ],
       "constraints": [
@@ -2083,7 +2088,8 @@
       ],
       "extensionPoints": [
         "扩展节点或连线时保持 ID、端点与坐标规则；锁定画布与内部阅读交互分别验证。",
-        "新增阶段状态时同时扩展 flowchart-contract.mjs 的 STAGE_STATES、i18n 的 state.* 与 CSS 色板。"
+        "新增阶段状态时同时扩展 flowchart-contract.mjs 的 STAGE_STATES、i18n 的 state.* 与 CSS 色板。",
+        "通过 SDK 的 ComponentInteractions 包装组件，绑定 {type:\"node\",scope:flow.id,id:对象ID}。已绑定对象调用 onActivate，未绑定对象保持原阅读行为；绑定不进入组件 props。"
       ],
       "invariants": [
         "保留原始输入与稳定 ID，明确区分源数据、派生值和阅读状态。",
@@ -9478,6 +9484,11 @@
           "action": "左右方向键 / 上下方向键",
           "effect": "在同一层的模块间移动 / 跨层移动；Escape 取消选择。",
           "persistence": "view"
+        },
+        {
+          "action": "在组合组件中绑定进入事件",
+          "effect": "外层 ComponentInteractions 可以为 module 对象的稳定 type/scope/id 绑定 activate；绑定对象进入外层指定视图，未绑定对象继续显示原来的详情。",
+          "persistence": "view"
         }
       ],
       "constraints": [
@@ -9512,7 +9523,10 @@
       "architecture": [
         "纯 HTML / CSS 布局：每层是两栏网格，按容器宽度变为单栏；层间连接线是装饰性 SVG。"
       ],
-      "extensionPoints": ["新增模块字段时在说明面板与打印列表中同时呈现。"],
+      "extensionPoints": [
+        "新增模块字段时在说明面板与打印列表中同时呈现。",
+        "通过 SDK 的 ComponentInteractions 包装组件，绑定 {type:\"module\",scope:layer.id,id:对象ID}。已绑定对象调用 onActivate，未绑定对象保持原阅读行为；绑定不进入组件 props。"
+      ],
       "invariants": [
         "选择只保存在组件本地，不调用 onChange。",
         "说明文字解析为 React 元素，从不注入 HTML。"

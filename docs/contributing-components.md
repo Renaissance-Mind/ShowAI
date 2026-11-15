@@ -45,6 +45,23 @@ The steps below follow what recent additions such as `scene-3d` and `roadmap` to
 12. **Runtime dependencies.** A new npm dependency used at runtime goes into `package.json`, the copy list in `scripts/package-runtime.mjs`, the runtime and SDK import allowlists in `compilePackage` in `src/core/catalog.ts`, and its license text into `resources/licenses/`. New icons are exported from `src/ui/icons.ts`.
 13. **Agent guidance.** Describe when to choose the component in the “组件与素材” paragraph of `resources/templates/system-presentation/guides/04-design.md`. Then run `npm run package:plugin`, which embeds that guide in the `show-document` Skill and regenerates the Codex, Claude Code and Kimi copies of the Skills. See [Revising the system workflow](contributing-templates.md#revising-the-system-workflow).
 
+## Composing reading interactions
+
+A container can bind a child's reading actions with `ComponentInteractions` from `showai:components`. A target is `{type, scope, id}`: Flowchart uses `type: "node"`, `scope: flow.id`, `id: node.id`; LayerDiagram uses `type: "module"`, `scope: layer.id`, `id: module.id`. The identity does not depend on labels, layout or DOM selectors.
+
+```jsx
+<ComponentInteractions
+  targets={[{ type: "node", scope: "system", id: "services" }]}
+  onActivate={() => setLevel("services")}
+>
+  <Flowchart data={overview} readOnly />
+</ComponentInteractions>
+```
+
+The provider handles only declared targets. Unbound items keep their existing detail and playback behavior. Components adding their own targets call `useComponentInteractions().canActivate(target)` to expose the action, then `activate(target)` on click or keyboard activation. It returns true only when the container handled the action; otherwise run the component's normal reading behavior. Nested providers isolate their bindings. Reading events never call `onChange`.
+
+The importable package in `examples/multi-level-view` demonstrates a lightweight navigator with an explicit hierarchy and bindings. `createMultiLevelView(registry)` accepts component renderers and adapters that enumerate their stable targets; each level keeps the child's native props. Custom component imports still need exact declared dependencies. The model checks cycles, unreachable views, duplicate bindings and references to missing targets before rendering.
+
 ## Changing an existing built-in
 
 To find the code of an existing built-in, start from its `registerBlock` call in `registry.ts`, which names the renderer and the validator. Saved pages keep the data they were written with, and exported pages keep the reader they were exported with. A change must therefore accept every shape the previous contract accepted, or convert old data when it is read; never tighten the contract in a way that makes existing pages fail validation. When the data contract, defaults or behavior change, raise `version` in `components.json`, update `propsSchema`, examples and documentation together, and extend the contract test with the old shape.

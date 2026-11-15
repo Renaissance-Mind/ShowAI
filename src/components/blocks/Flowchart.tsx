@@ -50,6 +50,10 @@ import messages from "../../i18n/messages/flowchart";
 import "@xyflow/react/dist/style.css";
 import "./flowchart.css";
 import { isRecord, isText, useReaderState } from "../../surface/reader-state";
+import {
+  useComponentInteractions,
+  type ComponentTarget,
+} from "./component-interactions";
 
 type Kind = "request" | "skill" | "decision" | "reference" | "query" | "result";
 interface FlowNode extends Record<string, unknown> {
@@ -119,7 +123,14 @@ interface FlowData extends BlockData {
   height?: number;
   flows: Flow[];
 }
-type DiagramNode = Node<FlowNode & { direction: "TB" | "LR" }, "showai">;
+type DiagramNode = Node<
+  FlowNode & {
+    direction: "TB" | "LR";
+    boundAction?: boolean;
+    activation?: ComponentTarget;
+  },
+  "showai"
+>;
 // Only nodes that carry an explanation open the detail panel; the others are
 // fully described by their card.
 function explorable(node: FlowNode) {
@@ -245,6 +256,7 @@ function stageTone(stage: Stage): StageState | undefined {
 
 const NodeViewContext = createContext<Map<string, NodeView>>(new Map());
 function DiagramCard({ id, data, selected }: NodeProps<DiagramNode>) {
+  const interactions = useComponentInteractions();
   const t = useTranslator(messages);
   const view = useContext(NodeViewContext).get(id);
   const horizontal = data.direction === "LR";
@@ -252,7 +264,7 @@ function DiagramCard({ id, data, selected }: NodeProps<DiagramNode>) {
     "sf-node",
     `sf-${data.kind ?? "query"}`,
     selected && "is-selected",
-    explorable(data) && "is-explorable",
+    (explorable(data) || data.boundAction) && "is-explorable",
     view?.state && `sf-state-${view.state}`,
     view?.current && "is-current",
     view?.dim && "is-dim",
@@ -263,6 +275,16 @@ function DiagramCard({ id, data, selected }: NodeProps<DiagramNode>) {
     <div
       className={className}
       style={{ width: nodeWidth, minHeight: nodeHeight }}
+      role={data.boundAction ? "button" : undefined}
+      tabIndex={data.boundAction ? 0 : undefined}
+      aria-label={data.boundAction ? data.label : undefined}
+      onKeyDown={(event) => {
+        if (data.activation && (event.key === "Enter" || event.key === " ")) {
+          event.preventDefault();
+          event.stopPropagation();
+          interactions.activate(data.activation);
+        }
+      }}
     >
       <Handle
         id="t"
@@ -656,17 +678,31 @@ function FlowCanvas({
   view: PlaybackView;
 }) {
   const t = useTranslator(messages);
-  const explorableNodes = flow.nodes.filter(explorable);
+  const interactions = useComponentInteractions();
+  const target = (id: string) => ({ type: "node", scope: flow.id, id });
+  const explorableNodes = flow.nodes.filter(
+    (node) => explorable(node) || interactions.canActivate(target(node.id)),
+  );
   const marker = `sf${useId().replace(/[^a-zA-Z0-9_-]/g, "")}`;
   const layoutNodes = useMemo(() => layoutFlow(flow), [flow]);
   const initialNodes = useMemo(
     () =>
       layoutNodes.map((node) => ({
         ...node,
-        selectable: explorable(node.data),
+        data: {
+          ...node.data,
+          boundAction: interactions.canActivate(target(node.id)),
+          activation: interactions.canActivate(target(node.id))
+            ? target(node.id)
+            : undefined,
+        },
+        focusable: !interactions.canActivate(target(node.id)),
+        ariaLabel: node.data.label,
+        selectable:
+          explorable(node.data) || interactions.canActivate(target(node.id)),
         selected: node.id === selected,
       })),
-    [layoutNodes, selected],
+    [layoutNodes, selected, interactions, flow.id],
   );
   const [nodes, setNodes, onNodesChange] =
     useNodesState<DiagramNode>(initialNodes);
@@ -1029,6 +1065,7 @@ function PlaybackOutline({ flow }: { flow: Flow }) {
 // A display component: readers explore it, while its content and layout come
 // only from the saved data, so nothing here calls onChange.
 export function FlowchartBlock({ data: raw }: BlockProps) {
+  const interactions = useComponentInteractions();
   const instanceId = useId();
   const t = useTranslator(messages);
   const lock = useViewportLock("flowchart");
@@ -1131,6 +1168,8 @@ export function FlowchartBlock({ data: raw }: BlockProps) {
   }, [playing, playbackIndex, playbackTotal]);
   const selectNode = (id: string) => {
     const target = flow.nodes.find((item) => item.id === id);
+    if (target && interactions.activate({ type: "node", scope: flow.id, id }))
+      return;
     if (target && explorable(target)) setSelected(id);
     if (mode.kind !== "journey") return;
     const steps = flow.journeys!.find((item) => item.id === mode.id)!.steps;
