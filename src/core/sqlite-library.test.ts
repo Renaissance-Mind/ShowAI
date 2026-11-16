@@ -217,6 +217,32 @@ test("a committed SQLite operation recovers its projection and preserves concurr
     ),
   ).toBe(true);
 });
+test("an uncommitted candidate retains prepared inputs without changing SQLite or its projection", async () => {
+  const f = await fixture(),
+    library = new SqliteLibrary(f.root),
+    path = `projects/${f.project.id}/pages/${f.page.document.id}.json`,
+    parent = await library.head(),
+    original = await library.readFile(path),
+    prepared = JSON.parse(original.toString());
+  prepared.document.title = "Interrupted before commit";
+  const id = crypto.randomUUID(), candidate = "f".repeat(64),
+    directory = join(f.root, "local/transactions", id),
+    { atomicLibraryFile } = await import("./library-files");
+  expect(await library.hasRevision(candidate)).toBe(false);
+  await atomicLibraryFile(f.root, join(directory, "journal.json"), Buffer.from(JSON.stringify({
+    id, parent, candidate, paths: [path], before: {},
+  })));
+  const input = Buffer.from(JSON.stringify(prepared));
+  await atomicLibraryFile(f.root, join(directory, "input", path), input);
+  await library.recover();
+  expect(await library.head()).toBe(parent);
+  expect(await library.readFile(path)).toEqual(original);
+  expect(await readFile(join(library.workspace, path))).toEqual(original);
+  expect(await readdir(join(f.root, "local/transactions"))).toEqual([]);
+  const retained = join(f.root, "local/drafts", `interrupted-${id}`);
+  expect(await readFile(join(retained, "input", path))).toEqual(input);
+  expect(JSON.parse(await readFile(join(retained, "journal.json"), "utf8")).candidate).toBe(candidate);
+});
 test("legacy Git content and operation history migrate losslessly into SQLite", async () => {
   const f = await legacyFixture(),
     path = f.path,

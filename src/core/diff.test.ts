@@ -47,6 +47,65 @@ describe("semantic page changes", () => {
     expect(indexBlocks(normalizeDocument(duplicate)).size).toBe(4);
   });
 
+  it("recovers missing IDs from repeated prior content without reusing an occupied ID", () => {
+    const before = document();
+    before.content.content = ["first", "second", "third"].map((id) => ({
+      type: "paragraph",
+      attrs: { id },
+      content: [{ type: "text", text: "Repeated evidence" }],
+    }));
+    const input = structuredClone(before);
+    input.content.content![0].attrs!.id = "second";
+    delete input.content.content![1].attrs!.id;
+    delete input.content.content![2].attrs!.id;
+    const saved = normalizeDocument(input, before);
+    expect([...indexBlocks(saved).keys()]).toEqual(["second", "first", "third"]);
+    expect(before.content.content.map((node) => node.attrs!.id)).toEqual([
+      "first", "second", "third",
+    ]);
+    expect(input.content.content![1].attrs!.id).toBeUndefined();
+  });
+
+  it("repairs duplicate and missing IDs while preserving a shared prior document", () => {
+    const before = document(), original = structuredClone(before);
+    const input = {
+      ...before,
+      content: {
+        ...before.content,
+        content: [
+          ...before.content.content!,
+          structuredClone(before.content.content![0]),
+          { type: "paragraph", content: [{ type: "text", text: "New evidence" }] },
+        ],
+      },
+    };
+    const saved = normalizeDocument(input, before);
+    const ids = [...indexBlocks(saved).keys()];
+    expect(ids.slice(0, 2)).toEqual(["summary", "methods"]);
+    expect(new Set(ids).size).toBe(4);
+    expect(before).toEqual(original);
+    expect(input.content.content[0]).toBe(before.content.content![0]);
+    expect(saved.content.content![0]).not.toBe(before.content.content![0]);
+    expect(normalizeDocument(input, before)).toEqual(saved);
+  });
+
+  it("keeps prior ID recovery when trusted documents share nodes during duplicate repair", () => {
+    for (const sharedDocument of [true, false]) {
+      const before = document();
+      before.content.content!.push(
+        { ...structuredClone(before.content.content![0]), attrs: { id: "summary" } },
+        { ...structuredClone(before.content.content![1]), attrs: {} },
+      );
+      const input = sharedDocument ? before : {
+        ...before,
+        content: { ...before.content, content: [...before.content.content!] },
+      };
+      const expected = normalizeDocument(structuredClone(input), structuredClone(before), { validated: true });
+      expect(normalizeDocument(input, before, { validated: true })).toEqual(expected);
+      expect(new Set([...indexBlocks(expected).keys()]).size).toBe(4);
+    }
+  });
+
   it("hashes key ordering consistently and retains meaningful user data", () => {
     expect(canonicalJson({ z: 1, a: { y: 3, b: 2 } })).toBe(
       canonicalJson({ a: { b: 2, y: 3 }, z: 1 }),

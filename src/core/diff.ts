@@ -83,6 +83,7 @@ export function normalizeDocument(
   if (!options.validated) assertBindings(document);
   const used = new Set<string>();
   const oldIds = new Map<string, string[]>();
+  let indexedPrevious = false;
   const signature = (node: JSONContent) => {
     const strip = (item: JSONContent): JSONContent => {
       const { id: _id, ...attrs } = item.attrs ?? {};
@@ -94,18 +95,23 @@ export function normalizeDocument(
     };
     return canonicalJson(strip(node));
   };
-  if (previous)
-    walk(previous.content, (node) => {
-      if (
-        node.type !== "doc" &&
-        node.type !== "surface" &&
-        node.type !== "text" &&
-        typeof node.attrs?.id === "string"
-      ) {
-        const key = signature(node);
-        oldIds.set(key, [...(oldIds.get(key) ?? []), node.attrs.id]);
-      }
-    }, { scope: "tree" });
+  const previousIds = () => {
+    if (!indexedPrevious && previous)
+      walk(previous.content, (node) => {
+        if (
+          node.type !== "doc" &&
+          node.type !== "surface" &&
+          node.type !== "text" &&
+          typeof node.attrs?.id === "string"
+        ) {
+          const key = signature(node);
+          oldIds.set(key, [...(oldIds.get(key) ?? []), node.attrs.id]);
+        }
+      }, { scope: "tree" });
+    indexedPrevious = true;
+    return oldIds;
+  };
+  if (options.validated && previous) previousIds();
   const visit = (node: JSONContent, path: string) => {
     if (!["doc", "surface", "text"].includes(node.type ?? "")) {
       let id =
@@ -113,7 +119,7 @@ export function normalizeDocument(
           ? node.attrs.id
           : undefined;
       if (!id)
-        id = oldIds
+        id = previousIds()
           .get(signature(node))
           ?.find((candidate) => !used.has(candidate));
       if (!id || used.has(id))

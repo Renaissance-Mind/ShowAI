@@ -8,6 +8,7 @@ import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { promisify } from "node:util";
 import { chromium, _electron } from "playwright-core";
+import { checkBoardGestures } from "./containers-board-gestures.mjs";
 
 process.env.SHOWAI_LANGUAGE ??= "zh-CN";
 const root = resolve(import.meta.dirname, "..");
@@ -82,9 +83,10 @@ async function poll(read, test, label) {
   throw new Error(`Timed out: ${label}: ${JSON.stringify(value).slice(-1500)}`);
 }
 const editorOnly = process.argv.includes("--editor-only");
+const gesturesOnly = process.argv.includes("--gestures-only");
 const result = {
   passed: false,
-  scope: editorOnly ? "editor" : "full",
+  scope: gesturesOnly ? "gestures" : editorOnly ? "editor" : "full",
   output,
   cli,
   checks: [],
@@ -93,6 +95,7 @@ const result = {
 let browser, page, application, fixturePath;
 try {
   browser = await chromium.launch({
+    headless: true,
     executablePath: process.env.SHOWAI_BROWSER_EXECUTABLE,
   });
   if (desktop) {
@@ -133,6 +136,7 @@ try {
       catch(reason){throw new Error(JSON.stringify({action,code:reason?.code,message:reason?.message}))}
     }, {action,args});
   const project = await api("projects:create", { name: "Page / Board 验收" });
+  if (!gesturesOnly) {
   const created = await api("pages:create", {
     projectId: project.id,
     title: "递归内容工作页",
@@ -516,7 +520,10 @@ try {
     await page.locator(`[data-container-root="${nestedPageId}"]`).count(),
     1,
   );
-  await page.getByRole("button", { name: "显示侧栏", exact: true }).click();
+  assert.equal(
+    await page.locator(".studio-sidebar-shell").getAttribute("data-sidebar-mode"),
+    "docked",
+  );
   await page
     .getByRole("navigation", { name: "主要导航" })
     .getByRole("button", { name: "组件", exact: true })
@@ -846,8 +853,16 @@ try {
       "reload, templates, recursive offline HTML, partial inline delivery and narrow-screen reading preserve container structure",
     );
   }
-  assert.deepEqual(result.errors, []);
   result.finalSourceHash = (await read()).hash;
+  }
+  const gestures = await checkBoardGestures({ page, api, project, output, poll });
+  result.boardGestures = gestures.result;
+  result.checks.push(...gestures.result.checks);
+  if (gesturesOnly) {
+    fixturePath = gestures.record.path;
+    result.finalSourceHash = gestures.record.hash;
+  }
+  assert.deepEqual(result.errors, []);
   result.passed = true;
 } catch (error) {
   result.error = error.stack ?? String(error);

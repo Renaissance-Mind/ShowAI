@@ -190,12 +190,14 @@ export function useWorkspaceEditor(
         : create();
     instance.current = next;
     editorOwners.set(next, latest);
-    next.setEditable(latest.current.editable !== false, false);
+    const editable = latest.current.editable !== false;
+    if (next.options.editable !== editable) next.setEditable(editable, false);
     setEditor(next);
     return () => {
       if (editorOwners.get(next) === latest) {
         editorOwners.delete(next);
-        if (!next.isDestroyed) next.setEditable(false, false);
+        if (!next.isDestroyed && next.options.editable)
+          next.setEditable(false, false);
       }
       if (pool) return;
       destruction.current = setTimeout(() => {

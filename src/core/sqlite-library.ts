@@ -1143,7 +1143,7 @@ export class SqliteLibrary {
       id = randomUUID(),
       directory = join(this.root, "local", "transactions", id);
     await mkdir(directory, { recursive: true });
-    const journal: Journal = { id, parent, paths: record.paths, before };
+    const journal: Journal = { id, parent, candidate: revision, paths: record.paths, before };
     await this.atomicFile(
       join(directory, "journal.json"),
       Buffer.from(JSON.stringify(journal)),
@@ -1151,11 +1151,6 @@ export class SqliteLibrary {
     for (const [path, bytes] of changes)
       if (bytes !== null)
         await this.atomicFile(join(directory, "input", path), bytes);
-    journal.candidate = revision;
-    await this.atomicFile(
-      join(directory, "journal.json"),
-      Buffer.from(JSON.stringify(journal)),
-    );
     await this.commit(entry, encoded, parent, false, digests);
     const written = new Map<string, Buffer | null>();
     for (const path of record.paths)

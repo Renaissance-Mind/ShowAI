@@ -77,6 +77,7 @@ export function useQueuedMount() {
     parent: HTMLElement;
     chrome: number;
     baseline: number;
+    anchored: boolean;
   } | null>(null);
   useLayoutEffect(() => {
     const element = placeholder.current;
@@ -88,6 +89,7 @@ export function useQueuedMount() {
         parent,
         baseline,
         chrome: baseline - element.offsetHeight,
+        anchored: false,
       };
     }
     if (distanceFromView(element) <= VIEW_MARGIN) {
@@ -98,20 +100,29 @@ export function useQueuedMount() {
   }, [mounted, queue]);
   useLayoutEffect(() => {
     const target = measured.current;
-    if (!mounted || !target?.parent.isConnected) return;
+    if (!mounted || !target || target.anchored) return;
+    target.anchored = true;
+    if (!target.parent.isConnected) return;
     const scroller = target.parent.closest<HTMLElement>(".container-page");
     if (!scroller || scroller.dataset.restoringScroll) return;
-    const top = target.parent.getBoundingClientRect().top;
-    if (top + target.baseline <= scroller.getBoundingClientRect().top)
-      scroller.scrollTop += target.parent.offsetHeight - target.baseline;
+    const height = target.parent.offsetHeight;
+    const box = target.parent.getBoundingClientRect();
+    if (
+      height &&
+      box.top + (box.height * target.baseline) / height <=
+        scroller.getBoundingClientRect().top
+    )
+      scroller.scrollTop += height - target.baseline;
   }, [mounted]);
   useEffect(() => {
     const target = measured.current;
     if (!mounted || !target || !reader?.block) return;
     const { store, page, block } = reader;
-    const observer = new ResizeObserver(() => {
-      const height = target.parent.offsetHeight - target.chrome;
-      if (target.parent.offsetHeight && height > 0)
+    const observer = new ResizeObserver(([entry]) => {
+      const outerHeight =
+        entry.borderBoxSize?.[0]?.blockSize ?? target.parent.offsetHeight;
+      const height = outerHeight - target.chrome;
+      if (outerHeight && height > 0)
         store.write(page, block, HEIGHT_SLOT, Math.round(height));
     });
     observer.observe(target.parent);

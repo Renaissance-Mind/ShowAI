@@ -558,9 +558,33 @@ export function canCommitBoardGesture(
   if (!latest) return false;
   const same = (a: unknown, b: unknown) =>
     a === b || canonicalJson(a) === canonicalJson(b);
+  const attributes = (node: JSONContent) => {
+    if (
+      node.type !== "surface" ||
+      node.attrs?.kind !== "board" ||
+      !Object.hasOwn(node.attrs, "inkState")
+    )
+      return node.attrs;
+    const { inkState, ...editable } = node.attrs;
+    return editable;
+  };
+  const editableNode = (node: JSONContent): JSONContent => {
+    const attrs = attributes(node),
+      content = node.content?.map(editableNode);
+    return attrs === node.attrs &&
+      (!content || content.every((child, i) => child === node.content![i]))
+      ? node
+      : { ...node, attrs, ...(content ? { content } : {}) };
+  };
+  const sameNode = (one: JSONContent, two: JSONContent | undefined) =>
+    one === two || (!!two && same(editableNode(one), editableNode(two)));
   const index = indexSurfaceTree(original.content),
-    latestIndex = indexSurfaceTree(latest.content),
-    frames = new Set<string>();
+    latestIndex =
+      original.content === latest.content
+        ? index
+        : indexSurfaceTree(latest.content),
+    frames = new Set<string>(),
+    checked = new Set<string>();
   for (const id of ids) {
     if (!latest.layout?.[id]) return false;
     let entry = index.get(id);
@@ -568,22 +592,24 @@ export function canCommitBoardGesture(
     const fixedSurface =
       entry.node.type === "surface" &&
       original.layout?.[id]?.heightMode !== "auto";
-    if (!fixedSurface && !same(entry.node, latestIndex.get(id)?.node))
+    if (!fixedSurface && !sameNode(entry.node, latestIndex.get(id)?.node))
       return false;
     while (entry) {
       const key: string | undefined = entry.node.attrs?.id;
+      if (key && checked.has(key)) break;
       const actual: ReturnType<typeof latestIndex.get> = key
         ? latestIndex.get(key)
         : undefined;
       if (
         !actual ||
         entry.node.type !== actual.node.type ||
-        !same(entry.node.attrs, actual.node.attrs) ||
+        !same(attributes(entry.node), attributes(actual.node)) ||
         entry.parent?.attrs?.id !== actual.parent?.attrs?.id
       )
         return false;
       if (key && (original.layout?.[key] || latest.layout?.[key]))
         frames.add(key);
+      if (key) checked.add(key);
       entry = entry.parent?.attrs?.id
         ? index.get(entry.parent.attrs.id)
         : undefined;
