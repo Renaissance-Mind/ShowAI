@@ -10,6 +10,12 @@ import "./design/desktop.css";
 initLanguagePreference();
 installBrowserBridge();
 
+const startUiLab =
+  import.meta.env.DEV &&
+  new URLSearchParams(location.search).has("uiLabSession")
+    ? await (await import("./ui-lab/bootstrap")).prepareUiLab()
+    : undefined;
+
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <AppErrorBoundary>
@@ -17,3 +23,4 @@ createRoot(document.getElementById("root")!).render(
     </AppErrorBoundary>
   </StrictMode>,
 );
+void startUiLab?.();

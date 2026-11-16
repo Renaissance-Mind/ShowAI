@@ -101,6 +101,10 @@ Desktop smoke scripts default to `SHOWAI_BACKGROUND=1`; native windows and previ
 
 The launcher and container smoke tests delete their isolated source copies and libraries when they finish. Set `SHOWAI_KEEP_TEST_FIXTURES=1` to keep them for debugging, and delete them yourself afterwards.
 
+### UI scenario review
+
+For interactive UI review and reusable functional scenarios, see [UI scenarios](ui-lab.md). `npm run ui:lab` opens no window; `npm run test:ui` captures the real application with headless Chromium or hidden Electron.
+
 ### Headless interaction performance
 
 Build the production frontend with `npm run build`, install full Chromium with `npx playwright-core install chromium`, and create an output directory outside the source content library. Run:

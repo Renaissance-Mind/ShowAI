@@ -97,6 +97,10 @@ Vitest 配置位于 `vite.config.ts` 的 `test` 部分。测试文件为 `src/**
 
 启动器和容器冒烟测试结束后会删除隔离的源码副本和内容库。排查问题时设置 `SHOWAI_KEEP_TEST_FIXTURES=1` 可以保留它们，用完后请自行删除。
 
+### 界面场景审阅
+
+可交互界面审阅及可复用的功能场景见[界面场景](ui-lab.zh-CN.md)。`npm run ui:lab` 不打开窗口，`npm run test:ui` 使用无头 Chromium 或隐藏 Electron 截取真实应用。
+
 ### 无头交互性能测试
 
 先用 `npm run build` 构建生产前端，运行 `npx playwright-core install chromium` 安装完整 Chromium，并在来源内容库之外创建结果目录：

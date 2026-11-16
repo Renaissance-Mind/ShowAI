@@ -1,0 +1,190 @@
+* {
+  box-sizing: border-box;
+}
+body {
+  margin: 0;
+  background: #f4f4f2;
+  color: #302f2b;
+  font:
+    14px/1.5 -apple-system,
+    BlinkMacSystemFont,
+    "PingFang SC",
+    sans-serif;
+}
+button,
+select,
+a {
+  font: inherit;
+}
+button,
+select {
+  border: 1px solid #dadad5;
+  border-radius: 6px;
+  background: white;
+  color: inherit;
+  padding: 7px 10px;
+}
+button {
+  cursor: pointer;
+}
+button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+a {
+  color: inherit;
+}
+button:focus-visible,
+a:focus-visible,
+select:focus-visible {
+  outline: 2px solid #64856d;
+  outline-offset: 2px;
+}
+.ui-lab > header {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  height: 56px;
+  display: flex;
+  align-items: center;
+  gap: 28px;
+  padding: 0 22px;
+  border-bottom: 1px solid #ddd;
+  background: #fff;
+}
+.ui-lab h1 {
+  font-size: 19px;
+  margin: 0;
+}
+.ui-lab > header span {
+  color: #75756f;
+  font-size: 12px;
+}
+.ui-lab > aside {
+  width: 232px;
+  position: fixed;
+  top: 56px;
+  bottom: 0;
+  overflow: auto;
+  padding: 18px 12px;
+  border-right: 1px solid #ddd;
+  background: #fafaf8;
+}
+.ui-lab nav h2 {
+  font-size: 12px;
+  color: #777;
+  margin: 12px;
+}
+.ui-lab nav button {
+  display: block;
+  width: 100%;
+  text-align: left;
+  border: 0;
+  background: none;
+  margin: 3px 0;
+  padding: 9px 12px;
+}
+.ui-lab nav button[aria-current] {
+  background: #e6ebe5;
+  color: #2e4933;
+  font-weight: 550;
+}
+.ui-lab > main {
+  margin-left: 232px;
+  padding: 18px;
+  min-width: 0;
+}
+.ui-lab-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+.ui-lab-toolbar strong {
+  margin-right: auto;
+}
+.ui-lab-toolbar label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+}
+.ui-lab .primary {
+  background: #363c35;
+  color: #fff;
+}
+.ui-lab-status {
+  font-size: 12px;
+  color: #74746e;
+  margin: 8px 0;
+}
+.ui-lab-canvas {
+  width: 100%;
+  overflow: auto;
+  border: 1px solid #d9d9d5;
+  background: #ddd;
+  border-radius: 8px;
+}
+.ui-lab iframe {
+  display: block;
+  border: 0;
+  background: #fff;
+  min-width: 760px;
+}
+.ui-lab-events {
+  padding: 14px 0;
+}
+.ui-lab-events button {
+  margin: 10px 8px 0 0;
+}
+.ui-lab-results {
+  padding: 16px 0;
+}
+.ui-lab-results h2 {
+  font-size: 18px;
+}
+.ui-lab-result {
+  background: #fff;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 16px;
+}
+.ui-lab-result > summary {
+  cursor: pointer;
+}
+.ui-lab-shots {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 14px;
+}
+.ui-lab-shots a {
+  display: grid;
+  gap: 6px;
+  font-size: 12px;
+  text-decoration: none;
+}
+.ui-lab-shots img {
+  width: 100%;
+  border: 1px solid #ddd;
+}
+.ui-lab pre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  color: #a34837;
+  font:
+    12px/1.6 ui-monospace,
+    monospace;
+}
+@media (max-width: 900px) {
+  .ui-lab > aside {
+    width: 180px;
+  }
+  .ui-lab > main {
+    margin-left: 180px;
+  }
+  .ui-lab > header span {
+    display: none;
+  }
+}

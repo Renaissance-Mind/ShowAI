@@ -61,6 +61,13 @@ export interface BrowserServerOptions {
   cliEntry: string;
   settingsPath: string;
   registerAgentRuntime?: boolean;
+  additionalActions?: ReadonlySet<string>;
+  agentWorkspaceRoot?: string;
+  interceptInvoke?: (
+    action: string,
+    args: Record<string, unknown>,
+    next: () => Promise<unknown>,
+  ) => Promise<unknown>;
   development?: { origin: string; token: string; sourceCommit?: string };
 }
 
@@ -260,7 +267,9 @@ export async function startBrowserServer(options: BrowserServerOptions) {
   const agentHost = new AgentHost({
     resources: new ModelResourceClient(() => store.root),
     root: join(dirname(options.settingsPath), "agent-host"),
-    workspaceRoot: process.env.SHOWAI_AGENT_WORKSPACES || undefined,
+    workspaceRoot:
+      options.agentWorkspaceRoot ??
+      (process.env.SHOWAI_AGENT_WORKSPACES || undefined),
     library: () => store,
     cli: () => info().cli,
     pluginRoot: () =>
@@ -270,7 +279,11 @@ export async function startBrowserServer(options: BrowserServerOptions) {
   });
   const assets = (name: string) =>
     options.development
-      ? join(process.cwd(), "plugins", name === "agent-plugin" ? "showai" : "dsh-showai")
+      ? join(
+          process.cwd(),
+          "plugins",
+          name === "agent-plugin" ? "showai" : "dsh-showai",
+        )
       : resolve(dirname(options.cliEntry), "../assets", name);
   const pluginInstaller = new DesktopPluginInstaller({
     root: join(dirname(options.settingsPath), "external-plugins"),
@@ -610,7 +623,8 @@ export async function startBrowserServer(options: BrowserServerOptions) {
             (!workbenchActions.has(action) &&
               !agentActions.has(action) &&
               !desktopPluginActions.has(action) &&
-              !remoteDeviceActions.has(action)) ||
+              !remoteDeviceActions.has(action) &&
+              !options.additionalActions?.has(action)) ||
             !args ||
             typeof args !== "object" ||
             Array.isArray(args)
@@ -619,7 +633,11 @@ export async function startBrowserServer(options: BrowserServerOptions) {
               "INVALID_DATA",
               "Unknown action or invalid arguments.",
             );
-          data = await invoke(action, args);
+          data = options.interceptInvoke
+            ? await options.interceptInvoke(action, args, () =>
+                invoke(action, args),
+              )
+            : await invoke(action, args);
           const saved = (data as { path?: unknown } | null)?.path;
           const origin = clientId(request.headers["x-showai-client"]);
           if (action === "pages:save" && origin && typeof saved === "string")
@@ -735,6 +753,7 @@ export async function startBrowserServer(options: BrowserServerOptions) {
   }
   return {
     url: origin + "/",
+    localUrl: `http://127.0.0.1:${address.port}`,
     home: store.root,
     close,
   };

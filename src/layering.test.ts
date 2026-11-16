@@ -30,6 +30,7 @@ const LAYERS: readonly (readonly [string, readonly string[]])[] = [
       "workbench",
       "desktop",
       "browser",
+      "ui-lab",
       "App.tsx",
       "AppErrorBoundary.tsx",
       "CanvasApp.tsx",

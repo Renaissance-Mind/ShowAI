@@ -42,6 +42,8 @@ Guides describe the current source. The released app, the plugin and hosted serv
 
 ## Integration and development
 
+[UI scenarios](ui-lab.md) provides an interactive real-app Demo, shared interaction steps, background screenshots and visual comparison.
+
 | Guide                                                           | Contents                                               |
 | --------------------------------------------------------------- | ------------------------------------------------------ |
 | [Agent integration](agent-integration.md)                       | stdio/HTTP, OAuth, tools and presentation              |

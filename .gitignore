@@ -64,6 +64,8 @@ plugins/showai/scripts/cli.mjs
 !/docs/contributing-components.md
 !/docs/contributing-templates.md
 !/docs/development.md
+!/docs/ui-lab.md
+!/docs/i18n/ui-lab.zh-CN.md
 !/docs/g2-components.md
 !/docs/i18n/README.zh-CN.md
 !/docs/icons.md

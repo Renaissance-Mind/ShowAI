@@ -238,6 +238,10 @@
 .remote-form {
   gap: 20px;
 }
+.studio-modal > .remote-form {
+  padding: 20px;
+  overflow-y: auto;
+}
 .remote-form input,
 .remote-form select,
 .remote-steps input {
