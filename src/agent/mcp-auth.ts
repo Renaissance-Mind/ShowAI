@@ -61,6 +61,7 @@ export interface LocalMcpAuthorization {
   >;
   consumePairingCode(code: string): boolean;
   desktopApproval?: boolean;
+  accessKeyOnly?: boolean;
 }
 const token = () => randomBytes(32).toString("base64url");
 const hash = (value: string) =>
@@ -267,6 +268,63 @@ export class McpAuthorization {
   revoke(id: string) {
     this.remove("grant", id);
   }
+  async createAccessKey(name: string) {
+    if (!this.local?.accessKeyOnly)
+      throw new Error(
+        "Access keys are available only for direct LAN connections.",
+      );
+    if (!name.trim() || name.length > 100)
+      throw new Error("Enter a client name of 1 to 100 characters.");
+    const projects = (await this.local.projects()).filter((p) => !p.archived);
+    const grantedScopes = ["projects.read"];
+    if (
+      projects.some((p) => p.role !== "viewer") ||
+      this.local.access === "all"
+    )
+      grantedScopes.push("projects.write");
+    if (this.local.access === "all") grantedScopes.push("projects.create");
+    const clientId = token(),
+      credential = token();
+    const grant: ProjectGrant = {
+      id: token(),
+      clientId,
+      serverUrl: this.url,
+      serverId: "local",
+      user: { id: "local", name: "Local ShowAI" },
+      upstreamToken: "",
+      projectAccess: this.local.access === "all" ? "account" : "selected",
+      projectIds: this.local.access === "all" ? [] : projects.map((p) => p.id),
+      scopes: grantedScopes,
+    };
+    const ttl = 90 * 86400_000;
+    this.put(
+      "client",
+      clientId,
+      {
+        client_id: clientId,
+        client_name: name.trim(),
+        redirect_uris: [],
+        token_endpoint_auth_method: "none",
+      },
+      ttl,
+    );
+    this.put("grant", grant.id, grant, ttl);
+    this.put(
+      "access",
+      hash(credential),
+      {
+        grantId: grant.id,
+        clientId,
+        scopes: grantedScopes,
+      },
+      ttl,
+    );
+    return {
+      id: grant.id,
+      token: credential,
+      expiresAt: new Date(Date.now() + ttl).toISOString(),
+    };
+  }
   close() {
     this.db.close();
   }
@@ -314,7 +372,11 @@ export class McpAuthorization {
       scopes: string[];
     }>("access", hash(credential));
     const grant = access && this.get<ProjectGrant>("grant", access.grantId);
-    if (!grant || grant.clientId !== access?.clientId)
+    if (
+      !grant ||
+      grant.clientId !== access?.clientId ||
+      (this.local?.accessKeyOnly && grant.serverUrl !== this.url)
+    )
       throw new AuthorizationError(
         "The connection expired or was revoked. Reconnect ShowAI.",
       );
@@ -330,6 +392,7 @@ export class McpAuthorization {
     return { ...grant, scopes: allowed };
   }
   challenge(needed = "projects.read") {
+    if (this.local?.accessKeyOnly) return 'Bearer realm="ShowAI"';
     return `Bearer resource_metadata="${this.url}/.well-known/oauth-protected-resource", scope="${needed}"`;
   }
   private validateResource(value: unknown) {

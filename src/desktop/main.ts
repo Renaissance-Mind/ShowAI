@@ -859,6 +859,8 @@ async function handle(
         return remoteMcp.stop();
       case "remoteMcp:check":
         return remoteMcp.check();
+      case "remoteMcp:createAccessKey":
+        return remoteMcp.createAccessKey(String(args.name ?? ""));
       case "remoteMcp:requests":
         return remoteMcp.requests();
       case "remoteMcp:decide":

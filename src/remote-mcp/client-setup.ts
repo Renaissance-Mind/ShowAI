@@ -1,4 +1,12 @@
-import type { PairingStatus } from "./types";
+import type { PairingStatus, RemoteMcpProvider } from "./types";
+
+export const isTailscaleProvider = (provider: RemoteMcpProvider) =>
+  provider === "tailscale" || provider === "tailscale-private";
+
+export const isPublicProvider = (provider: RemoteMcpProvider) =>
+  provider === "cloudflare" ||
+  provider === "cloudflare-quick" ||
+  provider === "tailscale";
 
 export function oauthSetupValues(endpoint: string) {
   const url = new URL(endpoint);

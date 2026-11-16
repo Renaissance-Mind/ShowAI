@@ -6,6 +6,8 @@ import {
   Copy,
   ExternalLink,
   RefreshCw,
+  Network,
+  Globe,
 } from "../ui/icons";
 import { useTranslator } from "../i18n/react";
 import messages from "../i18n/messages/remoteMcp";
@@ -16,7 +18,11 @@ import type {
 } from "../remote-mcp/types";
 import { desktop, errorMessage } from "../host/bridge";
 import Dialog from "../ui/Dialog";
-import ChatgptConnectionGuide from "./ChatgptConnectionGuide";
+import RemoteMcpClientSetup from "./RemoteMcpClientSetup";
+import {
+  isPublicProvider,
+  isTailscaleProvider,
+} from "../remote-mcp/client-setup";
 import cloudflareLogo from "./assets/connection-brands/cloudflare.svg";
 import tailscaleLight from "./assets/connection-brands/tailscale-light.svg";
 import tailscaleDark from "./assets/connection-brands/tailscale-dark.svg";
@@ -28,6 +34,8 @@ type Screen =
   | "cloudflare-quick"
   | "domain"
   | "tailscale"
+  | "tailscale-private"
+  | "lan"
   | "client"
   | "connected";
 export default function RemoteMcpSettings() {
@@ -38,13 +46,11 @@ export default function RemoteMcpSettings() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [token, setToken] = useState("");
-  const [manualSetup, setManualSetup] = useState(true);
   const [pluginLink, setPluginLink] = useState("");
   const [exported, setExported] = useState<{ path: string; url: string }>();
+  const [revokedClientId, setRevokedClientId] = useState("");
   const [copied, setCopied] = useState("");
   const [routeStep, setRouteStep] = useState(0);
-  const [clientStep, setClientStep] = useState(0);
-  const [otherClient, setOtherClient] = useState(false);
   const [modal, setModal] = useState<
     "rules" | "tools" | "diagnostics" | "authorization" | "package" | null
   >(null);
@@ -69,21 +75,36 @@ export default function RemoteMcpSettings() {
         setState(value);
         if (!initialized.current) {
           initialized.current = true;
-          setConfig({ ...value.config, access: value.config.access ?? "all" });
+          setConfig({
+            ...value.config,
+            access: value.config.access ?? "all",
+            bindAddress:
+              value.config.bindAddress || value.addresses[0]?.address,
+          });
           if (value.phase === "prepared") setScreen("domain");
           else if (["starting", "running", "error"].includes(value.phase))
             setScreen(methodScreen(value.config.provider));
         }
         if (value.phase === "prepared" && value.error) setRouteStep(0);
-        if (value.phase === "error" || value.phase === "stopped")
+        if (
+          value.phase === "error" ||
+          value.phase === "stopped" ||
+          (value.phase === "running" && value.reachable === false)
+        )
           setScreen((current) =>
             current === "client" || current === "connected"
               ? methodScreen(value.config.provider)
               : current,
           );
-        if (value.phase === "prepared")
+        if (value.phase === "prepared" || value.phase === "running")
           setConfig((previous) =>
-            previous ? { ...previous, port: value.config.port } : previous,
+            previous
+              ? {
+                  ...previous,
+                  port: value.config.port,
+                  httpsPort: value.config.httpsPort,
+                }
+              : previous,
           );
         if (value.phase === "running" && value.reachable)
           setScreen((current) =>
@@ -139,14 +160,12 @@ export default function RemoteMcpSettings() {
       setModal(null);
       setState(await desktop.invoke<RemoteMcpStatus>("remoteMcp:status"));
       setExported(value);
-      setClientStep(1);
     }
   }
   async function stop() {
     attempt.current++;
     setState(await desktop.invoke<RemoteMcpStatus>("remoteMcp:stop"));
     setExported(undefined);
-    setClientStep(0);
   }
   async function choose(provider: RemoteMcpProvider) {
     await run(async () => {
@@ -155,9 +174,11 @@ export default function RemoteMcpSettings() {
         ...config!,
         provider,
         executable: "",
+        bindAddress: config!.bindAddress || state?.addresses[0]?.address,
         access: config!.access ?? "all",
         port:
-          provider === "cloudflare" && config!.provider === "cloudflare"
+          provider === config!.provider &&
+          ["cloudflare", "lan"].includes(provider)
             ? config!.port
             : 0,
       };
@@ -186,7 +207,8 @@ export default function RemoteMcpSettings() {
     const ticket = ++attempt.current;
     await run(async () => {
       if (
-        next.provider !== "tailscale" &&
+        next.provider !== "lan" &&
+        !isTailscaleProvider(next.provider) &&
         !(next.executable || state?.executables.cloudflare)
       ) {
         next = {
@@ -205,11 +227,12 @@ export default function RemoteMcpSettings() {
       setState(value);
       setToken("");
       setExported(undefined);
-      setClientStep(0);
     });
   }
   const logo = (provider: RemoteMcpProvider) =>
-    provider === "tailscale" ? (
+    provider === "lan" ? (
+      <Network className="remote-brand" size={30} />
+    ) : isTailscaleProvider(provider) ? (
       <span className="remote-brand">
         <img className="remote-logo-light" src={tailscaleLight} alt="" />
         <img className="remote-logo-dark" src={tailscaleDark} alt="" />
@@ -240,7 +263,7 @@ export default function RemoteMcpSettings() {
   const provider = config.provider;
   const toolReady = !!(
     config.executable ||
-    (provider === "tailscale"
+    (isTailscaleProvider(provider)
       ? state.executables.tailscale
       : state.executables.cloudflare)
   );
@@ -289,23 +312,37 @@ export default function RemoteMcpSettings() {
         <section className="remote-stage">
           <h3>{t("providerTitle")}</h3>
           <div className="remote-provider-cards">
+            <button aria-label={t("lan")} onClick={() => void choose("lan")}>
+              {logo("lan")}
+              <span>
+                <strong>{t("lan")}</strong>
+                <small>{t("lanHint")}</small>
+              </span>
+              <ArrowRight size={18} />
+            </button>
             <button
-              aria-label="Cloudflare"
+              aria-label={t("tailscalePrivate")}
+              onClick={() => void choose("tailscale-private")}
+            >
+              {logo("tailscale-private")}
+              <span>
+                <strong>{t("tailscalePrivate")}</strong>
+                <small>{t("tailscalePrivateHint")}</small>
+              </span>
+              <ArrowRight size={18} />
+            </button>
+            <button
+              aria-label={t("publicNetwork")}
               onClick={() => {
                 setError("");
                 setScreen("cloudflare");
               }}
             >
-              {logo("cloudflare")}
-              <strong>Cloudflare</strong>
-              <ArrowRight size={18} />
-            </button>
-            <button
-              aria-label="Tailscale"
-              onClick={() => void choose("tailscale")}
-            >
-              {logo("tailscale")}
-              <strong>Tailscale</strong>
+              <Globe className="remote-brand" size={30} />
+              <span>
+                <strong>{t("publicNetwork")}</strong>
+                <small>{t("publicNetworkHint")}</small>
+              </span>
               <ArrowRight size={18} />
             </button>
           </div>
@@ -317,12 +354,19 @@ export default function RemoteMcpSettings() {
             <ArrowLeft size={15} />
             {t("back")}
           </button>
-          <h3>{t("cloudflareChoice")}</h3>
+          <h3>{t("publicChoice")}</h3>
           <div className="remote-methods">
             <button onClick={() => void choose("cloudflare-quick")}>
               <span>
                 <strong>{t("quick")}</strong>
                 <small>{t("quickHint")}</small>
+              </span>
+              <ArrowRight size={18} />
+            </button>
+            <button onClick={() => void choose("tailscale")}>
+              <span>
+                <strong>{t("tailscalePublic")}</strong>
+                <small>{t("tailscalePublicHint")}</small>
               </span>
               <ArrowRight size={18} />
             </button>
@@ -346,7 +390,11 @@ export default function RemoteMcpSettings() {
                   ? "domainTitle"
                   : provider === "tailscale"
                     ? "tailscaleTitle"
-                    : "quickTitle",
+                    : provider === "tailscale-private"
+                      ? "tailscalePrivate"
+                      : provider === "lan"
+                        ? "lan"
+                        : "quickTitle",
               )}
             </h3>
           </header>
@@ -412,6 +460,73 @@ export default function RemoteMcpSettings() {
             </div>
           ) : (
             <>
+              {provider === "lan" && (
+                <form
+                  className="remote-form"
+                  onSubmit={(event) => {
+                    event.preventDefault();
+                    void connect();
+                  }}
+                >
+                  <label>
+                    {t("networkAddress")}
+                    <select
+                      value={config.bindAddress ?? ""}
+                      onChange={(event) =>
+                        setConfig({
+                          ...config,
+                          bindAddress: event.target.value,
+                          port: 0,
+                        })
+                      }
+                      required
+                    >
+                      <option value="" disabled>
+                        {t("selectAddress")}
+                      </option>
+                      {state.addresses.map((entry) => (
+                        <option key={entry.address} value={entry.address}>
+                          {entry.address} · {entry.name}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <p>{t("lanTransport")}</p>
+                  {!state.addresses.length && (
+                    <p role="status">{t("noNetworkAddress")}</p>
+                  )}
+                  <div className="remote-primary-row">
+                    <button
+                      className="settings-button primary"
+                      type="submit"
+                      disabled={
+                        !state.addresses.some(
+                          (entry) => entry.address === config.bindAddress,
+                        )
+                      }
+                    >
+                      {t("startLan")}
+                      <ArrowRight size={16} />
+                    </button>
+                    <button
+                      className="remote-secondary"
+                      type="button"
+                      onClick={() =>
+                        void run(async () =>
+                          setState(
+                            await desktop.invoke<RemoteMcpStatus>(
+                              "remoteMcp:status",
+                              { refresh: true },
+                            ),
+                          ),
+                        )
+                      }
+                    >
+                      {t("refreshAddresses")}
+                    </button>
+                  </div>
+                </form>
+              )}
               {provider === "cloudflare-quick" && (
                 <div className="remote-primary-row">
                   <button
@@ -435,27 +550,16 @@ export default function RemoteMcpSettings() {
                   </button>
                 </div>
               )}
-              {provider === "tailscale" && (
-                <div className="remote-steps">
-                  <div>
-                    <span>1</span>
-                    {link(
-                      "https://tailscale.com/download",
-                      t("installTailscale"),
+              {isTailscaleProvider(provider) && (
+                <div className="remote-chatgpt-guide">
+                  <p>
+                    {t(
+                      provider === "tailscale-private"
+                        ? "tailscalePrivateSetup"
+                        : "tailscaleSetup",
                     )}
-                  </div>
-                  <div>
-                    <span>2</span>
-                    <section>
-                      {link(
-                        "https://login.tailscale.com/admin/dns",
-                        t("tailscaleSettings"),
-                      )}
-                      <p>{t("tailscaleSetup")}</p>
-                    </section>
-                  </div>
-                  <div>
-                    <span>3</span>
+                  </p>
+                  <div className="remote-primary-row">
                     <button
                       className="settings-button primary"
                       onClick={() => void connect()}
@@ -463,13 +567,24 @@ export default function RemoteMcpSettings() {
                       {t("tailscaleCheck")}
                       <ArrowRight size={16} />
                     </button>
+                    <button
+                      className="remote-secondary"
+                      onClick={() => setModal("tools")}
+                    >
+                      {t("chooseTool")}
+                    </button>
                   </div>
-                  <button
-                    className="remote-secondary"
-                    onClick={() => setModal("tools")}
-                  >
-                    {t("chooseTool")}
-                  </button>
+                  <details>
+                    <summary>{t("tailscaleConfiguration")}</summary>
+                    {link(
+                      "https://tailscale.com/download",
+                      t("installTailscale"),
+                    )}
+                    {link(
+                      "https://login.tailscale.com/admin/dns",
+                      t("tailscaleSettings"),
+                    )}
+                  </details>
                 </div>
               )}
               {provider === "cloudflare" && (
@@ -577,153 +692,23 @@ export default function RemoteMcpSettings() {
             <Check size={20} />
             <h3>{t("connected")}</h3>
           </header>
-          <div className="remote-steps">
-            <div>
-              <span>{clientStep > 0 ? <Check size={14} /> : 1}</span>
-              <section>
-                {manualSetup ? (
-                  <>
-                    <label>{t("endpoint")}</label>
-                    <code>{state.url}</code>
-                    <button
-                      className="settings-button primary"
-                      disabled={pending}
-                      onClick={() =>
-                        void run(async () => {
-                          await copy(state.url!, "endpoint");
-                          setClientStep(Math.max(1, clientStep));
-                        })
-                      }
-                    >
-                      {t(copied === "endpoint" ? "copied" : "copyEndpoint")}
-                    </button>
-                  </>
-                ) : (
-                  <>
-                    <button
-                      className="settings-button primary"
-                      disabled={pending}
-                      onClick={() => void run(() => exportPlugin())}
-                    >
-                      {t(
-                        exported?.url === state.url
-                          ? "exportAgain"
-                          : "exportPlugin",
-                      )}
-                    </button>
-                    {exported?.url === state.url && (
-                      <p role="status">{t("exportReady")}</p>
-                    )}
-                    {provider === "cloudflare-quick" && (
-                      <p>{t("quickPackage")}</p>
-                    )}
-                  </>
-                )}
-              </section>
-            </div>
-            {clientStep >= 1 && (
-              <div>
-                <span>{clientStep > 1 ? <Check size={14} /> : 2}</span>
-                <section>
-                  {!manualSetup ? (
-                    <>
-                      {link("https://chatgpt.com/plugins", t("importPlugin"))}
-                      <p>{t("importStep")}</p>
-                      {clientStep === 1 && (
-                        <button
-                          className="settings-button"
-                          onClick={() => setClientStep(2)}
-                        >
-                          {t("importConnected")}
-                        </button>
-                      )}
-                    </>
-                  ) : otherClient ? (
-                    <>
-                      <p>{t("addOther")}</p>
-                      <button
-                        className="settings-button"
-                        onClick={() => setClientStep(2)}
-                      >
-                        {t("addedOther")}
-                      </button>
-                    </>
-                  ) : (
-                    <>
-                      {link("https://chatgpt.com/plugins", t("openChatgpt"))}
-                      {clientStep === 1 && (
-                        <ChatgptConnectionGuide
-                          endpoint={state.url!}
-                          busy={pending}
-                          onCopy={(text) => copy(text, "field")}
-                          onCheck={async () => {
-                            const value =
-                              await desktop.invoke<RemoteMcpStatus>(
-                                "remoteMcp:check",
-                              );
-                            setState(value);
-                            if (!value.reachable)
-                              throw new Error(value.error || t("errorTitle"));
-                            return true;
-                          }}
-                          onReady={() => setClientStep(2)}
-                        />
-                      )}
-                    </>
-                  )}
-                  {manualSetup && (
-                    <button
-                      className="remote-secondary"
-                      onClick={() => setOtherClient(!otherClient)}
-                    >
-                      {t(otherClient ? "chatgptClient" : "otherClient")}
-                    </button>
-                  )}
-                </section>
-              </div>
-            )}
-            {clientStep >= 2 && (
-              <div>
-                <span>3</span>
-                <section>
-                  <h4>{t("authorize")}</h4>
-                  <button
-                    className="settings-button"
-                    disabled={pending}
-                    onClick={() => void run(() => exportPlugin())}
-                  >
-                    {t("exportPlugin")}
-                  </button>
-                  <p>{t("localApprovalStep")}</p>
-                  <p>{t("verifyInstructions")}</p>
-                  <button
-                    className="settings-button"
-                    onClick={() =>
-                      void run(() => copy(t("verifyPrompt"), "prompt"))
-                    }
-                  >
-                    {t(copied === "prompt" ? "copied" : "copyPrompt")}
-                  </button>
-                  <p role="status">{t("waiting")}</p>
-                  <button
-                    className="settings-button"
-                    onClick={() => setModal("authorization")}
-                  >
-                    {t("authWindowExpired")}
-                  </button>
-                </section>
-              </div>
-            )}
-          </div>
-          <button
-            className="remote-secondary"
-            onClick={() => {
-              setManualSetup(!manualSetup);
-              setClientStep(0);
+          <RemoteMcpClientSetup
+            key={state.url}
+            state={state}
+            busy={pending}
+            onCopy={(text) => copy(text, "client")}
+            onExport={() => exportPlugin()}
+            exported={exported?.url === state.url}
+            revokedClientId={revokedClientId}
+            onCheck={async () => {
+              const value =
+                await desktop.invoke<RemoteMcpStatus>("remoteMcp:check");
+              setState(value);
+              if (!value.reachable)
+                throw new Error(value.error || t("errorTitle"));
+              return true;
             }}
-          >
-            {t(manualSetup ? "packageSetup" : "manualSetup")}
-          </button>
+          />
           <button
             className="remote-secondary"
             onClick={() =>
@@ -733,7 +718,7 @@ export default function RemoteMcpSettings() {
               })
             }
           >
-            {t("disconnect")}
+            {t("changeMode")}
           </button>
         </section>
       )}
@@ -745,13 +730,15 @@ export default function RemoteMcpSettings() {
           </header>
           <code>{state.url}</code>
           <div className="remote-primary-row">
-            <button
-              className="settings-button primary"
-              disabled={pending}
-              onClick={() => void run(() => exportPlugin())}
-            >
-              {t("exportPlugin")}
-            </button>
+            {isPublicProvider(provider) && (
+              <button
+                className="settings-button primary"
+                disabled={pending}
+                onClick={() => void run(() => exportPlugin())}
+              >
+                {t("exportPlugin")}
+              </button>
+            )}
             <button
               className="settings-button"
               onClick={() => void run(() => copy(state.url!, "endpoint"))}
@@ -765,7 +752,6 @@ export default function RemoteMcpSettings() {
                   state.clients.map((client) => client.id),
                 );
                 awaitingClient.current = true;
-                setClientStep(0);
                 setExported(undefined);
                 setScreen("client");
               }}
@@ -784,6 +770,11 @@ export default function RemoteMcpSettings() {
               {t("disconnect")}
             </button>
           </div>
+        </section>
+      )}
+      {stage === 2 && state.clients.length > 0 && (
+        <section className="remote-client-list" aria-label={t("clients")}>
+          <h4>{t("clients")}</h4>
           {state.clients.map((c) => (
             <div className="remote-client" key={c.id}>
               <span>{c.name}</span>
@@ -797,6 +788,7 @@ export default function RemoteMcpSettings() {
                         { id: c.id },
                       ),
                     );
+                    setRevokedClientId(c.id);
                   })
                 }
               >

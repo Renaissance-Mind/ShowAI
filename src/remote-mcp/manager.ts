@@ -10,9 +10,11 @@ import type { RemoteMcpConfig, RemoteMcpStatus } from "./types";
 import { installCloudflared } from "./install";
 import { localLibraryPolicy } from "./local-library";
 import { PairingCodes } from "./pairing";
+import { isTailscaleProvider } from "./client-setup";
+import { isLanAddress, lanAddresses, tailscalePort } from "./network";
 
 const defaults: RemoteMcpConfig = {
-  provider: "cloudflare-quick",
+  provider: "lan",
   publicUrl: "",
   port: 0,
   access: "all",
@@ -23,12 +25,22 @@ export function validateRemoteMcpConfig(value: unknown): RemoteMcpConfig {
   const c = value as RemoteMcpConfig;
   if (
     !c ||
-    !["cloudflare-quick", "cloudflare", "tailscale"].includes(c.provider) ||
+    ![
+      "lan",
+      "tailscale-private",
+      "cloudflare-quick",
+      "cloudflare",
+      "tailscale",
+    ].includes(c.provider) ||
     !Number.isInteger(c.port) ||
     (c.port !== 0 && c.port < 1024) ||
     c.port > 65535 ||
     typeof c.publicUrl !== "string" ||
     typeof c.executable !== "string" ||
+    (c.bindAddress !== undefined &&
+      (typeof c.bindAddress !== "string" ||
+        (c.bindAddress !== "" && !isLanAddress(c.bindAddress)))) ||
+    (c.httpsPort !== undefined && ![443, 8443, 10000].includes(c.httpsPort)) ||
     (c.executable && !isAbsolute(c.executable)) ||
     (c.access !== undefined && !["all", "selected"].includes(c.access)) ||
     (c.chatgptAppId !== undefined &&
@@ -70,6 +82,8 @@ export function validateRemoteMcpConfig(value: unknown): RemoteMcpConfig {
     port: c.port,
     publicUrl,
     executable: c.executable.trim(),
+    ...(c.bindAddress ? { bindAddress: c.bindAddress } : {}),
+    ...(c.httpsPort ? { httpsPort: c.httpsPort } : {}),
     projects,
   };
 }
@@ -87,6 +101,7 @@ export class RemoteMcpManager {
   private lastCallClientId?: string;
   private child?: ChildProcess;
   private childClosed?: Promise<void>;
+  private connectorClosed = true;
   private http?: Awaited<ReturnType<typeof startMcpHttpServer>>;
   private readonly pairing = new PairingCodes();
   private instanceId = randomBytes(16).toString("hex");
@@ -219,6 +234,7 @@ export class RemoteMcpManager {
         .filter((p) => !p.archived)
         .map((p) => ({ id: p.id, name: p.name })),
       executables: this.executables,
+      addresses: lanAddresses(),
     };
   }
   private command<T>(operation: () => Promise<T>): Promise<T> {
@@ -259,7 +275,8 @@ export class RemoteMcpManager {
     const home = this.options.home();
     return {
       root: home,
-      desktopApproval: true,
+      desktopApproval: c.provider !== "lan",
+      accessKeyOnly: c.provider === "lan",
       ...localLibraryPolicy(home, c),
       consumePairingCode: (code: string) => this.pairing.consume(code),
       onCall: (_name: string, clientId: string) => {
@@ -275,7 +292,13 @@ export class RemoteMcpManager {
       stateDirectory: join(
         this.options.directory,
         createHash("sha256")
-          .update(this.options.home() + (origin ?? this.instanceId))
+          .update(
+            this.options.home() +
+              (origin ??
+                (c.provider === "lan"
+                  ? `lan:${c.bindAddress}`
+                  : this.instanceId)),
+          )
           .digest("hex"),
       ),
     };
@@ -285,12 +308,18 @@ export class RemoteMcpManager {
     try {
       return await startMcpHttpServer({
         ...options,
-        port: c.provider === "cloudflare" ? c.port : 0,
+        host: c.provider === "lan" ? c.bindAddress : undefined,
+        port: ["cloudflare", "lan"].includes(c.provider) ? c.port : 0,
         publicUrl: origin,
       });
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code !== "EADDRINUSE") throw error;
-      return startMcpHttpServer({ ...options, port: 0, publicUrl: origin });
+      return startMcpHttpServer({
+        ...options,
+        host: c.provider === "lan" ? c.bindAddress : undefined,
+        port: 0,
+        publicUrl: origin,
+      });
     }
   }
   private async startImpl(value: unknown, token?: unknown) {
@@ -305,6 +334,13 @@ export class RemoteMcpManager {
       throw new Error("Enter the public HTTPS domain before connecting.");
     if (config.access === "selected" && !config.projects.length)
       throw new Error("Select at least one project.");
+    if (
+      config.provider === "lan" &&
+      !lanAddresses().some((entry) => entry.address === config.bindAddress)
+    )
+      throw new Error(
+        "Select an available local network address. Reconnect to Wi-Fi or Ethernet and refresh the address list.",
+      );
     const store = new FileStore(this.options.home());
     for (const p of config.projects) await store.readProject(p.id);
     if (
@@ -351,21 +387,35 @@ export class RemoteMcpManager {
     return this.status();
   }
   private async launch(signal: AbortSignal) {
+    const c = this.config;
+    if (c.provider === "lan") {
+      this.http = await this.openListener(c);
+      this.config = { ...c, port: Number(new URL(this.http.localUrl).port) };
+      this.restrictGrants();
+      await this.persist();
+      signal.throwIfAborted();
+      await this.check();
+      signal.throwIfAborted();
+      if (!this.reachable)
+        throw new Error(this.error || "Cannot reach the selected LAN address.");
+      this.phase = "running";
+      return;
+    }
     await this.discover();
     signal.throwIfAborted();
-    const c = this.config;
     const executable =
       c.executable ||
-      (c.provider === "tailscale"
+      (isTailscaleProvider(c.provider)
         ? this.executables.tailscale
         : this.executables.cloudflare);
     if (!executable)
       throw new Error(
-        `Install ${c.provider === "tailscale" ? "Tailscale" : "cloudflared"}, then check again.`,
+        `Install ${isTailscaleProvider(c.provider) ? "Tailscale" : "cloudflared"}, then check again.`,
       );
     await access(executable, constants.X_OK);
     let origin = c.provider === "cloudflare" ? c.publicUrl : undefined;
-    if (c.provider === "tailscale") {
+    let httpsPort = 443;
+    if (isTailscaleProvider(c.provider)) {
       const status = await execute(executable, ["status", "--json"], {
         timeout: 15000,
         signal,
@@ -375,7 +425,7 @@ export class RemoteMcpManager {
       const state = JSON.parse(status.stdout);
       if (state.BackendState !== "Running" || !state.Self?.DNSName)
         throw new Error(
-          "Open Tailscale, sign in and enable MagicDNS before starting Funnel.",
+          "Open Tailscale, sign in and enable MagicDNS and HTTPS before connecting.",
         );
       const serving = await execute(executable, ["serve", "status", "--json"], {
         timeout: 15000,
@@ -387,19 +437,9 @@ export class RemoteMcpManager {
             "Cannot inspect existing Tailscale Serve configuration.",
         );
       const existing = JSON.parse(serving.stdout || "{}");
-      const occupied = (value: {
-        TCP?: Record<string, unknown>;
-        Foreground?: Record<string, { TCP?: Record<string, unknown> }>;
-      }) =>
-        !!value.TCP?.["443"] ||
-        Object.values(value.Foreground ?? {}).some(
-          (config) => !!config.TCP?.["443"],
-        );
-      if (occupied(existing))
-        throw new Error(
-          "Tailscale port 443 already serves another application. Keep it running; use a dedicated Tailscale device or remove that route yourself before enabling ShowAI.",
-        );
-      origin = `https://${String(state.Self.DNSName).replace(/\.$/, "")}`;
+      httpsPort = tailscalePort(existing, c.httpsPort);
+      this.config = { ...c, httpsPort };
+      origin = `https://${String(state.Self.DNSName).replace(/\.$/, "")}${httpsPort === 443 ? "" : `:${httpsPort}`}`;
     }
     if (this.http)
       await this.http.configure({
@@ -407,11 +447,8 @@ export class RemoteMcpManager {
         publicUrl: origin ?? this.http.localUrl,
       });
     else this.http = await this.openListener(c, origin);
-    if (c.access !== "selected") {
-      for (const client of this.http.authorization.connections())
-        if (client.projectAccess !== "account")
-          this.http.authorization.revoke(client.id);
-    }
+    this.restrictGrants();
+    await this.persist();
     const actualPort = Number(new URL(this.http.localUrl).port);
     if (c.provider === "cloudflare" && actualPort !== c.port) {
       this.config = { ...c, port: actualPort };
@@ -425,21 +462,27 @@ export class RemoteMcpManager {
       c.provider === "cloudflare"
         ? this.options.decrypt(this.encryptedToken!)
         : "";
-    const args =
-      c.provider === "tailscale"
-        ? ["funnel", "--yes", String(actualPort)]
-        : c.provider === "cloudflare"
-          ? ["tunnel", "--no-autoupdate", "run"]
-          : ["tunnel", "--no-autoupdate", "--url", this.http.localUrl];
+    const args = isTailscaleProvider(c.provider)
+      ? [
+          c.provider === "tailscale-private" ? "serve" : "funnel",
+          "--yes",
+          `--https=${httpsPort}`,
+          String(actualPort),
+        ]
+      : c.provider === "cloudflare"
+        ? ["tunnel", "--no-autoupdate", "run"]
+        : ["tunnel", "--no-autoupdate", "--url", this.http.localUrl];
     const child = spawn(executable, args, {
       stdio: ["ignore", "pipe", "pipe"],
       windowsHide: true,
+      detached: process.platform !== "win32",
       env: {
         ...process.env,
         TUNNEL_TOKEN: tunnelToken || undefined,
       },
     });
     this.child = child;
+    this.connectorClosed = false;
     let output = "";
     let resolveUrl: (url: string) => void;
     let rejectUrl: (reason: Error) => void;
@@ -463,6 +506,7 @@ export class RemoteMcpManager {
     child.once("error", (error) => rejectUrl(error));
     this.childClosed = new Promise((resolve) =>
       child.once("close", (code) => {
+        this.connectorClosed = true;
         rejectUrl(new Error(output || `Tunnel exited (${code}).`));
         if (!signal.aborted) {
           this.phase = "error";
@@ -533,7 +577,7 @@ export class RemoteMcpManager {
       const health = await response.json();
       if (!response.ok || health.instanceId !== expected)
         throw new Error(
-          "The public address does not reach this ShowAI instance. Check the tunnel route and local port.",
+          "The connection address does not reach this ShowAI instance. Check the network address and route.",
         );
       if (current === this.http) {
         this.reachable = true;
@@ -552,6 +596,39 @@ export class RemoteMcpManager {
     }
     this.checkedAt = new Date().toISOString();
     return this.status();
+  }
+  private restrictGrants() {
+    if (this.config.access !== "selected")
+      for (const client of this.http!.authorization.connections())
+        if (client.projectAccess !== "account")
+          this.http!.authorization.revoke(client.id);
+  }
+  private async persist() {
+    const path = join(this.options.directory, "config.json");
+    await writeFile(
+      path + ".tmp",
+      JSON.stringify({
+        config: this.config,
+        encryptedToken: this.encryptedToken,
+        managedCloudflared: this.managedCloudflared,
+        resumeOnLaunch: this.resumeOnLaunch,
+      }),
+      { mode: 0o600 },
+    );
+    await rename(path + ".tmp", path);
+  }
+  createAccessKey(name: string) {
+    return this.command(async () => {
+      if (
+        this.config.provider !== "lan" ||
+        this.phase !== "running" ||
+        !this.http
+      )
+        throw new Error(
+          "Start a direct LAN connection before creating an access key.",
+        );
+      return this.http.authorization.createAccessKey(name);
+    });
   }
   rememberChatgptApp(id: string, endpoint: string) {
     return this.command(async () => {
@@ -634,11 +711,22 @@ export class RemoteMcpManager {
   private async cleanup() {
     const child = this.child;
     this.child = undefined;
-    if (child && child.exitCode === null && child.signalCode === null) {
-      child.kill("SIGTERM");
-      const timer = setTimeout(() => child.kill("SIGKILL"), 5000);
-      await this.childClosed;
-      clearTimeout(timer);
+    if (child?.pid && !this.connectorClosed) {
+      const signal = (value: NodeJS.Signals) => {
+        try {
+          if (process.platform === "win32") child.kill(value);
+          else process.kill(-child.pid!, value);
+        } catch (error) {
+          if ((error as NodeJS.ErrnoException).code !== "ESRCH") throw error;
+        }
+      };
+      signal("SIGTERM");
+      const timer = setTimeout(() => signal("SIGKILL"), 5000);
+      try {
+        await this.childClosed;
+      } finally {
+        clearTimeout(timer);
+      }
     }
     const http = this.http;
     this.http = undefined;

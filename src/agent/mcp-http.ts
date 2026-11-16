@@ -10,6 +10,7 @@ import { mkdir, readFile, readdir, writeFile, rm } from "node:fs/promises";
 import { isAbsolute, join, resolve } from "node:path";
 import { randomBytes, randomUUID } from "node:crypto";
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
+import { isLanAddress } from "../remote-mcp/network";
 import {
   type RegisteredTool,
   type ToolCallback,
@@ -145,7 +146,8 @@ export async function createMcpHttpApp(options: McpHttpOptions) {
     (url.protocol !== "https:" &&
       !(
         url.protocol === "http:" &&
-        ["127.0.0.1", "localhost", "[::1]"].includes(url.hostname)
+        (["127.0.0.1", "localhost", "[::1]"].includes(url.hostname) ||
+          (options.local?.accessKeyOnly && isLanAddress(url.hostname)))
       ))
   )
     throw new Error(
@@ -305,8 +307,9 @@ export async function createMcpHttpApp(options: McpHttpOptions) {
                     ...(options.local
                       ? {
                           storage: "local",
-                          authorization:
-                            "Approve the matching connection request in the desktop ShowAI App; the OAuth page returns automatically. Older versions may use a pairing code. Access follows the desktop library policy and OAuth grant. Full-library grants include future projects and project creation; selected grants stay restricted. Writes save directly in the desktop library; no cloud synchronization is required. Do not use device filesystem paths.",
+                          authorization: options.local.accessKeyOnly
+                            ? "This direct LAN connection uses an access key created in desktop ShowAI. Configure the client Authorization: Bearer header. Keys follow the desktop project policy, expire after 90 days, and can be revoked in ShowAI. Writes save directly in the desktop library. Do not use device filesystem paths."
+                            : "Approve the matching connection request in the desktop ShowAI App; the OAuth page returns automatically. Older versions may use a pairing code. Access follows the desktop library policy and OAuth grant. Full-library grants include future projects and project creation; selected grants stay restricted. Writes save directly in the desktop library; no cloud synchronization is required. Do not use device filesystem paths.",
                         }
                       : {}),
                     tools: [...remoteTools].sort(),
@@ -827,6 +830,13 @@ export async function createMcpHttpApp(options: McpHttpOptions) {
             tool._meta = { ...tool._meta, securitySchemes: oauth(false) };
           if (tool._meta?.securitySchemes)
             tool.securitySchemes = tool._meta.securitySchemes;
+          if (options.local?.accessKeyOnly) {
+            tool.securitySchemes = [{ type: "http", scheme: "bearer" }];
+            tool._meta = {
+              ...tool._meta,
+              securitySchemes: tool.securitySchemes,
+            };
+          }
         }
       return json(output, response.status);
     } finally {
@@ -857,7 +867,15 @@ export async function createMcpHttpApp(options: McpHttpOptions) {
             ? { browserRendering: options.browserRendering }
             : {}),
         });
-      const auth = await authorization.fetch(request);
+      if (
+        options.local?.accessKeyOnly &&
+        (target.pathname.startsWith("/oauth/") ||
+          target.pathname.startsWith("/.well-known/"))
+      )
+        return json({ error: "This LAN connection uses access keys." }, 404);
+      const auth = options.local?.accessKeyOnly
+        ? undefined
+        : await authorization.fetch(request);
       if (auth) return auth;
       const asset = target.pathname.match(
         /^\/artifacts\/([A-Za-z0-9_-]{43})\/(page\.html|inline\.html|online\.html|compact\.html|page\.showai\.json)$/,
@@ -906,6 +924,24 @@ export async function createMcpHttpApp(options: McpHttpOptions) {
         return json({ error: "Use Streamable HTTP POST." }, 405, {
           allow: "POST",
         });
+      if (options.local?.accessKeyOnly) {
+        try {
+          authorization.verify(
+            request.headers
+              .get("authorization")
+              ?.match(/^Bearer ([A-Za-z0-9_-]+)$/)?.[1],
+          );
+        } catch (error) {
+          if (!(error instanceof AuthorizationError)) throw error;
+          return new Response(JSON.stringify({ error: error.code }), {
+            status: 401,
+            headers: {
+              "content-type": "application/json",
+              "www-authenticate": authorization.challenge(),
+            },
+          });
+        }
+      }
       let raw: string;
       try {
         raw = await readCapacityText(
@@ -1346,7 +1382,11 @@ export async function startMcpHttpServer(
   const address = server.address();
   if (!address || typeof address === "string")
     throw new Error("MCP server has no TCP address.");
-  const localUrl = `http://127.0.0.1:${address.port}`;
+  const host =
+    options.host && !["0.0.0.0", "::"].includes(options.host)
+      ? options.host
+      : "127.0.0.1";
+  const localUrl = `http://${host.includes(":") ? `[${host}]` : host}:${address.port}`;
   try {
     await options.durableState?.restore();
     app = await createMcpHttpApp({

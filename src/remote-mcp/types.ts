@@ -8,7 +8,8 @@ export interface RemoteApprovalRequest {
   createdAt: string;
   expiresAt: string;
 }
-export type RemoteMcpProvider = "cloudflare-quick" | "cloudflare" | "tailscale";
+export type RemoteMcpProvider =
+  "lan" | "tailscale-private" | "cloudflare-quick" | "cloudflare" | "tailscale";
 export interface PairingStatus {
   id: string;
   expiresAt: string;
@@ -19,6 +20,8 @@ export interface RemoteMcpConfig {
   publicUrl: string;
   port: number;
   executable: string;
+  bindAddress?: string;
+  httpsPort?: number;
   access?: "all" | "selected";
   chatgptAppId?: string;
   chatgptEndpoint?: string;
@@ -46,6 +49,7 @@ export interface RemoteMcpStatus {
   }>;
   projects: Array<{ id: string; name: string }>;
   executables: { cloudflare: string | null; tailscale: string | null };
+  addresses: Array<{ name: string; address: string }>;
 }
 export const remoteMcpActions = new Set([
   "remoteMcp:installCloudflare",
@@ -54,6 +58,7 @@ export const remoteMcpActions = new Set([
   "remoteMcp:start",
   "remoteMcp:stop",
   "remoteMcp:check",
+  "remoteMcp:createAccessKey",
   "remoteMcp:pair",
   "remoteMcp:requests",
   "remoteMcp:decide",

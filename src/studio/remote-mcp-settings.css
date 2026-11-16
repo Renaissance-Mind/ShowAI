@@ -54,8 +54,8 @@
 }
 .remote-provider-cards {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 16px;
+  grid-template-columns: 1fr;
+  gap: 12px;
 }
 .remote-provider-cards > button {
   display: flex;
@@ -72,9 +72,18 @@
   border-color: var(--muted);
 }
 .remote-provider-cards strong {
-  flex: 1;
   font-weight: 500;
   font-size: 15px;
+}
+.remote-provider-cards > button > span:not(.remote-brand) {
+  flex: 1;
+  display: grid;
+  gap: 6px;
+}
+.remote-provider-cards small {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.5;
 }
 .remote-brand {
   width: 44px;
@@ -241,6 +250,14 @@
   border-radius: 6px;
   font: inherit;
 }
+.remote-secret {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.remote-secret input {
+  min-width: 0;
+}
 .remote-rule-row {
   display: flex;
   align-items: center;
@@ -331,6 +348,71 @@
   display: grid;
   gap: 12px;
   min-width: 0;
+}
+.remote-client-setup {
+  display: grid;
+  gap: 20px;
+  min-width: 0;
+}
+.remote-client-setup h4 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 500;
+}
+.remote-client-progress {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 20px;
+  padding: 0;
+  margin: 0 0 8px;
+  list-style: none;
+  font-size: 12px;
+  color: var(--muted);
+}
+.remote-client-progress li[aria-current] {
+  color: var(--text);
+  font-weight: 550;
+}
+.remote-client-progress li[data-done="true"] {
+  color: var(--text);
+}
+.remote-guide-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 10px;
+  border-top: 1px solid var(--line);
+  padding-top: 20px;
+  margin-top: 8px;
+}
+.remote-instructions {
+  margin: 0;
+  padding-left: 22px;
+  display: grid;
+  gap: 14px;
+  font-size: 13px;
+  line-height: 1.7;
+}
+.remote-flow details,
+.remote-chatgpt-guide details {
+  font-size: 12px;
+  color: var(--muted);
+}
+.remote-flow summary,
+.remote-chatgpt-guide summary {
+  cursor: pointer;
+  width: fit-content;
+}
+.remote-flow details[open] > :not(summary),
+.remote-chatgpt-guide details[open] > :not(summary) {
+  margin-top: 12px;
+}
+.remote-plugin-option {
+  border-top: 1px solid var(--line);
+  padding-top: 16px;
+}
+.remote-plugin-option .settings-button {
+  margin-right: 10px;
 }
 .remote-chatgpt-guide h4,
 .remote-chatgpt-guide p {

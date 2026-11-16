@@ -117,4 +117,4 @@ npm run release:mac -- --headline "最显著的变化" --changes changes.json --
 
 ## 桌面远程 MCP 验证
 
-`npm run test:remote-mcp` 构建 App，以真实内容库验证本机 OAuth 和项目权限，再用隐藏 Electron 验证设置页。`SHOWAI_SMOKE_OUTPUT` 指定截图与结果目录，`TMPDIR` 指定临时库目录；测试结束清理临时库和连接器进程。可选 `SHOWAI_TEST_CLOUDFLARED` 指向真实 cloudflared 程序，执行公网 Quick Tunnel 的 OAuth/MCP 检查；`SHOWAI_TEST_DOWNLOAD=1` 校验真实官方工具下载。网络检查受提供方与本机网络影响。固定 Cloudflare 和 Tailscale 账号授权需要所有者配置，不模拟账号或网络服务。
+`npm run test:remote-mcp` 构建 App，以真实内容库验证本机 OAuth 和项目权限，再用隐藏 Electron 验证设置页。`SHOWAI_SMOKE_OUTPUT` 指定截图与结果目录，`TMPDIR` 指定临时库目录；测试结束清理临时库和连接器进程。可选 `SHOWAI_TEST_CLOUDFLARED` 指向真实 cloudflared 程序，执行公网 Quick Tunnel 的 OAuth/MCP 检查；`SHOWAI_TEST_DOWNLOAD=1` 校验真实官方工具下载。网络检查受提供方与本机网络影响。局域网测试使用可用的真实私网网卡，覆盖密钥授权、只读权限、撤销与 App 重启。可选 `SHOWAI_TEST_TAILSCALE` 指向已登录的 Tailscale 程序，执行真实 Serve/Funnel 的 HTTPS、OAuth 和页面保存检查，并验证退出连接器及保留已有路由；需要所有者已配置的 tailnet，选择空闲 HTTPS 端口，不修改账号权限。固定 Cloudflare 账号授权需要所有者配置，不模拟账号或网络服务。
