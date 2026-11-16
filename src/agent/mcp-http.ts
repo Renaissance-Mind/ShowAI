@@ -41,6 +41,7 @@ import { serverBaseUrl } from "../sync/server-url";
 import { FileStore } from "../core/store";
 import type { CloudBrowserCheck } from "./cloud-browser-check";
 import { getMcpGuide } from "./mcp-guides";
+import { McpCallLog, type McpLogResponse } from "./mcp-call-log";
 import {
   mcpSkillGuide,
   mcpSkillNames,
@@ -90,12 +91,14 @@ type StoredArtifact = {
   expires: number;
   publicSource: boolean;
 };
+const responseMetadata = new WeakMap<Response, McpLogResponse>();
 const json = (
   value: unknown,
   status = 200,
   headers: Record<string, string> = {},
-) =>
-  new Response(JSON.stringify(value), {
+) => {
+  const text = JSON.stringify(value);
+  const response = new Response(text, {
     status,
     headers: {
       "content-type": "application/json",
@@ -103,6 +106,13 @@ const json = (
       ...headers,
     },
   });
+  responseMetadata.set(response, {
+    value,
+    outputBytes: Buffer.byteLength(text),
+    httpStatus: status,
+  });
+  return response;
+};
 
 export interface McpHttpOptions {
   stateDirectory: string;
@@ -143,6 +153,12 @@ export async function createMcpHttpApp(options: McpHttpOptions) {
     );
   const origin = url.origin,
     state = resolve(options.stateDirectory);
+  const callLog = new McpCallLog({
+    transport: "http",
+    directory: options.local
+      ? join(options.local.root, "local", "mcp-logs")
+      : join(state, "logs", "mcp"),
+  });
   const servers = (options.syncServers ?? []).map(serverBaseUrl);
   await mkdir(state, { recursive: true, mode: 0o700 });
   const authorization = await McpAuthorization.open(
@@ -951,263 +967,299 @@ export async function createMcpHttpApp(options: McpHttpOptions) {
               : {}),
           },
         });
-      try {
-        if (
-          name &&
-          (!publicTools.has(name) ||
-            (options.local &&
-              [
-                "render_document",
-                "show_component",
-                "presentation_source",
-              ].includes(name)))
-        ) {
-          const bearer = request.headers
-            .get("authorization")
-            ?.match(/^Bearer ([A-Za-z0-9_-]+)$/)?.[1];
-          const grant = authorization.verify(
-            bearer,
-            name === "project_create"
-              ? "projects.create"
-              : writeTools.has(name)
-                ? "projects.write"
-                : "projects.read",
-          );
-          if (options.local && publicTools.has(name))
-            return execute(request, body, undefined, grant);
-          if (
-            options.local &&
-            name === "project_create" &&
-            (options.local.access !== "all" ||
-              grant.projectAccess !== "account")
-          )
-            return toolError(
-              new Error(
-                "Create projects in ShowAI, then select them for remote access.",
-              ),
-            );
-          if (name === "projects_list" || name === "project_create")
-            return execute(request, body, undefined, grant);
-          if (
-            (name === "page_create" || name === "page_save") &&
-            ["components", "remoteComponents"].some(
-              (key) => params?.arguments?.[key] !== undefined,
-            )
-          )
-            return toolError(
-              new Error(
-                "This connection accepts saved component references. Use component_save before page creation/saving; components and remoteComponents are not supported parameters.",
-              ),
-            );
-          const project = params?.arguments?.projectId;
-          if (typeof project !== "string" || !project)
-            return toolError(new Error("Pass projectId from projects_list."));
-          const participants = [project];
-          for (const key of ["destinationProjectId", "relativeProjectId"])
-            if (typeof params?.arguments?.[key] === "string")
-              participants.push(params.arguments[key] as string);
-          if (
-            options.local &&
-            ["catalog_version", "catalog_merge_preview"].includes(name)
-          ) {
-            for (const key of ["ref", "base", "ours", "theirs"]) {
-              const reference = params?.arguments?.[key] as
-                { projectId?: unknown } | undefined;
-              if (typeof reference?.projectId === "string")
-                participants.push(reference.projectId);
-            }
-          }
-          const operation = `${name}:${String(params?.arguments?.action ?? "")}`;
-          if (options.local) {
-            const projects = (await options.local.projects()).filter(
-              (p) =>
-                grant.projectAccess === "account" ||
-                grant.projectIds.includes(p.id),
-            );
-            const writers = new Set([project]);
-            if (
-              operation === "organization_update:move" &&
-              typeof params?.arguments?.destinationProjectId === "string"
-            )
-              writers.add(params.arguments.destinationProjectId);
-            for (const id of participants) {
-              const selected = projects.find((p) => p.id === id);
+      return callLog.run(
+        body,
+        async (loggedCall) => {
+          const dispatch = async () => {
+            try {
               if (
-                !selected ||
-                (writeTools.has(name) &&
-                  writers.has(id) &&
-                  selected.role === "viewer")
-              )
-                throw new AuthorizationError(
-                  "This project or operation is not allowed by the device owner.",
-                  "access_denied",
-                  403,
+                name &&
+                (!publicTools.has(name) ||
+                  (options.local &&
+                    [
+                      "render_document",
+                      "show_component",
+                      "presentation_source",
+                    ].includes(name)))
+              ) {
+                const bearer = request.headers
+                  .get("authorization")
+                  ?.match(/^Bearer ([A-Za-z0-9_-]+)$/)?.[1];
+                const grant = authorization.verify(
+                  bearer,
+                  name === "project_create"
+                    ? "projects.create"
+                    : writeTools.has(name)
+                      ? "projects.write"
+                      : "projects.read",
                 );
-            }
-            const context: RemoteWorkspaceContext = {
-              root: options.local.root,
-              projectId: project,
-              projectIds: projects.map((p) => p.id),
-              projectMap: Object.fromEntries(projects.map((p) => [p.id, p.id])),
-            };
-            const response = await withDatasetAccess(
-              {
-                root: context.root,
-                read: new Set(context.projectIds),
-                write: new Set(
-                  projects
-                    .filter(
-                      (p) =>
-                        p.role !== "viewer" &&
-                        grant.scopes.includes("projects.write"),
+                callLog.authorize(loggedCall, grant.id);
+                if (options.local && publicTools.has(name))
+                  return execute(request, body, undefined, grant);
+                if (
+                  options.local &&
+                  name === "project_create" &&
+                  (options.local.access !== "all" ||
+                    grant.projectAccess !== "account")
+                )
+                  return toolError(
+                    new Error(
+                      "Create projects in ShowAI, then select them for remote access.",
+                    ),
+                  );
+                if (name === "projects_list" || name === "project_create")
+                  return execute(request, body, undefined, grant);
+                if (
+                  (name === "page_create" || name === "page_save") &&
+                  ["components", "remoteComponents"].some(
+                    (key) => params?.arguments?.[key] !== undefined,
+                  )
+                )
+                  return toolError(
+                    new Error(
+                      "This connection accepts saved component references. Use component_save before page creation/saving; components and remoteComponents are not supported parameters.",
+                    ),
+                  );
+                const project = params?.arguments?.projectId;
+                if (typeof project !== "string" || !project)
+                  return toolError(
+                    new Error("Pass projectId from projects_list."),
+                  );
+                const participants = [project];
+                for (const key of ["destinationProjectId", "relativeProjectId"])
+                  if (typeof params?.arguments?.[key] === "string")
+                    participants.push(params.arguments[key] as string);
+                if (
+                  options.local &&
+                  ["catalog_version", "catalog_merge_preview"].includes(name)
+                ) {
+                  for (const key of ["ref", "base", "ours", "theirs"]) {
+                    const reference = params?.arguments?.[key] as
+                      { projectId?: unknown } | undefined;
+                    if (typeof reference?.projectId === "string")
+                      participants.push(reference.projectId);
+                  }
+                }
+                const operation = `${name}:${String(params?.arguments?.action ?? "")}`;
+                if (options.local) {
+                  const projects = (await options.local.projects()).filter(
+                    (p) =>
+                      grant.projectAccess === "account" ||
+                      grant.projectIds.includes(p.id),
+                  );
+                  const writers = new Set([project]);
+                  if (
+                    operation === "organization_update:move" &&
+                    typeof params?.arguments?.destinationProjectId === "string"
+                  )
+                    writers.add(params.arguments.destinationProjectId);
+                  for (const id of participants) {
+                    const selected = projects.find((p) => p.id === id);
+                    if (
+                      !selected ||
+                      (writeTools.has(name) &&
+                        writers.has(id) &&
+                        selected.role === "viewer")
                     )
-                    .map((p) => p.id),
-                ),
-              },
-              () => execute(request, body, context, grant),
-            );
-            const result = await response.json();
-            if (result.result?.structuredContent) {
-              result.result.structuredContent.persistence = {
-                storage: "local",
-                synchronized: false,
-              };
-              result.result.content.push({
-                type: "text",
-                text: JSON.stringify({
-                  persistence: result.result.structuredContent.persistence,
-                }),
-              });
-            }
-            return json(result, response.status);
-          }
-          if (sidebarOperations.has(operation))
-            participants.push(
-              ...(await workspaces.projects(grant, true)).map((p) => p.id),
-            );
-          const { value, synchronization, synchronizations } =
-            await workspaces.withProjects(
-              grant,
-              participants,
-              writeTools.has(name),
-              (context) => execute(request, body, context, grant),
-              {
-                administrator:
-                  operation === "organization_update:update_project" &&
-                  typeof params?.arguments?.archived === "boolean"
-                    ? project
-                    : undefined,
-                synchronizeWrites:
-                  !draftTools.has(name) &&
-                  ![
-                    "organization_update:create_group",
-                    "organization_update:update_group",
-                  ].includes(operation),
-                writeProjectIds: writeTools.has(name)
-                  ? [
-                      project,
-                      ...(operation === "organization_update:move" &&
-                      typeof params?.arguments?.destinationProjectId ===
-                        "string"
-                        ? [params.arguments.destinationProjectId]
-                        : []),
-                    ]
-                  : [],
-                afterSynchronization: async (response, context) => {
+                      throw new AuthorizationError(
+                        "This project or operation is not allowed by the device owner.",
+                        "access_denied",
+                        403,
+                      );
+                  }
+                  const context: RemoteWorkspaceContext = {
+                    root: options.local.root,
+                    projectId: project,
+                    projectIds: projects.map((p) => p.id),
+                    projectMap: Object.fromEntries(
+                      projects.map((p) => [p.id, p.id]),
+                    ),
+                  };
+                  const response = await withDatasetAccess(
+                    {
+                      root: context.root,
+                      read: new Set(context.projectIds),
+                      write: new Set(
+                        projects
+                          .filter(
+                            (p) =>
+                              p.role !== "viewer" &&
+                              grant.scopes.includes("projects.write"),
+                          )
+                          .map((p) => p.id),
+                      ),
+                    },
+                    () => execute(request, body, context, grant),
+                  );
                   const result = await response.json();
-                  const data = result.result?.structuredContent?.data;
-                  if (result.result && !result.result.isError && data) {
-                    const store = new FileStore(context.root);
-                    const refresh = async (
-                      record: {
-                        document?: { id?: string };
-                        hash?: string;
-                        revision?: string;
-                      },
-                      remoteId: string,
-                    ) => {
-                      if (!record?.document?.id || !record.hash) return;
-                      const current = await store.readPage(
-                        context.projectMap[remoteId],
-                        record.document.id,
-                      );
-                      if (record.hash === current.hash)
-                        record.revision = current.revision;
+                  if (result.result?.structuredContent) {
+                    result.result.structuredContent.persistence = {
+                      storage: "local",
+                      synchronized: false,
                     };
-                    if (data.document) await refresh(data, project);
-                    if (data.page)
-                      await refresh(
-                        data.page,
-                        typeof params?.arguments?.destinationProjectId ===
-                          "string"
-                          ? params.arguments.destinationProjectId
-                          : project,
-                      );
+                    result.result.content.push({
+                      type: "text",
+                      text: JSON.stringify({
+                        persistence:
+                          result.result.structuredContent.persistence,
+                      }),
+                    });
                   }
                   return json(result, response.status);
-                },
-              },
-            );
-          const result = await value.json();
-          if (result.result && !result.result.isError) {
-            result.result.structuredContent = {
-              ...(result.result.structuredContent ?? {}),
-              synchronization,
-              ...(synchronizations.length > 1 ? { synchronizations } : {}),
-              ...(draftTools.has(name) || sidebarOperations.has(operation)
-                ? {
-                    workspace: {
-                      scope: "connection",
-                      draftsSynchronized: false,
-                      sidebarOrganizationSynchronized: false,
+                }
+                if (sidebarOperations.has(operation))
+                  participants.push(
+                    ...(await workspaces.projects(grant, true)).map(
+                      (p) => p.id,
+                    ),
+                  );
+                const { value, synchronization, synchronizations } =
+                  await workspaces.withProjects(
+                    grant,
+                    participants,
+                    writeTools.has(name),
+                    (context) => execute(request, body, context, grant),
+                    {
+                      administrator:
+                        operation === "organization_update:update_project" &&
+                        typeof params?.arguments?.archived === "boolean"
+                          ? project
+                          : undefined,
+                      synchronizeWrites:
+                        !draftTools.has(name) &&
+                        ![
+                          "organization_update:create_group",
+                          "organization_update:update_group",
+                        ].includes(operation),
+                      writeProjectIds: writeTools.has(name)
+                        ? [
+                            project,
+                            ...(operation === "organization_update:move" &&
+                            typeof params?.arguments?.destinationProjectId ===
+                              "string"
+                              ? [params.arguments.destinationProjectId]
+                              : []),
+                          ]
+                        : [],
+                      afterSynchronization: async (response, context) => {
+                        const result = await response.json();
+                        const data = result.result?.structuredContent?.data;
+                        if (result.result && !result.result.isError && data) {
+                          const store = new FileStore(context.root);
+                          const refresh = async (
+                            record: {
+                              document?: { id?: string };
+                              hash?: string;
+                              revision?: string;
+                            },
+                            remoteId: string,
+                          ) => {
+                            if (!record?.document?.id || !record.hash) return;
+                            const current = await store.readPage(
+                              context.projectMap[remoteId],
+                              record.document.id,
+                            );
+                            if (record.hash === current.hash)
+                              record.revision = current.revision;
+                          };
+                          if (data.document) await refresh(data, project);
+                          if (data.page)
+                            await refresh(
+                              data.page,
+                              typeof params?.arguments?.destinationProjectId ===
+                                "string"
+                                ? params.arguments.destinationProjectId
+                                : project,
+                            );
+                        }
+                        return json(result, response.status);
+                      },
                     },
+                  );
+                const result = await value.json();
+                if (result.result && !result.result.isError) {
+                  result.result.structuredContent = {
+                    ...(result.result.structuredContent ?? {}),
+                    synchronization,
+                    ...(synchronizations.length > 1
+                      ? { synchronizations }
+                      : {}),
+                    ...(draftTools.has(name) || sidebarOperations.has(operation)
+                      ? {
+                          workspace: {
+                            scope: "connection",
+                            draftsSynchronized: false,
+                            sidebarOrganizationSynchronized: false,
+                          },
+                        }
+                      : {}),
+                  };
+                  const data = result.result.structuredContent.data;
+                  if (data && typeof data === "object" && data.persistence) {
+                    data.synchronization = synchronization;
+                    data.persistence.synchronized =
+                      synchronization.state === "synced";
                   }
-                : {}),
-            };
-            const data = result.result.structuredContent.data;
-            if (data && typeof data === "object" && data.persistence) {
-              data.synchronization = synchronization;
-              data.persistence.synchronized =
-                synchronization.state === "synced";
-            }
-            let rewritten = false;
-            result.result.content = (result.result.content ?? []).map(
-              (item: { type: string; text?: string }) =>
-                item.type === "text" && (name !== "board_read" || !rewritten)
-                  ? {
+                  let rewritten = false;
+                  result.result.content = (result.result.content ?? []).map(
+                    (item: { type: string; text?: string }) =>
+                      item.type === "text" &&
+                      (name !== "board_read" || !rewritten)
+                        ? {
+                            type: "text",
+                            text:
+                              ((rewritten = true),
+                              JSON.stringify(result.result.structuredContent)),
+                          }
+                        : item,
+                  );
+                  if (synchronization.state !== "synced") {
+                    result.result.isError = true;
+                    result.result.content.push({
                       type: "text",
-                      text:
-                        ((rewritten = true),
-                        JSON.stringify(result.result.structuredContent)),
-                    }
-                  : item,
-            );
-            if (synchronization.state !== "synced") {
-              result.result.isError = true;
-              result.result.content.push({
-                type: "text",
-                text: "The local replica retained the result, but synchronization did not complete. Inspect synchronization before reporting success.",
-              });
+                      text: "The local replica retained the result, but synchronization did not complete. Inspect synchronization before reporting success.",
+                    });
+                  }
+                }
+                return json(result, value.status);
+              }
+              if (name === "render_document" || name === "show_component") {
+                if (renderCount >= 2)
+                  return toolError(
+                    new Error(
+                      "Two presentations are rendering. Retry shortly.",
+                    ),
+                  );
+                renderCount++;
+                try {
+                  return await execute(request, body);
+                } finally {
+                  renderCount--;
+                }
+              }
+              return execute(request, body);
+            } catch (error) {
+              if (loggedCall && error instanceof AuthorizationError)
+                loggedCall.errorCode = error.code;
+              return toolError(error);
             }
-          }
-          return json(result, value.status);
-        }
-        if (name === "render_document" || name === "show_component") {
-          if (renderCount >= 2)
-            return toolError(
-              new Error("Two presentations are rendering. Retry shortly."),
-            );
-          renderCount++;
-          try {
-            return await execute(request, body);
-          } finally {
-            renderCount--;
-          }
-        }
-        return execute(request, body);
-      } catch (error) {
-        return toolError(error);
-      }
+          };
+          return options.durableState
+            ? options.durableState.run(dispatch, () =>
+                authorization.checkpoint(),
+              )
+            : dispatch();
+        },
+        (response) => {
+          const metadata = responseMetadata.get(response);
+          responseMetadata.delete(response);
+          return metadata ?? { httpStatus: response.status };
+        },
+        {
+          inputBytes: Buffer.byteLength(raw),
+          sessionId: request.headers.get("mcp-session-id") ?? undefined,
+        },
+      );
     },
     close() {
       authorization.close();
@@ -1269,7 +1321,8 @@ export async function startMcpHttpServer(
         },
       );
       const response =
-        options.durableState && new URL(request.url).pathname !== "/health"
+        options.durableState &&
+        !["/health", "/mcp"].includes(new URL(request.url).pathname)
           ? await options.durableState.run(
               () => app!.fetch(request),
               () => app!.authorization.checkpoint(),

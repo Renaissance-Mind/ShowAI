@@ -17,6 +17,7 @@ import { mcpFailure, mcpSuccess } from "./presentation-tools";
 import { withChangeContext, changeContext } from "../core/history-context";
 import { openLibrary } from "../core/open-library";
 import { recordConnections } from "./mcp-connections";
+import { recordMcpCalls } from "./mcp-call-log";
 import { mcpChangeContext } from "./mcp-actor";
 
 export function createLibraryMcpServer(options: {
@@ -42,8 +43,7 @@ export function createLibraryMcpServer(options: {
     projectId: "unselected",
     projectAccess: "library",
     sourceContext: inherited,
-    instructions:
-      "guide first; projectId for projects.",
+    instructions: "guide first; projectId for projects.",
     decorateTool(name, tool) {
       if (name === "guide") return;
       if (name === "project_context") {
@@ -167,6 +167,7 @@ export async function startLibraryMcp(
     maxBufferSize: CAPACITY.authoringRequestBytes,
   });
   recordConnections(transport, options.root);
+  recordMcpCalls(transport, options.root);
   await createLibraryMcpServer(options).connect(transport);
   process.stderr.write(
     "ShowAI MCP connected to the configured library. Select projectId explicitly.\n",

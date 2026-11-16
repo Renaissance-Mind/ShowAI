@@ -62,6 +62,16 @@ HTTP 私有工具沿用项目操作名，显式传 projectId 并检查 OAuth。p
 
 OAuth 提供发现、DCR、S256 PKCE、resource 绑定、过期访问 token、轮换刷新、授权与撤销。授权流程登录既有 ShowAI 账号，不自动创建或合并。GitHub/Google 使用配置服务器的身份来源：新标签页完成后，把一次性完成码填回发起授权的标签页，再确认项目/账号权限。密码仅转交明确配置的服务器，不保存在网关；上游会话凭据进入私有状态以执行授权操作。
 
+## MCP 调用日志
+
+源码运行时将每次 `tools/call` 记录为 `started` 和 `completed` 两条 JSONL 事件。项目绑定和内容库 stdio 入口（包括内置 Agent）写入 `<内容库>/local/mcp-logs/`；公共 stdio 使用同级目录 `<内容库>.mcp-logs/`，避免初始化内容库。本地 HTTP 使用 `<内容库>/local/mcp-logs/`，托管网关写入 `<stateDirectory>/logs/mcp/`。重新构建运行时并重启 MCP 进程后生效；只安装 Skill 不会更新正在运行的代码。
+
+统计调用次数时筛选 `event == "completed"`。记录包含 UTC 时间、传输方式、工具与 action、应用及插件版本、输入输出 JSON 字节数、毫秒耗时、状态（`success`、`error`、`cancelled`、`interrupted` 或 `transport_error`）和错误码。`callId` 关联开始与完成事件，`instanceId` 和 `sequence` 表示同一写入实例内的调用顺序。stdio 包含初始化时的客户端名称、版本及会话 ID。HTTP 是无状态入口，仅在调用方提供 `mcp-session-id` 时记录会话标识；授权调用还记录授权标识。资源、请求、操作、分组、授权和调用方提供的会话 ID 均保存为 SHA-256 摘要的前 24 位十六进制字符。只有 `started` 的记录可能表示仍在执行或进程意外退出；stdio 正常关闭会将未完成调用记为中断，收到取消通知后的失败会标为取消。HTTP 耗时包含项目同步及已配置的持久化检查点，不包含客户端接收和宿主渲染时间。
+
+日志省略参数对象、文档与源码正文、返回正文、请求头、凭据和错误消息；元数据标签经过限长与脱敏。每个写入实例使用独立文件，单文件达到 5 MiB 时轮转，最多保留三份，避免多进程轮转冲突。首次写入及之后最多每天一次检查并清理超过 30 天未更新的日志文件。POSIX 系统的日志文件仅所有者可读写。日志 I/O 失败时每个写入实例向 stderr 提示一次，不影响工具执行。
+
+启动运行时前设置 `SHOWAI_MCP_LOG=0` 可关闭日志，设置 `SHOWAI_MCP_LOG_DIRECTORY=/absolute/private/path` 可指定目录。日志保留在所属实例中，不会自动汇集到统一分析服务。无效 JSON、因主机名、Origin 或请求大小被拒绝的请求及非工具方法不属于调用日志的覆盖范围。
+
 ## ChatGPT 与展示宿主
 
 接入官方服务见 [ChatGPT 网页指南](chatgpt.zh-CN.md)。MCP Apps 资源使用 text/html;profile=mcp-app、_meta.ui.resourceUri 及 ChatGPT 兼容字段。页面从工具结果元数据进入宿主沙盒，自定义组件使用 Shadow DOM 内联运行。

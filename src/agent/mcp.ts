@@ -23,7 +23,7 @@ import {
 import { followAppLanguage } from "../core/app-language";
 import { GUIDE_TOPICS } from "./guides";
 import { getMcpGuide } from "./mcp-guides";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import { writeCachedPresentation } from "./presentation-cache";
 import type { TemplateSelection } from "./template-workflow";
 import { strictToolInputs } from "./mcp-actions";
@@ -31,6 +31,7 @@ import { pageWriteCapture, type PageWrite } from "../core/page-write-capture";
 import { savePageWrites } from "../agent-host/page-undo";
 import { WorkspaceService } from "./workspace-service";
 import { recordConnections } from "./mcp-connections";
+import { recordMcpCalls } from "./mcp-call-log";
 import { mcpChangeContext } from "./mcp-actor";
 import { PROJECT_TOOLS } from "./mcp-tools";
 import {
@@ -216,6 +217,7 @@ export async function startMcp(options: {
   });
   if (process.env.SHOWAI_MCP_CLIENT !== "builtin")
     recordConnections(transport, service.store.root);
+  recordMcpCalls(transport, service.store.root, options.projectId);
   await createMcpServer({
     ...options,
     pageWriteDirectory: process.env.SHOWAI_AGENT_PAGE_WRITES,
@@ -264,9 +266,9 @@ export async function startPublicMcp(root: string) {
     storePresentation: async (value) =>
       (await writeCachedPresentation(root, value)).delivery,
   });
-  await server.connect(
-    new StdioServerTransport(process.stdin, process.stdout, {
-      maxBufferSize: CAPACITY.authoringRequestBytes,
-    }),
-  );
+  const transport = new StdioServerTransport(process.stdin, process.stdout, {
+    maxBufferSize: CAPACITY.authoringRequestBytes,
+  });
+  recordMcpCalls(transport, root, undefined, `${resolve(root)}.mcp-logs`);
+  await server.connect(transport);
 }
