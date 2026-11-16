@@ -34,6 +34,7 @@ export interface UiLabOptions {
   port?: number;
   baseline?: string;
   idleSessionMs?: number;
+  onShutdown?: () => Promise<void>;
 }
 type Session = {
   client: LabSession;
@@ -333,6 +334,27 @@ export async function startUiLab(options: UiLabOptions) {
                 response.once("close", () => proxy.destroy());
                 return;
               }
+              if (
+                url.pathname === "/__ui-lab/api/shutdown" &&
+                method === "POST"
+              ) {
+                const input = await body(request);
+                if (input.pid !== process.pid) {
+                  respond(
+                    response,
+                    { error: "Server identity does not match." },
+                    403,
+                  );
+                  return;
+                }
+                response.once("finish", () => {
+                  void (options.onShutdown ?? close)().catch((error) =>
+                    console.error("UI Lab shutdown:", error),
+                  );
+                });
+                respond(response, { closing: true });
+                return;
+              }
               if (url.pathname === "/__ui-lab/api/status") {
                 respond(response, {
                   ready: !closing,
@@ -613,24 +635,20 @@ export async function startUiLab(options: UiLabOptions) {
       2,
     ),
   );
-  return {
-    url: origin + "/__ui-lab/",
-    origin,
-    output,
-    async close() {
-      if (closing) return;
-      closing = true;
-      clearInterval(collector);
-      await collecting;
-      for (const id of sessions.keys()) await deleteSession(id);
-      await vite.close();
-      await writeFile(
-        join(state, "closed.json"),
-        JSON.stringify({
-          pid: process.pid,
-          closedAt: new Date().toISOString(),
-        }),
-      );
-    },
-  };
+  async function close() {
+    if (closing) return;
+    closing = true;
+    clearInterval(collector);
+    await collecting;
+    for (const id of sessions.keys()) await deleteSession(id);
+    await vite.close();
+    await writeFile(
+      join(state, "closed.json"),
+      JSON.stringify({
+        pid: process.pid,
+        closedAt: new Date().toISOString(),
+      }),
+    );
+  }
+  return { url: origin + "/__ui-lab/", origin, output, close };
 }

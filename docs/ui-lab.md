@@ -69,6 +69,6 @@ npm run ui:lab -- status --state /absolute/path/ui-lab/state
 npm run ui:lab -- stop --state /absolute/path/ui-lab/state
 ```
 
-Status verifies the saved process identity against the listening server. Stop sends SIGTERM to that verified process; server shutdown disposes its sessions and the CLI removes its temporary bundle. Restart the server after changing backend or fixture code. Frontend changes use Vite's development reload. `server.json` records the process and directories; `closed.json` records completed shutdown.
+Status verifies the saved process identity against the listening server. Stop requests graceful shutdown and waits for the process to exit and record completion. Server shutdown disposes its sessions and the CLI removes its temporary bundle. Restart the server after changing backend or fixture code. Frontend changes use Vite's development reload. `server.json` records the process and directories; `closed.json` records completed shutdown.
 
 The mechanism itself is checked with `npx vitest run src/ui-lab`. Repository acceptance still includes `npm run check`, `npm run build` and `npm test`.

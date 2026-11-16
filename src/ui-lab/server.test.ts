@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, expect, test } from "vitest";
-import { access, mkdtemp, rm } from "node:fs/promises";
+import { access, mkdtemp, rm, readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { startUiLab } from "./server";
@@ -28,6 +28,35 @@ const post = (path: string, input: unknown, token?: string) =>
     },
     body: JSON.stringify(input),
   });
+test("shutdown checks server identity and waits for owned cleanup", async () => {
+  let completed = false;
+  const state = join(directory, "shutdown-state");
+  const owned = await startUiLab({
+    repository: process.cwd(),
+    state,
+    output: join(directory, "shutdown-results"),
+    onShutdown: async () => {
+      await owned.close();
+      completed = true;
+    },
+  });
+  try {
+    const request = (pid: number) =>
+      fetch(owned.origin + "/__ui-lab/api/shutdown", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ pid }),
+      });
+    expect((await request(-1)).status).toBe(403);
+    expect((await request(process.pid)).ok).toBe(true);
+    await expect.poll(() => completed).toBe(true);
+    expect(
+      JSON.parse(await readFile(join(state, "closed.json"), "utf8")).pid,
+    ).toBe(process.pid);
+  } finally {
+    await owned.close();
+  }
+});
 async function session(): Promise<LabSession> {
   const response = await post("/__ui-lab/api/sessions", {
     feature: "remote-connection",

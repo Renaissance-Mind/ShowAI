@@ -53,10 +53,33 @@ if (command === "status" || command === "stop") {
     status.root !== repository
   )
     throw new Error("The server identity does not match this UI Lab.");
-  if (command === "stop") process.kill(saved.pid, "SIGTERM");
+  if (command === "stop") {
+    const response = await fetch(saved.origin + "/__ui-lab/api/shutdown", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ pid: saved.pid }),
+    });
+    if (!response.ok) throw new Error("UI Lab rejected the shutdown request.");
+    let exited = false;
+    for (let attempt = 0; attempt < 100; attempt++) {
+      try {
+        process.kill(saved.pid, 0);
+      } catch (error) {
+        if (error.code !== "ESRCH") throw error;
+        exited = true;
+        break;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+    const closed = JSON.parse(
+      await readFile(join(resolve(values.state), "closed.json"), "utf8"),
+    );
+    if (!exited || closed.pid !== saved.pid)
+      throw new Error("UI Lab shutdown has not completed.");
+  }
   console.log(
     JSON.stringify(
-      command === "stop" ? { stopping: true, pid: saved.pid } : status,
+      command === "stop" ? { stopped: true, pid: saved.pid } : status,
     ),
   );
   process.exit(0);
@@ -118,6 +141,7 @@ try {
       output,
       port: values.port ? Number(values.port) : 0,
       baseline: values.baseline ? resolve(values.baseline) : undefined,
+      onShutdown: close,
     });
   }
   const origin = values.url ? new URL(values.url).origin : server.origin;

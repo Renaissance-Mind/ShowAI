@@ -69,6 +69,6 @@ npm run ui:lab -- status --state /absolute/path/ui-lab/state
 npm run ui:lab -- stop --state /absolute/path/ui-lab/state
 ```
 
-状态命令向监听服务核对保存的进程身份。停止命令向核实后的进程发送 SIGTERM，服务关闭各会话，CLI 清理临时 bundle。修改后端或 fixture 后重启服务；前端修改通过 Vite 开发刷新更新。`server.json` 记录进程与目录，`closed.json` 记录关闭完成。
+状态命令向监听服务核对保存的进程身份。停止命令请求正常关闭，并等待进程退出及关闭记录完成；服务释放各会话，CLI 清理临时 bundle。修改后端或 fixture 后重启服务；前端修改通过 Vite 开发刷新更新。`server.json` 记录进程与目录，`closed.json` 记录关闭完成。
 
 机制本身使用 `npx vitest run src/ui-lab` 检查。仓库验收仍包括 `npm run check`、`npm run build` 和 `npm test`。
