@@ -43,7 +43,7 @@ export function createLibraryMcpServer(options: {
     projectAccess: "library",
     sourceContext: inherited,
     instructions:
-      "Call ShowAI guide first; pass projectId to project tools.",
+      "guide first; projectId for projects.",
     decorateTool(name, tool) {
       if (name === "guide") return;
       if (name === "project_context") {

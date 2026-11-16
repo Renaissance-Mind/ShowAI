@@ -141,3 +141,11 @@ showai mcp --public
 添加 `inspect:{layout:true,blockIds:["图ID","解释ID"]}`，测量对象在原页面中的布局。它不同于顶层 blockIds，不会抽取区块。`scrollToBlockId:"图ID"` 滚动到已渲染的块，不展开隐藏步骤。layout.blocks 返回相对视口的 CSS 像素边界、经视口和祖先裁切后的可见边界与面积比例、块高/视口高，以及 client/scroll 尺寸与 overflow 模式。测量发生在全文截图扩高之前。未挂载块为 not-rendered；默认最多 200 个对象并带 total/truncated，显式目标最多 100 个 ID。它不评判美观，也不覆盖兄弟元素遮挡、位图文字和 iframe 内部。
 
 CLI：`showai pages read PAGE --project PROJECT --view image --capture viewport --width 1440 --height 900 --scroll-to-block BLOCK --state inspect.json --json`，其中 inspect.json 为 `{"inspect":{"layout":true,"blockIds":["BLOCK"]}}`。image 与 html 均支持测量；使用 out 时 MCP 回执仍保留 capture/layout，完整 `.read.json` 从 metadataPath 取得。调整前后用相同视口与定位比较，保存仍遵循 hash/revision 冲突检查。
+
+## 可选的对话持续更新
+
+页面创作继续使用 page_create、page_apply、page_save 与 page_present。会话可用 `show_component({kind,data,live:true,delivery:"mcp-app"})` 创建一个可持续更新的 MCP Apps 显示区。先查 `showai_capabilities.presentation.liveUpdates`，并确认宿主提供 serverTools；文件片段展示不代表支持持续更新。当前句柄属于原本机 MCP 连接，30 分钟未访问后过期，重连后不恢复；最多 32 份，每份源内容最多 16 MiB。
+
+保留回执 live.viewId、live.revision 和 blocks[].id。后续 `show_component_update({viewId,operationId,baseRevision,operations,complete?})` 沿用 page_apply 的稳定节点操作。每批应形成合法组件数据，相关字段一起更新；无效批次保留旧内容与版本。最近一次完全相同的请求可重试；CONFLICT 时先读回当前内容并比较，不盲目替换基线。最后带 complete:true，可用空 operations 结束，完成后只读。
+
+`show_component_read({viewId,source:true})` 返回最新完整 artifact，按正常项目流程保存 document 和 components；需要可编辑组件源码时，先用 component_save 保存返回的 componentSources。阅读探索状态单独处理。`show_component_close({viewId})` 只释放临时显示区。阅读器自行读取新版本并更新已挂载组件，不启动模型回合。一次性调用、正式页面和导出格式保持兼容；HTTP、图片、compact 和 fragment-file 沿用完整结果交付。

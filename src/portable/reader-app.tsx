@@ -5,7 +5,9 @@ import {
   useMemo,
   useRef,
   useState,
+  useSyncExternalStore,
 } from "react";
+import { ReaderSource } from "./reader-source";
 import PageIcon from "../components/PageIcon";
 import { installIconTooltips } from "../ui/icon-tooltip.mjs";
 import { createRoot } from "react-dom/client";
@@ -43,6 +45,7 @@ export interface ReaderHost {
   readOptions: () => string | null | undefined;
   readSite?: () => string | null | undefined;
   setTheme: (theme: "dark" | "light") => void;
+  subscribeArtifact?: (listener: () => void) => () => void;
 }
 
 const translate = translator(messages);
@@ -354,11 +357,16 @@ function ArtifactReader({
   );
 }
 
+const unchangedSource = () => () => {};
+
 function App({ host }: { host: ReaderHost }) {
   const t = useTranslator(messages);
   useLayoutEffect(() => installIconTooltips(window.document), []);
+  const raw = useSyncExternalStore(
+    host.subscribeArtifact ?? unchangedSource,
+    host.readArtifact,
+  );
   const result = useMemo(() => {
-    const raw = host.readArtifact();
     if (!raw || raw.trim() === "null") return { error: translate("emptyPage") };
     try {
       return { artifact: parseArtifact(raw) };
@@ -368,7 +376,7 @@ function App({ host }: { host: ReaderHost }) {
           error instanceof Error ? error.message : translate("unreadablePage"),
       };
     }
-  }, [host]);
+  }, [raw]);
   if (!result.artifact)
     return (
       <main className="portable-error">
@@ -380,6 +388,16 @@ function App({ host }: { host: ReaderHost }) {
 }
 
 export function mountReader(target: HTMLElement, host: ReaderHost) {
+  const source = new ReaderSource(host.readArtifact());
+  const liveHost: ReaderHost = {
+    ...host,
+    readArtifact: source.read,
+    subscribeArtifact: source.subscribe,
+  };
+  const unsubscribe = host.subscribeArtifact?.(() => {
+    const value = host.readArtifact();
+    if (typeof value === "string") source.update(value);
+  });
   setLocale(
     resolveLocale(
       host.inlineHost?.lang ||
@@ -390,8 +408,21 @@ export function mountReader(target: HTMLElement, host: ReaderHost) {
   const root = createRoot(target);
   root.render(
     <StrictMode>
-      <App host={host} />
+      <App host={liveHost} />
     </StrictMode>,
   );
-  return () => root.unmount();
+  const dispose = () => {
+    unsubscribe?.();
+    source.dispose();
+    root.unmount();
+  };
+  const controller = Object.assign(dispose, {
+    update: (value: string) => source.update(value),
+    read: source.read,
+  });
+  target.dispatchEvent(new CustomEvent("showai:reader-ready", {
+    bubbles: true,
+    detail: controller,
+  }));
+  return controller;
 }

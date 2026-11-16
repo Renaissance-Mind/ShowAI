@@ -216,7 +216,7 @@ test("show_component shows conversation components without a project and saves t
       const tools = await publicClient.listTools();
       const show = tools.tools.find((item) => item.name === "show_component");
       expect(show?._meta?.ui).toEqual({
-        resourceUri: "ui://showai/component-v1.html",
+        resourceUri: "ui://showai/component-v2.html",
       });
       const resource = await publicClient.readResource({
         uri: "ui://showai/component-v1.html",

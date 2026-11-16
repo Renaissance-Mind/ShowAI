@@ -5,12 +5,12 @@ description: 在对话中直接展示 1–5 个 ShowAI 组件（图表、示意�
 
 # 对话展示
 
-用一次 `show_component` 把组件直接放进对话。不需要项目、模板或制作流程，结果不写入内容库。
+用 `show_component` 把组件直接放进对话。通常一次给出完整内容；适合边做边看的任务，在支持的宿主里可以分批更新同一个显示区。不需要项目、模板或制作流程，结果不写入内容库。
 
 ## 先判断
 
 - **值不值得画。** 文字、Markdown 表格或 Mermaid 已经讲清时直接回答，不调用 ShowAI。画面要让读者看出文字说不清的关系、变化、空间结构，或能亲手调整参数。用户要求画图或做可视化时用 ShowAI 组件画：读者可以缩放、点开细节、切换视图，之后也能原样存进页面。
-- **是不是展示。** 请求提到保存、文档、报告、项目、分享、发给别人，或是在续改一份已有 Page 时，进入 [show-document](../show-document/SKILL.md)。其余可视化请求按对话展示处理。
+- **是不是展示。** 用户只想把已经展示的组件原样存下来时，按本技能的“之后要保存”处理；持续展示先读回最新结果。要整理成文档、报告、项目作品、可分享的完整内容，或续改已有 Page 时，进入 [show-document](../show-document/SKILL.md)。其余可视化请求按对话展示处理。
 - **这张图回答什么。** 先写一句“读者看完能知道什么”，据此选组件、取数据；这是展示路径里唯一的意图记录。
 
 画面遵循下面的视觉表达原则（与 show-document 的制作流程同源）：
@@ -28,13 +28,27 @@ description: 在对话中直接展示 1–5 个 ShowAI 组件（图表、示意�
 ## 制作
 
 1. **选组件。** 内置组件不需要项目：用 `public_catalog_list({kind:"component"})` 取得索引（任何连接都有）；已持有 `project_context` 的 componentCatalog 时直接沿用，它还含该项目的自定义组件。按 description、scenarios 和 signature 选一个主组件。需要并排对照或“图加一段说明”时最多放 5 个；内容再多就应整理成文档。索引条目带 `conversation: "limited"` 表示放进对话有已知限制（详情见该组件 summary 的 conversation.note，show_component 也会在 warnings 里说明），`"unsuitable"` 表示不适合放进对话，改选其他组件或整理成文档。
-   按读者要看出的关系选：流程与分支用 flowchart；“谁持有什么、这一步改了什么”的机制用 mechanism-diagram（对象可带小表格，steps 逐步切换）；参与者之间的往返用 sequence-diagram；数据用 chart 或 G2 图表；没有现成组件的示意图用 svg 手绘。顺序是先调整数据，再组合已有组件，最后才改造或新写。
+   按读者要看出的关系选：多层架构或流程的点击展开用 multi-level-view，每层复用 flowchart 或 layer-diagram，并用稳定的 type/scope/id 绑定下一层；流程与分支用 flowchart；“谁持有什么、这一步改了什么”的机制用 mechanism-diagram（对象可带小表格，steps 逐步切换）；参与者之间的往返用 sequence-diagram；数据用 chart 或 G2 图表；没有现成组件的示意图用 svg 手绘。顺序是先调整数据，再组合已有组件，最后才改造或新写。
    现有组件差一点时改造它：用 `public_catalog_describe({id,view:"source"})`（项目组件用 `catalog_describe`）取得源码，按 [create-component](../create-component/SKILL.md) 修改。目录里没有合适的组件时，先告诉用户可以用文字或表格回答，或临时写一个组件；选择写组件时同样按 create-component 编写。改造或新写的组件都用 `componentSources` 预览，格式与 `component_save` 的 source 相同（manifest、schema、source，可选 files、assets），预览不要求 manifest.documentation；块里写 `{kind:"custom",data:{componentId:manifest.id,version:manifest.version,props}}`，不必先保存；用户要复用时再按 use-showai 确定项目后保存。
 2. **读 guide。** 内置组件用 `public_catalog_describe({id,view:"guide"})`；项目自定义组件用 `catalog_describe({projectId,id,view:"guide"})`。按 schema 填真实数据，不补造数字；本轮已读过同一版本时不重复读。
 3. **调用。** `show_component({kind,data})`，多个组件用 `blocks:[{kind,data},…]`。data 与 `page_apply` 的 `component.insert` 完全相同。自定义组件写 `{kind:"custom",data:{componentId,version,integrity?,props}}`，integrity 取自目录条目；它保存在某个项目里时再传 `projectId`，只用于查找组件，不写入项目。开发中的组件包用 `componentSources` 预览。
 4. **回复。** 按返回的 delivery 交付（见下）。正文只写画面帮读者看出的一两点，不复述数据，不介绍工具或文件。
 
 ## 交付
+
+### 分批更新同一个显示区
+
+先核对 `showai_capabilities.presentation.liveUpdates`：`available:true` 只表示服务端有更新入口；还须确认当前宿主能显示 MCP App，并支持 App 通过 `serverTools` 读取更新。默认显示为文件片段、图片或模型填写 HTML 的宿主，继续使用完整交付；不能凭工具存在就改换宿主契约。用户已选择并验证 MCP Apps 入口时，才能显式使用 `delivery:"mcp-app"`。
+
+第一次用 `show_component({kind,data,live:true,delivery:"mcp-app"})`，或同样的 blocks 输入。第一批数据也必须完整合法。保留回执 `live.viewId`、`live.revision` 和 `blocks[].id`，核实显示区已经出现。
+
+后续调用 `show_component_update({viewId,operationId,baseRevision,operations,complete?})`。operations 沿用 page_apply 的稳定节点操作，例如 `{type:"component.props.set",blockId,props:{labels:[…],series:[…]}}`；props 中每个顶层字段整体替换，相关字段放在同一批。按完整段落、图表数据批次或记录更新，小任务一次给完。没有生成新组件版本时，继续使用已有组件；此接口不能导入新的组件包或写项目数据。
+
+每次沿用新 revision；最近一次响应丢失时，使用完全相同的 operationId 和输入重试。CONFLICT 时调用 `show_component_read({viewId,source:true})` 读出当前 artifact，比较后重新组织操作，不能只替换版本号覆盖。无效批次保留原内容与版本。最后一批带 `complete:true`，也可用空 operations 完成。完成后可读、可保存，但不再接受修改。
+
+同一 MCP 连接最多保留 32 个显示区，单份完整源最多 16 MiB，30 分钟未访问会过期；重连后原 viewId 不再可用。读取器会自行取回更新，这些读取不启动模型回合。连接中断时保留最后有效画面并报告错误。用户不再需要该临时结果时可用 `show_component_close({viewId})` 释放；它不删除已保存页面。
+
+用户要求保存持续展示时，先 `show_component_read({viewId,source:true})` 取最新 artifact，再沿正常项目归属保存 artifact.document 及其 components。若返回 componentSources 且用户需要可编辑组件源码，先用 component_save 保存这些包，再沿精确版本引用写入 Page。确认 Page 保存成功后再关闭临时显示。保存的是最新完整内容，不是最初传给 show_component 的那批参数。
 
 先读 [当前宿主适配](../use-showai/references/host-adapter.md)，再调用 show_component；通用规则见 [宿主显示](../use-showai/references/host-display.md)。默认 delivery:auto 跟随该连接声明；按实际返回的 delivery.mode 执行适配指南中的显示动作，例如 `mode:"compact"` 时把 `delivery.compact` 原样交给宿主的 HTML 展示工具。
 

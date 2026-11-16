@@ -39,7 +39,7 @@ export const presentationSchema = {
   document: object
     .optional()
     .describe(
-      "Complete ShowAI document. Custom nodes are {type:'widget',attrs:{id,kind:'custom',data:{componentId,version,props}}}.",
+      "ShowAI document; format: guide(document).",
     ),
   templateId: z.string().optional().describe("Public template ID."),
   templateVersion: z.string().optional(),
@@ -53,14 +53,14 @@ export const presentationSchema = {
     .max(20)
     .optional()
     .describe(
-      "Unsaved component packages (manifest, schema, source, files, assets).",
+      "Packages: manifest/schema/source/files/assets.",
     ),
   blockIds: z
     .array(z.string().min(1))
     .min(1)
     .optional()
     .describe(
-      "Node IDs to show inline; HTML and source keep the full document.",
+      "Inline selection; HTML/source stay complete.",
     ),
 };
 export type PresentationInput = z.infer<z.ZodObject<typeof presentationSchema>>;
@@ -371,15 +371,16 @@ export const SHOW_DELIVERIES = [
 ] as const;
 const showBlock = z.object({ kind: z.string().min(1), data: object });
 export const showComponentSchema = {
+  live: z.boolean().optional().describe("Keep view for updates; MCP Apps only."),
   kind: z
     .string()
     .min(1)
     .optional()
-    .describe("Component kind, e.g. chart, flowchart or custom."),
+    .describe("Component kind."),
   data: object
     .optional()
     .describe(
-      "Component data as in component.insert; custom components use {componentId,version,props}.",
+      "component.insert data; custom: {componentId,version,props}.",
     ),
   blocks: z
     .array(showBlock)
@@ -387,33 +388,33 @@ export const showComponentSchema = {
     .max(SHOW_COMPONENT_LIMIT)
     .optional()
     .describe(
-      "Several components in order, each {kind,data}, instead of kind/data.",
+      "Ordered {kind,data} list instead of kind/data.",
     ),
   projectId: z
     .string()
     .min(1)
     .optional()
-    .describe("Project whose saved custom components to resolve."),
+    .describe("Resolve project components here."),
   componentSources: z
     .array(object)
     .max(SHOW_COMPONENT_LIMIT)
     .optional()
     .describe(
-      "Unsaved component packages (manifest, schema, source, files, assets).",
+      "Packages: manifest/schema/source/files/assets.",
     ),
   title: z
     .string()
     .max(300)
     .optional()
-    .describe("Accessible name and host card title."),
+    .describe("View title."),
   delivery: z
     .enum(SHOW_DELIVERIES)
     .optional()
-    .describe("auto follows the plugin's declared host display."),
+    .describe("auto uses the host contract."),
   theme: z
     .enum(["light", "dark"])
     .optional()
-    .describe("Theme for image delivery."),
+    .describe("Image theme."),
 };
 export type ShowComponentInput = z.infer<
   z.ZodObject<typeof showComponentSchema>

@@ -7,6 +7,12 @@ export const TOOL_CHANGES: {
   {
     date: "2026-11-16",
     version: "0.12.0",
+    before: "show_component only returns complete presentations",
+    now: "Optional live:true with local MCP Apps adds stable viewId/revision; show_component_update/read/close operate on the same temporary view. Omitted live retains existing behavior. No old call translation is required.",
+  },
+  {
+    date: "2026-11-16",
+    version: "0.12.0",
     before: "page_read image/html: only full-height capture",
     now: 'page_read adds capture:"viewport"|"full" (default full), scrollToBlockId and inspect:{layout:true,blockIds?}. Old calls keep their full capture; no translation required.',
   },

@@ -1,5 +1,5 @@
-export const readerResourceUri = "ui://showai/reader-v3.html";
-export const componentResourceUri = "ui://showai/component-v1.html";
+export const readerResourceUri = "ui://showai/reader-v4.html";
+export const componentResourceUri = "ui://showai/component-v2.html";
 
 export const mcpReaderHtml = `<!doctype html>
 <html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
@@ -25,6 +25,37 @@ a{color:inherit}
  const root=document.getElementById('reader'),status=document.getElementById('status');
  const reduceMotion=matchMedia('(prefers-reduced-motion: reduce)').matches;
  let current='',sequence=1,settled=false,hostTheme='',page={},lastResult=null,contextSupported=false;
+ let readerControl=null,live=null,liveTimer=0,serverTools=false,initialized=false,readTool='show_component_read';
+ function applyLive(snapshot){
+  if(!snapshot||typeof snapshot.viewId!=='string'||!Number.isSafeInteger(snapshot.revision)||snapshot.revision<0||typeof snapshot.source!=='string'||typeof snapshot.complete!=='boolean')throw new Error('Invalid live presentation update.');
+  if(live&&live.viewId!==snapshot.viewId)throw new Error('This update belongs to another presentation.');
+  if(live&&snapshot.revision<live.revision)return;
+  if(live&&snapshot.revision===live.revision&&(snapshot.source!==live.source||snapshot.complete!==live.complete))throw new Error('Conflicting content for the same presentation revision.');
+  if(readerControl)readerControl.update(snapshot.source);
+  live=snapshot;
+ }
+ function pollLive(){
+  clearTimeout(liveTimer);
+  if(!live||live.complete||!readerControl||!initialized)return;
+  if(!serverTools){showStatus('当前宿主不支持持续读取展示更新。','error');return;}
+  const viewId=live.viewId;
+  liveTimer=setTimeout(async()=>{
+   try{
+    const result=await send('tools/call',{name:readTool,arguments:{viewId,sinceRevision:live.revision}});
+    if(live?.viewId!==viewId)return;
+    const error=failure(result);if(error)throw new Error(error);
+    const snapshot=payload(result)?.live;
+    if(snapshot)applyLive(snapshot);
+    showStatus('');pollLive();
+   }catch(error){if(live?.viewId!==viewId||!readerControl)return;showStatus('展示更新已暂停：'+error.message,'error');const retry=document.createElement('button');retry.type='button';retry.textContent='重试更新';retry.onclick=()=>{showStatus('正在重试更新…','busy');pollLive();};status.append(document.createTextNode(' '),retry);}
+  },750);
+ }
+ root.addEventListener('showai:reader-ready',event=>{
+  if(!event.target.closest('[data-showai-inline-root]')||typeof event.detail?.update!=='function')return;
+  readerControl=event.detail;
+  if(live){try{applyLive(live);pollLive();}catch(error){showStatus(error.message,'error');}}
+ });
+ window.addEventListener('pagehide',()=>{clearTimeout(liveTimer);readerControl?.();readerControl=null;});
  const pending=new Map();
  function send(method,params){const id=sequence++;parent.postMessage({jsonrpc:'2.0',id,method,params},'*');return new Promise((resolve,reject)=>{pending.set(id,{resolve,reject});setTimeout(()=>{if(pending.delete(id))reject(new Error('Host request timed out'));},10000);});}
  function notify(method,params){parent.postMessage({jsonrpc:'2.0',method,params},'*');}
@@ -49,11 +80,14 @@ a{color:inherit}
   const error=failure(result);
   if(error){settled=true;if(!current)showStatus('ShowAI 页面未能生成：'+error,'error');return;}
   const data=payload(result);if(!data)return;
+  if(data.live&&live?.viewId===data.live.viewId){try{applyLive(data.live);pollLive();}catch(error){showStatus(error.message,'error');}return;}
+  if(data.live&&!data.inline){showStatus('请先打开这份展示，再接收更新。','error');return;}
   settled=true;
   const info=result.structuredContent?.data;
   if(info)page={title:info.title,pageId:info.pageId,projectId:info.projectId,hash:info.hash,revision:info.revision};
   if(!data.inline){showStatus(data.inlineError||'完整页面已生成。');appendDelivery(data.delivery?.html);return;}
   if(data.inline===current)return;
+  clearTimeout(liveTimer);readerControl?.();readerControl=null;live=data.live||null;
   current=data.inline;states.clear();handed.clear();referenced=null;if(lastContext)publishState();root.replaceChildren();root.toggleAttribute('data-showai-conversation',conversational());readOptions();
   const parsed=new DOMParser().parseFromString(data.inline,'text/html');
   for(const child of [...parsed.head.childNodes,...parsed.body.childNodes])root.append(document.importNode(child,true));
@@ -160,7 +194,7 @@ a{color:inherit}
  function fromOpenAI(globals){if(!globals)return;theme(globals.theme);if(globals.toolOutput||globals.toolResponseMetadata)render({structuredContent:globals.toolOutput,_meta:globals.toolResponseMetadata,isError:globals.toolOutput?.ok===false});else waiting(globals.toolInput);}
  window.addEventListener('openai:set_globals',event=>fromOpenAI(event.detail?.globals));
  fromOpenAI(window.openai);
- send('ui/initialize',{appInfo:{name:'ShowAI',version:'1.0.0'},appCapabilities:{},protocolVersion:'2026-01-26'}).then(result=>{theme(result?.hostContext?.theme);contextSupported=!!result?.hostCapabilities?.updateModelContext;notify('ui/notifications/initialized');if(contextSupported&&current&&lastResult){current='';render(lastResult);}}).catch(error=>{if(!current&&!settled)showStatus('等待宿主提供页面。');console.warn(error.message);});
+ send('ui/initialize',{appInfo:{name:'ShowAI',version:'1.0.0'},appCapabilities:{},protocolVersion:'2026-01-26'}).then(result=>{initialized=true;serverTools=!!result?.hostCapabilities?.serverTools;const toolName=result?.hostContext?.toolInfo?.tool?.name;if(typeof toolName==='string'&&toolName.endsWith('show_component'))readTool=toolName.slice(0,-'show_component'.length)+'show_component_read';theme(result?.hostContext?.theme);contextSupported=!!result?.hostCapabilities?.updateModelContext;notify('ui/notifications/initialized');if(contextSupported&&current&&lastResult&&!live){current='';render(lastResult);}pollLive();}).catch(error=>{if(!current&&!settled)showStatus('等待宿主提供页面。');console.warn(error.message);});
  // Measure the whole body so status changes and shrinking content both resize the frame.
  new ResizeObserver(()=>notify('ui/notifications/size-changed',{height:Math.ceil(Math.max(document.body.getBoundingClientRect().height,document.body.scrollHeight))})).observe(document.body);
 })();

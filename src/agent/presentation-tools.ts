@@ -35,6 +35,10 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { renderReading } from "./reading-renderer";
 import { getLocale } from "../i18n";
+import { PresentationSession, MAX_LIVE_SOURCE_BYTES } from "./presentation-session";
+import { CoreError } from "../core/model";
+import type { PageOperation } from "../core/model";
+import { withLocalResources } from "../core/local-resources";
 
 export type Presentation = Awaited<ReturnType<typeof renderPresentation>>;
 export interface PresentationDelivery {
@@ -234,6 +238,26 @@ export function registerPresentationTools(
   },
 ) {
   const declaredDisplay = options.hostDisplay ?? hostDisplay();
+  const liveViews = new Map<string, { session: PresentationSession; projectId?: string; touched: number }>();
+  const expireViews = () => {
+    const cutoff = Date.now() - 30 * 60 * 1000;
+    for (const [id, view] of liveViews) if (view.touched < cutoff) {
+      view.session.close();
+      liveViews.delete(id);
+    }
+  };
+  const liveView = async (id: string) => {
+    expireViews();
+    const view = liveViews.get(id);
+    if (!view) {
+      const error = new CoreError("NOT_FOUND", "Presentation is unavailable or expired. Create a new live presentation.");
+      error.nextStep = "Create another show_component with live:true; temporary views expire after 30 minutes without access and do not survive reconnection.";
+      throw error;
+    }
+    if (view.projectId) await options.componentLibrary!.resolveProject(view.projectId);
+    view.touched = Date.now();
+    return view.session;
+  };
   const safe = (handler: () => Promise<unknown>) =>
     handler().then(mcpSuccess, mcpFailure);
   const readOnly = {
@@ -241,16 +265,16 @@ export function registerPresentationTools(
     destructiveHint: false,
     openWorldHint: false,
   };
-  server.registerResource(
-    "showai-reader",
-    readerResourceUri,
+  for (const uri of [readerResourceUri, "ui://showai/reader-v3.html"]) server.registerResource(
+    uri === readerResourceUri ? "showai-reader" : "showai-reader-legacy",
+    uri,
     { mimeType: "text/html;profile=mcp-app" },
     async () => {
       const domains = cdnReaderOrigins(await cdnReaderUrls());
       return {
         contents: [
           {
-            uri: readerResourceUri,
+            uri,
             mimeType: "text/html;profile=mcp-app",
             text: mcpReaderHtml,
             _meta: {
@@ -273,16 +297,16 @@ export function registerPresentationTools(
       };
     },
   );
-  server.registerResource(
-    "showai-component",
-    componentResourceUri,
+  for (const uri of [componentResourceUri, "ui://showai/component-v1.html"]) server.registerResource(
+    uri === componentResourceUri ? "showai-component" : "showai-component-legacy",
+    uri,
     { mimeType: "text/html;profile=mcp-app" },
     async () => {
       const domains = cdnReaderOrigins(await cdnReaderUrls());
       return {
         contents: [
           {
-            uri: componentResourceUri,
+            uri,
             mimeType: "text/html;profile=mcp-app",
             text: mcpComponentHtml,
             _meta: {
@@ -494,6 +518,19 @@ export function registerPresentationTools(
             savesContent: false,
             projectComponents: !!options.componentLibrary,
           },
+          liveUpdates: {
+            protocol: "showai-live-presentation-v1",
+            available: options.transport === "stdio",
+            delivery: "mcp-app",
+            requiresHostServerTools: true,
+            defaultDeliverySupported: declaredDisplay === "mcp-app" || declaredDisplay === "native",
+            scope: "connection",
+            idleMinutes: 30,
+            maxViews: 32,
+            maxSourceBytes: MAX_LIVE_SOURCE_BYTES,
+            tools: options.transport === "stdio" ? ["show_component_update", "show_component_read", "show_component_close"] : [],
+            preservesPageWorkflow: true,
+          },
           declaredHostDisplay: declaredDisplay ?? "undeclared",
           hostDisplay:
             "The harness determines whether inline or MCP Apps can be displayed. show_component follows the plugin's declared host display; documents always preserve a usable file or project receipt.",
@@ -521,7 +558,7 @@ export function registerPresentationTools(
     "public_catalog_list",
     {
       description:
-        "List public component and template names, descriptions, scenarios and one-line props signatures; limit/cursor paginate.",
+        "List public components/templates with scenarios and props signatures.",
       inputSchema: {
         kind: z.enum(["component", "template"]).optional(),
         query: z.string().optional(),
@@ -537,7 +574,7 @@ export function registerPresentationTools(
     "public_catalog_describe",
     {
       description:
-        "Read a public component's guide, schema, examples or source, or a public template whole (view guide: README and every guide) or its source.",
+        "Read public components or whole template guides.",
       inputSchema: {
         id: z.string(),
         version: z.string().optional(),
@@ -565,7 +602,7 @@ export function registerPresentationTools(
     "render_document",
     {
       description:
-        "Render a complete standalone document from public components/templates or supplied sources without saving it.",
+        "Render standalone content without saving.",
       inputSchema: presentationSchema,
       annotations: readOnly,
       _meta: { securitySchemes: noAuth, ...readerToolMeta },
@@ -620,7 +657,7 @@ export function registerPresentationTools(
   server.registerTool(
     "show_component",
     {
-      description: `Show 1–${SHOW_COMPONENT_LIMIT} components in the conversation without saving. kind/data match page_apply component.insert, so the same component can later be saved in a Page.`,
+      description: `Show 1–${SHOW_COMPONENT_LIMIT} components without saving; same kind/data as page_apply. live opts into updates.`,
       inputSchema: showComponentSchema,
       annotations: readOnly,
       _meta: { securitySchemes: noAuth, ...componentToolMeta },
@@ -637,6 +674,13 @@ export function registerPresentationTools(
             input.projectId,
           ),
         };
+        const requestedDelivery = input.delivery && input.delivery !== "auto"
+          ? input.delivery : declaredDisplay ? HOST_DISPLAYS[declaredDisplay] : undefined;
+        if (input.live && (options.transport !== "stdio" || requestedDelivery !== "mcp-app"))
+          throw new Error("Live updates require a local MCP Apps display. Use delivery mcp-app in a host that supports it, or omit live for ordinary presentation.");
+        expireViews();
+        if (input.live && liveViews.size >= 32)
+          throw new Error("Too many live presentations. Close one before creating another.");
         const shown = await renderComponents(input, library);
         const warnings = [...shown.warnings];
         let mode: Exclude<(typeof SHOW_DELIVERIES)[number], "auto"> =
@@ -706,7 +750,26 @@ export function registerPresentationTools(
             note: "A static image. Interactive views need an MCP Apps, Codex or model-written HTML host.",
           };
         }
+        if (input.live && (mode !== "mcp-app" || !shown.inline))
+          throw new Error("This presentation cannot use a live MCP Apps view. Use ordinary presentation.");
+        const renderedSource = input.live
+          ? shown.html.match(/<script\b[^>]*\bid=["']showai-data["'][^>]*>([\s\S]*?)<\/script>/i)?.[1]
+          : undefined;
+        if (input.live && !renderedSource) throw new Error("Live reader source is missing.");
+        const editableSources = input.live ? JSON.parse(shown.source).componentSources : undefined;
+        const live = input.live ? new PresentationSession(randomUUID(), JSON.stringify({
+          ...JSON.parse(renderedSource!), ...(editableSources ? { componentSources: editableSources } : {}),
+        })) : undefined;
+        const snapshot = live?.snapshot();
+        if (snapshot) {
+          expireViews();
+          if (liveViews.size >= 32)
+            throw new Error("Too many live presentations. Close one before creating another.");
+          liveViews.set(snapshot.viewId, { session: live!, projectId: library?.projectId, touched: Date.now() });
+        }
         const result = mcpSuccess({
+          ...(snapshot ? { live: { viewId: snapshot.viewId, revision: snapshot.revision, complete: false },
+            blocks: (shown.document.content.content ?? []).map(node => ({ id: node.attrs?.id, type: node.type, kind: node.attrs?.kind })) } : {}),
           ...(shown.title ? { title: shown.title } : {}),
           components: shown.components,
           delivery,
@@ -736,6 +799,7 @@ export function registerPresentationTools(
             showai: {
               inline: shown.inline,
               inlineError: shown.inlineError,
+              ...(snapshot ? { live: snapshot } : {}),
             },
           },
         };
@@ -744,4 +808,51 @@ export function registerPresentationTools(
       }
     },
   );
+  if (options.transport !== "stdio") return;
+  server.registerTool("show_component_update", {
+    description: "Apply page_apply operations to a live view; complete finalizes it.",
+    inputSchema: {
+      viewId: z.string().min(1).max(128),
+      operationId: z.string().min(1).max(128),
+      baseRevision: z.number().int().nonnegative(),
+      operations: z.array(z.record(z.string(), z.unknown())).max(100),
+      complete: z.boolean().optional(),
+    },
+    annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
+    _meta: { securitySchemes: noAuth },
+  }, async ({ viewId, ...input }) => {
+    try {
+      const session = await liveView(viewId);
+      const prepared = session.prepare({ ...input, operations: input.operations as PageOperation[] });
+      const artifact = JSON.parse(prepared.snapshot.source);
+      artifact.document = (await withLocalResources(artifact.document)).document;
+      const snapshot = prepared.commit(JSON.stringify(artifact));
+      return { ...mcpSuccess({ viewId, revision: snapshot.revision, complete: snapshot.complete, savedToProject: false }),
+        _meta: { showai: { live: snapshot } } };
+    } catch (error) { return mcpFailure(error, "present"); }
+  });
+  server.registerTool("show_component_read", {
+    description: "Read live view; source returns portable content to save.",
+    inputSchema: { viewId: z.string().min(1).max(128), sinceRevision: z.number().int().nonnegative().optional(), source: z.boolean().optional() },
+    annotations: readOnly,
+    _meta: { securitySchemes: noAuth },
+  }, async ({ viewId, sinceRevision, source }) => {
+    try {
+      const snapshot = (await liveView(viewId)).snapshot();
+      const changed = snapshot.revision !== sinceRevision;
+      return { ...mcpSuccess({ viewId, revision: snapshot.revision, complete: snapshot.complete, changed,
+        ...(source ? { artifact: JSON.parse(snapshot.source) } : {}) }),
+        _meta: { showai: { ...(changed ? { live: snapshot } : {}) } } };
+    } catch (error) { return mcpFailure(error, "present"); }
+  });
+  server.registerTool("show_component_close", {
+    description: "Release temporary view.",
+    inputSchema: { viewId: z.string().min(1).max(128) },
+    annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
+    _meta: { securitySchemes: noAuth },
+  }, async ({ viewId }) => {
+    liveViews.get(viewId)?.session.close();
+    liveViews.delete(viewId);
+    return mcpSuccess({ viewId, closed: true });
+  });
 }

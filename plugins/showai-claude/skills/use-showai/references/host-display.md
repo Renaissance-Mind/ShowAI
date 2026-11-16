@@ -4,6 +4,8 @@
 
 ## 当前插件的展示契约
 
+可选持续更新使用同一个 MCP App 显示区：服务端 liveUpdates.available 与宿主 serverTools 都须支持。普通 HTML 文件片段、图片和模型填写 HTML 继续一次交付，不能用不断返回新文件来冒充同一实例更新。当前本机持续显示句柄绑定原 MCP 连接；跨重连或 HTTP 连接不承诺恢复。分批调用、完成、读回保存和释放步骤见 show-visual。
+
 展示前读取 [当前宿主适配](host-adapter.md)。安装包在构建时绑定这份文件，Agent 只执行该契约，不从其他 Harness 猜测展示语法。host-profile.json 记录适配身份、声明的显示能力、公共 Skill 指纹与适配指纹，供安装和诊断核验；普通创作无需读取它。
 
 showai_capabilities.presentation.declaredHostDisplay 回显连接声明，show_component 的 delivery:auto 按声明选择；以工具实际返回的 delivery.mode 交付。需要模型自己写 HTML 的宿主中，page_present 与 render_document 另外返回 `conversation`（`mode`、`next`，可展示时带 `fragment`），按它完成展示。声明与插件指南不一致时，先核对所选连接、安装版本和宿主能力。配置更新后旧 MCP 进程可能仍沿用此前声明，重连与宿主加载分别验证。

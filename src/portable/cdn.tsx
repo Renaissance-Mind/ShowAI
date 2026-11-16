@@ -38,9 +38,14 @@ export function mount(
       ).dataset.theme = theme;
     },
   });
-  return () => {
+  const dispose = () => {
     unmount();
     detachStyles();
     target.remove();
   };
+  return Object.assign(dispose, {
+    update: (artifact: string | object) =>
+      unmount.update(typeof artifact === "string" ? artifact : JSON.stringify(artifact)),
+    read: unmount.read,
+  });
 }
