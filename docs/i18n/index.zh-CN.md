@@ -48,7 +48,7 @@ ShowAI 是可进化的人机交互界面：Agent 的回答不再只是一段文�
 | [CLI 脚本参考](agent-usage.zh-CN.md)             | 脚本、诊断、服务配置与运维                 |
 | [页面数据格式 v3](artifact-format.zh-CN.md)      | 节点、几何、组件、导出与限制               |
 | [品牌资源](branding.zh-CN.md)                    | 标识来源、变体与生成                       |
-| [开发与测试](development.zh-CN.md)               | 开发实例、`dev:status`、测试套件与持续集成 |
+| [开发与测试](development.zh-CN.md)               | 开发实例、`dev:status`、交互性能基准、测试套件与持续集成 |
 | [贡献内置组件](contributing-components.zh-CN.md) | 数据契约、注册点与验证                     |
 | [贡献内置模板](contributing-templates.zh-CN.md)  | 文件夹、注册、修订与系统呈现规则           |
 

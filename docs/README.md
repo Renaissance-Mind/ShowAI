@@ -48,7 +48,7 @@ Guides describe the current source. The released app, the plugin and hosted serv
 | [CLI reference](agent-usage.md)                                 | Scripts, diagnostics, service setup and administration |
 | [Artifact format v3](artifact-format.md)                        | Nodes, geometry, components, export and limits         |
 | [Brand assets](branding.md)                                     | Logo source, variants and generation                   |
-| [Development and testing](development.md)                       | Instances, `dev:status`, test suites and CI            |
+| [Development and testing](development.md)                       | Instances, `dev:status`, interaction benchmarks, test suites and CI            |
 | [Contributing a built-in component](contributing-components.md) | Contract, registration points and verification         |
 | [Contributing a built-in template](contributing-templates.md)   | Folder, registration, revisions and system workflow    |
 

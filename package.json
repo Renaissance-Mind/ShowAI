@@ -70,6 +70,8 @@
     "test:containers": "node scripts/containers-smoke.mjs",
     "test:page-outline": "npm run build:browser && vitest run src/document/page-outline.test.ts src/document/page-outline.integration.test.ts --maxWorkers=2 --testTimeout=60000 --hookTimeout=60000",
     "test:containers:desktop": "node scripts/containers-smoke.mjs --desktop",
+    "test:interaction-perf": "node scripts/interaction-perf.mjs",
+    "test:interaction-perf:unit": "node --test scripts/interaction-perf.test.mjs",
     "plugin:claude": "node scripts/install-claude-plugin.mjs",
     "plugin:antigravity": "node scripts/install-antigravity-plugin.mjs"
   },

@@ -97,6 +97,22 @@ Vitest 配置位于 `vite.config.ts` 的 `test` 部分。测试文件为 `src/**
 
 启动器和容器冒烟测试结束后会删除隔离的源码副本和内容库。排查问题时设置 `SHOWAI_KEEP_TEST_FIXTURES=1` 可以保留它们，用完后请自行删除。
 
+### 无头交互性能测试
+
+先用 `npm run build` 构建生产前端，运行 `npx playwright-core install chromium` 安装完整 Chromium，并在来源内容库之外创建结果目录：
+
+```sh
+npm run test:interaction-perf -- --source-home /绝对路径/内容库 --output /绝对路径/结果目录 --iterations 10
+```
+
+运行器以只读方式打开来源 SQLite 数据库，制作在线备份，并为副本分配新的内容库身份。它不复制本地同步连接、凭据、运行时登记或浏览器设置。界面操作和写入都发生在副本中，后端、Agent 工作目录和无头 Chromium 上下文分别隔离，全程不打开桌面窗口。来源必须是 SQLite 内容库，结果父目录必须已经存在。
+
+可先加 `--list` 查看已保存页面，再用 `--run /结果目录/run-ID --document 页面ID --board 白板ID` 复用这份快照。选择未归档、能够滚动的 Page，以及有可见可移动对象的 Board。四项场景分别为新浏览器上下文首次打开 Page、文档内 PageDown 翻页、切换保留的 Page/Board 标签，以及沿一秒轨迹拖动真实对象。目录发现会预热后端缓存，因此首次打开不代表冷磁盘读取。
+
+每项操作都断言结果，记录输入到内容就绪的时间、CDP 脚本与布局耗时、Event Timing、长任务和 rAF 间隔。拖拽单独记录松手到就绪的时间，不用固定轨迹时长评价响应。另跑一次诊断采集 CPU profile、Chromium 性能轨迹和截图，诊断轮不进入主要汇总。`results.json` 包含浏览器、GPU、构建信息、原始样本、样本数和测量边界。rAF 间隔不等于显示 FPS，内容就绪不证明物理呈现；Event Timing 会遗漏连续输入和短事件。PageDown 不覆盖 PDF 或幻灯片翻页。桌面 GPU、IPC 的结论需要独立显示环境中的 Electron 测量。
+
+快照与结果作为测试材料保留，运行时构建文件和 profile 在进程退出后清理。页面标题、轨迹和截图可能包含私人内容，结果应保存在本地。版本对比应使用同一台机器、相同页面和浏览器版本，避免同时构建。十次重复只用于探索分布，不足以建立稳定的尾部延迟结论。`npm run test:interaction-perf:unit` 验证快照隔离及缺失指标的处理。
+
 ### 持续集成
 
 `.github/workflows/check.yml` 在推送到 `main` 和提交拉取请求时运行，分为两个任务。Linux 任务运行 `npm run check`、`npm run build`、`npm test`、`npm run test:release`、`npm run test:whiteboard` 和 `npm audit --audit-level=high`。Windows 任务运行 `npm run check`、`npm run build`、用单个进程运行的 Vitest 套件，以及桌面和界面冒烟测试。发版要求两个任务都通过。

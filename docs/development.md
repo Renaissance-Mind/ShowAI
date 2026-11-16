@@ -101,6 +101,22 @@ Desktop smoke scripts default to `SHOWAI_BACKGROUND=1`; native windows and previ
 
 The launcher and container smoke tests delete their isolated source copies and libraries when they finish. Set `SHOWAI_KEEP_TEST_FIXTURES=1` to keep them for debugging, and delete them yourself afterwards.
 
+### Headless interaction performance
+
+Build the production frontend with `npm run build`, install full Chromium with `npx playwright-core install chromium`, and create an output directory outside the source content library. Run:
+
+```sh
+npm run test:interaction-perf -- --source-home /absolute/library --output /absolute/results --iterations 10
+```
+
+The runner opens the source SQLite database read-only, takes an online backup, and assigns the copy a new library identity. It copies no local sync connections, credentials, runtime registrations, or browser settings. All UI actions and writes run against the copy, with a separate backend, agent workspace and headless Chromium context. It never opens a desktop window. The source must be a SQLite library; the output parent must already exist.
+
+Use `--list` to inspect saved page metadata before running, then `--run /absolute/results/run-ID --document PAGE_ID --board BOARD_ID` to reuse that owned snapshot. Select an active, scrollable Page and a Board with a visible movable object. The four scenarios are first opening a Page in a fresh browser context, PageDown within that document, switching retained Page/Board tabs, and dragging a real object along a one-second trajectory. Catalog discovery warms backend caches, so first-open results are not cold-disk measurements. Archived pages are excluded.
+
+Each action asserts its outcome and records input-to-content-ready time, CDP script/layout totals, Event Timing observations, long tasks and rAF intervals. Drag results report release-to-ready separately from the fixed gesture duration. A separate diagnostic repetition captures CPU profiles, Chromium performance traces and screenshots; its timings are excluded from the primary summary. `results.json` includes browser/GPU/build metadata, raw samples, sample counts and limitations. rAF intervals are not display FPS, a content-ready assertion does not prove physical presentation, and Event Timing omits continuous inputs and short events. PageDown does not cover PDF or slide pagination. Desktop GPU/IPC conclusions require a separate Electron run on an isolated display.
+
+Retain the snapshot and results as test material; runtime build files and profiles are removed after shutdown. Keep results private because page titles, traces and screenshots can contain library content. Compare runs on the same machine without concurrent builds, using the same selected pages and browser version. Ten repetitions provide an exploratory distribution, not a stable tail-latency claim. Run `npm run test:interaction-perf:unit` to verify snapshot isolation and missing-metric handling.
+
 ### Continuous integration
 
 `.github/workflows/check.yml` runs for pushes to `main` and for pull requests, in two jobs. The Linux job runs `npm run check`, `npm run build`, `npm test`, `npm run test:release`, `npm run test:whiteboard` and `npm audit --audit-level=high`. The Windows job runs `npm run check`, `npm run build`, the Vitest suite in one worker, and the desktop and UI smoke tests. A release requires both jobs to pass.
