@@ -177,6 +177,7 @@ describe("host plugin connection", () => {
   it("maps MCP client names to plugin hosts", () => {
     expect(connectionHost("claude-code")).toBe("claude");
     expect(connectionHost("codex-mcp-client")).toBe("codex");
+    expect(connectionHost("antigravity")).toBe("antigravity");
     expect(connectionHost("some-other-client")).toBeNull();
   });
 

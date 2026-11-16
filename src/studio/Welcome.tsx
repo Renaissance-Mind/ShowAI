@@ -106,7 +106,9 @@ export default function Welcome({
     (host) => host.installed && host.enabled,
   );
   const shown = plugins.hosts.filter(
-    (host) => host.host !== "deepseek" || !!host.executable,
+    (host) =>
+      (host.host !== "deepseek" && host.host !== "antigravity") ||
+      !!host.executable,
   );
   const noHost =
     desktopPlugins &&

@@ -13,6 +13,7 @@ const icons = new Map([
   ["kimi", kimi],
   ["claude", claude],
   ["gemini", gemini],
+  ["antigravity", gemini],
   ["opencode", opencode],
   ["chatgpt", openai],
   ["openai", openai],

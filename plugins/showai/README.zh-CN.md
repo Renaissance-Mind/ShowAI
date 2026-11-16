@@ -6,7 +6,7 @@ ShowAI 让 Agent 用界面回答——可以交互、可以归档、在使用中
 
 ## 安装
 
-**推荐从 ShowAI App 安装。** 从 [GitHub Releases](https://github.com/Renaissance-Mind/ShowAI/releases/latest) 下载并打开 App，在欢迎页或「设置 → 插件」中为 Claude Code 或 Codex 安装插件。先安装 Agent，并确保其命令行工具可用。App 提供插件和运行时，无需源码，也无需单独安装 Node.js。安装后 Claude Code 重启会话，Codex 刷新插件或重启，然后新开对话。连接使用 App 当前的内容库；切换内容库或移动 App 后点「更新并启用」。已有其他来源的 ShowAI 插件时，先在 Agent 中停用原插件，再安装 App 版本。详见[在 Claude Code 与 Codex 中使用](https://github.com/Renaissance-Mind/ShowAI/blob/main/docs/i18n/codex.zh-CN.md)。
+**推荐从 ShowAI App 安装。** 从 [GitHub Releases](https://github.com/Renaissance-Mind/ShowAI/releases/latest) 下载并打开 App，在欢迎页或「设置 → 插件」中为 Claude Code、Codex 或 Antigravity 安装插件。先安装 Agent，并确保其命令行工具可用。App 提供插件和运行时，无需源码，也无需单独安装 Node.js。安装后 Claude Code 或 Antigravity 重启会话，Codex 刷新插件或重启，然后新开对话。连接使用 App 当前的内容库；切换内容库或移动 App 后点「更新并启用」。已有其他来源的 ShowAI 插件时，先在 Agent 中停用原插件，再安装 App 版本。详见[在 Claude Code 与 Codex 中使用](https://github.com/Renaissance-Mind/ShowAI/blob/main/docs/i18n/codex.zh-CN.md)。
 
 ### 从源码安装
 
@@ -27,6 +27,16 @@ npm run plugin:claude -- --port <端口> --json
 ```
 
 主目录安装 `showai-dev`，worktree 安装 `showai-dev-<worktree 名>`（即 `.git/worktrees/` 下的名称），固定连接这个开发实例的运行时与内容库。插件只在这个目录的 `.claude/settings.json` 中启用，并在这里停用 App 安装的 `showai`，所以一个会话只看到一个 ShowAI 插件。`--remove` 卸载本目录的开发插件；worktree 删除后用 `--prune` 清理。回执位于 artifacts/claude-plugin-install.json。
+
+Antigravity（PATH 中有 `agy`）可连接已登记运行时或运行中的开发实例：
+
+```sh
+npm run plugin:antigravity -- --json
+# 或绑定运行中的开发实例：
+npm run plugin:antigravity -- --port <端口> --json
+```
+
+`--remove` 从 Antigravity 卸载插件。回执位于 artifacts/antigravity-plugin-install.json。
 
 ### DeepSeek Harness
 
@@ -97,6 +107,6 @@ node scripts/install-codex-plugin.mjs --remote-url HTTPS_MCP_URL --marketplace-r
 
 ## 宿主包与公共源码
 
-公共工作流只维护 `plugins/showai/skills`，宿主展示契约分别维护在 `plugins/showai/host-adapters`。运行 `npm run package:plugin` 自动生成 Codex、Claude Code 和 Kimi 的安装内容；DeepSeek 准备插件时绑定自己的适配，远程 MCP Apps 使用原生视图指南。
+公共工作流只维护 `plugins/showai/skills`，宿主展示契约分别维护在 `plugins/showai/host-adapters`。运行 `npm run package:plugin` 自动生成 Codex、Claude Code、Antigravity 和 Kimi 的安装内容；DeepSeek 准备插件时绑定自己的适配，远程 MCP Apps 使用原生视图指南。
 
-Codex 市场指向 `plugins/showai-codex`，Claude Code 市场指向 `plugins/showai-claude`，插件身份沿用 showai@renaissance-mind。两份生成目录随仓库提交，供全新克隆直接安装；修改公共内容后重新生成，不手工修改生成副本。各包只替换当前宿主的 host-adapter.md；host-profile.json 记录适配身份、显示声明和公共文件指纹。App 安装入口使用同一套绑定逻辑，各宿主加载与 MCP 重连分别核验。
+Codex 市场指向 `plugins/showai-codex`，Claude Code 市场指向 `plugins/showai-claude`，Antigravity 安装包位于 `plugins/showai-antigravity`，插件身份沿用 showai@renaissance-mind。生成目录随仓库提交，供全新克隆直接安装；修改公共内容后重新生成，不手工修改生成副本。各包只替换当前宿主的 host-adapter.md；host-profile.json 记录适配身份、显示声明和公共文件指纹。App 安装入口使用同一套绑定逻辑，各宿主加载与 MCP 重连分别核验。

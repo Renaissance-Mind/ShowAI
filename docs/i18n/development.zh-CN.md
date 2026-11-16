@@ -37,7 +37,7 @@ npm run dev:status -- --port 5180 --home /absolute/showai-dev-a/library
 
 ### 让 Agent 连接实例
 
-`dev:status` 返回的 `cli` 对象包含针对该实例内容库运行 CLI 和 MCP 服务所需的命令、参数和环境，可用于 `template context`、`catalog describe` 等脚本化检查。要让 Claude Code 连接该实例，在 checkout 中运行 `npm run plugin:claude -- --port <port> [--mode browser] --json`，它会把绑定该实例的 `showai-dev` 插件安装到 checkout 的 `.claude/settings.json`。该命令需要实例正在运行，并且已安装 `claude` CLI。删除 checkout 前用 `--remove` 卸载。MCP 会话保持启动时的代码，因此运行时或 Skill 的改动要在实例重建后，在新会话中检查。
+`dev:status` 返回的 `cli` 对象包含针对该实例内容库运行 CLI 和 MCP 服务所需的命令、参数和环境，可用于 `template context`、`catalog describe` 等脚本化检查。要让 Claude Code 连接该实例，在 checkout 中运行 `npm run plugin:claude -- --port <port> [--mode browser] --json`，它会把绑定该实例的 `showai-dev` 插件安装到 checkout 的 `.claude/settings.json`。该命令需要实例正在运行，并且已安装 `claude` CLI。要让 Antigravity 连接该实例，运行 `npm run plugin:antigravity -- --port <port> [--mode browser] --json`（需已安装 `agy` CLI）。删除 checkout 前用 `--remove` 卸载。MCP 会话保持启动时的代码，因此运行时或 Skill 的改动要在实例重建后，在新会话中检查。
 
 ### 读懂 `dev:status`
 

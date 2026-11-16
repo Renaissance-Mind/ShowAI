@@ -379,7 +379,12 @@ function ManualPath({
 }) {
   const t = useTranslator(messages);
   const [path, setPath] = useState(host.manualPath ?? "");
-  const command = host.host === "deepseek" ? "dsh" : host.host;
+  const command =
+    host.host === "deepseek"
+      ? "dsh"
+      : host.host === "antigravity"
+        ? "agy"
+        : host.host;
   return (
     <div className="plugin-manual-path">
       {host.searched && (

@@ -16,6 +16,7 @@ export type PluginErrorCode =
 export const VERIFIED_HOST_VERSIONS = {
   codex: "0.163.0",
   claude: "2.1.306",
+  antigravity: "1.3.4",
 } as const;
 
 export class PluginInstallError extends Error {

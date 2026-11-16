@@ -201,7 +201,7 @@ await validateGuidanceLinks(join(plugin, "skills"));
 console.log(
   `Prepared ShowAI MCP plugin ${manifest.version}: ${skills.join(", ")}`,
 );
-for (const profile of ["codex", "claude"]) {
+for (const profile of ["codex", "claude", "antigravity"]) {
   const target = join(root, "plugins", `showai-${profile}`);
   await stageHostPlugin({ source: plugin, target, profile });
   await validateGuidanceLinks(join(target, "skills"), target);

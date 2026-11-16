@@ -1,4 +1,10 @@
-export type HostProfile = "codex" | "claude" | "deepseek" | "kimi" | "mcp-app";
+export type HostProfile =
+  | "codex"
+  | "claude"
+  | "antigravity"
+  | "deepseek"
+  | "kimi"
+  | "mcp-app";
 export const HOST_PROFILES: Record<HostProfile, string>;
 export const HOST_GUIDE: string;
 export function skillFiles(root: string): Promise<Record<string, string>>;
@@ -18,5 +24,5 @@ export function bindHostSkills(options: {
 export function stageHostPlugin(options: {
   source: string;
   target: string;
-  profile: "codex" | "claude";
+  profile: "codex" | "claude" | "antigravity";
 }): ReturnType<typeof bindHostSkills>;

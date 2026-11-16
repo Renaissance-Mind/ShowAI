@@ -1,0 +1,173 @@
+# 共享数据
+
+多个页面、多个组件需要同时读写同一份数据时（例如「全景」的目标看板和「日程」表格都要显示和修改同一批截止日期），把数据放进项目的共享数据（dataset），让这些组件绑定它。这样所有组件读写的都是同一份数据，任何一处的修改都会出现在其他地方。完整说明用 `guide({topic:"datasets"})` 读取。
+
+先确认 `showai_capabilities` 返回 `datasets.protocol` 为 `showai-datasets-v1`；没有时说明当前 ShowAI 运行时还不支持共享数据，请用户更新 ShowAI 后再继续。下面每个项目工具都显式传 `projectId`。
+
+## 模型
+
+- 共享数据是项目里的一个独立资源，保存一份 JSON 值，有自己的 hash 和 revision。新建一份：`dataset_write({projectId, action:"create", name, value})`，值很大时在本机连接改用 `valueFile:"/绝对路径/值.json"`（文件内容就是这个 JSON 值）；从页面上已有的组件生成见下文 fromBlock，让值留在外部文件里见「外部文件中的数据」。写入只需传读到的 `baseHash`。读写用 `dataset_read`（list / read）、`dataset_write`（create / apply / link / transform）与 `dataset_delete`。`dataset_read({projectId, action:"list"})` 列出共享数据；`dataset_read({projectId, action:"read", datasetId, path?})` 读取一份的值与 hash，同时返回本项目中使用它的页面与块（`references`）；本机连接加 `out:"/绝对路径/文件.json"` 时值写入该文件（已有文件需 overwrite:true），回执只含共享数据的名称、schema、hash/revision 与 out（path、bytes、sha256）。值也可以放在内容库以外的文件里，见下文「外部文件中的数据」；由其他数据计算得到的值见「处理脚本」。
+- 组件块通过 `data.$binding` 绑定共享数据。页面只保存绑定设置和这个块自己的值；共享数据变化不会改变页面的 hash，页面的保存冲突也不涉及共享数据。
+- 组件照常收到 `{data, onChange, readOnly}`，不需要任何新接口。宿主从共享数据生成组件参数，把 `onChange` 交回的整份参数按记录 id 拆成对共享数据的修改。组件要满足两点：列表条目有稳定 `id`，收到新的 `data` 时以它为准，见 [组件设计](../../create-component/references/component-authoring.md)。
+
+## 两种绑定
+
+**props**：共享数据（或其中 `path` 指向的对象）就是组件的顶层参数，`local` 列出的参数留在各块自己保存（如标题、视图设置）。把已有组件的数据变成共享数据：
+
+```text
+dataset_write({projectId, action:"create", name:"全景 OKR", fromBlock:{pageId, blockId, baseHash, local:["title"]}})
+```
+
+`baseHash` 必填，取最近一次 `page_read` 的 hash。`baseRevision` 可以不传；传了就必须是页面当前的 revision，否则返回 CONFLICT，共享数据也不会创建。省略 `local` 时，database 的 title、view、groupBy、calendar 和 views 留在各块，其他组件不保留本地参数；给出 `local` 就只按给出的列表。它在同一次保存里创建共享数据并把该块改为绑定。回执带共享数据本身及其 `hash`、`revision`，不需要再 `dataset_read`；`page` 给出该页新的 hash 与 revision，下一次 `page_apply` 用它们作 baseHash/baseRevision。用 `value` 新建时回执同样带 `hash`。绑定后的块只保存 `local` 中的参数和 `$binding`。把其他参数直接存进块（`component.insert` 的 data、`block.attrs.set`、`page_save`）会以 INVALID_DATA 拒绝；`component.props.set` 则把 `local` 以外的参数写进共享数据，所有绑定它的块都会跟着变。要让某个参数只属于这个块，用 `component.binding.set` 换成包含它的 `local` 列表。
+
+自定义组件共享后，当时那个组件版本的参数 schema 会约束此后对共享数据的每次写入。组件升级用 `page_apply` 的 `component.ref.set`：共享数据的 schema 若由旧版本派生，会在同一次保存中换成新版本的约束（回执 `datasetSchemas`），不需要另外改；它不写共享数据的值，所以不需要 `datasetBases`。回执 `warnings` 中的 DATASET_SHARED 列出还绑定这份数据的其他页面和块，它们之后的写入也按新 schema 检查，要告诉用户并按用户意思一起升级；DATASET_SCHEMA_KEPT 表示共享数据有自己定的 schema，需要时才用 `dataset_write` apply 的 `schema` 手动更换（`null` 取消约束）。已有数据的列表缺 id 时，先在源组件里补上 id 再共享。
+
+另一个块要显示同一份数据时有两种做法。database 都写 `local:["title","view","groupBy","calendar","views"]`，让每个块保留自己的视图。
+
+- 新建一个块：在 `component.insert` 的 `data` 里直接带上 `$binding`，插入时就已绑定，同一次 `page_apply` 完成。`data` 只放 `local` 中的参数，不放 columns、rows 等共享参数（放了会被拒绝）。例如日历视图：
+
+  ```json
+  {
+    "type": "component.insert",
+    "kind": "database",
+    "data": {
+      "title": "日程",
+      "view": "calendar",
+      "calendar": { "dateColumn": "due" },
+      "$binding": {
+        "dataset": "DATASET_ID",
+        "props": { "local": ["title", "view", "groupBy", "calendar", "views"] }
+      }
+    }
+  }
+  ```
+
+- 绑定页面上已有的块：`{type:"component.binding.set", blockId, binding:{dataset:ID, props:{local:[...]}}}`。同一次调用里不能引用新块；`page_apply` 回执的 `changedBlocks.added` 列出新插入块的 id，下一次调用用它绑定（也可以从 `page_read` 中找到）。props 绑定会保留块里 `local` 列出的参数，丢弃块原有的其他参数（例如原来的 columns、rows），所以块事先不需要任何列或行；要保留的原有值先写进共享数据或列入 `local`。
+
+两种做法都不检查 `local` 参数与块自身数据是否匹配：database 的 calendar、groupBy、views 可以引用只存在于共享数据里的列，保存时原样保留，由组件按解析后的列显示。两种做法也都不检查共享数据是否存在；之后 `page_read` 的 `bindings[].error` 会指出找不到的共享数据，`issues` 列出读不到的路径。
+
+**collections**：把共享数据里沿某条路径找到的记录，作为某个数组参数（如表格的 `rows`）的条目，排在块自己的条目之后，按来源中的顺序排列（表格排序和日历按各自规则显示）。下面是 `component.binding.set` 的 `binding` 参数。下面的字段名（`objectives`、`due`、`done`、`areas`、表格的列 id）只是示例，要换成实际的组件参数和表格列；写回的值必须符合来源字段的类型与格式（例如日期是 `YYYY-MM-DD` 文本）：
+
+```json
+{
+  "dataset": "DATASET_ID",
+  "collections": [
+    {
+      "key": "task",
+      "into": "rows",
+      "from": "objectives[*].keyResults[*].tasks[*]",
+      "where": { "field": "due", "exists": true },
+      "label": "全景 · 任务",
+      "fields": {
+        "title": "title",
+        "date": { "from": "due", "empty": "remove" },
+        "done": "done"
+      },
+      "derived": {
+        "project": "../../title",
+        "cat": { "lookup": "areas", "by": "../../area", "field": "name" },
+        "source": { "template": "全景 · {../title}" }
+      },
+      "defaults": { "kind": "截止" }
+    }
+  ]
+}
+```
+
+- 条目 id 是 `key:记录id`（如 `task:t1`）。同一 key 下记录 id 重复时改为 `key:各层id用/连接`（如 `task:o1/k1/t1`）。没有 id 的记录以 `#序号` 代替并且只读，只能在来源修改。
+- `fields` 把显示字段对应到记录自己的字段，修改会写回记录。对象写法支持 `map`（显示值 → 保存值）、`otherwise`（保存值不在 map 中时显示的值）和 `empty`（清空时 `remove` 删除该字段，`keep` 保存空字符串；可选日期用 `remove`）。例如 `{"from":"status","map":{"true":"done","false":"todo"},"otherwise":false}` 把勾选对应到状态；注意取消勾选会把状态写成 `todo`，原来的中间状态（进行中、有风险等）不会保留，必要时先和用户确认。
+- `derived` 只读：`../title` 表示上一层记录的字段，`{value}` 是常量，`{template}` 拼接文字，`{lookup, by, field}` 按 id 在别处查名字。
+- 其他字段（包括 `defaults`）由这个块按条目保存在 `$binding.overlay`，例如日程里的「开始准备」「确认」。
+- 多条 collection 可以填同一个 `into`（任务、关键目标、目标都进日程）。块自己的条目（手填行）不受影响。
+- 只有 collections 的绑定保留块自己的全部参数，并按该组件的数据规则检查。database 要事先有自己的列，列 id 对应 `fields`、`derived`、`defaults` 中要显示的字段；calendar 的 dateColumn 等也必须是这些列之一，否则以 INVALID_DATA 拒绝。
+- 映射来的条目不能在表格里删除或改派生字段；这样的修改会被拒绝并说明原因，不会悄悄丢掉。清空映射的日期会从来源删除日期，条目随之离开日程。
+
+两种绑定可以同时使用。
+
+## 读写
+
+- `page_read` 的结构化、markdown 和大纲结果都带 `bindings`（`response:"source"` 也保留，`"receipt"` 省略）：每个绑定块的共享数据 id、hash、解析后的参数 `props`、映射条目数 `mapped`、每个映射条目对应的来源路径 `sources` 和提示 `issues`。图像、html 视图按共享数据显示。
+- 每次 `page_read` 或 `dataset_read` 都会记住这个读者读到的版本；之后对绑定块的写入以它为起点，与期间别处的修改合并。读者按连接区分：每个新的 MCP 连接（宿主重启或重新连接、另一个 Agent、脚本或单独启动的客户端）都是另一个读者，看不到之前连接的读取；有固定 Agent 会话标识的宿主在同一会话内共用。
+- 读取和写入不在同一个连接时，写共享数据必须带上读取时的 hash，否则没有合并基线：`page_read` 的结果直接带 `datasetBases`（`{共享数据id: hash}`，其他项目的共享数据写作 `项目id/共享数据id`），原样传给 `page_apply` 的 `datasetBases`；`dataset_read` 返回的 `hash` 用作 `dataset_write` apply 的 `baseHash`。缺少基线时 `page_apply` 返回 `MISSING_BASELINE`，`details.datasetBases` 写明要传的键；不要拿 `currentHash` 顶替，除非你改的正是这个版本的内容，否则会把期间别人的修改当成你的修改覆盖。
+- 对绑定块的每次 `component.props.set` 都需要这个基线，只改块自己的 `local` 参数（标题、视图、calendar）也一样：本连接没读过该共享数据时，要传 `datasetBases`，否则返回 `MISSING_BASELINE`。`dataset_write` 的 create（包括 fromBlock）不算读取；新建后要修改绑定它的块，把 create 回执的 `hash` 放进 `datasetBases`。带 `$binding` 的 `component.insert`、`component.binding.set` 和 `component.binding.remove` 不需要基线。
+- 选择写法：修改页面上看到的一行（包括只属于这个块的字段，如开始准备），对绑定块用 `component.props.set`，按读取到的形式传参数（例如包含映射行的完整 `rows`）：映射字段写入共享数据，其他字段写入块，二者在同一次保存中完成。直接改来源记录（尤其是多条、嵌套或不在页面上显示的字段）用 `dataset_write({projectId, action:"apply", datasetId, baseHash, operations})`：`{op:"set",path,value}`、`{op:"remove",path}`、`{op:"insert",path:列表,value,after?}`、`{op:"move",path:条目,after}`。路径按 id 选记录，例如 `objectives[id=o1].keyResults[id=k1].tasks[id=t1].due`，或 `["objectives",{"id":"o1"},…]`；映射条目的完整路径取自 `bindings[].sources`。
+- 两种写法遇到同一字段的新修改都返回 CONFLICT 并且什么都不写，见下文。`page_apply` 返回的 CONFLICT 带 `details.datasetId` 与 `details.conflicts` 时是共享数据冲突：重新 `page_read` 后逐项决定，不走 `page_diff` 和整页合并；没有这些字段时是页面本身的保存冲突。
+- 查看共享数据自某次读取以来的变化（比较用的历史值是此前读取时按 hash 保存的版本，全库保留最近约 128 份；不可用时返回 MISSING_BASELINE，重新读取后以新 hash 为准）：`dataset_read({projectId, action:"read", datasetId, sinceHash})`，sinceHash 取之前 `page_read` 的 `datasetBases` 或 `dataset_read` 的 `hash`；返回按记录的 changes（path、op、before/after，长值摘要），按 offset/limit 分页，`path` 可只看一部分，本机连接的 `out` 写入文件。绑定块的数据变化不在 `page_diff` 中（页面 hash 不变），`page_diff` 的 `boundDatasets` 会列出相关共享数据。
+- `page_save` 不能把共享参数写进绑定块；要改这些参数用上面两种方式。
+- 解除绑定：`{type:"component.binding.remove", blockId, keep:"snapshot"}` 把当前显示的参数存为块的副本。
+- 删除：先用 `dataset_read` 的 `references` 查看本项目里使用它的页面，向用户确认（删除不能在应用中撤销）。`dataset_delete({projectId, datasetId, baseHash})` 只删除没有块使用的共享数据，已移到其他项目、仍指向它的页面也算在内；仍有使用时返回 `details.references`（每项带 projectId、pageId、blockIds）而不删除，由用户决定是否先在这些块上解除绑定：读取对应项目的页面后用 `component.binding.remove`。
+
+## 带类型的记录、关联与筛选
+
+数据库共享出来的数据是 `{columns, rows}`：columns 给每个字段定类型，rows 是带 id 的记录。字段类型、每种类型可用的筛选运算符和列设置写法用 `catalog_describe({projectId, kind:"component", id:"database", view:"guide"})` 的 `fieldTypes` 查询，其中也列出组件库里声明为字段类型的组件。
+
+- 关联：两份这样的数据之间用 relation 列连接，例如任务数据里加 `{"id":"project","name":"项目","type":"relation","relation":{"dataset":"projects","reverse":{"name":"任务"}}}`，记录里写项目记录 id 的列表 `["p1"]`。带 `reverse` 时，绑定 projects 的数据库会多出「任务」一列，列出指向每个项目的任务；这一列由软件计算，不写进 projects。
+- 汇总与公式：rollup 列对关联记录的某一字段计数、求和、求平均等；formula 列写 JavaScript 表达式，用 `prop("字段名")` 读取本记录的字段，在处理脚本的同一个沙箱里逐条计算。它们的值不存进 rows：写记录时不要给这些列写值；`page_read` 结果里块的 `$derived` 是计算出的快照，写入时不要带上它。表达式出错或互相引用时，该单元格显示错误原因。
+- 查询：`dataset_read({projectId, action:"read", datasetId, query:{filter, sorts, search}})` 返回符合条件的记录（含关联标题、汇总和公式结果），用 offset/limit 翻页；值不在顶层时加 `path` 指向 `{columns, rows}`。filter 是条件组 `{"join":"and","conditions":[{"column":"status","operator":"is","value":"进行中"},{"join":"or","conditions":[{"column":"due","operator":"within","value":{"direction":"next","days":7}},{"column":"hours","operator":"gt","value":10}]}]}`，最多嵌套一层；sorts 是 `[{"column":"due","direction":"asc"}]`。数据库视图的 `filter` 与 `sorts` 用同样的形状。
+
+## 并发与冲突
+
+每次写入都带着它开始时的值。不同记录、同一记录的不同字段可以同时修改，自动合并；两处把同一字段改成不同的值才是冲突：写入返回 CONFLICT、什么都不写，`details.conflicts` 给出每个字段的 `path`、`base`、`mine`、`theirs`。重新读取，把每个字段的 `base`、`mine`、`theirs` 告诉用户，由用户决定保留哪个（意图明确时按用户这次的要求），再用新的 baseHash 写入；不要用旧读取的整份值覆盖。没有 id 的列表只能整体替换，几处同时改它会冲突，所以多人编辑的列表条目要有稳定 id。顺序调整按最后一次为准，不丢内容。
+
+用户说应用里出现冲突提示时，先用 `page_read` 看该块是否在 `bindings` 中：是共享数据就按本节处理；不是则属于页面保存冲突，按 use-showai 的编辑与验证处理。工作台里的共享数据冲突留在出现冲突的那个窗口：组件上方列出「此处的修改」和「另一处的修改」，由使用者选择保留哪一个。「此处的修改」是这个窗口尚未保存的值，保存在该窗口的本地草稿里（不在 `draft_read` 列出的草稿中）；「另一处的修改」是已经保存的值。Agent 用 `dataset_read` 只能看到已保存的值，看不到窗口里未保存的那个值，也清除不了这个提示，需要请用户说出想保留的内容。用户问起时解释含义，读取已保存的值告诉用户；用户希望保留的值由 Agent 写入时，在确认后用 `dataset_write` 的 apply 写入，再请用户在该窗口点「采用另一处的」关闭提示（此时另一处就是刚写入的值）。
+
+## 把复制改成共享
+
+1. 核对组件：用 `catalog_describe` 的 parameters 查看各层列表是否有唯一 `id`，用 development/source 确认组件按收到的 `data` 渲染。不满足时先说明，或按 [组件设计](../../create-component/references/component-authoring.md) 更新组件。
+2. 认出副本：复制进来的行通常带同步脚本使用的 id 前缀或来源说明，能对应到来源记录 id。无法确定时按标题与日期匹配，把匹配结果列给用户确认，不要猜。
+3. 比较副本和来源：副本的日期、完成或标题与来源不同时，说明是在目标页面改过。把差异列给用户，确定每一处保留哪一边。
+4. 在源页面用 `dataset_write` create 的 `fromBlock` 把源组件改为共享数据（或在工作台的块菜单选「共享数据…」），再用 `dataset_write` 的 apply 写入用户决定保留的目标页面的值。
+5. 在目标页面对表格用 `component.binding.set` 设置 collections 映射；`page_read` 看 `bindings[].mapped`、`sources` 和 `issues` 核对条目数量与列名。
+6. 处理副本行：取 `bindings[].props.rows`，把副本行里只在目标页面填写的字段（如开始准备、确认、类型）抄到对应的映射行，去掉副本行，保留手填行，用一次 `component.props.set({rows})` 保存。这些字段进入 `$binding.overlay`，副本行从块中删除。
+7. 与用户一起停用原来的同步脚本，再读取两页核对一致。
+
+## 外部文件中的数据
+
+用户的数据已经在内容库以外的目录（脚本生成的 JSON、表格导出的 CSV、Excel 表格等）或某个网址上，或希望数据留在原处由其他工具一起维护时，用 `dataset_write` 的 link 让共享数据直接读取那份数据，数据留在原处，其他工具的修改会直接出现在页面里。链接本机文件前先确认 `showai_capabilities.datasets.externalFiles.available`；为 false（远程连接或旧版运行时）时说明当前连接不能链接本机文件，请用户在本机 ShowAI 中操作或更新运行时。在线数据看 `showai_capabilities.datasets.sources.url.available`，远程连接也可以链接。
+
+- 文件格式按扩展名：`.json` 保存任意 JSON 值；`.csv`、`.tsv` 读成 `{columns, rows}`，第一行是列名，单元格读成文字、数字或 true/false。CSV/TSV 只能保存这种表格结构，嵌套值会被拒绝。`.xlsx` 只读，读出全部工作表：`{sheets:[{name, rows:[[单元格, …], …]}]}`，单元格是文字、数字、true/false、ISO 日期字符串或 null，第一行按表格原样保留（不当作列名）；ShowAI 不写回 xlsx，用户要在 ShowAI 里修改时，先用 `path:null` 复制进内容库。文本文件必须是 UTF-8；中文版 Excel 默认的「CSV」是 GBK，会以 INVALID_DATA 拒绝读取，请用户另存为「CSV UTF-8」。Excel 打开期间保存的文件会在下次读取时出现；它可能改写日期和数字格式，写回的值以文件中实际的文字为准。
+- 表格要有 `id` 列，表格组件中的修改才能写回对应行；绑定表格时用 collections 的 `from:"rows[*]"`。读取后 `columns` 没有 `id` 时告诉用户：没有 id 的行在组件里只读，只能在原文件中修改。用户同意由 Agent 补上时，读出 rows，为每行加上稳定的 id，用 `dataset_write({projectId, action:"apply", datasetId, baseHash, operations:[{op:"set", path:"rows", value:新rows}]})` 一次写回（这会改写整个文件，先确认文件没有其他程序正在编辑）；或者请用户在原工具里加一列 id。
+- 从已有文件新建：`dataset_write({projectId, action:"link", name, path:"/绝对路径/schedule.csv"})`。把项目里已有的共享数据移到新文件：`dataset_write({projectId, action:"link", datasetId, path, use:"dataset"})`，目标文件必须还不存在；已存在时返回 CONFLICT、什么都不写，请用户换一个文件名，或在确认要以该文件内容替换共享数据后改用 `use:"file"`。用一个已有文件替换共享数据的值：`use:"file"`（两边都有数据时必须写明，替换前与用户确认）。已链接的外部数据在另一台设备上只需 `dataset_write({projectId, action:"link", datasetId, path})` 链接本机的那份文件。链接永远不会覆盖已有文件。路径必须是绝对路径，`~` 要展开成实际的主目录。
+- 选择 link 还是复制：用户希望数据继续留在那个文件里、由其他工具一起维护时用 link，ShowAI 会把修改直接写回这个文件，文件内容也不随项目同步；用户只想把数据存进项目时用 create 的 `valueFile` 复制一份，原文件之后不再关联。说法不明确（如“存成共享数据”）时把两种结果告诉用户，按其选择做。用户没给名称时按文件名或内容拟一个，并在回复中说明。JSON 文件里的列表同样需要稳定 `id`，否则只能整体替换（见上文「读写」）。
+- 在线数据：`dataset_write({projectId, action:"link", name, url:"https://…/data.csv"})`，格式按网址的扩展名判断，判断不出时传 `format`。只接受 http/https，网址里不能带用户名和密码（网址会随项目同步）。在线数据只读，第一次链接时必须能读到。之后读取时，距上次读取超过 `refreshSeconds`（默认 300 秒，0 表示只在明确刷新时读取，最大 86400）才重新请求，并用 ETag/Last-Modified 判断是否有变化；要马上取最新数据用 `dataset_read({projectId, action:"read", datasetId, refresh:true})`。已有共享数据改为读取网址时要写 `use:"file"`，替换前与用户确认。链接用户给出的网址；用户没给出时先问。把在线 JSON 或表格显示成表格时，用 database 组件按 collections 绑定（`from` 指向记录列表，列 id 对应 `fields`）；JSON 不是记录列表时先用处理脚本整理成 `{columns, rows}` 或记录数组。
+- 读取状态：`dataset_read`、list 和 `page_read` 的 `bindings[]` 都带 `status`、`editable` 和 `warnings`。`status:"ok"` 是当前数据；`"stale"` 表示数据源这次读不到（文件被删、内容解析失败、不再符合 schema、网址无法访问），返回的是这台设备上次成功读到的值，`cachedAt` 是那次读取的时间；`"empty"` 表示这台设备从没读到过，`dataset_read` 返回 `SOURCE_UNAVAILABLE`，绑定块没有数据。`editable` 为 false 时不能写入：在线数据、xlsx 和 stale 的值都是这样，项目内数据和 JSON/CSV/TSV 文件为 true。`page_read` 的 `bindings[].editable` 说明这个块能改哪些部分：只有一部分能改时为 `{paths}`，例如表格行映射自只读数据，块自己的标题、列和新加的行仍可编辑；`"*"`、`"title"`、`"rows[*]"` 是可改的部分，以 `!` 开头的是其中不能改的部分（如 `"!rows[id=task:*].title"`，映射来的条目 id 为「映射 key:记录 id」）。写只读数据返回 `READ_ONLY`，写 stale 的数据返回 `SOURCE_UNAVAILABLE`，都不改动任何内容；`page_read` 的 `datasetBases` 不包含 stale 的数据。`warnings` 每项为 `{code, level, stage, datasetId, message, actions}`：code 有 SOURCE_NOT_LINKED（本机未链接）、NOT_BUNDLED（文件来自其他设备，同步没有带来它的副本）、SOURCE_MISSING（文件不存在或打不开）、SOURCE_UNREACHABLE（网址无法访问）、PARSE_FAILED（内容无法解析）、SHAPE_CHANGED（内容不再符合 schema）、TRANSFORM_FAILED（处理脚本出错）、OUTPUT_INVALID（脚本输出不是 JSON）、WRITE_CONFLICT（本机文件和它的同步副本在不同设备上都被修改）、TOO_LARGE（超过 8 MiB）、READ_ONLY；stage 是出问题的环节（location、format、transform、writeback、capacity）；actions 是可以采取的处理（link-file 链接文件、retry 重试、open-file 打开文件修正、ask-agent、packaging）。把 message 的意思告诉用户并提供这些处理；数据源恢复可读后，组件自动回到当前数据。工作台在块上显示的「未打包」「已过期」「只读」分别对应 NOT_BUNDLED、stale 和 READ_ONLY。
+- 链接用户指明的、内容库以外的文件；用户没给出路径时先问。路径只记录在这台设备上。
+- 同步：项目同步到服务器时，默认带上每个链接文件的副本（单个不超过 64 MiB），其他设备没有链接自己的文件时读这份副本，`dataset_read` 的 list 标出 `source.bundled:true`。其他设备可以编辑副本（JSON/CSV/TSV），同步回来后 ShowAI 把它写进这台设备的文件；同一段时间里文件在本机也被改过时，文件保持原样，读取带 WRITE_CONFLICT 提示，请用户把两边的修改合并进文件，文件的下一次修改会同步给其他设备。哪些文件随同步携带由用户决定：`project_sync_status` 的 `packaging` 列出每项（名称、大小、`choice`），`project_sync({packaging:{项id:"bundle"|"skip"}})` 保存用户的选择；工作台在「设置 → 账号与同步」的项目详情里选择。选择随项目同步并进入历史，副本本身不进入历史。不带副本时，其他设备返回 `SOURCE_UNAVAILABLE`（code NOT_BUNDLED，`details.source` 带格式和文件名），绑定块显示提示和「链接文件…」按钮；链接过但文件读不到时显示「……现在无法读取」并给出路径。向用户说明：先把文件放到这台设备上（同步盘、拷贝等），再由用户点「链接文件…」选择它，或告诉 Agent 文件的绝对路径后用 `dataset_write({projectId, action:"link", datasetId, path})` 链接。文件格式必须与原来相同。
+- 读写与项目内的共享数据相同：每次读取都读文件，JSON/CSV/TSV 每次写入都原子地写回文件并保留原来的缩进、换行和引号；文件在别处被修改后，打开的窗口会更新，基于旧读取的写入按记录和字段合并。文件读取后又被改动时写入返回 CONFLICT，重新读取后再写。文件不可读或内容不符合 schema 时按上面的读取状态返回 stale 或 empty，并在 warnings 中说明原因。
+- `dataset_write({projectId, action:"link", datasetId, path:null})` 把文件当前内容复制回内容库并停止读写该文件；`dataset_delete` 只删除共享数据和链接。两者都保留文件本身。
+- 导出（html、inline、site 和工作台导出的页面源）带什么由用户逐项决定。页面用到本机文件的数据、由它们计算的处理结果或本机资源文件时，导出先返回 `CONFIRMATION_REQUIRED`，什么也不写：`details.packaging.items[]` 每项有 `id`、`kind`（file-dataset、url-dataset、transform-output、file-resource、url-resource）、名称、`bytes`（写进导出的大小）、`choices`、`choice`（默认或用户上次的选择）、使用它的块和 `available`，以及合计 `bytes` 与上限（单项 64 MiB、合计 256 MiB）。把每项的名称和大小告诉用户，说明导出不随文件更新、收到文件的人能看到这些数据，按用户的选择用 `packaging:{项id: 选择}` 重新导出（没写的项按显示的 choice）；用户说全部带上时可用 `externalData:"embed"`。选择：bundle 写入数据快照，skip 不写，块只显示数据名称和文件名；在线数据 keep-url 保留地址不写数据；处理结果 result 写入结果，inputs 只把各输入的当前值写成导出旁的 JSON 文件（`<名称>.inputs/` 或网站的 `inputs/`，块显示名称），both 两者都写（inline 和页面源只有 result 与 skip）；资源 embed 嵌入文件，在线资源默认 keep-url。在线数据和在线资源也列在清单里（默认 keep-url），只有它们时导出直接进行。导出文件里只有文件名，不含本机路径。
+- `page_present` 在对话里展示当前数据，不需要确认；它的 delivery 文件（delivery.html 等）带着预算内的全部数据，结果中的 `externalSnapshots` 列出大小。只在对话中展示时无需询问；要把 delivery 文件交给别人或上传时，改用 page_export 按上一条请用户选择；之前生成的 delivery 可能已过时，交付前重新 page_present 或改用 page_export 得到当前快照。
+
+## 处理脚本
+
+组件需要的形状和数据源不一致时（Excel 里位置不固定的表格、几份数据要合并或汇总、要换算成图表的 labels 和 series），写一个处理脚本生成一份新的共享数据（transform），让组件绑定它。数据源保持原样；任何一份输入变化后，输出重新计算，打开的页面随之更新。限制和可用的 helpers 见 `showai_capabilities.datasets.transforms`。
+
+- 脚本定义 `function transform(inputs, helpers) { … return 输出; }`。`inputs` 按名称给出每份输入的当前值（JSON 副本），同步返回的输出是普通对象、数组、字符串、有限数字、布尔或 null，最大 8 MiB。脚本在隔离环境中运行，可用 JavaScript 内置对象和 helpers，每次最多运行 2 秒、使用 64 MiB 内存。
+- 输入写成 `inputs:{名称: datasetId}`，其他项目的数据写 `{project, dataset}`，最多 16 份。输入可以是项目内数据、本机文件、在线数据或另一份处理结果；名称就是脚本中 `inputs` 的键，用 JavaScript 标识符。
+- helpers 处理 xlsx 读出的 `{sheets:[{name, rows}]}`。行列序号从 0 开始，单元格地址用 A1 写法：`helpers.sheet(book, 名称或序号)` 取工作表（省略时取第一张）；`helpers.cell(sheet, "B3")` 取单元格，空格和范围外为 null；`helpers.range(sheet, "A1:C10")` 取矩形区域的二维数组；`helpers.find(sheet, 值或函数)` 逐行找第一个匹配的单元格，返回 `{row, column, ref, value}` 或 null；`helpers.table(sheet或rows, {header: 行序号})` 把表头下方各行读成以表头文字为键的对象，读到第一个空行为止，没有表头文字的列用列字母命名；`helpers.columnName(序号)` 把列序号换成字母。
+- 例：预算表在工作表里的位置每月会变，先找到「月份」表头，再生成 `chart` 组件的 labels 和 series，并加上项目内目标数据：
+
+```js
+function transform({ budget, targets }, h) {
+  const sheet = h.sheet(budget, "预算");
+  const header = h.find(sheet, "月份");
+  const rows = h.table(sheet, { header: header.row });
+  return {
+    labels: rows.map((row) => String(row["月份"])),
+    series: [
+      { name: "预算", values: rows.map((row) => row["研发"] + row["市场"]) },
+      { name: "目标", values: rows.map(() => targets.monthly) },
+    ],
+  };
+}
+```
+
+- 先试运行：`dataset_write({projectId, action:"transform", dryRun:true, inputs, script})` 返回输出 `value` 和用时 `ms`（输出超过 64 KiB 时给出 `preview` 与 `bytes`），出错时返回 `code`、`message` 和 `line`，不保存任何内容。输出符合预期后创建：`dataset_write({projectId, action:"transform", name, inputs, script})`；本机连接可以用 `scriptFile:"/绝对路径/transform.js"` 传较长的脚本。修改脚本或输入：`dataset_write({projectId, action:"transform", datasetId, baseHash, script?, inputs?})`，`baseHash` 用 `dataset_read` 返回的 hash（结果为 stale 时也可以修改），脚本和输入的修改记入项目历史。
+- 绑定方式与其他共享数据相同。上例的图表用 props 绑定 `{dataset, props:{local:["title","type","unit"]}}`，输出提供 labels 和 series，标题与图表类型留在各块。
+- 处理结果只读：`editable` 为 false，绑定块显示数据，映射来的字段不能编辑，块自己的参数和条目照常编辑；写入返回 `READ_ONLY`。要改变结果就改输入或脚本；需要一份可编辑的副本时，用 `dataset_write({projectId, action:"link", datasetId, path:null})` 把当前输出复制进内容库，此后它成为普通共享数据。
+- `dataset_read` 返回输出值、定义 `dataset.transform`（inputs 和 script 全文）以及运行信息 `transform`：`scriptHash`、每份输入的状态与 hash、`lastRunMs` 和 `ranAt`。输入和脚本都没变时沿用上次的结果。在线输入在读取处理结果时按它的 `refreshSeconds` 重新获取；本机文件或项目内的输入改变后，打开的页面会自动更新。
+- 出错时的表现：某份输入是 stale 时，输出照常计算并标为 stale，`warnings` 带上那份输入的警告（`datasetId` 指向那份输入）。输入读不到，或脚本出错（TRANSFORM_FAILED，message 含错误和行号）、输出不是 JSON（OUTPUT_INVALID）、超过 8 MiB（TOO_LARGE）时，显示上次成功的输出并标为 stale；从未成功过时 `dataset_read` 返回 `SOURCE_UNAVAILABLE`，`details.warnings` 说明原因。处理时用 `dataset_read` 读出脚本全文和各输入的当前值，按 message 修改脚本，用 dryRun 验证后再保存。TRANSFORM_FAILED、OUTPUT_INVALID 的 `datasetId` 是处理结果本身，actions 为 ask-agent。被处理脚本使用的数据要删除时，`dataset_delete` 返回 CONFLICT 并在 `details.transforms` 列出这些处理结果，先修改它们的输入。
+
+## 其他
+
+共享数据和组件参数一样最大 8 MiB，外部文件和在线数据也一样。项目历史记录页面、共享数据的定义、处理脚本、绑定和打包选择；恢复或合并得到的页面版本，绑定的数据和链接的文件都显示当前值。导出、图像与 board_read 使用导出或渲染那一刻的最新数据快照；导出文件不再含绑定。页面移到其他项目后仍读原项目的共享数据（`binding.project`）。存为模板时，绑定块保存为当前数据的副本。项目同步按记录和字段合并两台设备的修改；无法合并的字段保留两份并生成说明页。

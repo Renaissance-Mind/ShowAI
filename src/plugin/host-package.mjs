@@ -5,6 +5,7 @@ import { dirname, isAbsolute, join, resolve, relative, sep } from "node:path";
 export const HOST_PROFILES = {
   codex: "mcp-app",
   claude: "model-html",
+  antigravity: "fragment-file",
   deepseek: "fragment-file",
   kimi: "fragment-file",
   "mcp-app": "mcp-app",
@@ -86,7 +87,7 @@ export async function bindHostSkills({ source, target, profile }) {
 }
 
 export async function stageHostPlugin({ source, target, profile }) {
-  if (!["codex", "claude"].includes(profile))
+  if (!["codex", "claude", "antigravity"].includes(profile))
     throw new Error(`Use the native bundle packager for ${profile}.`);
   const path = relative(resolve(source), resolve(target));
   if (
@@ -125,6 +126,29 @@ export async function stageHostPlugin({ source, target, profile }) {
   if (profile === "codex") {
     await rm(join(target, ".claude-plugin"), { recursive: true, force: true });
     await rm(join(target, ".mcp.json"), { force: true });
-  } else await rm(join(target, "mcp.json"), { force: true });
+  } else if (profile === "claude") {
+    await rm(join(target, "mcp.json"), { force: true });
+  } else {
+    await rm(join(target, ".claude-plugin"), { recursive: true, force: true });
+    await rm(join(target, ".mcp.json"), { force: true });
+    await rm(join(target, "mcp.json"), { force: true });
+    await writeFile(
+      join(target, "mcp_config.json"),
+      JSON.stringify(
+        {
+          mcpServers: {
+            showai: {
+              command: "node",
+              args: ["./mcp/launch.mjs"],
+              cwd: "./",
+              env: { SHOWAI_HOST_DISPLAY: receipt.declaredHostDisplay },
+            },
+          },
+        },
+        null,
+        2,
+      ) + "\n",
+    );
+  }
   return receipt;
 }

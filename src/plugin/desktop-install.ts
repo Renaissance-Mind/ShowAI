@@ -34,7 +34,7 @@ import {
   type DshProfileState,
 } from "./dsh-stage.mjs";
 
-export type PluginHost = "codex" | "claude" | "deepseek";
+export type PluginHost = "codex" | "claude" | "antigravity" | "deepseek";
 export interface DshPendingSteps {
   bundlePath: string;
   profileMissing: boolean;
@@ -206,7 +206,8 @@ async function writeLauncher(
 
 export async function hostExecutable(host: PluginHost) {
   if (host === "deepseek") return dshApplication();
-  const executable = await findExecutable(host);
+  const binary = host === "antigravity" ? "agy" : host;
+  const executable = await findExecutable(binary);
   if (executable || host !== "codex" || process.platform !== "darwin")
     return executable;
   for (const root of ["/Applications", join(homedir(), "Applications")]) {
@@ -222,7 +223,12 @@ export async function hostExecutable(host: PluginHost) {
   return null;
 }
 
-export const PLUGIN_HOSTS = ["codex", "claude", "deepseek"] as const;
+export const PLUGIN_HOSTS = [
+  "codex",
+  "claude",
+  "antigravity",
+  "deepseek",
+] as const;
 function pluginHost(value: unknown): PluginHost {
   if (!PLUGIN_HOSTS.includes(value as PluginHost))
     throw new PluginInstallError("PLUGIN_UNKNOWN_HOST", "Unknown plugin host.");
@@ -309,6 +315,10 @@ export class DesktopPluginInstaller {
     const env: NodeJS.ProcessEnv = {
       ...process.env,
       PATH: executablePaths().join(delimiter),
+      ...(process.env.AGY_HOME &&
+      /(?:^|[\\/])agy(?:\.(?:exe|cmd|bat))?$/i.test(executable)
+        ? { HOME: process.env.AGY_HOME }
+        : {}),
     };
     delete env.ELECTRON_RUN_AS_NODE;
     const result = await execute(executable, ["plugin", ...args], {
@@ -330,7 +340,7 @@ export class DesktopPluginInstaller {
   }
 
   private async listJson(
-    host: "codex" | "claude",
+    host: "codex" | "claude" | "antigravity",
     executable: string,
     args: string[],
     timeout?: number,
@@ -343,10 +353,16 @@ export class DesktopPluginInstaller {
     }
   }
 
-  private tooOld(host: "codex" | "claude", output: string) {
+  private tooOld(host: "codex" | "claude" | "antigravity", output: string) {
+    const name =
+      host === "codex"
+        ? "Codex"
+        : host === "claude"
+          ? "Claude Code"
+          : "Antigravity";
     return new PluginInstallError(
       "PLUGIN_HOST_TOO_OLD",
-      `This ${host === "codex" ? "Codex" : "Claude Code"} does not report plugins as JSON; update it to ${VERIFIED_HOST_VERSIONS[host]} or later.`,
+      `This ${name} does not report plugins as JSON; update it to ${VERIFIED_HOST_VERSIONS[host]} or later.`,
       {
         host,
         minimumVersion: VERIFIED_HOST_VERSIONS[host],
@@ -460,11 +476,19 @@ export class DesktopPluginInstaller {
         throw error;
       },
     );
-    const own = items.find(
-      (item) =>
-        (item.pluginId ?? item.id) === identity &&
-        (host === "codex" || item.scope === "user"),
-    );
+    const own =
+      host === "antigravity"
+        ? items.find(
+            (item) =>
+              item.name === "showai" &&
+              typeof item.version === "string" &&
+              item.version.includes("+desktop."),
+          )
+        : items.find(
+            (item) =>
+              (item.pluginId ?? item.id) === identity &&
+              (host === "codex" || item.scope === "user"),
+          );
     return {
       host,
       executable,
@@ -474,12 +498,20 @@ export class DesktopPluginInstaller {
       current:
         !!own?.version && !!expected && own.version === (await expected),
       expected: expected ? await expected : undefined,
-      installedPath: own?.installedPath ?? own?.installPath,
+      installedPath: own?.installedPath ?? own?.installPath ?? own?.path,
       ...(own && typeof receipt?.home === "string"
         ? { boundHome: receipt.home }
         : {}),
       otherSources: items
         .filter((item) => {
+          if (host === "antigravity") {
+            return (
+              typeof item.name === "string" &&
+              (item.name === "showai" || item.name.startsWith("showai-")) &&
+              item !== own &&
+              item.enabled
+            );
+          }
           const id = item.pluginId ?? item.id;
           return (
             typeof id === "string" &&
@@ -488,7 +520,13 @@ export class DesktopPluginInstaller {
             item.enabled
           );
         })
-        .map((item) => item.pluginId ?? item.id),
+        .map((item) =>
+          host === "antigravity"
+            ? item.version
+              ? `${item.name}@${item.version}`
+              : item.name
+            : (item.pluginId ?? item.id),
+        ),
     };
   }
 
@@ -589,7 +627,7 @@ export class DesktopPluginInstaller {
   }
 
   private async installHost(
-    host: "codex" | "claude",
+    host: "codex" | "claude" | "antigravity",
   ): Promise<PluginInstallReceipt> {
     if (host === "claude" && this.options.channel === "development")
       throw new PluginInstallError(
@@ -602,7 +640,7 @@ export class DesktopPluginInstaller {
     if (!executable)
       throw new PluginInstallError(
         "PLUGIN_HOST_MISSING",
-        `Install ${host === "codex" ? "Codex" : "Claude Code"} first, then refresh.`,
+        `Install ${host === "codex" ? "Codex" : host === "claude" ? "Claude Code" : "Antigravity"} first, then refresh.`,
         { host },
       );
     const before = await this.inspect(host, executable);
@@ -614,27 +652,30 @@ export class DesktopPluginInstaller {
       );
     const marketplace = join(this.options.root, host);
     const source = join(marketplace, "plugins/showai");
-    const registered = await this.listJson(host, executable, [
-      "marketplace",
-      "list",
-      "--json",
-    ]);
-    const marketplaces =
-      host === "codex" ? registered?.marketplaces : registered;
-    if (!Array.isArray(marketplaces))
-      throw this.tooOld(host, JSON.stringify(registered));
-    const existing = marketplaces.find((item) => item.name === marketplaceName);
-    if (existing) {
-      const path = host === "codex" ? existing.root : existing.path;
-      if (
-        typeof path !== "string" ||
-        (await realpath(path)) !== (await realpath(marketplace))
-      )
-        throw new PluginInstallError(
-          "PLUGIN_MARKETPLACE_CONFLICT",
-          "The showai-desktop marketplace belongs to another installation. Manage that source in the host before retrying.",
-          { host, path },
-        );
+    let existing: { root?: unknown; path?: unknown } | undefined;
+    if (host !== "antigravity") {
+      const registered = await this.listJson(host, executable, [
+        "marketplace",
+        "list",
+        "--json",
+      ]);
+      const marketplaces =
+        host === "codex" ? registered?.marketplaces : registered;
+      if (!Array.isArray(marketplaces))
+        throw this.tooOld(host, JSON.stringify(registered));
+      existing = marketplaces.find((item) => item.name === marketplaceName);
+      if (existing) {
+        const path = host === "codex" ? existing.root : existing.path;
+        if (
+          typeof path !== "string" ||
+          (await realpath(path)) !== (await realpath(marketplace))
+        )
+          throw new PluginInstallError(
+            "PLUGIN_MARKETPLACE_CONFLICT",
+            "The showai-desktop marketplace belongs to another installation. Manage that source in the host before retrying.",
+            { host, path },
+          );
+      }
     }
     const runtime = this.options.runtime();
     const { manifest, original, version } = await this.expectedVersion();
@@ -700,7 +741,7 @@ export class DesktopPluginInstaller {
         force: true,
       });
       await rm(join(source, ".mcp.json"), { force: true });
-    } else {
+    } else if (host === "claude") {
       await json(join(source, ".mcp.json"), {
         mcpServers: {
           showai: {
@@ -709,6 +750,24 @@ export class DesktopPluginInstaller {
           },
         },
       });
+      await rm(join(source, "mcp.json"), { force: true });
+    } else {
+      await json(join(source, "mcp_config.json"), {
+        mcpServers: {
+          showai: {
+            ...server,
+            env: {
+              ...server.env,
+              SHOWAI_HOST_DISPLAY: HOST_PROFILES.antigravity,
+            },
+          },
+        },
+      });
+      await rm(join(source, ".claude-plugin"), {
+        recursive: true,
+        force: true,
+      });
+      await rm(join(source, ".mcp.json"), { force: true });
       await rm(join(source, "mcp.json"), { force: true });
     }
     await mkdir(join(marketplace, ".agents/plugins"), { recursive: true });
@@ -739,7 +798,7 @@ export class DesktopPluginInstaller {
       installedPath = JSON.parse(
         await this.command(executable, ["add", identity, "--json"]),
       ).installedPath;
-    } else {
+    } else if (host === "claude") {
       if (!existing)
         await this.command(executable, [
           "marketplace",
@@ -762,6 +821,10 @@ export class DesktopPluginInstaller {
       ]);
       if (!(await this.inspect(host, executable)).enabled)
         await this.command(executable, ["enable", identity, "--scope", "user"]);
+    } else {
+      await this.command(executable, ["install", source]);
+      if (!(await this.inspect(host, executable)).enabled)
+        await this.command(executable, ["enable", "showai"]);
     }
     const after = await this.inspect(host, executable);
     installedPath ??= after.installedPath;

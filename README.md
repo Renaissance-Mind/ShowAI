@@ -40,6 +40,7 @@ The agent saves the interface in ShowAI and shows it in the conversation (or as 
 | ----------------------------------------- | ------------ | -------------------------------------------------------------------------------------------------------------------------------------- |
 | Claude Code                               | Supported    | ShowAI → **Settings → Plugins** → Install plugin                                                                                       |
 | Codex                                     | Supported    | ShowAI → **Settings → Plugins** → Install plugin                                                                                       |
+| Antigravity                               | Supported    | ShowAI → **Settings → Plugins** → Install plugin                                                                                       |
 | Built-in agent                            | Supported    | Inside ShowAI, using your local Codex or Claude Code sign-in, a model API key or Cloud                                                 |
 | DeepSeek Harness                          | Preview      | ShowAI → **Settings → Plugins** → Prepare plugin, then add it in DeepSeek Harness ([steps](plugins/showai/README.md#deepseek-harness)) |
 | Kimi Work                                 | Preview      | Add ShowAI's MCP server and the [Kimi plugin](plugins-kimi/showai/README.md) in Kimi Work                                              |

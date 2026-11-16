@@ -56,6 +56,7 @@ describe.skipIf(!output || !config)(
       CODEX_HOME: process.env.CODEX_HOME,
       CLAUDE_CONFIG_DIR: process.env.CLAUDE_CONFIG_DIR,
       DSH_HOME: process.env.DSH_HOME,
+      AGY_HOME: process.env.AGY_HOME,
     };
     beforeAll(async () => {
       await mkdir(output!, { recursive: true });
@@ -63,8 +64,10 @@ describe.skipIf(!output || !config)(
       process.env.CODEX_HOME = join(root, "codex");
       process.env.CLAUDE_CONFIG_DIR = join(root, "claude");
       process.env.DSH_HOME = join(root, "dsh");
+      process.env.AGY_HOME = join(root, "antigravity");
       await mkdir(process.env.CODEX_HOME, { recursive: true });
       await mkdir(process.env.CLAUDE_CONFIG_DIR, { recursive: true });
+      await mkdir(process.env.AGY_HOME, { recursive: true });
       const registered = JSON.parse(await readFile(config!, "utf8"));
       home = join(root, "library");
       cli = {
@@ -89,7 +92,7 @@ describe.skipIf(!output || !config)(
       }
       if (root) await rm(root, { recursive: true, force: true });
     });
-    test.each(["codex", "claude"] as const)(
+    test.each(["codex", "claude", "antigravity"] as const)(
       "%s installs, repeats, updates the library and starts MCP without Node on PATH",
       async (host) => {
         const first = await installer.install(host);
@@ -110,7 +113,11 @@ describe.skipIf(!output || !config)(
           await readFile(
             join(
               changed.installedPath,
-              host === "codex" ? "mcp.json" : ".mcp.json",
+              host === "codex"
+                ? "mcp.json"
+                : host === "claude"
+                  ? ".mcp.json"
+                  : "mcp_config.json",
             ),
             "utf8",
           ),
@@ -271,6 +278,9 @@ describe.skipIf(!output || !config)(
               name: "show_component_close",
               arguments: { viewId: initial.live.viewId },
             });
+          } else if (host === "antigravity") {
+            expect(delivery.mode).toBe("fragment-file");
+            expect(await readFile(delivery.inline, "utf8")).toContain("<");
           } else if (delivery.mode === "compact")
             expect(delivery.compact).toContain("<");
           else {
@@ -339,7 +349,9 @@ describe.skipIf(!output || !config)(
           dsh: { profile: { bundles: ["@showai/dsh-showai"] } },
         }),
       );
-      const [, , status] = await installer.status();
+      const dshState = async () =>
+        (await installer.status()).find((item) => item.host === "deepseek")!;
+      const status = await dshState();
       expect(status).toMatchObject({
         host: "deepseek",
         installed: true,
@@ -350,11 +362,11 @@ describe.skipIf(!output || !config)(
       const probe = join(bundle, "skills/update-probe.txt");
       await writeFile(probe, "newer bundle\n");
       try {
-        const [, , stale] = await installer.status();
+        const stale = await dshState();
         expect(stale).toMatchObject({ installed: true, current: false });
         expect(stale.expected).not.toBe(status.expected);
         await installer.install("deepseek");
-        const [, , refreshed] = await installer.status();
+        const refreshed = await dshState();
         expect(refreshed).toMatchObject({ current: true });
         expect(refreshed.expected).toBe(stale.expected);
       } finally {

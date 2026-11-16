@@ -205,6 +205,7 @@ plugins/showai/scripts/cli.mjs
 !/resources/templates/paper-explainer/guides/04-design.md
 
 # Public generated host packages; edit common Skills and adapters, then package:plugin.
+!/plugins/showai/host-adapters/antigravity.md
 !/plugins/showai/host-adapters/claude.md
 !/plugins/showai/host-adapters/codex.md
 !/plugins/showai/host-adapters/deepseek.md
@@ -218,6 +219,34 @@ plugins/showai/scripts/cli.mjs
 !/plugins/showai/skills/use-showai/references/page-reading.md
 !/plugins/showai/skills/use-showai/references/tasks.md
 !/plugins/showai/skills/use-showai/references/user-references.md
+!/plugins/showai-antigravity/README.md
+!/plugins/showai-antigravity/README.zh-CN.md
+!/plugins/showai-antigravity/skills/collaborate-canvas/SKILL.md
+!/plugins/showai-antigravity/skills/create-component/SKILL.md
+!/plugins/showai-antigravity/skills/create-component/references/component-authoring.md
+!/plugins/showai-antigravity/skills/create-component/references/parameter-contract.md
+!/plugins/showai-antigravity/skills/create-component/references/database-field.md
+!/plugins/showai-antigravity/skills/create-component/references/contributions.md
+!/plugins/showai-antigravity/skills/create-template/SKILL.md
+!/plugins/showai-antigravity/skills/create-template/references/template-abstraction.md
+!/plugins/showai-antigravity/skills/create-template/references/template-creation.md
+!/plugins/showai-antigravity/skills/show-document/SKILL.md
+!/plugins/showai-antigravity/skills/show-visual/SKILL.md
+!/plugins/showai-antigravity/skills/use-showai/SKILL.md
+!/plugins/showai-antigravity/skills/use-showai/references/host-adapter.md
+!/plugins/showai-antigravity/skills/use-showai/references/host-display.md
+!/plugins/showai-antigravity/skills/use-showai/references/integration.md
+!/plugins/showai-antigravity/skills/use-showai/references/runtime.md
+!/plugins/showai-antigravity/skills/use-showai/references/shared-data.md
+!/plugins/showai-antigravity/skills/use-showai/references/authoring.md
+!/plugins/showai-antigravity/skills/use-showai/references/board-authoring.md
+!/plugins/showai-antigravity/skills/use-showai/references/capacity.md
+!/plugins/showai-antigravity/skills/use-showai/references/editing.md
+!/plugins/showai-antigravity/skills/use-showai/references/page-reading.md
+!/plugins/showai-antigravity/skills/use-showai/references/tasks.md
+!/plugins/showai-antigravity/skills/use-showai/references/user-references.md
+!/plugins/showai-antigravity/skills/use-showai/references/import.md
+!/plugins/showai-antigravity/skills/use-showai/references/extension-points.md
 !/plugins/showai-claude/README.md
 !/plugins/showai-claude/README.zh-CN.md
 !/plugins/showai-claude/skills/collaborate-canvas/SKILL.md

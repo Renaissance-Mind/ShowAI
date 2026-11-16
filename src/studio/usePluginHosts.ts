@@ -12,6 +12,7 @@ import { desktop, errorCode, errorMessage } from "../host/bridge";
 export const pluginHostNames: Record<PluginHost, string> = {
   codex: "Codex",
   claude: "Claude Code",
+  antigravity: "Antigravity",
   deepseek: "DeepSeek Harness",
 };
 

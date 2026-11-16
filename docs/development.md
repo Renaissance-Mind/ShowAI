@@ -37,7 +37,7 @@ The development badge in the bottom-right corner shows the source directory, bra
 
 ### Connecting an Agent to an instance
 
-`dev:status` returns a `cli` object with the command, arguments and environment that run the CLI and MCP server of that instance against its library. Use it for scripted checks such as `template context` or `catalog describe`. To connect Claude Code to the instance, run `npm run plugin:claude -- --port <port> [--mode browser] --json` in the checkout; it installs a `showai-dev` plugin bound to that instance into the checkout's `.claude/settings.json`. It needs the instance running and the `claude` CLI. Remove it with `--remove` before deleting the checkout. An MCP session keeps the code it started with, so check runtime or Skill changes in a new session after the instance has rebuilt.
+`dev:status` returns a `cli` object with the command, arguments and environment that run the CLI and MCP server of that instance against its library. Use it for scripted checks such as `template context` or `catalog describe`. To connect Claude Code to the instance, run `npm run plugin:claude -- --port <port> [--mode browser] --json` in the checkout; it installs a `showai-dev` plugin bound to that instance into the checkout's `.claude/settings.json`. It needs the instance running and the `claude` CLI. For Antigravity, run `npm run plugin:antigravity -- --port <port> [--mode browser] --json` (needs the `agy` CLI). Remove it with `--remove` before deleting the checkout. An MCP session keeps the code it started with, so check runtime or Skill changes in a new session after the instance has rebuilt.
 
 ### Reading `dev:status`
 

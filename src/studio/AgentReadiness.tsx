@@ -103,6 +103,8 @@ export function connectionHost(client: string): PluginHost | null {
   const name = client.toLowerCase();
   if (name.includes("claude")) return "claude";
   if (name.includes("codex")) return "codex";
+  if (name.includes("antigravity") || /\bagy\b/.test(name))
+    return "antigravity";
   if (/deepseek|\bdsh\b|cordis/.test(name)) return "deepseek";
   return null;
 }

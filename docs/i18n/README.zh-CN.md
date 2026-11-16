@@ -40,6 +40,7 @@ Agent 会把界面保存到 ShowAI 并在对话中展示（不能内嵌显示的
 | ------------------------------------------ | ------ | ------------------------------------------------------------------------------------------------------------------------------ |
 | Claude Code                                | 正式   | ShowAI「设置 → 插件」→ 安装插件                                                                                                |
 | Codex                                      | 正式   | ShowAI「设置 → 插件」→ 安装插件                                                                                                |
+| Antigravity                                | 正式   | ShowAI「设置 → 插件」→ 安装插件                                                                                                |
 | 内置 Agent                                 | 正式   | 在 ShowAI 中使用本机 Codex 或 Claude Code 的登录、模型 API Key 或 Cloud                                                        |
 | DeepSeek Harness                           | 预览   | ShowAI「设置 → 插件」→ 准备插件，再在 DeepSeek Harness 中添加（[步骤](../../plugins/showai/README.zh-CN.md#deepseek-harness)） |
 | Kimi Work                                  | 预览   | 在 Kimi Work 中添加 ShowAI 的 MCP 服务和 [Kimi 插件](../../plugins-kimi/showai/README.md)                                      |

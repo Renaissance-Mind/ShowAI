@@ -52,6 +52,7 @@ describe("host-specific plugin distributions", () => {
     for (const [profile, target] of [
       ["codex", resolve("plugins/showai-codex")],
       ["claude", resolve("plugins/showai-claude")],
+      ["antigravity", resolve("plugins/showai-antigravity")],
       ["kimi", resolve("plugins-kimi/showai")],
     ]) {
       const files = await skillFiles(join(target, "skills"));
@@ -113,18 +114,24 @@ describe("host-specific plugin distributions", () => {
     expect(await skillFiles(join(source, "skills"))).toEqual(original);
   });
 
-  test.each(["codex", "claude"] as const)(
+  test.each(["codex", "claude", "antigravity"] as const)(
     "%s has only its own launch manifest and survives regeneration",
     async (profile) => {
       const target = join(await directory(), "plugin");
       const first = await stageHostPlugin({ source, target, profile });
-      const manifest = profile === "codex" ? "mcp.json" : ".mcp.json";
+      const manifest =
+        profile === "codex"
+          ? "mcp.json"
+          : profile === "claude"
+            ? ".mcp.json"
+            : "mcp_config.json";
       const launch = JSON.parse(await readFile(join(target, manifest), "utf8"))
         .mcpServers.showai;
       expect(launch.env.SHOWAI_HOST_DISPLAY).toBe(first.declaredHostDisplay);
-      expect(await readdir(target)).not.toContain(
-        profile === "codex" ? ".mcp.json" : "mcp.json",
-      );
+      for (const other of ["mcp.json", ".mcp.json", "mcp_config.json"].filter(
+        (name) => name !== manifest,
+      ))
+        expect(await readdir(target)).not.toContain(other);
       expect(await readdir(target)).not.toContain("host-adapters");
       expect(await stageHostPlugin({ source, target, profile })).toEqual(first);
     },

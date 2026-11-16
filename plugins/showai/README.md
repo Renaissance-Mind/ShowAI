@@ -6,7 +6,7 @@ ShowAI lets your agent answer with interfaces — interactive, archived, and evo
 
 ## Install
 
-**Recommended: install from the ShowAI app.** Download the app from [GitHub Releases](https://github.com/Renaissance-Mind/ShowAI/releases/latest), open it, and use the plugin panel on the welcome screen or under **Settings → Plugins** to install the plugin for Claude Code or Codex. Install the agent first and make its command-line tool available. The app supplies the plugin and runtime; no source checkout or separate Node.js is needed. Restart the Claude Code session, or refresh plugins or restart Codex, then start a new conversation. The connection uses the app's current library; click **Update and enable** after switching libraries or moving the app. Disable a ShowAI plugin enabled from another source before installing the app version. See [Use ShowAI in Claude Code and Codex](https://github.com/Renaissance-Mind/ShowAI/blob/main/docs/codex.md).
+**Recommended: install from the ShowAI app.** Download the app from [GitHub Releases](https://github.com/Renaissance-Mind/ShowAI/releases/latest), open it, and use the plugin panel on the welcome screen or under **Settings → Plugins** to install the plugin for Claude Code, Codex or Antigravity. Install the agent first and make its command-line tool available. The app supplies the plugin and runtime; no source checkout or separate Node.js is needed. Restart the Claude Code or Antigravity session, or refresh plugins or restart Codex, then start a new conversation. The connection uses the app's current library; click **Update and enable** after switching libraries or moving the app. Disable a ShowAI plugin enabled from another source before installing the app version. See [Use ShowAI in Claude Code and Codex](https://github.com/Renaissance-Mind/ShowAI/blob/main/docs/codex.md).
 
 ### From a source checkout
 
@@ -27,6 +27,16 @@ npm run plugin:claude -- --port <port> --json
 ```
 
 The main directory gets `showai-dev` and a worktree gets `showai-dev-<worktree name>` (its name under `.git/worktrees/`), pinned to that instance's runtime and library. The plugin is enabled only in this checkout's `.claude/settings.json`, which also turns off the App-installed `showai` here, so a session sees one ShowAI plugin. `--remove` uninstalls this checkout's plugin; `--prune` cleans up after deleted worktrees. The receipt is artifacts/claude-plugin-install.json.
+
+For Antigravity (`agy` on PATH), install from the registered runtime or bind to a running development instance:
+
+```sh
+npm run plugin:antigravity -- --json
+# Or bind to a running development instance:
+npm run plugin:antigravity -- --port <port> --json
+```
+
+`--remove` uninstalls the plugin from Antigravity. The receipt is artifacts/antigravity-plugin-install.json.
 
 ### DeepSeek Harness
 
@@ -50,6 +60,7 @@ Edit workflows in `plugins/showai/skills` and host delivery contracts in `plugin
 | --- | --- | --- |
 | Codex | `plugins/showai-codex` | Local visualization reference |
 | Claude Code | `plugins/showai-claude` | Host HTML display tool |
+| Antigravity | `plugins/showai-antigravity` | Bundled offline Artifact and inline embed |
 | DeepSeek Harness | Prepared bundle directory | Automatic tool-result preview |
 | Kimi Work | `plugins-kimi/showai` | Offline Widget workspace and display action |
 | Remote MCP Apps | Remote package or built-in HTTP guides | Attached native view |
