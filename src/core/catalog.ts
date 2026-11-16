@@ -1,3 +1,4 @@
+import { componentActivationIssue } from "../contract/component-activation.mjs";
 import conversationFit from "../../resources/catalog/inline-readiness.json";
 import type { InlineReadiness } from "../contract/types";
 import { resolveDocumentDatasets } from "./dataset-resolution";
@@ -17,8 +18,14 @@ import {
   createResource,
   insertResourceTemplate,
 } from "../document/containers.mjs";
-import { remapSurfaceIds, isSurface, upgradeDocument } from "../document/document.mjs";
+import {
+  remapSurfaceIds,
+  isSurface,
+  upgradeDocument,
+} from "../document/document.mjs";
 import { walk } from "../document/walk.mjs";
+import type { JSONContent } from "@tiptap/core";
+import type { MultiLevelViewData } from "../components/blocks/multi-level-view-contract.mjs";
 import { createHash, randomUUID } from "node:crypto";
 import {
   componentAuthoringIndex,
@@ -181,10 +188,45 @@ export function readBuiltinComponentSource(kind: string): ComponentSource {
     );
   const exported = builtinExports[kind];
   if (!exported) throw new Error(`No editable source for ${kind}.`);
-  const source = `import { ${exported} } from "showai:components";
+  const renderers = new Set<string>();
+  if (kind === "multi-level-view")
+    for (const sample of [
+      item.defaultData,
+      ...(item.examples ?? []).map((example) => example.data),
+    ])
+      for (const level of (sample as MultiLevelViewData).levels) {
+        if (level.component) renderers.add(level.component.kind);
+        if (level.content)
+          walk(
+            level.content as JSONContent,
+            (node) => {
+              if (node.type === "widget" || node.type === "inlineWidget")
+                renderers.add(node.attrs!.kind);
+            },
+            { scope: "tree" },
+          );
+      }
+  const children = [...renderers].map((child) => {
+    const name = builtinExports[child];
+    if (!name) throw new Error(`No editable renderer for ${child}.`);
+    return { kind: child, name };
+  });
+  const source = `import { ${[exported, ...children.map((child) => child.name)].join(", ")} } from "showai:components";
+${
+  children.length
+    ? `
+const renderers = { ${children.map((child) => `${JSON.stringify(child.kind)}: ${child.name}`).join(", ")} };
+function renderWidget({kind, ...props}) {
+  const Child = renderers[kind];
+  if (!Child) throw new Error("Add the component renderer to this package: " + kind);
+  return <Child {...props} />;
+}
+`
+    : ""
+}
 
 export default function Component({ data, onChange, readOnly }) {
-  return <${exported} data={data} onChange={onChange} readOnly={readOnly} />;
+  return <${exported} data={data} onChange={onChange} readOnly={readOnly}${children.length ? " renderWidget={renderWidget}" : ""} />;
 }
 `;
   return {
@@ -1557,6 +1599,8 @@ function fieldCalls(calls){const api=UserModule.field||{};return(Array.isArray(c
 const validationMessage=()=>(validate.errors||[]).map(error=>(error.instancePath||error.params?.missingProperty||'data')+' '+error.message).join('; ');
 function check(props){if(validate(props))return true;send('showai:error',{message:validationMessage()});return false;}
 function reading(props){try{const read=UserModule['read'+'Data'];if(${reader}&&typeof read!=='function')throw new Error('Declared readData export is missing');const computed=typeof read==='function'?read(props):undefined;if(computed&&typeof computed.then==='function')throw new Error('readData must be synchronous');const visit=(value,depth=0)=>{if(depth>40)throw new Error('readData is nested too deeply');if(value===null||typeof value==='string'||typeof value==='boolean'||typeof value==='number'&&Number.isFinite(value))return;if(Array.isArray(value)){value.forEach(child=>visit(child,depth+1));return;}if(value&&typeof value==='object'&&Object.getPrototypeOf(value)===Object.prototype){Object.values(value).forEach(child=>visit(child,depth+1));return;}throw new Error('readData must contain only finite JSON values');};if(typeof read==='function')visit(computed);const encoded=JSON.stringify(computed);if(encoded&&new TextEncoder().encode(encoded).byteLength>65536)throw new Error('readData exceeds 64 KiB');window.__SHOWAI_COMPONENT_READING__={ready:true,status:typeof read==='function'?'computed':'raw',props,data:encoded===undefined?undefined:JSON.parse(encoded)};}catch(error){window.__SHOWAI_COMPONENT_READING__={ready:true,status:'error',props,error:String(error.message||error)};}}
+const activationIssue=${componentActivationIssue.toString()};
+const activate=target=>{const issue=activationIssue(target);if(issue)throw new Error(issue);if(!(config.activationTargets||[]).some(bound=>bound.type===target.type&&bound.scope===target.scope&&bound.id===target.id))return false;if(navigator.userActivation&&!navigator.userActivation.isActive)return false;send("showai:activate",{target});return true;};
 const contextIssue=${componentContextIssue.toString()};let restore;
 const canEditPath=(${canEdit.toString()});const dataStateOfValue=(${componentDataState.toString()});
 const dataStateOf=(value,readOnly)=>dataStateOfValue(value,readOnly,canEditPath);
@@ -1566,8 +1610,8 @@ const keepView=value=>{const issue=viewIssue(value);if(issue)throw new Error('on
 window.addEventListener('pagehide',sendView);
 const handOver=snapshot=>{const issue=contextIssue(snapshot);if(issue)throw new Error('onContext: '+issue);if(navigator.userActivation&&!navigator.userActivation.isActive)return false;send('showai:context',{snapshot:JSON.parse(JSON.stringify(snapshot))});return true;};
 const goTo=target=>{if(typeof target!=='string'&&(!target||typeof target!=='object'))throw new Error('goTo needs a page link, "#blockId" or {pageId, blockId}');if(navigator.userActivation&&!navigator.userActivation.isActive)return false;send('showai:navigate',{target:typeof target==='string'?target:{...target}});return true;};
-function App(){const[outline,setOutline]=useState(config.outline);outlineUpdate=setOutline;const[field,setField]=useState(config.field);fieldUpdate=setField;const[state,setState]=useState(()=>({data:config.props||{},readOnly:config.readOnly!==false,dataState:dataStateOf(config.dataState,config.readOnly!==false)}));const[conversation,setConversation]=useState({available:config.context===true,key:0,value:undefined});useEffect(()=>reading(state.data),[state.data]);update=(data,readOnly,available,dataState)=>{setConversation(c=>c.available===available?c:{...c,available});if(check(data)){setState({data,readOnly,dataState:dataStateOf(dataState,readOnly)});send('showai:valid')}};restore=value=>setConversation(c=>c.key?c:{...c,key:1,value});return React.createElement(UserComponent,{key:conversation.key,...state,...(outline?{props:state.data,outline,navigate:itemId=>send('showai:outline-action',{action:'navigate',itemId}),setBranchExpanded:(itemId,expanded)=>send('showai:outline-action',{action:'branch',itemId,expanded}),collapse:()=>send('showai:outline-action',{action:'collapse'})}:{}),onChange:state.readOnly?undefined:(data)=>{if(check(data)){setState(s=>({...s,data}));send('showai:change',{props:data});}},...(field?{value:field.value,column:field.column,onValue:state.readOnly?undefined:value=>send('showai:field-value',{value:plain(value)}),onClose:()=>send('showai:field-close')}:{}),onContext:conversation.available?handOver:undefined,context:conversation.value,...(config.view===true?{viewState:config.viewState,onViewState:keepView}:{}),...(config.inline===true?{inline:true}:{}),goTo});}
-window.addEventListener('message',event=>{if(event.source!==parent||event.data?.channel!==channel)return;if(event.data?.type==='showai:validate'){const valid=validate(event.data.props);send('showai:validation',{requestId:event.data.requestId,valid,message:valid?'':validationMessage()});return;}if(event.data?.type==='showai:outline')outlineUpdate?.(event.data.outline);if(event.data?.type==='showai:field')fieldUpdate?.(event.data.field);if(event.data?.type==='showai:field-call'){send('showai:field-result',{requestId:event.data.requestId,results:fieldCalls(event.data.calls)});return;}if(event.data?.type==='showai:props')update?.(event.data.props,event.data.readOnly!==false,event.data.context===true,event.data.dataState);if(event.data?.type==='showai:context-restore'&&event.data.snapshot&&!contextIssue(event.data.snapshot))restore?.(event.data.snapshot);});
+function App(){const[outline,setOutline]=useState(config.outline);outlineUpdate=setOutline;const[field,setField]=useState(config.field);fieldUpdate=setField;const[state,setState]=useState(()=>({data:config.props||{},readOnly:config.readOnly!==false,dataState:dataStateOf(config.dataState,config.readOnly!==false)}));const[conversation,setConversation]=useState({available:config.context===true,key:0,value:undefined});useEffect(()=>reading(state.data),[state.data]);update=(data,readOnly,available,dataState,activationTargets)=>{config.activationTargets=Array.isArray(activationTargets)?activationTargets:[];setConversation(c=>c.available===available?c:{...c,available});if(check(data)){setState({data,readOnly,dataState:dataStateOf(dataState,readOnly)});send('showai:valid')}};restore=value=>setConversation(c=>c.key?c:{...c,key:1,value});return React.createElement(UserComponent,{key:conversation.key,...state,...(outline?{props:state.data,outline,navigate:itemId=>send('showai:outline-action',{action:'navigate',itemId}),setBranchExpanded:(itemId,expanded)=>send('showai:outline-action',{action:'branch',itemId,expanded}),collapse:()=>send('showai:outline-action',{action:'collapse'})}:{}),onChange:state.readOnly?undefined:(data)=>{if(check(data)){setState(s=>({...s,data}));send('showai:change',{props:data});}},...(field?{value:field.value,column:field.column,onValue:state.readOnly?undefined:value=>send('showai:field-value',{value:plain(value)}),onClose:()=>send('showai:field-close')}:{}),activationTargets:config.activationTargets||[],onActivate:config.activationTargets?.length?activate:undefined,onContext:conversation.available?handOver:undefined,context:conversation.value,...(config.view===true?{viewState:config.viewState,onViewState:keepView}:{}),...(config.inline===true?{inline:true}:{}),goTo});}
+window.addEventListener('message',event=>{if(event.source!==parent||event.data?.channel!==channel)return;if(event.data?.type==='showai:validate'){const valid=validate(event.data.props);send('showai:validation',{requestId:event.data.requestId,valid,message:valid?'':validationMessage()});return;}if(event.data?.type==='showai:outline')outlineUpdate?.(event.data.outline);if(event.data?.type==='showai:field')fieldUpdate?.(event.data.field);if(event.data?.type==='showai:field-call'){send('showai:field-result',{requestId:event.data.requestId,results:fieldCalls(event.data.calls)});return;}if(event.data?.type==='showai:props')update?.(event.data.props,event.data.readOnly!==false,event.data.context===true,event.data.dataState,event.data.activationTargets);if(event.data?.type==='showai:context-restore'&&event.data.snapshot&&!contextIssue(event.data.snapshot))restore?.(event.data.snapshot);});
 window.addEventListener('error',event=>send('showai:error',{message:event.message}));window.addEventListener('unhandledrejection',event=>send('showai:error',{message:String(event.reason?.message||event.reason)}));
 const componentRoot=document.getElementById('component-root');if(config.inline===true){componentRoot.style.display='inline-block';componentRoot.style.whiteSpace='nowrap';document.documentElement.style.overflow='hidden';document.body.style.margin='0';}
 createRoot(componentRoot).render(React.createElement(App));
@@ -1577,7 +1621,9 @@ new ResizeObserver(()=>{const box=componentRoot.getBoundingClientRect();send('sh
 function inlineRuntimeSource(entry: string): string {
   return `import React from 'react';import{createRoot}from'react-dom/client';import UserComponent from ${JSON.stringify(entry)};import validate from 'showai:validator';
 export function mount(target,initial){const root=createRoot(target,{onUncaughtError:error=>initial.onError(String(error?.message||error))});
-const render=(data,outline=initial.outline)=>{if(!validate(data)){initial.onError((validate.errors||[]).map(error=>(error.instancePath||'data')+' '+error.message).join('; '));return;}initial.onError('');root.render(React.createElement(UserComponent,{data,...(outline?{props:data,...outline}:{}),readOnly:true,onChange:undefined,dataState:{status:'ok',editable:false,canEdit:()=>false},onContext:initial.onContext,context:initial.context,goTo:initial.goTo}));};render(initial.data);return{update:render,destroy:()=>root.unmount()};}`;
+const activationIssue=${componentActivationIssue.toString()};
+const activate=target=>{const issue=activationIssue(target);if(issue)throw new Error(issue);if(!(initial.activationTargets||[]).some(bound=>bound.type===target.type&&bound.scope===target.scope&&bound.id===target.id))return false;return initial.onActivate?.(target)??false;};
+const render=(data,outline=initial.outline,activationTargets=initial.activationTargets)=>{initial.activationTargets=activationTargets;if(!validate(data)){initial.onError((validate.errors||[]).map(error=>(error.instancePath||'data')+' '+error.message).join('; '));return;}initial.onError('');root.render(React.createElement(UserComponent,{data,...(outline?{props:data,...outline}:{}),readOnly:true,onChange:undefined,dataState:{status:'ok',editable:false,canEdit:()=>false},activationTargets:initial.activationTargets||[],onActivate:initial.activationTargets?.length?activate:undefined,onContext:initial.onContext,context:initial.context,goTo:initial.goTo}));};render(initial.data);return{update:render,destroy:()=>root.unmount()};}`;
 }
 
 function componentValidatorSource(

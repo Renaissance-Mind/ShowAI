@@ -9,6 +9,7 @@ export {
   useComponentInteractions,
   sameComponentTarget,
   type ComponentTarget,
+  type ComponentActivationProps,
 } from "./component-interactions";
 export {
   TextBlock as Markdown,
@@ -20,6 +21,7 @@ export { ChartBlock as Chart } from "./Chart";
 export * from "./g2/exports";
 export { MindmapBlock as Mindmap } from "./Mindmap";
 export { FlowchartBlock as Flowchart } from "./Flowchart";
+export { MultiLevelViewBlock as MultiLevelView } from "./MultiLevelView";
 export {
   ArchifyBlock as Archify,
   DiagramDesignBlock as DiagramDesign,

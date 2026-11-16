@@ -8,7 +8,7 @@ import { plainNotes } from "../../document/note-markup.mjs";
 
 const genericTitles = new Set(
   [
-    "数据图表|数据库|关键指标|交互计算|图片画廊|交互流程图|思维导图|G2 图表|图表", // i18n-exempt: saved default titles
+    "数据图表|数据库|关键指标|交互计算|图片画廊|交互流程图|多级组件视图|思维导图|G2 图表|图表", // i18n-exempt: saved default titles
     "柱状图|折线图|面积图|散点图|气泡图|分组柱状图|双向条形图|雷达图|径向条形图|平行坐标|回归曲线", // i18n-exempt: saved default titles
     "饼图|环图|堆叠柱状图|堆叠面积图|玫瑰图|马赛克图|矩形树图|旭日图|漏斗图", // i18n-exempt: saved default titles
     "直方图|箱线图|小提琴图|分布曲线|密度热力图|色块图|等高线图|茎叶图", // i18n-exempt: saved default titles

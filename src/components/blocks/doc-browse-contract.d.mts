@@ -34,6 +34,7 @@ export interface CardGridData {
   variant?: "tile" | "row";
   columns?: number;
   cards: {
+    id?: string;
     icon?: string;
     title: string;
     body: string;

@@ -162,6 +162,7 @@ export function readerStateStore() {
 }
 
 export interface ReaderStateScope {
+  namespace?: string;
   page: string;
   block?: string;
   store: ReaderStateStore;
@@ -254,7 +255,10 @@ export function ReaderBlock({
 }) {
   const scope = useContext(ReaderStateContext);
   const value = useMemo(
-    () => (scope && id ? { ...scope, block: id } : scope),
+    () =>
+      scope && id
+        ? { ...scope, block: scope.namespace ? `${scope.namespace}:${id}` : id }
+        : scope,
     [scope, id],
   );
   return createElement(ReaderStateContext.Provider, { value }, children);

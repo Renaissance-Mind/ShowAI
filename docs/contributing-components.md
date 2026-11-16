@@ -60,7 +60,7 @@ A container can bind a child's reading actions with `ComponentInteractions` from
 
 The provider handles only declared targets. Unbound items keep their existing detail and playback behavior. Components adding their own targets call `useComponentInteractions().canActivate(target)` to expose the action, then `activate(target)` on click or keyboard activation. It returns true only when the container handled the action; otherwise run the component's normal reading behavior. Nested providers isolate their bindings. Reading events never call `onChange`.
 
-The importable package in `examples/multi-level-view` demonstrates a lightweight navigator with an explicit hierarchy and bindings. `createMultiLevelView(registry)` accepts component renderers and adapters that enumerate their stable targets; each level keeps the child's native props. Custom component imports still need exact declared dependencies. The model checks cycles, unreachable views, duplicate bindings and references to missing targets before rendering.
+The built-in `multi-level-view` hosts native document content and registered components in each level. Bind an object event to a child level with its component block ID and stable target identity; insert the container directly from the component catalog. The importable package in `examples/multi-level-view` remains an example of a custom composition. `createMultiLevelView(registry)` accepts component renderers and adapters that enumerate their stable targets; each level keeps the child's native props. Custom component imports still need exact declared dependencies. The model checks cycles, unreachable views, duplicate bindings and references to missing targets before rendering.
 
 ## Changing an existing built-in
 

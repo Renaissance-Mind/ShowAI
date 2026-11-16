@@ -4,7 +4,7 @@
   "schemaVersion": 4,
   "id": "system-presentation",
   "name": "系统呈现规则",
-  "version": "3.0.1",
+  "version": "3.0.2",
   "description": "制作任何讲解、报告、比较、教程或网站都遵循的流程：七个环节各自要回答的问题、基本方法和交出的记录，以及视觉表达原则。模板在此之上补充某一类内容的具体方法。",
   "scenarios": [
     "ShowAI 中任何作品的规划、设计、制作、评审与交付。"

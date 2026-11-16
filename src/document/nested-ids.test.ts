@@ -9,6 +9,8 @@ import { findNodes } from "./update.mjs";
 import { walk } from "./walk.mjs";
 import { copyObjects, pasteObjects } from "../surface/board-commands";
 import { retargetBindings } from "../datasets/binding.mjs";
+import catalog from "../../resources/catalog/components.json";
+import { validateMultiLevelViewData } from "../components/blocks/multi-level-view-contract.mjs";
 
 const paragraph = (id: string) => ({
   type: "paragraph",
@@ -37,6 +39,28 @@ function page(...content: JSONContent[]): ShowDocument {
 }
 
 describe("ids inside component content", () => {
+  test("repeated multilevel views retain their event bindings after normalization, copying and template insertion", () => {
+    const multilevel = (id: string) => ({
+      type: "widget",
+      attrs: {
+        id,
+        kind: "multi-level-view",
+        data: structuredClone(catalog.find((item) => item.kind === "multi-level-view")!.defaultData),
+      },
+    });
+    const source = page(multilevel("one"), multilevel("two"));
+    const copies = [source, remapSurfaceIds(source), placeTemplate(placeTemplate(page(), source), source)];
+    for (const copy of copies) {
+      const ids = nestedIds(copy);
+      expect(new Set(ids).size).toBe(ids.length);
+      walk(copy.content, (node) => {
+        if (node.attrs?.kind === "multi-level-view")
+          expect(() => validateMultiLevelViewData(node.attrs!.data)).not.toThrow();
+      }, { scope: "content" });
+    }
+    expect(source.content.content![0].attrs!.data.levels[0].bindings[0].blockId)
+      .not.toBe(source.content.content![1].attrs!.data.levels[0].bindings[0].blockId);
+  });
   test("saving gives repeated nested ids and nested components without an id distinct ids", () => {
     const document = page(
       paragraph("top"),

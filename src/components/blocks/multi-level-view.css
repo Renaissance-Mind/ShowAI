@@ -1,0 +1,119 @@
+.sb-block.mlv {
+  border: 1px solid var(--sb-line, #dfe3ea);
+  border-radius: 12px;
+  overflow: hidden;
+  background: var(--sb-surface, #fff);
+  color: var(--sb-text, #263248);
+  font:
+    13px/1.5 -apple-system,
+    BlinkMacSystemFont,
+    "PingFang SC",
+    sans-serif;
+  min-width: 0;
+}
+.mlv-nav {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 12px;
+  border-bottom: 1px solid var(--sb-line, #dfe3ea);
+}
+.mlv-nav button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  border: 0;
+  border-radius: 6px;
+  min-height: 30px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  padding: 4px 7px;
+  cursor: pointer;
+}
+.mlv-nav > button {
+  width: 30px;
+}
+.mlv-nav button:disabled {
+  opacity: 0.25;
+  cursor: default;
+}
+.mlv-nav button:hover:not(:disabled) {
+  background: var(--sb-hover, #f1f4f9);
+}
+.mlv-path {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  white-space: nowrap;
+  overflow-x: auto;
+  scrollbar-width: none;
+  min-width: 0;
+}
+.mlv-path > span {
+  opacity: 0.25;
+}
+.mlv-path strong {
+  font-weight: 600;
+  padding: 4px 0;
+}
+.mlv-view {
+  padding: 14px;
+  min-width: 0;
+  outline: none;
+  animation: mlv-in 0.24s ease both;
+  transform-origin: center;
+}
+.mlv-view[data-direction="out"] {
+  animation-name: mlv-out;
+}
+.mlv-view:focus-visible {
+  outline: 2px solid #668aeb;
+  outline-offset: -3px;
+}
+.mlv button:focus-visible {
+  outline: 2px solid #668aeb;
+  outline-offset: -2px;
+}
+.mlv-view > .sb-block {
+  margin: 0;
+}
+@keyframes mlv-in {
+  from {
+    opacity: 0;
+    transform: scale(0.975);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+@keyframes mlv-out {
+  from {
+    opacity: 0;
+    transform: scale(1.025);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+@media (max-width: 560px) {
+  .mlv-nav {
+    padding: 7px 8px;
+    gap: 5px;
+  }
+  .mlv-path {
+    gap: 5px;
+    font-size: 12px;
+  }
+  .mlv-view {
+    padding: 8px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .mlv-view {
+    animation: none !important;
+  }
+}

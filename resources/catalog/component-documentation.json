@@ -10088,6 +10088,10 @@
         {
           "path": "cards[].href",
           "meaning": "可选：整张卡片的链接；只允许 http(s)、mailto、# 锚点和相对路径，http(s) 在新标签页打开。"
+        },
+        {
+          "path": "cards[].id",
+          "meaning": "可选稳定卡片 ID；绑定激活事件时使用 type=card、scope=cards、id=此值。"
         }
       ],
       "recipes": [
@@ -10118,6 +10122,11 @@
           "action": "悬停或键盘聚焦有链接的卡片",
           "effect": "边框按色调高亮，显示箭头。",
           "persistence": "none"
+        },
+        {
+          "action": "公开卡片激活",
+          "effect": "有 id 的卡片可以通过 ComponentInteractions 绑定；未绑定时保持原链接行为。",
+          "persistence": "view"
         }
       ],
       "constraints": [
@@ -11045,6 +11054,201 @@
       ],
       "verification": [
         "真实组件插入、保存重读、桌面与窄屏、嵌套容器、离线导出。"
+      ]
+    }
+  },
+  "multi-level-view": {
+    "version": 2,
+    "reuse": {
+      "kind": "general",
+      "boundaries": [
+        "容器管理完整层级、组件事件与导航；每层的展示沿用原生内容模型。",
+        "组件是否能绑定到某个内部对象，由该组件公开的稳定事件契约决定；不会根据文字或 DOM 位置猜测点击目标。"
+      ]
+    },
+    "usage": {
+      "purpose": "将原生内容和已有组件组织为多级结构，按组件公开的对象事件进入下一层。",
+      "structure": [
+        "上方保留返回与层级路径。",
+        "每层 content 是原生 doc，可组合文字和多个组件；自定义组件使用标准 custom widget 精确版本引用。",
+        "bindings 的 blockId 定位发出事件的组件，source 描述该组件公开的 type/scope/id，to 指向直接子层。"
+      ],
+      "inputs": [
+        {
+          "path": "title",
+          "meaning": "容器的可访问名称。"
+        },
+        {
+          "path": "root",
+          "meaning": "根层级 ID，指向唯一 parentId=null 的层。"
+        },
+        {
+          "path": "levels",
+          "meaning": "完整层级树。每个子层有唯一父层，且至少有一条进入事件。"
+        },
+        {
+          "path": "levels[].id",
+          "meaning": "组件内唯一的稳定层级 ID。"
+        },
+        {
+          "path": "levels[].parentId",
+          "meaning": "父层级 ID，根层为 null。"
+        },
+        {
+          "path": "levels[].label",
+          "meaning": "路径和视图的名称。"
+        },
+        {
+          "path": "levels[].content",
+          "meaning": "原生富文本 doc 内容树。按原生文档格式写文字、表格、图像、widget 等；组件节点 attrs 包含稳定 id、kind 和 data。custom widget 的 data 使用 componentId/version/integrity/props，资源和组件依赖通过原有打包流程保留。",
+          "opaque": true,
+          "omission": {
+            "behavior": "fallback",
+            "computedFrom": ["levels[].component"],
+            "description": "仅使用 component 简写时生成包含该组件的单节点 doc。"
+          }
+        },
+        {
+          "path": "levels[].component",
+          "meaning": "兼容的单组件简写，和 content 二选一。",
+          "omission": {
+            "behavior": "omit",
+            "description": "使用 content。"
+          }
+        },
+        {
+          "path": "levels[].component.kind",
+          "meaning": "当前宿主已注册的组件 kind。单独的 custom 引用需写入 content 的 widget，确保版本和依赖可以导出。"
+        },
+        {
+          "path": "levels[].component.props",
+          "meaning": "该 kind 的原生 data，先读取对应组件 guide/parameters。",
+          "opaque": true
+        },
+        {
+          "path": "levels[].bindings",
+          "meaning": "公开激活事件到直接子层的绑定。空数组保留组件原来的阅读操作。"
+        },
+        {
+          "path": "levels[].bindings[].blockId",
+          "meaning": "本层 content 内发出事件的组件块 attrs.id。多个组件时必须明确指定。",
+          "omission": {
+            "behavior": "fallback",
+            "computedFrom": ["levels[].content", "levels[].component"],
+            "description": "本层只有一个组件时使用其块 ID；有多个组件时拒绝省略。"
+          }
+        },
+        {
+          "path": "levels[].bindings[].source",
+          "meaning": "该组件公开的稳定对象身份，所有字段共同匹配。"
+        },
+        {
+          "path": "levels[].bindings[].source.type",
+          "meaning": "组件公开的对象类型。已接入 node（流程图）、module（框图）、card（卡片）；自定义组件可公开自己的类型。"
+        },
+        {
+          "path": "levels[].bindings[].source.scope",
+          "meaning": "组件公开的对象作用域，例如 flow.id、layer.id 或 cards。"
+        },
+        {
+          "path": "levels[].bindings[].source.id",
+          "meaning": "该作用域中的稳定对象 ID，不能使用显示文字或数组序号替代。"
+        },
+        {
+          "path": "levels[].bindings[].to",
+          "meaning": "目标直接子层 ID，其 parentId 必须等于本层 ID。"
+        }
+      ],
+      "rules": [
+        {
+          "kind": "unique",
+          "path": "levels[].id"
+        },
+        {
+          "kind": "reference",
+          "path": "root",
+          "target": "levels[].id"
+        }
+      ],
+      "recipes": [
+        {
+          "title": "规划多级结构",
+          "steps": [
+            "先列出完整 levels 树。",
+            "为每层填写原生 content，组件 data 沿用自身契约；custom 引用固定精确版本。",
+            "查询组件公开的激活对象，填写 blockId、source(type/scope/id) 与直接子层 to。",
+            "逐支验证进入、返回、未绑定对象和导出。"
+          ],
+          "exampleIndex": 0
+        },
+        {
+          "title": "组合不同组件",
+          "steps": [
+            "用有稳定 ID 的卡片作为入口。",
+            "将不同卡片绑定到表格、图表、文字或 SVG 所在的子层。"
+          ],
+          "exampleIndex": 1
+        }
+      ],
+      "interactions": [
+        {
+          "action": "点击绑定的节点或模块",
+          "effect": "原组件通过 ComponentInteractions 发出稳定目标，容器切换到绑定的直接子视图；带短暂的缩放淡入。未绑定对象保留原来的详情等操作。",
+          "persistence": "view"
+        },
+        {
+          "action": "返回、层级路径与 Escape",
+          "effect": "返回父视图或直接选择祖先，回到不同组件；应用通过原生阅读状态记住层级，预览仅保留本次状态。",
+          "persistence": "view"
+        }
+      ],
+      "constraints": [
+        "最多 80 层级，每层最多 200 个内容组件与 100 条绑定。",
+        "层内组件块 ID 唯一；一个对象在同一视图最多绑定一条进入事件。",
+        "已接入目标适配器的组件会核对对象是否存在；自定义事件需由组件声明并通过真实调用验证。",
+        "阅读操作不写回页面；缺失的已保存层级回到根层。",
+        "应用和导出读者提供统一组件宿主。独立 SDK 使用可通过 renderWidget 注入本包已声明的组件渲染器。",
+        "视图不直接嵌套另一个 multi-level-view，使用 levels 表达多层关系。"
+      ],
+      "editing": {
+        "data": ["替换完整 levels 树、原生组件 props 与绑定。"],
+        "implementation": [
+          "为新的对象事件接入 ComponentInteractions；自定义组件通过 onActivate(target) 发出事件，并用 activationTargets 判断已绑定目标。"
+        ]
+      }
+    },
+    "development": {
+      "entryPoints": [
+        {
+          "path": "src/components/blocks/MultiLevelView.tsx",
+          "purpose": "原生子组件组合、层级导航与阅读状态。"
+        },
+        {
+          "path": "src/components/blocks/multi-level-view-contract.mjs",
+          "purpose": "校验原生子组件、完整层级树和稳定事件目标。"
+        },
+        {
+          "path": "src/components/blocks/multi-level-view.css",
+          "purpose": "轻量导航、窄屏和减少动态样式。"
+        }
+      ],
+      "architecture": [
+        "每层使用原生 doc，由统一组件宿主渲染；内容包、资源与依赖沿用现有流程。",
+        "绑定按组件块隔离，通过 ComponentInteractions 白名单匹配稳定对象。",
+        "子视图的阅读状态在容器和层级命名空间内保存。"
+      ],
+      "extensionPoints": [
+        "任意已注册的展示组件可进入 content。",
+        "为新组件公开稳定激活对象，并在需要时补充对象枚举适配器；已有组件 API 保持原样。"
+      ],
+      "invariants": [
+        "进入事件只指向直接子视图，所有非根视图必须可达。",
+        "没有绑定时，子组件行为与独立使用相同。",
+        "只保存层级阅读状态，不改变子组件的原生数据。"
+      ],
+      "verification": [
+        "独立 headless 实例真实编译并从流程图进入框图、再进入不同组件的多层结构。",
+        "测试返回、祖先跳转、无绑定节点、窄屏、键盘、非法路由与源数据不变。"
       ]
     }
   }

@@ -15,6 +15,7 @@ import {
 } from "../components/blocks/primitive-contract.mjs";
 import { validateMindmapData } from "../components/blocks/mindmap-contract.mjs";
 import { validateFlowchartData } from "../components/blocks/flowchart-contract.mjs";
+import { validateMultiLevelViewData } from "../components/blocks/multi-level-view-contract.mjs";
 import {
   validateDiagramData,
   diagramTemplates,
@@ -358,6 +359,10 @@ function validateWidgetData(kind, data, path) {
   }
   if (kind === "flowchart") {
     validateFlowchartData(data);
+    return;
+  }
+  if (kind === "multi-level-view") {
+    validateMultiLevelViewData(data, (childKind, childData) => validateWidgetData(childKind, childData, `${path}.levels.content`));
     return;
   }
   if (kind === "mechanism-diagram") {

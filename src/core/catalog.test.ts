@@ -295,6 +295,7 @@ describe("compiled React packages", () => {
       "bookmark",
       "mindmap",
       "flowchart",
+      "multi-level-view",
       "mechanism-diagram",
       "svg",
       "video",

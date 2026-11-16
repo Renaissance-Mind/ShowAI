@@ -124,10 +124,17 @@ export function readerKinds(documents) {
   const kinds = new Set();
   for (const document of documents)
     if (document.content)
-      walk(document.content, (node) => {
-        if (node?.type === "widget" || node?.type === "inlineWidget")
-          kinds.add(node.attrs?.kind);
-      }, { scope: "content" });
+      walk(
+        document.content,
+        (node) => {
+          if (node?.type === "widget" || node?.type === "inlineWidget")
+            kinds.add(node.attrs?.kind);
+          if (node.type === "widget" && node.attrs?.kind === "multi-level-view")
+            for (const level of node.attrs.data?.levels ?? [])
+              if (level.component?.kind) kinds.add(level.component.kind);
+        },
+        { scope: "content" },
+      );
   return [...kinds].filter((k) => typeof k === "string").sort();
 }
 const MATH_TEXT = /\$|\\\(|\\\[/;

@@ -33,6 +33,8 @@ import {
 import { injectComponentBootstrap, readCustomBlockData } from "../../contract/contract";
 import type { CompiledComponent } from "../../contract/types";
 import { InlineComponent } from "./InlineComponent";
+import { useComponentInteractions } from "../blocks/component-interactions";
+import { componentActivationIssue } from "../../contract/component-activation.mjs";
 import { findComponent, indexComponents } from "./component-index";
 import { installComponentLinks, openComponentLink } from "./external-links";
 import { openComponentMedia } from "./LocalMediaViewer";
@@ -216,6 +218,9 @@ function SandboxComponent({
   inline,
 }: BlockProps & { component: CompiledComponent }) {
   const parsed = readCustomBlockData(data);
+  const interactions = useComponentInteractions();
+  const activation = useRef(interactions);
+  activation.current = interactions;
   const iframe = useRef<HTMLIFrameElement>(null);
   const theme = useAppearanceTheme();
   const t = useTranslator(messages);
@@ -261,6 +266,7 @@ function SandboxComponent({
   });
   const initial = useRef({
     props: parsed.props,
+    activationTargets: interactions.targets,
     readOnly: !!readOnly || !onChange,
     dataState,
   });
@@ -377,6 +383,7 @@ function SandboxComponent({
       {
         channel,
         type: "showai:props",
+        activationTargets: activation.current.targets,
         props: current.parsed.props,
         readOnly: !!current.readOnly || !current.onChange,
         dataState: current.dataState,
@@ -429,6 +436,13 @@ function SandboxComponent({
         const value = event.data.clear === true ? undefined : event.data.state;
         if (!scope?.block || componentViewStateIssue(value)) return;
         scope.store.write(scope.page, scope.block, slot, value);
+        return;
+      }
+      if (event.data.type === "showai:activate") {
+        if (componentActivationIssue(event.data.target)) return;
+        if (navigator.userActivation && !navigator.userActivation.isActive)
+          return;
+        activation.current.activate(event.data.target);
         return;
       }
       if (event.data.type === "showai:context") {
@@ -721,6 +735,7 @@ function SandboxComponent({
     else if (crashedProps.current !== parsed.props) retry();
   }, [crash, parsed.props]);
   useEffect(sendProps, [
+    interactions.targets,
     parsed.props,
     readOnly,
     editable,

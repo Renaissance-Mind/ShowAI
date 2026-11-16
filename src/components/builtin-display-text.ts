@@ -162,6 +162,11 @@ export const builtinEnglish: BuiltinDisplayText = {
     description:
       "A zoomable React Flow chart with node details and multiple flows, plus optional step-through journeys and stage playback. Content and layout come only from the page data.",
   },
+  "multi-level-view": {
+    name: "Multilevel view",
+    description:
+      "Organize native content and registered components into linked views; use their declared activation events to drill down, with a path, back navigation and short transitions.",
+  },
   video: {
     name: "Video",
     description:

@@ -176,3 +176,20 @@ export default function Related({ goTo }) {
 目录组件声明 manifest.role="page-outline"、pageOutlineProtocol=1、category="outline"，通过 Page 的 attrs.outline.renderer 关联精确版本。React 入口接收 props 和 outline（protocol、pageId、items 树、activeItemId、expandedItemIds、container 的 placement/width/height、theme、locale），以及 navigate(itemId)、setBranchExpanded(itemId,expanded)、collapse()。组件负责呈现、分支和可访问性，Page 宿主负责位置、整体收起和目标校验。只读页面仍提供导航动作。作者 props 遵循包自己的 schema；阅读状态使用上述协议，普通 onChange 不参与。
 
 创建或修改后，在 Page 中实际关联并验证导航、当前章节、窗口宽度变化和收起展开；完整契约见 ShowAI 源码仓库的 docs/page-surface.md，两个独立示例位于仓库的 examples/page-outline-index 和 examples/page-outline-path（不随插件安装；没有仓库时以 guide containers 为准）。
+
+## 公开稳定对象事件
+
+组件在多级视图中可以接收 `activationTargets` 与 `onActivate(target)`。`activationTargets` 是 `{type, scope, id}` 对象的只读数组，列出本组件当前绑定的目标。target 是 `{type, scope, id}`，使用组件自己定义的稳定对象身份。仅当目标在 activationTargets 中时才提供进入动作；调用返回 true 表示外层容器处理了跳转，返回 false 或未提供回调时继续原有阅读行为。调用应来自用户的点击或键盘操作，不调用 onChange，也不把这两个属性写进 schema、defaultData 或实例数据。
+
+```jsx
+const target = { type: "item", scope: "items", id: item.id };
+const connected = activationTargets?.some(
+  (bound) => bound.type === target.type && bound.scope === target.scope && bound.id === target.id,
+);
+const open = () => {
+  if (connected && onActivate?.(target)) return;
+  setSelected(item.id);
+};
+```
+
+在 usage.interactions 中记录公开的对象类型、作用域、ID 来源和未绑定时的行为。原生组件通过 ComponentInteractions/useComponentInteractions 接入同一目标协议；自定义组件的 onActivate 会由沙箱和 inline 宿主按绑定白名单转交。加入这项能力后提高组件版本并重新编译，验证绑定目标、未绑定对象和多个组件使用相同对象 ID 时的隔离。

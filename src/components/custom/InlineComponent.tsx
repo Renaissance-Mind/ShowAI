@@ -1,3 +1,8 @@
+import {
+  useComponentInteractions,
+  type ComponentTarget,
+} from "../blocks/component-interactions";
+import { componentActivationIssue } from "../../contract/component-activation.mjs";
 import { installIconTooltips } from "../../ui/icon-tooltip.mjs";
 import * as ReactRuntime from "react";
 import * as DomRuntime from "react-dom";
@@ -24,6 +29,7 @@ interface MountedComponent {
   update(
     data: Record<string, unknown>,
     outline?: PageOutlineComponentProps,
+    activationTargets?: readonly ComponentTarget[],
   ): void;
   destroy(): void;
 }
@@ -37,6 +43,8 @@ interface InlineModule {
       context?: ComponentContextSnapshot;
       outline?: PageOutlineComponentProps;
       goTo: (target: unknown) => boolean;
+      activationTargets?: readonly ComponentTarget[];
+      onActivate?: (target: ComponentTarget) => boolean;
     },
   ): MountedComponent;
 }
@@ -57,6 +65,9 @@ export function InlineComponent({
   outline?: PageOutlineComponentProps;
   onError?: (message: string) => void;
 }) {
+  const interactions = useComponentInteractions();
+  const activation = useRef(interactions);
+  activation.current = interactions;
   const container = useRef<HTMLDivElement>(null);
   const mounted = useRef<MountedComponent | null>(null);
   const currentData = useRef(data);
@@ -151,6 +162,16 @@ export function InlineComponent({
         outline: currentOutline.current,
         onError: setError,
         goTo,
+        activationTargets: activation.current.targets.map((target) => ({
+          ...target,
+        })),
+        onActivate: (target) => {
+          const issue = componentActivationIssue(target);
+          if (issue) throw new Error(issue);
+          if (navigator.userActivation && !navigator.userActivation.isActive)
+            return false;
+          return activation.current.activate(target);
+        },
         ...(conversation
           ? { onContext, context: handedOver.get(blockId!) }
           : {}),
@@ -174,7 +195,15 @@ export function InlineComponent({
       queueMicrotask(() => instance?.destroy());
     };
   }, [component.integrity, host]);
-  useEffect(() => mounted.current?.update(data, outline), [data, outline]);
+  useEffect(
+    () =>
+      mounted.current?.update(
+        data,
+        outline,
+        interactions.targets.map((target) => ({ ...target })),
+      ),
+    [data, outline, interactions.targets],
+  );
   return (
     <section aria-label={component.name} style={{ margin: "18px 0" }}>
       <div ref={container} />

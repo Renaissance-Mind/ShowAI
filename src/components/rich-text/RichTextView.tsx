@@ -162,6 +162,7 @@ export function RichTextNode({
     kind: string,
     data: Record<string, unknown>,
     inline?: boolean,
+    blockId?: string,
   ) => ReactNode;
 }): ReactNode {
   const attrs = node.attrs ?? {};
@@ -201,7 +202,9 @@ export function RichTextNode({
           className="sb-inline-widget"
           data-widget-kind={attrs.kind}
         >
-          {renderWidget?.(attrs.kind, attrs.data ?? {}, true)}
+          <ReaderBlock id={attrs.id}>
+            {renderWidget?.(attrs.kind, attrs.data ?? {}, true, attrs.id)}
+          </ReaderBlock>
         </span>
       );
     case "mathInline":
@@ -383,7 +386,7 @@ export function RichTextNode({
           data-widget-kind={attrs.kind}
         >
           <ReaderBlock id={attrs.id}>
-            {renderWidget?.(attrs.kind, attrs.data ?? {})}
+            {renderWidget?.(attrs.kind, attrs.data ?? {}, false, attrs.id)}
           </ReaderBlock>
         </div>
       );
@@ -403,6 +406,7 @@ export function RichTextContent({
     kind: string,
     data: Record<string, unknown>,
     inline?: boolean,
+    blockId?: string,
   ) => ReactNode;
 }) {
   return (

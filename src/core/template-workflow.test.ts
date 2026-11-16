@@ -248,7 +248,7 @@ test("builtin catalog ships only the system workflow, the paper explainer and bl
     });
     const parsed = parseTemplateBundle(current.bundle);
     expect(parsed.metadata.schemaVersion).toBe(4);
-    expect(parsed.metadata.version).toBe(id === "system-presentation" ? "3.0.1" : "3.0.0");
+    expect(parsed.metadata.version).toBe(id === "system-presentation" ? "3.0.2" : "3.0.0");
     expect(parsed.guides.length).toBeGreaterThan(0);
     expect(current.document.content.content ?? []).toHaveLength(0);
   }

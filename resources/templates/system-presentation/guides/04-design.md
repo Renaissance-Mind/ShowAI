@@ -32,6 +32,7 @@
 **组件与素材。** 先定表达形式，再查真实能力：组件索引用 project_context 返回的 componentCatalog（或 `catalog_list({kind:"component",projectId})`），模板组件来自 template_context。选用后读精确版本的 guide 与 parameters。顺序是：调整已有组件的数据与布局 → 组合已有能力 → 扩展已有组件 → 为确认的缺口新建组件（create-component）。常用对应：
 - 分组与分栏可用原生布局容器 region：只显示子内容，columns 是最多列数，minColumnWidth 决定窄容器何时减少列数；同列多个对象可再嵌套 flow 分组。布局关系由当前设计决定，不固定成一种图文格式。
 - 流程与分支用 flowchart；参与者之间按顺序的往返用 sequence-diagram；分层架构用 layer-diagram。
+- 多层阅读用 multi-level-view：每层用原生 content 组合已有组件，bindings 按组件块 ID 和公开的稳定对象事件绑定直接子层；完整 levels 统一管理进入、返回与路径。
 - “谁持有什么、这一步改了什么”的机制（网络包、缓存、事务、握手）用 mechanism-diagram：对象可带小表格，steps 只写每一步的变化，同一布局逐步切换。各步画面本身不同时用 stepper，每一步放一张图或一个组件。
 - 没有现成组件的示意图（同尺度小多图、分层平面、空间示意）用 svg 手绘；几个方案并排对比时画在同一张 svg 里。
 - 数据用 chart 或适配数据类型的 G2 图表；对照用 table、comparison-matrix；参数探索用 playground；操作步骤用 step-guide；目录或字段结构用 structure-browser。

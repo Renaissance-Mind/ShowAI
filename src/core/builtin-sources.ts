@@ -120,6 +120,10 @@ import selectionToolbarCss from "../editor/selection-toolbar.css?raw";
 import flowchart from "../components/blocks/Flowchart.tsx?raw";
 import flowchartCss from "../components/blocks/flowchart.css?raw";
 import flowchartContract from "../components/blocks/flowchart-contract.mjs?raw";
+import multiLevelView from "../components/blocks/MultiLevelView.tsx?raw";
+import multiLevelViewCss from "../components/blocks/multi-level-view.css?raw";
+import multiLevelViewContract from "../components/blocks/multi-level-view-contract.mjs?raw";
+import multiLevelViewMessages from "../i18n/messages/multiLevelView.ts?raw";
 import icons from "../ui/icons.ts?raw";
 import expandableSearch from "../components/ExpandableSearch.tsx?raw";
 import expandableSearchCss from "../components/expandable-search.css?raw";
@@ -367,6 +371,10 @@ const sources: Record<string, string> = {
   "SelectionToolbar.tsx": selectionToolbar,
   "selection-toolbar.css": selectionToolbarCss,
   "Flowchart.tsx": flowchart,
+  "MultiLevelView.tsx": multiLevelView,
+  "multi-level-view.css": multiLevelViewCss,
+  "multi-level-view-contract.mjs": multiLevelViewContract,
+  "i18n/messages/multiLevelView.ts": multiLevelViewMessages,
   "flowchart.css": flowchartCss,
   "flowchart-contract.mjs": flowchartContract,
   "theme.css": `${themeTokens}\n${themeContent}`,
@@ -608,6 +616,7 @@ export const builtinExports: Record<string, string> = {
   chart: "Chart",
   mindmap: "Mindmap",
   flowchart: "Flowchart",
+  "multi-level-view": "MultiLevelView",
   "mechanism-diagram": "MechanismDiagram",
   svg: "Svg",
   archify: "Archify",

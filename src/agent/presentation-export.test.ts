@@ -27,6 +27,7 @@ test.each([
   "scene-3d",
   "sequence-diagram",
   "layer-diagram",
+  "multi-level-view",
   "step-guide",
   "command-reference",
   "structure-browser",

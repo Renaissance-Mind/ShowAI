@@ -13,6 +13,7 @@ import { blockLabel } from "./shared";
 import { useTranslator } from "../../i18n/react";
 import messages from "../../i18n/messages/cardGrid";
 import { NoteText } from "./NoteText";
+import { useComponentInteractions } from "./component-interactions";
 
 type Card = CardGridData["cards"][number];
 
@@ -83,6 +84,7 @@ function CardContent({
 
 export function CardGridBlock({ data }: BlockProps) {
   const t = useTranslator(messages);
+  const interactions = useComponentInteractions();
   const model = data as unknown as CardGridData;
   const variant = model.variant === "row" ? "row" : "tile";
   const columns = cardGridColumns(model);
@@ -102,16 +104,28 @@ export function CardGridBlock({ data }: BlockProps) {
         {model.cards.map((card, index) => {
           const tone = CARD_TONES.includes(card.tone!) ? card.tone : "brand";
           const href = card.href && isSafeHref(card.href) ? card.href : null;
+          const target = card.id
+            ? { type: "card", scope: "cards", id: card.id }
+            : null;
+          const bound = !!target && interactions.canActivate(target);
           const content: ReactNode = (
             <CardContent
               card={card}
               tile={variant === "tile"}
-              linked={Boolean(href)}
+              linked={Boolean(href) || bound}
             />
           );
           return (
-            <li key={index} className={`cg-item cg-tone-${tone}`}>
-              {href && isExternalHref(href) ? (
+            <li key={card.id ?? index} className={`cg-item cg-tone-${tone}`}>
+              {bound ? (
+                <button
+                  type="button"
+                  className="cg-card is-link"
+                  onClick={() => interactions.activate(target!)}
+                >
+                  {content}
+                </button>
+              ) : href && isExternalHref(href) ? (
                 <a
                   className="cg-card is-link"
                   href={href}

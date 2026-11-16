@@ -6,17 +6,23 @@ export interface ComponentTarget {
   scope: string;
   id: string;
 }
+export interface ComponentActivationProps {
+  activationTargets?: readonly ComponentTarget[];
+  onActivate?: (target: ComponentTarget) => boolean;
+}
 
 export function sameComponentTarget(a: ComponentTarget, b: ComponentTarget) {
   return a.type === b.type && a.scope === b.scope && a.id === b.id;
 }
 
 interface InteractionScope {
+  targets: readonly ComponentTarget[];
   canActivate: (target: ComponentTarget) => boolean;
   activate: (target: ComponentTarget) => boolean;
 }
 
 const inactive: InteractionScope = {
+  targets: [],
   canActivate: () => false,
   activate: () => false,
 };
@@ -36,6 +42,7 @@ export function ComponentInteractions({
     const canActivate = (target: ComponentTarget) =>
       targets.some((bound) => sameComponentTarget(bound, target));
     return {
+      targets,
       canActivate,
       activate(target) {
         if (!canActivate(target)) return false;

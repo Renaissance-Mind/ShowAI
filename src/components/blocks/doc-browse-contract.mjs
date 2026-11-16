@@ -155,7 +155,7 @@ function validateStructure(data) {
 
 export const CARD_TONES = ["brand", "teal", "warm", "violet", "rose", "slate"];
 export const CARD_VARIANTS = ["tile", "row"];
-const CARD_KEYS = ["icon", "title", "body", "href", "tag", "tone"];
+const CARD_KEYS = ["id", "icon", "title", "body", "href", "tag", "tone"];
 
 export function cardGridColumns(data) {
   if (data.columns) return data.columns;
@@ -172,9 +172,15 @@ function validateCards(data) {
     (!Number.isInteger(data.columns) || data.columns < 1 || data.columns > 4)
   )
     fail("columns must be an integer from 1 to 4.");
+  const ids = new Set();
   list(data.cards, "cards", 24).forEach((card, index) => {
     const at = `cards[${index}]`;
     known(card, CARD_KEYS, at);
+    if (card.id !== undefined) {
+      text(card.id, `${at}.id`, 200);
+      if (ids.has(card.id)) fail(`${at}.id duplicates ${card.id}.`);
+      ids.add(card.id);
+    }
     text(card.title, `${at}.title`, 80);
     text(card.body, `${at}.body`, 400);
     optionalText(card.icon, `${at}.icon`, 8);

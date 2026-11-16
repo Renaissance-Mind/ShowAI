@@ -27,6 +27,12 @@ import { PlaygroundBlock } from "./Playground";
 const FlowchartBlock = /* @__PURE__ */ lazy(() =>
   import("./Flowchart").then((module) => ({ default: module.FlowchartBlock })),
 );
+const MultiLevelViewBlock = /* @__PURE__ */ lazy(() =>
+  import("./MultiLevelView").then((module) => ({
+    default: module.MultiLevelViewBlock,
+  })),
+);
+import { validateMultiLevelViewData } from "./multi-level-view-contract.mjs";
 import { validateFlowchartData } from "./flowchart-contract.mjs";
 import { validateMindmapData } from "./mindmap-contract.mjs";
 const MindmapBlock = /* @__PURE__ */ lazy(() =>
@@ -715,4 +721,16 @@ registerBlock({
   validate: (data) => {
     validateBacklinksData(data);
   },
+});
+
+registerBlock({
+  kind: "multi-level-view",
+  title: "多级组件视图",
+  description: "组合原生内容与已有组件，按公开对象事件逐层展开",
+  icon: "⧉",
+  defaultData: componentMetadata.find(
+    (item) => item.kind === "multi-level-view",
+  )!.defaultData as BlockData,
+  renderer: MultiLevelViewBlock,
+  validate: validateMultiLevelViewData,
 });

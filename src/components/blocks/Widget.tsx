@@ -124,7 +124,9 @@ class BlockBoundary extends Component<
   }
 }
 
-export const Widget = memo(function Widget(props: BlockProps & { kind: string }) {
+export const Widget = memo(function Widget(
+  props: BlockProps & { kind: string },
+) {
   const host = useContext(BoundWidgetHost);
   if (!hasBinding(props.data))
     return (
@@ -182,6 +184,11 @@ const WidgetBody = memo(function WidgetBody({
     () => ({
       useCatalog: useComponentCatalog,
       registerComponent,
+      validateWidget: (kind: string, data: Record<string, unknown>) => {
+        const definition = getBlockDefinition(kind);
+        if (!definition) throw new Error(`Unknown component kind: ${kind}`);
+        definition.validate?.(data);
+      },
       renderWidget: (props: BlockProps & { kind: string }) => (
         <Widget {...props} />
       ),

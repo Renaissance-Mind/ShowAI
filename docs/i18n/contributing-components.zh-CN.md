@@ -60,7 +60,7 @@ G2 图表和外部图示家族各有自己的流程。`g2.json` 中的 G2 条目
 
 Provider 只处理声明过的目标；没有绑定的对象沿用原来的详情和播放行为。新增目标的组件使用 `useComponentInteractions().canActivate(target)` 判断是否提供动作，点击或键盘激活时调用 `activate(target)`。只有容器处理了动作才返回 true，否则继续原有阅读行为。嵌套 Provider 隔离各自的绑定。阅读事件不调用 `onChange`。
 
-`examples/multi-level-view` 是可导入的轻量多级容器。`createMultiLevelView(registry)` 接收组件渲染器和列举稳定目标的适配器，每层保留子组件的原生 props；自定义组件依赖仍需声明精确版本。模型在渲染前检查循环、不可达视图、重复绑定和不存在的目标。
+内置 `multi-level-view` 的每层使用原生内容，可组合已有组件；通过组件块 ID 与公开对象事件绑定子层，直接从组件目录插入；`examples/multi-level-view` 保留自定义组合示例。`createMultiLevelView(registry)` 接收组件渲染器和列举稳定目标的适配器，每层保留子组件的原生 props；自定义组件依赖仍需声明精确版本。模型在渲染前检查循环、不可达视图、重复绑定和不存在的目标。
 
 ## 修改已有内置组件
 

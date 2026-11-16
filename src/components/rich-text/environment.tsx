@@ -56,6 +56,7 @@ export const RichTextEnvironment = createContext<{
   useCatalog: typeof useComponentCatalog;
   registerComponent: (component: CompiledComponent) => void;
   renderWidget: (props: BlockProps & { kind: string }) => ReactNode;
+  validateWidget?: (kind: string, data: Record<string, unknown>) => void;
   assistant?: {
     open: (request: AssistantRequest) => void;
     reference: (request: AssistantRequest) => void;

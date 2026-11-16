@@ -265,5 +265,8 @@
   },
   "region": {
     "status": "ready"
+  },
+  "multi-level-view": {
+    "status": "ready"
   }
 }
