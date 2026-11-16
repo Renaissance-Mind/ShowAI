@@ -1,5 +1,12 @@
 import { createHash } from "node:crypto";
 import { CoreError } from "../core/model";
+import { FileStore } from "../core/store";
+import { resolveDocumentDatasets } from "../core/dataset-resolution";
+import { addressNode } from "../document/update.mjs";
+import {
+  componentContract,
+  componentObjects,
+} from "../contract/component-contract.mjs";
 import { canonicalJson } from "../core/diff";
 import {
   getTemplate,
@@ -70,6 +77,9 @@ export interface CatalogSelection {
   parameterOffset?: number;
   parameterLimit?: number;
   knownHash?: string;
+  instance?: { pageId: string; blockId: string };
+  objectOffset?: number;
+  objectLimit?: number;
 }
 export class CatalogService {
   constructor(
@@ -258,14 +268,21 @@ export class CatalogService {
             integrity: item.integrity,
             scope: item.scope,
           };
-    const filled = <T,>(
-      pick: (item: BuiltinComponentMetadata | ComponentListing) => T | undefined,
+    const filled = <T>(
+      pick: (
+        item: BuiltinComponentMetadata | ComponentListing,
+      ) => T | undefined,
       text: (value: T) => string[],
     ) =>
       components.flatMap((item) => {
         const value = pick(item);
         return value !== undefined &&
-          matches(item.name, item.description, ..."kind" in item ? [item.kind] : [item.id], ...text(value))
+          matches(
+            item.name,
+            item.description,
+            ...("kind" in item ? [item.kind] : [item.id]),
+            ...text(value),
+          )
           ? [{ ...ref(item), value }]
           : [];
       });
@@ -322,17 +339,22 @@ export class CatalogService {
           declare: "manifest.role page-outline with pageOutlineProtocol 1",
           guide: "component",
           filledBy: filled(
-            (item) => ("role" in item && item.role === "page-outline" ? true : undefined),
+            (item) =>
+              "role" in item && item.role === "page-outline" ? true : undefined,
             () => [],
           ).map(({ value: _value, ...item }) => item),
         },
         {
           slot: "importer",
-          harness: "Import of files, folders and zips: plan, confirm, write, undo.",
-          declare: "packages/importers/ID with importer.json and importer.js (catalog_version action importer)",
+          harness:
+            "Import of files, folders and zips: plan, confirm, write, undo.",
+          declare:
+            "packages/importers/ID with importer.json and importer.js (catalog_version action importer)",
           guide: "import",
           filledBy: importers
-            .filter((importer) => matches(importer.id, importer.name, importer.description))
+            .filter((importer) =>
+              matches(importer.id, importer.name, importer.description),
+            )
             .map((importer) => ({
               importerId: importer.id,
               name: importer.name,
@@ -426,6 +448,8 @@ export class CatalogService {
       throw new Error(
         "Parameter references belong to components; use template stage guides.",
       );
+    if (input.kind === "template" && view === "contract")
+      throw new Error("Runtime contracts belong to components.");
     if (input.kind === "template") {
       const template = await getTemplate(this.store.root, id, projectId, {
         scope: input.scope,
@@ -605,6 +629,7 @@ export class CatalogService {
         "guide",
         "development",
         "parameters",
+        "contract",
         "schema",
         "examples",
         "dependencies",
@@ -618,6 +643,116 @@ export class CatalogService {
       "propsSchema" in component ? component.propsSchema : component.schema;
     const parents = "parents" in component ? (component.parents ?? []) : [];
     const documentation = component.documentation;
+    if (
+      (input.instance ||
+        input.objectOffset !== undefined ||
+        input.objectLimit !== undefined) &&
+      view !== "contract"
+    )
+      throw new Error("Instance object discovery requires view=contract.");
+    if (view === "contract") {
+      const description = componentContract(component);
+      let data = component.defaultData;
+      let instance;
+      if (input.instance) {
+        const project = this.requireProject(projectId);
+        const page = await new FileStore(this.store.root).readPage(
+          project,
+          input.instance.pageId,
+          { checkpoint: false },
+        );
+        const resolved = await resolveDocumentDatasets(
+          new FileStore(this.store.root),
+          project,
+          page.document,
+          { includeProps: true, remember: false },
+        );
+        const target = addressNode(
+          resolved.document.content,
+          input.instance.blockId,
+        )?.node;
+        if (!target?.attrs)
+          throw new Error("Component instance does not exist.");
+        const custom = target.attrs.kind === "custom";
+        const insertion =
+          "insertion" in component ? component.insertion : undefined;
+        if (
+          insertion &&
+          (target.type !== insertion.nodeType ||
+            (insertion.nodeType === "surface" &&
+              target.attrs.kind !== insertion.surfaceKind))
+        )
+          throw new Error("The instance is not the selected native container.");
+        if (
+          !insertion &&
+          (custom
+            ? target.attrs.data.componentId !== id ||
+              target.attrs.data.version !== component.version
+            : target.attrs.kind !== id)
+        )
+          throw new Error(
+            "The instance does not use the selected component revision.",
+          );
+        if (custom) {
+          const actual = await getComponent(
+            this.store.root,
+            id,
+            target.attrs.data.version,
+            project,
+            {
+              integrity: target.attrs.data.integrity,
+              scope: target.attrs.data.scope,
+            },
+          );
+          if (
+            actual.integrity !==
+            ("integrity" in component ? component.integrity : undefined)
+          )
+            throw new Error(
+              "The instance uses a different component integrity.",
+            );
+        }
+        data = insertion
+          ? target
+          : custom
+            ? target.attrs.data.props
+            : target.attrs.data;
+        instance = {
+          ...input.instance,
+          pageHash: page.hash,
+          revision: page.revision,
+        };
+      }
+      const objects = componentObjects(description.contract, data);
+      const offset = input.objectOffset ?? 0,
+        limit = input.objectLimit ?? 100;
+      if (
+        !Number.isInteger(offset) ||
+        offset < 0 ||
+        !Number.isInteger(limit) ||
+        limit < 1 ||
+        limit > 500
+      )
+        throw new Error("Object discovery needs offset >= 0 and limit 1–500.");
+      return {
+        ...summary,
+        view,
+        ...description,
+        objects: objects.slice(offset, offset + limit),
+        objectTotal: objects.length,
+        objectOffset: offset,
+        ...(offset + limit < objects.length
+          ? { nextObjectOffset: offset + limit }
+          : {}),
+        objectsFrom: instance ? "instance" : "defaultData",
+        ...(instance ? { instance } : {}),
+        compatibility: {
+          legacyCallbacks: true,
+          unknownRequiredCapabilities: "reject",
+        },
+        next,
+      };
+    }
     if (view === "summary") return { ...summary, view, next };
     if (view === "parameters") {
       const report = componentParameterReference(

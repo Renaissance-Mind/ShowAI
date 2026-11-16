@@ -64,6 +64,7 @@ Discover only what you need:
   catalog list [--kind component|template|contribution] [--scope SCOPE] [--versions recommended|all] [--limit N --cursor CURSOR]
   catalog describe ID [--kind component|template] [--view VIEW]
   catalog describe ID --view parameters [--parameter-path PATH --parameter-offset N --parameter-limit N --known-hash HASH]
+  catalog describe ID --view contract [--page PAGE --block BLOCK --object-offset N --object-limit N]
   catalog remove ID --kind component|template [--version VERSION] [--scope project|global|published]
     Refuses while pages, packages or publications use it and lists where; built-ins cannot be removed.
 

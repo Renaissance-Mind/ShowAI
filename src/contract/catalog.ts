@@ -7,6 +7,7 @@ import diagramDocumentation from "../../resources/catalog/diagram-documentation.
 import documentation from "../../resources/catalog/component-documentation.json";
 import type { ComponentDocumentation } from "./documentation";
 import type { BuiltinComponentMetadata } from "./types";
+import { builtinContracts } from "./builtin-contracts.mjs";
 export function builtinComponentCatalog({
   includeLegacy = false,
 }: { includeLegacy?: boolean } = {}) {
@@ -18,6 +19,7 @@ export function builtinComponentCatalog({
     ...surfaces,
   ]).map((item) => ({
     ...item,
+    contract: structuredClone(builtinContracts[item.kind] ?? { version: 1 }),
     documentation: (
       { ...documentation, ...diagramDocumentation } as unknown as Record<
         string,

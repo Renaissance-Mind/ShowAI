@@ -58,6 +58,7 @@ import { exportPage, type ExportFormat } from "./exporter";
 import {
   importCompiledComponents,
   lockDocumentComponents,
+  prepareComponentInput,
   getTemplate,
   importComponent,
   instantiateTemplateRecord,
@@ -131,24 +132,32 @@ function rebindImportedComponents(
       component,
     ]),
   );
-  walk(copy.content, (node) => {
-    if ((node.type === "widget" || node.type === "inlineWidget") && node.attrs?.kind === "custom") {
-      const data = node.attrs.data;
-      const component = packages.get(`${data?.componentId}@${data?.version}`);
-      if (component) {
-        if (data.integrity && data.integrity !== component.integrity)
-          throw new CoreError(
-            "INVALID_DATA",
-            "The imported component does not match the page's pinned integrity.",
-          );
-        node.attrs.data = {
-          ...data,
-          scope: "project",
-          integrity: component.integrity,
-        };
+  walk(
+    copy.content,
+    (node) => {
+      if (
+        (node.type === "widget" || node.type === "inlineWidget") &&
+        node.attrs?.kind === "custom"
+      ) {
+        const data = node.attrs.data;
+        const component = packages.get(`${data?.componentId}@${data?.version}`);
+        if (component) {
+          if (data.integrity && data.integrity !== component.integrity)
+            throw new CoreError(
+              "INVALID_DATA",
+              "The imported component does not match the page's pinned integrity.",
+            );
+          node.attrs.data = {
+            ...data,
+            ...(component.contract ? { contract: component.contract } : {}),
+            scope: "project",
+            integrity: component.integrity,
+          };
+        }
       }
-    }
-  }, { scope: "content" });
+    },
+    { scope: "content" },
+  );
   return copy;
 }
 
@@ -666,8 +675,21 @@ export class AgentService extends CatalogService {
     ];
     if (components.length)
       await importCompiledComponents(this.store.root, components, project);
-    const source = input.blocks?.length
-      ? blocksDocument(input.blocks, input.title, input.kind)
+    const preparedBlocks = input.blocks
+      ? await Promise.all(
+          input.blocks.map(async (block) => ({
+            ...block,
+            data: await prepareComponentInput(
+              this.store.root,
+              block.kind,
+              block.data,
+              project,
+            ),
+          })),
+        )
+      : undefined;
+    const source = preparedBlocks?.length
+      ? blocksDocument(preparedBlocks, input.title, input.kind)
       : input.document;
     const document = source
       ? await lockDocumentComponents(
@@ -1340,12 +1362,16 @@ export function errorResult(
   };
 }
 
-function systemErrorFacts(
-  error: unknown,
-): { errno?: string; syscall?: string; path?: string } {
+function systemErrorFacts(error: unknown): {
+  errno?: string;
+  syscall?: string;
+  path?: string;
+} {
   for (const candidate of [
     error,
-    error && typeof error === "object" ? (error as { cause?: unknown }).cause : undefined,
+    error && typeof error === "object"
+      ? (error as { cause?: unknown }).cause
+      : undefined,
   ]) {
     if (!candidate || typeof candidate !== "object") continue;
     const { code, syscall, path } = candidate as Record<string, unknown>;

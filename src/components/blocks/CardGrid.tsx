@@ -13,7 +13,7 @@ import { blockLabel } from "./shared";
 import { useTranslator } from "../../i18n/react";
 import messages from "../../i18n/messages/cardGrid";
 import { NoteText } from "./NoteText";
-import { useComponentInteractions } from "./component-interactions";
+import { useComponentEvents } from "./component-interactions";
 
 type Card = CardGridData["cards"][number];
 
@@ -84,7 +84,7 @@ function CardContent({
 
 export function CardGridBlock({ data }: BlockProps) {
   const t = useTranslator(messages);
-  const interactions = useComponentInteractions();
+  const interactions = useComponentEvents();
   const model = data as unknown as CardGridData;
   const variant = model.variant === "row" ? "row" : "tile";
   const columns = cardGridColumns(model);

@@ -1,15 +1,15 @@
-import {
-  primitiveContentNode,
-  primitiveNodeTypes,
-  createRichTextNode,
-} from "../document/rich-text.mjs";
+import { componentInputNode } from "../document/component-input.mjs";
 import type { JSONContent } from "@tiptap/core";
 import type { ShowDocument } from "../types";
 import type { NodeLayout } from "../document/types";
 import { builtinComponent } from "../contract/catalog";
 import { translator } from "../i18n";
 import messages from "../i18n/messages/surface";
-import { createSurface, upgradeResource, surfaceKind } from "../document/containers.mjs";
+import {
+  createSurface,
+  upgradeResource,
+  surfaceKind,
+} from "../document/containers.mjs";
 import {
   findSurfaceNode,
   reconcileSurface,
@@ -57,20 +57,8 @@ export function componentBlock(
   kind: string,
   data: Record<string, unknown>,
 ): { node: JSONContent; frame: NodeLayout } {
-  if (kind === "text")
-    return { node: createRichTextNode(data), frame: { x: 0, y: 0, width: 640 } };
-  if (primitiveNodeTypes[kind])
-    return {
-      node: data.document
-        ? createRichTextNode({ content: data.document, format: "richtext" })
-        : primitiveContentNode(kind, data, crypto.randomUUID()),
-      frame: { x: 0, y: 0, width: 640 },
-    };
   return {
-    node: {
-      type: "widget",
-      attrs: { id: crypto.randomUUID(), kind, data: structuredClone(data) },
-    },
+    node: componentInputNode(kind, data),
     frame: { x: 0, y: 0, width: 640 },
   };
 }

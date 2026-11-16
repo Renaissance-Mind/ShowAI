@@ -1,3 +1,5 @@
+import { componentObjects } from "../../contract/component-contract.mjs";
+import { builtinComponentContract } from "../../contract/builtin-contracts.mjs";
 import { validateFlowchartData } from "./flowchart-contract.mjs";
 import { validateDocDiagramData } from "./doc-diagrams-contract.mjs";
 import { validateDocBrowseData } from "./doc-browse-contract.mjs";
@@ -63,23 +65,10 @@ export function multiLevelBindingBlock(level, binding) {
   return widgets[0].attrs.id;
 }
 export function multiLevelTargets(kind, props) {
-  if (kind === "flowchart")
-    return props.flows.flatMap((flow) =>
-      flow.nodes.map((node) => ({ type: "node", scope: flow.id, id: node.id })),
-    );
-  if (kind === "layer-diagram")
-    return props.layers.flatMap((layer) =>
-      layer.modules.map((module) => ({
-        type: "module",
-        scope: layer.id,
-        id: module.id,
-      })),
-    );
-  if (kind === "card-grid")
-    return props.cards
-      .filter((card) => card.id)
-      .map((card) => ({ type: "card", scope: "cards", id: card.id }));
-  return undefined;
+  const contract =
+    kind === "custom" ? props.contract : builtinComponentContract(kind);
+  if (!contract) return undefined;
+  return componentObjects(contract, kind === "custom" ? props.props : props);
 }
 export function multiLevelPath(levels, id) {
   const path = [];
@@ -166,7 +155,8 @@ export function validateMultiLevelViewData(data, validateChild) {
     list(level.bindings, `${at}.bindings`, 0, MULTI_LEVEL_LIMITS.bindings);
     for (const [bi, binding] of level.bindings.entries()) {
       const bp = `${at}.bindings[${bi}]`;
-      object(binding, bp, ["blockId", "source", "to"]);
+      object(binding, bp, ["event", "blockId", "source", "to"]);
+      if (binding.event !== undefined) text(binding.event, `${bp}.event`);
       text(binding.to, `${bp}.to`);
       if (binding.blockId !== undefined) text(binding.blockId, `${bp}.blockId`);
       object(binding.source, `${bp}.source`, ["type", "scope", "id"]);
@@ -207,6 +197,7 @@ export function validateMultiLevelViewData(data, validateChild) {
         );
       const key = JSON.stringify([
         blockId,
+        binding.event ?? "activate",
         binding.source.type,
         binding.source.scope,
         binding.source.id,
@@ -215,6 +206,19 @@ export function validateMultiLevelViewData(data, validateChild) {
         throw new Error(`${bp}.source duplicates a binding in this view.`);
       sources.add(key);
       const targets = multiLevelTargets(widget.attrs.kind, widget.attrs.data);
+      const contract =
+        widget.attrs.kind === "custom"
+          ? widget.attrs.data.contract
+          : builtinComponentContract(widget.attrs.kind);
+      if (
+        contract &&
+        !(contract.events ?? []).some(
+          (event) =>
+            event.name === (binding.event ?? "activate") &&
+            event.entity === binding.source.type,
+        )
+      )
+        throw new Error(`${bp}.event is not declared for this object type.`);
       if (
         targets &&
         !targets.some((target) => sameMultiLevelTarget(target, binding.source))

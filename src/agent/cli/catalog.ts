@@ -106,6 +106,10 @@ export const catalogCommands: CommandDeclaration[] = [
       "parameter-offset": text,
       "parameter-limit": text,
       "known-hash": text,
+      page: text,
+      block: text,
+      "object-offset": text,
+      "object-limit": text,
       scope: hiddenText,
       version: hiddenText,
       integrity: hiddenText,
@@ -116,6 +120,7 @@ export const catalogCommands: CommandDeclaration[] = [
     help: [
       "catalog describe ID [--kind component|template] [--view VIEW]",
       "catalog describe ID --view parameters [--parameter-path PATH --parameter-offset N --parameter-limit N --known-hash HASH]",
+      "catalog describe ID --view contract [--page PAGE --block BLOCK --object-offset N --object-limit N]",
     ],
     async run(args, { service, project, id }) {
       const kind = catalogKind(args);
@@ -132,6 +137,20 @@ export const catalogCommands: CommandDeclaration[] = [
         version: option(args, "version"),
         integrity: option(args, "integrity"),
         view: catalogView(args),
+        ...(option(args, "page") || option(args, "block")
+          ? {
+              instance: {
+                pageId: option(args, "page") ?? "",
+                blockId: option(args, "block") ?? "",
+              },
+            }
+          : {}),
+        ...(option(args, "object-offset")
+          ? { objectOffset: Number(option(args, "object-offset")) }
+          : {}),
+        ...(option(args, "object-limit")
+          ? { objectLimit: Number(option(args, "object-limit")) }
+          : {}),
         parameterPath: option(args, "parameter-path"),
         parameterOffset:
           option(args, "parameter-offset") === undefined

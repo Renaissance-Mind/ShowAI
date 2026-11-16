@@ -16,6 +16,12 @@ import {
 import { validateMindmapData } from "../components/blocks/mindmap-contract.mjs";
 import { validateFlowchartData } from "../components/blocks/flowchart-contract.mjs";
 import { validateMultiLevelViewData } from "../components/blocks/multi-level-view-contract.mjs";
+import { validateComponentContractData } from "../contract/component-contract.mjs";
+import { builtinContracts } from "../contract/builtin-contracts.mjs";
+import {
+  componentContentDocuments,
+  nodeComponentContract,
+} from "../document/component-structure.mjs";
 import {
   validateDiagramData,
   diagramTemplates,
@@ -308,7 +314,16 @@ function validateAttrs(attrs, path, permitted, surfaceIcon = false) {
 }
 
 function validateWidgetData(kind, data, path) {
-  if (kind === "region") throw new Error(`${path}: region is a native layout container; use component.insert instead of a widget.`);
+  const contract = kind === "custom" ? data?.contract : builtinContracts[kind];
+  if (contract)
+    validateComponentContractData(
+      contract,
+      kind === "custom" ? data.props : data,
+    );
+  if (kind === "region")
+    throw new Error(
+      `${path}: region is a native layout container; use component.insert instead of a widget.`,
+    );
   if (Object.hasOwn(data, BINDING_KEY)) {
     const binding = data[BINDING_KEY];
     object(binding, `${path}.${BINDING_KEY}`);
@@ -681,6 +696,17 @@ function validateNode(value, path, counter, depth = 0, parentType = null) {
       );
     object(node.attrs?.data, `${path}.attrs.data`);
     validateWidgetData(node.attrs.kind, node.attrs.data, `${path}.attrs.data`);
+    const definition = nodeComponentContract(node);
+    if (definition)
+      for (const [index, document] of componentContentDocuments(
+        node.attrs.kind === "custom" ? node.attrs.data.props : node.attrs.data,
+        definition,
+      ).entries()) {
+        const nested = { ...counter, surface: false, resource: false };
+        validateNode(document, `${path}.slots[${index}]`, nested, depth + 1);
+        counter.count = nested.count;
+        counter.capacityMayGrow ||= nested.capacityMayGrow;
+      }
   }
   if (node.marks !== undefined) {
     if (!["text", "hardBreak"].includes(node.type))
@@ -848,44 +874,107 @@ export function isDocumentTimestamp(value) {
 }
 
 function capacityPreimage(document) {
-  const plain = value => value && typeof value === "object" && !Array.isArray(value);
-  const view = value => plain(value) ? {...value, ...(Object.hasOwn(value, "readingOrder") && Array.isArray(value.readingOrder) ? {readingOrder: [...value.readingOrder]} : {})} : value;
-  return {...document,
-    ...(Object.hasOwn(document, "layout") && plain(document.layout) ? {layout: {...document.layout}} : {}),
-    ...(Object.hasOwn(document, "views") && plain(document.views) ? {views: view(document.views)} : {}),
-    ...(Object.hasOwn(document, "surfaceViews") && plain(document.surfaceViews) ? {surfaceViews: Object.fromEntries(Object.entries(document.surfaceViews).map(([id, value]) => [id, view(value)]))} : {}),
+  const plain = (value) =>
+    value && typeof value === "object" && !Array.isArray(value);
+  const view = (value) =>
+    plain(value)
+      ? {
+          ...value,
+          ...(Object.hasOwn(value, "readingOrder") &&
+          Array.isArray(value.readingOrder)
+            ? { readingOrder: [...value.readingOrder] }
+            : {}),
+        }
+      : value;
+  return {
+    ...document,
+    ...(Object.hasOwn(document, "layout") && plain(document.layout)
+      ? { layout: { ...document.layout } }
+      : {}),
+    ...(Object.hasOwn(document, "views") && plain(document.views)
+      ? { views: view(document.views) }
+      : {}),
+    ...(Object.hasOwn(document, "surfaceViews") && plain(document.surfaceViews)
+      ? {
+          surfaceViews: Object.fromEntries(
+            Object.entries(document.surfaceViews).map(([id, value]) => [
+              id,
+              view(value),
+            ]),
+          ),
+        }
+      : {}),
   };
 }
 function shrinkingProjection(before, after) {
   if (before === after) return true;
-  if (!before || !after || typeof before !== "object" || typeof after !== "object" || Array.isArray(before) !== Array.isArray(after)) return false;
-  if (Array.isArray(after)) return after.length <= before.length && after.every((value, index) => shrinkingProjection(before[index], value));
-  return Object.keys(after).every(key => Object.hasOwn(before, key) && shrinkingProjection(before[key], after[key]));
+  if (
+    !before ||
+    !after ||
+    typeof before !== "object" ||
+    typeof after !== "object" ||
+    Array.isArray(before) !== Array.isArray(after)
+  )
+    return false;
+  if (Array.isArray(after))
+    return (
+      after.length <= before.length &&
+      after.every((value, index) => shrinkingProjection(before[index], value))
+    );
+  return Object.keys(after).every(
+    (key) =>
+      Object.hasOwn(before, key) &&
+      shrinkingProjection(before[key], after[key]),
+  );
 }
 const documentCapacity = new WeakMap();
 function canonicalCapacity(before, after, sizes, opaque) {
   const added = {};
   let scan = opaque;
   for (const [key, value] of Object.entries(after)) {
-    if (!Object.hasOwn(before, key)) Object.defineProperty(added, key, {value, enumerable: true});
+    if (!Object.hasOwn(before, key))
+      Object.defineProperty(added, key, { value, enumerable: true });
     else if (!shrinkingProjection(before[key], value)) scan = true;
   }
   const addition = measureContent(added);
   if (addition.resourceCount) scan = true;
-  const overhead = count => 2 + Math.max(0, count - 1);
-  const addedCount = Object.keys(added).length, beforeCount = Object.keys(before).length, afterCount = Object.keys(after).length;
+  const overhead = (count) => 2 + Math.max(0, count - 1);
+  const addedCount = Object.keys(added).length,
+    beforeCount = Object.keys(before).length,
+    afterCount = Object.keys(after).length;
   const payload = addition.structureBytes - overhead(addedCount);
   const separators = overhead(afterCount) - overhead(beforeCount);
-  const prettyOverhead = count => overhead(count) + (count ? 4 * count + 1 : 0);
-  const upper = {...sizes, structureBytes: sizes.structureBytes + payload + separators, jsonBytes: sizes.jsonBytes + payload + separators,
-    prettyJsonBytes: sizes.prettyJsonBytes + addition.prettyJsonBytes - prettyOverhead(addedCount) + prettyOverhead(afterCount) - prettyOverhead(beforeCount)};
-  let result,maximumDepth=Math.max(contentMeasurementDepth(sizes) ?? 64,contentMeasurementDepth(addition) ?? 64);
-  if (scan) {result = assertContent(after);maximumDepth=contentMeasurementDepth(result);}
-  else {
-    try { result = assertContentSizes(upper); }
-    catch (error) { if (!(error instanceof CapacityError)) throw error; result = assertContent(after);maximumDepth=contentMeasurementDepth(result); }
+  const prettyOverhead = (count) =>
+    overhead(count) + (count ? 4 * count + 1 : 0);
+  const upper = {
+    ...sizes,
+    structureBytes: sizes.structureBytes + payload + separators,
+    jsonBytes: sizes.jsonBytes + payload + separators,
+    prettyJsonBytes:
+      sizes.prettyJsonBytes +
+      addition.prettyJsonBytes -
+      prettyOverhead(addedCount) +
+      prettyOverhead(afterCount) -
+      prettyOverhead(beforeCount),
+  };
+  let result,
+    maximumDepth = Math.max(
+      contentMeasurementDepth(sizes) ?? 64,
+      contentMeasurementDepth(addition) ?? 64,
+    );
+  if (scan) {
+    result = assertContent(after);
+    maximumDepth = contentMeasurementDepth(result);
+  } else {
+    try {
+      result = assertContentSizes(upper);
+    } catch (error) {
+      if (!(error instanceof CapacityError)) throw error;
+      result = assertContent(after);
+      maximumDepth = contentMeasurementDepth(result);
+    }
   }
-  documentCapacity.set(after, {before: sizes, upper: result, maximumDepth});
+  documentCapacity.set(after, { before: sizes, upper: result, maximumDepth });
 }
 
 export function validateDocument(value) {
@@ -1076,6 +1165,11 @@ function validateComponents(input) {
       object(item.schema, "component.schema");
     if (item.inline !== undefined) {
       object(item.inline, "component.inline");
+      if (
+        item.inline.protocol !== undefined &&
+        (!Number.isInteger(item.inline.protocol) || item.inline.protocol < 1)
+      )
+        throw new Error("Invalid component inline protocol version.");
       string(
         item.inline.script,
         "component.inline.script",
@@ -1300,15 +1394,21 @@ export function parseArtifact(input) {
 }
 
 export function parseArtifactConsumingDocument(input) {
-  return parseArtifactDocument(input, value => validateDocumentValue(value, false));
+  return parseArtifactDocument(input, (value) =>
+    validateDocumentValue(value, false),
+  );
 }
 
 export function parseArtifactWithValidatedDocument(input, heldDocument) {
-  return parseArtifactDocument(input, document => {
-    if (document !== heldDocument)
-      throw new Error("Artifact document is not the actual registered body.");
-    return heldDocument;
-  },heldDocument);
+  return parseArtifactDocument(
+    input,
+    (document) => {
+      if (document !== heldDocument)
+        throw new Error("Artifact document is not the actual registered body.");
+      return heldDocument;
+    },
+    heldDocument,
+  );
 }
 
 export function serializeArtifact(

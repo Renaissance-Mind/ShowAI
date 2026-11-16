@@ -45,9 +45,23 @@ The steps below follow what recent additions such as `scene-3d` and `roadmap` to
 12. **Runtime dependencies.** A new npm dependency used at runtime goes into `package.json`, the copy list in `scripts/package-runtime.mjs`, the runtime and SDK import allowlists in `compilePackage` in `src/core/catalog.ts`, and its license text into `resources/licenses/`. New icons are exported from `src/ui/icons.ts`.
 13. **Agent guidance.** Describe when to choose the component in the “组件与素材” paragraph of `resources/templates/system-presentation/guides/04-design.md`. Then run `npm run package:plugin`, which embeds that guide in the `show-document` Skill and regenerates the Codex, Claude Code and Kimi copies of the Skills. See [Revising the system workflow](contributing-templates.md#revising-the-system-workflow).
 
+## Component runtime contracts
+
+Built-in metadata and custom manifests share `contract` version 1. `src/contract/component-contract.mjs` defines its schema, validation, object discovery and legacy normalization. `catalog describe ID --view contract` reports the declaration and capabilities; `--page PAGE --block BLOCK` selects the actual instance, and `--object-offset` / `--object-limit` page its identities. Agents read the same contract through `catalog_describe`. The component guide returns `input.runtimeContractSchema`; host support is in `showai_capabilities.componentRuntime`.
+
+A declaration can define entities (JSON-pointer collections, stable IDs and scopes), events (typed notification or request), local actions (input/output schemas and content/view effects), rich-text content slots, references into those slots, versioned reading state and required host capabilities. `*` traverses one path segment. Components without declarations retain legacy adapters; a clickable element does not imply an exported event.
+
+New implementations receive `runtime`, or import `useComponentRuntime`, `useComponentAction` and `ComponentContent` from `showai:components`. Events return acknowledged `handled`, `unhandled`, `unavailable` or `failed` receipts. A handled data update is accepted by the host; a Page save's hash/revision remains the persistence receipt. `runtime.dataState` reports field permissions. Reader state is private to the reader and versioned separately from content. Actions run in their own component instance; a parent explicitly handles cross-component events.
+
+Only declared slots enter document traversal, dependency collection and ID remapping. Use a slot's `accepts` to name native widget renderers included in a custom package; custom widget children additionally need exact `manifest.dependencies`. Ordinary business JSON is not content even if it resembles a document. References name a slot and optional common path scope; missing or ambiguous targets fail. Keep business relationships in the existing parameter relation rules. The document layer must not inspect a component's kind or private data shape to repair its references.
+
+The workbench, sandbox and inline adapters use the same host-operation validation. Inline content slots reuse the host reader; sandbox packages bundle their reader. If a complete transport exceeds the preview budget, inline delivery may project out unused sandbox HTML and marks those packages `presentationOnly`; it never alters stored packages, and projections cannot be imported as catalog packages. Existing callbacks, page-outline roles and database-field contributions remain compatible adapters. A new privileged host service still requires a supported, versioned platform capability.
+
+For a new capability, test compilation and actual interaction in both execution modes, current instance discovery, read-only handling, default/unhandled behavior, object removal, scoped copies and template insertion, opaque business JSON, exports and old immutable packages. Keep the contract and its public types, guide, SDK exports and host checks together.
+
 ## Composing reading interactions
 
-A container can bind a child's reading actions with `ComponentInteractions` from `showai:components`. A target is `{type, scope, id}`: Flowchart uses `type: "node"`, `scope: flow.id`, `id: node.id`; LayerDiagram uses `type: "module"`, `scope: layer.id`, `id: module.id`. The identity does not depend on labels, layout or DOM selectors.
+Legacy SDK composition can bind a child's reading actions with `ComponentInteractions` from `showai:components`. A target is `{type, scope, id}`: Flowchart uses `type: "node"`, `scope: flow.id`, `id: node.id`; LayerDiagram uses `type: "module"`, `scope: layer.id`, `id: module.id`. The identity does not depend on labels, layout or DOM selectors.
 
 ```jsx
 <ComponentInteractions

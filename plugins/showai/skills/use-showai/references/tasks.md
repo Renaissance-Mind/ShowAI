@@ -18,6 +18,7 @@
 | 用户粘贴或附带 ShowAI 引用、组件状态 | 按 [用户引用与组件状态](user-references.md)核对版本、按 ID 读取，再进入对应任务 |
 | 阅读数据、长页局部 | 默认 structured；先 `detail:"outline"` 获取节点 ID，再用 `blockIds` 取局部；纯源读取用 `rendered:false` |
 | 理解 Board、从裁切图定位 Page 或对象 | `board_read` 默认图像包 → 同一 snapshotId 的 tile/region/element/source；Page 完整源用 `page_read` 的 snapshotId/blockIds；见 [Board 与 Page 阅读](page-reading.md) |
+| 只查询组件的对象、事件、动作或宿主能力 | 读 `showai_capabilities.componentRuntime`，再用 `catalog_describe({projectId,id,scope,version,integrity,view:"contract"})` 查询精确版本；`instance:{pageId,blockId}` 枚举实际实例对象，`objectOffset/objectLimit` 分页。没有声明的包标为 legacy，不推断点击事件；保持只读，不为查询创建项目或修改组件 |
 | 查看布局或操作效果 | `page_read` 的 image / html；读取 [阅读视图](page-reading.md)，遵循宿主实际 UI 操控规则 |
 | 在对话中直接展示 1–5 个组件 | [show-visual](../../show-visual/SKILL.md)，不建项目、不保存 |
 | 创建、修改、展示、导出作品，或应用模板 | [show-document](../../show-document/SKILL.md) |

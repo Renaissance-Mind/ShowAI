@@ -74,6 +74,16 @@ import editableSource from "../datasets/editable.mjs?raw";
 import sdk from "../components/blocks/sdk.tsx?raw";
 import actionHost from "../components/blocks/action-host.tsx?raw";
 import componentInteractions from "../components/blocks/component-interactions.tsx?raw";
+import componentContentSource from "../components/blocks/component-content.tsx?raw";
+import componentDefinitionSource from "../document/component-definition.mjs?raw";
+import builtinComponentDefinitionsSource from "../document/builtin-component-contracts.mjs?raw";
+import componentEditabilitySource from "../lib/component-editability.mjs?raw";
+import componentRuntimeReact from "../components/blocks/component-runtime.tsx?raw";
+import componentRuntime from "../contract/component-runtime.mjs?raw";
+import componentContextSource from "../contract/component-context.mjs?raw";
+import componentContractSource from "../contract/component-contract.mjs?raw";
+import builtinContractsSource from "../contract/builtin-contracts.mjs?raw";
+import componentStructureSource from "../document/component-structure.mjs?raw";
 import manualEditing from "../components/blocks/manual-editing.ts?raw";
 import gestureBoundary from "../components/blocks/GestureBoundary.tsx?raw";
 import viewportLock from "../components/blocks/ViewportLock.tsx?raw";
@@ -324,9 +334,19 @@ const sources: Record<string, string> = {
   "page-references.tsx": pageReferencesSource,
   "custom/local-media-link.ts": localMediaLinkSource,
   "editable.mjs": editableSource,
+  "document/component-definition.mjs": componentDefinitionSource,
+  "document/builtin-component-contracts.mjs": builtinComponentDefinitionsSource,
+  "lib/component-editability.mjs": componentEditabilitySource,
   "sdk.tsx": sdk,
   "action-host.tsx": actionHost,
   "component-interactions.tsx": componentInteractions,
+  "component-runtime.tsx": componentRuntimeReact,
+  "component-content.tsx": componentContentSource,
+  "contract/component-runtime.mjs": componentRuntime,
+  "contract/component-context.mjs": componentContextSource,
+  "contract/component-contract.mjs": componentContractSource,
+  "contract/builtin-contracts.mjs": builtinContractsSource,
+  "document/component-structure.mjs": componentStructureSource,
   "manual-editing.ts": manualEditing,
   "GestureBoundary.tsx": gestureBoundary,
   "ViewportLock.tsx": viewportLock,
@@ -499,6 +519,14 @@ export const builtinSources: Record<string, string> = Object.fromEntries(
       .replaceAll('"../portable/capacity.mjs"', '"./capacity.mjs"')
       // Harness modules (src/datasets) sit beside the blocks in the SDK.
       .replaceAll('"../../datasets/', '"./')
+      .replace(
+        /(["'])(?:\.\.\/)+lib\//g,
+        `$1${"../".repeat(name.split("/").length - 1) || "./"}lib/`,
+      )
+      .replace(
+        /(["'])(?:\.\.\/)+contract\//g,
+        `$1${"../".repeat(name.split("/").length - 1) || "./"}contract/`,
+      )
       .replaceAll('"../portable/owned-json.mjs"', '"./owned-json.mjs"')
       // Document format modules (src/document) sit in document/ of the SDK.
       .replace(

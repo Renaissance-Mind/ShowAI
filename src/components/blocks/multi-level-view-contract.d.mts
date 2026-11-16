@@ -9,7 +9,12 @@ export interface MultiLevelView {
   label: string;
   content?: { type: "doc"; content: import("@tiptap/core").JSONContent[] };
   component?: { kind: string; props: Record<string, unknown> };
-  bindings: { blockId?: string; source: MultiLevelTarget; to: string }[];
+  bindings: {
+    event?: string;
+    blockId?: string;
+    source: MultiLevelTarget;
+    to: string;
+  }[];
 }
 export interface MultiLevelViewData extends Record<string, unknown> {
   title: string;
@@ -29,9 +34,7 @@ export declare function multiLevelContent(level: MultiLevelView): {
   type: "doc";
   content: import("@tiptap/core").JSONContent[];
 };
-export declare function multiLevelWidgets(
-  level: MultiLevelView,
-): {
+export declare function multiLevelWidgets(level: MultiLevelView): {
   type: string;
   attrs: { id: string; kind: string; data: Record<string, unknown> };
 }[];

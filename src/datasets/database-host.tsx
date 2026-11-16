@@ -10,14 +10,12 @@ import {
   type FieldTypeListing,
 } from "../components/blocks/database-host";
 import { injectComponentBootstrap } from "../contract/contract";
+import { replyComponentRequest } from "../contract/component-host";
 import {
   componentSandboxPolicy,
   withoutPackagePolicies,
 } from "../contract/sandbox-policy.mjs";
-import type {
-  CompiledComponent,
-  ComponentListing,
-} from "../contract/types";
+import type { CompiledComponent, ComponentListing } from "../contract/types";
 import { appearanceTokens, installSandboxTheme } from "../design/sandbox-theme";
 import { useAppearanceTheme } from "../design/useAppearanceTheme";
 import { recordTable, type RecordTable } from "./derived-fields.mjs";
@@ -41,7 +39,12 @@ function fieldFrame(
   component: CompiledComponent,
   channel: string,
   props: Record<string, unknown>,
-  options: { readOnly: boolean; field?: unknown; theme: string },
+  options: {
+    readOnly: boolean;
+    field?: unknown;
+    theme: string;
+    runtimeCapabilities?: Record<string, number>;
+  },
 ) {
   return (
     `<!doctype html><meta http-equiv="Content-Security-Policy" content="${componentSandboxPolicy}">` +
@@ -164,6 +167,7 @@ function FieldEditorFrame({
         {
           readOnly: !onValue,
           field: { value, column },
+          runtimeCapabilities: { data: 1, databaseField: 1 },
           theme,
         },
       ),
@@ -181,6 +185,28 @@ function FieldEditorFrame({
       if (
         event.source !== frame.current?.contentWindow ||
         event.data?.channel !== channel
+      )
+        return;
+      const current = latest.current;
+      if (
+        replyComponentRequest(event, frame.current?.contentWindow, channel, {
+          contract: component.contract ?? { version: 1 },
+          data:
+            (current.column as { config?: Record<string, unknown> }).config ??
+            component.defaultData,
+          services: {
+            "field.set": current.onValue
+              ? (value) => {
+                  current.onValue!(value);
+                  return { status: "handled" };
+                }
+              : undefined,
+            "field.close": () => {
+              current.onClose();
+              return { status: "handled" };
+            },
+          },
+        })
       )
         return;
       if (event.data.type === "showai:height")

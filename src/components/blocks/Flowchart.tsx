@@ -51,7 +51,7 @@ import "@xyflow/react/dist/style.css";
 import "./flowchart.css";
 import { isRecord, isText, useReaderState } from "../../surface/reader-state";
 import {
-  useComponentInteractions,
+  useComponentEvents,
   type ComponentTarget,
 } from "./component-interactions";
 
@@ -256,7 +256,7 @@ function stageTone(stage: Stage): StageState | undefined {
 
 const NodeViewContext = createContext<Map<string, NodeView>>(new Map());
 function DiagramCard({ id, data, selected }: NodeProps<DiagramNode>) {
-  const interactions = useComponentInteractions();
+  const interactions = useComponentEvents();
   const t = useTranslator(messages);
   const view = useContext(NodeViewContext).get(id);
   const horizontal = data.direction === "LR";
@@ -678,7 +678,7 @@ function FlowCanvas({
   view: PlaybackView;
 }) {
   const t = useTranslator(messages);
-  const interactions = useComponentInteractions();
+  const interactions = useComponentEvents();
   const target = (id: string) => ({ type: "node", scope: flow.id, id });
   const explorableNodes = flow.nodes.filter(
     (node) => explorable(node) || interactions.canActivate(target(node.id)),
@@ -1065,7 +1065,7 @@ function PlaybackOutline({ flow }: { flow: Flow }) {
 // A display component: readers explore it, while its content and layout come
 // only from the saved data, so nothing here calls onChange.
 export function FlowchartBlock({ data: raw }: BlockProps) {
-  const interactions = useComponentInteractions();
+  const interactions = useComponentEvents();
   const instanceId = useId();
   const t = useTranslator(messages);
   const lock = useViewportLock("flowchart");

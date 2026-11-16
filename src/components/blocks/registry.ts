@@ -10,6 +10,8 @@ import {
   validatePrimitiveData,
 } from "./Primitives";
 import { createElement, lazy } from "react";
+import { builtinContracts } from "../../contract/builtin-contracts.mjs";
+import { validateComponentContract } from "../../contract/component-contract.mjs";
 import primitiveMetadata from "../../../resources/catalog/primitives.json";
 import componentMetadata from "../../../resources/catalog/components.json";
 import { BookmarkBlock } from "./Bookmark";
@@ -187,6 +189,9 @@ export function registerBlock(
         }
       : { ...input };
   if (!definition.title.trim()) throw new Error("Block title is required.");
+  definition.contract = validateComponentContract(
+    input.contract ?? builtinContracts[input.kind] ?? { version: 1 },
+  );
   definition.defaultData = cloneBlockData(definition.defaultData);
   definition.validate?.(definition.defaultData);
   allBlockDefinitions.push(definition);

@@ -14,6 +14,7 @@ import {
 import { createResource } from "../document/containers.mjs";
 import { buildPageHtml } from "../agent/exporter";
 import { toInlineFragment } from "./inline.mjs";
+import { restoreArtifact } from "./artifact-transport.mjs";
 it("renders a packed reader with an actual compiled component inside an opaque offline host", async () => {
   const home = await mkdtemp(join(tmpdir(), "showai-inline-packed-"));
   const store = new FileStore(home),
@@ -47,7 +48,10 @@ it("renders a packed reader with an actual compiled component inside an opaque o
   const transport = JSON.parse(
     gunzipSync(Buffer.from(packed.data, "base64")).toString(),
   );
-  const data = JSON.parse(transport.artifact);
+  const data = restoreArtifact({
+    artifact: JSON.parse(transport.artifact),
+    html: transport.html,
+  });
   expect(data.version).toBe(3);
   expect(data.document.content.attrs.kind).toBe("page");
   expect(data.components[0].html).toBe(component.html);

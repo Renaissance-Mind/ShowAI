@@ -8,16 +8,12 @@ import {
   type ReactNode,
 } from "react";
 import type { BlockProps } from "./types";
-import {
-  ComponentInteractions,
-  type ComponentTarget,
-} from "./component-interactions";
+import { ComponentEventBoundary } from "./component-interactions";
 import {
   multiLevelPath,
   multiLevelContent,
   multiLevelBindingBlock,
   type MultiLevelView,
-  sameMultiLevelTarget,
   validateMultiLevelViewData,
 } from "./multi-level-view-contract.mjs";
 import {
@@ -51,17 +47,19 @@ function LevelContent({
     const bindings = level.bindings.filter(
       (binding) => multiLevelBindingBlock(level, binding) === blockId,
     );
-    const targets = bindings.map((binding) => binding.source);
-    const activate = (target: ComponentTarget) => {
-      const binding = bindings.find((binding) =>
-        sameMultiLevelTarget(binding.source, target),
-      );
-      if (binding) choose(binding.to);
-    };
     return (
-      <ComponentInteractions targets={targets} onActivate={activate}>
+      <ComponentEventBoundary
+        bindings={bindings.map((binding) => ({
+          event: binding.event ?? "activate",
+          target: binding.source,
+          handle: () => {
+            choose(binding.to);
+            return { status: "handled" };
+          },
+        }))}
+      >
         {renderWidget({ kind, data, readOnly: true, inline })}
-      </ComponentInteractions>
+      </ComponentEventBoundary>
     );
   };
   return (

@@ -2,6 +2,11 @@ import { defineMessages } from "../index";
 
 export default defineMessages("customComponents", {
   "zh-CN": {
+    requiredCapability: "此位置不支持组件需要的能力：{capability}",
+    inlineProtocol:
+      "此组件需要 inline 协议 {version}，请更新阅读器或使用完整离线页面。",
+    inlineProjection:
+      "这份组件预览只能在对话阅读器中显示；请使用完整组件包打开独立页面。",
     notInstalledError: "组件尚未安装。",
     ambiguousVersion: "组件 {component} 有多个不同内容版本，请指定完整性指纹。",
     invalidJson: "JSON 格式不正确。",
@@ -39,6 +44,11 @@ export default defineMessages("customComponents", {
     "media.reveal": "在文件夹中显示",
   },
   en: {
+    requiredCapability: "This position does not support the required capability: {capability}",
+    inlineProtocol:
+      "This component requires inline protocol {version}. Update the reader or use the complete offline page.",
+    inlineProjection:
+      "This component preview requires the conversation reader. Use the complete component package for a standalone page.",
     notInstalledError: "This component isn't installed.",
     ambiguousVersion:
       "Component {component} has several versions with different content. Specify its integrity fingerprint.",

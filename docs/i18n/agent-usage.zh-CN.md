@@ -151,3 +151,10 @@ Codex 插件声明 `SHOWAI_HOST_DISPLAY=mcp-app`。`show_component` 的 `deliver
 保留回执 live.viewId、live.revision 和 blocks[].id。后续 `show_component_update({viewId,operationId,baseRevision,operations,complete?})` 沿用 page_apply 的稳定节点操作。每批应形成合法组件数据，相关字段一起更新；无效批次保留旧内容与版本。最近一次完全相同的请求可重试；CONFLICT 时先读回当前内容并比较，不盲目替换基线。最后带 complete:true，可用空 operations 结束，完成后只读。
 
 `show_component_read({viewId,source:true})` 返回最新完整 artifact，按正常项目流程保存 document 和 components；若返回 componentSources，先用 component_save 保存这些包，再引用回执的精确版本，以保留可编辑源码。阅读探索状态单独处理。`show_component_close({viewId})` 只释放临时显示区。阅读器自行读取新版本并更新已挂载组件，不启动模型回合。一次性调用、正式页面和导出格式保持兼容；HTTP、图片、compact 和 fragment-file 沿用完整结果交付。
+
+
+## 组件能力与组合
+
+绑定内部对象前，先读 showai_capabilities.componentRuntime，再以 catalog_describe view:"contract" 查询精确组件版本。返回的是编译器与阅读器共用的契约；没有声明的包标为 legacy，不根据可点击画面推断事件能力。传 instance:{pageId,blockId} 枚举页面实际对象，objectOffset/objectLimit 分页，共享数据也会先解析。
+
+CLI 使用 showai catalog describe ID --view contract --project PROJECT --page PAGE --block BLOCK --json。没有 instance 时对象来自 defaultData，不代表当前页面。新组件提供 contract version 1；声明对象、事件、子内容与动作前，读取 guide component 的 input.runtimeContractSchema 和 create-component Skill。数据仍通过已有 Page 操作编辑，保持业务 ID 稳定；内容块引用沿声明更新。组件版本保持不可变；升级事件契约时，必要的父级绑定修改应放在同一页面变更中。旧组件和页面保留原编译包，通过兼容入口运行。

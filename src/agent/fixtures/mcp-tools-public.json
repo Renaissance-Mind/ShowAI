@@ -144,6 +144,7 @@
             "guide",
             "development",
             "parameters",
+            "contract",
             "schema",
             "examples",
             "source",
@@ -165,6 +166,16 @@
           "type": "integer",
           "minimum": 1,
           "maximum": 50
+        },
+        "objectOffset": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "objectLimit": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 500
         },
         "knownHash": {
           "type": "string",

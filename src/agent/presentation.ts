@@ -127,6 +127,8 @@ export async function describePublicResource(
     parameterPath?: string;
     parameterOffset?: number;
     parameterLimit?: number;
+    objectOffset?: number;
+    objectLimit?: number;
     knownHash?: string;
     version?: string;
     integrity?: string;
@@ -192,6 +194,8 @@ export async function describePublicResource(
     parameterPath: input.parameterPath,
     parameterOffset: input.parameterOffset,
     parameterLimit: input.parameterLimit,
+    objectOffset: input.objectOffset,
+    objectLimit: input.objectLimit,
     knownHash: input.knownHash,
   });
 }

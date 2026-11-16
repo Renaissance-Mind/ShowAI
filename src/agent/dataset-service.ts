@@ -28,7 +28,11 @@ import { applyOperations } from "../core/diff";
 import { CoreError } from "../core/model";
 import type { FileStore } from "../core/store";
 import type { PageOperation, ShowDocument, JSONContent } from "../core/model";
-import { getComponent, lockDocumentComponents } from "../core/catalog";
+import {
+  getComponent,
+  lockDocumentComponents,
+  prepareComponentOperations,
+} from "../core/catalog";
 import { readCustomBlockData } from "../contract/contract";
 import { propsIssues, type PropsIssue } from "../contract/schema";
 import { canonicalJson } from "../core/canonical";
@@ -478,6 +482,27 @@ export class DatasetService {
     commit: () => Promise<void>;
     notes: ComponentRefNotes;
   }> {
+    if (
+      operations.some((operation) =>
+        [
+          "component.insert",
+          "block.insert",
+          "block.replace",
+          "component.props.set",
+          "block.attrs.set",
+          "component.ref.set",
+        ].includes(operation?.type),
+      )
+    ) {
+      const prepared = await prepareComponentOperations(
+        this.store.root,
+        document,
+        operations,
+        projectId,
+      );
+      document = prepared.document;
+      operations = prepared.operations;
+    }
     const bindingOps = (operation: PageOperation) =>
       operation?.type === "component.binding.set" ||
       operation?.type === "component.binding.remove" ||

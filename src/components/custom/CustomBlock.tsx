@@ -30,11 +30,20 @@ import {
   readViewportLock,
   writeViewportLock,
 } from "../blocks/ViewportLock";
-import { injectComponentBootstrap, readCustomBlockData } from "../../contract/contract";
+import {
+  injectComponentBootstrap,
+  readCustomBlockData,
+} from "../../contract/contract";
 import type { CompiledComponent } from "../../contract/types";
 import { InlineComponent } from "./InlineComponent";
 import { useComponentInteractions } from "../blocks/component-interactions";
 import { componentActivationIssue } from "../../contract/component-activation.mjs";
+import {
+  replyComponentRequest,
+  contractPayloadIssue,
+} from "../../contract/component-host";
+import { componentContract } from "../../contract/component-contract.mjs";
+import { propsIssues } from "../../contract/schema";
 import { findComponent, indexComponents } from "./component-index";
 import { installComponentLinks, openComponentLink } from "./external-links";
 import { openComponentMedia } from "./LocalMediaViewer";
@@ -72,7 +81,7 @@ import {
   repeatsRuntimeError,
   type FrameRuntimeError,
 } from "./frame-errors";
-import { readableValidation } from "./validation-messages";
+import { readableValidation, missingComponentCapability } from "./validation-messages";
 import "./custom.css";
 
 const ComponentsContext = createContext<ReadonlyMap<string, CompiledComponent>>(
@@ -174,12 +183,23 @@ export function frameDataState(
 }
 
 export function CustomBlock({ data, onChange, readOnly, inline }: BlockProps) {
+  const t = useTranslator(messages);
   const parsed = readCustomBlockData(data);
   const components = useContext(ComponentsContext);
   const inlineHost = useContext(InlineHostContext);
   const component = findComponent(components, parsed);
   const assistant = useContext(AssistantContext);
   const reference = `${parsed.componentId}@${parsed.version}`;
+  if (component?.presentationOnly && !inlineHost)
+    return (
+      <ComponentStatus
+        state="missing"
+        name={component.name}
+        reference={reference}
+        error={t("inlineProjection")}
+        readOnly
+      />
+    );
   return component && inlineHost ? (
     <InlineComponent
       key={component.integrity}
@@ -264,20 +284,28 @@ function SandboxComponent({
     assistant,
     dataState,
   });
+  const readerScope = useReaderStateScope();
   const initial = useRef({
     props: parsed.props,
     activationTargets: interactions.targets,
     readOnly: !!readOnly || !onChange,
     dataState,
+    runtimeCapabilities: {
+      ...componentContract(component).capabilities,
+      pageOutline: 0,
+      databaseField: 0,
+      events: 1,
+      conversation: assistant ? 1 : 0,
+      view: readerScope?.block ? 1 : 0,
+    },
   });
-  const readerScope = useReaderStateScope();
   const readerView = useRef({
     scope: readerScope,
-    slot: `component:${parsed.componentId}`,
+    slot: `component:${parsed.componentId}${component.contract?.view ? `:view:${component.contract.view.version}` : ""}`,
   });
   readerView.current = {
     scope: readerScope,
-    slot: `component:${parsed.componentId}`,
+    slot: `component:${parsed.componentId}${component.contract?.view ? `:view:${component.contract.view.version}` : ""}`,
   };
   latest.current = { data, parsed, onChange, readOnly, assistant, dataState };
   const basisContext = useContext(BindingBasisContext);
@@ -372,7 +400,13 @@ function SandboxComponent({
     const value = scope.store.read(scope.page, scope.block, slot);
     return {
       view: true,
-      viewState: componentViewStateIssue(value) ? undefined : value,
+      viewState:
+        componentViewStateIssue(value) ||
+        (component.contract?.view &&
+          value !== undefined &&
+          contractPayloadIssue(component.contract, "view", "state", value))
+          ? undefined
+          : value,
     };
   }
   const sendProps = () => {
@@ -415,6 +449,66 @@ function SandboxComponent({
         event.source !== iframe.current?.contentWindow ||
         !event.data ||
         event.data.channel !== channel
+      )
+        return;
+      const requestState = latest.current;
+      if (
+        replyComponentRequest(event, iframe.current?.contentWindow, channel, {
+          contract: component.contract ?? { version: 1 },
+          data: requestState.parsed.props,
+          gesture:
+            !navigator.userActivation || navigator.userActivation.isActive,
+          services: {
+            "event.emit": (input) =>
+              activation.current.emit(input.name, input.target, input.payload),
+            "data.update":
+              !requestState.readOnly && requestState.onChange
+                ? (value) => {
+                    const issues = propsIssues(
+                      component.schema,
+                      value,
+                      component.documentation,
+                    );
+                    if (issues.length) throw new Error(JSON.stringify(issues));
+                    requestState.onChange!({
+                      ...requestState.data,
+                      props: value,
+                    });
+                    return { status: "handled" };
+                  }
+                : undefined,
+            "view.set": (value) => {
+              const { scope, slot } = readerView.current;
+              if (!scope?.block) return { status: "unavailable" };
+              scope.store.write(scope.page, scope.block, slot, value);
+              return { status: "handled" };
+            },
+            "navigation.open": (value) => {
+              const target = navigationTarget(value);
+              if (!target) throw new Error("Invalid navigation target");
+              return {
+                status: requestNavigation(iframe.current!, target)
+                  ? "handled"
+                  : "unhandled",
+              };
+            },
+            "conversation.submit": requestState.assistant
+              ? (snapshot) => {
+                  const issue = componentContextIssue(snapshot);
+                  if (issue) throw new Error(issue);
+                  const id = blockId();
+                  if (!id) return { status: "unavailable" };
+                  requestState.assistant!.componentContext({
+                    ...snapshot,
+                    blockId: id,
+                    componentId: requestState.parsed.componentId,
+                    name: component.name,
+                  });
+                  return { status: "handled" };
+                }
+              : undefined,
+          },
+        })
       )
         return;
       if (event.data.type === "showai:ready") {
@@ -767,6 +861,7 @@ function SandboxComponent({
   }, [theme, channel]);
 
   const blank = !!(crash || error) && (measured === null || measured <= 4);
+  const missingCapability = missingComponentCapability(crash?.message ?? error);
   const starting = measured === null && !crash && !error;
   if (inline)
     return (
@@ -902,7 +997,9 @@ function SandboxComponent({
           error={crash?.message ?? error}
           stack={crash?.stack}
           cause={
-            crash?.kind === "rejection" ? tw("status.rejectionCause") : undefined
+            missingCapability
+              ? t("requiredCapability", { capability: missingCapability })
+              : crash?.kind === "rejection" ? tw("status.rejectionCause") : undefined
           }
           issues={crash ? [] : readableValidation(error)}
           data={parsed.props}

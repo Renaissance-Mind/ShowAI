@@ -2500,6 +2500,7 @@ test("catalog search indexes descriptive examples while returning only summaries
       "guide",
       "development",
       "parameters",
+      "contract",
       "schema",
       "examples",
       "dependencies",

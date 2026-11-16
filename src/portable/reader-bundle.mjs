@@ -1,3 +1,4 @@
+import { legacyEmbeddedKinds } from "../document/component-structure.mjs";
 import { build, version as compilerVersion } from "esbuild";
 import { rmSync } from "node:fs";
 import {
@@ -129,9 +130,12 @@ export function readerKinds(documents) {
         (node) => {
           if (node?.type === "widget" || node?.type === "inlineWidget")
             kinds.add(node.attrs?.kind);
-          if (node.type === "widget" && node.attrs?.kind === "multi-level-view")
-            for (const level of node.attrs.data?.levels ?? [])
-              if (level.component?.kind) kinds.add(level.component.kind);
+          if (node.type === "widget")
+            for (const kind of legacyEmbeddedKinds(
+              node.attrs?.kind,
+              node.attrs?.data,
+            ))
+              kinds.add(kind);
         },
         { scope: "content" },
       );
@@ -207,7 +211,9 @@ export function readerOmissions(documents) {
         (value.type === "widget" && value.attrs?.kind === "code")
       )
         code = true;
-      Object.values(value).forEach(visit);
+      Object.entries(value).forEach(([key, value]) => {
+        if (key !== "contract") visit(value);
+      });
     }
   };
   for (const document of documents) visit(document.content);
@@ -421,8 +427,8 @@ async function compileReader(archivePath, archive, kinds, omits = []) {
               'import messages from "../../i18n/messages/widget";',
               "const t = translator(messages);",
               'export const FIND_COMPONENT_EVENT = "showai:find-component";',
-              "export function ComponentStatus({ name, reference }) {",
-              '  return h("p", { role: "status", className: "sb-image-unavailable" }, t("status.unavailable", { name: name || reference }));',
+              "export function ComponentStatus({ name, reference, cause }) {",
+              '  return h("section", { role: "status", className: "sb-image-unavailable" }, h("p", null, t("status.unavailable", { name: name || reference })), cause && h("p", null, cause));',
               "}",
             ].join("\n"),
             loader: "js",
@@ -448,6 +454,7 @@ async function compileReader(archivePath, archive, kinds, omits = []) {
               "export const isValidationMessage = () => false;",
               'export const readablePath = () => "";',
               "export const readableValidation = (text) => [String(text)];",
+              "export const missingComponentCapability = message => message.match(/Required component host capability unavailable: ([A-Za-z][A-Za-z0-9]*)/)?.[1];",
             ].join("\n"),
             loader: "js",
           };

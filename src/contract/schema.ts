@@ -32,6 +32,14 @@ function validator(schema: JsonSchema) {
   }
   return validate;
 }
+export function schemaIssue(
+  schema: JsonSchema,
+  value: unknown,
+): string | undefined {
+  assertJsonValue(value);
+  const validate = validator(schema);
+  return validate(value) ? undefined : ajv.errorsText(validate.errors);
+}
 
 export interface PropsIssue {
   path: string;
@@ -156,4 +164,9 @@ export function assertParameterDefinition(
         "Fallback does not satisfy parameter schema: " + input.path,
       );
   }
+}
+
+export function assertComponentContent(value: unknown) {
+  assertJsonValue(value);
+  assertContent(value, "Component instance data", CAPACITY.componentPropsBytes);
 }

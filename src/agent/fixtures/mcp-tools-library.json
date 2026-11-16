@@ -2120,7 +2120,7 @@
   },
   {
     "name": "catalog_describe",
-    "description": "Describe a component or template. view: summary (default), guide (use contract, schema, example), parameters (paged by parameterPath/offset/limit), development, examples, dependencies, source or full. With view source, out (absolute folder) writes the component's whole package there for editing and component_save directory.",
+    "description": "Describe component/template. contract: objects. source+out: editable package.",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -2158,12 +2158,41 @@
             "guide",
             "development",
             "parameters",
+            "contract",
             "schema",
             "examples",
             "source",
             "dependencies",
             "full"
           ]
+        },
+        "instance": {
+          "type": "object",
+          "properties": {
+            "pageId": {
+              "type": "string",
+              "minLength": 1
+            },
+            "blockId": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [
+            "pageId",
+            "blockId"
+          ],
+          "additionalProperties": false
+        },
+        "objectOffset": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "objectLimit": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 500
         },
         "parameterPath": {
           "type": "string",
@@ -3398,6 +3427,7 @@
             "guide",
             "development",
             "parameters",
+            "contract",
             "schema",
             "examples",
             "source",
@@ -3419,6 +3449,16 @@
           "type": "integer",
           "minimum": 1,
           "maximum": 50
+        },
+        "objectOffset": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "objectLimit": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 500
         },
         "knownHash": {
           "type": "string",

@@ -1,4 +1,17 @@
 import { componentActivationIssue } from "../contract/component-activation.mjs";
+import {
+  validateComponentContract,
+  validateComponentContractData,
+} from "../contract/component-contract.mjs";
+import type { ComponentContract } from "../contract/component-contract.mjs";
+import {
+  componentContentDocuments,
+  legacyEmbeddedKinds,
+} from "../document/component-structure.mjs";
+import { nodeComponentContract } from "../document/component-structure.mjs";
+import { componentInputNode } from "../document/component-input.mjs";
+import { CoreError } from "./model";
+import { primitiveNodeTypes } from "../document/rich-text.mjs";
 import conversationFit from "../../resources/catalog/inline-readiness.json";
 import type { InlineReadiness } from "../contract/types";
 import { resolveDocumentDatasets } from "./dataset-resolution";
@@ -24,8 +37,6 @@ import {
   upgradeDocument,
 } from "../document/document.mjs";
 import { walk } from "../document/walk.mjs";
-import type { JSONContent } from "@tiptap/core";
-import type { MultiLevelViewData } from "../components/blocks/multi-level-view-contract.mjs";
 import { createHash, randomUUID } from "node:crypto";
 import {
   componentAuthoringIndex,
@@ -84,8 +95,9 @@ import {
   diagramTemplates,
   type DiagramFamily,
 } from "../components/blocks/diagrams/contract.mjs";
-import { validateDocument } from "../portable/validation.mjs";
+import { validateDocument, validateSubtree } from "../portable/validation.mjs";
 import type { ShowDocument } from "../types";
+import type { PageOperation } from "./model";
 import { canonicalJson } from "./diff";
 import {
   workspaceRoot,
@@ -189,23 +201,24 @@ export function readBuiltinComponentSource(kind: string): ComponentSource {
   const exported = builtinExports[kind];
   if (!exported) throw new Error(`No editable source for ${kind}.`);
   const renderers = new Set<string>();
-  if (kind === "multi-level-view")
+  if (item.contract?.slots?.length)
     for (const sample of [
       item.defaultData,
       ...(item.examples ?? []).map((example) => example.data),
-    ])
-      for (const level of (sample as MultiLevelViewData).levels) {
-        if (level.component) renderers.add(level.component.kind);
-        if (level.content)
-          walk(
-            level.content as JSONContent,
-            (node) => {
-              if (node.type === "widget" || node.type === "inlineWidget")
-                renderers.add(node.attrs!.kind);
-            },
-            { scope: "tree" },
-          );
+    ]) {
+      for (const embedded of legacyEmbeddedKinds(kind, sample))
+        renderers.add(embedded);
+      for (const content of componentContentDocuments(sample, item.contract)) {
+        walk(
+          content,
+          (node) => {
+            if (node.type === "widget" || node.type === "inlineWidget")
+              renderers.add(node.attrs!.kind);
+          },
+          { scope: "tree" },
+        );
       }
+    }
   const children = [...renderers].map((child) => {
     const name = builtinExports[child];
     if (!name) throw new Error(`No editable renderer for ${child}.`);
@@ -231,6 +244,7 @@ export default function Component({ data, onChange, readOnly }) {
 `;
   return {
     manifest: {
+      ...(item.contract ? { contract: item.contract } : {}),
       id: kind,
       name: item.name,
       version: item.version ?? "1.0.0",
@@ -1432,6 +1446,9 @@ function manifestFrom(value: unknown): ComponentManifest {
   return {
     id,
     version,
+    ...(item.contract !== undefined
+      ? { contract: validateComponentContract(item.contract) }
+      : {}),
     name: (item.name as string).trim(),
     description: item.description as string,
     ...(item.category !== undefined
@@ -1590,11 +1607,84 @@ function compiledIntegrity(
   );
 }
 
+function componentContractValidatorSource(
+  ajv: Ajv,
+  definition?: ComponentContract,
+): string {
+  const contract = definition
+    ? validateComponentContract(definition)
+    : { version: 1 as const };
+  const entries: [string, JsonSchema][] = [];
+  for (const event of contract.events ?? [])
+    entries.push([`event:${event.name}`, event.payload ?? true]);
+  for (const action of contract.actions ?? []) {
+    entries.push(
+      [`input:${action.name}`, action.input ?? true],
+      [`output:${action.name}`, action.output ?? true],
+    );
+  }
+  if (contract.view) entries.push(["view:state", contract.view.schema]);
+  const identity = createHash("sha256")
+    .update(JSON.stringify(contract))
+    .digest("hex");
+  const exports = Object.fromEntries(
+    entries.map(([, schema], index) => {
+      const id = `showai-contract:${identity}:${index}`;
+      if (!ajv.getSchema(id)) ajv.addSchema(schema, id);
+      return [`check${index}`, id];
+    }),
+  );
+  const sources = entries.map(
+    ([key], index) => `${JSON.stringify(key)}:check${index}`,
+  );
+  return `${standaloneCode(ajv, exports)}\nexport const contract=${JSON.stringify(contract)};const validators={${sources.join(",")}};export function checkContract(kind,name,value){const validate=validators[kind+':'+name];return !validate||validate(value)?undefined:JSON.stringify(validate.errors);}`;
+}
+function contentRendererSource(manifest: ComponentManifest): string {
+  const kinds = new Set(
+    (manifest.contract?.slots ?? []).flatMap((slot) => slot.accepts ?? []),
+  );
+  for (const sample of [
+    manifest.defaultData,
+    ...manifest.examples.map((example) => example.data),
+  ])
+    for (const doc of componentContentDocuments(sample, manifest.contract))
+      walk(
+        doc,
+        (node) => {
+          if (node.type === "widget" || node.type === "inlineWidget")
+            kinds.add(node.attrs!.kind);
+        },
+        { scope: "tree" },
+      );
+  const native = [...kinds]
+    .filter((kind) => kind !== "custom")
+    .map((kind) => {
+      const renderer = builtinExports[kind];
+      if (!renderer)
+        throw new Error(
+          "Content slot references an unavailable renderer: " + kind,
+        );
+      return { kind, renderer };
+    });
+  const dependencies = manifest.dependencies ?? [];
+  return `import React from 'react';${native.length ? `import{${native.map((entry) => entry.renderer).join(",")}}from'showai:components';` : ""}
+${dependencies.map((ref, index) => `import Child${index} from 'showai:component/${ref.id}';`).join("\n")}
+const renderers={${native.map((entry) => `${JSON.stringify(entry.kind)}:${entry.renderer}`).join(",")}};
+const children={${dependencies.map((ref, index) => `${JSON.stringify(ref.id)}:{Component:Child${index},version:${JSON.stringify(ref.version)},integrity:${JSON.stringify(ref.integrity)}}`).join(",")}};
+export function renderWidget({kind,data,...props}){if(kind==='custom'){const child=children[data.componentId];if(!child||child.version!==data.version||data.integrity&&child.integrity!==data.integrity)throw new Error('Content dependency is not declared at this exact revision.');return <child.Component {...props} data={data.props}/>;}const Child=renderers[kind];if(!Child)throw new Error('Declare this content renderer in contract.slots.accepts: '+kind);return <Child {...props} data={data}/>;}`;
+}
 function runtimeSource(entry: string, reader = false): string {
-  return `import React, {useState,useEffect} from 'react';import{createRoot}from'react-dom/client';import * as UserModule from ${JSON.stringify(entry)};import validate from 'showai:validator';const UserComponent=UserModule.default;
+  return `import React, {useState,useEffect} from 'react';import{createRoot}from'react-dom/client';import * as UserModule from ${JSON.stringify(entry)};import validate from 'showai:validator';import{createComponentRuntime}from'showai:runtime';import{ComponentRuntimeProvider}from'showai:runtime-provider';import{contract,checkContract}from'showai:contract-validator';import{renderWidget}from'showai:content-renderers';const UserComponent=UserModule.default;
 const config=JSON.parse(document.getElementById('showai-component-data')?.textContent||'{}');const channel=config.channel;
 const send=(type,extra={})=>parent.postMessage({channel,type,...extra},'*');let update,outlineUpdate,fieldUpdate;
+window.addEventListener('error',event=>send('showai:error',{message:event.message}));window.addEventListener('unhandledrejection',event=>send('showai:error',{message:String(event.reason?.message||event.reason)}));
 const plain=value=>JSON.parse(JSON.stringify(value===undefined?null:value));
+let runtimeState={data:config.props||{},readOnly:config.readOnly!==false},sequence=0;const requests=new Map();
+const request=(operation,input)=>!config.runtimeCapabilities?Promise.resolve({status:'unavailable',reason:'This host predates the component runtime protocol.'}):new Promise(resolve=>{const requestId='runtime-'+(++sequence);const timer=setTimeout(()=>{requests.delete(requestId);resolve({status:'failed',reason:'Component host request timed out.'});},10000);requests.set(requestId,{resolve,timer});send('showai:runtime-request',{requestId,operation,input});});
+const runtime=createComponentRuntime({contract,state:()=>runtimeState,validate:checkContract,capabilities:()=>config.runtimeCapabilities||{},request});
+window.addEventListener('pagehide',()=>{runtime.dispose();for(const entry of requests.values()){clearTimeout(entry.timer);entry.resolve({status:'unavailable',reason:'Component unmounted.'});}requests.clear();});
+window.addEventListener('message',event=>{if(event.source!==parent||event.data?.channel!==channel||event.data?.type!=='showai:runtime-result')return;const entry=requests.get(event.data.requestId);if(!entry)return;clearTimeout(entry.timer);requests.delete(event.data.requestId);entry.resolve(event.data.result);});
+
 function fieldCalls(calls){const api=UserModule.field||{};return(Array.isArray(calls)?calls:[]).map(call=>{try{const fn=api[call.fn];if(typeof fn!=='function')return{missing:true};const value=fn(...call.args);if(value&&typeof value.then==='function')throw new Error(call.fn+' must be synchronous');return{value:plain(value)};}catch(error){return{error:String(error&&error.message||error)};}});}
 const validationMessage=()=>(validate.errors||[]).map(error=>(error.instancePath||error.params?.missingProperty||'data')+' '+error.message).join('; ');
 function check(props){if(validate(props))return true;send('showai:error',{message:validationMessage()});return false;}
@@ -1610,20 +1700,21 @@ const keepView=value=>{const issue=viewIssue(value);if(issue)throw new Error('on
 window.addEventListener('pagehide',sendView);
 const handOver=snapshot=>{const issue=contextIssue(snapshot);if(issue)throw new Error('onContext: '+issue);if(navigator.userActivation&&!navigator.userActivation.isActive)return false;send('showai:context',{snapshot:JSON.parse(JSON.stringify(snapshot))});return true;};
 const goTo=target=>{if(typeof target!=='string'&&(!target||typeof target!=='object'))throw new Error('goTo needs a page link, "#blockId" or {pageId, blockId}');if(navigator.userActivation&&!navigator.userActivation.isActive)return false;send('showai:navigate',{target:typeof target==='string'?target:{...target}});return true;};
-function App(){const[outline,setOutline]=useState(config.outline);outlineUpdate=setOutline;const[field,setField]=useState(config.field);fieldUpdate=setField;const[state,setState]=useState(()=>({data:config.props||{},readOnly:config.readOnly!==false,dataState:dataStateOf(config.dataState,config.readOnly!==false)}));const[conversation,setConversation]=useState({available:config.context===true,key:0,value:undefined});useEffect(()=>reading(state.data),[state.data]);update=(data,readOnly,available,dataState,activationTargets)=>{config.activationTargets=Array.isArray(activationTargets)?activationTargets:[];setConversation(c=>c.available===available?c:{...c,available});if(check(data)){setState({data,readOnly,dataState:dataStateOf(dataState,readOnly)});send('showai:valid')}};restore=value=>setConversation(c=>c.key?c:{...c,key:1,value});return React.createElement(UserComponent,{key:conversation.key,...state,...(outline?{props:state.data,outline,navigate:itemId=>send('showai:outline-action',{action:'navigate',itemId}),setBranchExpanded:(itemId,expanded)=>send('showai:outline-action',{action:'branch',itemId,expanded}),collapse:()=>send('showai:outline-action',{action:'collapse'})}:{}),onChange:state.readOnly?undefined:(data)=>{if(check(data)){setState(s=>({...s,data}));send('showai:change',{props:data});}},...(field?{value:field.value,column:field.column,onValue:state.readOnly?undefined:value=>send('showai:field-value',{value:plain(value)}),onClose:()=>send('showai:field-close')}:{}),activationTargets:config.activationTargets||[],onActivate:config.activationTargets?.length?activate:undefined,onContext:conversation.available?handOver:undefined,context:conversation.value,...(config.view===true?{viewState:config.viewState,onViewState:keepView}:{}),...(config.inline===true?{inline:true}:{}),goTo});}
+function App(){const[outline,setOutline]=useState(config.outline);outlineUpdate=setOutline;const[field,setField]=useState(config.field);fieldUpdate=setField;const[state,setState]=useState(()=>({data:config.props||{},readOnly:config.readOnly!==false,dataState:dataStateOf(config.dataState,config.readOnly!==false)}));const[conversation,setConversation]=useState({available:config.context===true,key:0,value:undefined});useEffect(()=>reading(state.data),[state.data]);update=(data,readOnly,available,dataState,activationTargets)=>{config.activationTargets=Array.isArray(activationTargets)?activationTargets:[];setConversation(c=>c.available===available?c:{...c,available});if(check(data)){setState({data,readOnly,dataState:dataStateOf(dataState,readOnly)});send('showai:valid')}};restore=value=>setConversation(c=>c.key?c:{...c,key:1,value});runtimeState={...state,dataState:field?{...state.dataState,editable:false}:state.dataState,view:config.viewState,slot:outline?{kind:'pageOutline',context:outline}:field?{kind:'databaseField',context:{...field,editable:!state.readOnly}}:{kind:config.inline?'inline':'block'}};return React.createElement(ComponentRuntimeProvider,{runtime,renderWidget},React.createElement(UserComponent,{runtime,key:conversation.key,...state,...(outline?{props:state.data,outline,navigate:itemId=>send('showai:outline-action',{action:'navigate',itemId}),setBranchExpanded:(itemId,expanded)=>send('showai:outline-action',{action:'branch',itemId,expanded}),collapse:()=>send('showai:outline-action',{action:'collapse'})}:{}),onChange:state.readOnly?undefined:(data)=>{if(check(data)){setState(s=>({...s,data}));send('showai:change',{props:data});}},...(field?{value:field.value,column:field.column,onValue:state.readOnly?undefined:value=>send('showai:field-value',{value:plain(value)}),onClose:()=>send('showai:field-close')}:{}),activationTargets:config.activationTargets||[],onActivate:config.activationTargets?.length?activate:undefined,onContext:conversation.available?handOver:undefined,context:conversation.value,...(config.view===true?{viewState:config.viewState,onViewState:keepView}:{}),...(config.inline===true?{inline:true}:{}),goTo}));}
 window.addEventListener('message',event=>{if(event.source!==parent||event.data?.channel!==channel)return;if(event.data?.type==='showai:validate'){const valid=validate(event.data.props);send('showai:validation',{requestId:event.data.requestId,valid,message:valid?'':validationMessage()});return;}if(event.data?.type==='showai:outline')outlineUpdate?.(event.data.outline);if(event.data?.type==='showai:field')fieldUpdate?.(event.data.field);if(event.data?.type==='showai:field-call'){send('showai:field-result',{requestId:event.data.requestId,results:fieldCalls(event.data.calls)});return;}if(event.data?.type==='showai:props')update?.(event.data.props,event.data.readOnly!==false,event.data.context===true,event.data.dataState,event.data.activationTargets);if(event.data?.type==='showai:context-restore'&&event.data.snapshot&&!contextIssue(event.data.snapshot))restore?.(event.data.snapshot);});
-window.addEventListener('error',event=>send('showai:error',{message:event.message}));window.addEventListener('unhandledrejection',event=>send('showai:error',{message:String(event.reason?.message||event.reason)}));
 const componentRoot=document.getElementById('component-root');if(config.inline===true){componentRoot.style.display='inline-block';componentRoot.style.whiteSpace='nowrap';document.documentElement.style.overflow='hidden';document.body.style.margin='0';}
 createRoot(componentRoot).render(React.createElement(App));
 new ResizeObserver(()=>{const box=componentRoot.getBoundingClientRect();send('showai:height',{height:Math.ceil(box.height)+2,...(config.inline===true?{width:Math.ceil(box.width)+2}:{})});}).observe(componentRoot);send('showai:ready');`;
 }
 
 function inlineRuntimeSource(entry: string): string {
-  return `import React from 'react';import{createRoot}from'react-dom/client';import UserComponent from ${JSON.stringify(entry)};import validate from 'showai:validator';
-export function mount(target,initial){const root=createRoot(target,{onUncaughtError:error=>initial.onError(String(error?.message||error))});
+  return `import React from 'react';import{createRoot}from'react-dom/client';import UserComponent from ${JSON.stringify(entry)};import validate from 'showai:validator';import{createComponentRuntime}from'showai:runtime';import{ComponentRuntimeProvider}from'showai:runtime-provider';import{contract,checkContract}from'showai:contract-validator';import{renderWidget}from'showai:content-renderers';
+export function mount(target,initial){
+let runtimeState={data:initial.data,readOnly:true};const runtime=createComponentRuntime({contract,state:()=>runtimeState,validate:checkContract,capabilities:()=>initial.runtimeCapabilities||{},request:(operation,input)=>initial.request?.(operation,input)??{status:'unavailable'}});
+const root=createRoot(target,{onUncaughtError:error=>initial.onError(String(error?.message||error))});
 const activationIssue=${componentActivationIssue.toString()};
 const activate=target=>{const issue=activationIssue(target);if(issue)throw new Error(issue);if(!(initial.activationTargets||[]).some(bound=>bound.type===target.type&&bound.scope===target.scope&&bound.id===target.id))return false;return initial.onActivate?.(target)??false;};
-const render=(data,outline=initial.outline,activationTargets=initial.activationTargets)=>{initial.activationTargets=activationTargets;if(!validate(data)){initial.onError((validate.errors||[]).map(error=>(error.instancePath||'data')+' '+error.message).join('; '));return;}initial.onError('');root.render(React.createElement(UserComponent,{data,...(outline?{props:data,...outline}:{}),readOnly:true,onChange:undefined,dataState:{status:'ok',editable:false,canEdit:()=>false},activationTargets:initial.activationTargets||[],onActivate:initial.activationTargets?.length?activate:undefined,onContext:initial.onContext,context:initial.context,goTo:initial.goTo}));};render(initial.data);return{update:render,destroy:()=>root.unmount()};}`;
+const render=(data,outline=initial.outline,activationTargets=initial.activationTargets)=>{initial.activationTargets=activationTargets;if(!validate(data)){initial.onError((validate.errors||[]).map(error=>(error.instancePath||'data')+' '+error.message).join('; '));return;}initial.onError('');runtimeState={data,readOnly:true,slot:outline?{kind:"pageOutline",context:outline.outline}:{kind:"inline"}};root.render(React.createElement(ComponentRuntimeProvider,{runtime,renderWidget},React.createElement(UserComponent,{runtime,data,...(outline?{props:data,...outline}:{}),readOnly:true,onChange:undefined,dataState:{status:'ok',editable:false,canEdit:()=>false},activationTargets:initial.activationTargets||[],onActivate:initial.activationTargets?.length?activate:undefined,onContext:initial.onContext,context:initial.context,goTo:initial.goTo})));};render(initial.data);return{update:render,invoke:(name,input)=>runtime.actions.invoke(name,input),destroy:()=>{runtime.dispose();root.unmount();}};}`;
 }
 
 function componentValidatorSource(
@@ -1679,6 +1770,24 @@ export async function compilePackage(
   manifest.examples.forEach((example) =>
     assertProps(schema, example.data, manifest.documentation),
   );
+  if (manifest.contract)
+    for (const data of [
+      manifest.defaultData,
+      ...manifest.examples.map((example) => example.data),
+    ]) {
+      validateComponentContractData(manifest.contract, data);
+      let count = 0;
+      for (const content of componentContentDocuments(data, manifest.contract))
+        count += validateSubtree(content, {
+          path: "contract.slots",
+          parentPath: "contract",
+          parentType: "widget",
+          depth: 0,
+          count,
+          surface: false,
+          resource: false,
+        });
+    }
   for (const [index, command] of (
     manifest.contributes?.commands ?? []
   ).entries()) {
@@ -1799,6 +1908,7 @@ export async function compilePackage(
     manifest: ComponentManifest;
     files: Map<string, Buffer>;
     validator: string;
+    contractValidator: string;
     children: Map<string, string>;
   };
   const packages = new Map<string, RuntimePackage>();
@@ -1806,6 +1916,7 @@ export async function compilePackage(
     manifest,
     files,
     validator,
+    contractValidator: componentContractValidatorSource(ajv, manifest.contract),
     children: new Map(),
   };
   packages.set("root", rootPackage);
@@ -1841,6 +1952,10 @@ export async function compilePackage(
       const child: RuntimePackage = {
         manifest: source.manifest,
         files: componentSourceFiles(source),
+        contractValidator: componentContractValidatorSource(
+          ajv,
+          source.manifest.contract,
+        ),
         validator: componentValidatorSource(
           ajv,
           source.schema,
@@ -1885,10 +2000,12 @@ export async function compilePackage(
   };
   const sdkSource = componentSdkSource(
     builtinSources["sdk.tsx"],
-    [...packages.values()].flatMap((owner) =>
-      [...owner.files].filter(([path]) => /\.(?:[jt]sx?|mjs)$/.test(path))
+    [...packages.values()].flatMap((owner) => [
+      contentRendererSource(owner.manifest),
+      ...[...owner.files]
+        .filter(([path]) => /\.(?:[jt]sx?|mjs)$/.test(path))
         .map(([, contents]) => contents.toString("utf8")),
-    ),
+    ]),
   );
   const boundary: Plugin = {
     name: "showai-component-boundary",
@@ -1897,9 +2014,24 @@ export async function compilePackage(
         const owner =
           args.namespace === "showai-package"
             ? splitModule(args.importer).key
-            : args.namespace === "showai-nested"
+            : [
+                  "showai-nested",
+                  "showai-content-renderers",
+                  "showai-contract-validator",
+                ].includes(args.namespace)
               ? args.importer
               : "root";
+        if (args.path === "showai:runtime")
+          return {
+            path: "contract/component-runtime.mjs",
+            namespace: "showai-builtin",
+          };
+        if (args.path === "showai:runtime-provider")
+          return { path: "component-runtime.tsx", namespace: "showai-builtin" };
+        if (args.path === "showai:contract-validator")
+          return { path: owner, namespace: "showai-contract-validator" };
+        if (args.path === "showai:content-renderers")
+          return { path: owner, namespace: "showai-content-renderers" };
         if (args.path === "showai:validator")
           return { path: owner, namespace: "showai-validator" };
         if (args.path === "showai:components")
@@ -1929,8 +2061,23 @@ export async function compilePackage(
           loader: "js",
         }),
       );
+      plugin.onLoad(
+        { filter: /.*/, namespace: "showai-contract-validator" },
+        (args) => ({
+          contents: packages.get(args.path)!.contractValidator,
+          loader: "js",
+        }),
+      );
+      plugin.onLoad(
+        { filter: /.*/, namespace: "showai-content-renderers" },
+        (args) => ({
+          contents: contentRendererSource(packages.get(args.path)!.manifest),
+          loader: "tsx",
+        }),
+      );
       plugin.onLoad({ filter: /.*/, namespace: "showai-builtin" }, (args) => ({
-        contents: args.path === "sdk.tsx" ? sdkSource : builtinSources[args.path],
+        contents:
+          args.path === "sdk.tsx" ? sdkSource : builtinSources[args.path],
         loader: args.path.endsWith(".mjs")
           ? "js"
           : (extname(args.path).slice(1) as "tsx" | "ts" | "css"),
@@ -1938,10 +2085,10 @@ export async function compilePackage(
       plugin.onLoad({ filter: /.*/, namespace: "showai-nested" }, (args) => {
         const owner = packages.get(args.path)!;
         return {
-          contents: `import React from 'react';import Child from './${owner.manifest.entry.replace(/^\.\//, "")}';import validate from 'showai:validator';
+          contents: `import React,{useMemo,useRef,useState,useEffect} from 'react';import Child from './${owner.manifest.entry.replace(/^\.\//, "")}';import validate from 'showai:validator';import{createComponentRuntime}from'showai:runtime';import{ComponentRuntimeProvider,useComponentRuntime}from'showai:runtime-provider';import{contract,checkContract}from'showai:contract-validator';import{renderWidget}from'showai:content-renderers';
 const defaults=${JSON.stringify(owner.manifest.defaultData)};
 function check(data){if(!validate(data))throw new Error(${JSON.stringify(owner.manifest.id)}+' props: '+JSON.stringify(validate.errors));return data;}
-export default function Nested({data=defaults,onChange,readOnly=true}){check(data);return <Child data={data} readOnly={readOnly} onChange={readOnly||!onChange?undefined:next=>onChange(check(next))}/>;}`,
+export default function Nested({data=defaults,onChange,readOnly=true}){check(data);const outer=useComponentRuntime();const[view,setView]=useState();const latest=useRef();latest.current={data,onChange,readOnly,view,outer};const runtime=useMemo(()=>createComponentRuntime({contract,validate:checkContract,state:()=>latest.current,capabilities:()=>({...outer.capabilities,view:1,pageOutline:0,databaseField:0,conversation:0}),request:(operation,input)=>{const current=latest.current;if(operation==='data.update'){if(current.readOnly||!current.onChange)return{status:'unavailable'};current.onChange(check(input));return{status:'handled'};}if(operation==='view.set'){setView(input);return{status:'handled'};}if(operation==='event.emit'){if(!current.outer.contract.events?.some(event=>event.name===input.name))return{status:'unhandled'};return current.outer.events.emit(input.name,input.target,input.payload);}if(operation==='navigation.open')return current.outer.navigation.open(input);return{status:'unavailable'};}}),[]);useEffect(()=>()=>runtime.dispose(),[runtime]);return <ComponentRuntimeProvider runtime={runtime} renderWidget={renderWidget}><Child runtime={runtime} data={data} readOnly={readOnly} dataState={{status:'ok',editable:!readOnly&&!!onChange,canEdit:()=>!readOnly&&!!onChange}} onChange={readOnly||!onChange?undefined:next=>onChange(check(next))}/></ComponentRuntimeProvider>;}`,
           loader: "tsx",
         };
       });
@@ -1962,7 +2109,9 @@ export default function Nested({data=defaults,onChange,readOnly=true}){check(dat
       plugin.onResolve({ filter: /.*/ }, (args) => {
         if (args.path.startsWith("showai:")) return;
         if (
-          args.namespace === "showai-validator" &&
+          ["showai-validator", "showai-contract-validator"].includes(
+            args.namespace,
+          ) &&
           args.path.startsWith("ajv/")
         )
           return { path: require.resolve(args.path) };
@@ -2133,6 +2282,37 @@ export default function Nested({data=defaults,onChange,readOnly=true}){check(dat
   const inlineReact: Plugin = {
     name: "showai-inline-react",
     setup(plugin) {
+      plugin.onResolve({ filter: /^showai:runtime$/ }, () => ({
+        path: "runtime",
+        namespace: "showai-inline-runtime",
+      }));
+      plugin.onLoad(
+        { filter: /.*/, namespace: "showai-inline-runtime" },
+        () => ({
+          contents: `const factory=globalThis.__SHOWAI_COMPONENT_HOST__.runtime;if(!factory)throw new Error('This inline host does not implement component protocol v1.');export{factory as createComponentRuntime};`,
+          loader: "js",
+        }),
+      );
+      plugin.onResolve({ filter: /component-content(?:\.tsx)?$/ }, (args) =>
+        args.namespace === "showai-builtin"
+          ? { path: "component-content", namespace: "showai-inline-content" }
+          : undefined,
+      );
+      plugin.onResolve({ filter: /^showai:content-style$/ }, () => ({
+        path: "rich-text/editor.css",
+        namespace: "showai-builtin",
+      }));
+      plugin.onResolve({ filter: /^showai:content-math-style$/ }, () => ({
+        path: "katex.css",
+        namespace: "showai-builtin",
+      }));
+      plugin.onLoad(
+        { filter: /.*/, namespace: "showai-inline-content" },
+        () => ({
+          contents: `import React from 'react';import{useComponentRuntime,useComponentRuntimeContext}from'showai:runtime-provider';import'showai:content-style';import'showai:content-math-style';const renderContent=globalThis.__SHOWAI_COMPONENT_HOST__.content;export function ComponentContent(props){const runtime=useComponentRuntime();const context=useComponentRuntimeContext();if(!renderContent)throw new Error('This inline host does not implement native content slots.');return renderContent({...props,runtime,renderWidget:context?.renderWidget});}`,
+          loader: "js",
+        }),
+      );
       plugin.onResolve(
         {
           filter:
@@ -2183,6 +2363,7 @@ export default function Nested({data=defaults,onChange,readOnly=true}){check(dat
     legalComments: "none",
   });
   const inline = {
+    protocol: 1,
     script: inlineOutput.outputFiles.find((file) => file.path.endsWith(".js"))!
       .text,
     styles: inlineOutput.outputFiles
@@ -2362,6 +2543,10 @@ interface StoredComponent extends CompiledComponent {
 }
 function compiledRecord(value: unknown, scope: CatalogScope): StoredComponent {
   const item = record(value, "Compiled component");
+  if (item.presentationOnly)
+    throw new Error(
+      "Inline presentation projections are not importable component packages. Import the complete source or catalog bundle.",
+    );
   const manifest = manifestFrom(item);
   if (
     typeof item.html !== "string" ||
@@ -2901,8 +3086,18 @@ export async function resolveDocumentComponents(
     if (!schemas.has(reference))
       throw new Error("A custom component reference was not resolved.");
     const component = schemas.get(reference)!;
-    if (!hasBinding(node.attrs!.data))
+    if (
+      data.contract &&
+      canonicalJson(data.contract) !== canonicalJson(component.contract)
+    )
+      throw new Error(
+        `Component contract differs from exact package: ${data.componentId}@${data.version}.`,
+      );
+    if (!hasBinding(node.attrs!.data)) {
       assertProps(component.schema, data.props, component.documentation);
+      if (component.contract)
+        validateComponentContractData(component.contract, data.props);
+    }
   }
   return components;
 }
@@ -3032,11 +3227,15 @@ export async function lockDocumentComponents(
   home: string,
   document: ShowDocument,
   projectId?: string,
+  options: { validate?: boolean } = {},
 ): Promise<ShowDocument> {
-  const copy = documentCopy(document);
+  const copy = JSON.parse(JSON.stringify(document)) as ShowDocument;
   const selected = new Map<string, Promise<CompiledComponent>>();
   const lock = async (node: ShowDocument["content"]): Promise<void> => {
-    if ((node.type === "widget" || node.type === "inlineWidget") && node.attrs?.kind === "custom") {
+    if (
+      (node.type === "widget" || node.type === "inlineWidget") &&
+      node.attrs?.kind === "custom"
+    ) {
       const data = node.attrs.data as Record<string, unknown>;
       const ref = readCustomBlockData(data);
       const key = `${ref.componentId}@${ref.version}:${ref.integrity ?? ""}:${ref.scope ?? ""}`;
@@ -3049,14 +3248,18 @@ export async function lockDocumentComponents(
         selected.set(key, pending);
       }
       const component = await pending;
-      if (!hasBinding(data))
+      if (!hasBinding(data)) {
         assertProps(component.schema, data.props, component.documentation);
-      const { scope: _scope, ...properties } = data;
+        if (component.contract)
+          validateComponentContractData(component.contract, data.props);
+      }
+      const { scope: _scope, contract: _contract, ...properties } = data;
       node.attrs.data = {
         ...properties,
         componentId: component.id,
         version: component.version,
         integrity: component.integrity,
+        ...(component.contract ? { contract: component.contract } : {}),
       };
     }
     if (node.attrs?.outline?.enabled && node.attrs.outline.renderer) {
@@ -3076,17 +3279,225 @@ export async function lockDocumentComponents(
       assertProps(component.schema, ref.props, component.documentation);
     }
   };
-  const nodes: ShowDocument["content"][] = [];
-  walk(copy.content, (node) => {
+  const visit = async (
+    node: ShowDocument["content"],
+    depth = 0,
+  ): Promise<void> => {
+    if (!node || depth > 40)
+      throw new Error("Component content is missing or nested too deeply.");
+    if (["widget", "inlineWidget"].includes(node.type ?? "")) {
+      await lock(node);
+      const props =
+        node.attrs?.kind === "custom"
+          ? node.attrs.data?.props
+          : node.attrs?.data;
+      for (const doc of componentContentDocuments(
+        props,
+        nodeComponentContract(node),
+      ))
+        await visit(doc, depth + 1);
+    } else if (node.attrs?.outline?.renderer) await lock(node);
+    if (node.content !== undefined && !Array.isArray(node.content))
+      throw new Error("Native content must be an array.");
+    for (const child of node.content ?? []) await visit(child, depth + 1);
+  };
+  await visit(copy.content);
+  return options.validate === false ? copy : validateDocument(copy);
+}
+
+export async function prepareComponentInput(
+  home: string,
+  kind: string,
+  data: Record<string, unknown>,
+  projectId?: string,
+): Promise<Record<string, unknown>> {
+  let input = structuredClone(data);
+  if (
+    kind === "stepper" &&
+    Array.isArray(input.steps) &&
+    input.steps.some((step) => Array.isArray(step.blocks))
+  ) {
+    for (const step of input.steps) {
+      if (Array.isArray(step.blocks))
+        for (const block of step.blocks)
+          block.data = await prepareComponentInput(
+            home,
+            block.kind,
+            block.data,
+            projectId,
+          );
+      if (step.content !== undefined)
+        step.content = (
+          await prepareComponentInput(
+            home,
+            "text",
+            { content: step.content },
+            projectId,
+          )
+        ).content;
+    }
+    return input;
+  }
+  if (kind === "region" && Array.isArray(input.blocks))
+    for (const block of input.blocks)
+      block.data = await prepareComponentInput(
+        home,
+        block.kind,
+        block.data,
+        projectId,
+      );
+  const primitive =
+    kind === "text" ||
+    (Object.hasOwn(primitiveNodeTypes, kind) && input.document !== undefined);
+  const root = primitive
+    ? componentInputNode(kind, input)
+    : { type: "widget", attrs: { kind, data: input } };
+  const temporary = {
+    ...blankDocument(),
+    content: { type: "doc", content: [root] },
+  };
+  const prepared = await lockDocumentComponents(home, temporary, projectId, {
+    validate: false,
+  });
+  const node = prepared.content.content![0];
+  if (primitive) {
+    const content = node.type === "richText" ? (node.content ?? []) : [node];
+    input =
+      kind === "text"
+        ? { ...input, content: { type: "doc", content }, format: "richtext" }
+        : { ...input, document: { type: "doc", content } };
+  } else input = node.attrs!.data;
+  if (["page", "board"].includes(kind) && Array.isArray(input.content)) {
+    const prepared = await lockDocumentComponents(
+      home,
+      { ...blankDocument(), content: { type: "doc", content: input.content } },
+      projectId,
+      { validate: false },
+    );
+    input.content = prepared.content.content;
+  }
+  return input;
+}
+
+export async function prepareComponentOperations(
+  home: string,
+  document: ShowDocument,
+  operations: PageOperation[],
+  projectId: string,
+) {
+  const prepared = await lockDocumentComponents(home, document, projectId, {
+    validate: false,
+  });
+  const nodes = new Map<string, ShowDocument["content"]>();
+  const index = (node: ShowDocument["content"]) =>
+    walk(
+      node,
+      (child) => {
+        if (child.attrs?.id) nodes.set(child.attrs.id, child);
+      },
+      { scope: "content" },
+    );
+  index(prepared.content);
+  const result: PageOperation[] = [];
+  const prepareNode = async (node: ShowDocument["content"]) =>
+    (
+      await lockDocumentComponents(
+        home,
+        { ...blankDocument(), content: { type: "doc", content: [node] } },
+        projectId,
+        { validate: false },
+      )
+    ).content.content![0];
+  for (const value of operations) {
+    let operation = structuredClone(value);
+    if (operation.type === "component.insert")
+      operation.data = await prepareComponentInput(
+        home,
+        operation.kind,
+        operation.data,
+        projectId,
+      );
     if (
-      ((node.type === "widget" || node.type === "inlineWidget") &&
-        node.attrs?.kind === "custom") ||
-      node.attrs?.outline?.renderer
-    )
-      nodes.push(node);
-  }, { scope: "content" });
-  await Promise.all(nodes.map(lock));
-  return copy;
+      operation.type === "block.insert" ||
+      operation.type === "block.replace"
+    ) {
+      operation.node = await prepareNode(operation.node);
+      index(operation.node);
+      if (operation.type === "block.replace")
+        nodes.set(operation.blockId, operation.node);
+    }
+    if (operation.type === "component.props.set") {
+      if (
+        !operation.props ||
+        typeof operation.props !== "object" ||
+        Array.isArray(operation.props)
+      )
+        throw new Error("component.props.set requires a props object.");
+      const original = nodes.get(operation.blockId);
+      if (original?.attrs?.kind && original.attrs.data) {
+        const node = structuredClone(original),
+          custom = node.attrs!.kind === "custom";
+        const data = node.attrs!.data;
+        const merged = { ...(custom ? data.props : data), ...operation.props };
+        node.attrs!.data = custom ? { ...data, props: merged } : merged;
+        const hydrated = await prepareNode(node);
+        const props = custom
+          ? hydrated.attrs!.data.props
+          : hydrated.attrs!.data;
+        operation.props = Object.fromEntries(
+          Object.keys(operation.props).map((key) => [key, props[key]]),
+        );
+        nodes.set(operation.blockId, hydrated);
+      }
+    }
+    if (operation.type === "block.attrs.set") {
+      const original = nodes.get(operation.blockId);
+      if (original && Object.hasOwn(operation.attrs, "data")) {
+        const node = await prepareNode({
+          ...original,
+          attrs: { ...original.attrs, ...operation.attrs },
+        });
+        operation.attrs.data = node.attrs!.data;
+        nodes.set(operation.blockId, node);
+      }
+    }
+    if (operation.type === "component.ref.set") {
+      const node = nodes.get(operation.blockId);
+      if (node?.attrs?.kind === "custom") {
+        let selected;
+        try {
+          selected = await getComponent(
+            home,
+            operation.componentId ?? node.attrs.data.componentId,
+            operation.version,
+            projectId,
+            { integrity: operation.integrity },
+          );
+        } catch (error) {
+          throw new CoreError(
+            "NOT_FOUND",
+            `component.ref.set on ${operation.blockId}: ${error instanceof Error ? error.message : String(error)} Use the exact componentId/version/integrity of a component_save or catalog_list receipt.`,
+          );
+        }
+        operation.contract = selected.contract ?? null;
+        nodes.set(operation.blockId, {
+          ...node,
+          attrs: {
+            ...node.attrs,
+            data: {
+              ...node.attrs.data,
+              componentId: selected.id,
+              version: selected.version,
+              integrity: selected.integrity,
+              contract: operation.contract,
+            },
+          },
+        });
+      }
+    }
+    result.push(operation);
+  }
+  return { document: prepared, operations: result };
 }
 
 export async function instantiateTemplateRecord(

@@ -176,6 +176,8 @@ export type PageOperation =
   | { type: "block.text.set"; blockId: string; text: string }
   | {
       type: "component.ref.set";
+      contract?:
+        import("../contract/component-contract.mjs").ComponentContract | null;
       blockId: string;
       componentId?: string;
       version: string;
@@ -200,7 +202,11 @@ export type PageOperation =
       threadId?: string;
       resolved?: boolean;
     }
-  | { type: "diagram.arrange"; nodeIds: string[]; direction?: DiagramDirection };
+  | {
+      type: "diagram.arrange";
+      nodeIds: string[];
+      direction?: DiagramDirection;
+    };
 
 export const PAGE_OPERATION_FIELDS = {
   "component.insert": ["kind", "data", "parentId", "afterId"],

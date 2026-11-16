@@ -2,6 +2,7 @@ import type { ComponentType } from "react";
 
 export type BlockData = Record<string, unknown>;
 export interface BlockProps {
+  runtime?: import("../../contract/component-runtime.mjs").ComponentRuntime;
   data: BlockData;
   onChange?: (data: BlockData) => void;
   readOnly?: boolean;
@@ -10,6 +11,7 @@ export interface BlockProps {
 }
 
 export interface BlockDefinition {
+  contract?: import("../../contract/component-contract.mjs").ComponentContract;
   kind: string;
   replacedBy?: string;
   title: string;
@@ -22,6 +24,7 @@ export interface BlockDefinition {
 }
 
 export interface BlockRegistration {
+  contract?: import("../../contract/component-contract.mjs").ComponentContract;
   kind: string;
   label: string;
   description: string;

@@ -4,6 +4,7 @@ import type { WalkContext, WalkOptions } from "./walk.mjs";
 export function mapWidgetDocuments(
   data: unknown,
   map: (document: JSONContent) => JSONContent,
+  contract?: import("./component-definition.mjs").ComponentContract,
 ): unknown;
 export function mapNodes<T extends JSONContent>(
   root: T,

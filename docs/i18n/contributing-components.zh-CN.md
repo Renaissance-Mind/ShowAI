@@ -45,6 +45,20 @@ G2 图表和外部图示家族各有自己的流程。`g2.json` 中的 G2 条目
 12. **运行时依赖。** 运行时使用的新 npm 依赖要加入 `package.json`、`scripts/package-runtime.mjs` 的复制列表、`src/core/catalog.ts` 中 `compilePackage` 的运行时与 SDK 导入允许列表，许可证文本放进 `resources/licenses/`。新图标从 `src/ui/icons.ts` 导出。
 13. **Agent 指引。** 在 `resources/templates/system-presentation/guides/04-design.md` 的“组件与素材”一段中说明何时选用该组件，然后运行 `npm run package:plugin`，把这份指南嵌入 `show-document` Skill，并重新生成 Codex、Claude Code 和 Kimi 的 Skill 副本。另见[修订系统呈现规则](contributing-templates.zh-CN.md#修订系统呈现规则)。
 
+## 组件运行时契约
+
+内置组件元数据与自定义 manifest 共用 contract version 1。src/contract/component-contract.mjs 提供 schema、校验、对象发现和旧版适配。catalog describe ID --view contract 返回声明与能力；--page PAGE --block BLOCK 读取实际实例，--object-offset / --object-limit 分页。Agent 使用同一 catalog_describe 入口；guide component 的 input.runtimeContractSchema 提供准确 schema，showai_capabilities.componentRuntime 提供宿主支持信息。
+
+契约可声明对象集合与稳定身份、带类型的通知和请求事件、局部动作、原生富文本子内容、内容块引用、独立版本的阅读状态及必需宿主能力。路径使用 JSON pointer，* 遍历一层。没有声明的包保留 legacy 适配，可点击界面不自动具有公开事件。
+
+新实现接收 runtime，或从 showai:components 导入 useComponentRuntime、useComponentAction、ComponentContent。事件返回 handled、unhandled、unavailable、failed 回执；数据更新的 handled 表示宿主接受了更新，正式持久化仍以 Page 保存的 hash/revision 为准。runtime.dataState 提供字段权限，阅读状态只属于当前读者。动作在自己的组件实例中注册执行，跨组件行为由父组件显式处理事件。
+
+只有声明的 slot 进入内容遍历、依赖收集和 ID 更新。自定义包通过 accepts 列出要包含的内置 widget；custom 子组件还需 manifest.dependencies 精确引用。普通业务 JSON 即使形似 doc 也不作为子内容处理。引用指向 slot，可用共享路径前缀隔离重复分组；目标缺失或歧义应报错。业务数据关系继续使用已有参数关系规则。文档层通过声明处理引用，不检查组件名称或私有数据形状。
+
+工作台、沙箱与 inline 共用宿主操作校验。inline 子内容复用宿主阅读器，沙箱包包含自己的实现。完整传输超出对话预算时，对话交付可省略未使用的沙箱 HTML，以 presentationOnly 标记执行投影；存储的组件包不变，投影不能作为组件包导入。原回调、页面目录 role 和数据库字段 contributes 均通过兼容适配继续工作。新的特权宿主服务需要平台提供明确的版本化能力。
+
+新增能力时验证真实编译与两种执行模式、实例对象发现、只读与未处理行为、对象删除、带作用域的复制和模板插入、业务 JSON 隔离、导出及旧不可变包。契约、公开类型、指南、SDK 导出和宿主校验应同时更新。
+
 ## 组合阅读交互
 
 容器可以使用 `showai:components` 的 `ComponentInteractions` 绑定子组件的阅读动作。目标身份为 `{type, scope, id}`：Flowchart 使用 `type: "node"`、`scope: flow.id`、`id: node.id`；LayerDiagram 使用 `type: "module"`、`scope: layer.id`、`id: module.id`。身份与文字、布局和 DOM 选择器无关。

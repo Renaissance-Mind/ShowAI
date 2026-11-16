@@ -177,9 +177,9 @@ export default function Related({ goTo }) {
 
 创建或修改后，在 Page 中实际关联并验证导航、当前章节、窗口宽度变化和收起展开；完整契约见 ShowAI 源码仓库的 docs/page-surface.md，两个独立示例位于仓库的 examples/page-outline-index 和 examples/page-outline-path（不随插件安装；没有仓库时以 guide containers 为准）。
 
-## 公开稳定对象事件
+## 旧组件的事件兼容入口
 
-组件在多级视图中可以接收 `activationTargets` 与 `onActivate(target)`。`activationTargets` 是 `{type, scope, id}` 对象的只读数组，列出本组件当前绑定的目标。target 是 `{type, scope, id}`，使用组件自己定义的稳定对象身份。仅当目标在 activationTargets 中时才提供进入动作；调用返回 true 表示外层容器处理了跳转，返回 false 或未提供回调时继续原有阅读行为。调用应来自用户的点击或键盘操作，不调用 onChange，也不把这两个属性写进 schema、defaultData 或实例数据。
+组件在多级视图中可以接收 `activationTargets` 与 `onActivate(target)`。`activationTargets` 是 `{type, scope, id}` 对象的只读数组，列出本组件当前绑定的目标。target 是 `{type, scope, id}`，使用组件自己定义的稳定对象身份。仅当目标在 activationTargets 中时才提供进入动作；旧 onActivate 返回 true 仅表示该目标具备派发资格，异步跳转的结果不能由这个布尔值确认，返回 false 或未提供回调时继续原有阅读行为。调用应来自用户的点击或键盘操作，不调用 onChange，也不把这两个属性写进 schema、defaultData 或实例数据。
 
 ```jsx
 const target = { type: "item", scope: "items", id: item.id };
@@ -193,3 +193,51 @@ const open = () => {
 ```
 
 在 usage.interactions 中记录公开的对象类型、作用域、ID 来源和未绑定时的行为。原生组件通过 ComponentInteractions/useComponentInteractions 接入同一目标协议；自定义组件的 onActivate 会由沙箱和 inline 宿主按绑定白名单转交。加入这项能力后提高组件版本并重新编译，验证绑定目标、未绑定对象和多个组件使用相同对象 ID 时的隔离。
+
+## 统一组件契约
+
+新组件在 manifest.contract 声明 version:1，字段的准确 JSON Schema 见 guide({topic:"component"}) 的 input.runtimeContractSchema。先读 showai_capabilities.componentRuntime 确认当前宿主协议，再读所选精确版本的 catalog_describe view:"contract"；status 为 declared、adapted 或 legacy。需要实例中真正存在的对象时传 instance:{pageId,blockId}，objectOffset/objectLimit 分页，保留回执中的页面 hash 与版本。旧编译包保持原指纹；加入新能力后发布新组件版本并显式升级页面引用。
+
+contract 的自定义位置统一如下：
+
+- entities：每项 {name,path,id,scope? 或 scopeValue?,optional?}。path 是组件 data 中对象集合的 JSON pointer，* 遍历一层；id 是每个对象内的标量路径。scope 使用与集合共享通配前缀的绝对路径，scopeValue 是固定作用域。对象身份为 {type:name,scope,id}，ID 和 scope 各最多 200 字符，单组件最多 50000 个对象。
+- events：每项 {name,entity?,intent,payload?}。intent 为 notification（通知事实）或 request（请求外层处理）；payload 是 JSON Schema，省略时接受 JSON。entity 指向上述对象类型，不根据标签、布局或 DOM 猜测对象。
+- actions：每项 {name,effect,input?,output?}。effect 为 view 或 content，输入和输出为 JSON Schema；useComponentAction(name,handler) 注册当前实例的局部动作，runtime.actions.invoke(name,input) 调用它。content 动作在只读时不可执行。跨实例行为由外层组件显式处理事件，不建立全局事件总线。
+- slots：每项 {name,path,format:"richtext",accepts?,fallbackFor?}。fallbackFor 指向兼容主槽，主槽有值时该旧格式槽不参与遍历。只有这些路径被当作原生子内容；业务 JSON 即使形似 doc 也不进入内容遍历。ComponentContent 的 slot 指向 name，index 可选择集合中的一个文档。自定义包通过 accepts 列出要使用的内置 widget kind；custom 子组件还要在 manifest.dependencies 声明精确版本和指纹。
+- references：每项 {path,slot,scope?} 声明指向该子内容中块 ID 的字段。scope 是引用路径和 slot 路径共享的前缀，用来隔离重复分组。复制时系统更新块引用；缺失或歧义目标报错。普通业务对象之间的关系继续通过参数契约 usage.rules 校验。
+- view：{version,schema} 声明本机阅读状态；改变结构时提高它的版本。runtime.view.value 提供恢复快照，runtime.view.set(value) 写入，undefined 清除。仍需用当前 data 检查选中对象是否存在。没有阅读状态服务的导出/预览返回 unavailable，组件保留本地默认状态。
+- requires：{能力名:1} 声明必需的宿主能力。支持的名称来自 capabilities；未知名称或版本拒绝，当前宿主缺少必需能力时明确报错。可选能力先查 runtime.capabilities，调用时处理 unavailable，不把能力声明当作权限授予。
+
+```json
+"contract": {
+  "version": 1,
+  "entities": [{"name":"item","path":"/items/*","id":"/id","scopeValue":"items"}],
+  "events": [{"name":"activate","entity":"item","intent":"request","payload":{"type":"null"}}]
+}
+```
+
+```jsx
+import { useState } from "react";
+import { useComponentRuntime } from "showai:components";
+export default function Items({ data }) {
+  const runtime = useComponentRuntime();
+  const [selected, setSelected] = useState(null);
+  const [error, setError] = useState("");
+  const open = async (item) => {
+    const receipt = await runtime.events.emit("activate", { type: "item", scope: "items", id: item.id });
+    if (receipt.status === "unhandled") setSelected(item.id);
+    if (receipt.status === "failed" || receipt.status === "unavailable") setError(receipt.reason ?? "当前宿主无法处理该操作");
+  };
+  return <section>{data.items.map(item => <button key={item.id} aria-pressed={selected === item.id} onClick={() => open(item)}>{item.title}</button>)}{error && <p role="alert">{error}</p>}</section>;
+}
+```
+
+回执 status 为 handled、unhandled、unavailable 或 failed。handled 表示宿主已处理请求；内容更新的回执不代替正式 Page 保存的 hash/revision。沙箱通过请求与回执转交，inline 直接调用同一协议；旧 onActivate 的布尔值仅为兼容的派发资格，不能当作执行回执。
+
+runtime.update(nextData) 提交内容更新，runtime.dataState 提供数据状态和字段权限；runtime.navigation.open(target)、runtime.conversation.submit(snapshot) 调用已有导航和交给对话能力。页面目录通过 runtime.slot 的 pageOutline 上下文与 runtime.outline 操作；数据库字段通过 databaseField 上下文与 runtime.field 操作，原 role/contributes 声明继续被适配。资源、页面引用和手势仍使用 SDK 的类型化 hook，参见对应章节。
+
+事件/动作数据只包含有限 JSON，最多 64 KiB、20 层；阅读状态最多 16 KiB。运行时属性不进入 props schema、defaultData 或实例事实。原生数据更新继续受 schema、关系规则和共享数据权限检查。文件、网络和工作台专有操作仍由宿主支持的能力决定。
+
+验证新增能力时，使用真实编译包检查对象发现、未处理与失败回执、局部动作、只读、声明子内容与普通 JSON 的区别、复制后的引用、旧页面、版本升级和导出。inline 复用宿主内容阅读器，沙箱使用包内实现；对话传输只携带所需的执行视图，不可把 inline presentationOnly 投影当成完整组件包导入。
+
+inline 执行协议单独通过编译包的 inline.protocol 标记，当前为 1；没有标记的旧包走旧版 React 桥接。契约查询的 execution 字段与 showai_capabilities.componentRuntime.inlineProtocol 用于判断兼容性。原生 Page、Board、region 的内容操作通过 insertion 元数据适配，查询返回原生块对象，不把它们当作普通 React 数据组件。

@@ -7,6 +7,10 @@ import {
   type ReactNode,
 } from "react";
 import { injectComponentBootstrap } from "../contract/contract";
+import {
+  replyComponentRequest,
+  outlineRuntimeServices,
+} from "../contract/component-host";
 import { InlineComponent } from "../components/custom/InlineComponent";
 import { useInlineComponentHost } from "../components/custom/CustomBlock";
 import {
@@ -90,7 +94,7 @@ function OutlineFrame({
       `<!doctype html><meta http-equiv="Content-Security-Policy" content="${componentSandboxPolicy}">` +
       injectComponentBootstrap(
         withoutPackagePolicies(component.html),
-        `<script>(${installSandboxTheme.toString()})(${json(channel)},${json(contract.outline.theme)},${json(appearanceTokens())});window.addEventListener('keydown',event=>{if(event.key==='Escape'){event.preventDefault();parent.postMessage({channel:${json(channel)},type:'showai:outline-action',action:'collapse'},'*');}},true);</script><script id="showai-component-data" type="application/json">${json({ channel, props: contract.props, readOnly: true, outline: contract.outline })}</script>`,
+        `<script>(${installSandboxTheme.toString()})(${json(channel)},${json(contract.outline.theme)},${json(appearanceTokens())});window.addEventListener('keydown',event=>{if(event.key==='Escape'){event.preventDefault();parent.postMessage({channel:${json(channel)},type:'showai:outline-action',action:'collapse'},'*');}},true);</script><script id="showai-component-data" type="application/json">${json({ channel, props: contract.props, runtimeCapabilities: { data: 1, pageOutline: 1 }, readOnly: true, outline: contract.outline })}</script>`,
       ),
     [component.html, channel],
   );
@@ -127,6 +131,14 @@ function OutlineFrame({
         return;
       const data = event.data,
         value = current.current.contract;
+      if (
+        replyComponentRequest(event, frame.current?.contentWindow, channel, {
+          contract: component.contract ?? { version: 1 },
+          data: value.props,
+          services: outlineRuntimeServices(value),
+        })
+      )
+        return;
       if (data.type === "showai:ready") {
         clearTimeout(timer);
         send();

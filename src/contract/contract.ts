@@ -1,5 +1,6 @@
 import { CAPACITY, assertContent } from "../portable/capacity.mjs";
 import { walk } from "../document/walk.mjs";
+import { validateComponentContract } from "./component-contract.mjs";
 import type { ShowDocument } from "../types";
 import type {
   CompiledComponent,
@@ -48,7 +49,7 @@ export function assertJsonValue(value: unknown, depth = 0): void {
 export function componentWidgetData(
   component: Pick<
     CompiledComponent,
-    "id" | "version" | "integrity" | "defaultData"
+    "id" | "version" | "integrity" | "defaultData" | "contract"
   >,
   props: Record<string, unknown> = component.defaultData,
 ): Record<string, unknown> {
@@ -60,6 +61,7 @@ export function componentWidgetData(
       version: component.version,
       integrity: component.integrity,
       props: structuredClone(props),
+      ...(component.contract ? { contract: component.contract } : {}),
     }),
   };
 }
@@ -106,6 +108,9 @@ export function readCustomBlockData(value: unknown): CustomBlockData {
     componentId: data.componentId,
     version: data.version,
     props: data.props as Record<string, unknown>,
+    ...(data.contract
+      ? { contract: validateComponentContract(data.contract) }
+      : {}),
     ...(data.integrity ? { integrity: data.integrity as string } : {}),
     ...(data.scope ? { scope: data.scope as CustomComponentRef["scope"] } : {}),
   };

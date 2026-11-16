@@ -116,11 +116,7 @@ export const catalogTools: ToolDeclaration[] = [
     name: "catalog_describe",
     access: "read",
     description: ({ localFiles }) =>
-      `Describe a component or template. view: summary (default), guide (use contract, schema, example), parameters (paged by parameterPath/offset/limit), development, examples, dependencies, source or full.${
-        localFiles
-          ? " With view source, out (absolute folder) writes the component's whole package there for editing and component_save directory."
-          : ""
-      }`,
+      `Describe component/template. contract: objects.${localFiles ? " source+out: editable package." : ""}`,
     input: ({ localFiles }) => ({
       id: z.string(),
       kind: z.enum(["component", "template", "importer"]).optional(),
@@ -128,6 +124,12 @@ export const catalogTools: ToolDeclaration[] = [
       version: z.string().optional(),
       integrity: z.string().optional(),
       view: z.enum(CATALOG_VIEWS).optional(),
+      instance: z
+        .object({ pageId: z.string().min(1), blockId: z.string().min(1) })
+        .strict()
+        .optional(),
+      objectOffset: z.number().int().nonnegative().optional(),
+      objectLimit: z.number().int().min(1).max(500).optional(),
       parameterPath: z.string().min(1).max(500).optional(),
       parameterOffset: z.number().int().nonnegative().optional(),
       parameterLimit: z.number().int().min(1).max(50).optional(),

@@ -1,6 +1,12 @@
 import { translator } from "../../i18n";
 import messages from "../../i18n/messages/componentValidation";
 
+export function missingComponentCapability(message: string) {
+  return message.match(
+    /Required component host capability unavailable: ([A-Za-z][A-Za-z0-9]*)/,
+  )?.[1];
+}
+
 export interface ValidationIssue {
   path: (string | number)[];
   rule:

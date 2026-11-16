@@ -11104,7 +11104,9 @@
           "opaque": true,
           "omission": {
             "behavior": "fallback",
-            "computedFrom": ["levels[].component"],
+            "computedFrom": [
+              "levels[].component"
+            ],
             "description": "仅使用 component 简写时生成包含该组件的单节点 doc。"
           }
         },
@@ -11134,7 +11136,10 @@
           "meaning": "本层 content 内发出事件的组件块 attrs.id。多个组件时必须明确指定。",
           "omission": {
             "behavior": "fallback",
-            "computedFrom": ["levels[].content", "levels[].component"],
+            "computedFrom": [
+              "levels[].content",
+              "levels[].component"
+            ],
             "description": "本层只有一个组件时使用其块 ID；有多个组件时拒绝省略。"
           }
         },
@@ -11157,6 +11162,15 @@
         {
           "path": "levels[].bindings[].to",
           "meaning": "目标直接子层 ID，其 parentId 必须等于本层 ID。"
+        },
+        {
+          "path": "levels[].bindings[].event",
+          "meaning": "源组件契约声明的请求事件名称。",
+          "omission": {
+            "behavior": "fallback",
+            "value": "activate",
+            "description": "省略时绑定 activate 事件。"
+          }
         }
       ],
       "rules": [
@@ -11211,7 +11225,9 @@
         "视图不直接嵌套另一个 multi-level-view，使用 levels 表达多层关系。"
       ],
       "editing": {
-        "data": ["替换完整 levels 树、原生组件 props 与绑定。"],
+        "data": [
+          "替换完整 levels 树、原生组件 props 与绑定。"
+        ],
         "implementation": [
           "为新的对象事件接入 ComponentInteractions；自定义组件通过 onActivate(target) 发出事件，并用 activationTargets 判断已绑定目标。"
         ]

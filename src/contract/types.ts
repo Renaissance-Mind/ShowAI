@@ -117,6 +117,7 @@ export type ComponentCategory =
   | "other";
 
 export interface ComponentManifest {
+  contract?: import("./component-contract.mjs").ComponentContract;
   role?: "page-outline";
   pageOutlineProtocol?: 1;
   documentation?: import("./documentation").ComponentDocumentation;
@@ -155,9 +156,10 @@ export interface ComponentListing extends Omit<
 }
 
 export interface CompiledComponent extends ComponentMetadata {
+  presentationOnly?: "inline";
   html: string;
   schema: JsonSchema;
-  inline?: { script: string; styles: string };
+  inline?: { protocol?: number; script: string; styles: string };
 }
 
 export interface ComponentSource {
@@ -171,8 +173,11 @@ export interface ComponentSource {
 }
 
 export interface BuiltinComponentMetadata {
+  contract?: import("./component-contract.mjs").ComponentContract;
   documentation?: import("./documentation").ComponentDocumentation;
-  insertion?: { nodeType: "surface"; surfaceKind: "page" | "board" } | { nodeType: "region" };
+  insertion?:
+    | { nodeType: "surface"; surfaceKind: "page" | "board" }
+    | { nodeType: "region" };
   kind: string;
   replacedBy?: string;
   name: string;
@@ -201,6 +206,7 @@ export interface CustomComponentRef {
 }
 
 export interface CustomBlockData extends CustomComponentRef {
+  contract?: import("./component-contract.mjs").ComponentContract;
   props: Record<string, unknown>;
 }
 
@@ -239,6 +245,22 @@ export interface CustomComponentProps<
   data: T;
   onChange?: (data: T) => void;
   readOnly: boolean;
+  runtime?: import("./component-runtime.mjs").ComponentRuntime;
+  dataState?: ReturnType<
+    typeof import("../lib/component-editability.mjs").componentDataState
+  >;
+  inline?: boolean;
+  goTo?: (target: unknown) => boolean;
+  activationTargets?: readonly import("./component-contract.mjs").ComponentObject[];
+  onActivate?: (
+    target: import("./component-contract.mjs").ComponentObject,
+  ) => boolean;
+  viewState?: unknown;
+  onViewState?: (value: unknown) => void;
+  context?: import("./component-context.mjs").ComponentContextSnapshot;
+  onContext?: (
+    snapshot: import("./component-context.mjs").ComponentContextSnapshot,
+  ) => boolean;
 }
 
 export type {

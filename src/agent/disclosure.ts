@@ -5,12 +5,14 @@ import type {
   PackageRevisionRef,
 } from "../contract/types";
 import { componentSignature } from "../portable/component-signature.mjs";
+import { componentContract } from "../contract/component-contract.mjs";
 
 export const CATALOG_VIEWS = [
   "summary",
   "guide",
   "development",
   "parameters",
+  "contract",
   "schema",
   "examples",
   "source",
@@ -58,6 +60,8 @@ export function compareCatalogVersions(
   return 0;
 }
 export interface CatalogSummary {
+  componentProtocol?: string;
+  contractStatus?: string;
   kind: CatalogKind;
   id: string;
   name: string;
@@ -126,8 +130,7 @@ export function catalogSearchText(value: object): string {
   }
   for (const related of records(item.related)) add(related.purpose);
   const contributes = item.contributes as
-    | import("../contract/contributions").ComponentContributions
-    | undefined;
+    import("../contract/contributions").ComponentContributions | undefined;
   for (const command of contributes?.commands ?? []) {
     add(command.title);
     add(command.keywords);
@@ -184,6 +187,12 @@ export function summarizeCatalog(
     id,
     name: String(item.name ?? id),
     description: typeof item.description === "string" ? item.description : "",
+    ...(kind === "component"
+      ? {
+          componentProtocol: componentContract(item).protocol,
+          contractStatus: componentContract(item).status,
+        }
+      : {}),
     ...(signature ? { signature } : {}),
     scope,
     ...(kind === "template" && item.workflow

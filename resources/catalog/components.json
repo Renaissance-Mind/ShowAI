@@ -4094,7 +4094,7 @@
     "kind": "multi-level-view",
     "name": "多级组件视图",
     "description": "每层展示原生内容与已有组件，通过组件公开的稳定对象事件逐层展开；统一管理层级路径、返回和切换过渡。",
-    "version": "1.0.0",
+    "version": "1.1.0",
     "scenarios": [
       "把架构、流程、图表、表格和文字组织成可展开的完整结构。",
       "用组件公开的节点或条目事件驱动不同内容层级之间的跳转。"
@@ -4740,6 +4740,12 @@
                       "minLength": 1,
                       "maxLength": 200,
                       "description": "直接子视图 ID"
+                    },
+                    "event": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 200,
+                      "description": "源组件公开的请求事件名称，省略为 activate"
                     }
                   },
                   "required": [

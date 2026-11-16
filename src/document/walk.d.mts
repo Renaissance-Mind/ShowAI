@@ -14,7 +14,10 @@ export interface WalkOptions {
   owner?: JSONContent | null;
 }
 export const SKIP: unique symbol;
-export function widgetDocuments(data: unknown): JSONContent[];
+export function widgetDocuments(
+  data: unknown,
+  contract?: import("./component-definition.mjs").ComponentContract,
+): JSONContent[];
 export function walk(
   root: JSONContent,
   visit: (node: JSONContent, context: WalkContext) => unknown,

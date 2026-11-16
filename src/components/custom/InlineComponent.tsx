@@ -3,6 +3,14 @@ import {
   type ComponentTarget,
 } from "../blocks/component-interactions";
 import { componentActivationIssue } from "../../contract/component-activation.mjs";
+import { renderComponentContent } from "../blocks/component-content";
+import { createComponentRuntime } from "../../contract/component-runtime.mjs";
+import {
+  componentHostRequest,
+  outlineRuntimeServices,
+} from "../../contract/component-host";
+import { componentContract } from "../../contract/component-contract.mjs";
+import type { ComponentReceipt } from "../../contract/component-runtime.mjs";
 import { installIconTooltips } from "../../ui/icon-tooltip.mjs";
 import * as ReactRuntime from "react";
 import * as DomRuntime from "react-dom";
@@ -13,7 +21,7 @@ import { useEffect, useRef, useState } from "react";
 import type { CompiledComponent } from "../../contract/types";
 import type { PageOutlineComponentProps } from "../../document/page-outline.mjs";
 import { ComponentStatus } from "../blocks/ComponentStatus";
-import { isValidationMessage, readableValidation } from "./validation-messages";
+import { isValidationMessage, readableValidation, missingComponentCapability } from "./validation-messages";
 import { useTranslator } from "../../i18n/react";
 import messages from "../../i18n/messages/customComponents";
 import {
@@ -45,6 +53,11 @@ interface InlineModule {
       goTo: (target: unknown) => boolean;
       activationTargets?: readonly ComponentTarget[];
       onActivate?: (target: ComponentTarget) => boolean;
+      runtimeCapabilities?: Record<string, number>;
+      request?: (
+        operation: string,
+        input: unknown,
+      ) => Promise<ComponentReceipt>;
     },
   ): MountedComponent;
 }
@@ -95,6 +108,13 @@ export function InlineComponent({
       );
       return;
     }
+    if (
+      component.inline.protocol !== undefined &&
+      component.inline.protocol !== 1
+    ) {
+      setError(t("inlineProtocol", { version: component.inline.protocol }));
+      return;
+    }
     const shadow =
       container.current.shadowRoot ??
       container.current.attachShadow({ mode: "open" });
@@ -118,6 +138,8 @@ export function InlineComponent({
       dom: DomRuntime,
       jsx: JsxRuntime,
       jsxDev: JsxDevRuntime,
+      content: renderComponentContent,
+      runtime: createComponentRuntime,
     };
     const owner = container.current.closest<HTMLElement>(
       "[data-block-id],[data-surface-id]",
@@ -156,32 +178,74 @@ export function InlineComponent({
         return false;
       return requestNavigation(container.current ?? host, target);
     };
+    let startupFailed = false;
     globals[callbackKey] = (module: InlineModule) => {
-      mounted.current = module.mount(root, {
-        data: currentData.current,
-        outline: currentOutline.current,
-        onError: setError,
-        goTo,
-        activationTargets: activation.current.targets.map((target) => ({
-          ...target,
-        })),
-        onActivate: (target) => {
-          const issue = componentActivationIssue(target);
-          if (issue) throw new Error(issue);
-          if (navigator.userActivation && !navigator.userActivation.isActive)
-            return false;
-          return activation.current.activate(target);
-        },
-        ...(conversation
-          ? { onContext, context: handedOver.get(blockId!) }
-          : {}),
-      });
+      try {
+        mounted.current = module.mount(root, {
+          data: currentData.current,
+          outline: currentOutline.current,
+          onError: setError,
+          goTo,
+          runtimeCapabilities: {
+            ...componentContract(component).capabilities,
+            pageOutline: currentOutline.current ? 1 : 0,
+            databaseField: 0,
+            events: 1,
+            conversation: conversation ? 1 : 0,
+            view: 0,
+          },
+          request: (operation, input) =>
+            componentHostRequest({
+              contract: component.contract ?? { version: 1 },
+              data: currentData.current,
+              operation,
+              input,
+              gesture:
+                !navigator.userActivation || navigator.userActivation.isActive,
+              services: {
+                "event.emit": (value) =>
+                  activation.current.emit(
+                    value.name,
+                    value.target,
+                    value.payload,
+                  ),
+                "navigation.open": (value) => ({
+                  status: goTo(value) ? "handled" : "unhandled",
+                }),
+                "conversation.submit": conversation
+                  ? (snapshot) => ({
+                      status: onContext(snapshot) ? "handled" : "unhandled",
+                    })
+                  : undefined,
+                ...(currentOutline.current
+                  ? outlineRuntimeServices(currentOutline.current)
+                  : {}),
+              },
+            }),
+          activationTargets: activation.current.targets.map((target) => ({
+            ...target,
+          })),
+          onActivate: (target) => {
+            const issue = componentActivationIssue(target);
+            if (issue) throw new Error(issue);
+            if (navigator.userActivation && !navigator.userActivation.isActive)
+              return false;
+            return activation.current.activate(target);
+          },
+          ...(conversation
+            ? { onContext, context: handedOver.get(blockId!) }
+            : {}),
+        });
+      } catch (error) {
+        startupFailed = true;
+        setError(error instanceof Error ? error.message : String(error));
+      }
     };
     const script = document.createElement("script");
     script.textContent = `(()=>{${component.inline.script}\nglobalThis[${JSON.stringify(callbackKey)}](ShowAIInlineComponent);})();`;
     try {
       host.appendChild(script);
-      if (!mounted.current) setError(t("inlineBlocked"));
+      if (!mounted.current && !startupFailed) setError(t("inlineBlocked"));
     } finally {
       script.remove();
       delete globals[callbackKey];
@@ -204,6 +268,7 @@ export function InlineComponent({
       ),
     [data, outline, interactions.targets],
   );
+  const missingCapability = missingComponentCapability(error);
   return (
     <section aria-label={component.name} style={{ margin: "18px 0" }}>
       <div ref={container} />
@@ -213,6 +278,7 @@ export function InlineComponent({
           name={component.name}
           reference={`${component.id}@${component.version}`}
           error={error}
+          cause={missingCapability ? t("requiredCapability", { capability: missingCapability }) : undefined}
           issues={
             isValidationMessage(error)
               ? readableValidation(error)

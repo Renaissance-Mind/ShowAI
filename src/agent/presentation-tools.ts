@@ -1,4 +1,8 @@
 import { COMPONENT_PARAMETER_CAPABILITIES } from "../contract/component-parameters.mjs";
+import {
+  COMPONENT_PROTOCOL,
+  COMPONENT_CAPABILITIES,
+} from "../contract/component-contract.mjs";
 import { cdnReaderOrigins, cdnReaderUrls } from "../core/cdn-reader";
 import { workRecordsLocation } from "../core/work-records";
 import { CAPACITY } from "../portable/capacity.mjs";
@@ -348,6 +352,13 @@ export function registerPresentationTools(
           baseline: { tool: "guide", arguments: { topic: "presentation" } },
         },
         componentParameters: COMPONENT_PARAMETER_CAPABILITIES,
+        componentRuntime: {
+          inlineProtocol: 1,
+          protocol: COMPONENT_PROTOCOL,
+          capabilities: COMPONENT_CAPABILITIES,
+          discovery: { tool: "catalog_describe", view: "contract" },
+          compatibility: "legacy adapters; immutable package revisions",
+        },
         authoring: {
           available: options.privateProjects !== false,
           pageOperations: [
@@ -587,6 +598,8 @@ export function registerPresentationTools(
         parameterPath: z.string().min(1).max(500).optional(),
         parameterOffset: z.number().int().nonnegative().optional(),
         parameterLimit: z.number().int().min(1).max(50).optional(),
+        objectOffset: z.number().int().nonnegative().optional(),
+        objectLimit: z.number().int().min(1).max(500).optional(),
         knownHash: z
           .string()
           .regex(/^[a-f0-9]{64}$/)
@@ -751,25 +764,58 @@ export function registerPresentationTools(
           };
         }
         if (input.live && (mode !== "mcp-app" || !shown.inline))
-          throw new Error("This presentation cannot use a live MCP Apps view. Use ordinary presentation.");
+          throw new Error(
+            "This presentation cannot use a live MCP Apps view. Use ordinary presentation.",
+          );
         const renderedSource = input.live
-          ? shown.html.match(/<script\b[^>]*\bid=["']showai-data["'][^>]*>([\s\S]*?)<\/script>/i)?.[1]
+          ? shown.html.match(
+              /<script\b[^>]*\bid=["']showai-data["'][^>]*>([\s\S]*?)<\/script>/i,
+            )?.[1]
           : undefined;
-        if (input.live && !renderedSource) throw new Error("Live reader source is missing.");
-        const editableSources = input.live ? JSON.parse(shown.source).componentSources : undefined;
-        const live = input.live ? new PresentationSession(randomUUID(), JSON.stringify({
-          ...JSON.parse(renderedSource!), ...(editableSources ? { componentSources: editableSources } : {}),
-        })) : undefined;
+        if (input.live && !renderedSource)
+          throw new Error("Live reader source is missing.");
+        const editableSources = input.live
+          ? JSON.parse(shown.source).componentSources
+          : undefined;
+        const live = input.live
+          ? new PresentationSession(
+              randomUUID(),
+              JSON.stringify({
+                ...JSON.parse(renderedSource!),
+                ...(editableSources
+                  ? { componentSources: editableSources }
+                  : {}),
+              }),
+            )
+          : undefined;
         const snapshot = live?.snapshot();
         if (snapshot) {
           expireViews();
           if (liveViews.size >= 32)
-            throw new Error("Too many live presentations. Close one before creating another.");
-          liveViews.set(snapshot.viewId, { session: live!, projectId: library?.projectId, touched: Date.now() });
+            throw new Error(
+              "Too many live presentations. Close one before creating another.",
+            );
+          liveViews.set(snapshot.viewId, {
+            session: live!,
+            projectId: library?.projectId,
+            touched: Date.now(),
+          });
         }
         const result = mcpSuccess({
-          ...(snapshot ? { live: { viewId: snapshot.viewId, revision: snapshot.revision, complete: false },
-            blocks: (shown.document.content.content ?? []).map(node => ({ id: node.attrs?.id, type: node.type, kind: node.attrs?.kind })) } : {}),
+          ...(snapshot
+            ? {
+                live: {
+                  viewId: snapshot.viewId,
+                  revision: snapshot.revision,
+                  complete: false,
+                },
+                blocks: (shown.document.content.content ?? []).map((node) => ({
+                  id: node.attrs?.id,
+                  type: node.type,
+                  kind: node.attrs?.kind,
+                })),
+              }
+            : {}),
           ...(shown.title ? { title: shown.title } : {}),
           components: shown.components,
           delivery,

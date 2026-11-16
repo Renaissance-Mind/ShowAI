@@ -5,10 +5,33 @@ import "./block.css";
 import "./theme.css";
 export { GestureBoundary } from "./GestureBoundary";
 export {
+  ComponentRuntimeProvider,
+  useComponentRuntime,
+  useComponentAction,
+} from "./component-runtime";
+export { createComponentRuntime } from "../../contract/component-runtime.mjs";
+export {
+  componentObjects,
+  componentContract,
+  COMPONENT_PROTOCOL,
+  COMPONENT_CAPABILITIES,
+} from "../../contract/component-contract.mjs";
+export type {
+  ComponentContract,
+  ComponentObject,
+} from "../../contract/component-contract.mjs";
+export type {
+  ComponentRuntime,
+  ComponentReceipt,
+} from "../../contract/component-runtime.mjs";
+export {
   ComponentInteractions,
+  ComponentEventBoundary,
+  useComponentEvents,
   useComponentInteractions,
   sameComponentTarget,
   type ComponentTarget,
+  type ComponentEventBinding,
   type ComponentActivationProps,
 } from "./component-interactions";
 export {
@@ -82,3 +105,6 @@ export {
   operatorsOf,
   describeValueTypes,
 } from "../../datasets/value-types.mjs";
+
+export { ComponentContent } from "./component-content";
+export type { CustomComponentProps } from "../../contract/types";

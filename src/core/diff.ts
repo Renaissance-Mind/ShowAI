@@ -871,12 +871,20 @@ function applyOperation(
         if (node.type === "region") {
           validateRegionData(operation.props);
           if (operation.props.blocks !== undefined)
-            throw new CoreError("INVALID_DATA", "Change region children with component.insert or block operations; props.set only updates layout/name.");
+            throw new CoreError(
+              "INVALID_DATA",
+              "Change region children with component.insert or block operations; props.set only updates layout/name.",
+            );
           const { name, ...layout } = operation.props;
           const frame = draft.layout?.[operation.blockId];
-          if (!frame) throw new CoreError("INVALID_DATA", "Region has no layout frame.");
+          if (!frame)
+            throw new CoreError("INVALID_DATA", "Region has no layout frame.");
           draft.layout![operation.blockId] = { ...frame, ...layout };
-          if (name !== undefined) edit(operation.blockId, current => ({ ...current, attrs: { ...current.attrs, name } }));
+          if (name !== undefined)
+            edit(operation.blockId, (current) => ({
+              ...current,
+              attrs: { ...current.attrs, name },
+            }));
           break;
         }
         const data = node.attrs?.data;
@@ -914,7 +922,7 @@ function applyOperation(
         const node = target(operation.blockId);
         const data = node.attrs?.data;
         if (
-          node.type !== "widget" ||
+          !["widget", "inlineWidget"].includes(node.type ?? "") ||
           node.attrs?.kind !== "custom" ||
           !data ||
           typeof data !== "object" ||
@@ -945,6 +953,9 @@ function applyOperation(
           componentId: operation.componentId ?? rest.componentId,
           version: operation.version,
           integrity: operation.integrity,
+          ...(operation.contract !== undefined
+            ? { contract: operation.contract }
+            : {}),
         };
         try {
           readCustomBlockData(next);
