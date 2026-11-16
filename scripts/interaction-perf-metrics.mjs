@@ -19,6 +19,7 @@ export function installInteractionProbe() {
     frames: [],
     inputs: [],
     calls: [],
+    stages: [],
     active: false,
     previous: 0,
   };
@@ -27,6 +28,14 @@ export function installInteractionProbe() {
       new PerformanceObserver((list) =>
         list.getEntries().forEach(accept),
       ).observe({ type, buffered: true, ...extra });
+  };
+  window.__showaiNativePerf = (stage, duration) => {
+    if (state.active)
+      state.stages.push({
+        stage,
+        duration,
+        start: performance.now() - duration,
+      });
   };
   observe(
     "event",
@@ -65,6 +74,8 @@ export function installInteractionProbe() {
     "pointerup",
     "click",
     "keydown",
+    "input",
+    "beforeinput",
     "wheel",
   ])
     addEventListener(
@@ -78,6 +89,7 @@ export function installInteractionProbe() {
             trusted: e.isTrusted,
             x: e.clientX,
             y: e.clientY,
+            key: e.key,
             objectId:
               e.target instanceof Element
                 ? e.target
@@ -116,12 +128,14 @@ export function installInteractionProbe() {
       const inside = (e) => e.start >= state.start && e.start < state.end;
       const first = state.inputs.find((e) => e.type !== "pointermove");
       const release = state.inputs.findLast((e) => e.type === "pointerup");
+      const last = state.inputs.findLast((e) => e.type !== "pointermove");
       return {
         start: state.start,
         end: state.end,
         driverToReadyMs: state.end - state.start,
         inputToReadyMs: first ? state.end - first.eventAt : null,
         releaseToReadyMs: release ? state.end - release.eventAt : null,
+        lastInputToReadyMs: last ? state.end - last.eventAt : null,
         inputCount: state.inputs.length,
         inputs: state.inputs,
         trustedInput:
@@ -131,6 +145,7 @@ export function installInteractionProbe() {
         longTasks: state.longTasks.filter(inside),
         longFrames: state.longFrames.filter(inside),
         calls: state.calls.filter(inside),
+        stages: state.stages.filter(inside),
       };
     },
     attachHost() {
@@ -147,6 +162,9 @@ export function installInteractionProbe() {
           });
         }
       };
+    },
+    calls() {
+      return state.calls;
     },
   };
 }

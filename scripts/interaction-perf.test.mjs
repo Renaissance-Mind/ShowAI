@@ -12,7 +12,11 @@ import {
 } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { snapshotLibrary } from "./interaction-perf-fixture.mjs";
+import {
+  snapshotLibrary,
+  selectPerfPages,
+  workflowPages,
+} from "./interaction-perf-fixture.mjs";
 import { distribution } from "./interaction-perf-metrics.mjs";
 
 test("snapshot leaves a real WAL database unchanged and excludes sync credentials", async () => {
@@ -84,4 +88,38 @@ test("missing observations stay unavailable rather than becoming zero latency", 
     p95: 30,
     max: 30,
   });
+});
+
+test("workflow selection covers page sizes and excludes archived pages", () => {
+  const pages = [2000, 10000, 20000, 70000].map((text) => ({
+    pageId: String(text),
+    title: `Page ${text}`,
+    kind: "page",
+    text,
+    nodes: 100,
+    topObjects: 5,
+  }));
+  const board = {
+    pageId: "board",
+    title: "Sketch",
+    kind: "board",
+    text: 0,
+    nodes: 50,
+    topObjects: 10,
+  };
+  const catalog = [
+    ...pages,
+    board,
+    { ...pages[0], pageId: "archived", text: 500000, archived: true },
+  ];
+  const selected = selectPerfPages(catalog, {});
+  assert.equal(selected.document.text, 20000);
+  assert.deepEqual(
+    workflowPages(catalog, selected).map((p) => p.text),
+    [2000, 20000, 70000],
+  );
+  assert.equal(
+    workflowPages(catalog, { document: pages.at(-1), board }).length,
+    3,
+  );
 });

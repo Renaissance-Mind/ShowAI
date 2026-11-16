@@ -8,11 +8,14 @@ export function selectPerfPages(catalog, options) {
   const active = catalog.filter(
     (p) => !p.archived && !/验收|regression|smoke|测试|stress/i.test(p.title),
   );
+  const pages = active
+    .filter((p) => p.kind === "page" && p.text > 1000)
+    .sort((a, b) => a.text - b.text);
+  const substantial = pages.filter((p) => p.text > 5000);
+  const representative = substantial.length ? substantial : pages;
   const document = options.document
     ? catalog.find((p) => p.pageId === options.document)
-    : active
-        .filter((p) => p.kind === "page" && p.text > 1000)
-        .sort((a, b) => b.text - a.text)[0];
+    : representative[Math.floor(representative.length / 2)];
   const board = options.board
     ? catalog.find((p) => p.pageId === options.board)
     : active
@@ -27,6 +30,29 @@ export function selectPerfPages(catalog, options) {
     "Select active pages; archived pages are not in normal navigation",
   );
   return { document, board };
+}
+
+export function workflowPages(catalog, selected) {
+  const pages = catalog
+    .filter(
+      (p) =>
+        !p.archived &&
+        p.kind === "page" &&
+        p.text > 1000 &&
+        !/验收|regression|smoke|测试|stress/i.test(p.title),
+    )
+    .sort((a, b) => a.text - b.text);
+  const chosen = new Map(
+    [pages[0], selected.document, pages.at(-1)]
+      .filter(Boolean)
+      .map((p) => [p.pageId, p]),
+  );
+  if (chosen.size < 3 && pages.length > 2) {
+    const middle = pages.filter((p) => !chosen.has(p.pageId));
+    const page = middle[Math.floor(middle.length / 2)];
+    if (page) chosen.set(page.pageId, page);
+  }
+  return [...chosen.values()].sort((a, b) => a.text - b.text);
 }
 
 export async function snapshotLibrary(source, destination) {

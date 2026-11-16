@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { spawn, execFile } from "node:child_process";
+import { createHash } from "node:crypto";
 import { once } from "node:events";
 import {
   mkdir,
@@ -12,6 +13,7 @@ import {
   open,
   cp,
   copyFile,
+  rename,
 } from "node:fs/promises";
 import { join, resolve, sep } from "node:path";
 import { homedir, cpus, totalmem, platform } from "node:os";
@@ -19,6 +21,7 @@ import { promisify } from "node:util";
 import { parseArgs } from "node:util";
 import { build } from "esbuild";
 import { chromium } from "playwright-core";
+import { runWorkflows } from "./interaction-perf-workflows.mjs";
 import { rawSourcePlugin } from "./raw-source-plugin.mjs";
 import {
   snapshotLibrary,
@@ -38,17 +41,22 @@ const { values: args } = parseArgs({
     document: { type: "string" },
     board: { type: "string" },
     iterations: { type: "string", default: "10" },
+    suite: { type: "string", default: "all" },
     list: { type: "boolean" },
     help: { type: "boolean" },
   },
 });
 if (args.help) {
   console.log(
-    "node scripts/interaction-perf.mjs --source-home /library --output /existing/output [--iterations 10] [--document ID --board ID] [--list]\nResume an owned snapshot with --run /output/run-… . Source SQLite is opened read-only. Run npm run build first. PageDown is the page-turn scenario; this does not measure PDF pagination or physical display latency.",
+    "node scripts/interaction-perf.mjs --source-home /library --output /existing/output [--suite all|interactions|workflow] [--iterations 10] [--document ID --board ID] [--list]\nResume an owned snapshot with --run /output/run-… . Source SQLite is opened read-only. Run npm run build first. PageDown is the page-turn scenario; this does not measure PDF pagination or physical display latency.",
   );
   process.exit(0);
 }
 const root = resolve(import.meta.dirname, "..");
+assert.ok(
+  ["all", "interactions", "workflow"].includes(args.suite),
+  "--suite must be all, interactions or workflow",
+);
 const iterations = Number(args.iterations);
 assert.ok(Number.isInteger(iterations) && iterations >= 1 && iterations <= 100);
 const execute = promisify(execFile);
@@ -93,7 +101,10 @@ const env = {
   SHOWAI_BACKGROUND: "1",
 };
 const report = {
-  version: 1,
+  version: 2,
+  suite: args.suite,
+  resources: [],
+  startups: [],
   startedAt: new Date().toISOString(),
   output,
   snapshot,
@@ -108,7 +119,7 @@ const report = {
     "rAF intervals are main-thread scheduling opportunities, not display FPS",
     "Event Timing omits continuous inputs and entries below its threshold",
     "Page turn uses PageDown in a real document; PDF/slide pagination is not covered",
-    "Catalog discovery warms backend caches; first-open refers to a fresh renderer, not cold disk",
+    "Fixture discovery runs separately; the measured backend is fresh, but filesystem caches are not flushed",
   ],
 };
 let server,
@@ -132,6 +143,33 @@ try {
     home,
     "Snapshot directory must not be a symlink",
   );
+  const previous = await readFile(join(output, "results.json"), "utf8").catch(
+    (error) => {
+      if (error.code !== "ENOENT") throw error;
+      return null;
+    },
+  );
+  if (previous) {
+    const archived = join(
+      output,
+      "measurements",
+      JSON.parse(previous).startedAt.replace(/[^0-9A-Za-z]/g, "-"),
+    );
+    await mkdir(archived, { recursive: true });
+    for (const name of [
+      "results.json",
+      "report.md",
+      "session.json",
+      "server.log",
+      "server-performance.json",
+      "selection.json",
+      "evidence",
+    ])
+      await rename(join(output, name), join(archived, name)).catch((error) => {
+        if (error.code !== "ENOENT") throw error;
+      });
+    report.previousMeasurement = archived;
+  }
   await mkdir(runtime, { recursive: true });
   await mkdir(profile, { recursive: true });
   await mkdir(join(output, "evidence"), { recursive: true });
@@ -159,21 +197,38 @@ try {
     join(runtime, "index-worker.mjs"),
   );
   env.SHOWAI_INDEX_WORKER = join(runtime, "index-worker.mjs");
-  server = spawn(
+  const serverArgs = [
+    entry,
+    home,
+    profile,
+    join(runtime, "web"),
+    join(root, "dist-runtime/scripts/cli.mjs"),
+    output,
+    args.document ?? "",
+    args.board ?? "",
+    args.list ? "list" : "",
+  ];
+  const preparation = await execute(
     process.execPath,
-    [
-      entry,
-      home,
-      profile,
-      join(runtime, "web"),
-      join(root, "dist-runtime/scripts/cli.mjs"),
-      output,
-      args.document ?? "",
-      args.board ?? "",
-      args.list ? "list" : "",
-    ],
-    { env, cwd: root, stdio: ["ignore", "pipe", "pipe"] },
+    [...serverArgs, "prepare"],
+    { env, cwd: root, timeout: 300000, maxBuffer: 4 * 1024 * 1024 },
   );
+  await writeFile(
+    join(output, "preparation.log"),
+    preparation.stdout + preparation.stderr,
+  );
+  report.preparation = JSON.parse(
+    preparation.stdout
+      .trim()
+      .split("\n")
+      .find((line) => line.startsWith('{"prepared":')),
+  );
+  const backendStarted = performance.now();
+  server = spawn(process.execPath, [...serverArgs, "serve"], {
+    env,
+    cwd: root,
+    stdio: ["ignore", "pipe", "pipe", "ipc"],
+  });
   server.stderr.on("data", (chunk) => {
     serverLog += chunk;
   });
@@ -205,7 +260,12 @@ try {
       reject(new Error(`Server exited ${code}: ${serverLog}`));
     });
   });
-  report.server = startup;
+  report.server = { ...startup, startupMs: performance.now() - backendStarted };
+  assert.notEqual(
+    report.server.pid,
+    report.preparation.pid,
+    "Preparation must not warm the measured backend process",
+  );
   await json(join(output, "session.json"), {
     root,
     branch: (
@@ -234,6 +294,23 @@ try {
     const browserCdp = await browser.newBrowserCDPSession();
     const gpu = await browserCdp.send("SystemInfo.getInfo");
     report.environment = {
+      harnessHash: createHash("sha256")
+        .update(
+          (
+            await Promise.all(
+              [
+                "interaction-perf.mjs",
+                "interaction-perf-metrics.mjs",
+                "interaction-perf-workflows.mjs",
+                "interaction-perf-server.ts",
+                "interaction-perf-fixture.mjs",
+              ].map((name) => readFile(join(root, "scripts", name))),
+            )
+          )
+            .map((bytes) => bytes.toString())
+            .join("\n"),
+        )
+        .digest("hex"),
       browser: browser.version(),
       gpu: gpu.gpu,
       platform: platform(),
@@ -267,6 +344,7 @@ try {
       );
       cdp = await context.newCDPSession(page);
       await cdp.send("Performance.enable");
+      const navigating = performance.now();
       await page.goto(`${startup.url}?project=${document.projectId}`);
       await page.locator(".studio-sidebar").waitFor();
       await page.waitForFunction(
@@ -277,6 +355,13 @@ try {
       await page.evaluate(() => window.__interactionPerf.attachHost());
       const info = await page.evaluate(() => window.showai.invoke("app:info"));
       assert.equal(info.home, home, "Workbench must use the owned snapshot");
+      report.startups.push({
+        frontendToWorkbenchReadyMs: performance.now() - navigating,
+        navigation: await page.evaluate(() =>
+          performance.getEntriesByType("navigation")[0]?.toJSON(),
+        ),
+        context: "fresh browser context",
+      });
       return context;
     }
     const surface = (target) =>
@@ -344,7 +429,14 @@ try {
           ({ name, value }) => [name, value],
         ),
       );
-    async function measure(name, action, index, diagnostic = false, verify) {
+    async function measure(
+      name,
+      action,
+      index,
+      diagnostic = false,
+      verify,
+      inputRequired = true,
+    ) {
       await delay(250);
       const before = await metrics();
       if (diagnostic) {
@@ -366,7 +458,7 @@ try {
       const after = await metrics();
       await delay(120);
       const sample = await page.evaluate(() => window.__interactionPerf.read());
-      if (!sample.trustedInput)
+      if (inputRequired && !sample.trustedInput)
         failure ??= `${name} did not receive browser input`;
       if (!failure && verify) {
         try {
@@ -375,10 +467,27 @@ try {
           failure = error.stack ?? String(error);
         }
       }
+      sample.inputRequired = inputRequired;
       sample.name = name;
       sample.index = index;
       sample.assertion = assertion;
       sample.failure = failure;
+      if (failure)
+        sample.failureContext = await page.evaluate(() => ({
+          active: document.activeElement?.outerHTML.slice(0, 600),
+          selection: window
+            .getSelection()
+            ?.anchorNode?.parentElement?.outerHTML.slice(0, 600),
+          editable: [
+            ...document.querySelectorAll(
+              '.ProseMirror[contenteditable="true"]',
+            ),
+          ].map((el) => ({
+            visible: !!el.getClientRects().length,
+            className: el.className,
+            text: el.textContent.slice(-120),
+          })),
+        }));
       sample.raf = distribution(sample.rafIntervals);
       sample.mainThread = Object.fromEntries(
         [
@@ -444,307 +553,402 @@ try {
       );
       return sample;
     }
-    let context = await newPage();
-    for (let i = 0; i < iterations; i++) {
-      if (i) {
-        await context.close();
-        context = await newPage();
+    let messageId = 0;
+    const backend = (message) =>
+      new Promise((done, reject) => {
+        const id = `perf-${++messageId}`;
+        const timeout = setTimeout(() => {
+          server.off("message", receive);
+          reject(new Error(`Backend measurement timed out: ${message.type}`));
+        }, 30000);
+        const receive = (reply) => {
+          if (reply?.id !== id) return;
+          clearTimeout(timeout);
+          server.off("message", receive);
+          if (reply.error) reject(new Error(reply.error));
+          else done(reply.data);
+        };
+        server.on("message", receive);
+        server.send({ ...message, id });
+      });
+    const resource = async (name, durationMs) => {
+      const start = performance.now();
+      const before = {
+        frontend: await metrics(),
+        backend: await backend({ type: "perf-resources" }),
+        calls: await page.evaluate(
+          () => window.__interactionPerf.calls().length,
+        ),
+      };
+      await delay(durationMs);
+      const after = {
+        frontend: await metrics(),
+        backend: await backend({ type: "perf-resources" }),
+      };
+      const calls = await page.evaluate(
+        (from) => window.__interactionPerf.calls().slice(from),
+        before.calls,
+      );
+      const record = {
+        name,
+        durationMs: performance.now() - start,
+        before,
+        after,
+        frontendTaskMs:
+          (after.frontend.TaskDuration - before.frontend.TaskDuration) * 1000,
+        frontendScriptMs:
+          (after.frontend.ScriptDuration - before.frontend.ScriptDuration) *
+          1000,
+        backendCpuMs:
+          (after.backend.cpu.user +
+            after.backend.cpu.system -
+            (before.backend.cpu.user + before.backend.cpu.system)) /
+          1000,
+        calls,
+      };
+      report.resources.push(record);
+      await save();
+    };
+    let context;
+    if (args.suite !== "workflow") {
+      context = await newPage();
+      for (let i = 0; i < iterations; i++) {
+        if (i) {
+          await context.close();
+          context = await newPage();
+        }
+        await page
+          .locator(`[data-open-page="${document.pageId}"]`)
+          .filter({ visible: true })
+          .first()
+          .waitFor();
+        const sample = await measure(
+          "open",
+          async () => {
+            await clickPage(document);
+            return {
+              targetPage: document.pageId,
+              contentReady: true,
+              cache: "fresh-browser-context/warm-backend",
+            };
+          },
+          i,
+        );
+        assert.ok(!sample.failure, "Opening failed; see the recorded sample");
       }
-      await page
-        .locator(`[data-open-page="${document.pageId}"]`)
-        .filter({ visible: true })
-        .first()
-        .waitFor();
-      const sample = await measure(
+      await context.close();
+      context = await newPage();
+      await measure(
         "open",
         async () => {
           await clickPage(document);
-          return {
-            targetPage: document.pageId,
-            contentReady: true,
-            cache: "fresh-browser-context/warm-backend",
-          };
+          return { targetPage: document.pageId, contentReady: true };
         },
-        i,
+        0,
+        true,
       );
-      assert.ok(!sample.failure, "Opening failed; see the recorded sample");
-    }
-    await context.close();
-    context = await newPage();
-    await measure(
-      "open",
-      async () => {
-        await clickPage(document);
-        return { targetPage: document.pageId, contentReady: true };
-      },
-      0,
-      true,
-    );
-    const pageTurn = async () => {
-      const selector = surface(document);
-      const before = await page
-        .locator(selector)
-        .filter({ visible: true })
-        .first()
-        .evaluate((el) => ({
-          top: el.scrollTop,
-          height: el.clientHeight,
-          total: el.scrollHeight,
-        }));
-      assert.ok(
-        before.total > before.height * 1.5,
-        "The selected document is not long enough to turn a page",
-      );
-      await page.keyboard.press("PageDown");
-      await page.waitForFunction(
-        ({ selector, top }) =>
-          [...document.querySelectorAll(selector)].some(
-            (el) => el.getClientRects().length && el.scrollTop > top + 100,
-          ),
-        { selector, top: before.top },
-      );
-      let previous = -1,
-        stable = 0,
-        current;
-      for (let tries = 0; tries < 80 && stable < 3; tries++) {
-        current = await page
+      const pageTurn = async () => {
+        const selector = surface(document);
+        const before = await page
           .locator(selector)
           .filter({ visible: true })
           .first()
-          .evaluate((el) => el.scrollTop);
-        stable = Math.abs(current - previous) < 0.5 ? stable + 1 : 0;
-        previous = current;
-        await delay(20);
-      }
-      assert.ok(stable >= 3, "PageDown did not settle");
-      await ready(document);
-      return {
-        key: "PageDown",
-        before: before.top,
-        after: current,
-        distance: current - before.top,
-        settlementSamplingMs: 20,
+          .evaluate((el) => ({
+            top: el.scrollTop,
+            height: el.clientHeight,
+            total: el.scrollHeight,
+          }));
+        assert.ok(
+          before.total > before.height * 1.5,
+          "The selected document is not long enough to turn a page",
+        );
+        await page.keyboard.press("PageDown");
+        await page.waitForFunction(
+          ({ selector, top }) =>
+            [...document.querySelectorAll(selector)].some(
+              (el) => el.getClientRects().length && el.scrollTop > top + 100,
+            ),
+          { selector, top: before.top },
+        );
+        let previous = -1,
+          stable = 0,
+          current;
+        for (let tries = 0; tries < 80 && stable < 3; tries++) {
+          current = await page
+            .locator(selector)
+            .filter({ visible: true })
+            .first()
+            .evaluate((el) => el.scrollTop);
+          stable = Math.abs(current - previous) < 0.5 ? stable + 1 : 0;
+          previous = current;
+          await delay(20);
+        }
+        assert.ok(stable >= 3, "PageDown did not settle");
+        await ready(document);
+        return {
+          key: "PageDown",
+          before: before.top,
+          after: current,
+          distance: current - before.top,
+          settlementSamplingMs: 20,
+        };
       };
-    };
-    async function prepareTurn() {
-      const scroll = page
-        .locator(surface(document))
+      async function prepareTurn() {
+        const scroll = page
+          .locator(surface(document))
+          .filter({ visible: true })
+          .first();
+        await scroll.evaluate((el) => {
+          el.scrollTop = 0;
+        });
+        const box = await scroll.boundingBox();
+        await page.mouse.click(box.x + box.width - 20, box.y + 100);
+        await delay(200);
+      }
+      for (let i = 0; i < iterations; i++) {
+        await prepareTurn();
+        await measure("page-turn", pageTurn, i);
+      }
+      await prepareTurn();
+      await measure("page-turn", pageTurn, 0, true);
+      await clickPage(board, ["ControlOrMeta"]);
+      let boardTab = await page
+        .locator('button[id^="workspace-tab-"][aria-selected="true"]')
+        .getAttribute("id");
+      const boardRoot = page
+        .locator(surface(board))
         .filter({ visible: true })
         .first();
-      await scroll.evaluate((el) => {
-        el.scrollTop = 0;
-      });
-      const box = await scroll.boundingBox();
-      await page.mouse.click(box.x + box.width - 20, box.y + 100);
-      await delay(200);
-    }
-    for (let i = 0; i < iterations; i++) {
-      await prepareTurn();
-      await measure("page-turn", pageTurn, i);
-    }
-    await prepareTurn();
-    await measure("page-turn", pageTurn, 0, true);
-    await clickPage(board, ["ControlOrMeta"]);
-    let boardTab = await page
-      .locator('button[id^="workspace-tab-"][aria-selected="true"]')
-      .getAttribute("id");
-    const boardRoot = page
-      .locator(surface(board))
-      .filter({ visible: true })
-      .first();
-    const candidatesForDrag = await boardRoot
-      .locator(".surface-world > [data-surface-id]")
-      .evaluateAll((elements) =>
-        elements
-          .filter(
-            (el) =>
-              el.getClientRects().length && !el.classList.contains("is-locked"),
-          )
-          .map((el) => {
-            const r = el.getBoundingClientRect();
-            return {
-              id: el.dataset.surfaceId,
-              x: r.x,
-              y: r.y,
-              width: r.width,
-              height: r.height,
-            };
-          })
-          .filter(
-            (r) =>
-              r.width > 30 &&
-              r.height > 30 &&
-              r.x > 250 &&
-              r.y > 100 &&
-              r.x + r.width < innerWidth - 130 &&
-              r.y < innerHeight - 150,
-          ),
-      );
-    assert.ok(
-      candidatesForDrag.length,
-      "No visible movable object fits the drag trajectory; select another real board",
-    );
-    const objectId = candidatesForDrag[0].id;
-    const object = boardRoot.locator(`[data-surface-id="${objectId}"]`).first();
-    let dragSign = 1;
-    const drag = async () => {
-      const start = await object.evaluate((el) => {
-        const outline = el.querySelector(".board-object-outline");
-        if (outline) {
-          const r = outline.getBoundingClientRect();
-          return { x: r.x + r.width / 2, y: r.y + r.height / 2 };
-        }
-        const path = el.querySelector("svg path");
-        if (path instanceof SVGPathElement && path.getTotalLength()) {
-          const p = path.getPointAtLength(path.getTotalLength() * 0.4);
-          const point = new DOMPoint(p.x, p.y).matrixTransform(
-            path.getScreenCTM(),
-          );
-          return { x: point.x, y: point.y };
-        }
-        const r = el.getBoundingClientRect();
-        return { x: r.x + r.width / 2, y: r.y + 8 };
-      });
-      const initial = await object.evaluate((el) => ({
-        left: el.style.left,
-        top: el.style.top,
-      }));
-      await page.mouse.move(start.x, start.y);
-      await page.mouse.down();
-      const began = performance.now();
-      const samples = [];
-      for (let step = 1; step <= 45; step++) {
-        const expectedAt = began + (step * 1000) / 45;
-        await delay(Math.max(0, expectedAt - performance.now()));
-        await page.mouse.move(
-          start.x + (dragSign * 90 * step) / 45,
-          start.y + (dragSign * 45 * step) / 45,
+      const candidatesForDrag = await boardRoot
+        .locator(".surface-world > [data-surface-id]")
+        .evaluateAll((elements) =>
+          elements
+            .filter(
+              (el) =>
+                el.getClientRects().length &&
+                !el.classList.contains("is-locked"),
+            )
+            .map((el) => {
+              const r = el.getBoundingClientRect();
+              return {
+                id: el.dataset.surfaceId,
+                x: r.x,
+                y: r.y,
+                width: r.width,
+                height: r.height,
+              };
+            })
+            .filter(
+              (r) =>
+                r.width > 30 &&
+                r.height > 30 &&
+                r.x > 250 &&
+                r.y > 100 &&
+                r.x + r.width < innerWidth - 130 &&
+                r.y < innerHeight - 150,
+            ),
         );
-        samples.push(performance.now() - expectedAt);
-      }
-      const during = await object.evaluate((el) => ({
-        left: el.style.left,
-        top: el.style.top,
-        selected: el.classList.contains("is-selected"),
-      }));
-      await page.mouse.up();
-      await page.evaluate(() => new Promise(requestAnimationFrame));
-      const final = await object.evaluate((el) => ({
-        left: el.style.left,
-        top: el.style.top,
-      }));
       assert.ok(
-        final.left !== initial.left || final.top !== initial.top,
-        `Dragged object did not move: ${JSON.stringify({ objectId, start, initial, during, final })}`,
+        candidatesForDrag.length,
+        "No visible movable object fits the drag trajectory; select another real board",
       );
-      dragSign *= -1;
-      return {
-        objectId,
-        start,
-        initial,
-        during,
-        final,
-        trajectoryMs: 1000,
-        steps: 45,
-        driverScheduleLatenessMs: distribution(samples),
-      };
-    };
-    const verifyDrag = async (assertion) => {
-      await page.waitForFunction(
-        async ({ projectId, pageId, objectId, final }) => {
-          const record = await window.showai.invoke("pages:get", {
-            projectId,
-            pageId,
-          });
-          const frame = record.document.layout?.[objectId];
-          return (
-            frame &&
-            Math.abs(frame.x - parseFloat(final.left)) < 0.5 &&
-            Math.abs(frame.y - parseFloat(final.top)) < 0.5
+      const objectId = candidatesForDrag[0].id;
+      const object = boardRoot
+        .locator(`[data-surface-id="${objectId}"]`)
+        .first();
+      let dragSign = 1;
+      const drag = async () => {
+        const start = await object.evaluate((el) => {
+          const outline = el.querySelector(".board-object-outline");
+          if (outline) {
+            const r = outline.getBoundingClientRect();
+            return { x: r.x + r.width / 2, y: r.y + r.height / 2 };
+          }
+          const path = el.querySelector("svg path");
+          if (path instanceof SVGPathElement && path.getTotalLength()) {
+            const p = path.getPointAtLength(path.getTotalLength() * 0.4);
+            const point = new DOMPoint(p.x, p.y).matrixTransform(
+              path.getScreenCTM(),
+            );
+            return { x: point.x, y: point.y };
+          }
+          const r = el.getBoundingClientRect();
+          return { x: r.x + r.width / 2, y: r.y + 8 };
+        });
+        const initial = await object.evaluate((el) => ({
+          left: el.style.left,
+          top: el.style.top,
+        }));
+        await page.mouse.move(start.x, start.y);
+        await page.mouse.down();
+        const began = performance.now();
+        const samples = [];
+        for (let step = 1; step <= 45; step++) {
+          const expectedAt = began + (step * 1000) / 45;
+          await delay(Math.max(0, expectedAt - performance.now()));
+          await page.mouse.move(
+            start.x + (dragSign * 90 * step) / 45,
+            start.y + (dragSign * 45 * step) / 45,
           );
-        },
-        {
-          projectId: board.projectId,
-          pageId: board.pageId,
+          samples.push(performance.now() - expectedAt);
+        }
+        const during = await object.evaluate((el) => ({
+          left: el.style.left,
+          top: el.style.top,
+          selected: el.classList.contains("is-selected"),
+        }));
+        await page.mouse.up();
+        await page.evaluate(() => new Promise(requestAnimationFrame));
+        const final = await object.evaluate((el) => ({
+          left: el.style.left,
+          top: el.style.top,
+        }));
+        assert.ok(
+          final.left !== initial.left || final.top !== initial.top,
+          `Dragged object did not move: ${JSON.stringify({ objectId, start, initial, during, final })}`,
+        );
+        dragSign *= -1;
+        return {
           objectId,
-          final: assertion.final,
-        },
-        { timeout: 10000, polling: 200 },
-      );
-      assertion.persistedInSnapshot = true;
-    };
-    for (let i = 0; i < iterations; i++)
-      await measure("drag", drag, i, false, verifyDrag);
-    await measure("drag", drag, 0, true, verifyDrag);
-    await clickPage(document, ["ControlOrMeta"]);
-    let documentTab = await page
-      .locator('button[id^="workspace-tab-"][aria-selected="true"]')
-      .getAttribute("id");
-    assert.notEqual(
-      boardTab,
-      documentTab,
-      "Switch benchmark needs two different retained tabs",
-    );
-    let nextTarget = board;
-    const switchTab = async () => {
-      const target = nextTarget;
-      await page
-        .locator(`[id="${target === board ? boardTab : documentTab}"]`)
-        .click();
-      await ready(target);
-      nextTarget = target === board ? document : board;
-      return { targetPage: target.pageId, retainedTab: true };
-    };
-    for (let i = 0; i < iterations; i++) {
-      const sample = await measure("switch", switchTab, i);
-      if (sample.failure) break;
-    }
-    await context.close();
-    context = await newPage();
-    await clickPage(board, ["ControlOrMeta"]);
-    boardTab = await page
-      .locator('button[id^="workspace-tab-"][aria-selected="true"]')
-      .getAttribute("id");
-    await clickPage(document, ["ControlOrMeta"]);
-    documentTab = await page
-      .locator('button[id^="workspace-tab-"][aria-selected="true"]')
-      .getAttribute("id");
-    nextTarget = board;
-    await measure("switch", switchTab, 0, true);
-    report.summary = Object.fromEntries(
-      ["open", "page-turn", "switch", "drag"].map((name) => {
-        const all = report.scenarios.filter((s) => s.name === name);
-        const samples = all.filter((s) => !s.failure);
-        return [
-          name,
-          {
-            attempted: all.length,
-            failed: all.length - samples.length,
-            inputToContentReadyMs:
-              name === "drag"
-                ? null
-                : distribution(samples.map((s) => s.inputToReadyMs)),
-            releaseToReadyMs:
-              name === "drag"
-                ? distribution(samples.map((s) => s.releaseToReadyMs))
-                : null,
-            actionDurationMs: distribution(
-              samples.map((s) => s.inputToReadyMs),
-            ),
-            mainThreadScriptMs: distribution(
-              samples.map((s) => s.mainThread.ScriptDuration * 1000),
-            ),
-            layoutMs: distribution(
-              samples.map((s) => s.mainThread.LayoutDuration * 1000),
-            ),
-            rafIntervalMs: distribution(samples.flatMap((s) => s.rafIntervals)),
-            longTaskCount: samples.reduce(
-              (sum, s) => sum + s.longTasks.length,
-              0,
-            ),
+          start,
+          initial,
+          during,
+          final,
+          trajectoryMs: 1000,
+          steps: 45,
+          driverScheduleLatenessMs: distribution(samples),
+        };
+      };
+      const verifyDrag = async (assertion) => {
+        await page.waitForFunction(
+          async ({ projectId, pageId, objectId, final }) => {
+            const record = await window.showai.invoke("pages:get", {
+              projectId,
+              pageId,
+            });
+            const frame = record.document.layout?.[objectId];
+            return (
+              frame &&
+              Math.abs(frame.x - parseFloat(final.left)) < 0.5 &&
+              Math.abs(frame.y - parseFloat(final.top)) < 0.5
+            );
           },
-        ];
-      }),
+          {
+            projectId: board.projectId,
+            pageId: board.pageId,
+            objectId,
+            final: assertion.final,
+          },
+          { timeout: 10000, polling: 200 },
+        );
+        assertion.persistedInSnapshot = true;
+      };
+      for (let i = 0; i < iterations; i++)
+        await measure("drag", drag, i, false, verifyDrag);
+      await measure("drag", drag, 0, true, verifyDrag);
+      await clickPage(document, ["ControlOrMeta"]);
+      let documentTab = await page
+        .locator('button[id^="workspace-tab-"][aria-selected="true"]')
+        .getAttribute("id");
+      assert.notEqual(
+        boardTab,
+        documentTab,
+        "Switch benchmark needs two different retained tabs",
+      );
+      let nextTarget = board;
+      const switchTab = async () => {
+        const target = nextTarget;
+        await page
+          .locator(`[id="${target === board ? boardTab : documentTab}"]`)
+          .click();
+        await ready(target);
+        nextTarget = target === board ? document : board;
+        return { targetPage: target.pageId, retainedTab: true };
+      };
+      for (let i = 0; i < iterations; i++) {
+        const sample = await measure("switch", switchTab, i);
+        if (sample.failure) break;
+      }
+      await context.close();
+      context = await newPage();
+      await clickPage(board, ["ControlOrMeta"]);
+      boardTab = await page
+        .locator('button[id^="workspace-tab-"][aria-selected="true"]')
+        .getAttribute("id");
+      await clickPage(document, ["ControlOrMeta"]);
+      documentTab = await page
+        .locator('button[id^="workspace-tab-"][aria-selected="true"]')
+        .getAttribute("id");
+      nextTarget = board;
+      await measure("switch", switchTab, 0, true);
+    }
+    if (args.suite !== "interactions") {
+      await context?.close();
+      context = await newPage();
+      await runWorkflows({
+        page,
+        measure,
+        document,
+        board,
+        catalog,
+        clickPage,
+        ready,
+        surface,
+        resource,
+        backend,
+        iterations,
+        report,
+      });
+    }
+    report.summary = Object.fromEntries(
+      [...new Set(report.scenarios.map((sample) => sample.name))].map(
+        (name) => {
+          const all = report.scenarios.filter((s) => s.name === name);
+          const samples = all.filter((s) => !s.failure);
+          return [
+            name,
+            {
+              attempted: all.length,
+              failed: all.length - samples.length,
+              inputToContentReadyMs:
+                name === "drag"
+                  ? null
+                  : distribution(
+                      samples.map((s) => s.inputToReadyMs ?? s.driverToReadyMs),
+                    ),
+              releaseToReadyMs:
+                name === "drag"
+                  ? distribution(samples.map((s) => s.releaseToReadyMs))
+                  : null,
+              lastInputToReadyMs: distribution(
+                samples.map((s) => s.lastInputToReadyMs),
+              ),
+              observedEventDelayMs: distribution(
+                samples.flatMap((s) => s.events.map((e) => e.delay)),
+              ),
+              observedEventDurationMs: distribution(
+                samples.flatMap((s) => s.events.map((e) => e.duration)),
+              ),
+              actionDurationMs: distribution(
+                samples.map((s) => s.inputToReadyMs ?? s.driverToReadyMs),
+              ),
+              mainThreadScriptMs: distribution(
+                samples.map((s) => s.mainThread.ScriptDuration * 1000),
+              ),
+              layoutMs: distribution(
+                samples.map((s) => s.mainThread.LayoutDuration * 1000),
+              ),
+              rafIntervalMs: distribution(
+                samples.flatMap((s) => s.rafIntervals),
+              ),
+              longTaskCount: samples.reduce(
+                (sum, s) => sum + s.longTasks.length,
+                0,
+              ),
+            },
+          ];
+        },
+      ),
     );
     report.passed =
       report.errors.length === 0 &&
@@ -754,6 +958,11 @@ try {
   }
 } catch (error) {
   report.failure = error.stack ?? String(error);
+  if (page && !page.isClosed())
+    await writeFile(
+      join(output, "evidence/failure.html"),
+      await page.content(),
+    );
   if (page && !page.isClosed())
     await page
       .screenshot({ path: join(output, "evidence/failure.png") })
@@ -792,19 +1001,37 @@ try {
   await writeFile(
     join(output, "report.md"),
     [
-      "# ShowAI interaction performance",
+      "# ShowAI workflow and resource performance",
       "",
       `Recorded: ${report.startedAt}`,
       "",
       `Result: ${report.passed ? "passed" : report.catalogOnly ? "catalog only" : "failed; inspect failed actions"}`,
       "",
-      "| Action | Successful/attempted | Latency p50 (ms) | Latency p95 (ms) | rAF interval p95 (ms) | Long tasks |",
+      "| Action | Successful/attempted | Input/result time p50 (ms) | Input/result time p95 (ms) | rAF interval p95 (ms) | Long tasks |",
       "|---|---:|---:|---:|---:|---:|",
       ...rows,
       "",
-      "Drag latency means pointer release to asserted position. Other latencies mean input to asserted content/settled scroll. rAF is not display FPS. Failed samples and diagnostic repetitions are excluded from distributions.",
+      "Multi-event workflow durations include the input schedule; use lastInputToReadyMs and observed Event Timing for responsiveness. Idle/resource samples do not run a continuous rAF observer. Drag latency means pointer release to asserted position. Other latencies mean input to asserted content/settled scroll. rAF is not display FPS. Failed samples and diagnostic repetitions are excluded from distributions.",
       "",
       ...report.limitations.map((line) => `- ${line}`),
+      "",
+      "| Resource window | Duration (ms) | Renderer task (ms) | Backend CPU (ms) | Backend RSS (MiB) | DOM nodes | JS heap (MiB) | Host calls |",
+      "|---|---:|---:|---:|---:|---:|---:|---:|",
+      ...report.resources.map(
+        (r) =>
+          `| ${r.name} | ${number(r.durationMs)} | ${number(r.frontendTaskMs)} | ${number(r.backendCpuMs)} | ${number(r.after.backend.memory.rss / 1048576)} | ${r.after.frontend.Nodes ?? "—"} | ${number(r.after.frontend.JSHeapUsedSize / 1048576)} | ${r.calls.length} |`,
+      ),
+      "",
+      `Backend readiness: ${number(report.server?.startupMs)} ms. Browser-context workbench readiness: ${JSON.stringify(distribution(report.startups.map((s) => s.frontendToWorkbenchReadyMs)))}. Filesystem caches are not flushed.`,
+      ...(report.coverage
+        ? [
+            "",
+            "Coverage:",
+            "```json",
+            JSON.stringify(report.coverage, null, 2),
+            "```",
+          ]
+        : []),
       "",
       ...report.scenarios
         .filter((s) => s.failure)
