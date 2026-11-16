@@ -756,5 +756,6 @@ export async function startBrowserServer(options: BrowserServerOptions) {
     localUrl: `http://127.0.0.1:${address.port}`,
     home: store.root,
     close,
+    connectedClients: () => clients.size,
   };
 }

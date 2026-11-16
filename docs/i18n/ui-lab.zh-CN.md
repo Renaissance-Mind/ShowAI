@@ -62,6 +62,8 @@ npm run test:ui -- --feature remote-connection --baseline /absolute/path/ui-lab/
 
 每个会话独立保存内容库、设置、Agent 状态和工作目录。重置会关闭对应后端并移除临时内容库、profile 和工作目录，保留会话元信息及脱敏调用记录。测试渲染器退出后清理 profile。报告和已审阅基线保存在 `--out` 与 `--baseline`；保留审阅所需轮次，主动清理旧的生成结果。UI Lab 不修改稳定版 App 及其内容库。
 
+手动场景的应用事件连接关闭约 30 秒后也会自动回收。保持连接的应用会继续运行，包括独立打开的应用，避免关闭标签页和前端刷新积累后端进程。
+
 ```sh
 npm run ui:lab -- status --state /absolute/path/ui-lab/state
 npm run ui:lab -- stop --state /absolute/path/ui-lab/state

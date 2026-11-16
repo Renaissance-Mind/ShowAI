@@ -12,6 +12,7 @@ beforeAll(async () => {
     repository: process.cwd(),
     state: join(directory, "state"),
     output: join(directory, "results"),
+    idleSessionMs: 400,
   });
 });
 afterAll(async () => {
@@ -43,6 +44,60 @@ async function invoke(client: LabSession, action: string, args = {}) {
   expect(result.ok).toBe(true);
   return result.data;
 }
+
+test("closed Demo tabs release sessions while connected applications stay alive", async () => {
+  const response = await post("/__ui-lab/api/sessions", {
+    feature: "workbench",
+    scene: "basic",
+    mode: "manual",
+  });
+  const client: LabSession = await response.json();
+  const controller = new AbortController();
+  const events = await fetch(
+    `${lab.origin}/api/events?token=${client.token}&client=ui-lab-lifecycle`,
+    { signal: controller.signal },
+  );
+  const reader = events.body!.getReader();
+  await reader.read();
+  reader.releaseLock();
+  const status = async () =>
+    fetch(lab.origin + "/__ui-lab/api/status").then((response) =>
+      response.json(),
+    );
+  try {
+    await expect
+      .poll(
+        async () =>
+          (await status()).sessions.find(
+            (item: { id: string }) => item.id === client.id,
+          )?.connectedClients,
+      )
+      .toBe(1);
+    await new Promise((resolve) => setTimeout(resolve, 650));
+    expect(
+      (await status()).sessions.some(
+        (item: { id: string }) => item.id === client.id,
+      ),
+    ).toBe(true);
+  } finally {
+    controller.abort();
+  }
+  await expect
+    .poll(async () =>
+      (await status()).sessions.some(
+        (item: { id: string }) => item.id === client.id,
+      ),
+    )
+    .toBe(false);
+  await expect
+    .poll(async () =>
+      access(client.home).then(
+        () => true,
+        () => false,
+      ),
+    )
+    .toBe(false);
+});
 
 test("sessions render the real entry, isolate application storage, and clean runtime files after close", async () => {
   const one = await session(),

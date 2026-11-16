@@ -33,6 +33,7 @@ export interface UiLabOptions {
   output: string;
   port?: number;
   baseline?: string;
+  idleSessionMs?: number;
 }
 type Session = {
   client: LabSession;
@@ -41,6 +42,7 @@ type Session = {
   fixture: SceneFixture;
   trace: Array<Record<string, unknown>>;
   directory: string;
+  lastConnectedAt: number;
 };
 const redact = (value: unknown): unknown =>
   Array.isArray(value)
@@ -88,6 +90,7 @@ export async function startUiLab(options: UiLabOptions) {
     closing = false;
   let running = false;
   async function createSession(input: Record<string, unknown>) {
+    await collectIdle();
     if (sessions.size >= 12)
       throw new Error(
         "Close or reset an existing scene before opening another session.",
@@ -180,7 +183,15 @@ export async function startUiLab(options: UiLabOptions) {
       mode: input.mode === "test" ? "test" : "manual",
       appUrl: `${origin}/app?uiLabSession=${id}`,
     };
-    const session = { client, service, backend, fixture, trace, directory };
+    const session = {
+      client,
+      service,
+      backend,
+      fixture,
+      trace,
+      directory,
+      lastConnectedAt: Date.now(),
+    };
     sessions.set(id, session);
     byToken.set(token, session);
     await writeFile(
@@ -201,10 +212,10 @@ export async function startUiLab(options: UiLabOptions) {
   async function deleteSession(id: string) {
     const session = sessions.get(id);
     if (!session) return;
-    session.fixture.close();
-    await session.backend.close();
     sessions.delete(id);
     byToken.delete(session.client.token);
+    session.fixture.close();
+    await session.backend.close();
     await writeFile(
       join(session.directory, "trace.json"),
       JSON.stringify(session.trace, null, 2),
@@ -215,6 +226,34 @@ export async function startUiLab(options: UiLabOptions) {
         force: true,
       });
   }
+  const idleSessionMs = options.idleSessionMs ?? 30000;
+  let collecting: Promise<void> | undefined;
+  function collectIdle(): Promise<void> {
+    if (collecting) return collecting;
+    collecting = (async () => {
+      const now = Date.now();
+      for (const [id, session] of sessions) {
+        if (session.backend.connectedClients()) session.lastConnectedAt = now;
+        else if (
+          session.client.mode === "manual" &&
+          now - session.lastConnectedAt > idleSessionMs
+        )
+          await deleteSession(id);
+      }
+    })().finally(() => {
+      collecting = undefined;
+    });
+    return collecting;
+  }
+  const collector = setInterval(
+    () => {
+      void collectIdle().catch((error) =>
+        console.error("UI Lab session cleanup:", error),
+      );
+    },
+    Math.max(25, Math.min(idleSessionMs / 2, 5000)),
+  );
+  collector.unref();
   const respond = (response: ServerResponse, value: unknown, status = 200) => {
     response.writeHead(status, {
       "content-type": "application/json",
@@ -311,6 +350,7 @@ export async function startUiLab(options: UiLabOptions) {
                     id: session.client.id,
                     home: session.client.home,
                     mode: session.client.mode,
+                    connectedClients: session.backend.connectedClients(),
                   })),
                 });
                 return;
@@ -580,6 +620,8 @@ export async function startUiLab(options: UiLabOptions) {
     async close() {
       if (closing) return;
       closing = true;
+      clearInterval(collector);
+      await collecting;
       for (const id of sessions.keys()) await deleteSession(id);
       await vite.close();
       await writeFile(

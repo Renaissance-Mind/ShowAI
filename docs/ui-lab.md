@@ -62,6 +62,8 @@ The shared target interface and separate DOM/Playwright drivers keep manual repl
 
 Each session has its own library, settings, Agent state and workspace. Reset closes its backend and removes its temporary library/profile/workspace while preserving session metadata and redacted traces. Test renderer profiles are removed after the process closes. Reports and approved baselines remain in `--out` and `--baseline`; keep the runs needed for review and remove old generated results deliberately. UI Lab never changes the stable App or its content library.
 
+Manual sessions are also reclaimed about 30 seconds after their application event connection closes. A connected application stays alive, including one opened separately. This prevents closed tabs and frontend reloads from accumulating backends.
+
 ```sh
 npm run ui:lab -- status --state /absolute/path/ui-lab/state
 npm run ui:lab -- stop --state /absolute/path/ui-lab/state
