@@ -26,6 +26,7 @@ import { messages } from "./messages";
 import type { LabSession, SceneFixture } from "./types";
 import { runUiScenes } from "./runner";
 import { sourceIdentity } from "./source";
+import { redactTrace as redact } from "./trace";
 
 export interface UiLabOptions {
   repository: string;
@@ -45,19 +46,6 @@ type Session = {
   directory: string;
   lastConnectedAt: number;
 };
-const redact = (value: unknown): unknown =>
-  Array.isArray(value)
-    ? value.map(redact)
-    : value && typeof value === "object"
-      ? Object.fromEntries(
-          Object.entries(value).map(([key, item]) => [
-            key,
-            /token|secret|password|authorization|credential/i.test(key)
-              ? "[redacted]"
-              : redact(item),
-          ]),
-        )
-      : value;
 
 export async function startUiLab(options: UiLabOptions) {
   const repository = resolve(options.repository),

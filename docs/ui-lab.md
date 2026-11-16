@@ -35,6 +35,8 @@ Without `--url`, the test command owns an isolated server and closes it after th
 
 Each run writes `report.json` and an offline `index.html`, viewport PNGs, accessibility DOM snapshots, layout measurements and redacted service traces. Failed interactions retain a screenshot and DOM snapshot of the failure. Screenshots wait for assertions, fonts, visible images and two animation frames; capture disables CSS animations and hides the caret. Checks reject a missing application root, viewport overflow, insufficient dialog padding and low contrast on enabled primary buttons where the scene declares those requirements. Renderer exceptions fail the scene; console errors are retained separately for diagnosis. Source commit and working-tree hashes are recorded, and changes during a run invalidate it.
 
+Large trace arguments are recorded as byte counts and SHA-256 hashes so repeated sample imports and datasets do not duplicate their full payloads in every report.
+
 Chromium runs headless. Electron creates a hidden window with an isolated profile, denies new native windows and records every show, focus and activation event. A visibility or focus event fails the run. Neither renderer uses the system mouse or keyboard. Native OS dialogs and foreground window behavior need an isolated display or a separate explicitly authorized acceptance run.
 
 ## Review visual changes

@@ -7,6 +7,7 @@ import { remoteConnectionFixture } from "./fixtures/remote-connection";
 import { uiFeatures, uiScene } from "./registry";
 import { comparePng, runUiScenes } from "./runner";
 import type { RemoteMcpConfig } from "../remote-mcp/types";
+import { redactTrace } from "./trace";
 
 const directory = await mkdtemp(join(tmpdir(), "showai-ui-lab-unit-"));
 afterAll(() => rm(directory, { recursive: true, force: true }));
@@ -20,6 +21,27 @@ const config: RemoteMcpConfig = {
   projects: [],
 };
 const projects = [{ id: "project-one", name: "One" }];
+
+test("trace records redact credentials and bound large application payloads", () => {
+  const input = {
+    name: "visible name",
+    token: "hidden-value",
+    nested: { password: "hidden-password" },
+    artifact: "x".repeat(100000),
+    rows: Array.from({ length: 1000 }, (_, id) => ({ id })),
+  };
+  const output = redactTrace(input) as Record<string, unknown>;
+  expect(output.name).toBe(input.name);
+  expect(output.token).toBe("[redacted]");
+  expect(output.nested).toEqual({ password: "[redacted]" });
+  expect(output.artifact).toMatchObject({
+    omitted: true,
+    bytes: 100000,
+    sha256: expect.stringMatching(/^[a-f0-9]{64}$/),
+  });
+  expect(JSON.stringify(output).length).toBeLessThan(1000);
+  expect(input.artifact.length).toBe(100000);
+});
 
 test("every registered scene has stable unique checkpoints in both locales", () => {
   for (const locale of ["zh-CN", "en"] as const) {
