@@ -51,7 +51,7 @@ function Lab() {
     });
   const [session, setSession] = useState<LabSession>(),
     [theme, setTheme] = useState<"light" | "dark">("light"),
-    [viewport, setViewport] = useState("adaptive"),
+    [viewport, setViewport] = useState("desktop"),
     [status, setStatus] = useState(t("preparing"));
   const [error, setError] = useState(""),
     [busy, setBusy] = useState(false),
@@ -171,7 +171,12 @@ function Lab() {
       await api("runs", {
         ...selected,
         theme,
-        width: viewport === "narrow" ? 800 : 1440,
+        width:
+          viewport === "adaptive"
+            ? Math.round(frame.current?.clientWidth ?? 1440)
+            : viewport === "narrow"
+              ? 800
+              : 1440,
         height: 1000,
         scale: 2,
       });
