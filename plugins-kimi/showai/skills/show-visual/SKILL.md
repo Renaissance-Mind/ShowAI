@@ -5,7 +5,7 @@ description: 在对话中直接展示 1–5 个 ShowAI 组件（图表、示意�
 
 # 对话展示
 
-用 `show_component` 把组件直接放进对话。通常一次给出完整内容；适合边做边看的任务，在支持的宿主里可以分批更新同一个显示区。不需要项目、模板或制作流程，结果不写入内容库。
+用 `show_component` 把组件直接放进对话。在支持持续更新的宿主中，用户要求边生成边看，或内容会分批到达时，先展示第一批有效内容，再更新同一个显示区；内容已齐或任务很小时一次给完。不需要项目、模板或制作流程，结果不写入内容库。
 
 ## 先判断
 
@@ -38,9 +38,9 @@ description: 在对话中直接展示 1–5 个 ShowAI 组件（图表、示意�
 
 ### 分批更新同一个显示区
 
-先核对 `showai_capabilities.presentation.liveUpdates`：`available:true` 只表示服务端有更新入口；还须确认当前宿主能显示 MCP App，并支持 App 通过 `serverTools` 读取更新。默认显示为文件片段、图片或模型填写 HTML 的宿主，继续使用完整交付；不能凭工具存在就改换宿主契约。用户已选择并验证 MCP Apps 入口时，才能显式使用 `delivery:"mcp-app"`。
+先核对 `showai_capabilities.presentation.liveUpdates`：`available:true` 只表示服务端有更新入口；还须确认当前宿主能显示 MCP App，并支持 App 通过 `serverTools` 读取更新。先读取当前宿主适配。Codex 插件默认采用 MCP Apps，可直接使用持续更新；其他宿主按各自契约判断。文件片段、图片或模型填写 HTML 的交付方式仍一次给完。无需每次询问用户是否改用 MCP Apps；只有视图未出现、回调不支持或更新暂停时才排查。
 
-第一次用 `show_component({kind,data,live:true,delivery:"mcp-app"})`，或同样的 blocks 输入。第一批数据也必须完整合法。保留回执 `live.viewId`、`live.revision` 和 `blocks[].id`，核实显示区已经出现。
+第一次用 `show_component({kind,data,live:true,delivery:"mcp-app"})`，或同样的 blocks 输入。第一批数据也必须完整合法，不能为了提前显示补造数据。保留回执 `live.viewId`、`live.revision` 和 `blocks[].id`，核实显示区已经出现；不要等全部内容生成后才首次展示。
 
 后续调用 `show_component_update({viewId,operationId,baseRevision,operations,complete?})`。operations 沿用 page_apply 的稳定节点操作，例如 `{type:"component.props.set",blockId,props:{labels:[…],series:[…]}}`；props 中每个顶层字段整体替换，相关字段放在同一批。按完整段落、图表数据批次或记录更新，小任务一次给完。没有生成新组件版本时，继续使用已有组件；此接口不能导入新的组件包或写项目数据。
 
@@ -48,7 +48,7 @@ description: 在对话中直接展示 1–5 个 ShowAI 组件（图表、示意�
 
 同一 MCP 连接最多保留 32 个显示区，单份完整源最多 16 MiB，30 分钟未访问会过期；重连后原 viewId 不再可用。读取器会自行取回更新，这些读取不启动模型回合。连接中断时保留最后有效画面并报告错误。用户不再需要该临时结果时可用 `show_component_close({viewId})` 释放；它不删除已保存页面。
 
-用户要求保存持续展示时，先 `show_component_read({viewId,source:true})` 取最新 artifact，再沿正常项目归属保存 artifact.document 及其 components。若返回 componentSources 且用户需要可编辑组件源码，先用 component_save 保存这些包，再沿精确版本引用写入 Page。确认 Page 保存成功后再关闭临时显示。保存的是最新完整内容，不是最初传给 show_component 的那批参数。
+用户要求保存持续展示时，先 `show_component_read({viewId,source:true})` 取最新 artifact，再沿正常项目归属保存 artifact.document 及其 components。若返回 componentSources，先用 component_save 保存这些包，再沿回执的精确版本引用写入 Page，保留可编辑组件源码。确认 Page 保存成功后再关闭临时显示。保存的是最新完整内容，不是最初传给 show_component 的那批参数。
 
 先读 [当前宿主适配](../use-showai/references/host-adapter.md)，再调用 show_component；通用规则见 [宿主显示](../use-showai/references/host-display.md)。默认 delivery:auto 跟随该连接声明；按实际返回的 delivery.mode 执行适配指南中的显示动作，例如 `mode:"compact"` 时把 `delivery.compact` 原样交给宿主的 HTML 展示工具。
 

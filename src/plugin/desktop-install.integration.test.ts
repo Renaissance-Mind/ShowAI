@@ -20,7 +20,9 @@ async function codexServerTools() {
     send({
       id: 1,
       method: "initialize",
-      params: { clientInfo: { name: "desktop-plugin-acceptance", version: "1" } },
+      params: {
+        clientInfo: { name: "desktop-plugin-acceptance", version: "1" },
+      },
     });
     for await (const line of createInterface({ input: child.stdout })) {
       const message = JSON.parse(line);
@@ -146,7 +148,11 @@ describe.skipIf(!output || !config)(
         const record = JSON.parse(
           await readFile(server.env.SHOWAI_RUNTIME_CONFIG, "utf8"),
         );
-        expect(record).toMatchObject({ home, launch: cli, channel: "packaged" });
+        expect(record).toMatchObject({
+          home,
+          launch: cli,
+          channel: "packaged",
+        });
         expect(server.env.SHOWAI_RUNTIME_CONFIG).not.toBe(
           join(home, "agent-runtime.json"),
         );
@@ -205,8 +211,67 @@ describe.skipIf(!output || !config)(
           });
           expect(shown.isError).not.toBe(true);
           const delivery = (shown.structuredContent as any).data.delivery;
-          if (host === "codex") expect(delivery.mode).toBe("fragment-file");
-          else if (delivery.mode === "compact")
+          if (host === "codex") {
+            expect(delivery.mode).toBe("mcp-app");
+            expect(
+              (capabilities.structuredContent as any).data.presentation
+                .liveUpdates,
+            ).toMatchObject({
+              available: true,
+              defaultDeliverySupported: true,
+            });
+            const liveResult = await client.callTool({
+              name: "show_component",
+              arguments: {
+                kind: "chart",
+                data: {
+                  labels: ["A"],
+                  series: [{ name: "result", values: [1] }],
+                },
+                live: true,
+              },
+            });
+            expect(liveResult.isError).not.toBe(true);
+            const initial = (liveResult.structuredContent as any).data;
+            expect(initial.delivery.mode).toBe("mcp-app");
+            const updated = await client.callTool({
+              name: "show_component_update",
+              arguments: {
+                viewId: initial.live.viewId,
+                baseRevision: 0,
+                operationId: "installed-codex-update",
+                complete: true,
+                operations: [
+                  {
+                    type: "component.props.set",
+                    blockId: initial.blocks[0].id,
+                    props: {
+                      labels: ["A", "B"],
+                      series: [{ name: "result", values: [1, 2] }],
+                    },
+                  },
+                ],
+              },
+            });
+            expect(updated.isError).not.toBe(true);
+            expect((updated.structuredContent as any).data).toMatchObject({
+              viewId: initial.live.viewId,
+              revision: 1,
+              complete: true,
+            });
+            const latest = await client.callTool({
+              name: "show_component_read",
+              arguments: { viewId: initial.live.viewId, source: true },
+            });
+            expect(
+              (latest.structuredContent as any).data.artifact.document.content
+                .content[0].attrs.data.labels,
+            ).toEqual(["A", "B"]);
+            await client.callTool({
+              name: "show_component_close",
+              arguments: { viewId: initial.live.viewId },
+            });
+          } else if (delivery.mode === "compact")
             expect(delivery.compact).toContain("<");
           else {
             expect(delivery.mode).toBe("image");

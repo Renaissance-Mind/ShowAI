@@ -523,7 +523,7 @@ export function registerPresentationTools(
             available: options.transport === "stdio",
             delivery: "mcp-app",
             requiresHostServerTools: true,
-            defaultDeliverySupported: declaredDisplay === "mcp-app" || declaredDisplay === "native",
+            defaultDeliverySupported: options.transport === "stdio" && (declaredDisplay === "mcp-app" || declaredDisplay === "native"),
             scope: "connection",
             idleMinutes: 30,
             maxViews: 32,

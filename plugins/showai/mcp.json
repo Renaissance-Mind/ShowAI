@@ -6,7 +6,7 @@
       "command": "node",
       "args": ["./mcp/launch.mjs"],
       "cwd": "./",
-      "env": { "SHOWAI_HOST_DISPLAY": "codex-visualize" }
+      "env": { "SHOWAI_HOST_DISPLAY": "mcp-app" }
     }
   }
 }

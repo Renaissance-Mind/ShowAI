@@ -144,8 +144,10 @@ CLI：`showai pages read PAGE --project PROJECT --view image --capture viewport 
 
 ## 可选的对话持续更新
 
+Codex 插件声明 `SHOWAI_HOST_DISPLAY=mcp-app`。`show_component` 的 `delivery:"auto"` 使用原生视图；内容分批到达时加 `live:true`，先展示第一批有效内容，再更新同一显示区。小任务一次给完，正式页面创作流程保持不变。旧安装若仍声明 `codex-visualize`，可在支持 MCP Apps 的 Codex 中显式使用 `delivery:"mcp-app"`；旧声明仍保留文件式交付含义。
+
 页面创作继续使用 page_create、page_apply、page_save 与 page_present。会话可用 `show_component({kind,data,live:true,delivery:"mcp-app"})` 创建一个可持续更新的 MCP Apps 显示区。先查 `showai_capabilities.presentation.liveUpdates`，并确认宿主提供 serverTools；文件片段展示不代表支持持续更新。当前句柄属于原本机 MCP 连接，30 分钟未访问后过期，重连后不恢复；最多 32 份，每份源内容最多 16 MiB。
 
 保留回执 live.viewId、live.revision 和 blocks[].id。后续 `show_component_update({viewId,operationId,baseRevision,operations,complete?})` 沿用 page_apply 的稳定节点操作。每批应形成合法组件数据，相关字段一起更新；无效批次保留旧内容与版本。最近一次完全相同的请求可重试；CONFLICT 时先读回当前内容并比较，不盲目替换基线。最后带 complete:true，可用空 operations 结束，完成后只读。
 
-`show_component_read({viewId,source:true})` 返回最新完整 artifact，按正常项目流程保存 document 和 components；需要可编辑组件源码时，先用 component_save 保存返回的 componentSources。阅读探索状态单独处理。`show_component_close({viewId})` 只释放临时显示区。阅读器自行读取新版本并更新已挂载组件，不启动模型回合。一次性调用、正式页面和导出格式保持兼容；HTTP、图片、compact 和 fragment-file 沿用完整结果交付。
+`show_component_read({viewId,source:true})` 返回最新完整 artifact，按正常项目流程保存 document 和 components；若返回 componentSources，先用 component_save 保存这些包，再引用回执的精确版本，以保留可编辑源码。阅读探索状态单独处理。`show_component_close({viewId})` 只释放临时显示区。阅读器自行读取新版本并更新已挂载组件，不启动模型回合。一次性调用、正式页面和导出格式保持兼容；HTTP、图片、compact 和 fragment-file 沿用完整结果交付。

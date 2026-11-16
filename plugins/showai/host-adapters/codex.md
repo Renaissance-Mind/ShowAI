@@ -1,13 +1,23 @@
 # Codex 展示适配
 
-此插件绑定 Codex 本机文件式展示，声明 `SHOWAI_HOST_DISPLAY=codex-visualize`。先核对当前连接回显；show_component 默认使用 `delivery:"auto"`，返回 fragment-file 后，使用实际 delivery.inline 路径。
+此插件默认使用 Codex 的 MCP Apps 原生视图，声明 `SHOWAI_HOST_DISPLAY=mcp-app`。show_component 使用 `delivery:"auto"`；工具调用后由宿主直接展示组件，无需等待最终回复，也无需追加 visualize 文件引用。page_present 和 render_document 同样使用附带的阅读器；正式页面仍先保存再展示。
 
-最终回复在代码块外单独一行写下面的完整引用，仅替换 path，保留全部专用定界符：
+## 分批生成
+
+用户要求边生成边看，或任务中的内容会分批到达时，按 show-visual 的持续更新流程调用 `show_component({kind,data,live:true})`。第一批内容须完整合法并有实际信息，后续使用同一个 viewId 和块 ID 调用 show_component_update，最后 complete:true。读取器自动读取新版本，不启动模型回合。内容已齐或小任务可直接一次展示，不为了流式效果拆成逐字调用。
+
+先看 capabilities.presentation.liveUpdates；本机 stdio 支持持续更新，HTTP 连接仍完整交付。旧插件若回显 codex-visualize，在支持 MCP Apps 的 Codex 中显式传 `delivery:"mcp-app"`，无需仅为展示改内容库。liveUpdates.available 说明服务端入口可用，宿主是否实际显示和能否回调另行核对。
+
+最终回复只补充结论。原生组件已经出现时，不再追加同一内容的文件式展示。工具成功、资源附带、用户实际看到是不同证据；电脑操控的 MCP Apps 标签页列表只列出已展开的侧栏视图，列表为空不能判定 inline 未显示。无法直接检查 inline 时，请用户确认画面或展开到侧栏，不重复生成多张图来验证。
+
+## 不支持 MCP Apps 的入口
+
+只有实际确认宿主不能显示 MCP Apps，或用户明确要求文件式展示时，使用 `show_component({kind,data,delivery:"fragment-file"})`，不传 live。使用返回的 delivery.inline 绝对路径，在最终回复中单独一行写：
 
 ```text
 visualize{"path":"实际返回的绝对inline文件路径"}
 ```
 
-page_present 和 render_document 的本机 delivery.inline 同样按此契约交付。页面超出对话预算时（嵌入图片是常见原因）结果没有 delivery.inline，只带 `inlineError`：用 page_read 的 `detail:"outline"` 取得块 ID，带一到三个不含大图的关键块的 blockIds 再调用一次，按上面的引用交付新的 delivery.inline，并说明整页可用 openUrl 打开；单个块也超限时给出 openUrl 和 delivery.html 的路径，不把 delivery.html 写进 visualize 引用。普通文字 visualize 加 JSON 不是有效引用。URL 不是本机文件路径；远程连接另有 MCP Apps 视图时，以该连接的实际能力为准。
+文件式交付不持续更新。page_present、render_document 的本机 delivery.inline 也可作为该入口的完整交付。URL 不是本机路径；不要把 delivery.html 写进 visualize 引用。
 
-已经确认当前入口能显示 MCP Apps 时，可以显式选择 `delivery:"mcp-app"`；返回该模式后，最终回复只补充解释，不追加文件引用。用户看到原样引用时检查定界符；Markdown 符号原样显示还需检查宿主正文渲染。文件存在和工具附带资源都不能单独证明用户已看到。
+页面超出对话预算时，查看 inlineError，用 page_read 的 detail:"outline" 取得块 ID，再选一到三个独立可理解的关键块展示，并提供整页 openUrl。单个块仍超限时保留完整 HTML 与源页面入口。更新中断或宿主不支持 serverTools 时保留最后有效内容，按 show-visual 排查和读回保存，不宣称持续更新成功。

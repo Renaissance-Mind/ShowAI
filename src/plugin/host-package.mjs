@@ -3,7 +3,7 @@ import { createHash } from "node:crypto";
 import { dirname, isAbsolute, join, resolve, relative, sep } from "node:path";
 
 export const HOST_PROFILES = {
-  codex: "codex-visualize",
+  codex: "mcp-app",
   claude: "model-html",
   deepseek: "fragment-file",
   kimi: "fragment-file",

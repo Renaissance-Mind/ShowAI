@@ -34,6 +34,13 @@ async function directory() {
 
 describe("host-specific plugin distributions", () => {
   test("committed marketplace and Kimi packages match their single shared source", async () => {
+    const codexConfig = JSON.parse(
+      await readFile(resolve("plugins/showai-codex/mcp.json"), "utf8"),
+    );
+    expect(codexConfig.mcpServers.showai.env.SHOWAI_HOST_DISPLAY).toBe(
+      "mcp-app",
+    );
+    expect(HOST_PROFILES.codex).toBe("mcp-app");
     const common = Object.fromEntries(
       Object.entries(await skillFiles(join(source, "skills"))).filter(
         ([name]) => name !== HOST_GUIDE,

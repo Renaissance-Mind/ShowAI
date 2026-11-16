@@ -27,7 +27,7 @@ import {
   type RuntimeLaunch,
 } from "../agent/runtime";
 import { PluginInstallError, VERIFIED_HOST_VERSIONS } from "./plugin-errors";
-import { bindHostSkills } from "./host-package.mjs";
+import { bindHostSkills, HOST_PROFILES } from "./host-package.mjs";
 import {
   inspectDshProfile,
   stageDshBundle,
@@ -691,7 +691,7 @@ export class DesktopPluginInstaller {
             type: "stdio",
             command: `./mcp/${launcher}`,
             args: [],
-            env: { ...server.env, SHOWAI_HOST_DISPLAY: "codex-visualize" },
+            env: { ...server.env, SHOWAI_HOST_DISPLAY: HOST_PROFILES.codex },
           },
         },
       });
@@ -705,7 +705,7 @@ export class DesktopPluginInstaller {
         mcpServers: {
           showai: {
             ...server,
-            env: { ...server.env, SHOWAI_HOST_DISPLAY: "model-html" },
+            env: { ...server.env, SHOWAI_HOST_DISPLAY: HOST_PROFILES.claude },
           },
         },
       });
