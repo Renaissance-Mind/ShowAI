@@ -19,14 +19,17 @@ async function renderedBy() {
 
 export { structuredContent } from "./page-structured";
 
-import { randomUUID } from "node:crypto";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { createHash, randomUUID } from "node:crypto";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { z } from "zod";
 import { FileStore } from "../core/store";
 import { CoreError } from "../core/model";
-import { recordReadingCache } from "../core/reading-cache";
+import {
+  recordGeneratedCache,
+  writeGeneratedCache,
+} from "../core/generated-cache";
 import { resolveDocumentComponents } from "../core/catalog";
 import { selectDocumentBlocks } from "../portable/selection.mjs";
 import { assertExportDestination, buildPageHtml } from "./exporter";
@@ -566,20 +569,46 @@ export async function readPageView(
       { ...identity, resources: undefined },
       locale,
     );
-    path = await outputPath(
-      store,
-      projectId,
-      options.view === "html" && options.out
-        ? options.out
-        : `${generated}.html`,
-      options.overwrite,
-    );
-    await writeFile(path, html, "utf8");
-    if (!(options.view === "html" && options.out))
-      await recordReadingCache(store.root, path, html);
-    capture = await renderReading(path, options, locale, {
-      image: options.view !== "structured",
-    });
+    if (options.view === "html") {
+      if (options.out) {
+        path = await outputPath(
+          store,
+          projectId,
+          options.out,
+          options.overwrite,
+        );
+        await writeFile(path, html, "utf8");
+      } else {
+        const key = createHash("sha256")
+          .update(html)
+          .digest("hex")
+          .slice(0, 36);
+        path = await writeGeneratedCache(
+          store.root,
+          join(
+            store.projectPath(projectId),
+            "exports",
+            "reads",
+            `${pageId}-${record.hash.slice(0, 12)}-${key}.html`,
+          ),
+          html,
+        );
+      }
+      capture = await renderReading(path, options, locale, { image: true });
+    } else {
+      const temporaryRoot = join(store.root, "tmp");
+      await mkdir(temporaryRoot, { recursive: true });
+      const temporary = await mkdtemp(join(temporaryRoot, "reading-"));
+      try {
+        const rendering = join(temporary, "page.html");
+        await writeFile(rendering, html, "utf8");
+        capture = await renderReading(rendering, options, locale, {
+          image: options.view !== "structured",
+        });
+      } finally {
+        await rm(temporary, { recursive: true, force: true });
+      }
+    }
   }
   const computed = capture?.components ?? [];
   const markdown =
@@ -629,7 +658,7 @@ export async function readPageView(
           computed,
         };
   }
-  if (!capture || !path)
+  if (!capture || (options.view === "html" && !path))
     throw new Error("A rendered reading did not produce a capture.");
   if (options.view === "image") {
     path = await outputPath(
@@ -639,7 +668,9 @@ export async function readPageView(
       options.overwrite,
     );
     await writeFile(path, capture.png);
+    if (!options.out) await recordGeneratedCache(store.root, path, capture.png);
   }
+  if (!path) throw new Error("A rendered reading did not produce an output.");
   const result = {
     ...identity,
     path,
@@ -664,9 +695,14 @@ export async function readPageView(
   const metadataPath = await outputPath(
     store,
     projectId,
-    `${path}.read.json`,
+    options.out
+      ? `${path}.read.json`
+      : `${generated}.${options.view === "image" ? "png" : "html"}.read.json`,
     options.overwrite,
   );
-  await writeFile(metadataPath, JSON.stringify(result, null, 2));
+  const metadata = JSON.stringify(result, null, 2);
+  await writeFile(metadataPath, metadata);
+  if (!options.out)
+    await recordGeneratedCache(store.root, metadataPath, metadata);
   return { ...result, metadataPath };
 }

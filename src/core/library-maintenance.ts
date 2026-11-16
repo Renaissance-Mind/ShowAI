@@ -1,5 +1,5 @@
 import { IndexClient } from "./index-client";
-import { createHash, randomUUID } from "node:crypto";
+import { randomUUID } from "node:crypto";
 import {
   copyFile,
   lstat,
@@ -23,7 +23,11 @@ import {
 import { EditorDrafts } from "./editor-drafts";
 import type { LibraryManifest } from "./history-model";
 import { libraryFingerprint } from "./library-fingerprints";
-import { readingCacheRecords, readingCachePath } from "./reading-cache";
+import {
+  generatedCacheRecords,
+  generatedCachePath,
+  generatedCacheRecordPath,
+} from "./generated-cache";
 
 export type StorageCategory =
   | "repository"
@@ -31,6 +35,8 @@ export type StorageCategory =
   | "indexes"
   | "receipts"
   | "cache"
+  | "previews"
+  | "sync"
   | "drafts"
   | "conflicts"
   | "recovery"
@@ -100,9 +106,16 @@ export interface MaintenanceState {
   pid?: number;
   root?: string;
 }
-const sha = (bytes: Buffer | string) =>
-  createHash("sha256").update(bytes).digest("hex");
 const uuid = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/;
+function withCleanupLocks<T>(root: string, action: () => Promise<T>) {
+  return withLibraryLock(root, () =>
+    withLibraryLock(
+      root,
+      () => withLibraryLock(root, action, "generated-cache"),
+      "drafts",
+    ),
+  );
+}
 function category(path: string): StorageCategory {
   if (path.startsWith("repository.git/") || path.startsWith("history/"))
     return "repository";
@@ -112,8 +125,10 @@ function category(path: string): StorageCategory {
     return "cache";
   if (path.startsWith("workspace/")) return "workspace";
   if (path.startsWith("local/receipts/")) return "receipts";
+  if (path.startsWith("local/sync/")) return "sync";
+  if (path.startsWith("local/agent-previews/")) return "previews";
   if (
-    /^(cache\/|tmp\/|local\/reading-cache\/)/.test(path) ||
+    /^(cache\/|tmp\/|local\/(?:reading-cache|generated-cache)\/)/.test(path) ||
     /^projects\/[^/]+\/exports\/reads\//.test(path)
   )
     return "cache";
@@ -223,6 +238,8 @@ export class LibraryMaintenance {
           "indexes",
           "receipts",
           "cache",
+          "previews",
+          "sync",
           "drafts",
           "conflicts",
           "recovery",
@@ -416,234 +433,209 @@ export class LibraryMaintenance {
       (!Number.isFinite(input.olderThanDays) || input.olderThanDays < 0)
     )
       throw new CoreError("INVALID_DATA", "Cleanup age must be nonnegative.");
-    return withLibraryLock(this.root, () =>
-      withLibraryLock(
-        this.root,
-        async () => {
-          const drafts = await new EditorDrafts(this.root).list(),
-            references = new Set(drafts.flatMap((draft) => draft.assets));
-          const cutoff = Date.now() - (input.olderThanDays ?? 1) * 86400000,
-            inventory = await files(this.root),
-            chosen: CleanupPlan["files"] = [];
-          const revision = await this.library.head(),
-            importHeads = new Set(
-              revision
-                ? (await this.library.tree(revision))
-                    .filter((file) =>
-                      /^imports\/[a-f0-9-]{36}\/manifest\.json$/.test(
-                        file.path,
-                      ),
-                    )
-                    .map((file) => file.path.split("/")[1])
-                : [],
-            );
-          const reading =
-            input.cache !== false
-              ? (await readingCacheRecords(this.root)).filter(
-                  (item) => Date.parse(item.record.createdAt) < cutoff,
+    return withCleanupLocks(this.root, async () => {
+      const drafts = await new EditorDrafts(this.root).list(),
+        references = new Set(drafts.flatMap((draft) => draft.assets));
+      const cutoff = Date.now() - (input.olderThanDays ?? 1) * 86400000,
+        inventory = await files(this.root),
+        chosen: CleanupPlan["files"] = [];
+      const revision = await this.library.head(),
+        importHeads = new Set(
+          revision
+            ? (await this.library.tree(revision))
+                .filter((file) =>
+                  /^imports\/[a-f0-9-]{36}\/manifest\.json$/.test(file.path),
                 )
-              : [];
-          const readingPaths = new Set(
-            reading.flatMap((item) => [item.path, item.record.path]),
-          );
-          for (const file of inventory) {
-            let eligible = false;
-            if (readingPaths.has(file.path)) {
-              const owner = reading.find(
-                (item) => item.record.path === file.path,
-              );
-              if (owner) {
-                const current = await libraryFingerprint(
-                  this.root,
-                  join(this.root, file.path),
-                );
-                if (
-                  !current ||
-                  current.bytes !== owner.record.bytes ||
-                  current.sha256 !== owner.record.sha256
-                )
-                  throw new CoreError(
-                    "CONFLICT",
-                    "A generated reading output was modified; cleanup retained it.",
-                  );
-              }
-              eligible = true;
-            }
-            if (
-              input.receipts !== false &&
-              /^local\/receipts\/[a-f0-9]{64}\.json$/.test(file.path)
+                .map((file) => file.path.split("/")[1])
+            : [],
+        );
+      const reading =
+        input.cache !== false
+          ? (await generatedCacheRecords(this.root)).filter(
+              (item) => Date.parse(item.record.createdAt) < cutoff,
             )
-              eligible = true;
-            if (
-              input.orphanAssets !== false &&
-              /^local\/draft-assets\/[a-f0-9]{64}$/.test(file.path) &&
-              !references.has(file.path.split("/").at(-1)!)
-            )
-              eligible = true;
-            if (
-              input.cache !== false &&
-              file.modifiedAt < cutoff &&
-              /^(?:cache\/|tmp\/component-[a-f0-9-]{36}\/)/.test(file.path)
-            )
-              eligible = true;
-            if (
-              input.importCopies !== false &&
-              /^local\/imports\/([a-f0-9-]{36})\/originals\/[a-f0-9]{64}\.gz$/.test(
-                file.path,
-              )
-            ) {
-              const importId = file.path.split("/")[2],
-                hash = file.path.split("/").at(-1)!;
-              if (importHeads.has(importId)) {
-                const bytes = await readLibraryBytes(
-                  this.root,
-                  join(this.root, file.path),
-                );
-                const committed = await this.library.readFile(
-                  `imports/${importId}/originals/${hash}`,
-                  revision!,
-                );
-                if (!bytes?.equals(committed))
-                  throw new CoreError(
-                    "INVALID_DATA",
-                    "The import preparation archive differs from its committed copy.",
-                  );
-                eligible = true;
-              }
-            }
-            if (!eligible) continue;
+          : [];
+      const verifiedReading = [];
+      for (const item of reading) {
+        const current = await libraryFingerprint(
+          this.root,
+          join(this.root, item.record.path),
+        );
+        if (
+          !current ||
+          (current.bytes === item.record.bytes &&
+            current.sha256 === item.record.sha256)
+        )
+          verifiedReading.push(item);
+      }
+      const readingPaths = new Set(
+        verifiedReading.flatMap((item) => [item.path, item.record.path]),
+      );
+      for (const file of inventory) {
+        let eligible = false;
+        if (readingPaths.has(file.path)) {
+          eligible = true;
+        }
+        if (
+          input.receipts !== false &&
+          /^local\/receipts\/[a-f0-9]{64}\.json$/.test(file.path)
+        )
+          eligible = true;
+        if (
+          input.orphanAssets !== false &&
+          /^local\/draft-assets\/[a-f0-9]{64}$/.test(file.path) &&
+          !references.has(file.path.split("/").at(-1)!)
+        )
+          eligible = true;
+        if (
+          input.cache !== false &&
+          file.modifiedAt < cutoff &&
+          /^(?:cache\/|tmp\/component-[a-f0-9-]{36}\/)/.test(file.path)
+        )
+          eligible = true;
+        if (
+          input.importCopies !== false &&
+          /^local\/imports\/([a-f0-9-]{36})\/originals\/[a-f0-9]{64}\.gz$/.test(
+            file.path,
+          )
+        ) {
+          const importId = file.path.split("/")[2],
+            hash = file.path.split("/").at(-1)!;
+          if (importHeads.has(importId)) {
             const bytes = await readLibraryBytes(
               this.root,
               join(this.root, file.path),
             );
-            if (!bytes)
+            const committed = await this.library.readFile(
+              `imports/${importId}/originals/${hash}`,
+              revision!,
+            );
+            if (!bytes?.equals(committed))
               throw new CoreError(
-                "CONFLICT",
-                "A cleanup candidate changed during preparation.",
+                "INVALID_DATA",
+                "The import preparation archive differs from its committed copy.",
               );
-            chosen.push({
-              path: file.path,
-              bytes: bytes.length,
-              sha256: sha(bytes),
-              category: category(file.path),
-            });
+            eligible = true;
           }
-          const conflicts = (await files(this.root, "local/conflicts")).filter(
-            (file) => file.path.endsWith("/conflict.json"),
+        }
+        if (!eligible) continue;
+        const fingerprint = await libraryFingerprint(
+          this.root,
+          join(this.root, file.path),
+        );
+        if (!fingerprint)
+          throw new CoreError(
+            "CONFLICT",
+            "A cleanup candidate changed during preparation.",
           );
-          const plan: CleanupPlan = {
-            format: "showai-cleanup-plan",
-            version: 1,
-            id: randomUUID(),
-            libraryId: (await this.library.manifest()).id,
-            revision,
-            createdAt: new Date().toISOString(),
-            bytes: chosen.reduce((sum, item) => sum + item.bytes, 0),
-            files: chosen,
-            protectedDrafts: drafts.length,
-            protectedConflicts: conflicts.length,
-          };
-          await atomicLibraryFile(
-            this.root,
-            join(this.root, "local", "cleanup-plans", `${plan.id}.json`),
-            Buffer.from(JSON.stringify(plan)),
-          );
-          return plan;
-        },
-        "drafts",
-      ),
-    );
+        chosen.push({
+          path: file.path,
+          ...fingerprint,
+          category: category(file.path),
+        });
+      }
+      const conflicts = (await files(this.root, "local/conflicts")).filter(
+        (file) => file.path.endsWith("/conflict.json"),
+      );
+      const plan: CleanupPlan = {
+        format: "showai-cleanup-plan",
+        version: 1,
+        id: randomUUID(),
+        libraryId: (await this.library.manifest()).id,
+        revision,
+        createdAt: new Date().toISOString(),
+        bytes: chosen.reduce((sum, item) => sum + item.bytes, 0),
+        files: chosen,
+        protectedDrafts: drafts.length,
+        protectedConflicts: conflicts.length,
+      };
+      await atomicLibraryFile(
+        this.root,
+        join(this.root, "local", "cleanup-plans", `${plan.id}.json`),
+        Buffer.from(JSON.stringify(plan)),
+      );
+      return plan;
+    });
   }
   async cleanup(id: string) {
     if (!uuid.test(id))
       throw new CoreError("INVALID_PATH", "Invalid cleanup plan identity.");
     return this.job("cleanup", () =>
-      withLibraryLock(this.root, () =>
-        withLibraryLock(
+      withCleanupLocks(this.root, async () => {
+        const path = join(this.root, "local", "cleanup-plans", `${id}.json`),
+          bytes = await readLibraryBytes(this.root, path);
+        if (!bytes) throw new CoreError("NOT_FOUND", "Cleanup plan not found.");
+        const plan = JSON.parse(bytes.toString("utf8")) as CleanupPlan;
+        if (
+          plan.format !== "showai-cleanup-plan" ||
+          plan.version !== 1 ||
+          plan.id !== id ||
+          plan.libraryId !== (await this.library.manifest()).id ||
+          !Array.isArray(plan.files)
+        )
+          throw new CoreError("INVALID_DATA", "Invalid cleanup plan.");
+        const referenced = new Set(
+          (await new EditorDrafts(this.root).list()).flatMap(
+            (draft) => draft.assets,
+          ),
+        );
+        for (const file of plan.files) {
+          if (
+            (!/^local\/(?:receipts\/[a-f0-9]{64}\.json|reading-cache\/[a-f0-9]{64}\.json|draft-assets\/[a-f0-9]{64}|imports\/[a-f0-9-]{36}\/originals\/[a-f0-9]{64}\.gz)$|^(?:cache\/|tmp\/component-[a-f0-9-]{36}\/)/.test(
+              file.path,
+            ) &&
+              !generatedCachePath(file.path) &&
+              !generatedCacheRecordPath.test(file.path)) ||
+            file.path
+              .split("/")
+              .some((part) => part === ".." || part === ".") ||
+            file.path.includes("\\")
+          )
+            throw new CoreError(
+              "INVALID_PATH",
+              "Cleanup plan contains a protected path.",
+            );
+          if (
+            file.path.startsWith("local/draft-assets/") &&
+            referenced.has(file.path.split("/").at(-1)!)
+          )
+            throw new CoreError(
+              "CONFLICT",
+              "A newer draft now references this asset; cleanup retained it.",
+            );
+          const current = await libraryFingerprint(
+            this.root,
+            join(this.root, file.path),
+          );
+          if (
+            current &&
+            (current.bytes !== file.bytes || current.sha256 !== file.sha256)
+          )
+            throw new CoreError(
+              "CONFLICT",
+              "A cleanup candidate has changed; prepare a fresh plan.",
+            );
+        }
+        for (const file of plan.files)
+          await rm(join(this.root, file.path), { force: true });
+        await atomicLibraryFile(
           this.root,
-          async () => {
-            const path = join(
-                this.root,
-                "local",
-                "cleanup-plans",
-                `${id}.json`,
-              ),
-              bytes = await readLibraryBytes(this.root, path);
-            if (!bytes)
-              throw new CoreError("NOT_FOUND", "Cleanup plan not found.");
-            const plan = JSON.parse(bytes.toString("utf8")) as CleanupPlan;
-            if (
-              plan.format !== "showai-cleanup-plan" ||
-              plan.version !== 1 ||
-              plan.id !== id ||
-              plan.libraryId !== (await this.library.manifest()).id ||
-              !Array.isArray(plan.files)
-            )
-              throw new CoreError("INVALID_DATA", "Invalid cleanup plan.");
-            const referenced = new Set(
-              (await new EditorDrafts(this.root).list()).flatMap(
-                (draft) => draft.assets,
-              ),
-            );
-            for (const file of plan.files) {
-              if (
-                (!/^local\/(?:receipts\/[a-f0-9]{64}\.json|reading-cache\/[a-f0-9]{64}\.json|draft-assets\/[a-f0-9]{64}|imports\/[a-f0-9-]{36}\/originals\/[a-f0-9]{64}\.gz)$|^(?:cache\/|tmp\/component-[a-f0-9-]{36}\/)/.test(
-                  file.path,
-                ) &&
-                  !readingCachePath.test(file.path)) ||
-                file.path
-                  .split("/")
-                  .some((part) => part === ".." || part === ".") ||
-                file.path.includes("\\")
-              )
-                throw new CoreError(
-                  "INVALID_PATH",
-                  "Cleanup plan contains a protected path.",
-                );
-              if (
-                file.path.startsWith("local/draft-assets/") &&
-                referenced.has(file.path.split("/").at(-1)!)
-              )
-                throw new CoreError(
-                  "CONFLICT",
-                  "A newer draft now references this asset; cleanup retained it.",
-                );
-              const current = await readLibraryBytes(
-                this.root,
-                join(this.root, file.path),
-              );
-              if (
-                current &&
-                (current.length !== file.bytes || sha(current) !== file.sha256)
-              )
-                throw new CoreError(
-                  "CONFLICT",
-                  "A cleanup candidate has changed; prepare a fresh plan.",
-                );
-            }
-            for (const file of plan.files)
-              await rm(join(this.root, file.path), { force: true });
-            await atomicLibraryFile(
-              this.root,
-              path,
-              Buffer.from(
-                JSON.stringify({
-                  ...plan,
-                  appliedAt: new Date().toISOString(),
-                }),
-              ),
-            );
-            return {
-              files: plan.files.length,
-              freedBytes: plan.bytes,
-              revision: await this.library.head(),
-              protectedDrafts: plan.protectedDrafts,
-              protectedConflicts: plan.protectedConflicts,
-            };
-          },
-          "drafts",
-        ),
-      ),
+          path,
+          Buffer.from(
+            JSON.stringify({
+              ...plan,
+              appliedAt: new Date().toISOString(),
+            }),
+          ),
+        );
+        return {
+          files: plan.files.length,
+          freedBytes: plan.bytes,
+          revision: await this.library.head(),
+          protectedDrafts: plan.protectedDrafts,
+          protectedConflicts: plan.protectedConflicts,
+        };
+      }),
     );
   }
   async rebuildIndex() {

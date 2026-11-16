@@ -24,7 +24,7 @@ import { followAppLanguage } from "../core/app-language";
 import { GUIDE_TOPICS } from "./guides";
 import { getMcpGuide } from "./mcp-guides";
 import { join } from "node:path";
-import { writePresentation } from "./presentation";
+import { writeCachedPresentation } from "./presentation-cache";
 import type { TemplateSelection } from "./template-workflow";
 import { strictToolInputs } from "./mcp-actions";
 import { pageWriteCapture, type PageWrite } from "../core/page-write-capture";
@@ -192,14 +192,10 @@ export function createMcpServer(options: McpServerOptions): McpServer {
       },
       storePresentation: async (value) =>
         (
-          await writePresentation(
+          await writeCachedPresentation(
+            service.store.root,
             value,
-            join(
-              options.presentationDirectory ??
-                join(service.store.root, "local", "agent-previews"),
-              randomUUID(),
-              "page.html",
-            ),
+            options.presentationDirectory,
           )
         ).delivery,
     },
@@ -266,12 +262,7 @@ export async function startPublicMcp(root: string) {
     privateProjects: false,
     previewDirectory: join(root, "local", "agent-previews"),
     storePresentation: async (value) =>
-      (
-        await writePresentation(
-          value,
-          join(root, "local", "agent-previews", randomUUID(), "page.html"),
-        )
-      ).delivery,
+      (await writeCachedPresentation(root, value)).delivery,
   });
   await server.connect(
     new StdioServerTransport(process.stdin, process.stdout, {

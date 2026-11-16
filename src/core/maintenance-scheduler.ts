@@ -10,6 +10,7 @@ import {
   storedBundles,
 } from "./dataset-bundles";
 import { FileStore } from "./store";
+import { collectGeneratedCache } from "./generated-cache";
 export interface MaintenancePolicy {
   automatic: boolean;
   idleMs: number;
@@ -77,6 +78,7 @@ export class MaintenanceScheduler {
   private timer?: ReturnType<typeof setTimeout>;
   private pending?: Promise<void>;
   private settled?: { head: string; state: string; at: number };
+  private cacheCollectedAt = 0;
   constructor(
     readonly root: string,
     readonly onError: (error: unknown) => void = (error) =>
@@ -96,6 +98,10 @@ export class MaintenanceScheduler {
       this.changedAt = Date.now();
     }
     if (!head || Date.now() - this.changedAt < policy.idleMs) return;
+    if (Date.now() - this.cacheCollectedAt >= 3600000) {
+      await collectGeneratedCache(this.root);
+      this.cacheCollectedAt = Date.now();
+    }
     const at = Date.now(),
       bundles = await storedBundles(this.root),
       state = JSON.stringify([

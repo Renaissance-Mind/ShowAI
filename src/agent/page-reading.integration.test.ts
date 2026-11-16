@@ -6,6 +6,7 @@ import {
   rm,
   mkdir,
   writeFile,
+  readdir,
 } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import { tmpdir } from "node:os";
@@ -172,6 +173,12 @@ test("structured reading retains source props and evaluates the matching compone
   ]);
   expect(markdown.markdown).toContain("原始值与派生值");
   expect(markdown).not.toHaveProperty("document");
+  const reads = join(dirname(dirname(pagePath)), "exports", "reads");
+  expect(await readdir(reads).catch((error: NodeJS.ErrnoException) => {
+    if (error.code === "ENOENT") return [];
+    throw error;
+  })).toEqual([]);
+  expect(await readdir(join(home, "tmp"))).toEqual([]);
 }, 30000);
 
 test("outline and explicit source reading work without a renderer and keep source identity", async () => {
@@ -252,10 +259,21 @@ test("image, HTML and partial reads keep one hash and generate actual browser ou
   expect(await readFile(html.path, "utf8")).toContain("showai-read-options");
   expect(html.hash).toBe(hash);
   expect(html.componentRefs).toEqual(image.componentRefs);
+  const again = await run(["pages", "read", pageId, "--project", projectId, "--view", "html"]);
+  expect(again.path).toBe(html.path);
+  expect((await readdir(dirname(html.path))).filter((name) => name.endsWith(".html"))).toEqual([html.path.split("/").at(-1)]);
+  expect(await readdir(join(home, "tmp"))).toEqual([]);
   expect(
     html.dom.some((frame: { blockId?: string }) => frame.blockId === "gantt"),
   ).toBe(true);
 }, 30000);
+
+test("failed rendered readings remove their intermediate files", async () => {
+  await expect(execute(process.execPath, [cli, "pages", "read", pageId, "--project", projectId, "--rendered", "true", "--json"], {
+    env: { ...environment(), SHOWAI_BROWSER_EXECUTABLE: join(home, "missing-browser") },
+  })).rejects.toThrow();
+  expect(await readdir(join(home, "tmp"))).toEqual([]);
+});
 
 test("HTML actions edit a temporary draft while preserving the full Page bytes", async () => {
   const before = await readFile(pagePath, "utf8");

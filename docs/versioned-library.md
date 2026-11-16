@@ -35,3 +35,7 @@ Content history browsing, historical previews and Page version restoration are u
 Existing Git libraries migrate under the writer lock, with original records, bytes and IDs verified before activation. Original Git archives and preexisting SQLite records remain retained as recovery material. Subsequent saves update current content. Import preserves source files and validates current pages, packages and dependencies before activation.
 
 Storage statistics distinguish content objects, readable files, indexes, caches, drafts, conflicts and retained originals. Compaction serializes database maintenance under a writer lease. Reviewed cleanup verifies fingerprints and live references before deleting eligible generated caches. Backups include current content and protected recovery material.
+
+Structured and image reads remove their intermediate HTML after rendering, including failed renders. Identical generated HTML and Agent presentations reuse their files. Explicit exports retain their requested destination and lifetime.
+
+While the app is idle, hourly maintenance checks registered reading and preview caches. It removes outputs unused for seven days and targets 512 MiB by evicting older outputs first, preserving the most recent hour. Each deletion verifies the recorded size and checksum; edited and unregistered files remain available. Storage statistics show Agent previews and local synchronization copies separately. Synchronization baselines and recovery inputs retain their own lifecycle.

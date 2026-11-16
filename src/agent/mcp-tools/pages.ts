@@ -1,6 +1,4 @@
-import { randomUUID } from "node:crypto";
 import { readFile, writeFile } from "node:fs/promises";
-import { join } from "node:path";
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
 import { CAPACITY, CapacityError } from "../../portable/capacity.mjs";
@@ -15,7 +13,8 @@ import {
 } from "../presentation-tools";
 import { presentPage } from "../page-presentation";
 import type { PageReadResult } from "../page-reading";
-import { inlineReader, writePresentation } from "../presentation";
+import { inlineReader } from "../presentation";
+import { writeCachedPresentation } from "../presentation-cache";
 import { compactData, compactMcpResult } from "../mcp-response";
 import type { BoardReadResult } from "../board-reading";
 import { assertLocalPath, fileReceipt, inlineOrFile } from "../local-files";
@@ -499,14 +498,10 @@ export const pagePresentTool: ToolDeclaration = {
       const delivery = options.storeProjectPresentation
         ? await options.storeProjectPresentation(value)
         : (
-            await writePresentation(
+            await writeCachedPresentation(
+              service.store.root,
               value,
-              join(
-                options.presentationDirectory ??
-                  join(service.store.root, "local", "agent-previews"),
-                randomUUID(),
-                "page.html",
-              ),
+              options.presentationDirectory,
             )
           ).delivery;
       const location = (await withOpenLink({}, value.pageId)) as {
