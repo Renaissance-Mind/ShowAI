@@ -14,10 +14,10 @@ export function sourceIdentity(repository: string) {
     "package-lock.json",
   ];
   const commit = git(["rev-parse", "HEAD"]).trim();
-  const hash = createHash("sha256").update(commit);
-  hash.update(git(["diff", "HEAD", "--", ...paths]));
-  const untracked = git([
+  const hash = createHash("sha256");
+  const files = git([
     "ls-files",
+    "--cached",
     "--others",
     "--exclude-standard",
     "-z",
@@ -27,7 +27,20 @@ export function sourceIdentity(repository: string) {
     .split("\0")
     .filter(Boolean)
     .sort();
-  for (const path of untracked)
-    hash.update(path).update(readFileSync(join(repository, path)));
+  for (const path of [...new Set(files)]) {
+    let bytes: Buffer;
+    try {
+      bytes = readFileSync(join(repository, path));
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === "ENOENT") continue;
+      throw error;
+    }
+    hash
+      .update(path)
+      .update("\0")
+      .update(String(bytes.length))
+      .update("\0")
+      .update(bytes);
+  }
   return { commit, hash: hash.digest("hex") };
 }

@@ -7,6 +7,8 @@ import pixelmatch from "pixelmatch";
 import { uiFeatures } from "./registry";
 import type { LabSession, SceneContext, UiDriver, UiTarget } from "./types";
 import { sourceIdentity } from "./source";
+import { uiFlow } from "./flow";
+import type { UiScene } from "./types";
 const require = createRequire(import.meta.url);
 const { PNG } = require("pngjs");
 
@@ -16,6 +18,9 @@ export interface UiRunOptions {
   repository: string;
   feature?: string;
   scenes?: string[];
+  flow?: boolean;
+  nodes?: string[];
+  annotations?: boolean;
   theme?: "light" | "dark";
   locale?: "zh-CN" | "en";
   width?: number;
@@ -177,7 +182,7 @@ async function layout(page: Page) {
       });
     const primaryButtons = [
       ...document.querySelectorAll<HTMLButtonElement>(
-        ".settings-button.primary,.studio-button.primary",
+        ".settings-button.primary,.studio-button.primary,.rm-button.primary",
       ),
     ]
       .filter((element) => visible(element) && !element.disabled)
@@ -204,7 +209,7 @@ async function layout(page: Page) {
         document.documentElement.scrollWidth > innerWidth + 1 ||
         [
           ...document.querySelectorAll(
-            ".studio-settings,.remote-flow,.studio-modal",
+            ".studio-settings,.remote-flow,.remote-settings,.studio-modal",
           ),
         ].some((element) => element.scrollWidth > element.clientWidth + 1),
       dialogs,
@@ -248,10 +253,42 @@ export async function runUiScenes(options: UiRunOptions) {
   const cases = uiFeatures(locale)
     .filter((feature) => !options.feature || feature.id === options.feature)
     .flatMap((feature) =>
-      feature.scenes
+      (options.flow
+        ? uiFlow(feature.id, locale)
+            .nodes.filter(
+              (node) =>
+                !options.nodes?.length || options.nodes.includes(node.id),
+            )
+            .map((node): UiScene => ({
+              id: node.id,
+              description: node.title,
+              title: `${node.screenTitle} · ${node.title}`,
+              fixture: feature.scenes.find((scene) => scene.id === node.scene)!
+                .fixture,
+              prepare: node.enter,
+              steps: [
+                {
+                  id: "state",
+                  title: node.title,
+                  run: async (ctx) => {
+                    for (const match of node.matches)
+                      await ctx.ui.expect(match.target, match.state);
+                    if (node.when)
+                      ctx.assert(
+                        node.when(await ctx.inspect()),
+                        "The requested UI condition must be active.",
+                      );
+                  },
+                },
+              ],
+            }))
+        : feature.scenes
+      )
         .filter(
           (scene) =>
-            !options.scenes?.length || options.scenes.includes(scene.id),
+            options.flow ||
+            !options.scenes?.length ||
+            options.scenes.includes(scene.id),
         )
         .map((scene) => ({ feature: feature.id, scene })),
     );
@@ -303,6 +340,13 @@ export async function runUiScenes(options: UiRunOptions) {
           theme,
           locale,
           mode: "test",
+          ...(options.flow
+            ? {
+                flow: true,
+                node: item.scene.id,
+                annotations: options.annotations ?? false,
+              }
+            : {}),
         }),
       });
       const session = (await response.json()) as LabSession;
@@ -399,6 +443,21 @@ export async function runUiScenes(options: UiRunOptions) {
           },
         };
         await item.scene.prepare(uiContext);
+        if (options.flow)
+          await page.waitForFunction(
+            (id) => document.documentElement.dataset.uiLabNode === id,
+            item.scene.id,
+          );
+        if (
+          options.flow &&
+          uiFlow(item.feature, locale).nodes.find(
+            (node) => node.id === item.scene.id,
+          )!.actions.length
+        )
+          if (!Number(await page.getAttribute("html", "data-ui-lab-actions")))
+            throw new Error(
+              "No declared test action is available on this state.",
+            );
         for (const step of item.scene.steps) {
           await step.run(uiContext);
           await settled(page);
@@ -434,6 +493,7 @@ export async function runUiScenes(options: UiRunOptions) {
             animations: "disabled",
             caret: "hide",
             fullPage: false,
+            scale: scale === 1 ? "css" : "device",
           });
           await writeFile(join(directory, file), bytes);
           const image = PNG.sync.read(bytes);
@@ -499,6 +559,7 @@ export async function runUiScenes(options: UiRunOptions) {
             await target.screenshot({
               path: join(directory, name + ".detail.png"),
               animations: "disabled",
+              scale: scale === 1 ? "css" : "device",
             });
           }
           if (electron) {

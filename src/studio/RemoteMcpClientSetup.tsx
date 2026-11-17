@@ -1,293 +1,382 @@
-import { useEffect, useState } from "react";
-import { ArrowLeft, ArrowRight, Copy, ExternalLink } from "../ui/icons";
+import { useEffect, useRef, useState } from "react";
+import {
+  ArrowRight,
+  Check,
+  CircleCheck,
+  Copy,
+  Eye,
+  EyeOff,
+  KeyRound,
+  Laptop,
+  Plus,
+  RefreshCw,
+  Unplug,
+  ExternalLink,
+  FileDown,
+} from "../ui/icons";
 import { desktop, errorMessage } from "../host/bridge";
 import { useTranslator } from "../i18n/react";
-import messages from "../i18n/messages/remoteMcp";
+import messages from "../i18n/messages/remoteConnections";
 import { isPublicProvider } from "../remote-mcp/client-setup";
 import type { RemoteMcpStatus } from "../remote-mcp/types";
 import ChatgptConnectionGuide from "./ChatgptConnectionGuide";
+import { RemoteCopyField, RemoteIconButton } from "./RemoteConnectionControls";
 
 export default function RemoteMcpClientSetup({
   state,
   busy,
   onCopy,
-  onCheck,
   onExport,
-  exported,
-  revokedClientId,
+  onRefresh,
 }: {
   state: RemoteMcpStatus;
   busy: boolean;
-  onCopy: (text: string) => Promise<void>;
-  onCheck: () => Promise<boolean>;
-  onExport: () => Promise<void>;
-  exported: boolean;
-  revokedClientId: string;
+  onCopy(value: string): Promise<void>;
+  onExport(): void;
+  onRefresh(): Promise<void>;
 }) {
-  const t = useTranslator(messages);
-  const lan = state.config.provider === "lan";
-  const publicNetwork = isPublicProvider(state.config.provider);
-  const [client, setClient] = useState<"chatgpt" | "other" | undefined>(
-    publicNetwork ? undefined : "other",
-  );
-  const [step, setStep] = useState(0);
-  const [name, setName] = useState("");
-  const [key, setKey] = useState<{
-    id: string;
-    token: string;
-    expiresAt: string;
-  }>();
-  const [working, setWorking] = useState(false);
-  const [error, setError] = useState("");
-  const [copied, setCopied] = useState("");
-  const pending = busy || working;
+  const t = useTranslator(messages),
+    lan = state.config.provider === "lan",
+    publicNetwork = isPublicProvider(state.config.provider);
+  const [client, setClient] = useState<"chatgpt" | "other">("other"),
+    [view, setView] = useState<"list" | "setup" | "verify">(
+      state.clients.length ? "list" : "setup",
+    );
+  const [name, setName] = useState(""),
+    [key, setKey] = useState<{
+      id: string;
+      token: string;
+      expiresAt: string;
+    }>(),
+    [showKey, setShowKey] = useState(false),
+    [copied, setCopied] = useState(false),
+    [working, setWorking] = useState(false),
+    [error, setError] = useState("");
+  const baseline = useRef(new Set(state.clients.map((client) => client.id))),
+    callBaseline = useRef(state.lastCallAt);
+  const pending = busy || working,
+    provider = state.config.provider;
   useEffect(() => {
-    if (key && revokedClientId === key.id) {
-      setKey(undefined);
-      setStep(0);
-    }
-  }, [revokedClientId, key]);
+    if (
+      view === "verify" &&
+      state.lastCallAt &&
+      state.lastCallAt !== callBaseline.current &&
+      (key
+        ? state.lastCallClientId === key.id
+        : !!state.lastCallClientId &&
+          !baseline.current.has(state.lastCallClientId))
+    )
+      setView("list");
+  }, [state.lastCallAt, state.lastCallClientId, view, key]);
   async function run(operation: () => Promise<void>) {
     setWorking(true);
     setError("");
     try {
       await operation();
-    } catch (reason) {
-      setError(errorMessage(reason));
+    } catch (error) {
+      setError(errorMessage(error));
     } finally {
       setWorking(false);
     }
   }
-  async function copy(value: string, field: string) {
-    await onCopy(value);
-    setCopied(field);
+  function add() {
+    baseline.current = new Set(state.clients.map((client) => client.id));
+    callBaseline.current = state.lastCallAt;
+    setKey(undefined);
+    setName("");
+    setView("setup");
   }
-  const row = (label: string, value: string, copyable = false) => (
-    <div className="remote-field-guide" key={label}>
-      <dt>{label}</dt>
-      <dd>
-        <span>{value}</span>
-        {copyable && (
-          <button
-            className="settings-button"
-            disabled={pending}
-            aria-label={t("copyField", { name: label })}
-            onClick={() => void run(() => copy(value, label))}
-          >
-            {copied === label ? t("copied") : <Copy size={14} />}
-          </button>
-        )}
-      </dd>
-    </div>
-  );
+  async function copyKey() {
+    await onCopy(key!.token);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1800);
+  }
+  const authorized =
+    (!!key && state.clients.some((client) => client.id === key.id)) ||
+    state.clients.some((client) => !baseline.current.has(client.id));
+  const rejected = !authorized && state.approval?.decision === "deny";
   return (
-    <div className="remote-client-setup" aria-busy={pending}>
-      {!client ? (
+    <div
+      className="rm-client-area"
+      data-client-view={view}
+      data-client-type={client}
+    >
+      {view === "list" ? (
         <>
-          <h4>{t("clientChoice")}</h4>
-          <div className="remote-methods">
-            <button onClick={() => setClient("other")}>
-              <span>
-                <strong>{t("otherClient")}</strong>
-                <small>{t("otherClientHint")}</small>
-              </span>
-              <ArrowRight size={18} />
-            </button>
-            <button onClick={() => setClient("chatgpt")}>
-              <span>
-                <strong>ChatGPT</strong>
-                <small>{t("chatgptHint")}</small>
-              </span>
-              <ArrowRight size={18} />
+          <div className="rm-section-heading">
+            <h3>{t("authorizedClients")}</h3>
+            <button className="rm-button" onClick={add}>
+              <Plus size={15} />
+              {t("addClient")}
             </button>
           </div>
+          {state.clients.length ? (
+            <div className="rm-client-table">
+              <div className="rm-client-table-head">
+                <span>{t("clients")}</span>
+                <span>{t("clientStatus")}</span>
+                <span />
+              </div>
+              {state.clients.map((connection) => (
+                <div className="rm-client-record" key={connection.id}>
+                  <span className="rm-device-name">
+                    <Laptop size={18} />
+                    {connection.name}
+                  </span>
+                  <span
+                    className={`rm-tag${state.lastCallClientId === connection.id ? " success" : ""}`}
+                  >
+                    {state.lastCallClientId === connection.id ? (
+                      <Check size={12} />
+                    ) : (
+                      <KeyRound size={12} />
+                    )}
+                    {t(
+                      state.lastCallClientId === connection.id
+                        ? "verifiedState"
+                        : "authorizedState",
+                    )}
+                  </span>
+                  <RemoteIconButton
+                    label={t("revoke", { name: connection.name })}
+                    danger
+                    disabled={pending}
+                    onClick={() =>
+                      void run(async () => {
+                        await desktop.invoke("remoteMcp:revoke", {
+                          provider,
+                          id: connection.id,
+                        });
+                        await onRefresh();
+                      })
+                    }
+                  >
+                    <Unplug size={16} />
+                  </RemoteIconButton>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="rm-empty">
+              <Laptop size={28} />
+              <h3>{t("noClients")}</h3>
+              <button className="rm-button primary" onClick={add}>
+                <Plus size={15} />
+                {t("addClient")}
+              </button>
+            </div>
+          )}
         </>
       ) : (
         <>
-          {publicNetwork && (
-            <button
-              className="remote-back"
-              disabled={pending}
-              onClick={() => {
-                setClient(undefined);
-                setStep(0);
-              }}
+          <div className="rm-client-toolbar">
+            <div
+              className="rm-step-tabs"
+              role="tablist"
+              aria-label={t("clients")}
             >
-              <ArrowLeft size={14} />
-              {t("changeClient")}
-            </button>
-          )}
-          {step === 0 && client === "chatgpt" ? (
-            <ChatgptConnectionGuide
-              endpoint={state.url!}
-              busy={pending}
-              onCopy={onCopy}
-              onCheck={onCheck}
-              onReady={() => setStep(1)}
-            />
-          ) : (
-            <div className="remote-chatgpt-guide">
-              <h4>{t(step === 0 ? "addServer" : "verifyConnection")}</h4>
-              {step === 0 && (
+              <button
+                role="tab"
+                aria-selected={view === "setup"}
+                onClick={() => setView("setup")}
+              >
+                <KeyRound size={15} />
+                {t("serverSetup")}
+              </button>
+              <button
+                role="tab"
+                aria-selected={view === "verify"}
+                disabled={lan && !key}
+                onClick={() => setView("verify")}
+              >
+                <ArrowRight size={15} />
+                {t("sendMessage")}
+              </button>
+            </div>
+            {state.clients.length > 0 && (
+              <RemoteIconButton
+                label={t("authorizedClients")}
+                onClick={() => setView("list")}
+              >
+                <Laptop size={17} />
+              </RemoteIconButton>
+            )}
+          </div>
+          {view === "setup" ? (
+            <>
+              {publicNetwork && (
+                <div
+                  className="rm-segmented rm-client-kind"
+                  aria-label={t("clientType")}
+                >
+                  <button
+                    aria-pressed={client === "other"}
+                    onClick={() => setClient("other")}
+                  >
+                    <Laptop size={15} />
+                    {t("other")}
+                  </button>
+                  <button
+                    aria-pressed={client === "chatgpt"}
+                    onClick={() => setClient("chatgpt")}
+                  >
+                    ChatGPT
+                  </button>
+                </div>
+              )}
+              {client === "chatgpt" && publicNetwork ? (
                 <>
-                  <dl>
-                    {row(t("endpoint"), state.url!, true)}
-                    {row(t("transport"), "Streamable HTTP")}
-                    {row(
-                      t("formAuthentication"),
-                      lan ? t("accessKeyAuth") : "OAuth",
-                    )}
-                  </dl>
-                  {lan ? (
-                    <form
-                      className="remote-form"
-                      onSubmit={(event) => {
-                        event.preventDefault();
-                        void run(async () => {
-                          const receipt = await desktop.invoke<{
-                            id: string;
-                            token: string;
-                            expiresAt: string;
-                          }>("remoteMcp:createAccessKey", { name });
-                          setKey(receipt);
-                          await copy(receipt.token, "key");
-                        });
-                      }}
-                    >
-                      {!key ? (
-                        <>
-                          <label>
-                            {t("clientName")}
+                  <ChatgptConnectionGuide
+                    endpoint={state.url!}
+                    onCopy={onCopy}
+                    busy={pending}
+                    onReady={() => setView("verify")}
+                  />
+                  <button className="rm-button" onClick={onExport}>
+                    <FileDown size={15} />
+                    {t("export")}
+                  </button>
+                </>
+              ) : (
+                <div className="rm-client-recipe">
+                  <RemoteCopyField
+                    label={t("endpoint")}
+                    value={state.url!}
+                    onCopy={onCopy}
+                  />
+                  <div className="rm-readonly-row">
+                    <span>{t("authentication")}</span>
+                    <span className="rm-capability">
+                      <KeyRound size={14} />
+                      {lan ? "Bearer" : "OAuth"}
+                    </span>
+                  </div>
+                  {lan &&
+                    (!key ? (
+                      <form
+                        onSubmit={(event) => {
+                          event.preventDefault();
+                          void run(async () => {
+                            const receipt = await desktop.invoke<{
+                              id: string;
+                              token: string;
+                              expiresAt: string;
+                            }>("remoteMcp:createAccessKey", { provider, name });
+                            setKey(receipt);
+                            await onRefresh();
+                          });
+                        }}
+                      >
+                        <div className="rm-field">
+                          <label htmlFor="remote-client-name">
+                            {t("name")}
+                          </label>
+                          <div className="rm-input-action">
                             <input
-                              required
-                              maxLength={100}
-                              placeholder={t("clientNamePlaceholder")}
+                              id="remote-client-name"
                               value={name}
+                              maxLength={100}
+                              placeholder={t("namePlaceholder")}
                               onChange={(event) => setName(event.target.value)}
                             />
-                          </label>
-                          <button
-                            className="settings-button primary"
-                            disabled={pending || !name.trim()}
-                            type="submit"
+                            <button
+                              className="rm-button"
+                              type="submit"
+                              disabled={pending || !name.trim()}
+                            >
+                              <KeyRound size={15} />
+                              {t("generateKey")}
+                            </button>
+                          </div>
+                        </div>
+                      </form>
+                    ) : (
+                      <div className="rm-field">
+                        <label htmlFor="remote-access-key">{t("key")}</label>
+                        <div className="rm-secret-field">
+                          <input
+                            id="remote-access-key"
+                            type={showKey ? "text" : "password"}
+                            readOnly
+                            value={key.token}
+                          />
+                          <RemoteIconButton
+                            label={t(showKey ? "hideKey" : "showKey")}
+                            onClick={() => setShowKey((value) => !value)}
                           >
-                            {t("createAccessKey")}
-                          </button>
-                        </>
-                      ) : (
-                        <>
-                          <label>
-                            {t("accessKey")}
-                            <div className="remote-secret">
-                              <input
-                                type="password"
-                                readOnly
-                                value={key.token}
-                              />
-                              <button
-                                className="settings-button"
-                                type="button"
-                                onClick={() =>
-                                  void run(() => copy(key.token, "key"))
-                                }
-                              >
-                                {t(copied === "key" ? "copied" : "copyKey")}
-                              </button>
-                            </div>
-                          </label>
-                          <p>{t("accessKeyInstructions")}</p>
-                          <button
-                            className="settings-button primary"
-                            disabled={pending}
-                            type="button"
-                            onClick={() => setStep(1)}
+                            {showKey ? <EyeOff size={16} /> : <Eye size={16} />}
+                          </RemoteIconButton>
+                          <RemoteIconButton
+                            label={
+                              copied
+                                ? t("copied")
+                                : t("copy", { name: t("key") })
+                            }
+                            onClick={() => void run(copyKey)}
                           >
-                            {t("addedKey")}
-                            <ArrowRight size={16} />
-                          </button>
-                        </>
-                      )}
-                    </form>
-                  ) : (
-                    <>
-                      <p>{t("otherOAuth")}</p>
-                      <div className="remote-guide-actions">
-                        <button
-                          className="settings-button primary"
-                          onClick={() => setStep(1)}
-                        >
-                          {t("addedOther")}
-                          <ArrowRight size={16} />
-                        </button>
+                            {copied ? <Check size={16} /> : <Copy size={16} />}
+                          </RemoteIconButton>
+                        </div>
                       </div>
-                    </>
-                  )}
-                </>
-              )}
-              {step === 1 && (
-                <>
-                  {!lan && <p>{t("approveClient")}</p>}
-                  <p>
-                    {t(
-                      client === "chatgpt"
-                        ? "verifyInstructions"
-                        : "verifyOther",
-                    )}
-                  </p>
-                  <div className="remote-primary-row">
+                    ))}
+                  <div className="rm-form-actions">
                     <button
-                      className="settings-button primary"
-                      onClick={() =>
-                        void run(() => copy(t("verifyPrompt"), "prompt"))
-                      }
+                      className="rm-button primary"
+                      disabled={pending || (lan && !key)}
+                      onClick={() => setView("verify")}
                     >
-                      {t(copied === "prompt" ? "copied" : "copyPrompt")}
-                    </button>
-                    <button
-                      className="remote-secondary"
-                      onClick={() => setStep(0)}
-                    >
-                      {t("backToSetup")}
+                      {t("nextMessage")}
+                      <ArrowRight size={15} />
                     </button>
                   </div>
-                  <p role="status">{t("waiting")}</p>
-                  {!lan && (
-                    <details>
-                      <summary>{t("authWindowExpired")}</summary>
-                      <p>{t("authWindowRecovery")}</p>
-                    </details>
-                  )}
-                </>
+                </div>
               )}
-            </div>
-          )}
-          {client === "chatgpt" && (
-            <details className="remote-plugin-option">
-              <summary>{t("optionalSkills")}</summary>
-              <button
-                className="settings-button"
-                disabled={pending}
-                onClick={() => void run(onExport)}
+            </>
+          ) : (
+            <div className="rm-message-task">
+              <div className="rm-section-heading">
+                <h3>{client === "chatgpt" ? "ChatGPT" : name || t("other")}</h3>
+                {client === "chatgpt" && (
+                  <a
+                    className="rm-button"
+                    href="https://chatgpt.com/"
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    {t("openChatgpt")}
+                    <ExternalLink size={14} />
+                  </a>
+                )}
+              </div>
+              <RemoteCopyField
+                label={t("testMessage")}
+                value={t("prompt")}
+                onCopy={onCopy}
+              />
+              <div
+                className={`rm-client-status${rejected ? " error" : ""}`}
+                role="status"
               >
-                {t(exported ? "exportAgain" : "exportPlugin")}
-              </button>
-              {exported && (
-                <a
-                  className="settings-button"
-                  href="https://chatgpt.com/plugins"
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  {t("importPlugin")}
-                  <ExternalLink size={14} />
-                </a>
-              )}
-              {exported && <p>{t("importStep")}</p>}
-            </details>
+                {authorized ? (
+                  <CircleCheck size={17} />
+                ) : (
+                  <RefreshCw className={rejected ? "" : "rm-spin"} size={17} />
+                )}
+                <span>
+                  {rejected
+                    ? t("denied")
+                    : t(authorized ? "authorized" : "noRequest")}
+                </span>
+              </div>
+            </div>
           )}
         </>
       )}
-      {error && <p role="alert">{error}</p>}
+      {error && (
+        <div role="alert" className="rm-error">
+          {error}
+        </div>
+      )}
     </div>
   );
 }

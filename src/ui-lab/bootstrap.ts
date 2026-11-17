@@ -1,6 +1,8 @@
 import type { LabSession, SceneContext } from "./types";
 import { domDriver } from "./dom-driver";
 import { uiScene } from "./registry";
+import { uiFlow, flowNode } from "./flow";
+import { mountFlowOverlay } from "./flow-overlay";
 import { setLanguagePreference } from "../i18n";
 
 declare global {
@@ -64,75 +66,25 @@ export async function prepareUiLab() {
   };
   return async () => {
     try {
-      if (new URLSearchParams(location.search).get("prepare") !== "0")
-        await uiScene(config.feature, config.scene, config.locale).prepare(
-          context,
+      if (new URLSearchParams(location.search).get("prepare") !== "0") {
+        if (config.flow)
+          await flowNode(config.flow, config.node!, config.locale).enter(
+            context,
+          );
+        else
+          await uiScene(config.feature, config.scene, config.locale).prepare(
+            context,
+          );
+      }
+      if (config.flow)
+        mountFlowOverlay(config, uiFlow(config.flow, config.locale), () =>
+          call("inspect?fixture=1"),
         );
       document.documentElement.dataset.uiLabReady = "true";
       window.parent.postMessage(
         { type: "showai-ui-lab-ready", session: config.id },
         location.origin,
       );
-      let cursor = 0,
-        replaying = false;
-      window.addEventListener("message", async (event) => {
-        if (
-          event.origin !== location.origin ||
-          !["showai-ui-lab-replay", "showai-ui-lab-advance"].includes(
-            event.data?.type,
-          ) ||
-          event.data.session !== config.id
-        )
-          return;
-        if (replaying) return;
-        replaying = true;
-        try {
-          const steps = uiScene(
-            config.feature,
-            config.scene,
-            config.locale,
-          ).steps;
-          const end =
-            event.data.type === "showai-ui-lab-advance"
-              ? Math.min(cursor + 1, steps.length)
-              : steps.length;
-          while (cursor < end) {
-            const step = steps[cursor];
-            await step.run(context);
-            cursor++;
-            window.parent.postMessage(
-              {
-                type: "showai-ui-lab-step",
-                session: config.id,
-                step: step.id,
-                cursor,
-              },
-              location.origin,
-            );
-          }
-          window.parent.postMessage(
-            {
-              type:
-                cursor === steps.length
-                  ? "showai-ui-lab-replayed"
-                  : "showai-ui-lab-paused",
-              session: config.id,
-            },
-            location.origin,
-          );
-        } catch (error) {
-          window.parent.postMessage(
-            {
-              type: "showai-ui-lab-error",
-              session: config.id,
-              error: String(error),
-            },
-            location.origin,
-          );
-        } finally {
-          replaying = false;
-        }
-      });
     } catch (error) {
       document.documentElement.dataset.uiLabError = String(error);
       window.parent.postMessage(

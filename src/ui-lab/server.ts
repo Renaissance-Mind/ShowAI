@@ -27,6 +27,7 @@ import type { LabSession, SceneFixture } from "./types";
 import { runUiScenes } from "./runner";
 import { sourceIdentity } from "./source";
 import { redactTrace as redact } from "./trace";
+import { flowNode, uiFlow } from "./flow";
 
 export interface UiLabOptions {
   repository: string;
@@ -63,7 +64,9 @@ export async function startUiLab(options: UiLabOptions) {
     encoding: "utf8",
   }).trim();
   const sessions = new Map<string, Session>(),
-    byToken = new Map<string, Session>();
+    byToken = new Map<string, Session>(),
+    pendingSessions = new Set<Promise<LabSession>>(),
+    deletingSessions = new Map<string, Promise<void>>();
   const empty: SceneFixture = {
     actions: new Set(),
     invoke: async () => {
@@ -78,7 +81,15 @@ export async function startUiLab(options: UiLabOptions) {
   let origin = "",
     closing = false;
   let running = false;
-  async function createSession(input: Record<string, unknown>) {
+  function createSession(input: Record<string, unknown>) {
+    if (closing) throw new Error("UI Lab is shutting down.");
+    const operation = initializeSession(input).finally(() =>
+      pendingSessions.delete(operation),
+    );
+    pendingSessions.add(operation);
+    return operation;
+  }
+  async function initializeSession(input: Record<string, unknown>) {
     await collectIdle();
     if (sessions.size >= 12)
       throw new Error(
@@ -87,7 +98,14 @@ export async function startUiLab(options: UiLabOptions) {
     const locale = input.locale === "en" ? "en" : "zh-CN",
       theme = input.theme === "dark" ? "dark" : "light";
     const feature = String(input.feature ?? "remote-connection"),
-      sceneId = String(input.scene ?? "overview"),
+      selectedNode = input.flow
+        ? flowNode(
+            feature,
+            String(input.node ?? uiFlow(feature, locale).entry),
+            locale,
+          )
+        : undefined,
+      sceneId = selectedNode?.scene ?? String(input.scene ?? "overview"),
       scene = uiScene(feature, sceneId, locale);
     const id = randomUUID(),
       token = randomBytes(32).toString("hex"),
@@ -110,7 +128,7 @@ export async function startUiLab(options: UiLabOptions) {
       scene.fixture === "remote-connection"
         ? remoteConnectionFixture(
             projects.map((project) => ({ id: project.id, name: project.name })),
-            input.mode !== "test",
+            input.mode !== "test" && !input.flow,
           )
         : empty;
     const trace: Session["trace"] = [];
@@ -171,6 +189,10 @@ export async function startUiLab(options: UiLabOptions) {
       theme,
       mode: input.mode === "test" ? "test" : "manual",
       appUrl: `${origin}/app?uiLabSession=${id}`,
+      ...(selectedNode ? { flow: feature, node: selectedNode.id } : {}),
+      ...(typeof input.annotations === "boolean"
+        ? { annotations: input.annotations }
+        : {}),
     };
     const session = {
       client,
@@ -198,22 +220,28 @@ export async function startUiLab(options: UiLabOptions) {
     );
     return client;
   }
-  async function deleteSession(id: string) {
+  function deleteSession(id: string): Promise<void> {
+    const existing = deletingSessions.get(id);
+    if (existing) return existing;
     const session = sessions.get(id);
-    if (!session) return;
+    if (!session) return Promise.resolve();
     sessions.delete(id);
     byToken.delete(session.client.token);
-    session.fixture.close();
-    await session.backend.close();
-    await writeFile(
-      join(session.directory, "trace.json"),
-      JSON.stringify(session.trace, null, 2),
-    );
-    for (const child of ["library", "profile", "agent-workspaces"])
-      await rm(join(session.directory, child), {
-        recursive: true,
-        force: true,
-      });
+    const operation = (async () => {
+      session.fixture.close();
+      await session.backend.close();
+      await writeFile(
+        join(session.directory, "trace.json"),
+        JSON.stringify(session.trace, null, 2),
+      );
+      for (const child of ["library", "profile", "agent-workspaces"])
+        await rm(join(session.directory, child), {
+          recursive: true,
+          force: true,
+        });
+    })().finally(() => deletingSessions.delete(id));
+    deletingSessions.set(id, operation);
+    return operation;
   }
   const idleSessionMs = options.idleSessionMs ?? 30000;
   let collecting: Promise<void> | undefined;
@@ -371,6 +399,39 @@ export async function startUiLab(options: UiLabOptions) {
                     id: feature.id,
                     title: feature.title,
                     events: feature.events,
+                    flow: (() => {
+                      const flow = uiFlow(feature.id);
+                      return {
+                        entry: flow.entry,
+                        nodes: flow.nodes.map(
+                          ({
+                            id,
+                            title,
+                            stateLabel,
+                            variantLabels,
+                            screen,
+                            screenTitle,
+                            parent,
+                            variants,
+                            actions,
+                          }) => ({
+                            id,
+                            title,
+                            stateLabel,
+                            variantLabels,
+                            screen,
+                            screenTitle,
+                            parent,
+                            variants,
+                            actions: actions.map(({ id, title, to }) => ({
+                              id,
+                              title,
+                              to,
+                            })),
+                          }),
+                        ),
+                      };
+                    })(),
                     scenes: feature.scenes.map(
                       ({ id, title, description, fixture, steps }) => ({
                         id,
@@ -411,11 +472,14 @@ export async function startUiLab(options: UiLabOptions) {
                     repository,
                     feature: String(input.feature ?? "remote-connection"),
                     scenes: input.scene ? [String(input.scene)] : undefined,
+                    flow: !!input.node,
+                    nodes: input.node ? [String(input.node)] : undefined,
+                    annotations: input.annotations === true,
                     theme: input.theme === "dark" ? "dark" : "light",
                     width: Number(input.width ?? 1440),
                     height: Number(input.height ?? 1000),
                     scale: 2,
-                    baseline: options.baseline,
+                    baseline: input.node ? undefined : options.baseline,
                   });
                   respond(response, { id: result.id, passed: result.passed });
                 } finally {
@@ -443,6 +507,10 @@ export async function startUiLab(options: UiLabOptions) {
                   return;
                 }
                 if (target[2] === "inspect" && method === "GET") {
+                  if (url.searchParams.get("fixture") === "1") {
+                    respond(response, session.fixture.inspect());
+                    return;
+                  }
                   respond(response, {
                     ...session.fixture.inspect(),
                     application: {
@@ -623,20 +691,25 @@ export async function startUiLab(options: UiLabOptions) {
       2,
     ),
   );
-  async function close() {
-    if (closing) return;
+  let closePromise: Promise<void> | undefined;
+  function close() {
+    if (closePromise) return closePromise;
     closing = true;
-    clearInterval(collector);
-    await collecting;
-    for (const id of sessions.keys()) await deleteSession(id);
-    await vite.close();
-    await writeFile(
-      join(state, "closed.json"),
-      JSON.stringify({
-        pid: process.pid,
-        closedAt: new Date().toISOString(),
-      }),
-    );
+    return (closePromise = (async () => {
+      clearInterval(collector);
+      await collecting;
+      await Promise.all(pendingSessions);
+      await Promise.all([...sessions.keys()].map(deleteSession));
+      await Promise.all(deletingSessions.values());
+      await vite.close();
+      await writeFile(
+        join(state, "closed.json"),
+        JSON.stringify({
+          pid: process.pid,
+          closedAt: new Date().toISOString(),
+        }),
+      );
+    })());
   }
   return { url: origin + "/__ui-lab/", origin, output, close };
 }

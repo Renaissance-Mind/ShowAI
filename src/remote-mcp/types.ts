@@ -1,4 +1,5 @@
 export interface RemoteApprovalRequest {
+  provider?: RemoteMcpProvider;
   id: string;
   code: string;
   clientName: string;
@@ -28,6 +29,9 @@ export interface RemoteMcpConfig {
   projects: Array<{ id: string; write: boolean }>;
 }
 export interface RemoteMcpStatus {
+  approval?: { decision: "allow" | "deny"; clientName: string; at: string };
+  configured?: boolean;
+  connections?: RemoteMcpConnectionSummary[];
   phase: "stopped" | "prepared" | "starting" | "running" | "error";
   config: RemoteMcpConfig;
   tokenSaved: boolean;
@@ -51,7 +55,43 @@ export interface RemoteMcpStatus {
   executables: { cloudflare: string | null; tailscale: string | null };
   addresses: Array<{ name: string; address: string }>;
 }
+export interface RemoteMcpConnectionSummary {
+  provider: RemoteMcpProvider;
+  phase: RemoteMcpStatus["phase"];
+  configured: boolean;
+  enabled: boolean;
+  config: RemoteMcpConfig;
+  url?: string;
+  reachable?: boolean;
+  clients: number;
+  error?: string;
+}
+export const remoteMcpProviders: RemoteMcpProvider[] = [
+  "lan",
+  "tailscale-private",
+  "tailscale",
+  "cloudflare-quick",
+  "cloudflare",
+];
+export function defaultRemoteMcpConfig(
+  provider: RemoteMcpProvider,
+): RemoteMcpConfig {
+  return {
+    provider,
+    publicUrl: "",
+    port: 0,
+    access: "all",
+    executable: "",
+    projects: [],
+    ...(provider === "tailscale-private"
+      ? { httpsPort: 8443 }
+      : provider === "tailscale"
+        ? { httpsPort: 443 }
+        : {}),
+  };
+}
 export const remoteMcpActions = new Set([
+  "remoteMcp:configure",
   "remoteMcp:installCloudflare",
   "remoteMcp:status",
   "remoteMcp:prepare",

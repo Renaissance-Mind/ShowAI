@@ -1,28 +1,28 @@
 import {
   remoteMcpActions,
+  remoteMcpProviders,
+  defaultRemoteMcpConfig,
+  type RemoteMcpProvider,
   type RemoteApprovalRequest,
   type RemoteMcpStatus,
 } from "../../remote-mcp/types";
 import { validateRemoteMcpConfig } from "../../remote-mcp/manager";
 import type { SceneFixture } from "../types";
 
-export function remoteConnectionFixture(
+function singleConnectionFixture(
   projects: Array<{ id: string; name: string }>,
   automatic: boolean,
+  provider: RemoteMcpProvider,
+  index: number,
 ): SceneFixture {
   let sequence = 0,
     timer: ReturnType<typeof setTimeout> | undefined;
   let requests: RemoteApprovalRequest[] = [];
+  let lastDecision: "allow" | "deny" | undefined;
   const state: RemoteMcpStatus = {
     phase: "stopped",
-    config: {
-      provider: "lan",
-      publicUrl: "",
-      port: 0,
-      executable: "",
-      access: "all",
-      projects: [],
-    },
+    configured: false,
+    config: defaultRemoteMcpConfig(provider),
     tokenSaved: false,
     clients: [],
     projects,
@@ -45,8 +45,8 @@ export function remoteConnectionFixture(
     state.checkedAt = "2026-11-17T00:00:00.000Z";
     state.localUrl =
       state.config.provider === "lan"
-        ? `http://${state.config.bindAddress}:8789`
-        : "http://127.0.0.1:8789";
+        ? `http://${state.config.bindAddress}:${8789 + index}`
+        : `http://127.0.0.1:${8789 + index}`;
     state.url =
       (state.config.provider === "lan"
         ? state.localUrl
@@ -65,13 +65,19 @@ export function remoteConnectionFixture(
           return copy(state);
         case "remoteMcp:requests":
           return copy(requests);
+        case "remoteMcp:configure":
+          state.config = validateRemoteMcpConfig(args.config);
+          if (args.token) state.tokenSaved = true;
+          state.configured = true;
+          return copy(state);
         case "remoteMcp:prepare":
           state.config = {
             ...validateRemoteMcpConfig(args.config),
-            port: 8789,
+            port: 8789 + index,
           };
           state.phase = "prepared";
-          state.localUrl = "http://127.0.0.1:8789";
+          state.configured = true;
+          state.localUrl = `http://127.0.0.1:${8789 + index}`;
           return copy(state);
         case "remoteMcp:start": {
           clearTimeout(timer);
@@ -92,11 +98,14 @@ export function remoteConnectionFixture(
             throw new Error("Enter the domain and tunnel token.");
           state.config = config;
           state.phase = "starting";
+          state.configured = true;
           state.reachable = undefined;
           state.error = undefined;
           state.lastCallAt = undefined;
           state.lastCallClientId = undefined;
           state.clients = [];
+          lastDecision = undefined;
+          state.approval = undefined;
           state.resumeOnLaunch = true;
           if (args.token) state.tokenSaved = true;
           if (automatic) timer = setTimeout(ready, 500);
@@ -121,7 +130,7 @@ export function remoteConnectionFixture(
             throw new Error("Start a LAN connection first.");
           if (typeof args.name !== "string" || !args.name.trim())
             throw new Error("Enter a client name.");
-          const id = `ui-lab-client-${++sequence}`;
+          const id = `ui-lab-${provider}-client-${++sequence}`;
           state.clients.push({
             id,
             name: args.name.trim(),
@@ -140,6 +149,14 @@ export function remoteConnectionFixture(
         case "remoteMcp:decide": {
           const request = requests.find((request) => request.id === args.id);
           if (!request) throw new Error("Authorization request not found.");
+          if (args.decision !== "allow" && args.decision !== "deny")
+            throw new Error("Invalid authorization decision.");
+          lastDecision = args.decision;
+          state.approval = {
+            decision: args.decision,
+            clientName: request.clientName,
+            at: "2026-11-17T00:00:00.000Z",
+          };
           requests = requests.filter((request) => request.id !== args.id);
           if (args.decision === "allow")
             state.clients.push({
@@ -182,7 +199,11 @@ export function remoteConnectionFixture(
       }
     },
     async event(name, input) {
-      if (name === "service.ready") {
+      if (name === "tools.empty") {
+        state.executables = { cloudflare: null, tailscale: null };
+      } else if (name === "addresses.empty") {
+        state.addresses = [];
+      } else if (name === "service.ready") {
         clearTimeout(timer);
         ready();
       } else if (name === "service.error") {
@@ -193,11 +214,12 @@ export function remoteConnectionFixture(
         state.diagnostics =
           "The simulated service could not reach its configured address.";
       } else if (name === "authorization.request") {
+        lastDecision = undefined;
         if (state.phase !== "running")
           throw new Error("The service is not running.");
         requests = [
           {
-            id: `ui-lab-oauth-${++sequence}`,
+            id: `ui-lab-${provider}-oauth-${++sequence}`,
             code: "A17B-2026",
             clientName:
               typeof input.clientName === "string"
@@ -217,7 +239,112 @@ export function remoteConnectionFixture(
         state.lastCallClientId = state.clients.at(-1)!.id;
       } else throw new Error(`Unknown remote fixture event: ${name}`);
     },
-    inspect: () => copy({ ...state, requests }),
+    inspect: () => copy({ ...state, requests, lastDecision }),
     close: () => clearTimeout(timer),
+  };
+}
+
+export function remoteConnectionFixture(
+  projects: Array<{ id: string; name: string }>,
+  automatic: boolean,
+): SceneFixture {
+  const profiles = new Map(
+    remoteMcpProviders.map((provider, index) => [
+      provider,
+      singleConnectionFixture(projects, automatic, provider, index),
+    ]),
+  );
+  let selected: RemoteMcpProvider = "lan";
+  const get = (provider: unknown = selected) => {
+    if (!remoteMcpProviders.includes(provider as RemoteMcpProvider))
+      throw new Error("Unknown connection provider.");
+    return profiles.get(provider as RemoteMcpProvider)!;
+  };
+  const requests = () =>
+    [...profiles].flatMap(([provider, fixture]) =>
+      (fixture.inspect().requests as RemoteApprovalRequest[]).map(
+        (request) => ({ ...request, provider }),
+      ),
+    );
+  const connections = () =>
+    [...profiles].map(([provider, fixture]) => {
+      const value = fixture.inspect() as unknown as RemoteMcpStatus;
+      return {
+        provider,
+        phase: value.phase,
+        configured: !!value.configured,
+        enabled: !!value.resumeOnLaunch,
+        config: value.config,
+        url: value.url,
+        reachable: value.reachable,
+        clients: value.clients.length,
+        error: value.error,
+      };
+    });
+  const inspect = () => ({
+    ...get().inspect(),
+    connections: connections(),
+    requests: requests(),
+  });
+  return {
+    actions: remoteMcpActions,
+    async invoke(action, args) {
+      if (action === "remoteMcp:requests") return requests();
+      if (action === "remoteMcp:decide") {
+        const request = requests().find((request) => request.id === args.id);
+        if (!request) throw new Error("Authorization request not found.");
+        await get(request.provider).invoke(action, args);
+        return requests();
+      }
+      const provider =
+        (args.config as { provider?: RemoteMcpProvider } | undefined)
+          ?.provider ??
+        args.provider ??
+        selected;
+      const fixture = get(provider);
+      selected = provider as RemoteMcpProvider;
+      const result = await fixture.invoke(action, args);
+      if (
+        [
+          "remoteMcp:status",
+          "remoteMcp:start",
+          "remoteMcp:stop",
+          "remoteMcp:configure",
+          "remoteMcp:prepare",
+          "remoteMcp:check",
+          "remoteMcp:revoke",
+        ].includes(action)
+      )
+        return { ...(result as object), connections: connections() };
+      return result;
+    },
+    async event(name, input) {
+      if (name === "connections.multiple") {
+        for (const provider of [
+          "lan",
+          "tailscale-private",
+          "cloudflare-quick",
+        ] as const) {
+          const config = {
+            ...defaultRemoteMcpConfig(provider),
+            bindAddress: "192.168.50.20",
+          };
+          await get(provider).invoke("remoteMcp:start", { config });
+          await get(provider).event("service.ready", {});
+        }
+        return;
+      }
+      if (input.provider) selected = input.provider as RemoteMcpProvider;
+      if (name === "tools.empty") {
+        for (const fixture of profiles.values())
+          await fixture.event(name, input);
+        return;
+      }
+      await get().event(name, input);
+    },
+    inspect,
+    close() {
+      for (const fixture of profiles.values()) fixture.close();
+    },
   };
 }

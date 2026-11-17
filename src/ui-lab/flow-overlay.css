@@ -1,0 +1,52 @@
+.ui-flow-markers {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 2147483000;
+}
+.ui-flow-target {
+  position: absolute;
+  border: 1.5px dashed #7654cf;
+  border-radius: 6px;
+  box-sizing: border-box;
+  pointer-events: none;
+}
+.ui-flow-target > button {
+  position: absolute;
+  right: -9px;
+  top: -10px;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 2px solid white;
+  border-radius: 50%;
+  background: #7654cf;
+  color: white;
+  font: 600 11px/18px system-ui;
+  cursor: pointer;
+  pointer-events: auto;
+  box-shadow: 0 1px 5px #21103940;
+}
+.ui-flow-target.disabled {
+  border-color: #a7a2ae;
+}
+.ui-flow-target.disabled > button {
+  background: #a7a2ae;
+  cursor: default;
+}
+.ui-flow-target > button > span {
+  display: none;
+  position: absolute;
+  right: 0;
+  top: 25px;
+  white-space: nowrap;
+  background: #30253f;
+  color: white;
+  padding: 5px 8px;
+  border-radius: 4px;
+  font: 12px/1.5 system-ui;
+}
+.ui-flow-target > button:hover > span,
+.ui-flow-target > button:focus-visible > span {
+  display: block;
+}

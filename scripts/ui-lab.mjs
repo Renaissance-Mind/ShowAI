@@ -15,6 +15,9 @@ const { values, positionals } = parseArgs({
     url: { type: "string" },
     feature: { type: "string" },
     scene: { type: "string", multiple: true },
+    flow: { type: "boolean" },
+    node: { type: "string", multiple: true },
+    annotations: { type: "boolean" },
     theme: { type: "string" },
     locale: { type: "string" },
     width: { type: "string" },
@@ -28,7 +31,7 @@ const { values, positionals } = parseArgs({
 });
 if (values.help) {
   console.log(
-    "npm run ui:lab -- [--port PORT] [--state DIRECTORY] [--out DIRECTORY]\nnpm run test:ui -- [--url ORIGIN] [--feature FEATURE] [--scene SCENE] [--renderer chromium|electron] [--theme light|dark] [--width 1440] [--height 1000] [--scale 2] [--baseline DIRECTORY] [--update-baseline]\nThe Demo starts in the background without opening a browser. Tests never display native windows.",
+    "npm run ui:lab -- [--port PORT] [--state DIRECTORY] [--out DIRECTORY]\nnpm run test:ui -- [--url ORIGIN] [--feature FEATURE] [--scene SCENE] [--flow] [--node NODE] [--annotations] [--renderer chromium|electron] [--theme light|dark] [--width 1440] [--height 1000] [--scale 2] [--baseline DIRECTORY] [--update-baseline]\nThe Demo starts in the background without opening a browser. Tests never display native windows.",
   );
   process.exit(0);
 }
@@ -103,6 +106,8 @@ async function close() {
   if (closing) return;
   closing = true;
   await server?.close();
+  if (test && server)
+    await rm(join(state, "vite-cache"), { recursive: true, force: true });
   await rm(buildDirectory, { recursive: true, force: true });
 }
 for (const signal of ["SIGINT", "SIGTERM"])
@@ -166,6 +171,9 @@ try {
       repository,
       feature: values.feature,
       scenes: values.scene,
+      flow: values.flow || !!values.node?.length,
+      nodes: values.node,
+      annotations: values.annotations,
       theme: values.theme,
       locale: values.locale,
       width: values.width ? Number(values.width) : undefined,

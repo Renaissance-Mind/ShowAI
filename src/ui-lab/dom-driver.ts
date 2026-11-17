@@ -4,21 +4,77 @@ import {
   getByTestId,
   waitFor,
   queryByRole,
+  queryAllByRole,
+  queryAllByLabelText,
+  queryAllByTestId,
+  queryAllByText,
 } from "@testing-library/dom";
-import userEvent from "@testing-library/user-event";
 import type { UiDriver, UiTarget } from "./types";
 
+function rendered(element: HTMLElement) {
+  return (
+    element.getClientRects().length > 0 &&
+    element.checkVisibility({ visibilityProperty: true })
+  );
+}
+
+export function queryUiTarget(
+  document: Document,
+  target: UiTarget,
+): HTMLElement | undefined {
+  const container = target.within
+    ? queryUiTarget(document, target.within)
+    : document.body;
+  if (!container) return undefined;
+  let elements: HTMLElement[];
+  if (target.role) {
+    elements = queryAllByRole(container, target.role, { name: target.name });
+    if (!elements.length && target.role === "textbox" && target.name)
+      elements = queryAllByLabelText(container, target.name).filter((element) =>
+        element.matches("input,textarea"),
+      );
+  } else if (target.testId)
+    elements = queryAllByTestId(container, target.testId);
+  else if (target.selector)
+    elements = [
+      ...container.querySelectorAll<HTMLElement>(target.selector),
+    ].filter(
+      (element) =>
+        !target.name ||
+        element.textContent?.trim() === target.name ||
+        element.getAttribute("aria-label") === target.name,
+    );
+  else if (target.name)
+    elements = queryAllByText(container, target.name, { exact: true });
+  else return undefined;
+  return elements.find(rendered);
+}
+
 export function domDriver(document: Document): UiDriver {
-  const user = userEvent.setup({ document });
+  const settle = () => new Promise<void>((resolve) => setTimeout(resolve, 0));
+  function view() {
+    if (!document.defaultView) throw new Error("The UI session was closed.");
+    return document.defaultView;
+  }
+  function changed(element: HTMLElement) {
+    const window = view();
+    element.dispatchEvent(new window.Event("input", { bubbles: true }));
+    element.dispatchEvent(new window.Event("change", { bubbles: true }));
+  }
   function root(target: UiTarget): HTMLElement {
     return target.within ? locate(target.within) : document.body;
   }
   function locate(target: UiTarget): HTMLElement {
     const container = root(target);
     if (target.role)
-      return getByRole(container, target.role, {
-        name: target.name,
-      });
+      return (
+        (target.role === "textbox"
+          ? queryUiTarget(document, target)
+          : undefined) ??
+        getByRole(container, target.role, {
+          name: target.name,
+        })
+      );
     if (target.testId) return getByTestId(container, target.testId);
     if (target.selector) {
       const elements = [
@@ -42,11 +98,7 @@ export function domDriver(document: Document): UiDriver {
     return waitFor(
       () => {
         const element = locate(target);
-        if (
-          !element.getClientRects().length ||
-          getComputedStyle(element).visibility === "hidden"
-        )
-          throw new Error("Target is not visible.");
+        if (!rendered(element)) throw new Error("Target is not visible.");
         return element;
       },
       { timeout: 15000, container: document.body },
@@ -54,15 +106,52 @@ export function domDriver(document: Document): UiDriver {
   }
   return {
     async click(target) {
-      await user.click(await visible(target));
+      const element = await visible(target);
+      element.scrollIntoView({ block: "nearest", inline: "nearest" });
+      if (
+        element.matches(":disabled") ||
+        element.getAttribute("aria-disabled") === "true"
+      )
+        throw new Error("The control is disabled.");
+      element.focus({ preventScroll: true });
+      element.click();
+      await settle();
     },
     async fill(target, value) {
       const element = await visible(target);
-      await user.clear(element);
-      await user.type(element, value);
+      const window = view();
+      if (
+        !(element instanceof window.HTMLInputElement) &&
+        !(element instanceof window.HTMLTextAreaElement)
+      )
+        throw new Error("The target is not a form text field.");
+      if (element.disabled || element.readOnly)
+        throw new Error("The text field is not editable.");
+      const prototype =
+        element instanceof window.HTMLInputElement
+          ? window.HTMLInputElement.prototype
+          : window.HTMLTextAreaElement.prototype;
+      Object.getOwnPropertyDescriptor(prototype, "value")!.set!.call(
+        element,
+        value,
+      );
+      changed(element);
+      await settle();
     },
     async select(target, value) {
-      await user.selectOptions(await visible(target), value);
+      const element = await visible(target),
+        window = view();
+      if (!(element instanceof window.HTMLSelectElement) || element.disabled)
+        throw new Error("The target is not an enabled select field.");
+      if (
+        ![...element.options].some(
+          (option) => option.value === value && !option.disabled,
+        )
+      )
+        throw new Error("The select option is unavailable.");
+      element.value = value;
+      changed(element);
+      await settle();
     },
     async expect(target, state = "visible") {
       await waitFor(
@@ -79,13 +168,12 @@ export function domDriver(document: Document): UiDriver {
                     return null;
                   }
                 })();
-            if (element?.getClientRects().length)
+            if (element && rendered(element))
               throw new Error("Target is still visible.");
             return;
           }
           const element = locate(target);
-          if (!element.getClientRects().length)
-            throw new Error("Target is not visible.");
+          if (!rendered(element)) throw new Error("Target is not visible.");
           const disabled =
             (element as HTMLButtonElement).disabled ||
             element.getAttribute("aria-disabled") === "true";

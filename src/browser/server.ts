@@ -122,6 +122,9 @@ export async function startBrowserServer(options: BrowserServerOptions) {
   const clientId = (value: unknown) =>
     typeof value === "string" && /^[\w-]{1,100}$/.test(value) ? value : "";
   let timer: ReturnType<typeof setTimeout> | undefined;
+  let closed = false;
+  const pendingRequests = new Set<Promise<void>>(),
+    pendingChanges = new Set<Promise<void>>();
   let watcher!: ReturnType<typeof watchLibrary>;
   let sources: ReturnType<typeof watchDatasetSources> | undefined;
   let maintenance: MaintenanceScheduler | undefined;
@@ -149,6 +152,7 @@ export async function startBrowserServer(options: BrowserServerOptions) {
       );
   };
   async function deliverFiles(root: string, batch: string[]) {
+    if (closed) return;
     const echoes = await ownWrites.echoes(batch);
     if (root !== store.root) return;
     const change = changedResources(root, batch);
@@ -175,7 +179,7 @@ export async function startBrowserServer(options: BrowserServerOptions) {
         })}\n\n`,
       );
     }
-    if (change.projectIds?.length || change.catalog || change.all)
+    if (!closed && (change.projectIds?.length || change.catalog || change.all))
       syncManager(root).wake(
         change.catalog || change.all ? undefined : change.projectIds,
         !!(change.catalog || change.all),
@@ -253,9 +257,10 @@ export async function startBrowserServer(options: BrowserServerOptions) {
         timer = undefined;
         const batch = [...paths];
         paths.clear();
-        void deliverFiles(store.root, batch).catch((error) =>
-          console.error("ShowAI file watcher:", error),
-        );
+        const operation = deliverFiles(store.root, batch)
+          .catch((error) => console.error("ShowAI file watcher:", error))
+          .finally(() => pendingChanges.delete(operation));
+        pendingChanges.add(operation);
       }, 180);
     });
     watcher.on("error", (error) =>
@@ -474,28 +479,35 @@ export async function startBrowserServer(options: BrowserServerOptions) {
     };
   }
   const printables = new Map<string, string>();
-  let closed = false;
   const server = createServer((request, response) => {
-    void handleRequest().catch((error) => {
-      if (response.headersSent) {
-        response.destroy();
-        return;
-      }
-      const result = errorResult(error);
-      const status =
-        error instanceof SyntaxError
-          ? 400
-          : ({
-              INVALID_DATA: 400,
-              INVALID_PATH: 400,
-              NOT_FOUND: 404,
-              CONFLICT: 409,
-            }[result.code] ?? 500);
-      response.writeHead(status, {
-        "Content-Type": "application/json",
-      });
-      response.end(JSON.stringify({ ok: false, error: result }));
-    });
+    if (closed) {
+      response.writeHead(503);
+      response.end("ShowAI is shutting down.");
+      return;
+    }
+    const operation = handleRequest()
+      .catch((error) => {
+        if (response.headersSent) {
+          response.destroy();
+          return;
+        }
+        const result = errorResult(error);
+        const status =
+          error instanceof SyntaxError
+            ? 400
+            : ({
+                INVALID_DATA: 400,
+                INVALID_PATH: 400,
+                NOT_FOUND: 404,
+                CONFLICT: 409,
+              }[result.code] ?? 500);
+        response.writeHead(status, {
+          "Content-Type": "application/json",
+        });
+        response.end(JSON.stringify({ ok: false, error: result }));
+      })
+      .finally(() => pendingRequests.delete(operation));
+    pendingRequests.add(operation);
     async function handleRequest() {
       response.setHeader("Cache-Control", "no-store");
       response.setHeader("X-Content-Type-Options", "nosniff");
@@ -726,23 +738,28 @@ export async function startBrowserServer(options: BrowserServerOptions) {
     await presence?.remove();
     throw error;
   }
-  async function close() {
-    await remoteConnector.close();
-    agentHost.close();
-    await syncManager(store.root).stop();
-    if (closed) return;
+  let closePromise: Promise<void> | undefined;
+  function close() {
+    if (closePromise) return closePromise;
     closed = true;
-    await presence?.remove();
-    clearInterval(heartbeat);
-    clearTimeout(timer);
-    await watcher.close();
-    await sources?.close();
-    await maintenance?.stop();
-    for (const client of clients.keys()) client.end();
-    await new Promise<void>((done, reject) => {
-      server.close((error) => (error ? reject(error) : done()));
-      server.closeAllConnections();
-    });
+    return (closePromise = (async () => {
+      clearInterval(heartbeat);
+      clearTimeout(timer);
+      await Promise.all(pendingRequests);
+      await watcher.close();
+      await sources?.close();
+      await Promise.all(pendingChanges);
+      await remoteConnector.close();
+      agentHost.close();
+      await syncManager(store.root).stop();
+      await maintenance?.stop();
+      await presence?.remove();
+      for (const client of clients.keys()) client.end();
+      await new Promise<void>((done, reject) => {
+        server.close((error) => (error ? reject(error) : done()));
+        server.closeAllConnections();
+      });
+    })());
   }
   const address = server.address();
   if (!address || typeof address === "string")

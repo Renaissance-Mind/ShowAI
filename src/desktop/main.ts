@@ -28,7 +28,7 @@ import {
   remotePluginPackage,
   chatgptAppId,
 } from "../remote-mcp/plugin-package";
-import { RemoteMcpManager } from "../remote-mcp/manager";
+import { RemoteMcpConnections } from "../remote-mcp/connections";
 import { remoteMcpActions } from "../remote-mcp/types";
 import type { IpcMainEvent, IpcMainInvokeEvent, NativeImage } from "electron";
 import { watchLibrary, type LibraryWatcher } from "../core/library-watcher";
@@ -144,7 +144,7 @@ let agentHost: AgentHost;
 let pluginInstaller: DesktopPluginInstaller;
 let appUpdates: AppUpdates | undefined;
 let remoteConnector: RemoteMacConnector;
-let remoteMcp: RemoteMcpManager | undefined;
+let remoteMcp: RemoteMcpConnections | undefined;
 let watcher: LibraryWatcher | undefined;
 let sources: ReturnType<typeof watchDatasetSources> | undefined;
 let maintenance: MaintenanceScheduler | undefined;
@@ -382,7 +382,7 @@ async function deliverFiles(root: string, batch: string[]): Promise<void> {
 }
 
 async function useHome(home?: string): Promise<void> {
-  await remoteMcp?.stop();
+  await remoteMcp?.stopAll();
   if (store) await syncManager(store.root).stop();
   await maintenance?.stop();
   await watcher?.close();
@@ -772,10 +772,7 @@ async function nativeAction(
 ): Promise<unknown> {
   switch (action) {
     case "export:printPdf":
-      return printHtmlToPdf(
-        String(args.html),
-        String(args.path),
-      );
+      return printHtmlToPdf(String(args.html), String(args.path));
     case "fs:reveal": {
       const id = projectId(args),
         page = text(args, "pageId", true);
@@ -848,19 +845,24 @@ async function handle(
     if (!remoteMcp) throw new Error("Remote MCP is not ready.");
     switch (action) {
       case "remoteMcp:installCloudflare":
-        return remoteMcp.installCloudflare();
+        return remoteMcp.installCloudflare(args.provider);
+      case "remoteMcp:configure":
+        return remoteMcp.configure(args.config, args.token);
       case "remoteMcp:prepare":
         return remoteMcp.prepare(args.config);
       case "remoteMcp:status":
-        return remoteMcp.status(args.refresh === true);
+        return remoteMcp.status(args.refresh === true, args.provider);
       case "remoteMcp:start":
         return remoteMcp.start(args.config, args.token);
       case "remoteMcp:stop":
-        return remoteMcp.stop();
+        return remoteMcp.stop(args.provider);
       case "remoteMcp:check":
-        return remoteMcp.check();
+        return remoteMcp.check(args.provider);
       case "remoteMcp:createAccessKey":
-        return remoteMcp.createAccessKey(String(args.name ?? ""));
+        return remoteMcp.createAccessKey(
+          String(args.name ?? ""),
+          args.provider,
+        );
       case "remoteMcp:requests":
         return remoteMcp.requests();
       case "remoteMcp:decide":
@@ -869,7 +871,7 @@ async function handle(
           args.decision as "allow" | "deny",
         );
       case "remoteMcp:exportPlugin": {
-        const status = await remoteMcp.status();
+        const status = await remoteMcp.status(false, args.provider);
         if (status.phase !== "running" || !status.reachable || !status.url)
           throw new Error(
             "Connect the remote service before exporting a plugin.",
@@ -896,7 +898,11 @@ async function handle(
         });
         if (selection.canceled || !selection.filePath) return null;
         await writeFile(selection.filePath, bundle.bytes, { mode: 0o600 });
-        await remoteMcp.rememberChatgptApp(registeredApp, status.url);
+        await remoteMcp.rememberChatgptApp(
+          registeredApp,
+          status.url,
+          args.provider,
+        );
         return {
           path: selection.filePath,
           name: bundle.name,
@@ -905,9 +911,9 @@ async function handle(
         };
       }
       case "remoteMcp:pair":
-        return remoteMcp.pair();
+        return remoteMcp.pair(args.provider);
       case "remoteMcp:revoke":
-        return remoteMcp.revoke(String(args.id));
+        return remoteMcp.revoke(String(args.id), args.provider);
       case "remoteMcp:chooseExecutable": {
         const selection = await dialog.showOpenDialog(window, {
           properties: ["openFile"],
@@ -1980,7 +1986,7 @@ else {
         channel: app.isPackaged ? "packaged" : "development",
       });
       remoteConnector = new RemoteMacConnector(agentHost, () => store.root);
-      remoteMcp = new RemoteMcpManager({
+      remoteMcp = new RemoteMcpConnections({
         directory: join(app.getPath("userData"), "remote-mcp"),
         home: () => store.root,
         encrypt: (value) => {

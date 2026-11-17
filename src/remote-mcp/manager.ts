@@ -6,7 +6,12 @@ import { isAbsolute, join } from "node:path";
 import { execute, findExecutable } from "../agent-host/process";
 import { startMcpHttpServer } from "../agent/mcp-http";
 import { FileStore, assertId } from "../core/store";
-import type { RemoteMcpConfig, RemoteMcpStatus } from "./types";
+import {
+  defaultRemoteMcpConfig,
+  type RemoteMcpConfig,
+  type RemoteMcpStatus,
+  type RemoteMcpProvider,
+} from "./types";
 import { installCloudflared } from "./install";
 import { localLibraryPolicy } from "./local-library";
 import { PairingCodes } from "./pairing";
@@ -90,6 +95,7 @@ export function validateRemoteMcpConfig(value: unknown): RemoteMcpConfig {
 
 export class RemoteMcpManager {
   private config = { ...defaults };
+  private configured = false;
   private encryptedToken?: string;
   private managedCloudflared?: string;
   private phase: RemoteMcpStatus["phase"] = "stopped";
@@ -99,6 +105,7 @@ export class RemoteMcpManager {
   private reachable?: boolean;
   private lastCallAt?: string;
   private lastCallClientId?: string;
+  private approval?: RemoteMcpStatus["approval"];
   private child?: ChildProcess;
   private childClosed?: Promise<void>;
   private connectorClosed = true;
@@ -122,8 +129,18 @@ export class RemoteMcpManager {
       home: () => string;
       encrypt: (value: string) => string;
       decrypt: (value: string) => string;
+      provider?: RemoteMcpProvider;
+      toolsDirectory?: string;
+      reserveHttpsPort?: (
+        config: Parameters<typeof tailscalePort>[0],
+        preferred?: number,
+      ) => number;
+      releaseHttpsPort?: () => void;
     },
-  ) {}
+  ) {
+    if (options.provider)
+      this.config = defaultRemoteMcpConfig(options.provider);
+  }
   private initialize() {
     return (this.initialized ??= (async () => {
       await mkdir(this.options.directory, { recursive: true, mode: 0o700 });
@@ -136,6 +153,14 @@ export class RemoteMcpManager {
       });
       if (saved) {
         this.config = validateRemoteMcpConfig(saved.config);
+        if (
+          this.options.provider &&
+          this.config.provider !== this.options.provider
+        )
+          throw new Error(
+            "The saved connection belongs to a different provider.",
+          );
+        this.configured = true;
         this.resumeOnLaunch = saved.resumeOnLaunch === true;
         this.managedCloudflared =
           typeof saved.managedCloudflared === "string"
@@ -154,7 +179,7 @@ export class RemoteMcpManager {
       if (this.phase === "starting" || this.phase === "running")
         throw new Error("Stop the connection before installing a connector.");
       const executable = await installCloudflared(
-        join(this.options.directory, "tools"),
+        this.options.toolsDirectory ?? join(this.options.directory, "tools"),
       );
       this.config = { ...this.config, executable };
       this.managedCloudflared = executable;
@@ -170,6 +195,7 @@ export class RemoteMcpManager {
         { mode: 0o600 },
       );
       await rename(path + ".tmp", path);
+      this.configured = true;
       return executable;
     });
   }
@@ -216,6 +242,7 @@ export class RemoteMcpManager {
     if (refresh) await this.discover();
     const projects = await new FileStore(this.options.home()).listProjects();
     return {
+      configured: this.configured,
       phase: this.phase,
       config: this.config,
       tokenSaved: !!this.encryptedToken,
@@ -227,6 +254,7 @@ export class RemoteMcpManager {
       reachable: this.reachable,
       lastCallAt: this.lastCallAt,
       lastCallClientId: this.lastCallClientId,
+      approval: this.approval,
       pairing: this.pairing.status(),
       resumeOnLaunch: this.resumeOnLaunch,
       clients: this.http?.authorization.connections() ?? [],
@@ -248,6 +276,27 @@ export class RemoteMcpManager {
   start(value: unknown, token?: unknown) {
     return this.command(() => this.startImpl(value, token));
   }
+  configure(value: unknown, token?: unknown) {
+    return this.command(async () => {
+      await this.initialize();
+      if (this.phase === "starting" || this.phase === "running")
+        throw new Error(
+          "Stop this connection before changing its configuration.",
+        );
+      const config = validateRemoteMcpConfig(value);
+      if (this.options.provider && config.provider !== this.options.provider)
+        throw new Error("The connection provider cannot be changed.");
+      const store = new FileStore(this.options.home());
+      for (const project of config.projects)
+        await store.readProject(project.id);
+      if (this.phase === "prepared") await this.stopImpl();
+      if (typeof token === "string" && token.trim())
+        this.encryptedToken = this.options.encrypt(token.trim());
+      this.config = config;
+      await this.persist();
+      return this.status();
+    });
+  }
   prepare(value: unknown) {
     return this.command(async () => {
       await this.initialize();
@@ -268,6 +317,8 @@ export class RemoteMcpManager {
       };
       this.phase = "prepared";
       this.error = undefined;
+      this.resumeOnLaunch = false;
+      await this.persist();
       return this.status();
     });
   }
@@ -366,11 +417,13 @@ export class RemoteMcpManager {
       { mode: 0o600 },
     );
     await rename(path + ".tmp", path);
+    this.configured = true;
     this.phase = "starting";
     this.error = undefined;
     this.diagnostics = undefined;
     this.lastCallAt = undefined;
     this.lastCallClientId = undefined;
+    this.approval = undefined;
     this.checkedAt = undefined;
     this.reachable = undefined;
     this.abort = new AbortController();
@@ -437,7 +490,9 @@ export class RemoteMcpManager {
             "Cannot inspect existing Tailscale Serve configuration.",
         );
       const existing = JSON.parse(serving.stdout || "{}");
-      httpsPort = tailscalePort(existing, c.httpsPort);
+      httpsPort = this.options.reserveHttpsPort
+        ? this.options.reserveHttpsPort(existing, c.httpsPort)
+        : tailscalePort(existing, c.httpsPort);
       this.config = { ...c, httpsPort };
       origin = `https://${String(state.Self.DNSName).replace(/\.$/, "")}${httpsPort === 443 ? "" : `:${httpsPort}`}`;
     }
@@ -616,6 +671,7 @@ export class RemoteMcpManager {
       { mode: 0o600 },
     );
     await rename(path + ".tmp", path);
+    this.configured = true;
   }
   createAccessKey(name: string) {
     return this.command(async () => {
@@ -664,7 +720,13 @@ export class RemoteMcpManager {
   }
   decide(id: string, decision: "allow" | "deny") {
     if (!this.http) throw new Error("The remote connection is not running.");
+    const request = this.requests().find((request) => request.id === id);
     this.http.authorization.decideApproval(id, decision);
+    this.approval = {
+      decision,
+      clientName: request?.clientName ?? "",
+      at: new Date().toISOString(),
+    };
     return this.requests();
   }
   async restore() {
@@ -731,6 +793,7 @@ export class RemoteMcpManager {
     const http = this.http;
     this.http = undefined;
     await http?.close();
+    this.options.releaseHttpsPort?.();
     this.pairing.clear();
   }
   stop() {

@@ -12,6 +12,7 @@ export type UiRole =
   | "radio"
   | "slider"
   | "spinbutton"
+  | "switch"
   | "status"
   | "tab"
   | "tabpanel"
@@ -71,6 +72,42 @@ export interface LabSession {
   theme: "light" | "dark";
   mode: "manual" | "test";
   appUrl: string;
+  flow?: string;
+  node?: string;
+  annotations?: boolean;
+}
+
+export interface FlowAction {
+  id: string;
+  title: string;
+  target: UiTarget;
+  to?: string;
+}
+export interface FlowMatch {
+  target: UiTarget;
+  state?: "visible" | "hidden" | "enabled" | "disabled";
+}
+export interface FlowNode {
+  id: string;
+  title: string;
+  stateLabel?: string;
+  variantLabels?: Record<string, string>;
+  screen: string;
+  screenTitle: string;
+  parent?: string;
+  scene: string;
+  variants?: string[];
+  matches: FlowMatch[];
+  priority?: number;
+  when?: (state: Record<string, unknown>) => boolean;
+  enter(context: SceneContext): Promise<void>;
+  actions: FlowAction[];
+}
+export interface UiFlow {
+  feature: string;
+  title: string;
+  entry: string;
+  nodes: FlowNode[];
 }
 export interface SceneFixture {
   actions: ReadonlySet<string>;

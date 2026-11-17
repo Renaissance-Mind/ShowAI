@@ -1,9 +1,11 @@
 import { afterAll, beforeAll, expect, test } from "vitest";
-import { access, mkdtemp, rm, readFile } from "node:fs/promises";
+import { access, mkdtemp, rm, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { startUiLab } from "./server";
 import type { LabSession } from "./types";
+import { startBrowserServer } from "../browser/server";
+import { pageToken } from "../browser/bridge";
 
 let directory: string, lab: Awaited<ReturnType<typeof startUiLab>>;
 beforeAll(async () => {
@@ -28,6 +30,66 @@ const post = (path: string, input: unknown, token?: string) =>
     },
     body: JSON.stringify(input),
   });
+test("browser shutdown drains in-flight application writes before releasing its home", async () => {
+  let begin!: () => void, resume!: () => void;
+  const started = new Promise<void>((resolve) => {
+      begin = resolve;
+    }),
+    release = new Promise<void>((resolve) => {
+      resume = resolve;
+    }),
+    home = join(directory, "pending-library");
+  const owned = await startBrowserServer({
+    home,
+    webRoot: join(process.cwd(), "dist"),
+    cliEntry: join(process.cwd(), "dist-runtime/scripts/cli.mjs"),
+    settingsPath: join(directory, "pending-profile/settings.json"),
+    registerAgentRuntime: false,
+    additionalActions: new Set(["uiLab:pending"]),
+    interceptInvoke: async (action, _args, next) => {
+      if (action !== "uiLab:pending") return next();
+      begin();
+      await release;
+      await writeFile(join(home, "local", "shutdown-marker.json"), "{}");
+      return true;
+    },
+  });
+  const token = pageToken(
+    await fetch(owned.url).then((response) => response.text()),
+  )!;
+  const request = fetch(owned.localUrl + "/api/invoke", {
+    method: "POST",
+    headers: {
+      authorization: `Bearer ${token}`,
+      "content-type": "application/json",
+    },
+    body: JSON.stringify({ action: "uiLab:pending", args: {} }),
+  });
+  try {
+    await Promise.race([
+      started,
+      request.then((response) => {
+        throw new Error(
+          `Pending invoke returned before starting: ${response.status}`,
+        );
+      }),
+    ]);
+    const closing = owned.close();
+    expect(owned.close()).toBe(closing);
+    expect((await fetch(owned.localUrl)).status).toBe(503);
+    resume();
+    expect((await request).ok).toBe(true);
+    await closing;
+  } finally {
+    resume();
+    await owned.close();
+  }
+  expect(
+    await readFile(join(home, "local", "shutdown-marker.json"), "utf8"),
+  ).toBe("{}");
+  await rm(home, { recursive: true });
+  await expect(access(home)).rejects.toThrow();
+});
 test("shutdown checks server identity and waits for owned cleanup", async () => {
   let completed = false;
   const state = join(directory, "shutdown-state");
@@ -49,7 +111,7 @@ test("shutdown checks server identity and waits for owned cleanup", async () => 
       });
     expect((await request(-1)).status).toBe(403);
     expect((await request(process.pid)).ok).toBe(true);
-    await expect.poll(() => completed).toBe(true);
+    await expect.poll(() => completed, { timeout: 10000 }).toBe(true);
     expect(
       JSON.parse(await readFile(join(state, "closed.json"), "utf8")).pid,
     ).toBe(process.pid);
